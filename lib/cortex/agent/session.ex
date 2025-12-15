@@ -115,17 +115,15 @@ defmodule Cortex.Agent.Session do
         # Tag the run with this session's key so `:session` approvals are scoped to it.
         opts = Keyword.put(opts, :session_key, state.key)
         # Run off-process so the session stays responsive (e.g. to `/stop`). We hold
-        # the caller's `from` and reply once the run reports back via `:run_done`.
-        pid = spawn_run(agent, messages, opts)
-        {:noreply, %{state | running: %{task: pid, from: from}}}
+        # the caller's `from` and reply once the run reports back via `:run_done`,
+        # and monitor the task so a stuck/dead run can't pin the session on `:busy`.
+        {pid, ref} = spawn_run(agent, messages, opts)
+        {:noreply, %{state | running: %{task: pid, ref: ref, from: from}}}
     end
   end
 
-  def handle_call(:stop, _from, %{running: %{task: pid, from: run_from}} = state) do
-    Process.exit(pid, :kill)
-    # The pending chat caller is unblocked with `:stopped`, which surfaces silently.
-    GenServer.reply(run_from, {:error, :stopped})
-    {:reply, :ok, %{state | running: nil}}
+  def handle_call(:stop, _from, %{running: %{}} = state) do
+    {:reply, :ok, cancel_running(state, {:error, :stopped})}
   end
 
   def handle_call(:stop, _from, state), do: {:reply, {:error, :not_running}, state}
@@ -148,8 +146,10 @@ defmodule Cortex.Agent.Session do
   end
 
   def handle_call(:reset, _from, state) do
-    # A fresh conversation also forgets any "allow for this session" grants.
+    # A fresh conversation cancels any in-flight run (so a stuck one can't leave the
+    # session wedged on `:busy`) and forgets "allow for this session" grants.
     Cortex.Permissions.SessionStore.clear(state.key)
+    state = cancel_running(state, {:error, :stopped})
     {:reply, :ok, %{state | messages: init_messages(state.agent_name)}}
   end
 
@@ -186,7 +186,9 @@ defmodule Cortex.Agent.Session do
   # A finished run reports here. Reply to the waiting caller and absorb the new
   # history. A stale `:run_done` (the run was stopped meanwhile) is ignored.
   @impl true
-  def handle_info({:run_done, result, agent_name}, %{running: %{from: from}} = state) do
+  def handle_info({:run_done, result, agent_name}, %{running: %{from: from, ref: ref}} = state) do
+    Process.demonitor(ref, [:flush])
+
     state =
       case result do
         {:ok, reply, all_messages} ->
@@ -203,8 +205,31 @@ defmodule Cortex.Agent.Session do
 
   def handle_info({:run_done, _result, _agent_name}, state), do: {:noreply, state}
 
-  # Run the loop in an unlinked process so a crash (or a `/stop` kill) can't take the
-  # session down. It always reports back, turning a raise into an `{:error, _}`.
+  # The run task died without reporting (external kill, unexpected exit). Recover the
+  # session so it isn't pinned on `:busy`, and unblock the waiting caller.
+  def handle_info(
+        {:DOWN, ref, :process, _pid, _reason},
+        %{running: %{ref: ref, from: from}} = state
+      ) do
+    GenServer.reply(from, {:error, :stopped})
+    {:noreply, %{state | running: nil}}
+  end
+
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
+
+  # Cancel the in-flight run (if any): drop the monitor, kill the task, and unblock
+  # the waiting caller with `reply`. Used by `/stop` and `/new`.
+  defp cancel_running(%{running: %{task: pid, ref: ref, from: from}} = state, reply) do
+    Process.demonitor(ref, [:flush])
+    Process.exit(pid, :kill)
+    GenServer.reply(from, reply)
+    %{state | running: nil}
+  end
+
+  defp cancel_running(state, _reply), do: state
+
+  # Run the loop in an unlinked, monitored process so a crash or a `/stop` kill can't
+  # take the session down. It always reports back, turning a raise/exit into `{:error, _}`.
   defp spawn_run(agent, messages, opts) do
     parent = self()
 
@@ -215,12 +240,14 @@ defmodule Cortex.Agent.Session do
             Runtime.run(agent, messages, opts)
           rescue
             e -> {:error, Exception.message(e)}
+          catch
+            kind, reason -> {:error, "run #{kind}: #{inspect(reason)}"}
           end
 
         send(parent, {:run_done, result, agent.name})
       end)
 
-    pid
+    {pid, Process.monitor(pid)}
   end
 
   # A session started before any agent existed has no system message yet — seed one.

@@ -1,8 +1,13 @@
 defmodule Cortex.Gateways.Supervisor do
   @moduledoc """
-  Supervises messaging gateways. The Telegram gateway is started only when a bot
-  token is configured (in `~/.cortex/config.json` or `TELEGRAM_BOT_TOKEN`), so a
-  default install boots clean with no gateways running.
+  Supervises messaging gateways. A gateway starts only when both:
+
+    * gateways are enabled for this run (`:start_gateways` app env) — set by the
+      `serve` and `gateway` commands, but NOT by local `run`/`tui`, so a console
+      session never spins up the Telegram poller (which would 409 against a real
+      gateway already polling the same bot); and
+    * its credentials are configured — e.g. a Telegram bot token in
+      `~/.cortex/config.json` or `TELEGRAM_BOT_TOKEN`.
   """
   use Supervisor
 
@@ -31,10 +36,13 @@ defmodule Cortex.Gateways.Supervisor do
   end
 
   defp children do
-    if Cortex.Gateways.Telegram.enabled?() do
+    if enabled?() and Cortex.Gateways.Telegram.enabled?() do
       [Cortex.Gateways.Telegram]
     else
       []
     end
   end
+
+  # Gateways only run when this command asked for them (serve / gateway).
+  defp enabled?, do: Application.get_env(:cortex, :start_gateways, false)
 end

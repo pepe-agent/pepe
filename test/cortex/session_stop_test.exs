@@ -100,4 +100,18 @@ defmodule Cortex.Agent.SessionStopTest do
     # The session is free again.
     assert Session.stop(key) == {:error, :not_running}
   end
+
+  test "/new recovers a session wedged on a stuck run", %{key: key} do
+    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
+    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
+
+    caller = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
+    Process.sleep(200)
+    assert Session.chat(key, "again") == {:error, :busy}
+
+    # /new cancels the stuck run and frees the session.
+    assert Session.reset(key) == :ok
+    assert Task.await(caller) == {:error, :stopped}
+    assert Session.stop(key) == {:error, :not_running}
+  end
 end

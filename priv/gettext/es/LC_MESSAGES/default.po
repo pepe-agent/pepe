@@ -4,6 +4,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: lib/cortex/gateways/telegram.ex:416
+#: lib/cortex/gateways/tui.ex:179
 #, elixir-autogen, elixir-format
 msgid "(default)"
 msgstr "(predeterminado)"
@@ -15,21 +16,25 @@ msgstr "(respuesta vacía)"
 
 #: lib/cortex/gateways/telegram.ex:417
 #: lib/cortex/gateways/telegram.ex:515
+#: lib/cortex/gateways/tui.ex:180
 #, elixir-autogen, elixir-format
 msgid "(unset)"
 msgstr "(sin definir)"
 
 #: lib/cortex/gateways/telegram.ex:415
+#: lib/cortex/gateways/tui.ex:178
 #, elixir-autogen, elixir-format
 msgid "Agent: %{agent}\nModel: %{model}\nTurns: %{turns}"
 msgstr "Agente: %{agent}\nModelo: %{model}\nTurnos: %{turns}"
 
 #: lib/cortex/gateways/telegram.ex:486
+#: lib/cortex/gateways/tui.ex:200
 #, elixir-autogen, elixir-format
 msgid "Commands:"
 msgstr "Comandos:"
 
 #: lib/cortex/gateways/telegram.ex:391
+#: lib/cortex/gateways/tui.ex:170
 #, elixir-autogen, elixir-format
 msgid "I couldn't summarize right now. Try again shortly?"
 msgstr "No pude resumir ahora. ¿Puedes intentarlo de nuevo en un momento?"
@@ -75,6 +80,7 @@ msgid "Switch agent — /agent <name>"
 msgstr "Cambiar de agente — /agent <nombre>"
 
 #: lib/cortex/gateways/telegram.ex:403
+#: lib/cortex/gateways/tui.ex:193
 #, elixir-autogen, elixir-format
 msgid "Switched to agent %{name}."
 msgstr "Agente cambiado a %{name}."
@@ -95,26 +101,31 @@ msgid "Undo your last message"
 msgstr "Deshacer tu último mensaje"
 
 #: lib/cortex/gateways/telegram.ex:405
+#: lib/cortex/gateways/tui.ex:195
 #, elixir-autogen, elixir-format
 msgid "Unknown agent: %{name}"
 msgstr "Agente desconocido: %{name}"
 
 #: lib/cortex/gateways/telegram.ex:477
+#: lib/cortex/gateways/tui.ex:204
 #, elixir-autogen, elixir-format
 msgid "Unknown command: /%{cmd}"
 msgstr "Comando desconocido: /%{cmd}"
 
 #: lib/cortex/gateways/telegram.ex:396
+#: lib/cortex/gateways/tui.ex:187
 #, elixir-autogen, elixir-format
 msgid "Usage: /agent <name>"
 msgstr "Uso: /agent <nombre>"
 
 #: lib/cortex/gateways/telegram.ex:378
+#: lib/cortex/gateways/tui.ex:164
 #, elixir-autogen, elixir-format
 msgid "↩️ Undid your last message."
 msgstr "↩️ Deshice tu último mensaje."
 
 #: lib/cortex/gateways/telegram.ex:387
+#: lib/cortex/gateways/tui.ex:169
 #, elixir-autogen, elixir-format
 msgid "🗜️ History compacted."
 msgstr "🗜️ Historial compactado."
@@ -125,11 +136,12 @@ msgid "🧠 Cortex ready."
 msgstr "🧠 Cortex listo."
 
 #: lib/cortex/gateways/telegram.ex:372
+#: lib/cortex/gateways/tui.ex:159
 #, elixir-autogen, elixir-format
 msgid "🧠 New conversation started."
 msgstr "🧠 Nueva conversación iniciada."
 
-#: lib/mix/tasks/cortex.ex:679
+#: lib/cortex/gateways/tui.ex:88
 #, elixir-autogen, elixir-format
 msgid "not allowed"
 msgstr "no permitido"
@@ -319,3 +331,33 @@ msgstr "💬 Permitido en esta sesión."
 #, elixir-autogen, elixir-format
 msgid "🛑 Stopped."
 msgstr "🛑 Detenido."
+
+#: lib/cortex/agent/workspace.ex:95
+#, elixir-autogen, elixir-format
+msgid "You are Cortex, an AI agent, but your identity isn't set up yet — you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Cortex and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the rename_agent tool. Always reply in the user's language."
+msgstr "Eres Cortex, un agente de IA, pero tu identidad aún no está configurada — no tienes nombre, persona ni rasgos propios definidos. Si el usuario pregunta quién eres, dile que eres Cortex y que aún no tienes nombre ni personalidad definidos, y luego ofrécete a configurarlo ahora. Si acepta, ayúdale a elegir un nombre y algunos rasgos, y guárdalo: escribe tu persona en SOUL.md y, si elige un nombre, renómbrate con la herramienta rename_agent. Responde siempre en el idioma del usuario."
+
+#: lib/cortex/gateways/tui.ex:48
+#, elixir-autogen, elixir-format
+msgid "(no model set)"
+msgstr "(sin modelo definido)"
+
+#: lib/cortex/gateways/tui.ex:45
+#, elixir-autogen, elixir-format
+msgid "/help for commands · /exit to quit"
+msgstr "/help para comandos · /exit para salir"
+
+#: lib/cortex/gateways/tui.ex:39
+#, elixir-autogen, elixir-format
+msgid "Agent"
+msgstr "Agente"
+
+#: lib/cortex/gateways/tui.ex:40
+#, elixir-autogen, elixir-format
+msgid "Model"
+msgstr "Modelo"
+
+#: lib/cortex/gateways/tui.ex:41
+#, elixir-autogen, elixir-format
+msgid "Session"
+msgstr "Sesión"

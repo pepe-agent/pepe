@@ -46,6 +46,23 @@ defmodule Cortex.Agent.WorkspaceTest do
     assert Workspace.resolve_in_ctx("notes.md", %{cwd: "/tmp"}) == "/tmp/notes.md"
   end
 
+  test "an agent with no SOUL and the default seed gets onboarding guidance" do
+    agent = %{name: "zak", system_prompt: Cortex.Config.Agent.default_prompt()}
+    prompt = Workspace.system_prompt(agent)
+
+    assert prompt =~ "Cortex"
+    assert prompt =~ "identity isn't set up yet"
+    assert prompt =~ "offer to set one up"
+  end
+
+  test "a user-provided seed persona is kept (no onboarding override)" do
+    agent = %{name: "zak", system_prompt: "You are Vega, a terse ops bot."}
+    prompt = Workspace.system_prompt(agent)
+
+    assert prompt =~ "You are Vega, a terse ops bot."
+    refute prompt =~ "identity isn't set up yet"
+  end
+
   test "system_prompt uses SOUL.md when present, else the seed prompt" do
     agent = %{name: "zak", system_prompt: "seed persona"}
     assert Workspace.system_prompt(agent) =~ "seed persona"

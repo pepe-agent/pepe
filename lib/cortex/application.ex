@@ -57,6 +57,9 @@ defmodule Cortex.Application do
     argv = Burrito.Util.Args.argv()
     serve? = serve_command?(argv)
 
+    # Only `serve`/`gateway` bring up the messaging gateways; `run`/`tui` must not.
+    Application.put_env(:cortex, :start_gateways, gateways_command?(argv))
+
     # The endpoint must be in the tree at boot, so decide before starting it.
     endpoint_children =
       if serve? do
@@ -81,6 +84,10 @@ defmodule Cortex.Application do
 
   defp serve_command?(["serve" | _]), do: true
   defp serve_command?(_), do: false
+
+  defp gateways_command?(["serve" | _]), do: true
+  defp gateways_command?(["gateway" | _]), do: true
+  defp gateways_command?(_), do: false
 
   defp enable_endpoint_server do
     conf = Application.get_env(:cortex, CortexWeb.Endpoint, [])

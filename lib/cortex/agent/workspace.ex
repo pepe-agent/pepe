@@ -18,7 +18,10 @@ defmodule Cortex.Agent.Workspace do
   `SOUL.md` (or the config `system_prompt` seed) is the persona.
   """
 
+  use Gettext, backend: Cortex.Gettext
+
   alias Cortex.Config
+  alias Cortex.Config.Agent
 
   @doc "An agent's private workspace directory."
   def dir(agent_name), do: Path.join([Config.home(), "agents", to_string(agent_name)])
@@ -73,12 +76,25 @@ defmodule Cortex.Agent.Workspace do
   bloats the context. A note teaches the agent when to read each.
   """
   def system_prompt(%{name: name, system_prompt: seed}) do
-    persona = read(name, "SOUL.md") || seed
+    persona = read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
 
     [persona, identity, knowledge_index(name), skills_index(), convention_note()]
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n\n")
+  end
+
+  # With no SOUL.md and only the default seed, the agent has no identity yet — give
+  # it onboarding guidance (translated) so it presents as Cortex and offers to set
+  # one up. A user-provided seed persona is respected as-is.
+  defp persona_seed(seed) do
+    if seed in [nil, "", Agent.default_prompt()], do: unnamed_persona(), else: seed
+  end
+
+  defp unnamed_persona do
+    gettext(
+      "You are Cortex, an AI agent, but your identity isn't set up yet — you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Cortex and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the rename_agent tool. Always reply in the user's language."
+    )
   end
 
   # List available skills (name + one-line summary). The agent reads the relevant

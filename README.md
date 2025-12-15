@@ -5,14 +5,15 @@ a tool-calling loop, built to lean on Elixir's strengths: OTP supervision, a
 process per conversation, first-class concurrency, and a tiny streaming HTTP
 stack.
 
-It exposes those core capabilities three ways:
+It exposes those core capabilities several ways:
 
 | Surface | Endpoint | Use it for |
 |---|---|---|
 | **OpenAI-compatible HTTP** | `POST /v1/chat/completions`, `GET /v1/models` | Point any OpenAI SDK / LangChain / `curl` at Cortex |
 | **WebSocket** | `ws://…/socket/websocket`, topic `agent:<name>` | Live, token-streamed conversations |
 | **Telegram** | long-polling gateway | Chat with your agent from your phone |
-| **CLI** | `mix cortex …` | Create agents & model connections, run, chat, serve |
+| **TUI console** | `mix cortex tui` | A session-backed REPL in your terminal |
+| **CLI** | `mix cortex …` | Create agents & model connections, run, serve |
 
 Everything talks to providers over the **OpenAI Chat Completions** protocol using
 [`Req`](https://hexdocs.pm/req), so OpenAI, OpenRouter, Together, Groq, DeepSeek,
@@ -41,16 +42,23 @@ llama.cpp and any other compatible endpoint work with zero code changes.
   written as `${ENV_VAR}` and are interpolated at read time. No database required.
 * **`Cortex.LLM`** — `Req`-based OpenAI client; `chat/3` (blocking) and
   `stream_chat/4` (SSE, with a per-fragment callback). Assembles streamed tool calls.
-* **`Cortex.Tools`** — a `@behaviour` plus a built-in registry: `bash`, `read_file`,
-  `write_file`, `edit_file`, `list_dir`, `fetch_url`, `web_search`.
+* **`Cortex.Tools`** — a `@behaviour` plus a built-in registry: `bash`, `run_script`,
+  `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir`, `fetch_url`,
+  `web_search`, `skill`, plus self-configuration tools (`config_get`, `config_set`,
+  `enable_tool`, `rename_agent`). Drop-in `.exs` plugins extend it with no recompile.
 * **`Cortex.Agent.Runtime`** — the conversation loop: call model → run tool calls →
   feed results back → repeat until a final answer or `max_iterations`. Emits
   lifecycle events (`:assistant_delta`, `:tool_call`, `:tool_result`, `:done`).
 * **`Cortex.Agent.Session`** — one GenServer per conversation key (e.g.
-  `telegram:12345`), supervised by a `DynamicSupervisor` + `Registry`. Crash
+  `telegram:12345`), supervised by a `DynamicSupervisor` + `Registry`. Each run
+  executes off-process so the session stays responsive (e.g. to `/stop`). Crash
   isolation and context retention for free.
-* **Gateways** — `Cortex.Gateways.Telegram` (long polling) starts only when a bot
-  token is configured.
+* **`Cortex.Permissions`** — gates risky tool calls (running code, writing files,
+  changing config). Each surface renders the prompt natively (Telegram buttons, the
+  console's arrow-key menu); read-only tools run freely. See **Permissions** below.
+* **Gateways** — `Cortex.Gateways.Telegram` (long polling) and `Cortex.Gateways.TUI`
+  (the console). They start only when requested (`serve`/`gateway`), so a local
+  `run`/`tui` never spins up the Telegram poller.
 
 ---
 
@@ -130,9 +138,16 @@ mix cortex agent default assistant
 ```bash
 mix cortex run "list the files here and summarize the project"   # one-shot, streams to stdout
 mix cortex run assistant "hello"                                 # pick an agent explicitly
-mix cortex chat                        # interactive REPL (/reset, /exit)
+mix cortex tui                         # interactive console, keeps the session
+mix cortex tui --agent zak             # …with a specific agent (or: mix cortex tui zak)
 mix cortex serve --port 4000           # OpenAI-compatible HTTP API + WebSocket
 ```
+
+`tui` (alias: `chat`) opens a session-backed console — it keeps context across
+turns and prints a summary box (agent · model · session) on open. The same slash
+commands as the other gateways work: `/new`, `/undo`, `/compact`, `/status`,
+`/agent <name>`, `/help`, `/exit`. Replies stream as they arrive, and a risky tool
+asks for permission through an arrow-key menu (see **Permissions**).
 
 ### Telegram gateway
 
@@ -225,14 +240,42 @@ menu, in your configured language):
 
 ```
 /new        start a fresh conversation        /status   show session info
-/undo       undo your last message            /agent X  switch agent
-/compact    summarize history to free context /help     list commands
+/undo       undo your last message            /whoami   show your user/chat id
+/compact    summarize history to free context /model    show or set the model
+/stop       cancel the current run            /models   list configured models
+/agent X    switch agent                      /tools    list runtime tools
+/skill [X]  list skills, or run one by name   /approve  manage saved permissions
+/btw <q>    ask a side question (not saved)    /help     list commands
 ```
 
-Config keys under `"telegram"`: `bot_token`, `enabled`, `allowed_chats`,
-`allowed_users`, `require_mention` (only reply when @mentioned in groups), `agent`.
-Fixed system messages follow the configured `locale`; the agent's own replies
-follow the user's language.
+Installed **skills are also surfaced as their own slash commands** (e.g. a
+`weather` skill shows up as `/weather`), so they're discoverable from the "/" menu.
+
+`/whoami` is the easy way to find the ids for the allowlists. Config keys under
+`"telegram"`: `bot_token`, `enabled`, `allowed_chats`, `allowed_users`,
+`require_mention` (only reply when @mentioned in groups), `agent`. Fixed system
+messages follow the configured `locale`; the agent's own replies follow the user's
+language, and raw internal errors are never leaked into the chat.
+
+## Permissions
+
+Before a **risky** tool runs — running code (`bash`, `run_script`), writing/moving
+files, changing config, or any plugin tool — Cortex asks you to authorize it.
+Read-only tools (`read_file`, `list_dir`, `fetch_url`, `web_search`, …) run freely.
+
+Each surface renders the prompt natively — **Telegram** shows inline buttons, the
+**console** an arrow-key menu — but the four choices are the same everywhere:
+
+| Choice | Effect |
+|---|---|
+| **Allow once** | just this call; ask again next time |
+| **Allow for this session** | the rest of this session (forgotten on `/new` and on restart) |
+| **Always allow** | from now on — persisted on the agent (`auto_approve` in `config.json`) |
+| **Don't allow** | refuse; never remembered, so it's asked again |
+
+Manage the persistent grants from chat with `/approve` (list), `/approve clear`, or
+`/approve clear <tool>`. Surfaces with no human to ask (the HTTP API) run tools
+without prompting.
 
 ## Configuration (`~/.cortex/config.json`)
 
@@ -252,7 +295,8 @@ follow the user's language.
     "assistant": {
       "model": "openrouter",
       "system_prompt": "You are Cortex, a helpful agent.",
-      "tools": ["bash", "read_file", "write_file", "edit_file", "list_dir", "fetch_url", "web_search"],
+      "tools": ["bash", "run_script", "read_file", "write_file", "edit_file", "list_dir", "fetch_url", "web_search"],
+      "auto_approve": ["read_file"],
       "max_iterations": 12
     }
   },
@@ -266,6 +310,11 @@ Override the location with `CORTEX_HOME` (directory) or `CORTEX_CONFIG` (file).
 Each agent also gets a persistent directory at `~/.cortex/agents/<name>/` holding
 its `SOUL.md` (persona) and any files it creates (`MEMORY.md`, `people.md`, …);
 `~/.cortex/shared/` is shared across agents.
+
+An agent with **no identity yet** (no `SOUL.md`, default seed) presents itself as
+Cortex, tells you it has no name or characteristics defined, and offers to set one
+up — then saves your choices to `SOUL.md` and renames itself with `rename_agent`.
+`auto_approve` lists tools the agent may run without asking (see **Permissions**).
 
 ## Adding a tool
 
@@ -322,8 +371,10 @@ tool that does X": it reads the `install-tool` skill, writes the plugin to
 For complex/multi-step work the agent doesn't grind it out by hand — the
 `run_script` tool lets it write a short program (Python, Node, Ruby, Bash, or
 Elixir — Elixir is always available) and run it, getting back stdout/stderr/exit
-code and iterating on errors. The `write-a-script` skill teaches when to reach for
-it.
+code and iterating on errors. Worthwhile scripts are **saved** under `scripts/` and
+re-run later (`run_script` with `file:`), and when the agent works out *how* to do
+a recurring task (read a PDF, crunch a spreadsheet) it **writes itself a skill** to
+`skills/<name>.md`. The `write-a-script` skill teaches the whole loop.
 
 ## Tests
 

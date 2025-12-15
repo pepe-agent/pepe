@@ -34,7 +34,7 @@ defmodule Mix.Tasks.Cortex do
   ## Running
 
       mix cortex run [AGENT] "your prompt"      # one-shot, streams to stdout
-      mix cortex chat [AGENT]                    # interactive REPL
+      mix cortex tui [AGENT | --agent NAME] [--session KEY]   # interactive console, keeps the session (alias: chat)
       mix cortex serve [--port 4000]             # OpenAI API + WebSocket server
       mix cortex gateway telegram setup          # configure the Telegram bot token
       mix cortex gateway telegram                # run the Telegram gateway
@@ -73,12 +73,13 @@ defmodule Mix.Tasks.Cortex do
       ["tools" | _] -> with_config(&tools/0)
       ["model" | rest] -> with_config(fn -> model_cmd(rest) end)
       ["agent" | rest] -> with_config(fn -> agent_cmd(rest) end)
-      ["run" | rest] -> with_app(false, fn -> run_cmd(rest) end)
-      ["chat" | rest] -> with_app(false, fn -> chat_cmd(rest) end)
-      ["serve" | rest] -> with_app(true, fn -> serve_cmd(rest) end)
+      ["run" | rest] -> with_app([], fn -> run_cmd(rest) end)
+      ["chat" | rest] -> with_app([], fn -> tui_cmd(rest) end)
+      ["tui" | rest] -> with_app([], fn -> tui_cmd(rest) end)
+      ["serve" | rest] -> with_app([serve: true, gateways: true], fn -> serve_cmd(rest) end)
       # Configuring a gateway only touches the config file — no app needed.
       ["gateway", "telegram", "setup" | _] -> with_config(&telegram_setup/0)
-      ["gateway" | rest] -> with_app(false, fn -> gateway_cmd(rest) end)
+      ["gateway" | rest] -> with_app([gateways: true], fn -> gateway_cmd(rest) end)
       other -> error("unknown command: #{Enum.join(other, " ")}\n") && help()
     end
   end
@@ -93,9 +94,13 @@ defmodule Mix.Tasks.Cortex do
     fun.()
   end
 
-  # Commands that talk to a model / serve: start the full OTP app.
-  defp with_app(serve?, fun) do
+  # Commands that talk to a model / serve: start the full OTP app. `opts` decides
+  # what to bring up — `serve: true` opens the HTTP endpoint, `gateways: true`
+  # starts the messaging gateways (Telegram). Local `run`/`tui` pass neither.
+  defp with_app(opts, fun) do
+    serve? = Keyword.get(opts, :serve, false)
     Application.put_env(:cortex, :serve_endpoint, serve?)
+    Application.put_env(:cortex, :start_gateways, Keyword.get(opts, :gateways, false))
 
     if serve? do
       # Phoenix only opens the HTTP listener when the endpoint is told to serve.
@@ -602,107 +607,35 @@ defmodule Mix.Tasks.Cortex do
             else: {nil, Enum.join(args, " ")}
       end
 
-    on_event = stdout_events()
-
+    # Reuse the console gateway's rendering + permission prompt for the one-shot.
     case Cortex.Agent.oneshot(agent_name, prompt,
            stream: true,
-           on_event: on_event,
-           authorize: cli_authorizer()
+           on_event: Cortex.Gateways.TUI.stream_events(),
+           authorize: Cortex.Gateways.TUI.authorizer()
          ) do
       {:ok, _content, _msgs} -> IO.puts("")
       {:error, reason} -> error("\n#{inspect(reason)}")
     end
   end
 
-  defp chat_cmd(args) do
-    agent_name = List.first(args) || Config.default_agent_name()
+  # The interactive console gateway lives in Cortex.Gateways.TUI; just resolve the
+  # agent and hand off. `chat` and `tui` both land here.
+  defp tui_cmd(args) do
+    # Accept the agent as a positional (`tui NAME`) or a flag (`tui --agent NAME`),
+    # and an optional `--session KEY` to resume/separate console sessions.
+    {opts, rest} = OptionParser.parse!(args, strict: [agent: :string, session: :string])
+    agent_name = opts[:agent] || List.first(rest) || Config.default_agent_name()
 
     case agent_name && Config.get_agent(agent_name) do
       nil ->
         error(
-          "no agent. create one with `mix cortex agent add ...` or pass one: mix cortex chat AGENT"
+          "no agent. create one with `mix cortex agent add ...` or pass one: mix cortex tui [--agent NAME]"
         )
 
       agent ->
-        info("chatting with #{green(agent.name)} — type /reset to clear, /exit to quit\n")
-        loop_chat(agent, [Cortex.LLM.Message.system(agent.system_prompt)])
+        Cortex.Gateways.TUI.start(agent.name, opts[:session])
     end
   end
-
-  defp loop_chat(agent, messages) do
-    case IO.gets("you › ") do
-      :eof ->
-        :ok
-
-      data ->
-        text = String.trim(data)
-
-        cond do
-          text in ["/exit", "/quit"] ->
-            :ok
-
-          text == "/reset" ->
-            info("(history cleared)")
-            Cortex.Permissions.SessionStore.clear(cli_session_key())
-            loop_chat(agent, [Cortex.LLM.Message.system(agent.system_prompt)])
-
-          text == "" ->
-            loop_chat(agent, messages)
-
-          true ->
-            messages = messages ++ [Cortex.LLM.Message.user(text)]
-            IO.write(bold("\nbot › "))
-
-            case Cortex.Agent.Runtime.run(agent, messages,
-                   stream: true,
-                   on_event: stdout_events(),
-                   session_key: cli_session_key(),
-                   authorize: cli_authorizer()
-                 ) do
-              {:ok, _content, all} ->
-                IO.puts("\n")
-                loop_chat(agent, all)
-
-              {:error, reason} ->
-                error("\n#{inspect(reason)}")
-                loop_chat(agent, messages)
-            end
-        end
-    end
-  end
-
-  # Stream text deltas + tool activity to stdout.
-  defp stdout_events do
-    fn
-      {:assistant_delta, text} -> IO.write(text)
-      {:tool_call, name, args} -> IO.write(dim("\n[→ #{name} #{one_line(args)}]\n"))
-      {:tool_denied, name} -> IO.write(dim("[✗ #{name} #{gettext("not allowed")}]\n"))
-      {:tool_result, name, _out} -> IO.write(dim("[✓ #{name}]\n"))
-      _ -> :ok
-    end
-  end
-
-  # The `authorize` callback for the CLI — an arrow-key menu over the shared
-  # decision options (same vocabulary every gateway uses).
-  defp cli_authorizer do
-    fn name, args, _ctx ->
-      Config.put_locale()
-      label = bold(Cortex.Permissions.Prompt.question(name)) <> "\n" <> dim(one_line(args))
-
-      Cortex.TUI.select(Cortex.Permissions.Prompt.options(),
-        label: label,
-        render_as: &Cortex.Permissions.Prompt.label/1
-      )
-    end
-  end
-
-  # One key for the whole REPL run, so "allow for this session" sticks across turns.
-  defp cli_session_key, do: "cli:chat"
-
-  defp one_line(args) when is_binary(args),
-    do: args |> String.replace("\n", " ") |> String.slice(0, 120)
-
-  defp one_line(args), do: inspect(args)
 
   ###
   ### serve / gateway
