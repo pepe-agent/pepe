@@ -15,6 +15,7 @@ defmodule Cortex.Config.Agent do
             system_prompt: @default_prompt,
             tools: [],
             auto_approve: [],
+            can_message: [],
             max_iterations: 12,
             temperature: nil
 
@@ -33,6 +34,7 @@ defmodule Cortex.Config.Agent do
       system_prompt: map["system_prompt"] || @default_prompt,
       tools: map["tools"] || [],
       auto_approve: map["auto_approve"] || [],
+      can_message: map["can_message"] || [],
       max_iterations: map["max_iterations"] || 12,
       temperature: map["temperature"]
     }

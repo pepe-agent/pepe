@@ -55,7 +55,9 @@ defmodule Cortex.Agent.Runtime do
         cwd: opts[:cwd] || File.cwd!(),
         agent: agent,
         session_key: opts[:session_key],
-        authorize: opts[:authorize]
+        authorize: opts[:authorize],
+        # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
+        agent_chain: opts[:agent_chain]
       }
 
       loop(agent, model, messages, specs, ctx, opts, agent.max_iterations)

@@ -67,7 +67,9 @@ defmodule Cortex.Gateways.Telegram do
     reserved = MapSet.new(Enum.map(menu(), &elem(&1, 0)))
 
     Cortex.Skills.list()
-    |> Enum.map(fn {name, summary} -> {command_name(name), command_desc(summary, name)} end)
+    |> Enum.map(fn {name, summary} ->
+      {command_name(name), command_desc(skill_summary(name) || summary, name)}
+    end)
     |> Enum.reject(fn {cmd, _desc} -> cmd == "" or MapSet.member?(reserved, cmd) end)
     |> Enum.uniq_by(&elem(&1, 0))
   end
@@ -130,11 +132,21 @@ defmodule Cortex.Gateways.Telegram do
     {:ok, %{offset: 0}}
   end
 
-  # Publish the command list so it shows in Telegram's "/" menu.
+  # Scopes Cortex never sets itself. A more-specific scope (e.g. a leftover set by
+  # another app that shared this token) overrides our default menu — so we clear
+  # them on boot to make sure our default-scope commands always win.
+  @owned_scopes ["all_private_chats", "all_group_chats", "all_chat_administrators"]
+
+  # Publish the command list so it shows in Telegram's "/" menu, and clear any
+  # stale command sets in the scopes we don't use, so ours are always what shows.
   defp register_commands do
     Config.put_locale()
     commands = Enum.map(full_menu(), fn {name, desc} -> %{command: name, description: desc} end)
     Req.post(api_url(token(), "setMyCommands"), json: %{commands: commands})
+
+    for scope <- @owned_scopes do
+      Req.post(api_url(token(), "deleteMyCommands"), json: %{scope: %{type: scope}})
+    end
   end
 
   @impl true
@@ -303,7 +315,8 @@ defmodule Cortex.Gateways.Telegram do
 
   defp send_permission_prompt(chat_id, id, name, args) do
     Config.put_locale()
-    text = Prompt.question(name) <> perm_args(args)
+    map = decode_args(args)
+    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map)
 
     # One button per shared decision, rendered as Telegram's inline keyboard.
     buttons =
@@ -312,15 +325,58 @@ defmodule Cortex.Gateways.Telegram do
       end)
 
     Req.post(api_url(token(), "sendMessage"),
-      json: %{chat_id: chat_id, text: text, reply_markup: %{inline_keyboard: buttons}}
+      json: %{
+        chat_id: chat_id,
+        text: text,
+        parse_mode: "HTML",
+        reply_markup: %{inline_keyboard: buttons}
+      }
     )
   end
 
-  defp perm_args(args) when is_binary(args) and args not in ["", "{}"] do
-    "\n" <> (args |> String.replace("\n", " ") |> String.slice(0, 300))
+  defp decode_args(raw) when is_binary(raw) do
+    case Jason.decode(raw) do
+      {:ok, map} when is_map(map) -> map
+      _ -> %{}
+    end
   end
 
-  defp perm_args(_args), do: ""
+  defp decode_args(_raw), do: %{}
+
+  # Human-readable risk hints ("⚠️ runs embedded code") above the call preview.
+  defp risk_lines(name, map) do
+    case Cortex.Permissions.Risk.hints(name, map) do
+      [] ->
+        ""
+
+      kinds ->
+        "\n" <>
+          Enum.map_join(kinds, "\n", fn kind ->
+            "⚠️ " <> esc(Cortex.Permissions.Risk.label(kind))
+          end)
+    end
+  end
+
+  # The meaningful field to show (command for bash, path for write_file, …) in a
+  # code block — not the raw JSON args.
+  defp arg_block(map) when map_size(map) == 0, do: ""
+  defp arg_block(map), do: "\n<code>" <> esc(map_preview(map)) <> "</code>"
+
+  defp map_preview(%{"command" => c}) when is_binary(c), do: clip(c)
+  defp map_preview(%{"path" => p}) when is_binary(p), do: clip(p)
+  defp map_preview(%{"file" => f}) when is_binary(f), do: clip(f)
+  defp map_preview(%{"url" => u}) when is_binary(u), do: clip(u)
+  defp map_preview(%{"to" => t}) when is_binary(t), do: clip(t)
+
+  defp map_preview(%{"code" => c} = m) when is_binary(c),
+    do: "[" <> to_string(m["language"] || "code") <> "] " <> clip(c)
+
+  defp map_preview(map), do: clip(Jason.encode!(map))
+
+  defp clip(text) do
+    one = text |> to_string() |> String.replace(~r/\s+/, " ") |> String.trim()
+    if String.length(one) > 300, do: String.slice(one, 0, 299) <> "…", else: one
+  end
 
   # "perm:<id>:<token>" → wake the waiting session and tidy the message.
   defp deliver_permission("perm:" <> rest, cq) do
@@ -420,12 +476,12 @@ defmodule Cortex.Gateways.Telegram do
     )
   end
 
-  defp run_command(chat_id, "models", _args), do: send_message(chat_id, models_text())
+  defp run_command(chat_id, "models", _args), do: send_html(chat_id, models_text())
 
   defp run_command(chat_id, "model", ""), do: show_model(chat_id)
   defp run_command(chat_id, "model", name), do: set_model(chat_id, name)
 
-  defp run_command(chat_id, "tools", _args), do: send_message(chat_id, tools_text())
+  defp run_command(chat_id, "tools", _args), do: send_html(chat_id, tools_text())
 
   defp run_command(chat_id, "stop", _args) do
     ensure_session(chat_id)
@@ -436,7 +492,7 @@ defmodule Cortex.Gateways.Telegram do
     end
   end
 
-  defp run_command(chat_id, "skill", ""), do: send_message(chat_id, skills_text())
+  defp run_command(chat_id, "skill", ""), do: send_html(chat_id, skills_text())
   defp run_command(chat_id, "skill", name), do: run_skill(chat_id, name, "")
 
   defp run_command(chat_id, "approve", args) do
@@ -501,8 +557,13 @@ defmodule Cortex.Gateways.Telegram do
 
   defp models_text do
     case Config.models() do
-      [] -> gettext("No models are configured yet.")
-      models -> Enum.map_join(models, "\n", fn m -> "• #{m.name} (#{m.model})" end)
+      [] ->
+        gettext("No models are configured yet.")
+
+      models ->
+        htmlb(gettext("Available models")) <>
+          "\n" <>
+          Enum.map_join(models, "\n", fn m -> "• " <> htmlb(m.name) <> " — " <> esc(m.model) end)
     end
   end
 
@@ -534,17 +595,63 @@ defmodule Cortex.Gateways.Telegram do
   end
 
   defp tools_text do
-    Cortex.Tools.all()
-    |> Enum.map(fn mod -> {mod.name(), tool_desc(mod)} end)
-    |> Enum.sort()
-    |> Enum.map_join("\n", fn {name, desc} -> "• #{name} — #{desc}" end)
+    body =
+      Cortex.Tools.all()
+      |> Enum.map(fn mod -> {mod.name(), tool_label(mod)} end)
+      |> Enum.sort()
+      |> Enum.map_join("\n\n", fn {name, desc} -> "• " <> htmlb(name) <> " — " <> esc(desc) end)
+
+    htmlb(gettext("Available tools")) <> "\n\n" <> body
   end
 
-  defp tool_desc(mod) do
-    mod.spec()
-    |> get_in(["function", "description"])
-    |> to_string()
-    |> String.slice(0, 160)
+  # Display text for a tool: a translated one-liner for built-ins, falling back to
+  # the (English) spec description's first sentence for plugins.
+  defp tool_label(mod), do: tool_summary(mod.name()) || short_desc(tool_desc(mod))
+
+  defp tool_desc(mod), do: mod.spec() |> get_in(["function", "description"]) |> to_string()
+
+  # Translated one-liners for the built-in tools (names are never translated). An
+  # unknown name (e.g. a plugin) returns nil so the caller falls back to the spec.
+  defp tool_summary("bash"), do: gettext("Run a shell command and return its output.")
+  defp tool_summary("run_script"), do: gettext("Write and run a program for complex tasks.")
+  defp tool_summary("read_file"), do: gettext("Read a text file.")
+  defp tool_summary("write_file"), do: gettext("Create or overwrite a file.")
+  defp tool_summary("edit_file"), do: gettext("Replace text in a file.")
+  defp tool_summary("move_file"), do: gettext("Move or rename a file or directory.")
+  defp tool_summary("list_dir"), do: gettext("List files in a directory.")
+  defp tool_summary("fetch_url"), do: gettext("Fetch a URL (HTTP GET).")
+  defp tool_summary("web_search"), do: gettext("Search the web.")
+  defp tool_summary("skill"), do: gettext("Read a skill (a how-to guide).")
+  defp tool_summary("send_to_agent"), do: gettext("Send a message to another agent.")
+  defp tool_summary("rename_agent"), do: gettext("Rename yourself (this agent).")
+  defp tool_summary("config_get"), do: gettext("Read the Cortex configuration.")
+  defp tool_summary("config_set"), do: gettext("Change a Cortex setting.")
+  defp tool_summary("enable_tool"), do: gettext("Enable a tool for yourself.")
+  defp tool_summary("set_route"), do: gettext("Add or remove an agent-to-agent route.")
+  defp tool_summary(_other), do: nil
+
+  # Translated one-liners for the built-in skills, shown in the "/" menu and the
+  # /skill list (in the configured language). User skills fall back to their own
+  # first line (nil here).
+  defp skill_summary("install-tool"), do: gettext("How to install a new tool when asked.")
+  defp skill_summary("manage-routing"), do: gettext("Change which agents can message each other.")
+  defp skill_summary("skill-creator"), do: gettext("Create, edit, audit or improve a skill.")
+
+  defp skill_summary("write-a-script"),
+    do: gettext("Tackle a complex task by writing and running a script.")
+
+  defp skill_summary(_other), do: nil
+
+  # First sentence of a description, trimmed — keeps the tool list scannable.
+  defp short_desc(text) do
+    first =
+      text
+      |> String.trim()
+      |> String.split(~r/(?<=\.)\s/, parts: 2)
+      |> List.first()
+      |> to_string()
+
+    if String.length(first) > 110, do: String.slice(first, 0, 109) <> "…", else: first
   end
 
   defp skills_text do
@@ -553,8 +660,11 @@ defmodule Cortex.Gateways.Telegram do
         gettext("No skills are available yet.")
 
       skills ->
-        gettext("Available skills (run with /skill <name>):") <>
-          "\n" <> Enum.map_join(skills, "\n", fn {name, summary} -> "• #{name} — #{summary}" end)
+        htmlb(gettext("Available skills (run with /skill <name>):")) <>
+          "\n\n" <>
+          Enum.map_join(skills, "\n\n", fn {name, summary} ->
+            "• " <> htmlb(name) <> " — " <> esc(skill_summary(name) || summary)
+          end)
     end
   end
 
@@ -638,6 +748,28 @@ defmodule Cortex.Gateways.Telegram do
     |> Enum.each(fn part ->
       Req.post(api_url(token(), "sendMessage"), json: %{chat_id: chat_id, text: part})
     end)
+  end
+
+  # Send an HTML-formatted message (bold names, etc.). Callers must escape dynamic
+  # text with `esc/1`; `htmlb/1` does both (escape + bold).
+  defp send_html(chat_id, text) do
+    text
+    |> chunk(4000)
+    |> Enum.each(fn part ->
+      Req.post(api_url(token(), "sendMessage"),
+        json: %{chat_id: chat_id, text: part, parse_mode: "HTML"}
+      )
+    end)
+  end
+
+  defp htmlb(text), do: "<b>" <> esc(text) <> "</b>"
+
+  defp esc(text) do
+    text
+    |> to_string()
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
   end
 
   defp send_chat_action(chat_id, action) do

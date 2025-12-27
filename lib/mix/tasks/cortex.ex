@@ -25,8 +25,9 @@ defmodule Mix.Tasks.Cortex do
 
   ## Agents
 
-      mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--default]
+      mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--default]
       mix cortex agent list
+      mix cortex agent route FROM TO [--remove]   # let FROM message TO (directed)
       mix cortex agent rename OLD NEW          # rename + move its workspace dir
       mix cortex agent remove NAME
       mix cortex agent default NAME
@@ -518,6 +519,7 @@ defmodule Mix.Tasks.Cortex do
           prompt: :string,
           description: :string,
           tools: :string,
+          can_message: :string,
           max_iterations: :integer,
           temperature: :float,
           default: :boolean
@@ -531,12 +533,19 @@ defmodule Mix.Tasks.Cortex do
         str -> str |> String.split(",") |> Enum.map(&String.trim/1)
       end
 
+    can_message =
+      case opts[:can_message] do
+        v when v in [nil, ""] -> []
+        str -> str |> String.split(",") |> Enum.map(&String.trim/1)
+      end
+
     agent = %Agent{
       name: name,
       description: opts[:description],
       model: opts[:model],
       system_prompt: opts[:prompt] || "You are Cortex, a helpful AI agent.",
       tools: tools,
+      can_message: can_message,
       max_iterations: opts[:max_iterations] || 12,
       temperature: opts[:temperature]
     }
@@ -558,9 +567,10 @@ defmodule Mix.Tasks.Cortex do
       agents ->
         Enum.each(agents, fn a ->
           mark = if a.name == default, do: " #{green("(default)")}", else: ""
+          routes = if a.can_message == [], do: "", else: "\n  → #{Enum.join(a.can_message, ", ")}"
 
           IO.puts(
-            "#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}"
+            "#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}"
           )
         end)
     end
@@ -581,6 +591,29 @@ defmodule Mix.Tasks.Cortex do
         ok("agent #{green(old)} → #{green(new)} (workspace moved)")
     end
   end
+
+  defp agent_cmd(["route", from, to | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean])
+
+    cond do
+      is_nil(Config.get_agent(from)) ->
+        error("unknown agent: #{from}")
+
+      is_nil(Config.get_agent(to)) ->
+        error("unknown agent: #{to}")
+
+      opts[:remove] ->
+        Config.disallow_message(from, to)
+        ok("removed route #{green(from)} → #{green(to)}")
+
+      true ->
+        Config.allow_message(from, to)
+        ok("#{green(from)} → #{green(to)} (can message)")
+    end
+  end
+
+  defp agent_cmd(["route" | _]),
+    do: error("usage: mix cortex agent route FROM TO [--remove]")
 
   defp agent_cmd(["default", name | _]) do
     Config.set_default_agent(name)

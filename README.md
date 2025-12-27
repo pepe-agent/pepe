@@ -277,6 +277,44 @@ Manage the persistent grants from chat with `/approve` (list), `/approve clear`,
 `/approve clear <tool>`. Surfaces with no human to ask (the HTTP API) run tools
 without prompting.
 
+## Agent-to-agent routing
+
+Agents can message each other through the `send_to_agent` tool, governed by a
+**directed allowlist** — each agent's `can_message` lists who *it* may message, so
+`A → B` does **not** imply `B → A`. The called agent answers in a fresh run and its
+reply comes back as the tool result; a hop limit and cycle check stop chains from
+looping.
+
+```bash
+# A can message B; B can message C and D; C can message A and B
+mix cortex agent route A B
+mix cortex agent route B C
+mix cortex agent route B D
+mix cortex agent route C A
+mix cortex agent route C B
+mix cortex agent route A B --remove        # revoke a route
+
+# or set it when creating the agent
+mix cortex agent add A --model mock --can-message B
+```
+
+```jsonc
+"agents": {
+  "A": { "can_message": ["B"] },
+  "B": { "can_message": ["C", "D"] },
+  "C": { "can_message": ["A", "B"] }
+}
+```
+
+Add `send_to_agent` to an agent's `tools` to let it route. The route allowlist is
+the authorization, so the call itself isn't put through the human permission gate —
+but the callee's own risky tools still are.
+
+Routes can also be changed **from chat**: give an agent the `set_route` tool and it
+can add/remove routes (`{from, to, action}`, `from` defaults to itself) — guided by
+the `manage-routing` skill. Since it edits config, the change goes through the
+permission prompt.
+
 ## Configuration (`~/.cortex/config.json`)
 
 ```jsonc
@@ -360,9 +398,17 @@ Skills are on-demand instruction docs (Markdown) that teach an agent a *procedur
 agent's context, and the agent reads the relevant one with the `skill` tool when
 its topic comes up, so they don't bloat every prompt.
 
-- **Built-in** skills ship under `priv/skills/*.md` (e.g. `install-tool`).
+- **Built-in** skills ship under `priv/skills/*.md`:
+  - `skill-creator` — how to create, edit, audit and improve skills (the meta-skill).
+  - `install-tool` — write a plugin tool and enable it from chat.
+  - `write-a-script` — solve complex tasks by writing/saving a program to run.
+  - `manage-routing` — change agent-to-agent routes with `set_route`.
 - **User** skills live in `~/.cortex/skills/*.md` and override a built-in of the
   same name. The first non-empty line is the summary; the rest is the procedure.
+
+An agent can **author its own skills**: ask it to "remember how to do X as a skill"
+and (guided by `skill-creator`) it writes a new `skills/<name>.md` — which then
+appears in its skills list, no restart.
 
 Combined with plugins + `enable_tool`, an agent can be asked in chat to "install a
 tool that does X": it reads the `install-tool` skill, writes the plugin to

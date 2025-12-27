@@ -153,6 +153,22 @@ defmodule Cortex.Config do
     end
   end
 
+  @doc "Allow `from` to message `to` (a directed route; `to → from` is unaffected)."
+  def allow_message(from, to) do
+    case get_agent(from) do
+      nil -> {:error, :unknown_agent}
+      agent -> put_agent(%{agent | can_message: Enum.uniq(agent.can_message ++ [to])})
+    end
+  end
+
+  @doc "Remove the `from → to` route."
+  def disallow_message(from, to) do
+    case get_agent(from) do
+      nil -> {:error, :unknown_agent}
+      agent -> put_agent(%{agent | can_message: List.delete(agent.can_message, to)})
+    end
+  end
+
   def delete_agent(name) do
     load()
     |> update_in(["agents"], &Map.delete(&1 || %{}, name))

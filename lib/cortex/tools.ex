@@ -22,6 +22,8 @@ defmodule Cortex.Tools do
   alias Cortex.Tools.ReadFile
   alias Cortex.Tools.RenameAgent
   alias Cortex.Tools.RunScript
+  alias Cortex.Tools.SendToAgent
+  alias Cortex.Tools.SetRoute
   alias Cortex.Tools.Skill
   alias Cortex.Tools.WebSearch
   alias Cortex.Tools.WriteFile
@@ -37,10 +39,12 @@ defmodule Cortex.Tools do
     FetchUrl,
     WebSearch,
     Skill,
+    SendToAgent,
     RenameAgent,
     ConfigGet,
     ConfigSet,
-    EnableTool
+    EnableTool,
+    SetRoute
   ]
 
   @doc "All tool modules — built-ins plus loaded plugins."

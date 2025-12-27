@@ -102,8 +102,21 @@ defmodule Cortex.Gateways.TUI do
   def authorizer do
     fn name, args, _ctx ->
       Config.put_locale()
-      label = bold(Prompt.question(name)) <> "\n" <> dim(one_line(args))
+      label = bold(Prompt.question(name)) <> risk_lines(name, args) <> "\n" <> dim(one_line(args))
       Cortex.TUI.select(Prompt.options(), label: label, render_as: &Prompt.label/1)
+    end
+  end
+
+  defp risk_lines(name, args) do
+    map =
+      case Jason.decode(to_string(args)) do
+        {:ok, m} when is_map(m) -> m
+        _ -> %{}
+      end
+
+    case Cortex.Permissions.Risk.hints(name, map) do
+      [] -> ""
+      kinds -> "\n" <> Enum.map_join(kinds, "\n", &("⚠️  " <> Cortex.Permissions.Risk.label(&1)))
     end
   end
 
