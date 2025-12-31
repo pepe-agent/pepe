@@ -28,10 +28,25 @@ defmodule Cortex.Application do
         Cortex.Permissions.SessionStore,
         # Messaging gateways (Telegram, ...). No-ops when not configured.
         Cortex.Gateways.Supervisor
-      ] ++ endpoint_children
+      ] ++ endpoint_children ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Cortex.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # When session persistence is on, re-spawn the saved sessions on boot (off the
+  # boot path — the disposable store starts lazily and can be slow).
+  defp restore_children do
+    if Application.get_env(:cortex, :persist_sessions, false) do
+      [
+        Supervisor.child_spec({Task, &Cortex.Agent.SessionSupervisor.restore/0},
+          id: :session_restore,
+          restart: :transient
+        )
+      ]
+    else
+      []
+    end
   end
 
   # The Phoenix endpoint (OpenAI-compatible HTTP API + WebSocket) is only started
@@ -59,6 +74,8 @@ defmodule Cortex.Application do
 
     # Only `serve`/`gateway` bring up the messaging gateways; `run`/`tui` must not.
     Application.put_env(:cortex, :start_gateways, gateways_command?(argv))
+    # …and only those long-running surfaces persist/restore sessions.
+    Application.put_env(:cortex, :persist_sessions, gateways_command?(argv))
 
     # The endpoint must be in the tree at boot, so decide before starting it.
     endpoint_children =

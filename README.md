@@ -9,6 +9,7 @@ It exposes those core capabilities several ways:
 
 | Surface | Endpoint | Use it for |
 |---|---|---|
+| **Web dashboard** | `GET /` (Phoenix LiveView) | Browse sessions and chat from the browser |
 | **OpenAI-compatible HTTP** | `POST /v1/chat/completions`, `GET /v1/models` | Point any OpenAI SDK / LangChain / `curl` at Cortex |
 | **WebSocket** | `ws://…/socket/websocket`, topic `agent:<name>` | Live, token-streamed conversations |
 | **Telegram** | long-polling gateway | Chat with your agent from your phone |
@@ -59,6 +60,13 @@ llama.cpp and any other compatible endpoint work with zero code changes.
 * **Gateways** — `Cortex.Gateways.Telegram` (long polling) and `Cortex.Gateways.TUI`
   (the console). They start only when requested (`serve`/`gateway`), so a local
   `run`/`tui` never spins up the Telegram poller.
+
+> **Where surfaces live.** `lib/cortex/gateways/` holds the **non-web** surfaces
+> (the Telegram poller, the TUI console). Everything served by the Phoenix endpoint
+> — the OpenAI-compatible API, the WebSocket channel, and the LiveView dashboard —
+> lives in `lib/cortex_web/`, since those are bound to the router/endpoint/layouts.
+> So the dashboard is in `lib/cortex_web/live/`, alongside the other web surfaces,
+> not under `gateways/`.
 
 ---
 
@@ -163,6 +171,24 @@ mix cortex tools                       # list available tools (built-ins + plugi
 mix cortex config                      # show config path + a summary
 mix cortex help                        # full command help
 ```
+
+## Web dashboard
+
+A Phoenix LiveView dashboard at **`/`** — a live list of sessions on the left and a
+streaming chat panel on the right. Pick a session to read its history and talk to
+its agent; replies stream in token-by-token. `New chat` starts a fresh session, and
+each session shows its agent, model and turn count.
+
+```bash
+mix assets.build          # once (builds css/js)
+mix cortex serve          # API + dashboard + gateways, one process
+# open http://localhost:4000
+```
+
+Because sessions are in-process, run everything from the **one** `mix cortex serve`
+process and the dashboard sees every session — including the ones from Telegram.
+(Risky tools currently run without a prompt on the dashboard — it's the owner's
+local surface; a web approval flow can be added like the Telegram one.)
 
 ## OpenAI-compatible HTTP API
 

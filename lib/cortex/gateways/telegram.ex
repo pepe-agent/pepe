@@ -220,7 +220,101 @@ defmodule Cortex.Gateways.Telegram do
     end
   end
 
+  # Non-text messages: download the file into the agent's workspace and hand it the
+  # path, so it can figure out how to understand it (transcribe, read, …) with its
+  # own tools — installing whatever it needs. We don't hardcode transcription.
+  defp handle_update(%{"message" => %{"voice" => %{"file_id" => id}} = m}),
+    do: media(m, id, "voice")
+
+  defp handle_update(%{"message" => %{"audio" => %{"file_id" => id}} = m}),
+    do: media(m, id, "audio")
+
+  defp handle_update(%{"message" => %{"video_note" => %{"file_id" => id}} = m}),
+    do: media(m, id, "voice")
+
+  defp handle_update(%{"message" => %{"document" => %{"file_id" => id}} = m}),
+    do: media(m, id, "document")
+
+  defp handle_update(%{"message" => %{"photo" => [_ | _] = sizes} = m}),
+    do: media(m, List.last(sizes)["file_id"], "photo")
+
   defp handle_update(_), do: :ok
+
+  defp media(message, file_id, kind) do
+    chat = message["chat"] || %{}
+    chat_id = chat["id"]
+    user_id = get_in(message, ["from", "id"])
+    caption = message["caption"] || ""
+
+    if active?() and allowed?(chat_id, user_id) and addressed?(caption, chat["type"]) do
+      Task.start(fn -> ingest_media(chat_id, file_id, kind, caption) end)
+    end
+  end
+
+  defp ingest_media(chat_id, file_id, kind, caption) do
+    Config.put_locale()
+    send_chat_action(chat_id, "typing")
+
+    case download_file(file_id, kind) do
+      {:ok, path} ->
+        chat_with_agent(chat_id, media_prompt(kind, path, caption))
+
+      :error ->
+        Logger.warning("[telegram] could not download #{kind} #{file_id}")
+        send_message(chat_id, friendly_error(:download))
+    end
+  end
+
+  # Download the Telegram file into the agent's workspace under `media/`, returning
+  # the workspace-relative path the agent's tools can use.
+  defp download_file(file_id, kind) do
+    with {:ok, file_path} <- telegram_file_path(file_id),
+         url = "https://api.telegram.org/file/bot#{token()}/#{file_path}",
+         {:ok, %{status: 200, body: body}} when is_binary(body) <- Req.get(url) do
+      agent = Config.telegram()["agent"] || Config.default_agent_name()
+      dir = Path.join(Cortex.Agent.Workspace.dir(agent), "media")
+      File.mkdir_p!(dir)
+      name = "#{kind}_#{System.unique_integer([:positive])}#{Path.extname(file_path)}"
+      File.write!(Path.join(dir, name), body)
+      {:ok, "media/#{name}"}
+    else
+      _ -> :error
+    end
+  end
+
+  defp telegram_file_path(file_id) do
+    case Req.get(api_url(token(), "getFile"), params: [file_id: file_id]) do
+      {:ok, %{status: 200, body: %{"ok" => true, "result" => %{"file_path" => path}}}} ->
+        {:ok, path}
+
+      _ ->
+        :error
+    end
+  end
+
+  # Agent-facing instruction (English; the agent replies in the user's language).
+  defp media_prompt("voice", path, caption),
+    do:
+      "The user sent a voice message. The audio is saved in your workspace at `#{path}`. Transcribe it, then respond to what they actually said." <>
+        caption_line(caption)
+
+  defp media_prompt("audio", path, caption),
+    do:
+      "The user sent an audio file, saved at `#{path}`. Transcribe it and respond to its content." <>
+        caption_line(caption)
+
+  defp media_prompt("photo", path, caption),
+    do:
+      "The user sent a photo, saved at `#{path}`. Look at it and respond to what they want." <>
+        caption_line(caption)
+
+  defp media_prompt("document", path, caption),
+    do:
+      "The user sent a file, saved at `#{path}`. Inspect it and help with whatever they need." <>
+        caption_line(caption)
+
+  defp caption_line(""), do: ""
+  defp caption_line(caption), do: "\n\nTheir caption: #{caption}"
 
   defp respond(chat_id, user_id, text) do
     Config.put_locale()
@@ -275,6 +369,9 @@ defmodule Cortex.Gateways.Telegram do
   # Map internal errors to a short, user-safe message (no structs/stacktraces).
   defp friendly_error(%Req.TransportError{}),
     do: gettext("I'm having a connection problem right now. Could you try again?")
+
+  defp friendly_error(:download),
+    do: gettext("I couldn't download that file. Could you send it again?")
 
   defp friendly_error(%{reason: :timeout}),
     do: gettext("That took too long. Could you try again, please?")
@@ -634,6 +731,10 @@ defmodule Cortex.Gateways.Telegram do
   # /skill list (in the configured language). User skills fall back to their own
   # first line (nil here).
   defp skill_summary("install-tool"), do: gettext("How to install a new tool when asked.")
+
+  defp skill_summary("handle-media"),
+    do: gettext("Understand a voice/audio/image/file the user sent.")
+
   defp skill_summary("manage-routing"), do: gettext("Change which agents can message each other.")
   defp skill_summary("skill-creator"), do: gettext("Create, edit, audit or improve a skill.")
 

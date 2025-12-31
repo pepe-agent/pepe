@@ -69,21 +69,37 @@ defmodule Cortex.Agent.Session do
   ### server
   ###
 
+  alias Cortex.Agent.SessionPersistence
+
   @impl true
   def init(opts) do
     key = Keyword.fetch!(opts, :key)
-    agent_name = Keyword.get(opts, :agent_name) || Config.default_agent_name()
+    default_agent = Keyword.get(opts, :agent_name) || Config.default_agent_name()
 
-    state = %{
-      key: key,
-      agent_name: agent_name,
-      messages: init_messages(agent_name),
-      # The in-flight run, if any: %{task: pid, from: GenServer.from}. Holding the
-      # caller's `from` lets us defer the reply until the run finishes (or is stopped).
-      running: nil
-    }
+    state =
+      case persist?() && SessionPersistence.load(key) do
+        {:ok, name, messages} ->
+          %{key: key, agent_name: name || default_agent, messages: messages, running: nil}
+
+        _ ->
+          %{
+            key: key,
+            agent_name: default_agent,
+            messages: init_messages(default_agent),
+            running: nil
+          }
+      end
 
     {:ok, state}
+  end
+
+  # Sessions are only persisted in long-running surfaces (serve/gateway), so local
+  # `run`/`tui` and tests don't write files.
+  defp persist?, do: Application.get_env(:cortex, :persist_sessions, false)
+
+  defp persist(state) do
+    if persist?(), do: SessionPersistence.save(state.key, state.agent_name, state.messages)
+    state
   end
 
   # Seed a session with the system prompt built from the agent's CURRENT config/soul.
@@ -150,7 +166,7 @@ defmodule Cortex.Agent.Session do
     # session wedged on `:busy`) and forgets "allow for this session" grants.
     Cortex.Permissions.SessionStore.clear(state.key)
     state = cancel_running(state, {:error, :stopped})
-    {:reply, :ok, %{state | messages: init_messages(state.agent_name)}}
+    {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name)})}
   end
 
   def handle_call(:history, _from, state) do
@@ -158,11 +174,11 @@ defmodule Cortex.Agent.Session do
   end
 
   def handle_call({:set_agent, agent_name}, _from, state) do
-    {:reply, :ok, %{state | agent_name: agent_name, messages: init_messages(agent_name)}}
+    {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name)})}
   end
 
   def handle_call(:undo, _from, state) do
-    {:reply, :ok, %{state | messages: drop_last_turn(state.messages)}}
+    {:reply, :ok, persist(%{state | messages: drop_last_turn(state.messages)})}
   end
 
   def handle_call(:status, _from, state) do
@@ -177,8 +193,11 @@ defmodule Cortex.Agent.Session do
 
       agent ->
         case compact_messages(agent, state.messages) do
-          {:ok, messages, summary} -> {:reply, {:ok, summary}, %{state | messages: messages}}
-          {:error, reason} -> {:reply, {:error, reason}, state}
+          {:ok, messages, summary} ->
+            {:reply, {:ok, summary}, persist(%{state | messages: messages})}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
         end
     end
   end
@@ -193,7 +212,7 @@ defmodule Cortex.Agent.Session do
       case result do
         {:ok, reply, all_messages} ->
           GenServer.reply(from, {:ok, reply})
-          %{state | agent_name: agent_name, messages: all_messages, running: nil}
+          persist(%{state | agent_name: agent_name, messages: all_messages, running: nil})
 
         {:error, reason} ->
           GenServer.reply(from, {:error, reason})

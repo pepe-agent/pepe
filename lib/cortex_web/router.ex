@@ -1,8 +1,26 @@
 defmodule CortexWeb.Router do
   use CortexWeb, :router
 
+  import Phoenix.LiveView.Router
+
   pipeline :api do
     plug :accepts, ["json"]
+  end
+
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {CortexWeb.Layouts, :root}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
+  # The web dashboard (LiveView): sessions list + chat.
+  scope "/", CortexWeb do
+    pipe_through :browser
+
+    live "/", DashboardLive, :index
   end
 
   scope "/", CortexWeb do

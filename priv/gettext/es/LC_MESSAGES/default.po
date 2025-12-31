@@ -3,43 +3,43 @@ msgstr ""
 "Language: es\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/cortex/gateways/telegram.ex:472
+#: lib/cortex/gateways/telegram.ex:569
 #: lib/cortex/gateways/tui.ex:198
 #, elixir-autogen, elixir-format
 msgid "(default)"
 msgstr "(predeterminado)"
 
-#: lib/cortex/gateways/telegram.ex:781
+#: lib/cortex/gateways/telegram.ex:882
 #, elixir-autogen, elixir-format
 msgid "(empty response)"
 msgstr "(respuesta vacía)"
 
-#: lib/cortex/gateways/telegram.ex:473
-#: lib/cortex/gateways/telegram.ex:576
+#: lib/cortex/gateways/telegram.ex:570
+#: lib/cortex/gateways/telegram.ex:673
 #: lib/cortex/gateways/tui.ex:199
 #, elixir-autogen, elixir-format
 msgid "(unset)"
 msgstr "(sin definir)"
 
-#: lib/cortex/gateways/telegram.ex:471
+#: lib/cortex/gateways/telegram.ex:568
 #: lib/cortex/gateways/tui.ex:197
 #, elixir-autogen, elixir-format
 msgid "Agent: %{agent}\nModel: %{model}\nTurns: %{turns}"
 msgstr "Agente: %{agent}\nModelo: %{model}\nTurnos: %{turns}"
 
-#: lib/cortex/gateways/telegram.ex:542
+#: lib/cortex/gateways/telegram.ex:639
 #: lib/cortex/gateways/tui.ex:219
 #, elixir-autogen, elixir-format
 msgid "Commands:"
 msgstr "Comandos:"
 
-#: lib/cortex/gateways/telegram.ex:447
+#: lib/cortex/gateways/telegram.ex:544
 #: lib/cortex/gateways/tui.ex:189
 #, elixir-autogen, elixir-format
 msgid "I couldn't summarize right now. Try again shortly?"
 msgstr "No pude resumir ahora. ¿Puedes intentarlo de nuevo en un momento?"
 
-#: lib/cortex/gateways/telegram.ex:277
+#: lib/cortex/gateways/telegram.ex:371
 #, elixir-autogen, elixir-format
 msgid "I'm having a connection problem right now. Could you try again?"
 msgstr "Tengo un problema de conexión ahora mismo. ¿Puedes intentarlo de nuevo?"
@@ -49,7 +49,7 @@ msgstr "Tengo un problema de conexión ahora mismo. ¿Puedes intentarlo de nuevo
 msgid "List commands"
 msgstr "Listar comandos"
 
-#: lib/cortex/gateways/telegram.ex:283
+#: lib/cortex/gateways/telegram.ex:380
 #, elixir-autogen, elixir-format
 msgid "My credentials need to be refreshed. Please ask the team to reconnect."
 msgstr "Mis credenciales necesitan renovarse. Pide al equipo que reconecte."
@@ -59,7 +59,7 @@ msgstr "Mis credenciales necesitan renovarse. Pide al equipo que reconecte."
 msgid "Show session info"
 msgstr "Mostrar información de la sesión"
 
-#: lib/cortex/gateways/telegram.ex:289
+#: lib/cortex/gateways/telegram.ex:386
 #, elixir-autogen, elixir-format
 msgid "Sorry, something went wrong on my end. Try again in a moment?"
 msgstr "Lo siento, algo salió mal por mi parte. ¿Puedes intentarlo de nuevo en un momento?"
@@ -79,18 +79,18 @@ msgstr "Resumir el historial para liberar contexto"
 msgid "Switch agent — /agent <name>"
 msgstr "Cambiar de agente — /agent <nombre>"
 
-#: lib/cortex/gateways/telegram.ex:459
+#: lib/cortex/gateways/telegram.ex:556
 #: lib/cortex/gateways/tui.ex:212
 #, elixir-autogen, elixir-format
 msgid "Switched to agent %{name}."
 msgstr "Agente cambiado a %{name}."
 
-#: lib/cortex/gateways/telegram.ex:280
+#: lib/cortex/gateways/telegram.ex:377
 #, elixir-autogen, elixir-format
 msgid "That took too long. Could you try again, please?"
 msgstr "Tardé demasiado en responder. ¿Puedes intentarlo de nuevo, por favor?"
 
-#: lib/cortex/gateways/telegram.ex:286
+#: lib/cortex/gateways/telegram.ex:383
 #, elixir-autogen, elixir-format
 msgid "The model returned an error just now. Could you try again?"
 msgstr "El modelo devolvió un error ahora. ¿Puedes intentarlo de nuevo?"
@@ -100,42 +100,42 @@ msgstr "El modelo devolvió un error ahora. ¿Puedes intentarlo de nuevo?"
 msgid "Undo your last message"
 msgstr "Deshacer tu último mensaje"
 
-#: lib/cortex/gateways/telegram.ex:461
+#: lib/cortex/gateways/telegram.ex:558
 #: lib/cortex/gateways/tui.ex:214
 #, elixir-autogen, elixir-format
 msgid "Unknown agent: %{name}"
 msgstr "Agente desconocido: %{name}"
 
-#: lib/cortex/gateways/telegram.ex:533
+#: lib/cortex/gateways/telegram.ex:630
 #: lib/cortex/gateways/tui.ex:223
 #, elixir-autogen, elixir-format
 msgid "Unknown command: /%{cmd}"
 msgstr "Comando desconocido: /%{cmd}"
 
-#: lib/cortex/gateways/telegram.ex:452
+#: lib/cortex/gateways/telegram.ex:549
 #: lib/cortex/gateways/tui.ex:206
 #, elixir-autogen, elixir-format
 msgid "Usage: /agent <name>"
 msgstr "Uso: /agent <nombre>"
 
-#: lib/cortex/gateways/telegram.ex:434
+#: lib/cortex/gateways/telegram.ex:531
 #: lib/cortex/gateways/tui.ex:183
 #, elixir-autogen, elixir-format
 msgid "↩️ Undid your last message."
 msgstr "↩️ Deshice tu último mensaje."
 
-#: lib/cortex/gateways/telegram.ex:443
+#: lib/cortex/gateways/telegram.ex:540
 #: lib/cortex/gateways/tui.ex:188
 #, elixir-autogen, elixir-format
 msgid "🗜️ History compacted."
 msgstr "🗜️ Historial compactado."
 
-#: lib/cortex/gateways/telegram.ex:522
+#: lib/cortex/gateways/telegram.ex:619
 #, elixir-autogen, elixir-format
 msgid "🧠 Cortex ready."
 msgstr "🧠 Cortex listo."
 
-#: lib/cortex/gateways/telegram.ex:428
+#: lib/cortex/gateways/telegram.ex:525
 #: lib/cortex/gateways/tui.ex:178
 #, elixir-autogen, elixir-format
 msgid "🧠 New conversation started."
@@ -181,7 +181,7 @@ msgstr "🚫 No permitir"
 msgid "🚫 Not allowed."
 msgstr "🚫 No permitido."
 
-#: lib/cortex/gateways/telegram.ex:698
+#: lib/cortex/gateways/telegram.ex:799
 #, elixir-autogen, elixir-format
 msgid "Always allowed (clear with /approve clear <tool>):"
 msgstr "Permitido siempre (limpiar con /approve clear <tool>):"
@@ -191,17 +191,17 @@ msgstr "Permitido siempre (limpiar con /approve clear <tool>):"
 msgid "Ask a side question that isn't saved — /btw <q>"
 msgstr "Hacer una pregunta aparte que no se guarda — /btw <q>"
 
-#: lib/cortex/gateways/telegram.ex:663
+#: lib/cortex/gateways/telegram.ex:764
 #, elixir-autogen, elixir-format
 msgid "Available skills (run with /skill <name>):"
 msgstr "Skills disponibles (ejecuta con /skill <name>):"
 
-#: lib/cortex/gateways/telegram.ex:708
+#: lib/cortex/gateways/telegram.ex:809
 #, elixir-autogen, elixir-format
 msgid "Cleared all saved permissions."
 msgstr "Borré todos los permisos guardados."
 
-#: lib/cortex/gateways/telegram.ex:576
+#: lib/cortex/gateways/telegram.ex:673
 #, elixir-autogen, elixir-format
 msgid "Current model: %{model}"
 msgstr "Modelo actual: %{model}"
@@ -226,33 +226,33 @@ msgstr "Listar o ejecutar una skill — /skill <name>"
 msgid "Manage saved tool permissions — /approve"
 msgstr "Gestionar permisos guardados — /approve"
 
-#: lib/cortex/gateways/telegram.ex:593
+#: lib/cortex/gateways/telegram.ex:690
 #, elixir-autogen, elixir-format
 msgid "Model set to %{name}."
 msgstr "Modelo establecido en %{name}."
 
-#: lib/cortex/gateways/telegram.ex:690
-#: lib/cortex/gateways/telegram.ex:729
+#: lib/cortex/gateways/telegram.ex:791
+#: lib/cortex/gateways/telegram.ex:830
 #, elixir-autogen, elixir-format
 msgid "No agent is configured."
 msgstr "No hay ningún agente configurado."
 
-#: lib/cortex/gateways/telegram.ex:561
+#: lib/cortex/gateways/telegram.ex:658
 #, elixir-autogen, elixir-format
 msgid "No models are configured yet."
 msgstr "Aún no hay modelos configurados."
 
-#: lib/cortex/gateways/telegram.ex:660
+#: lib/cortex/gateways/telegram.ex:761
 #, elixir-autogen, elixir-format
 msgid "No skills are available yet."
 msgstr "Aún no hay skills disponibles."
 
-#: lib/cortex/gateways/telegram.ex:693
+#: lib/cortex/gateways/telegram.ex:794
 #, elixir-autogen, elixir-format
 msgid "Nothing is pre-approved — I'll ask before risky tools."
 msgstr "Nada preaprobado — preguntaré antes de herramientas de riesgo."
 
-#: lib/cortex/gateways/telegram.ex:716
+#: lib/cortex/gateways/telegram.ex:817
 #, elixir-autogen, elixir-format
 msgid "Removed %{tool}."
 msgstr "Eliminado %{tool}."
@@ -272,42 +272,42 @@ msgstr "Ver o establecer el modelo — /model <name>"
 msgid "Show your Telegram ids"
 msgstr "Mostrar tus ids de Telegram"
 
-#: lib/cortex/gateways/telegram.ex:588
+#: lib/cortex/gateways/telegram.ex:685
 #, elixir-autogen, elixir-format
 msgid "There's no agent to set the model on."
 msgstr "No hay agente para establecer el modelo."
 
-#: lib/cortex/gateways/telegram.ex:585
+#: lib/cortex/gateways/telegram.ex:682
 #, elixir-autogen, elixir-format
 msgid "Unknown model: %{name}"
 msgstr "Modelo desconocido: %{name}"
 
-#: lib/cortex/gateways/telegram.ex:676
+#: lib/cortex/gateways/telegram.ex:777
 #, elixir-autogen, elixir-format
 msgid "Unknown skill: %{name}"
 msgstr "Skill desconocida: %{name}"
 
-#: lib/cortex/gateways/telegram.ex:721
+#: lib/cortex/gateways/telegram.ex:822
 #, elixir-autogen, elixir-format
 msgid "Usage: /approve  ·  /approve clear  ·  /approve clear <tool>"
 msgstr "Uso: /approve  ·  /approve clear  ·  /approve clear <tool>"
 
-#: lib/cortex/gateways/telegram.ex:503
+#: lib/cortex/gateways/telegram.ex:600
 #, elixir-autogen, elixir-format
 msgid "Usage: /btw <question>"
 msgstr "Uso: /btw <pregunta>"
 
-#: lib/cortex/gateways/telegram.ex:554
+#: lib/cortex/gateways/telegram.ex:651
 #, elixir-autogen, elixir-format
 msgid "Your user id: %{user}\nThis chat id: %{chat}"
 msgstr "Tu user id: %{user}\nId de este chat: %{chat}"
 
-#: lib/cortex/gateways/telegram.ex:265
+#: lib/cortex/gateways/telegram.ex:359
 #, elixir-autogen, elixir-format
 msgid "I'm still on the previous message — send /stop to cancel it."
 msgstr "Sigo con el mensaje anterior — envía /stop para cancelarlo."
 
-#: lib/cortex/gateways/telegram.ex:491
+#: lib/cortex/gateways/telegram.ex:588
 #, elixir-autogen, elixir-format
 msgid "Nothing is running right now."
 msgstr "No hay nada en ejecución ahora."
@@ -327,7 +327,7 @@ msgstr "💬 Permitir en esta sesión"
 msgid "💬 Allowed for this session."
 msgstr "💬 Permitido en esta sesión."
 
-#: lib/cortex/gateways/telegram.ex:490
+#: lib/cortex/gateways/telegram.ex:587
 #, elixir-autogen, elixir-format
 msgid "🛑 Stopped."
 msgstr "🛑 Detenido."
@@ -362,112 +362,112 @@ msgstr "Modelo"
 msgid "Session"
 msgstr "Sesión"
 
-#: lib/cortex/gateways/telegram.ex:564
+#: lib/cortex/gateways/telegram.ex:661
 #, elixir-autogen, elixir-format
 msgid "Available models"
 msgstr "Modelos disponibles"
 
-#: lib/cortex/gateways/telegram.ex:604
+#: lib/cortex/gateways/telegram.ex:701
 #, elixir-autogen, elixir-format
 msgid "Available tools"
 msgstr "Herramientas disponibles"
 
-#: lib/cortex/gateways/telegram.ex:630
+#: lib/cortex/gateways/telegram.ex:727
 #, elixir-autogen, elixir-format
 msgid "Add or remove an agent-to-agent route."
 msgstr "Agrega o elimina una ruta entre agentes."
 
-#: lib/cortex/gateways/telegram.ex:628
+#: lib/cortex/gateways/telegram.ex:725
 #, elixir-autogen, elixir-format
 msgid "Change a Cortex setting."
 msgstr "Cambia un ajuste de Cortex."
 
-#: lib/cortex/gateways/telegram.ex:618
+#: lib/cortex/gateways/telegram.ex:715
 #, elixir-autogen, elixir-format
 msgid "Create or overwrite a file."
 msgstr "Crea o sobrescribe un archivo."
 
-#: lib/cortex/gateways/telegram.ex:629
+#: lib/cortex/gateways/telegram.ex:726
 #, elixir-autogen, elixir-format
 msgid "Enable a tool for yourself."
 msgstr "Habilita una herramienta para ti."
 
-#: lib/cortex/gateways/telegram.ex:622
+#: lib/cortex/gateways/telegram.ex:719
 #, elixir-autogen, elixir-format
 msgid "Fetch a URL (HTTP GET)."
 msgstr "Obtiene una URL (HTTP GET)."
 
-#: lib/cortex/gateways/telegram.ex:621
+#: lib/cortex/gateways/telegram.ex:718
 #, elixir-autogen, elixir-format
 msgid "List files in a directory."
 msgstr "Lista archivos de un directorio."
 
-#: lib/cortex/gateways/telegram.ex:620
+#: lib/cortex/gateways/telegram.ex:717
 #, elixir-autogen, elixir-format
 msgid "Move or rename a file or directory."
 msgstr "Mueve o renombra un archivo o directorio."
 
-#: lib/cortex/gateways/telegram.ex:624
+#: lib/cortex/gateways/telegram.ex:721
 #, elixir-autogen, elixir-format
 msgid "Read a skill (a how-to guide)."
 msgstr "Lee una skill (una guía paso a paso)."
 
-#: lib/cortex/gateways/telegram.ex:617
+#: lib/cortex/gateways/telegram.ex:714
 #, elixir-autogen, elixir-format
 msgid "Read a text file."
 msgstr "Lee un archivo de texto."
 
-#: lib/cortex/gateways/telegram.ex:627
+#: lib/cortex/gateways/telegram.ex:724
 #, elixir-autogen, elixir-format
 msgid "Read the Cortex configuration."
 msgstr "Lee la configuración de Cortex."
 
-#: lib/cortex/gateways/telegram.ex:626
+#: lib/cortex/gateways/telegram.ex:723
 #, elixir-autogen, elixir-format
 msgid "Rename yourself (this agent)."
 msgstr "Renómbrate (este agente)."
 
-#: lib/cortex/gateways/telegram.ex:619
+#: lib/cortex/gateways/telegram.ex:716
 #, elixir-autogen, elixir-format
 msgid "Replace text in a file."
 msgstr "Reemplaza texto en un archivo."
 
-#: lib/cortex/gateways/telegram.ex:615
+#: lib/cortex/gateways/telegram.ex:712
 #, elixir-autogen, elixir-format
 msgid "Run a shell command and return its output."
 msgstr "Ejecuta un comando de shell y devuelve su salida."
 
-#: lib/cortex/gateways/telegram.ex:623
+#: lib/cortex/gateways/telegram.ex:720
 #, elixir-autogen, elixir-format
 msgid "Search the web."
 msgstr "Busca en la web."
 
-#: lib/cortex/gateways/telegram.ex:625
+#: lib/cortex/gateways/telegram.ex:722
 #, elixir-autogen, elixir-format
 msgid "Send a message to another agent."
 msgstr "Envía un mensaje a otro agente."
 
-#: lib/cortex/gateways/telegram.ex:616
+#: lib/cortex/gateways/telegram.ex:713
 #, elixir-autogen, elixir-format
 msgid "Write and run a program for complex tasks."
 msgstr "Escribe y ejecuta un programa para tareas complejas."
 
-#: lib/cortex/gateways/telegram.ex:637
+#: lib/cortex/gateways/telegram.ex:738
 #, elixir-autogen, elixir-format
 msgid "Change which agents can message each other."
 msgstr "Cambiar qué agentes pueden hablarse (enrutamiento)."
 
-#: lib/cortex/gateways/telegram.ex:638
+#: lib/cortex/gateways/telegram.ex:739
 #, elixir-autogen, elixir-format
 msgid "Create, edit, audit or improve a skill."
 msgstr "Crear, editar, auditar o mejorar una skill."
 
-#: lib/cortex/gateways/telegram.ex:636
+#: lib/cortex/gateways/telegram.ex:733
 #, elixir-autogen, elixir-format
 msgid "How to install a new tool when asked."
 msgstr "Cómo instalar una herramienta nueva cuando lo pidan."
 
-#: lib/cortex/gateways/telegram.ex:641
+#: lib/cortex/gateways/telegram.ex:742
 #, elixir-autogen, elixir-format
 msgid "Tackle a complex task by writing and running a script."
 msgstr "Resolver una tarea compleja escribiendo y ejecutando un script."
@@ -506,3 +506,39 @@ msgstr "se ejecuta con privilegios elevados"
 #, elixir-autogen, elixir-format
 msgid "writes to a file"
 msgstr "escribe en un archivo"
+
+#: lib/cortex_web/components/core_components.ex:375
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "Acciones"
+
+#: lib/cortex_web/components/layouts.ex:102
+#: lib/cortex_web/components/layouts.ex:117
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr "Intentando reconectar"
+
+#: lib/cortex/gateways/telegram.ex:374
+#, elixir-autogen, elixir-format
+msgid "I couldn't download that file. Could you send it again?"
+msgstr "No pude descargar ese archivo. ¿Puedes enviarlo de nuevo?"
+
+#: lib/cortex_web/components/layouts.ex:109
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr "¡Algo salió mal!"
+
+#: lib/cortex/gateways/telegram.ex:736
+#, elixir-autogen, elixir-format
+msgid "Understand a voice/audio/image/file the user sent."
+msgstr "Entender un audio/voz/imagen/archivo que envió el usuario."
+
+#: lib/cortex_web/components/layouts.ex:94
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr "No encontramos internet"
+
+#: lib/cortex_web/components/core_components.ex:81
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr "cerrar"

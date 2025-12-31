@@ -75,8 +75,8 @@ defmodule Mix.Tasks.Cortex do
       ["model" | rest] -> with_config(fn -> model_cmd(rest) end)
       ["agent" | rest] -> with_config(fn -> agent_cmd(rest) end)
       ["run" | rest] -> with_app([], fn -> run_cmd(rest) end)
-      ["chat" | rest] -> with_app([], fn -> tui_cmd(rest) end)
-      ["tui" | rest] -> with_app([], fn -> tui_cmd(rest) end)
+      ["chat" | rest] -> with_app([persist: true], fn -> tui_cmd(rest) end)
+      ["tui" | rest] -> with_app([persist: true], fn -> tui_cmd(rest) end)
       ["serve" | rest] -> with_app([serve: true, gateways: true], fn -> serve_cmd(rest) end)
       # Configuring a gateway only touches the config file — no app needed.
       ["gateway", "telegram", "setup" | _] -> with_config(&telegram_setup/0)
@@ -100,8 +100,16 @@ defmodule Mix.Tasks.Cortex do
   # starts the messaging gateways (Telegram). Local `run`/`tui` pass neither.
   defp with_app(opts, fun) do
     serve? = Keyword.get(opts, :serve, false)
+    gateways? = Keyword.get(opts, :gateways, false)
     Application.put_env(:cortex, :serve_endpoint, serve?)
-    Application.put_env(:cortex, :start_gateways, Keyword.get(opts, :gateways, false))
+    Application.put_env(:cortex, :start_gateways, gateways?)
+    # Persist sessions for any keyed surface so they survive a restart and show in
+    # the dashboard (serve/gateway, and the console which holds a session too).
+    Application.put_env(
+      :cortex,
+      :persist_sessions,
+      serve? or gateways? or Keyword.get(opts, :persist, false)
+    )
 
     if serve? do
       # Phoenix only opens the HTTP listener when the endpoint is told to serve.
