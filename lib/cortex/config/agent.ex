@@ -16,6 +16,7 @@ defmodule Cortex.Config.Agent do
             tools: [],
             auto_approve: [],
             can_message: [],
+            learn: false,
             max_iterations: 12,
             temperature: nil
 
@@ -35,6 +36,7 @@ defmodule Cortex.Config.Agent do
       tools: map["tools"] || [],
       auto_approve: map["auto_approve"] || [],
       can_message: map["can_message"] || [],
+      learn: map["learn"] || false,
       max_iterations: map["max_iterations"] || 12,
       temperature: map["temperature"]
     }

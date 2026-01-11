@@ -21,13 +21,16 @@ defmodule CortexWeb.DashboardLive do
     {:ok,
      assign(socket,
        page_title: "Cortex",
+       view: :chat,
        sessions: list_sessions(),
        selected: nil,
        agent: nil,
        messages: [],
        streaming: "",
        running: false,
-       input: ""
+       input: "",
+       learn_agent: Config.default_agent_name(),
+       learn_nodes: []
      )}
   end
 
@@ -37,9 +40,27 @@ defmodule CortexWeb.DashboardLive do
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-900 text-zinc-100">
       <aside class="flex w-72 flex-col border-r border-zinc-800">
-        <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
-          <span class="text-xl">🧠</span>
-          <span class="font-semibold">Cortex</span>
+        <div class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🧠</span>
+            <span class="font-semibold">Cortex</span>
+          </div>
+          <div class="flex overflow-hidden rounded bg-zinc-800 text-xs">
+            <button
+              phx-click="view"
+              phx-value-to="chat"
+              class={["px-3 py-1", @view == :chat && "bg-blue-600"]}
+            >
+              Chat
+            </button>
+            <button
+              phx-click="view"
+              phx-value-to="learn"
+              class={["px-3 py-1", @view == :learn && "bg-blue-600"]}
+            >
+              Learn
+            </button>
+          </div>
         </div>
         <button
           phx-click="new_chat"
@@ -87,7 +108,35 @@ defmodule CortexWeb.DashboardLive do
       </aside>
 
       <main class="flex flex-1 flex-col">
-        <div :if={@selected} class="flex h-full flex-col">
+        <div :if={@view == :learn} class="flex h-full flex-col">
+          <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+            <div>
+              <div class="font-medium">✦ TimeLearn</div>
+              <div class="text-xs text-zinc-400">what the agent has learned, newest first</div>
+            </div>
+            <form phx-change="pick_learn_agent">
+              <select name="agent" class="rounded bg-zinc-800 px-2 py-1 text-sm outline-none">
+                <option :for={a <- agent_names()} value={a} selected={a == @learn_agent}>{a}</option>
+              </select>
+            </form>
+          </header>
+          <div class="flex-1 space-y-4 overflow-y-auto p-4">
+            <div :for={n <- @learn_nodes} class="flex gap-3">
+              <span class="text-lg">{learn_icon(n.kind)}</span>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">{n.title}</span>
+                  <span class="rounded bg-zinc-800 px-1.5 text-xs text-zinc-400">{n.source}</span>
+                  <span class="text-xs text-zinc-500">{learn_date(n.at)}</span>
+                </div>
+                <div class="truncate text-sm text-zinc-400">{n.summary}</div>
+              </div>
+            </div>
+            <p :if={@learn_nodes == []} class="text-sm text-zinc-500">Nothing learned yet.</p>
+          </div>
+        </div>
+
+        <div :if={@view == :chat and @selected} class="flex h-full flex-col">
           <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
             <div class="truncate">
               <div class="font-medium">{@selected}</div>
@@ -130,7 +179,10 @@ defmodule CortexWeb.DashboardLive do
           </form>
         </div>
 
-        <div :if={!@selected} class="flex flex-1 items-center justify-center text-zinc-500">
+        <div
+          :if={@view == :chat and !@selected}
+          class="flex flex-1 items-center justify-center text-zinc-500"
+        >
           Select or start a session.
         </div>
       </main>
@@ -150,6 +202,20 @@ defmodule CortexWeb.DashboardLive do
     """
   end
 
+  defp agent_names, do: Config.agents() |> Enum.map(& &1.name) |> Enum.sort()
+
+  defp learn_icon(:skill), do: "🧠"
+  defp learn_icon(_memory), do: "📝"
+
+  defp learn_date(0), do: "—"
+
+  defp learn_date(ts) do
+    case DateTime.from_unix(ts) do
+      {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+      _ -> "—"
+    end
+  end
+
   defp bubble_class("user"), do: "ml-auto bg-blue-600"
   defp bubble_class("tool"), do: "bg-zinc-800/60 font-mono text-xs text-zinc-400"
   defp bubble_class("tool_call"), do: "bg-transparent px-0"
@@ -160,6 +226,20 @@ defmodule CortexWeb.DashboardLive do
   ###
 
   @impl true
+  def handle_event("view", %{"to" => "learn"}, socket) do
+    {:noreply,
+     assign(socket,
+       view: :learn,
+       learn_nodes: Cortex.Learning.timeline(socket.assigns.learn_agent)
+     )}
+  end
+
+  def handle_event("view", %{"to" => _chat}, socket), do: {:noreply, assign(socket, view: :chat)}
+
+  def handle_event("pick_learn_agent", %{"agent" => name}, socket) do
+    {:noreply, assign(socket, learn_agent: name, learn_nodes: Cortex.Learning.timeline(name))}
+  end
+
   def handle_event("type", %{"text" => text}, socket), do: {:noreply, assign(socket, input: text)}
 
   def handle_event("select", %{"key" => key}, socket) do
@@ -231,7 +311,14 @@ defmodule CortexWeb.DashboardLive do
   end
 
   def handle_info(:refresh_sessions, socket) do
-    {:noreply, assign(socket, sessions: list_sessions())}
+    socket = assign(socket, sessions: list_sessions())
+
+    socket =
+      if socket.assigns.view == :learn,
+        do: assign(socket, learn_nodes: Cortex.Learning.timeline(socket.assigns.learn_agent)),
+        else: socket
+
+    {:noreply, socket}
   end
 
   defp apply_event({:assistant_delta, text}, socket),

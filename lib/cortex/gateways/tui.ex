@@ -183,6 +183,11 @@ defmodule Cortex.Gateways.TUI do
     info(gettext("↩️ Undid your last message."))
   end
 
+  defp run_command(key, "learn", _rest) do
+    Session.learn(key)
+    info(gettext("🧠 Reviewing what I learned…"))
+  end
+
   defp run_command(key, "compact", _rest) do
     case Session.compact(key) do
       {:ok, _summary} -> info(gettext("🗜️ History compacted."))
@@ -216,7 +221,10 @@ defmodule Cortex.Gateways.TUI do
   end
 
   defp run_command(_key, "help", _rest) do
-    info(gettext("Commands:") <> "\n/new  /undo  /compact  /status  /agent <name>  /help  /exit")
+    info(
+      gettext("Commands:") <>
+        "\n/new  /undo  /compact  /learn  /status  /agent <name>  /help  /exit"
+    )
   end
 
   defp run_command(_key, cmd, _rest) do

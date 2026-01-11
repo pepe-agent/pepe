@@ -27,6 +27,7 @@ defmodule Mix.Tasks.Cortex do
 
       mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--default]
       mix cortex agent list
+      mix cortex agent learn NAME [on|off]        # toggle self-improvement (memory/skills)
       mix cortex agent route FROM TO [--remove]   # let FROM message TO (directed)
       mix cortex agent rename OLD NEW          # rename + move its workspace dir
       mix cortex agent remove NAME
@@ -43,6 +44,7 @@ defmodule Mix.Tasks.Cortex do
   ## Misc
 
       mix cortex tools                           # list built-in tools
+      mix cortex timelearn [AGENT]               # what the agent has learned, on a timeline
       mix cortex setup                           # scaffold ~/.cortex/config.json
       mix cortex config                          # show config path + summary
   """
@@ -69,9 +71,14 @@ defmodule Mix.Tasks.Cortex do
     case argv do
       [] -> help()
       ["help"] -> help()
+      # `cortex help <group>` mirrors `cortex <group> help`.
+      ["help", "agent" | _] -> agent_cmd(["help"])
+      ["help", "model" | _] -> model_cmd(["help"])
+      ["help", "gateway" | _] -> gateway_cmd(["help"])
       ["setup" | _] -> with_config(&setup/0)
       ["config" | rest] -> with_config(fn -> config_cmd(rest) end)
       ["tools" | _] -> with_config(&tools/0)
+      ["timelearn" | rest] -> with_config(fn -> timelearn_cmd(rest) end)
       ["model" | rest] -> with_config(fn -> model_cmd(rest) end)
       ["agent" | rest] -> with_config(fn -> agent_cmd(rest) end)
       ["run" | rest] -> with_app([], fn -> run_cmd(rest) end)
@@ -289,8 +296,24 @@ defmodule Mix.Tasks.Cortex do
     end
   end
 
+  defp model_cmd(["help"]) do
+    info("""
+    mix cortex model — manage model connections
+
+      (no args)                              show default + switch/add interactively
+      add NAME [--base-url URL --api-key KEY --model ID] [--default]
+      providers                              list known providers
+      models --base-url URL --api-key KEY    list a provider's models
+      list                                   list saved connections
+      test [NAME]                            ping a connection
+      remove NAME
+      default NAME                           set the default model
+    """)
+  end
+
   defp model_cmd(_),
-    do: error("usage: mix cortex model [add|list|models|providers|test|remove|default] ...")
+    do:
+      error("usage: mix cortex model [add|list|models|providers|test|remove|default] (or: help)")
 
   defp add_model_interactively do
     name =
@@ -528,6 +551,7 @@ defmodule Mix.Tasks.Cortex do
           description: :string,
           tools: :string,
           can_message: :string,
+          learn: :boolean,
           max_iterations: :integer,
           temperature: :float,
           default: :boolean
@@ -554,6 +578,7 @@ defmodule Mix.Tasks.Cortex do
       system_prompt: opts[:prompt] || "You are Cortex, a helpful AI agent.",
       tools: tools,
       can_message: can_message,
+      learn: opts[:learn] || false,
       max_iterations: opts[:max_iterations] || 12,
       temperature: opts[:temperature]
     }
@@ -628,7 +653,39 @@ defmodule Mix.Tasks.Cortex do
     ok("default agent -> #{name}")
   end
 
-  defp agent_cmd(_), do: error("usage: mix cortex agent add|list|rename|remove|default ...")
+  defp agent_cmd(["learn", name | rest]) do
+    on? = List.first(rest) not in ["off", "false", "0", "no"]
+
+    case Config.get_agent(name) do
+      nil ->
+        error("unknown agent: #{name}")
+
+      agent ->
+        Config.put_agent(%{agent | learn: on?})
+        ok("#{green(name)} learn #{onoff(on?)}")
+    end
+  end
+
+  defp agent_cmd(cmd) when cmd in [[], ["help"]] do
+    info("""
+    mix cortex agent — manage agents
+
+      add NAME [--model M] [--prompt "…"] [--tools t1,t2]
+               [--can-message b,c] [--learn] [--default]   create/replace an agent
+      list                                                 list agents (+ routes)
+      learn NAME [on|off]                                  toggle self-improvement
+      route FROM TO [--remove]                             directed A→B messaging
+      rename OLD NEW                                        rename + move its dir
+      remove NAME
+      default NAME                                         set the default agent
+    """)
+  end
+
+  defp agent_cmd(other),
+    do: error("unknown: mix cortex agent #{Enum.join(other, " ")}  (try: mix cortex agent help)")
+
+  defp onoff(true), do: "on"
+  defp onoff(false), do: "off"
 
   ###
   ### run / chat
@@ -706,7 +763,16 @@ defmodule Mix.Tasks.Cortex do
     end
   end
 
-  defp gateway_cmd(_), do: error("usage: mix cortex gateway telegram [setup]")
+  defp gateway_cmd(cmd) when cmd in [[], ["help"]] do
+    info("""
+    mix cortex gateway — messaging gateways
+
+      telegram setup    configure the Telegram bot token, allowlists, agent
+      telegram          run the Telegram gateway (long-polling)
+    """)
+  end
+
+  defp gateway_cmd(_), do: error("usage: mix cortex gateway telegram [setup]  (or: help)")
 
   # Interactive Telegram config — token, optional agent, optional chat allowlist.
   defp telegram_setup do
@@ -1009,6 +1075,44 @@ defmodule Mix.Tasks.Cortex do
       %{"function" => %{"description" => desc}} = mod.spec()
       IO.puts("  #{bold(mod.name())} — #{desc}")
     end)
+  end
+
+  # `mix cortex timelearn [AGENT]` — the learning timeline (skills + memory).
+  defp timelearn_cmd(args) do
+    case List.first(args) || Config.default_agent_name() do
+      nil ->
+        error("no agent. pass one: mix cortex timelearn AGENT")
+
+      name ->
+        c = Cortex.Learning.counts(name)
+
+        info(
+          bold("✦ TimeLearn — ") <>
+            green(name) <>
+            dim("  (#{c[:skill] || 0} skills · #{c[:memory] || 0} memories)")
+        )
+
+        case Enum.reverse(Cortex.Learning.timeline(name)) do
+          [] -> info(dim("  nothing learned yet."))
+          nodes -> Enum.each(nodes, &print_learning_node/1)
+        end
+    end
+  end
+
+  defp print_learning_node(node) do
+    icon = if node.kind == :skill, do: "🧠", else: "📝"
+    meta = dim("· #{node.source} · #{learn_date(node.at)}")
+    info("\n#{icon} #{bold(node.title)} #{meta}")
+    info(dim("   " <> (node.summary |> String.replace("\n", " ") |> String.slice(0, 96))))
+  end
+
+  defp learn_date(0), do: "—"
+
+  defp learn_date(ts) do
+    case DateTime.from_unix(ts) do
+      {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+      _ -> "—"
+    end
   end
 
   defp help do

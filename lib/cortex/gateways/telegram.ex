@@ -50,6 +50,7 @@ defmodule Cortex.Gateways.Telegram do
       {"status", gettext("Show session info")},
       {"whoami", gettext("Show your Telegram ids")},
       {"btw", gettext("Ask a side question that isn't saved — /btw <q>")},
+      {"learn", gettext("Save what I learned to memory/skills")},
       {"stop", gettext("Stop the current run")},
       {"help", gettext("List commands")}
     ]
@@ -579,6 +580,15 @@ defmodule Cortex.Gateways.Telegram do
   defp run_command(chat_id, "model", name), do: set_model(chat_id, name)
 
   defp run_command(chat_id, "tools", _args), do: send_html(chat_id, tools_text())
+
+  defp run_command(chat_id, "learn", _args) do
+    ensure_session(chat_id)
+
+    case Cortex.Agent.Session.learn(session_key(chat_id)) do
+      :ok -> send_message(chat_id, gettext("🧠 Reviewing what I learned…"))
+      _ -> send_message(chat_id, gettext("No agent to learn with."))
+    end
+  end
 
   defp run_command(chat_id, "stop", _args) do
     ensure_session(chat_id)

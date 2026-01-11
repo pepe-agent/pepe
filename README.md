@@ -136,9 +136,12 @@ mix cortex agent add assistant \
   --prompt "You are a helpful coding agent." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search --default
 mix cortex agent list
+mix cortex agent learn zak on            # opt into self-improvement (see Learning)
+mix cortex agent route zak helper        # let zak message another agent (see Routing)
 mix cortex agent rename assistant zak   # rename + move its workspace dir (~/.cortex/agents/<name>/)
 mix cortex agent remove zak
 mix cortex agent default assistant
+mix cortex agent help                    # (or `mix cortex help agent`)
 ```
 
 ### Running
@@ -168,8 +171,9 @@ mix cortex gateway telegram            # run the gateway in the foreground (long
 
 ```bash
 mix cortex tools                       # list available tools (built-ins + plugins)
+mix cortex timelearn [AGENT]           # what the agent has learned, on a timeline
 mix cortex config                      # show config path + a summary
-mix cortex help                        # full command help
+mix cortex help                        # full command help (or: help <group>)
 ```
 
 ## Web dashboard
@@ -177,7 +181,8 @@ mix cortex help                        # full command help
 A Phoenix LiveView dashboard at **`/`** — a live list of sessions on the left and a
 streaming chat panel on the right. Pick a session to read its history and talk to
 its agent; replies stream in token-by-token. `New chat` starts a fresh session, and
-each session shows its agent, model and turn count.
+each session shows its agent, model and turn count. A **Chat / Learn** toggle
+switches the main pane to the **TimeLearn** timeline (see **Learning**).
 
 ```bash
 mix assets.build          # once (builds css/js)
@@ -429,6 +434,8 @@ its topic comes up, so they don't bloat every prompt.
   - `install-tool` — write a plugin tool and enable it from chat.
   - `write-a-script` — solve complex tasks by writing/saving a program to run.
   - `manage-routing` — change agent-to-agent routes with `set_route`.
+  - `handle-media` — understand a voice/audio/image/file (transcribe, read), installing
+    what it needs.
 - **User** skills live in `~/.cortex/skills/*.md` and override a built-in of the
   same name. The first non-empty line is the summary; the rest is the procedure.
 
@@ -447,6 +454,38 @@ code and iterating on errors. Worthwhile scripts are **saved** under `scripts/` 
 re-run later (`run_script` with `file:`), and when the agent works out *how* to do
 a recurring task (read a PDF, crunch a spreadsheet) it **writes itself a skill** to
 `skills/<name>.md`. The `write-a-script` skill teaches the whole loop.
+
+## Learning (self-improvement + TimeLearn)
+
+An agent can **turn conversations into lasting knowledge on its own** — the
+"reflect" loop, opt-in per agent:
+
+```bash
+mix cortex agent learn zak on          # turn it on (off to stop)
+```
+
+When on, after a session the agent **reviews the conversation** and updates two
+things, kept separate:
+
+- **Memory** (about *you*) → `USER.md` / `MEMORY.md` / `people.md`, kept lean
+  (it consolidates instead of piling on).
+- **Skills** (about *technique*) → prefers updating a rich existing skill over
+  spawning a narrow new one.
+
+The review is a background run with tools restricted to file/skill management (no
+shell/network), so it can update the workspace but nothing else; the live session
+is untouched. It fires on `/compact`, on idle (~90s after the last turn), and on
+demand with **`/learn`** (Telegram + console).
+
+**TimeLearn** shows what an agent has learned, on a timeline — skills (🧠) and
+memory entries (📝), newest first, with source and date:
+
+```bash
+mix cortex timelearn zak               # in the terminal
+```
+
+…or the **Learn** tab in the web dashboard (with an agent picker). The generator
+(reflect) produces; TimeLearn displays.
 
 ## Tests
 

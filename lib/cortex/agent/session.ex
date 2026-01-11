@@ -45,6 +45,10 @@ defmodule Cortex.Agent.Session do
   @spec stop(term()) :: :ok | {:error, :not_running}
   def stop(key), do: GenServer.call(via(key), :stop)
 
+  @doc "Run the memory/skill review now over this session (the `/learn` trigger)."
+  @spec learn(term()) :: :ok | {:error, :no_agent}
+  def learn(key), do: GenServer.call(via(key), :learn)
+
   @doc "Return `%{agent:, model:, turns:}` for the session."
   def status(key), do: GenServer.call(via(key), :status)
 
@@ -86,11 +90,12 @@ defmodule Cortex.Agent.Session do
             key: key,
             agent_name: default_agent,
             messages: init_messages(default_agent),
-            running: nil
+            running: nil,
+            idle_ref: nil
           }
       end
 
-    {:ok, state}
+    {:ok, Map.put_new(state, :idle_ref, nil)}
   end
 
   # Sessions are only persisted in long-running surfaces (serve/gateway), so local
@@ -130,6 +135,8 @@ defmodule Cortex.Agent.Session do
         messages = ensure_system(state.messages, agent) ++ [Message.user(text)]
         # Tag the run with this session's key so `:session` approvals are scoped to it.
         opts = Keyword.put(opts, :session_key, state.key)
+        # A new message cancels any pending idle review.
+        state = cancel_idle(state)
         # Run off-process so the session stays responsive (e.g. to `/stop`). We hold
         # the caller's `from` and reply once the run reports back via `:run_done`,
         # and monitor the task so a stuck/dead run can't pin the session on `:busy`.
@@ -143,6 +150,17 @@ defmodule Cortex.Agent.Session do
   end
 
   def handle_call(:stop, _from, state), do: {:reply, {:error, :not_running}, state}
+
+  def handle_call(:learn, _from, state) do
+    case Config.get_agent(state.agent_name) || Config.default_agent() do
+      nil ->
+        {:reply, {:error, :no_agent}, state}
+
+      agent ->
+        Cortex.Agent.Reflect.review_async(agent, state.messages)
+        {:reply, :ok, cancel_idle(state)}
+    end
+  end
 
   def handle_call({:aside, text, opts}, _from, state) do
     case Config.get_agent(state.agent_name) || Config.default_agent() do
@@ -192,6 +210,9 @@ defmodule Cortex.Agent.Session do
         {:reply, {:error, :no_agent}, state}
 
       agent ->
+        # Review before compacting, while the full detail is still here.
+        if agent.learn, do: Cortex.Agent.Reflect.review_async(agent, state.messages)
+
         case compact_messages(agent, state.messages) do
           {:ok, messages, summary} ->
             {:reply, {:ok, summary}, persist(%{state | messages: messages})}
@@ -212,7 +233,10 @@ defmodule Cortex.Agent.Session do
       case result do
         {:ok, reply, all_messages} ->
           GenServer.reply(from, {:ok, reply})
-          persist(%{state | agent_name: agent_name, messages: all_messages, running: nil})
+
+          %{state | agent_name: agent_name, messages: all_messages, running: nil}
+          |> persist()
+          |> maybe_schedule_idle()
 
         {:error, reason} ->
           GenServer.reply(from, {:error, reason})
@@ -235,6 +259,38 @@ defmodule Cortex.Agent.Session do
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
+
+  # The session went idle after a run — run the memory/skill review if the agent
+  # opted in (`learn: true`), then clear the timer.
+  def handle_info(:idle_review, state) do
+    case Config.get_agent(state.agent_name) do
+      %{learn: true} = agent -> Cortex.Agent.Reflect.review_async(agent, state.messages)
+      _ -> :ok
+    end
+
+    {:noreply, %{state | idle_ref: nil}}
+  end
+
+  # Idle-review timer (fires the reflect pass a while after the last turn).
+  @idle_ms 90_000
+
+  defp maybe_schedule_idle(state) do
+    case Config.get_agent(state.agent_name) do
+      %{learn: true} ->
+        state = cancel_idle(state)
+        %{state | idle_ref: Process.send_after(self(), :idle_review, @idle_ms)}
+
+      _ ->
+        state
+    end
+  end
+
+  defp cancel_idle(%{idle_ref: ref} = state) when is_reference(ref) do
+    Process.cancel_timer(ref)
+    %{state | idle_ref: nil}
+  end
+
+  defp cancel_idle(state), do: state
 
   # Cancel the in-flight run (if any): drop the monitor, kill the task, and unblock
   # the waiting caller with `reply`. Used by `/stop` and `/new`.
