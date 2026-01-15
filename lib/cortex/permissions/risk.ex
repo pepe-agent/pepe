@@ -3,7 +3,7 @@ defmodule Cortex.Permissions.Risk do
   Lightweight, pattern-based **risk hints** for a tool call — a human-readable note
   of *what makes it risky*, shown next to the authorize prompt (e.g. "runs embedded
   code", "deletes files"). It's a cheap heuristic to help the user decide, not a
-  full shell analyzer like reference's command-explainer.
+  full shell command-explainer/analyzer.
 
   Hint labels are translated via Gettext, so any surface (Telegram, the console)
   renders the same vocabulary in the user's language.

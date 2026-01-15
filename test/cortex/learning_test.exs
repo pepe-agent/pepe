@@ -42,7 +42,7 @@ defmodule Cortex.LearningTest do
     assert Enum.any?(memory, &(&1.source == :user and &1.summary =~ "Jho"))
   end
 
-  test "counts groups by kind", %{home: home} do
+  test "counts groups by kind", %{home: _home} do
     dir = Workspace.dir("zak")
     File.mkdir_p!(dir)
     File.write!(Path.join(dir, "MEMORY.md"), "one")

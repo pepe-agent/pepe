@@ -56,7 +56,11 @@ defmodule Cortex.Permissions do
   # Pre-approved either persistently (on the agent) or for this session.
   defp preapproved?(name, ctx), do: persistent?(name, ctx) or session?(name, ctx)
 
-  defp persistent?(name, %{agent: %{auto_approve: list}}) when is_list(list), do: name in list
+  # `"*"` is a wildcard grant — the agent runs every tool without asking (the
+  # owner's omnipotent primary agent). Otherwise a tool is approved by exact name.
+  defp persistent?(name, %{agent: %{auto_approve: list}}) when is_list(list),
+    do: "*" in list or name in list
+
   defp persistent?(_name, _ctx), do: false
 
   defp session?(name, %{session_key: key}) when is_binary(key),

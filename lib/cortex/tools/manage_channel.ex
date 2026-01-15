@@ -1,0 +1,202 @@
+defmodule Cortex.Tools.ManageChannel do
+  @moduledoc """
+  Let an agent create and manage **Telegram channels (bots)** from a conversation —
+  "add a bot for the sales agent", "point the ops bot at a different agent".
+
+  Deliberately guarded, so autonomy stays safe:
+
+    * **In the agent's tool allowlist** — that's the on/off; and it's a risky tool, so
+      each call goes through the permission gate unless pre-approved.
+    * **Scoped to named bots** — it only touches bots under `"telegrams"`, never the
+      protected `"default"` bot or any other config. (The equivalent of an allowlist
+      of editable config paths.)
+    * **Secrets never pass through the chat** — you give the *name of an environment
+      variable* that holds the token, not the token itself. It's stored as
+      `${THE_VAR}` and resolved at read time, so the raw secret never reaches the
+      model or the logs.
+
+  After any change it asks the gateway supervisor to reconcile the running pollers,
+  so the bot starts/stops live (no restart) when the server is up.
+
+  Actions: `add`, `list`, `set_agent`, `enable`, `disable`, `remove`.
+  """
+
+  @behaviour Cortex.Tools.Tool
+
+  import Cortex.Tools.Tool, only: [function: 3]
+
+  alias Cortex.Config
+
+  # A conventional environment-variable name (so a raw token, which contains ":",
+  # is rejected — the agent must reference an env var instead).
+  @env_var ~r/^[A-Za-z_][A-Za-z0-9_]*$/
+
+  @impl true
+  def name, do: "manage_channel"
+
+  @impl true
+  def spec do
+    function(
+      "manage_channel",
+      """
+      Create and manage Telegram bots (channels), each bound to an agent. A bot is a \
+      whole channel that talks to one agent. IMPORTANT: never pass a raw bot token — \
+      pass `token_env`, the NAME of an environment variable that holds the token \
+      (e.g. "SALES_BOT_TOKEN"); the secret stays out of this chat. Confirm the details \
+      with the user first.
+
+      actions:
+      - add: needs `name` (the bot's label, not "default"), `token_env` (env var name \
+        with the @BotFather token), `agent` (an existing agent this bot talks to).
+      - list: show configured bots (name, agent, whether active).
+      - set_agent: rebind a bot to another agent — needs `name`, `agent`.
+      - enable / disable / remove: needs `name`.
+      """,
+      %{
+        "type" => "object",
+        "properties" => %{
+          "action" => %{
+            "type" => "string",
+            "enum" => ~w(add list set_agent enable disable remove),
+            "description" => "What to do."
+          },
+          "name" => %{"type" => "string", "description" => "The bot's name (never \"default\")."},
+          "token_env" => %{
+            "type" => "string",
+            "description" =>
+              "NAME of the env var holding the bot token, e.g. \"SALES_BOT_TOKEN\". Never the token itself."
+          },
+          "agent" => %{"type" => "string", "description" => "Existing agent to bind the bot to."}
+        },
+        "required" => ["action"]
+      }
+    )
+  end
+
+  @impl true
+  def run(%{"action" => action} = args, ctx) do
+    if ctx[:agent], do: dispatch(action, args), else: {:error, "no calling agent in context"}
+  end
+
+  def run(_args, _ctx), do: {:error, "manage_channel needs an `action`"}
+
+  defp dispatch("list", _args), do: {:ok, render_list(Config.telegram_bots())}
+  defp dispatch("add", args), do: add(args)
+  defp dispatch("set_agent", args), do: set_agent(args)
+  defp dispatch("enable", args), do: toggle(args, true)
+  defp dispatch("disable", args), do: toggle(args, false)
+  defp dispatch("remove", args), do: remove(args)
+  defp dispatch(other, _args), do: {:error, "unknown or incomplete action: #{other}"}
+
+  defp add(args) do
+    with {:ok, name} <- fetch(args, "name"),
+         :ok <- guard_name(name),
+         {:ok, token_env} <- fetch(args, "token_env"),
+         :ok <- validate_env(token_env),
+         {:ok, agent} <- fetch(args, "agent"),
+         :ok <- ensure_agent(agent) do
+      Config.put_telegram_bot(name, %{"bot_token" => "${#{token_env}}", "agent" => agent})
+      reload()
+
+      {:ok,
+       "Bot #{name} created → agent #{agent}, token from $#{token_env}. " <> token_note(token_env)}
+    end
+  end
+
+  defp set_agent(args) do
+    with {:ok, name} <- fetch(args, "name"),
+         :ok <- guard_name(name),
+         {:ok, agent} <- fetch(args, "agent"),
+         :ok <- ensure_agent(agent),
+         {:ok, bot} <- fetch_bot(name) do
+      Config.put_telegram_bot(name, Map.put(bot, "agent", agent))
+      reload()
+      {:ok, "Bot #{name} now talks to agent #{agent}."}
+    end
+  end
+
+  defp toggle(args, enabled?) do
+    with {:ok, name} <- fetch(args, "name"),
+         :ok <- guard_name(name),
+         {:ok, bot} <- fetch_bot(name) do
+      Config.put_telegram_bot(name, Map.put(bot, "enabled", enabled?))
+      reload()
+      {:ok, "Bot #{name} #{if enabled?, do: "enabled", else: "disabled"}."}
+    end
+  end
+
+  defp remove(args) do
+    with {:ok, name} <- fetch(args, "name"),
+         :ok <- guard_name(name),
+         {:ok, _bot} <- fetch_bot(name) do
+      Config.delete_telegram_bot(name)
+      reload()
+      {:ok, "Bot #{name} removed."}
+    end
+  end
+
+  ###
+  ### guards & helpers
+  ###
+
+  # Never let the agent touch the protected default bot.
+  defp guard_name("default"), do: {:error, "the \"default\" bot is protected; use another name"}
+  defp guard_name(_name), do: :ok
+
+  defp validate_env(token_env) do
+    if Regex.match?(@env_var, token_env) do
+      :ok
+    else
+      {:error,
+       "`token_env` must be an environment-variable NAME (e.g. SALES_BOT_TOKEN), not a raw token. " <>
+         "Ask the user to set that env var to the token; the secret must not go through the chat."}
+    end
+  end
+
+  defp ensure_agent(agent) do
+    if Config.get_agent(agent), do: :ok, else: {:error, "unknown agent: #{agent}"}
+  end
+
+  # A named bot must already exist for set_agent/enable/disable/remove.
+  defp fetch_bot(name) do
+    case Config.telegram_bot(name) do
+      nil -> {:error, "no bot named #{name}"}
+      bot -> {:ok, Map.delete(bot, "name")}
+    end
+  end
+
+  defp reload do
+    Cortex.Gateways.Supervisor.reload_telegram()
+  rescue
+    _ -> :ok
+  end
+
+  defp token_note(token_env) do
+    if System.get_env(token_env) do
+      "The env var is set, so it can start now."
+    else
+      "Note: $#{token_env} isn't set in this environment yet — set it (and restart the gateway) for the bot to run."
+    end
+  end
+
+  defp render_list([]), do: "No Telegram bots configured."
+
+  defp render_list(bots) do
+    Enum.map_join(bots, "\n", fn b ->
+      active = if Cortex.Gateways.Telegram.bot_active?(b), do: "active", else: "inactive"
+      "• #{b["name"]} → agent #{b["agent"] || "(default)"} [#{active}]"
+    end)
+  end
+
+  defp fetch(args, key) do
+    case blank_to_nil(args[key]) do
+      nil -> {:error, "#{key} is required"}
+      value -> {:ok, value}
+    end
+  end
+
+  defp blank_to_nil(v) when is_binary(v),
+    do: if(String.trim(v) == "", do: nil, else: String.trim(v))
+
+  defp blank_to_nil(v), do: v
+end

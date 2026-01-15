@@ -18,10 +18,13 @@ defmodule Cortex.Tools do
   alias Cortex.Tools.EnableTool
   alias Cortex.Tools.FetchUrl
   alias Cortex.Tools.ListDir
+  alias Cortex.Tools.ManageAgent
+  alias Cortex.Tools.ManageChannel
   alias Cortex.Tools.MoveFile
   alias Cortex.Tools.ReadFile
   alias Cortex.Tools.RenameAgent
   alias Cortex.Tools.RunScript
+  alias Cortex.Tools.ScheduleTask
   alias Cortex.Tools.SendToAgent
   alias Cortex.Tools.SetRoute
   alias Cortex.Tools.Skill
@@ -40,6 +43,9 @@ defmodule Cortex.Tools do
     WebSearch,
     Skill,
     SendToAgent,
+    ScheduleTask,
+    ManageChannel,
+    ManageAgent,
     RenameAgent,
     ConfigGet,
     ConfigSet,

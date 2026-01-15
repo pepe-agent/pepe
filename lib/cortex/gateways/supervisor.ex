@@ -11,24 +11,33 @@ defmodule Cortex.Gateways.Supervisor do
   """
   use Supervisor
 
+  alias Cortex.Config
+  alias Cortex.Gateways.Telegram
+
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
 
   @doc """
-  Restart the Telegram gateway for a clean slate (e.g. after a bot-token change).
-  Most config changes are picked up live without this — the gateway reads config
-  fresh each poll — so it's only needed to reset in-memory state.
+  Reconcile the running Telegram pollers with the current config: stop the ones
+  that went away, (re)start the ones that should run — one poller per configured
+  bot. Call this after adding/removing/editing a bot so the change takes effect
+  without a full restart. (Token edits to an existing bot are picked up live, since
+  each poll reads the token fresh.)
   """
-  def restart_telegram do
-    child = Cortex.Gateways.Telegram
-    _ = Supervisor.terminate_child(__MODULE__, child)
-
-    case Supervisor.restart_child(__MODULE__, child) do
-      {:error, :not_found} -> Supervisor.start_child(__MODULE__, child)
-      other -> other
+  def reload_telegram do
+    for {id, _pid, _type, _mods} <- Supervisor.which_children(__MODULE__),
+        match?({Telegram, _}, id) do
+      Supervisor.terminate_child(__MODULE__, id)
+      Supervisor.delete_child(__MODULE__, id)
     end
+
+    for spec <- telegram_specs(), do: Supervisor.start_child(__MODULE__, spec)
+    :ok
   end
+
+  # Kept for callers of the old name.
+  def restart_telegram, do: reload_telegram()
 
   @impl true
   def init(_init_arg) do
@@ -36,11 +45,17 @@ defmodule Cortex.Gateways.Supervisor do
   end
 
   defp children do
-    if enabled?() and Cortex.Gateways.Telegram.enabled?() do
-      [Cortex.Gateways.Telegram]
-    else
-      []
-    end
+    if enabled?(), do: telegram_specs(), else: []
+  end
+
+  # One supervised poller per active bot, each tagged with a unique id so several
+  # can coexist under this one_for_one supervisor.
+  defp telegram_specs do
+    Config.telegram_bots()
+    |> Enum.filter(&Telegram.bot_active?/1)
+    |> Enum.map(fn bot ->
+      Supervisor.child_spec({Telegram, bot}, id: {Telegram, bot["name"]})
+    end)
   end
 
   # Gateways only run when this command asked for them (serve / gateway).

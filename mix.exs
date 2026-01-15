@@ -94,7 +94,11 @@ defmodule Cortex.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:burrito, "~> 1.0"},
-      {:owl, "~> 0.13"}
+      {:owl, "~> 0.13"},
+      # Scheduled tasks: cron-expression parsing + a pure-Elixir timezone database
+      # (`tz` builds the zone data at compile time — no hackney/runtime download).
+      {:crontab, "~> 1.1"},
+      {:tz, "~> 0.28"}
     ]
   end
 

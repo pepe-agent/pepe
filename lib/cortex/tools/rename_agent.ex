@@ -49,12 +49,17 @@ defmodule Cortex.Tools.RenameAgent do
 
   def run(_, _), do: {:error, "missing 'new_name'"}
 
-  # If the Telegram gateway is pinned to the old name, follow the rename.
+  # Follow the rename anywhere a Telegram bot is pinned to the old name — the
+  # default bot and any named (multi-channel) bots.
   defp retarget_telegram(old, new_name) do
     telegram = Config.telegram()
 
     if telegram["agent"] == old do
       Config.put_telegram(Map.put(telegram, "agent", new_name))
+    end
+
+    for bot <- Config.telegram_bots(), bot["name"] != "default", bot["agent"] == old do
+      Config.put_telegram_bot(bot["name"], Map.put(bot, "agent", new_name))
     end
   end
 end

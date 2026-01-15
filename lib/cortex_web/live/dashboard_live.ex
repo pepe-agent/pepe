@@ -30,7 +30,10 @@ defmodule CortexWeb.DashboardLive do
        running: false,
        input: "",
        learn_agent: Config.default_agent_name(),
-       learn_nodes: []
+       learn_nodes: [],
+       crons: Config.crons(),
+       cron_open: nil,
+       bots: Config.telegram_bots()
      )}
   end
 
@@ -59,6 +62,20 @@ defmodule CortexWeb.DashboardLive do
               class={["px-3 py-1", @view == :learn && "bg-blue-600"]}
             >
               Learn
+            </button>
+            <button
+              phx-click="view"
+              phx-value-to="cron"
+              class={["px-3 py-1", @view == :cron && "bg-blue-600"]}
+            >
+              Cron
+            </button>
+            <button
+              phx-click="view"
+              phx-value-to="bots"
+              class={["px-3 py-1", @view == :bots && "bg-blue-600"]}
+            >
+              Bots
             </button>
           </div>
         </div>
@@ -136,6 +153,147 @@ defmodule CortexWeb.DashboardLive do
           </div>
         </div>
 
+        <div :if={@view == :cron} class="flex h-full flex-col">
+          <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+            <div>
+              <div class="font-medium">🕒 Scheduled tasks</div>
+              <div class="text-xs text-zinc-400">recurring agent jobs · fire while the server runs</div>
+            </div>
+          </header>
+          <div class="flex-1 space-y-4 overflow-y-auto p-4">
+            <div
+              :for={c <- @crons}
+              class="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <span class="font-medium">{c.name}</span>
+                  <span class={["ml-2 rounded px-1.5 text-xs", c.enabled && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                    {(c.enabled && "enabled") || "disabled"}
+                  </span>
+                </div>
+                <div class="flex shrink-0 gap-1 text-xs">
+                  <button phx-click="cron_run" phx-value-id={c.id} class="rounded bg-blue-600 px-2 py-1 hover:bg-blue-500">
+                    Run now
+                  </button>
+                  <button phx-click="cron_toggle" phx-value-id={c.id} class="rounded bg-zinc-700 px-2 py-1 hover:bg-zinc-600">
+                    {(c.enabled && "Disable") || "Enable"}
+                  </button>
+                  <button
+                    phx-click="cron_remove"
+                    phx-value-id={c.id}
+                    data-confirm={"Remove scheduled task #{c.name}?"}
+                    class="rounded bg-zinc-700 px-2 py-1 text-red-300 hover:bg-zinc-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <div class="mt-1 text-xs text-zinc-400">
+                <code>{c.schedule}</code> · {c.timezone} · next {cron_next(c)}
+              </div>
+              <div class="text-xs text-zinc-500">
+                {c.agent}{model_suffix(c.model)} · → {deliver_label(c.deliver)}
+              </div>
+              <details class="mt-1">
+                <summary class="cursor-pointer text-xs text-zinc-500">prompt & last runs</summary>
+                <pre class="mt-1 whitespace-pre-wrap rounded bg-zinc-900 p-2 text-xs text-zinc-300">{c.prompt}</pre>
+                <div :for={e <- cron_history(c.id)} class="mt-1 text-xs text-zinc-400">
+                  {(e["ok"] && "✅") || "⚠️"} {learn_date(e["at"])} · {e["source"]}
+                  <span class="text-zinc-500">— {String.slice(to_string(e["output"]), 0, 120)}</span>
+                </div>
+              </details>
+            </div>
+            <p :if={@crons == []} class="text-sm text-zinc-500">No scheduled tasks yet — create one below.</p>
+
+            <form phx-submit="cron_create" class="space-y-2 rounded-lg border border-zinc-800 p-3">
+              <div class="text-sm font-medium">+ New scheduled task</div>
+              <input name="name" placeholder="Name (e.g. Daily XML check)" required
+                class="w-full rounded bg-zinc-800 px-2 py-1 text-sm outline-none" />
+              <textarea name="prompt" rows="3" required
+                placeholder="What to do each run — self-contained (no chat memory)"
+                class="w-full rounded bg-zinc-800 px-2 py-1 text-sm outline-none"></textarea>
+              <div class="flex gap-2">
+                <input name="schedule" placeholder="0 8 * * *" required
+                  class="flex-1 rounded bg-zinc-800 px-2 py-1 font-mono text-sm outline-none" />
+                <input name="timezone" value={Config.default_timezone()}
+                  class="flex-1 rounded bg-zinc-800 px-2 py-1 text-sm outline-none" />
+              </div>
+              <div class="flex gap-2">
+                <select name="agent" class="flex-1 rounded bg-zinc-800 px-2 py-1 text-sm outline-none">
+                  <option :for={a <- agent_names()} value={a}>{a}</option>
+                </select>
+                <select name="model" class="flex-1 rounded bg-zinc-800 px-2 py-1 text-sm outline-none">
+                  <option value="">agent default model</option>
+                  <option :for={m <- model_names()} value={m}>{m}</option>
+                </select>
+                <select name="deliver" class="flex-1 rounded bg-zinc-800 px-2 py-1 text-sm outline-none">
+                  <option value="none">Don't send anywhere</option>
+                  <option :for={t <- deliver_targets(@sessions)} value={t}>{deliver_label(t)}</option>
+                </select>
+              </div>
+              <div class="text-xs text-zinc-500">
+                Schedule is a 5-field cron expression. Timezone is any IANA name.
+              </div>
+              <button type="submit" class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-500">
+                Create task
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div :if={@view == :bots} class="flex h-full flex-col">
+          <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+            <div>
+              <div class="font-medium">🤖 Telegram bots</div>
+              <div class="text-xs text-zinc-400">
+                one poller per bot, each bound to an agent · changes apply live
+              </div>
+            </div>
+          </header>
+          <div class="flex-1 space-y-4 overflow-y-auto p-4">
+            <div :for={b <- @bots} class="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <span class="font-medium">{b["name"]}</span>
+                  <span class={["ml-2 rounded px-1.5 text-xs", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                    {(bot_active?(b) && "active") || "inactive"}
+                  </span>
+                </div>
+                <button
+                  :if={b["name"] != "default"}
+                  phx-click="bot_remove"
+                  phx-value-name={b["name"]}
+                  data-confirm={"Remove bot #{b["name"]}?"}
+                  class="rounded bg-zinc-700 px-2 py-1 text-xs text-red-300 hover:bg-zinc-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="mt-1 text-xs text-zinc-400">agent: {b["agent"] || "(default)"}</div>
+              <div class="text-xs text-zinc-500">token: {token_hint(b["bot_token"])}</div>
+            </div>
+            <p :if={@bots == []} class="text-sm text-zinc-500">
+              No bots yet. The default bot is set via <code>mix cortex gateway telegram setup</code>.
+            </p>
+
+            <form phx-submit="bot_add" class="space-y-2 rounded-lg border border-zinc-800 p-3">
+              <div class="text-sm font-medium">+ Add a bot</div>
+              <input name="name" placeholder="Name (e.g. sales)" required
+                class="w-full rounded bg-zinc-800 px-2 py-1 text-sm outline-none" />
+              <input name="token" placeholder="Bot token from @BotFather (or ${ENV_VAR})" required
+                class="w-full rounded bg-zinc-800 px-2 py-1 text-sm outline-none" />
+              <select name="agent" class="w-full rounded bg-zinc-800 px-2 py-1 text-sm outline-none">
+                <option value="">default agent</option>
+                <option :for={a <- agent_names()} value={a}>{a}</option>
+              </select>
+              <button type="submit" class="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-500">
+                Add bot
+              </button>
+            </form>
+          </div>
+        </div>
+
         <div :if={@view == :chat and @selected} class="flex h-full flex-col">
           <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
             <div class="truncate">
@@ -203,6 +361,70 @@ defmodule CortexWeb.DashboardLive do
   end
 
   defp agent_names, do: Config.agents() |> Enum.map(& &1.name) |> Enum.sort()
+  defp model_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
+
+  # Next fire time of a cron, formatted, or "—".
+  defp cron_next(cron) do
+    case Cortex.Cron.next_run(cron) do
+      nil -> "—"
+      dt -> Calendar.strftime(dt, "%Y-%m-%d %H:%M %Z")
+    end
+  end
+
+  defp cron_history(id), do: Cortex.Cron.Log.tail(id, 3)
+
+  defp model_suffix(nil), do: ""
+  defp model_suffix(model), do: " · #{model}"
+
+  defp deliver_label("none"), do: "not sent"
+  defp deliver_label("telegram:" <> id), do: "Telegram #{id}"
+  defp deliver_label(other), do: other
+
+  # Delivery targets offered in the form: the known Telegram chats (from sessions).
+  defp deliver_targets(sessions) do
+    sessions
+    |> Enum.map(& &1.key)
+    |> Enum.filter(&String.starts_with?(&1, "telegram:"))
+    |> Enum.uniq()
+  end
+
+  defp blank(nil), do: nil
+  defp blank(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: v)
+  defp blank(v), do: v
+
+  defp bot_active?(bot), do: Cortex.Gateways.Telegram.bot_active?(bot)
+
+  defp reject_nil(map), do: :maps.filter(fn _k, v -> not is_nil(v) end, map)
+
+  # Apply bot changes to the running pollers (we're inside the serve process).
+  defp reload_gateways do
+    Cortex.Gateways.Supervisor.reload_telegram()
+  rescue
+    _ -> :ok
+  end
+
+  defp token_hint(nil), do: "(none)"
+  defp token_hint("${" <> _ = env), do: env
+  defp token_hint(t), do: String.slice(to_string(t), 0, 6) <> "…"
+
+  # A readable, unique cron id derived from its name.
+  defp new_cron_id(name) do
+    base =
+      name
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9]+/u, "-")
+      |> String.trim("-")
+
+    base = if base == "", do: "task", else: base
+    taken = Enum.map(Config.crons(), & &1.id)
+
+    if base not in taken do
+      base
+    else
+      Stream.iterate(2, &(&1 + 1))
+      |> Enum.find_value(fn n -> if "#{base}-#{n}" not in taken, do: "#{base}-#{n}" end)
+    end
+  end
 
   defp learn_icon(:skill), do: "🧠"
   defp learn_icon(_memory), do: "📝"
@@ -234,7 +456,95 @@ defmodule CortexWeb.DashboardLive do
      )}
   end
 
+  def handle_event("view", %{"to" => "cron"}, socket) do
+    {:noreply, assign(socket, view: :cron, crons: Config.crons())}
+  end
+
+  def handle_event("view", %{"to" => "bots"}, socket) do
+    {:noreply, assign(socket, view: :bots, bots: Config.telegram_bots())}
+  end
+
   def handle_event("view", %{"to" => _chat}, socket), do: {:noreply, assign(socket, view: :chat)}
+
+  def handle_event("bot_add", %{"name" => name, "token" => token} = params, socket) do
+    name = String.trim(name)
+
+    cond do
+      name in ["", "default"] ->
+        {:noreply, put_flash(socket, :error, "Pick a name other than \"default\".")}
+
+      blank(token) == nil ->
+        {:noreply, put_flash(socket, :error, "A bot token is required.")}
+
+      true ->
+        map = %{"bot_token" => token, "agent" => blank(params["agent"])}
+        Config.put_telegram_bot(name, reject_nil(map))
+        reload_gateways()
+
+        {:noreply,
+         socket |> assign(bots: Config.telegram_bots()) |> put_flash(:info, "Bot #{name} added.")}
+    end
+  end
+
+  def handle_event("bot_remove", %{"name" => name}, socket) do
+    Config.delete_telegram_bot(name)
+    reload_gateways()
+    {:noreply, assign(socket, bots: Config.telegram_bots())}
+  end
+
+  def handle_event("cron_run", %{"id" => id}, socket) do
+    case Config.get_cron(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Task not found.")}
+
+      cron ->
+        # Fire off the main-loop path; the run can take a while, so don't block LiveView.
+        Task.start(fn -> Cortex.Cron.run(cron, :manual) end)
+        {:noreply, put_flash(socket, :info, "Running “#{cron.name}” now…")}
+    end
+  end
+
+  def handle_event("cron_toggle", %{"id" => id}, socket) do
+    case Config.get_cron(id) do
+      nil ->
+        {:noreply, socket}
+
+      cron ->
+        Config.put_cron(%{cron | enabled: !cron.enabled})
+        {:noreply, assign(socket, crons: Config.crons())}
+    end
+  end
+
+  def handle_event("cron_remove", %{"id" => id}, socket) do
+    Config.delete_cron(id)
+    Cortex.Cron.Log.delete(id)
+    {:noreply, assign(socket, crons: Config.crons())}
+  end
+
+  def handle_event("cron_create", params, socket) do
+    %{"name" => name, "prompt" => prompt, "schedule" => schedule} = params
+
+    case Cortex.Cron.parse(schedule) do
+      {:error, msg} ->
+        {:noreply, put_flash(socket, :error, "Invalid schedule: #{msg}")}
+
+      {:ok, _} ->
+        cron = %Cortex.Config.Cron{
+          id: new_cron_id(name),
+          name: name,
+          agent: blank(params["agent"]) || Config.default_agent_name(),
+          prompt: prompt,
+          schedule: schedule,
+          timezone: blank(params["timezone"]) || Config.default_timezone(),
+          model: blank(params["model"]),
+          deliver: blank(params["deliver"]) || "none",
+          enabled: true
+        }
+
+        Config.put_cron(cron)
+        {:noreply, socket |> assign(crons: Config.crons()) |> put_flash(:info, "Task created.")}
+    end
+  end
 
   def handle_event("pick_learn_agent", %{"agent" => name}, socket) do
     {:noreply, assign(socket, learn_agent: name, learn_nodes: Cortex.Learning.timeline(name))}
@@ -314,9 +624,19 @@ defmodule CortexWeb.DashboardLive do
     socket = assign(socket, sessions: list_sessions())
 
     socket =
-      if socket.assigns.view == :learn,
-        do: assign(socket, learn_nodes: Cortex.Learning.timeline(socket.assigns.learn_agent)),
-        else: socket
+      case socket.assigns.view do
+        :learn ->
+          assign(socket, learn_nodes: Cortex.Learning.timeline(socket.assigns.learn_agent))
+
+        :cron ->
+          assign(socket, crons: Config.crons())
+
+        :bots ->
+          assign(socket, bots: Config.telegram_bots())
+
+        _ ->
+          socket
+      end
 
     {:noreply, socket}
   end

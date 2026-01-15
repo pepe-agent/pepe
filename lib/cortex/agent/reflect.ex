@@ -3,7 +3,7 @@ defmodule Cortex.Agent.Reflect do
   Background self-improvement: after a session, the agent reviews the conversation
   and decides what should become **memory** or a **skill** — writing them itself.
 
-  Modelled on reference's background memory/skill review, in Cortex's own terms: a
+  A background memory/skill review, in Cortex's own terms: a
   *fork* is just an extra `Cortex.Agent.Runtime` run over a copy of the session's
   transcript, with the tool set **restricted to file/skill management** (read, write,
   edit, list, skill) and no human permission prompt — so the review can update the

@@ -4,7 +4,24 @@ defmodule Cortex.Gateways.Telegram do
   Cortex session, so conversations keep context — talk to your agent from Telegram
   while it works.
 
-  Configuration (in `~/.cortex/config.json` under `"telegram"`):
+  **Multi-channel:** you can run several bots at once, each bound to its own agent —
+  one bot is agent X, another is agent Y. `Cortex.Gateways.Supervisor` starts one
+  instance of this GenServer per configured bot; each keeps the bot map it serves in
+  its process dictionary (`@bot_key`), so its token, bound agent, allowlists and
+  session-key namespace are all its own. The default (legacy) bot uses the plain
+  `telegram:<chat_id>` session key; named bots use `telegram:<name>:<chat_id>`.
+
+  Configuration — the default bot lives under `"telegram"`, additional bots under
+  `"telegrams"` (a name→config map), in `~/.cortex/config.json`:
+
+      {
+        "telegram": { "bot_token": "${TELEGRAM_BOT_TOKEN}", "agent": "assistant" },
+        "telegrams": {
+          "sales": { "bot_token": "${SALES_BOT_TOKEN}", "agent": "sales-bot" }
+        }
+      }
+
+  Each bot map accepts:
 
       {
         "bot_token": "${TELEGRAM_BOT_TOKEN}",
@@ -12,7 +29,7 @@ defmodule Cortex.Gateways.Telegram do
         "allowed_chats": [12345],      // optional chat allowlist; empty = any chat
         "allowed_users": [67890],      // optional user allowlist; empty = any user
         "require_mention": true,       // optional; in groups only reply when @mentioned
-        "agent": "assistant"           // optional agent override
+        "agent": "assistant"           // the agent this bot talks to
       }
   """
   use GenServer
@@ -57,7 +74,7 @@ defmodule Cortex.Gateways.Telegram do
   end
 
   # Built-in commands plus one command per installed skill (so skills are
-  # discoverable from the "/" menu, the way reference surfaces them).
+  # discoverable from the "/" menu too).
   @spec full_menu() :: [{String.t(), String.t()}]
   defp full_menu, do: menu() ++ skill_commands()
 
@@ -106,13 +123,34 @@ defmodule Cortex.Gateways.Telegram do
   ### lifecycle
   ###
 
-  def enabled?, do: not is_nil(token())
+  # Each poller (one per bot) keeps the bot map it serves in its process
+  # dictionary, so the many token/agent/allowlist/send helpers can stay single-arg
+  # while still reading *their* bot. Cross-process hops re-install it explicitly:
+  # spawned Tasks (`respond`/`ingest_media`/`register_commands`), the Session's
+  # `authorize` callback, and cron `deliver/2`.
+  @bot_key :cortex_tg_bot
 
-  def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  @doc "Is at least one Telegram bot configured and enabled?"
+  def enabled?, do: Enum.any?(Config.telegram_bots(), &bot_active?/1)
 
-  defp token do
-    Config.telegram() |> Map.get("bot_token") |> Cortex.Config.interpolate() |> presence()
-  end
+  @doc "Is this bot map enabled and does it resolve to a usable token?"
+  def bot_active?(bot) when is_map(bot),
+    do: bot["enabled"] != false and not is_nil(resolve_token(bot))
+
+  def start_link(bot), do: GenServer.start_link(__MODULE__, bot, [])
+
+  defp put_bot(bot), do: Process.put(@bot_key, bot || %{})
+  defp bot, do: Process.get(@bot_key) || %{}
+  defp bot_name, do: bot()["name"] || "default"
+
+  defp token, do: resolve_token(bot())
+
+  defp resolve_token(bot),
+    do: bot |> Map.get("bot_token") |> Cortex.Config.interpolate() |> presence()
+
+  # The agent this bot is bound to (its whole reason for existing), else the global
+  # default. This is how "this channel talks only to agent X" works per bot.
+  defp agent_default, do: bot()["agent"] || Config.default_agent_name()
 
   defp presence(nil), do: nil
   defp presence(""), do: nil
@@ -123,12 +161,19 @@ defmodule Cortex.Gateways.Telegram do
   ###
 
   @impl true
-  def init(_) do
-    Logger.info("[telegram] gateway starting")
+  def init(bot) do
+    put_bot(bot)
+    Logger.info("[telegram] gateway starting for bot #{bot_name()}")
     # Fresh start: forget any cached bot username (the token may be a new bot).
-    :persistent_term.erase({__MODULE__, :username})
+    :persistent_term.erase({__MODULE__, :username, bot_name()})
     if :ets.whereis(@pending) == :undefined, do: :ets.new(@pending, [:set, :public, :named_table])
-    Task.start(&register_commands/0)
+    b = bot()
+
+    Task.start(fn ->
+      put_bot(b)
+      register_commands()
+    end)
+
     send(self(), :poll)
     {:ok, %{offset: 0}}
   end
@@ -205,7 +250,12 @@ defmodule Cortex.Gateways.Telegram do
     user_id = get_in(message, ["from", "id"])
 
     if active?() and allowed?(chat_id, user_id) and addressed?(text, chat["type"]) do
-      Task.start(fn -> respond(chat_id, user_id, strip_mention(text)) end)
+      b = bot()
+
+      Task.start(fn ->
+        put_bot(b)
+        respond(chat_id, user_id, strip_mention(text))
+      end)
     end
   end
 
@@ -248,7 +298,15 @@ defmodule Cortex.Gateways.Telegram do
     caption = message["caption"] || ""
 
     if active?() and allowed?(chat_id, user_id) and addressed?(caption, chat["type"]) do
-      Task.start(fn -> ingest_media(chat_id, file_id, kind, caption) end)
+      b = bot()
+
+      learn = learn_allowed?(user_id)
+
+      Task.start(fn ->
+        put_bot(b)
+        put_learn(learn)
+        ingest_media(chat_id, file_id, kind, caption)
+      end)
     end
   end
 
@@ -272,7 +330,7 @@ defmodule Cortex.Gateways.Telegram do
     with {:ok, file_path} <- telegram_file_path(file_id),
          url = "https://api.telegram.org/file/bot#{token()}/#{file_path}",
          {:ok, %{status: 200, body: body}} when is_binary(body) <- Req.get(url) do
-      agent = Config.telegram()["agent"] || Config.default_agent_name()
+      agent = agent_default()
       dir = Path.join(Cortex.Agent.Workspace.dir(agent), "media")
       File.mkdir_p!(dir)
       name = "#{kind}_#{System.unique_integer([:positive])}#{Path.extname(file_path)}"
@@ -319,6 +377,7 @@ defmodule Cortex.Gateways.Telegram do
 
   defp respond(chat_id, user_id, text) do
     Config.put_locale()
+    put_learn(learn_allowed?(user_id))
 
     case parse_command(text) do
       # /whoami is the one command that needs the sender id.
@@ -344,9 +403,12 @@ defmodule Cortex.Gateways.Telegram do
 
   defp chat_with_agent(chat_id, text) do
     send_chat_action(chat_id, "typing")
-    agent = Config.telegram()["agent"] || Config.default_agent_name()
+    agent = agent_default()
 
-    case Cortex.Agent.chat(session_key(chat_id), agent, text, authorize: authorizer(chat_id)) do
+    case Cortex.Agent.chat(session_key(chat_id), agent, text,
+           authorize: authorizer(chat_id),
+           learn: learn?()
+         ) do
       {:ok, reply} ->
         send_message(chat_id, reply)
 
@@ -394,7 +456,14 @@ defmodule Cortex.Gateways.Telegram do
   # the Session process; we render Telegram's own inline keyboard and block until
   # the poll loop delivers the pressed button (or we time out → deny).
   defp authorizer(chat_id) do
-    fn name, args, _ctx -> request_authorization(chat_id, name, args) end
+    # Captured here (in the bot's task) and re-installed when the Session process
+    # invokes the callback, so the prompt is sent via *this* bot's token.
+    b = bot()
+
+    fn name, args, _ctx ->
+      put_bot(b)
+      request_authorization(chat_id, name, args)
+    end
   end
 
   defp request_authorization(chat_id, name, args) do
@@ -582,11 +651,16 @@ defmodule Cortex.Gateways.Telegram do
   defp run_command(chat_id, "tools", _args), do: send_html(chat_id, tools_text())
 
   defp run_command(chat_id, "learn", _args) do
-    ensure_session(chat_id)
+    if learn?() do
+      ensure_session(chat_id)
 
-    case Cortex.Agent.Session.learn(session_key(chat_id)) do
-      :ok -> send_message(chat_id, gettext("🧠 Reviewing what I learned…"))
-      _ -> send_message(chat_id, gettext("No agent to learn with."))
+      case Cortex.Agent.Session.learn(session_key(chat_id)) do
+        :ok -> send_message(chat_id, gettext("🧠 Reviewing what I learned…"))
+        {:error, :not_allowed} -> send_message(chat_id, gettext("Learning is off for this chat."))
+        _ -> send_message(chat_id, gettext("No agent to learn with."))
+      end
+    else
+      send_message(chat_id, gettext("Learning is off for this chat."))
     end
   end
 
@@ -613,7 +687,7 @@ defmodule Cortex.Gateways.Telegram do
   defp run_command(chat_id, cmd, question) when cmd in ["btw", "side"] do
     ensure_session(chat_id)
     send_chat_action(chat_id, "typing")
-    agent = Config.telegram()["agent"] || Config.default_agent_name()
+    agent = agent_default()
 
     case Cortex.Agent.aside(session_key(chat_id), agent, question, authorize: authorizer(chat_id)) do
       {:ok, reply} ->
@@ -685,7 +759,7 @@ defmodule Cortex.Gateways.Telegram do
   end
 
   defp set_model(chat_id, name) do
-    agent_name = Config.telegram()["agent"] || Config.default_agent_name()
+    agent_name = agent_default()
 
     cond do
       is_nil(Config.get_model(name)) ->
@@ -794,7 +868,7 @@ defmodule Cortex.Gateways.Telegram do
 
   # /approve — inspect or clear the agent's persistent ("always allow") grants.
   defp manage_approvals(chat_id, []) do
-    agent_name = Config.telegram()["agent"] || Config.default_agent_name()
+    agent_name = agent_default()
 
     case Config.get_agent(agent_name) do
       nil ->
@@ -833,7 +907,7 @@ defmodule Cortex.Gateways.Telegram do
   end
 
   defp update_agent_approvals(chat_id, fun, ok_message) do
-    agent_name = Config.telegram()["agent"] || Config.default_agent_name()
+    agent_name = agent_default()
 
     case Config.get_agent(agent_name) do
       nil ->
@@ -845,11 +919,51 @@ defmodule Cortex.Gateways.Telegram do
     end
   end
 
-  defp session_key(chat_id), do: "telegram:#{chat_id}"
+  # The default bot keeps the legacy `telegram:<chat_id>` key so existing sessions
+  # and bindings survive; named bots are namespaced to avoid collisions and to let
+  # cron delivery route back to the right bot.
+  defp session_key(chat_id), do: session_key(bot_name(), chat_id)
+  defp session_key("default", chat_id), do: "telegram:#{chat_id}"
+  defp session_key(name, chat_id), do: "telegram:#{name}:#{chat_id}"
 
   defp ensure_session(chat_id) do
-    agent = Config.telegram()["agent"] || Config.default_agent_name()
+    agent = agent_default()
     Cortex.Agent.SessionSupervisor.ensure(session_key(chat_id), agent)
+  end
+
+  @doc """
+  Public entry point for delivering an unsolicited message to a chat (used by the
+  scheduled-task engine to report cron results). `target` is the part after
+  `"telegram:"` in a delivery address: `"<chat_id>"` (the default bot) or
+  `"<bot_name>:<chat_id>"` (a named bot). No-op when the bot/token can't be found.
+  """
+  def deliver(target, text) do
+    case resolve_delivery(target) do
+      {bot, chat_id} ->
+        put_bot(bot)
+        if token(), do: send_message(chat_id, text)
+
+      :error ->
+        Logger.warning("[telegram] no bot to deliver to #{inspect(target)}")
+    end
+
+    :ok
+  end
+
+  defp resolve_delivery(target) do
+    case String.split(to_string(target), ":", parts: 2) do
+      [name, chat_id] ->
+        case Config.telegram_bot(name) do
+          nil -> :error
+          bot -> {bot, chat_id}
+        end
+
+      [chat_id] ->
+        case Config.telegram_bot("default") || List.first(Config.telegram_bots()) do
+          nil -> :error
+          bot -> {bot, chat_id}
+        end
+    end
   end
 
   defp send_message(chat_id, text) do
@@ -895,13 +1009,13 @@ defmodule Cortex.Gateways.Telegram do
     end
   end
 
-  # The config `enabled` flag — lets you pause the bot without deleting the token.
-  defp active?, do: Config.telegram()["enabled"] != false
+  # The bot's `enabled` flag — lets you pause it without deleting the token.
+  defp active?, do: bot()["enabled"] != false
 
-  # Both the chat and the user must clear their (optional) allowlists. An empty or
-  # missing list means "no restriction" on that dimension.
+  # Both the chat and the user must clear this bot's (optional) allowlists. An empty
+  # or missing list means "no restriction" on that dimension.
   defp allowed?(chat_id, user_id) do
-    tg = Config.telegram()
+    tg = bot()
     allowlisted?(tg["allowed_chats"], chat_id) and allowlisted?(tg["allowed_users"], user_id)
   end
 
@@ -916,7 +1030,29 @@ defmodule Cortex.Gateways.Telegram do
     if require_mention?(), do: mentions_bot?(text) or command?(text), else: true
   end
 
-  defp require_mention?, do: Config.telegram()["require_mention"] != false
+  defp require_mention?, do: bot()["require_mention"] != false
+
+  @doc """
+  Whether a conversation may feed the memory/skill review, from a bot's `trainers`
+  allowlist: missing/null = learns from everyone, `[]` = learns from no one,
+  `[ids]` = learns only from those user ids. So a client's chat on a client-facing
+  bot never becomes memory.
+  """
+  def learns_from?(bot, user_id) when is_map(bot) do
+    case bot["trainers"] do
+      nil -> true
+      [] -> false
+      list when is_list(list) -> "*" in list or user_id in list
+      _ -> true
+    end
+  end
+
+  defp learn_allowed?(user_id), do: learns_from?(bot(), user_id)
+
+  # Stashed for this task process so downstream helpers (chat_with_agent, /learn)
+  # see the decision without threading user_id everywhere.
+  defp put_learn(allowed?), do: Process.put(:cortex_tg_learn, allowed?)
+  defp learn?, do: Process.get(:cortex_tg_learn, true)
   defp command?(text), do: String.starts_with?(text, "/")
 
   defp mentions_bot?(text) do
@@ -936,10 +1072,12 @@ defmodule Cortex.Gateways.Telegram do
 
   # Cache the bot's @username (from getMe) for mention handling.
   defp bot_username do
-    case :persistent_term.get({__MODULE__, :username}, :unset) do
+    key = {__MODULE__, :username, bot_name()}
+
+    case :persistent_term.get(key, :unset) do
       :unset ->
         username = fetch_username()
-        :persistent_term.put({__MODULE__, :username}, username)
+        :persistent_term.put(key, username)
         username
 
       username ->

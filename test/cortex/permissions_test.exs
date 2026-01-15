@@ -39,6 +39,14 @@ defmodule Cortex.PermissionsTest do
     assert Permissions.gate("bash", "{}", %{agent: agent}) == :allow
   end
 
+  test "a \"*\" auto_approve grant runs every risky tool without asking (omnipotent agent)" do
+    omni = %Agent{name: "boss", auto_approve: ["*"]}
+    ctx = %{agent: omni, authorize: fn _, _, _ -> flunk("should not ask") end}
+    assert Permissions.gate("bash", "{}", ctx) == :allow
+    assert Permissions.gate("write_file", "{}", ctx) == :allow
+    assert Permissions.gate("some_plugin_tool", "{}", ctx) == :allow
+  end
+
   test "deny refuses and is never remembered", %{agent: agent} do
     ctx = %{agent: agent, session_key: "s1", authorize: fn _, _, _ -> :deny end}
     assert Permissions.gate("bash", "{}", ctx) == :deny

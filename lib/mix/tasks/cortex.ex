@@ -25,10 +25,10 @@ defmodule Mix.Tasks.Cortex do
 
   ## Agents
 
-      mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--default]
+      mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--default]
       mix cortex agent list
-      mix cortex agent learn NAME [on|off]        # toggle self-improvement (memory/skills)
       mix cortex agent route FROM TO [--remove]   # let FROM message TO (directed)
+      mix cortex agent manage ADMIN TARGET [--remove]  # let ADMIN administer TARGET ("*" = all)
       mix cortex agent rename OLD NEW          # rename + move its workspace dir
       mix cortex agent remove NAME
       mix cortex agent default NAME
@@ -38,13 +38,17 @@ defmodule Mix.Tasks.Cortex do
       mix cortex run [AGENT] "your prompt"      # one-shot, streams to stdout
       mix cortex tui [AGENT | --agent NAME] [--session KEY]   # interactive console, keeps the session (alias: chat)
       mix cortex serve [--port 4000]             # OpenAI API + WebSocket server
-      mix cortex gateway telegram setup          # configure the Telegram bot token
-      mix cortex gateway telegram                # run the Telegram gateway
+      mix cortex gateway telegram setup          # configure the default Telegram bot
+      mix cortex gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
+      mix cortex gateway telegram list           # list configured bots
+      mix cortex gateway telegram remove NAME    # delete a named bot
+      mix cortex gateway telegram                # run the gateway (one poller per bot)
 
   ## Misc
 
       mix cortex tools                           # list built-in tools
       mix cortex timelearn [AGENT]               # what the agent has learned, on a timeline
+      mix cortex cron list|add|run|logs …        # scheduled tasks (recurring agent jobs)
       mix cortex setup                           # scaffold ~/.cortex/config.json
       mix cortex config                          # show config path + summary
   """
@@ -69,26 +73,72 @@ defmodule Mix.Tasks.Cortex do
   """
   def dispatch(argv) do
     case argv do
-      [] -> help()
-      ["help"] -> help()
+      [] ->
+        help()
+
+      ["help"] ->
+        help()
+
       # `cortex help <group>` mirrors `cortex <group> help`.
-      ["help", "agent" | _] -> agent_cmd(["help"])
-      ["help", "model" | _] -> model_cmd(["help"])
-      ["help", "gateway" | _] -> gateway_cmd(["help"])
-      ["setup" | _] -> with_config(&setup/0)
-      ["config" | rest] -> with_config(fn -> config_cmd(rest) end)
-      ["tools" | _] -> with_config(&tools/0)
-      ["timelearn" | rest] -> with_config(fn -> timelearn_cmd(rest) end)
-      ["model" | rest] -> with_config(fn -> model_cmd(rest) end)
-      ["agent" | rest] -> with_config(fn -> agent_cmd(rest) end)
-      ["run" | rest] -> with_app([], fn -> run_cmd(rest) end)
-      ["chat" | rest] -> with_app([persist: true], fn -> tui_cmd(rest) end)
-      ["tui" | rest] -> with_app([persist: true], fn -> tui_cmd(rest) end)
-      ["serve" | rest] -> with_app([serve: true, gateways: true], fn -> serve_cmd(rest) end)
+      ["help", "agent" | _] ->
+        agent_cmd(["help"])
+
+      ["help", "model" | _] ->
+        model_cmd(["help"])
+
+      ["help", "gateway" | _] ->
+        gateway_cmd(["help"])
+
+      ["setup" | _] ->
+        with_config(&setup/0)
+
+      ["config" | rest] ->
+        with_config(fn -> config_cmd(rest) end)
+
+      ["tools" | _] ->
+        with_config(&tools/0)
+
+      ["timelearn" | rest] ->
+        with_config(fn -> timelearn_cmd(rest) end)
+
+      # `cron list/history` only read files; `cron run` needs the full app to call
+      # the model, so route everything through with_app.
+      ["cron", sub | rest] when sub in ["list", "history", "logs"] ->
+        with_config(fn -> cron_cmd([sub | rest]) end)
+
+      ["cron" | rest] ->
+        with_app([], fn -> cron_cmd(rest) end)
+
+      ["model" | rest] ->
+        with_config(fn -> model_cmd(rest) end)
+
+      ["agent" | rest] ->
+        with_config(fn -> agent_cmd(rest) end)
+
+      ["run" | rest] ->
+        with_app([], fn -> run_cmd(rest) end)
+
+      ["chat" | rest] ->
+        with_app([persist: true], fn -> tui_cmd(rest) end)
+
+      ["tui" | rest] ->
+        with_app([persist: true], fn -> tui_cmd(rest) end)
+
+      ["serve" | rest] ->
+        with_app([serve: true, gateways: true], fn -> serve_cmd(rest) end)
+
       # Configuring a gateway only touches the config file — no app needed.
-      ["gateway", "telegram", "setup" | _] -> with_config(&telegram_setup/0)
-      ["gateway" | rest] -> with_app([gateways: true], fn -> gateway_cmd(rest) end)
-      other -> error("unknown command: #{Enum.join(other, " ")}\n") && help()
+      ["gateway", "telegram", "setup" | _] ->
+        with_config(&telegram_setup/0)
+
+      ["gateway", "telegram", sub | rest] when sub in ["add", "remove", "list"] ->
+        with_config(fn -> gateway_cmd(["telegram", sub | rest]) end)
+
+      ["gateway" | rest] ->
+        with_app([gateways: true], fn -> gateway_cmd(rest) end)
+
+      other ->
+        error("unknown command: #{Enum.join(other, " ")}\n") && help()
     end
   end
 
@@ -551,7 +601,7 @@ defmodule Mix.Tasks.Cortex do
           description: :string,
           tools: :string,
           can_message: :string,
-          learn: :boolean,
+          can_manage: :string,
           max_iterations: :integer,
           temperature: :float,
           default: :boolean
@@ -571,6 +621,15 @@ defmodule Mix.Tasks.Cortex do
         str -> str |> String.split(",") |> Enum.map(&String.trim/1)
       end
 
+    # --can-manage: omitted → nil (itself only); "none" → [] (nobody); "*" or a
+    # comma list → those. Mirrors Cortex.Config.can_manage?/2.
+    can_manage =
+      case opts[:can_manage] do
+        nil -> nil
+        "none" -> []
+        str -> str |> String.split(",") |> Enum.map(&String.trim/1)
+      end
+
     agent = %Agent{
       name: name,
       description: opts[:description],
@@ -578,7 +637,7 @@ defmodule Mix.Tasks.Cortex do
       system_prompt: opts[:prompt] || "You are Cortex, a helpful AI agent.",
       tools: tools,
       can_message: can_message,
-      learn: opts[:learn] || false,
+      can_manage: can_manage,
       max_iterations: opts[:max_iterations] || 12,
       temperature: opts[:temperature]
     }
@@ -601,9 +660,10 @@ defmodule Mix.Tasks.Cortex do
         Enum.each(agents, fn a ->
           mark = if a.name == default, do: " #{green("(default)")}", else: ""
           routes = if a.can_message == [], do: "", else: "\n  → #{Enum.join(a.can_message, ", ")}"
+          manages = manages_line(a.can_manage)
 
           IO.puts(
-            "#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}"
+            "#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}#{manages}"
           )
         end)
     end
@@ -648,22 +708,33 @@ defmodule Mix.Tasks.Cortex do
   defp agent_cmd(["route" | _]),
     do: error("usage: mix cortex agent route FROM TO [--remove]")
 
+  defp agent_cmd(["manage", from, to | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean])
+
+    cond do
+      is_nil(Config.get_agent(from)) ->
+        error("unknown agent: #{from}")
+
+      # `to` may be "*" (all) or a not-yet-created child, so it's not required to exist.
+      to != "*" and is_nil(Config.get_agent(to)) ->
+        error("unknown agent: #{to}  (use \"*\" for all)")
+
+      opts[:remove] ->
+        Config.disallow_manage(from, to)
+        ok("revoked: #{green(from)} no longer manages #{green(to)}")
+
+      true ->
+        Config.allow_manage(from, to)
+        ok("#{green(from)} can now manage #{green(to)}")
+    end
+  end
+
+  defp agent_cmd(["manage" | _]),
+    do: error("usage: mix cortex agent manage ADMIN TARGET [--remove]   (TARGET may be \"*\")")
+
   defp agent_cmd(["default", name | _]) do
     Config.set_default_agent(name)
     ok("default agent -> #{name}")
-  end
-
-  defp agent_cmd(["learn", name | rest]) do
-    on? = List.first(rest) not in ["off", "false", "0", "no"]
-
-    case Config.get_agent(name) do
-      nil ->
-        error("unknown agent: #{name}")
-
-      agent ->
-        Config.put_agent(%{agent | learn: on?})
-        ok("#{green(name)} learn #{onoff(on?)}")
-    end
   end
 
   defp agent_cmd(cmd) when cmd in [[], ["help"]] do
@@ -671,21 +742,27 @@ defmodule Mix.Tasks.Cortex do
     mix cortex agent — manage agents
 
       add NAME [--model M] [--prompt "…"] [--tools t1,t2]
-               [--can-message b,c] [--learn] [--default]   create/replace an agent
+               [--can-message b,c] [--can-manage x,y|*|none] [--default]
       list                                                 list agents (+ routes)
-      learn NAME [on|off]                                  toggle self-improvement
       route FROM TO [--remove]                             directed A→B messaging
+      manage ADMIN TARGET [--remove]                       let ADMIN administer TARGET (or "*")
       rename OLD NEW                                        rename + move its dir
       remove NAME
       default NAME                                         set the default agent
+
+    Capabilities are controlled by an agent's --tools (a capability = having its
+    tool); learning is controlled per-conversation by a bot's `trainers` list.
     """)
   end
 
   defp agent_cmd(other),
     do: error("unknown: mix cortex agent #{Enum.join(other, " ")}  (try: mix cortex agent help)")
 
-  defp onoff(true), do: "on"
-  defp onoff(false), do: "off"
+  # Only surface management scope when it's beyond the default (itself only).
+  defp manages_line(nil), do: ""
+  defp manages_line([]), do: "\n  ⚙ manages: nobody"
+  defp manages_line(["*"]), do: "\n  ⚙ manages: all agents"
+  defp manages_line(list) when is_list(list), do: "\n  ⚙ manages: #{Enum.join(list, ", ")}"
 
   ###
   ### run / chat
@@ -754,12 +831,77 @@ defmodule Mix.Tasks.Cortex do
     Process.sleep(:infinity)
   end
 
+  defp gateway_cmd(["telegram", "list" | _]) do
+    case Config.telegram_bots() do
+      [] ->
+        info(dim("no telegram bots configured. add one: mix cortex gateway telegram setup"))
+
+      bots ->
+        info(bold("✦ Telegram bots") <> dim(" — one poller per bot, each bound to an agent"))
+
+        Enum.each(bots, fn b ->
+          state =
+            if Cortex.Gateways.Telegram.bot_active?(b), do: green("active"), else: dim("inactive")
+
+          info("\n#{bold(b["name"])}  [#{state}]")
+          info(dim("   agent:    #{b["agent"] || "(default)"}"))
+          info(dim("   token:    #{token_hint(b["bot_token"])}"))
+          info(dim("   learns from: #{trainers_hint(b["trainers"])}"))
+        end)
+    end
+  end
+
+  defp gateway_cmd(["telegram", "add", name | rest]) do
+    {opts, _, _} =
+      OptionParser.parse(rest, strict: [token: :string, agent: :string, trainers: :string])
+
+    cond do
+      name == "default" ->
+        error("the default bot is managed via: mix cortex gateway telegram setup")
+
+      is_nil(opts[:token]) ->
+        error("telegram add needs --token (create a bot with @BotFather)")
+
+      true ->
+        map =
+          %{
+            "bot_token" => opts[:token],
+            "agent" => opts[:agent],
+            "trainers" => parse_trainers(opts[:trainers])
+          }
+          |> reject_nil_values()
+
+        Config.put_telegram_bot(name, map)
+        ok("telegram bot #{green(name)} → agent #{opts[:agent] || "(default)"}")
+        info(dim("run/refresh with: mix cortex gateway telegram  (or restart serve)"))
+    end
+  end
+
+  defp gateway_cmd(["telegram", "remove", name | _]) do
+    cond do
+      name == "default" ->
+        error("the default bot is managed via: mix cortex gateway telegram setup")
+
+      is_nil(Config.telegram_bot(name)) ->
+        error("unknown telegram bot: #{name}")
+
+      true ->
+        Config.delete_telegram_bot(name)
+        ok("#{green(name)} removed")
+    end
+  end
+
   defp gateway_cmd(["telegram" | _]) do
-    if Cortex.Gateways.Telegram.enabled?() do
-      ok("Telegram gateway running. Press Ctrl-C to stop.")
-      Process.sleep(:infinity)
-    else
-      error("no Telegram bot token configured. Run: mix cortex gateway telegram setup")
+    active = Config.telegram_bots() |> Enum.filter(&Cortex.Gateways.Telegram.bot_active?/1)
+
+    case active do
+      [] ->
+        error("no Telegram bot token configured. Run: mix cortex gateway telegram setup")
+
+      bots ->
+        names = Enum.map_join(bots, ", ", & &1["name"])
+        ok("Telegram gateway running (#{length(bots)} bot(s): #{names}). Press Ctrl-C to stop.")
+        Process.sleep(:infinity)
     end
   end
 
@@ -767,12 +909,45 @@ defmodule Mix.Tasks.Cortex do
     info("""
     mix cortex gateway — messaging gateways
 
-      telegram setup    configure the Telegram bot token, allowlists, agent
-      telegram          run the Telegram gateway (long-polling)
+      telegram setup              configure the DEFAULT bot (token, allowlists, agent)
+      telegram add NAME --token T [--agent A] [--trainers id1,id2]
+                                  add another bot bound to an agent
+                                  (--trainers: who it learns from; omit=everyone, none=nobody)
+      telegram list               list configured bots
+      telegram remove NAME        delete a named bot
+      telegram                    run the gateway — one poller per bot (long-polling)
     """)
   end
 
-  defp gateway_cmd(_), do: error("usage: mix cortex gateway telegram [setup]  (or: help)")
+  defp gateway_cmd(_),
+    do: error("usage: mix cortex gateway telegram [setup|add|list|remove]  (or: help)")
+
+  defp token_hint(nil), do: "(none)"
+  defp token_hint("${" <> _ = env), do: env
+  defp token_hint(t), do: String.slice(to_string(t), 0, 6) <> "…"
+
+  defp trainers_hint(nil), do: "everyone (default)"
+  defp trainers_hint([]), do: "no one"
+  defp trainers_hint(["*"]), do: "everyone"
+  defp trainers_hint(list) when is_list(list), do: Enum.join(list, ", ")
+  defp trainers_hint(_), do: "everyone"
+
+  # --trainers: omitted → nil (default: everyone); "*" → ["*"] (everyone, explicit);
+  # "none"/"" → [] (no one); "id1,id2" → [id1, id2] (only those user ids).
+  defp parse_trainers(nil), do: nil
+  defp parse_trainers(str) when str in ["", "none"], do: []
+  defp parse_trainers("*"), do: ["*"]
+
+  defp parse_trainers(str) do
+    str
+    |> String.split(",")
+    |> Enum.flat_map(fn s ->
+      case Integer.parse(String.trim(s)) do
+        {n, _} -> [n]
+        :error -> []
+      end
+    end)
+  end
 
   # Interactive Telegram config — token, optional agent, optional chat allowlist.
   defp telegram_setup do
@@ -880,6 +1055,7 @@ defmodule Mix.Tasks.Cortex do
       {:agent, "Agent — add or set the default"},
       {:telegram, "Telegram gateway"},
       {:language, "Language for system messages"},
+      {:timezone, "Default timezone for scheduled tasks"},
       {:full, "Run the full guided setup"},
       {:done, "Done"}
     ]
@@ -911,6 +1087,10 @@ defmodule Mix.Tasks.Cortex do
 
       :language ->
         setup_language()
+        config_menu()
+
+      :timezone ->
+        setup_timezone()
         config_menu()
     end
   end
@@ -949,7 +1129,7 @@ defmodule Mix.Tasks.Cortex do
             ok("model #{green(name)} → #{model_id}")
 
             info("\n" <> bold("Step 2/2 · Agent"))
-            add_agent()
+            add_agent(true)
             maybe_setup_telegram()
             info("\n" <> green("✓ All set!") <> "  Try:  " <> bold("cortex run \"hello\""))
         end
@@ -974,8 +1154,38 @@ defmodule Mix.Tasks.Cortex do
     ok("language → #{code}")
   end
 
-  # Add an agent bound to the current default model connection.
-  defp add_agent do
+  # Default timezone for scheduled tasks that don't name their own. Free-text so any
+  # IANA zone works ("America/Sao_Paulo", "Europe/Berlin", …); a task can still
+  # override it. Blank keeps the current value.
+  defp setup_timezone do
+    tz =
+      Owl.IO.input(
+        label:
+          "Default timezone for scheduled tasks" <>
+            dim(" (current: #{Config.default_timezone()})") <> ":",
+        optional: true
+      )
+      |> blank_default(Config.default_timezone())
+
+    case DateTime.now(tz) do
+      {:ok, _} ->
+        Config.set_default_timezone(tz)
+        ok("timezone → #{tz}")
+
+      _ ->
+        error("unknown timezone: #{tz} — keeping #{Config.default_timezone()}")
+    end
+  end
+
+  # Add an agent bound to the current default model connection. The `primary?`
+  # agent — the one created on first setup — is the owner's own agent, so it's born
+  # omnipotent: every tool, super-admin over all agents, and auto-approval of all
+  # tools (no permission prompts), so it can do anything via chat from the start.
+  defp add_agent(primary? \\ false) do
+    # The very first agent is always the primary (omnipotent) one, whatever path
+    # created it.
+    primary? = primary? or agent_names() == []
+
     agent_name =
       Owl.IO.input(label: "Agent name:", optional: true)
       |> blank_default("assistant")
@@ -985,27 +1195,37 @@ defmodule Mix.Tasks.Cortex do
       Owl.IO.input(label: "System prompt:", optional: true)
       |> blank_default("You are Cortex, a helpful AI agent.")
 
-    tools =
-      case Cortex.TUI.multiselect(Cortex.Tools.names(),
-             label:
-               bold("Select tools") <> dim(" (numbers, space/comma separated; blank = all):"),
-             render_as: &tool_render/1
-           ) do
-        [] -> Cortex.Tools.names()
-        picked -> picked
-      end
+    tools = if primary?, do: Cortex.Tools.names(), else: pick_tools()
 
     Config.put_agent(%Agent{
       name: agent_name,
       model: Config.default_model_name(),
       system_prompt: system_prompt,
       tools: tools,
+      auto_approve: if(primary?, do: ["*"], else: []),
+      can_manage: if(primary?, do: ["*"], else: nil),
       max_iterations: 12
     })
 
     Config.set_default_agent(agent_name)
-    ok("agent #{green(agent_name)} (tools: #{Enum.join(tools, ", ")})")
+
+    if primary? do
+      ok("agent #{green(agent_name)} — full access (all tools, super-admin, no prompts)")
+    else
+      ok("agent #{green(agent_name)} (tools: #{Enum.join(tools, ", ")})")
+    end
+
     :ok
+  end
+
+  defp pick_tools do
+    case Cortex.TUI.multiselect(Cortex.Tools.names(),
+           label: bold("Select tools") <> dim(" (numbers, space/comma separated; blank = all):"),
+           render_as: &tool_render/1
+         ) do
+      [] -> Cortex.Tools.names()
+      picked -> picked
+    end
   end
 
   defp maybe_setup_telegram do
@@ -1112,6 +1332,186 @@ defmodule Mix.Tasks.Cortex do
     case DateTime.from_unix(ts) do
       {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
       _ -> "—"
+    end
+  end
+
+  ###
+  ### cron (scheduled tasks)
+  ###
+
+  defp cron_cmd(["list" | _]) do
+    case Config.crons() do
+      [] ->
+        info(dim("no scheduled tasks. add one: mix cortex cron add …"))
+
+      crons ->
+        info(bold("✦ Scheduled tasks"))
+        Enum.each(crons, &print_cron/1)
+    end
+  end
+
+  defp cron_cmd(["add" | rest]) do
+    {opts, _, _} =
+      OptionParser.parse(rest,
+        strict: [
+          name: :string,
+          agent: :string,
+          prompt: :string,
+          schedule: :string,
+          timezone: :string,
+          model: :string,
+          deliver: :string
+        ]
+      )
+
+    with {:ok, name} <- require_opt(opts, :name),
+         {:ok, prompt} <- require_opt(opts, :prompt),
+         {:ok, schedule} <- require_opt(opts, :schedule),
+         {:ok, _} <- Cortex.Cron.parse(schedule) do
+      agent = opts[:agent] || Config.default_agent_name()
+
+      if is_nil(agent) do
+        error("no agent. pass --agent NAME or set a default agent")
+      else
+        cron = %Cortex.Config.Cron{
+          id: cron_id(name),
+          name: name,
+          agent: agent,
+          prompt: prompt,
+          schedule: schedule,
+          timezone: opts[:timezone] || Config.default_timezone(),
+          model: opts[:model],
+          deliver: opts[:deliver] || "none",
+          enabled: true
+        }
+
+        Config.put_cron(cron)
+        ok("scheduled task #{green(cron.id)} created")
+        print_cron(cron)
+      end
+    else
+      {:error, :missing, key} -> error("cron add needs --#{key}")
+      {:error, msg} -> error("invalid --schedule: #{msg}")
+    end
+  end
+
+  defp cron_cmd(["run", id | _]) do
+    case Config.get_cron(id) do
+      nil ->
+        error("unknown task: #{id}")
+
+      cron ->
+        info(dim("running #{id}…"))
+
+        case Cortex.Cron.run(cron, :manual) do
+          {:ok, output} -> info("\n" <> output)
+          {:error, reason} -> error("task failed: #{inspect(reason)}")
+        end
+    end
+  end
+
+  defp cron_cmd([action, id | _]) when action in ["enable", "disable"] do
+    on? = action == "enable"
+
+    case Config.get_cron(id) do
+      nil ->
+        error("unknown task: #{id}")
+
+      cron ->
+        Config.put_cron(%{cron | enabled: on?})
+        ok("#{green(id)} #{action}d")
+    end
+  end
+
+  defp cron_cmd(["remove", id | _]) do
+    case Config.get_cron(id) do
+      nil ->
+        error("unknown task: #{id}")
+
+      _ ->
+        Config.delete_cron(id)
+        Cortex.Cron.Log.delete(id)
+        ok("#{green(id)} removed")
+    end
+  end
+
+  defp cron_cmd(["history", id | _]), do: cron_cmd(["logs", id])
+
+  defp cron_cmd(["logs", id | _]) do
+    case Cortex.Cron.Log.tail(id, 20) do
+      [] ->
+        info(dim("no runs recorded for #{id} yet"))
+
+      entries ->
+        info(bold("✦ Runs of ") <> green(id))
+
+        Enum.each(entries, fn e ->
+          mark = if e["ok"], do: "✅", else: "⚠️"
+          info("\n#{mark} #{dim(learn_date(e["at"]))} #{dim("· " <> e["source"])}")
+
+          info(
+            dim(
+              "   " <>
+                (to_string(e["output"]) |> String.replace("\n", " ") |> String.slice(0, 120))
+            )
+          )
+        end)
+    end
+  end
+
+  defp cron_cmd(_) do
+    info("""
+    mix cortex cron — scheduled tasks (recurring agent jobs)
+
+      list                                              list all tasks (+ next run)
+      add --name N --prompt "…" --schedule "0 8 * * *"
+          [--agent A] [--timezone America/Sao_Paulo]
+          [--model M] [--deliver telegram:<chat_id>|none]   create a task
+      run ID                                            force a task now (preview)
+      enable ID | disable ID
+      remove ID
+      logs ID                                           recent run history
+
+    Schedule is a standard 5-field cron expression. Timezone is any IANA name
+    (default: #{Config.default_timezone()}). Tasks fire only while `serve`/`gateway` runs.
+    """)
+  end
+
+  defp print_cron(%Cortex.Config.Cron{} = c) do
+    next = Cortex.Cron.next_run(c)
+    state = if c.enabled, do: green("enabled"), else: dim("disabled")
+
+    info("\n#{bold(c.id)} — #{c.name}  [#{state}]")
+    info(dim("   when:    #{c.schedule} (#{c.timezone})"))
+    if next, do: info(dim("   next:    #{Calendar.strftime(next, "%Y-%m-%d %H:%M %Z")}"))
+    info(dim("   agent:   #{c.agent}#{if c.model, do: " · model #{c.model}", else: ""}"))
+    info(dim("   deliver: #{c.deliver}"))
+    if c.last_run, do: info(dim("   last:    #{learn_date(c.last_run)}"))
+  end
+
+  defp require_opt(opts, key) do
+    case opts[key] do
+      nil -> {:error, :missing, key}
+      val -> {:ok, val}
+    end
+  end
+
+  # Slugify a name into a unique cron id.
+  defp cron_id(name) do
+    base =
+      name
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9]+/u, "-")
+      |> String.trim("-")
+
+    base = if base == "", do: "task", else: base
+    taken = Enum.map(Config.crons(), & &1.id)
+
+    if base not in taken do
+      base
+    else
+      Stream.iterate(2, &(&1 + 1))
+      |> Enum.find_value(fn n -> if "#{base}-#{n}" not in taken, do: "#{base}-#{n}" end)
     end
   end
 

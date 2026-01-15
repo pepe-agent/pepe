@@ -64,6 +64,9 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Timezone database (used by scheduled tasks / cron for "America/Sao_Paulo" etc.).
+config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+
 # Fixed system messages (CLI/gateway) are translated via Cortex.Gettext. The
 # active locale comes from the config file (`mix cortex setup`); the agent's own
 # replies are unaffected and follow the user's language.

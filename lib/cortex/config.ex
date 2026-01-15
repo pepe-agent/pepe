@@ -22,6 +22,7 @@ defmodule Cortex.Config do
   """
 
   alias Cortex.Config.Agent
+  alias Cortex.Config.Cron
   alias Cortex.Config.Model
 
   @doc "Absolute path to the config directory (created on demand)."
@@ -169,6 +170,39 @@ defmodule Cortex.Config do
     end
   end
 
+  @doc """
+  May `admin` administer the agent named `target`? Authority defaults to CLOSED:
+
+    * `can_manage == nil` → itself only (a mild default).
+    * `[]` → nobody, not even itself (a locked child).
+    * `[names]` → exactly those (list is exhaustive — include its own name to also
+      manage itself).
+    * `["*"]` → everyone (an explicit super-admin, never implicit).
+  """
+  def can_manage?(%Agent{name: name, can_manage: cm}, target) do
+    cond do
+      is_nil(cm) -> to_string(target) == to_string(name)
+      "*" in cm -> true
+      true -> to_string(target) in Enum.map(cm, &to_string/1)
+    end
+  end
+
+  @doc "Grant `from` management authority over `to` (directed; list is exhaustive)."
+  def allow_manage(from, to) do
+    case get_agent(from) do
+      nil -> {:error, :unknown_agent}
+      agent -> put_agent(%{agent | can_manage: Enum.uniq((agent.can_manage || []) ++ [to])})
+    end
+  end
+
+  @doc "Revoke `from`'s authority over `to`."
+  def disallow_manage(from, to) do
+    case get_agent(from) do
+      nil -> {:error, :unknown_agent}
+      agent -> put_agent(%{agent | can_manage: List.delete(agent.can_manage || [], to)})
+    end
+  end
+
   def delete_agent(name) do
     load()
     |> update_in(["agents"], &Map.delete(&1 || %{}, name))
@@ -221,6 +255,42 @@ defmodule Cortex.Config do
   def model_for_agent(%Agent{model: name}), do: get_model(name) || default_model()
 
   ###
+  ### Scheduled tasks (crons)
+  ###
+
+  @doc "All configured crons, as `Cortex.Config.Cron` structs."
+  def crons do
+    load()
+    |> Map.get("crons", %{})
+    |> Enum.map(fn {id, map} -> Cron.from_map(Map.put(map, "id", id)) end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @doc "Fetch one cron by id, or nil."
+  def get_cron(id) do
+    case load() |> get_in(["crons", id]) do
+      nil -> nil
+      map -> Cron.from_map(Map.put(map, "id", id))
+    end
+  end
+
+  @doc "Create or replace a cron (keyed by its `id`)."
+  def put_cron(%Cron{id: id} = cron) when is_binary(id) do
+    map = cron |> Map.from_struct() |> Map.delete(:id) |> stringify()
+
+    load()
+    |> update_in(["crons"], fn c -> Map.put(c || %{}, id, map) end)
+    |> save()
+  end
+
+  @doc "Delete a cron by id."
+  def delete_cron(id) do
+    load()
+    |> update_in(["crons"], &Map.delete(&1 || %{}, id))
+    |> save()
+  end
+
+  ###
   ### Gateways
   ###
 
@@ -232,9 +302,61 @@ defmodule Cortex.Config do
     load() |> Map.put("telegram", map) |> save()
   end
 
+  @doc """
+  All configured Telegram bots as maps, each carrying a `"name"`. Multi-channel:
+  the legacy singular `"telegram"` map is the bot named `"default"`; any extra bots
+  live under `"telegrams"` (a name→config map), each bound to its own agent. Bots
+  that resolve to the same token are de-duplicated (two pollers on one token would
+  409 against each other).
+  """
+  def telegram_bots do
+    base =
+      case load()["telegram"] do
+        m when is_map(m) and map_size(m) > 0 -> [Map.put(m, "name", m["name"] || "default")]
+        _ -> []
+      end
+
+    extra =
+      load()
+      |> Map.get("telegrams", %{})
+      |> Enum.map(fn {name, m} -> Map.put(m, "name", name) end)
+      |> Enum.sort_by(& &1["name"])
+
+    (base ++ extra)
+    |> Enum.uniq_by(fn m -> interpolate(m["bot_token"]) || m["name"] end)
+  end
+
+  @doc "Fetch one Telegram bot config by name (`\"default\"` is the legacy one)."
+  def telegram_bot(name), do: Enum.find(telegram_bots(), &(&1["name"] == name))
+
+  @doc "Create or replace a named (non-default) Telegram bot."
+  def put_telegram_bot(name, map) when is_binary(name) and is_map(map) do
+    clean = Map.delete(map, "name")
+
+    load()
+    |> update_in(["telegrams"], fn t -> Map.put(t || %{}, name, clean) end)
+    |> save()
+  end
+
+  @doc "Delete a named Telegram bot."
+  def delete_telegram_bot(name) do
+    load()
+    |> update_in(["telegrams"], &Map.delete(&1 || %{}, name))
+    |> save()
+  end
+
   def server do
     load() |> Map.get("server", %{"port" => 4000})
   end
+
+  @doc """
+  Default IANA timezone for scheduled tasks that don't name their own (e.g.
+  `"America/Sao_Paulo"`). Set at `mix cortex setup`; falls back to UTC.
+  """
+  def default_timezone, do: load()["timezone"] || "Etc/UTC"
+
+  @doc "Set the default timezone for scheduled tasks."
+  def set_default_timezone(tz), do: load() |> Map.put("timezone", tz) |> save()
 
   @doc "Locale for fixed system messages (default \"en\")."
   def locale, do: load()["locale"] || "en"

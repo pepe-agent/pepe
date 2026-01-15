@@ -95,7 +95,11 @@ defmodule Cortex.Agent.Session do
           }
       end
 
-    {:ok, Map.put_new(state, :idle_ref, nil)}
+    # `learn_allowed` gates the memory/skill review for THIS conversation. The
+    # surface sets it per turn (Telegram computes it from the bot's `trainers`
+    # allowlist + the sender), so a client's chat never becomes memory. Defaults to
+    # true (an owner console/API conversation learns unless told otherwise).
+    {:ok, state |> Map.put_new(:idle_ref, nil) |> Map.put_new(:learn_allowed, true)}
   end
 
   # Sessions are only persisted in long-running surfaces (serve/gateway), so local
@@ -135,6 +139,8 @@ defmodule Cortex.Agent.Session do
         messages = ensure_system(state.messages, agent) ++ [Message.user(text)]
         # Tag the run with this session's key so `:session` approvals are scoped to it.
         opts = Keyword.put(opts, :session_key, state.key)
+        # Whether this conversation may feed the memory/skill review (set by the surface).
+        state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
         # A new message cancels any pending idle review.
         state = cancel_idle(state)
         # Run off-process so the session stays responsive (e.g. to `/stop`). We hold
@@ -150,6 +156,10 @@ defmodule Cortex.Agent.Session do
   end
 
   def handle_call(:stop, _from, state), do: {:reply, {:error, :not_running}, state}
+
+  def handle_call(:learn, _from, %{learn_allowed: false} = state) do
+    {:reply, {:error, :not_allowed}, state}
+  end
 
   def handle_call(:learn, _from, state) do
     case Config.get_agent(state.agent_name) || Config.default_agent() do
@@ -211,7 +221,7 @@ defmodule Cortex.Agent.Session do
 
       agent ->
         # Review before compacting, while the full detail is still here.
-        if agent.learn, do: Cortex.Agent.Reflect.review_async(agent, state.messages)
+        if state.learn_allowed, do: Cortex.Agent.Reflect.review_async(agent, state.messages)
 
         case compact_messages(agent, state.messages) do
           {:ok, messages, summary} ->
@@ -260,12 +270,12 @@ defmodule Cortex.Agent.Session do
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
 
-  # The session went idle after a run — run the memory/skill review if the agent
-  # opted in (`learn: true`), then clear the timer.
+  # The session went idle after a run — run the memory/skill review if this
+  # conversation is allowed to learn, then clear the timer.
   def handle_info(:idle_review, state) do
-    case Config.get_agent(state.agent_name) do
-      %{learn: true} = agent -> Cortex.Agent.Reflect.review_async(agent, state.messages)
-      _ -> :ok
+    with true <- state.learn_allowed,
+         agent when not is_nil(agent) <- Config.get_agent(state.agent_name) do
+      Cortex.Agent.Reflect.review_async(agent, state.messages)
     end
 
     {:noreply, %{state | idle_ref: nil}}
@@ -274,16 +284,12 @@ defmodule Cortex.Agent.Session do
   # Idle-review timer (fires the reflect pass a while after the last turn).
   @idle_ms 90_000
 
-  defp maybe_schedule_idle(state) do
-    case Config.get_agent(state.agent_name) do
-      %{learn: true} ->
-        state = cancel_idle(state)
-        %{state | idle_ref: Process.send_after(self(), :idle_review, @idle_ms)}
-
-      _ ->
-        state
-    end
+  defp maybe_schedule_idle(%{learn_allowed: true} = state) do
+    state = cancel_idle(state)
+    %{state | idle_ref: Process.send_after(self(), :idle_review, @idle_ms)}
   end
+
+  defp maybe_schedule_idle(state), do: state
 
   defp cancel_idle(%{idle_ref: ref} = state) when is_reference(ref) do
     Process.cancel_timer(ref)

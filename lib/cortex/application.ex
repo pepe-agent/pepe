@@ -28,7 +28,7 @@ defmodule Cortex.Application do
         Cortex.Permissions.SessionStore,
         # Messaging gateways (Telegram, ...). No-ops when not configured.
         Cortex.Gateways.Supervisor
-      ] ++ endpoint_children ++ restore_children()
+      ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Cortex.Supervisor]
     Supervisor.start_link(children, opts)
@@ -47,6 +47,16 @@ defmodule Cortex.Application do
     else
       []
     end
+  end
+
+  # The scheduled-task timer only runs on the long-lived surfaces (serve/gateway),
+  # never during a one-shot CLI command — otherwise `mix cortex run` could fire a
+  # cron. Both flags default to false; serve enables the endpoint, gateway the
+  # gateways, and either brings up the scheduler.
+  defp scheduler_children do
+    serve? = Application.get_env(:cortex, :serve_endpoint, false)
+    gateways? = Application.get_env(:cortex, :start_gateways, false)
+    if serve? or gateways?, do: [Cortex.Cron.Scheduler], else: []
   end
 
   # The Phoenix endpoint (OpenAI-compatible HTTP API + WebSocket) is only started

@@ -136,7 +136,6 @@ mix cortex agent add assistant \
   --prompt "You are a helpful coding agent." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search --default
 mix cortex agent list
-mix cortex agent learn zak on            # opt into self-improvement (see Learning)
 mix cortex agent route zak helper        # let zak message another agent (see Routing)
 mix cortex agent rename assistant zak   # rename + move its workspace dir (~/.cortex/agents/<name>/)
 mix cortex agent remove zak
@@ -172,6 +171,7 @@ mix cortex gateway telegram            # run the gateway in the foreground (long
 ```bash
 mix cortex tools                       # list available tools (built-ins + plugins)
 mix cortex timelearn [AGENT]           # what the agent has learned, on a timeline
+mix cortex cron list|add|run|logs …    # scheduled tasks (see Scheduled tasks)
 mix cortex config                      # show config path + a summary
 mix cortex help                        # full command help (or: help <group>)
 ```
@@ -181,8 +181,10 @@ mix cortex help                        # full command help (or: help <group>)
 A Phoenix LiveView dashboard at **`/`** — a live list of sessions on the left and a
 streaming chat panel on the right. Pick a session to read its history and talk to
 its agent; replies stream in token-by-token. `New chat` starts a fresh session, and
-each session shows its agent, model and turn count. A **Chat / Learn** toggle
-switches the main pane to the **TimeLearn** timeline (see **Learning**).
+each session shows its agent, model and turn count. A **Chat / Learn / Cron / Bots**
+toggle switches the main pane to the **TimeLearn** timeline (see **Learning**), the
+**scheduled-tasks** manager (see **Scheduled tasks**), or the **Telegram bots**
+manager (see **Telegram → Multiple bots**).
 
 ```bash
 mix assets.build          # once (builds css/js)
@@ -235,11 +237,11 @@ Three equivalent ways (first match wins):
 ```bash
 # turn 1
 curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
-  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"meu nome é Jho"}]}'
+  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"my name is John Doe"}]}'
 
 # turn 2 — same "user", server remembers turn 1
 curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
-  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"qual meu nome?"}]}'
+  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"what is my name?"}]}'
 ```
 
 Each session is a supervised GenServer keyed by `api:<id>` (`Cortex.Agent.Session`).
@@ -288,10 +290,86 @@ Installed **skills are also surfaced as their own slash commands** (e.g. a
 messages follow the configured `locale`; the agent's own replies follow the user's
 language, and raw internal errors are never leaked into the chat.
 
+### Multiple bots, one per agent
+
+You can run **several bots at once, each bound directly to its own agent** — one
+Telegram bot *is* agent X, another *is* agent Y. Cortex starts one poller per bot;
+each has its own token, bound agent, allowlists and session namespace.
+
+```bash
+mix cortex gateway telegram setup                        # the default bot
+mix cortex gateway telegram add sales --token $T --agent sales-bot
+mix cortex gateway telegram add ops   --token $T2 --agent ops-bot
+mix cortex gateway telegram list                         # see them all
+mix cortex gateway telegram                              # runs every bot
+```
+
+The default bot lives under `"telegram"`; extra bots under `"telegrams"` (a
+name→config map) in `~/.cortex/config.json`, each accepting the same keys. Bots
+that resolve to the same token are de-duplicated (two pollers on one token would
+conflict). The default bot keeps the `telegram:<chat_id>` session key; named bots
+use `telegram:<name>:<chat_id>`, so their conversations (and cron delivery) never
+collide. You can also manage bots live from the **Bots** tab in the dashboard —
+add/remove there and the running pollers reconcile without a restart.
+
+Within a single bot you can still switch agent per chat with `/agent X` (see
+**Agent-to-agent routing**); dedicated bots are for when a whole channel should
+*be* one agent.
+
+#### Let an agent add a bot from chat
+
+An agent can create and manage bots itself with the `manage_channel` tool — *"add
+a bot for the sales agent, token in `$SALES_BOT_TOKEN`"* — as long as the tool is in
+its allowlist. It's guarded two ways:
+
+- **Permission gate** — `manage_channel` is a risky tool, so each call is authorized
+  by the human (or pre-approved), like any risky tool.
+- **Scoped** — it only touches named bots, never the protected `default` bot or any
+  other config.
+- **Secrets never pass through the chat** — you give the *name of an environment
+  variable* holding the token (`token_env: "SALES_BOT_TOKEN"`), not the token; it's
+  stored as `${SALES_BOT_TOKEN}` and resolved at read time, so the raw secret never
+  reaches the model or the logs. Set that env var yourself.
+
+After a change the running pollers reconcile live. Actions: `add`, `list`,
+`set_agent`, `enable`, `disable`, `remove`.
+
+## Admin agents (manage & train other agents)
+
+An agent can administer and **train other agents** — set their persona, model, tools,
+and memory, or create new ones — with the `manage_agent` tool. Authority is a
+**directed, per-agent allowlist** (`can_manage`), so you can have several admins,
+each scoped to different agents:
+
+| `can_manage`      | means                                             |
+|-------------------|---------------------------------------------------|
+| *omitted* / `nil` | itself only (default)                             |
+| `[]`              | nobody, not even itself (a locked client agent)   |
+| `[a, b]`          | exactly those (add its own name to include self)  |
+| `["*"]`           | every agent (an explicit super-admin)             |
+
+```bash
+mix cortex agent manage boss vendas        # boss can now administer "vendas"
+mix cortex agent manage boss "*"           # a super-admin over all agents
+mix cortex agent add child --can-manage none   # a locked agent that can't alter itself
+```
+
+`manage_agent` actions: `list`, `get`, `create`, `set_persona`, `set_model`,
+`add_tool`, `remove_tool`, `remember` (append a fact to the target's memory). It's a
+risky tool, so each use is authorized through the permission gate; persona and memory
+live in the target's workspace, tools/model in its config.
+
 ## Permissions
 
+The **primary agent** — the one created on first `mix cortex setup` (the owner's own
+agent) — is born **omnipotent**: every tool, super-admin over all agents
+(`can_manage: ["*"]`), and a `"*"` auto-approve grant so it runs any tool without a
+prompt. It can do everything via chat from the start. Agents you add later are
+scoped normally.
+
 Before a **risky** tool runs — running code (`bash`, `run_script`), writing/moving
-files, changing config, or any plugin tool — Cortex asks you to authorize it.
+files, changing config, or any plugin tool — Cortex asks you to authorize it
+(unless the agent has approved it — `"*"` approves everything).
 Read-only tools (`read_file`, `list_dir`, `fetch_url`, `web_search`, …) run freely.
 
 Each surface renders the prompt natively — **Telegram** shows inline buttons, the
@@ -458,13 +536,23 @@ a recurring task (read a PDF, crunch a spreadsheet) it **writes itself a skill**
 ## Learning (self-improvement + TimeLearn)
 
 An agent can **turn conversations into lasting knowledge on its own** — the
-"reflect" loop, opt-in per agent:
+"reflect" loop. It learns only from **trusted conversations** so a client's chat
+never becomes memory. Who counts as trusted is a per-bot `trainers` allowlist:
+
+- **`["*"]`** → learns from everyone
+- **`[]`** → learns from no one (a client-facing bot)
+- **`[id1, id2]`** → learns only from those user ids (your ids — the trainers)
+- **omitted / `null`** → the default (everyone)
+
+The allowlist convention is the same everywhere in Cortex: `["*"]` = all, `[]` =
+none, `[items]` = exactly those, and omitted/`null` = that field's default.
 
 ```bash
-mix cortex agent learn zak on          # turn it on (off to stop)
+mix cortex gateway telegram add support --token $T --agent helper --trainers none
+# a client-facing bot that never learns; your own DM bot (no --trainers) still does
 ```
 
-When on, after a session the agent **reviews the conversation** and updates two
+After a trusted session the agent **reviews the conversation** and updates two
 things, kept separate:
 
 - **Memory** (about *you*) → `USER.md` / `MEMORY.md` / `people.md`, kept lean
@@ -486,6 +574,52 @@ mix cortex timelearn zak               # in the terminal
 
 …or the **Learn** tab in the web dashboard (with an agent picker). The generator
 (reflect) produces; TimeLearn displays.
+
+## Scheduled tasks (cron)
+
+Run an agent on a recurring schedule — a daily report, a periodic check — and
+deliver the result to a chat (or nowhere). A task fires in a **fresh session with
+no chat memory**, so its prompt must be self-contained.
+
+Three ways to create and manage them:
+
+**1. From the CLI** (`mix cortex cron`):
+
+```bash
+mix cortex cron add \
+  --name "Daily XML check" \
+  --prompt "Check the 06:00 XML load and report anything abnormal." \
+  --schedule "0 8 * * *" \
+  --timezone America/Sao_Paulo \
+  --deliver telegram:123456        # or omit / "none" to report nowhere
+mix cortex cron list               # all tasks + next run time
+mix cortex cron run daily-xml-check   # force it now (preview)
+mix cortex cron logs daily-xml-check  # recent run history
+mix cortex cron disable daily-xml-check
+mix cortex cron remove daily-xml-check
+```
+
+The schedule is a standard 5-field cron expression; the timezone is any IANA name
+(`America/Sao_Paulo`, `Europe/Berlin`, …) — nothing is hard-coded. The default
+timezone is set at `mix cortex setup` and used when a task doesn't name its own.
+
+**2. From the web dashboard** — the **Cron** tab lists every task with its next
+run, a **Run now** button, enable/disable/remove, and a form to create one
+(agent, prompt, schedule, timezone, model, and *where to deliver* — including
+"Don't send anywhere"). Each task keeps a run history you can expand.
+
+**3. By asking the agent in chat** — *"every day at 8am Brasília time, check the
+XML load and tell me here."* The agent creates the task with the `schedule_task`
+tool (which must be in its allowlist), baking the context into the prompt. It's a
+risky tool, so each use is authorized through the permission gate (or pre-approved).
+When created from a chat, a task reports back to that same chat by default. The
+agent can also `run` a task on demand from the conversation.
+
+Tasks fire from an in-process timer that only runs while `mix cortex serve` or
+`mix cortex gateway` is up (never during one-shot commands). Due tasks each run in
+their own process, so they fire concurrently — one slow task never blocks another.
+Definitions live in `~/.cortex/config.json` (`"crons"`); run history in
+`~/.cortex/data/cron_logs/`.
 
 ## Tests
 

@@ -16,7 +16,10 @@ defmodule Cortex.Config.Agent do
             tools: [],
             auto_approve: [],
             can_message: [],
-            learn: false,
+            # Which agents this one may administer (see Cortex.Config.can_manage?/2):
+            # nil = itself only, [] = nobody (not even itself), [names] = exactly those,
+            # ["*"] = everyone.
+            can_manage: nil,
             max_iterations: 12,
             temperature: nil
 
@@ -36,7 +39,8 @@ defmodule Cortex.Config.Agent do
       tools: map["tools"] || [],
       auto_approve: map["auto_approve"] || [],
       can_message: map["can_message"] || [],
-      learn: map["learn"] || false,
+      # Preserve nil (the "itself only" default) vs [] (nobody) — don't coalesce.
+      can_manage: map["can_manage"],
       max_iterations: map["max_iterations"] || 12,
       temperature: map["temperature"]
     }
