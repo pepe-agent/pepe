@@ -407,7 +407,8 @@ defmodule Cortex.Gateways.Telegram do
 
     case Cortex.Agent.chat(session_key(chat_id), agent, text,
            authorize: authorizer(chat_id),
-           learn: learn?()
+           learn: learn?(),
+           on_event: activity_callback(chat_id)
          ) do
       {:ok, reply} ->
         send_message(chat_id, reply)
@@ -964,6 +965,68 @@ defmodule Cortex.Gateways.Telegram do
           bot -> {bot, chat_id}
         end
     end
+  end
+
+  ###
+  ### live activity layer
+  ###
+
+  # An `on_event` callback that renders the agent's tool activity into a single
+  # status message which updates in place as tools run, then deletes itself when the
+  # run finishes — so only the final answer stays in the chat. Runs in the run task
+  # process, so it re-installs this bot and keeps its state in that process dict.
+  defp activity_callback(chat_id) do
+    b = bot()
+
+    fn event ->
+      put_bot(b)
+      tg_activity(chat_id, event)
+    end
+  end
+
+  defp tg_activity(chat_id, {:tool_call, name, raw}) do
+    lines = (Process.get(:tg_act_lines, []) ++ [activity_line(name, raw)]) |> Enum.take(-6)
+    Process.put(:tg_act_lines, lines)
+
+    id = Process.get(:tg_act_id) || send_status(chat_id)
+    Process.put(:tg_act_id, id)
+    if id, do: edit_status(chat_id, id, Enum.join(lines, "\n"))
+    :ok
+  end
+
+  defp tg_activity(chat_id, event) when elem(event, 0) in [:done, :error] do
+    if id = Process.get(:tg_act_id), do: delete_status(chat_id, id)
+    Process.delete(:tg_act_id)
+    Process.delete(:tg_act_lines)
+    :ok
+  end
+
+  defp tg_activity(_chat_id, _event), do: :ok
+
+  defp activity_line(name, raw) do
+    case decode_args(raw) do
+      map when map_size(map) > 0 -> "🛠️ " <> name <> " · " <> map_preview(map)
+      _ -> "🛠️ " <> name
+    end
+  end
+
+  defp send_status(chat_id) do
+    case Req.post(api_url(token(), "sendMessage"),
+           json: %{chat_id: chat_id, text: gettext("🛠️ Working…")}
+         ) do
+      {:ok, %{status: 200, body: %{"result" => %{"message_id" => id}}}} -> id
+      _ -> nil
+    end
+  end
+
+  defp edit_status(chat_id, id, text) do
+    Req.post(api_url(token(), "editMessageText"),
+      json: %{chat_id: chat_id, message_id: id, text: text}
+    )
+  end
+
+  defp delete_status(chat_id, id) do
+    Req.post(api_url(token(), "deleteMessage"), json: %{chat_id: chat_id, message_id: id})
   end
 
   defp send_message(chat_id, text) do

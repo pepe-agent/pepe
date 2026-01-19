@@ -125,7 +125,7 @@ defmodule Mix.Tasks.Cortex do
         with_app([persist: true], fn -> tui_cmd(rest) end)
 
       ["serve" | rest] ->
-        with_app([serve: true, gateways: true], fn -> serve_cmd(rest) end)
+        with_app([serve: true, gateways: true, port: serve_port(rest)], fn -> serve_cmd(rest) end)
 
       # Configuring a gateway only touches the config file — no app needed.
       ["gateway", "telegram", "setup" | _] ->
@@ -169,13 +169,31 @@ defmodule Mix.Tasks.Cortex do
     )
 
     if serve? do
-      # Phoenix only opens the HTTP listener when the endpoint is told to serve.
+      # Phoenix only opens the HTTP listener when the endpoint is told to serve; set
+      # the port here (before boot) so `--port` / $PORT actually takes effect.
       conf = Application.get_env(:cortex, CortexWeb.Endpoint, [])
-      Application.put_env(:cortex, CortexWeb.Endpoint, Keyword.put(conf, :server, true))
+      http = conf |> Keyword.get(:http, []) |> Keyword.put(:port, Keyword.get(opts, :port, 4000))
+
+      Application.put_env(
+        :cortex,
+        CortexWeb.Endpoint,
+        conf |> Keyword.put(:server, true) |> Keyword.put(:http, http)
+      )
     end
 
     {:ok, _} = Application.ensure_all_started(:cortex)
     fun.()
+  end
+
+  # Resolve the serve port: `--port N`, else $PORT, else 4000.
+  defp serve_port(rest) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [port: :integer])
+
+    cond do
+      opts[:port] -> opts[:port]
+      System.get_env("PORT") -> String.to_integer(System.get_env("PORT"))
+      true -> 4000
+    end
   end
 
   ###

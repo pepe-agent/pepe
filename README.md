@@ -181,10 +181,16 @@ mix cortex help                        # full command help (or: help <group>)
 A Phoenix LiveView dashboard at **`/`** — a live list of sessions on the left and a
 streaming chat panel on the right. Pick a session to read its history and talk to
 its agent; replies stream in token-by-token. `New chat` starts a fresh session, and
-each session shows its agent, model and turn count. A **Chat / Learn / Cron / Bots**
-toggle switches the main pane to the **TimeLearn** timeline (see **Learning**), the
-**scheduled-tasks** manager (see **Scheduled tasks**), or the **Telegram bots**
-manager (see **Telegram → Multiple bots**).
+each session shows its agent, model and turn count. Tabs across the top mirror the
+CLI, so almost everything you can do with `mix cortex` you can do here:
+
+- **Chat** — talk to a session (risky tools prompt inline).
+- **Learn** — the TimeLearn timeline (see **Learning**).
+- **Cron** — create/run/manage scheduled tasks (see **Scheduled tasks**).
+- **Bots** — add/remove Telegram bots, applied live (see **Telegram → Multiple bots**).
+- **Agents** — create/edit/delete agents: persona, model, tools, routes, admin scope,
+  default.
+- **Models** — add/remove model connections and pick the default.
 
 ```bash
 mix assets.build          # once (builds css/js)
@@ -194,8 +200,9 @@ mix cortex serve          # API + dashboard + gateways, one process
 
 Because sessions are in-process, run everything from the **one** `mix cortex serve`
 process and the dashboard sees every session — including the ones from Telegram.
-(Risky tools currently run without a prompt on the dashboard — it's the owner's
-local surface; a web approval flow can be added like the Telegram one.)
+Risky tools are authorized inline on the dashboard too: the run pauses and shows an
+allow/deny prompt (the web version of the Telegram buttons), unless the agent has
+pre-approved the tool (the omnipotent primary agent never prompts).
 
 ## OpenAI-compatible HTTP API
 
