@@ -470,6 +470,64 @@ Cortex, tells you it has no name or characteristics defined, and offers to set o
 up — then saves your choices to `SOUL.md` and renames itself with `rename_agent`.
 `auto_approve` lists tools the agent may run without asking (see **Permissions**).
 
+## MCP servers (external tools)
+
+Connect **MCP (Model Context Protocol)** servers — Sentry, GitHub, … — and their
+tools become callable by agents as if built in. Servers launch over stdio on demand
+(via `npx`, so **nothing to install manually**); tokens go in as `${ENV_VAR}` refs.
+
+```bash
+mix cortex mcp add sentry --command npx \
+  --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
+mix cortex mcp tools sentry     # launch it and list its tools (validate the connection)
+mix cortex mcp list
+```
+
+Each MCP tool is exposed as `mcp__<server>__<tool>`. **Scoping is just the tool
+allowlist** — to make an agent *read-only* against a server, give it only the read
+tools and leave the mutating ones out:
+
+```bash
+mix cortex agent add backoffice --tools read_file,mcp__sentry__find_organizations,mcp__sentry__get_issue
+# (no mcp__sentry__update_issue → the agent can look, not change)
+```
+
+`mcp__sentry__*` grants all of a server's tools. MCP tools are risky, so each call
+still goes through the permission gate. An agent with the `manage_mcp` tool can add
+and validate servers itself from chat (secrets stay as `${ENV}` refs). Definitions
+live in `~/.cortex/config.json` under `"mcp"`.
+
+## Self-knowledge & self-management (how an agent operates Cortex)
+
+Cortex is designed so an agent can **resolve requests about Cortex itself** — "add a
+bot", "schedule this", "connect Sentry", "switch the timezone" — without bespoke
+hand-holding, and without ever being dangerous:
+
+- **It reads its own docs.** How-to guides ship under `priv/docs/` (agents, channels,
+  cron, MCP, permissions, config) and are listed in every agent's system prompt as
+  the *authoritative* source; the read-only `docs` tool loads the relevant one on
+  demand. New/unforeseen requests get resolved by reading, not guessing. (Drop extra
+  guides in `~/.cortex/docs/` to extend or override.)
+- **It discovers what's editable.** `config_set` called with no arguments returns the
+  schema — the editable settings, their current values and accepted values. The
+  editable set is a **fail-closed allowlist** (`default_model`, `default_agent`,
+  `language`, `timezone`, `telegram.require_mention/enabled`); anything else is
+  refused with a pointer to the right guarded tool (`manage_agent`, `manage_channel`,
+  `manage_mcp`, `schedule_task`). Secrets are never editable from chat.
+- **It verifies its own work.** After changing something, the agent (or you) runs the
+  **doctor**: offline checks (every `${ENV}` ref resolves, agents point at real
+  models and known tools, cron schedules/timezones/agents are valid) plus live probes
+  (Telegram `getMe` per bot, a ping per model connection, an MCP launch + tool list
+  per server).
+
+```bash
+mix cortex doctor              # live probes (Telegram, models, MCP)
+mix cortex doctor --offline    # config-consistency only, no network
+```
+
+The loop is **do → verify → correct**: structured guarded tools for the hot paths,
+generic tools + docs for everything else, and the doctor to confirm it worked.
+
 ## Adding a tool
 
 A tool is any module implementing the `Cortex.Tools.Tool` behaviour

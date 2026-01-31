@@ -54,6 +54,46 @@ defmodule Cortex.Cron do
   end
 
   @doc """
+  Catch-up: did this cron **miss** a firing (server was down/asleep at the scheduled
+  time)? True when the most recent scheduled time passed without a run and we're
+  still inside the grace window — half the job's period, clamped to 2min–2h. Used by
+  the scheduler to fire a missed job ONCE on recovery, anchored to `last_run`.
+  Returns `{true, missed_time_iso}` or `false`.
+  """
+  @spec missed?(Cron.t()) :: {true, String.t()} | false
+  def missed?(%Cron{schedule: schedule, timezone: tz, last_run: last_run}) do
+    with {:ok, expr} <- parse(schedule),
+         {:ok, now} <- DateTime.now(tz),
+         naive = DateTime.to_naive(now),
+         {:ok, prev} <- Crontab.Scheduler.get_previous_run_date(expr, naive),
+         {:ok, next} <- Scheduler.get_next_run_date(expr, naive),
+         {:ok, prev_dt} <- from_naive(prev, tz) do
+      period = NaiveDateTime.diff(next, prev)
+      grace = period |> div(2) |> max(120) |> min(7200)
+      overdue = DateTime.diff(now, prev_dt)
+      prev_unix = DateTime.to_unix(prev_dt)
+
+      # Never ran, or last run predates the missed slot — and we're within grace.
+      if (last_run || 0) < prev_unix and overdue > 0 and overdue <= grace do
+        {true, NaiveDateTime.to_iso8601(prev)}
+      else
+        false
+      end
+    else
+      _ -> false
+    end
+  end
+
+  defp from_naive(naive, tz) do
+    case DateTime.from_naive(naive, tz) do
+      {:ok, dt} -> {:ok, dt}
+      {:ambiguous, _first, later} -> {:ok, later}
+      {:gap, _before, just_after} -> {:ok, just_after}
+      other -> other
+    end
+  end
+
+  @doc """
   Run a cron now: execute the agent on the stored prompt in a fresh session, record
   the outcome (both `last_result` and the append-only run log), and deliver it.
 

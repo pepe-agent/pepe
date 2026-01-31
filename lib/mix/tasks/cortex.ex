@@ -49,6 +49,8 @@ defmodule Mix.Tasks.Cortex do
       mix cortex tools                           # list built-in tools
       mix cortex timelearn [AGENT]               # what the agent has learned, on a timeline
       mix cortex cron list|add|run|logs …        # scheduled tasks (recurring agent jobs)
+      mix cortex mcp add|list|tools|remove …      # external tool servers (MCP: Sentry, GitHub, …)
+      mix cortex doctor [--offline]              # health-check the whole setup
       mix cortex setup                           # scaffold ~/.cortex/config.json
       mix cortex config                          # show config path + summary
   """
@@ -108,6 +110,16 @@ defmodule Mix.Tasks.Cortex do
 
       ["cron" | rest] ->
         with_app([], fn -> cron_cmd(rest) end)
+
+      ["doctor" | rest] ->
+        with_app([], fn -> doctor_cmd(rest) end)
+
+      # `mcp tools` launches the server (needs the app); the rest just edit config.
+      ["mcp", "tools" | rest] ->
+        with_app([], fn -> mcp_cmd(["tools" | rest]) end)
+
+      ["mcp" | rest] ->
+        with_config(fn -> mcp_cmd(rest) end)
 
       ["model" | rest] ->
         with_config(fn -> model_cmd(rest) end)
@@ -1530,6 +1542,112 @@ defmodule Mix.Tasks.Cortex do
     else
       Stream.iterate(2, &(&1 + 1))
       |> Enum.find_value(fn n -> if "#{base}-#{n}" not in taken, do: "#{base}-#{n}" end)
+    end
+  end
+
+  ###
+  ### mcp (Model Context Protocol servers)
+  ###
+
+  defp mcp_cmd(["list" | _]) do
+    case Config.mcp_servers() do
+      m when map_size(m) == 0 ->
+        info(dim("no MCP servers. add one: mix cortex mcp add NAME --command npx --args \"...\""))
+
+      servers ->
+        info(bold("✦ MCP servers"))
+
+        Enum.each(servers, fn {name, cfg} ->
+          info("\n#{bold(name)}")
+          info(dim("   #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"))
+        end)
+    end
+  end
+
+  defp mcp_cmd(["add", name | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [command: :string, args: :string])
+
+    cond do
+      is_nil(opts[:command]) ->
+        error("mcp add needs --command (e.g. npx)")
+
+      true ->
+        args = if opts[:args], do: String.split(opts[:args], " ", trim: true), else: []
+        Config.put_mcp_server(name, %{"command" => opts[:command], "args" => args, "env" => %{}})
+        ok("MCP server #{green(name)} saved")
+        info(dim("validate: mix cortex mcp tools #{name}"))
+    end
+  end
+
+  defp mcp_cmd(["tools", name | _]) do
+    case Config.mcp_server(name) do
+      nil ->
+        error("unknown MCP server: #{name}")
+
+      _ ->
+        info(dim("connecting to #{name}…"))
+
+        case Cortex.MCP.tools(name) do
+          {:ok, tools} ->
+            info(bold("✦ #{name} tools") <> dim(" (grant read ones to an agent)"))
+
+            Enum.each(tools, fn t ->
+              info("\n#{bold("mcp__#{name}__#{t["name"]}")}")
+              info(dim("   #{String.slice(to_string(t["description"]), 0, 120)}"))
+            end)
+
+          {:error, reason} ->
+            error("couldn't reach #{name}: #{inspect(reason)}")
+        end
+    end
+  end
+
+  defp mcp_cmd(["remove", name | _]) do
+    case Config.mcp_server(name) do
+      nil ->
+        error("unknown MCP server: #{name}")
+
+      _ ->
+        Config.delete_mcp_server(name)
+        ok("#{green(name)} removed")
+    end
+  end
+
+  defp mcp_cmd(_) do
+    info("""
+    mix cortex mcp — external tool servers (Model Context Protocol)
+
+      add NAME --command npx --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
+      list                       list configured servers
+      tools NAME                 launch it and list its tools (validate)
+      remove NAME
+
+    Put tokens as ${ENV_VAR} refs. Grant an agent only the read tools by adding
+    names like mcp__NAME__<tool> to its --tools (see: mix cortex agent).
+    """)
+  end
+
+  # `mix cortex doctor [--offline]` — health-check the setup (live probes by default).
+  defp doctor_cmd(rest) do
+    live? = "--offline" not in rest
+    info(bold("✦ Cortex doctor") <> dim(if live?, do: " (live probes)", else: " (offline)"))
+
+    checks = Cortex.Doctor.checks(live: live?)
+
+    if checks == [] do
+      info(dim("nothing configured to check yet."))
+    else
+      Enum.each(checks, fn
+        {area, subject, :ok} -> info("#{green("✓")} [#{area}] #{subject}")
+        {area, subject, {:warn, msg}} -> info("#{dim("⚠")} [#{area}] #{subject} — #{msg}")
+        {area, subject, {:error, msg}} -> error("✗ [#{area}] #{subject} — #{msg}")
+      end)
+
+      if Cortex.Doctor.healthy?(checks) do
+        ok("healthy")
+      else
+        error("issues found — fix the ✗ items above")
+      end
     end
   end
 

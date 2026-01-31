@@ -254,6 +254,25 @@ defmodule Cortex.Config do
   def model_for_agent(%Agent{model: nil}), do: default_model()
   def model_for_agent(%Agent{model: name}), do: get_model(name) || default_model()
 
+  @doc """
+  The failover chain for an agent: its model followed by that model's `fallbacks`
+  (resolved, deduped, missing names dropped). Transient errors walk down the chain.
+  """
+  def model_chain_for_agent(%Agent{} = agent) do
+    case model_for_agent(agent) do
+      nil ->
+        []
+
+      primary ->
+        fallbacks =
+          primary.fallbacks
+          |> Enum.map(&get_model/1)
+          |> Enum.reject(&is_nil/1)
+
+        Enum.uniq_by([primary | fallbacks], & &1.name)
+    end
+  end
+
   ###
   ### Scheduled tasks (crons)
   ###
@@ -342,6 +361,46 @@ defmodule Cortex.Config do
   def delete_telegram_bot(name) do
     load()
     |> update_in(["telegrams"], &Map.delete(&1 || %{}, name))
+    |> save()
+  end
+
+  ###
+  ### MCP servers (Model Context Protocol)
+  ###
+
+  @doc """
+  Configured MCP servers as `%{name => %{command, args, env}}`. Each is an external
+  tool server launched over stdio (e.g. `npx @sentry/mcp-server`). Secrets go in
+  `args`/`env` as `${ENV_VAR}` references, resolved at spawn time.
+  """
+  def mcp_servers, do: load() |> Map.get("mcp", %{})
+
+  @doc "One MCP server spec by name, as an atom-keyed map ready for Cortex.MCP.Client, or nil."
+  def mcp_server(name) do
+    case mcp_servers()[name] do
+      nil ->
+        nil
+
+      map ->
+        %{
+          command: map["command"],
+          args: map["args"] || [],
+          env: map["env"] || %{}
+        }
+    end
+  end
+
+  @doc "Create or replace an MCP server definition."
+  def put_mcp_server(name, map) when is_binary(name) and is_map(map) do
+    load()
+    |> update_in(["mcp"], fn m -> Map.put(m || %{}, name, map) end)
+    |> save()
+  end
+
+  @doc "Delete an MCP server definition."
+  def delete_mcp_server(name) do
+    load()
+    |> update_in(["mcp"], &Map.delete(&1 || %{}, name))
     |> save()
   end
 

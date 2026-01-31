@@ -14,16 +14,20 @@ defmodule Cortex.Tools do
   alias Cortex.Tools.Bash
   alias Cortex.Tools.ConfigGet
   alias Cortex.Tools.ConfigSet
+  alias Cortex.Tools.Docs
+  alias Cortex.Tools.Doctor
   alias Cortex.Tools.EditFile
   alias Cortex.Tools.EnableTool
   alias Cortex.Tools.FetchUrl
   alias Cortex.Tools.ListDir
   alias Cortex.Tools.ManageAgent
   alias Cortex.Tools.ManageChannel
+  alias Cortex.Tools.ManageMcp
   alias Cortex.Tools.MoveFile
   alias Cortex.Tools.ReadFile
   alias Cortex.Tools.RenameAgent
   alias Cortex.Tools.RunScript
+  alias Cortex.Tools.ScanSkill
   alias Cortex.Tools.ScheduleTask
   alias Cortex.Tools.SendToAgent
   alias Cortex.Tools.SetRoute
@@ -42,10 +46,14 @@ defmodule Cortex.Tools do
     FetchUrl,
     WebSearch,
     Skill,
+    Docs,
+    Doctor,
     SendToAgent,
     ScheduleTask,
     ManageChannel,
     ManageAgent,
+    ManageMcp,
+    ScanSkill,
     RenameAgent,
     ConfigGet,
     ConfigSet,
@@ -132,13 +140,13 @@ defmodule Cortex.Tools do
   are skipped. An empty list yields nil (so callers omit the `tools` field).
   """
   def specs(names) when is_list(names) do
-    specs =
+    builtin =
       names
       |> Enum.map(&get/1)
       |> Enum.reject(&is_nil/1)
       |> Enum.map(& &1.spec())
 
-    case specs do
+    case builtin ++ Cortex.MCP.specs_for(names) do
       [] -> nil
       specs -> specs
     end
@@ -151,6 +159,59 @@ defmodule Cortex.Tools do
   string result (always — errors are turned into a readable string for the model).
   """
   def execute(%{"function" => %{"name" => name, "arguments" => raw_args}}, ctx \\ %{}) do
+    result =
+      if Cortex.MCP.mcp_tool?(name) do
+        execute_mcp(name, raw_args)
+      else
+        execute_builtin(name, raw_args, ctx)
+      end
+
+    spill_large(result, name, ctx)
+  end
+
+  # Keep huge tool output out of the context window: past the threshold, save the
+  # full text to a file in the agent's workspace and hand the model a preview + the
+  # path (it can `read_file` slices on demand). Protects the window from a single
+  # noisy command; `read_file` itself is exempt (reading a file back would loop).
+  @spill_threshold 16_000
+  @spill_preview 2_000
+
+  defp spill_large(result, name, ctx)
+       when byte_size(result) > @spill_threshold and name != "read_file" do
+    case spill_dir(ctx) do
+      nil ->
+        result
+
+      dir ->
+        File.mkdir_p!(dir)
+        path = Path.join(dir, "#{name}-#{System.unique_integer([:positive])}.txt")
+        File.write!(path, result)
+
+        String.slice(result, 0, @spill_preview) <>
+          "\n\n[... output truncated: #{byte_size(result)} bytes total. " <>
+          "Full output saved to #{path} — read slices of it with read_file if needed.]"
+    end
+  rescue
+    _ -> result
+  end
+
+  defp spill_large(result, _name, _ctx), do: result
+
+  defp spill_dir(%{agent: %{name: name}}) when is_binary(name),
+    do: Path.join(Cortex.Agent.Workspace.dir(name), "tmp")
+
+  defp spill_dir(_), do: nil
+
+  defp execute_mcp(name, raw_args) do
+    with {:ok, args} <- decode_args(raw_args),
+         {:ok, out} <- Cortex.MCP.call(name, args) do
+      to_string(out)
+    else
+      {:error, reason} -> "Error: #{name} failed: #{inspect(reason)}"
+    end
+  end
+
+  defp execute_builtin(name, raw_args, ctx) do
     with mod when not is_nil(mod) <- get(name),
          {:ok, args} <- decode_args(raw_args) do
       try do

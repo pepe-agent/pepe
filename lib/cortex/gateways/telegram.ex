@@ -817,6 +817,9 @@ defmodule Cortex.Gateways.Telegram do
   # first line (nil here).
   defp skill_summary("install-tool"), do: gettext("How to install a new tool when asked.")
 
+  defp skill_summary("install-skill"),
+    do: gettext("Install a skill from a URL, with a security review first.")
+
   defp skill_summary("handle-media"),
     do: gettext("Understand a voice/audio/image/file the user sent.")
 

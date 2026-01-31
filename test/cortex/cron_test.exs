@@ -82,6 +82,33 @@ defmodule Cortex.CronTest do
     assert Log.tail("daily", 10) == []
   end
 
+  test "missed?/1 detects a just-missed slot once, anchored to last_run" do
+    # An hourly job scheduled for the minute that just passed (~60s ago): well inside
+    # the grace window (half of 1h = 30min), and last_run predates the slot → missed.
+    now = DateTime.now!("Etc/UTC")
+    prev_minute = now |> DateTime.add(-60, :second) |> Map.fetch!(:minute)
+    cron = sample(%{schedule: "#{prev_minute} * * * *", timezone: "Etc/UTC", last_run: 0})
+    assert {true, _slot} = Cortex.Cron.missed?(cron)
+
+    # After recording a run "now", nothing is missed anymore.
+    ran =
+      sample(%{
+        schedule: "#{prev_minute} * * * *",
+        timezone: "Etc/UTC",
+        last_run: System.os_time(:second)
+      })
+
+    refute Cortex.Cron.missed?(ran)
+  end
+
+  test "missed?/1 is false outside the grace window" do
+    # Daily job whose slot was ~half a day ago: grace caps at 2h → not missed.
+    now = DateTime.now!("Etc/UTC")
+    far_hour = rem(now.hour + 12, 24)
+    cron = sample(%{schedule: "0 #{far_hour} * * *", timezone: "Etc/UTC", last_run: 0})
+    refute Cortex.Cron.missed?(cron)
+  end
+
   test "deliver \"none\" is a no-op, unknown targets go to the log" do
     assert Cortex.Cron.deliver("none", "anything") == :ok
     assert Cortex.Cron.deliver("log", "goes to logger") == :ok

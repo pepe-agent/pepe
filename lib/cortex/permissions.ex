@@ -27,7 +27,7 @@ defmodule Cortex.Permissions do
   # Tools that don't go through the human gate: read-only ones, plus `send_to_agent`
   # (governed by the directed `can_message` route allowlist instead). Anything not
   # listed — including drop-in plugin tools — requires approval (the safe default).
-  @always_safe ~w(read_file list_dir fetch_url web_search config_get skill send_to_agent)
+  @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent)
 
   @type decision :: :once | :session | :always | :deny
 

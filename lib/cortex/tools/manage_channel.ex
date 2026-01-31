@@ -50,6 +50,8 @@ defmodule Cortex.Tools.ManageChannel do
         with the @BotFather token), `agent` (an existing agent this bot talks to).
       - list: show configured bots (name, agent, whether active).
       - set_agent: rebind a bot to another agent — needs `name`, `agent`.
+      - set_trainers: who the bot LEARNS from — needs `name`, `trainers` ("*" = \
+        everyone, "none" = nobody (client-facing bot), or comma-separated user ids).
       - enable / disable / remove: needs `name`.
       """,
       %{
@@ -57,7 +59,7 @@ defmodule Cortex.Tools.ManageChannel do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(add list set_agent enable disable remove),
+            "enum" => ~w(add list set_agent set_trainers enable disable remove),
             "description" => "What to do."
           },
           "name" => %{"type" => "string", "description" => "The bot's name (never \"default\")."},
@@ -66,7 +68,11 @@ defmodule Cortex.Tools.ManageChannel do
             "description" =>
               "NAME of the env var holding the bot token, e.g. \"SALES_BOT_TOKEN\". Never the token itself."
           },
-          "agent" => %{"type" => "string", "description" => "Existing agent to bind the bot to."}
+          "agent" => %{"type" => "string", "description" => "Existing agent to bind the bot to."},
+          "trainers" => %{
+            "type" => "string",
+            "description" => "Who the bot learns from: \"*\", \"none\", or \"id1,id2\"."
+          }
         },
         "required" => ["action"]
       }
@@ -83,6 +89,7 @@ defmodule Cortex.Tools.ManageChannel do
   defp dispatch("list", _args), do: {:ok, render_list(Config.telegram_bots())}
   defp dispatch("add", args), do: add(args)
   defp dispatch("set_agent", args), do: set_agent(args)
+  defp dispatch("set_trainers", args), do: set_trainers(args)
   defp dispatch("enable", args), do: toggle(args, true)
   defp dispatch("disable", args), do: toggle(args, false)
   defp dispatch("remove", args), do: remove(args)
@@ -114,6 +121,35 @@ defmodule Cortex.Tools.ManageChannel do
       {:ok, "Bot #{name} now talks to agent #{agent}."}
     end
   end
+
+  defp set_trainers(args) do
+    with {:ok, name} <- fetch(args, "name"),
+         :ok <- guard_name(name),
+         {:ok, raw} <- fetch(args, "trainers"),
+         {:ok, bot} <- fetch_bot(name) do
+      trainers =
+        case String.trim(raw) do
+          "*" -> ["*"]
+          "none" -> []
+          csv -> csv |> String.split(",") |> Enum.flat_map(&parse_id/1)
+        end
+
+      Config.put_telegram_bot(name, Map.put(bot, "trainers", trainers))
+      reload()
+      {:ok, "Bot #{name} now learns from: #{trainers_text(trainers)}."}
+    end
+  end
+
+  defp parse_id(s) do
+    case Integer.parse(String.trim(s)) do
+      {n, _} -> [n]
+      :error -> []
+    end
+  end
+
+  defp trainers_text(["*"]), do: "everyone"
+  defp trainers_text([]), do: "no one"
+  defp trainers_text(list), do: Enum.join(list, ", ")
 
   defp toggle(args, enabled?) do
     with {:ok, name} <- fetch(args, "name"),

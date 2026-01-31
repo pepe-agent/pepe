@@ -26,6 +26,9 @@ defmodule Cortex.Application do
         Cortex.Agent.SessionSupervisor,
         # In-memory session-scoped tool approvals (the `:session` permission grant)
         Cortex.Permissions.SessionStore,
+        # MCP tool servers: a registry + dynamic supervisor; clients start on demand.
+        {Registry, keys: :unique, name: Cortex.MCP.Registry},
+        {DynamicSupervisor, name: Cortex.MCP.DynSup, strategy: :one_for_one},
         # Messaging gateways (Telegram, ...). No-ops when not configured.
         Cortex.Gateways.Supervisor
       ] ++ endpoint_children ++ scheduler_children() ++ restore_children()

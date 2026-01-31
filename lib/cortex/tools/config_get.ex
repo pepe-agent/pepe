@@ -23,12 +23,18 @@ defmodule Cortex.Tools.ConfigGet do
     models = Config.models() |> Enum.map(& &1.name)
     agents = Config.agents() |> Enum.map(& &1.name)
     telegram = Config.telegram()
+    bots = Config.telegram_bots() |> Enum.map(& &1["name"])
+    mcp = Config.mcp_servers() |> Map.keys()
+    crons = Config.crons() |> Enum.map(& &1.id)
 
     text = """
     Models: #{join(models)} (default: #{Config.default_model_name() || "none"})
     Agents: #{join(agents)} (default: #{Config.default_agent_name() || "none"})
-    Language: #{Config.locale()}
+    Language: #{Config.locale()} · Timezone: #{Config.default_timezone()}
     Telegram: #{telegram_status(telegram)}
+    Bots: #{join(bots)}
+    MCP servers: #{join(mcp)}
+    Scheduled tasks: #{join(crons)}
     """
 
     {:ok, String.trim(text)}

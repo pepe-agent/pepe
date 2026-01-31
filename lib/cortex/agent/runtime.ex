@@ -44,9 +44,15 @@ defmodule Cortex.Agent.Runtime do
   @spec run(Agent.t(), [map()], opts()) ::
           {:ok, String.t(), [map()]} | {:error, term()}
   def run(%Agent{} = agent, messages, opts \\ []) do
-    model = opts[:model] || Config.model_for_agent(agent)
+    # The failover chain: an explicit :model wins (single-entry chain); otherwise the
+    # agent's model followed by that model's `fallbacks`. Transient errors advance.
+    chain =
+      case opts[:model] do
+        nil -> Config.model_chain_for_agent(agent)
+        model -> [model]
+      end
 
-    if is_nil(model) do
+    if chain == [] do
       {:error, :no_model_configured}
     else
       specs = Tools.specs(agent.tools)
@@ -60,7 +66,7 @@ defmodule Cortex.Agent.Runtime do
         agent_chain: opts[:agent_chain]
       }
 
-      loop(agent, model, messages, specs, ctx, opts, agent.max_iterations)
+      loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations)
     end
   end
 
@@ -73,21 +79,15 @@ defmodule Cortex.Agent.Runtime do
     run(agent, messages, opts)
   end
 
-  defp loop(_agent, _model, messages, _specs, _ctx, opts, 0) do
+  defp loop(_agent, _chain, messages, _specs, _ctx, opts, 0) do
     emit(opts, {:done, "(stopped: max iterations reached)"})
     {:ok, "(stopped: max iterations reached)", messages}
   end
 
-  defp loop(agent, model, messages, specs, ctx, opts, iterations_left) do
+  defp loop(agent, chain, messages, specs, ctx, opts, iterations_left) do
     chat_opts = [tools: specs, temperature: agent.temperature]
 
-    result =
-      if opts[:stream] do
-        on_delta = fn text -> emit(opts, {:assistant_delta, text}) end
-        LLM.stream_chat(model, messages, on_delta, chat_opts)
-      else
-        LLM.chat(model, messages, chat_opts)
-      end
+    result = chat_with_failover(chain, messages, chat_opts, opts)
 
     case result do
       {:ok, %{tool_calls: tool_calls} = res} when tool_calls != [] ->
@@ -97,7 +97,7 @@ defmodule Cortex.Agent.Runtime do
         tool_msgs = Enum.map(tool_calls, &run_tool(&1, ctx, opts))
 
         new_messages = messages ++ [assistant_msg] ++ tool_msgs
-        loop(agent, model, new_messages, specs, ctx, opts, iterations_left - 1)
+        loop(agent, chain, new_messages, specs, ctx, opts, iterations_left - 1)
 
       {:ok, %{content: content}} ->
         content = content || ""
@@ -110,6 +110,46 @@ defmodule Cortex.Agent.Runtime do
         {:error, reason}
     end
   end
+
+  # Try each model in the chain; advance ONLY on transient failures (rate limit,
+  # server error, network) — auth/request errors fail fast (a bad key on model B
+  # won't be fixed by model C's endpoint, and 4xx would just repeat).
+  defp chat_with_failover([model | rest], messages, chat_opts, opts) do
+    result =
+      if opts[:stream] do
+        on_delta = fn text -> emit(opts, {:assistant_delta, text}) end
+        LLM.stream_chat(model, messages, on_delta, chat_opts)
+      else
+        LLM.chat(model, messages, chat_opts)
+      end
+
+    case result do
+      {:error, reason} = error ->
+        if rest != [] and transient?(reason) do
+          require Logger
+
+          Logger.warning(
+            "[llm] #{model.name} failed transiently, failing over: #{inspect(reason)}"
+          )
+
+          emit(opts, {:failover, model.name, hd(rest).name})
+          chat_with_failover(rest, messages, chat_opts, opts)
+        else
+          error
+        end
+
+      ok ->
+        ok
+    end
+  end
+
+  defp transient?(%Req.TransportError{}), do: true
+  defp transient?(%{reason: :timeout}), do: true
+
+  defp transient?({:http_error, status, _}) when status in [408, 429, 500, 502, 503, 504, 529],
+    do: true
+
+  defp transient?(_), do: false
 
   defp run_tool(
          %{"id" => id, "function" => %{"name" => name, "arguments" => raw}} = call,

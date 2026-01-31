@@ -19,6 +19,9 @@ defmodule Cortex.Config.Model do
             temperature: nil,
             context_window: nil,
             headers: %{},
+            # Ordered failover chain: names of other model connections to try when
+            # this one errors transiently (rate limit, 5xx, network).
+            fallbacks: [],
             # OAuth/subscription metadata when signed in via `Cortex.OAuth`
             # (%{"provider", "refresh", "expires_at", "token_url", "client_id"}).
             # `api_key` still holds the current access token (Bearer).
@@ -38,6 +41,7 @@ defmodule Cortex.Config.Model do
       temperature: map["temperature"],
       context_window: map["context_window"],
       headers: map["headers"] || %{},
+      fallbacks: map["fallbacks"] || [],
       oauth: map["oauth"]
     }
   end

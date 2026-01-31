@@ -42,16 +42,35 @@ defmodule Cortex.Cron.Scheduler do
   defp maybe_fire(cron, fired) do
     case minute_key(cron.timezone) do
       {:ok, naive, key} ->
-        if Cron.due?(cron, naive) and fired[cron.id] != key do
-          Task.start(fn -> Cron.run(cron, :scheduler) end)
-          Map.put(fired, cron.id, key)
-        else
-          fired
+        cond do
+          Cron.due?(cron, naive) and fired[cron.id] != key ->
+            Task.start(fn -> Cron.run(cron, :scheduler) end)
+            Map.put(fired, cron.id, key)
+
+          # Catch-up: the scheduled time passed while we were down — fire once,
+          # deduped on the missed slot so one recovery never double-fires.
+          catchup = catch_up_key(cron, fired) ->
+            Task.start(fn -> Cron.run(cron, :scheduler) end)
+            Map.put(fired, cron.id, catchup)
+
+          true ->
+            fired
         end
 
       :error ->
         Logger.warning("cron #{cron.id}: unknown timezone #{inspect(cron.timezone)}")
         fired
+    end
+  end
+
+  defp catch_up_key(cron, fired) do
+    case Cron.missed?(cron) do
+      {true, slot} ->
+        key = "catchup:" <> slot
+        if fired[cron.id] == key, do: nil, else: key
+
+      false ->
+        nil
     end
   end
 

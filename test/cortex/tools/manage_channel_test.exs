@@ -88,6 +88,37 @@ defmodule Cortex.Tools.ManageChannelTest do
     refute Config.telegram_bot("sales")
   end
 
+  test "set_trainers accepts *, none and id lists" do
+    ManageChannel.run(
+      %{"action" => "add", "name" => "sales", "token_env" => "T", "agent" => "sales-bot"},
+      ctx()
+    )
+
+    assert {:ok, _} =
+             ManageChannel.run(
+               %{"action" => "set_trainers", "name" => "sales", "trainers" => "none"},
+               ctx()
+             )
+
+    assert Config.telegram_bot("sales")["trainers"] == []
+
+    assert {:ok, _} =
+             ManageChannel.run(
+               %{"action" => "set_trainers", "name" => "sales", "trainers" => "111, 222"},
+               ctx()
+             )
+
+    assert Config.telegram_bot("sales")["trainers"] == [111, 222]
+
+    assert {:ok, _} =
+             ManageChannel.run(
+               %{"action" => "set_trainers", "name" => "sales", "trainers" => "*"},
+               ctx()
+             )
+
+    assert Config.telegram_bot("sales")["trainers"] == ["*"]
+  end
+
   test "list shows configured bots" do
     ManageChannel.run(
       %{"action" => "add", "name" => "sales", "token_env" => "T", "agent" => "sales-bot"},

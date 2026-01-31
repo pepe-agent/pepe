@@ -44,4 +44,38 @@ defmodule Cortex.Tools.ConfigToolsTest do
 
     assert {:error, _} = ConfigSet.run(%{"setting" => "default_model", "value" => "Nope"}, %{})
   end
+
+  test "config_set with no args returns the schema (self-discovery)" do
+    assert {:ok, schema} = ConfigSet.run(%{}, %{})
+    assert schema =~ "timezone"
+    assert schema =~ "default_model"
+    assert schema =~ "Not editable here"
+  end
+
+  test "config_set is fail-closed for settings outside the allowlist" do
+    assert {:error, msg} = ConfigSet.run(%{"setting" => "api_key", "value" => "x"}, %{})
+    assert msg =~ "not editable"
+
+    assert {:error, _} =
+             ConfigSet.run(%{"setting" => "telegram.bot_token", "value" => "x"}, %{})
+  end
+
+  test "config_set validates and sets the timezone" do
+    assert {:ok, _} =
+             ConfigSet.run(%{"setting" => "timezone", "value" => "America/Sao_Paulo"}, %{})
+
+    assert Config.default_timezone() == "America/Sao_Paulo"
+
+    assert {:error, _} = ConfigSet.run(%{"setting" => "timezone", "value" => "Not/AZone"}, %{})
+  end
+
+  test "config_set toggles the default bot's telegram flags" do
+    assert {:ok, _} =
+             ConfigSet.run(%{"setting" => "telegram.require_mention", "value" => "false"}, %{})
+
+    assert Config.telegram()["require_mention"] == false
+
+    assert {:error, _} =
+             ConfigSet.run(%{"setting" => "telegram.require_mention", "value" => "maybe"}, %{})
+  end
 end

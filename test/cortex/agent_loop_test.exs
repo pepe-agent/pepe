@@ -50,6 +50,35 @@ defmodule Cortex.AgentLoopTest do
     %{model: model}
   end
 
+  test "failover: a dead primary falls through to a working fallback", %{model: model} do
+    home = Path.join(System.tmp_dir!(), "cortex_fo_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(home)
+    prev = System.get_env("CORTEX_HOME")
+    System.put_env("CORTEX_HOME", home)
+
+    on_exit(fn ->
+      if prev, do: System.put_env("CORTEX_HOME", prev), else: System.delete_env("CORTEX_HOME")
+      File.rm_rf(home)
+    end)
+
+    # Primary points at a closed port (transport error → transient); fallback is the
+    # live mock server.
+    Cortex.Config.put_model(%Model{
+      name: "dead",
+      base_url: "http://localhost:1",
+      api_key: "x",
+      model: "dead-model",
+      fallbacks: ["mock"]
+    })
+
+    Cortex.Config.put_model(%{model | name: "mock"})
+    Cortex.Config.put_agent(%Agent{name: "fo", system_prompt: "x", tools: [], model: "dead"})
+
+    agent = Cortex.Config.get_agent("fo")
+    assert {:ok, content, _msgs} = Runtime.converse(agent, "hi")
+    assert content == "Hello from the mock!"
+  end
+
   test "non-streaming chat returns assembled content", %{model: model} do
     {:ok, result} = LLM.chat(model, [%{"role" => "user", "content" => "hi"}])
     assert result.content == "Hello from the mock!"

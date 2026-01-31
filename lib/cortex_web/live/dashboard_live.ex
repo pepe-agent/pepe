@@ -54,7 +54,10 @@ defmodule CortexWeb.DashboardLive do
        models: Config.models(),
        edit_model: nil,
        default_agent: Config.default_agent_name(),
-       default_model: Config.default_model_name()
+       default_model: Config.default_model_name(),
+       mcp: Config.mcp_servers(),
+       mcp_tools: %{},
+       edit_mcp: nil
      )}
   end
 
@@ -76,6 +79,7 @@ defmodule CortexWeb.DashboardLive do
             <.tab view={@view} to="bots" label={gettext("Bots")} />
             <.tab view={@view} to="agents" label={gettext("Agents")} />
             <.tab view={@view} to="models" label={gettext("Models")} />
+            <.tab view={@view} to="mcp" label={gettext("MCP")} />
           </nav>
         </div>
         <button
@@ -507,6 +511,61 @@ defmodule CortexWeb.DashboardLive do
           </div>
         </div>
 
+        <div :if={@view == :mcp} class="mx-auto flex h-full w-full max-w-3xl flex-col">
+          <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+            <div>
+              <div class="font-medium">🧰 {gettext("MCP servers")}</div>
+              <div class="text-xs text-zinc-400">{gettext("external tool servers (Sentry, GitHub, …) · tokens as ${ENV_VAR}")}</div>
+            </div>
+            <button phx-click="mcp_new" class="rounded bg-blue-600 px-3 py-1 text-sm hover:bg-blue-500">{gettext("+ New")}</button>
+          </header>
+          <div class="flex-1 space-y-3 overflow-y-auto p-4">
+            <div :for={{name, cfg} <- @mcp} class="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-medium">{name}</span>
+                <div class="flex shrink-0 gap-1 text-xs">
+                  <button phx-click="mcp_validate" phx-value-name={name} class="rounded bg-blue-600 px-2 py-1 hover:bg-blue-500">{gettext("Validate (list tools)")}</button>
+                  <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class="rounded bg-zinc-700 px-2 py-1 text-red-300 hover:bg-zinc-600">✕</button>
+                </div>
+              </div>
+              <div class="mt-1 text-xs text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
+              <div :if={@mcp_tools[name] == :loading} class="mt-1 text-xs text-zinc-500">{gettext("connecting…")}</div>
+              <div :if={is_list(@mcp_tools[name])} class="mt-2 space-y-1">
+                <div :for={t <- @mcp_tools[name]} class="text-xs text-zinc-400">
+                  <code class="text-zinc-300">mcp__{name}__{t["name"]}</code>
+                  <span class="text-zinc-500">— {String.slice(to_string(t["description"]), 0, 90)}</span>
+                </div>
+                <p class="text-xs text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab → Tools) to keep it read-only.")}</p>
+              </div>
+              <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-xs text-red-400">
+                {gettext("couldn't connect — check the command and the env var token")}
+              </div>
+            </div>
+            <p :if={@mcp == %{}} class="text-sm text-zinc-500">{gettext("No MCP servers yet — add one below.")}</p>
+
+            <form :if={@edit_mcp} phx-submit="mcp_save" class="space-y-3 rounded-lg border border-blue-800 p-4">
+              <div class="text-sm font-medium">{gettext("+ New MCP server")}</div>
+              <div>
+                <label class="mb-1 block text-xs text-zinc-400">{gettext("Name")}</label>
+                <input name="name" placeholder="sentry" required class="w-full rounded bg-zinc-800 px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="mb-1 block text-xs text-zinc-400">{gettext("Command")}</label>
+                <input name="command" value="npx" required class="w-full rounded bg-zinc-800 px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="mb-1 block text-xs text-zinc-400">{gettext("Arguments")}</label>
+                <input name="args" placeholder={"-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"} required class="w-full rounded bg-zinc-800 px-2 py-1.5 font-mono text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+                <p class="mt-1 text-xs text-zinc-500">{gettext("Put the token as ${ENV_VAR} — the secret stays out of the config file.")}</p>
+              </div>
+              <div class="flex gap-2 pt-1">
+                <button type="submit" class="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium hover:bg-blue-500">{gettext("Save")}</button>
+                <button type="button" phx-click="mcp_cancel" class="rounded bg-zinc-700 px-4 py-1.5 text-sm hover:bg-zinc-600">{gettext("Cancel")}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <div :if={@view == :chat and @selected} class="flex h-full flex-col">
           <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
             <div class="truncate">
@@ -894,6 +953,47 @@ defmodule CortexWeb.DashboardLive do
     {:noreply, assign(socket, view: :models, models: Config.models(), edit_model: nil)}
   end
 
+  def handle_event("view", %{"to" => "mcp"}, socket) do
+    {:noreply, assign(socket, view: :mcp, mcp: Config.mcp_servers(), edit_mcp: nil)}
+  end
+
+  def handle_event("mcp_new", _p, socket), do: {:noreply, assign(socket, edit_mcp: %{})}
+  def handle_event("mcp_cancel", _p, socket), do: {:noreply, assign(socket, edit_mcp: nil)}
+
+  def handle_event("mcp_save", %{"name" => name, "command" => command, "args" => args}, socket) do
+    name = String.trim(name)
+
+    if name == "" or String.trim(command) == "" do
+      {:noreply, put_flash(socket, :error, gettext("Name and command are required."))}
+    else
+      Config.put_mcp_server(name, %{
+        "command" => String.trim(command),
+        "args" => String.split(args, " ", trim: true),
+        "env" => %{}
+      })
+
+      {:noreply,
+       socket
+       |> assign(mcp: Config.mcp_servers(), edit_mcp: nil)
+       |> put_flash(:info, gettext("MCP server %{name} saved — validate it.", name: name))}
+    end
+  end
+
+  def handle_event("mcp_remove", %{"name" => name}, socket) do
+    Config.delete_mcp_server(name)
+    {:noreply, assign(socket, mcp: Config.mcp_servers())}
+  end
+
+  def handle_event("mcp_validate", %{"name" => name}, socket) do
+    parent = self()
+
+    Task.start(fn ->
+      send(parent, {:mcp_validated, name, Cortex.MCP.tools(name)})
+    end)
+
+    {:noreply, update(socket, :mcp_tools, &Map.put(&1, name, :loading))}
+  end
+
   def handle_event("view", %{"to" => _chat}, socket), do: {:noreply, assign(socket, view: :chat)}
 
   ###
@@ -1253,6 +1353,16 @@ defmodule CortexWeb.DashboardLive do
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_info({:mcp_validated, name, result}, socket) do
+    value =
+      case result do
+        {:ok, tools} -> tools
+        {:error, reason} -> {:error, reason}
+      end
+
+    {:noreply, update(socket, :mcp_tools, &Map.put(&1, name, value))}
   end
 
   def handle_info({:models_loaded, provider, ids}, socket) do

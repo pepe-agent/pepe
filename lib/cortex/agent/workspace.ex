@@ -79,9 +79,25 @@ defmodule Cortex.Agent.Workspace do
     persona = read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
 
-    [persona, identity, knowledge_index(name), skills_index(), convention_note()]
+    [persona, identity, knowledge_index(name), docs_index(), skills_index(), convention_note()]
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n\n")
+  end
+
+  # List Cortex's own how-to docs. They are authoritative for how Cortex works — the
+  # agent reads the relevant one with the `docs` tool before configuring the system,
+  # rather than guessing.
+  defp docs_index do
+    case Cortex.Docs.list() do
+      [] ->
+        nil
+
+      docs ->
+        "## Cortex docs — authoritative for how Cortex works. Read the relevant one " <>
+          "with the `docs` tool BEFORE configuring/operating Cortex (agents, channels, " <>
+          "cron, MCP, permissions); don't guess.\n" <>
+          Enum.map_join(docs, "\n", fn {name, title} -> "- #{name}: #{title}" end)
+    end
   end
 
   # With no SOUL.md and only the default seed, the agent has no identity yet — give
