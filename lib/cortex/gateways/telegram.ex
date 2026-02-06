@@ -175,7 +175,8 @@ defmodule Cortex.Gateways.Telegram do
     end)
 
     send(self(), :poll)
-    {:ok, %{offset: 0}}
+    schedule_heartbeat_tick()
+    {:ok, %{offset: 0, heartbeat_last: 0}}
   end
 
   # Scopes Cortex never sets itself. A more-specific scope (e.g. a leftover set by
@@ -210,13 +211,90 @@ defmodule Cortex.Gateways.Telegram do
           state
 
         {:error, reason} ->
-          Logger.warning("[telegram] poll error: #{inspect(reason)}")
+          Logger.warning("[telegram] poll error: #{safe_inspect(reason)}")
           Process.sleep(2_000)
           state
       end
 
     send(self(), :poll)
     {:noreply, state}
+  end
+
+  # Opt-in proactive engine: once a minute, check whether this bot's heartbeat is
+  # due (config `"heartbeat_minutes"`, nil = disabled) and, if so, pulse each of its
+  # sessions off-process. A quiet pulse (the overwhelmingly common case) never
+  # reaches the chat; only a genuine `{:ok, text}` gets delivered.
+  @impl true
+  def handle_info(:heartbeat_tick, state) do
+    b = bot()
+    now = System.system_time(:second)
+
+    state =
+      case b["heartbeat_minutes"] do
+        minutes when is_integer(minutes) and minutes > 0 ->
+          if now - state.heartbeat_last >= minutes * 60 and heartbeat_hour_ok?(b) do
+            for key <- bot_session_keys(b) do
+              Task.start(fn ->
+                put_bot(b)
+                deliver_heartbeat(key)
+              end)
+            end
+
+            %{state | heartbeat_last: now}
+          else
+            state
+          end
+
+        _ ->
+          state
+      end
+
+    schedule_heartbeat_tick()
+    {:noreply, state}
+  end
+
+  defp schedule_heartbeat_tick, do: Process.send_after(self(), :heartbeat_tick, 60_000)
+
+  defp heartbeat_hour_ok?(bot) do
+    tz = bot["timezone"] || Config.default_timezone()
+
+    case DateTime.now(tz) do
+      {:ok, dt} -> Cortex.Heartbeat.active_hours?(bot["heartbeat_active_hours"], dt.hour)
+      _ -> true
+    end
+  end
+
+  # Session keys belonging to THIS bot: "telegram:<chat_id>" for the default bot,
+  # "telegram:<name>:<chat_id>" for a named one — never another bot's sessions.
+  defp bot_session_keys(bot) do
+    name = bot["name"] || "default"
+    prefix = if name == "default", do: "telegram:", else: "telegram:#{name}:"
+
+    Cortex.Agent.SessionPersistence.all()
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.filter(&own_key?(&1, name, prefix))
+  end
+
+  # A named-bot key looks like "telegram:<name>:<chat_id>" (one more ":" after the
+  # prefix); the default bot's own keys never have that extra segment.
+  defp own_key?(key, "default", prefix) do
+    String.starts_with?(key, prefix) and
+      not String.contains?(String.trim_leading(key, prefix), ":")
+  end
+
+  defp own_key?(key, _name, prefix), do: String.starts_with?(key, prefix)
+
+  defp deliver_heartbeat(key) do
+    Config.put_locale()
+
+    case Cortex.Heartbeat.pulse(key) do
+      {:ok, text} ->
+        chat_id = key |> String.split(":") |> List.last()
+        send_message(chat_id, text)
+
+      _silent_or_deferred_or_error ->
+        :ok
+    end
   end
 
   defp next_offset([], offset), do: offset
@@ -230,6 +308,15 @@ defmodule Cortex.Gateways.Telegram do
   ###
 
   defp api_url(token, method), do: "https://api.telegram.org/bot#{token}/#{method}"
+
+  # The bot token rides in the URL *path* (`/bot<id>:<secret>/method`), so a Req/Mint
+  # error that embeds the request URL leaks it verbatim through `inspect/1`. Mask the
+  # token before anything derived from an error reaches the logs.
+  defp redact(text) when is_binary(text) do
+    Regex.replace(~r/bot\d{6,}(:|%3[aA])[A-Za-z0-9_-]{20,}/, text, "bot<redacted>")
+  end
+
+  defp safe_inspect(term), do: term |> inspect() |> redact()
 
   defp get_updates(token, offset) do
     params = [offset: offset, timeout: @poll_timeout]
@@ -402,31 +489,35 @@ defmodule Cortex.Gateways.Telegram do
   defp parse_command(_), do: :chat
 
   defp chat_with_agent(chat_id, text) do
-    send_chat_action(chat_id, "typing")
     agent = agent_default()
+    typing = keep_typing(chat_id)
 
-    case Cortex.Agent.chat(session_key(chat_id), agent, text,
-           authorize: authorizer(chat_id),
-           learn: learn?(),
-           on_event: activity_callback(chat_id)
-         ) do
-      {:ok, reply} ->
-        send_message(chat_id, reply)
+    try do
+      case Cortex.Agent.chat(session_key(chat_id), agent, text,
+             authorize: authorizer(chat_id),
+             learn: learn?(),
+             on_event: activity_callback(chat_id)
+           ) do
+        {:ok, reply} ->
+          send_message(chat_id, reply)
 
-      {:error, :stopped} ->
-        # The user issued /stop; that command already acknowledged it.
-        :ok
+        {:error, :stopped} ->
+          # The user issued /stop; that command already acknowledged it.
+          :ok
 
-      {:error, :busy} ->
-        send_message(
-          chat_id,
-          gettext("I'm still on the previous message — send /stop to cancel it.")
-        )
+        {:error, :busy} ->
+          send_message(
+            chat_id,
+            gettext("I'm still on the previous message — send /stop to cancel it.")
+          )
 
-      {:error, reason} ->
-        # Never leak raw internal errors into the chat — log them, reply kindly.
-        Logger.warning("[telegram] chat error: #{inspect(reason)}")
-        send_message(chat_id, friendly_error(reason))
+        {:error, reason} ->
+          # Never leak raw internal errors into the chat — log them, reply kindly.
+          Logger.warning("[telegram] chat error: #{safe_inspect(reason)}")
+          send_message(chat_id, friendly_error(reason))
+      end
+    after
+      stop_typing(typing)
     end
   end
 
@@ -611,7 +702,7 @@ defmodule Cortex.Gateways.Telegram do
         send_message(chat_id, gettext("🗜️ History compacted."))
 
       {:error, reason} ->
-        Logger.warning("[telegram] compact error: #{inspect(reason)}")
+        Logger.warning("[telegram] compact error: #{safe_inspect(reason)}")
         send_message(chat_id, gettext("I couldn't summarize right now. Try again shortly?"))
     end
   end
@@ -695,7 +786,7 @@ defmodule Cortex.Gateways.Telegram do
         send_message(chat_id, reply)
 
       {:error, reason} ->
-        Logger.warning("[telegram] aside error: #{inspect(reason)}")
+        Logger.warning("[telegram] aside error: #{safe_inspect(reason)}")
         send_message(chat_id, friendly_error(reason))
     end
   end
@@ -987,14 +1078,21 @@ defmodule Cortex.Gateways.Telegram do
     end
   end
 
+  @tool_running "🛠️"
+  @tool_done "✅"
+
   defp tg_activity(chat_id, {:tool_call, name, raw}) do
     lines = (Process.get(:tg_act_lines, []) ++ [activity_line(name, raw)]) |> Enum.take(-6)
     Process.put(:tg_act_lines, lines)
+    render_activity(chat_id, lines)
+  end
 
-    id = Process.get(:tg_act_id) || send_status(chat_id)
-    Process.put(:tg_act_id, id)
-    if id, do: edit_status(chat_id, id, Enum.join(lines, "\n"))
-    :ok
+  # Tools run sequentially, so a result always belongs to the last running line —
+  # flip its icon to done, in place, in the same status message.
+  defp tg_activity(chat_id, {:tool_result, _name, _out}) do
+    lines = Process.get(:tg_act_lines, []) |> mark_last_done()
+    Process.put(:tg_act_lines, lines)
+    render_activity(chat_id, lines)
   end
 
   defp tg_activity(chat_id, event) when elem(event, 0) in [:done, :error] do
@@ -1006,10 +1104,26 @@ defmodule Cortex.Gateways.Telegram do
 
   defp tg_activity(_chat_id, _event), do: :ok
 
+  # Send the single status message once, then keep editing it in place; store its id
+  # in the run task's process dict so every event in this turn updates the same one.
+  defp render_activity(chat_id, lines) do
+    id = Process.get(:tg_act_id) || send_status(chat_id)
+    Process.put(:tg_act_id, id)
+    if id, do: edit_status(chat_id, id, Enum.join(lines, "\n"))
+    :ok
+  end
+
+  defp mark_last_done([]), do: []
+
+  defp mark_last_done(lines) do
+    {init, [last]} = Enum.split(lines, -1)
+    init ++ [String.replace_prefix(last, @tool_running, @tool_done)]
+  end
+
   defp activity_line(name, raw) do
     case decode_args(raw) do
-      map when map_size(map) > 0 -> "🛠️ " <> name <> " · " <> map_preview(map)
-      _ -> "🛠️ " <> name
+      map when map_size(map) > 0 -> @tool_running <> " " <> name <> " · " <> map_preview(map)
+      _ -> @tool_running <> " " <> name
     end
   end
 
@@ -1033,24 +1147,46 @@ defmodule Cortex.Gateways.Telegram do
   end
 
   defp send_message(chat_id, text) do
-    # Telegram caps messages at 4096 chars.
-    text
-    |> chunk(4000)
-    |> Enum.each(fn part ->
-      Req.post(api_url(token(), "sendMessage"), json: %{chat_id: chat_id, text: part})
-    end)
+    unless dead_target?(chat_id) do
+      # Telegram caps messages at 4096 chars.
+      text
+      |> chunk(4000)
+      |> Enum.each(fn part ->
+        api_url(token(), "sendMessage")
+        |> Req.post(json: %{chat_id: chat_id, text: part})
+        |> track_delivery(chat_id)
+      end)
+    end
   end
 
   # Send an HTML-formatted message (bold names, etc.). Callers must escape dynamic
   # text with `esc/1`; `htmlb/1` does both (escape + bold).
   defp send_html(chat_id, text) do
-    text
-    |> chunk(4000)
-    |> Enum.each(fn part ->
-      Req.post(api_url(token(), "sendMessage"),
-        json: %{chat_id: chat_id, text: part, parse_mode: "HTML"}
-      )
-    end)
+    unless dead_target?(chat_id) do
+      text
+      |> chunk(4000)
+      |> Enum.each(fn part ->
+        api_url(token(), "sendMessage")
+        |> Req.post(json: %{chat_id: chat_id, text: part, parse_mode: "HTML"})
+        |> track_delivery(chat_id)
+      end)
+    end
+  end
+
+  # Self-healing dead-target tracking: skip a chat we already know is gone;
+  # otherwise send and mark it dead/alive from the actual response, so a target
+  # recovers automatically (e.g. the user un-blocked the bot) with no manual reset.
+  defp dead_target?(chat_id), do: Cortex.Gateways.Reachability.dead?(bot_name(), chat_id)
+
+  defp track_delivery(response, chat_id) do
+    if Cortex.Gateways.Reachability.permanent_failure?(response) do
+      Logger.info("[telegram] marking chat #{chat_id} dead (permanent delivery failure)")
+      Cortex.Gateways.Reachability.mark_dead(bot_name(), chat_id)
+    else
+      Cortex.Gateways.Reachability.clear(bot_name(), chat_id)
+    end
+
+    response
   end
 
   defp htmlb(text), do: "<b>" <> esc(text) <> "</b>"
@@ -1062,6 +1198,32 @@ defmodule Cortex.Gateways.Telegram do
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
   end
+
+  # Telegram's "typing…" bubble lasts only ~5s, so a long non-streaming turn (slow
+  # model, no tool calls) would look frozen after the first hint. Keep it alive by
+  # re-sending the action every few seconds until the run finishes. Linked to the run
+  # task (so a crash tears it down) but stopped explicitly, since a normal task exit
+  # doesn't kill a linked child.
+  defp keep_typing(chat_id) do
+    b = bot()
+
+    spawn_link(fn ->
+      put_bot(b)
+      typing_loop(chat_id)
+    end)
+  end
+
+  defp typing_loop(chat_id) do
+    send_chat_action(chat_id, "typing")
+
+    receive do
+      :stop -> :ok
+    after
+      4_000 -> typing_loop(chat_id)
+    end
+  end
+
+  defp stop_typing(pid) when is_pid(pid), do: send(pid, :stop)
 
   defp send_chat_action(chat_id, action) do
     Req.post(api_url(token(), "sendChatAction"), json: %{chat_id: chat_id, action: action})

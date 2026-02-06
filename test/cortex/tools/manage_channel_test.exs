@@ -119,6 +119,38 @@ defmodule Cortex.Tools.ManageChannelTest do
     assert Config.telegram_bot("sales")["trainers"] == ["*"]
   end
 
+  test "set_heartbeat enables/tunes and disables the proactive check-in" do
+    ManageChannel.run(
+      %{"action" => "add", "name" => "sales", "token_env" => "T", "agent" => "sales-bot"},
+      ctx()
+    )
+
+    assert {:ok, msg} =
+             ManageChannel.run(
+               %{
+                 "action" => "set_heartbeat",
+                 "name" => "sales",
+                 "heartbeat_minutes" => 30,
+                 "heartbeat_hours" => "8-22"
+               },
+               ctx()
+             )
+
+    assert msg =~ "every 30min"
+    bot = Config.telegram_bot("sales")
+    assert bot["heartbeat_minutes"] == 30
+    assert bot["heartbeat_active_hours"] == [8, 22]
+
+    assert {:ok, msg2} =
+             ManageChannel.run(
+               %{"action" => "set_heartbeat", "name" => "sales", "heartbeat_minutes" => 0},
+               ctx()
+             )
+
+    assert msg2 =~ "disabled"
+    refute Config.telegram_bot("sales")["heartbeat_minutes"]
+  end
+
   test "list shows configured bots" do
     ManageChannel.run(
       %{"action" => "add", "name" => "sales", "token_env" => "T", "agent" => "sales-bot"},

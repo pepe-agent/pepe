@@ -52,6 +52,9 @@ defmodule Cortex.Tools.ManageChannel do
       - set_agent: rebind a bot to another agent — needs `name`, `agent`.
       - set_trainers: who the bot LEARNS from — needs `name`, `trainers` ("*" = \
         everyone, "none" = nobody (client-facing bot), or comma-separated user ids).
+      - set_heartbeat: enable/tune the bot's proactive heartbeat — needs `name`; \
+        `heartbeat_minutes` (integer, how often to check; omit/0 disables it) and \
+        optional `heartbeat_hours` ("8-22", quiet outside that local-hour window).
       - enable / disable / remove: needs `name`.
       """,
       %{
@@ -59,7 +62,7 @@ defmodule Cortex.Tools.ManageChannel do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(add list set_agent set_trainers enable disable remove),
+            "enum" => ~w(add list set_agent set_trainers set_heartbeat enable disable remove),
             "description" => "What to do."
           },
           "name" => %{"type" => "string", "description" => "The bot's name (never \"default\")."},
@@ -72,6 +75,14 @@ defmodule Cortex.Tools.ManageChannel do
           "trainers" => %{
             "type" => "string",
             "description" => "Who the bot learns from: \"*\", \"none\", or \"id1,id2\"."
+          },
+          "heartbeat_minutes" => %{
+            "type" => "integer",
+            "description" => "How often (minutes) to check in proactively. 0 disables it."
+          },
+          "heartbeat_hours" => %{
+            "type" => "string",
+            "description" => "Local-hour active window, e.g. \"8-22\" (omit = always active)."
           }
         },
         "required" => ["action"]
@@ -90,6 +101,7 @@ defmodule Cortex.Tools.ManageChannel do
   defp dispatch("add", args), do: add(args)
   defp dispatch("set_agent", args), do: set_agent(args)
   defp dispatch("set_trainers", args), do: set_trainers(args)
+  defp dispatch("set_heartbeat", args), do: set_heartbeat(args)
   defp dispatch("enable", args), do: toggle(args, true)
   defp dispatch("disable", args), do: toggle(args, false)
   defp dispatch("remove", args), do: remove(args)
@@ -150,6 +162,53 @@ defmodule Cortex.Tools.ManageChannel do
   defp trainers_text(["*"]), do: "everyone"
   defp trainers_text([]), do: "no one"
   defp trainers_text(list), do: Enum.join(list, ", ")
+
+  defp set_heartbeat(args) do
+    with {:ok, name} <- fetch(args, "name"),
+         :ok <- guard_name(name),
+         {:ok, bot} <- fetch_bot(name) do
+      minutes = args["heartbeat_minutes"]
+
+      bot =
+        case minutes do
+          n when is_integer(n) and n > 0 -> Map.put(bot, "heartbeat_minutes", n)
+          _ -> Map.delete(bot, "heartbeat_minutes")
+        end
+
+      bot =
+        case parse_hours(args["heartbeat_hours"]) do
+          {:ok, window} -> Map.put(bot, "heartbeat_active_hours", window)
+          :skip -> bot
+          :clear -> Map.delete(bot, "heartbeat_active_hours")
+        end
+
+      Config.put_telegram_bot(name, bot)
+      reload()
+
+      state =
+        if bot["heartbeat_minutes"], do: "every #{bot["heartbeat_minutes"]}min", else: "disabled"
+
+      {:ok, "Bot #{name} heartbeat: #{state}."}
+    end
+  end
+
+  defp parse_hours(nil), do: :skip
+  defp parse_hours(""), do: :clear
+
+  defp parse_hours(str) do
+    case String.split(str, "-") do
+      [a, b] ->
+        with {start, ""} <- Integer.parse(String.trim(a)),
+             {finish, ""} <- Integer.parse(String.trim(b)) do
+          {:ok, [start, finish]}
+        else
+          _ -> :skip
+        end
+
+      _ ->
+        :skip
+    end
+  end
 
   defp toggle(args, enabled?) do
     with {:ok, name} <- fetch(args, "name"),

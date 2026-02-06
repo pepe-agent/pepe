@@ -33,3 +33,25 @@ allowlist of user ids:
 
 So a client-facing bot (`trainers: []`) never lets a client's chat become the agent's
 memory, while your own DM bot still learns from you.
+
+## Heartbeat — proactive check-ins (opt-in)
+
+A bot can periodically give its agent the floor to say something **on its own
+initiative** — "the deploy finished", "you asked me to watch for X and it happened"
+— and, just as importantly, the right to say **nothing** most of the time. Off by
+default. Enable with `manage_channel`:
+
+```
+manage_channel set_heartbeat name: "sales" heartbeat_minutes: 30 heartbeat_hours: "8-22"
+```
+
+- `heartbeat_minutes` — how often to check (0 disables it).
+- `heartbeat_hours` — local-hour window ("8-22"); outside it, no pulse. Omit for
+  always-on.
+
+Each pulse runs on the session's live context. Add an optional `HEARTBEAT.md` to the
+agent's workspace describing what to watch for; system events (queued by any
+subsystem via `Cortex.Heartbeat.Events`) are included automatically. The agent
+replies with exactly `HEARTBEAT_OK` when there's nothing worth saying — that's
+expected most of the time and nothing is sent. A cooldown gate (min 30s spacing, a
+flood breaker at 5 fires/60s) makes a runaway proactive loop impossible.

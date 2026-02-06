@@ -297,6 +297,34 @@ Installed **skills are also surfaced as their own slash commands** (e.g. a
 messages follow the configured `locale`; the agent's own replies follow the user's
 language, and raw internal errors are never leaked into the chat.
 
+A **dead chat is self-healing**: if a send comes back permanently failed (bot
+blocked, chat/user gone), that chat is skipped on every further send — no wasted API
+calls or log noise — and automatically un-marked the moment a send to it succeeds
+again (e.g. the user un-blocked the bot). No manual reset needed.
+
+### Heartbeat — proactive check-ins (opt-in)
+
+A bot can periodically give its agent the floor to say something **on its own
+initiative** ("the deploy finished", "you asked me to watch for X") — and, just as
+importantly, the right to say **nothing** most of the time. Off by default:
+
+```bash
+# via the manage_channel tool (an agent can set this up itself, from chat):
+manage_channel set_heartbeat name: "sales" heartbeat_minutes: 30 heartbeat_hours: "8-22"
+```
+
+Each pulse runs the agent on its session's live context with a prompt that says
+"this is an automatic check — reply with exactly `HEARTBEAT_OK` if there's nothing
+worth saying." That's the common case; only a genuine message gets sent. Feed it:
+
+- an optional `HEARTBEAT.md` in the agent's workspace ("what to watch for"),
+- **system events** any part of Cortex can queue for a session
+  (`Cortex.Heartbeat.Events.push/2`) and the next pulse picks up automatically.
+
+A cooldown gate (30s min spacing, a 5-fires/60s flood breaker) makes a runaway
+proactive loop impossible, and `heartbeat_hours` ("8-22") keeps it quiet outside
+local waking hours.
+
 ### Multiple bots, one per agent
 
 You can run **several bots at once, each bound directly to its own agent** — one

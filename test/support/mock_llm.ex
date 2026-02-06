@@ -31,6 +31,14 @@ defmodule Cortex.Test.MockLLM do
 
         respond(conn, stream?, %{content: nil, tool_calls: [tool_call]})
 
+      # A heartbeat pulse: stay silent, UNLESS the prompt was seeded with something
+      # worth surfacing (used to test the "speaks up" path).
+      user_content(messages) =~ "TRIGGER_SPEAK" ->
+        respond(conn, stream?, %{content: "Something happened!", tool_calls: nil})
+
+      user_content(messages) =~ "HEARTBEAT_OK" ->
+        respond(conn, stream?, %{content: "HEARTBEAT_OK", tool_calls: nil})
+
       true ->
         respond(conn, stream?, %{content: "Hello from the mock!", tool_calls: nil})
     end
@@ -40,6 +48,12 @@ defmodule Cortex.Test.MockLLM do
     Enum.any?(messages, fn m ->
       m["role"] == "user" and String.contains?(m["content"] || "", "read")
     end)
+  end
+
+  defp user_content(messages) do
+    messages
+    |> Enum.filter(&(&1["role"] == "user"))
+    |> Enum.map_join(" ", &(&1["content"] || ""))
   end
 
   defp respond(conn, false, %{content: content, tool_calls: tool_calls}) do

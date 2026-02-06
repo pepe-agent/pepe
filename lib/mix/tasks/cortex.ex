@@ -40,6 +40,7 @@ defmodule Mix.Tasks.Cortex do
       mix cortex serve [--port 4000]             # OpenAI API + WebSocket server
       mix cortex gateway telegram setup          # configure the default Telegram bot
       mix cortex gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
+                                          [--heartbeat-minutes N] [--heartbeat-hours 8-22]
       mix cortex gateway telegram list           # list configured bots
       mix cortex gateway telegram remove NAME    # delete a named bot
       mix cortex gateway telegram                # run the gateway (one poller per bot)
@@ -883,7 +884,15 @@ defmodule Mix.Tasks.Cortex do
 
   defp gateway_cmd(["telegram", "add", name | rest]) do
     {opts, _, _} =
-      OptionParser.parse(rest, strict: [token: :string, agent: :string, trainers: :string])
+      OptionParser.parse(rest,
+        strict: [
+          token: :string,
+          agent: :string,
+          trainers: :string,
+          heartbeat_minutes: :integer,
+          heartbeat_hours: :string
+        ]
+      )
 
     cond do
       name == "default" ->
@@ -897,7 +906,9 @@ defmodule Mix.Tasks.Cortex do
           %{
             "bot_token" => opts[:token],
             "agent" => opts[:agent],
-            "trainers" => parse_trainers(opts[:trainers])
+            "trainers" => parse_trainers(opts[:trainers]),
+            "heartbeat_minutes" => opts[:heartbeat_minutes],
+            "heartbeat_active_hours" => parse_hour_window(opts[:heartbeat_hours])
           }
           |> reject_nil_values()
 
@@ -941,6 +952,7 @@ defmodule Mix.Tasks.Cortex do
 
       telegram setup              configure the DEFAULT bot (token, allowlists, agent)
       telegram add NAME --token T [--agent A] [--trainers id1,id2]
+                          [--heartbeat-minutes N] [--heartbeat-hours 8-22]
                                   add another bot bound to an agent
                                   (--trainers: who it learns from; omit=everyone, none=nobody)
       telegram list               list configured bots
@@ -964,6 +976,23 @@ defmodule Mix.Tasks.Cortex do
 
   # --trainers: omitted → nil (default: everyone); "*" → ["*"] (everyone, explicit);
   # "none"/"" → [] (no one); "id1,id2" → [id1, id2] (only those user ids).
+  defp parse_hour_window(nil), do: nil
+
+  defp parse_hour_window(str) do
+    case String.split(str, "-") do
+      [a, b] ->
+        with {start, ""} <- Integer.parse(String.trim(a)),
+             {finish, ""} <- Integer.parse(String.trim(b)) do
+          [start, finish]
+        else
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
   defp parse_trainers(nil), do: nil
   defp parse_trainers(str) when str in ["", "none"], do: []
   defp parse_trainers("*"), do: ["*"]

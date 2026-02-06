@@ -49,6 +49,15 @@ defmodule Cortex.Agent.Session do
   @spec learn(term()) :: :ok | {:error, :no_agent}
   def learn(key), do: GenServer.call(via(key), :learn)
 
+  @doc """
+  Run one heartbeat pulse on this session's live context — the agent decides, on its
+  own, whether anything is worth proactively saying. Returns `{:ok, text}` when it
+  wants to speak, `:silent` when it chose not to, or `{:error, reason}`
+  (`:busy` when a normal turn is already running — the pulse is simply skipped).
+  """
+  @spec heartbeat(term()) :: {:ok, String.t()} | :silent | {:error, term()}
+  def heartbeat(key), do: GenServer.call(via(key), :heartbeat, 120_000)
+
   @doc "Return `%{agent:, model:, turns:}` for the session."
   def status(key), do: GenServer.call(via(key), :status)
 
@@ -169,6 +178,38 @@ defmodule Cortex.Agent.Session do
       agent ->
         Cortex.Agent.Reflect.review_async(agent, state.messages)
         {:reply, :ok, cancel_idle(state)}
+    end
+  end
+
+  # Skip a pulse outright while a normal turn is in flight — never collide with it.
+  def handle_call(:heartbeat, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
+  def handle_call(:heartbeat, _from, state) do
+    case Config.get_agent(state.agent_name) || Config.default_agent() do
+      nil ->
+        {:reply, {:error, :no_agent}, state}
+
+      agent ->
+        prompt = Cortex.Heartbeat.build_prompt(state.key, agent.name)
+        messages = ensure_system(state.messages, agent) ++ [Message.user(prompt)]
+        opts = [session_key: state.key]
+
+        case Runtime.run(agent, messages, opts) do
+          {:ok, reply, _all} ->
+            if Cortex.Heartbeat.silent?(reply) do
+              {:reply, :silent, state}
+            else
+              # Only the agent's own message joins the visible history — the
+              # internal pulse prompt stays invisible, like a cron/system trigger.
+              new_state = %{state | messages: state.messages ++ [Message.assistant(reply)]}
+              {:reply, {:ok, reply}, persist(new_state)}
+            end
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
     end
   end
 
