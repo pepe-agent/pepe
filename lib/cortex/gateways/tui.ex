@@ -32,8 +32,29 @@ defmodule Cortex.Gateways.TUI do
   def start(agent_name, key) when is_binary(key) do
     Config.put_locale()
     {:ok, _pid} = SessionSupervisor.ensure(key, agent_name)
+    subscribe_watches(key)
     print_header(agent_name, key)
     loop(key)
+  end
+
+  # Receive this console's fired watches, and register so the scheduler knows a live
+  # surface is here. A watch created from the TUI (origin "tui:<key>") delivers back
+  # to this same console.
+  defp subscribe_watches(key) do
+    topic = Cortex.Watch.Delivery.topic(%{"channel" => "tui", "key" => key})
+    Phoenix.PubSub.subscribe(Cortex.PubSub, topic)
+    Registry.register(Cortex.Watch.Subscribers, topic, nil)
+  end
+
+  # Print any watch notifications that arrived while we were blocked on input.
+  defp drain_watches do
+    receive do
+      {:watch_message, _origin, text} ->
+        IO.puts("\n" <> bold("🔭 watch › ") <> text)
+        drain_watches()
+    after
+      0 -> :ok
+    end
   end
 
   # A summary box (agent · model · session) shown when the console opens.
@@ -125,6 +146,8 @@ defmodule Cortex.Gateways.TUI do
   ###
 
   defp loop(key) do
+    drain_watches()
+
     case IO.gets("\n" <> bold("you › ")) do
       :eof ->
         :ok

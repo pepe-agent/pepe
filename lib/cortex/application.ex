@@ -32,6 +32,8 @@ defmodule Cortex.Application do
         # Heartbeat: ephemeral system-events queue + the anti-spam cooldown gate.
         Cortex.Heartbeat.Events,
         Cortex.Heartbeat.Cooldown,
+        # Where live TUI/WebSocket sessions register so a fired watch can reach them.
+        {Registry, keys: :duplicate, name: Cortex.Watch.Subscribers},
         # Self-healing tracker for permanently-gone Telegram chats.
         Cortex.Gateways.Reachability,
         # Messaging gateways (Telegram, ...). No-ops when not configured.
@@ -64,7 +66,14 @@ defmodule Cortex.Application do
   defp scheduler_children do
     serve? = Application.get_env(:cortex, :serve_endpoint, false)
     gateways? = Application.get_env(:cortex, :start_gateways, false)
-    if serve? or gateways?, do: [Cortex.Cron.Scheduler], else: []
+    persist? = Application.get_env(:cortex, :persist_sessions, false)
+
+    # Cron fires only on the server surfaces; watches also run on an interactive
+    # console (`tui`/`chat`) so a standalone REPL can fire and deliver its own watches.
+    # (Run a single long-lived surface at a time — two schedulers on one config double-fire.)
+    crons = if serve? or gateways?, do: [Cortex.Cron.Scheduler], else: []
+    watches = if serve? or gateways? or persist?, do: [Cortex.Watch.Scheduler], else: []
+    crons ++ watches
   end
 
   # The Phoenix endpoint (OpenAI-compatible HTTP API + WebSocket) is only started

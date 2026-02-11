@@ -87,8 +87,9 @@ defmodule CortexWeb.OpenAIControllerTest do
 
     _body2 = json_response(post_msg.("e agora?"), 200)
 
-    # system + (user + assistant) * 2 = 5 messages retained server-side
-    history = Cortex.Agent.Session.history("api:" <> sid)
+    # system + (user + assistant) * 2 = 5 messages retained server-side.
+    # The key is scoped by the agent's scope ("root" here) to isolate tenants.
+    history = Cortex.Agent.Session.history("api:root:" <> sid)
     roles = Enum.map(history, & &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end

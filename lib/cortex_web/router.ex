@@ -7,6 +7,12 @@ defmodule CortexWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # The /v1 API adds bearer-token auth: open when no tokens exist, scoped once they do.
+  pipeline :v1_api do
+    plug :accepts, ["json"]
+    plug CortexWeb.ApiAuth
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -32,7 +38,7 @@ defmodule CortexWeb.Router do
 
   # OpenAI-compatible API surface.
   scope "/v1", CortexWeb do
-    pipe_through :api
+    pipe_through :v1_api
 
     get "/models", OpenAIController, :models
     post "/chat/completions", OpenAIController, :chat_completions

@@ -309,6 +309,31 @@ defmodule Cortex.Gateways.Telegram do
 
   defp api_url(token, method), do: "https://api.telegram.org/bot#{token}/#{method}"
 
+  @doc """
+  Deliver a fired watch's message to a Telegram chat, resolving the bot token from
+  config so it works from any process (e.g. the watch scheduler task, which doesn't
+  hold a bot in its process dictionary). Returns `:ok`/`{:error, reason}`.
+  """
+  def deliver_watch(%{"chat_id" => chat_id} = origin, text) do
+    bot_name = origin["bot"] || "default"
+
+    case Config.telegram_bot(bot_name) do
+      %{"bot_token" => raw} ->
+        token = Config.interpolate(raw)
+
+        case Req.post(api_url(token, "sendMessage"), json: %{chat_id: chat_id, text: text}) do
+          {:ok, %{status: 200}} -> :ok
+          {:ok, %{status: status}} -> {:error, {:telegram, status}}
+          {:error, reason} -> {:error, reason}
+        end
+
+      _ ->
+        {:error, :unknown_bot}
+    end
+  end
+
+  def deliver_watch(_origin, _text), do: {:error, :no_chat}
+
   # The bot token rides in the URL *path* (`/bot<id>:<secret>/method`), so a Req/Mint
   # error that embeds the request URL leaks it verbatim through `inspect/1`. Mask the
   # token before anything derived from an error reaches the logs.

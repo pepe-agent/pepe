@@ -13,12 +13,22 @@ defmodule CortexWeb.OpenAIController do
   use CortexWeb, :controller
 
   alias Cortex.Agent.Runtime
+  alias Cortex.ApiScope
+  alias Cortex.Company
   alias Cortex.Config
+  alias Cortex.Config.Agent
   alias Cortex.LLM.Message
 
   def models(conn, _params) do
-    agents = Enum.map(Config.agents(), &model_object(&1.name, "agent"))
-    models = Enum.map(Config.models(), &model_object(&1.name, "model"))
+    scope = conn.assigns[:api_scope] || :unrestricted
+    agents = Enum.map(ApiScope.visible_agents(scope), &model_object(&1.name, "agent"))
+    # Raw model connections are only listed for open/root scope; company/agent tokens
+    # see only their agents.
+    models =
+      if ApiScope.root_or_open?(scope),
+        do: Enum.map(Config.models(), &model_object(&1.name, "model")),
+        else: []
+
     json(conn, %{"object" => "list", "data" => agents ++ models})
   end
 
@@ -29,10 +39,16 @@ defmodule CortexWeb.OpenAIController do
   def chat_completions(conn, params) do
     messages = normalize_messages(params["messages"] || [])
     stream? = params["stream"] == true
-    {agent, model} = resolve(params["model"])
+    scope = conn.assigns[:api_scope] || :unrestricted
+    {agent, model} = resolve(params["model"], scope)
     session_id = params["session_id"] || params["user"] || session_header(conn)
 
     cond do
+      # A named agent that resolved to nothing under a real (non-open) scope is out of
+      # bounds — refuse without revealing whether it exists elsewhere.
+      is_nil(agent) and scope != :unrestricted and present?(params["model"]) ->
+        error(conn, 403, "agent not accessible with this token")
+
       is_nil(agent) ->
         error(conn, 400, "no agent or model resolved for #{inspect(params["model"])}")
 
@@ -63,20 +79,23 @@ defmodule CortexWeb.OpenAIController do
     end
   end
 
-  # Resolve the requested "model" into an agent (+ optional model override).
-  defp resolve(name) do
-    cond do
-      name && Config.get_agent(name) ->
-        {Config.get_agent(name), nil}
+  # Resolve the requested "model" into an agent (+ optional model override) within the
+  # token's scope. Agent authorization is shared with the WebSocket via Cortex.ApiScope;
+  # only the open/root scope may additionally pass a request through to a bare model
+  # connection wrapped in an ephemeral agent.
+  defp resolve(name, scope) do
+    case ApiScope.authorize_agent(name, scope) do
+      %Agent{} = agent ->
+        {agent, nil}
 
-      name && Config.get_model(name) ->
-        # Wrap a bare model connection in an ephemeral tool-less agent.
-        {ephemeral_agent(name), Config.get_model(name)}
-
-      true ->
-        {Config.default_agent(), nil}
+      nil ->
+        if present?(name) and ApiScope.root_or_open?(scope) and Config.get_model(name),
+          do: {ephemeral_agent(name), Config.get_model(name)},
+          else: {nil, nil}
     end
   end
+
+  defp present?(v), do: is_binary(v) and v != ""
 
   defp ephemeral_agent(model_name) do
     %Cortex.Config.Agent{
@@ -114,10 +133,14 @@ defmodule CortexWeb.OpenAIController do
   ### stateful sessions
   ###
 
-  # The conversation lives in a supervised GenServer keyed by "api:<session_id>".
-  # Subsequent calls with the same id keep the full history server-side.
+  # The conversation lives in a supervised GenServer keyed per scope so a session id
+  # can't be reused across companies to reach another tenant's conversation.
+  defp session_key(agent, session_id) do
+    "api:" <> (Company.of(agent.name) || "root") <> ":" <> session_id
+  end
+
   defp session_response(conn, agent, session_id, text, false) do
-    key = "api:" <> session_id
+    key = session_key(agent, session_id)
 
     case Cortex.Agent.chat(key, agent.name, text) do
       {:ok, reply} -> json(conn, completion_object(agent.name, reply, session_id))
@@ -126,7 +149,7 @@ defmodule CortexWeb.OpenAIController do
   end
 
   defp session_response(conn, agent, session_id, text, true) do
-    key = "api:" <> session_id
+    key = session_key(agent, session_id)
     id = "chatcmpl-" <> random_id()
 
     conn =

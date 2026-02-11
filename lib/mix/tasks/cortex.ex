@@ -23,11 +23,42 @@ defmodule Mix.Tasks.Cortex do
       mix cortex model remove NAME
       mix cortex model default NAME
 
+  ## Companies (multi-tenant)
+
+  Optional. Without `--company`, everything operates on the **root** scope, exactly
+  as a single-tenant install always has. Add a company to isolate a tenant: its
+  agents, workspaces, `shared/` space, models and routing are walled off from every
+  other company. Add `--company NAME` to any agent/model command to act inside it.
+
+      mix cortex company add NAME [--description "..."]
+      mix cortex company list
+      mix cortex company remove NAME [--force]   # --force also drops its agents
+
+  ## API access tokens
+
+  Bearer tokens for the `/v1` HTTP API. With no tokens the API is open (legacy
+  behaviour); creating the first one locks it — every call then needs a valid token.
+  Scope a token to a company (`--company`) or a single agent (`--agent HANDLE`).
+
+      mix cortex token add [--company CO] [--agent HANDLE] [--label "..."]
+      mix cortex token list
+      mix cortex token revoke ID
+
+  ## Watches (one-shot "notify me when X")
+
+  A watch polls a cheap probe and notifies **once** when it passes, then stops —
+  durable across restarts. Agent-judged watches are created from chat (the `watch`
+  tool); the CLI creates probe watches.
+
+      mix cortex watch add "site up" --probe "curl -sf https://x" [--message "..."] [--every 120] [--deliver telegram:<chat>]
+      mix cortex watch list
+      mix cortex watch pause ID | resume ID | cancel ID
+
   ## Agents
 
-      mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--default]
-      mix cortex agent list
-      mix cortex agent route FROM TO [--remove]   # let FROM message TO (directed)
+      mix cortex agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--default] [--company CO]
+      mix cortex agent list [--company CO | --all]
+      mix cortex agent route FROM TO [--remove] [--company CO]   # let FROM message TO (directed)
       mix cortex agent manage ADMIN TARGET [--remove]  # let ADMIN administer TARGET ("*" = all)
       mix cortex agent rename OLD NEW          # rename + move its workspace dir
       mix cortex agent remove NAME
@@ -58,6 +89,7 @@ defmodule Mix.Tasks.Cortex do
   use Mix.Task
   use Gettext, backend: Cortex.Gettext
 
+  alias Cortex.Company
   alias Cortex.Config
   alias Cortex.Config.Agent
   alias Cortex.Config.Model
@@ -92,6 +124,9 @@ defmodule Mix.Tasks.Cortex do
       ["help", "gateway" | _] ->
         gateway_cmd(["help"])
 
+      ["help", "company" | _] ->
+        company_cmd(["help"])
+
       ["setup" | _] ->
         with_config(&setup/0)
 
@@ -121,6 +156,15 @@ defmodule Mix.Tasks.Cortex do
 
       ["mcp" | rest] ->
         with_config(fn -> mcp_cmd(rest) end)
+
+      ["company" | rest] ->
+        with_config(fn -> company_cmd(rest) end)
+
+      ["token" | rest] ->
+        with_config(fn -> token_cmd(rest) end)
+
+      ["watch" | rest] ->
+        with_config(fn -> watch_cmd(rest) end)
 
       ["model" | rest] ->
         with_config(fn -> model_cmd(rest) end)
@@ -252,6 +296,7 @@ defmodule Mix.Tasks.Cortex do
     {opts, _} =
       OptionParser.parse!(rest,
         strict: [
+          company: :string,
           base_url: :string,
           api_key: :string,
           model: :string,
@@ -262,42 +307,46 @@ defmodule Mix.Tasks.Cortex do
         ]
       )
 
-    # Guided flow: no --base-url ⇒ pick a provider from the catalog, resolve its
-    # URL + API key, then pick a model. --base-url ⇒ use it directly.
-    {base_url, api_key, oauth} =
-      if opts[:base_url] do
-        {opts[:base_url], opts[:api_key], nil}
-      else
-        choose_provider()
-      end
+    if validate_scope(name, opts[:company]) == :ok do
+      handle = Company.handle(opts[:company], name)
 
-    cond do
-      is_nil(base_url) ->
-        error("no provider selected; aborting.")
-
-      true ->
-        model_id = opts[:model] || pick_model(base_url, api_key)
-
-        case model_id do
-          nil ->
-            error("no model selected; aborting.")
-
-          id ->
-            model = %Model{
-              name: name,
-              base_url: base_url,
-              api_key: api_key,
-              oauth: oauth,
-              model: id,
-              api: opts[:api] || api_for(base_url),
-              max_tokens: opts[:max_tokens],
-              temperature: opts[:temperature]
-            }
-
-            Config.put_model(model)
-            if opts[:default], do: Config.set_default_model(name)
-            ok("model connection #{green(name)} saved -> #{model.base_url} (#{green(id)})")
+      # Guided flow: no --base-url ⇒ pick a provider from the catalog, resolve its
+      # URL + API key, then pick a model. --base-url ⇒ use it directly.
+      {base_url, api_key, oauth} =
+        if opts[:base_url] do
+          {opts[:base_url], opts[:api_key], nil}
+        else
+          choose_provider()
         end
+
+      cond do
+        is_nil(base_url) ->
+          error("no provider selected; aborting.")
+
+        true ->
+          model_id = opts[:model] || pick_model(base_url, api_key)
+
+          case model_id do
+            nil ->
+              error("no model selected; aborting.")
+
+            id ->
+              model = %Model{
+                name: handle,
+                base_url: base_url,
+                api_key: api_key,
+                oauth: oauth,
+                model: id,
+                api: opts[:api] || api_for(base_url),
+                max_tokens: opts[:max_tokens],
+                temperature: opts[:temperature]
+              }
+
+              Config.put_model(model)
+              if opts[:default], do: Config.set_default_model_for(opts[:company], name)
+              ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
+          end
+      end
     end
   end
 
@@ -325,10 +374,16 @@ defmodule Mix.Tasks.Cortex do
     end
   end
 
-  defp model_cmd(["list" | _]) do
+  defp model_cmd(["list" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [company: :string, all: :boolean])
     default = Config.default_model_name()
 
-    case Config.models() do
+    models =
+      if opts[:all],
+        do: Config.models(),
+        else: Enum.filter(Config.models(), &(Company.of(&1.name) == opts[:company]))
+
+    case models do
       [] ->
         info(
           "no model connections. add one:\n  mix cortex model add openrouter --base-url https://openrouter.ai/api/v1 --api-key '${OPENROUTER_API_KEY}' --model anthropic/claude-3.5-sonnet"
@@ -623,10 +678,294 @@ defmodule Mix.Tasks.Cortex do
   ### agent
   ###
 
+  ###
+  ### company commands
+  ###
+
+  defp company_cmd(["add", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [description: :string])
+    meta = if opts[:description], do: %{"description" => opts[:description]}, else: %{}
+
+    case Config.add_company(name, meta) do
+      :ok ->
+        ok(
+          "company #{green(name)} created — add agents with " <>
+            "#{bold("mix cortex agent add NAME --company #{name}")}"
+        )
+
+      {:error, :invalid_name} ->
+        error("invalid company name #{inspect(name)} — use letters, digits, - and _ only")
+
+      {:error, :already_exists} ->
+        error("company #{name} already exists")
+    end
+  end
+
+  defp company_cmd(["list" | _]) do
+    case Config.companies() do
+      [] ->
+        info(
+          "no companies. everything runs in the root scope. add one:\n  mix cortex company add acme"
+        )
+
+      companies ->
+        Enum.each(companies, fn name ->
+          count = length(Config.agents_in(name))
+          desc = (Config.get_company(name) || %{})["description"]
+          suffix = if desc, do: " — #{desc}", else: ""
+          IO.puts("#{bold(name)} (#{count} agent#{if count == 1, do: "", else: "s"})#{suffix}")
+        end)
+    end
+  end
+
+  defp company_cmd(["remove", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [force: :boolean])
+
+    case Config.delete_company(name, force: opts[:force] || false) do
+      :ok ->
+        ok("removed company #{name}")
+
+      {:error, :not_found} ->
+        error("unknown company: #{name}")
+
+      {:error, {:not_empty, n}} ->
+        error(
+          "company #{name} still has #{n} agent#{if n == 1, do: "", else: "s"} — " <>
+            "move them out first, or pass --force to drop them too"
+        )
+    end
+  end
+
+  defp company_cmd(cmd) when cmd in [[], ["help"]] do
+    IO.puts("""
+    #{bold("mix cortex company")} — multi-tenant scopes
+
+      add NAME [--description "..."]   create a company (an isolated tenant)
+      list                            list companies + how many agents each has
+      remove NAME [--force]           delete a company (--force also drops its agents)
+
+    Without --company, every command uses the root scope (the single-tenant default).
+    Add --company NAME to an agent/model command to act inside that company; its
+    agents, workspaces, shared/ space and models are isolated from other companies.
+    """)
+  end
+
+  defp company_cmd(other),
+    do: error("unknown company command: #{Enum.join(other, " ")} (try: mix cortex company help)")
+
+  ###
+  ### API token commands
+  ###
+
+  defp token_cmd(["add" | rest]) do
+    {opts, _} =
+      OptionParser.parse!(rest, strict: [company: :string, agent: :string, label: :string])
+
+    attrs = [company: opts[:company], agent: opts[:agent], label: opts[:label]]
+
+    case Config.add_api_token(attrs) do
+      {:ok, raw, id} ->
+        scope =
+          cond do
+            opts[:agent] -> "agent #{opts[:agent]}"
+            opts[:company] -> "company #{opts[:company]}"
+            true -> "root"
+          end
+
+        ok("API token created (id #{green(id)}, scope: #{scope})")
+        IO.puts("\n  #{bold(raw)}\n")
+        info("Save it now — it is shown only once and stored only as a hash.")
+
+      {:error, :unknown_company} ->
+        error("unknown company: #{opts[:company]}")
+
+      {:error, :unknown_agent} ->
+        error("unknown agent: #{opts[:agent]}")
+
+      {:error, :agent_out_of_scope} ->
+        error("agent #{opts[:agent]} is not in company #{opts[:company] || "(root)"}")
+    end
+  end
+
+  defp token_cmd(["list" | _]) do
+    case Config.api_tokens() do
+      [] ->
+        info("no API tokens — the /v1 API is open. lock it with: mix cortex token add")
+
+      tokens ->
+        Enum.each(tokens, fn t ->
+          scope = t["agent"] || t["company"] || "root"
+          label = if t["label"], do: " — #{t["label"]}", else: ""
+          IO.puts("#{bold(t["id"])}  #{t["prefix"]}  [#{scope}]#{label}")
+        end)
+    end
+  end
+
+  defp token_cmd(["revoke", id | _]) do
+    case Config.revoke_api_token(id) do
+      :ok -> ok("revoked token #{id}")
+      {:error, :not_found} -> error("unknown token id: #{id}")
+    end
+  end
+
+  defp token_cmd(_) do
+    IO.puts("""
+    #{bold("mix cortex token")} — API access tokens for /v1
+
+      add [--company CO] [--agent HANDLE] [--label "..."]   mint a token (shown once)
+      list                                                  list tokens (scope + fingerprint)
+      revoke ID                                             revoke a token
+
+    No tokens ⇒ the /v1 API is open. The first token locks it: every call then needs
+    `Authorization: Bearer ctx_…`. A token scoped to a company reaches only its
+    agents; scoped to an agent, only that one.
+    """)
+  end
+
+  ###
+  ### watch commands (one-shot "notify me when X")
+  ###
+
+  defp watch_cmd(["add", description | rest]) do
+    {opts, _} =
+      OptionParser.parse!(rest,
+        strict: [
+          probe: :string,
+          contains: :string,
+          message: :string,
+          every: :integer,
+          deliver: :string
+        ]
+      )
+
+    case opts[:probe] do
+      nil ->
+        error(
+          "watch add needs --probe \"<command>\" (agent-checked watches are created from chat)"
+        )
+
+      cmd ->
+        success = if opts[:contains], do: %{"contains" => opts[:contains]}, else: "exit_zero"
+
+        watch = %Cortex.Config.Watch{
+          id: watch_id(description),
+          description: description,
+          agent: Config.default_agent_name(),
+          trigger: %{"type" => "probe", "command" => cmd, "success" => success},
+          on_fire: %{"type" => "template", "text" => opts[:message] || "✅ #{description}"},
+          origin: watch_origin(opts[:deliver]),
+          interval_s: max(opts[:every] || 120, 30),
+          state: "pending",
+          created: 0
+        }
+
+        Config.put_watch(watch)
+
+        ok(
+          "watch #{green(watch.id)} created (probe every #{watch.interval_s}s → #{watch.origin["channel"]})"
+        )
+    end
+  end
+
+  defp watch_cmd(["list" | _]) do
+    case Config.watches() do
+      [] ->
+        info(
+          "no watches. create one from chat, or: mix cortex watch add \"site up\" --probe \"curl -sf https://x\""
+        )
+
+      watches ->
+        Enum.each(watches, fn w ->
+          detail = w.trigger["command"] || w.trigger["prompt"] || ""
+
+          IO.puts(
+            "#{bold(w.id)} [#{w.state}] — #{w.description}\n  #{w.trigger["type"]} every #{w.interval_s}s · checks #{w.checks}/#{w.max_checks} · #{String.slice(to_string(detail), 0, 60)}"
+          )
+        end)
+    end
+  end
+
+  defp watch_cmd(["pause", id | _]), do: watch_set_state(id, "paused", "paused")
+
+  defp watch_cmd(["resume", id | _]) do
+    case Config.get_watch(id) do
+      nil ->
+        error("unknown watch: #{id}")
+
+      w ->
+        Config.put_watch(%{w | state: "pending", next_check: nil})
+        ok("watch #{id} resumed")
+    end
+  end
+
+  defp watch_cmd(["cancel", id | _]) do
+    case Config.get_watch(id) do
+      nil ->
+        error("unknown watch: #{id}")
+
+      _ ->
+        Config.delete_watch(id)
+        ok("watch #{id} cancelled")
+    end
+  end
+
+  defp watch_cmd(_) do
+    IO.puts("""
+    #{bold("mix cortex watch")} — one-shot "notify me when X" watches
+
+      add DESC --probe "<cmd>" [--contains STR] [--message "…"] [--every SECS] [--deliver telegram:<chat>|log]
+      list                          show all watches
+      pause ID / resume ID          pause or resume a watch
+      cancel ID                     delete a watch
+
+    A watch polls a cheap probe and notifies ONCE when it passes, then stops. It's
+    durable (survives restarts). Agent-judged watches are created from chat via the
+    `watch` tool; the CLI creates probe watches.
+    """)
+  end
+
+  defp watch_set_state(id, state, label) do
+    case Config.get_watch(id) do
+      nil ->
+        error("unknown watch: #{id}")
+
+      w ->
+        Config.put_watch(%{w | state: state})
+        ok("watch #{id} #{label}")
+    end
+  end
+
+  defp watch_origin("telegram:" <> chat),
+    do: %{
+      "channel" => "telegram",
+      "bot" => "default",
+      "chat_id" => chat,
+      "key" => "telegram:#{chat}"
+    }
+
+  defp watch_origin(_), do: %{"channel" => "log"}
+
+  defp watch_id(desc) do
+    base =
+      desc
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9]+/u, "-")
+      |> String.trim("-")
+      |> String.slice(0, 30)
+      |> then(fn s -> if s == "", do: "watch", else: s end)
+
+    taken = Enum.map(Config.watches(), & &1.id)
+
+    if base not in taken,
+      do: base,
+      else: base <> "-" <> Integer.to_string(System.unique_integer([:positive]))
+  end
+
   defp agent_cmd(["add", name | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
         strict: [
+          company: :string,
           model: :string,
           prompt: :string,
           description: :string,
@@ -639,52 +978,72 @@ defmodule Mix.Tasks.Cortex do
         ]
       )
 
-    tools =
-      case opts[:tools] do
-        nil -> Cortex.Tools.names()
-        "" -> []
-        str -> str |> String.split(",") |> Enum.map(&String.trim/1)
-      end
+    if validate_scope(name, opts[:company]) == :ok do
+      handle = Company.handle(opts[:company], name)
 
-    can_message =
-      case opts[:can_message] do
-        v when v in [nil, ""] -> []
-        str -> str |> String.split(",") |> Enum.map(&String.trim/1)
-      end
+      tools =
+        case opts[:tools] do
+          nil -> Cortex.Tools.names()
+          "" -> []
+          str -> str |> String.split(",") |> Enum.map(&String.trim/1)
+        end
 
-    # --can-manage: omitted → nil (itself only); "none" → [] (nobody); "*" or a
-    # comma list → those. Mirrors Cortex.Config.can_manage?/2.
-    can_manage =
-      case opts[:can_manage] do
-        nil -> nil
-        "none" -> []
-        str -> str |> String.split(",") |> Enum.map(&String.trim/1)
-      end
+      # Routes are scoped: a bare peer name resolves into this agent's own company.
+      can_message =
+        case opts[:can_message] do
+          v when v in [nil, ""] -> []
+          str -> str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
+        end
 
-    agent = %Agent{
-      name: name,
-      description: opts[:description],
-      model: opts[:model],
-      system_prompt: opts[:prompt] || "You are Cortex, a helpful AI agent.",
-      tools: tools,
-      can_message: can_message,
-      can_manage: can_manage,
-      max_iterations: opts[:max_iterations] || 12,
-      temperature: opts[:temperature]
-    }
+      # --can-manage: omitted → nil (itself only); "none" → [] (nobody); "*" or a
+      # comma list → those. Mirrors Cortex.Config.can_manage?/2.
+      can_manage =
+        case opts[:can_manage] do
+          nil -> nil
+          "none" -> []
+          "*" -> ["*"]
+          str -> str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
+        end
 
-    Config.put_agent(agent)
-    if opts[:default], do: Config.set_default_agent(name)
-    ok("agent #{green(name)} saved (tools: #{Enum.join(tools, ", ")})")
+      agent = %Agent{
+        name: handle,
+        description: opts[:description],
+        model: opts[:model],
+        system_prompt: opts[:prompt] || "You are Cortex, a helpful AI agent.",
+        tools: tools,
+        can_message: can_message,
+        can_manage: can_manage,
+        max_iterations: opts[:max_iterations] || 12,
+        temperature: opts[:temperature]
+      }
+
+      Config.put_agent(agent)
+      if opts[:default], do: Config.set_default_agent_for(opts[:company], name)
+      ok("agent #{green(handle)} saved (tools: #{Enum.join(tools, ", ")})")
+    end
   end
 
-  defp agent_cmd(["list" | _]) do
+  defp agent_cmd(["list" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [company: :string, all: :boolean])
     default = Config.default_agent_name()
 
-    case Config.agents() do
+    agents =
+      cond do
+        opts[:all] -> Config.agents()
+        true -> Config.agents_in(opts[:company])
+      end
+
+    scope_note =
+      cond do
+        opts[:all] -> " (all scopes)"
+        opts[:company] -> " in company #{opts[:company]}"
+        true -> ""
+      end
+
+    case agents do
       [] ->
         info(
-          "no agents. add one:\n  mix cortex agent add assistant --model <model> --prompt \"You are helpful.\""
+          "no agents#{scope_note}. add one:\n  mix cortex agent add assistant --model <model> --prompt \"You are helpful.\"#{if opts[:company], do: " --company #{opts[:company]}", else: ""}"
         )
 
       agents ->
@@ -700,9 +1059,11 @@ defmodule Mix.Tasks.Cortex do
     end
   end
 
-  defp agent_cmd(["remove", name | _]) do
-    Config.delete_agent(name)
-    ok("removed agent #{name}")
+  defp agent_cmd(["remove", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [company: :string])
+    handle = Company.handle(opts[:company], name)
+    Config.delete_agent(handle)
+    ok("removed agent #{handle}")
   end
 
   defp agent_cmd(["rename", old, new | _]) do
@@ -717,7 +1078,9 @@ defmodule Mix.Tasks.Cortex do
   end
 
   defp agent_cmd(["route", from, to | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean])
+    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean, company: :string])
+    from = Company.handle(opts[:company], from)
+    to = Company.handle(opts[:company], to)
 
     cond do
       is_nil(Config.get_agent(from)) ->
@@ -725,6 +1088,9 @@ defmodule Mix.Tasks.Cortex do
 
       is_nil(Config.get_agent(to)) ->
         error("unknown agent: #{to}")
+
+      not Company.same_scope?(from, to) ->
+        error("refusing route across companies: #{from} → #{to}")
 
       opts[:remove] ->
         Config.disallow_message(from, to)
@@ -740,7 +1106,9 @@ defmodule Mix.Tasks.Cortex do
     do: error("usage: mix cortex agent route FROM TO [--remove]")
 
   defp agent_cmd(["manage", from, to | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean])
+    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean, company: :string])
+    from = Company.handle(opts[:company], from)
+    to = if to == "*", do: "*", else: Company.handle(opts[:company], to)
 
     cond do
       is_nil(Config.get_agent(from)) ->
@@ -763,9 +1131,11 @@ defmodule Mix.Tasks.Cortex do
   defp agent_cmd(["manage" | _]),
     do: error("usage: mix cortex agent manage ADMIN TARGET [--remove]   (TARGET may be \"*\")")
 
-  defp agent_cmd(["default", name | _]) do
-    Config.set_default_agent(name)
-    ok("default agent -> #{name}")
+  defp agent_cmd(["default", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [company: :string])
+    Config.set_default_agent_for(opts[:company], name)
+    scope = if opts[:company], do: " for #{opts[:company]}", else: ""
+    ok("default agent#{scope} -> #{name}")
   end
 
   defp agent_cmd(cmd) when cmd in [[], ["help"]] do
@@ -773,16 +1143,17 @@ defmodule Mix.Tasks.Cortex do
     mix cortex agent — manage agents
 
       add NAME [--model M] [--prompt "…"] [--tools t1,t2]
-               [--can-message b,c] [--can-manage x,y|*|none] [--default]
-      list                                                 list agents (+ routes)
-      route FROM TO [--remove]                             directed A→B messaging
-      manage ADMIN TARGET [--remove]                       let ADMIN administer TARGET (or "*")
+               [--can-message b,c] [--can-manage x,y|*|none] [--default] [--company CO]
+      list [--company CO | --all]                          list agents (+ routes)
+      route FROM TO [--remove] [--company CO]              directed A→B messaging
+      manage ADMIN TARGET [--remove] [--company CO]        let ADMIN administer TARGET (or "*")
       rename OLD NEW                                        rename + move its dir
-      remove NAME
-      default NAME                                         set the default agent
+      remove NAME [--company CO]
+      default NAME [--company CO]                           set the (scope) default agent
 
     Capabilities are controlled by an agent's --tools (a capability = having its
     tool); learning is controlled per-conversation by a bot's `trainers` list.
+    Add --company CO to scope any of these to a company; without it, the root scope.
     """)
   end
 
@@ -829,8 +1200,18 @@ defmodule Mix.Tasks.Cortex do
   defp tui_cmd(args) do
     # Accept the agent as a positional (`tui NAME`) or a flag (`tui --agent NAME`),
     # and an optional `--session KEY` to resume/separate console sessions.
-    {opts, rest} = OptionParser.parse!(args, strict: [agent: :string, session: :string])
-    agent_name = opts[:agent] || List.first(rest) || Config.default_agent_name()
+    {opts, rest} =
+      OptionParser.parse!(args, strict: [agent: :string, session: :string, company: :string])
+
+    raw = opts[:agent] || List.first(rest)
+
+    agent_name =
+      cond do
+        raw && opts[:company] -> Company.handle(opts[:company], raw)
+        raw -> raw
+        opts[:company] -> Config.default_agent_for(opts[:company])
+        true -> Config.default_agent_name()
+      end
 
     case agent_name && Config.get_agent(agent_name) do
       nil ->
@@ -1316,6 +1697,29 @@ defmodule Mix.Tasks.Cortex do
 
   defp model_names, do: Enum.map(Config.models(), & &1.name)
   defp agent_names, do: Enum.map(Config.agents(), & &1.name)
+
+  # CLI: qualify a bare peer/target into the same company as `handle`; leave the "*"
+  # wildcard and already-qualified handles untouched.
+  defp qualify("*", _handle), do: "*"
+  defp qualify(name, handle), do: Company.qualify(name, handle)
+
+  # Validate a name (and optional --company target) before creating something in it:
+  # the bare name must be a legal segment and, when given, the company must exist.
+  # Prints and returns :error on failure, :ok otherwise. `nil` company = root scope.
+  defp validate_scope(name, company) do
+    cond do
+      not Company.valid_name?(name) ->
+        error("invalid name #{inspect(name)} — use letters, digits, - and _ only (no \"/\")")
+        :error
+
+      company && not Config.company_exists?(company) ->
+        error("unknown company: #{company} — create it with: mix cortex company add #{company}")
+        :error
+
+      true ->
+        :ok
+    end
+  end
 
   # Suggest a connection name from the host (api.openai.com → "openai").
   defp default_conn_name(base_url) do

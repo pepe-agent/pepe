@@ -23,11 +23,31 @@ defmodule Cortex.Agent.Workspace do
   alias Cortex.Config
   alias Cortex.Config.Agent
 
-  @doc "An agent's private workspace directory."
-  def dir(agent_name), do: Path.join([Config.home(), "agents", to_string(agent_name)])
+  @doc """
+  An agent's private workspace directory. Root agents live under `agents/<name>`;
+  a company agent lives under `companies/<company>/agents/<name>`, so identically
+  named agents in different companies never collide and never see each other's files.
+  """
+  def dir(agent_handle) do
+    case Cortex.Company.split(to_string(agent_handle)) do
+      {nil, name} -> Path.join([Config.home(), "agents", name])
+      {company, name} -> Path.join([Config.home(), "companies", company, "agents", name])
+    end
+  end
 
-  @doc "The shared, cross-agent directory."
-  def shared_dir, do: Path.join(Config.home(), "shared")
+  @doc "The shared, cross-agent directory for the root scope."
+  def shared_dir, do: shared_dir(nil)
+
+  @doc """
+  The shared directory for an agent's scope. Root shares `shared/`; a company shares
+  its own `companies/<company>/shared/` — so `shared/…` paths isolate per company.
+  """
+  def shared_dir(agent_handle) do
+    case Cortex.Company.of(to_string(agent_handle)) do
+      nil -> Path.join(Config.home(), "shared")
+      company -> Path.join([Config.home(), "companies", company, "shared"])
+    end
+  end
 
   @doc "The drop-in plugins directory (`.exs` tools)."
   def plugins_dir, do: Path.join(Config.home(), "plugins")
@@ -47,14 +67,29 @@ defmodule Cortex.Agent.Workspace do
   """
   def resolve(path, agent_name) do
     cond do
-      Path.type(path) == :absolute -> path
-      path == "shared" -> shared_dir()
-      String.starts_with?(path, "shared/") -> Path.join(shared_dir(), strip("shared/", path))
-      path == "plugins" -> plugins_dir()
-      String.starts_with?(path, "plugins/") -> Path.join(plugins_dir(), strip("plugins/", path))
-      path == "skills" -> skills_dir()
-      String.starts_with?(path, "skills/") -> Path.join(skills_dir(), strip("skills/", path))
-      true -> Path.join(dir(agent_name), path)
+      Path.type(path) == :absolute ->
+        path
+
+      path == "shared" ->
+        shared_dir(agent_name)
+
+      String.starts_with?(path, "shared/") ->
+        Path.join(shared_dir(agent_name), strip("shared/", path))
+
+      path == "plugins" ->
+        plugins_dir()
+
+      String.starts_with?(path, "plugins/") ->
+        Path.join(plugins_dir(), strip("plugins/", path))
+
+      path == "skills" ->
+        skills_dir()
+
+      String.starts_with?(path, "skills/") ->
+        Path.join(skills_dir(), strip("skills/", path))
+
+      true ->
+        Path.join(dir(agent_name), path)
     end
   end
 

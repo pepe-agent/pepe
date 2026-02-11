@@ -13,26 +13,52 @@ defmodule CortexWeb.AgentChannel do
     * `"tool_call"`    %{"name", "arguments"}    — a tool is being invoked
     * `"tool_result"`  %{"name", "output"}       — tool output
     * `"done"`         %{"content" => "..."}      — final answer
+    * `"watch"`        %{"text" => "..."}         — a fired watch's notification
     * `"error"`        %{"reason" => "..."}
+
+  A watch created from this connection (via the `watch` tool) delivers back here as a
+  `"watch"` event. Pass a stable `session` in the join payload to keep the same watch
+  channel across reconnects; otherwise a per-connection id is used.
   """
   use CortexWeb, :channel
 
   alias Cortex.Agent.Runtime
-  alias Cortex.Config
+  alias Cortex.ApiScope
   alias Cortex.LLM.Message
+  alias Cortex.Watch.Delivery
 
   @impl true
-  def join("agent:" <> agent_name, _payload, socket) do
-    agent_name =
-      if agent_name in ["", "default"], do: Config.default_agent_name(), else: agent_name
+  def join("agent:" <> topic, payload, socket) do
+    scope = socket.assigns[:api_scope] || :unrestricted
+    # "default" (or an empty topic) means "the scope's default agent"; any other name
+    # is resolved and authorized against the token scope, so a client can't join an
+    # agent outside what its token allows.
+    requested = if topic in ["", "default"], do: nil, else: topic
 
-    case agent_name && Config.get_agent(agent_name) do
+    case ApiScope.authorize_agent(requested, scope) do
       nil ->
-        {:error, %{reason: "unknown agent: #{inspect(agent_name)}"}}
+        {:error, %{reason: "agent not accessible: #{inspect(topic)}"}}
 
       agent ->
-        {:ok, assign(socket, agent: agent, messages: [Message.system(agent.system_prompt)])}
+        key = "ws:" <> to_string(payload["session"] || System.unique_integer([:positive]))
+        subscribe_watches(key)
+
+        {:ok,
+         assign(socket,
+           agent: agent,
+           messages: [Message.system(agent.system_prompt)],
+           watch_key: key
+         )}
     end
+  end
+
+  # Listen for this connection's fired watches, and register so the scheduler knows a
+  # live surface is here (the Registry entry is tied to this process and cleared on
+  # disconnect). The scheduler retries any held delivery on its next tick.
+  defp subscribe_watches(key) do
+    topic = Delivery.topic(%{"channel" => "ws", "key" => key})
+    Phoenix.PubSub.subscribe(Cortex.PubSub, topic)
+    Registry.register(Cortex.Watch.Subscribers, topic, nil)
   end
 
   @impl true
@@ -54,7 +80,9 @@ defmodule CortexWeb.AgentChannel do
     end
 
     Task.start(fn ->
-      case Runtime.run(agent, messages, stream: true, on_event: on_event) do
+      opts = [stream: true, on_event: on_event, session_key: socket.assigns.watch_key]
+
+      case Runtime.run(agent, messages, opts) do
         {:ok, content, all} ->
           push_event(channel, "done", %{content: content})
           send(channel, {:update_messages, all})
@@ -75,6 +103,12 @@ defmodule CortexWeb.AgentChannel do
 
   def handle_info({:update_messages, messages}, socket) do
     {:noreply, assign(socket, messages: messages)}
+  end
+
+  # A watch created from this connection fired — push its message to the client.
+  def handle_info({:watch_message, _origin, text}, socket) do
+    push(socket, "watch", %{text: text})
+    {:noreply, socket}
   end
 
   # Events are produced from a Task; route them through the channel process so

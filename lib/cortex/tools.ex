@@ -32,6 +32,7 @@ defmodule Cortex.Tools do
   alias Cortex.Tools.SendToAgent
   alias Cortex.Tools.SetRoute
   alias Cortex.Tools.Skill
+  alias Cortex.Tools.Watch
   alias Cortex.Tools.WebSearch
   alias Cortex.Tools.WriteFile
 
@@ -58,7 +59,8 @@ defmodule Cortex.Tools do
     ConfigGet,
     ConfigSet,
     EnableTool,
-    SetRoute
+    SetRoute,
+    Watch
   ]
 
   @doc "All tool modules — built-ins plus loaded plugins."

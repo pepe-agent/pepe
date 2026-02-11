@@ -20,6 +20,7 @@ defmodule Cortex.Tools.SendToAgent do
   import Cortex.Tools.Tool, only: [function: 3]
 
   alias Cortex.Agent.Runtime
+  alias Cortex.Company
   alias Cortex.Config
 
   @max_hops 5
@@ -49,10 +50,17 @@ defmodule Cortex.Tools.SendToAgent do
     from = ctx[:agent]
     from_name = from && from.name
     chain = ctx[:agent_chain] || List.wrap(from_name)
+    # A bare target resolves to a peer in the sender's own company.
+    to = from_name && Company.qualify(to, from_name)
 
     cond do
       is_nil(from) ->
         {:error, "no calling agent in context"}
+
+      # Hard tenant boundary: never route across companies, even if an allowlist or a
+      # qualified handle asks for it. The route allowlist is scoped, this backs it up.
+      not Company.same_scope?(to, from_name) ->
+        {:error, "Refusing to message #{to}: it belongs to a different company."}
 
       to not in (from.can_message || []) ->
         {:error, "You're not allowed to message agent #{to}."}

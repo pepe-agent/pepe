@@ -21,6 +21,7 @@ defmodule Cortex.Config do
   interpolated against the environment at read time, never persisted expanded.
   """
 
+  alias Cortex.Company
   alias Cortex.Config.Agent
   alias Cortex.Config.Cron
   alias Cortex.Config.Model
@@ -94,7 +95,7 @@ defmodule Cortex.Config do
   def put_model(%Model{name: name} = model) do
     load()
     |> update_in(["models"], fn m -> Map.put(m || %{}, name, encode(model)) end)
-    |> maybe_default("default_model", name)
+    |> maybe_default_root("default_model", name)
     |> save()
   end
 
@@ -116,6 +117,93 @@ defmodule Cortex.Config do
 
   def set_default_model(name) do
     load() |> Map.put("default_model", name) |> save()
+  end
+
+  @doc "Set the default model for a scope: global for root, or the company's own."
+  def set_default_model_for(nil, name), do: set_default_model(name)
+
+  def set_default_model_for(company, name) do
+    load()
+    |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_model", name) end)
+    |> save()
+  end
+
+  ###
+  ### Companies (multi-tenant scopes)
+  ###
+
+  @doc """
+  Names of all configured companies (the tenant scopes), sorted. The **root** scope
+  is not a company — it's the implicit default every command uses without
+  `--company`, so it never appears here.
+  """
+  def companies do
+    load() |> Map.get("companies", %{}) |> Map.keys() |> Enum.sort()
+  end
+
+  @doc "Fetch one company's metadata map by name, or nil."
+  def get_company(name), do: load() |> get_in(["companies", name])
+
+  @doc "Does this company exist?"
+  def company_exists?(name), do: not is_nil(get_company(name))
+
+  @doc """
+  Create a company (a tenant scope). Fails on an invalid name or a duplicate. Meta
+  is a free-form map (e.g. `%{\"description\" => ...}`); a `\"created\"` marker is kept.
+  """
+  def add_company(name, meta \\ %{}) do
+    cond do
+      not Company.valid_name?(name) ->
+        {:error, :invalid_name}
+
+      company_exists?(name) ->
+        {:error, :already_exists}
+
+      true ->
+        load()
+        |> update_in(["companies"], fn c ->
+          Map.put(c || %{}, name, Map.put_new(meta, "created", true))
+        end)
+        |> save()
+
+        :ok
+    end
+  end
+
+  @doc """
+  Delete a company. Refuses while it still owns agents unless `force: true`, which
+  also drops those agents from the config (their workspace files are left on disk).
+  """
+  def delete_company(name, opts \\ []) do
+    owned = agents_in(name)
+
+    cond do
+      not company_exists?(name) ->
+        {:error, :not_found}
+
+      owned != [] and not Keyword.get(opts, :force, false) ->
+        {:error, {:not_empty, length(owned)}}
+
+      true ->
+        config = load()
+        agents = Map.get(config, "agents", %{})
+        kept = Map.reject(agents, fn {handle, _} -> Company.of(handle) == name end)
+
+        config
+        |> Map.put("agents", kept)
+        |> update_in(["companies"], &Map.delete(&1 || %{}, name))
+        |> save()
+
+        :ok
+    end
+  end
+
+  @doc """
+  Agents in a scope: `nil` for the root scope, or a company name. Root returns only
+  bare-name agents; a company returns only its own — never another's.
+  """
+  def agents_in(scope) do
+    agents() |> Enum.filter(fn a -> Company.of(a.name) == scope end)
   end
 
   ###
@@ -142,7 +230,7 @@ defmodule Cortex.Config do
   def put_agent(%Agent{name: name} = agent) do
     load()
     |> update_in(["agents"], fn a -> Map.put(a || %{}, name, encode(agent)) end)
-    |> maybe_default("default_agent", name)
+    |> maybe_default_root("default_agent", name)
     |> save()
   end
 
@@ -248,11 +336,53 @@ defmodule Cortex.Config do
   end
 
   @doc """
-  Resolve the model connection an agent should use, falling back to the global
-  default model when the agent doesn't pin one.
+  Set the default agent for a scope: the global default for root, or the company's
+  own default (stored as a bare name in the company meta) for a company.
   """
-  def model_for_agent(%Agent{model: nil}), do: default_model()
-  def model_for_agent(%Agent{model: name}), do: get_model(name) || default_model()
+  def set_default_agent_for(nil, name), do: set_default_agent(name)
+
+  def set_default_agent_for(company, name) do
+    load()
+    |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_agent", name) end)
+    |> save()
+  end
+
+  @doc """
+  The default model for a scope: a company's own default if it pins one (resolved in
+  the company then the root scope), otherwise the root default. So companies can
+  share the operator's global provider or pin their own isolated keys.
+  """
+  def default_model_for(nil), do: default_model()
+
+  def default_model_for(company) do
+    case (get_company(company) || %{})["default_model"] do
+      nil -> default_model()
+      ref -> get_model(Company.handle(company, ref)) || get_model(ref) || default_model()
+    end
+  end
+
+  @doc "The default agent handle for a scope, or nil. Root uses the global default."
+  def default_agent_for(nil), do: default_agent_name()
+
+  def default_agent_for(company) do
+    case (get_company(company) || %{})["default_agent"] do
+      nil -> nil
+      name -> Company.handle(company, name)
+    end
+  end
+
+  @doc """
+  Resolve the model connection an agent should use. A company agent's model
+  reference resolves within its own company first, then the root scope; an unset
+  reference falls back to the scope's default model. Company keys stay invisible to
+  other companies.
+  """
+  def model_for_agent(%Agent{name: handle, model: nil}), do: default_model_for(Company.of(handle))
+
+  def model_for_agent(%Agent{name: handle, model: ref}) do
+    scope = Company.of(handle)
+    get_model(Company.handle(scope, ref)) || get_model(ref) || default_model_for(scope)
+  end
 
   @doc """
   The failover chain for an agent: its model followed by that model's `fallbacks`
@@ -308,6 +438,129 @@ defmodule Cortex.Config do
     |> update_in(["crons"], &Map.delete(&1 || %{}, id))
     |> save()
   end
+
+  ###
+  ### Watches (one-shot "notify me when X" commitments)
+  ###
+
+  alias Cortex.Config.Watch
+
+  @doc "All watches, as `Cortex.Config.Watch` structs, sorted by id."
+  def watches do
+    load()
+    |> Map.get("watches", %{})
+    |> Enum.map(fn {id, map} -> Watch.from_map(Map.put(map, "id", id)) end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @doc "Fetch one watch by id, or nil."
+  def get_watch(id) do
+    case load() |> get_in(["watches", id]) do
+      nil -> nil
+      map -> Watch.from_map(Map.put(map, "id", id))
+    end
+  end
+
+  @doc "Create or replace a watch (keyed by its `id`)."
+  def put_watch(%Watch{id: id} = watch) when is_binary(id) do
+    map = watch |> Map.from_struct() |> Map.delete(:id) |> stringify()
+
+    load()
+    |> update_in(["watches"], fn w -> Map.put(w || %{}, id, map) end)
+    |> save()
+  end
+
+  @doc "Delete a watch by id."
+  def delete_watch(id) do
+    load()
+    |> update_in(["watches"], &Map.delete(&1 || %{}, id))
+    |> save()
+  end
+
+  ###
+  ### API access tokens
+  ###
+
+  @doc """
+  All API tokens as maps (each carrying its `"id"`), sorted by id. Only the hash is
+  stored — never the raw token.
+  """
+  def api_tokens do
+    load()
+    |> Map.get("api_tokens", %{})
+    |> Enum.map(fn {id, m} -> Map.put(m, "id", id) end)
+    |> Enum.sort_by(& &1["id"])
+  end
+
+  @doc """
+  Is API auth on? It turns on the moment the first token exists — with none, the
+  `/v1` API stays open (single-tenant/backward-compatible). Creating a token locks it.
+  """
+  def api_auth_required?, do: api_tokens() != []
+
+  @doc """
+  Mint an API token scoped to `company` (nil = root) and optionally `agent` (a full
+  handle). Returns `{raw_token, id}`; the raw token is shown once and only its hash is
+  stored. `agent` must be within `company`.
+  """
+  def add_api_token(opts \\ []) do
+    company = opts[:company]
+    agent = opts[:agent]
+
+    cond do
+      company && not company_exists?(company) ->
+        {:error, :unknown_company}
+
+      agent && Company.of(agent) != company ->
+        {:error, :agent_out_of_scope}
+
+      agent && is_nil(get_agent(agent)) ->
+        {:error, :unknown_agent}
+
+      true ->
+        raw = Cortex.ApiToken.generate()
+        id = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+
+        entry = %{
+          "hash" => Cortex.ApiToken.hash(raw),
+          "company" => company,
+          "agent" => agent,
+          "label" => opts[:label],
+          "prefix" => Cortex.ApiToken.fingerprint(raw)
+        }
+
+        load()
+        |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
+        |> save()
+
+        {:ok, raw, id}
+    end
+  end
+
+  @doc "Revoke a token by id."
+  def revoke_api_token(id) do
+    if get_in(load(), ["api_tokens", id]) do
+      load() |> update_in(["api_tokens"], &Map.delete(&1 || %{}, id)) |> save()
+      :ok
+    else
+      {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Verify a raw bearer token. Returns its scope `%{company: c, agent: a}` (either may
+  be nil) when it matches a stored hash, or `nil` when it doesn't.
+  """
+  def verify_api_token(raw) when is_binary(raw) do
+    hash = Cortex.ApiToken.hash(raw)
+
+    case Enum.find(api_tokens(), &(&1["hash"] == hash)) do
+      nil -> nil
+      t -> %{company: t["company"], agent: t["agent"]}
+    end
+  end
+
+  def verify_api_token(_), do: nil
 
   ###
   ### Gateways
@@ -468,6 +721,12 @@ defmodule Cortex.Config do
 
   defp maybe_default(config, key, name) do
     if is_nil(config[key]), do: Map.put(config, key, name), else: config
+  end
+
+  # Like maybe_default/3 but only for root-scope handles: a company agent/model must
+  # never become the global (root) default just by being the first one created.
+  defp maybe_default_root(config, key, name) do
+    if is_nil(Company.of(name)), do: maybe_default(config, key, name), else: config
   end
 
   defp clear_default_if(config, key, name) do

@@ -47,9 +47,12 @@ defmodule CortexWeb.DashboardLive do
        learn_nodes: [],
        crons: Config.crons(),
        cron_open: nil,
+       watches: Config.watches(),
        bots: Config.telegram_bots(),
        pending_perm: nil,
        agents: Config.agents(),
+       companies: Config.companies(),
+       agent_scope: "all",
        edit_agent: nil,
        models: Config.models(),
        edit_model: nil,
@@ -76,6 +79,7 @@ defmodule CortexWeb.DashboardLive do
             <.tab view={@view} to="chat" label={gettext("Chat")} />
             <.tab view={@view} to="learn" label={gettext("Learn")} />
             <.tab view={@view} to="cron" label={gettext("Cron")} />
+            <.tab view={@view} to="watches" label={gettext("Watches")} />
             <.tab view={@view} to="bots" label={gettext("Bots")} />
             <.tab view={@view} to="agents" label={gettext("Agents")} />
             <.tab view={@view} to="models" label={gettext("Models")} />
@@ -278,6 +282,38 @@ defmodule CortexWeb.DashboardLive do
           </div>
         </div>
 
+        <div :if={@view == :watches} class="mx-auto flex h-full w-full max-w-3xl flex-col">
+          <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+            <div>
+              <div class="font-medium">🔭 {gettext("Watches")}</div>
+              <div class="text-xs text-zinc-400">{gettext("one-shot \"notify me when X\" · fire once, then stop")}</div>
+            </div>
+          </header>
+          <div class="flex-1 space-y-3 overflow-y-auto p-4">
+            <div :if={@watches == []} class="text-sm text-zinc-500">
+              {gettext("No watches. Ask an agent to \"notify me when …\" from chat.")}
+            </div>
+            <div :for={w <- @watches} class="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <span class="font-medium">{w.description}</span>
+                  <span class="ml-2 rounded bg-zinc-700 px-1.5 text-xs text-zinc-300">{w.state}</span>
+                  <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-xs">{gettext("fired · delivering")}</span>
+                </div>
+                <div class="flex shrink-0 gap-1 text-xs">
+                  <button :if={w.state == "pending"} phx-click="watch_pause" phx-value-id={w.id} class="rounded bg-zinc-700 px-2 py-1 hover:bg-zinc-600">{gettext("Pause")}</button>
+                  <button :if={w.state == "paused"} phx-click="watch_resume" phx-value-id={w.id} class="rounded bg-zinc-700 px-2 py-1 hover:bg-zinc-600">{gettext("Resume")}</button>
+                  <button phx-click="watch_cancel" phx-value-id={w.id} data-confirm={gettext("Cancel watch %{name}?", name: w.description)} class="rounded bg-zinc-700 px-2 py-1 text-red-300 hover:bg-zinc-600">✕</button>
+                </div>
+              </div>
+              <div class="mt-1 text-xs text-zinc-400">
+                {w.trigger["type"]} · {gettext("every")} {w.interval_s}s · {gettext("checks")} {w.checks}/{w.max_checks} · {watch_origin_label(w.origin)}
+              </div>
+              <div class="truncate text-xs text-zinc-500"><code>{w.trigger["command"] || w.trigger["prompt"]}</code></div>
+            </div>
+          </div>
+        </div>
+
         <div :if={@view == :bots} class="mx-auto flex h-full w-full max-w-3xl flex-col">
           <header class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
             <div>
@@ -346,14 +382,24 @@ defmodule CortexWeb.DashboardLive do
               <div class="font-medium">🧩 {gettext("Agents")}</div>
               <div class="text-xs text-zinc-400">{gettext("persona, model, tools, routes & admin scope")}</div>
             </div>
-            <button phx-click="agent_new" class="rounded bg-blue-600 px-3 py-1 text-sm hover:bg-blue-500">
-              {gettext("+ New")}
-            </button>
+            <div class="flex items-center gap-2">
+              <form :if={@companies != []} phx-change="agent_scope">
+                <select name="to" class="rounded bg-zinc-800 px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="all" selected={@agent_scope == "all"}>{gettext("All scopes")}</option>
+                  <option value="root" selected={@agent_scope == "root"}>{gettext("Root")}</option>
+                  <option :for={c <- @companies} value={c} selected={@agent_scope == c}>{c}</option>
+                </select>
+              </form>
+              <button phx-click="agent_new" class="rounded bg-blue-600 px-3 py-1 text-sm hover:bg-blue-500">
+                {gettext("+ New")}
+              </button>
+            </div>
           </header>
           <div class="flex-1 space-y-3 overflow-y-auto p-4">
-            <div :for={a <- @agents} class="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3">
+            <div :for={a <- scoped_agents(@agents, @agent_scope)} class="rounded-lg border border-zinc-800 bg-zinc-800/40 p-3">
               <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
+                  <span :if={Cortex.Company.of(a.name)} class="mr-1 rounded bg-indigo-800 px-1.5 text-xs text-indigo-100">{Cortex.Company.of(a.name)}</span>
                   <span class="font-medium">{a.name}</span>
                   <span :if={a.name == @default_agent} class="ml-2 rounded bg-green-700 px-1.5 text-xs">{gettext("default")}</span>
                 </div>
@@ -704,6 +750,41 @@ defmodule CortexWeb.DashboardLive do
   end
 
   defp agent_names, do: Config.agents() |> Enum.map(& &1.name) |> Enum.sort()
+
+  # Filter the agent list by the selected scope: "all", "root" (no company), or a
+  # company name.
+  defp watch_set(socket, id, changes) do
+    case Config.get_watch(id) do
+      nil ->
+        socket
+
+      w ->
+        Config.put_watch(struct(w, changes))
+        assign(socket, watches: Config.watches())
+    end
+  end
+
+  defp watch_origin_label(%{"channel" => "telegram"}), do: "telegram"
+  defp watch_origin_label(%{"channel" => ch}), do: ch
+  defp watch_origin_label(_), do: "log"
+
+  defp scoped_agents(agents, "all"), do: agents
+
+  defp scoped_agents(agents, "root"),
+    do: Enum.filter(agents, &(Cortex.Company.of(&1.name) == nil))
+
+  defp scoped_agents(agents, company),
+    do: Enum.filter(agents, &(Cortex.Company.of(&1.name) == company))
+
+  # Qualify a bare name into the selected company scope (leave it alone for "all",
+  # "root", an empty name, or a name that already carries a company prefix).
+  defp scope_name("", _scope), do: ""
+
+  defp scope_name(name, scope) when scope not in [nil, "all", "root"] do
+    if Cortex.Company.of(name), do: name, else: Cortex.Company.handle(scope, name)
+  end
+
+  defp scope_name(name, _scope), do: name
   defp model_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
 
   # Next fire time of a cron, formatted, or "—".
@@ -941,12 +1022,39 @@ defmodule CortexWeb.DashboardLive do
     {:noreply, assign(socket, view: :cron, crons: Config.crons())}
   end
 
+  def handle_event("view", %{"to" => "watches"}, socket) do
+    {:noreply, assign(socket, view: :watches, watches: Config.watches())}
+  end
+
+  def handle_event("watch_pause", %{"id" => id}, socket) do
+    {:noreply, watch_set(socket, id, %{state: "paused"})}
+  end
+
+  def handle_event("watch_resume", %{"id" => id}, socket) do
+    {:noreply, watch_set(socket, id, %{state: "pending", next_check: nil})}
+  end
+
+  def handle_event("watch_cancel", %{"id" => id}, socket) do
+    Config.delete_watch(id)
+    {:noreply, assign(socket, watches: Config.watches())}
+  end
+
   def handle_event("view", %{"to" => "bots"}, socket) do
     {:noreply, assign(socket, view: :bots, bots: Config.telegram_bots())}
   end
 
   def handle_event("view", %{"to" => "agents"}, socket) do
-    {:noreply, assign(socket, view: :agents, agents: Config.agents(), edit_agent: nil)}
+    {:noreply,
+     assign(socket,
+       view: :agents,
+       agents: Config.agents(),
+       companies: Config.companies(),
+       edit_agent: nil
+     )}
+  end
+
+  def handle_event("agent_scope", %{"to" => scope}, socket) do
+    {:noreply, assign(socket, agent_scope: scope)}
   end
 
   def handle_event("view", %{"to" => "models"}, socket) do
@@ -1024,7 +1132,9 @@ defmodule CortexWeb.DashboardLive do
   def handle_event("agent_cancel", _p, socket), do: {:noreply, assign(socket, edit_agent: nil)}
 
   def handle_event("agent_save", params, socket) do
-    name = String.trim(params["name"] || "")
+    # A bare name created while a company scope is selected lands in that company.
+    name =
+      params["name"] |> to_string() |> String.trim() |> scope_name(socket.assigns[:agent_scope])
 
     if name == "" do
       {:noreply, put_flash(socket, :error, gettext("Name is required."))}

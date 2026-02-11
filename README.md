@@ -143,6 +143,24 @@ mix cortex agent default assistant
 mix cortex agent help                    # (or `mix cortex help agent`)
 ```
 
+### Companies (multi-tenant, optional)
+
+Host isolated tenants in one deployment. Without `--company`, everything uses the
+**root** scope, exactly as a single-tenant install always has — so this is entirely
+opt-in. Add `--company NAME` to scope a command to a company; its agents,
+workspaces, `shared/` space and models are walled off from every other company (see
+**[Companies](#companies-multi-tenant-isolation)**).
+
+```bash
+mix cortex company add acme --description "Acme Inc"     # create a tenant scope
+mix cortex company list
+mix cortex agent add vendas --company acme --prompt "…"  # agent "acme/vendas"
+mix cortex agent list --company acme                     # only Acme's agents
+mix cortex agent list --all                              # every scope
+mix cortex run acme/vendas "hello"                       # run it by its handle
+mix cortex company remove acme --force                   # drop the company + its agents
+```
+
 ### Running
 
 ```bash
@@ -229,6 +247,38 @@ curl http://localhost:4000/health
 Works with the official OpenAI SDKs — just set the base URL to
 `http://localhost:4000/v1` and the model to your agent's name.
 
+### Access tokens (per company or per agent)
+
+The `/v1` API is **open until you create the first token** — then every call needs
+a valid `Authorization: Bearer ctx_…`. A token is stored only as a SHA-256 hash (the
+raw value is shown once), and its scope decides what it can reach:
+
+| Scope | Created with | Can call |
+| --- | --- | --- |
+| **Agent** | `--agent HANDLE` | only that agent (the `model` field is ignored) |
+| **Company** | `--company CO` | any agent in that company (bare names qualify into it); other companies → `403` |
+| **Root** | neither | root agents + bare model connections |
+
+```bash
+mix cortex token add --company acme --label "acme mobile app"   # prints ctx_… once
+mix cortex token add --agent acme/vendas --label "single integration"
+mix cortex token list       # id · fingerprint · scope · label
+mix cortex token revoke <id>
+
+# then callers must authenticate
+curl http://localhost:4000/v1/chat/completions \
+  -H 'authorization: Bearer ctx_…' \
+  -H 'content-type: application/json' \
+  -d '{"model":"vendas","messages":[{"role":"user","content":"oi"}]}'   # "vendas" → acme/vendas
+```
+
+The token is read from `Authorization: Bearer …` (the OpenAI standard, what the
+official SDKs send) or, as a fallback, the Azure-style `api-key: …` header.
+
+`GET /v1/models` is filtered to the token's scope, so a client only ever sees the
+agents it may use. This is what makes the [company isolation](#companies-multi-tenant-isolation)
+real over the network — without a token the API can reach any agent.
+
 ### Stateful sessions
 
 By default the endpoint is stateless (you send the full `messages` array each
@@ -264,6 +314,13 @@ join topic `agent:<name>` (`agent:default` for the default agent).
 * push `"prompt"` `{ "text": "…" }` → receive streamed `"delta"`, `"tool_call"`,
   `"tool_result"`, then `"done"` events.
 * push `"reset"` to clear history.
+
+Auth mirrors the [`/v1` API](#access-tokens-per-company-or-per-agent): open until
+tokens exist, then pass one as a **connect param** (a WebSocket can't set headers) —
+`ws://localhost:4000/socket/websocket?token=ctx_…`. The token's scope is enforced on
+`join`: a client can only join `agent:` topics its token allows (`agent:default`
+resolves to the scope's default), and a company token joining another company's agent
+is refused. Bare names qualify into the token's company (`agent:vendas` → `acme/vendas`).
 
 ## Telegram
 
@@ -458,6 +515,63 @@ Routes can also be changed **from chat**: give an agent the `set_route` tool and
 can add/remove routes (`{from, to, action}`, `from` defaults to itself) — guided by
 the `manage-routing` skill. Since it edits config, the change goes through the
 permission prompt.
+
+## Companies (multi-tenant isolation)
+
+Optional. A **company** is an isolated tenant scope, so one deployment can serve
+many clients whose data never crosses. It is entirely opt-in: with no company,
+everything lives in the **root** scope — identical to a single-tenant install — and
+that's what every command uses without `--company`. Most deployments never need a
+company; add one only when you must wall tenants off.
+
+An agent's identity is a **handle**: a bare name in root (`vendas`) or
+`company/name` inside a company (`acme/vendas`). The same bare name can be reused
+per company — `acme/vendas` and `globex/vendas` are different agents. Because the
+handle is what keys everything (config, workspace, sessions, routes), isolation
+follows automatically:
+
+- **Files** — a company agent's workspace is `~/.cortex/companies/<co>/agents/<name>/`
+  and its shared space is `~/.cortex/companies/<co>/shared/`, so equally named agents
+  in different companies never collide and `shared/…` paths never leak across tenants.
+  Root agents keep `~/.cortex/agents/<name>/` and `~/.cortex/shared/`.
+- **Routing** — `send_to_agent` never crosses companies: a bare target resolves to a
+  peer in the sender's own company, and a hard guard refuses any cross-company route
+  even if an allowlist asks for it.
+- **Models/keys** — a company agent resolves its own models first, then root, so a
+  company can pin private provider keys other companies can't see — or inherit one
+  shared global provider. A company agent/model never becomes the global default.
+
+```bash
+mix cortex company add acme --description "Acme Inc"
+mix cortex company add globex
+mix cortex company list
+
+# agents, models, routes all take --company
+mix cortex model add llm  --company acme --base-url … --api-key '${ACME_KEY}' --model …
+mix cortex agent add vendas  --company acme --prompt "…" --can-message suporte
+mix cortex agent add suporte --company acme --prompt "…"
+mix cortex agent route vendas suporte --company acme   # both resolve inside acme
+
+mix cortex agent list --company acme    # only Acme's
+mix cortex agent list                   # only root
+mix cortex agent list --all             # every scope
+mix cortex tui --company acme vendas    # or: mix cortex run acme/vendas "…"
+
+mix cortex company remove acme          # refuses while it owns agents…
+mix cortex company remove acme --force  # …unless forced (drops its agents too)
+```
+
+```jsonc
+"companies": { "acme": { "description": "Acme Inc", "default_model": "llm" } },
+"agents": {
+  "assistant":    { "can_message": [] },          // root scope
+  "acme/vendas":  { "can_message": ["acme/suporte"] },
+  "acme/suporte": { "can_message": [] }
+}
+```
+
+A Telegram bot bound to a company agent keeps its whole conversation inside that
+company; without a company it serves root, as before.
 
 ## Configuration (`~/.cortex/config.json`)
 
@@ -713,6 +827,50 @@ Tasks fire from an in-process timer that only runs while `mix cortex serve` or
 their own process, so they fire concurrently — one slow task never blocks another.
 Definitions live in `~/.cortex/config.json` (`"crons"`); run history in
 `~/.cortex/data/cron_logs/`.
+
+## Watches — "notify me when X" (one-shot)
+
+A **watch** is a durable, one-shot commitment: you ask the agent to *check something
+and tell you when it happens*, it watches in the background, messages you **once**
+when the condition is met, and then stops. Unlike a heartbeat (a periodic pulse) or a
+cron (a recurring job), a watch fires exactly once and cleans itself up.
+
+It's created on demand — the agent calls the `watch` tool when you ask
+("avise quando o deploy concluir") — and it's **durable**: it survives a restart and
+this session closing, and delivers back on the **channel you asked from**: Telegram
+(direct push), a WebSocket session (a `"watch"` event — pass a stable `session` on
+join to receive it across reconnects), or the TUI console (printed inline). If that
+channel is momentarily unreachable, the message is held and retried until it lands.
+
+The scheduler runs on whichever long-lived surface is up — `serve`, `gateway`, or an
+interactive `tui`/`chat`. Run **one at a time** against the same config; two would
+both tick and double-fire.
+
+Two cost tiers, chosen at creation so checking stays cheap:
+
+- **`probe`** — a shell command polled every interval, **no LLM per check** (success =
+  exit 0, or a substring match). Best for scriptable conditions ("site is back",
+  "log contains `Deploy complete`").
+- **`agent`** — re-ask the model each check, for conditions that need judgement.
+
+…and the notification (`on_fire`) is either a fixed **template** (no LLM) or an
+**agent**-composed message (one LLM call, only when it fires). The powerful combo is a
+free probe gating an agent message: poll `curl` for nothing, and only let the model
+write the summary the moment it passes.
+
+```bash
+# from chat: "avise quando o site x voltar" → the agent creates a probe watch.
+# from the CLI (probe watches):
+mix cortex watch add "site x up" --probe "curl -sf https://x" --message "✅ voltou" --every 60
+mix cortex watch list
+mix cortex watch pause <id> | resume <id> | cancel <id>
+```
+
+Manage them three ways — dashboard **Watches** tab, chat ("para o watch do site" →
+the agent lists and cancels via the `watch` tool), or the CLI — all reading the same
+durable store (`~/.cortex/config.json`, `"watches"`). The scheduler ticks only while
+`serve`/`gateway` is up; the updated state is persisted **before** delivery, so a
+crash can't double-fire.
 
 ## Tests
 
