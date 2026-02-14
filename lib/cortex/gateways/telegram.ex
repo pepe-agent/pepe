@@ -42,6 +42,9 @@ defmodule Cortex.Gateways.Telegram do
 
   @poll_timeout 30
 
+  # The emoji dropped on the user's own message while the agent works (reaction mode).
+  @work_reaction "👀"
+
   # Pending permission prompts: request_id => the waiting session pid. Lives in a
   # public ETS table so the poll loop (this process) can answer a `receive` that's
   # blocking in a Session process.
@@ -366,7 +369,7 @@ defmodule Cortex.Gateways.Telegram do
 
       Task.start(fn ->
         put_bot(b)
-        respond(chat_id, user_id, strip_mention(text))
+        respond(chat_id, user_id, message["message_id"], strip_mention(text))
       end)
     end
   end
@@ -428,7 +431,7 @@ defmodule Cortex.Gateways.Telegram do
 
     case download_file(file_id, kind) do
       {:ok, path} ->
-        chat_with_agent(chat_id, media_prompt(kind, path, caption))
+        chat_with_agent(chat_id, nil, media_prompt(kind, path, caption))
 
       :error ->
         Logger.warning("[telegram] could not download #{kind} #{file_id}")
@@ -487,7 +490,7 @@ defmodule Cortex.Gateways.Telegram do
   defp caption_line(""), do: ""
   defp caption_line(caption), do: "\n\nTheir caption: #{caption}"
 
-  defp respond(chat_id, user_id, text) do
+  defp respond(chat_id, user_id, msg_id, text) do
     Config.put_locale()
     put_learn(learn_allowed?(user_id))
 
@@ -495,7 +498,7 @@ defmodule Cortex.Gateways.Telegram do
       # /whoami is the one command that needs the sender id.
       {:command, "whoami", _args} -> whoami(chat_id, user_id)
       {:command, name, args} -> run_command(chat_id, name, args)
-      :chat -> chat_with_agent(chat_id, text)
+      :chat -> chat_with_agent(chat_id, msg_id, text)
     end
   end
 
@@ -513,9 +516,10 @@ defmodule Cortex.Gateways.Telegram do
 
   defp parse_command(_), do: :chat
 
-  defp chat_with_agent(chat_id, text) do
+  defp chat_with_agent(chat_id, msg_id, text) do
     agent = agent_default()
     typing = keep_typing(chat_id)
+    if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, @work_reaction)
 
     try do
       case Cortex.Agent.chat(session_key(chat_id), agent, text,
@@ -543,6 +547,7 @@ defmodule Cortex.Gateways.Telegram do
       end
     after
       stop_typing(typing)
+      if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, nil)
     end
   end
 
@@ -982,7 +987,7 @@ defmodule Cortex.Gateways.Telegram do
 
       _content ->
         extra = if args == "", do: "", else: "\n\nInput: #{args}"
-        chat_with_agent(chat_id, "Carry out the \"#{name}\" skill now." <> extra)
+        chat_with_agent(chat_id, nil, "Carry out the \"#{name}\" skill now." <> extra)
     end
   end
 
@@ -1106,35 +1111,98 @@ defmodule Cortex.Gateways.Telegram do
   @tool_running "🛠️"
   @tool_done "✅"
 
+  # How much of the agent's tool activity to surface, per bot (`"tool_progress"`):
+  #   * "reaction" — (default) NO message at all; just a 👀 reaction on the user's own
+  #     message while working, cleared when the answer lands. The quietest signal.
+  #   * "ambient"  — a single vague "what kind of work is happening" line, edited in
+  #     place; no tool names, args or per-step ledger.
+  #   * "off"      — nothing but the native typing indicator.
+  #   * "verbose"  — the detailed per-tool breadcrumb list (for power users).
+  # The message-based modes use one message, edited in place, deleted when done.
+  defp progress_mode, do: bot()["tool_progress"] || "reaction"
+
   defp tg_activity(chat_id, {:tool_call, name, raw}) do
-    lines = (Process.get(:tg_act_lines, []) ++ [activity_line(name, raw)]) |> Enum.take(-6)
-    Process.put(:tg_act_lines, lines)
-    render_activity(chat_id, lines)
+    case progress_mode() do
+      "verbose" -> verbose_tool(chat_id, name, raw)
+      "ambient" -> ambient_tool(chat_id, name)
+      # "off" and "reaction" show no status message (reaction is set around the run).
+      _ -> :ok
+    end
   end
 
-  # Tools run sequentially, so a result always belongs to the last running line —
-  # flip its icon to done, in place, in the same status message.
   defp tg_activity(chat_id, {:tool_result, _name, _out}) do
-    lines = Process.get(:tg_act_lines, []) |> mark_last_done()
-    Process.put(:tg_act_lines, lines)
-    render_activity(chat_id, lines)
+    if progress_mode() == "verbose", do: verbose_result(chat_id), else: :ok
   end
 
   defp tg_activity(chat_id, event) when elem(event, 0) in [:done, :error] do
     if id = Process.get(:tg_act_id), do: delete_status(chat_id, id)
     Process.delete(:tg_act_id)
     Process.delete(:tg_act_lines)
+    Process.delete(:tg_act_phrase)
     :ok
   end
 
   defp tg_activity(_chat_id, _event), do: :ok
 
-  # Send the single status message once, then keep editing it in place; store its id
-  # in the run task's process dict so every event in this turn updates the same one.
-  defp render_activity(chat_id, lines) do
-    id = Process.get(:tg_act_id) || send_status(chat_id)
-    Process.put(:tg_act_id, id)
-    if id, do: edit_status(chat_id, id, Enum.join(lines, "\n"))
+  # Ambient: one loose phrase for the *kind* of work, re-edited only when it changes.
+  defp ambient_tool(chat_id, name) do
+    phrase = ambient_phrase(name)
+
+    if Process.get(:tg_act_phrase) != phrase do
+      Process.put(:tg_act_phrase, phrase)
+      render_activity(chat_id, phrase)
+    end
+
+    :ok
+  end
+
+  defp ambient_phrase(name) do
+    cond do
+      name == "web_search" ->
+        "🔎 " <> gettext("looking things up…")
+
+      name == "fetch_url" ->
+        "🌐 " <> gettext("fetching a page…")
+
+      name in ["bash", "run_script"] ->
+        "💻 " <> gettext("running something…")
+
+      name in ~w(read_file write_file edit_file list_dir move_file) ->
+        "📄 " <> gettext("working with files…")
+
+      name == "send_to_agent" ->
+        "💬 " <> gettext("checking with another agent…")
+
+      String.starts_with?(name, "mcp__") ->
+        "🧰 " <> gettext("using a connected tool…")
+
+      true ->
+        "⚙️ " <> gettext("working on it…")
+    end
+  end
+
+  # Verbose: the per-tool breadcrumb ledger, edited in place; a result marks the last
+  # line done.
+  defp verbose_tool(chat_id, name, raw) do
+    lines = (Process.get(:tg_act_lines, []) ++ [activity_line(name, raw)]) |> Enum.take(-6)
+    Process.put(:tg_act_lines, lines)
+    render_activity(chat_id, Enum.join(lines, "\n"))
+  end
+
+  defp verbose_result(chat_id) do
+    lines = Process.get(:tg_act_lines, []) |> mark_last_done()
+    Process.put(:tg_act_lines, lines)
+    render_activity(chat_id, Enum.join(lines, "\n"))
+  end
+
+  # One status message per turn: send it the first time (with the real text, no
+  # placeholder flash), then edit it in place. Id stored in the run task's dict.
+  defp render_activity(chat_id, text) do
+    case Process.get(:tg_act_id) do
+      nil -> if id = send_status(chat_id, text), do: Process.put(:tg_act_id, id)
+      id -> edit_status(chat_id, id, text)
+    end
+
     :ok
   end
 
@@ -1152,10 +1220,8 @@ defmodule Cortex.Gateways.Telegram do
     end
   end
 
-  defp send_status(chat_id) do
-    case Req.post(api_url(token(), "sendMessage"),
-           json: %{chat_id: chat_id, text: gettext("🛠️ Working…")}
-         ) do
+  defp send_status(chat_id, text) do
+    case Req.post(api_url(token(), "sendMessage"), json: %{chat_id: chat_id, text: text}) do
       {:ok, %{status: 200, body: %{"result" => %{"message_id" => id}}}} -> id
       _ -> nil
     end
@@ -1249,6 +1315,20 @@ defmodule Cortex.Gateways.Telegram do
   end
 
   defp stop_typing(pid) when is_pid(pid), do: send(pid, :stop)
+
+  # Set (or, with nil, clear) a reaction on a message. Fire-and-forget: if reactions
+  # are disabled in the chat the call just fails harmlessly and the typing hint remains.
+  defp set_reaction(_chat_id, nil, _emoji), do: :ok
+
+  defp set_reaction(chat_id, msg_id, emoji) do
+    reaction = if emoji, do: [%{type: "emoji", emoji: emoji}], else: []
+
+    Req.post(api_url(token(), "setMessageReaction"),
+      json: %{chat_id: chat_id, message_id: msg_id, reaction: reaction}
+    )
+
+    :ok
+  end
 
   defp send_chat_action(chat_id, action) do
     Req.post(api_url(token(), "sendChatAction"), json: %{chat_id: chat_id, action: action})

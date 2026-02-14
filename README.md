@@ -199,16 +199,21 @@ mix cortex help                        # full command help (or: help <group>)
 A Phoenix LiveView dashboard at **`/`** — a live list of sessions on the left and a
 streaming chat panel on the right. Pick a session to read its history and talk to
 its agent; replies stream in token-by-token. `New chat` starts a fresh session, and
-each session shows its agent, model and turn count. Tabs across the top mirror the
+each session shows its agent, model and turn count. The left sidebar mirrors the
 CLI, so almost everything you can do with `mix cortex` you can do here:
 
 - **Chat** — talk to a session (risky tools prompt inline).
-- **Learn** — the TimeLearn timeline (see **Learning**).
-- **Cron** — create/run/manage scheduled tasks (see **Scheduled tasks**).
-- **Bots** — add/remove Telegram bots, applied live (see **Telegram → Multiple bots**).
+- **Companies** — create/edit/delete tenant scopes and their billing markup (see **Companies**).
 - **Agents** — create/edit/delete agents: persona, model, tools, routes, admin scope,
   default.
-- **Models** — add/remove model connections and pick the default.
+- **Models** — add/remove/edit model connections, set per-model prices, pick the default.
+- **Usage & billing** — token usage and cost by cycle, per company (see **Usage metering & billing**).
+- **Learning** — the TimeLearn timeline (see **Learning**).
+- **Scheduled** — create/run/manage scheduled tasks (see **Scheduled tasks**).
+- **Watches** — one-shot "notify me when X" (see **Watches**).
+- **Channels** — add/remove/edit Telegram bots, applied live (see **Telegram → Multiple bots**).
+- **MCP** — external tool servers (see **MCP servers**).
+- **Config file** — edit `~/.cortex/config.json` inline, validated on save.
 
 ```bash
 mix assets.build          # once (builds css/js)
@@ -358,6 +363,19 @@ A **dead chat is self-healing**: if a send comes back permanently failed (bot
 blocked, chat/user gone), that chat is skipped on every further send — no wasted API
 calls or log noise — and automatically un-marked the moment a send to it succeeds
 again (e.g. the user un-blocked the bot). No manual reset needed.
+
+**"Working" activity while the agent runs** is deliberately ambient, not a status
+report you're meant to read. Tune it per bot with `tool_progress`:
+
+- `reaction` (default) — a 👀 reaction on your own message while the agent works,
+  cleared when the answer lands. No extra message in the chat; the quietest signal.
+- `ambient` — a single vague line ("🔎 looking things up…", "💻 running something…")
+  edited in place and deleted when done. No tool names, args or ledger.
+- `off` — nothing but the native "typing…" indicator.
+- `verbose` — a per-tool breadcrumb list (for power users).
+
+The native "typing…" indicator stays alive across all modes. Set it from chat
+(`manage_channel` → `set_progress`) or the CLI (`--progress`).
 
 ### Heartbeat — proactive check-ins (opt-in)
 
@@ -611,6 +629,30 @@ An agent with **no identity yet** (no `SOUL.md`, default seed) presents itself a
 Cortex, tells you it has no name or characteristics defined, and offers to set one
 up — then saves your choices to `SOUL.md` and renames itself with `rename_agent`.
 `auto_approve` lists tools the agent may run without asking (see **Permissions**).
+
+### Storage & backup — it's all files, no database
+
+Everything lives under `~/.cortex/` (or `CORTEX_HOME`) — there is **no database
+server**. `config.json` is the single source of truth (companies, agents, models,
+watches, crons, bots, MCP, hashed API tokens). Agent knowledge lives as files in
+`agents/<name>/` and `companies/<co>/agents/<name>/`; conversation history in
+`data/sessions/`; `data/mnesia/` is a disposable cache (rebuilds itself). `Cortex.Repo`
++ Postgres exist in the code but are **off** (`ecto_repos: []`) — the door for a future
+DB backend, unused today.
+
+Secrets are never stored raw — they're `${ENV_VAR}` references resolved at read time,
+so they live in your environment, not the files.
+
+Back up with one command — it archives the durable parts, skips the disposable cache,
+and lists the secret env vars you must save separately (they're not in the archive):
+
+```bash
+mix cortex backup                       # → cortex-backup-YYYY-MM-DD.tgz
+mix cortex backup --output /path/x.tgz
+```
+
+Restore = extract back into `~/` (or `CORTEX_HOME`'s parent) and re-export those env
+vars. That's the whole disaster-recovery story.
 
 ## MCP servers (external tools)
 
@@ -871,6 +913,43 @@ the agent lists and cancels via the `watch` tool), or the CLI — all reading th
 durable store (`~/.cortex/config.json`, `"watches"`). The scheduler ticks only while
 `serve`/`gateway` is up; the updated state is persisted **before** delivery, so a
 crash can't double-fire.
+
+## Usage metering & billing
+
+Every model call is metered and attributed to the agent's company, so you can bill a
+client per token. Metering happens at the one point all surfaces flow through (CLI,
+HTTP `/v1`, WebSocket, Telegram) and appends to a durable, append-only ledger under
+`~/.cortex/data/usage/<company>/YYYY-MM.jsonl` — the audit trail for what's charged.
+
+**Cost** = `tokens × the model's price` (per 1M tokens). A price is resolved in
+layers: the **manual price** on the model wins, then a **live cache**
+(`~/.cortex/data/price_book.json`, refreshed from OpenRouter + the LiteLLM price
+map), then a **built-in seed** of well-known prices (offline fallback). So known
+models are priced automatically; you only type a price to override or fill a gap.
+
+**Amount to bill** = `cost × the company's markup` — an optional per-company
+multiplier (`1.3` = +30%; blank = bill exactly the provider cost). Both the provider
+cost and the amount to bill are always shown side by side, so the markup never hides
+the real cost from your team.
+
+```bash
+mix cortex usage                                  # all scopes, by month, per company
+mix cortex usage --company acme --granularity day # a company, by day
+mix cortex usage export --company acme            # a client invoice (Markdown or --format csv)
+mix cortex usage prices --refresh                 # refresh the live price cache
+```
+
+**Invoices.** `usage export` turns a company's month into a client invoice (Markdown
+or CSV), and the `export_invoice` **tool** lets an agent do it itself — so a monthly
+scheduled task can export each client's invoice and send it, using Cortex to bill for
+its own use.
+
+Prices also auto-refresh once a week while `serve`/`gateway` is up. In the dashboard,
+the **Usage & billing** section shows tokens, cost and amount-to-bill by cycle
+(hour / day / week / month / year) with breakdowns by company, model and agent; set
+per-model prices under **Models → Edit** and a company's markup under
+**Companies → Edit**. Currency is a label only (default `USD`, set `"currency"` in
+config); there's no FX conversion. Full walkthrough: `mix cortex` doc **billing**.
 
 ## Tests
 

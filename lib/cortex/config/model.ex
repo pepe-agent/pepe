@@ -18,6 +18,10 @@ defmodule Cortex.Config.Model do
             max_tokens: nil,
             temperature: nil,
             context_window: nil,
+            # Billing: price per 1M tokens, in the operator's configured currency.
+            # nil means "unpriced" — usage is still counted, just not costed.
+            input_price: nil,
+            output_price: nil,
             headers: %{},
             # Ordered failover chain: names of other model connections to try when
             # this one errors transiently (rate limit, 5xx, network).
@@ -40,6 +44,8 @@ defmodule Cortex.Config.Model do
       max_tokens: map["max_tokens"],
       temperature: map["temperature"],
       context_window: map["context_window"],
+      input_price: map["input_price"],
+      output_price: map["output_price"],
       headers: map["headers"] || %{},
       fallbacks: map["fallbacks"] || [],
       oauth: map["oauth"]

@@ -72,6 +72,7 @@ defmodule Mix.Tasks.Cortex do
       mix cortex gateway telegram setup          # configure the default Telegram bot
       mix cortex gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
                                           [--heartbeat-minutes N] [--heartbeat-hours 8-22]
+                                          [--progress reaction|ambient|off|verbose]
       mix cortex gateway telegram list           # list configured bots
       mix cortex gateway telegram remove NAME    # delete a named bot
       mix cortex gateway telegram                # run the gateway (one poller per bot)
@@ -81,10 +82,14 @@ defmodule Mix.Tasks.Cortex do
       mix cortex tools                           # list built-in tools
       mix cortex timelearn [AGENT]               # what the agent has learned, on a timeline
       mix cortex cron list|add|run|logs …        # scheduled tasks (recurring agent jobs)
+      mix cortex usage [--company CO] …          # token usage & cost by cycle (billing)
+      mix cortex usage export --company CO …     # generate a client invoice (md/csv)
+      mix cortex usage prices [--refresh]        # show/refresh the live model price cache
       mix cortex mcp add|list|tools|remove …      # external tool servers (MCP: Sentry, GitHub, …)
       mix cortex doctor [--offline]              # health-check the whole setup
       mix cortex setup                           # scaffold ~/.cortex/config.json
       mix cortex config                          # show config path + summary
+      mix cortex backup [--output FILE.tgz]      # archive ~/.cortex + list the secret env vars to save
   """
   use Mix.Task
   use Gettext, backend: Cortex.Gettext
@@ -133,6 +138,9 @@ defmodule Mix.Tasks.Cortex do
       ["config" | rest] ->
         with_config(fn -> config_cmd(rest) end)
 
+      ["backup" | rest] ->
+        with_config(fn -> backup_cmd(rest) end)
+
       ["tools" | _] ->
         with_config(&tools/0)
 
@@ -156,6 +164,14 @@ defmodule Mix.Tasks.Cortex do
 
       ["mcp" | rest] ->
         with_config(fn -> mcp_cmd(rest) end)
+
+      # `usage prices --refresh` fetches over the network (needs Req/the app);
+      # reporting just reads the ledger files.
+      ["usage", "prices" | rest] ->
+        with_app([], fn -> usage_cmd(["prices" | rest]) end)
+
+      ["usage" | rest] ->
+        with_config(fn -> usage_cmd(rest) end)
 
       ["company" | rest] ->
         with_config(fn -> company_cmd(rest) end)
@@ -677,6 +693,161 @@ defmodule Mix.Tasks.Cortex do
   ###
   ### agent
   ###
+
+  ###
+  ### usage / billing
+  ###
+
+  @granularity_atoms %{
+    "hour" => :hour,
+    "day" => :day,
+    "week" => :week,
+    "month" => :month,
+    "year" => :year
+  }
+
+  defp usage_cmd(["prices" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [refresh: :boolean])
+
+    if opts[:refresh] do
+      info("fetching current prices from OpenRouter + LiteLLM…")
+
+      case Cortex.Pricing.refresh() do
+        {:ok, n} -> ok("cached #{n} model prices")
+        {:error, reason} -> error("couldn't refresh prices: #{inspect(reason)}")
+      end
+    end
+
+    case Cortex.Pricing.cache_info() do
+      nil ->
+        info(
+          "no live price cache yet — using built-in seed prices.\n" <>
+            "  refresh: mix cortex usage prices --refresh"
+        )
+
+      %{fetched_at: at, count: c} ->
+        date = at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
+        info("#{c} live prices cached · refreshed #{date}")
+    end
+  end
+
+  defp usage_cmd(["export" | rest]) do
+    {opts, _} =
+      OptionParser.parse!(rest,
+        strict: [company: :string, month: :string, format: :string, output: :string]
+      )
+
+    cond do
+      is_nil(opts[:company]) ->
+        error("--company is required, e.g. mix cortex usage export --company acme")
+
+      not Config.company_exists?(opts[:company]) ->
+        error("unknown company: #{opts[:company]}")
+
+      true ->
+        inv = Cortex.Usage.invoice(opts[:company], month: opts[:month])
+
+        {body, ext} =
+          if opts[:format] == "csv",
+            do: {Cortex.Usage.Invoice.to_csv(inv), "csv"},
+            else: {Cortex.Usage.Invoice.to_markdown(inv), "md"}
+
+        case opts[:output] do
+          nil ->
+            IO.puts(body)
+
+          path ->
+            File.write!(path, body)
+            ok("wrote #{ext} invoice for #{opts[:company]} #{inv.period.label} → #{path}")
+        end
+    end
+  end
+
+  defp usage_cmd(["help"]), do: usage_help()
+
+  defp usage_cmd(rest) do
+    {opts, _} =
+      OptionParser.parse!(rest,
+        strict: [company: :string, granularity: :string, limit: :integer]
+      )
+
+    case @granularity_atoms[opts[:granularity] || "month"] do
+      nil ->
+        error("unknown cycle: #{opts[:granularity]} (use hour|day|week|month|year)")
+
+      gran ->
+        scope = opts[:company] || :all
+        s = Cortex.Usage.summary(scope, gran, limit: opts[:limit] || 24)
+        print_usage(s, scope)
+    end
+  end
+
+  defp print_usage(s, scope) do
+    label = if scope == :all, do: "all scopes", else: scope
+    IO.puts("#{bold("usage")} · #{label} · by #{s.granularity} · #{s.currency}\n")
+
+    if s.buckets == [] do
+      info("no usage recorded yet for this scope.")
+    else
+      Enum.each(s.buckets, fn b ->
+        IO.puts(
+          "  #{String.pad_trailing(b.key, 18)} " <>
+            "#{String.pad_leading(fmt_tok(b.total), 10)} tok  " <>
+            "cost #{String.pad_leading(fmt_money(b.cost, s.currency), 12)}  " <>
+            "bill #{String.pad_leading(fmt_money(b.billable, s.currency), 12)}"
+        )
+      end)
+
+      t = s.totals
+
+      IO.puts(
+        "\n  #{bold(String.pad_trailing("TOTAL", 18))} " <>
+          "#{String.pad_leading(fmt_tok(t.total), 10)} tok  " <>
+          "cost #{String.pad_leading(fmt_money(t.cost, s.currency), 12)}  " <>
+          "bill #{String.pad_leading(fmt_money(t.billable, s.currency), 12)}"
+      )
+    end
+
+    if scope == :all and s.by_company != [] do
+      IO.puts("\n#{bold("by company")}")
+
+      Enum.each(s.by_company, fn c ->
+        markup = if c.markup != 1.0, do: " (×#{c.markup})", else: ""
+
+        IO.puts(
+          "  #{String.pad_trailing(c.key, 16)} " <>
+            "cost #{String.pad_leading(fmt_money(c.cost, s.currency), 12)}  " <>
+            "bill #{String.pad_leading(fmt_money(c.billable, s.currency), 12)}#{markup}"
+        )
+      end)
+    end
+  end
+
+  defp fmt_tok(n) when n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 1)}M"
+  defp fmt_tok(n) when n >= 1_000, do: "#{Float.round(n / 1_000, 1)}K"
+  defp fmt_tok(n), do: Integer.to_string(n)
+
+  defp fmt_money(amount, currency),
+    do: "#{currency} #{:erlang.float_to_binary(amount / 1, decimals: 2)}"
+
+  defp usage_help do
+    IO.puts("""
+    #{bold("mix cortex usage")} — token metering & billing
+
+      usage [--company NAME] [--granularity CYCLE] [--limit N]
+                                    report token usage & cost by cycle
+                                    CYCLE = hour|day|week|month|year (default month)
+                                    no --company = all scopes, broken down per company
+      usage prices [--refresh]      show (or refresh) the live price cache
+      usage export --company NAME [--month YYYY-MM] [--format markdown|csv] [--output FILE]
+                                    generate a client invoice (an agent can do this
+                                    too, via the export_invoice tool, then email it)
+
+    Cost = tokens × the model's price (set per model, or auto from the price book).
+    The amount to bill = cost × the company's markup (set per company; blank = 1.0).
+    Every model call is metered automatically and attributed to the agent's company.
+    """)
+  end
 
   ###
   ### company commands
@@ -1271,7 +1442,8 @@ defmodule Mix.Tasks.Cortex do
           agent: :string,
           trainers: :string,
           heartbeat_minutes: :integer,
-          heartbeat_hours: :string
+          heartbeat_hours: :string,
+          progress: :string
         ]
       )
 
@@ -1289,7 +1461,8 @@ defmodule Mix.Tasks.Cortex do
             "agent" => opts[:agent],
             "trainers" => parse_trainers(opts[:trainers]),
             "heartbeat_minutes" => opts[:heartbeat_minutes],
-            "heartbeat_active_hours" => parse_hour_window(opts[:heartbeat_hours])
+            "heartbeat_active_hours" => parse_hour_window(opts[:heartbeat_hours]),
+            "tool_progress" => valid_progress(opts[:progress])
           }
           |> reject_nil_values()
 
@@ -1357,6 +1530,9 @@ defmodule Mix.Tasks.Cortex do
 
   # --trainers: omitted → nil (default: everyone); "*" → ["*"] (everyone, explicit);
   # "none"/"" → [] (no one); "id1,id2" → [id1, id2] (only those user ids).
+  defp valid_progress(m) when m in ~w(reaction ambient off verbose), do: m
+  defp valid_progress(_), do: nil
+
   defp parse_hour_window(nil), do: nil
 
   defp parse_hour_window(str) do
@@ -1749,6 +1925,78 @@ defmodule Mix.Tasks.Cortex do
     info("default agent: #{Config.default_agent_name() || "(none)"}")
     info("models: #{Config.models() |> Enum.map(& &1.name) |> Enum.join(", ")}")
     info("agents: #{Config.agents() |> Enum.map(& &1.name) |> Enum.join(", ")}")
+  end
+
+  ###
+  ### backup
+  ###
+
+  # Tar up the durable parts of CORTEX_HOME (config + agent/company workspaces +
+  # sessions), skip the disposable Mnesia cache, then list the ${ENV_VAR} secrets that
+  # live outside the files and must be saved separately.
+  defp backup_cmd(rest) do
+    {opts, _} = OptionParser.parse!(rest, strict: [output: :string])
+    home = Config.home()
+
+    cond do
+      not File.dir?(home) ->
+        error("nothing to back up — #{home} doesn't exist yet (run `mix cortex setup`)")
+
+      true ->
+        out = Path.expand(opts[:output] || "cortex-backup-#{Date.utc_today()}.tgz")
+        base = Path.basename(home)
+        args = ["--exclude", "#{base}/data/mnesia", "-czf", out, "-C", Path.dirname(home), base]
+
+        case System.cmd("tar", args, stderr_to_stdout: true) do
+          {_, 0} ->
+            ok("backup written to #{green(out)}#{backup_size(out)}")
+            info("  included: config.json · agent & company workspaces · shared · sessions")
+            info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
+            report_backup_secrets(home)
+
+            info(
+              "\nRestore: extract into #{Path.dirname(home)}/ and re-export your secret env vars."
+            )
+
+          {msg, _} ->
+            error("backup failed: #{String.trim(msg)}")
+        end
+    end
+  end
+
+  defp backup_size(path) do
+    case File.stat(path) do
+      {:ok, %{size: bytes}} -> " (#{Float.round(bytes / 1024, 1)} KB)"
+      _ -> ""
+    end
+  end
+
+  # Secrets are stored as ${ENV_VAR} references, never raw — so they're NOT in the
+  # backup. List them (and whether each is currently set) so they're saved elsewhere.
+  defp report_backup_secrets(home) do
+    vars =
+      case File.read(Path.join(home, "config.json")) do
+        {:ok, body} ->
+          ~r/\$\{([A-Z0-9_]+)\}/
+          |> Regex.scan(body)
+          |> Enum.map(&List.last/1)
+          |> Enum.uniq()
+          |> Enum.sort()
+
+        _ ->
+          []
+      end
+
+    if vars == [] do
+      info("\nNo ${ENV_VAR} secrets referenced — nothing extra to save.")
+    else
+      IO.puts("\n" <> bold("⚠ Secrets are NOT in the backup — save these env vars separately:"))
+
+      Enum.each(vars, fn v ->
+        status = if System.get_env(v), do: green("set"), else: red("UNSET")
+        IO.puts("  #{v}  (#{status})")
+      end)
+    end
   end
 
   defp tools do

@@ -171,6 +171,32 @@ defmodule Cortex.Config do
   end
 
   @doc """
+  Update a company's metadata (e.g. its `"description"`). Merges `meta` over the
+  existing map, dropping keys whose value is nil, and always keeps the `"created"`
+  marker. The name is the identity key and never changes here. Fails if unknown.
+  """
+  def update_company(name, meta) do
+    case get_company(name) do
+      nil ->
+        {:error, :not_found}
+
+      existing ->
+        merged =
+          existing
+          |> Map.merge(meta)
+          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+          |> Map.new()
+          |> Map.put("created", true)
+
+        load()
+        |> update_in(["companies"], &Map.put(&1 || %{}, name, merged))
+        |> save()
+
+        :ok
+    end
+  end
+
+  @doc """
   Delete a company. Refuses while it still owns agents unless `force: true`, which
   also drops those agents from the config (their workspace files are left on disk).
   """
@@ -669,6 +695,29 @@ defmodule Cortex.Config do
 
   @doc "Set the default timezone for scheduled tasks."
   def set_default_timezone(tz), do: load() |> Map.put("timezone", tz) |> save()
+
+  @doc """
+  The billing currency symbol/code used to label costs (default `\"USD\"`). Prices
+  are entered and shown in this currency; there is no FX conversion.
+  """
+  def currency, do: load()["currency"] || "USD"
+
+  @doc "Set the billing currency label."
+  def set_currency(code), do: load() |> Map.put("currency", code) |> save()
+
+  @doc """
+  A company's billing markup: the multiplier applied to provider cost to get the
+  amount to charge. Unset (or root) means `1.0` — bill exactly the provider cost.
+  """
+  @spec company_markup(String.t() | nil) :: float()
+  def company_markup(nil), do: 1.0
+
+  def company_markup(company) do
+    case (get_company(company) || %{})["markup"] do
+      n when is_number(n) and n > 0 -> n / 1
+      _ -> 1.0
+    end
+  end
 
   @doc "Locale for fixed system messages (default \"en\")."
   def locale, do: load()["locale"] || "en"

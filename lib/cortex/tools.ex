@@ -19,6 +19,7 @@ defmodule Cortex.Tools do
   alias Cortex.Tools.EditFile
   alias Cortex.Tools.EnableTool
   alias Cortex.Tools.FetchUrl
+  alias Cortex.Tools.Invoice
   alias Cortex.Tools.ListDir
   alias Cortex.Tools.ManageAgent
   alias Cortex.Tools.ManageChannel
@@ -46,6 +47,7 @@ defmodule Cortex.Tools do
     ListDir,
     FetchUrl,
     WebSearch,
+    Invoice,
     Skill,
     Docs,
     Doctor,

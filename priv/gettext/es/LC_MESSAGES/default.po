@@ -3,151 +3,151 @@ msgstr ""
 "Language: es\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/cortex/gateways/telegram.ex:640
-#: lib/cortex/gateways/tui.ex:203
-#: lib/cortex_web/live/dashboard_live.ex:309
-#: lib/cortex_web/live/dashboard_live.ex:366
+#: lib/cortex/gateways/telegram.ex:761
+#: lib/cortex/gateways/tui.ex:226
+#: lib/cortex_web/live/agents_live.ex:54
+#: lib/cortex_web/live/channels_live.ex:51
 #, elixir-autogen, elixir-format
 msgid "(default)"
 msgstr "(predeterminado)"
 
-#: lib/cortex/gateways/telegram.ex:1072
+#: lib/cortex/gateways/telegram.ex:1339
 #, elixir-autogen, elixir-format
 msgid "(empty response)"
 msgstr "(respuesta vacía)"
 
-#: lib/cortex/gateways/telegram.ex:641
-#: lib/cortex/gateways/telegram.ex:758
-#: lib/cortex/gateways/tui.ex:204
+#: lib/cortex/gateways/telegram.ex:762
+#: lib/cortex/gateways/telegram.ex:879
+#: lib/cortex/gateways/tui.ex:227
 #, elixir-autogen, elixir-format
 msgid "(unset)"
 msgstr "(sin definir)"
 
-#: lib/cortex/gateways/telegram.ex:639
-#: lib/cortex/gateways/tui.ex:202
+#: lib/cortex/gateways/telegram.ex:760
+#: lib/cortex/gateways/tui.ex:225
 #, elixir-autogen, elixir-format
 msgid "Agent: %{agent}\nModel: %{model}\nTurns: %{turns}"
 msgstr "Agente: %{agent}\nModelo: %{model}\nTurnos: %{turns}"
 
-#: lib/cortex/gateways/telegram.ex:724
-#: lib/cortex/gateways/tui.ex:225
+#: lib/cortex/gateways/telegram.ex:845
+#: lib/cortex/gateways/tui.ex:248
 #, elixir-autogen, elixir-format
 msgid "Commands:"
 msgstr "Comandos:"
 
-#: lib/cortex/gateways/telegram.ex:615
-#: lib/cortex/gateways/tui.ex:194
+#: lib/cortex/gateways/telegram.ex:736
+#: lib/cortex/gateways/tui.ex:217
 #, elixir-autogen, elixir-format
 msgid "I couldn't summarize right now. Try again shortly?"
 msgstr "No pude resumir ahora. ¿Puedes intentarlo de nuevo en un momento?"
 
-#: lib/cortex/gateways/telegram.ex:435
+#: lib/cortex/gateways/telegram.ex:556
 #, elixir-autogen, elixir-format
 msgid "I'm having a connection problem right now. Could you try again?"
 msgstr "Tengo un problema de conexión ahora mismo. ¿Puedes intentarlo de nuevo?"
 
-#: lib/cortex/gateways/telegram.ex:72
+#: lib/cortex/gateways/telegram.ex:75
 #, elixir-autogen, elixir-format
 msgid "List commands"
 msgstr "Listar comandos"
 
-#: lib/cortex/gateways/telegram.ex:444
+#: lib/cortex/gateways/telegram.ex:565
 #, elixir-autogen, elixir-format
 msgid "My credentials need to be refreshed. Please ask the team to reconnect."
 msgstr "Mis credenciales necesitan renovarse. Pide al equipo que reconecte."
 
-#: lib/cortex/gateways/telegram.ex:67
+#: lib/cortex/gateways/telegram.ex:70
 #, elixir-autogen, elixir-format
 msgid "Show session info"
 msgstr "Mostrar información de la sesión"
 
-#: lib/cortex/gateways/telegram.ex:450
+#: lib/cortex/gateways/telegram.ex:571
 #, elixir-autogen, elixir-format
 msgid "Sorry, something went wrong on my end. Try again in a moment?"
 msgstr "Lo siento, algo salió mal por mi parte. ¿Puedes intentarlo de nuevo en un momento?"
 
-#: lib/cortex/gateways/telegram.ex:58
-#: lib/cortex_web/live/dashboard_live.ex:24
+#: lib/cortex/gateways/telegram.ex:61
+#: lib/cortex_web/live/chat_live.ex:21
 #, elixir-autogen, elixir-format
 msgid "Start a fresh conversation"
 msgstr "Iniciar una conversación nueva"
 
-#: lib/cortex/gateways/telegram.ex:60
-#: lib/cortex_web/live/dashboard_live.ex:26
+#: lib/cortex/gateways/telegram.ex:63
+#: lib/cortex_web/live/chat_live.ex:23
 #, elixir-autogen, elixir-format
 msgid "Summarize history to free up context"
 msgstr "Resumir el historial para liberar contexto"
 
-#: lib/cortex/gateways/telegram.ex:61
+#: lib/cortex/gateways/telegram.ex:64
 #, elixir-autogen, elixir-format
 msgid "Switch agent — /agent <name>"
 msgstr "Cambiar de agente — /agent <nombre>"
 
-#: lib/cortex/gateways/telegram.ex:627
-#: lib/cortex/gateways/tui.ex:217
+#: lib/cortex/gateways/telegram.ex:748
+#: lib/cortex/gateways/tui.ex:240
 #, elixir-autogen, elixir-format
 msgid "Switched to agent %{name}."
 msgstr "Agente cambiado a %{name}."
 
-#: lib/cortex/gateways/telegram.ex:441
+#: lib/cortex/gateways/telegram.ex:562
 #, elixir-autogen, elixir-format
 msgid "That took too long. Could you try again, please?"
 msgstr "Tardé demasiado en responder. ¿Puedes intentarlo de nuevo, por favor?"
 
-#: lib/cortex/gateways/telegram.ex:447
+#: lib/cortex/gateways/telegram.ex:568
 #, elixir-autogen, elixir-format
 msgid "The model returned an error just now. Could you try again?"
 msgstr "El modelo devolvió un error ahora. ¿Puedes intentarlo de nuevo?"
 
-#: lib/cortex/gateways/telegram.ex:59
+#: lib/cortex/gateways/telegram.ex:62
 #, elixir-autogen, elixir-format
 msgid "Undo your last message"
 msgstr "Deshacer tu último mensaje"
 
-#: lib/cortex/gateways/telegram.ex:629
-#: lib/cortex/gateways/tui.ex:219
+#: lib/cortex/gateways/telegram.ex:750
+#: lib/cortex/gateways/tui.ex:242
 #, elixir-autogen, elixir-format
 msgid "Unknown agent: %{name}"
 msgstr "Agente desconocido: %{name}"
 
-#: lib/cortex/gateways/telegram.ex:715
-#: lib/cortex/gateways/tui.ex:231
+#: lib/cortex/gateways/telegram.ex:836
+#: lib/cortex/gateways/tui.ex:254
 #, elixir-autogen, elixir-format
 msgid "Unknown command: /%{cmd}"
 msgstr "Comando desconocido: /%{cmd}"
 
-#: lib/cortex/gateways/telegram.ex:620
-#: lib/cortex/gateways/tui.ex:211
+#: lib/cortex/gateways/telegram.ex:741
+#: lib/cortex/gateways/tui.ex:234
 #, elixir-autogen, elixir-format
 msgid "Usage: /agent <name>"
 msgstr "Uso: /agent <nombre>"
 
-#: lib/cortex/gateways/telegram.ex:602
-#: lib/cortex/gateways/tui.ex:183
+#: lib/cortex/gateways/telegram.ex:723
+#: lib/cortex/gateways/tui.ex:206
 #, elixir-autogen, elixir-format
 msgid "↩️ Undid your last message."
 msgstr "↩️ Deshice tu último mensaje."
 
-#: lib/cortex/gateways/telegram.ex:611
-#: lib/cortex/gateways/tui.ex:193
+#: lib/cortex/gateways/telegram.ex:732
+#: lib/cortex/gateways/tui.ex:216
 #, elixir-autogen, elixir-format
 msgid "🗜️ History compacted."
 msgstr "🗜️ Historial compactado."
 
-#: lib/cortex/gateways/telegram.ex:704
+#: lib/cortex/gateways/telegram.ex:825
 #, elixir-autogen, elixir-format
 msgid "🧠 Cortex ready."
 msgstr "🧠 Cortex listo."
 
-#: lib/cortex/gateways/telegram.ex:596
-#: lib/cortex/gateways/tui.ex:178
-#: lib/cortex_web/live/dashboard_live.ex:768
-#: lib/cortex_web/live/dashboard_live.ex:1316
+#: lib/cortex/gateways/telegram.ex:717
+#: lib/cortex/gateways/tui.ex:201
+#: lib/cortex_web/live/chat_live.ex:258
+#: lib/cortex_web/live/chat_live.ex:392
 #, elixir-autogen, elixir-format
 msgid "🧠 New conversation started."
 msgstr "🧠 Nueva conversación iniciada."
 
-#: lib/cortex/gateways/tui.ex:94
+#: lib/cortex/gateways/tui.ex:115
 #, elixir-autogen, elixir-format
 msgid "not allowed"
 msgstr "no permitido"
@@ -187,139 +187,139 @@ msgstr "🚫 No permitir"
 msgid "🚫 Not allowed."
 msgstr "🚫 No permitido."
 
-#: lib/cortex/gateways/telegram.ex:887
+#: lib/cortex/gateways/telegram.ex:1008
 #, elixir-autogen, elixir-format
 msgid "Always allowed (clear with /approve clear <tool>):"
 msgstr "Permitido siempre (limpiar con /approve clear <tool>):"
 
-#: lib/cortex/gateways/telegram.ex:69
+#: lib/cortex/gateways/telegram.ex:72
 #, elixir-autogen, elixir-format
 msgid "Ask a side question that isn't saved — /btw <q>"
 msgstr "Hacer una pregunta aparte que no se guarda — /btw <q>"
 
-#: lib/cortex/gateways/telegram.ex:852
+#: lib/cortex/gateways/telegram.ex:973
 #, elixir-autogen, elixir-format
 msgid "Available skills (run with /skill <name>):"
 msgstr "Skills disponibles (ejecuta con /skill <name>):"
 
-#: lib/cortex/gateways/telegram.ex:897
+#: lib/cortex/gateways/telegram.ex:1018
 #, elixir-autogen, elixir-format
 msgid "Cleared all saved permissions."
 msgstr "Borré todos los permisos guardados."
 
-#: lib/cortex/gateways/telegram.ex:758
+#: lib/cortex/gateways/telegram.ex:879
 #, elixir-autogen, elixir-format
 msgid "Current model: %{model}"
 msgstr "Modelo actual: %{model}"
 
-#: lib/cortex/gateways/telegram.ex:64
+#: lib/cortex/gateways/telegram.ex:67
 #, elixir-autogen, elixir-format
 msgid "List available runtime tools"
 msgstr "Listar las herramientas del runtime"
 
-#: lib/cortex/gateways/telegram.ex:63
+#: lib/cortex/gateways/telegram.ex:66
 #, elixir-autogen, elixir-format
 msgid "List configured models"
 msgstr "Listar los modelos configurados"
 
-#: lib/cortex/gateways/telegram.ex:65
+#: lib/cortex/gateways/telegram.ex:68
 #, elixir-autogen, elixir-format
 msgid "List or run a skill — /skill <name>"
 msgstr "Listar o ejecutar una skill — /skill <name>"
 
-#: lib/cortex/gateways/telegram.ex:66
+#: lib/cortex/gateways/telegram.ex:69
 #, elixir-autogen, elixir-format
 msgid "Manage saved tool permissions — /approve"
 msgstr "Gestionar permisos guardados — /approve"
 
-#: lib/cortex/gateways/telegram.ex:775
+#: lib/cortex/gateways/telegram.ex:896
 #, elixir-autogen, elixir-format
 msgid "Model set to %{name}."
 msgstr "Modelo establecido en %{name}."
 
-#: lib/cortex/gateways/telegram.ex:879
-#: lib/cortex/gateways/telegram.ex:918
+#: lib/cortex/gateways/telegram.ex:1000
+#: lib/cortex/gateways/telegram.ex:1039
 #, elixir-autogen, elixir-format
 msgid "No agent is configured."
 msgstr "No hay ningún agente configurado."
 
-#: lib/cortex/gateways/telegram.ex:743
+#: lib/cortex/gateways/telegram.ex:864
 #, elixir-autogen, elixir-format
 msgid "No models are configured yet."
 msgstr "Aún no hay modelos configurados."
 
-#: lib/cortex/gateways/telegram.ex:849
+#: lib/cortex/gateways/telegram.ex:970
 #, elixir-autogen, elixir-format
 msgid "No skills are available yet."
 msgstr "Aún no hay skills disponibles."
 
-#: lib/cortex/gateways/telegram.ex:882
+#: lib/cortex/gateways/telegram.ex:1003
 #, elixir-autogen, elixir-format
 msgid "Nothing is pre-approved — I'll ask before risky tools."
 msgstr "Nada preaprobado — preguntaré antes de herramientas de riesgo."
 
-#: lib/cortex/gateways/telegram.ex:905
+#: lib/cortex/gateways/telegram.ex:1026
 #, elixir-autogen, elixir-format
 msgid "Removed %{tool}."
 msgstr "Eliminado %{tool}."
 
-#: lib/cortex/gateways/telegram.ex:117
+#: lib/cortex/gateways/telegram.ex:120
 #, elixir-autogen, elixir-format
 msgid "Run the %{name} skill"
 msgstr "Ejecutar la skill %{name}"
 
-#: lib/cortex/gateways/telegram.ex:62
+#: lib/cortex/gateways/telegram.ex:65
 #, elixir-autogen, elixir-format
 msgid "Show or set the model — /model <name>"
 msgstr "Ver o establecer el modelo — /model <name>"
 
-#: lib/cortex/gateways/telegram.ex:68
+#: lib/cortex/gateways/telegram.ex:71
 #, elixir-autogen, elixir-format
 msgid "Show your Telegram ids"
 msgstr "Mostrar tus ids de Telegram"
 
-#: lib/cortex/gateways/telegram.ex:770
+#: lib/cortex/gateways/telegram.ex:891
 #, elixir-autogen, elixir-format
 msgid "There's no agent to set the model on."
 msgstr "No hay agente para establecer el modelo."
 
-#: lib/cortex/gateways/telegram.ex:767
+#: lib/cortex/gateways/telegram.ex:888
 #, elixir-autogen, elixir-format
 msgid "Unknown model: %{name}"
 msgstr "Modelo desconocido: %{name}"
 
-#: lib/cortex/gateways/telegram.ex:865
+#: lib/cortex/gateways/telegram.ex:986
 #, elixir-autogen, elixir-format
 msgid "Unknown skill: %{name}"
 msgstr "Skill desconocida: %{name}"
 
-#: lib/cortex/gateways/telegram.ex:910
+#: lib/cortex/gateways/telegram.ex:1031
 #, elixir-autogen, elixir-format
 msgid "Usage: /approve  ·  /approve clear  ·  /approve clear <tool>"
 msgstr "Uso: /approve  ·  /approve clear  ·  /approve clear <tool>"
 
-#: lib/cortex/gateways/telegram.ex:685
+#: lib/cortex/gateways/telegram.ex:806
 #, elixir-autogen, elixir-format
 msgid "Usage: /btw <question>"
 msgstr "Uso: /btw <pregunta>"
 
-#: lib/cortex/gateways/telegram.ex:736
+#: lib/cortex/gateways/telegram.ex:857
 #, elixir-autogen, elixir-format
 msgid "Your user id: %{user}\nThis chat id: %{chat}"
 msgstr "Tu user id: %{user}\nId de este chat: %{chat}"
 
-#: lib/cortex/gateways/telegram.ex:423
+#: lib/cortex/gateways/telegram.ex:540
 #, elixir-autogen, elixir-format
 msgid "I'm still on the previous message — send /stop to cancel it."
 msgstr "Sigo con el mensaje anterior — envía /stop para cancelarlo."
 
-#: lib/cortex/gateways/telegram.ex:673
+#: lib/cortex/gateways/telegram.ex:794
 #, elixir-autogen, elixir-format
 msgid "Nothing is running right now."
 msgstr "No hay nada en ejecución ahora."
 
-#: lib/cortex/gateways/telegram.ex:71
-#: lib/cortex_web/live/dashboard_live.ex:25
+#: lib/cortex/gateways/telegram.ex:74
+#: lib/cortex_web/live/chat_live.ex:22
 #, elixir-autogen, elixir-format
 msgid "Stop the current run"
 msgstr "Detener la ejecución actual"
@@ -334,151 +334,152 @@ msgstr "💬 Permitir en esta sesión"
 msgid "💬 Allowed for this session."
 msgstr "💬 Permitido en esta sesión."
 
-#: lib/cortex/gateways/telegram.ex:672
+#: lib/cortex/gateways/telegram.ex:793
 #, elixir-autogen, elixir-format
 msgid "🛑 Stopped."
 msgstr "🛑 Detenido."
 
-#: lib/cortex/agent/workspace.ex:111
+#: lib/cortex/agent/workspace.ex:146
 #, elixir-autogen, elixir-format
 msgid "You are Cortex, an AI agent, but your identity isn't set up yet — you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Cortex and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the rename_agent tool. Always reply in the user's language."
 msgstr "Eres Cortex, un agente de IA, pero tu identidad aún no está configurada — no tienes nombre, persona ni rasgos propios definidos. Si el usuario pregunta quién eres, dile que eres Cortex y que aún no tienes nombre ni personalidad definidos, y luego ofrécete a configurarlo ahora. Si acepta, ayúdale a elegir un nombre y algunos rasgos, y guárdalo: escribe tu persona en SOUL.md y, si elige un nombre, renómbrate con la herramienta rename_agent. Responde siempre en el idioma del usuario."
 
-#: lib/cortex/gateways/tui.ex:54
+#: lib/cortex/gateways/tui.ex:75
 #, elixir-autogen, elixir-format
 msgid "(no model set)"
 msgstr "(sin modelo definido)"
 
-#: lib/cortex/gateways/tui.ex:51
+#: lib/cortex/gateways/tui.ex:72
 #, elixir-autogen, elixir-format
 msgid "/help for commands · /exit to quit"
 msgstr "/help para comandos · /exit para salir"
 
-#: lib/cortex/gateways/tui.ex:45
-#: lib/cortex_web/live/dashboard_live.ex:248
+#: lib/cortex/gateways/tui.ex:66
+#: lib/cortex_web/live/scheduled_live.ex:99
 #, elixir-autogen, elixir-format
 msgid "Agent"
 msgstr "Agente"
 
-#: lib/cortex/gateways/tui.ex:46
-#: lib/cortex_web/live/dashboard_live.ex:254
-#: lib/cortex_web/live/dashboard_live.ex:387
-#: lib/cortex_web/live/dashboard_live.ex:482
+#: lib/cortex/gateways/tui.ex:67
+#: lib/cortex_web/live/agents_live.ex:74
+#: lib/cortex_web/live/models_live.ex:150
+#: lib/cortex_web/live/models_live.ex:190
+#: lib/cortex_web/live/scheduled_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Model"
 msgstr "Modelo"
 
-#: lib/cortex/gateways/tui.ex:47
+#: lib/cortex/gateways/tui.ex:68
 #, elixir-autogen, elixir-format
 msgid "Session"
 msgstr "Sesión"
 
-#: lib/cortex/gateways/telegram.ex:746
+#: lib/cortex/gateways/telegram.ex:867
 #, elixir-autogen, elixir-format
 msgid "Available models"
 msgstr "Modelos disponibles"
 
-#: lib/cortex/gateways/telegram.ex:786
+#: lib/cortex/gateways/telegram.ex:907
 #, elixir-autogen, elixir-format
 msgid "Available tools"
 msgstr "Herramientas disponibles"
 
-#: lib/cortex/gateways/telegram.ex:812
+#: lib/cortex/gateways/telegram.ex:933
 #, elixir-autogen, elixir-format
 msgid "Add or remove an agent-to-agent route."
 msgstr "Agrega o elimina una ruta entre agentes."
 
-#: lib/cortex/gateways/telegram.ex:810
+#: lib/cortex/gateways/telegram.ex:931
 #, elixir-autogen, elixir-format
 msgid "Change a Cortex setting."
 msgstr "Cambia un ajuste de Cortex."
 
-#: lib/cortex/gateways/telegram.ex:800
+#: lib/cortex/gateways/telegram.ex:921
 #, elixir-autogen, elixir-format
 msgid "Create or overwrite a file."
 msgstr "Crea o sobrescribe un archivo."
 
-#: lib/cortex/gateways/telegram.ex:811
+#: lib/cortex/gateways/telegram.ex:932
 #, elixir-autogen, elixir-format
 msgid "Enable a tool for yourself."
 msgstr "Habilita una herramienta para ti."
 
-#: lib/cortex/gateways/telegram.ex:804
+#: lib/cortex/gateways/telegram.ex:925
 #, elixir-autogen, elixir-format
 msgid "Fetch a URL (HTTP GET)."
 msgstr "Obtiene una URL (HTTP GET)."
 
-#: lib/cortex/gateways/telegram.ex:803
+#: lib/cortex/gateways/telegram.ex:924
 #, elixir-autogen, elixir-format
 msgid "List files in a directory."
 msgstr "Lista archivos de un directorio."
 
-#: lib/cortex/gateways/telegram.ex:802
+#: lib/cortex/gateways/telegram.ex:923
 #, elixir-autogen, elixir-format
 msgid "Move or rename a file or directory."
 msgstr "Mueve o renombra un archivo o directorio."
 
-#: lib/cortex/gateways/telegram.ex:806
+#: lib/cortex/gateways/telegram.ex:927
 #, elixir-autogen, elixir-format
 msgid "Read a skill (a how-to guide)."
 msgstr "Lee una skill (una guía paso a paso)."
 
-#: lib/cortex/gateways/telegram.ex:799
+#: lib/cortex/gateways/telegram.ex:920
 #, elixir-autogen, elixir-format
 msgid "Read a text file."
 msgstr "Lee un archivo de texto."
 
-#: lib/cortex/gateways/telegram.ex:809
+#: lib/cortex/gateways/telegram.ex:930
 #, elixir-autogen, elixir-format
 msgid "Read the Cortex configuration."
 msgstr "Lee la configuración de Cortex."
 
-#: lib/cortex/gateways/telegram.ex:808
+#: lib/cortex/gateways/telegram.ex:929
 #, elixir-autogen, elixir-format
 msgid "Rename yourself (this agent)."
 msgstr "Renómbrate (este agente)."
 
-#: lib/cortex/gateways/telegram.ex:801
+#: lib/cortex/gateways/telegram.ex:922
 #, elixir-autogen, elixir-format
 msgid "Replace text in a file."
 msgstr "Reemplaza texto en un archivo."
 
-#: lib/cortex/gateways/telegram.ex:797
+#: lib/cortex/gateways/telegram.ex:918
 #, elixir-autogen, elixir-format
 msgid "Run a shell command and return its output."
 msgstr "Ejecuta un comando de shell y devuelve su salida."
 
-#: lib/cortex/gateways/telegram.ex:805
+#: lib/cortex/gateways/telegram.ex:926
 #, elixir-autogen, elixir-format
 msgid "Search the web."
 msgstr "Busca en la web."
 
-#: lib/cortex/gateways/telegram.ex:807
+#: lib/cortex/gateways/telegram.ex:928
 #, elixir-autogen, elixir-format
 msgid "Send a message to another agent."
 msgstr "Envía un mensaje a otro agente."
 
-#: lib/cortex/gateways/telegram.ex:798
+#: lib/cortex/gateways/telegram.ex:919
 #, elixir-autogen, elixir-format
 msgid "Write and run a program for complex tasks."
 msgstr "Escribe y ejecuta un programa para tareas complejas."
 
-#: lib/cortex/gateways/telegram.ex:826
+#: lib/cortex/gateways/telegram.ex:947
 #, elixir-autogen, elixir-format
 msgid "Change which agents can message each other."
 msgstr "Cambiar qué agentes pueden hablarse (enrutamiento)."
 
-#: lib/cortex/gateways/telegram.ex:827
+#: lib/cortex/gateways/telegram.ex:948
 #, elixir-autogen, elixir-format
 msgid "Create, edit, audit or improve a skill."
 msgstr "Crear, editar, auditar o mejorar una skill."
 
-#: lib/cortex/gateways/telegram.ex:818
+#: lib/cortex/gateways/telegram.ex:939
 #, elixir-autogen, elixir-format
 msgid "How to install a new tool when asked."
 msgstr "Cómo instalar una herramienta nueva cuando lo pidan."
 
-#: lib/cortex/gateways/telegram.ex:830
+#: lib/cortex/gateways/telegram.ex:951
 #, elixir-autogen, elixir-format
 msgid "Tackle a complex task by writing and running a script."
 msgstr "Resolver una tarea compleja escribiendo y ejecutando un script."
@@ -529,7 +530,7 @@ msgstr "Acciones"
 msgid "Attempting to reconnect"
 msgstr "Intentando reconectar"
 
-#: lib/cortex/gateways/telegram.ex:438
+#: lib/cortex/gateways/telegram.ex:559
 #, elixir-autogen, elixir-format
 msgid "I couldn't download that file. Could you send it again?"
 msgstr "No pude descargar ese archivo. ¿Puedes enviarlo de nuevo?"
@@ -539,7 +540,7 @@ msgstr "No pude descargar ese archivo. ¿Puedes enviarlo de nuevo?"
 msgid "Something went wrong!"
 msgstr "¡Algo salió mal!"
 
-#: lib/cortex/gateways/telegram.ex:824
+#: lib/cortex/gateways/telegram.ex:945
 #, elixir-autogen, elixir-format
 msgid "Understand a voice/audio/image/file the user sent."
 msgstr "Entender un audio/voz/imagen/archivo que envió el usuario."
@@ -554,790 +555,1349 @@ msgstr "No encontramos internet"
 msgid "close"
 msgstr "cerrar"
 
-#: lib/cortex/gateways/telegram.ex:661
+#: lib/cortex/gateways/telegram.ex:782
 #, elixir-autogen, elixir-format
 msgid "No agent to learn with."
 msgstr "No hay agente para aprender."
 
-#: lib/cortex/gateways/telegram.ex:70
+#: lib/cortex/gateways/telegram.ex:73
 #, elixir-autogen, elixir-format
 msgid "Save what I learned to memory/skills"
 msgstr "Guardar lo que aprendí en memoria/skills"
 
-#: lib/cortex/gateways/telegram.ex:659
-#: lib/cortex/gateways/tui.ex:188
+#: lib/cortex/gateways/telegram.ex:780
+#: lib/cortex/gateways/tui.ex:211
 #, elixir-autogen, elixir-format
 msgid "🧠 Reviewing what I learned…"
 msgstr "🧠 Revisando lo que aprendí…"
 
-#: lib/cortex_web/live/dashboard_live.ex:366
+#: lib/cortex_web/live/agents_live.ex:54
 #, elixir-autogen, elixir-format
 msgid "%{count} tools"
-msgstr ""
+msgstr "%{count} herramientas"
 
-#: lib/cortex_web/live/dashboard_live.ex:110
+#: lib/cortex_web/live/chat_live.ex:82
 #, elixir-autogen, elixir-format
 msgid "%{count} turns"
-msgstr ""
+msgstr "%{count} turnos"
 
-#: lib/cortex_web/live/dashboard_live.ex:229
+#: lib/cortex_web/live/scheduled_live.ex:76
 #, elixir-autogen, elixir-format
 msgid "(cron)"
-msgstr ""
+msgstr "(cron)"
 
-#: lib/cortex_web/live/dashboard_live.ex:887
+#: lib/cortex_web/live/dash_data.ex:90
 #, elixir-autogen, elixir-format
 msgid "(none)"
-msgstr ""
+msgstr "(ninguno)"
 
-#: lib/cortex_web/live/dashboard_live.ex:468
+#: lib/cortex_web/live/models_live.ex:179
 #, elixir-autogen, elixir-format
 msgid "(this connection)"
-msgstr ""
+msgstr "(esta conexión)"
 
-#: lib/cortex_web/live/dashboard_live.ex:389
+#: lib/cortex_web/live/agents_live.ex:76
 #, elixir-autogen, elixir-format
 msgid "(use default model)"
-msgstr ""
+msgstr "(usar modelo predeterminado)"
 
-#: lib/cortex_web/live/dashboard_live.ex:317
+#: lib/cortex_web/live/channels_live.ex:80
 #, elixir-autogen, elixir-format
 msgid "+ Add a bot"
-msgstr ""
+msgstr "+ Agregar un bot"
 
-#: lib/cortex_web/live/dashboard_live.ex:350
-#: lib/cortex_web/live/dashboard_live.ex:436
-#: lib/cortex_web/live/dashboard_live.ex:520
-#, elixir-autogen, elixir-format
-msgid "+ New"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:372
+#: lib/cortex_web/live/agents_live.ex:37
+#: lib/cortex_web/live/agents_live.ex:60
 #, elixir-autogen, elixir-format
 msgid "+ New agent"
-msgstr ""
+msgstr "+ Nuevo agente"
 
-#: lib/cortex_web/live/dashboard_live.ex:89
-#, elixir-autogen, elixir-format
-msgid "+ New chat"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:454
+#: lib/cortex_web/live/models_live.ex:166
 #, elixir-autogen, elixir-format
 msgid "+ New model connection"
-msgstr ""
+msgstr "+ Nueva conexión de modelo"
 
-#: lib/cortex_web/live/dashboard_live.ex:213
+#: lib/cortex_web/live/scheduled_live.ex:65
 #, elixir-autogen, elixir-format
 msgid "+ New scheduled task"
-msgstr ""
+msgstr "+ Nueva tarea programada"
 
-#: lib/cortex_web/live/dashboard_live.ex:1167
+#: lib/cortex_web/live/channels_live.ex:114
 #, elixir-autogen, elixir-format
 msgid "A bot token is required."
-msgstr ""
+msgstr "Se requiere un token de bot."
 
-#: lib/cortex_web/live/dashboard_live.ex:1553
+#: lib/cortex_web/live/chat_live.ex:489
 #, elixir-autogen, elixir-format
 msgid "API"
-msgstr ""
+msgstr "API"
 
-#: lib/cortex_web/live/dashboard_live.ex:493
+#: lib/cortex_web/live/models_live.ex:154
+#: lib/cortex_web/live/models_live.ex:199
 #, elixir-autogen, elixir-format
 msgid "API key"
-msgstr ""
+msgstr "Clave de API"
 
-#: lib/cortex_web/live/dashboard_live.ex:337
+#: lib/cortex_web/live/channels_live.ex:97
 #, elixir-autogen, elixir-format
 msgid "Add bot"
-msgstr ""
+msgstr "Agregar bot"
 
-#: lib/cortex_web/live/dashboard_live.ex:411
+#: lib/cortex_web/live/agents_live.ex:97
 #, elixir-autogen, elixir-format
 msgid "Admin scope — which agents it can manage & train"
-msgstr ""
+msgstr "Ámbito de administración — qué agentes puede gestionar y entrenar"
 
-#: lib/cortex_web/live/dashboard_live.ex:1053
+#: lib/cortex_web/live/agents_live.ex:169
 #, elixir-autogen, elixir-format
 msgid "Agent %{name} saved."
-msgstr ""
+msgstr "Agente %{name} guardado."
 
-#: lib/cortex_web/live/dashboard_live.ex:80
-#: lib/cortex_web/live/dashboard_live.ex:346
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/dash_data.ex:33
+#: lib/cortex_web/live/dash_ui.ex:104
+#, elixir-autogen, elixir-format
 msgid "Agents"
-msgstr "Agente"
+msgstr "Agentes"
 
-#: lib/cortex_web/live/dashboard_live.ex:602
+#: lib/cortex_web/live/chat_live.ex:116
 #, elixir-autogen, elixir-format
 msgid "Allow me to run the"
-msgstr ""
+msgstr "¿Puedo ejecutar la"
 
-#: lib/cortex_web/live/dashboard_live.ex:476
+#: lib/cortex_web/live/models_live.ex:146
+#: lib/cortex_web/live/models_live.ex:185
 #, elixir-autogen, elixir-format
 msgid "Base URL"
-msgstr ""
+msgstr "URL base"
 
-#: lib/cortex_web/live/dashboard_live.ex:1177
+#: lib/cortex_web/live/channels_live.ex:127
 #, elixir-autogen, elixir-format
 msgid "Bot %{name} added."
-msgstr ""
+msgstr "Bot %{name} agregado."
 
-#: lib/cortex_web/live/dashboard_live.ex:324
+#: lib/cortex_web/live/channels_live.ex:69
+#: lib/cortex_web/live/channels_live.ex:86
 #, elixir-autogen, elixir-format
 msgid "Bot token"
-msgstr ""
+msgstr "Token del bot"
 
-#: lib/cortex_web/live/dashboard_live.ex:79
-#, elixir-autogen, elixir-format
-msgid "Bots"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:404
+#: lib/cortex_web/live/agents_live.ex:91
 #, elixir-autogen, elixir-format
 msgid "Can message — agents it may talk to"
-msgstr ""
+msgstr "Puede hablar con — agentes con los que puede conversar"
 
-#: lib/cortex_web/live/dashboard_live.ex:424
-#: lib/cortex_web/live/dashboard_live.ex:508
-#: lib/cortex_web/live/dashboard_live.ex:563
+#: lib/cortex_web/live/agents_live.ex:109
+#: lib/cortex_web/live/channels_live.ex:75
+#: lib/cortex_web/live/companies_live.ex:121
+#: lib/cortex_web/live/dash_ui.ex:92
+#: lib/cortex_web/live/learning_live.ex:63
+#: lib/cortex_web/live/models_live.ex:160
+#: lib/cortex_web/live/models_live.ex:213
+#: lib/cortex_web/live/tool_servers_live.ex:80
 #, elixir-autogen, elixir-format
 msgid "Cancel"
-msgstr ""
+msgstr "Cancelar"
 
-#: lib/cortex_web/live/dashboard_live.ex:76
+#: lib/cortex_web/live/dash_ui.ex:99
 #, elixir-autogen, elixir-format
 msgid "Chat"
-msgstr ""
+msgstr "Chat"
 
-#: lib/cortex_web/live/dashboard_live.ex:223
+#: lib/cortex_web/live/scheduled_live.ex:72
 #, elixir-autogen, elixir-format
 msgid "Check the 06:00 XML load and report anything off."
-msgstr ""
+msgstr "Revisa la carga de XML de las 06:00 y reporta cualquier problema."
 
-#: lib/cortex_web/live/dashboard_live.ex:460
+#: lib/cortex_web/live/models_live.ex:171
 #, elixir-autogen, elixir-format
 msgid "Choose a provider…"
-msgstr ""
+msgstr "Elige un proveedor…"
 
-#: lib/cortex_web/live/dashboard_live.ex:407
+#: lib/cortex_web/live/agents_live.ex:93
 #, elixir-autogen, elixir-format
 msgid "Comma-separated agent names. Blank = talks to no one."
-msgstr ""
+msgstr "Nombres de agentes separados por comas. Vacío = no habla con nadie."
 
-#: lib/cortex_web/live/dashboard_live.ex:782
+#: lib/cortex_web/live/chat_live.ex:406
 #, elixir-autogen, elixir-format
 msgid "Compacting history…"
-msgstr ""
+msgstr "Compactando el historial…"
 
-#: lib/cortex_web/live/dashboard_live.ex:1552
+#: lib/cortex_web/live/chat_live.ex:488
 #, elixir-autogen, elixir-format
 msgid "Console"
-msgstr ""
+msgstr "Console"
 
-#: lib/cortex_web/live/dashboard_live.ex:275
+#: lib/cortex_web/live/scheduled_live.ex:122
 #, elixir-autogen, elixir-format
 msgid "Create task"
-msgstr ""
+msgstr "Crear tarea"
 
-#: lib/cortex_web/live/dashboard_live.ex:78
-#, elixir-autogen, elixir-format
-msgid "Cron"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:217
+#: lib/cortex_web/live/scheduled_live.ex:68
 #, elixir-autogen, elixir-format
 msgid "Daily XML check"
-msgstr ""
+msgstr "Verificación diaria de XML"
 
-#: lib/cortex_web/live/dashboard_live.ex:497
+#: lib/cortex_web/live/models_live.ex:202
 #, elixir-autogen, elixir-format
 msgid "Defaults to the %{env} env var (%{status}). Paste a key here to load its models now."
-msgstr ""
+msgstr "Usa por defecto la variable de entorno %{env} (%{status}). Pega una clave aquí para cargar sus modelos ahora."
 
-#: lib/cortex_web/live/dashboard_live.ex:363
+#: lib/cortex_web/live/agents_live.ex:51
 #, elixir-autogen, elixir-format
 msgid "Delete agent %{name}?"
-msgstr ""
+msgstr "¿Eliminar el agente %{name}?"
 
-#: lib/cortex_web/live/dashboard_live.ex:447
+#: lib/cortex_web/live/models_live.ex:130
 #, elixir-autogen, elixir-format
 msgid "Delete model %{name}?"
-msgstr ""
+msgstr "¿Eliminar el modelo %{name}?"
 
-#: lib/cortex_web/live/dashboard_live.ex:117
+#: lib/cortex_web/live/chat_live.ex:84
 #, elixir-autogen, elixir-format
 msgid "Delete session"
-msgstr ""
+msgstr "Eliminar sesión"
 
-#: lib/cortex_web/live/dashboard_live.ex:116
+#: lib/cortex_web/live/chat_live.ex:84
 #, elixir-autogen, elixir-format
 msgid "Delete session %{key}?"
-msgstr ""
+msgstr "¿Eliminar la sesión %{key}?"
 
-#: lib/cortex_web/live/dashboard_live.ex:183
+#: lib/cortex_web/live/scheduled_live.ex:47
 #, elixir-autogen, elixir-format
 msgid "Disable"
-msgstr ""
+msgstr "Desactivar"
 
-#: lib/cortex_web/live/dashboard_live.ex:361
+#: lib/cortex_web/live/agents_live.ex:49
+#: lib/cortex_web/live/channels_live.ex:46
+#: lib/cortex_web/live/companies_live.ex:52
+#: lib/cortex_web/live/models_live.ex:128
 #, elixir-autogen, elixir-format
 msgid "Edit"
-msgstr ""
+msgstr "Editar"
 
-#: lib/cortex_web/live/dashboard_live.ex:372
+#: lib/cortex_web/live/agents_live.ex:60
+#: lib/cortex_web/live/channels_live.ex:59
+#: lib/cortex_web/live/companies_live.ex:76
+#: lib/cortex_web/live/models_live.ex:139
 #, elixir-autogen, elixir-format
 msgid "Edit %{name}"
-msgstr ""
+msgstr "Editar %{name}"
 
-#: lib/cortex_web/live/dashboard_live.ex:183
+#: lib/cortex_web/live/scheduled_live.ex:47
 #, elixir-autogen, elixir-format
 msgid "Enable"
-msgstr ""
+msgstr "Activar"
 
-#: lib/cortex_web/live/dashboard_live.ex:233
+#: lib/cortex_web/live/scheduled_live.ex:80
 #, elixir-autogen, elixir-format
 msgid "Every 15 minutes"
-msgstr ""
+msgstr "Cada 15 minutos"
 
-#: lib/cortex_web/live/dashboard_live.ex:234
+#: lib/cortex_web/live/scheduled_live.ex:81
 #, elixir-autogen, elixir-format
 msgid "Every Monday 09:00"
-msgstr ""
+msgstr "Todos los lunes a las 09:00"
 
-#: lib/cortex_web/live/dashboard_live.ex:231
+#: lib/cortex_web/live/scheduled_live.ex:78
 #, elixir-autogen, elixir-format
 msgid "Every day at 08:00"
-msgstr ""
+msgstr "Todos los días a las 08:00"
 
-#: lib/cortex_web/live/dashboard_live.ex:232
+#: lib/cortex_web/live/scheduled_live.ex:79
 #, elixir-autogen, elixir-format
 msgid "Every hour"
-msgstr ""
+msgstr "Cada hora"
 
-#: lib/cortex_web/live/dashboard_live.ex:235
+#: lib/cortex_web/live/scheduled_live.ex:82
 #, elixir-autogen, elixir-format
 msgid "First of the month"
-msgstr ""
+msgstr "El primer día del mes"
 
-#: lib/cortex_web/live/dashboard_live.ex:594
+#: lib/cortex_web/live/chat_live.ex:108
 #, elixir-autogen, elixir-format
 msgid "Fresh conversation — send a message to start."
-msgstr ""
+msgstr "Conversación nueva — envía un mensaje para empezar."
 
-#: lib/cortex_web/live/dashboard_live.ex:1221
+#: lib/cortex_web/live/scheduled_live.ex:178
 #, elixir-autogen, elixir-format
 msgid "Invalid schedule: %{msg}"
-msgstr ""
+msgstr "Programación inválida: %{msg}"
 
-#: lib/cortex_web/live/dashboard_live.ex:77
-#, elixir-autogen, elixir-format
-msgid "Learn"
-msgstr ""
-
-#: lib/cortex/gateways/telegram.ex:660
-#: lib/cortex/gateways/telegram.ex:664
+#: lib/cortex/gateways/telegram.ex:781
+#: lib/cortex/gateways/telegram.ex:785
 #, elixir-autogen, elixir-format
 msgid "Learning is off for this chat."
-msgstr ""
+msgstr "El aprendizaje está desactivado para este chat."
 
-#: lib/cortex_web/live/dashboard_live.ex:640
+#: lib/cortex_web/live/chat_live.ex:136
 #, elixir-autogen, elixir-format
 msgid "Message…  (type / for commands)"
-msgstr ""
+msgstr "Mensaje…  (escribe / para comandos)"
 
-#: lib/cortex_web/live/dashboard_live.ex:1143
+#: lib/cortex_web/live/models_live.ex:312
 #, elixir-autogen, elixir-format
 msgid "Model %{name} saved."
-msgstr ""
+msgstr "Modelo %{name} guardado."
 
-#: lib/cortex_web/live/dashboard_live.ex:433
+#: lib/cortex_web/live/models_live.ex:115
 #, elixir-autogen, elixir-format
 msgid "Model connections"
-msgstr ""
+msgstr "Conexiones de modelo"
 
-#: lib/cortex_web/live/dashboard_live.ex:81
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/dash_ui.ex:105
+#, elixir-autogen, elixir-format
 msgid "Models"
-msgstr "Modelo"
+msgstr "Modelos"
 
-#: lib/cortex_web/live/dashboard_live.ex:216
-#: lib/cortex_web/live/dashboard_live.ex:319
-#: lib/cortex_web/live/dashboard_live.ex:375
-#: lib/cortex_web/live/dashboard_live.ex:468
-#: lib/cortex_web/live/dashboard_live.ex:549
+#: lib/cortex_web/live/agents_live.ex:63
+#: lib/cortex_web/live/channels_live.ex:82
+#: lib/cortex_web/live/companies_live.ex:79
+#: lib/cortex_web/live/models_live.ex:142
+#: lib/cortex_web/live/models_live.ex:179
+#: lib/cortex_web/live/scheduled_live.ex:67
+#: lib/cortex_web/live/tool_servers_live.ex:66
 #, elixir-autogen, elixir-format
 msgid "Name"
-msgstr ""
+msgstr "Nombre"
 
-#: lib/cortex_web/live/dashboard_live.ex:1030
+#: lib/cortex_web/live/agents_live.ex:146
 #, elixir-autogen, elixir-format
 msgid "Name is required."
-msgstr ""
+msgstr "El nombre es obligatorio."
 
-#: lib/cortex_web/live/dashboard_live.ex:1126
+#: lib/cortex_web/live/models_live.ex:290
 #, elixir-autogen, elixir-format
 msgid "Name, base URL and model id are required."
-msgstr ""
+msgstr "El nombre, la URL base y el id del modelo son obligatorios."
 
-#: lib/cortex_web/live/dashboard_live.ex:580
+#: lib/cortex_web/live/chat_live.ex:101
 #, elixir-autogen, elixir-format
 msgid "New"
-msgstr ""
+msgstr "Nueva"
 
-#: lib/cortex_web/live/dashboard_live.ex:313
+#: lib/cortex_web/live/channels_live.ex:55
 #, elixir-autogen, elixir-format
 msgid "No bots yet. The default bot is set via"
-msgstr ""
+msgstr "Aún no hay bots. El bot predeterminado se configura mediante"
 
-#: lib/cortex_web/live/dashboard_live.ex:1273
+#: lib/cortex_web/live/chat_live.ex:217
 #, elixir-autogen, elixir-format
 msgid "No default agent configured."
-msgstr ""
+msgstr "No hay ningún agente predeterminado configurado."
 
-#: lib/cortex_web/live/dashboard_live.ex:210
+#: lib/cortex_web/live/scheduled_live.ex:62
 #, elixir-autogen, elixir-format
 msgid "No scheduled tasks yet — create one below."
-msgstr ""
+msgstr "Aún no hay tareas programadas — crea una abajo."
 
-#: lib/cortex_web/live/dashboard_live.ex:125
-#, elixir-autogen, elixir-format
-msgid "No sessions yet — start one."
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:155
+#: lib/cortex_web/live/learning_live.ex:86
 #, elixir-autogen, elixir-format
 msgid "Nothing learned yet."
-msgstr ""
+msgstr "Nada aprendido todavía."
 
-#: lib/cortex_web/live/dashboard_live.ex:265
+#: lib/cortex_web/live/scheduled_live.ex:115
 #, elixir-autogen, elixir-format
 msgid "Nowhere (just keep the run history)"
-msgstr ""
+msgstr "En ningún lugar (solo mantener el historial de ejecución)"
 
-#: lib/cortex_web/live/dashboard_live.ex:434
-#, elixir-autogen, elixir-format
-msgid "OpenAI-compatible endpoints"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:381
+#: lib/cortex_web/live/agents_live.ex:69
 #, elixir-autogen, elixir-format
 msgid "Persona (system prompt)"
-msgstr ""
+msgstr "Persona (prompt de sistema)"
 
-#: lib/cortex_web/live/dashboard_live.ex:1164
+#: lib/cortex_web/live/channels_live.ex:111
 #, elixir-autogen, elixir-format
 msgid "Pick a name other than \"default\"."
-msgstr ""
+msgstr "Elige un nombre distinto de \"default\"."
 
-#: lib/cortex_web/live/dashboard_live.ex:457
+#: lib/cortex_web/live/models_live.ex:169
 #, elixir-autogen, elixir-format
 msgid "Provider"
-msgstr ""
+msgstr "Proveedor"
 
-#: lib/cortex_web/live/dashboard_live.ex:303
+#: lib/cortex_web/live/channels_live.ex:48
 #, elixir-autogen, elixir-format
 msgid "Remove bot %{name}?"
-msgstr ""
+msgstr "¿Eliminar el bot %{name}?"
 
-#: lib/cortex_web/live/dashboard_live.ex:188
+#: lib/cortex_web/live/scheduled_live.ex:48
 #, elixir-autogen, elixir-format
 msgid "Remove scheduled task %{name}?"
-msgstr ""
+msgstr "¿Eliminar la tarea programada %{name}?"
 
-#: lib/cortex_web/live/dashboard_live.ex:263
+#: lib/cortex_web/live/scheduled_live.ex:113
 #, elixir-autogen, elixir-format
 msgid "Report the result to"
-msgstr ""
+msgstr "Enviar el resultado a"
 
-#: lib/cortex_web/live/dashboard_live.ex:180
+#: lib/cortex_web/live/scheduled_live.ex:46
 #, elixir-autogen, elixir-format
 msgid "Run now"
-msgstr ""
+msgstr "Ejecutar ahora"
 
-#: lib/cortex_web/live/dashboard_live.ex:1195
+#: lib/cortex_web/live/scheduled_live.ex:138
 #, elixir-autogen, elixir-format
 msgid "Running “%{name}” now…"
-msgstr ""
+msgstr "Ejecutando “%{name}” ahora…"
 
-#: lib/cortex_web/live/dashboard_live.ex:423
-#: lib/cortex_web/live/dashboard_live.ex:507
-#: lib/cortex_web/live/dashboard_live.ex:562
+#: lib/cortex_web/live/agents_live.ex:108
+#: lib/cortex_web/live/channels_live.ex:74
+#: lib/cortex_web/live/companies_live.ex:120
+#: lib/cortex_web/live/learning_live.ex:62
+#: lib/cortex_web/live/models_live.ex:159
+#: lib/cortex_web/live/models_live.ex:212
+#: lib/cortex_web/live/tool_servers_live.ex:79
 #, elixir-autogen, elixir-format
 msgid "Save"
-msgstr ""
+msgstr "Guardar"
 
-#: lib/cortex_web/live/dashboard_live.ex:162
+#: lib/cortex_web/live/scheduled_live.ex:33
 #, elixir-autogen, elixir-format
 msgid "Scheduled tasks"
-msgstr ""
+msgstr "Tareas programadas"
 
-#: lib/cortex_web/live/dashboard_live.ex:654
-#, elixir-autogen, elixir-format
-msgid "Select or start a session."
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:644
+#: lib/cortex_web/live/chat_live.ex:138
 #, elixir-autogen, elixir-format
 msgid "Send"
-msgstr ""
+msgstr "Enviar"
 
-#: lib/cortex_web/live/dashboard_live.ex:362
-#: lib/cortex_web/live/dashboard_live.ex:446
+#: lib/cortex_web/live/agents_live.ex:50
+#: lib/cortex_web/live/models_live.ex:129
 #, elixir-autogen, elixir-format
 msgid "Set default"
-msgstr ""
+msgstr "Establecer como predeterminado"
 
-#: lib/cortex_web/live/dashboard_live.ex:587
+#: lib/cortex_web/live/chat_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "Stop"
-msgstr ""
+msgstr "Detener"
 
-#: lib/cortex_web/live/dashboard_live.ex:1239
+#: lib/cortex_web/live/scheduled_live.ex:194
 #, elixir-autogen, elixir-format
 msgid "Task created."
-msgstr ""
+msgstr "Tarea creada."
 
-#: lib/cortex_web/live/dashboard_live.ex:1190
+#: lib/cortex_web/live/scheduled_live.ex:134
 #, elixir-autogen, elixir-format
 msgid "Task not found."
-msgstr ""
+msgstr "Tarea no encontrada."
 
-#: lib/cortex_web/live/dashboard_live.ex:1550
+#: lib/cortex_web/live/chat_live.ex:486
 #, elixir-autogen, elixir-format
 msgid "Telegram"
-msgstr ""
+msgstr "Telegram"
 
-#: lib/cortex_web/live/dashboard_live.ex:284
-#, elixir-autogen, elixir-format
-msgid "Telegram bots"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:266
+#: lib/cortex_web/live/scheduled_live.ex:116
 #, elixir-autogen, elixir-format
 msgid "The app log"
-msgstr ""
+msgstr "El registro de la app"
 
-#: lib/cortex_web/live/dashboard_live.ex:1424
+#: lib/cortex_web/live/chat_live.ex:327
 #, elixir-autogen, elixir-format
 msgid "The run failed. Check the model connection."
-msgstr ""
+msgstr "La ejecución falló. Revisa la conexión del modelo."
 
-#: lib/cortex_web/live/dashboard_live.ex:330
+#: lib/cortex_web/live/channels_live.ex:62
+#: lib/cortex_web/live/channels_live.ex:91
 #, elixir-autogen, elixir-format
 msgid "This bot talks to"
-msgstr ""
+msgstr "Este bot habla con"
 
-#: lib/cortex_web/live/dashboard_live.ex:239
+#: lib/cortex_web/live/scheduled_live.ex:91
 #, elixir-autogen, elixir-format
 msgid "Timezone"
-msgstr ""
+msgstr "Zona horaria"
 
-#: lib/cortex_web/live/dashboard_live.ex:327
+#: lib/cortex_web/live/channels_live.ex:88
 #, elixir-autogen, elixir-format
 msgid "Tip: use an env-var reference to keep the token out of the config file."
-msgstr ""
+msgstr "Consejo: usa una referencia de variable de entorno para mantener el token fuera del archivo de configuración."
 
-#: lib/cortex_web/live/dashboard_live.ex:395
+#: lib/cortex_web/live/agents_live.ex:82
 #, elixir-autogen, elixir-format
 msgid "Tools"
-msgstr ""
+msgstr "Herramientas"
 
-#: lib/cortex_web/live/dashboard_live.ex:785
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/chat_live.ex:409
+#, elixir-autogen, elixir-format
 msgid "Unknown command %{cmd}"
-msgstr "Comando desconocido: /%{cmd}"
+msgstr "Comando desconocido %{cmd}"
 
-#: lib/cortex_web/live/dashboard_live.ex:1551
+#: lib/cortex_web/live/chat_live.ex:487
 #, elixir-autogen, elixir-format
 msgid "Web"
-msgstr ""
+msgstr "Web"
 
-#: lib/cortex_web/live/dashboard_live.ex:222
+#: lib/cortex_web/live/scheduled_live.ex:71
 #, elixir-autogen, elixir-format
 msgid "What to do"
-msgstr ""
+msgstr "Qué hacer"
 
-#: lib/cortex_web/live/dashboard_live.ex:229
+#: lib/cortex_web/live/scheduled_live.ex:76
 #, elixir-autogen, elixir-format
 msgid "When"
-msgstr ""
+msgstr "Cuándo"
 
-#: lib/cortex_web/live/dashboard_live.ex:382
+#: lib/cortex_web/live/agents_live.ex:70
 #, elixir-autogen, elixir-format
 msgid "You are …"
-msgstr ""
+msgstr "Eres …"
 
-#: lib/cortex_web/live/dashboard_live.ex:296
+#: lib/cortex_web/live/channels_live.ex:42
 #, elixir-autogen, elixir-format
 msgid "active"
-msgstr ""
+msgstr "activo"
 
-#: lib/cortex_web/live/dashboard_live.ex:256
+#: lib/cortex_web/live/scheduled_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "agent's default"
-msgstr ""
+msgstr "predeterminado del agente"
 
-#: lib/cortex_web/live/dashboard_live.ex:309
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/channels_live.ex:51
+#, elixir-autogen, elixir-format
 msgid "agent:"
-msgstr "Agente"
+msgstr "agente:"
 
-#: lib/cortex_web/live/dashboard_live.ex:417
-#: lib/cortex_web/live/dashboard_live.ex:818
+#: lib/cortex_web/live/agents_live.ex:102
+#: lib/cortex_web/live/dash_data.ex:74
 #, elixir-autogen, elixir-format
 msgid "all agents"
-msgstr ""
+msgstr "todos los agentes"
 
-#: lib/cortex_web/live/dashboard_live.ex:376
+#: lib/cortex_web/live/agents_live.ex:64
 #, elixir-autogen, elixir-format
 msgid "assistant"
-msgstr ""
+msgstr "asistente"
 
-#: lib/cortex_web/live/dashboard_live.ex:412
-#: lib/cortex_web/live/dashboard_live.ex:415
+#: lib/cortex_web/live/agents_live.ex:98
+#: lib/cortex_web/live/agents_live.ex:100
 #, elixir-autogen, elixir-format
 msgid "blank"
-msgstr ""
+msgstr "vacío"
 
-#: lib/cortex_web/live/dashboard_live.ex:358
-#: lib/cortex_web/live/dashboard_live.ex:443
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/agents_live.ex:46
+#: lib/cortex_web/live/models_live.ex:125
+#, elixir-autogen, elixir-format
 msgid "default"
-msgstr "(predeterminado)"
+msgstr "predeterminado"
 
-#: lib/cortex_web/live/dashboard_live.ex:175
+#: lib/cortex_web/live/scheduled_live.ex:42
 #, elixir-autogen, elixir-format
 msgid "disabled"
-msgstr ""
+msgstr "desactivado"
 
-#: lib/cortex_web/live/dashboard_live.ex:405
+#: lib/cortex_web/live/agents_live.ex:92
 #, elixir-autogen, elixir-format
 msgid "e.g. helper, researcher"
-msgstr ""
+msgstr "ej.: helper, researcher"
 
-#: lib/cortex_web/live/dashboard_live.ex:175
+#: lib/cortex_web/live/scheduled_live.ex:42
 #, elixir-autogen, elixir-format
 msgid "enabled"
-msgstr ""
+msgstr "activado"
 
-#: lib/cortex_web/live/dashboard_live.ex:296
+#: lib/cortex_web/live/channels_live.ex:42
 #, elixir-autogen, elixir-format
 msgid "inactive"
-msgstr ""
+msgstr "inactivo"
 
-#: lib/cortex_web/live/dashboard_live.ex:415
+#: lib/cortex_web/live/agents_live.ex:100
 #, elixir-autogen, elixir-format
 msgid "itself only"
-msgstr ""
+msgstr "solo él mismo"
 
-#: lib/cortex_web/live/dashboard_live.ex:483
+#: lib/cortex_web/live/models_live.ex:191
 #, elixir-autogen, elixir-format
 msgid "loading models…"
-msgstr ""
+msgstr "cargando modelos…"
 
-#: lib/cortex_web/live/dashboard_live.ex:368
+#: lib/cortex_web/live/agents_live.ex:56
 #, elixir-autogen, elixir-format
 msgid "manages:"
-msgstr ""
+msgstr "gestiona:"
 
-#: lib/cortex_web/live/dashboard_live.ex:367
+#: lib/cortex_web/live/agents_live.ex:55
 #, elixir-autogen, elixir-format
 msgid "messages:"
-msgstr ""
+msgstr "mensajes:"
 
-#: lib/cortex_web/live/dashboard_live.ex:488
+#: lib/cortex_web/live/models_live.ex:195
 #, elixir-autogen, elixir-format
 msgid "model id (e.g. gpt-5)"
-msgstr ""
+msgstr "id del modelo (ej.: gpt-5)"
 
-#: lib/cortex_web/live/dashboard_live.ex:366
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/agents_live.ex:54
+#, elixir-autogen, elixir-format
 msgid "model:"
-msgstr "Modelo"
+msgstr "modelo:"
 
-#: lib/cortex_web/live/dashboard_live.ex:196
+#: lib/cortex_web/live/scheduled_live.ex:51
 #, elixir-autogen, elixir-format
 msgid "next"
-msgstr ""
+msgstr "siguiente"
 
-#: lib/cortex_web/live/dashboard_live.ex:416
-#: lib/cortex_web/live/dashboard_live.ex:817
+#: lib/cortex_web/live/agents_live.ex:101
+#: lib/cortex_web/live/dash_data.ex:73
 #, elixir-autogen, elixir-format
 msgid "nobody"
-msgstr ""
+msgstr "nadie"
 
-#: lib/cortex_web/live/dashboard_live.ex:722
+#: lib/cortex_web/live/dash_data.ex:114
 #, elixir-autogen, elixir-format
 msgid "not sent"
-msgstr ""
+msgstr "no enviado"
 
-#: lib/cortex_web/live/dashboard_live.ex:286
-#, elixir-autogen, elixir-format
-msgid "one poller per bot, each bound to an agent · changes apply live"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:418
+#: lib/cortex_web/live/agents_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "only those"
-msgstr ""
+msgstr "solo esos"
 
-#: lib/cortex_web/live/dashboard_live.ex:347
-#, elixir-autogen, elixir-format
-msgid "persona, model, tools, routes & admin scope"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:202
+#: lib/cortex_web/live/scheduled_live.ex:54
 #, elixir-autogen, elixir-format
 msgid "prompt & last runs"
-msgstr ""
+msgstr "prompt y últimas ejecuciones"
 
-#: lib/cortex_web/live/dashboard_live.ex:163
-#, elixir-autogen, elixir-format
-msgid "recurring agent jobs · fire while the server runs"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:320
+#: lib/cortex_web/live/channels_live.ex:83
 #, elixir-autogen, elixir-format
 msgid "sales"
-msgstr ""
+msgstr "ventas"
 
-#: lib/cortex_web/live/dashboard_live.ex:820
+#: lib/cortex_web/live/dash_data.ex:76
 #, elixir-autogen, elixir-format
 msgid "self"
-msgstr ""
+msgstr "él mismo"
 
-#: lib/cortex_web/live/dashboard_live.ex:332
+#: lib/cortex_web/live/channels_live.ex:64
+#: lib/cortex_web/live/channels_live.ex:93
 #, elixir-autogen, elixir-format
 msgid "the default agent"
-msgstr ""
+msgstr "el agente predeterminado"
 
-#: lib/cortex_web/live/dashboard_live.ex:310
+#: lib/cortex_web/live/channels_live.ex:52
 #, elixir-autogen, elixir-format
 msgid "token:"
-msgstr ""
+msgstr "token:"
 
-#: lib/cortex_web/live/dashboard_live.ex:602
+#: lib/cortex_web/live/chat_live.ex:116
 #, elixir-autogen, elixir-format
 msgid "tool?"
-msgstr ""
+msgstr "?"
 
-#: lib/cortex_web/live/dashboard_live.ex:135
-#, elixir-autogen, elixir-format
-msgid "what the agent has learned, newest first"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:324
+#: lib/cortex_web/live/channels_live.ex:86
 #, elixir-autogen, elixir-format
 msgid "— from @BotFather"
-msgstr ""
+msgstr "— de @BotFather"
 
-#: lib/cortex_web/live/dashboard_live.ex:222
+#: lib/cortex_web/live/scheduled_live.ex:71
 #, elixir-autogen, elixir-format
 msgid "— runs fresh each time, no chat memory"
-msgstr ""
+msgstr "— se ejecuta desde cero cada vez, sin memoria de chat"
 
-#: lib/cortex_web/live/dashboard_live.ex:395
+#: lib/cortex_web/live/agents_live.ex:82
 #, elixir-autogen, elixir-format
 msgid "— what this agent can do"
-msgstr ""
+msgstr "— lo que este agente puede hacer"
 
-#: lib/cortex_web/live/dashboard_live.ex:875
+#: lib/cortex_web/live/dash_data.ex:173
 #, elixir-autogen, elixir-format
 msgid "⚠ not set yet — export it before use."
-msgstr ""
+msgstr "⚠ aún no está definida — expórtala antes de usarla."
 
-#: lib/cortex_web/live/dashboard_live.ex:874
+#: lib/cortex_web/live/dash_data.ex:172
 #, elixir-autogen, elixir-format
 msgid "✓ it's set."
-msgstr ""
+msgstr "✓ está definida."
 
-#: lib/cortex_web/live/dashboard_live.ex:270
+#: lib/cortex_web/live/scheduled_live.ex:120
 #, elixir-autogen, elixir-format
 msgid "No Telegram chats yet — paste a chat id (find it with /whoami)"
-msgstr ""
+msgstr "Aún no hay chats de Telegram — pega un id de chat (encuéntralo con /whoami)"
 
-#: lib/cortex/gateways/telegram.ex:1018
-#, elixir-autogen, elixir-format
-msgid "🛠️ Working…"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:547
+#: lib/cortex_web/live/tool_servers_live.ex:64
 #, elixir-autogen, elixir-format
 msgid "+ New MCP server"
-msgstr ""
+msgstr "+ Nuevo servidor MCP"
 
-#: lib/cortex_web/live/dashboard_live.ex:557
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/tool_servers_live.ex:74
+#, elixir-autogen, elixir-format
 msgid "Arguments"
-msgstr "Agente"
+msgstr "Argumentos"
 
-#: lib/cortex_web/live/dashboard_live.ex:553
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/cortex_web/live/tool_servers_live.ex:70
+#, elixir-autogen, elixir-format
 msgid "Command"
-msgstr "Comandos:"
+msgstr "Comando"
 
-#: lib/cortex_web/live/dashboard_live.ex:538
+#: lib/cortex_web/live/tool_servers_live.ex:55
 #, elixir-autogen, elixir-format
 msgid "Grant an agent only the read tools (Agents tab → Tools) to keep it read-only."
-msgstr ""
+msgstr "Otorga a un agente solo las herramientas de lectura (pestaña Agentes → Herramientas) para mantenerlo de solo lectura."
 
-#: lib/cortex_web/live/dashboard_live.ex:82
-#, elixir-autogen, elixir-format
-msgid "MCP"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:978
+#: lib/cortex_web/live/tool_servers_live.ex:108
 #, elixir-autogen, elixir-format
 msgid "MCP server %{name} saved — validate it."
-msgstr ""
+msgstr "Servidor MCP %{name} guardado — valídalo."
 
-#: lib/cortex_web/live/dashboard_live.ex:517
-#, elixir-autogen, elixir-format
-msgid "MCP servers"
-msgstr ""
-
-#: lib/cortex_web/live/dashboard_live.ex:967
+#: lib/cortex_web/live/tool_servers_live.ex:97
 #, elixir-autogen, elixir-format
 msgid "Name and command are required."
-msgstr ""
+msgstr "El nombre y el comando son obligatorios."
 
-#: lib/cortex_web/live/dashboard_live.ex:544
+#: lib/cortex_web/live/tool_servers_live.ex:61
 #, elixir-autogen, elixir-format
 msgid "No MCP servers yet — add one below."
-msgstr ""
+msgstr "Aún no hay servidores MCP — agrega uno abajo."
 
-#: lib/cortex_web/live/dashboard_live.ex:559
+#: lib/cortex_web/live/tool_servers_live.ex:76
 #, elixir-autogen, elixir-format
 msgid "Put the token as ${ENV_VAR} — the secret stays out of the config file."
-msgstr ""
+msgstr "Pon el token como ${ENV_VAR} — el secreto se mantiene fuera del archivo de configuración."
 
-#: lib/cortex_web/live/dashboard_live.ex:528
+#: lib/cortex_web/live/tool_servers_live.ex:45
 #, elixir-autogen, elixir-format
 msgid "Remove MCP server %{name}?"
-msgstr ""
+msgstr "¿Eliminar el servidor MCP %{name}?"
 
-#: lib/cortex_web/live/dashboard_live.ex:527
+#: lib/cortex_web/live/tool_servers_live.ex:44
 #, elixir-autogen, elixir-format
 msgid "Validate (list tools)"
-msgstr ""
+msgstr "Validar (listar herramientas)"
 
-#: lib/cortex_web/live/dashboard_live.ex:532
+#: lib/cortex_web/live/tool_servers_live.ex:49
 #, elixir-autogen, elixir-format
 msgid "connecting…"
-msgstr ""
+msgstr "conectando…"
 
-#: lib/cortex_web/live/dashboard_live.ex:541
+#: lib/cortex_web/live/tool_servers_live.ex:58
 #, elixir-autogen, elixir-format
 msgid "couldn't connect — check the command and the env var token"
-msgstr ""
+msgstr "no se pudo conectar — revisa el comando y la env var del token"
 
-#: lib/cortex_web/live/dashboard_live.ex:518
-#, elixir-autogen, elixir-format
-msgid "external tool servers (Sentry, GitHub, …) · tokens as ${ENV_VAR}"
-msgstr ""
-
-#: lib/cortex/gateways/telegram.ex:821
+#: lib/cortex/gateways/telegram.ex:942
 #, elixir-autogen, elixir-format
 msgid "Install a skill from a URL, with a security review first."
-msgstr ""
+msgstr "Instalar una skill desde una URL, con una revisión de seguridad antes."
+
+#: lib/cortex_web/live/companies_live.ex:48
+#, elixir-autogen, elixir-format
+msgid "%{count} agents"
+msgstr "%{count} agentes"
+
+#: lib/cortex_web/live/companies_live.ex:101
+#: lib/cortex_web/live/companies_live.ex:112
+#, elixir-autogen, elixir-format
+msgid "(optional)"
+msgstr "(opcional)"
+
+#: lib/cortex_web/live/channels_live.ex:70
+#, elixir-autogen, elixir-format
+msgid "(or paste a new token)"
+msgstr "(o pega un nuevo token)"
+
+#: lib/cortex_web/live/companies_live.ex:40
+#: lib/cortex_web/live/companies_live.ex:76
+#: lib/cortex_web/live/dash_ui.ex:92
+#, elixir-autogen, elixir-format
+msgid "+ New company"
+msgstr "+ Nueva empresa"
+
+#: lib/cortex_web/live/models_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "+ New connection"
+msgstr "+ Nueva conexión"
+
+#: lib/cortex_web/live/tool_servers_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "+ New server"
+msgstr "+ Nuevo servidor"
+
+#: lib/cortex_web/live/scheduled_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" = 09:30 on weekdays. Invalid expressions are rejected."
+msgstr "5 campos: minuto hora día mes día-de-la-semana. Ej.: \"30 9 * * 1-5\" = 09:30 en días laborables. Las expresiones inválidas se rechazan."
+
+#: lib/cortex_web/live/companies_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "A company is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Root is the default, non-company workspace."
+msgstr "Una empresa es un workspace aislado (locatario): sus agentes, modelos y automatizaciones quedan separados de todos los demás. Raíz es el workspace por defecto, sin empresa."
+
+#: lib/cortex_web/live/companies_live.ex:106
+#, elixir-autogen, elixir-format
+msgid "Acme Inc — sales team"
+msgstr "Acme Inc — equipo de ventas"
+
+#: lib/cortex_web/live/dash_ui.ex:89
+#, elixir-autogen, elixir-format
+msgid "Add"
+msgstr "Agregar"
+
+#: lib/cortex_web/live/dash_data.ex:35
+#, elixir-autogen, elixir-format
+msgid "Agents · %{c}"
+msgstr "Agentes · %{c}"
+
+#: lib/cortex_web/live/dash_data.ex:34
+#, elixir-autogen, elixir-format
+msgid "Agents · Root"
+msgstr "Agentes · Raíz"
+
+#: lib/cortex_web/live/dash_ui.ex:79
+#, elixir-autogen, elixir-format
+msgid "All scopes"
+msgstr "Todos los ámbitos"
+
+#: lib/cortex_web/live/agents_live.ex:35
+#, elixir-autogen, elixir-format
+msgid "An agent is a persona (its instructions) bound to a model, with the tools it's allowed to use. Define who they are and what they can do."
+msgstr "Un agente es una persona (sus instrucciones) vinculada a un modelo, con las herramientas que puede usar. Define quiénes son y qué pueden hacer."
+
+#: lib/cortex_web/live/dash_ui.ex:109
+#, elixir-autogen, elixir-format
+msgid "Automation"
+msgstr "Automatización"
+
+#: lib/cortex_web/live/channels_live.ex:156
+#, elixir-autogen, elixir-format
+msgid "Bot %{name} saved."
+msgstr "Bot %{name} guardado."
+
+#: lib/cortex_web/live/dash_ui.ex:102
+#, elixir-autogen, elixir-format
+msgid "Build"
+msgstr "Construcción"
+
+#: lib/cortex_web/live/watches_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "Cancel watch %{name}?"
+msgstr "¿Cancelar el watch %{name}?"
+
+#: lib/cortex_web/live/channels_live.ex:33
+#: lib/cortex_web/live/dash_ui.ex:112
+#, elixir-autogen, elixir-format
+msgid "Channels"
+msgstr "Canales"
+
+#: lib/cortex_web/live/companies_live.ex:37
+#: lib/cortex_web/live/dash_ui.ex:103
+#, elixir-autogen, elixir-format
+msgid "Companies"
+msgstr "Empresas"
+
+#: lib/cortex_web/live/companies_live.ex:184
+#, elixir-autogen, elixir-format
+msgid "Company %{name} created."
+msgstr "Empresa %{name} creada."
+
+#: lib/cortex_web/live/companies_live.ex:160
+#, elixir-autogen, elixir-format
+msgid "Company %{name} removed."
+msgstr "Empresa %{name} eliminada."
+
+#: lib/cortex_web/live/dash_ui.ex:121
+#, elixir-autogen, elixir-format
+msgid "Config file"
+msgstr "Archivo de configuración"
+
+#: lib/cortex_web/live/config_live.ex:70
+#, elixir-autogen, elixir-format
+msgid "Config saved."
+msgstr "Configuración guardada."
+
+#: lib/cortex_web/live/config_live.ex:34
+#, elixir-autogen, elixir-format
+msgid "Configuration file"
+msgstr "Archivo de configuración"
+
+#: lib/cortex_web/live/channels_live.ex:34
+#, elixir-autogen, elixir-format
+msgid "Connect your agents to messaging channels so people can chat with them. Telegram is available now — Slack and others are coming."
+msgstr "Conecta tus agentes a canales de mensajería para que la gente pueda chatear con ellos. Telegram ya está disponible — Slack y otros están por llegar."
+
+#: lib/cortex_web/live/dash_ui.ex:98
+#, elixir-autogen, elixir-format
+msgid "Conversation"
+msgstr "Conversación"
+
+#: lib/cortex_web/live/scheduled_live.ex:83
+#, elixir-autogen, elixir-format
+msgid "Custom…"
+msgstr "Personalizado…"
+
+#: lib/cortex_web/live/companies_live.ex:56
+#, elixir-autogen, elixir-format
+msgid "Delete company %{name} and its %{count} agents? Their workspaces stay on disk."
+msgstr "¿Eliminar la empresa %{name} y sus %{count} agentes? Sus workspaces permanecen en el disco."
+
+#: lib/cortex_web/live/companies_live.ex:101
+#, elixir-autogen, elixir-format
+msgid "Description"
+msgstr "Descripción"
+
+#: lib/cortex_web/live/chat_live.ex:71
+#, elixir-autogen, elixir-format
+msgid "Every conversation — web, Telegram, API and console — appears here."
+msgstr "Todas las conversaciones — web, Telegram, API y consola — aparecen aquí."
+
+#: lib/cortex_web/live/tool_servers_live.ex:35
+#, elixir-autogen, elixir-format
+msgid "Give agents extra abilities from external tool servers — MCP (Sentry, GitHub, …). Keep secrets safe by writing tokens as ${ENV_VAR}."
+msgstr "Dale a los agentes capacidades extra desde servidores de herramientas externos — MCP (Sentry, GitHub, …). Mantén los secretos seguros escribiendo los tokens como ${ENV_VAR}."
+
+#: lib/cortex_web/live/dash_ui.ex:115
+#, elixir-autogen, elixir-format
+msgid "Insight"
+msgstr "Insights"
+
+#: lib/cortex_web/live/config_live.ex:78
+#, elixir-autogen, elixir-format
+msgid "Invalid JSON: %{msg}"
+msgstr "JSON inválido: %{msg}"
+
+#: lib/cortex_web/live/companies_live.ex:191
+#, elixir-autogen, elixir-format
+msgid "Invalid name — use letters, digits, - and _."
+msgstr "Nombre inválido — usa letras, dígitos, - y _."
+
+#: lib/cortex_web/live/config_live.ex:101
+#: lib/cortex_web/live/dash_data.ex:215
+#, elixir-autogen, elixir-format
+msgid "Invalid or duplicate company name."
+msgstr "Nombre de empresa inválido o duplicado."
+
+#: lib/cortex_web/live/dash_ui.ex:116
+#: lib/cortex_web/live/learning_live.ex:41
+#, elixir-autogen, elixir-format
+msgid "Learning"
+msgstr "Aprendizaje"
+
+#: lib/cortex_web/live/companies_live.ex:90
+#, elixir-autogen, elixir-format
+msgid "Letters, digits, - and _ only. Becomes the prefix for its agents (e.g. acme/sales)."
+msgstr "Solo letras, dígitos, - y _. Se convierte en el prefijo de sus agentes (ej.: acme/sales)."
+
+#: lib/cortex_web/live/dash_ui.ex:125
+#, elixir-autogen, elixir-format
+msgid "Local dashboard · localhost"
+msgstr "Panel local · localhost"
+
+#: lib/cortex_web/live/scheduled_live.ex:174
+#, elixir-autogen, elixir-format
+msgid "Name and what-to-do are required."
+msgstr "El nombre y qué hacer son obligatorios."
+
+#: lib/cortex_web/live/chat_live.ex:68
+#: lib/cortex_web/live/chat_live.ex:146
+#, elixir-autogen, elixir-format
+msgid "New chat"
+msgstr "Nueva conversación"
+
+#: lib/cortex_web/live/companies_live.ex:71
+#, elixir-autogen, elixir-format
+msgid "No companies yet — everything lives in the root workspace. Create one to isolate a client or team."
+msgstr "Aún no hay empresas — todo vive en el workspace raíz. Crea una para aislar un cliente o equipo."
+
+#: lib/cortex_web/live/chat_live.ex:89
+#, elixir-autogen, elixir-format
+msgid "No conversations yet. Start one with “New chat”."
+msgstr "Aún no hay conversaciones. Empieza una con “Nueva conversación”."
+
+#: lib/cortex_web/live/watches_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "No watches. Ask an agent to \"notify me when …\" from chat."
+msgstr "Ningún watch. Pide a un agente que \"me avise cuando …\" desde el chat."
+
+#: lib/cortex_web/live/watches_live.ex:33
+#, elixir-autogen, elixir-format
+msgid "One-shot “notify me when X happens”. A watch checks a condition on a timer, messages you once when it's met, then stops. Create them from chat."
+msgstr "“Avísame cuando pase X”, de una sola vez. Un watch revisa una condición periódicamente, te avisa una vez que se cumple, y luego se detiene. Créalos desde el chat."
+
+#: lib/cortex_web/live/companies_live.ex:51
+#, elixir-autogen, elixir-format
+msgid "Open"
+msgstr "Abrir"
+
+#: lib/cortex_web/live/watches_live.ex:47
+#, elixir-autogen, elixir-format
+msgid "Pause"
+msgstr "Pausar"
+
+#: lib/cortex_web/live/dash_ui.ex:85
+#, elixir-autogen, elixir-format
+msgid "Pick a company to see and configure only its agents, models and automations."
+msgstr "Elige una empresa para ver y configurar solo sus agentes, modelos y automatizaciones."
+
+#: lib/cortex_web/live/chat_live.ex:145
+#, elixir-autogen, elixir-format
+msgid "Pick a conversation on the left, or start a new one to talk to your agent."
+msgstr "Elige una conversación a la izquierda, o inicia una nueva para hablar con tu agente."
+
+#: lib/cortex_web/live/scheduled_live.ex:34
+#, elixir-autogen, elixir-format
+msgid "Recurring jobs: an agent runs a fixed instruction on a schedule and reports the result. They fire while the server is running."
+msgstr "Trabajos recurrentes: un agente ejecuta una instrucción fija según una programación y reporta el resultado. Se disparan mientras el servidor está en ejecución."
+
+#: lib/cortex_web/live/config_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "Reload from disk"
+msgstr "Recargar desde el disco"
+
+#: lib/cortex_web/live/watches_live.ex:48
+#, elixir-autogen, elixir-format
+msgid "Resume"
+msgstr "Reanudar"
+
+#: lib/cortex_web/live/dash_ui.ex:80
+#, elixir-autogen, elixir-format
+msgid "Root (no company)"
+msgstr "Raíz (sin empresa)"
+
+#: lib/cortex_web/live/config_live.ex:48
+#, elixir-autogen, elixir-format
+msgid "Save config"
+msgstr "Guardar configuración"
+
+#: lib/cortex_web/live/learning_live.ex:116
+#, elixir-autogen, elixir-format
+msgid "Saved %{title}."
+msgstr "%{title} guardado."
+
+#: lib/cortex_web/live/config_live.ex:50
+#, elixir-autogen, elixir-format
+msgid "Saving replaces the whole file. Invalid JSON is rejected."
+msgstr "Guardar reemplaza todo el archivo. El JSON inválido se rechaza."
+
+#: lib/cortex_web/live/dash_ui.ex:110
+#, elixir-autogen, elixir-format
+msgid "Scheduled"
+msgstr "Programado"
+
+#: lib/cortex_web/live/dash_ui.ex:120
+#, elixir-autogen, elixir-format
+msgid "System"
+msgstr "Sistema"
+
+#: lib/cortex_web/live/companies_live.ex:187
+#, elixir-autogen, elixir-format
+msgid "That company already exists."
+msgstr "Esa empresa ya existe."
+
+#: lib/cortex_web/live/models_live.ex:116
+#, elixir-autogen, elixir-format
+msgid "The AI providers your agents run on — any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model…). Pick a provider and we fill in the rest."
+msgstr "Los proveedores de IA en los que se ejecutan tus agentes — cualquier endpoint compatible con OpenAI (OpenAI, OpenRouter, un modelo local…). Elige un proveedor y completamos el resto."
+
+#: lib/cortex_web/live/config_live.ex:35
+#, elixir-autogen, elixir-format
+msgid "The raw config.json the runtime reads. Edit and save — it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw)."
+msgstr "El config.json crudo que lee el runtime. Edítalo y guárdalo — primero se valida como JSON, así que un archivo roto se rechaza. Los secretos se mantienen como referencias ${ENV_VAR}, resueltas al leer (nunca guardadas en crudo)."
+
+#: lib/cortex_web/live/config_live.ex:74
+#, elixir-autogen, elixir-format
+msgid "The top level must be a JSON object { … }."
+msgstr "El nivel superior debe ser un objeto JSON { … }."
+
+#: lib/cortex_web/live/channels_live.ex:71
+#, elixir-autogen, elixir-format
+msgid "Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file."
+msgstr "Consejo: usa una referencia de variable de entorno como ${MY_BOT_TOKEN} para mantener el secreto fuera del archivo de configuración."
+
+#: lib/cortex_web/live/dash_ui.ex:111
+#: lib/cortex_web/live/watches_live.ex:32
+#, elixir-autogen, elixir-format
+msgid "Watches"
+msgstr "Watches"
+
+#: lib/cortex_web/live/learning_live.ex:42
+#, elixir-autogen, elixir-format
+msgid "What this agent has picked up — skills it can run and memory it saved, newest first. Click any item to read and edit it."
+msgstr "Lo que este agente ha aprendido — skills que puede ejecutar y memoria que guardó, lo más reciente primero. Haz clic en cualquier elemento para leerlo y editarlo."
+
+#: lib/cortex_web/live/dash_ui.ex:75
+#, elixir-autogen, elixir-format
+msgid "Workspace"
+msgstr "Workspace"
+
+#: lib/cortex_web/live/dash_ui.ex:69
+#, elixir-autogen, elixir-format
+msgid "agent runtime"
+msgstr "runtime de agentes"
+
+#: lib/cortex/gateways/telegram.ex:1174
+#, elixir-autogen, elixir-format
+msgid "checking with another agent…"
+msgstr "consultando con otro agente…"
+
+#: lib/cortex_web/live/watches_live.ex:53
+#, elixir-autogen, elixir-format
+msgid "checks"
+msgstr "verificaciones"
+
+#: lib/cortex_web/live/dash_ui.ex:88
+#, elixir-autogen, elixir-format
+msgid "company name"
+msgstr "nombre de la empresa"
+
+#: lib/cortex_web/live/learning_live.ex:143
+#, elixir-autogen, elixir-format
+msgid "editing the built-in — saving creates your own copy"
+msgstr "editando el integrado — guardar crea tu propia copia"
+
+#: lib/cortex_web/live/watches_live.ex:53
+#, elixir-autogen, elixir-format
+msgid "every"
+msgstr "cada"
+
+#: lib/cortex/gateways/telegram.ex:1165
+#, elixir-autogen, elixir-format
+msgid "fetching a page…"
+msgstr "obteniendo una página…"
+
+#: lib/cortex_web/live/watches_live.ex:44
+#, elixir-autogen, elixir-format
+msgid "fired · delivering"
+msgstr "disparado · entregando"
+
+#: lib/cortex/gateways/telegram.ex:1162
+#, elixir-autogen, elixir-format
+msgid "looking things up…"
+msgstr "buscando información…"
+
+#: lib/cortex/gateways/telegram.ex:1168
+#, elixir-autogen, elixir-format
+msgid "running something…"
+msgstr "ejecutando algo…"
+
+#: lib/cortex/gateways/telegram.ex:1177
+#, elixir-autogen, elixir-format
+msgid "using a connected tool…"
+msgstr "usando una herramienta conectada…"
+
+#: lib/cortex/gateways/telegram.ex:1180
+#, elixir-autogen, elixir-format
+msgid "working on it…"
+msgstr "trabajando en ello…"
+
+#: lib/cortex/gateways/telegram.ex:1171
+#, elixir-autogen, elixir-format
+msgid "working with files…"
+msgstr "trabajando con archivos…"
+
+#: lib/cortex_web/live/channels_live.ex:69
+#, elixir-autogen, elixir-format
+msgid "— leave blank to keep the current one"
+msgstr "— deja en blanco para mantener el actual"
+
+#: lib/cortex_web/live/learning_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "← Back"
+msgstr "← Atrás"
+
+#: lib/cortex_web/live/companies_live.ex:206
+#, elixir-autogen, elixir-format
+msgid "Company %{name} updated."
+msgstr "Empresa %{name} actualizada."
+
+#: lib/cortex_web/live/companies_live.ex:59
+#, elixir-autogen, elixir-format
+msgid "Delete"
+msgstr "Eliminar"
+
+#: lib/cortex_web/live/companies_live.ex:94
+#, elixir-autogen, elixir-format
+msgid "The name can't change — it keys every agent, workspace and binding in this company."
+msgstr "El nombre no puede cambiar: es la clave de cada agente, workspace y vínculo de esta empresa."
+
+#: lib/cortex_web/live/dash_data.ex:262
+#, elixir-autogen, elixir-format
+msgid "%{count} live prices · refreshed %{date}"
+msgstr "%{count} precios en tiempo real · actualizado el %{date}"
+
+#: lib/cortex_web/live/models_live.ex:37
+#: lib/cortex_web/live/models_live.ex:41
+#, elixir-autogen, elixir-format
+msgid "/ 1M tok"
+msgstr "/ 1M tok"
+
+#: lib/cortex_web/live/companies_live.ex:112
+#, elixir-autogen, elixir-format
+msgid "Billing markup"
+msgstr "Markup de facturación"
+
+#: lib/cortex_web/live/usage_live.ex:122
+#, elixir-autogen, elixir-format
+msgid "By agent"
+msgstr "Por agente"
+
+#: lib/cortex_web/live/usage_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "By company"
+msgstr "Por empresa"
+
+#: lib/cortex_web/live/usage_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "By cycle"
+msgstr "Por ciclo"
+
+#: lib/cortex_web/live/usage_live.ex:120
+#, elixir-autogen, elixir-format
+msgid "By model"
+msgstr "Por modelo"
+
+#: lib/cortex_web/live/usage_live.ex:80
+#, elixir-autogen, elixir-format
+msgid "Calls"
+msgstr "Llamadas"
+
+#: lib/cortex_web/live/usage_live.ex:96
+#, elixir-autogen, elixir-format
+msgid "Cost"
+msgstr "Costo"
+
+#: lib/cortex_web/live/usage_live.ex:194
+#, elixir-autogen, elixir-format
+msgid "Couldn't refresh prices — check the connection."
+msgstr "No se pudieron actualizar los precios — revisa la conexión."
+
+#: lib/cortex_web/live/usage_live.ex:69
+#: lib/cortex_web/live/usage_live.ex:92
+#, elixir-autogen, elixir-format
+msgid "Cycle"
+msgstr "Ciclo"
+
+#: lib/cortex_web/live/dash_data.ex:225
+#, elixir-autogen, elixir-format
+msgid "Day"
+msgstr "Día"
+
+#: lib/cortex_web/live/dash_data.ex:224
+#, elixir-autogen, elixir-format
+msgid "Hour"
+msgstr "Hora"
+
+#: lib/cortex_web/live/usage_live.ex:93
+#, elixir-autogen, elixir-format
+msgid "Input"
+msgstr "Entrada"
+
+#: lib/cortex_web/live/models_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "Input price"
+msgstr "Precio de entrada"
+
+#: lib/cortex_web/live/dash_data.ex:227
+#, elixir-autogen, elixir-format
+msgid "Month"
+msgstr "Mes"
+
+#: lib/cortex_web/live/companies_live.ex:116
+#, elixir-autogen, elixir-format
+msgid "Multiplier applied to provider cost to get the amount to bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost."
+msgstr "Multiplicador aplicado al costo del proveedor para obtener el monto a facturar (ej.: 1.3 = +30%). En blanco = facturar exactamente el costo del proveedor."
+
+#: lib/cortex_web/live/usage_live.ex:110
+#, elixir-autogen, elixir-format
+msgid "No usage recorded yet for this scope."
+msgstr "Aún no hay uso registrado para este ámbito."
+
+#: lib/cortex_web/live/usage_live.ex:94
+#, elixir-autogen, elixir-format
+msgid "Output"
+msgstr "Salida"
+
+#: lib/cortex_web/live/models_live.ex:41
+#, elixir-autogen, elixir-format
+msgid "Output price"
+msgstr "Precio de salida"
+
+#: lib/cortex_web/live/models_live.ex:45
+#, elixir-autogen, elixir-format
+msgid "Per 1M tokens, in %{currency}. Leave blank to use the known/auto price for this model."
+msgstr "Por 1M de tokens, en %{currency}. Déjalo en blanco para usar el precio conocido/automático de este modelo."
+
+#: lib/cortex_web/live/usage_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "Provider cost"
+msgstr "Costo del proveedor"
+
+#: lib/cortex_web/live/usage_live.ex:62
+#, elixir-autogen, elixir-format
+msgid "Refresh prices"
+msgstr "Actualizar precios"
+
+#: lib/cortex_web/live/usage_live.ex:191
+#, elixir-autogen, elixir-format
+msgid "Refreshed %{count} live prices."
+msgstr "%{count} precios en tiempo real actualizados."
+
+#: lib/cortex_web/live/usage_live.ex:82
+#: lib/cortex_web/live/usage_live.ex:97
+#, elixir-autogen, elixir-format
+msgid "To bill"
+msgstr "A facturar"
+
+#: lib/cortex_web/live/usage_live.ex:57
+#, elixir-autogen, elixir-format
+msgid "Tokens metered per company, agent and model, by cycle. Cost uses each model's price; the amount to bill adds the company's markup. Prices are editable per model."
+msgstr "Tokens medidos por empresa, agente y modelo, por ciclo. El costo usa el precio de cada modelo; el monto a facturar suma el markup de la empresa. Los precios son editables por modelo."
+
+#: lib/cortex_web/live/usage_live.ex:95
+#, elixir-autogen, elixir-format
+msgid "Total"
+msgstr "Total"
+
+#: lib/cortex_web/live/usage_live.ex:79
+#, elixir-autogen, elixir-format
+msgid "Total tokens"
+msgstr "Total de tokens"
+
+#: lib/cortex_web/live/dash_ui.ex:117
+#: lib/cortex_web/live/usage_live.ex:56
+#, elixir-autogen, elixir-format
+msgid "Usage & billing"
+msgstr "Uso y facturación"
+
+#: lib/cortex_web/live/dash_data.ex:226
+#, elixir-autogen, elixir-format
+msgid "Week"
+msgstr "Semana"
+
+#: lib/cortex_web/live/dash_data.ex:228
+#, elixir-autogen, elixir-format
+msgid "Year"
+msgstr "Año"
+
+#: lib/cortex_web/live/models_live.ex:64
+#, elixir-autogen, elixir-format
+msgid "auto price · in %{in} · out %{out}"
+msgstr "precio automático · entrada %{in} · salida %{out}"
+
+#: lib/cortex_web/live/companies_live.ex:66
+#, elixir-autogen, elixir-format
+msgid "markup ×%{m}"
+msgstr "markup ×%{m}"
+
+#: lib/cortex_web/live/models_live.ex:70
+#, elixir-autogen, elixir-format
+msgid "no price — set one to bill for this model"
+msgstr "sin precio — define uno para facturar este modelo"
+
+#: lib/cortex_web/live/usage_live.ex:161
+#, elixir-autogen, elixir-format
+msgid "nothing yet"
+msgstr "nada todavía"
+
+#: lib/cortex_web/live/models_live.ex:74
+#, elixir-autogen, elixir-format
+msgid "price · in %{in} · out %{out}"
+msgstr "precio · entrada %{in} · salida %{out}"
+
+#: lib/cortex_web/live/usage_live.ex:62
+#, elixir-autogen, elixir-format
+msgid "refreshing…"
+msgstr "actualizando…"
+
+#: lib/cortex_web/live/dash_data.ex:258
+#, elixir-autogen, elixir-format
+msgid "using built-in seed prices — never refreshed"
+msgstr "usando precios base integrados — nunca actualizado"

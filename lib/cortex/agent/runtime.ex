@@ -87,7 +87,7 @@ defmodule Cortex.Agent.Runtime do
   defp loop(agent, chain, messages, specs, ctx, opts, iterations_left) do
     chat_opts = [tools: specs, temperature: agent.temperature]
 
-    result = chat_with_failover(chain, messages, chat_opts, opts)
+    result = chat_with_failover(chain, messages, chat_opts, ctx, opts)
 
     case result do
       {:ok, %{tool_calls: tool_calls} = res} when tool_calls != [] ->
@@ -114,7 +114,7 @@ defmodule Cortex.Agent.Runtime do
   # Try each model in the chain; advance ONLY on transient failures (rate limit,
   # server error, network) — auth/request errors fail fast (a bad key on model B
   # won't be fixed by model C's endpoint, and 4xx would just repeat).
-  defp chat_with_failover([model | rest], messages, chat_opts, opts) do
+  defp chat_with_failover([model | rest], messages, chat_opts, ctx, opts) do
     result =
       if opts[:stream] do
         on_delta = fn text -> emit(opts, {:assistant_delta, text}) end
@@ -133,15 +133,28 @@ defmodule Cortex.Agent.Runtime do
           )
 
           emit(opts, {:failover, model.name, hd(rest).name})
-          chat_with_failover(rest, messages, chat_opts, opts)
+          chat_with_failover(rest, messages, chat_opts, ctx, opts)
         else
           error
         end
 
-      ok ->
+      {:ok, res} = ok ->
+        record_usage(ctx, model, res[:usage], opts)
         ok
     end
   end
+
+  # Meter tokens for billing, attributed to the agent's company (the model call is
+  # the single choke point every surface flows through). Best-effort: a metering
+  # failure must never break the conversation.
+  defp record_usage(%{agent: %{name: name}}, model, usage, opts) when is_map(usage) do
+    Cortex.Usage.record(name, model.name, usage)
+    emit(opts, {:usage, model.name, usage})
+  rescue
+    _ -> :ok
+  end
+
+  defp record_usage(_ctx, _model, _usage, _opts), do: :ok
 
   defp transient?(%Req.TransportError{}), do: true
   defp transient?(%{reason: :timeout}), do: true

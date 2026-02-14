@@ -26,14 +26,29 @@ defmodule Cortex.Cron.Scheduler do
   @impl true
   def init(_opts) do
     schedule_tick()
-    {:ok, %{fired: %{}}}
+    {:ok, %{fired: %{}, price_check: 0}}
   end
 
   @impl true
   def handle_info(:tick, state) do
     fired = Enum.reduce(Config.crons(), state.fired, &maybe_fire/2)
+    price_check = maybe_refresh_prices(state.price_check)
     schedule_tick()
-    {:noreply, %{state | fired: fired}}
+    {:noreply, %{state | fired: fired, price_check: price_check}}
+  end
+
+  # Piggyback the weekly billing price-cache refresh on the tick — attempted at most
+  # hourly, and only here (this scheduler runs only while a server surface is up).
+  # `Cortex.Pricing` no-ops unless the cache is actually stale.
+  defp maybe_refresh_prices(next_at) do
+    now = System.system_time(:second)
+
+    if now >= next_at do
+      Task.start(&Cortex.Pricing.maybe_auto_refresh/0)
+      now + 3600
+    else
+      next_at
+    end
   end
 
   # Disabled jobs never fire; enabled jobs fire once per matching minute.

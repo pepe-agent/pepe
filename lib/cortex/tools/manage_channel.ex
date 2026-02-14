@@ -55,6 +55,10 @@ defmodule Cortex.Tools.ManageChannel do
       - set_heartbeat: enable/tune the bot's proactive heartbeat — needs `name`; \
         `heartbeat_minutes` (integer, how often to check; omit/0 disables it) and \
         optional `heartbeat_hours` ("8-22", quiet outside that local-hour window).
+      - set_progress: how the bot signals "I'm working" while running — needs `name` \
+        and `mode`: "reaction" (default — a 👀 reaction on the user's message, no text), \
+        "ambient" (one vague activity line), "off" (just the typing indicator), or \
+        "verbose" (a per-tool breadcrumb list).
       - enable / disable / remove: needs `name`.
       """,
       %{
@@ -62,8 +66,14 @@ defmodule Cortex.Tools.ManageChannel do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(add list set_agent set_trainers set_heartbeat enable disable remove),
+            "enum" =>
+              ~w(add list set_agent set_trainers set_heartbeat set_progress enable disable remove),
             "description" => "What to do."
+          },
+          "mode" => %{
+            "type" => "string",
+            "enum" => ~w(reaction ambient off verbose),
+            "description" => "For set_progress: how much working activity to show."
           },
           "name" => %{"type" => "string", "description" => "The bot's name (never \"default\")."},
           "token_env" => %{
@@ -102,6 +112,7 @@ defmodule Cortex.Tools.ManageChannel do
   defp dispatch("set_agent", args), do: set_agent(args)
   defp dispatch("set_trainers", args), do: set_trainers(args)
   defp dispatch("set_heartbeat", args), do: set_heartbeat(args)
+  defp dispatch("set_progress", args), do: set_progress(args)
   defp dispatch("enable", args), do: toggle(args, true)
   defp dispatch("disable", args), do: toggle(args, false)
   defp dispatch("remove", args), do: remove(args)
@@ -191,6 +202,24 @@ defmodule Cortex.Tools.ManageChannel do
       {:ok, "Bot #{name} heartbeat: #{state}."}
     end
   end
+
+  defp set_progress(args) do
+    with {:ok, name} <- fetch(args, "name"),
+         {:ok, mode} <- fetch(args, "mode"),
+         :ok <- validate_progress(mode),
+         {:ok, bot} <- fetch_bot(name) do
+      save_bot(name, Map.put(bot, "tool_progress", mode))
+      reload()
+      {:ok, "Bot #{name} activity display: #{mode}."}
+    end
+  end
+
+  defp validate_progress(m) when m in ~w(reaction ambient off verbose), do: :ok
+  defp validate_progress(_), do: {:error, "mode must be reaction, ambient, off or verbose"}
+
+  # The default bot lives in the "telegram" map; named bots in "telegrams".
+  defp save_bot("default", bot), do: Config.put_telegram(Map.delete(bot, "name"))
+  defp save_bot(name, bot), do: Config.put_telegram_bot(name, bot)
 
   defp parse_hours(nil), do: :skip
   defp parse_hours(""), do: :clear

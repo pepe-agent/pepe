@@ -22,18 +22,35 @@ defmodule CortexWeb.Router do
     plug :put_secure_browser_headers
   end
 
-  # The web dashboard (LiveView): sessions list + chat.
-  scope "/", CortexWeb do
-    pipe_through :browser
-
-    live "/", DashboardLive, :index
-  end
-
   scope "/", CortexWeb do
     pipe_through :api
 
     get "/health", HealthController, :index
     get "/healthz", HealthController, :index
+  end
+
+  # The web dashboard. Each section is a clean path; a specific conversation adds
+  # `?chat=<key>` (session keys carry ":", so they ride in the query). The section is
+  # carried by the live_action.
+  scope "/", CortexWeb do
+    pipe_through :browser
+
+    # One on_mount hook applies the configured locale to every dashboard LiveView, so
+    # no LiveView repeats Config.put_locale/0 in its mount.
+    live_session :dashboard, on_mount: {CortexWeb.LiveLocale, :default} do
+      live "/", ChatLive
+      live "/chat", ChatLive
+      live "/companies", CompaniesLive
+      live "/agents", AgentsLive
+      live "/models", ModelsLive
+      live "/bots", ChannelsLive
+      live "/cron", ScheduledLive
+      live "/watches", WatchesLive
+      live "/learn", LearningLive
+      live "/usage", UsageLive
+      live "/mcp", ToolServersLive
+      live "/config", ConfigLive
+    end
   end
 
   # OpenAI-compatible API surface.
