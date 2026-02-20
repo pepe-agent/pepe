@@ -8,7 +8,7 @@ admin scope — see below).
 
 - **name**, **model** (a configured connection; blank = default model).
 - **persona** — the system prompt. Stored as `SOUL.md` in the agent's workspace
-  (`~/.cortex/agents/<name>/`); falls back to the config `system_prompt` seed.
+  (`~/.pepe/agents/<name>/`); falls back to the config `system_prompt` seed.
 - **tools** — the allowlist. A capability = having its tool. Includes built-ins,
   `mcp__<server>__<tool>` MCP tools, and plugin tools.
 - **can_message** — directed routing: which agents it may message.
@@ -33,4 +33,4 @@ admin scope — see below).
 - **`["*"]`** → every agent (an explicit super-admin).
 
 An agent can only `manage_agent` a target inside its `can_manage`. Authority defaults
-to closed. Grant it deliberately (CLI: `mix cortex agent manage ADMIN TARGET`).
+to closed. Grant it deliberately (CLI: `mix pepe agent manage ADMIN TARGET`).

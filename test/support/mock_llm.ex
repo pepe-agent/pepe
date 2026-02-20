@@ -1,4 +1,4 @@
-defmodule Cortex.Test.MockLLM do
+defmodule Pepe.Test.MockLLM do
   @moduledoc """
   A tiny OpenAI-compatible `/chat/completions` server for tests.
 

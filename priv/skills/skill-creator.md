@@ -2,13 +2,13 @@ Use when asked to create, edit, audit, tidy, or improve a skill.
 
 A **skill** is a short Markdown file that teaches you (the agent) *how to use the
 tools* to handle a recurring kind of request — when to act and exactly what to do.
-Skills are how Cortex grows new know-how without new code.
+Skills are how Pepe grows new know-how without new code.
 
-## How skills work in Cortex (read this first)
+## How skills work in Pepe (read this first)
 
 - One skill = one Markdown file, named in `kebab-case`, e.g. `read-pdf.md`.
 - It lives in your skills space: write it with `write_file` to `skills/<name>.md`
-  (that resolves to `~/.cortex/skills/`). Built-in skills ship read-only; a user
+  (that resolves to `~/.pepe/skills/`). Built-in skills ship read-only; a user
   skill of the same name overrides one.
 - **The first non-empty line is the summary.** Only the *name + that one line* are
   ever shown to you automatically (in your skills list). The full body is read **on

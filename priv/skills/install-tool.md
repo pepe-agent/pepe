@@ -1,15 +1,15 @@
 How to install a new tool/capability when the user asks you to add or install one.
 
-You can gain new tools at runtime as "plugins" — no changes to Cortex's code and no
+You can gain new tools at runtime as "plugins" — no changes to Pepe's code and no
 restart. Follow these steps:
 
-1. Write the tool as an Elixir module implementing the `Cortex.Tools.Tool` behaviour
+1. Write the tool as an Elixir module implementing the `Pepe.Tools.Tool` behaviour
    (`name/0`, `spec/0`, `run/2`) and save it with `write_file` to
    `plugins/<name>.exs`. Use this shape:
 
-       defmodule CortexPlugins.Weather do
-         @behaviour Cortex.Tools.Tool
-         import Cortex.Tools.Tool, only: [function: 3]
+       defmodule PepePlugins.Weather do
+         @behaviour Pepe.Tools.Tool
+         import Pepe.Tools.Tool, only: [function: 3]
 
          def name, do: "weather"
 

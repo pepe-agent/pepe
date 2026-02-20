@@ -12,21 +12,20 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/cortex start
+#     PHX_SERVER=true bin/pepe start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :cortex, CortexWeb.Endpoint, server: true
+  config :pepe, PepeWeb.Endpoint, server: true
 end
 
-config :cortex, CortexWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+config :pepe, PepeWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
-  # Cortex ships as a standalone CLI (escript / Burrito release) and keeps **no
+  # Pepe ships as a standalone CLI (escript / Burrito release) and keeps **no
   # database** (`ecto_repos: []`), so we never require DATABASE_URL. The HTTP
-  # endpoint is only used by `cortex serve`; it signs no persistent cookies, so a
+  # endpoint is only used by `pepe serve`; it signs no persistent cookies, so a
   # random per-run secret is fine when SECRET_KEY_BASE isn't provided. This keeps
   # the distributed binary runnable with zero environment setup.
   secret_key_base =
@@ -34,9 +33,9 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "localhost"
 
-  config :cortex, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :pepe, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :cortex, CortexWeb.Endpoint,
+  config :pepe, PepeWeb.Endpoint,
     url: [host: host],
     secret_key_base: secret_key_base
 
@@ -45,7 +44,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :cortex, CortexWeb.Endpoint,
+  #     config :pepe, PepeWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -67,7 +66,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :cortex, CortexWeb.Endpoint,
+  #     config :pepe, PepeWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
@@ -77,7 +76,7 @@ if config_env() == :prod do
   # In production you need to configure the mailer to use a different adapter.
   # Here is an example configuration for Mailgun:
   #
-  #     config :cortex, Cortex.Mailer,
+  #     config :pepe, Pepe.Mailer,
   #       adapter: Swoosh.Adapters.Mailgun,
   #       api_key: System.get_env("MAILGUN_API_KEY"),
   #       domain: System.get_env("MAILGUN_DOMAIN")

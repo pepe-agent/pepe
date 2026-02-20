@@ -1,9 +1,9 @@
-defmodule Cortex.MixProject do
+defmodule Pepe.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :cortex,
+      app: :pepe,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -17,10 +17,10 @@ defmodule Cortex.MixProject do
     ]
   end
 
-  # Standalone `cortex` executable, built with `mix escript.build`.
+  # Standalone `pepe` executable, built with `mix escript.build`.
   # Requires Erlang/Elixir on the target machine (used for dev / hackers).
   defp escript do
-    [main_module: Cortex.CLI, name: "cortex"]
+    [main_module: Pepe.CLI, name: "pepe"]
   end
 
   # Self-contained, runtime-bundled binaries built with Burrito (Zig under the
@@ -31,7 +31,7 @@ defmodule Cortex.MixProject do
   #     BURRITO_TARGET=macos_arm MIX_ENV=prod mix release   # a single target
   defp releases do
     [
-      cortex: [
+      pepe: [
         steps: [:assemble, &Burrito.wrap/1],
         burrito: [
           targets: [
@@ -51,7 +51,7 @@ defmodule Cortex.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Cortex.Application, []},
+      mod: {Pepe.Application, []},
       extra_applications: [:logger, :runtime_tools, :mnesia]
     ]
   end
@@ -114,10 +114,10 @@ defmodule Cortex.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind cortex", "esbuild cortex"],
+      "assets.build": ["compile", "tailwind pepe", "esbuild pepe"],
       "assets.deploy": [
-        "tailwind cortex --minify",
-        "esbuild cortex --minify",
+        "tailwind pepe --minify",
+        "esbuild pepe --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

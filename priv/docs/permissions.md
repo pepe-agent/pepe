@@ -1,6 +1,6 @@
-# Permissions — how Cortex decides what a tool may do
+# Permissions — how Pepe decides what a tool may do
 
-Cortex asks the user before a **risky** tool runs, so an agent can be autonomous
+Pepe asks the user before a **risky** tool runs, so an agent can be autonomous
 without being dangerous.
 
 ## The layers

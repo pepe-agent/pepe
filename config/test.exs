@@ -5,23 +5,23 @@ import Config
 # The MIX_TEST_PARTITION environment variable can be used
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
-config :cortex, Cortex.Repo,
+config :pepe, Pepe.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "cortex_test#{System.get_env("MIX_TEST_PARTITION")}",
+  database: "pepe_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
-config :cortex, CortexWeb.Endpoint,
+config :pepe, PepeWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "wv4Gwv4ze6r8+JmDuAAyC6KEBvJR2a1iJ3BNkvSTB31Dkc2lfyu6jPHRcxx5aUkv",
   server: false
 
 # In test we don't send emails
-config :cortex, Cortex.Mailer, adapter: Swoosh.Adapters.Test
+config :pepe, Pepe.Mailer, adapter: Swoosh.Adapters.Test
 
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false

@@ -30,5 +30,5 @@ When created from a chat, `deliver` defaults to that same chat. Confirm the deta
 
 - Schedule is a standard 5-field cron expression. Timezone is any IANA name — never
   hard-code it; use what the user asked (e.g. "6am German time" → `Europe/Berlin`).
-- Tasks only fire while a long-running surface is up (`mix cortex serve` / `gateway`).
+- Tasks only fire while a long-running surface is up (`mix pepe serve` / `gateway`).
 - Each due task runs in its own process, so many can fire at once without blocking.

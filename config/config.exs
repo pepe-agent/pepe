@@ -7,22 +7,22 @@
 # General application configuration
 import Config
 
-# Cortex keeps no database by default — model connections, agents and gateway
-# credentials live in a JSON config file (see Cortex.Config). Ecto deps remain
+# Pepe keeps no database by default — model connections, agents and gateway
+# credentials live in a JSON config file (see Pepe.Config). Ecto deps remain
 # available if you want to add persistence later.
-config :cortex,
+config :pepe,
   ecto_repos: [],
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
-config :cortex, CortexWeb.Endpoint,
+config :pepe, PepeWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [json: CortexWeb.ErrorJSON],
+    formats: [json: PepeWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Cortex.PubSub,
+  pubsub_server: Pepe.PubSub,
   live_view: [signing_salt: "oUKCzGru"]
 
 # Configure the mailer
@@ -32,12 +32,12 @@ config :cortex, CortexWeb.Endpoint,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :cortex, Cortex.Mailer, adapter: Swoosh.Adapters.Local
+config :pepe, Pepe.Mailer, adapter: Swoosh.Adapters.Local
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  cortex: [
+  pepe: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -47,7 +47,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.3.0",
-  cortex: [
+  pepe: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
@@ -67,10 +67,10 @@ config :phoenix, :json_library, Jason
 # Timezone database (used by scheduled tasks / cron for "America/Sao_Paulo" etc.).
 config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 
-# Fixed system messages (CLI/gateway) are translated via Cortex.Gettext. The
-# active locale comes from the config file (`mix cortex setup`); the agent's own
+# Fixed system messages (CLI/gateway) are translated via Pepe.Gettext. The
+# active locale comes from the config file (`mix pepe setup`); the agent's own
 # replies are unaffected and follow the user's language.
-config :cortex, Cortex.Gettext, default_locale: "en", locales: ~w(en pt_BR pt_PT es)
+config :pepe, Pepe.Gettext, default_locale: "en", locales: ~w(en pt_BR pt_PT es)
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

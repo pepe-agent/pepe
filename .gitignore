@@ -23,12 +23,12 @@ erl_crash.dump
 /tmp/
 
 # Ignore package tarball (built via "mix hex.build").
-cortex-*.tar
+pepe-*.tar
 
 # Ignore the escript binary (built via "mix escript.build").
-/cortex
+/pepe
 
-# Ignore any stray local Mnesia dir (the real store lives in ~/.cortex/data).
+# Ignore any stray local Mnesia dir (the real store lives in ~/.pepe/data).
 /Mnesia.*
 
 # Ignore assets that are produced by build tools.
@@ -41,3 +41,13 @@ cortex-*.tar
 npm-debug.log
 /assets/node_modules/
 
+
+# Local-only agent instructions (not versioned)
+CLAUDE.md
+
+# Built escript binary (mix escript.build)
+/pepe
+/cortex
+
+# Stray test-approval artifacts
+arquivo_teste_aprovacao_*.txt

@@ -1,6 +1,6 @@
 # Channels — Telegram bots
 
-Cortex talks to users over Telegram bots. You can run several bots at once, each
+Pepe talks to users over Telegram bots. You can run several bots at once, each
 bound to one agent. Manage them with the `manage_channel` tool.
 
 ## Add / manage a bot (`manage_channel`)
@@ -51,7 +51,7 @@ manage_channel set_heartbeat name: "sales" heartbeat_minutes: 30 heartbeat_hours
 
 Each pulse runs on the session's live context. Add an optional `HEARTBEAT.md` to the
 agent's workspace describing what to watch for; system events (queued by any
-subsystem via `Cortex.Heartbeat.Events`) are included automatically. The agent
+subsystem via `Pepe.Heartbeat.Events`) are included automatically. The agent
 replies with exactly `HEARTBEAT_OK` when there's nothing worth saying — that's
 expected most of the time and nothing is sent. A cooldown gate (min 30s spacing, a
 flood breaker at 5 fires/60s) makes a runaway proactive loop impossible.

@@ -1,23 +1,39 @@
-# Cortex 🧠
+<p align="center">
+  <img src="images/pepe.jpg" alt="Pepe" width="440">
+</p>
 
-**An Elixir/OTP AI agent runtime** — define agents, connect to any model, and run
-a tool-calling loop, built to lean on Elixir's strengths: OTP supervision, a
-process per conversation, first-class concurrency, and a tiny streaming HTTP
-stack.
+# Pepe 🫡
+
+> A little joke, if you know the reference. **Pepe** is a character from the
+> beloved Mexican comedy universe of Chespirito (*El Chapulín Colorado* /
+> *El Chavo del Ocho*) — shows that generations across Latin America and much of the
+> world grew up watching. Pepe's whole thing? **He did exactly what he was told.**
+> No arguing, no improvising beyond the order — you say it, Pepe does it.
+>
+> Which is, funnily enough, a perfect description of an AI agent runtime: you hand
+> it instructions and tools, and it carries them out, faithfully, again and again.
+> So the project used to be called *Cortex* — now it's **Pepe**. Same engine, better
+> name. 🫡
+
+**Pepe is an Elixir/OTP AI agent runtime** — define agents, connect to any model,
+and run a tool-calling loop. It leans on what Elixir is good at: a lightweight
+process per conversation (so many run side by side), supervision that isolates
+crashes (one conversation failing never takes the rest down), and a small
+streaming HTTP stack.
 
 It exposes those core capabilities several ways:
 
 | Surface | Endpoint | Use it for |
 |---|---|---|
 | **Web dashboard** | `GET /` (Phoenix LiveView) | Browse sessions and chat from the browser |
-| **OpenAI-compatible HTTP** | `POST /v1/chat/completions`, `GET /v1/models` | Point any OpenAI SDK / LangChain / `curl` at Cortex |
+| **OpenAI-compatible HTTP** | `POST /v1/chat/completions`, `GET /v1/models` | Point any OpenAI SDK / LangChain / `curl` at Pepe |
 | **WebSocket** | `ws://…/socket/websocket`, topic `agent:<name>` | Live, token-streamed conversations |
-| **Telegram** | long-polling gateway | Chat with your agent from your phone |
-| **TUI console** | `mix cortex tui` | A session-backed REPL in your terminal |
-| **CLI** | `mix cortex …` | Create agents & model connections, run, serve |
+| **Telegram** | a Telegram bot | Chat with your agent from your phone |
+| **Terminal console** | `mix pepe tui` | An interactive console that remembers the conversation |
+| **CLI** | `mix pepe …` | Create agents & model connections, run, serve |
 
-Everything talks to providers over the **OpenAI Chat Completions** protocol using
-[`Req`](https://hexdocs.pm/req), so OpenAI, OpenRouter, Together, Groq, DeepSeek,
+Everything talks to providers over the **OpenAI Chat Completions** protocol, so
+OpenAI, OpenRouter, Together, Groq, DeepSeek,
 Mistral, z.ai/GLM, Kimi/Moonshot, MiniMax, NovitaAI, Ollama, LM Studio, vLLM,
 llama.cpp and any other compatible endpoint work with zero code changes.
 
@@ -25,48 +41,38 @@ llama.cpp and any other compatible endpoint work with zero code changes.
 
 ## Architecture
 
-```
-                       ┌──────────────────────────────────────────┐
-   CLI (mix cortex) ───▶ │            Cortex.Agent (facade)          │
-   HTTP /v1/...   ───▶ │   oneshot / chat (keyed sessions)         │
-   WebSocket      ───▶ │                                           │
-   Telegram       ───▶ │   Cortex.Agent.Runtime  ── the loop ──────┼──▶ tools
-                       │     ├─ Cortex.LLM (Req, OpenAI proto)      │     (bash, files,
-                       │     │    chat/3 + stream_chat/4 (SSE)      │      web, http…)
-                       │     └─ Cortex.Tools (behaviour + registry) │
-                       └──────────────────────────────────────────┘
-                                        │
-                       Cortex.Config  ─ ~/.cortex/config.json (models, agents, gateways)
+Four surfaces feed one facade. The runtime then loops — **call the model → run any
+tool calls → feed the results back** — until it has a final answer. Everything is
+configured from a single JSON file; there is no database.
+
+```mermaid
+flowchart LR
+    CLI["CLI — mix pepe"] --> AG
+    API["HTTP — /v1"] --> AG
+    WS["WebSocket"] --> AG
+    TG["Telegram"] --> AG
+
+    AG["<b>Pepe.Agent</b><br/>oneshot · keyed chat sessions"] --> RT
+    RT["<b>Pepe.Agent.Runtime</b><br/>the tool-calling loop"] --> LLM
+    RT --> TL["<b>Pepe.Tools</b><br/>bash · files · web · MCP"]
+    LLM["<b>Pepe.LLM</b><br/>calls the model over HTTP<br/>(OpenAI API format)"] --> PROV(["any OpenAI-compatible provider"])
+    CFG["<b>Pepe.Config</b> — ~/.pepe/config.json"] -.-> AG
 ```
 
-* **`Cortex.Config`** — file-backed store (`~/.cortex/config.json`). Secrets may be
-  written as `${ENV_VAR}` and are interpolated at read time. No database required.
-* **`Cortex.LLM`** — `Req`-based OpenAI client; `chat/3` (blocking) and
-  `stream_chat/4` (SSE, with a per-fragment callback). Assembles streamed tool calls.
-* **`Cortex.Tools`** — a `@behaviour` plus a built-in registry: `bash`, `run_script`,
-  `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir`, `fetch_url`,
-  `web_search`, `skill`, plus self-configuration tools (`config_get`, `config_set`,
-  `enable_tool`, `rename_agent`). Drop-in `.exs` plugins extend it with no recompile.
-* **`Cortex.Agent.Runtime`** — the conversation loop: call model → run tool calls →
-  feed results back → repeat until a final answer or `max_iterations`. Emits
-  lifecycle events (`:assistant_delta`, `:tool_call`, `:tool_result`, `:done`).
-* **`Cortex.Agent.Session`** — one GenServer per conversation key (e.g.
-  `telegram:12345`), supervised by a `DynamicSupervisor` + `Registry`. Each run
-  executes off-process so the session stays responsive (e.g. to `/stop`). Crash
-  isolation and context retention for free.
-* **`Cortex.Permissions`** — gates risky tool calls (running code, writing files,
-  changing config). Each surface renders the prompt natively (Telegram buttons, the
-  console's arrow-key menu); read-only tools run freely. See **Permissions** below.
-* **Gateways** — `Cortex.Gateways.Telegram` (long polling) and `Cortex.Gateways.TUI`
-  (the console). They start only when requested (`serve`/`gateway`), so a local
-  `run`/`tui` never spins up the Telegram poller.
+| Module | What it does |
+|---|---|
+| **`Pepe.Config`** | File-backed store at `~/.pepe/config.json`. Secrets written as `${ENV_VAR}` are interpolated at read time. No database. |
+| **`Pepe.LLM`** | Talks to the model over HTTP in the OpenAI API format — either waiting for the whole reply or streaming it token by token. Reassembles streamed tool calls from fragments. |
+| **`Pepe.Tools`** | A `@behaviour` plus a built-in registry (`bash`, `read_file`, `write_file`, `edit_file`, `fetch_url`, `web_search`, `skill`, self-config tools…). Drop-in `.exs` plugins extend it with no recompile. |
+| **`Pepe.Agent.Runtime`** | The conversation loop: call model → run tools → feed back → repeat until a final answer or `max_iterations`. Emits lifecycle events (`:assistant_delta`, `:tool_call`, `:tool_result`, `:done`). |
+| **`Pepe.Agent.Session`** | One `GenServer` per conversation key (e.g. `telegram:12345`), under a `DynamicSupervisor` + `Registry`. Runs execute off-process, so a session stays responsive (e.g. to `/stop`). Crash isolation and context retention for free. |
+| **`Pepe.Permissions`** | Gates risky tool calls (running code, writing files, changing config). Each surface renders the prompt natively; read-only tools run freely. |
+| **Gateways** | `Pepe.Gateways.Telegram` (long polling) and `Pepe.Gateways.TUI` (the console). They start only on `serve`/`gateway`, so a local `run`/`tui` never spins up the poller. |
 
-> **Where surfaces live.** `lib/cortex/gateways/` holds the **non-web** surfaces
-> (the Telegram poller, the TUI console). Everything served by the Phoenix endpoint
-> — the OpenAI-compatible API, the WebSocket channel, and the LiveView dashboard —
-> lives in `lib/cortex_web/`, since those are bound to the router/endpoint/layouts.
-> So the dashboard is in `lib/cortex_web/live/`, alongside the other web surfaces,
-> not under `gateways/`.
+> **Web vs non-web surfaces.** `lib/pepe/gateways/` holds the non-web surfaces (the
+> Telegram poller, the TUI console). Everything served by the Phoenix endpoint — the
+> OpenAI-compatible API, the WebSocket channel, and the LiveView dashboard — lives in
+> `lib/pepe_web/`.
 
 ---
 
@@ -75,72 +81,72 @@ llama.cpp and any other compatible endpoint work with zero code changes.
 ```bash
 mix deps.get
 
-# 1) scaffold ~/.cortex/config.json
-mix cortex setup
+# 1) scaffold ~/.pepe/config.json
+mix pepe setup
 
 # 2) add a model connection (any OpenAI-compatible provider)
-mix cortex model add openrouter \
+mix pepe model add openrouter \
   --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
   --model anthropic/claude-3.5-sonnet \
   --default
 
 # 3) define an agent (defaults to all built-in tools)
-mix cortex agent add assistant \
-  --prompt "You are Cortex, a helpful coding agent." \
+mix pepe agent add assistant \
+  --prompt "You are Pepe, a helpful coding agent." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search \
   --default
 
 # 4) run it
 export OPENROUTER_API_KEY=sk-...
-mix cortex run "list the files here and summarize the project"
+mix pepe run "list the files here and summarize the project"
 ```
 
-## CLI reference (`mix cortex`)
+## CLI reference (`mix pepe`)
 
-> In development use `mix cortex …`. The standalone `cortex` binary
+> In development use `mix pepe …`. The standalone `pepe` binary
 > (`mix escript.build`, or a Burrito release) takes the same subcommands.
 
 ### Setup
 
 ```bash
-mix cortex setup        # first run: guided wizard (language → model → agent → Telegram)
+mix pepe setup        # first run: guided wizard (language → model → agent → Telegram)
                         # later runs: a menu to add/reconfigure any part
 ```
 
 ### Model connections
 
 ```bash
-mix cortex model                       # show the default + switch among saved / add a new one
-mix cortex model add openai            # guided: pick provider → auth method → model
-mix cortex model add openrouter \
+mix pepe model                       # show the default + switch among saved / add a new one
+mix pepe model add openai            # guided: pick provider → auth method → model
+mix pepe model add openrouter \
   --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
   --model anthropic/claude-3.5-sonnet --default      # fully manual
-mix cortex model providers             # list known providers (OpenAI, Anthropic, Gemini, …)
-mix cortex model models --base-url https://api.openai.com/v1 --api-key '${OPENAI_API_KEY}'
-mix cortex model list                  # list saved connections
-mix cortex model test [NAME]           # ping a connection to verify the key/endpoint work
-mix cortex model remove openrouter
-mix cortex model default openai
+mix pepe model providers             # list known providers (OpenAI, Anthropic, Gemini, …)
+mix pepe model models --base-url https://api.openai.com/v1 --api-key '${OPENAI_API_KEY}'
+mix pepe model list                  # list saved connections
+mix pepe model test [NAME]           # ping a connection to verify the key/endpoint work
+mix pepe model remove openrouter
+mix pepe model default openai
 ```
 
 ChatGPT/Codex and Claude Pro/Max can be added by **subscription sign-in** —
-`mix cortex model add openai` → "ChatGPT / Codex subscription" opens your browser
+`mix pepe model add openai` → "ChatGPT / Codex subscription" opens your browser
 (OAuth PKCE), captures the token, and refreshes it automatically.
 
 ### Agents
 
 ```bash
-mix cortex agent add assistant \
+mix pepe agent add assistant \
   --prompt "You are a helpful coding agent." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search --default
-mix cortex agent list
-mix cortex agent route zak helper        # let zak message another agent (see Routing)
-mix cortex agent rename assistant zak   # rename + move its workspace dir (~/.cortex/agents/<name>/)
-mix cortex agent remove zak
-mix cortex agent default assistant
-mix cortex agent help                    # (or `mix cortex help agent`)
+mix pepe agent list
+mix pepe agent route zak helper        # let zak message another agent (see Routing)
+mix pepe agent rename assistant zak   # rename + move its workspace dir (~/.pepe/agents/<name>/)
+mix pepe agent remove zak
+mix pepe agent default assistant
+mix pepe agent help                    # (or `mix pepe help agent`)
 ```
 
 ### Companies (multi-tenant, optional)
@@ -152,23 +158,24 @@ workspaces, `shared/` space and models are walled off from every other company (
 **[Companies](#companies-multi-tenant-isolation)**).
 
 ```bash
-mix cortex company add acme --description "Acme Inc"     # create a tenant scope
-mix cortex company list
-mix cortex agent add vendas --company acme --prompt "…"  # agent "acme/vendas"
-mix cortex agent list --company acme                     # only Acme's agents
-mix cortex agent list --all                              # every scope
-mix cortex run acme/vendas "hello"                       # run it by its handle
-mix cortex company remove acme --force                   # drop the company + its agents
+mix pepe company add acme --description "Acme Inc"     # create a tenant scope
+mix pepe company list
+mix pepe company rename acme umbrella                  # re-key everything to a new name
+mix pepe agent add vendas --company acme --prompt "…"  # agent "acme/vendas"
+mix pepe agent list --company acme                     # only Acme's agents
+mix pepe agent list --all                              # every scope
+mix pepe run acme/vendas "hello"                       # run it by its handle
+mix pepe company remove acme --force                   # drop the company + its agents
 ```
 
 ### Running
 
 ```bash
-mix cortex run "list the files here and summarize the project"   # one-shot, streams to stdout
-mix cortex run assistant "hello"                                 # pick an agent explicitly
-mix cortex tui                         # interactive console, keeps the session
-mix cortex tui --agent zak             # …with a specific agent (or: mix cortex tui zak)
-mix cortex serve --port 4000           # OpenAI-compatible HTTP API + WebSocket
+mix pepe run "list the files here and summarize the project"   # one-shot, streams to stdout
+mix pepe run assistant "hello"                                 # pick an agent explicitly
+mix pepe tui                         # interactive console, keeps the session
+mix pepe tui --agent zak             # …with a specific agent (or: mix pepe tui zak)
+mix pepe serve --port 4000           # OpenAI-compatible HTTP API + WebSocket
 ```
 
 `tui` (alias: `chat`) opens a session-backed console — it keeps context across
@@ -180,18 +187,18 @@ asks for permission through an arrow-key menu (see **Permissions**).
 ### Telegram gateway
 
 ```bash
-mix cortex gateway telegram setup      # interactive: bot token, allowlists, which agent
-mix cortex gateway telegram            # run the gateway in the foreground (long-polling)
+mix pepe gateway telegram setup      # interactive: bot token, allowlists, which agent
+mix pepe gateway telegram            # run the gateway in the foreground (long-polling)
 ```
 
 ### Misc
 
 ```bash
-mix cortex tools                       # list available tools (built-ins + plugins)
-mix cortex timelearn [AGENT]           # what the agent has learned, on a timeline
-mix cortex cron list|add|run|logs …    # scheduled tasks (see Scheduled tasks)
-mix cortex config                      # show config path + a summary
-mix cortex help                        # full command help (or: help <group>)
+mix pepe tools                       # list available tools (built-ins + plugins)
+mix pepe timelearn [AGENT]           # what the agent has learned, on a timeline
+mix pepe cron list|add|run|logs …    # scheduled tasks (see Scheduled tasks)
+mix pepe config                      # show config path + a summary
+mix pepe help                        # full command help (or: help <group>)
 ```
 
 ## Web dashboard
@@ -200,28 +207,38 @@ A Phoenix LiveView dashboard at **`/`** — a live list of sessions on the left 
 streaming chat panel on the right. Pick a session to read its history and talk to
 its agent; replies stream in token-by-token. `New chat` starts a fresh session, and
 each session shows its agent, model and turn count. The left sidebar mirrors the
-CLI, so almost everything you can do with `mix cortex` you can do here:
+CLI, so almost everything you can do with `mix pepe` you can do here:
 
 - **Chat** — talk to a session (risky tools prompt inline).
+
 - **Companies** — create/edit/delete tenant scopes and their billing markup (see **Companies**).
+
 - **Agents** — create/edit/delete agents: persona, model, tools, routes, admin scope,
   default.
+
 - **Models** — add/remove/edit model connections, set per-model prices, pick the default.
+
 - **Usage & billing** — token usage and cost by cycle, per company (see **Usage metering & billing**).
+
 - **Learning** — the TimeLearn timeline (see **Learning**).
+
 - **Scheduled** — create/run/manage scheduled tasks (see **Scheduled tasks**).
+
 - **Watches** — one-shot "notify me when X" (see **Watches**).
+
 - **Channels** — add/remove/edit Telegram bots, applied live (see **Telegram → Multiple bots**).
+
 - **MCP** — external tool servers (see **MCP servers**).
-- **Config file** — edit `~/.cortex/config.json` inline, validated on save.
+
+- **Config file** — edit `~/.pepe/config.json` inline, validated on save.
 
 ```bash
 mix assets.build          # once (builds css/js)
-mix cortex serve          # API + dashboard + gateways, one process
+mix pepe serve          # API + dashboard + gateways, one process
 # open http://localhost:4000
 ```
 
-Because sessions are in-process, run everything from the **one** `mix cortex serve`
+Because sessions are in-process, run everything from the **one** `mix pepe serve`
 process and the dashboard sees every session — including the ones from Telegram.
 Risky tools are authorized inline on the dashboard too: the run pauses and shows an
 allow/deny prompt (the web version of the Telegram buttons), unless the agent has
@@ -230,11 +247,11 @@ pre-approved the tool (the omnipotent primary agent never prompts).
 ## OpenAI-compatible HTTP API
 
 ```bash
-mix cortex serve         # or: PHX_SERVER=true mix phx.server
+mix pepe serve         # or: PHX_SERVER=true mix phx.server
 ```
 
 ```bash
-# The "model" field selects an Cortex AGENT by name (so its tools/persona apply);
+# The "model" field selects an Pepe AGENT by name (so its tools/persona apply);
 # falls back to a bare model connection, then the default agent.
 curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
@@ -265,10 +282,10 @@ raw value is shown once), and its scope decides what it can reach:
 | **Root** | neither | root agents + bare model connections |
 
 ```bash
-mix cortex token add --company acme --label "acme mobile app"   # prints ctx_… once
-mix cortex token add --agent acme/vendas --label "single integration"
-mix cortex token list       # id · fingerprint · scope · label
-mix cortex token revoke <id>
+mix pepe token add --company acme --label "acme mobile app"   # prints ctx_… once
+mix pepe token add --agent acme/vendas --label "single integration"
+mix pepe token list       # id · fingerprint · scope · label
+mix pepe token revoke <id>
 
 # then callers must authenticate
 curl http://localhost:4000/v1/chat/completions \
@@ -293,7 +310,9 @@ conversation for you — then you only need to send the latest user message.
 Three equivalent ways (first match wins):
 
 * `"session_id": "abc"` in the JSON body, **or**
+
 * `"user": "abc"` — the standard OpenAI field, **or**
+
 * an `X-Session-Id: abc` request header.
 
 ```bash
@@ -306,8 +325,8 @@ curl http://localhost:4000/v1/chat/completions -H 'content-type: application/jso
   -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"what is my name?"}]}'
 ```
 
-Each session is a supervised GenServer keyed by `api:<id>` (`Cortex.Agent.Session`).
-Streaming works with sessions too. WebSocket and Telegram are stateful by design
+Each session is its own supervised process, keyed by `api:<id>`
+(`Pepe.Agent.Session`). Streaming works with sessions too. WebSocket and Telegram are stateful by design
 (per-connection / per-chat-id). An empty `user`/`session_id` (`""`) is treated as
 stateless.
 
@@ -318,6 +337,7 @@ join topic `agent:<name>` (`agent:default` for the default agent).
 
 * push `"prompt"` `{ "text": "…" }` → receive streamed `"delta"`, `"tool_call"`,
   `"tool_result"`, then `"done"` events.
+
 * push `"reset"` to clear history.
 
 Auth mirrors the [`/v1` API](#access-tokens-per-company-or-per-agent): open until
@@ -333,8 +353,8 @@ Configure interactively (creates a bot via [@BotFather](https://t.me/BotFather)
 first), then run the long-polling gateway (no webhook needed):
 
 ```bash
-mix cortex gateway telegram setup      # bot token, allowlists, which agent answers
-mix cortex gateway telegram            # run it
+mix pepe gateway telegram setup      # bot token, allowlists, which agent answers
+mix pepe gateway telegram            # run it
 ```
 
 Each chat is a persistent session. In-chat slash commands (also shown in the "/"
@@ -369,9 +389,12 @@ report you're meant to read. Tune it per bot with `tool_progress`:
 
 - `reaction` (default) — a 👀 reaction on your own message while the agent works,
   cleared when the answer lands. No extra message in the chat; the quietest signal.
+
 - `ambient` — a single vague line ("🔎 looking things up…", "💻 running something…")
   edited in place and deleted when done. No tool names, args or ledger.
+
 - `off` — nothing but the native "typing…" indicator.
+
 - `verbose` — a per-tool breadcrumb list (for power users).
 
 The native "typing…" indicator stays alive across all modes. Set it from chat
@@ -393,8 +416,9 @@ Each pulse runs the agent on its session's live context with a prompt that says
 worth saying." That's the common case; only a genuine message gets sent. Feed it:
 
 - an optional `HEARTBEAT.md` in the agent's workspace ("what to watch for"),
-- **system events** any part of Cortex can queue for a session
-  (`Cortex.Heartbeat.Events.push/2`) and the next pulse picks up automatically.
+
+- **system events** any part of Pepe can queue for a session
+  (`Pepe.Heartbeat.Events.push/2`) and the next pulse picks up automatically.
 
 A cooldown gate (30s min spacing, a 5-fires/60s flood breaker) makes a runaway
 proactive loop impossible, and `heartbeat_hours` ("8-22") keeps it quiet outside
@@ -403,19 +427,19 @@ local waking hours.
 ### Multiple bots, one per agent
 
 You can run **several bots at once, each bound directly to its own agent** — one
-Telegram bot *is* agent X, another *is* agent Y. Cortex starts one poller per bot;
+Telegram bot *is* agent X, another *is* agent Y. Pepe starts one poller per bot;
 each has its own token, bound agent, allowlists and session namespace.
 
 ```bash
-mix cortex gateway telegram setup                        # the default bot
-mix cortex gateway telegram add sales --token $T --agent sales-bot
-mix cortex gateway telegram add ops   --token $T2 --agent ops-bot
-mix cortex gateway telegram list                         # see them all
-mix cortex gateway telegram                              # runs every bot
+mix pepe gateway telegram setup                        # the default bot
+mix pepe gateway telegram add sales --token $T --agent sales-bot
+mix pepe gateway telegram add ops   --token $T2 --agent ops-bot
+mix pepe gateway telegram list                         # see them all
+mix pepe gateway telegram                              # runs every bot
 ```
 
 The default bot lives under `"telegram"`; extra bots under `"telegrams"` (a
-name→config map) in `~/.cortex/config.json`, each accepting the same keys. Bots
+name→config map) in `~/.pepe/config.json`, each accepting the same keys. Bots
 that resolve to the same token are de-duplicated (two pollers on one token would
 conflict). The default bot keeps the `telegram:<chat_id>` session key; named bots
 use `telegram:<name>:<chat_id>`, so their conversations (and cron delivery) never
@@ -434,8 +458,10 @@ its allowlist. It's guarded two ways:
 
 - **Permission gate** — `manage_channel` is a risky tool, so each call is authorized
   by the human (or pre-approved), like any risky tool.
+
 - **Scoped** — it only touches named bots, never the protected `default` bot or any
   other config.
+
 - **Secrets never pass through the chat** — you give the *name of an environment
   variable* holding the token (`token_env: "SALES_BOT_TOKEN"`), not the token; it's
   stored as `${SALES_BOT_TOKEN}` and resolved at read time, so the raw secret never
@@ -459,9 +485,9 @@ each scoped to different agents:
 | `["*"]`           | every agent (an explicit super-admin)             |
 
 ```bash
-mix cortex agent manage boss vendas        # boss can now administer "vendas"
-mix cortex agent manage boss "*"           # a super-admin over all agents
-mix cortex agent add child --can-manage none   # a locked agent that can't alter itself
+mix pepe agent manage boss vendas        # boss can now administer "vendas"
+mix pepe agent manage boss "*"           # a super-admin over all agents
+mix pepe agent add child --can-manage none   # a locked agent that can't alter itself
 ```
 
 `manage_agent` actions: `list`, `get`, `create`, `set_persona`, `set_model`,
@@ -471,14 +497,14 @@ live in the target's workspace, tools/model in its config.
 
 ## Permissions
 
-The **primary agent** — the one created on first `mix cortex setup` (the owner's own
+The **primary agent** — the one created on first `mix pepe setup` (the owner's own
 agent) — is born **omnipotent**: every tool, super-admin over all agents
 (`can_manage: ["*"]`), and a `"*"` auto-approve grant so it runs any tool without a
 prompt. It can do everything via chat from the start. Agents you add later are
 scoped normally.
 
 Before a **risky** tool runs — running code (`bash`, `run_script`), writing/moving
-files, changing config, or any plugin tool — Cortex asks you to authorize it
+files, changing config, or any plugin tool — Pepe asks you to authorize it
 (unless the agent has approved it — `"*"` approves everything).
 Read-only tools (`read_file`, `list_dir`, `fetch_url`, `web_search`, …) run freely.
 
@@ -506,15 +532,15 @@ looping.
 
 ```bash
 # A can message B; B can message C and D; C can message A and B
-mix cortex agent route A B
-mix cortex agent route B C
-mix cortex agent route B D
-mix cortex agent route C A
-mix cortex agent route C B
-mix cortex agent route A B --remove        # revoke a route
+mix pepe agent route A B
+mix pepe agent route B C
+mix pepe agent route B D
+mix pepe agent route C A
+mix pepe agent route C B
+mix pepe agent route A B --remove        # revoke a route
 
 # or set it when creating the agent
-mix cortex agent add A --model mock --can-message B
+mix pepe agent add A --model mock --can-message B
 ```
 
 ```jsonc
@@ -548,35 +574,39 @@ per company — `acme/vendas` and `globex/vendas` are different agents. Because 
 handle is what keys everything (config, workspace, sessions, routes), isolation
 follows automatically:
 
-- **Files** — a company agent's workspace is `~/.cortex/companies/<co>/agents/<name>/`
-  and its shared space is `~/.cortex/companies/<co>/shared/`, so equally named agents
+- **Files** — a company agent's workspace is `~/.pepe/companies/<co>/agents/<name>/`
+  and its shared space is `~/.pepe/companies/<co>/shared/`, so equally named agents
   in different companies never collide and `shared/…` paths never leak across tenants.
-  Root agents keep `~/.cortex/agents/<name>/` and `~/.cortex/shared/`.
+  Root agents keep `~/.pepe/agents/<name>/` and `~/.pepe/shared/`.
+
 - **Routing** — `send_to_agent` never crosses companies: a bare target resolves to a
   peer in the sender's own company, and a hard guard refuses any cross-company route
   even if an allowlist asks for it.
+
 - **Models/keys** — a company agent resolves its own models first, then root, so a
   company can pin private provider keys other companies can't see — or inherit one
   shared global provider. A company agent/model never becomes the global default.
 
 ```bash
-mix cortex company add acme --description "Acme Inc"
-mix cortex company add globex
-mix cortex company list
+mix pepe company add acme --description "Acme Inc"
+mix pepe company add globex
+mix pepe company list
 
 # agents, models, routes all take --company
-mix cortex model add llm  --company acme --base-url … --api-key '${ACME_KEY}' --model …
-mix cortex agent add vendas  --company acme --prompt "…" --can-message suporte
-mix cortex agent add suporte --company acme --prompt "…"
-mix cortex agent route vendas suporte --company acme   # both resolve inside acme
+mix pepe model add llm  --company acme --base-url … --api-key '${ACME_KEY}' --model …
+mix pepe agent add vendas  --company acme --prompt "…" --can-message suporte
+mix pepe agent add suporte --company acme --prompt "…"
+mix pepe agent route vendas suporte --company acme   # both resolve inside acme
 
-mix cortex agent list --company acme    # only Acme's
-mix cortex agent list                   # only root
-mix cortex agent list --all             # every scope
-mix cortex tui --company acme vendas    # or: mix cortex run acme/vendas "…"
+mix pepe agent list --company acme    # only Acme's
+mix pepe agent list                   # only root
+mix pepe agent list --all             # every scope
+mix pepe tui --company acme vendas    # or: mix pepe run acme/vendas "…"
 
-mix cortex company remove acme          # refuses while it owns agents…
-mix cortex company remove acme --force  # …unless forced (drops its agents too)
+mix pepe company rename acme umbrella # re-keys its agents, models, routes,
+                                      # crons, watches, bots, tokens and files
+mix pepe company remove acme          # refuses while it owns agents…
+mix pepe company remove acme --force  # …unless forced (drops its agents too)
 ```
 
 ```jsonc
@@ -591,7 +621,7 @@ mix cortex company remove acme --force  # …unless forced (drops its agents too
 A Telegram bot bound to a company agent keeps its whole conversation inside that
 company; without a company it serves root, as before.
 
-## Configuration (`~/.cortex/config.json`)
+## Configuration (`~/.pepe/config.json`)
 
 ```jsonc
 {
@@ -608,7 +638,7 @@ company; without a company it serves root, as before.
   "agents": {
     "assistant": {
       "model": "openrouter",
-      "system_prompt": "You are Cortex, a helpful agent.",
+      "system_prompt": "You are Pepe, a helpful agent.",
       "tools": ["bash", "run_script", "read_file", "write_file", "edit_file", "list_dir", "fetch_url", "web_search"],
       "auto_approve": ["read_file"],
       "max_iterations": 12
@@ -620,23 +650,23 @@ company; without a company it serves root, as before.
 }
 ```
 
-Override the location with `CORTEX_HOME` (directory) or `CORTEX_CONFIG` (file).
-Each agent also gets a persistent directory at `~/.cortex/agents/<name>/` holding
+Override the location with `PEPE_HOME` (directory) or `PEPE_CONFIG` (file).
+Each agent also gets a persistent directory at `~/.pepe/agents/<name>/` holding
 its `SOUL.md` (persona) and any files it creates (`MEMORY.md`, `people.md`, …);
-`~/.cortex/shared/` is shared across agents.
+`~/.pepe/shared/` is shared across agents.
 
 An agent with **no identity yet** (no `SOUL.md`, default seed) presents itself as
-Cortex, tells you it has no name or characteristics defined, and offers to set one
+Pepe, tells you it has no name or characteristics defined, and offers to set one
 up — then saves your choices to `SOUL.md` and renames itself with `rename_agent`.
 `auto_approve` lists tools the agent may run without asking (see **Permissions**).
 
 ### Storage & backup — it's all files, no database
 
-Everything lives under `~/.cortex/` (or `CORTEX_HOME`) — there is **no database
+Everything lives under `~/.pepe/` (or `PEPE_HOME`) — there is **no database
 server**. `config.json` is the single source of truth (companies, agents, models,
 watches, crons, bots, MCP, hashed API tokens). Agent knowledge lives as files in
 `agents/<name>/` and `companies/<co>/agents/<name>/`; conversation history in
-`data/sessions/`; `data/mnesia/` is a disposable cache (rebuilds itself). `Cortex.Repo`
+`data/sessions/`; `data/mnesia/` is a disposable cache (rebuilds itself). `Pepe.Repo`
 + Postgres exist in the code but are **off** (`ecto_repos: []`) — the door for a future
 DB backend, unused today.
 
@@ -647,11 +677,11 @@ Back up with one command — it archives the durable parts, skips the disposable
 and lists the secret env vars you must save separately (they're not in the archive):
 
 ```bash
-mix cortex backup                       # → cortex-backup-YYYY-MM-DD.tgz
-mix cortex backup --output /path/x.tgz
+mix pepe backup                       # → pepe-backup-YYYY-MM-DD.tgz
+mix pepe backup --output /path/x.tgz
 ```
 
-Restore = extract back into `~/` (or `CORTEX_HOME`'s parent) and re-export those env
+Restore = extract back into `~/` (or `PEPE_HOME`'s parent) and re-export those env
 vars. That's the whole disaster-recovery story.
 
 ## MCP servers (external tools)
@@ -661,10 +691,10 @@ tools become callable by agents as if built in. Servers launch over stdio on dem
 (via `npx`, so **nothing to install manually**); tokens go in as `${ENV_VAR}` refs.
 
 ```bash
-mix cortex mcp add sentry --command npx \
+mix pepe mcp add sentry --command npx \
   --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
-mix cortex mcp tools sentry     # launch it and list its tools (validate the connection)
-mix cortex mcp list
+mix pepe mcp tools sentry     # launch it and list its tools (validate the connection)
+mix pepe mcp list
 ```
 
 Each MCP tool is exposed as `mcp__<server>__<tool>`. **Scoping is just the tool
@@ -672,18 +702,18 @@ allowlist** — to make an agent *read-only* against a server, give it only the 
 tools and leave the mutating ones out:
 
 ```bash
-mix cortex agent add backoffice --tools read_file,mcp__sentry__find_organizations,mcp__sentry__get_issue
+mix pepe agent add backoffice --tools read_file,mcp__sentry__find_organizations,mcp__sentry__get_issue
 # (no mcp__sentry__update_issue → the agent can look, not change)
 ```
 
 `mcp__sentry__*` grants all of a server's tools. MCP tools are risky, so each call
 still goes through the permission gate. An agent with the `manage_mcp` tool can add
 and validate servers itself from chat (secrets stay as `${ENV}` refs). Definitions
-live in `~/.cortex/config.json` under `"mcp"`.
+live in `~/.pepe/config.json` under `"mcp"`.
 
-## Self-knowledge & self-management (how an agent operates Cortex)
+## Self-knowledge & self-management (how an agent operates Pepe)
 
-Cortex is designed so an agent can **resolve requests about Cortex itself** — "add a
+Pepe is designed so an agent can **resolve requests about Pepe itself** — "add a
 bot", "schedule this", "connect Sentry", "switch the timezone" — without bespoke
 hand-holding, and without ever being dangerous:
 
@@ -691,13 +721,15 @@ hand-holding, and without ever being dangerous:
   cron, MCP, permissions, config) and are listed in every agent's system prompt as
   the *authoritative* source; the read-only `docs` tool loads the relevant one on
   demand. New/unforeseen requests get resolved by reading, not guessing. (Drop extra
-  guides in `~/.cortex/docs/` to extend or override.)
+  guides in `~/.pepe/docs/` to extend or override.)
+
 - **It discovers what's editable.** `config_set` called with no arguments returns the
   schema — the editable settings, their current values and accepted values. The
   editable set is a **fail-closed allowlist** (`default_model`, `default_agent`,
   `language`, `timezone`, `telegram.require_mention/enabled`); anything else is
   refused with a pointer to the right guarded tool (`manage_agent`, `manage_channel`,
   `manage_mcp`, `schedule_task`). Secrets are never editable from chat.
+
 - **It verifies its own work.** After changing something, the agent (or you) runs the
   **doctor**: offline checks (every `${ENV}` ref resolves, agents point at real
   models and known tools, cron schedules/timezones/agents are valid) plus live probes
@@ -705,8 +737,8 @@ hand-holding, and without ever being dangerous:
   per server).
 
 ```bash
-mix cortex doctor              # live probes (Telegram, models, MCP)
-mix cortex doctor --offline    # config-consistency only, no network
+mix pepe doctor              # live probes (Telegram, models, MCP)
+mix pepe doctor --offline    # config-consistency only, no network
 ```
 
 The loop is **do → verify → correct**: structured guarded tools for the hot paths,
@@ -714,16 +746,16 @@ generic tools + docs for everything else, and the doctor to confirm it worked.
 
 ## Adding a tool
 
-A tool is any module implementing the `Cortex.Tools.Tool` behaviour
+A tool is any module implementing the `Pepe.Tools.Tool` behaviour
 (`name/0`, `spec/0`, `run/2`). Two ways to ship one:
 
-**Built-in** (compiled in) — add the module under `lib/cortex/tools/` and list it
-in `@builtin` in `Cortex.Tools`:
+**Built-in** (compiled in) — add the module under `lib/pepe/tools/` and list it
+in `@builtin` in `Pepe.Tools`:
 
 ```elixir
-defmodule Cortex.Tools.MyTool do
-  @behaviour Cortex.Tools.Tool
-  import Cortex.Tools.Tool, only: [function: 3]
+defmodule Pepe.Tools.MyTool do
+  @behaviour Pepe.Tools.Tool
+  import Pepe.Tools.Tool, only: [function: 3]
 
   def name, do: "my_tool"
   def spec, do: function("my_tool", "what it does", %{"type" => "object", "properties" => %{}})
@@ -732,15 +764,15 @@ end
 ```
 
 **Plugin** (drop-in, no recompile) — put the same module in a `.exs` under
-`~/.cortex/plugins/`. It's compiled at runtime, hot-reloaded on change (by mtime),
-and appears in `mix cortex tools`. Add its `name` to an agent's `tools` to enable
+`~/.pepe/plugins/`. It's compiled at runtime, hot-reloaded on change (by mtime),
+and appears in `mix pepe tools`. Add its `name` to an agent's `tools` to enable
 it:
 
 ```elixir
-# ~/.cortex/plugins/weather.exs
-defmodule CortexPlugins.Weather do
-  @behaviour Cortex.Tools.Tool
-  import Cortex.Tools.Tool, only: [function: 3]
+# ~/.pepe/plugins/weather.exs
+defmodule PepePlugins.Weather do
+  @behaviour Pepe.Tools.Tool
+  import Pepe.Tools.Tool, only: [function: 3]
 
   def name, do: "weather"
   def spec, do: function("weather", "Get the weather for a city.",
@@ -763,7 +795,8 @@ its topic comes up, so they don't bloat every prompt.
   - `manage-routing` — change agent-to-agent routes with `set_route`.
   - `handle-media` — understand a voice/audio/image/file (transcribe, read), installing
     what it needs.
-- **User** skills live in `~/.cortex/skills/*.md` and override a built-in of the
+
+- **User** skills live in `~/.pepe/skills/*.md` and override a built-in of the
   same name. The first non-empty line is the summary; the rest is the procedure.
 
 An agent can **author its own skills**: ask it to "remember how to do X as a skill"
@@ -789,15 +822,18 @@ An agent can **turn conversations into lasting knowledge on its own** — the
 never becomes memory. Who counts as trusted is a per-bot `trainers` allowlist:
 
 - **`["*"]`** → learns from everyone
+
 - **`[]`** → learns from no one (a client-facing bot)
+
 - **`[id1, id2]`** → learns only from those user ids (your ids — the trainers)
+
 - **omitted / `null`** → the default (everyone)
 
-The allowlist convention is the same everywhere in Cortex: `["*"]` = all, `[]` =
+The allowlist convention is the same everywhere in Pepe: `["*"]` = all, `[]` =
 none, `[items]` = exactly those, and omitted/`null` = that field's default.
 
 ```bash
-mix cortex gateway telegram add support --token $T --agent helper --trainers none
+mix pepe gateway telegram add support --token $T --agent helper --trainers none
 # a client-facing bot that never learns; your own DM bot (no --trainers) still does
 ```
 
@@ -806,6 +842,7 @@ things, kept separate:
 
 - **Memory** (about *you*) → `USER.md` / `MEMORY.md` / `people.md`, kept lean
   (it consolidates instead of piling on).
+
 - **Skills** (about *technique*) → prefers updating a rich existing skill over
   spawning a narrow new one.
 
@@ -818,7 +855,7 @@ demand with **`/learn`** (Telegram + console).
 memory entries (📝), newest first, with source and date:
 
 ```bash
-mix cortex timelearn zak               # in the terminal
+mix pepe timelearn zak               # in the terminal
 ```
 
 …or the **Learn** tab in the web dashboard (with an agent picker). The generator
@@ -832,25 +869,25 @@ no chat memory**, so its prompt must be self-contained.
 
 Three ways to create and manage them:
 
-**1. From the CLI** (`mix cortex cron`):
+**1. From the CLI** (`mix pepe cron`):
 
 ```bash
-mix cortex cron add \
+mix pepe cron add \
   --name "Daily XML check" \
   --prompt "Check the 06:00 XML load and report anything abnormal." \
   --schedule "0 8 * * *" \
   --timezone America/Sao_Paulo \
   --deliver telegram:123456        # or omit / "none" to report nowhere
-mix cortex cron list               # all tasks + next run time
-mix cortex cron run daily-xml-check   # force it now (preview)
-mix cortex cron logs daily-xml-check  # recent run history
-mix cortex cron disable daily-xml-check
-mix cortex cron remove daily-xml-check
+mix pepe cron list               # all tasks + next run time
+mix pepe cron run daily-xml-check   # force it now (preview)
+mix pepe cron logs daily-xml-check  # recent run history
+mix pepe cron disable daily-xml-check
+mix pepe cron remove daily-xml-check
 ```
 
 The schedule is a standard 5-field cron expression; the timezone is any IANA name
 (`America/Sao_Paulo`, `Europe/Berlin`, …) — nothing is hard-coded. The default
-timezone is set at `mix cortex setup` and used when a task doesn't name its own.
+timezone is set at `mix pepe setup` and used when a task doesn't name its own.
 
 **2. From the web dashboard** — the **Cron** tab lists every task with its next
 run, a **Run now** button, enable/disable/remove, and a form to create one
@@ -864,11 +901,11 @@ risky tool, so each use is authorized through the permission gate (or pre-approv
 When created from a chat, a task reports back to that same chat by default. The
 agent can also `run` a task on demand from the conversation.
 
-Tasks fire from an in-process timer that only runs while `mix cortex serve` or
-`mix cortex gateway` is up (never during one-shot commands). Due tasks each run in
+Tasks fire from an in-process timer that only runs while `mix pepe serve` or
+`mix pepe gateway` is up (never during one-shot commands). Due tasks each run in
 their own process, so they fire concurrently — one slow task never blocks another.
-Definitions live in `~/.cortex/config.json` (`"crons"`); run history in
-`~/.cortex/data/cron_logs/`.
+Definitions live in `~/.pepe/config.json` (`"crons"`); run history in
+`~/.pepe/data/cron_logs/`.
 
 ## Watches — "notify me when X" (one-shot)
 
@@ -893,6 +930,7 @@ Two cost tiers, chosen at creation so checking stays cheap:
 - **`probe`** — a shell command polled every interval, **no LLM per check** (success =
   exit 0, or a substring match). Best for scriptable conditions ("site is back",
   "log contains `Deploy complete`").
+
 - **`agent`** — re-ask the model each check, for conditions that need judgement.
 
 …and the notification (`on_fire`) is either a fixed **template** (no LLM) or an
@@ -903,14 +941,14 @@ write the summary the moment it passes.
 ```bash
 # from chat: "avise quando o site x voltar" → the agent creates a probe watch.
 # from the CLI (probe watches):
-mix cortex watch add "site x up" --probe "curl -sf https://x" --message "✅ voltou" --every 60
-mix cortex watch list
-mix cortex watch pause <id> | resume <id> | cancel <id>
+mix pepe watch add "site x up" --probe "curl -sf https://x" --message "✅ voltou" --every 60
+mix pepe watch list
+mix pepe watch pause <id> | resume <id> | cancel <id>
 ```
 
 Manage them three ways — dashboard **Watches** tab, chat ("para o watch do site" →
 the agent lists and cancels via the `watch` tool), or the CLI — all reading the same
-durable store (`~/.cortex/config.json`, `"watches"`). The scheduler ticks only while
+durable store (`~/.pepe/config.json`, `"watches"`). The scheduler ticks only while
 `serve`/`gateway` is up; the updated state is persisted **before** delivery, so a
 crash can't double-fire.
 
@@ -919,11 +957,11 @@ crash can't double-fire.
 Every model call is metered and attributed to the agent's company, so you can bill a
 client per token. Metering happens at the one point all surfaces flow through (CLI,
 HTTP `/v1`, WebSocket, Telegram) and appends to a durable, append-only ledger under
-`~/.cortex/data/usage/<company>/YYYY-MM.jsonl` — the audit trail for what's charged.
+`~/.pepe/data/usage/<company>/YYYY-MM.jsonl` — the audit trail for what's charged.
 
 **Cost** = `tokens × the model's price` (per 1M tokens). A price is resolved in
 layers: the **manual price** on the model wins, then a **live cache**
-(`~/.cortex/data/price_book.json`, refreshed from OpenRouter + the LiteLLM price
+(`~/.pepe/data/price_book.json`, refreshed from OpenRouter + the LiteLLM price
 map), then a **built-in seed** of well-known prices (offline fallback). So known
 models are priced automatically; you only type a price to override or fill a gap.
 
@@ -933,15 +971,15 @@ cost and the amount to bill are always shown side by side, so the markup never h
 the real cost from your team.
 
 ```bash
-mix cortex usage                                  # all scopes, by month, per company
-mix cortex usage --company acme --granularity day # a company, by day
-mix cortex usage export --company acme            # a client invoice (Markdown or --format csv)
-mix cortex usage prices --refresh                 # refresh the live price cache
+mix pepe usage                                  # all scopes, by month, per company
+mix pepe usage --company acme --granularity day # a company, by day
+mix pepe usage export --company acme            # a client invoice (Markdown or --format csv)
+mix pepe usage prices --refresh                 # refresh the live price cache
 ```
 
 **Invoices.** `usage export` turns a company's month into a client invoice (Markdown
 or CSV), and the `export_invoice` **tool** lets an agent do it itself — so a monthly
-scheduled task can export each client's invoice and send it, using Cortex to bill for
+scheduled task can export each client's invoice and send it, using Pepe to bill for
 its own use.
 
 Prices also auto-refresh once a week while `serve`/`gateway` is up. In the dashboard,
@@ -949,7 +987,7 @@ the **Usage & billing** section shows tokens, cost and amount-to-bill by cycle
 (hour / day / week / month / year) with breakdowns by company, model and agent; set
 per-model prices under **Models → Edit** and a company's markup under
 **Companies → Edit**. Currency is a label only (default `USD`, set `"currency"` in
-config); there's no FX conversion. Full walkthrough: `mix cortex` doc **billing**.
+config); there's no FX conversion. Full walkthrough: `mix pepe` doc **billing**.
 
 ## Tests
 
@@ -960,3 +998,68 @@ mix test
 The suite stands up a real local OpenAI-compatible mock server (Bandit) and
 exercises the full stack: non-streaming chat, SSE streaming, the tool-calling
 loop, and the HTTP `/v1` endpoints — all over real TCP. No database needed.
+
+## Contributing & help wanted
+
+Pepe is young and help is very welcome — bug reports, provider confirmations, docs
+fixes, and features. Small, focused PRs are the easiest to review and merge.
+
+### Set up for development
+
+You need **Elixir ~> 1.15** and Erlang/OTP (install via [asdf](https://asdf-vm.com/)
+or your package manager). **No database is required** — the test suite starts its own
+local mock model server, so there's nothing to provision.
+
+```bash
+git clone https://github.com/jhonathas/pepe.git pepe && cd pepe
+mix deps.get
+mix test          # runs the whole suite over real TCP — no DB, no API keys
+```
+
+Only if you want to open the **web dashboard** locally:
+
+```bash
+mix assets.setup && mix assets.build
+mix pepe serve                     # http://localhost:4000
+```
+
+### Open a pull request
+
+1. **Fork** the repo, then branch off `master`:
+   `git checkout -b fix-telegram-retry`.
+
+2. **Make your change.** Match the surrounding style; the detailed conventions live in
+   **`AGENTS.md`** (HTTP client, immutability, one module per file, `?`-suffixed
+   predicates, …). A new tool follows the `Pepe.Tools.Tool` behaviour — see
+   [**Adding a tool**](#adding-a-tool).
+
+3. **Run the full check** before pushing — it must pass (it's the same gate a
+   reviewer applies):
+
+   ```bash
+   mix precommit    # compile (warnings = errors) + unused-deps check + format + tests
+   ```
+
+4. **Push to your fork and open a PR** against `master`. Say what changed and why, and
+   link an issue if there is one. Please include a test for new behaviour and a line
+   in this README for anything user-facing.
+
+### What needs testing (help especially wanted here)
+
+I've been running Pepe day-to-day on a **single** setup — the ChatGPT/Codex OAuth
+**subscription** model. Everything speaks the same OpenAI protocol, so the rest
+*should* work unchanged, but I genuinely haven't verified it. If you can confirm (or
+break) any of the below, please open an issue with what you tried and what happened:
+
+- **Model providers** — API-key connections to OpenRouter, Groq, DeepSeek, Together,
+  Mistral, z.ai/GLM, Kimi/Moonshot, MiniMax, NovitaAI, and local runtimes (Ollama, LM
+  Studio, vLLM, llama.cpp). Ideally both **streaming** and **tool-calling** on each.
+
+- **The Claude Pro/Max OAuth sign-in** — only the ChatGPT/Codex flow has been exercised.
+
+- **Surfaces & features** — Telegram (single and multi-bot), the WebSocket API with
+  access tokens, company isolation, usage metering & invoices, cron, watches, and MCP
+  servers against a real server.
+
+The most useful quick report: your provider, the output of `mix pepe model test`, and
+one prompt run — did the reply **stream**, and did a **tool call** work?
