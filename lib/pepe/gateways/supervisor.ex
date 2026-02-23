@@ -2,11 +2,11 @@ defmodule Pepe.Gateways.Supervisor do
   @moduledoc """
   Supervises messaging gateways. A gateway starts only when both:
 
-    * gateways are enabled for this run (`:start_gateways` app env) — set by the
+    * gateways are enabled for this run (`:start_gateways` app env) - set by the
       `serve` and `gateway` commands, but NOT by local `run`/`tui`, so a console
       session never spins up the Telegram poller (which would 409 against a real
       gateway already polling the same bot); and
-    * its credentials are configured — e.g. a Telegram bot token in
+    * its credentials are configured - e.g. a Telegram bot token in
       `~/.pepe/config.json` or `TELEGRAM_BOT_TOKEN`.
   """
   use Supervisor
@@ -20,7 +20,7 @@ defmodule Pepe.Gateways.Supervisor do
 
   @doc """
   Reconcile the running Telegram pollers with the current config: stop the ones
-  that went away, (re)start the ones that should run — one poller per configured
+  that went away, (re)start the ones that should run - one poller per configured
   bot. Call this after adding/removing/editing a bot so the change takes effect
   without a full restart. (Token edits to an existing bot are picked up live, since
   each poll reads the token fresh.)

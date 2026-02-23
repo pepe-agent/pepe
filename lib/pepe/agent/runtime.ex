@@ -1,6 +1,6 @@
 defmodule Pepe.Agent.Runtime do
   @moduledoc """
-  The agent conversation loop — the heart of Pepe.
+  The agent conversation loop - the heart of Pepe.
 
   Given an agent, a model connection and a list of messages, it calls the model,
   executes any requested tool calls, feeds the results back, and repeats until
@@ -52,22 +52,32 @@ defmodule Pepe.Agent.Runtime do
         model -> [model]
       end
 
-    if chain == [] do
-      {:error, :no_model_configured}
-    else
-      specs = Tools.specs(agent.tools)
+    cond do
+      chain == [] ->
+        {:error, :no_model_configured}
 
-      ctx = %{
-        cwd: opts[:cwd] || File.cwd!(),
-        agent: agent,
-        session_key: opts[:session_key],
-        authorize: opts[:authorize],
-        # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
-        agent_chain: opts[:agent_chain]
-      }
+      # A model marked `require_redaction` refuses to run unless the agent redacts.
+      Enum.any?(chain, & &1.require_redaction) and not Pepe.Hooks.any?(agent) ->
+        {:error, :redaction_required}
 
-      loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations)
+      true ->
+        run_chain(agent, chain, messages, opts)
     end
+  end
+
+  defp run_chain(agent, chain, messages, opts) do
+    specs = Tools.specs(agent.tools)
+
+    ctx = %{
+      cwd: opts[:cwd] || File.cwd!(),
+      agent: agent,
+      session_key: opts[:session_key],
+      authorize: opts[:authorize],
+      # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
+      agent_chain: opts[:agent_chain]
+    }
+
+    loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations)
   end
 
   @doc """
@@ -112,7 +122,7 @@ defmodule Pepe.Agent.Runtime do
   end
 
   # Try each model in the chain; advance ONLY on transient failures (rate limit,
-  # server error, network) — auth/request errors fail fast (a bad key on model B
+  # server error, network) - auth/request errors fail fast (a bad key on model B
   # won't be fixed by model C's endpoint, and 4xx would just repeat).
   defp chat_with_failover([model | rest], messages, chat_opts, ctx, opts) do
     result =

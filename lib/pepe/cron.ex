@@ -2,7 +2,7 @@ defmodule Pepe.Cron do
   @moduledoc """
   Runs a single scheduled task and delivers its result.
 
-  A cron fires in a **fresh, stateless run** (`Pepe.Agent.oneshot/3`) — it carries
+  A cron fires in a **fresh, stateless run** (`Pepe.Agent.oneshot/3`) - it carries
   no chat history, which is why the stored `prompt` must be self-contained. The
   result is delivered to the cron's `deliver` target (a Telegram chat, or the log).
 
@@ -56,7 +56,7 @@ defmodule Pepe.Cron do
   @doc """
   Catch-up: did this cron **miss** a firing (server was down/asleep at the scheduled
   time)? True when the most recent scheduled time passed without a run and we're
-  still inside the grace window — half the job's period, clamped to 2min–2h. Used by
+  still inside the grace window - half the job's period, clamped to 2min-2h. Used by
   the scheduler to fire a missed job ONCE on recovery, anchored to `last_run`.
   Returns `{true, missed_time_iso}` or `false`.
   """
@@ -73,7 +73,7 @@ defmodule Pepe.Cron do
       overdue = DateTime.diff(now, prev_dt)
       prev_unix = DateTime.to_unix(prev_dt)
 
-      # Never ran, or last run predates the missed slot — and we're within grace.
+      # Never ran, or last run predates the missed slot - and we're within grace.
       if (last_run || 0) < prev_unix and overdue > 0 and overdue <= grace do
         {true, NaiveDateTime.to_iso8601(prev)}
       else
@@ -151,7 +151,7 @@ defmodule Pepe.Cron do
 
   # Keep last_result small in the config file.
   defp clip(text) when is_binary(text) do
-    if String.length(text) > 2000, do: String.slice(text, 0, 2000) <> "…", else: text
+    if String.length(text) > 2000, do: String.slice(text, 0, 2000) <> "...", else: text
   end
 
   defp clip(text), do: to_string(text)

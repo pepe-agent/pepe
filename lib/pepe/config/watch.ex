@@ -1,23 +1,23 @@
 defmodule Pepe.Config.Watch do
   @moduledoc """
-  A **watch** — a one-shot, durable "check X and notify me when it happens".
+  A **watch** - a one-shot, durable "check X and notify me when it happens".
 
   Created on demand (the agent calls `notify_when` when you ask), it lives on disk so
   it survives a restart and the originating session closing, and it **stops once it
   fires**. Two cost tiers, chosen at creation:
 
-    * `trigger` — how the condition is re-checked every interval:
+    * `trigger` - how the condition is re-checked every interval:
       * `%{"type" => "probe", "command" => "curl -sf https://x", "success" => "exit_zero"}`
-        — a cheap shell probe, **no LLM per check** (success = exit 0, or
+        - a cheap shell probe, **no LLM per check** (success = exit 0, or
         `%{"contains" => "..."}` against stdout).
-      * `%{"type" => "agent", "prompt" => "has the deploy finished?"}` — re-ask the
+      * `%{"type" => "agent", "prompt" => "has the deploy finished?"}` - re-ask the
         agent when the condition needs judgement (one LLM call per check).
-    * `on_fire` — what to send when it fires:
-      * `%{"type" => "template", "text" => "✅ site is back"}` — a fixed message, no LLM.
-      * `%{"type" => "agent", "prompt" => "summarise the deploy result"}` — the agent
+    * `on_fire` - what to send when it fires:
+      * `%{"type" => "template", "text" => "✅ site is back"}` - a fixed message, no LLM.
+      * `%{"type" => "agent", "prompt" => "summarise the deploy result"}` - the agent
         composes the message (one LLM call, once).
 
-  `origin` records where to deliver — `%{"channel" => "telegram", "chat_id" => ...}` —
+  `origin` records where to deliver - `%{"channel" => "telegram", "chat_id" => ...}` -
   captured when the watch is created, so the reply lands on the channel you asked from
   even after a restart.
   """

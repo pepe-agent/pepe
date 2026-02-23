@@ -1,11 +1,11 @@
 defmodule Pepe.Tools do
   @moduledoc """
-  Registry of tools — the built-in `@builtin` set plus drop-in plugins.
+  Registry of tools - the built-in `@builtin` set plus drop-in plugins.
 
   Turns an agent's tool allowlist into OpenAI tool specs / execute calls. Plugins
   are `.exs` files under `<PEPE_HOME>/plugins/`, each defining a module that
   implements the `Pepe.Tools.Tool` behaviour. They're compiled at runtime and
-  hot-reloaded on change (by mtime) — drop a file and it works on the next call, no
+  hot-reloaded on change (by mtime) - drop a file and it works on the next call, no
   restart. Built-ins win on a name collision.
   """
 
@@ -18,6 +18,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Doctor
   alias Pepe.Tools.EditFile
   alias Pepe.Tools.EnableTool
+  alias Pepe.Tools.EndSession
   alias Pepe.Tools.FetchUrl
   alias Pepe.Tools.Invoice
   alias Pepe.Tools.ListDir
@@ -48,6 +49,7 @@ defmodule Pepe.Tools do
     FetchUrl,
     WebSearch,
     Invoice,
+    EndSession,
     Skill,
     Docs,
     Doctor,
@@ -65,7 +67,7 @@ defmodule Pepe.Tools do
     Watch
   ]
 
-  @doc "All tool modules — built-ins plus loaded plugins."
+  @doc "All tool modules - built-ins plus loaded plugins."
   def all, do: @builtin ++ plugins()
 
   @doc "Map of name => module. Built-ins take precedence over plugins on a clash."
@@ -160,7 +162,7 @@ defmodule Pepe.Tools do
 
   @doc """
   Execute a tool call. `tool_call` is the OpenAI tool_call map. Returns the
-  string result (always — errors are turned into a readable string for the model).
+  string result (always - errors are turned into a readable string for the model).
   """
   def execute(%{"function" => %{"name" => name, "arguments" => raw_args}}, ctx \\ %{}) do
     result =
@@ -193,7 +195,7 @@ defmodule Pepe.Tools do
 
         String.slice(result, 0, @spill_preview) <>
           "\n\n[... output truncated: #{byte_size(result)} bytes total. " <>
-          "Full output saved to #{path} — read slices of it with read_file if needed.]"
+          "Full output saved to #{path} - read slices of it with read_file if needed.]"
     end
   rescue
     _ -> result

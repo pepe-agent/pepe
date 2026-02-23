@@ -1,13 +1,13 @@
 defmodule Pepe.Learning do
   @moduledoc """
-  **TimeLearn** — what an agent has learned, on a timeline.
+  **TimeLearn** - what an agent has learned, on a timeline.
 
   Assembles a single list of learning "nodes" from what already lives on disk, so
   the dashboard panel and the `mix pepe timelearn` CLI draw the same data:
 
-    * **skills** — the `.md` procedure docs (built-in in `priv/skills/`, user ones
+    * **skills** - the `.md` procedure docs (built-in in `priv/skills/`, user ones
       in `<PEPE_HOME>/skills/`), timestamped by file mtime; and
-    * **memory** — the entries in the agent's `MEMORY.md`, `USER.md` and `people.md`.
+    * **memory** - the entries in the agent's `MEMORY.md`, `USER.md` and `people.md`.
 
   Skills are shared across agents; memory is per-agent. Nodes are returned newest
   first (like a feed), each with a `:kind`, title, summary, `:source` and `:at`
@@ -28,7 +28,7 @@ defmodule Pepe.Learning do
 
   @memory_files ~w(MEMORY.md USER.md people.md)
 
-  @doc "The learning timeline for `agent_name` — skills + its memory, newest first."
+  @doc "The learning timeline for `agent_name` - skills + its memory, newest first."
   @spec timeline(String.t() | nil) :: [learning_node()]
   def timeline(agent_name) do
     (skill_nodes() ++ memory_nodes(agent_name))

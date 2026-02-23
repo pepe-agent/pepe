@@ -45,7 +45,7 @@ defmodule PepeWeb.OpenAIController do
 
     cond do
       # A named agent that resolved to nothing under a real (non-open) scope is out of
-      # bounds — refuse without revealing whether it exists elsewhere.
+      # bounds - refuse without revealing whether it exists elsewhere.
       is_nil(agent) and scope != :unrestricted and present?(params["model"]) ->
         error(conn, 403, "agent not accessible with this token")
 

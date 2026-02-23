@@ -1,6 +1,6 @@
 defmodule Pepe.Tools.Doctor do
   @moduledoc """
-  Run the health checks (`Pepe.Doctor`) from chat — the agent's way to **verify**
+  Run the health checks (`Pepe.Doctor`) from chat - the agent's way to **verify**
   something worked after changing it (a new bot, MCP server, cron, model). Read-only.
   """
 
@@ -51,6 +51,6 @@ defmodule Pepe.Tools.Doctor do
     end
   end
 
-  defp format({area, subject, {:error, msg}}), do: "❌ [#{area}] #{subject} — #{msg}"
-  defp format({area, subject, {:warn, msg}}), do: "⚠️ [#{area}] #{subject} — #{msg}"
+  defp format({area, subject, {:error, msg}}), do: "❌ [#{area}] #{subject} - #{msg}"
+  defp format({area, subject, {:warn, msg}}), do: "⚠️ [#{area}] #{subject} - #{msg}"
 end

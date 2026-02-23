@@ -4,8 +4,8 @@ defmodule Pepe.MCP.Client do
 
   Launches an MCP server as a child process (e.g. `npx -y @sentry/mcp-server`),
   speaks JSON-RPC 2.0 line-by-line over its stdin/stdout, performs the
-  `initialize` handshake, lists the server's tools, and can call them — so an agent
-  can use external tools (Sentry, GitHub, …) as if they were built in.
+  `initialize` handshake, lists the server's tools, and can call them - so an agent
+  can use external tools (Sentry, GitHub, ...) as if they were built in.
 
   One GenServer per configured server. Robust to noise: any stdout line that isn't
   valid JSON (some packages print a startup banner) is skipped, so it can't break

@@ -1,7 +1,7 @@
 defmodule PepeWeb.ConfigLive do
   @moduledoc """
   The raw config-file editor: show `~/.pepe/config.json`, let the operator edit it,
-  and save it back — validated as JSON first, so a broken file can't be written.
+  and save it back - validated as JSON first, so a broken file can't be written.
   """
   use PepeWeb, :live_view
   use Gettext, backend: Pepe.Gettext
@@ -32,7 +32,7 @@ defmodule PepeWeb.ConfigLive do
         <.view_header
           icon="⚙️"
           title={gettext("Configuration file")}
-          desc={gettext("The raw config.json the runtime reads. Edit and save — it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
+          desc={gettext("The raw config.json the runtime reads. Edit and save - it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
         >
           <button phx-click="config_reload" class={btn_ghost()}>{gettext("Reload from disk")}</button>
         </.view_header>
@@ -71,7 +71,7 @@ defmodule PepeWeb.ConfigLive do
 
       {:ok, _} ->
         {:noreply,
-         put_flash(socket, :error, gettext("The top level must be a JSON object { … }."))}
+         put_flash(socket, :error, gettext("The top level must be a JSON object { ... }."))}
 
       {:error, err} ->
         {:noreply,

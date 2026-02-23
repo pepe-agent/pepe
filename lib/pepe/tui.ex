@@ -1,6 +1,6 @@
 defmodule Pepe.TUI do
   @moduledoc """
-  Interactive terminal menus — arrow-key `select` and space-toggle `multiselect`.
+  Interactive terminal menus - arrow-key `select` and space-toggle `multiselect`.
 
   Pure Elixir, no NIF. Uses OTP 28's native **raw terminal mode**
   (`:shell.start_interactive({:noshell, :raw})`) to read keystrokes without echo
@@ -206,7 +206,7 @@ defmodule Pepe.TUI do
     end
   end
 
-  # Read a single character (raw mode → returns immediately, no echo).
+  # Read a single character (raw mode -> returns immediately, no echo).
   defp getc do
     case IO.getn(:stdio, "", 1) do
       :eof -> :eof

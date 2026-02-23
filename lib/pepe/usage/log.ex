@@ -1,6 +1,6 @@
 defmodule Pepe.Usage.Log do
   @moduledoc """
-  Append-only token-usage ledger — the durable record billing is built on.
+  Append-only token-usage ledger - the durable record billing is built on.
 
   One JSONL file per company per month under
   `<PEPE_HOME>/data/usage/<company>/YYYY-MM.jsonl` (the root scope lives under
@@ -19,7 +19,7 @@ defmodule Pepe.Usage.Log do
   @doc "Root directory holding the per-company usage ledgers."
   def dir, do: Path.join([Config.home(), "data", "usage"])
 
-  @doc "The directory for one scope (`nil`/`\"root\"` → `root/`)."
+  @doc "The directory for one scope (`nil`/`\"root\"` -> `root/`)."
   def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
 
   @doc """
@@ -92,7 +92,7 @@ defmodule Pepe.Usage.Log do
   defp scope_name(scope) when scope in [nil, "", "root"], do: "root"
   defp scope_name(scope), do: to_string(scope)
 
-  # Partition file by the entry's UTC month — a storage bucket, independent of the
+  # Partition file by the entry's UTC month - a storage bucket, independent of the
   # timezone used later to draw billing-day boundaries.
   defp month_file(at) when is_integer(at) do
     dt = DateTime.from_unix!(at)

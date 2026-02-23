@@ -1,7 +1,7 @@
 defmodule Pepe.Store do
   @moduledoc """
-  Disposable key/value store for runtime data (sessions, agent memory, …), backed
-  by **Mnesia** `disc_copies` — records live in RAM (ETS speed) and are journaled
+  Disposable key/value store for runtime data (sessions, agent memory, ...), backed
+  by **Mnesia** `disc_copies` - records live in RAM (ETS speed) and are journaled
   to disk, so they survive restarts but carry no 2 GB DETS limit.
 
   This is the *disposable* tier of Pepe's storage: configs (and souls) are the

@@ -1,11 +1,11 @@
 defmodule Pepe.Skills do
   @moduledoc """
   Skills are on-demand instruction docs (Markdown) that teach the agent a
-  *procedure* — e.g. how to install a tool. Built-in skills ship under
+  *procedure* - e.g. how to install a tool. Built-in skills ship under
   `priv/skills/`; user skills live in `<PEPE_HOME>/skills/` and override a
   built-in of the same name.
 
-  They are NOT loaded into the system prompt in full — only their name + a one-line
+  They are NOT loaded into the system prompt in full - only their name + a one-line
   summary are listed there. The agent reads the relevant one with the `skill` tool
   when its topic comes up, keeping context lean.
   """

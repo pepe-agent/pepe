@@ -1,18 +1,18 @@
 defmodule Pepe.Providers do
   @moduledoc """
   Catalog of well-known, OpenAI-compatible providers, used by the CLI for a
-  guided "pick a company → pick an auth method → pick a model" flow.
+  guided "pick a company -> pick an auth method -> pick a model" flow.
 
   Each provider has one or more **auth methods**. Selecting a provider opens its
   submenu of methods:
 
-    * `:api_key` — read the key from `env` (or paste it once); `Authorization: Bearer`.
-    * `:oauth`   — subscription sign-in (ChatGPT/Codex, Claude Pro/Max, …). When the
+    * `:api_key` - read the key from `env` (or paste it once); `Authorization: Bearer`.
+    * `:oauth`   - subscription sign-in (ChatGPT/Codex, Claude Pro/Max, ...). When the
                    method carries an `:oauth_flow` spec, `Pepe.OAuth` runs the full
-                   browser PKCE login (generate link → open → capture token); without
+                   browser PKCE login (generate link -> open -> capture token); without
                    one it falls back to pasting an access token. An optional
                    `:base_url` overrides the endpoint for that method.
-    * `:none`    — local, keyless services.
+    * `:none`    - local, keyless services.
   """
 
   @providers [

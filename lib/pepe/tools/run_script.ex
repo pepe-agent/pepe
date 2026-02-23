@@ -1,6 +1,6 @@
 defmodule Pepe.Tools.RunScript do
   @moduledoc """
-  Write a short program and run it — or re-run a script the agent saved earlier.
+  Write a short program and run it - or re-run a script the agent saved earlier.
 
   This is how the agent tackles complex/multi-step tasks (read a PDF, crunch a
   spreadsheet, call an API): instead of doing them by hand, it writes a program and
@@ -147,7 +147,7 @@ defmodule Pepe.Tools.RunScript do
   end
 
   defp truncate(output) when byte_size(output) > @max_output,
-    do: binary_part(output, 0, @max_output) <> "\n…(truncated)"
+    do: binary_part(output, 0, @max_output) <> "\n...(truncated)"
 
   defp truncate(output), do: output
 end

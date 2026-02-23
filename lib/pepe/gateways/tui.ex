@@ -1,14 +1,14 @@
 defmodule Pepe.Gateways.TUI do
   @moduledoc """
-  Interactive console gateway — a REPL backed by a persistent `Pepe.Agent.Session`.
+  Interactive console gateway - a REPL backed by a persistent `Pepe.Agent.Session`.
 
   Like `mix pepe run`, but it *holds* the session: the conversation keeps context
-  across turns and the same slash commands as the other gateways work — `/new`,
+  across turns and the same slash commands as the other gateways work - `/new`,
   `/undo`, `/compact`, `/status`, `/agent`, `/help`, `/exit`. Replies stream to
   stdout and risky tools prompt through the shared arrow-key permission menu
   (`Pepe.Permissions.Prompt`), scoped to the console session.
 
-  It also exposes that console rendering — `stream_events/0` and `authorizer/0` —
+  It also exposes that console rendering - `stream_events/0` and `authorizer/0` -
   so the one-shot `run` command shares exactly the same output and prompt.
   """
 
@@ -111,14 +111,14 @@ defmodule Pepe.Gateways.TUI do
   def stream_events do
     fn
       {:assistant_delta, text} -> IO.write(text)
-      {:tool_call, name, args} -> IO.write(dim("\n[→ #{name} #{one_line(args)}]\n"))
+      {:tool_call, name, args} -> IO.write(dim("\n[-> #{name} #{one_line(args)}]\n"))
       {:tool_denied, name} -> IO.write(dim("[✗ #{name} #{gettext("not allowed")}]\n"))
       {:tool_result, name, _out} -> IO.write(dim("[✓ #{name}]\n"))
       _ -> :ok
     end
   end
 
-  @doc "The console `authorize` callback — an arrow-key menu over the shared options."
+  @doc "The console `authorize` callback - an arrow-key menu over the shared options."
   @spec authorizer() :: (String.t(), term(), map() -> Pepe.Permissions.decision())
   def authorizer do
     fn name, args, _ctx ->
@@ -208,7 +208,7 @@ defmodule Pepe.Gateways.TUI do
 
   defp run_command(key, "learn", _rest) do
     Session.learn(key)
-    info(gettext("🧠 Reviewing what I learned…"))
+    info(gettext("🧠 Reviewing what I learned..."))
   end
 
   defp run_command(key, "compact", _rest) do

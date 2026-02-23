@@ -6,7 +6,7 @@ defmodule Pepe.Watch do
   A watch is re-checked on a timer. The **trigger** is the cheap part that runs every
   interval; only when it fires does the (possibly expensive) **on_fire** run, once:
 
-    * a `probe` trigger runs a shell command — no LLM per check;
+    * a `probe` trigger runs a shell command - no LLM per check;
     * an `agent` trigger re-asks the agent (one LLM call per check) for conditions that
       need judgement.
 
@@ -29,8 +29,8 @@ defmodule Pepe.Watch do
 
   @doc """
   Run one check of a due watch. Returns `{updated_watch, delivery_text | nil}`:
-  fired → state `done` + the text to send; still waiting → bumped counters; hit
-  `max_checks` → state `expired`.
+  fired -> state `done` + the text to send; still waiting -> bumped counters; hit
+  `max_checks` -> state `expired`.
   """
   @spec evaluate(Watch.t()) :: {Watch.t(), String.t() | nil}
   def evaluate(%Watch{} = w) do
@@ -55,14 +55,14 @@ defmodule Pepe.Watch do
     end
   end
 
-  # Out of budget → stop watching (expired); otherwise keep waiting.
+  # Out of budget -> stop watching (expired); otherwise keep waiting.
   defp expire_or_keep(%Watch{checks: c, max_checks: max} = w) when c >= max,
     do: %{w | state: "expired", next_check: nil}
 
   defp expire_or_keep(w), do: w
 
   ###
-  ### trigger — is the condition met?
+  ### trigger - is the condition met?
   ###
 
   defp run_check(%Watch{trigger: %{"type" => "probe"} = t}) do
@@ -75,7 +75,7 @@ defmodule Pepe.Watch do
 
   defp run_check(%Watch{trigger: %{"type" => "agent", "prompt" => prompt}, agent: agent}) do
     contract =
-      "This is an automatic condition check — the user does not see it. Reply with " <>
+      "This is an automatic condition check - the user does not see it. Reply with " <>
         "EXACTLY `#{@fired}` if the condition is now satisfied, or `#{@wait}` if it is " <>
         "not yet. Nothing else."
 
@@ -103,7 +103,7 @@ defmodule Pepe.Watch do
   end
 
   ###
-  ### on_fire — the message to send
+  ### on_fire - the message to send
   ###
 
   defp fire_text(%Watch{on_fire: %{"type" => "template", "text" => text}}) when is_binary(text),
@@ -116,5 +116,5 @@ defmodule Pepe.Watch do
     end
   end
 
-  defp fire_text(%Watch{description: d}), do: {:ok, "✅ #{d || "watch"} — condition met."}
+  defp fire_text(%Watch{description: d}), do: {:ok, "✅ #{d || "watch"} - condition met."}
 end

@@ -1,8 +1,8 @@
 defmodule PepeWeb.DashData do
   @moduledoc """
-  Data/format helpers shared by the dashboard's per-section LiveViews — scope
+  Data/format helpers shared by the dashboard's per-section LiveViews - scope
   filtering, name qualification, form parsing and small display helpers. Kept in one
-  place so each section LiveView (AgentsLive, ModelsLive, …) can `import` them instead
+  place so each section LiveView (AgentsLive, ModelsLive, ...) can `import` them instead
   of each carrying its own copy.
   """
   use Gettext, backend: Pepe.Gettext
@@ -54,13 +54,13 @@ defmodule PepeWeb.DashData do
   def put_or_delete(map, key, nil), do: Map.delete(map, key)
   def put_or_delete(map, key, value), do: Map.put(map, key, value)
 
-  @doc "Comma text → trimmed list (\"\" → [])."
+  @doc "Comma text -> trimmed list (\"\" -> [])."
   def parse_list(nil), do: []
 
   def parse_list(str),
     do: str |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
 
-  @doc "can_manage: \"\" → nil (self), \"none\" → [], \"*\" → [\"*\"], \"a,b\" → [a, b]."
+  @doc "can_manage: \"\" -> nil (self), \"none\" -> [], \"*\" -> [\"*\"], \"a,b\" -> [a, b]."
   def parse_manage(v) do
     case blank(v) do
       nil -> nil
@@ -89,7 +89,7 @@ defmodule PepeWeb.DashData do
 
   def token_hint(nil), do: gettext("(none)")
   def token_hint("${" <> _ = env), do: env
-  def token_hint(t), do: String.slice(to_string(t), 0, 6) <> "…"
+  def token_hint(t), do: String.slice(to_string(t), 0, 6) <> "..."
 
   @doc "Apply bot changes to the running pollers (no-op if the supervisor isn't up)."
   def reload_gateways do
@@ -102,7 +102,7 @@ defmodule PepeWeb.DashData do
 
   def cron_next(cron) do
     case Pepe.Cron.next_run(cron) do
-      nil -> "—"
+      nil -> "-"
       dt -> Calendar.strftime(dt, "%Y-%m-%d %H:%M %Z")
     end
   end
@@ -131,7 +131,7 @@ defmodule PepeWeb.DashData do
     |> Enum.uniq()
   end
 
-  @doc "A readable, unique cron id derived from its name (append -2, -3, … on collision)."
+  @doc "A readable, unique cron id derived from its name (append -2, -3, ... on collision)."
   def new_cron_id(name) do
     base =
       name
@@ -170,7 +170,7 @@ defmodule PepeWeb.DashData do
   def key_status(env) do
     if System.get_env(env),
       do: gettext("✓ it's set."),
-      else: gettext("⚠ not set yet — export it before use.")
+      else: gettext("⚠ not set yet - export it before use.")
   end
 
   def watch_origin_label(%{"channel" => "telegram"}), do: "telegram"
@@ -180,12 +180,12 @@ defmodule PepeWeb.DashData do
   def learn_icon(:skill), do: "🧠"
   def learn_icon(_memory), do: "📝"
 
-  def learn_date(0), do: "—"
+  def learn_date(0), do: "-"
 
   def learn_date(ts) do
     case DateTime.from_unix(ts) do
       {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-      _ -> "—"
+      _ -> "-"
     end
   end
 
@@ -197,7 +197,7 @@ defmodule PepeWeb.DashData do
     |> Enum.uniq()
   end
 
-  ## shared sidebar events — the workspace scope drives agents/models, so changing it
+  ## shared sidebar events - the workspace scope drives agents/models, so changing it
   ## (or creating a company) jumps to that scope's Agents page.
 
   def set_scope(socket, %{"scope" => scope}, base) do
@@ -255,7 +255,7 @@ defmodule PepeWeb.DashData do
   def tokens(_), do: "0"
 
   @doc "A short label for how fresh the live price cache is."
-  def price_cache_label(nil), do: gettext("using built-in seed prices — never refreshed")
+  def price_cache_label(nil), do: gettext("using built-in seed prices - never refreshed")
 
   def price_cache_label(%{fetched_at: at, count: count}) do
     date = at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")

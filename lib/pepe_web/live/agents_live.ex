@@ -52,7 +52,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </div>
             <div class="mt-1 text-xs text-zinc-400">{gettext("model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
-            <div :if={a.can_message != []} class="text-xs text-zinc-500">→ {gettext("messages:")} {Enum.join(a.can_message, ", ")}</div>
+            <div :if={a.can_message != []} class="text-xs text-zinc-500">-> {gettext("messages:")} {Enum.join(a.can_message, ", ")}</div>
             <div :if={a.can_manage} class="text-xs text-zinc-500">⚙ {gettext("manages:")} {manages_text(a.can_manage)}</div>
           </div>
 
@@ -67,7 +67,7 @@ defmodule PepeWeb.AgentsLive do
 
             <div>
               <label class={lbl()}>{gettext("Persona (system prompt)")}</label>
-              <textarea name="system_prompt" rows="3" placeholder={gettext("You are …")} class={fld()}>{@edit_agent.system_prompt}</textarea>
+              <textarea name="system_prompt" rows="3" placeholder={gettext("You are ...")} class={fld()}>{@edit_agent.system_prompt}</textarea>
             </div>
 
             <div>
@@ -79,7 +79,7 @@ defmodule PepeWeb.AgentsLive do
             </div>
 
             <div>
-              <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("— what this agent can do")}</span></label>
+              <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("- what this agent can do")}</span></label>
               <div class="grid grid-cols-2 gap-1 rounded bg-zinc-900/60 p-2">
                 <label :for={t <- Pepe.Tools.names()} class="flex items-center gap-1.5 text-xs text-zinc-300">
                   <input type="checkbox" name="tools[]" value={t} checked={t in @edit_agent.tools} /> {t}
@@ -88,13 +88,23 @@ defmodule PepeWeb.AgentsLive do
             </div>
 
             <div>
-              <label class={lbl()}>{gettext("Can message — agents it may talk to")}</label>
+              <label class={lbl()}>{gettext("Privacy hooks")} <span class="text-zinc-600">{gettext("- redact PII on the message flow")}</span></label>
+              <div class="grid grid-cols-2 gap-1 rounded bg-zinc-900/60 p-2">
+                <label :for={h <- Pepe.Hooks.names()} class="flex items-center gap-1.5 text-xs text-zinc-300">
+                  <input type="checkbox" name="hooks[]" value={h} checked={h in (@edit_agent.hooks || [])} /> {h}
+                </label>
+              </div>
+              <p class={hlp()}>{gettext("Configure each hook (packs, model, ...) under Config; empty = no redaction (raw).")}</p>
+            </div>
+
+            <div>
+              <label class={lbl()}>{gettext("Can message - agents it may talk to")}</label>
               <input name="can_message" value={Enum.join(@edit_agent.can_message, ",")} placeholder={gettext("e.g. helper, researcher")} class={fld()} />
               <p class={hlp()}>{gettext("Comma-separated agent names. Blank = talks to no one.")}</p>
             </div>
 
             <div>
-              <label class={lbl()}>{gettext("Admin scope — which agents it can manage & train")}</label>
+              <label class={lbl()}>{gettext("Admin scope - which agents it can manage & train")}</label>
               <input name="can_manage" value={manage_field(@edit_agent.can_manage)} placeholder={gettext("blank")} class={fld()} />
               <p class={hlp()}>
                 <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("itself only")} ·
@@ -124,7 +134,8 @@ defmodule PepeWeb.AgentsLive do
       model: nil,
       tools: [],
       can_message: [],
-      can_manage: nil
+      can_manage: nil,
+      hooks: []
     }
 
     {:noreply, assign(socket, edit_agent: blank)}
@@ -154,7 +165,8 @@ defmodule PepeWeb.AgentsLive do
           model: blank(params["model"]),
           tools: params["tools"] || [],
           can_message: parse_list(params["can_message"]),
-          can_manage: parse_manage(params["can_manage"])
+          can_manage: parse_manage(params["can_manage"]),
+          hooks: params["hooks"] || []
       }
 
       Config.put_agent(agent)

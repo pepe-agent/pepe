@@ -1,18 +1,18 @@
 defmodule Pepe.Gateways.Telegram do
   @moduledoc """
   Telegram gateway via long polling (`getUpdates`). Each chat maps to a persistent
-  Pepe session, so conversations keep context — talk to your agent from Telegram
+  Pepe session, so conversations keep context - talk to your agent from Telegram
   while it works.
 
-  **Multi-channel:** you can run several bots at once, each bound to its own agent —
+  **Multi-channel:** you can run several bots at once, each bound to its own agent -
   one bot is agent X, another is agent Y. `Pepe.Gateways.Supervisor` starts one
   instance of this GenServer per configured bot; each keeps the bot map it serves in
   its process dictionary (`@bot_key`), so its token, bound agent, allowlists and
   session-key namespace are all its own. The default (legacy) bot uses the plain
   `telegram:<chat_id>` session key; named bots use `telegram:<name>:<chat_id>`.
 
-  Configuration — the default bot lives under `"telegram"`, additional bots under
-  `"telegrams"` (a name→config map), in `~/.pepe/config.json`:
+  Configuration - the default bot lives under `"telegram"`, additional bots under
+  `"telegrams"` (a name->config map), in `~/.pepe/config.json`:
 
       {
         "telegram": { "bot_token": "${TELEGRAM_BOT_TOKEN}", "agent": "assistant" },
@@ -61,15 +61,15 @@ defmodule Pepe.Gateways.Telegram do
       {"new", gettext("Start a fresh conversation")},
       {"undo", gettext("Undo your last message")},
       {"compact", gettext("Summarize history to free up context")},
-      {"agent", gettext("Switch agent — /agent <name>")},
-      {"model", gettext("Show or set the model — /model <name>")},
+      {"agent", gettext("Switch agent - /agent <name>")},
+      {"model", gettext("Show or set the model - /model <name>")},
       {"models", gettext("List configured models")},
       {"tools", gettext("List available runtime tools")},
-      {"skill", gettext("List or run a skill — /skill <name>")},
-      {"approve", gettext("Manage saved tool permissions — /approve")},
+      {"skill", gettext("List or run a skill - /skill <name>")},
+      {"approve", gettext("Manage saved tool permissions - /approve")},
       {"status", gettext("Show session info")},
       {"whoami", gettext("Show your Telegram ids")},
-      {"btw", gettext("Ask a side question that isn't saved — /btw <q>")},
+      {"btw", gettext("Ask a side question that isn't saved - /btw <q>")},
       {"learn", gettext("Save what I learned to memory/skills")},
       {"stop", gettext("Stop the current run")},
       {"help", gettext("List commands")}
@@ -103,7 +103,7 @@ defmodule Pepe.Gateways.Telegram do
     end)
   end
 
-  # Telegram commands: lowercase a–z, digits, underscore, ≤32 chars.
+  # Telegram commands: lowercase a-z, digits, underscore, ≤32 chars.
   @spec command_name(String.t()) :: String.t()
   defp command_name(name) do
     name
@@ -113,7 +113,7 @@ defmodule Pepe.Gateways.Telegram do
     |> String.slice(0, 32)
   end
 
-  # Telegram descriptions must be 1–256 chars; fall back to a generic line.
+  # Telegram descriptions must be 1-256 chars; fall back to a generic line.
   @spec command_desc(String.t(), String.t()) :: String.t()
   defp command_desc(summary, name) do
     case summary |> to_string() |> String.trim() |> String.slice(0, 256) do
@@ -183,7 +183,7 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Scopes Pepe never sets itself. A more-specific scope (e.g. a leftover set by
-  # another app that shared this token) overrides our default menu — so we clear
+  # another app that shared this token) overrides our default menu - so we clear
   # them on boot to make sure our default-scope commands always win.
   @owned_scopes ["all_private_chats", "all_group_chats", "all_chat_administrators"]
 
@@ -202,7 +202,7 @@ defmodule Pepe.Gateways.Telegram do
   @impl true
   def handle_info(:poll, state) do
     # Read the token fresh each poll so a token change in the config takes effect
-    # live — no restart needed (most config is hot-reloaded this way).
+    # live - no restart needed (most config is hot-reloaded this way).
     state =
       case token() && get_updates(token(), state.offset) do
         {:ok, updates} ->
@@ -268,7 +268,7 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Session keys belonging to THIS bot: "telegram:<chat_id>" for the default bot,
-  # "telegram:<name>:<chat_id>" for a named one — never another bot's sessions.
+  # "telegram:<name>:<chat_id>" for a named one - never another bot's sessions.
   defp bot_session_keys(bot) do
     name = bot["name"] || "default"
     prefix = if name == "default", do: "telegram:", else: "telegram:#{name}:"
@@ -387,8 +387,8 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Non-text messages: download the file into the agent's workspace and hand it the
-  # path, so it can figure out how to understand it (transcribe, read, …) with its
-  # own tools — installing whatever it needs. We don't hardcode transcription.
+  # path, so it can figure out how to understand it (transcribe, read, ...) with its
+  # own tools - installing whatever it needs. We don't hardcode transcription.
   defp handle_update(%{"message" => %{"voice" => %{"file_id" => id}} = m}),
     do: media(m, id, "voice")
 
@@ -502,7 +502,7 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # "/cmd@botname args" → {:command, "cmd", "args"}; anything else → :chat.
+  # "/cmd@botname args" -> {:command, "cmd", "args"}; anything else -> :chat.
   defp parse_command("/" <> rest) do
     {cmd, args} =
       case String.split(rest, ~r/\s+/, parts: 2) do
@@ -537,11 +537,11 @@ defmodule Pepe.Gateways.Telegram do
         {:error, :busy} ->
           send_message(
             chat_id,
-            gettext("I'm still on the previous message — send /stop to cancel it.")
+            gettext("I'm still on the previous message - send /stop to cancel it.")
           )
 
         {:error, reason} ->
-          # Never leak raw internal errors into the chat — log them, reply kindly.
+          # Never leak raw internal errors into the chat - log them, reply kindly.
           Logger.warning("[telegram] chat error: #{safe_inspect(reason)}")
           send_message(chat_id, friendly_error(reason))
       end
@@ -576,7 +576,7 @@ defmodule Pepe.Gateways.Telegram do
 
   # The `authorize` callback Pepe calls before a risky tool runs. It executes in
   # the Session process; we render Telegram's own inline keyboard and block until
-  # the poll loop delivers the pressed button (or we time out → deny).
+  # the poll loop delivers the pressed button (or we time out -> deny).
   defp authorizer(chat_id) do
     # Captured here (in the bot's task) and re-installed when the Session process
     # invokes the callback, so the prompt is sent via *this* bot's token.
@@ -646,8 +646,8 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # The meaningful field to show (command for bash, path for write_file, …) in a
-  # code block — not the raw JSON args.
+  # The meaningful field to show (command for bash, path for write_file, ...) in a
+  # code block - not the raw JSON args.
   defp arg_block(map) when map_size(map) == 0, do: ""
   defp arg_block(map), do: "\n<code>" <> esc(map_preview(map)) <> "</code>"
 
@@ -664,10 +664,10 @@ defmodule Pepe.Gateways.Telegram do
 
   defp clip(text) do
     one = text |> to_string() |> String.replace(~r/\s+/, " ") |> String.trim()
-    if String.length(one) > 300, do: String.slice(one, 0, 299) <> "…", else: one
+    if String.length(one) > 300, do: String.slice(one, 0, 299) <> "...", else: one
   end
 
-  # "perm:<id>:<token>" → wake the waiting session and tidy the message.
+  # "perm:<id>:<token>" -> wake the waiting session and tidy the message.
   defp deliver_permission("perm:" <> rest, cq) do
     case String.split(rest, ":") do
       [id_str, token] ->
@@ -777,7 +777,7 @@ defmodule Pepe.Gateways.Telegram do
       ensure_session(chat_id)
 
       case Pepe.Agent.Session.learn(session_key(chat_id)) do
-        :ok -> send_message(chat_id, gettext("🧠 Reviewing what I learned…"))
+        :ok -> send_message(chat_id, gettext("🧠 Reviewing what I learned..."))
         {:error, :not_allowed} -> send_message(chat_id, gettext("Learning is off for this chat."))
         _ -> send_message(chat_id, gettext("No agent to learn with."))
       end
@@ -843,14 +843,14 @@ defmodule Pepe.Gateways.Telegram do
 
   defp help_text do
     gettext("Commands:") <>
-      "\n" <> Enum.map_join(full_menu(), "\n", fn {n, d} -> "/#{n} — #{d}" end)
+      "\n" <> Enum.map_join(full_menu(), "\n", fn {n, d} -> "/#{n} - #{d}" end)
   end
 
   ###
   ### command helpers
   ###
 
-  # /whoami — surface the ids needed to fill the allowlists in config.
+  # /whoami - surface the ids needed to fill the allowlists in config.
   defp whoami(chat_id, user_id) do
     send_message(
       chat_id,
@@ -866,7 +866,7 @@ defmodule Pepe.Gateways.Telegram do
       models ->
         htmlb(gettext("Available models")) <>
           "\n" <>
-          Enum.map_join(models, "\n", fn m -> "• " <> htmlb(m.name) <> " — " <> esc(m.model) end)
+          Enum.map_join(models, "\n", fn m -> "• " <> htmlb(m.name) <> " - " <> esc(m.model) end)
     end
   end
 
@@ -902,7 +902,7 @@ defmodule Pepe.Gateways.Telegram do
       Pepe.Tools.all()
       |> Enum.map(fn mod -> {mod.name(), tool_label(mod)} end)
       |> Enum.sort()
-      |> Enum.map_join("\n\n", fn {name, desc} -> "• " <> htmlb(name) <> " — " <> esc(desc) end)
+      |> Enum.map_join("\n\n", fn {name, desc} -> "• " <> htmlb(name) <> " - " <> esc(desc) end)
 
     htmlb(gettext("Available tools")) <> "\n\n" <> body
   end
@@ -952,7 +952,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp skill_summary(_other), do: nil
 
-  # First sentence of a description, trimmed — keeps the tool list scannable.
+  # First sentence of a description, trimmed - keeps the tool list scannable.
   defp short_desc(text) do
     first =
       text
@@ -961,7 +961,7 @@ defmodule Pepe.Gateways.Telegram do
       |> List.first()
       |> to_string()
 
-    if String.length(first) > 110, do: String.slice(first, 0, 109) <> "…", else: first
+    if String.length(first) > 110, do: String.slice(first, 0, 109) <> "...", else: first
   end
 
   defp skills_text do
@@ -973,7 +973,7 @@ defmodule Pepe.Gateways.Telegram do
         htmlb(gettext("Available skills (run with /skill <name>):")) <>
           "\n\n" <>
           Enum.map_join(skills, "\n\n", fn {name, summary} ->
-            "• " <> htmlb(name) <> " — " <> esc(skill_summary(name) || summary)
+            "• " <> htmlb(name) <> " - " <> esc(skill_summary(name) || summary)
           end)
     end
   end
@@ -991,7 +991,7 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # /approve — inspect or clear the agent's persistent ("always allow") grants.
+  # /approve - inspect or clear the agent's persistent ("always allow") grants.
   defp manage_approvals(chat_id, []) do
     agent_name = agent_default()
 
@@ -1000,7 +1000,7 @@ defmodule Pepe.Gateways.Telegram do
         send_message(chat_id, gettext("No agent is configured."))
 
       %{auto_approve: []} ->
-        send_message(chat_id, gettext("Nothing is pre-approved — I'll ask before risky tools."))
+        send_message(chat_id, gettext("Nothing is pre-approved - I'll ask before risky tools."))
 
       %{auto_approve: tools} ->
         send_message(
@@ -1097,7 +1097,7 @@ defmodule Pepe.Gateways.Telegram do
 
   # An `on_event` callback that renders the agent's tool activity into a single
   # status message which updates in place as tools run, then deletes itself when the
-  # run finishes — so only the final answer stays in the chat. Runs in the run task
+  # run finishes - so only the final answer stays in the chat. Runs in the run task
   # process, so it re-installs this bot and keeps its state in that process dict.
   defp activity_callback(chat_id) do
     b = bot()
@@ -1112,12 +1112,12 @@ defmodule Pepe.Gateways.Telegram do
   @tool_done "✅"
 
   # How much of the agent's tool activity to surface, per bot (`"tool_progress"`):
-  #   * "reaction" — (default) NO message at all; just a 👀 reaction on the user's own
+  #   * "reaction" - (default) NO message at all; just a 👀 reaction on the user's own
   #     message while working, cleared when the answer lands. The quietest signal.
-  #   * "ambient"  — a single vague "what kind of work is happening" line, edited in
+  #   * "ambient"  - a single vague "what kind of work is happening" line, edited in
   #     place; no tool names, args or per-step ledger.
-  #   * "off"      — nothing but the native typing indicator.
-  #   * "verbose"  — the detailed per-tool breadcrumb list (for power users).
+  #   * "off"      - nothing but the native typing indicator.
+  #   * "verbose"  - the detailed per-tool breadcrumb list (for power users).
   # The message-based modes use one message, edited in place, deleted when done.
   defp progress_mode, do: bot()["tool_progress"] || "reaction"
 
@@ -1159,25 +1159,25 @@ defmodule Pepe.Gateways.Telegram do
   defp ambient_phrase(name) do
     cond do
       name == "web_search" ->
-        "🔎 " <> gettext("looking things up…")
+        "🔎 " <> gettext("looking things up...")
 
       name == "fetch_url" ->
-        "🌐 " <> gettext("fetching a page…")
+        "🌐 " <> gettext("fetching a page...")
 
       name in ["bash", "run_script"] ->
-        "💻 " <> gettext("running something…")
+        "💻 " <> gettext("running something...")
 
       name in ~w(read_file write_file edit_file list_dir move_file) ->
-        "📄 " <> gettext("working with files…")
+        "📄 " <> gettext("working with files...")
 
       name == "send_to_agent" ->
-        "💬 " <> gettext("checking with another agent…")
+        "💬 " <> gettext("checking with another agent...")
 
       String.starts_with?(name, "mcp__") ->
-        "🧰 " <> gettext("using a connected tool…")
+        "🧰 " <> gettext("using a connected tool...")
 
       true ->
-        "⚙️ " <> gettext("working on it…")
+        "⚙️ " <> gettext("working on it...")
     end
   end
 
@@ -1290,7 +1290,7 @@ defmodule Pepe.Gateways.Telegram do
     |> String.replace(">", "&gt;")
   end
 
-  # Telegram's "typing…" bubble lasts only ~5s, so a long non-streaming turn (slow
+  # Telegram's "typing..." bubble lasts only ~5s, so a long non-streaming turn (slow
   # model, no tool calls) would look frozen after the first hint. Keep it alive by
   # re-sending the action every few seconds until the run finishes. Linked to the run
   # task (so a crash tears it down) but stopped explicitly, since a normal task exit
@@ -1342,7 +1342,7 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # The bot's `enabled` flag — lets you pause it without deleting the token.
+  # The bot's `enabled` flag - lets you pause it without deleting the token.
   defp active?, do: bot()["enabled"] != false
 
   # Both the chat and the user must clear this bot's (optional) allowlists. An empty

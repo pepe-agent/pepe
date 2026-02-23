@@ -2,18 +2,18 @@ defmodule PepeWeb.AgentChannel do
   @moduledoc """
   Streaming agent conversation over WebSocket.
 
-  Topic: `agent:<agent_name>` — use `agent:default` for the default agent.
+  Topic: `agent:<agent_name>` - use `agent:default` for the default agent.
 
   Inbound events:
-    * `"prompt"`  %{"text" => "..."}  — send a message; streams the reply
-    * `"reset"`                        — clear the conversation history
+    * `"prompt"`  %{"text" => "..."}  - send a message; streams the reply
+    * `"reset"`                        - clear the conversation history
 
   Outbound events:
-    * `"delta"`        %{"text" => "..."}        — streamed text fragment
-    * `"tool_call"`    %{"name", "arguments"}    — a tool is being invoked
-    * `"tool_result"`  %{"name", "output"}       — tool output
-    * `"done"`         %{"content" => "..."}      — final answer
-    * `"watch"`        %{"text" => "..."}         — a fired watch's notification
+    * `"delta"`        %{"text" => "..."}        - streamed text fragment
+    * `"tool_call"`    %{"name", "arguments"}    - a tool is being invoked
+    * `"tool_result"`  %{"name", "output"}       - tool output
+    * `"done"`         %{"content" => "..."}      - final answer
+    * `"watch"`        %{"text" => "..."}         - a fired watch's notification
     * `"error"`        %{"reason" => "..."}
 
   A watch created from this connection (via the `watch` tool) delivers back here as a
@@ -105,7 +105,7 @@ defmodule PepeWeb.AgentChannel do
     {:noreply, assign(socket, messages: messages)}
   end
 
-  # A watch created from this connection fired — push its message to the client.
+  # A watch created from this connection fired - push its message to the client.
   def handle_info({:watch_message, _origin, text}, socket) do
     push(socket, "watch", %{text: text})
     {:noreply, socket}

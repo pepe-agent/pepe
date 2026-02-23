@@ -71,20 +71,20 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
   end
 
   test "trainers allowlist decides who a bot learns from" do
-    # null / missing → learns from everyone
+    # null / missing -> learns from everyone
     assert Telegram.learns_from?(%{}, 111)
     assert Telegram.learns_from?(%{"trainers" => nil}, 111)
-    # [] → learns from no one (a client-facing bot)
+    # [] -> learns from no one (a client-facing bot)
     refute Telegram.learns_from?(%{"trainers" => []}, 111)
-    # [ids] → only those users
+    # [ids] -> only those users
     assert Telegram.learns_from?(%{"trainers" => [111, 222]}, 111)
     refute Telegram.learns_from?(%{"trainers" => [111, 222]}, 999)
-    # ["*"] → everyone (explicit, the standard "all" token)
+    # ["*"] -> everyone (explicit, the standard "all" token)
     assert Telegram.learns_from?(%{"trainers" => ["*"]}, 999)
   end
 
   test "delivering to an unknown/missing bot is a safe no-op" do
-    # No bots configured → nothing to deliver to, but never raises.
+    # No bots configured -> nothing to deliver to, but never raises.
     assert Telegram.deliver("999", "hi") == :ok
     assert Telegram.deliver("nope:999", "hi") == :ok
   end

@@ -1,7 +1,7 @@
 defmodule Pepe.Tools.ManageMcp do
   @moduledoc """
-  Let an agent connect and inspect **MCP (Model Context Protocol) servers** — external
-  tool providers like Sentry or GitHub — from a conversation.
+  Let an agent connect and inspect **MCP (Model Context Protocol) servers** - external
+  tool providers like Sentry or GitHub - from a conversation.
 
   The typical flow (autonomous, no manual install because the server is launched via
   `npx` on demand):
@@ -11,7 +11,7 @@ defmodule Pepe.Tools.ManageMcp do
     2. `tools` it to validate the connection **live** and see what it offers.
     3. Grant an agent the *read-only* subset by adding the specific tool names
        (e.g. `mcp__sentry__find_organizations`) to that agent's tools with
-       `manage_agent` — leaving the mutating ones (`mcp__sentry__update_issue`) out.
+       `manage_agent` - leaving the mutating ones (`mcp__sentry__update_issue`) out.
 
   It's a risky tool (in the allowlist + through the permission gate). Secrets are
   expected as env-var references; a raw-looking token in the args is refused.
@@ -31,15 +31,15 @@ defmodule Pepe.Tools.ManageMcp do
     function(
       "manage_mcp",
       """
-      Connect and inspect MCP (Model Context Protocol) servers — external tool \
+      Connect and inspect MCP (Model Context Protocol) servers - external tool \
       providers. Put tokens as ${ENV_VAR} references, never raw. Actions:
-      - add: register a server — needs `name`, `command` (e.g. "npx"), `args` (array, \
+      - add: register a server - needs `name`, `command` (e.g. "npx"), `args` (array, \
         e.g. ["-y","@sentry/mcp-server@latest","--access-token","${SENTRY_AUTH_TOKEN}"]); \
         optional `env` (object of ${ENV} refs).
-      - tools: launch the server and list its tools live to validate — needs `name`. \
+      - tools: launch the server and list its tools live to validate - needs `name`. \
         Their agent-facing names are mcp__<name>__<tool>.
       - list: show configured servers.
-      - remove: delete a server — needs `name`.
+      - remove: delete a server - needs `name`.
 
       After adding, grant an agent only the READ tools via manage_agent (add_tool).
       """,
@@ -101,7 +101,7 @@ defmodule Pepe.Tools.ManageMcp do
       _ ->
         case Pepe.MCP.tools(name) do
           {:ok, tools} ->
-            {:ok, "#{name} exposes (agent name → description):\n\n" <> render_tools(name, tools)}
+            {:ok, "#{name} exposes (agent name -> description):\n\n" <> render_tools(name, tools)}
 
           {:error, reason} ->
             {:error, "couldn't reach #{name}: #{inspect(reason)}"}
@@ -138,7 +138,7 @@ defmodule Pepe.Tools.ManageMcp do
 
   defp render_tools(server, tools) do
     Enum.map_join(tools, "\n", fn t ->
-      "• mcp__#{server}__#{t["name"]} — #{String.slice(to_string(t["description"]), 0, 100)}"
+      "• mcp__#{server}__#{t["name"]} - #{String.slice(to_string(t["description"]), 0, 100)}"
     end)
   end
 

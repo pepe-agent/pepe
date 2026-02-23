@@ -3,7 +3,7 @@ defmodule Pepe.Tools.ScheduleTask do
   Create and manage the agent's own **scheduled tasks** (crons) from a conversation.
 
   A scheduled task runs a self-contained prompt on a recurring schedule, in a fresh
-  session with no chat history — so when the agent creates one it must bake the full
+  session with no chat history - so when the agent creates one it must bake the full
   context into `prompt` (what to do, which data, the window), exactly the way the
   user described it in chat.
 
@@ -41,13 +41,13 @@ defmodule Pepe.Tools.ScheduleTask do
       actions:
       - create: needs `name`, `prompt`, `schedule` (5-field cron, e.g. "0 8 * * *" \
         = 08:00 daily); optional `timezone` (IANA, e.g. "America/Sao_Paulo", \
-        "Europe/Berlin" — omit to use the default), `model` (a configured model to \
+        "Europe/Berlin" - omit to use the default), `model` (a configured model to \
         run it with), `deliver` ("telegram:<chat_id>" to report to a chat, "none" to \
         report nowhere; omit to report back to THIS chat).
       - list: show all scheduled tasks.
-      - run: force a task now to preview it — needs `id`.
+      - run: force a task now to preview it - needs `id`.
       - enable / disable / remove: needs `id`.
-      - history: recent runs of a task — needs `id`.
+      - history: recent runs of a task - needs `id`.
       """,
       %{
         "type" => "object",
@@ -189,7 +189,7 @@ defmodule Pepe.Tools.ScheduleTask do
     next = Pepe.Cron.next_run(c)
 
     [
-      "• #{c.id} — #{c.name}#{if c.enabled, do: "", else: " (disabled)"}",
+      "• #{c.id} - #{c.name}#{if c.enabled, do: "", else: " (disabled)"}",
       "  when: #{c.schedule} (#{c.timezone})",
       next && "  next: #{Calendar.strftime(next, "%Y-%m-%d %H:%M %Z")}",
       "  deliver: #{c.deliver}",
@@ -236,7 +236,7 @@ defmodule Pepe.Tools.ScheduleTask do
   defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: v)
   defp blank_to_nil(v), do: v
 
-  # A readable, unique id derived from the name (append -2, -3, … on collision).
+  # A readable, unique id derived from the name (append -2, -3, ... on collision).
   defp unique_id(name) do
     base =
       name

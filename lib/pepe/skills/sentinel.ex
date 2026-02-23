@@ -2,17 +2,17 @@ defmodule Pepe.Skills.Sentinel do
   @moduledoc """
   Static security scan for skill content **before it's installed or trusted**.
 
-  A skill is a Markdown file the agent later *follows as instructions* — so
+  A skill is a Markdown file the agent later *follows as instructions* - so
   installing one from outside the project is executing someone else's text. This
   scans for the shapes of attack that show up in that text: prompt injection,
   secret exfiltration, destructive commands, persistence, obfuscation.
 
-  Pattern-based and deliberately simple (no AST, no execution) — a fast, dependency
+  Pattern-based and deliberately simple (no AST, no execution) - a fast, dependency
   free first line of defense. It flags; it never blocks anything itself. Verdicts:
 
-    * `:safe`    — nothing matched.
-    * `:caution` — matched a pattern that's often legitimate (e.g. `curl`); read it.
-    * `:danger`  — matched a pattern with no good reason to be in a skill.
+    * `:safe`    - nothing matched.
+    * `:caution` - matched a pattern that's often legitimate (e.g. `curl`); read it.
+    * `:danger`  - matched a pattern with no good reason to be in a skill.
 
   Used by the `install-skill` skill (via `Pepe.Skills.Sentinel.scan/1`) as a second,
   programmatic check alongside the agent's own read-through.
@@ -61,7 +61,7 @@ defmodule Pepe.Skills.Sentinel do
 
   @doc """
   Scan skill markdown text. Returns findings (possibly empty) and an overall
-  verdict — the worst individual finding's severity.
+  verdict - the worst individual finding's severity.
   """
   @spec scan(String.t()) :: %{verdict: verdict(), findings: [finding()]}
   def scan(text) when is_binary(text) do
@@ -99,8 +99,8 @@ defmodule Pepe.Skills.Sentinel do
 
     header =
       case verdict do
-        :danger -> "#{icon} DANGER — do not install without explicit review:"
-        :caution -> "#{icon} Caution — review these before installing:"
+        :danger -> "#{icon} DANGER - do not install without explicit review:"
+        :caution -> "#{icon} Caution - review these before installing:"
       end
 
     header <>

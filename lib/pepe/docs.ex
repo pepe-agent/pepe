@@ -1,11 +1,11 @@
 defmodule Pepe.Docs do
   @moduledoc """
-  Bundled how-to documentation the agent reads to learn **how Pepe itself works** —
+  Bundled how-to documentation the agent reads to learn **how Pepe itself works** -
   the authoritative source for configuring agents, channels, scheduled tasks, MCP
   servers, permissions, etc. Docs ship under `priv/docs/`; extra docs can live in
   `<PEPE_HOME>/docs/` (and override a built-in of the same name).
 
-  Like skills, docs aren't loaded in full — only their titles are listed in the
+  Like skills, docs aren't loaded in full - only their titles are listed in the
   system prompt; the agent reads the relevant one on demand with the `docs` tool.
   """
 

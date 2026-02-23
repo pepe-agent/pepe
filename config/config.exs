@@ -7,7 +7,7 @@
 # General application configuration
 import Config
 
-# Pepe keeps no database by default — model connections, agents and gateway
+# Pepe keeps no database by default - model connections, agents and gateway
 # credentials live in a JSON config file (see Pepe.Config). Ecto deps remain
 # available if you want to add persistence later.
 config :pepe,

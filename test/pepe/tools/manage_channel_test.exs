@@ -40,7 +40,7 @@ defmodule Pepe.Tools.ManageChannelTest do
     assert bot["agent"] == "sales-bot"
   end
 
-  test "rejects a raw token — must be an env var NAME" do
+  test "rejects a raw token - must be an env var NAME" do
     args = %{
       "action" => "add",
       "name" => "sales",

@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.Pepe do
-  @shortdoc "Pepe CLI — manage agents & model connections, run, chat, serve"
+  @shortdoc "Pepe CLI - manage agents & model connections, run, chat, serve"
   @moduledoc """
   Pepe command-line interface.
 
@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Pepe do
 
       mix pepe model                                        # show current + switch/add (easiest)
 
-      # guided: pick a provider → auth method → model
+      # guided: pick a provider -> auth method -> model
       mix pepe model add NAME [--default]
       # or fully manual:
       mix pepe model add NAME --base-url URL --api-key KEY [--model ID] [--default]
@@ -37,7 +37,7 @@ defmodule Mix.Tasks.Pepe do
   ## API access tokens
 
   Bearer tokens for the `/v1` HTTP API. With no tokens the API is open (legacy
-  behaviour); creating the first one locks it — every call then needs a valid token.
+  behaviour); creating the first one locks it - every call then needs a valid token.
   Scope a token to a company (`--company`) or a single agent (`--agent HANDLE`).
 
       mix pepe token add [--company CO] [--agent HANDLE] [--label "..."]
@@ -46,7 +46,7 @@ defmodule Mix.Tasks.Pepe do
 
   ## Watches (one-shot "notify me when X")
 
-  A watch polls a cheap probe and notifies **once** when it passes, then stops —
+  A watch polls a cheap probe and notifies **once** when it passes, then stops -
   durable across restarts. Agent-judged watches are created from chat (the `watch`
   tool); the CLI creates probe watches.
 
@@ -81,11 +81,11 @@ defmodule Mix.Tasks.Pepe do
 
       mix pepe tools                           # list built-in tools
       mix pepe timelearn [AGENT]               # what the agent has learned, on a timeline
-      mix pepe cron list|add|run|logs …        # scheduled tasks (recurring agent jobs)
-      mix pepe usage [--company CO] …          # token usage & cost by cycle (billing)
-      mix pepe usage export --company CO …     # generate a client invoice (md/csv)
+      mix pepe cron list|add|run|logs ...        # scheduled tasks (recurring agent jobs)
+      mix pepe usage [--company CO] ...          # token usage & cost by cycle (billing)
+      mix pepe usage export --company CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
-      mix pepe mcp add|list|tools|remove …      # external tool servers (MCP: Sentry, GitHub, …)
+      mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe setup                           # scaffold ~/.pepe/config.json
       mix pepe config                          # show config path + summary
@@ -176,6 +176,13 @@ defmodule Mix.Tasks.Pepe do
       ["company" | rest] ->
         with_config(fn -> company_cmd(rest) end)
 
+      # `hooks generate` calls a model (needs the app); `list` just reads.
+      ["hooks", "generate" | rest] ->
+        with_app([], fn -> hooks_cmd(["generate" | rest]) end)
+
+      ["hooks" | rest] ->
+        with_config(fn -> hooks_cmd(rest) end)
+
       ["token" | rest] ->
         with_config(fn -> token_cmd(rest) end)
 
@@ -200,12 +207,17 @@ defmodule Mix.Tasks.Pepe do
       ["serve" | rest] ->
         with_app([serve: true, gateways: true, port: serve_port(rest)], fn -> serve_cmd(rest) end)
 
-      # Configuring a gateway only touches the config file — no app needed.
+      # Configuring a gateway only touches the config file - no app needed.
       ["gateway", "telegram", "setup" | _] ->
         with_config(&telegram_setup/0)
 
       ["gateway", "telegram", sub | rest] when sub in ["add", "remove", "list"] ->
         with_config(fn -> gateway_cmd(["telegram", sub | rest]) end)
+
+      # WhatsApp connections are webhook-based - served by `mix pepe serve`, so the
+      # CLI just edits config (no running poller).
+      ["gateway", "whatsapp" | rest] ->
+        with_config(fn -> gateway_cmd(["whatsapp" | rest]) end)
 
       ["gateway" | rest] ->
         with_app([gateways: true], fn -> gateway_cmd(rest) end)
@@ -226,7 +238,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   # Commands that talk to a model / serve: start the full OTP app. `opts` decides
-  # what to bring up — `serve: true` opens the HTTP endpoint, `gateways: true`
+  # what to bring up - `serve: true` opens the HTTP endpoint, `gateways: true`
   # starts the messaging gateways (Telegram). Local `run`/`tui` pass neither.
   defp with_app(opts, fun) do
     serve? = Keyword.get(opts, :serve, false)
@@ -273,7 +285,7 @@ defmodule Mix.Tasks.Pepe do
   ### model
   ###
 
-  # `mix pepe model` (no subcommand): the friendly entry point — show the current
+  # `mix pepe model` (no subcommand): the friendly entry point - show the current
   # default and either switch among saved connections or start the add wizard.
   defp model_cmd([]) do
     case Config.models() do
@@ -292,7 +304,7 @@ defmodule Mix.Tasks.Pepe do
                 dim("+ add a new connection")
 
               m ->
-                mark = if m.name == default, do: dim(" ← current"), else: ""
+                mark = if m.name == default, do: dim(" <- current"), else: ""
                 [m.name, dim("  (#{m.model})"), mark]
             end
           )
@@ -436,11 +448,11 @@ defmodule Mix.Tasks.Pepe do
 
       model ->
         {:ok, _} = Application.ensure_all_started(:req)
-        info("pinging #{bold(name)} (#{model.model})…")
+        info("pinging #{bold(name)} (#{model.model})...")
 
         case Pepe.LLM.chat(model, [%{"role" => "user", "content" => "ping"}], max_tokens: 5) do
           {:ok, res} ->
-            ok("#{green(name)} works — reply: #{String.slice(res.content || "", 0, 60)}")
+            ok("#{green(name)} works - reply: #{String.slice(res.content || "", 0, 60)}")
 
           {:error, reason} ->
             error("#{name} failed: #{describe(reason)}")
@@ -450,7 +462,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp model_cmd(["help"]) do
     info("""
-    mix pepe model — manage model connections
+    mix pepe model - manage model connections
 
       (no args)                              show default + switch/add interactively
       add NAME [--base-url URL --api-key KEY --model ID] [--default]
@@ -474,7 +486,7 @@ defmodule Mix.Tasks.Pepe do
     model_cmd(["add", name, "--default"])
   end
 
-  # Step 1: "Select a provider" — interactive catalog of known providers.
+  # Step 1: "Select a provider" - interactive catalog of known providers.
   defp choose_provider do
     provider =
       Pepe.Providers.all()
@@ -491,7 +503,7 @@ defmodule Mix.Tasks.Pepe do
     choose_auth(provider)
   end
 
-  # Step 2: "Auth method for {provider}" — submenu (auto-picks when only one).
+  # Step 2: "Auth method for {provider}" - submenu (auto-picks when only one).
   defp choose_auth(provider) do
     case Pepe.Providers.auth_methods(provider) do
       [single] ->
@@ -517,7 +529,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp apply_auth(provider, %{type: :none}) do
-    info(dim("local provider — no API key needed"))
+    info(dim("local provider - no API key needed"))
     {provider.base_url, nil, nil}
   end
 
@@ -527,7 +539,7 @@ defmodule Mix.Tasks.Pepe do
 
     case Pepe.OAuth.login(flow) do
       {:ok, %{access: access} = creds} when is_binary(access) ->
-        ok("signed in — subscription token captured")
+        ok("signed in - subscription token captured")
 
         oauth = %{
           "provider" => provider.key,
@@ -607,18 +619,18 @@ defmodule Mix.Tasks.Pepe do
 
     if api_key && Pepe.Config.interpolate(api_key) in [nil, ""] do
       info(
-        dim("note: api key #{api_key} resolves to empty — export the env var, or this may 401")
+        dim("note: api key #{api_key} resolves to empty - export the env var, or this may 401")
       )
     end
 
     Pepe.LLM.list_models(probe)
   end
 
-  # Step 3: "Loading available models" → "Default model" picker. Tries the live
+  # Step 3: "Loading available models" -> "Default model" picker. Tries the live
   # catalog first (including the Codex subscription's own /models endpoint); if
   # that returns nothing, falls back to a curated list, then to manual entry.
   defp pick_model(base_url, api_key) do
-    info(dim("Loading available models…"))
+    info(dim("Loading available models..."))
 
     case fetch_models(base_url, api_key) do
       {:ok, [_ | _] = ids} ->
@@ -630,7 +642,7 @@ defmodule Mix.Tasks.Pepe do
             choose_model(ids)
 
           [] ->
-            info(dim("This provider doesn't list models — enter the model id."))
+            info(dim("This provider doesn't list models - enter the model id."))
             prompt_model_id()
         end
     end
@@ -709,7 +721,7 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} = OptionParser.parse!(rest, strict: [refresh: :boolean])
 
     if opts[:refresh] do
-      info("fetching current prices from OpenRouter + LiteLLM…")
+      info("fetching current prices from OpenRouter + LiteLLM...")
 
       case Pepe.Pricing.refresh() do
         {:ok, n} -> ok("cached #{n} model prices")
@@ -720,7 +732,7 @@ defmodule Mix.Tasks.Pepe do
     case Pepe.Pricing.cache_info() do
       nil ->
         info(
-          "no live price cache yet — using built-in seed prices.\n" <>
+          "no live price cache yet - using built-in seed prices.\n" <>
             "  refresh: mix pepe usage prices --refresh"
         )
 
@@ -757,7 +769,7 @@ defmodule Mix.Tasks.Pepe do
 
           path ->
             File.write!(path, body)
-            ok("wrote #{ext} invoice for #{opts[:company]} #{inv.period.label} → #{path}")
+            ok("wrote #{ext} invoice for #{opts[:company]} #{inv.period.label} -> #{path}")
         end
     end
   end
@@ -831,7 +843,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp usage_help do
     IO.puts("""
-    #{bold("mix pepe usage")} — token metering & billing
+    #{bold("mix pepe usage")} - token metering & billing
 
       usage [--company NAME] [--granularity CYCLE] [--limit N]
                                     report token usage & cost by cycle
@@ -849,6 +861,56 @@ defmodule Mix.Tasks.Pepe do
   end
 
   ###
+  ### hooks commands
+  ###
+
+  defp hooks_cmd(["list" | _]) do
+    info("available hooks: #{Enum.join(Pepe.Hooks.names(), ", ")}")
+    info(dim("enable per agent: mix pepe agent add NAME --hooks pii_redact,llm_redact"))
+    info(dim("settings live under \"hooks\" in ~/.pepe/config.json"))
+  end
+
+  defp hooks_cmd(["generate", desc | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [model: :string, save: :boolean])
+    model = opts[:model] || Config.default_model_name()
+
+    cond do
+      is_nil(model) ->
+        error("no model to generate with - pass --model NAME (or set a default model)")
+
+      true ->
+        info("asking #{model} to build a pii_redact config...")
+
+        case Pepe.Hooks.Generator.generate(desc, model) do
+          {:ok, config, dropped} ->
+            IO.puts(Jason.encode!(config, pretty: true))
+            if dropped != [], do: info(dim("dropped (invalid): #{Enum.join(dropped, ", ")}"))
+
+            if opts[:save] do
+              Config.put_hook_settings("pii_redact", config)
+              ok("saved to hooks.pii_redact")
+            else
+              info(dim("re-run with --save to store it, or paste it under \"hooks\" yourself"))
+            end
+
+          {:error, reason} ->
+            error("couldn't generate: #{inspect(reason)}")
+        end
+    end
+  end
+
+  defp hooks_cmd(_) do
+    info("""
+    mix pepe hooks - message-flow redaction hooks
+
+      list                          show available hooks
+      generate "what to redact" [--model NAME] [--save]
+                                    let a model build a pii_redact config (packs +
+                                    custom regex), validated before it's saved
+    """)
+  end
+
+  ###
   ### company commands
   ###
 
@@ -859,12 +921,12 @@ defmodule Mix.Tasks.Pepe do
     case Config.add_company(name, meta) do
       :ok ->
         ok(
-          "company #{green(name)} created — add agents with " <>
+          "company #{green(name)} created - add agents with " <>
             "#{bold("mix pepe agent add NAME --company #{name}")}"
         )
 
       {:error, :invalid_name} ->
-        error("invalid company name #{inspect(name)} — use letters, digits, - and _ only")
+        error("invalid company name #{inspect(name)} - use letters, digits, - and _ only")
 
       {:error, :already_exists} ->
         error("company #{name} already exists")
@@ -882,7 +944,7 @@ defmodule Mix.Tasks.Pepe do
         Enum.each(companies, fn name ->
           count = length(Config.agents_in(name))
           desc = (Config.get_company(name) || %{})["description"]
-          suffix = if desc, do: " — #{desc}", else: ""
+          suffix = if desc, do: " - #{desc}", else: ""
           IO.puts("#{bold(name)} (#{count} agent#{if count == 1, do: "", else: "s"})#{suffix}")
         end)
     end
@@ -900,7 +962,7 @@ defmodule Mix.Tasks.Pepe do
 
       {:error, {:not_empty, n}} ->
         error(
-          "company #{name} still has #{n} agent#{if n == 1, do: "", else: "s"} — " <>
+          "company #{name} still has #{n} agent#{if n == 1, do: "", else: "s"} - " <>
             "move them out first, or pass --force to drop them too"
         )
     end
@@ -910,7 +972,7 @@ defmodule Mix.Tasks.Pepe do
     case Config.rename_company(old, new) do
       :ok ->
         ok(
-          "renamed company #{green(old)} → #{green(new)} — agents, models, routes, " <>
+          "renamed company #{green(old)} -> #{green(new)} - agents, models, routes, " <>
             "crons, watches, bots, tokens and files all re-keyed"
         )
 
@@ -921,7 +983,7 @@ defmodule Mix.Tasks.Pepe do
         error("company #{new} already exists")
 
       {:error, :invalid_name} ->
-        error("invalid name #{inspect(new)} — use letters, digits, - and _ only")
+        error("invalid name #{inspect(new)} - use letters, digits, - and _ only")
     end
   end
 
@@ -930,7 +992,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp company_cmd(cmd) when cmd in [[], ["help"]] do
     IO.puts("""
-    #{bold("mix pepe company")} — multi-tenant scopes
+    #{bold("mix pepe company")} - multi-tenant scopes
 
       add NAME [--description "..."]   create a company (an isolated tenant)
       list                            list companies + how many agents each has
@@ -967,7 +1029,7 @@ defmodule Mix.Tasks.Pepe do
 
         ok("API token created (id #{green(id)}, scope: #{scope})")
         IO.puts("\n  #{bold(raw)}\n")
-        info("Save it now — it is shown only once and stored only as a hash.")
+        info("Save it now - it is shown only once and stored only as a hash.")
 
       {:error, :unknown_company} ->
         error("unknown company: #{opts[:company]}")
@@ -983,12 +1045,12 @@ defmodule Mix.Tasks.Pepe do
   defp token_cmd(["list" | _]) do
     case Config.api_tokens() do
       [] ->
-        info("no API tokens — the /v1 API is open. lock it with: mix pepe token add")
+        info("no API tokens - the /v1 API is open. lock it with: mix pepe token add")
 
       tokens ->
         Enum.each(tokens, fn t ->
           scope = t["agent"] || t["company"] || "root"
-          label = if t["label"], do: " — #{t["label"]}", else: ""
+          label = if t["label"], do: " - #{t["label"]}", else: ""
           IO.puts("#{bold(t["id"])}  #{t["prefix"]}  [#{scope}]#{label}")
         end)
     end
@@ -1003,14 +1065,14 @@ defmodule Mix.Tasks.Pepe do
 
   defp token_cmd(_) do
     IO.puts("""
-    #{bold("mix pepe token")} — API access tokens for /v1
+    #{bold("mix pepe token")} - API access tokens for /v1
 
       add [--company CO] [--agent HANDLE] [--label "..."]   mint a token (shown once)
       list                                                  list tokens (scope + fingerprint)
       revoke ID                                             revoke a token
 
     No tokens ⇒ the /v1 API is open. The first token locks it: every call then needs
-    `Authorization: Bearer ctx_…`. A token scoped to a company reaches only its
+    `Authorization: Bearer ctx_...`. A token scoped to a company reaches only its
     agents; scoped to an agent, only that one.
     """)
   end
@@ -1055,7 +1117,7 @@ defmodule Mix.Tasks.Pepe do
         Config.put_watch(watch)
 
         ok(
-          "watch #{green(watch.id)} created (probe every #{watch.interval_s}s → #{watch.origin["channel"]})"
+          "watch #{green(watch.id)} created (probe every #{watch.interval_s}s -> #{watch.origin["channel"]})"
         )
     end
   end
@@ -1072,7 +1134,7 @@ defmodule Mix.Tasks.Pepe do
           detail = w.trigger["command"] || w.trigger["prompt"] || ""
 
           IO.puts(
-            "#{bold(w.id)} [#{w.state}] — #{w.description}\n  #{w.trigger["type"]} every #{w.interval_s}s · checks #{w.checks}/#{w.max_checks} · #{String.slice(to_string(detail), 0, 60)}"
+            "#{bold(w.id)} [#{w.state}] - #{w.description}\n  #{w.trigger["type"]} every #{w.interval_s}s · checks #{w.checks}/#{w.max_checks} · #{String.slice(to_string(detail), 0, 60)}"
           )
         end)
     end
@@ -1104,9 +1166,9 @@ defmodule Mix.Tasks.Pepe do
 
   defp watch_cmd(_) do
     IO.puts("""
-    #{bold("mix pepe watch")} — one-shot "notify me when X" watches
+    #{bold("mix pepe watch")} - one-shot "notify me when X" watches
 
-      add DESC --probe "<cmd>" [--contains STR] [--message "…"] [--every SECS] [--deliver telegram:<chat>|log]
+      add DESC --probe "<cmd>" [--contains STR] [--message "..."] [--every SECS] [--deliver telegram:<chat>|log]
       list                          show all watches
       pause ID / resume ID          pause or resume a watch
       cancel ID                     delete a watch
@@ -1165,6 +1227,7 @@ defmodule Mix.Tasks.Pepe do
           tools: :string,
           can_message: :string,
           can_manage: :string,
+          hooks: :string,
           max_iterations: :integer,
           temperature: :float,
           default: :boolean
@@ -1188,14 +1251,20 @@ defmodule Mix.Tasks.Pepe do
           str -> str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
         end
 
-      # --can-manage: omitted → nil (itself only); "none" → [] (nobody); "*" or a
-      # comma list → those. Mirrors Pepe.Config.can_manage?/2.
+      # --can-manage: omitted -> nil (itself only); "none" -> [] (nobody); "*" or a
+      # comma list -> those. Mirrors Pepe.Config.can_manage?/2.
       can_manage =
         case opts[:can_manage] do
           nil -> nil
           "none" -> []
           "*" -> ["*"]
           str -> str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
+        end
+
+      hooks =
+        case opts[:hooks] do
+          v when v in [nil, ""] -> []
+          str -> str |> String.split(",") |> Enum.map(&String.trim/1)
         end
 
       agent = %Agent{
@@ -1206,6 +1275,7 @@ defmodule Mix.Tasks.Pepe do
         tools: tools,
         can_message: can_message,
         can_manage: can_manage,
+        hooks: hooks,
         max_iterations: opts[:max_iterations] || 12,
         temperature: opts[:temperature]
       }
@@ -1242,7 +1312,10 @@ defmodule Mix.Tasks.Pepe do
       agents ->
         Enum.each(agents, fn a ->
           mark = if a.name == default, do: " #{green("(default)")}", else: ""
-          routes = if a.can_message == [], do: "", else: "\n  → #{Enum.join(a.can_message, ", ")}"
+
+          routes =
+            if a.can_message == [], do: "", else: "\n  -> #{Enum.join(a.can_message, ", ")}"
+
           manages = manages_line(a.can_manage)
 
           IO.puts(
@@ -1266,7 +1339,7 @@ defmodule Mix.Tasks.Pepe do
 
       _ ->
         Pepe.Agent.Workspace.rename(old, new)
-        ok("agent #{green(old)} → #{green(new)} (workspace moved)")
+        ok("agent #{green(old)} -> #{green(new)} (workspace moved)")
     end
   end
 
@@ -1283,15 +1356,15 @@ defmodule Mix.Tasks.Pepe do
         error("unknown agent: #{to}")
 
       not Company.same_scope?(from, to) ->
-        error("refusing route across companies: #{from} → #{to}")
+        error("refusing route across companies: #{from} -> #{to}")
 
       opts[:remove] ->
         Config.disallow_message(from, to)
-        ok("removed route #{green(from)} → #{green(to)}")
+        ok("removed route #{green(from)} -> #{green(to)}")
 
       true ->
         Config.allow_message(from, to)
-        ok("#{green(from)} → #{green(to)} (can message)")
+        ok("#{green(from)} -> #{green(to)} (can message)")
     end
   end
 
@@ -1333,12 +1406,12 @@ defmodule Mix.Tasks.Pepe do
 
   defp agent_cmd(cmd) when cmd in [[], ["help"]] do
     info("""
-    mix pepe agent — manage agents
+    mix pepe agent - manage agents
 
-      add NAME [--model M] [--prompt "…"] [--tools t1,t2]
+      add NAME [--model M] [--prompt "..."] [--tools t1,t2]
                [--can-message b,c] [--can-manage x,y|*|none] [--default] [--company CO]
       list [--company CO | --all]                          list agents (+ routes)
-      route FROM TO [--remove] [--company CO]              directed A→B messaging
+      route FROM TO [--remove] [--company CO]              directed A->B messaging
       manage ADMIN TARGET [--remove] [--company CO]        let ADMIN administer TARGET (or "*")
       rename OLD NEW                                        rename + move its dir
       remove NAME [--company CO]
@@ -1436,13 +1509,128 @@ defmodule Mix.Tasks.Pepe do
     Process.sleep(:infinity)
   end
 
+  defp gateway_cmd(["whatsapp", "list" | _]) do
+    case Config.webhooks() |> Enum.filter(fn {_s, e} -> e["provider"] == "whatsapp" end) do
+      [] ->
+        info(
+          "no WhatsApp connections. Add one:\n  mix pepe gateway whatsapp add support --agent <handle>"
+        )
+
+      conns ->
+        Enum.each(conns, fn {slug, e} ->
+          co = e["company"] || "root"
+          IO.puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}")
+          IO.puts(dim("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
+        end)
+    end
+  end
+
+  defp gateway_cmd(["whatsapp", "add", slug | rest]) do
+    {opts, _, _} =
+      OptionParser.parse(rest,
+        strict: [
+          agent: :string,
+          company: :string,
+          mode: :string,
+          phone_number_id: :string,
+          access_token: :string,
+          app_secret: :string,
+          verify_token: :string,
+          trainers: :string,
+          ttl_min: :integer,
+          ephemeral: :boolean,
+          commands: :boolean
+        ]
+      )
+
+    mode = if opts[:mode] == "admin", do: "admin", else: "support"
+
+    cond do
+      Config.webhook_exists?(slug) ->
+        error("a webhook connection named #{slug} already exists")
+
+      is_nil(opts[:agent]) ->
+        error("whatsapp add needs --agent HANDLE (who answers)")
+
+      is_nil(opts[:phone_number_id]) ->
+        error("whatsapp add needs --phone-number-id (from the Meta app)")
+
+      true ->
+        # support defaults: never learn + ephemeral; admin: learns + persisted.
+        support? = mode == "support"
+
+        entry =
+          %{
+            "provider" => "whatsapp",
+            "company" => blank_default(opts[:company], nil),
+            "agent" => opts[:agent],
+            "mode" => mode,
+            "commands" => Keyword.get(opts, :commands, mode == "admin"),
+            "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
+            "ephemeral" => Keyword.get(opts, :ephemeral, support?),
+            "session_ttl_min" => opts[:ttl_min],
+            "config" =>
+              %{
+                "phone_number_id" => opts[:phone_number_id],
+                "access_token" => opts[:access_token] || "${WA_TOKEN_#{String.upcase(slug)}}",
+                "app_secret" => opts[:app_secret] || "${WA_APP_SECRET_#{String.upcase(slug)}}",
+                "verify_token" => opts[:verify_token] || slug
+              }
+              |> reject_nil_values()
+          }
+          |> reject_nil_values()
+
+        Config.put_webhook(slug, entry)
+        co = entry["company"] || "root"
+        ok("whatsapp #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
+        info("register this Callback URL in the Meta app:")
+        info(bold("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
+        info(dim("   verify token: #{entry["config"]["verify_token"]}"))
+    end
+  end
+
+  defp gateway_cmd(["whatsapp", "set-agent", slug, agent | _]) do
+    case Config.get_webhook(slug) do
+      nil ->
+        error("unknown whatsapp connection: #{slug}")
+
+      e ->
+        Config.put_webhook(slug, Map.put(e, "agent", agent))
+        ok("#{green(slug)} -> agent #{agent}")
+    end
+  end
+
+  defp gateway_cmd(["whatsapp", "remove", slug | _]) do
+    if Config.webhook_exists?(slug) do
+      Config.delete_webhook(slug)
+      ok("#{green(slug)} removed")
+    else
+      error("unknown whatsapp connection: #{slug}")
+    end
+  end
+
+  defp gateway_cmd(["whatsapp" | _]) do
+    info("""
+    mix pepe gateway whatsapp - WhatsApp Cloud API connections (webhook-based)
+
+      add SLUG --agent HANDLE --phone-number-id ID [--company CO] [--mode support|admin]
+               [--access-token ${ENV}] [--app-secret ${ENV}] [--verify-token X]
+               [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
+      list                     list connections + their Callback URLs
+      set-agent SLUG HANDLE     rebind a connection to another agent
+      remove SLUG               delete a connection
+
+    Served by `mix pepe serve`. Register the printed Callback URL in your Meta app.
+    """)
+  end
+
   defp gateway_cmd(["telegram", "list" | _]) do
     case Config.telegram_bots() do
       [] ->
         info(dim("no telegram bots configured. add one: mix pepe gateway telegram setup"))
 
       bots ->
-        info(bold("✦ Telegram bots") <> dim(" — one poller per bot, each bound to an agent"))
+        info(bold("✦ Telegram bots") <> dim(" - one poller per bot, each bound to an agent"))
 
         Enum.each(bots, fn b ->
           state =
@@ -1489,7 +1677,7 @@ defmodule Mix.Tasks.Pepe do
           |> reject_nil_values()
 
         Config.put_telegram_bot(name, map)
-        ok("telegram bot #{green(name)} → agent #{opts[:agent] || "(default)"}")
+        ok("telegram bot #{green(name)} -> agent #{opts[:agent] || "(default)"}")
         info(dim("run/refresh with: mix pepe gateway telegram  (or restart serve)"))
     end
   end
@@ -1524,7 +1712,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp gateway_cmd(cmd) when cmd in [[], ["help"]] do
     info("""
-    mix pepe gateway — messaging gateways
+    mix pepe gateway - messaging gateways
 
       telegram setup              configure the DEFAULT bot (token, allowlists, agent)
       telegram add NAME --token T [--agent A] [--trainers id1,id2]
@@ -1533,7 +1721,7 @@ defmodule Mix.Tasks.Pepe do
                                   (--trainers: who it learns from; omit=everyone, none=nobody)
       telegram list               list configured bots
       telegram remove NAME        delete a named bot
-      telegram                    run the gateway — one poller per bot (long-polling)
+      telegram                    run the gateway - one poller per bot (long-polling)
     """)
   end
 
@@ -1542,7 +1730,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp token_hint(nil), do: "(none)"
   defp token_hint("${" <> _ = env), do: env
-  defp token_hint(t), do: String.slice(to_string(t), 0, 6) <> "…"
+  defp token_hint(t), do: String.slice(to_string(t), 0, 6) <> "..."
 
   defp trainers_hint(nil), do: "everyone (default)"
   defp trainers_hint([]), do: "no one"
@@ -1550,8 +1738,8 @@ defmodule Mix.Tasks.Pepe do
   defp trainers_hint(list) when is_list(list), do: Enum.join(list, ", ")
   defp trainers_hint(_), do: "everyone"
 
-  # --trainers: omitted → nil (default: everyone); "*" → ["*"] (everyone, explicit);
-  # "none"/"" → [] (no one); "id1,id2" → [id1, id2] (only those user ids).
+  # --trainers: omitted -> nil (default: everyone); "*" -> ["*"] (everyone, explicit);
+  # "none"/"" -> [] (no one); "id1,id2" -> [id1, id2] (only those user ids).
   defp valid_progress(m) when m in ~w(reaction ambient off verbose), do: m
   defp valid_progress(_), do: nil
 
@@ -1572,6 +1760,8 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp webhook_host, do: System.get_env("PEPE_PUBLIC_URL") || "https://YOUR_HOST"
+
   defp parse_trainers(nil), do: nil
   defp parse_trainers(str) when str in ["", "none"], do: []
   defp parse_trainers("*"), do: ["*"]
@@ -1587,7 +1777,7 @@ defmodule Mix.Tasks.Pepe do
     end)
   end
 
-  # Interactive Telegram config — token, optional agent, optional chat allowlist.
+  # Interactive Telegram config - token, optional agent, optional chat allowlist.
   defp telegram_setup do
     current = Config.telegram()
 
@@ -1672,7 +1862,7 @@ defmodule Mix.Tasks.Pepe do
   ### misc
   ###
 
-  # Guided, end-to-end onboarding: provider → auth → model → agent → tools, then
+  # Guided, end-to-end onboarding: provider -> auth -> model -> agent -> tools, then
   # everything is saved and set as default. The interactive controls come from
   # Owl (select / multiselect / input) so we don't hand-roll a TUI.
   # First run walks the full wizard; later runs open a menu to (re)configure parts.
@@ -1686,11 +1876,11 @@ defmodule Mix.Tasks.Pepe do
 
   # Subsequent runs: pick what to add/reconfigure instead of redoing every step.
   defp config_menu do
-    info(bold("Pepe setup") <> dim(" — you're already configured. What do you want to do?\n"))
+    info(bold("Pepe setup") <> dim(" - you're already configured. What do you want to do?\n"))
 
     options = [
-      {:model, "Model connection — add or switch the default"},
-      {:agent, "Agent — add or set the default"},
+      {:model, "Model connection - add or switch the default"},
+      {:agent, "Agent - add or set the default"},
       {:telegram, "Telegram gateway"},
       {:language, "Language for system messages"},
       {:timezone, "Default timezone for scheduled tasks"},
@@ -1734,7 +1924,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp first_run_setup do
-    info(bold("Welcome to Pepe setup") <> " — let's get you ready.\n")
+    info(bold("Welcome to Pepe setup") <> " - let's get you ready.\n")
     setup_language()
 
     info("\n" <> bold("Step 1/2 · Model connection"))
@@ -1764,7 +1954,7 @@ defmodule Mix.Tasks.Pepe do
             })
 
             Config.set_default_model(name)
-            ok("model #{green(name)} → #{model_id}")
+            ok("model #{green(name)} -> #{model_id}")
 
             info("\n" <> bold("Step 2/2 · Agent"))
             add_agent(true)
@@ -1789,11 +1979,11 @@ defmodule Mix.Tasks.Pepe do
       )
 
     Config.set_locale(code)
-    ok("language → #{code}")
+    ok("language -> #{code}")
   end
 
   # Default timezone for scheduled tasks that don't name their own. Free-text so any
-  # IANA zone works ("America/Sao_Paulo", "Europe/Berlin", …); a task can still
+  # IANA zone works ("America/Sao_Paulo", "Europe/Berlin", ...); a task can still
   # override it. Blank keeps the current value.
   defp setup_timezone do
     tz =
@@ -1808,15 +1998,15 @@ defmodule Mix.Tasks.Pepe do
     case DateTime.now(tz) do
       {:ok, _} ->
         Config.set_default_timezone(tz)
-        ok("timezone → #{tz}")
+        ok("timezone -> #{tz}")
 
       _ ->
-        error("unknown timezone: #{tz} — keeping #{Config.default_timezone()}")
+        error("unknown timezone: #{tz} - keeping #{Config.default_timezone()}")
     end
   end
 
   # Add an agent bound to the current default model connection. The `primary?`
-  # agent — the one created on first setup — is the owner's own agent, so it's born
+  # agent - the one created on first setup - is the owner's own agent, so it's born
   # omnipotent: every tool, super-admin over all agents, and auto-approval of all
   # tools (no permission prompts), so it can do anything via chat from the start.
   defp add_agent(primary? \\ false) do
@@ -1848,7 +2038,7 @@ defmodule Mix.Tasks.Pepe do
     Config.set_default_agent(agent_name)
 
     if primary? do
-      ok("agent #{green(agent_name)} — full access (all tools, super-admin, no prompts)")
+      ok("agent #{green(agent_name)} - full access (all tools, super-admin, no prompts)")
     else
       ok("agent #{green(agent_name)} (tools: #{Enum.join(tools, ", ")})")
     end
@@ -1907,11 +2097,11 @@ defmodule Mix.Tasks.Pepe do
   defp validate_scope(name, company) do
     cond do
       not Company.valid_name?(name) ->
-        error("invalid name #{inspect(name)} — use letters, digits, - and _ only (no \"/\")")
+        error("invalid name #{inspect(name)} - use letters, digits, - and _ only (no \"/\")")
         :error
 
       company && not Config.company_exists?(company) ->
-        error("unknown company: #{company} — create it with: mix pepe company add #{company}")
+        error("unknown company: #{company} - create it with: mix pepe company add #{company}")
         :error
 
       true ->
@@ -1919,7 +2109,7 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  # Suggest a connection name from the host (api.openai.com → "openai").
+  # Suggest a connection name from the host (api.openai.com -> "openai").
   defp default_conn_name(base_url) do
     host = URI.parse(base_url).host || "model"
 
@@ -1937,7 +2127,7 @@ defmodule Mix.Tasks.Pepe do
 
       mod ->
         %{"function" => %{"description" => desc}} = mod.spec()
-        [name, dim("  — " <> String.slice(desc, 0, 48))]
+        [name, dim("  - " <> String.slice(desc, 0, 48))]
     end
   end
 
@@ -1962,7 +2152,7 @@ defmodule Mix.Tasks.Pepe do
 
     cond do
       not File.dir?(home) ->
-        error("nothing to back up — #{home} doesn't exist yet (run `mix pepe setup`)")
+        error("nothing to back up - #{home} doesn't exist yet (run `mix pepe setup`)")
 
       true ->
         out = Path.expand(opts[:output] || "pepe-backup-#{Date.utc_today()}.tgz")
@@ -1993,7 +2183,7 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  # Secrets are stored as ${ENV_VAR} references, never raw — so they're NOT in the
+  # Secrets are stored as ${ENV_VAR} references, never raw - so they're NOT in the
   # backup. List them (and whether each is currently set) so they're saved elsewhere.
   defp report_backup_secrets(home) do
     vars =
@@ -2010,9 +2200,9 @@ defmodule Mix.Tasks.Pepe do
       end
 
     if vars == [] do
-      info("\nNo ${ENV_VAR} secrets referenced — nothing extra to save.")
+      info("\nNo ${ENV_VAR} secrets referenced - nothing extra to save.")
     else
-      IO.puts("\n" <> bold("⚠ Secrets are NOT in the backup — save these env vars separately:"))
+      IO.puts("\n" <> bold("⚠ Secrets are NOT in the backup - save these env vars separately:"))
 
       Enum.each(vars, fn v ->
         status = if System.get_env(v), do: green("set"), else: red("UNSET")
@@ -2026,11 +2216,11 @@ defmodule Mix.Tasks.Pepe do
 
     Enum.each(Pepe.Tools.all(), fn mod ->
       %{"function" => %{"description" => desc}} = mod.spec()
-      IO.puts("  #{bold(mod.name())} — #{desc}")
+      IO.puts("  #{bold(mod.name())} - #{desc}")
     end)
   end
 
-  # `mix pepe timelearn [AGENT]` — the learning timeline (skills + memory).
+  # `mix pepe timelearn [AGENT]` - the learning timeline (skills + memory).
   defp timelearn_cmd(args) do
     case List.first(args) || Config.default_agent_name() do
       nil ->
@@ -2040,7 +2230,7 @@ defmodule Mix.Tasks.Pepe do
         c = Pepe.Learning.counts(name)
 
         info(
-          bold("✦ TimeLearn — ") <>
+          bold("✦ TimeLearn - ") <>
             green(name) <>
             dim("  (#{c[:skill] || 0} skills · #{c[:memory] || 0} memories)")
         )
@@ -2059,12 +2249,12 @@ defmodule Mix.Tasks.Pepe do
     info(dim("   " <> (node.summary |> String.replace("\n", " ") |> String.slice(0, 96))))
   end
 
-  defp learn_date(0), do: "—"
+  defp learn_date(0), do: "-"
 
   defp learn_date(ts) do
     case DateTime.from_unix(ts) do
       {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-      _ -> "—"
+      _ -> "-"
     end
   end
 
@@ -2075,7 +2265,7 @@ defmodule Mix.Tasks.Pepe do
   defp cron_cmd(["list" | _]) do
     case Config.crons() do
       [] ->
-        info(dim("no scheduled tasks. add one: mix pepe cron add …"))
+        info(dim("no scheduled tasks. add one: mix pepe cron add ..."))
 
       crons ->
         info(bold("✦ Scheduled tasks"))
@@ -2134,7 +2324,7 @@ defmodule Mix.Tasks.Pepe do
         error("unknown task: #{id}")
 
       cron ->
-        info(dim("running #{id}…"))
+        info(dim("running #{id}..."))
 
         case Pepe.Cron.run(cron, :manual) do
           {:ok, output} -> info("\n" <> output)
@@ -2194,10 +2384,10 @@ defmodule Mix.Tasks.Pepe do
 
   defp cron_cmd(_) do
     info("""
-    mix pepe cron — scheduled tasks (recurring agent jobs)
+    mix pepe cron - scheduled tasks (recurring agent jobs)
 
       list                                              list all tasks (+ next run)
-      add --name N --prompt "…" --schedule "0 8 * * *"
+      add --name N --prompt "..." --schedule "0 8 * * *"
           [--agent A] [--timezone America/Sao_Paulo]
           [--model M] [--deliver telegram:<chat_id>|none]   create a task
       run ID                                            force a task now (preview)
@@ -2214,7 +2404,7 @@ defmodule Mix.Tasks.Pepe do
     next = Pepe.Cron.next_run(c)
     state = if c.enabled, do: green("enabled"), else: dim("disabled")
 
-    info("\n#{bold(c.id)} — #{c.name}  [#{state}]")
+    info("\n#{bold(c.id)} - #{c.name}  [#{state}]")
     info(dim("   when:    #{c.schedule} (#{c.timezone})"))
     if next, do: info(dim("   next:    #{Calendar.strftime(next, "%Y-%m-%d %H:%M %Z")}"))
     info(dim("   agent:   #{c.agent}#{if c.model, do: " · model #{c.model}", else: ""}"))
@@ -2288,7 +2478,7 @@ defmodule Mix.Tasks.Pepe do
         error("unknown MCP server: #{name}")
 
       _ ->
-        info(dim("connecting to #{name}…"))
+        info(dim("connecting to #{name}..."))
 
         case Pepe.MCP.tools(name) do
           {:ok, tools} ->
@@ -2318,7 +2508,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp mcp_cmd(_) do
     info("""
-    mix pepe mcp — external tool servers (Model Context Protocol)
+    mix pepe mcp - external tool servers (Model Context Protocol)
 
       add NAME --command npx --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
       list                       list configured servers
@@ -2330,7 +2520,7 @@ defmodule Mix.Tasks.Pepe do
     """)
   end
 
-  # `mix pepe doctor [--offline]` — health-check the setup (live probes by default).
+  # `mix pepe doctor [--offline]` - health-check the setup (live probes by default).
   defp doctor_cmd(rest) do
     live? = "--offline" not in rest
     info(bold("✦ Pepe doctor") <> dim(if live?, do: " (live probes)", else: " (offline)"))
@@ -2342,14 +2532,14 @@ defmodule Mix.Tasks.Pepe do
     else
       Enum.each(checks, fn
         {area, subject, :ok} -> info("#{green("✓")} [#{area}] #{subject}")
-        {area, subject, {:warn, msg}} -> info("#{dim("⚠")} [#{area}] #{subject} — #{msg}")
-        {area, subject, {:error, msg}} -> error("✗ [#{area}] #{subject} — #{msg}")
+        {area, subject, {:warn, msg}} -> info("#{dim("⚠")} [#{area}] #{subject} - #{msg}")
+        {area, subject, {:error, msg}} -> error("✗ [#{area}] #{subject} - #{msg}")
       end)
 
       if Pepe.Doctor.healthy?(checks) do
         ok("healthy")
       else
-        error("issues found — fix the ✗ items above")
+        error("issues found - fix the ✗ items above")
       end
     end
   end

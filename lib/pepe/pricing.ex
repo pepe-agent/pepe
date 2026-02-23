@@ -6,7 +6,7 @@ defmodule Pepe.Pricing do
                  ▲
       live cache   ~/.pepe/data/price_book.json   (OpenRouter + LiteLLM, refreshed)
                  ▲
-      built-in seed   (@seed below — an offline fallback, no network needed)
+      built-in seed   (@seed below - an offline fallback, no network needed)
 
   Prices are **per 1,000,000 tokens** in the operator's currency. Provider rate
   cards change over time, so the seed is only a floor: `refresh/0` pulls current
@@ -115,7 +115,7 @@ defmodule Pepe.Pricing do
 
   @doc """
   Fetch current prices from OpenRouter and the LiteLLM price map and write the
-  cache. Returns `{:ok, count}` or `{:error, reason}`. Networked — call on demand
+  cache. Returns `{:ok, count}` or `{:error, reason}`. Networked - call on demand
   (a button, `mix pepe usage prices --refresh`) or on a weekly tick, never per
   model call.
   """
@@ -173,7 +173,7 @@ defmodule Pepe.Pricing do
 
   defp per_million(_, _), do: 0.0
 
-  ## live sources — best-effort; a failed fetch just contributes nothing
+  ## live sources - best-effort; a failed fetch just contributes nothing
 
   defp fetch_litellm do
     case get_json(@litellm_url) do

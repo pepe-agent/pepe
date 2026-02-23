@@ -3,9 +3,9 @@ defmodule Pepe.Tools.Tool do
   Behaviour for agent tools.
 
   A tool exposes:
-    * `name/0`        — the function name the model calls
-    * `spec/0`        — the OpenAI function/tool JSON spec
-    * `run/2`         — execute with decoded `args` and a `ctx` map, returning a
+    * `name/0`        - the function name the model calls
+    * `spec/0`        - the OpenAI function/tool JSON spec
+    * `run/2`         - execute with decoded `args` and a `ctx` map, returning a
                         string result (fed back to the model as a tool message)
   """
 

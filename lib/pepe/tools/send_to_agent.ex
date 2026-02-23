@@ -1,11 +1,11 @@
 defmodule Pepe.Tools.SendToAgent do
   @moduledoc """
-  Send a message to another agent and return its reply — the agent-to-agent router.
+  Send a message to another agent and return its reply - the agent-to-agent router.
 
   Routing is a **directed allowlist**: an agent may only message the agents listed
-  in its `can_message`, so `A → B` does not imply `B → A`. The called agent answers
+  in its `can_message`, so `A -> B` does not imply `B -> A`. The called agent answers
   in a fresh one-shot run (it sees the message labelled with the sender), and its
-  reply comes back as this tool's result — answering is not itself "messaging", so
+  reply comes back as this tool's result - answering is not itself "messaging", so
   no reverse route is needed.
 
   A **hop limit** and a **cycle check** keep chains from looping: a run carries the
@@ -70,7 +70,7 @@ defmodule Pepe.Tools.SendToAgent do
 
       to in chain ->
         {:error,
-         "Refusing to message #{to}: already in this chain (#{Enum.join(chain, " → ")}) — would loop."}
+         "Refusing to message #{to}: already in this chain (#{Enum.join(chain, " -> ")}) - would loop."}
 
       length(chain) >= @max_hops ->
         {:error, "Agent message chain too deep (max #{@max_hops})."}

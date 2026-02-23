@@ -42,7 +42,7 @@ defmodule Pepe.Tools.ScheduleTaskTest do
     assert cron.name == "Daily XML"
     assert cron.agent == "zak"
     assert cron.timezone == "America/Sao_Paulo"
-    # No explicit deliver → reports back to the chat it was created in.
+    # No explicit deliver -> reports back to the chat it was created in.
     assert cron.deliver == "telegram:123"
   end
 

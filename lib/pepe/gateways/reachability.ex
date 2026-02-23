@@ -1,16 +1,16 @@
 defmodule Pepe.Gateways.Reachability do
   @moduledoc """
-  Stop hammering a Telegram chat that's permanently gone — the bot was blocked, the
+  Stop hammering a Telegram chat that's permanently gone - the bot was blocked, the
   group was deleted, the user deactivated their account. Telegram answers those with
   a **permanent** error (403 Forbidden, or 400 "chat not found"); retrying does
   nothing but burn API calls and log noise.
 
   Self-healing: a chat is marked dead on that error, skipped on every send while
   dead, and **cleared automatically** the moment a send to it succeeds again (e.g.
-  the user un-blocked the bot) — no manual reset needed.
+  the user un-blocked the bot) - no manual reset needed.
 
   Keyed by `{bot_name, chat_id}` so one bot's dead chat doesn't affect another's.
-  In-memory (ETS) — a restart gives every target a fresh chance, which is fine: the
+  In-memory (ETS) - a restart gives every target a fresh chance, which is fine: the
   cost of one wasted retry after a restart is negligible.
   """
 

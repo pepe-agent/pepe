@@ -3,9 +3,9 @@ defmodule Pepe.Watch.Delivery do
   Route a fired watch's message back to the channel it was created from.
 
   The `origin` is captured when the watch is created, so delivery lands where you
-  asked from — even after a restart. Returns `:ok` when it reached the user, or
+  asked from - even after a restart. Returns `:ok` when it reached the user, or
   `{:error, reason}` so the scheduler can hold the message (`pending_delivery`) and
-  retry later — that's how a watch "delivers when you're reachable again".
+  retry later - that's how a watch "delivers when you're reachable again".
 
   Connected surfaces (TUI, WebSocket) are reached over `Phoenix.PubSub`: a live
   session subscribes to its origin topic (and registers in `Pepe.Watch.Subscribers`
@@ -48,7 +48,7 @@ defmodule Pepe.Watch.Delivery do
   end
 
   @doc """
-  Build an origin map from a tool `ctx` — the channel plus a stable key so delivery
+  Build an origin map from a tool `ctx` - the channel plus a stable key so delivery
   can find the same conversation later. Falls back to `log` when the surface is
   unknown or can't receive proactive messages (the stateless HTTP API).
   """

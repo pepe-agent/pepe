@@ -7,8 +7,8 @@ defmodule Pepe.LLM do
 
   Two entry points:
 
-    * `chat/3`        — blocking request, returns the assembled message.
-    * `stream_chat/4` — Server-Sent-Events streaming; invokes `on_delta` with each
+    * `chat/3`        - blocking request, returns the assembled message.
+    * `stream_chat/4` - Server-Sent-Events streaming; invokes `on_delta` with each
                         text chunk as it arrives and returns the final assembled
                         message (including any tool calls).
   """
@@ -26,9 +26,9 @@ defmodule Pepe.LLM do
   Perform a (non-streaming) chat completion.
 
   Options:
-    * `:tools` — list of OpenAI tool/function specs
-    * `:temperature`, `:max_tokens` — override the model defaults
-    * `:extra` — extra body params merged verbatim
+    * `:tools` - list of OpenAI tool/function specs
+    * `:temperature`, `:max_tokens` - override the model defaults
+    * `:extra` - extra body params merged verbatim
   """
   @spec chat(Model.t(), [map()], keyword()) :: {:ok, result()} | {:error, term()}
   def chat(model, messages, opts \\ [])

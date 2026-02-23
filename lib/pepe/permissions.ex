@@ -1,22 +1,22 @@
 defmodule Pepe.Permissions do
   @moduledoc """
-  The permission gate for tool calls — Pepe's "ask before doing something risky".
+  The permission gate for tool calls - Pepe's "ask before doing something risky".
 
-  Read-only tools (`@always_safe`) run freely. Everything else — running code,
+  Read-only tools (`@always_safe`) run freely. Everything else - running code,
   writing/moving files, changing config, and *any* plugin tool (unknown ⇒ treated
-  as risky) — must be authorized. When a risky tool hasn't been pre-approved, the
+  as risky) - must be authorized. When a risky tool hasn't been pre-approved, the
   runtime asks the user through an **`authorize` callback supplied by the surface**
   (`ctx.authorize`), so each gateway renders the prompt in its own native format
-  (Telegram inline buttons, the CLI's arrow-key menu, …). The core only defines the
+  (Telegram inline buttons, the CLI's arrow-key menu, ...). The core only defines the
   decision contract and remembers the answer.
 
   A decision is one of:
 
-    * `:once`    — allow just this call; ask again next time.
-    * `:session` — allow for the rest of this session (kept in-memory; forgotten on
-      `/new` and on restart) — other sessions ask again.
-    * `:always`  — allow from now on; persisted on the agent in `config.json`.
-    * `:deny`    — refuse; never remembered, so it's asked again.
+    * `:once`    - allow just this call; ask again next time.
+    * `:session` - allow for the rest of this session (kept in-memory; forgotten on
+      `/new` and on restart) - other sessions ask again.
+    * `:always`  - allow from now on; persisted on the agent in `config.json`.
+    * `:deny`    - refuse; never remembered, so it's asked again.
 
   Surfaces with no human to ask (the HTTP API) pass no `authorize` and run freely.
   """
@@ -26,7 +26,7 @@ defmodule Pepe.Permissions do
 
   # Tools that don't go through the human gate: read-only ones, plus `send_to_agent`
   # (governed by the directed `can_message` route allowlist instead). Anything not
-  # listed — including drop-in plugin tools — requires approval (the safe default).
+  # listed - including drop-in plugin tools - requires approval (the safe default).
   @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent)
 
   @type decision :: :once | :session | :always | :deny
@@ -49,14 +49,14 @@ defmodule Pepe.Permissions do
 
   @doc "The message handed back to the model when a tool call was refused."
   def denied_message(name) do
-    "Error: the user did not authorize running `#{name}`. Do not retry it — " <>
+    "Error: the user did not authorize running `#{name}`. Do not retry it - " <>
       "consider a different approach or ask the user what to do instead."
   end
 
   # Pre-approved either persistently (on the agent) or for this session.
   defp preapproved?(name, ctx), do: persistent?(name, ctx) or session?(name, ctx)
 
-  # `"*"` is a wildcard grant — the agent runs every tool without asking (the
+  # `"*"` is a wildcard grant - the agent runs every tool without asking (the
   # owner's omnipotent primary agent). Otherwise a tool is approved by exact name.
   defp persistent?(name, %{agent: %{auto_approve: list}}) when is_list(list),
     do: "*" in list or name in list

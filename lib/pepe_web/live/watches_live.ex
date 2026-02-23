@@ -34,7 +34,7 @@ defmodule PepeWeb.WatchesLive do
         />
         <div class="flex-1 space-y-3 overflow-y-auto p-6">
           <div :if={@watches == []} class="text-sm text-zinc-500">
-            {gettext("No watches. Ask an agent to \"notify me when …\" from chat.")}
+            {gettext("No watches. Ask an agent to \"notify me when ...\" from chat.")}
           </div>
           <div :for={w <- scoped_by_agent(@watches, @scope, & &1.agent)} class={card()}>
             <div class="flex items-center justify-between gap-2">

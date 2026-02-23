@@ -79,7 +79,7 @@ defmodule Pepe.PermissionsTest do
     ctx = %{agent: agent, session_key: key, authorize: authorize}
 
     assert Permissions.gate("bash", "{}", ctx) == :allow
-    # Second call is pre-approved — the authorizer is not invoked again.
+    # Second call is pre-approved - the authorizer is not invoked again.
     assert Permissions.gate("bash", "{}", ctx) == :allow
     assert :counters.get(asks, 1) == 1
     assert SessionStore.member?(key, "bash")

@@ -1,12 +1,12 @@
 defmodule Pepe.Heartbeat.Events do
   @moduledoc """
-  An ephemeral, per-session **system events** queue — the payload channel a
+  An ephemeral, per-session **system events** queue - the payload channel a
   heartbeat pulse reads from.
 
   Any subsystem can drop a short note here (a backgrounded command finished, a
   webhook fired, a sub-agent completed) without knowing anything about heartbeats;
   the next pulse for that session picks them up and decides whether they're worth
-  surfacing. Bounded ring (default 20) per key, in-memory only (an ETS table — lost
+  surfacing. Bounded ring (default 20) per key, in-memory only (an ETS table - lost
   on restart by design, these are transient nudges, not durable data).
   """
 
@@ -44,7 +44,7 @@ defmodule Pepe.Heartbeat.Events do
     |> Enum.map(&elem(&1, 2))
   end
 
-  @doc "Peek without clearing — how many events are pending."
+  @doc "Peek without clearing - how many events are pending."
   @spec count(String.t()) :: non_neg_integer()
   def count(session_key) do
     ensure_table()
@@ -63,7 +63,7 @@ defmodule Pepe.Heartbeat.Events do
   end
 
   # The table owner (this GenServer) is started under the supervision tree, but
-  # helpers may be called before it's up in tests — create on demand, idempotent.
+  # helpers may be called before it's up in tests - create on demand, idempotent.
   defp ensure_table do
     if :ets.whereis(@table) == :undefined do
       :ets.new(@table, [:bag, :public, :named_table, read_concurrency: true])

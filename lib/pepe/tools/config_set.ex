@@ -1,12 +1,12 @@
 defmodule Pepe.Tools.ConfigSet do
   @moduledoc """
-  Change a Pepe setting from chat — **fail-closed** config self-management.
+  Change a Pepe setting from chat - **fail-closed** config self-management.
 
   Only settings on the explicit allowlist below are editable; anything else is
   refused (secrets, tool allowlists, bot tokens and agent definitions have their own
-  guarded tools — `manage_agent`, `manage_channel`, `manage_mcp`). Every value is
-  validated before it's written. Calling with no `setting` returns the schema —
-  the editable settings, their current values and what's accepted — so the agent
+  guarded tools - `manage_agent`, `manage_channel`, `manage_mcp`). Every value is
+  validated before it's written. Calling with no `setting` returns the schema -
+  the editable settings, their current values and what's accepted - so the agent
   can discover what's possible instead of guessing.
   """
 
@@ -25,7 +25,7 @@ defmodule Pepe.Tools.ConfigSet do
   def spec do
     function(
       "config_set",
-      "Change a Pepe setting. Call with no arguments first to see the editable settings (the schema), their current values and accepted values. Only allowlisted settings can be changed — secrets and structural config go through their own tools (manage_agent, manage_channel, manage_mcp).",
+      "Change a Pepe setting. Call with no arguments first to see the editable settings (the schema), their current values and accepted values. Only allowlisted settings can be changed - secrets and structural config go through their own tools (manage_agent, manage_channel, manage_mcp).",
       %{
         "type" => "object",
         "properties" => %{
@@ -48,9 +48,9 @@ defmodule Pepe.Tools.ConfigSet do
       {"language", "system-message language: #{Enum.join(@locales, " | ")}", &set_language/1},
       {"timezone", "default IANA timezone for scheduled tasks (e.g. America/Sao_Paulo)",
        &set_timezone/1},
-      {"telegram.require_mention", "true|false — in groups, reply only when @mentioned",
+      {"telegram.require_mention", "true|false - in groups, reply only when @mentioned",
        &set_tg_flag("require_mention", &1)},
-      {"telegram.enabled", "true|false — pause/resume the default bot without deleting it",
+      {"telegram.enabled", "true|false - pause/resume the default bot without deleting it",
        &set_tg_flag("enabled", &1)}
     ]
   end
@@ -79,7 +79,7 @@ defmodule Pepe.Tools.ConfigSet do
   defp set_default_model(value) do
     if Config.get_model(value) do
       Config.set_default_model(value)
-      {:ok, "default model → #{value}"}
+      {:ok, "default model -> #{value}"}
     else
       {:error, "no model connection named #{value}"}
     end
@@ -88,7 +88,7 @@ defmodule Pepe.Tools.ConfigSet do
   defp set_default_agent(value) do
     if Config.get_agent(value) do
       Config.set_default_agent(value)
-      {:ok, "default agent → #{value}"}
+      {:ok, "default agent -> #{value}"}
     else
       {:error, "no agent named #{value}"}
     end
@@ -97,7 +97,7 @@ defmodule Pepe.Tools.ConfigSet do
   defp set_language(value) do
     if value in @locales do
       Config.set_locale(value)
-      {:ok, "language → #{value}"}
+      {:ok, "language -> #{value}"}
     else
       {:error, "unsupported language #{value} (use one of: #{Enum.join(@locales, ", ")})"}
     end
@@ -107,7 +107,7 @@ defmodule Pepe.Tools.ConfigSet do
     case DateTime.now(value) do
       {:ok, _} ->
         Config.set_default_timezone(value)
-        {:ok, "timezone → #{value}"}
+        {:ok, "timezone -> #{value}"}
 
       _ ->
         {:error, "unknown IANA timezone: #{value}"}
@@ -116,7 +116,7 @@ defmodule Pepe.Tools.ConfigSet do
 
   defp set_tg_flag(flag, value) when value in ["true", "false"] do
     Config.put_telegram(Map.put(Config.telegram(), flag, value == "true"))
-    {:ok, "telegram.#{flag} → #{value}"}
+    {:ok, "telegram.#{flag} -> #{value}"}
   end
 
   defp set_tg_flag(flag, _value), do: {:error, "telegram.#{flag} must be true or false"}
@@ -126,9 +126,9 @@ defmodule Pepe.Tools.ConfigSet do
   ###
 
   defp render_schema do
-    "Editable settings (setting — accepted values — current):\n" <>
+    "Editable settings (setting - accepted values - current):\n" <>
       Enum.map_join(schema(), "\n", fn {name, desc, _} ->
-        "• #{name} — #{desc} — current: #{current(name)}"
+        "• #{name} - #{desc} - current: #{current(name)}"
       end) <>
       "\n\nNot editable here: secrets/tokens (${ENV} refs, set by the user), agent " <>
       "definitions (manage_agent), bots (manage_channel), MCP servers (manage_mcp), " <>

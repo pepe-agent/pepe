@@ -1,6 +1,6 @@
 How to install a new tool/capability when the user asks you to add or install one.
 
-You can gain new tools at runtime as "plugins" — no changes to Pepe's code and no
+You can gain new tools at runtime as "plugins" - no changes to Pepe's code and no
 restart. Follow these steps:
 
 1. Write the tool as an Elixir module implementing the `Pepe.Tools.Tool` behaviour
@@ -27,14 +27,14 @@ restart. Follow these steps:
          end
        end
 
-2. The plugin is picked up automatically (hot-reloaded by file change) — you don't
+2. The plugin is picked up automatically (hot-reloaded by file change) - you don't
    restart anything.
 3. Enable it on yourself with the `enable_tool` tool, passing the tool's `name`.
 4. It's usable from your next message.
 
 Tips:
 - The `description` in `spec` is what tells you (and other agents) WHEN to use the
-  tool — write it clearly.
+  tool - write it clearly.
 - Use `Req` for HTTP requests (it's available). Keep `run/2` total: return
   `{:error, "..."}` instead of letting it crash.
-- A plugin is real Elixir code running in the host — only write tools you trust.
+- A plugin is real Elixir code running in the host - only write tools you trust.

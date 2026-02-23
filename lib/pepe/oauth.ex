@@ -10,9 +10,9 @@ defmodule Pepe.OAuth do
   A *flow spec* is a plain map (declared per provider in `Pepe.Providers`):
 
       %{
-        authorize_url: "https://…/authorize",
-        token_url: "https://…/token",
-        client_id: "…",
+        authorize_url: "https://.../authorize",
+        token_url: "https://.../token",
+        client_id: "...",
         redirect_uri: "http://localhost:1455/auth/callback",
         callback_port: 1455,
         callback_path: "/auth/callback",
@@ -78,7 +78,7 @@ defmodule Pepe.OAuth do
   defp fresh?(expires_at) when is_integer(expires_at),
     do: System.os_time(:second) < expires_at - @refresh_margin_seconds
 
-  # Unknown expiry → assume valid (refresh would happen on a 401 instead).
+  # Unknown expiry -> assume valid (refresh would happen on a 401 instead).
   defp fresh?(_), do: true
 
   defp refresh(oauth) do
@@ -199,7 +199,7 @@ defmodule Pepe.OAuth do
     end
   end
 
-  # Accept a bare code, or a full redirect URL with `?code=…`.
+  # Accept a bare code, or a full redirect URL with `?code=...`.
   defp extract_code(value) do
     value = String.trim(value)
 
@@ -274,12 +274,12 @@ defmodule Pepe.OAuth do
     link = "\e]8;;#{url}\e\\#{url}\e]8;;\e\\"
     IO.puts("")
     IO.puts(IO.ANSI.bright() <> "Sign in to continue" <> IO.ANSI.reset())
-    IO.puts("Opening your browser… if it doesn't open, click or paste this URL:\n  " <> link)
+    IO.puts("Opening your browser... if it doesn't open, click or paste this URL:\n  " <> link)
 
     if server?,
       do:
         IO.puts(
-          IO.ANSI.faint() <> "Waiting for you to authorize in the browser…" <> IO.ANSI.reset()
+          IO.ANSI.faint() <> "Waiting for you to authorize in the browser..." <> IO.ANSI.reset()
         )
 
     IO.puts("")

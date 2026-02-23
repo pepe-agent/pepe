@@ -20,12 +20,15 @@ defmodule Pepe.Config.Agent do
             # nil = itself only, [] = nobody (not even itself), [names] = exactly those,
             # ["*"] = everyone.
             can_manage: nil,
+            # Privacy/transform hooks this agent runs on the message flow (redaction,
+            # ...), by name - see `Pepe.Hooks`. Empty = none (raw, the default).
+            hooks: [],
             max_iterations: 12,
             temperature: nil
 
   @type t :: %__MODULE__{}
 
-  @doc "The default seed persona — the marker for an agent with no identity set yet."
+  @doc "The default seed persona - the marker for an agent with no identity set yet."
   @spec default_prompt() :: String.t()
   def default_prompt, do: @default_prompt
 
@@ -39,8 +42,9 @@ defmodule Pepe.Config.Agent do
       tools: map["tools"] || [],
       auto_approve: map["auto_approve"] || [],
       can_message: map["can_message"] || [],
-      # Preserve nil (the "itself only" default) vs [] (nobody) — don't coalesce.
+      # Preserve nil (the "itself only" default) vs [] (nobody) - don't coalesce.
       can_manage: map["can_manage"],
+      hooks: map["hooks"] || [],
       max_iterations: map["max_iterations"] || 12,
       temperature: map["temperature"]
     }

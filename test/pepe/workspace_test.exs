@@ -106,7 +106,7 @@ defmodule Pepe.Agent.WorkspaceTest do
 
     prompt = Workspace.system_prompt(agent)
 
-    # listed by name, read on demand — content NOT preloaded
+    # listed by name, read on demand - content NOT preloaded
     assert prompt =~ "- USER.md"
     assert prompt =~ "- people.md"
     refute prompt =~ "The user is Jho."

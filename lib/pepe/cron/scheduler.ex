@@ -3,7 +3,7 @@ defmodule Pepe.Cron.Scheduler do
   The in-app cron timer. Ticks on a short interval and fires any enabled cron whose
   schedule matches the current minute *in that cron's own timezone*.
 
-  This is a plain in-process ticker — no OS crontab — like a `setInterval` loop or a
+  This is a plain in-process ticker - no OS crontab - like a `setInterval` loop or a
   `croniter`-driven scheduler in other runtimes. It only
   runs while a long-running surface is up (`mix pepe serve` / `gateway`); one-shot
   CLI commands never start it, so they can't fire jobs.
@@ -37,7 +37,7 @@ defmodule Pepe.Cron.Scheduler do
     {:noreply, %{state | fired: fired, price_check: price_check}}
   end
 
-  # Piggyback the weekly billing price-cache refresh on the tick — attempted at most
+  # Piggyback the weekly billing price-cache refresh on the tick - attempted at most
   # hourly, and only here (this scheduler runs only while a server surface is up).
   # `Pepe.Pricing` no-ops unless the cache is actually stale.
   defp maybe_refresh_prices(next_at) do
@@ -62,7 +62,7 @@ defmodule Pepe.Cron.Scheduler do
             Task.start(fn -> Cron.run(cron, :scheduler) end)
             Map.put(fired, cron.id, key)
 
-          # Catch-up: the scheduled time passed while we were down — fire once,
+          # Catch-up: the scheduled time passed while we were down - fire once,
           # deduped on the missed slot so one recovery never double-fires.
           catchup = catch_up_key(cron, fired) ->
             Task.start(fn -> Cron.run(cron, :scheduler) end)

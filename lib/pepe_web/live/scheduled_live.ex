@@ -49,17 +49,17 @@ defmodule PepeWeb.ScheduledLive do
               </div>
             </div>
             <div class="mt-1 text-xs text-zinc-400"><code>{c.schedule}</code> · {c.timezone} · {gettext("next")} {cron_next(c)}</div>
-            <div class="text-xs text-zinc-500">{c.agent}{model_suffix(c.model)} · → {deliver_label(c.deliver)}</div>
+            <div class="text-xs text-zinc-500">{c.agent}{model_suffix(c.model)} · -> {deliver_label(c.deliver)}</div>
             <details class="mt-1">
               <summary class="cursor-pointer text-xs text-zinc-500">{gettext("prompt & last runs")}</summary>
               <pre class="mt-1 whitespace-pre-wrap rounded bg-zinc-900 p-2 text-xs text-zinc-300">{c.prompt}</pre>
               <div :for={e <- cron_history(c.id)} class="mt-1 text-xs text-zinc-400">
                 {(e["ok"] && "✅") || "⚠️"} {learn_date(e["at"])} · {e["source"]}
-                <span class="text-zinc-500">— {String.slice(to_string(e["output"]), 0, 120)}</span>
+                <span class="text-zinc-500">- {String.slice(to_string(e["output"]), 0, 120)}</span>
               </div>
             </details>
           </div>
-          <p :if={@crons == []} class="text-sm text-zinc-500">{gettext("No scheduled tasks yet — create one below.")}</p>
+          <p :if={@crons == []} class="text-sm text-zinc-500">{gettext("No scheduled tasks yet - create one below.")}</p>
 
           <form phx-submit="cron_create" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
             <div class="text-sm font-medium">{gettext("+ New scheduled task")}</div>
@@ -68,7 +68,7 @@ defmodule PepeWeb.ScheduledLive do
               <input name="name" placeholder={gettext("Daily XML check")} class={fld()} />
             </div>
             <div>
-              <label class={lbl()}>{gettext("What to do")} <span class="text-zinc-600">{gettext("— runs fresh each time, no chat memory")}</span></label>
+              <label class={lbl()}>{gettext("What to do")} <span class="text-zinc-600">{gettext("- runs fresh each time, no chat memory")}</span></label>
               <textarea name="prompt" rows="3" placeholder={gettext("Check the 06:00 XML load and report anything off.")} class={fld()}></textarea>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -80,7 +80,7 @@ defmodule PepeWeb.ScheduledLive do
                   <option value="*/15 * * * *">{gettext("Every 15 minutes")}</option>
                   <option value="0 9 * * 1">{gettext("Every Monday 09:00")}</option>
                   <option value="0 0 1 * *">{gettext("First of the month")}</option>
-                  <option value="custom" selected={@cron_custom}>{gettext("Custom…")}</option>
+                  <option value="custom" selected={@cron_custom}>{gettext("Custom...")}</option>
                 </select>
                 <input :if={@cron_custom} name="schedule_custom" placeholder="*/5 * * * *" class={[fld(), "mt-2 font-mono"]} />
                 <p :if={@cron_custom} class={hlp()}>
@@ -117,7 +117,7 @@ defmodule PepeWeb.ScheduledLive do
                 <option :for={t <- telegram_targets()} value={t}>{deliver_label(t)}</option>
               </select>
               <input :if={telegram_targets() == []} name="deliver_chat"
-                placeholder={gettext("No Telegram chats yet — paste a chat id (find it with /whoami)")} class={[fld(), "mt-2"]} />
+                placeholder={gettext("No Telegram chats yet - paste a chat id (find it with /whoami)")} class={[fld(), "mt-2"]} />
             </div>
             <button type="submit" class={btn()}>{gettext("Create task")}</button>
           </form>
@@ -135,7 +135,7 @@ defmodule PepeWeb.ScheduledLive do
 
       cron ->
         Task.start(fn -> Pepe.Cron.run(cron, :manual) end)
-        {:noreply, put_flash(socket, :info, gettext("Running “%{name}” now…", name: cron.name))}
+        {:noreply, put_flash(socket, :info, gettext("Running “%{name}” now...", name: cron.name))}
     end
   end
 

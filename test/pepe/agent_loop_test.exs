@@ -61,7 +61,7 @@ defmodule Pepe.AgentLoopTest do
       File.rm_rf(home)
     end)
 
-    # Primary points at a closed port (transport error → transient); fallback is the
+    # Primary points at a closed port (transport error -> transient); fallback is the
     # live mock server.
     Pepe.Config.put_model(%Model{
       name: "dead",
@@ -100,7 +100,7 @@ defmodule Pepe.AgentLoopTest do
 
   test "agent loop executes a tool call and threads the result back", %{model: model} do
     # The mock reads "note.txt" (relative), which resolves into the agent's
-    # persistent workspace — so seed the file there.
+    # persistent workspace - so seed the file there.
     home = Path.join(System.tmp_dir!(), "pepe_loop_#{System.unique_integer([:positive])}")
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)

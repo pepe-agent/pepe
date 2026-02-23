@@ -4,7 +4,7 @@ defmodule Pepe.Permissions.SessionStore do
 
   Backed by a public named ETS table owned by this process for the node's lifetime.
   Being in RAM only is the point: a `:session` grant is forgotten when the session
-  is reset (`/new` → `clear/1`) and when the node restarts — unlike an `:always`
+  is reset (`/new` -> `clear/1`) and when the node restarts - unlike an `:always`
   grant, which is persisted on the agent in `config.json`.
   """
 
@@ -40,7 +40,7 @@ defmodule Pepe.Permissions.SessionStore do
     {:ok, %{}}
   end
 
-  # Create the table if it isn't there yet — tolerates being called before the
+  # Create the table if it isn't there yet - tolerates being called before the
   # GenServer has started (e.g. from a fast CLI path).
   defp ensure_table do
     if :ets.whereis(@table) == :undefined do

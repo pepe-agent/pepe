@@ -169,7 +169,7 @@ defmodule Pepe.UsageTest do
       assert csv =~ "TOTAL,1000000,500000,1500000,7.50,11.25"
 
       md = Pepe.Usage.Invoice.to_markdown(inv)
-      assert md =~ "# Invoice — acme"
+      assert md =~ "# Invoice - acme"
       assert md =~ "markup **1.5**"
       assert md =~ "USD 11.25"
       assert Pepe.Usage.Invoice.basename(inv) == "acme-#{month}"
@@ -184,7 +184,7 @@ defmodule Pepe.UsageTest do
     test "the export_invoice tool saves a file and returns it" do
       assert {:ok, out} = Pepe.Tools.Invoice.run(%{"company" => "acme"}, %{})
       assert out =~ "Saved invoice to"
-      assert out =~ "# Invoice — acme"
+      assert out =~ "# Invoice - acme"
 
       assert {:error, msg} = Pepe.Tools.Invoice.run(%{"company" => "ghost"}, %{})
       assert msg =~ "unknown company"

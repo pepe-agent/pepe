@@ -21,14 +21,14 @@ When created from a chat, `deliver` defaults to that same chat. Confirm the deta
 
 ## Other actions
 
-- `list` — all tasks with their next run.
-- `run id: <id>` — force a task now to preview it.
+- `list` - all tasks with their next run.
+- `run id: <id>` - force a task now to preview it.
 - `enable` / `disable` / `remove id: <id>`.
-- `history id: <id>` — recent runs.
+- `history id: <id>` - recent runs.
 
 ## Notes
 
-- Schedule is a standard 5-field cron expression. Timezone is any IANA name — never
-  hard-code it; use what the user asked (e.g. "6am German time" → `Europe/Berlin`).
+- Schedule is a standard 5-field cron expression. Timezone is any IANA name - never
+  hard-code it; use what the user asked (e.g. "6am German time" -> `Europe/Berlin`).
 - Tasks only fire while a long-running surface is up (`mix pepe serve` / `gateway`).
 - Each due task runs in its own process, so many can fire at once without blocking.

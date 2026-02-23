@@ -1,7 +1,7 @@
 defmodule Pepe.Gettext do
   @moduledoc """
-  Gettext backend for Pepe's **fixed system messages** — the strings Pepe
-  itself emits (chat command replies, error notices, …), as opposed to the agent's
+  Gettext backend for Pepe's **fixed system messages** - the strings Pepe
+  itself emits (chat command replies, error notices, ...), as opposed to the agent's
   own replies, which always follow the language the user is speaking.
 
   Source strings (msgids) are written in English; translations live under

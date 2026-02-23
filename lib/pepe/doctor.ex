@@ -1,6 +1,6 @@
 defmodule Pepe.Doctor do
   @moduledoc """
-  Health checks for the whole setup — the **verify** half of do → verify → correct.
+  Health checks for the whole setup - the **verify** half of do -> verify -> correct.
 
   Run after changing something (or any time) to catch what's broken *before* it
   bites: unset `${ENV}` secrets, agents pointing at missing models, unknown tools in
@@ -9,8 +9,8 @@ defmodule Pepe.Doctor do
 
   Two tiers so it's cheap by default:
 
-    * `checks/0` — offline checks only (config consistency). Fast, no network.
-    * `checks/1` with `live: true` — also probes the outside world: Telegram `getMe`
+    * `checks/0` - offline checks only (config consistency). Fast, no network.
+    * `checks/1` with `live: true` - also probes the outside world: Telegram `getMe`
       per bot, a `/models` ping per model connection, and an MCP launch + tools list
       per server.
 
@@ -151,7 +151,7 @@ defmodule Pepe.Doctor do
     end)
   end
 
-  # A successful getMe is :ok, not a warning — helper keeps the branch tidy.
+  # A successful getMe is :ok, not a warning - helper keeps the branch tidy.
   defp ok_if_ok({:warn, "ok" <> _}), do: :ok
   defp ok_if_ok(other), do: other
 

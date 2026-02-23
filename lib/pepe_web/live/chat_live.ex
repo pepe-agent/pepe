@@ -68,7 +68,7 @@ defmodule PepeWeb.ChatLive do
                 + {gettext("New chat")}
               </button>
               <p class="mt-2 px-1 text-[11px] leading-relaxed text-zinc-500">
-                {gettext("Every conversation — web, Telegram, API and console — appears here.")}
+                {gettext("Every conversation - web, Telegram, API and console - appears here.")}
               </p>
             </div>
             <div class="flex-1 overflow-y-auto py-1">
@@ -79,7 +79,7 @@ defmodule PepeWeb.ChatLive do
                 <div :for={s <- items} class={["group mx-2 mb-0.5 flex items-center rounded-lg transition hover:bg-zinc-800/70", @selected == s.key && "bg-zinc-800"]}>
                   <button phx-click="select" phx-value-key={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
                     <div class="truncate text-sm font-medium">{session_suffix(s.key)}</div>
-                    <div class="truncate text-xs text-zinc-500">{s.agent || "—"} · {gettext("%{count} turns", count: s.turns)}</div>
+                    <div class="truncate text-xs text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
                   </button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
                     class="px-3 py-2 text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100">✕</button>
@@ -95,7 +95,7 @@ defmodule PepeWeb.ChatLive do
             <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
               <div class="min-w-0 truncate">
                 <div class="truncate font-medium">{session_suffix(@selected)}</div>
-                <div class="truncate text-xs text-zinc-500">{@agent || "—"} · {@selected}</div>
+                <div class="truncate text-xs text-zinc-500">{@agent || "-"} · {@selected}</div>
               </div>
               <div class="flex gap-2">
                 <button phx-click="reset" class={btn_ghost()}>{gettext("New")}</button>
@@ -105,11 +105,11 @@ defmodule PepeWeb.ChatLive do
 
             <div class="flex-1 space-y-3 overflow-y-auto p-5">
               <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-sm text-zinc-600">
-                {gettext("Fresh conversation — send a message to start.")}
+                {gettext("Fresh conversation - send a message to start.")}
               </div>
               <.bubble :for={m <- @messages} role={m.role} content={m.content} />
               <.bubble :if={@running and @streaming != ""} role="assistant" content={@streaming} />
-              <div :if={@running and @streaming == "" and !@pending_perm} class="text-sm text-zinc-500">…</div>
+              <div :if={@running and @streaming == "" and !@pending_perm} class="text-sm text-zinc-500">...</div>
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-amber-600/60 bg-amber-950/30 p-3">
                 <div class="mb-2 text-sm">
@@ -133,7 +133,7 @@ defmodule PepeWeb.ChatLive do
               </div>
 
               <form phx-submit="send" phx-change="type" class="flex gap-2">
-                <input name="text" value={@input} autocomplete="off" placeholder={gettext("Message…  (type / for commands)")}
+                <input name="text" value={@input} autocomplete="off" placeholder={gettext("Message...  (type / for commands)")}
                   class="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 outline-none transition placeholder:text-zinc-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
                 <button type="submit" class="rounded-lg bg-blue-600 px-5 py-2 font-medium transition hover:bg-blue-500">{gettext("Send")}</button>
               </form>
@@ -403,7 +403,7 @@ defmodule PepeWeb.ChatLive do
           send(parent, {:compacted, key})
         end)
 
-        socket |> assign(input: "") |> put_flash(:info, gettext("Compacting history…"))
+        socket |> assign(input: "") |> put_flash(:info, gettext("Compacting history..."))
 
       _ ->
         put_flash(socket, :error, gettext("Unknown command %{cmd}", cmd: cmd))

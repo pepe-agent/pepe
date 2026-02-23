@@ -1,10 +1,10 @@
 defmodule Pepe.Agent.SessionPersistence do
   @moduledoc """
-  File-backed persistence for live sessions — one JSON file per session under
+  File-backed persistence for live sessions - one JSON file per session under
   `<PEPE_HOME>/data/sessions/`, so conversations survive a restart.
 
   Files are written on every change. Being plain files (not a DB) makes them
-  durable against an abrupt kill or the machine sleeping — there's no log to flush —
+  durable against an abrupt kill or the machine sleeping - there's no log to flush -
   and trivial to inspect or delete. This is the disposable tier: configs remain the
   source of truth; dropping this directory only loses in-progress conversations.
   """

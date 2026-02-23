@@ -1,26 +1,26 @@
 defmodule Pepe.Heartbeat do
   @moduledoc """
   The proactive engine: periodically give a session's agent the floor to say
-  something **on its own initiative** — and the right to say nothing.
+  something **on its own initiative** - and the right to say nothing.
 
   A pulse runs the same reply path as a real turn, but the prompt makes clear this
   is an automatic check and instructs the agent to answer with exactly the sentinel
   `HEARTBEAT_OK` when nothing is worth surfacing. Most pulses are silent; that's the
-  point — it's what keeps a 24/7 agent from being spammy.
+  point - it's what keeps a 24/7 agent from being spammy.
 
   Three things feed a pulse:
 
-    * **System events** (`Pepe.Heartbeat.Events`) — short notes any subsystem can
-      queue for a session (a background command finished, a cron fired, …).
-    * **`HEARTBEAT.md`** — an optional file in the agent's workspace telling it what
-      to watch for and how proactive to be. No file → the agent still gets a pulse
+    * **System events** (`Pepe.Heartbeat.Events`) - short notes any subsystem can
+      queue for a session (a background command finished, a cron fired, ...).
+    * **`HEARTBEAT.md`** - an optional file in the agent's workspace telling it what
+      to watch for and how proactive to be. No file -> the agent still gets a pulse
       but with no special brief (it can only act on system events + its own
       judgment).
-    * **The cooldown gate** (`Pepe.Heartbeat.Cooldown`) — min-spacing + a flood
+    * **The cooldown gate** (`Pepe.Heartbeat.Cooldown`) - min-spacing + a flood
       breaker, checked before the pulse runs at all.
 
   `pulse/1` runs one check for a session. `active_hours?/2` and the caller decide
-  *when* to call it — Pepe doesn't hardcode a scheduler here; each surface (e.g.
+  *when* to call it - Pepe doesn't hardcode a scheduler here; each surface (e.g.
   the Telegram gateway) drives its own timer and calls `pulse/1` for sessions that
   opted in.
   """
@@ -42,7 +42,7 @@ defmodule Pepe.Heartbeat do
 
   @doc """
   Was `reply` the silence sentinel? Models routinely wrap a bare token in stray
-  formatting — `*HEARTBEAT_OK*`, `"HEARTBEAT_OK"`, `HEARTBEAT_OK!!!`, `.HEARTBEAT_OK`.
+  formatting - `*HEARTBEAT_OK*`, `"HEARTBEAT_OK"`, `HEARTBEAT_OK!!!`, `.HEARTBEAT_OK`.
   Match the exact token first, then retry after stripping edge whitespace and
   surrounding punctuation, so those all still count as "stay silent" while the token
   embedded in real prose does not.
@@ -65,12 +65,12 @@ defmodule Pepe.Heartbeat do
     events = Pepe.Heartbeat.Events.take(session_key)
 
     [
-      "[Automatic heartbeat check — the user does not see this prompt, only your reply if you choose to send one.]",
+      "[Automatic heartbeat check - the user does not see this prompt, only your reply if you choose to send one.]",
       brief(agent_name),
       events_block(events),
-      "Decide, on your own, whether there's anything genuinely worth proactively telling the user right now (based on the events above, prior conversation, or anything you were asked to watch for). Most of the time there is nothing — that's expected and correct.",
+      "Decide, on your own, whether there's anything genuinely worth proactively telling the user right now (based on the events above, prior conversation, or anything you were asked to watch for). Most of the time there is nothing - that's expected and correct.",
       "If there's nothing worth saying, reply with EXACTLY: #{@sentinel}",
-      "If there IS something worth saying, write that message directly — it will be sent to the user as-is."
+      "If there IS something worth saying, write that message directly - it will be sent to the user as-is."
     ]
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n\n")
@@ -94,7 +94,7 @@ defmodule Pepe.Heartbeat do
   @doc """
   Is `hour` (0-23, in whatever timezone the caller resolved) inside the given
   `[start, finish)` active window? Permissive on a nonsensical window (start >=
-  finish, or no window given) — always active, so a config mistake never silences a
+  finish, or no window given) - always active, so a config mistake never silences a
   heartbeat that's actually wanted.
   """
   @spec active_hours?(nil | [integer()], integer()) :: boolean()

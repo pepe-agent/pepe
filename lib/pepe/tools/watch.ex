@@ -1,6 +1,6 @@
 defmodule Pepe.Tools.Watch do
   @moduledoc """
-  Create and manage one-shot **watches** — "check X and notify me when it happens" —
+  Create and manage one-shot **watches** - "check X and notify me when it happens" -
   from a conversation.
 
   A watch re-checks a condition on a timer and messages the user **once** when it's
@@ -9,7 +9,7 @@ defmodule Pepe.Tools.Watch do
   polled with no LLM) whenever the condition is scriptable; use an `agent` check only
   when it needs judgement.
 
-  Like `schedule_task`, it's a gated tool — creating a watch goes through the human
+  Like `schedule_task`, it's a gated tool - creating a watch goes through the human
   permission prompt unless pre-approved. Actions: `create`, `list`, `pause`,
   `resume`, `cancel`.
   """
@@ -41,7 +41,7 @@ defmodule Pepe.Tools.Watch do
       durable and replies on this same channel.
 
       Prefer a cheap probe when the condition is scriptable (a URL is up, a command \
-      succeeds, a log contains a line) — it costs no tokens per check. Use an agent \
+      succeeds, a log contains a line) - it costs no tokens per check. Use an agent \
       check only when judging the condition needs the model.
 
       actions:
@@ -129,7 +129,7 @@ defmodule Pepe.Tools.Watch do
       }
 
       Config.put_watch(watch)
-      {:ok, "Watch created — I'll check and notify you once.\n\n" <> describe(watch)}
+      {:ok, "Watch created - I'll check and notify you once.\n\n" <> describe(watch)}
     end
   end
 
@@ -174,7 +174,7 @@ defmodule Pepe.Tools.Watch do
 
   defp within_cap do
     if length(active()) >= @max_active,
-      do: {:error, "too many active watches (max #{@max_active}) — cancel some first"},
+      do: {:error, "too many active watches (max #{@max_active}) - cancel some first"},
       else: :ok
   end
 
@@ -229,7 +229,7 @@ defmodule Pepe.Tools.Watch do
     detail = w.trigger["command"] || w.trigger["prompt"] || ""
 
     [
-      "• #{w.id} — #{w.description} (#{w.state})",
+      "• #{w.id} - #{w.description} (#{w.state})",
       "  trigger: #{kind} · every #{w.interval_s}s · #{String.slice(to_string(detail), 0, 60)}",
       "  checks: #{w.checks}/#{w.max_checks}",
       w.pending_delivery && "  ⏳ fired, waiting to deliver"

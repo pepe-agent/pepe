@@ -1,7 +1,7 @@
 defmodule Pepe.Tools.ScanSkill do
   @moduledoc """
   Run the static security scanner (`Pepe.Skills.Sentinel`) over skill text before
-  installing it — a programmatic second check alongside the agent's own read-through.
+  installing it - a programmatic second check alongside the agent's own read-through.
   Read-only (never installs anything itself).
   """
 

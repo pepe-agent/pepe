@@ -1,18 +1,18 @@
 defmodule Pepe.Tools.ManageAgent do
   @moduledoc """
-  Let one agent **administer and train another** — a scoped "admin agent". An admin
+  Let one agent **administer and train another** - a scoped "admin agent". An admin
   can shape a target agent's persona, model, tools, and memory, and even create new
   agents, all from chat.
 
   Authority is a **directed, per-agent allowlist** (`can_manage`), so you can have
   several admins, each scoped to different agents:
 
-    * `nil` (default) → the agent may manage only itself.
-    * `[]` → it may manage nobody, not even itself (a locked child — e.g. a
+    * `nil` (default) -> the agent may manage only itself.
+    * `[]` -> it may manage nobody, not even itself (a locked child - e.g. a
       client-facing agent that must not alter itself).
-    * `[names]` → exactly those agents (the list is exhaustive; include its own name
+    * `[names]` -> exactly those agents (the list is exhaustive; include its own name
       to also manage itself).
-    * `["*"]` → every agent (an explicit super-admin).
+    * `["*"]` -> every agent (an explicit super-admin).
 
   It's a risky tool (in the allowlist + through the permission gate). Persona and
   memory live in the target's workspace (`SOUL.md`, `MEMORY.md`); tools/model live in
@@ -43,14 +43,14 @@ defmodule Pepe.Tools.ManageAgent do
 
       actions:
       - list: show which agents you may manage.
-      - get: show a target's definition — needs `target`.
-      - create: create a new agent — needs `target` (name); optional `value` (its
+      - get: show a target's definition - needs `target`.
+      - create: create a new agent - needs `target` (name); optional `value` (its
         starting persona/system prompt).
-      - set_persona: set the target's persona (its SOUL.md) — needs `target`, `value`.
-      - set_model: point the target at a configured model — needs `target`, `value`.
-      - add_tool / remove_tool: grant or revoke one tool on the target — needs
+      - set_persona: set the target's persona (its SOUL.md) - needs `target`, `value`.
+      - set_model: point the target at a configured model - needs `target`, `value`.
+      - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
-      - remember: append a durable fact to the target's memory (train it) — needs
+      - remember: append a durable fact to the target's memory (train it) - needs
         `target`, `value`.
       """,
       %{

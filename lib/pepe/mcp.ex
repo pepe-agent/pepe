@@ -2,7 +2,7 @@ defmodule Pepe.MCP do
   @moduledoc """
   Facade for MCP (Model Context Protocol) tool servers.
 
-  Configured servers (`Pepe.Config.mcp_servers/0`) are launched **on demand** —
+  Configured servers (`Pepe.Config.mcp_servers/0`) are launched **on demand** -
   one `Pepe.MCP.Client` per server, started lazily under a DynamicSupervisor and
   cached in a Registry, so the first agent that uses a server pays the spawn cost and
   the rest reuse it.
@@ -22,7 +22,7 @@ defmodule Pepe.MCP do
   @registry Pepe.MCP.Registry
   @sup Pepe.MCP.DynSup
 
-  @doc "Is this an MCP tool name (`mcp__…`)?"
+  @doc "Is this an MCP tool name (`mcp__...`)?"
   def mcp_tool?(name), do: is_binary(name) and String.starts_with?(name, "mcp__")
 
   @doc "Ensure the client for `server` is running, starting it if needed."
@@ -94,7 +94,7 @@ defmodule Pepe.MCP do
     end
   end
 
-  # "mcp__<server>__<tool>" → {server, tool}; "mcp__<server>__*" / "mcp__<server>" → {server, "*"}
+  # "mcp__<server>__<tool>" -> {server, tool}; "mcp__<server>__*" / "mcp__<server>" -> {server, "*"}
   defp parse("mcp__" <> rest) do
     case String.split(rest, "__", parts: 2) do
       [server, "*"] -> {server, "*"}

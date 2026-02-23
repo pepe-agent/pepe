@@ -1,6 +1,6 @@
 defmodule Pepe.Cron.Log do
   @moduledoc """
-  Append-only run history for scheduled tasks — one JSONL file per cron under
+  Append-only run history for scheduled tasks - one JSONL file per cron under
   `<PEPE_HOME>/data/cron_logs/<id>.jsonl`. Every fire (scheduled or forced)
   records a line so the result can be consulted later from the dashboard, the CLI,
   or a chat.
@@ -63,7 +63,7 @@ defmodule Pepe.Cron.Log do
   defp path(id), do: Path.join(dir(), Base.url_encode64(id, padding: false) <> ".jsonl")
 
   defp clip(text) when is_binary(text) do
-    if String.length(text) > 4000, do: String.slice(text, 0, 4000) <> "…", else: text
+    if String.length(text) > 4000, do: String.slice(text, 0, 4000) <> "...", else: text
   end
 
   defp clip(text), do: to_string(text)

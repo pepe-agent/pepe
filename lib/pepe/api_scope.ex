@@ -1,6 +1,6 @@
 defmodule Pepe.ApiScope do
   @moduledoc """
-  Resolve and authorize agents against an API-token scope — shared by the HTTP
+  Resolve and authorize agents against an API-token scope - shared by the HTTP
   controller and the WebSocket channel so both enforce tenancy identically.
 
   A scope is `:unrestricted` (the API is open because no tokens are configured) or
@@ -14,8 +14,8 @@ defmodule Pepe.ApiScope do
   Resolve a requested agent name to an in-scope `%Config.Agent{}`, or `nil` when it's
   out of scope. An empty name yields the scope's default agent.
 
-  The open scope is lenient — an unknown name falls back to the default agent (legacy
-  behaviour) — while a token scope is strict: an agent-locked token always returns its
+  The open scope is lenient - an unknown name falls back to the default agent (legacy
+  behaviour) - while a token scope is strict: an agent-locked token always returns its
   agent, and a company token returns only agents inside it (bare names qualify in),
   `nil` otherwise. A name that is a bare model connection (not an agent) returns `nil`
   so callers that support model pass-through can handle it.

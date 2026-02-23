@@ -68,7 +68,7 @@ defmodule PepeWeb.CompaniesLive do
             </div>
           </div>
           <p :if={@companies == []} class="text-sm text-zinc-500">
-            {gettext("No companies yet — everything lives in the root workspace. Create one to isolate a client or team.")}
+            {gettext("No companies yet - everything lives in the root workspace. Create one to isolate a client or team.")}
           </p>
 
           <form :if={@editing} phx-submit="company_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
@@ -92,7 +92,7 @@ defmodule PepeWeb.CompaniesLive do
                     ),
                   else:
                     gettext(
-                      "This name keys every agent, workspace and binding — use Rename below to change it safely."
+                      "This name keys every agent, workspace and binding - use Rename below to change it safely."
                     )}
               </p>
             </div>
@@ -103,7 +103,7 @@ defmodule PepeWeb.CompaniesLive do
               <input
                 name="description"
                 value={@editing.description}
-                placeholder={gettext("Acme Inc — sales team")}
+                placeholder={gettext("Acme Inc - sales team")}
                 class={fld()}
               />
             </div>
@@ -177,7 +177,7 @@ defmodule PepeWeb.CompaniesLive do
 
       {:error, _} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Invalid name — use letters, digits, - and _."))}
+         put_flash(socket, :error, gettext("Invalid name - use letters, digits, - and _."))}
     end
   end
 
@@ -224,7 +224,7 @@ defmodule PepeWeb.CompaniesLive do
 
       {:error, _} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Invalid name — use letters, digits, - and _."))}
+         put_flash(socket, :error, gettext("Invalid name - use letters, digits, - and _."))}
     end
   end
 

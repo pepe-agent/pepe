@@ -13,7 +13,7 @@ defmodule Pepe.Tools.ConfigGet do
   def spec do
     function(
       "config_get",
-      "Read the current Pepe configuration — model connections, agents, the default model/agent, the system-message language, and Telegram status. Use it to answer the user about the setup or before changing something.",
+      "Read the current Pepe configuration - model connections, agents, the default model/agent, the system-message language, and Telegram status. Use it to answer the user about the setup or before changing something.",
       %{"type" => "object", "properties" => %{}, "required" => []}
     )
   end

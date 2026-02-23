@@ -1,11 +1,11 @@
 defmodule Pepe.Tools.SetRoute do
   @moduledoc """
-  Add or remove a **directed** agent-to-agent route — change who may message whom.
+  Add or remove a **directed** agent-to-agent route - change who may message whom.
 
   This is how the agent reconfigures routing from chat. `from` defaults to the
   calling agent; `action` is `"allow"` (add the route) or `"deny"` (remove it).
-  Routing is directed, so allowing `A → B` does not allow `B → A`. Because it edits
-  config, it goes through the permission gate like other config-changing tools — the
+  Routing is directed, so allowing `A -> B` does not allow `B -> A`. Because it edits
+  config, it goes through the permission gate like other config-changing tools - the
   user authorizes the change. Pairs with the `manage-routing` skill.
   """
 
@@ -22,7 +22,7 @@ defmodule Pepe.Tools.SetRoute do
   def spec do
     function(
       "set_route",
-      "Allow or remove a directed agent-to-agent route (who can message whom). `from` defaults to you; `action` is \"allow\" (add) or \"deny\" (remove). Directed: allowing A→B does not allow B→A.",
+      "Allow or remove a directed agent-to-agent route (who can message whom). `from` defaults to you; `action` is \"allow\" (add) or \"deny\" (remove). Directed: allowing A->B does not allow B->A.",
       %{
         "type" => "object",
         "properties" => %{
@@ -62,6 +62,6 @@ defmodule Pepe.Tools.SetRoute do
 
   defp remove(from, to) do
     Config.disallow_message(from, to)
-    {:ok, "Removed route #{from} → #{to}."}
+    {:ok, "Removed route #{from} -> #{to}."}
   end
 end

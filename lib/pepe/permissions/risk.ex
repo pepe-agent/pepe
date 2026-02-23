@@ -1,6 +1,6 @@
 defmodule Pepe.Permissions.Risk do
   @moduledoc """
-  Lightweight, pattern-based **risk hints** for a tool call — a human-readable note
+  Lightweight, pattern-based **risk hints** for a tool call - a human-readable note
   of *what makes it risky*, shown next to the authorize prompt (e.g. "runs embedded
   code", "deletes files"). It's a cheap heuristic to help the user decide, not a
   full shell command-explainer/analyzer.
@@ -69,7 +69,7 @@ defmodule Pepe.Permissions.Risk do
     |> Enum.map(&elem(&1, 0))
   end
 
-  # `python -c`, `node -e`, … or a heredoc piped into a script interpreter.
+  # `python -c`, `node -e`, ... or a heredoc piped into a script interpreter.
   defp inline_eval?(t) do
     Regex.match?(~r/\b(python3?|node|ruby|perl|deno|php)\b[^\n]*\s-(c|e)\b/, t) or
       (String.contains?(t, "<<") and Regex.match?(~r/\b(python3?|node|ruby|perl|deno|php)\b/, t))

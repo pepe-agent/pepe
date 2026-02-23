@@ -14,7 +14,7 @@ defmodule Pepe.Tools.RenameAgent do
   def spec do
     function(
       "rename_agent",
-      "Rename yourself (this agent) to a new handle: this renames your config entry and moves your workspace directory to the new name. Use it when the user wants you to be known under a different name. Your persona/identity itself lives in SOUL.md/IDENTITY.md — this only changes the handle/directory.",
+      "Rename yourself (this agent) to a new handle: this renames your config entry and moves your workspace directory to the new name. Use it when the user wants you to be known under a different name. Your persona/identity itself lives in SOUL.md/IDENTITY.md - this only changes the handle/directory.",
       %{
         "type" => "object",
         "properties" => %{
@@ -49,7 +49,7 @@ defmodule Pepe.Tools.RenameAgent do
 
   def run(_, _), do: {:error, "missing 'new_name'"}
 
-  # Follow the rename anywhere a Telegram bot is pinned to the old name — the
+  # Follow the rename anywhere a Telegram bot is pinned to the old name - the
   # default bot and any named (multi-channel) bots.
   defp retarget_telegram(old, new_name) do
     telegram = Config.telegram()

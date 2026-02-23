@@ -26,7 +26,7 @@ defmodule Pepe.Tools.SetRouteTest do
     assert {:ok, msg} = SetRoute.run(%{"from" => "A", "to" => "B", "action" => "allow"}, %{})
     assert msg =~ "A can now message B"
     assert Config.get_agent("A").can_message == ["B"]
-    # Directed: B → A was not created.
+    # Directed: B -> A was not created.
     assert Config.get_agent("B").can_message == []
   end
 
@@ -39,7 +39,7 @@ defmodule Pepe.Tools.SetRouteTest do
   test "deny removes the route" do
     Config.allow_message("A", "B")
     assert {:ok, msg} = SetRoute.run(%{"from" => "A", "to" => "B", "action" => "deny"}, %{})
-    assert msg =~ "Removed route A → B"
+    assert msg =~ "Removed route A -> B"
     assert Config.get_agent("A").can_message == []
   end
 

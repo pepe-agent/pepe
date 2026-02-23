@@ -5,8 +5,8 @@ defmodule PepeWeb.AgentSocket do
   streaming token deltas.
 
   Auth mirrors the `/v1` API: open when no tokens are configured, otherwise a valid
-  token must be passed as a connect param — `/socket/websocket?token=ctx_…` (browsers
-  can't set headers on a WebSocket) — and the connection is tagged with the token's
+  token must be passed as a connect param - `/socket/websocket?token=ctx_...` (browsers
+  can't set headers on a WebSocket) - and the connection is tagged with the token's
   scope, which `PepeWeb.AgentChannel` enforces when joining an agent topic.
   """
   use Phoenix.Socket

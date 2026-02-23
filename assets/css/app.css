@@ -107,7 +107,7 @@
 
 /* This file is for your main application CSS */
 
-/* Native <select> chevrons look ugly on the dark dashboard — replace with a clean one. */
+/* Native <select> chevrons look ugly on the dark dashboard - replace with a clean one. */
 select {
   appearance: none;
   -webkit-appearance: none;

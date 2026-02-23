@@ -1,5 +1,5 @@
 defmodule Pepe.Tools.Skill do
-  @moduledoc "Read a skill — an on-demand instruction doc that teaches the agent a procedure."
+  @moduledoc "Read a skill - an on-demand instruction doc that teaches the agent a procedure."
   @behaviour Pepe.Tools.Tool
 
   import Pepe.Tools.Tool, only: [function: 3]
@@ -11,7 +11,7 @@ defmodule Pepe.Tools.Skill do
   def spec do
     function(
       "skill",
-      "Read a skill: a step-by-step instruction doc. Use it when the user asks for something a listed skill covers (e.g. installing a tool) — read the skill, then follow it. Pass the skill `name` from the list in your context.",
+      "Read a skill: a step-by-step instruction doc. Use it when the user asks for something a listed skill covers (e.g. installing a tool) - read the skill, then follow it. Pass the skill `name` from the list in your context.",
       %{
         "type" => "object",
         "properties" => %{

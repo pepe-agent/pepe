@@ -44,14 +44,18 @@ defmodule Pepe.Agent.SessionSupervisor do
 
   defp persist?, do: Application.get_env(:pepe, :persist_sessions, false)
 
-  @doc "Start (or return the existing) session process for the given key."
-  def ensure(key, agent_name) do
+  @doc """
+  Start (or return the existing) session process for the given key. `opts` are
+  passed to the session on first creation (e.g. `ttl_ms:`, `ephemeral:`); an
+  already-running session keeps the options it was created with.
+  """
+  def ensure(key, agent_name, opts \\ []) do
     case Registry.lookup(Pepe.Agent.Registry, key) do
       [{pid, _}] ->
         {:ok, pid}
 
       [] ->
-        spec = {Pepe.Agent.Session, key: key, agent_name: agent_name}
+        spec = {Pepe.Agent.Session, [key: key, agent_name: agent_name] ++ opts}
 
         case DynamicSupervisor.start_child(__MODULE__, spec) do
           {:ok, pid} -> {:ok, pid}

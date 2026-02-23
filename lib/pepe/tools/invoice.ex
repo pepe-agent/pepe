@@ -2,7 +2,7 @@ defmodule Pepe.Tools.Invoice do
   @moduledoc """
   Generate a billing invoice for a company from metered token usage, saved as a
   file and returned inline. Lets an agent produce (and then send) an invoice on its
-  own — e.g. a monthly scheduled task that exports each client's invoice and emails
+  own - e.g. a monthly scheduled task that exports each client's invoice and emails
   it.
   """
   @behaviour Pepe.Tools.Tool

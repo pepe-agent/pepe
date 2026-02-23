@@ -3,14 +3,14 @@ defmodule Pepe.Company do
   Multi-tenant scoping.
 
   An agent's identity is a **handle**. In the **root** scope it's a bare name
-  (`"vendas"`) — exactly what a single-tenant install has always used, so nothing
+  (`"vendas"`) - exactly what a single-tenant install has always used, so nothing
   changes for setups that never touch companies. Inside a company it's qualified as
   `"company/name"` (`"acme/vendas"`), and the same bare name can be reused across
   companies (`"acme/vendas"` and `"globex/vendas"` are different agents).
 
-  The handle is the identity used everywhere agents are keyed — config, workspace
+  The handle is the identity used everywhere agents are keyed - config, workspace
   directory, session keys, the `Pepe.Agent.Registry`, `can_message` routes, cron
-  and bot bindings — so isolation rides along for free: a company handle carries its
+  and bot bindings - so isolation rides along for free: a company handle carries its
   company prefix through all of them. The scope-aware behaviour lives in just a few
   places (config lookups/listing, workspace paths, and the cross-company guard in
   `Pepe.Tools.SendToAgent`).
@@ -65,7 +65,7 @@ defmodule Pepe.Company do
 
   @doc """
   Is `name` valid as a company or agent name segment? Alphanumerics, `-` and `_`
-  only — no separator, no dots or spaces (it becomes a path segment and a handle
+  only - no separator, no dots or spaces (it becomes a path segment and a handle
   part).
   """
   @spec valid_name?(term()) :: boolean()

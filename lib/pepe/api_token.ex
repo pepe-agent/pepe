@@ -4,17 +4,17 @@ defmodule Pepe.ApiToken do
   root) and optionally a single agent.
 
   A token is a random string prefixed `ctx_`. Only its **SHA-256 hash** is stored in
-  the config — the raw token is shown once at creation and never persisted, so a
+  the config - the raw token is shown once at creation and never persisted, so a
   leaked config can't be replayed. Verification hashes the presented token and looks
   it up.
 
   Scope, from narrowest to widest:
 
-    * `agent`   — locked to exactly that agent handle; the request's `model` field is
+    * `agent`   - locked to exactly that agent handle; the request's `model` field is
       ignored, so the token always runs that one agent.
-    * `company` — any agent inside that company; a bare `model` name qualifies into it,
+    * `company` - any agent inside that company; a bare `model` name qualifies into it,
       and another company's agent is refused.
-    * neither   — the root scope (root agents + bare model connections).
+    * neither   - the root scope (root agents + bare model connections).
   """
 
   @prefix "ctx_"
@@ -33,7 +33,7 @@ defmodule Pepe.ApiToken do
 
   @doc "A short, safe fingerprint for display (never the full secret)."
   @spec fingerprint(String.t()) :: String.t()
-  def fingerprint(raw) when is_binary(raw), do: String.slice(raw, 0, 12) <> "…"
+  def fingerprint(raw) when is_binary(raw), do: String.slice(raw, 0, 12) <> "..."
 
   @doc "Extract a bearer token from an Authorization header value, or nil."
   @spec from_header(String.t() | nil) :: String.t() | nil

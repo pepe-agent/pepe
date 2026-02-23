@@ -1,6 +1,6 @@
 defmodule Pepe.Agent do
   @moduledoc """
-  High-level facade for running agents — the public API used by the CLI, the
+  High-level facade for running agents - the public API used by the CLI, the
   OpenAI-compatible HTTP server, the WebSocket channel and the Telegram gateway.
   """
 
@@ -33,7 +33,7 @@ defmodule Pepe.Agent do
   end
 
   @doc """
-  Ask a one-off side question on a session's live context without recording it —
+  Ask a one-off side question on a session's live context without recording it -
   the exchange does not affect future turns. Creates the session if needed.
   """
   @spec aside(String.t(), String.t() | nil, String.t(), keyword()) ::

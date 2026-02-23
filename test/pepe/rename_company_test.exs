@@ -23,12 +23,12 @@ defmodule Pepe.RenameCompanyTest do
     Config.add_company("acme", %{"description" => "Acme Inc", "markup" => 1.5})
 
     Config.put_agent(%Agent{
-      name: "acme/vendas",
-      can_message: ["acme/suporte"],
-      can_manage: ["acme/suporte"]
+      name: "acme/sales",
+      can_message: ["acme/support"],
+      can_manage: ["acme/support"]
     })
 
-    Config.put_agent(%Agent{name: "acme/suporte"})
+    Config.put_agent(%Agent{name: "acme/support"})
     Config.put_model(%Pepe.Config.Model{name: "acme/llm", model: "gpt-4o"})
   end
 
@@ -54,18 +54,18 @@ defmodule Pepe.RenameCompanyTest do
 
     # agents re-keyed, and cross-refs inside them rewritten
     names = Enum.map(Config.agents(), & &1.name) |> Enum.sort()
-    assert names == ["umbrella/suporte", "umbrella/vendas"]
+    assert names == ["umbrella/sales", "umbrella/support"]
 
-    vendas = Config.get_agent("umbrella/vendas")
-    assert vendas.can_message == ["umbrella/suporte"]
-    assert vendas.can_manage == ["umbrella/suporte"]
+    sales = Config.get_agent("umbrella/sales")
+    assert sales.can_message == ["umbrella/support"]
+    assert sales.can_manage == ["umbrella/support"]
 
     # model re-keyed
     assert Enum.map(Config.models(), & &1.name) == ["umbrella/llm"]
 
     # agents_in follows the new scope
     assert Enum.map(Config.agents_in("umbrella"), & &1.name) |> Enum.sort() ==
-             ["umbrella/suporte", "umbrella/vendas"]
+             ["umbrella/sales", "umbrella/support"]
 
     assert Config.agents_in("acme") == []
   end
@@ -75,33 +75,33 @@ defmodule Pepe.RenameCompanyTest do
 
     Config.put_cron(%Pepe.Config.Cron{
       id: "c1",
-      agent: "acme/vendas",
+      agent: "acme/sales",
       prompt: "hi",
       schedule: "0 8 * * *"
     })
 
-    Config.put_watch(%Pepe.Config.Watch{id: "w1", agent: "acme/suporte", trigger: %{}})
+    Config.put_watch(%Pepe.Config.Watch{id: "w1", agent: "acme/support", trigger: %{}})
 
     Config.put_telegram_bot("sales", %{
       "name" => "sales",
-      "agent" => "acme/vendas",
+      "agent" => "acme/sales",
       "bot_token" => "${T}"
     })
 
     assert {:ok, raw, _id} =
-             Config.add_api_token(company: "acme", agent: "acme/vendas", label: "x")
+             Config.add_api_token(company: "acme", agent: "acme/sales", label: "x")
 
     assert is_binary(raw)
 
     assert Config.rename_company("acme", "umbrella") == :ok
 
-    assert Config.get_cron("c1").agent == "umbrella/vendas"
-    assert Config.get_watch("w1").agent == "umbrella/suporte"
-    assert Config.telegram_bot("sales")["agent"] == "umbrella/vendas"
+    assert Config.get_cron("c1").agent == "umbrella/sales"
+    assert Config.get_watch("w1").agent == "umbrella/support"
+    assert Config.telegram_bot("sales")["agent"] == "umbrella/sales"
 
     [tok] = Config.api_tokens()
     assert tok["company"] == "umbrella"
-    assert tok["agent"] == "umbrella/vendas"
+    assert tok["agent"] == "umbrella/sales"
     # the cron prompt (free text) is untouched
     assert Config.get_cron("c1").prompt == "hi"
   end
@@ -109,10 +109,10 @@ defmodule Pepe.RenameCompanyTest do
   test "moves the workspace and usage directories on disk" do
     seed()
     # create a workspace file + a usage ledger entry under acme
-    File.mkdir_p!(Workspace.dir("acme/vendas"))
-    File.write!(Path.join(Workspace.dir("acme/vendas"), "MEMORY.md"), "remember me")
+    File.mkdir_p!(Workspace.dir("acme/sales"))
+    File.write!(Path.join(Workspace.dir("acme/sales"), "MEMORY.md"), "remember me")
 
-    Pepe.Usage.record("acme/vendas", "acme/llm", %{
+    Pepe.Usage.record("acme/sales", "acme/llm", %{
       "prompt_tokens" => 1000,
       "completion_tokens" => 0
     })
@@ -121,7 +121,7 @@ defmodule Pepe.RenameCompanyTest do
 
     # old dirs gone, new dirs carry the content
     refute File.dir?(Path.join([Config.home(), "companies", "acme"]))
-    assert File.read!(Path.join(Workspace.dir("umbrella/vendas"), "MEMORY.md")) == "remember me"
+    assert File.read!(Path.join(Workspace.dir("umbrella/sales"), "MEMORY.md")) == "remember me"
     assert Pepe.Usage.summary("umbrella", :month).totals.total == 1000
     assert Pepe.Usage.summary("acme", :month).totals.total == 0
   end

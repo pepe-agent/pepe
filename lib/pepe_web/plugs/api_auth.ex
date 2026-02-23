@@ -9,8 +9,8 @@ defmodule PepeWeb.ApiAuth do
 
   The token may arrive either way clients send it:
 
-    * `Authorization: Bearer ctx_…` — the OpenAI standard (used by the official SDKs).
-    * `api-key: ctx_…` — the Azure OpenAI style, accepted as a fallback.
+    * `Authorization: Bearer ctx_...` - the OpenAI standard (used by the official SDKs).
+    * `api-key: ctx_...` - the Azure OpenAI style, accepted as a fallback.
   """
 
   import Plug.Conn

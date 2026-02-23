@@ -2,7 +2,7 @@ defmodule PepeWeb.UsageLive do
   @moduledoc """
   Usage (billing) section: token consumption metered per company, agent and model,
   aggregated into billing cycles (hour / day / week / month / year). Shows provider
-  cost and — when a company has a markup — the amount to bill, side by side. Prices
+  cost and - when a company has a markup - the amount to bill, side by side. Prices
   come from the layered price book; a button refreshes the live cache.
   """
   use PepeWeb, :live_view
@@ -59,7 +59,7 @@ defmodule PepeWeb.UsageLive do
           <div class="flex items-center gap-2">
             <span class="hidden text-[11px] text-zinc-500 sm:inline">{price_cache_label(@cache_info)}</span>
             <button phx-click="refresh_prices" disabled={@refreshing} class={btn_ghost()}>
-              {if @refreshing, do: gettext("refreshing…"), else: gettext("Refresh prices")}
+              {if @refreshing, do: gettext("refreshing..."), else: gettext("Refresh prices")}
             </button>
           </div>
         </.view_header>
@@ -191,7 +191,7 @@ defmodule PepeWeb.UsageLive do
           put_flash(socket, :info, gettext("Refreshed %{count} live prices.", count: count))
 
         {:error, _} ->
-          put_flash(socket, :error, gettext("Couldn't refresh prices — check the connection."))
+          put_flash(socket, :error, gettext("Couldn't refresh prices - check the connection."))
       end
 
     {:noreply,

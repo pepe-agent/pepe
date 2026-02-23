@@ -35,7 +35,7 @@ defmodule Pepe.HeartbeatTest do
       key = "cd:#{System.unique_integer([:positive])}"
       now = System.monotonic_time(:millisecond)
       # Most recent fire 31s ago (clears the 30s min-spacing floor on its own), with
-      # 4 more before it — all 5 still inside the 60s flood window.
+      # 4 more before it - all 5 still inside the 60s flood window.
       for i <- 0..4, do: :ets.insert(Cooldown, {key, now - 31_000 - i * 6_000})
       assert Cooldown.allow?(key) == {:defer, :flood}
     end
@@ -58,7 +58,7 @@ defmodule Pepe.HeartbeatTest do
     end
 
     test "the sentinel embedded in real prose is not silence" do
-      refute Heartbeat.silent?("HEARTBEAT_OK — but also, your deploy is done.")
+      refute Heartbeat.silent?("HEARTBEAT_OK - but also, your deploy is done.")
       refute Heartbeat.silent?("Status: HEARTBEAT_OK")
     end
   end
@@ -71,7 +71,7 @@ defmodule Pepe.HeartbeatTest do
       prompt = Heartbeat.build_prompt(key, "nonexistent-agent")
       assert prompt =~ "background job finished"
       assert prompt =~ "HEARTBEAT_OK"
-      # Consumed — a second build sees no events.
+      # Consumed - a second build sees no events.
       assert Heartbeat.build_prompt(key, "nonexistent-agent") =~ "nothing worth"
     end
 

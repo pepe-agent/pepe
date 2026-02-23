@@ -1,6 +1,6 @@
 defmodule Pepe.Config.Model do
   @moduledoc """
-  A model *connection* — everything needed to talk to an OpenAI-compatible
+  A model *connection* - everything needed to talk to an OpenAI-compatible
   chat-completions endpoint: a base URL, an API key, the upstream model id and a
   few generation knobs.
 
@@ -19,9 +19,12 @@ defmodule Pepe.Config.Model do
             temperature: nil,
             context_window: nil,
             # Billing: price per 1M tokens, in the operator's configured currency.
-            # nil means "unpriced" — usage is still counted, just not costed.
+            # nil means "unpriced" - usage is still counted, just not costed.
             input_price: nil,
             output_price: nil,
+            # When true, the runtime refuses to send to this provider unless the agent
+            # runs a redaction hook - a hard guarantee that raw PII never reaches it.
+            require_redaction: nil,
             headers: %{},
             # Ordered failover chain: names of other model connections to try when
             # this one errors transiently (rate limit, 5xx, network).
@@ -46,6 +49,7 @@ defmodule Pepe.Config.Model do
       context_window: map["context_window"],
       input_price: map["input_price"],
       output_price: map["output_price"],
+      require_redaction: map["require_redaction"],
       headers: map["headers"] || %{},
       fallbacks: map["fallbacks"] || [],
       oauth: map["oauth"]

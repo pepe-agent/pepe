@@ -1,5 +1,5 @@
 defmodule PepeWeb.ChannelsLive do
-  @moduledoc "Channels section: connect agents to messaging channels (Telegram today)."
+  @moduledoc "Channels section: connect agents to messaging channels (Telegram + WhatsApp)."
   use PepeWeb, :live_view
   use Gettext, backend: Pepe.Gettext
 
@@ -17,8 +17,14 @@ defmodule PepeWeb.ChannelsLive do
        companies: Config.companies(),
        new_company: false,
        bots: Config.telegram_bots(),
-       edit_bot: nil
+       edit_bot: nil,
+       whatsapp: wa_list()
      )}
+  end
+
+  # WhatsApp connections (webhook-based), newest config wins.
+  defp wa_list do
+    Config.webhooks() |> Enum.filter(fn {_slug, e} -> e["provider"] == "whatsapp" end)
   end
 
   @impl true
@@ -31,7 +37,7 @@ defmodule PepeWeb.ChannelsLive do
         <.view_header
           icon="📡"
           title={gettext("Channels")}
-          desc={gettext("Connect your agents to messaging channels so people can chat with them. Telegram is available now — Slack and others are coming.")}
+          desc={gettext("Connect your agents to messaging channels so people can chat with them - Telegram bots and WhatsApp (Meta Cloud API) numbers, each bound to an agent.")}
         />
         <div class="flex-1 space-y-4 overflow-y-auto p-6">
           <div :for={b <- scoped_by_agent(@bots, @scope, & &1["agent"])} class={card()}>
@@ -66,7 +72,7 @@ defmodule PepeWeb.ChannelsLive do
               </select>
             </div>
             <div>
-              <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("— leave blank to keep the current one")}</span></label>
+              <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("- leave blank to keep the current one")}</span></label>
               <input name="token" placeholder={"${TELEGRAM_BOT_TOKEN}  " <> gettext("(or paste a new token)")} class={fld()} />
               <p class={hlp()}>{gettext("Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file.")}</p>
             </div>
@@ -83,8 +89,8 @@ defmodule PepeWeb.ChannelsLive do
               <input name="name" placeholder={gettext("sales")} class={fld()} />
             </div>
             <div>
-              <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("— from @BotFather")}</span></label>
-              <input name="token" placeholder="123456:ABC…  or  ${SALES_BOT_TOKEN}" class={fld()} />
+              <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("- from @BotFather")}</span></label>
+              <input name="token" placeholder="123456:ABC...  or  ${SALES_BOT_TOKEN}" class={fld()} />
               <p class={hlp()}>{gettext("Tip: use an env-var reference to keep the token out of the config file.")}</p>
             </div>
             <div>
@@ -96,6 +102,77 @@ defmodule PepeWeb.ChannelsLive do
             </div>
             <button type="submit" class={btn()}>{gettext("Add bot")}</button>
           </form>
+
+          <div class="border-t border-zinc-800 pt-5">
+            <div class="mb-2 text-sm font-medium">{gettext("WhatsApp (Meta Cloud API)")}</div>
+
+            <div :for={{slug, e} <- @whatsapp} class={[card(), "mb-2"]}>
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <span class="font-medium">{slug}</span>
+                  <span class={["ml-2 rounded px-1.5 text-xs", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
+                    {e["mode"] || "support"}
+                  </span>
+                </div>
+                <button phx-click="wa_remove" phx-value-slug={slug}
+                  data-confirm={gettext("Remove WhatsApp connection %{slug}?", slug: slug)}
+                  class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
+              </div>
+              <div class="mt-1 text-xs text-zinc-400">{gettext("agent:")} {e["agent"] || gettext("(default)")}</div>
+              <div class="text-xs text-zinc-500">
+                {gettext("Callback URL")}: <code>/webhooks/{e["company"] || "root"}/whatsapp/{slug}</code>
+                <span class="text-zinc-600">- {gettext("prefix with your public host")}</span>
+              </div>
+            </div>
+
+            <form phx-submit="wa_add" class="space-y-4 rounded-xl border border-emerald-900/50 bg-emerald-950/10 p-5">
+              <div class="text-sm font-medium">{gettext("+ Connect a WhatsApp number")}</div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class={lbl()}>{gettext("Slug")} <span class="text-zinc-600">{gettext("(URL id)")}</span></label>
+                  <input name="slug" placeholder="suporte" class={fld()} />
+                </div>
+                <div>
+                  <label class={lbl()}>{gettext("Mode")}</label>
+                  <select name="mode" class={fld()}>
+                    <option value="support">{gettext("support (customer-facing)")}</option>
+                    <option value="admin">{gettext("admin (yours)")}</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class={lbl()}>{gettext("This connection talks to")}</label>
+                <select name="agent" class={fld()}>
+                  <option :for={a <- scoped_agent_names(@scope)} value={a}>{a}</option>
+                </select>
+                <p class={hlp()}>{gettext("The agent's company scopes the connection automatically.")}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class={lbl()}>{gettext("Phone number ID")}</label>
+                  <input name="phone_number_id" placeholder="123456789" class={fld()} />
+                </div>
+                <div>
+                  <label class={lbl()}>{gettext("Verify token")}</label>
+                  <input name="verify_token" placeholder={gettext("(defaults to the slug)")} class={fld()} />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class={lbl()}>{gettext("Access token")}</label>
+                  <input name="access_token" placeholder="${WA_TOKEN_SUPORTE}" class={[fld(), "font-mono"]} />
+                </div>
+                <div>
+                  <label class={lbl()}>{gettext("App secret")}</label>
+                  <input name="app_secret" placeholder="${WA_APP_SECRET_SUPORTE}" class={[fld(), "font-mono"]} />
+                </div>
+              </div>
+              <p class={hlp()}>
+                {gettext("Write tokens as ${ENV_VAR} to keep secrets out of the config file. Leave blank to auto-name them from the slug.")}
+              </p>
+              <button type="submit" class={btn()}>{gettext("Connect")}</button>
+            </form>
+          </div>
         </div>
       </main>
     </div>
@@ -154,6 +231,63 @@ defmodule PepeWeb.ChannelsLive do
      socket
      |> assign(bots: Config.telegram_bots(), edit_bot: nil)
      |> put_flash(:info, gettext("Bot %{name} saved.", name: name))}
+  end
+
+  def handle_event("wa_add", params, socket) do
+    slug = String.trim(params["slug"] || "")
+    agent = blank(params["agent"])
+
+    cond do
+      slug == "" ->
+        {:noreply, put_flash(socket, :error, gettext("A slug is required."))}
+
+      Config.webhook_exists?(slug) ->
+        {:noreply, put_flash(socket, :error, gettext("That slug is already in use."))}
+
+      is_nil(agent) ->
+        {:noreply, put_flash(socket, :error, gettext("Pick the agent that answers."))}
+
+      blank(params["phone_number_id"]) == nil ->
+        {:noreply, put_flash(socket, :error, gettext("The phone number ID is required."))}
+
+      true ->
+        mode = if params["mode"] == "admin", do: "admin", else: "support"
+        support? = mode == "support"
+        up = String.upcase(slug)
+
+        entry =
+          reject_nil(%{
+            "provider" => "whatsapp",
+            "company" => Pepe.Company.of(agent),
+            "agent" => agent,
+            "mode" => mode,
+            "commands" => mode == "admin",
+            "trainers" => if(support?, do: [], else: nil),
+            "ephemeral" => support?,
+            "config" =>
+              reject_nil(%{
+                "phone_number_id" => blank(params["phone_number_id"]),
+                "access_token" => blank(params["access_token"]) || "${WA_TOKEN_#{up}}",
+                "app_secret" => blank(params["app_secret"]) || "${WA_APP_SECRET_#{up}}",
+                "verify_token" => blank(params["verify_token"]) || slug
+              })
+          })
+
+        Config.put_webhook(slug, entry)
+
+        {:noreply,
+         socket
+         |> assign(whatsapp: wa_list())
+         |> put_flash(
+           :info,
+           gettext("WhatsApp %{slug} connected - register its Callback URL in Meta.", slug: slug)
+         )}
+    end
+  end
+
+  def handle_event("wa_remove", %{"slug" => slug}, socket) do
+    Config.delete_webhook(slug)
+    {:noreply, assign(socket, whatsapp: wa_list())}
   end
 
   def handle_event("set_scope", params, socket),

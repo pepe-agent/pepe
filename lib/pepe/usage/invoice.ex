@@ -1,7 +1,7 @@
 defmodule Pepe.Usage.Invoice do
   @moduledoc """
   Render a billing invoice (from `Pepe.Usage.invoice/2`) as CSV for spreadsheets
-  or Markdown for a human — an email body, a Telegram message, a PDF source.
+  or Markdown for a human - an email body, a Telegram message, a PDF source.
   """
 
   @doc "A stable filename stem for an invoice, e.g. `acme-2026-07`."
@@ -30,7 +30,7 @@ defmodule Pepe.Usage.Invoice do
     |> Enum.map_join("\n", fn cells -> Enum.map_join(cells, ",", &csv_cell/1) end)
   end
 
-  @doc "Render the invoice as Markdown — a readable statement for a client."
+  @doc "Render the invoice as Markdown - a readable statement for a client."
   def to_markdown(inv) do
     cur = inv.currency
     gen = inv.generated_at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
@@ -48,7 +48,7 @@ defmodule Pepe.Usage.Invoice do
       end
 
     """
-    # Invoice — #{inv.company}
+    # Invoice - #{inv.company}
 
     **Period:** #{inv.period.label}
     **Currency:** #{cur}

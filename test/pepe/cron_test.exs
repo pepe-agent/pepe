@@ -84,7 +84,7 @@ defmodule Pepe.CronTest do
 
   test "missed?/1 detects a just-missed slot once, anchored to last_run" do
     # An hourly job scheduled for the minute that just passed (~60s ago): well inside
-    # the grace window (half of 1h = 30min), and last_run predates the slot → missed.
+    # the grace window (half of 1h = 30min), and last_run predates the slot -> missed.
     now = DateTime.now!("Etc/UTC")
     prev_minute = now |> DateTime.add(-60, :second) |> Map.fetch!(:minute)
     cron = sample(%{schedule: "#{prev_minute} * * * *", timezone: "Etc/UTC", last_run: 0})
@@ -102,7 +102,7 @@ defmodule Pepe.CronTest do
   end
 
   test "missed?/1 is false outside the grace window" do
-    # Daily job whose slot was ~half a day ago: grace caps at 2h → not missed.
+    # Daily job whose slot was ~half a day ago: grace caps at 2h -> not missed.
     now = DateTime.now!("Etc/UTC")
     far_hour = rem(now.hour + 12, 24)
     cron = sample(%{schedule: "0 #{far_hour} * * *", timezone: "Etc/UTC", last_run: 0})

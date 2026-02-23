@@ -8,7 +8,7 @@ defmodule Pepe.Agent.SessionStopTest do
   alias Pepe.Config.Model
 
   # A mock model that always asks to run `bash` (a risky tool). Combined with an
-  # authorizer that never answers, the run blocks inside the permission gate — which
+  # authorizer that never answers, the run blocks inside the permission gate - which
   # is exactly the state /stop must be able to interrupt.
   defmodule BashPlug do
     @moduledoc false

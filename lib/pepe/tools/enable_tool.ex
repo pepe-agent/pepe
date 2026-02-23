@@ -13,7 +13,7 @@ defmodule Pepe.Tools.EnableTool do
   def spec do
     function(
       "enable_tool",
-      "Add a tool to your own allowlist so you can start using it — e.g. right after installing a plugin under plugins/. Pass the tool's `name` (it must already exist as a built-in or a plugin). Takes effect on your next message.",
+      "Add a tool to your own allowlist so you can start using it - e.g. right after installing a plugin under plugins/. Pass the tool's `name` (it must already exist as a built-in or a plugin). Takes effect on your next message.",
       %{
         "type" => "object",
         "properties" => %{

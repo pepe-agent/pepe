@@ -1,16 +1,16 @@
 defmodule Pepe.Tools.ManageChannel do
   @moduledoc """
-  Let an agent create and manage **Telegram channels (bots)** from a conversation —
+  Let an agent create and manage **Telegram channels (bots)** from a conversation -
   "add a bot for the sales agent", "point the ops bot at a different agent".
 
   Deliberately guarded, so autonomy stays safe:
 
-    * **In the agent's tool allowlist** — that's the on/off; and it's a risky tool, so
+    * **In the agent's tool allowlist** - that's the on/off; and it's a risky tool, so
       each call goes through the permission gate unless pre-approved.
-    * **Scoped to named bots** — it only touches bots under `"telegrams"`, never the
+    * **Scoped to named bots** - it only touches bots under `"telegrams"`, never the
       protected `"default"` bot or any other config. (The equivalent of an allowlist
       of editable config paths.)
-    * **Secrets never pass through the chat** — you give the *name of an environment
+    * **Secrets never pass through the chat** - you give the *name of an environment
       variable* that holds the token, not the token itself. It's stored as
       `${THE_VAR}` and resolved at read time, so the raw secret never reaches the
       model or the logs.
@@ -28,7 +28,7 @@ defmodule Pepe.Tools.ManageChannel do
   alias Pepe.Config
 
   # A conventional environment-variable name (so a raw token, which contains ":",
-  # is rejected — the agent must reference an env var instead).
+  # is rejected - the agent must reference an env var instead).
   @env_var ~r/^[A-Za-z_][A-Za-z0-9_]*$/
 
   @impl true
@@ -40,7 +40,7 @@ defmodule Pepe.Tools.ManageChannel do
       "manage_channel",
       """
       Create and manage Telegram bots (channels), each bound to an agent. A bot is a \
-      whole channel that talks to one agent. IMPORTANT: never pass a raw bot token — \
+      whole channel that talks to one agent. IMPORTANT: never pass a raw bot token - \
       pass `token_env`, the NAME of an environment variable that holds the token \
       (e.g. "SALES_BOT_TOKEN"); the secret stays out of this chat. Confirm the details \
       with the user first.
@@ -49,14 +49,14 @@ defmodule Pepe.Tools.ManageChannel do
       - add: needs `name` (the bot's label, not "default"), `token_env` (env var name \
         with the @BotFather token), `agent` (an existing agent this bot talks to).
       - list: show configured bots (name, agent, whether active).
-      - set_agent: rebind a bot to another agent — needs `name`, `agent`.
-      - set_trainers: who the bot LEARNS from — needs `name`, `trainers` ("*" = \
+      - set_agent: rebind a bot to another agent - needs `name`, `agent`.
+      - set_trainers: who the bot LEARNS from - needs `name`, `trainers` ("*" = \
         everyone, "none" = nobody (client-facing bot), or comma-separated user ids).
-      - set_heartbeat: enable/tune the bot's proactive heartbeat — needs `name`; \
+      - set_heartbeat: enable/tune the bot's proactive heartbeat - needs `name`; \
         `heartbeat_minutes` (integer, how often to check; omit/0 disables it) and \
         optional `heartbeat_hours` ("8-22", quiet outside that local-hour window).
-      - set_progress: how the bot signals "I'm working" while running — needs `name` \
-        and `mode`: "reaction" (default — a 👀 reaction on the user's message, no text), \
+      - set_progress: how the bot signals "I'm working" while running - needs `name` \
+        and `mode`: "reaction" (default - a 👀 reaction on the user's message, no text), \
         "ambient" (one vague activity line), "off" (just the typing indicator), or \
         "verbose" (a per-tool breadcrumb list).
       - enable / disable / remove: needs `name`.
@@ -129,7 +129,8 @@ defmodule Pepe.Tools.ManageChannel do
       reload()
 
       {:ok,
-       "Bot #{name} created → agent #{agent}, token from $#{token_env}. " <> token_note(token_env)}
+       "Bot #{name} created -> agent #{agent}, token from $#{token_env}. " <>
+         token_note(token_env)}
     end
   end
 
@@ -299,7 +300,7 @@ defmodule Pepe.Tools.ManageChannel do
     if System.get_env(token_env) do
       "The env var is set, so it can start now."
     else
-      "Note: $#{token_env} isn't set in this environment yet — set it (and restart the gateway) for the bot to run."
+      "Note: $#{token_env} isn't set in this environment yet - set it (and restart the gateway) for the bot to run."
     end
   end
 
@@ -308,7 +309,7 @@ defmodule Pepe.Tools.ManageChannel do
   defp render_list(bots) do
     Enum.map_join(bots, "\n", fn b ->
       active = if Pepe.Gateways.Telegram.bot_active?(b), do: "active", else: "inactive"
-      "• #{b["name"]} → agent #{b["agent"] || "(default)"} [#{active}]"
+      "• #{b["name"]} -> agent #{b["agent"] || "(default)"} [#{active}]"
     end)
   end
 

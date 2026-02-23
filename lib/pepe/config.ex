@@ -134,7 +134,7 @@ defmodule Pepe.Config do
 
   @doc """
   Names of all configured companies (the tenant scopes), sorted. The **root** scope
-  is not a company — it's the implicit default every command uses without
+  is not a company - it's the implicit default every command uses without
   `--company`, so it never appears here.
   """
   def companies do
@@ -226,7 +226,7 @@ defmodule Pepe.Config do
 
   @doc """
   Rename a company, re-keying everything that carries its handle: the company entry
-  itself, its agents and models (and any `company/…` references in `can_message` /
+  itself, its agents and models (and any `company/...` references in `can_message` /
   `can_manage`), and the `agent` binding of every cron, watch, bot and API token
   that points at one of its agents. Also moves the company's workspace and usage
   directories on disk. Free text (prompts, descriptions) is never touched.
@@ -281,7 +281,7 @@ defmodule Pepe.Config do
     end)
   end
 
-  # Re-key a handle-keyed map (agents/models): rename `old/…` keys and transform the
+  # Re-key a handle-keyed map (agents/models): rename `old/...` keys and transform the
   # value with `tx`.
   defp rekey_section(config, section, old, new, tx) do
     case Map.get(config, section) do
@@ -308,7 +308,7 @@ defmodule Pepe.Config do
     end
   end
 
-  # In an id→entry map (crons/watches), remap each entry's `"agent"` handle.
+  # In an id->entry map (crons/watches), remap each entry's `"agent"` handle.
   defp rewrite_agent_binding(config, section, old, new) do
     case Map.get(config, section) do
       m when is_map(m) ->
@@ -375,7 +375,7 @@ defmodule Pepe.Config do
 
   @doc """
   Agents in a scope: `nil` for the root scope, or a company name. Root returns only
-  bare-name agents; a company returns only its own — never another's.
+  bare-name agents; a company returns only its own - never another's.
   """
   def agents_in(scope) do
     agents() |> Enum.filter(fn a -> Company.of(a.name) == scope end)
@@ -417,7 +417,7 @@ defmodule Pepe.Config do
     end
   end
 
-  @doc "Allow `from` to message `to` (a directed route; `to → from` is unaffected)."
+  @doc "Allow `from` to message `to` (a directed route; `to -> from` is unaffected)."
   def allow_message(from, to) do
     case get_agent(from) do
       nil -> {:error, :unknown_agent}
@@ -425,7 +425,7 @@ defmodule Pepe.Config do
     end
   end
 
-  @doc "Remove the `from → to` route."
+  @doc "Remove the `from -> to` route."
   def disallow_message(from, to) do
     case get_agent(from) do
       nil -> {:error, :unknown_agent}
@@ -436,11 +436,11 @@ defmodule Pepe.Config do
   @doc """
   May `admin` administer the agent named `target`? Authority defaults to CLOSED:
 
-    * `can_manage == nil` → itself only (a mild default).
-    * `[]` → nobody, not even itself (a locked child).
-    * `[names]` → exactly those (list is exhaustive — include its own name to also
+    * `can_manage == nil` -> itself only (a mild default).
+    * `[]` -> nobody, not even itself (a locked child).
+    * `[names]` -> exactly those (list is exhaustive - include its own name to also
       manage itself).
-    * `["*"]` → everyone (an explicit super-admin, never implicit).
+    * `["*"]` -> everyone (an explicit super-admin, never implicit).
   """
   def can_manage?(%Agent{name: name, can_manage: cm}, target) do
     cond do
@@ -658,7 +658,7 @@ defmodule Pepe.Config do
 
   @doc """
   All API tokens as maps (each carrying its `"id"`), sorted by id. Only the hash is
-  stored — never the raw token.
+  stored - never the raw token.
   """
   def api_tokens do
     load()
@@ -668,7 +668,7 @@ defmodule Pepe.Config do
   end
 
   @doc """
-  Is API auth on? It turns on the moment the first token exists — with none, the
+  Is API auth on? It turns on the moment the first token exists - with none, the
   `/v1` API stays open (single-tenant/backward-compatible). Creating a token locks it.
   """
   def api_auth_required?, do: api_tokens() != []
@@ -752,7 +752,7 @@ defmodule Pepe.Config do
   @doc """
   All configured Telegram bots as maps, each carrying a `"name"`. Multi-channel:
   the legacy singular `"telegram"` map is the bot named `"default"`; any extra bots
-  live under `"telegrams"` (a name→config map), each bound to its own agent. Bots
+  live under `"telegrams"` (a name->config map), each bound to its own agent. Bots
   that resolve to the same token are de-duplicated (two pollers on one token would
   409 against each other).
   """
@@ -789,6 +789,55 @@ defmodule Pepe.Config do
   def delete_telegram_bot(name) do
     load()
     |> update_in(["telegrams"], &Map.delete(&1 || %{}, name))
+    |> save()
+  end
+
+  ###
+  ### Webhook channels (WhatsApp, ...)
+  ###
+
+  @doc """
+  All webhook connections as a `slug => entry` map. Each entry binds a provider
+  (`\"whatsapp\"`, ...) and an agent to a URL `/webhooks/:company/:provider/:slug`.
+  """
+  def webhooks, do: load() |> Map.get("webhooks", %{})
+
+  @doc "Fetch one webhook connection by its unique slug, or nil."
+  def get_webhook(slug), do: load() |> get_in(["webhooks", slug])
+
+  @doc "Does a webhook connection with this slug exist?"
+  def webhook_exists?(slug), do: not is_nil(get_webhook(slug))
+
+  @doc "Create or replace a webhook connection (keyed by its slug)."
+  def put_webhook(slug, map) when is_binary(slug) and is_map(map) do
+    clean = Map.delete(map, "slug")
+
+    load()
+    |> update_in(["webhooks"], fn w -> Map.put(w || %{}, slug, clean) end)
+    |> save()
+  end
+
+  @doc "Delete a webhook connection."
+  def delete_webhook(slug) do
+    load()
+    |> update_in(["webhooks"], &Map.delete(&1 || %{}, slug))
+    |> save()
+  end
+
+  ###
+  ### Hooks (message-flow transforms - PII redaction, ...)
+  ###
+
+  @doc "Global per-hook settings (`name => settings`), e.g. `pii_redact`'s packs/custom."
+  def hooks_settings, do: load() |> Map.get("hooks", %{})
+
+  @doc "Settings for one hook by name, or `%{}`."
+  def hook_settings(name), do: hooks_settings() |> Map.get(name, %{})
+
+  @doc "Replace one hook's global settings map."
+  def put_hook_settings(name, settings) when is_binary(name) and is_map(settings) do
+    load()
+    |> update_in(["hooks"], fn h -> Map.put(h || %{}, name, settings) end)
     |> save()
   end
 
@@ -856,7 +905,7 @@ defmodule Pepe.Config do
 
   @doc """
   A company's billing markup: the multiplier applied to provider cost to get the
-  amount to charge. Unset (or root) means `1.0` — bill exactly the provider cost.
+  amount to charge. Unset (or root) means `1.0` - bill exactly the provider cost.
   """
   @spec company_markup(String.t() | nil) :: float()
   def company_markup(nil), do: 1.0

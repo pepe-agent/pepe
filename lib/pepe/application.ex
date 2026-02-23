@@ -45,7 +45,7 @@ defmodule Pepe.Application do
   end
 
   # When session persistence is on, re-spawn the saved sessions on boot (off the
-  # boot path — the disposable store starts lazily and can be slow).
+  # boot path - the disposable store starts lazily and can be slow).
   defp restore_children do
     if Application.get_env(:pepe, :persist_sessions, false) do
       [
@@ -60,7 +60,7 @@ defmodule Pepe.Application do
   end
 
   # The scheduled-task timer only runs on the long-lived surfaces (serve/gateway),
-  # never during a one-shot CLI command — otherwise `mix pepe run` could fire a
+  # never during a one-shot CLI command - otherwise `mix pepe run` could fire a
   # cron. Both flags default to false; serve enables the endpoint, gateway the
   # gateways, and either brings up the scheduler.
   defp scheduler_children do
@@ -70,7 +70,7 @@ defmodule Pepe.Application do
 
     # Cron fires only on the server surfaces; watches also run on an interactive
     # console (`tui`/`chat`) so a standalone REPL can fire and deliver its own watches.
-    # (Run a single long-lived surface at a time — two schedulers on one config double-fire.)
+    # (Run a single long-lived surface at a time - two schedulers on one config double-fire.)
     crons = if serve? or gateways?, do: [Pepe.Cron.Scheduler], else: []
     watches = if serve? or gateways? or persist?, do: [Pepe.Watch.Scheduler], else: []
     crons ++ watches
@@ -101,7 +101,7 @@ defmodule Pepe.Application do
 
     # Only `serve`/`gateway` bring up the messaging gateways; `run`/`tui` must not.
     Application.put_env(:pepe, :start_gateways, gateways_command?(argv))
-    # …and only those long-running surfaces persist/restore sessions.
+    # ...and only those long-running surfaces persist/restore sessions.
     Application.put_env(:pepe, :persist_sessions, gateways_command?(argv))
 
     # The endpoint must be in the tree at boot, so decide before starting it.

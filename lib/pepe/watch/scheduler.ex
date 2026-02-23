@@ -7,10 +7,10 @@ defmodule Pepe.Watch.Scheduler do
   Like the cron scheduler, it's a plain in-process ticker (no OS crontab) that only
   runs while a long-lived surface is up (`serve`/`gateway`). Two guarantees:
 
-    * **At-most-once fire** — the updated (often `done`) watch is persisted *before*
+    * **At-most-once fire** - the updated (often `done`) watch is persisted *before*
       delivery is attempted, so a crash between firing and delivering can't re-check
       and re-fire; only the delivery is retried.
-    * **Deliver-when-reachable** — a watch that fired but couldn't be delivered holds
+    * **Deliver-when-reachable** - a watch that fired but couldn't be delivered holds
       its message in `pending_delivery`; every tick re-attempts delivery (without
       re-checking) until it lands.
 
@@ -43,7 +43,7 @@ defmodule Pepe.Watch.Scheduler do
     {:noreply, %{state | busy: busy}}
   end
 
-  # A check/delivery task finished for this watch id — clear the in-flight guard.
+  # A check/delivery task finished for this watch id - clear the in-flight guard.
   def handle_info({:done, id}, state),
     do: {:noreply, %{state | busy: MapSet.delete(state.busy, id)}}
 
@@ -56,7 +56,7 @@ defmodule Pepe.Watch.Scheduler do
         run_check(watch)
         MapSet.put(busy, watch.id)
 
-      # Fired earlier but the channel was down — retry only the delivery.
+      # Fired earlier but the channel was down - retry only the delivery.
       watch.pending_delivery ->
         run_retry(watch)
         MapSet.put(busy, watch.id)
@@ -71,7 +71,7 @@ defmodule Pepe.Watch.Scheduler do
 
     Task.start(fn ->
       {updated, text} = Watch.evaluate(watch)
-      # Persist the new state (e.g. `done`) BEFORE delivering — at-most-once fire.
+      # Persist the new state (e.g. `done`) BEFORE delivering - at-most-once fire.
       Config.put_watch(updated)
       if text, do: deliver(updated, text)
       send(parent, {:done, watch.id})

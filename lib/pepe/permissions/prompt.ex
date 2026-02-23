@@ -3,8 +3,8 @@ defmodule Pepe.Permissions.Prompt do
   The shared vocabulary for the "may I run this tool?" prompt, reused by every
   surface so the choices, wording and outcomes stay consistent across gateways.
 
-  A gateway renders the prompt in its own native widget — Telegram an inline
-  keyboard, the CLI an arrow-key menu — but draws the option list, button labels,
+  A gateway renders the prompt in its own native widget - Telegram an inline
+  keyboard, the CLI an arrow-key menu - but draws the option list, button labels,
   decision tokens and confirmation text from here. The core
   (`Pepe.Permissions`) owns *what a decision means*; this module owns *how it's
   offered and acknowledged*. All strings are translated via Gettext.
@@ -39,7 +39,7 @@ defmodule Pepe.Permissions.Prompt do
   def token(decision) when decision in @options, do: Atom.to_string(decision)
 
   @doc """
-  Parse a token back into a decision. Unknown tokens map to `:deny` — the safe
+  Parse a token back into a decision. Unknown tokens map to `:deny` - the safe
   default, and it avoids `String.to_atom/1` on outside input.
   """
   @spec from_token(String.t()) :: Permissions.decision()

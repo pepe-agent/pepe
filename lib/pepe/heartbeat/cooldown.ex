@@ -1,16 +1,16 @@
 defmodule Pepe.Heartbeat.Cooldown do
   @moduledoc """
-  Anti-spam gate every heartbeat pulse must pass through — makes a runaway
+  Anti-spam gate every heartbeat pulse must pass through - makes a runaway
   self-triggering loop mathematically impossible.
 
   Two independent guards, both keyed per session:
 
-    * **Minimum spacing** — pulses closer together than `@min_spacing_ms` are
+    * **Minimum spacing** - pulses closer together than `@min_spacing_ms` are
       deferred, regardless of why they were requested.
-    * **Flood breaker** — if a key would fire ≥5 times within 60s, every further
+    * **Flood breaker** - if a key would fire ≥5 times within 60s, every further
       pulse for that key is deferred until the window clears.
 
-  In-memory only (an ETS table of recent fire timestamps) — a restart naturally
+  In-memory only (an ETS table of recent fire timestamps) - a restart naturally
   resets the guard, which is fine since there's nothing to protect across a restart.
   """
 

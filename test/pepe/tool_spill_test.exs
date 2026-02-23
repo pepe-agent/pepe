@@ -22,7 +22,7 @@ defmodule Pepe.ToolSpillTest do
 
   test "huge tool output is spilled to a workspace file with an inline preview" do
     ctx = %{agent: %Agent{name: "spiller"}, cwd: System.tmp_dir!()}
-    # ~20KB of output — past the spill threshold but under bash's own 30KB cap, so
+    # ~20KB of output - past the spill threshold but under bash's own 30KB cap, so
     # this exercises the spill path specifically (not bash's separate truncation).
     out = Pepe.Tools.execute(call("yes 0123456789abcdef | head -c 20000"), ctx)
 

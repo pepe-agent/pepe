@@ -67,7 +67,7 @@ defmodule PepeWeb.ModelsLive do
             )
 
           nil ->
-            gettext("no price — set one to bill for this model")
+            gettext("no price - set one to bill for this model")
         end
 
       {i, o} ->
@@ -113,7 +113,7 @@ defmodule PepeWeb.ModelsLive do
         <.view_header
           icon="🔌"
           title={gettext("Model connections")}
-          desc={gettext("The AI providers your agents run on — any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model…). Pick a provider and we fill in the rest.")}
+          desc={gettext("The AI providers your agents run on - any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model...). Pick a provider and we fill in the rest.")}
         >
           <button phx-click="model_new" class={btn()}>{gettext("+ New connection")}</button>
         </.view_header>
@@ -155,6 +155,10 @@ defmodule PepeWeb.ModelsLive do
               <input name="api_key" value={@edit_model.api_key} class={fld()} />
             </div>
             <.price_fields edit_model={@edit_model} currency={@currency} />
+            <label class="flex items-center gap-2 border-t border-zinc-800/60 pt-3 text-xs text-zinc-300">
+              <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} />
+              {gettext("Require redaction - refuse to send raw PII to this provider (the agent must run a redaction hook)")}
+            </label>
             <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="model_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -168,7 +172,7 @@ defmodule PepeWeb.ModelsLive do
             <div>
               <label class={lbl()}>{gettext("Provider")}</label>
               <select name="provider" phx-change="model_pick_provider" class={fld()}>
-                <option value="">{gettext("Choose a provider…")}</option>
+                <option value="">{gettext("Choose a provider...")}</option>
                 <option :for={{k, label} <- provider_options()} value={k} selected={k == @edit_model.provider}>{label}</option>
               </select>
             </div>
@@ -183,12 +187,12 @@ defmodule PepeWeb.ModelsLive do
                 <input :if={@edit_model.base_url} type="hidden" name="base_url" value={@edit_model.base_url} />
                 <div :if={!@edit_model.base_url}>
                   <label class={lbl()}>{gettext("Base URL")}</label>
-                  <input name="base_url" placeholder="https://…/v1" class={fld()} />
+                  <input name="base_url" placeholder="https://.../v1" class={fld()} />
                 </div>
 
                 <div>
                   <label class={lbl()}>{gettext("Model")}</label>
-                  <div :if={@edit_model.models == :loading} class="text-xs text-zinc-500">{gettext("loading models…")}</div>
+                  <div :if={@edit_model.models == :loading} class="text-xs text-zinc-500">{gettext("loading models...")}</div>
                   <select :if={is_list(@edit_model.models) and @edit_model.models != []} name="model" class={fld()}>
                     <option :for={id <- @edit_model.models} value={id}>{id}</option>
                   </select>
@@ -242,7 +246,8 @@ defmodule PepeWeb.ModelsLive do
              model_id: m.model,
              api_key: m.api_key,
              input_price: m.input_price,
-             output_price: m.output_price
+             output_price: m.output_price,
+             require_redaction: m.require_redaction
            }
          )}
     end
@@ -299,7 +304,8 @@ defmodule PepeWeb.ModelsLive do
           api_key: blank(params["api_key"]),
           model: params["model"],
           input_price: parse_price(params["input_price"]),
-          output_price: parse_price(params["output_price"])
+          output_price: parse_price(params["output_price"]),
+          require_redaction: params["require_redaction"] == "on" || nil
       })
 
       {:noreply,

@@ -32,7 +32,7 @@ defmodule PepeWeb.ToolServersLive do
         <.view_header
           icon="🧰"
           title="MCP"
-          desc={gettext("Give agents extra abilities from external tool servers — MCP (Sentry, GitHub, …). Keep secrets safe by writing tokens as ${ENV_VAR}.")}
+          desc={gettext("Give agents extra abilities from external tool servers - MCP (Sentry, GitHub, ...). Keep secrets safe by writing tokens as ${ENV_VAR}.")}
         >
           <button phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
         </.view_header>
@@ -46,19 +46,19 @@ defmodule PepeWeb.ToolServersLive do
               </div>
             </div>
             <div class="mt-1 text-xs text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
-            <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("connecting…")}</div>
+            <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("connecting...")}</div>
             <div :if={is_list(@mcp_tools[name])} class="mt-2 space-y-1">
               <div :for={t <- @mcp_tools[name]} class="text-xs text-zinc-400">
                 <code class="text-zinc-300">mcp__{name}__{t["name"]}</code>
-                <span class="text-zinc-500">— {String.slice(to_string(t["description"]), 0, 90)}</span>
+                <span class="text-zinc-500">- {String.slice(to_string(t["description"]), 0, 90)}</span>
               </div>
-              <p class="text-xs text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab → Tools) to keep it read-only.")}</p>
+              <p class="text-xs text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only.")}</p>
             </div>
             <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-xs text-red-400">
-              {gettext("couldn't connect — check the command and the env var token")}
+              {gettext("couldn't connect - check the command and the env var token")}
             </div>
           </div>
-          <p :if={@mcp == %{}} class="text-sm text-zinc-500">{gettext("No MCP servers yet — add one below.")}</p>
+          <p :if={@mcp == %{}} class="text-sm text-zinc-500">{gettext("No MCP servers yet - add one below.")}</p>
 
           <form :if={@edit_mcp} phx-submit="mcp_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
             <div class="text-sm font-medium">{gettext("+ New MCP server")}</div>
@@ -73,7 +73,7 @@ defmodule PepeWeb.ToolServersLive do
             <div>
               <label class={lbl()}>{gettext("Arguments")}</label>
               <input name="args" placeholder={"-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"} class={[fld(), "font-mono"]} />
-              <p class={hlp()}>{gettext("Put the token as ${ENV_VAR} — the secret stays out of the config file.")}</p>
+              <p class={hlp()}>{gettext("Put the token as ${ENV_VAR} - the secret stays out of the config file.")}</p>
             </div>
             <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
@@ -105,7 +105,7 @@ defmodule PepeWeb.ToolServersLive do
       {:noreply,
        socket
        |> assign(mcp: Config.mcp_servers(), edit_mcp: nil)
-       |> put_flash(:info, gettext("MCP server %{name} saved — validate it.", name: name))}
+       |> put_flash(:info, gettext("MCP server %{name} saved - validate it.", name: name))}
     end
   end
 

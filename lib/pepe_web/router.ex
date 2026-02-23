@@ -29,6 +29,15 @@ defmodule PepeWeb.Router do
     get "/healthz", HealthController, :index
   end
 
+  # Inbound webhook channels (WhatsApp, ...). One route, dispatched by provider.
+  # GET = verification handshake; POST = an inbound event. No CSRF (external caller).
+  scope "/webhooks", PepeWeb do
+    pipe_through :api
+
+    get "/:company/:provider/:slug", WebhookController, :verify
+    post "/:company/:provider/:slug", WebhookController, :receive
+  end
+
   # The web dashboard. Each section is a clean path; a specific conversation adds
   # `?chat=<key>` (session keys carry ":", so they ride in the query). The section is
   # carried by the live_action.

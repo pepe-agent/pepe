@@ -4,9 +4,9 @@ defmodule Pepe.LLM.Responses do
   (`https://chatgpt.com/backend-api/codex/responses`). It speaks a different shape
   than Chat Completions, so this module translates on both ends:
 
-    * inbound  — Pepe's OpenAI chat-format `messages`/`tools` → Responses
+    * inbound  - Pepe's OpenAI chat-format `messages`/`tools` -> Responses
       `instructions` + `input` items + flat `tools`.
-    * outbound — the SSE `response.*` event stream → the same
+    * outbound - the SSE `response.*` event stream -> the same
       `%{content, tool_calls, finish_reason, usage}` result `Pepe.LLM` returns,
       with `tool_calls` in Chat-Completions shape so the runtime is unchanged.
 
@@ -34,7 +34,7 @@ defmodule Pepe.LLM.Responses do
 
     collector = fn {:data, data}, {req, resp} ->
       state = resp.private[:pepe] || init
-      # Keep the raw bytes too — on a non-2xx the error body lands here (not in
+      # Keep the raw bytes too - on a non-2xx the error body lands here (not in
       # `resp.body`), and we want to surface what the provider actually said.
       state = %{state | raw: state.raw <> data}
       state = consume(state.buffer <> data, %{state | buffer: ""}, on_delta)
@@ -255,7 +255,7 @@ defmodule Pepe.LLM.Responses do
 
   defp text_part(type, content), do: %{"type" => type, "text" => to_string(content)}
 
-  # Chat-Completions tool specs (nested under "function") → flat Responses tools.
+  # Chat-Completions tool specs (nested under "function") -> flat Responses tools.
   defp to_tools(nil), do: []
 
   defp to_tools(specs) when is_list(specs) do
@@ -315,7 +315,7 @@ defmodule Pepe.LLM.Responses do
     %{state | content: state.content <> delta}
   end
 
-  # a new output item — register function calls so we can stream their arguments
+  # a new output item - register function calls so we can stream their arguments
   defp handle_event(
          "response.output_item.added",
          %{"item" => %{"type" => "function_call"} = item},

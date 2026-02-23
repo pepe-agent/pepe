@@ -1,7 +1,7 @@
 defmodule Pepe.OAuth.Callback do
   @moduledoc """
   Tiny Plug that backs the local OAuth redirect server. The provider redirects the
-  browser to `http://localhost:<port><path>?code=…&state=…` after sign-in; this
+  browser to `http://localhost:<port><path>?code=...&state=...` after sign-in; this
   validates `state`, hands the `code` back to the waiting process, and shows a
   friendly "you can close this tab" page.
   """
@@ -32,7 +32,7 @@ defmodule Pepe.OAuth.Callback do
 
       params["state"] != expected_state ->
         send(owner, {:oauth_error, ref, :state_mismatch})
-        html(conn, 400, page("Sign-in failed", "state mismatch — please retry"))
+        html(conn, 400, page("Sign-in failed", "state mismatch - please retry"))
 
       is_binary(params["code"]) and params["code"] != "" ->
         send(owner, {:oauth_code, ref, params["code"]})

@@ -30,7 +30,7 @@ defmodule Pepe.Tools.MoveFile do
     File.mkdir_p!(Path.dirname(dst))
 
     case File.rename(src, dst) do
-      :ok -> {:ok, "moved #{src} → #{dst}"}
+      :ok -> {:ok, "moved #{src} -> #{dst}"}
       {:error, reason} -> {:error, "cannot move #{src}: #{:file.format_error(reason)}"}
     end
   end

@@ -4,7 +4,7 @@ defmodule Pepe.Config.Cron do
   recurring schedule, and deliver the result somewhere.
 
   Because a cron fires in a **fresh session** (no memory of any chat), its `prompt`
-  must include everything the agent needs — the domain context, what to check, the
+  must include everything the agent needs - the domain context, what to check, the
   window, the timezone. The agent bakes that in when it creates the job.
   """
 

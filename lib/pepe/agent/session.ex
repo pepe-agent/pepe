@@ -5,7 +5,11 @@ defmodule Pepe.Agent.Session do
   agent. Concurrency, isolation and crash recovery come for free from OTP.
   """
 
-  use GenServer
+  # Temporary: a session is never auto-restarted by the supervisor. A crashed
+  # conversation just ends (the next message recreates it via `ensure`, reloading any
+  # persisted history), and TTL eviction can stop the process without a restart loop.
+  # Persisted sessions are re-spawned explicitly on boot by `SessionSupervisor.restore`.
+  use GenServer, restart: :temporary
 
   alias Pepe.Agent.Runtime
   alias Pepe.Agent.Workspace
@@ -31,6 +35,13 @@ defmodule Pepe.Agent.Session do
   @doc "Reset the conversation history (keeps the system prompt)."
   def reset(key), do: GenServer.call(via(key), :reset)
 
+  @doc """
+  Ask the session to clear its context **after the current turn** - how an agent
+  ends its own conversation (the `end_session` tool). The in-flight reply is still
+  delivered; the next message starts fresh.
+  """
+  def end_session(key), do: GenServer.cast(via(key), :end_session)
+
   @doc "Return the current message history."
   def history(key), do: GenServer.call(via(key), :history)
 
@@ -50,10 +61,10 @@ defmodule Pepe.Agent.Session do
   def learn(key), do: GenServer.call(via(key), :learn)
 
   @doc """
-  Run one heartbeat pulse on this session's live context — the agent decides, on its
+  Run one heartbeat pulse on this session's live context - the agent decides, on its
   own, whether anything is worth proactively saying. Returns `{:ok, text}` when it
   wants to speak, `:silent` when it chose not to, or `{:error, reason}`
-  (`:busy` when a normal turn is already running — the pulse is simply skipped).
+  (`:busy` when a normal turn is already running - the pulse is simply skipped).
   """
   @spec heartbeat(term()) :: {:ok, String.t()} | :silent | {:error, term()}
   def heartbeat(key), do: GenServer.call(via(key), :heartbeat, 120_000)
@@ -69,7 +80,7 @@ defmodule Pepe.Agent.Session do
   Answer a one-off **side question** against the live context without recording it.
 
   The question and the reply are run on top of the current history but are *not*
-  stored, so they never influence future turns — this powers the Telegram `/btw`
+  stored, so they never influence future turns - this powers the Telegram `/btw`
   (a.k.a. `/side`) command. Returns `{:ok, reply}` or `{:error, reason}`.
   """
   @spec aside(term(), String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
@@ -108,7 +119,25 @@ defmodule Pepe.Agent.Session do
     # surface sets it per turn (Telegram computes it from the bot's `trainers`
     # allowlist + the sender), so a client's chat never becomes memory. Defaults to
     # true (an owner console/API conversation learns unless told otherwise).
-    {:ok, state |> Map.put_new(:idle_ref, nil) |> Map.put_new(:learn_allowed, true)}
+    #
+    # `ttl_ms` evicts the session after that much inactivity (nil = never, the
+    # default). `ephemeral` skips persistence and clears on eviction - used by
+    # customer-facing channels so support conversations don't accumulate.
+    state =
+      state
+      |> Map.put_new(:idle_ref, nil)
+      |> Map.put_new(:learn_allowed, true)
+      |> Map.merge(%{
+        ttl_ms: Keyword.get(opts, :ttl_ms),
+        ephemeral: Keyword.get(opts, :ephemeral, false),
+        reset_pending: false,
+        ttl_ref: nil,
+        # Reversible redaction map (pseudonym -> real) accumulated by inbound hooks and
+        # applied to outbound replies. Lives only in this process; cleared on reset.
+        pii_map: []
+      })
+
+    {:ok, arm_ttl(state)}
   end
 
   # Sessions are only persisted in long-running surfaces (serve/gateway), so local
@@ -116,13 +145,15 @@ defmodule Pepe.Agent.Session do
   defp persist?, do: Application.get_env(:pepe, :persist_sessions, false)
 
   defp persist(state) do
-    if persist?(), do: SessionPersistence.save(state.key, state.agent_name, state.messages)
+    if persist?() and not Map.get(state, :ephemeral, false),
+      do: SessionPersistence.save(state.key, state.agent_name, state.messages)
+
     state
   end
 
   # Seed a session with the system prompt built from the agent's CURRENT config/soul.
   # Called at session start and on /new (reset), so a fresh session always picks up
-  # the latest persona/config — a live session keeps its prompt stable until then.
+  # the latest persona/config - a live session keeps its prompt stable until then.
   defp init_messages(agent_name) do
     case agent_name && Config.get_agent(agent_name) do
       nil -> []
@@ -145,17 +176,17 @@ defmodule Pepe.Agent.Session do
         {:reply, {:error, :no_agent}, state}
 
       agent ->
-        messages = ensure_system(state.messages, agent) ++ [Message.user(text)]
         # Tag the run with this session's key so `:session` approvals are scoped to it.
         opts = Keyword.put(opts, :session_key, state.key)
         # Whether this conversation may feed the memory/skill review (set by the surface).
         state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
-        # A new message cancels any pending idle review.
-        state = cancel_idle(state)
-        # Run off-process so the session stays responsive (e.g. to `/stop`). We hold
-        # the caller's `from` and reply once the run reports back via `:run_done`,
-        # and monitor the task so a stuck/dead run can't pin the session on `:busy`.
-        {pid, ref} = spawn_run(agent, messages, opts)
+        # A new message cancels any pending idle review and re-arms the TTL.
+        state = state |> cancel_idle() |> arm_ttl()
+        # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
+        # user text and the reversible map go in; the task redacts (inbound hooks)
+        # before the model sees anything and restores the reply on the way out.
+        base = ensure_system(state.messages, agent)
+        {pid, ref} = spawn_run(agent, base, text, state.pii_map, opts)
         {:noreply, %{state | running: %{task: pid, ref: ref, from: from}}}
     end
   end
@@ -181,7 +212,7 @@ defmodule Pepe.Agent.Session do
     end
   end
 
-  # Skip a pulse outright while a normal turn is in flight — never collide with it.
+  # Skip a pulse outright while a normal turn is in flight - never collide with it.
   def handle_call(:heartbeat, _from, %{running: %{}} = state) do
     {:reply, {:error, :busy}, state}
   end
@@ -201,7 +232,7 @@ defmodule Pepe.Agent.Session do
             if Pepe.Heartbeat.silent?(reply) do
               {:reply, :silent, state}
             else
-              # Only the agent's own message joins the visible history — the
+              # Only the agent's own message joins the visible history - the
               # internal pulse prompt stays invisible, like a cron/system trigger.
               new_state = %{state | messages: state.messages ++ [Message.assistant(reply)]}
               {:reply, {:ok, reply}, persist(new_state)}
@@ -235,7 +266,7 @@ defmodule Pepe.Agent.Session do
     # session wedged on `:busy`) and forgets "allow for this session" grants.
     Pepe.Permissions.SessionStore.clear(state.key)
     state = cancel_running(state, {:error, :stopped})
-    {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name)})}
+    {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name), pii_map: []})}
   end
 
   def handle_call(:history, _from, state) do
@@ -282,10 +313,24 @@ defmodule Pepe.Agent.Session do
 
     state =
       case result do
-        {:ok, reply, all_messages} ->
+        {:ok, reply, all_messages, entries} ->
           GenServer.reply(from, {:ok, reply})
 
-          %{state | agent_name: agent_name, messages: all_messages, running: nil}
+          # If the agent called `end_session` this turn, clear the context (and the
+          # reversible map) now that the reply is out - the next message starts fresh.
+          {messages, pii_map} =
+            if state.reset_pending,
+              do: {init_messages(agent_name), []},
+              else: {all_messages, state.pii_map ++ entries}
+
+          %{
+            state
+            | agent_name: agent_name,
+              messages: messages,
+              running: nil,
+              reset_pending: false,
+              pii_map: pii_map
+          }
           |> persist()
           |> maybe_schedule_idle()
 
@@ -311,7 +356,7 @@ defmodule Pepe.Agent.Session do
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
 
-  # The session went idle after a run — run the memory/skill review if this
+  # The session went idle after a run - run the memory/skill review if this
   # conversation is allowed to learn, then clear the timer.
   def handle_info(:idle_review, state) do
     with true <- state.learn_allowed,
@@ -321,6 +366,37 @@ defmodule Pepe.Agent.Session do
 
     {:noreply, %{state | idle_ref: nil}}
   end
+
+  # The session sat idle past its TTL - stop the process to free memory. An
+  # ephemeral session also drops its persisted history.
+  def handle_info(:ttl_expire, state), do: {:stop, :normal, maybe_clear(state)}
+
+  # An agent ended its own conversation - mark it so `:run_done` clears the context
+  # once the current reply is delivered.
+  @impl true
+  def handle_cast(:end_session, state), do: {:noreply, %{state | reset_pending: true}}
+
+  # TTL eviction: re-armed on every message; nil ttl_ms = never expire.
+  defp arm_ttl(%{ttl_ms: ms} = state) when is_integer(ms) and ms > 0 do
+    state = cancel_ttl(state)
+    %{state | ttl_ref: Process.send_after(self(), :ttl_expire, ms)}
+  end
+
+  defp arm_ttl(state), do: state
+
+  defp cancel_ttl(%{ttl_ref: ref} = state) when is_reference(ref) do
+    Process.cancel_timer(ref)
+    %{state | ttl_ref: nil}
+  end
+
+  defp cancel_ttl(state), do: state
+
+  defp maybe_clear(%{ephemeral: true, key: key} = state) do
+    if persist?(), do: SessionPersistence.delete(key)
+    state
+  end
+
+  defp maybe_clear(state), do: state
 
   # Idle-review timer (fires the reflect pass a while after the last turn).
   @idle_ms 90_000
@@ -352,14 +428,26 @@ defmodule Pepe.Agent.Session do
 
   # Run the loop in an unlinked, monitored process so a crash or a `/stop` kill can't
   # take the session down. It always reports back, turning a raise/exit into `{:error, _}`.
-  defp spawn_run(agent, messages, opts) do
+  defp spawn_run(agent, base_messages, text, pii_map, opts) do
     parent = self()
 
     {:ok, pid} =
       Task.start(fn ->
         result =
           try do
-            Runtime.run(agent, messages, opts)
+            # Inbound hooks redact the user text (and grow the reversible map) before
+            # the model - off the GenServer, so an LLM-backed redactor never blocks it.
+            {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => pii_map})
+
+            case Runtime.run(agent, base_messages ++ [Message.user(redacted)], opts) do
+              {:ok, reply, all_messages} ->
+                map = pii_map ++ entries
+                {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
+                {:ok, Pepe.Hooks.restore(shown, map), all_messages, entries}
+
+              other ->
+                other
+            end
           rescue
             e -> {:error, Exception.message(e)}
           catch
@@ -372,7 +460,7 @@ defmodule Pepe.Agent.Session do
     {pid, Process.monitor(pid)}
   end
 
-  # A session started before any agent existed has no system message yet — seed one.
+  # A session started before any agent existed has no system message yet - seed one.
   defp ensure_system([%{"role" => "system"} | _] = messages, _agent), do: messages
 
   defp ensure_system(messages, agent),

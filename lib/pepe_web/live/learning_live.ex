@@ -1,6 +1,6 @@
 defmodule PepeWeb.LearningLive do
   @moduledoc """
-  Learning (TimeLearn) section: what an agent has picked up — its skills and memory,
+  Learning (TimeLearn) section: what an agent has picked up - its skills and memory,
   newest first. Click an item to read its file and edit it in place; a skill edit is
   saved as a user override, memory to the agent's workspace.
   """
@@ -39,14 +39,14 @@ defmodule PepeWeb.LearningLive do
         <.view_header
           icon="✦"
           title={gettext("Learning")}
-          desc={gettext("What this agent has picked up — skills it can run and memory it saved, newest first. Click any item to read and edit it.")}
+          desc={gettext("What this agent has picked up - skills it can run and memory it saved, newest first. Click any item to read and edit it.")}
         >
           <form :if={!@editing} phx-change="pick_learn_agent">
             <select name="agent" class={fld()}>
               <option :for={a <- scoped_agent_names(@scope)} value={a} selected={a == @learn_agent}>{a}</option>
             </select>
           </form>
-          <button :if={@editing} phx-click="learn_close" class={btn_ghost()}>{gettext("← Back")}</button>
+          <button :if={@editing} phx-click="learn_close" class={btn_ghost()}>{gettext("<- Back")}</button>
         </.view_header>
 
         <div :if={@editing} class="flex min-h-0 flex-1 flex-col gap-3 p-6">
@@ -140,7 +140,7 @@ defmodule PepeWeb.LearningLive do
       title: title,
       path: user,
       content: read(if(File.exists?(user), do: user, else: builtin)),
-      note: override? && gettext("editing the built-in — saving creates your own copy")
+      note: override? && gettext("editing the built-in - saving creates your own copy")
     }
   end
 

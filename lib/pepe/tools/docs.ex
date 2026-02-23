@@ -1,7 +1,7 @@
 defmodule Pepe.Tools.Docs do
   @moduledoc """
-  Read Pepe's own documentation — the authoritative source for **how Pepe works**
-  (configuring agents, channels, scheduled tasks, MCP servers, permissions, …).
+  Read Pepe's own documentation - the authoritative source for **how Pepe works**
+  (configuring agents, channels, scheduled tasks, MCP servers, permissions, ...).
 
   Before figuring out how to configure or operate Pepe, the agent should read the
   relevant doc rather than guess. Read-only, so it never needs authorization.
@@ -18,7 +18,7 @@ defmodule Pepe.Tools.Docs do
   def spec do
     function(
       "docs",
-      "Read Pepe's own how-to docs — the authoritative source for how Pepe works (agents, channels, cron, MCP, permissions, config). Pass a doc `name` from the list in your context to read it; omit `name` to list the available docs. Read these before configuring or operating Pepe.",
+      "Read Pepe's own how-to docs - the authoritative source for how Pepe works (agents, channels, cron, MCP, permissions, config). Pass a doc `name` from the list in your context to read it; omit `name` to list the available docs. Read these before configuring or operating Pepe.",
       %{
         "type" => "object",
         "properties" => %{

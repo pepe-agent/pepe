@@ -2,11 +2,11 @@ defmodule Pepe.Usage do
   @moduledoc """
   Token metering for billing. Every model call the runtime makes is recorded to a
   durable per-company ledger (`Pepe.Usage.Log`); this module records those
-  entries and aggregates them into time buckets — hour, day, week, month, year —
+  entries and aggregates them into time buckets - hour, day, week, month, year -
   with the money math on top.
 
   Cost is `tokens × the model's price` (per 1M tokens; see `Pepe.Pricing`). The
-  amount to bill a client is `cost × the company's markup` — a company with no
+  amount to bill a client is `cost × the company's markup` - a company with no
   markup bills exactly the provider cost. Both figures are kept side by side so the
   operator always sees the real cost, never just the marked-up number.
   """
@@ -32,7 +32,7 @@ defmodule Pepe.Usage do
     out_tok = int(usage["completion_tokens"])
     total = int(usage["total_tokens"])
 
-    # Some providers report only a total — attribute it to input rather than lose it.
+    # Some providers report only a total - attribute it to input rather than lose it.
     {in_tok, out_tok} =
       cond do
         in_tok > 0 or out_tok > 0 -> {in_tok, out_tok}
@@ -63,7 +63,7 @@ defmodule Pepe.Usage do
   (most-recent buckets to return, default 60).
 
   Returns a map with `:buckets` (each `%{key, in, out, total, cost, billable}`,
-  oldest→newest), `:totals`, and `:by_model` / `:by_agent` / `:by_company`
+  oldest->newest), `:totals`, and `:by_model` / `:by_agent` / `:by_company`
   breakdowns, plus the `:currency` label.
   """
   def summary(scope, granularity, opts \\ []) when granularity in @granularities do
@@ -99,7 +99,7 @@ defmodule Pepe.Usage do
 
   `opts`: `:month` (`\"YYYY-MM\"`, default the current month in the billing tz),
   `:tz`. Returns a map with the `:period`, per-model `:line_items`, `:totals`, the
-  `:markup` and `:currency` — ready to render (`Pepe.Usage.Invoice`).
+  `:markup` and `:currency` - ready to render (`Pepe.Usage.Invoice`).
   """
   def invoice(company, opts \\ []) do
     tz = opts[:tz] || Config.default_timezone()
@@ -185,8 +185,8 @@ defmodule Pepe.Usage do
 
   @doc """
   The `{input_price, output_price}` per 1M tokens for a model connection: its own
-  manual prices if set, else the layered price book (live cache → seed) for its
-  upstream id. `models` is a name→Model map and `cache` the loaded price cache, so
+  manual prices if set, else the layered price book (live cache -> seed) for its
+  upstream id. `models` is a name->Model map and `cache` the loaded price cache, so
   this stays disk-free when pricing many rows.
   """
   @spec price_for(String.t(), map(), map()) :: {number() | nil, number() | nil}
