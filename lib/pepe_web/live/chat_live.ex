@@ -64,7 +64,7 @@ defmodule PepeWeb.ChatLive do
         <div class="flex h-full min-w-0">
           <div class="flex w-72 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30">
             <div class="border-b border-zinc-800 p-3">
-              <button phx-click="new_chat" class="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium transition hover:bg-blue-500">
+              <button phx-click="new_chat" class="w-full rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium transition hover:bg-orange-500">
                 + {gettext("New chat")}
               </button>
               <p class="mt-2 px-1 text-[11px] leading-relaxed text-zinc-500">
@@ -127,15 +127,15 @@ defmodule PepeWeb.ChatLive do
               <div :if={slash_matches(@input) != []} class="absolute bottom-full left-3 mb-2 w-72 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
                 <button :for={{cmd, desc} <- slash_matches(@input)} type="button" phx-click="run_slash" phx-value-cmd={cmd}
                   class="flex w-full items-baseline gap-2 px-3 py-2 text-left hover:bg-zinc-800">
-                  <span class="font-mono text-sm text-blue-400">{cmd}</span>
+                  <span class="font-mono text-sm text-orange-400">{cmd}</span>
                   <span class="text-xs text-zinc-500">{desc}</span>
                 </button>
               </div>
 
               <form phx-submit="send" phx-change="type" class="flex gap-2">
                 <input name="text" value={@input} autocomplete="off" placeholder={gettext("Message...  (type / for commands)")}
-                  class="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 outline-none transition placeholder:text-zinc-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
-                <button type="submit" class="rounded-lg bg-blue-600 px-5 py-2 font-medium transition hover:bg-blue-500">{gettext("Send")}</button>
+                  class="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                <button type="submit" class="rounded-lg bg-orange-600 px-5 py-2 font-medium transition hover:bg-orange-500">{gettext("Send")}</button>
               </form>
             </div>
           </div>
@@ -174,7 +174,7 @@ defmodule PepeWeb.ChatLive do
     )
   end
 
-  defp bubble_class("user"), do: "ml-auto bg-blue-600"
+  defp bubble_class("user"), do: "ml-auto bg-orange-600"
   defp bubble_class("tool"), do: "bg-zinc-800/60 font-mono text-xs text-zinc-400"
   defp bubble_class("tool_call"), do: "bg-transparent px-0"
   defp bubble_class(_), do: "bg-zinc-800"

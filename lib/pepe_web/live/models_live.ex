@@ -135,7 +135,7 @@ defmodule PepeWeb.ModelsLive do
           </div>
 
           <%!-- Editing an existing connection: fields shown directly (no provider picker). --%>
-          <form :if={@edit_model && @edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form :if={@edit_model && @edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{gettext("Edit %{name}", name: @edit_model.name)}</div>
             <input type="hidden" name="name" value={@edit_model.name} />
             <div>
@@ -166,7 +166,7 @@ defmodule PepeWeb.ModelsLive do
           </form>
 
           <%!-- Creating a new connection: provider-driven. --%>
-          <form :if={@edit_model && !@edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form :if={@edit_model && !@edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{gettext("+ New model connection")}</div>
 
             <div>

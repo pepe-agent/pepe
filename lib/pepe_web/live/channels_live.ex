@@ -61,7 +61,7 @@ defmodule PepeWeb.ChannelsLive do
             {gettext("No bots yet. The default bot is set via")} <code>mix pepe gateway telegram setup</code>.
           </p>
 
-          <form :if={@edit_bot} phx-submit="bot_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form :if={@edit_bot} phx-submit="bot_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{gettext("Edit %{name}", name: @edit_bot["name"])}</div>
             <input type="hidden" name="name" value={@edit_bot["name"]} />
             <div>
@@ -82,7 +82,7 @@ defmodule PepeWeb.ChannelsLive do
             </div>
           </form>
 
-          <form phx-submit="bot_add" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form phx-submit="bot_add" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{gettext("+ Add a bot")}</div>
             <div>
               <label class={lbl()}>{gettext("Name")}</label>

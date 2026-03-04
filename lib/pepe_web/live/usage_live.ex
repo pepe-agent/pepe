@@ -70,7 +70,7 @@ defmodule PepeWeb.UsageLive do
             <button :for={{g, label} <- granularity_options()} phx-click="set_granularity" phx-value-g={g}
               class={[
                 "rounded-lg px-3 py-1.5 text-xs transition",
-                (@granularity == g && "bg-blue-600 font-medium text-white") ||
+                (@granularity == g && "bg-orange-600 font-medium text-white") ||
                   "border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700"
               ]}>{label}</button>
           </div>

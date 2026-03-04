@@ -71,7 +71,7 @@ defmodule PepeWeb.CompaniesLive do
             {gettext("No companies yet - everything lives in the root workspace. Create one to isolate a client or team.")}
           </p>
 
-          <form :if={@editing} phx-submit="company_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form :if={@editing} phx-submit="company_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">
               {if @editing.new?, do: gettext("+ New company"), else: gettext("Edit %{name}", name: @editing.name)}
             </div>

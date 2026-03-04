@@ -57,7 +57,7 @@ defmodule PepeWeb.LearningLive do
           </div>
           <form phx-submit="learn_save" class="flex min-h-0 flex-1 flex-col gap-3">
             <textarea name="content" spellcheck="false"
-              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">{@editing.content}</textarea>
+              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500">{@editing.content}</textarea>
             <div class="flex gap-2">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="learn_close" class={btn_ghost()}>{gettext("Cancel")}</button>

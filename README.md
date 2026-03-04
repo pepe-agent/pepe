@@ -1,19 +1,32 @@
 <p align="center">
-  <img src="images/pepe.jpg" alt="Pepe" width="440">
+  <img src="images/pepe.jpg" alt="Pepe" width="420">
 </p>
 
-# Pepe 🫡
+<h1 align="center">
+  <img src="assets/brand/pepe-mark.svg" alt="" height="30" valign="middle">&nbsp; Pepe
+</h1>
 
-> A little joke, if you know the reference. **Pepe** is a character from the
-> beloved Mexican comedy universe of Chespirito (*El Chapulín Colorado* /
-> *El Chavo del Ocho*) - shows that generations across Latin America and much of the
-> world grew up watching. Pepe's whole thing? **He did exactly what he was told.**
-> No arguing, no improvising beyond the order - you say it, Pepe does it.
->
-> Which is, funnily enough, a perfect description of an AI agent runtime: you hand
-> it instructions and tools, and it carries them out, faithfully, again and again.
-> So the project used to be called *Cortex* - now it's **Pepe**. Same engine, better
-> name. 🫡
+<p align="center">
+  <strong>An Elixir/OTP AI agent runtime</strong> - define agents, connect to any model, and run a tool-calling loop.
+</p>
+
+<p align="center">
+  Web dashboard &nbsp;·&nbsp; OpenAI-compatible HTTP &nbsp;·&nbsp; WebSocket &nbsp;·&nbsp; Telegram &nbsp;·&nbsp; WhatsApp &nbsp;·&nbsp; CLI
+</p>
+
+<details>
+<summary><b>Why the name "Pepe"?</b></summary>
+
+<br>
+
+Pepe is a character from the beloved Mexican comedy universe of Chespirito
+(*El Chapulin Colorado* / *El Chavo del Ocho*) - shows generations across Latin
+America and much of the world grew up with. His whole thing? **He did exactly what
+he was told.** No arguing, no improvising beyond the order - you say it, Pepe does
+it. Which is, funnily enough, a perfect description of an AI agent runtime. The
+project used to be called *Cortex*; now it's **Pepe** - same engine, better name.
+
+</details>
 
 **Pepe is an Elixir/OTP AI agent runtime** - define agents, connect to any model,
 and run a tool-calling loop. It leans on what Elixir is good at: a lightweight
@@ -36,6 +49,18 @@ Everything talks to providers over the **OpenAI Chat Completions** protocol, so
 OpenAI, OpenRouter, Together, Groq, DeepSeek,
 Mistral, z.ai/GLM, Kimi/Moonshot, MiniMax, NovitaAI, Ollama, LM Studio, vLLM,
 llama.cpp and any other compatible endpoint work with zero code changes.
+
+---
+
+## Contents
+
+**Start here:** [Architecture](#architecture) · [Quick start](#quick-start) · [CLI reference](#cli-reference-mix-pepe) · [Configuration](#configuration-pepeconfigjson) · [Tests](#tests) · [Contributing](#contributing--help-wanted)
+
+**Talk to it:** [Web dashboard](#web-dashboard) · [HTTP API](#openai-compatible-http-api) · [WebSocket](#websocket) · [Telegram](#telegram) · [WhatsApp](#whatsapp-meta-cloud-api)
+
+**Agents:** [Admin agents](#admin-agents-manage--train-other-agents) · [Permissions](#permissions) · [Agent-to-agent routing](#agent-to-agent-routing) · [Companies](#companies-multi-tenant-isolation) · [Skills](#skills) · [Learning](#learning-self-improvement--timelearn) · [Adding a tool](#adding-a-tool) · [Self-management](#self-knowledge--self-management-how-an-agent-operates-pepe)
+
+**Automation & ops:** [MCP servers](#mcp-servers-external-tools) · [Scheduled tasks](#scheduled-tasks-cron) · [Watches](#watches---notify-me-when-x-one-shot) · [Usage & billing](#usage-metering--billing) · [Privacy hooks](#privacy-hooks-pii-redaction)
 
 ---
 

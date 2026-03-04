@@ -10,7 +10,7 @@ defmodule PepeWeb.DashUI do
   # Shared Tailwind class strings (functions, since `@name` inside ~H means an assign).
   def fld,
     do:
-      "w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+      "w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
 
   def lbl, do: "mb-1 block text-xs font-medium text-zinc-300"
   def hlp, do: "mt-1 text-xs leading-relaxed text-zinc-500"
@@ -20,7 +20,7 @@ defmodule PepeWeb.DashUI do
 
   def btn,
     do:
-      "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+      "rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-500"
 
   def btn_ghost,
     do:
@@ -62,11 +62,19 @@ defmodule PepeWeb.DashUI do
   def sidebar(assigns) do
     ~H"""
     <aside class="flex w-60 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/40">
-      <.link navigate={~p"/"} class="flex items-center gap-2.5 border-b border-zinc-800 px-5 py-4">
-        <span class="text-2xl">🧠</span>
+      <.link navigate={~p"/"} class="flex items-center gap-2 border-b border-zinc-800 px-5 py-4">
+        <svg width="25" height="34" viewBox="16 8 32 44" class="mt-1 shrink-0" role="img" aria-label="Pepe">
+          <g stroke="#a1a1aa" stroke-width="3" stroke-linecap="round" fill="none">
+            <path d="M26 24 L 21 13" />
+            <path d="M38 24 L 43 13" />
+          </g>
+          <circle cx="20.5" cy="12" r="3.2" fill="#e2231a" />
+          <circle cx="43.5" cy="12" r="3.2" fill="#f5b301" />
+          <rect x="18" y="22" width="28" height="27" rx="9" fill="none" stroke="#e4e4e7" stroke-width="3.4" />
+        </svg>
         <div class="leading-tight">
           <div class="font-semibold">Pepe</div>
-          <div class="text-[11px] text-zinc-500">{gettext("agent runtime")}</div>
+          <div class="text-[11px] text-zinc-500">agent runtime</div>
         </div>
       </.link>
 
@@ -86,7 +94,7 @@ defmodule PepeWeb.DashUI do
         </p>
         <form :if={@new_company} phx-submit="company_add" class="mt-2 flex gap-1">
           <input name="name" placeholder={gettext("company name")} required class={fld()} />
-          <button class="rounded-lg bg-blue-600 px-3 text-sm font-medium hover:bg-blue-500">{gettext("Add")}</button>
+          <button class="rounded-lg bg-orange-600 px-3 text-sm font-medium hover:bg-orange-500">{gettext("Add")}</button>
         </form>
         <button phx-click="toggle_new_company" class="mt-1.5 px-1 text-[11px] text-zinc-500 transition hover:text-zinc-300">
           {(@new_company && gettext("Cancel")) || gettext("+ New company")}
@@ -139,7 +147,7 @@ defmodule PepeWeb.DashUI do
       navigate={"/#{@to}"}
       class={[
         "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition",
-        (@active == @to && "bg-blue-600/15 font-medium text-blue-300") ||
+        (@active == @to && "bg-orange-600/15 font-medium text-orange-300") ||
           "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100"
       ]}
     >

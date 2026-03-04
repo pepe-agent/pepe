@@ -60,7 +60,7 @@ defmodule PepeWeb.ToolServersLive do
           </div>
           <p :if={@mcp == %{}} class="text-sm text-zinc-500">{gettext("No MCP servers yet - add one below.")}</p>
 
-          <form :if={@edit_mcp} phx-submit="mcp_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form :if={@edit_mcp} phx-submit="mcp_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{gettext("+ New MCP server")}</div>
             <div>
               <label class={lbl()}>{gettext("Name")}</label>

@@ -61,7 +61,7 @@ defmodule PepeWeb.ScheduledLive do
           </div>
           <p :if={@crons == []} class="text-sm text-zinc-500">{gettext("No scheduled tasks yet - create one below.")}</p>
 
-          <form phx-submit="cron_create" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form phx-submit="cron_create" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{gettext("+ New scheduled task")}</div>
             <div>
               <label class={lbl()}>{gettext("Name")}</label>

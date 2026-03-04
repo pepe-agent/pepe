@@ -56,7 +56,7 @@ defmodule PepeWeb.AgentsLive do
             <div :if={a.can_manage} class="text-xs text-zinc-500">⚙ {gettext("manages:")} {manages_text(a.can_manage)}</div>
           </div>
 
-          <form :if={@edit_agent} phx-submit="agent_save" class="space-y-4 rounded-xl border border-blue-900/60 bg-blue-950/10 p-5">
+          <form :if={@edit_agent} phx-submit="agent_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
             <div class="text-sm font-medium">{if @edit_agent.new?, do: gettext("+ New agent"), else: gettext("Edit %{name}", name: @edit_agent.name)}</div>
 
             <div>
