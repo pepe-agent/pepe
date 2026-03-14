@@ -33,26 +33,26 @@ defmodule PepeWeb.WatchesLive do
           desc={gettext("One-shot “notify me when X happens”. A watch checks a condition on a timer, messages you once when it's met, then stops. Create them from chat.")}
         />
         <div class="flex-1 space-y-3 overflow-y-auto p-6">
-          <div :if={@watches == []} class="text-sm text-zinc-500">
+          <div :if={@watches == []} class="text-[15px] text-zinc-500">
             {gettext("No watches. Ask an agent to \"notify me when ...\" from chat.")}
           </div>
           <div :for={w <- scoped_by_agent(@watches, @scope, & &1.agent)} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span class="font-medium">{w.description}</span>
-                <span class="ml-2 rounded bg-zinc-700 px-1.5 text-xs text-zinc-300">{w.state}</span>
-                <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-xs">{gettext("fired · delivering")}</span>
+                <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{w.state}</span>
+                <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("fired · delivering")}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <button :if={w.state == "pending"} phx-click="watch_pause" phx-value-id={w.id} class={btn_ghost()}>{gettext("Pause")}</button>
                 <button :if={w.state == "paused"} phx-click="watch_resume" phx-value-id={w.id} class={btn_ghost()}>{gettext("Resume")}</button>
                 <button phx-click="watch_cancel" phx-value-id={w.id} data-confirm={gettext("Cancel watch %{name}?", name: w.description)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-xs text-zinc-400">
+            <div class="mt-1 text-sm text-zinc-400">
               {w.trigger["type"]} · {gettext("every")} {w.interval_s}s · {gettext("checks")} {w.checks}/{w.max_checks} · {watch_origin_label(w.origin)}
             </div>
-            <div class="truncate text-xs text-zinc-500"><code>{w.trigger["command"] || w.trigger["prompt"]}</code></div>
+            <div class="truncate text-sm text-zinc-500"><code>{w.trigger["command"] || w.trigger["prompt"]}</code></div>
           </div>
         </div>
       </main>

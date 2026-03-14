@@ -41,23 +41,23 @@ defmodule PepeWeb.AgentsLive do
           <div :for={a <- scoped_agents(@agents, @scope)} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
-                <span :if={Pepe.Company.of(a.name)} class="mr-1 rounded bg-indigo-800 px-1.5 text-xs text-indigo-100">{Pepe.Company.of(a.name)}</span>
+                <span :if={Pepe.Company.of(a.name)} class="mr-1 rounded bg-indigo-800 px-1.5 text-sm text-indigo-100">{Pepe.Company.of(a.name)}</span>
                 <span class="font-medium">{a.name}</span>
-                <span :if={a.name == @default_agent} class="ml-2 rounded bg-green-700 px-1.5 text-xs">{gettext("default")}</span>
+                <span :if={a.name == @default_agent} class="ml-2 rounded bg-green-700 px-1.5 text-sm">{gettext("default")}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="agent_edit" phx-value-name={a.name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button :if={a.name != @default_agent} phx-click="agent_default" phx-value-name={a.name} class={btn_ghost()}>{gettext("Set default")}</button>
                 <button phx-click="agent_delete" phx-value-name={a.name} data-confirm={gettext("Delete agent %{name}?", name: a.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-xs text-zinc-400">{gettext("model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
-            <div :if={a.can_message != []} class="text-xs text-zinc-500">-> {gettext("messages:")} {Enum.join(a.can_message, ", ")}</div>
-            <div :if={a.can_manage} class="text-xs text-zinc-500">⚙ {gettext("manages:")} {manages_text(a.can_manage)}</div>
+            <div class="mt-1 text-sm text-zinc-400">{gettext("model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
+            <div :if={a.can_message != []} class="text-sm text-zinc-500">-> {gettext("messages:")} {Enum.join(a.can_message, ", ")}</div>
+            <div :if={a.can_manage} class="text-sm text-zinc-500">⚙ {gettext("manages:")} {manages_text(a.can_manage)}</div>
           </div>
 
           <form :if={@edit_agent} phx-submit="agent_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{if @edit_agent.new?, do: gettext("+ New agent"), else: gettext("Edit %{name}", name: @edit_agent.name)}</div>
+            <div class="text-[15px] font-medium">{if @edit_agent.new?, do: gettext("+ New agent"), else: gettext("Edit %{name}", name: @edit_agent.name)}</div>
 
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
@@ -81,7 +81,7 @@ defmodule PepeWeb.AgentsLive do
             <div>
               <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("- what this agent can do")}</span></label>
               <div class="grid grid-cols-2 gap-1 rounded bg-zinc-900/60 p-2">
-                <label :for={t <- Pepe.Tools.names()} class="flex items-center gap-1.5 text-xs text-zinc-300">
+                <label :for={t <- Pepe.Tools.names()} class="flex items-center gap-1.5 text-sm text-zinc-300">
                   <input type="checkbox" name="tools[]" value={t} checked={t in @edit_agent.tools} /> {t}
                 </label>
               </div>
@@ -90,11 +90,11 @@ defmodule PepeWeb.AgentsLive do
             <div>
               <label class={lbl()}>{gettext("Privacy hooks")} <span class="text-zinc-600">{gettext("- redact PII on the message flow")}</span></label>
               <div class="grid grid-cols-2 gap-1 rounded bg-zinc-900/60 p-2">
-                <label :for={h <- Pepe.Hooks.names()} class="flex items-center gap-1.5 text-xs text-zinc-300">
+                <label :for={h <- Pepe.Hooks.names()} class="flex items-center gap-1.5 text-sm text-zinc-300">
                   <input type="checkbox" name="hooks[]" value={h} checked={h in (@edit_agent.hooks || [])} /> {h}
                 </label>
               </div>
-              <p class={hlp()}>{gettext("Configure each hook (packs, model, ...) under Config; empty = no redaction (raw).")}</p>
+              <p class={hlp()}>{gettext("Configure each hook (packs, model, ...) under Privacy; empty = no redaction (raw).")}</p>
             </div>
 
             <div>

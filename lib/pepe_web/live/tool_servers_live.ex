@@ -40,28 +40,28 @@ defmodule PepeWeb.ToolServersLive do
           <div :for={{name, cfg} <- @mcp} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <span class="font-medium">{name}</span>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="mcp_validate" phx-value-name={name} class={btn_ghost()}>{gettext("Validate (list tools)")}</button>
                 <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-xs text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
+            <div class="mt-1 text-sm text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
             <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("connecting...")}</div>
             <div :if={is_list(@mcp_tools[name])} class="mt-2 space-y-1">
-              <div :for={t <- @mcp_tools[name]} class="text-xs text-zinc-400">
+              <div :for={t <- @mcp_tools[name]} class="text-sm text-zinc-400">
                 <code class="text-zinc-300">mcp__{name}__{t["name"]}</code>
                 <span class="text-zinc-500">- {String.slice(to_string(t["description"]), 0, 90)}</span>
               </div>
-              <p class="text-xs text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only.")}</p>
+              <p class="text-sm text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only.")}</p>
             </div>
-            <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-xs text-red-400">
+            <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-sm text-red-400">
               {gettext("couldn't connect - check the command and the env var token")}
             </div>
           </div>
-          <p :if={@mcp == %{}} class="text-sm text-zinc-500">{gettext("No MCP servers yet - add one below.")}</p>
+          <p :if={@mcp == %{}} class="text-[15px] text-zinc-500">{gettext("No MCP servers yet - add one below.")}</p>
 
           <form :if={@edit_mcp} phx-submit="mcp_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("+ New MCP server")}</div>
+            <div class="text-[15px] font-medium">{gettext("+ New MCP server")}</div>
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
               <input name="name" placeholder="sentry" class={fld()} />

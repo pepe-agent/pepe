@@ -138,6 +138,9 @@ defmodule Mix.Tasks.Pepe do
       ["config" | rest] ->
         with_config(fn -> config_cmd(rest) end)
 
+      ["dashboard" | rest] ->
+        with_config(fn -> dashboard_cmd(rest) end)
+
       ["backup" | rest] ->
         with_config(fn -> backup_cmd(rest) end)
 
@@ -1506,7 +1509,38 @@ defmodule Mix.Tasks.Pepe do
       WebSocket  : ws://localhost:#{port}/socket/websocket  (topic agent:default)
     """)
 
+    dashboard_posture()
     Process.sleep(:infinity)
+  end
+
+  # Report (and, where risky, warn about) how the dashboard is exposed. The per-request
+  # NetworkGuard is the actual enforcement; this just makes the posture visible at boot.
+  defp dashboard_posture do
+    ip = PepeWeb.Endpoint.config(:http)[:ip]
+    loopback? = ip in [{127, 0, 0, 1}, {0, 0, 0, 0, 0, 0, 0, 1}]
+
+    cond do
+      Config.dashboard_auth_required?() ->
+        ok("dashboard: password protected (login required)")
+
+      loopback? ->
+        info(
+          dim(
+            "   dashboard: open on localhost only; remote clients are blocked until you set a password"
+          )
+        )
+
+      true ->
+        info("")
+        info(yellow("   dashboard: bound to a public interface with NO password."))
+        info(yellow("   Remote access is blocked (fail-closed). To allow it:"))
+
+        info(
+          yellow(
+            "     mix pepe dashboard password '<pass>'   (or bind to 127.0.0.1 and tunnel in)"
+          )
+        )
+    end
   end
 
   defp gateway_cmd(["whatsapp", "list" | _]) do
@@ -2140,6 +2174,102 @@ defmodule Mix.Tasks.Pepe do
   end
 
   ###
+  ### dashboard (auth)
+  ###
+
+  defp dashboard_cmd(["password", "--clear"]) do
+    cfg = Config.load()
+    dash = cfg |> Map.get("dashboard", %{}) |> Map.delete("password")
+    Config.save(Map.put(cfg, "dashboard", dash))
+
+    if System.get_env("PEPE_DASHBOARD_PASSWORD") do
+      ok(
+        "cleared the config password (but PEPE_DASHBOARD_PASSWORD is still set in the environment)"
+      )
+    else
+      ok("dashboard password cleared - the dashboard is open again")
+    end
+  end
+
+  defp dashboard_cmd(["password", value]) when is_binary(value) do
+    cfg = Config.load()
+    dash = cfg |> Map.get("dashboard", %{}) |> Map.put("password", value)
+    Config.save(Map.put(cfg, "dashboard", dash))
+    ok("dashboard password set - the dashboard now requires signing in at /login")
+
+    if value =~ ~r/^\$\{.+\}$/ do
+      info(dim("   it references an env var, so export that variable before serving"))
+    end
+  end
+
+  defp dashboard_cmd(["password"]) do
+    error("usage: mix pepe dashboard password '<password or ${ENV_VAR}>'  (or --clear)")
+  end
+
+  defp dashboard_cmd(["hosts", "--clear"]),
+    do: clear_dashboard_key("allowed_hosts", "allowed hosts")
+
+  defp dashboard_cmd(["hosts", csv]) when is_binary(csv),
+    do: set_dashboard_list("allowed_hosts", csv, "allowed hosts")
+
+  defp dashboard_cmd(["hosts"]),
+    do: error("usage: mix pepe dashboard hosts app.example.com,dash.example.com  (or --clear)")
+
+  defp dashboard_cmd(["trusted-proxies", "--clear"]),
+    do: clear_dashboard_key("trusted_proxies", "trusted proxies")
+
+  defp dashboard_cmd(["trusted-proxies", csv]) when is_binary(csv),
+    do: set_dashboard_list("trusted_proxies", csv, "trusted proxies")
+
+  defp dashboard_cmd(["trusted-proxies"]),
+    do: error("usage: mix pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8  (or --clear)")
+
+  defp dashboard_cmd(_), do: dashboard_status()
+
+  defp dashboard_status do
+    if Config.dashboard_auth_required?() do
+      info("dashboard auth: " <> green("on") <> " - a password is configured; login required")
+    else
+      info("dashboard auth: off - open to localhost only (remote clients are blocked)")
+
+      info(
+        dim(
+          "   enable it: mix pepe dashboard password '<pass>'   (or export PEPE_DASHBOARD_PASSWORD)"
+        )
+      )
+    end
+
+    info(
+      "   allowed hosts  : #{list_or(Config.dashboard_allowed_hosts(), "loopback names only")}"
+    )
+
+    info("   trusted proxies: #{list_or(Config.dashboard_trusted_proxies(), "none")}")
+    info(dim("   set with: mix pepe dashboard hosts <h1,h2>  |  trusted-proxies <cidr,...>"))
+  end
+
+  defp list_or([], default), do: default
+  defp list_or(list, _default), do: Enum.join(list, ", ")
+
+  defp set_dashboard_list(key, csv, label) do
+    list = csv |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    put_dashboard(key, list)
+    ok("#{label}: #{list_or(list, "(none)")}")
+  end
+
+  defp clear_dashboard_key(key, label) do
+    cfg = Config.load()
+    dash = cfg |> Map.get("dashboard", %{}) |> Map.delete(key)
+    Config.save(Map.put(cfg, "dashboard", dash))
+    ok("#{label} cleared")
+  end
+
+  defp put_dashboard(key, value) do
+    cfg = Config.load()
+    dash = cfg |> Map.get("dashboard", %{}) |> Map.put(key, value)
+    Config.save(Map.put(cfg, "dashboard", dash))
+  end
+
+  ###
   ### backup
   ###
 
@@ -2558,6 +2688,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp green(s), do: IO.ANSI.green() <> s <> IO.ANSI.reset()
   defp red(s), do: IO.ANSI.red() <> s <> IO.ANSI.reset()
+  defp yellow(s), do: IO.ANSI.yellow() <> s <> IO.ANSI.reset()
   defp bold(s), do: IO.ANSI.bright() <> s <> IO.ANSI.reset()
   defp dim(s), do: IO.ANSI.faint() <> s <> IO.ANSI.reset()
 end

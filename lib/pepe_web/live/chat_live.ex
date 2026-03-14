@@ -64,28 +64,28 @@ defmodule PepeWeb.ChatLive do
         <div class="flex h-full min-w-0">
           <div class="flex w-72 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30">
             <div class="border-b border-zinc-800 p-3">
-              <button phx-click="new_chat" class="w-full rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium transition hover:bg-orange-500">
+              <button phx-click="new_chat" class="w-full rounded-lg bg-orange-600 px-3 py-2 text-[15px] font-medium transition hover:bg-orange-500">
                 + {gettext("New chat")}
               </button>
-              <p class="mt-2 px-1 text-[11px] leading-relaxed text-zinc-500">
+              <p class="mt-2 px-1 text-xs leading-relaxed text-zinc-500">
                 {gettext("Every conversation - web, Telegram, API and console - appears here.")}
               </p>
             </div>
             <div class="flex-1 overflow-y-auto py-1">
               <div :for={{type, items} <- grouped(@sessions)}>
-                <div class="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-zinc-600">
                   {type_label(type)} <span class="text-zinc-700">· {length(items)}</span>
                 </div>
                 <div :for={s <- items} class={["group mx-2 mb-0.5 flex items-center rounded-lg transition hover:bg-zinc-800/70", @selected == s.key && "bg-zinc-800"]}>
                   <button phx-click="select" phx-value-key={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
-                    <div class="truncate text-sm font-medium">{session_suffix(s.key)}</div>
-                    <div class="truncate text-xs text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
+                    <div class="truncate text-[15px] font-medium">{session_suffix(s.key)}</div>
+                    <div class="truncate text-sm text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
                   </button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
                     class="px-3 py-2 text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100">✕</button>
                 </div>
               </div>
-              <p :if={@sessions == []} class="px-4 py-6 text-sm text-zinc-500">
+              <p :if={@sessions == []} class="px-4 py-6 text-[15px] text-zinc-500">
                 {gettext("No conversations yet. Start one with “New chat”.")}
               </p>
             </div>
@@ -95,7 +95,7 @@ defmodule PepeWeb.ChatLive do
             <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
               <div class="min-w-0 truncate">
                 <div class="truncate font-medium">{session_suffix(@selected)}</div>
-                <div class="truncate text-xs text-zinc-500">{@agent || "-"} · {@selected}</div>
+                <div class="truncate text-sm text-zinc-500">{@agent || "-"} · {@selected}</div>
               </div>
               <div class="flex gap-2">
                 <button phx-click="reset" class={btn_ghost()}>{gettext("New")}</button>
@@ -104,15 +104,15 @@ defmodule PepeWeb.ChatLive do
             </header>
 
             <div class="flex-1 space-y-3 overflow-y-auto p-5">
-              <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-sm text-zinc-600">
+              <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-[15px] text-zinc-600">
                 {gettext("Fresh conversation - send a message to start.")}
               </div>
               <.bubble :for={m <- @messages} role={m.role} content={m.content} />
               <.bubble :if={@running and @streaming != ""} role="assistant" content={@streaming} />
-              <div :if={@running and @streaming == "" and !@pending_perm} class="text-sm text-zinc-500">...</div>
+              <div :if={@running and @streaming == "" and !@pending_perm} class="text-[15px] text-zinc-500">...</div>
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-amber-600/60 bg-amber-950/30 p-3">
-                <div class="mb-2 text-sm">
+                <div class="mb-2 text-[15px]">
                   🔐 {gettext("Allow me to run the")} <code class="text-amber-300">{@pending_perm.tool}</code> {gettext("tool?")}
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -127,8 +127,8 @@ defmodule PepeWeb.ChatLive do
               <div :if={slash_matches(@input) != []} class="absolute bottom-full left-3 mb-2 w-72 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
                 <button :for={{cmd, desc} <- slash_matches(@input)} type="button" phx-click="run_slash" phx-value-cmd={cmd}
                   class="flex w-full items-baseline gap-2 px-3 py-2 text-left hover:bg-zinc-800">
-                  <span class="font-mono text-sm text-orange-400">{cmd}</span>
-                  <span class="text-xs text-zinc-500">{desc}</span>
+                  <span class="font-mono text-[15px] text-orange-400">{cmd}</span>
+                  <span class="text-sm text-zinc-500">{desc}</span>
                 </button>
               </div>
 
@@ -142,7 +142,7 @@ defmodule PepeWeb.ChatLive do
 
           <div :if={!@selected} class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <div class="text-5xl opacity-40">💬</div>
-            <div class="max-w-xs text-sm text-zinc-400">{gettext("Pick a conversation on the left, or start a new one to talk to your agent.")}</div>
+            <div class="max-w-xs text-[15px] text-zinc-400">{gettext("Pick a conversation on the left, or start a new one to talk to your agent.")}</div>
             <button phx-click="new_chat" class={btn()}>+ {gettext("New chat")}</button>
           </div>
         </div>
@@ -156,7 +156,7 @@ defmodule PepeWeb.ChatLive do
 
   defp bubble(assigns) do
     ~H"""
-    <div class={["max-w-2xl whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed", bubble_class(@role)]}>
+    <div class={["max-w-2xl whitespace-pre-wrap rounded-lg px-3 py-2 text-[15px] leading-relaxed", bubble_class(@role)]}>
       <span :if={@role == "tool_call"} class="text-amber-400">⚙ {@content}</span>
       <span :if={@role != "tool_call"}>{Phoenix.HTML.raw(format_md(@content))}</span>
     </div>
@@ -175,7 +175,7 @@ defmodule PepeWeb.ChatLive do
   end
 
   defp bubble_class("user"), do: "ml-auto bg-orange-600"
-  defp bubble_class("tool"), do: "bg-zinc-800/60 font-mono text-xs text-zinc-400"
+  defp bubble_class("tool"), do: "bg-zinc-800/60 font-mono text-sm text-zinc-400"
   defp bubble_class("tool_call"), do: "bg-transparent px-0"
   defp bubble_class(_), do: "bg-zinc-800"
 
@@ -277,7 +277,7 @@ defmodule PepeWeb.ChatLive do
   end
 
   def handle_event("set_scope", params, socket),
-    do: {:noreply, set_scope(socket, params, "/agents")}
+    do: {:noreply, set_scope(socket, params, "/chat")}
 
   def handle_event("toggle_new_company", _p, socket),
     do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}

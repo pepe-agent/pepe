@@ -38,31 +38,31 @@ defmodule PepeWeb.ScheduledLive do
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span class="font-medium">{c.name}</span>
-                <span class={["ml-2 rounded px-1.5 text-xs", c.enabled && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                <span class={["ml-2 rounded px-1.5 text-sm", c.enabled && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
                   {(c.enabled && gettext("enabled")) || gettext("disabled")}
                 </span>
               </div>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="cron_run" phx-value-id={c.id} class={btn_ghost()}>{gettext("Run now")}</button>
                 <button phx-click="cron_toggle" phx-value-id={c.id} class={btn_ghost()}>{(c.enabled && gettext("Disable")) || gettext("Enable")}</button>
                 <button phx-click="cron_remove" phx-value-id={c.id} data-confirm={gettext("Remove scheduled task %{name}?", name: c.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-xs text-zinc-400"><code>{c.schedule}</code> · {c.timezone} · {gettext("next")} {cron_next(c)}</div>
-            <div class="text-xs text-zinc-500">{c.agent}{model_suffix(c.model)} · -> {deliver_label(c.deliver)}</div>
+            <div class="mt-1 text-sm text-zinc-400"><code>{c.schedule}</code> · {c.timezone} · {gettext("next")} {cron_next(c)}</div>
+            <div class="text-sm text-zinc-500">{c.agent}{model_suffix(c.model)} · -> {deliver_label(c.deliver)}</div>
             <details class="mt-1">
-              <summary class="cursor-pointer text-xs text-zinc-500">{gettext("prompt & last runs")}</summary>
-              <pre class="mt-1 whitespace-pre-wrap rounded bg-zinc-900 p-2 text-xs text-zinc-300">{c.prompt}</pre>
-              <div :for={e <- cron_history(c.id)} class="mt-1 text-xs text-zinc-400">
+              <summary class="cursor-pointer text-sm text-zinc-500">{gettext("prompt & last runs")}</summary>
+              <pre class="mt-1 whitespace-pre-wrap rounded bg-zinc-900 p-2 text-sm text-zinc-300">{c.prompt}</pre>
+              <div :for={e <- cron_history(c.id)} class="mt-1 text-sm text-zinc-400">
                 {(e["ok"] && "✅") || "⚠️"} {learn_date(e["at"])} · {e["source"]}
                 <span class="text-zinc-500">- {String.slice(to_string(e["output"]), 0, 120)}</span>
               </div>
             </details>
           </div>
-          <p :if={@crons == []} class="text-sm text-zinc-500">{gettext("No scheduled tasks yet - create one below.")}</p>
+          <p :if={@crons == []} class="text-[15px] text-zinc-500">{gettext("No scheduled tasks yet - create one below.")}</p>
 
           <form phx-submit="cron_create" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("+ New scheduled task")}</div>
+            <div class="text-[15px] font-medium">{gettext("+ New scheduled task")}</div>
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
               <input name="name" placeholder={gettext("Daily XML check")} class={fld()} />

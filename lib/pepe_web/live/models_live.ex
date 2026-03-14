@@ -41,7 +41,7 @@ defmodule PepeWeb.ModelsLive do
         <label class={lbl()}>{gettext("Output price")} <span class="text-zinc-600">{gettext("/ 1M tok")}</span></label>
         <input name="output_price" value={@edit_model[:output_price]} placeholder={suggest_ph(@suggest, 1)} inputmode="decimal" class={fld()} />
       </div>
-      <p class="col-span-2 text-xs text-zinc-500">
+      <p class="col-span-2 text-sm text-zinc-500">
         {gettext("Per 1M tokens, in %{currency}. Leave blank to use the known/auto price for this model.", currency: @currency)}
       </p>
     </div>
@@ -122,21 +122,21 @@ defmodule PepeWeb.ModelsLive do
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span class="font-medium">{m.name}</span>
-                <span :if={m.name == @default_model} class="ml-2 rounded bg-green-700 px-1.5 text-xs">{gettext("default")}</span>
+                <span :if={m.name == @default_model} class="ml-2 rounded bg-green-700 px-1.5 text-sm">{gettext("default")}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="model_edit" phx-value-name={m.name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button :if={m.name != @default_model} phx-click="model_default" phx-value-name={m.name} class={btn_ghost()}>{gettext("Set default")}</button>
                 <button phx-click="model_delete" phx-value-name={m.name} data-confirm={gettext("Delete model %{name}?", name: m.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-xs text-zinc-400">{m.model} · {m.base_url}</div>
-            <div class="mt-0.5 text-xs text-zinc-500">{price_line(m, @currency)}</div>
+            <div class="mt-1 text-sm text-zinc-400">{m.model} · {m.base_url}</div>
+            <div class="mt-0.5 text-sm text-zinc-500">{price_line(m, @currency)}</div>
           </div>
 
           <%!-- Editing an existing connection: fields shown directly (no provider picker). --%>
           <form :if={@edit_model && @edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("Edit %{name}", name: @edit_model.name)}</div>
+            <div class="text-[15px] font-medium">{gettext("Edit %{name}", name: @edit_model.name)}</div>
             <input type="hidden" name="name" value={@edit_model.name} />
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
@@ -155,7 +155,7 @@ defmodule PepeWeb.ModelsLive do
               <input name="api_key" value={@edit_model.api_key} class={fld()} />
             </div>
             <.price_fields edit_model={@edit_model} currency={@currency} />
-            <label class="flex items-center gap-2 border-t border-zinc-800/60 pt-3 text-xs text-zinc-300">
+            <label class="flex items-center gap-2 border-t border-zinc-800/60 pt-3 text-sm text-zinc-300">
               <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} />
               {gettext("Require redaction - refuse to send raw PII to this provider (the agent must run a redaction hook)")}
             </label>
@@ -167,7 +167,7 @@ defmodule PepeWeb.ModelsLive do
 
           <%!-- Creating a new connection: provider-driven. --%>
           <form :if={@edit_model && !@edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("+ New model connection")}</div>
+            <div class="text-[15px] font-medium">{gettext("+ New model connection")}</div>
 
             <div>
               <label class={lbl()}>{gettext("Provider")}</label>
@@ -192,7 +192,7 @@ defmodule PepeWeb.ModelsLive do
 
                 <div>
                   <label class={lbl()}>{gettext("Model")}</label>
-                  <div :if={@edit_model.models == :loading} class="text-xs text-zinc-500">{gettext("loading models...")}</div>
+                  <div :if={@edit_model.models == :loading} class="text-sm text-zinc-500">{gettext("loading models...")}</div>
                   <select :if={is_list(@edit_model.models) and @edit_model.models != []} name="model" class={fld()}>
                     <option :for={id <- @edit_model.models} value={id}>{id}</option>
                   </select>

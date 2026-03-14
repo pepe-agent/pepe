@@ -99,7 +99,8 @@ defmodule Pepe.MixProject do
       # (`tz` builds the zone data at compile time - no hackney/runtime download).
       {:crontab, "~> 1.1"},
       {:tz, "~> 0.28"},
-      {:mimic, "~> 1.11", only: :test}
+      {:mimic, "~> 1.11", only: :test},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 

@@ -57,7 +57,7 @@ defmodule PepeWeb.UsageLive do
           desc={gettext("Tokens metered per company, agent and model, by cycle. Cost uses each model's price; the amount to bill adds the company's markup. Prices are editable per model.")}
         >
           <div class="flex items-center gap-2">
-            <span class="hidden text-[11px] text-zinc-500 sm:inline">{price_cache_label(@cache_info)}</span>
+            <span class="hidden text-xs text-zinc-500 sm:inline">{price_cache_label(@cache_info)}</span>
             <button phx-click="refresh_prices" disabled={@refreshing} class={btn_ghost()}>
               {if @refreshing, do: gettext("refreshing..."), else: gettext("Refresh prices")}
             </button>
@@ -66,10 +66,10 @@ defmodule PepeWeb.UsageLive do
 
         <div class="flex-1 space-y-5 overflow-y-auto p-6">
           <div class="flex flex-wrap items-center gap-1">
-            <span class="mr-2 text-xs text-zinc-500">{gettext("Cycle")}</span>
+            <span class="mr-2 text-sm text-zinc-500">{gettext("Cycle")}</span>
             <button :for={{g, label} <- granularity_options()} phx-click="set_granularity" phx-value-g={g}
               class={[
-                "rounded-lg px-3 py-1.5 text-xs transition",
+                "rounded-lg px-3 py-1.5 text-sm transition",
                 (@granularity == g && "bg-orange-600 font-medium text-white") ||
                   "border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700"
               ]}>{label}</button>
@@ -84,10 +84,10 @@ defmodule PepeWeb.UsageLive do
           </div>
 
           <div>
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{gettext("By cycle")}</div>
+            <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("By cycle")}</div>
             <div class="overflow-x-auto rounded-xl border border-zinc-800">
-              <table class="w-full min-w-[640px] text-sm">
-                <thead class="bg-zinc-900/60 text-left text-xs text-zinc-500">
+              <table class="w-full min-w-[640px] text-[15px]">
+                <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
                   <tr>
                     <th class="px-3 py-2 font-medium">{gettext("Cycle")}</th>
                     <th class="px-3 py-2 text-right font-medium">{gettext("Input")}</th>
@@ -99,7 +99,7 @@ defmodule PepeWeb.UsageLive do
                 </thead>
                 <tbody>
                   <tr :for={b <- Enum.reverse(@summary.buckets)} class="border-t border-zinc-800/70">
-                    <td class="px-3 py-2 font-mono text-xs text-zinc-300">{b.key}</td>
+                    <td class="px-3 py-2 font-mono text-sm text-zinc-300">{b.key}</td>
                     <td class="px-3 py-2 text-right text-zinc-400">{tokens(b.in)}</td>
                     <td class="px-3 py-2 text-right text-zinc-400">{tokens(b.out)}</td>
                     <td class="px-3 py-2 text-right">{tokens(b.total)}</td>
@@ -107,7 +107,7 @@ defmodule PepeWeb.UsageLive do
                     <td class="px-3 py-2 text-right font-medium">{money(b.billable, @summary.currency)}</td>
                   </tr>
                   <tr :if={@summary.buckets == []}>
-                    <td colspan="6" class="px-3 py-6 text-center text-sm text-zinc-500">{gettext("No usage recorded yet for this scope.")}</td>
+                    <td colspan="6" class="px-3 py-6 text-center text-[15px] text-zinc-500">{gettext("No usage recorded yet for this scope.")}</td>
                   </tr>
                 </tbody>
               </table>
@@ -135,7 +135,7 @@ defmodule PepeWeb.UsageLive do
   defp stat(assigns) do
     ~H"""
     <div class={card()}>
-      <div class="text-xs text-zinc-500">{@label}</div>
+      <div class="text-sm text-zinc-500">{@label}</div>
       <div class={["mt-1 text-xl font-semibold", @accent && "text-green-400"]}>{@value}</div>
     </div>
     """
@@ -149,16 +149,16 @@ defmodule PepeWeb.UsageLive do
   defp breakdown(assigns) do
     ~H"""
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
+      <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
       <div class="space-y-1 rounded-xl border border-zinc-800 p-2">
-        <div :for={{name, total, cost, billable} <- @rows} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-zinc-800/50">
+        <div :for={{name, total, cost, billable} <- @rows} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-[15px] hover:bg-zinc-800/50">
           <span class="min-w-0 truncate text-zinc-300">{name}</span>
-          <span class="flex shrink-0 items-center gap-3 text-xs">
+          <span class="flex shrink-0 items-center gap-3 text-sm">
             <span class="text-zinc-500">{tokens(total)}</span>
             <span class="w-20 text-right font-medium">{money((@bill? && billable) || cost, @currency)}</span>
           </span>
         </div>
-        <p :if={@rows == []} class="px-2 py-3 text-center text-xs text-zinc-600">{gettext("nothing yet")}</p>
+        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("nothing yet")}</p>
       </div>
     </div>
     """

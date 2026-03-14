@@ -50,14 +50,14 @@ defmodule PepeWeb.LearningLive do
         </.view_header>
 
         <div :if={@editing} class="flex min-h-0 flex-1 flex-col gap-3 p-6">
-          <div class="text-sm">
+          <div class="text-[15px]">
             <span class="font-medium">{@editing.title}</span>
-            <span class="ml-2 text-xs text-zinc-500">{@editing.path}</span>
-            <span :if={@editing.note} class="ml-2 rounded bg-amber-800/40 px-1.5 text-xs text-amber-200">{@editing.note}</span>
+            <span class="ml-2 text-sm text-zinc-500">{@editing.path}</span>
+            <span :if={@editing.note} class="ml-2 rounded bg-amber-800/40 px-1.5 text-sm text-amber-200">{@editing.note}</span>
           </div>
           <form phx-submit="learn_save" class="flex min-h-0 flex-1 flex-col gap-3">
             <textarea name="content" spellcheck="false"
-              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500">{@editing.content}</textarea>
+              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500">{@editing.content}</textarea>
             <div class="flex gap-2">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="learn_close" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -77,13 +77,13 @@ defmodule PepeWeb.LearningLive do
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span class="font-medium">{n.title}</span>
-                <span class="rounded bg-zinc-800 px-1.5 text-xs text-zinc-400">{n.source}</span>
-                <span class="text-xs text-zinc-500">{learn_date(n.at)}</span>
+                <span class="rounded bg-zinc-800 px-1.5 text-sm text-zinc-400">{n.source}</span>
+                <span class="text-sm text-zinc-500">{learn_date(n.at)}</span>
               </div>
-              <div class="truncate text-sm text-zinc-400">{n.summary}</div>
+              <div class="truncate text-[15px] text-zinc-400">{n.summary}</div>
             </div>
           </button>
-          <p :if={@learn_nodes == []} class="text-sm text-zinc-500">{gettext("Nothing learned yet.")}</p>
+          <p :if={@learn_nodes == []} class="text-[15px] text-zinc-500">{gettext("Nothing learned yet.")}</p>
         </div>
       </main>
     </div>

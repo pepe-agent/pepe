@@ -15,6 +15,8 @@ defmodule PepeWeb.Router do
 
   pipeline :browser do
     plug :accepts, ["html"]
+    # Fail-closed: without a dashboard password, only genuine loopback clients get in.
+    plug PepeWeb.NetworkGuard
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {PepeWeb.Layouts, :root}
@@ -44,10 +46,17 @@ defmodule PepeWeb.Router do
   scope "/", PepeWeb do
     pipe_through :browser
 
-    # One on_mount hook applies the configured locale to every dashboard LiveView, so
-    # no LiveView repeats Config.put_locale/0 in its mount.
-    live_session :dashboard, on_mount: {PepeWeb.LiveLocale, :default} do
-      live "/", ChatLive
+    # Dashboard sign-in (only enforced when a dashboard password is configured).
+    get "/login", LoginController, :new
+    post "/login", LoginController, :create
+    delete "/logout", LoginController, :delete
+
+    # Two on_mount hooks: apply the configured locale, and gate on the dashboard
+    # password (a no-op when none is set).
+    live_session :dashboard,
+      on_mount: [{PepeWeb.LiveLocale, :default}, {PepeWeb.Auth, :ensure}] do
+      live "/", OverviewLive
+      live "/overview", OverviewLive
       live "/chat", ChatLive
       live "/companies", CompaniesLive
       live "/agents", AgentsLive
@@ -58,6 +67,7 @@ defmodule PepeWeb.Router do
       live "/learn", LearningLive
       live "/usage", UsageLive
       live "/mcp", ToolServersLive
+      live "/hooks", HooksLive
       live "/config", ConfigLive
     end
   end

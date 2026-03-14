@@ -904,6 +904,47 @@ defmodule Pepe.Config do
   def set_currency(code), do: load() |> Map.put("currency", code) |> save()
 
   @doc """
+  The dashboard password, or nil when unset. Read from config `dashboard.password`
+  (`${ENV}`-interpolated so the secret stays out of the file) with a fallback to the
+  `PEPE_DASHBOARD_PASSWORD` env var. Unset = the dashboard is open (local dev).
+  """
+  def dashboard_password do
+    case interpolate(get_in(load(), ["dashboard", "password"])) do
+      p when is_binary(p) and p != "" -> p
+      _ -> blank_env("PEPE_DASHBOARD_PASSWORD")
+    end
+  end
+
+  @doc "Is the dashboard behind a password? (a dashboard password is configured)"
+  def dashboard_auth_required?, do: not is_nil(dashboard_password())
+
+  @doc """
+  Extra `Host` header values the dashboard accepts besides loopback names (for
+  serving behind a domain; also the anti DNS-rebinding allowlist). Default `[]`.
+  """
+  def dashboard_allowed_hosts, do: dashboard_list("allowed_hosts")
+
+  @doc """
+  Reverse proxies whose `X-Forwarded-For` may be trusted, as CIDRs or bare IPs
+  (e.g. `["127.0.0.1", "10.0.0.0/8"]`). Empty (default) = trust no forwarding header.
+  """
+  def dashboard_trusted_proxies, do: dashboard_list("trusted_proxies")
+
+  defp dashboard_list(key) do
+    case get_in(load(), ["dashboard", key]) do
+      list when is_list(list) -> Enum.filter(list, &is_binary/1)
+      _ -> []
+    end
+  end
+
+  defp blank_env(var) do
+    case System.get_env(var) do
+      v when is_binary(v) and v != "" -> v
+      _ -> nil
+    end
+  end
+
+  @doc """
   A company's billing markup: the multiplier applied to provider cost to get the
   amount to charge. Unset (or root) means `1.0` - bill exactly the provider cost.
   """

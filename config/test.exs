@@ -23,6 +23,9 @@ config :pepe, PepeWeb.Endpoint,
 # In test we don't send emails
 config :pepe, Pepe.Mailer, adapter: Swoosh.Adapters.Test
 
+# A low login rate-limit so the throttle test hits its ceiling quickly.
+config :pepe, login_max_attempts: 3
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 

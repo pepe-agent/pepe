@@ -42,11 +42,11 @@ defmodule PepeWeb.ConfigLive do
             <textarea
               name="json"
               spellcheck="false"
-              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
             >{@config_text}</textarea>
             <div class="flex items-center gap-3">
               <button type="submit" class={btn()}>{gettext("Save config")}</button>
-              <span class="text-xs text-zinc-500">
+              <span class="text-sm text-zinc-500">
                 {gettext("Saving replaces the whole file. Invalid JSON is rejected.")}
               </span>
             </div>
@@ -83,10 +83,9 @@ defmodule PepeWeb.ConfigLive do
     {:noreply, assign(socket, config_text: read_config())}
   end
 
-  # Shared sidebar events. The workspace scope drives agents/models, so changing it
-  # jumps to that scope's Agents; creating a company does the same.
+  # Changing the company stays on this page; creating one jumps to its Agents.
   def handle_event("set_scope", %{"scope" => scope}, socket) do
-    {:noreply, push_navigate(socket, to: "/agents?scope=#{scope}")}
+    {:noreply, push_navigate(socket, to: "/config?scope=#{scope}")}
   end
 
   def handle_event("toggle_new_company", _p, socket) do

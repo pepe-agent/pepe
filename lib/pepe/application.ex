@@ -37,7 +37,9 @@ defmodule Pepe.Application do
         # Self-healing tracker for permanently-gone Telegram chats.
         Pepe.Gateways.Reachability,
         # Messaging gateways (Telegram, ...). No-ops when not configured.
-        Pepe.Gateways.Supervisor
+        Pepe.Gateways.Supervisor,
+        # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).
+        PepeWeb.LoginThrottle
       ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Pepe.Supervisor]

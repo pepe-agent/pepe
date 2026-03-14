@@ -44,25 +44,25 @@ defmodule PepeWeb.ChannelsLive do
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span class="font-medium">{b["name"]}</span>
-                <span class={["ml-2 rounded px-1.5 text-xs", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                <span class={["ml-2 rounded px-1.5 text-sm", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
                   {(bot_active?(b) && gettext("active")) || gettext("inactive")}
                 </span>
               </div>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="bot_edit" phx-value-name={b["name"]} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button :if={b["name"] != "default"} phx-click="bot_remove" phx-value-name={b["name"]}
                   data-confirm={gettext("Remove bot %{name}?", name: b["name"])} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-xs text-zinc-400">{gettext("agent:")} {b["agent"] || gettext("(default)")}</div>
-            <div class="text-xs text-zinc-500">{gettext("token:")} {token_hint(b["bot_token"])}</div>
+            <div class="mt-1 text-sm text-zinc-400">{gettext("agent:")} {b["agent"] || gettext("(default)")}</div>
+            <div class="text-sm text-zinc-500">{gettext("token:")} {token_hint(b["bot_token"])}</div>
           </div>
-          <p :if={@bots == []} class="text-sm text-zinc-500">
+          <p :if={@bots == []} class="text-[15px] text-zinc-500">
             {gettext("No bots yet. The default bot is set via")} <code>mix pepe gateway telegram setup</code>.
           </p>
 
           <form :if={@edit_bot} phx-submit="bot_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("Edit %{name}", name: @edit_bot["name"])}</div>
+            <div class="text-[15px] font-medium">{gettext("Edit %{name}", name: @edit_bot["name"])}</div>
             <input type="hidden" name="name" value={@edit_bot["name"]} />
             <div>
               <label class={lbl()}>{gettext("This bot talks to")}</label>
@@ -83,7 +83,7 @@ defmodule PepeWeb.ChannelsLive do
           </form>
 
           <form phx-submit="bot_add" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("+ Add a bot")}</div>
+            <div class="text-[15px] font-medium">{gettext("+ Add a bot")}</div>
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
               <input name="name" placeholder={gettext("sales")} class={fld()} />
@@ -104,13 +104,13 @@ defmodule PepeWeb.ChannelsLive do
           </form>
 
           <div class="border-t border-zinc-800 pt-5">
-            <div class="mb-2 text-sm font-medium">{gettext("WhatsApp (Meta Cloud API)")}</div>
+            <div class="mb-2 text-[15px] font-medium">{gettext("WhatsApp (Meta Cloud API)")}</div>
 
             <div :for={{slug, e} <- @whatsapp} class={[card(), "mb-2"]}>
               <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
                   <span class="font-medium">{slug}</span>
-                  <span class={["ml-2 rounded px-1.5 text-xs", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
+                  <span class={["ml-2 rounded px-1.5 text-sm", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
                     {e["mode"] || "support"}
                   </span>
                 </div>
@@ -118,15 +118,15 @@ defmodule PepeWeb.ChannelsLive do
                   data-confirm={gettext("Remove WhatsApp connection %{slug}?", slug: slug)}
                   class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
-              <div class="mt-1 text-xs text-zinc-400">{gettext("agent:")} {e["agent"] || gettext("(default)")}</div>
-              <div class="text-xs text-zinc-500">
+              <div class="mt-1 text-sm text-zinc-400">{gettext("agent:")} {e["agent"] || gettext("(default)")}</div>
+              <div class="text-sm text-zinc-500">
                 {gettext("Callback URL")}: <code>/webhooks/{e["company"] || "root"}/whatsapp/{slug}</code>
                 <span class="text-zinc-600">- {gettext("prefix with your public host")}</span>
               </div>
             </div>
 
             <form phx-submit="wa_add" class="space-y-4 rounded-xl border border-emerald-900/50 bg-emerald-950/10 p-5">
-              <div class="text-sm font-medium">{gettext("+ Connect a WhatsApp number")}</div>
+              <div class="text-[15px] font-medium">{gettext("+ Connect a WhatsApp number")}</div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class={lbl()}>{gettext("Slug")} <span class="text-zinc-600">{gettext("(URL id)")}</span></label>

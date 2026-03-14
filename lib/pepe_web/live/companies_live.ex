@@ -45,9 +45,9 @@ defmodule PepeWeb.CompaniesLive do
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span class="font-medium">{name}</span>
-                <span class="ml-2 text-xs text-zinc-500">{gettext("%{count} agents", count: length(Config.agents_in(name)))}</span>
+                <span class="ml-2 text-sm text-zinc-500">{gettext("%{count} agents", count: length(Config.agents_in(name)))}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-xs">
+              <div class="flex shrink-0 gap-1 text-sm">
                 <.link navigate={~p"/agents?scope=#{name}"} class={btn_ghost()}>{gettext("Open")}</.link>
                 <button phx-click="company_edit" phx-value-name={name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button
@@ -60,19 +60,19 @@ defmodule PepeWeb.CompaniesLive do
                 </button>
               </div>
             </div>
-            <div class="mt-1 flex items-center gap-2 text-xs">
+            <div class="mt-1 flex items-center gap-2 text-sm">
               <span :if={desc_of(name)} class="text-zinc-400">{desc_of(name)}</span>
               <span :if={Config.company_markup(name) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
                 {gettext("markup ×%{m}", m: Config.company_markup(name))}
               </span>
             </div>
           </div>
-          <p :if={@companies == []} class="text-sm text-zinc-500">
+          <p :if={@companies == []} class="text-[15px] text-zinc-500">
             {gettext("No companies yet - everything lives in the root workspace. Create one to isolate a client or team.")}
           </p>
 
           <form :if={@editing} phx-submit="company_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-sm font-medium">
+            <div class="text-[15px] font-medium">
               {if @editing.new?, do: gettext("+ New company"), else: gettext("Edit %{name}", name: @editing.name)}
             </div>
             <div>
@@ -124,7 +124,7 @@ defmodule PepeWeb.CompaniesLive do
 
           <form :if={@editing && !@editing.new?} phx-submit="company_rename"
             class="space-y-3 rounded-xl border border-amber-900/50 bg-amber-950/10 p-5">
-            <div class="text-sm font-medium">{gettext("Rename company")}</div>
+            <div class="text-[15px] font-medium">{gettext("Rename company")}</div>
             <input type="hidden" name="old" value={@editing.name} />
             <div>
               <input name="new" placeholder={gettext("new name")} class={fld()} />
