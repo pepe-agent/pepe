@@ -14,8 +14,7 @@ defmodule Pepe.Tools.ListDir do
       "properties" => %{
         "path" => %{
           "type" => "string",
-          "description" =>
-            "Directory (relative = your workspace; shared/... = shared space; or absolute). Defaults to your workspace."
+          "description" => "Directory (relative = your workspace; shared/... = shared space; or absolute). Defaults to your workspace."
         }
       },
       "required" => []

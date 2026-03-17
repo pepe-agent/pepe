@@ -25,7 +25,9 @@ defmodule Pepe.Tools.SendToAgentTest do
   test "refuses an agent that isn't in can_message" do
     from = %Agent{name: "A", can_message: ["B"]}
     assert {:error, msg} = SendToAgent.run(%{"to" => "C", "message" => "hi"}, ctx(from))
-    assert msg =~ "not allowed"
+    # discreet: the denial doesn't reveal the permission model
+    assert msg =~ "isn't available"
+    refute msg =~ "not allowed"
   end
 
   test "refuses an unknown agent even if routed" do

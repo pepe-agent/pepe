@@ -138,9 +138,7 @@ defmodule Pepe.Agent.Runtime do
         if rest != [] and transient?(reason) do
           require Logger
 
-          Logger.warning(
-            "[llm] #{model.name} failed transiently, failing over: #{inspect(reason)}"
-          )
+          Logger.warning("[llm] #{model.name} failed transiently, failing over: #{inspect(reason)}")
 
           emit(opts, {:failover, model.name, hd(rest).name})
           chat_with_failover(rest, messages, chat_opts, ctx, opts)

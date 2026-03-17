@@ -49,8 +49,7 @@ defmodule Pepe.Tools.RunScript do
         "properties" => %{
           "language" => %{
             "type" => "string",
-            "description" =>
-              "python | node | ruby | bash | elixir (optional when `file` has a known extension)"
+            "description" => "python | node | ruby | bash | elixir (optional when `file` has a known extension)"
           },
           "code" => %{
             "type" => "string",
@@ -58,8 +57,7 @@ defmodule Pepe.Tools.RunScript do
           },
           "file" => %{
             "type" => "string",
-            "description" =>
-              "Path to a saved script in your workspace to re-run (use this OR code)."
+            "description" => "Path to a saved script in your workspace to re-run (use this OR code)."
           },
           "args" => %{
             "type" => "array",

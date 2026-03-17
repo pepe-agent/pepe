@@ -63,14 +63,14 @@ defmodule Pepe.Tools.SendToAgent do
         {:error, "Refusing to message #{to}: it belongs to a different company."}
 
       to not in (from.can_message || []) ->
-        {:error, "You're not allowed to message agent #{to}."}
+        # Discreet on purpose: don't reveal the permission model to the end user.
+        {:error, "Agent #{to} isn't available to you."}
 
       is_nil(Config.get_agent(to)) ->
         {:error, "Unknown agent: #{to}"}
 
       to in chain ->
-        {:error,
-         "Refusing to message #{to}: already in this chain (#{Enum.join(chain, " -> ")}) - would loop."}
+        {:error, "Refusing to message #{to}: already in this chain (#{Enum.join(chain, " -> ")}) - would loop."}
 
       length(chain) >= @max_hops ->
         {:error, "Agent message chain too deep (max #{@max_hops})."}

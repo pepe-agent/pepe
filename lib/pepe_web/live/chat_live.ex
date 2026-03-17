@@ -40,6 +40,7 @@ defmodule PepeWeb.ChatLive do
        messages: [],
        streaming: "",
        running: false,
+       activity: [],
        input: "",
        pending_perm: nil
      )}
@@ -68,7 +69,7 @@ defmodule PepeWeb.ChatLive do
                 + {gettext("New chat")}
               </button>
               <p class="mt-2 px-1 text-xs leading-relaxed text-zinc-500">
-                {gettext("Every conversation - web, Telegram, API and console - appears here.")}
+                {gettext("Every conversation (web, Telegram, API and console) appears here.")}
               </p>
             </div>
             <div class="flex-1 overflow-y-auto py-1">
@@ -105,11 +106,11 @@ defmodule PepeWeb.ChatLive do
 
             <div class="flex-1 space-y-3 overflow-y-auto p-5">
               <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-[15px] text-zinc-600">
-                {gettext("Fresh conversation - send a message to start.")}
+                {gettext("Fresh conversation. Send a message to start.")}
               </div>
               <.bubble :for={m <- @messages} role={m.role} content={m.content} />
               <.bubble :if={@running and @streaming != ""} role="assistant" content={@streaming} />
-              <div :if={@running and @streaming == "" and !@pending_perm} class="text-[15px] text-zinc-500">...</div>
+              <.activity :if={(@running or @activity != []) and !@pending_perm} running={@running} steps={@activity} />
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-amber-600/60 bg-amber-950/30 p-3">
                 <div class="mb-2 text-[15px]">
@@ -174,6 +175,29 @@ defmodule PepeWeb.ChatLive do
     )
   end
 
+  attr :running, :boolean, required: true
+  attr :steps, :list, required: true
+
+  # A compact, transient "what I'm doing" strip - a spinner while running, the tool
+  # steps below it. Shown during the run and for a couple seconds after (then cleared),
+  # so machine chatter never lingers in the conversation but the answer isn't preceded
+  # by a blank gap either.
+  defp activity(assigns) do
+    ~H"""
+    <div class="max-w-2xl rounded-xl border border-zinc-800 bg-zinc-900/40 px-3.5 py-2.5">
+      <div class="flex items-center gap-2 text-sm text-zinc-500">
+        <span :if={@running} class="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-orange-500"></span>
+        <span :if={!@running} class="text-emerald-500">✓</span>
+        <span>{(@running && gettext("Working...")) || gettext("Done")}</span>
+      </div>
+      <div :for={step <- @steps} class="mt-1 flex items-center gap-2 text-sm text-zinc-500">
+        <span class="text-amber-400/80">⚙</span>
+        <span class="font-mono text-xs">{step}</span>
+      </div>
+    </div>
+    """
+  end
+
   defp bubble_class("user"), do: "ml-auto bg-orange-600"
   defp bubble_class("tool"), do: "bg-zinc-800/60 font-mono text-sm text-zinc-400"
   defp bubble_class("tool_call"), do: "bg-transparent px-0"
@@ -196,7 +220,14 @@ defmodule PepeWeb.ChatLive do
       unsubscribe(key)
 
       socket =
-        assign(socket, selected: nil, agent: nil, messages: [], streaming: "", running: false)
+        assign(socket,
+          selected: nil,
+          agent: nil,
+          messages: [],
+          streaming: "",
+          running: false,
+          activity: []
+        )
 
       {:noreply, push_patch(socket, to: ~p"/chat")}
     else
@@ -210,8 +241,7 @@ defmodule PepeWeb.ChatLive do
 
     case agent && SessionSupervisor.ensure(key, agent) do
       {:ok, _pid} ->
-        {:noreply,
-         socket |> assign(sessions: list_sessions()) |> push_patch(to: ~p"/chat?chat=#{key}")}
+        {:noreply, socket |> assign(sessions: list_sessions()) |> push_patch(to: ~p"/chat?chat=#{key}")}
 
       _ ->
         {:noreply, put_flash(socket, :error, gettext("No default agent configured."))}
@@ -231,7 +261,7 @@ defmodule PepeWeb.ChatLive do
         {:noreply,
          socket
          |> update(:messages, &(&1 ++ [%{role: "user", content: text}]))
-         |> assign(streaming: "", running: true, input: "")}
+         |> assign(streaming: "", running: true, activity: [], input: "")}
 
       true ->
         {:noreply, socket}
@@ -253,6 +283,7 @@ defmodule PepeWeb.ChatLive do
        messages: history(socket.assigns.selected),
        streaming: "",
        running: false,
+       activity: [],
        pending_perm: nil
      )
      |> put_flash(:info, gettext("🧠 New conversation started."))}
@@ -260,7 +291,7 @@ defmodule PepeWeb.ChatLive do
 
   def handle_event("stop", _params, socket) do
     if socket.assigns.selected, do: Session.stop(socket.assigns.selected)
-    {:noreply, assign(socket, running: false, streaming: "")}
+    {:noreply, assign(socket, running: false, streaming: "", activity: [])}
   end
 
   def handle_event("perm", %{"id" => id, "decision" => token}, socket) do
@@ -294,26 +325,44 @@ defmodule PepeWeb.ChatLive do
   end
 
   def handle_info({:compacted, key}, socket) do
-    if key == socket.assigns.selected,
-      do: {:noreply, assign(socket, messages: history(key))},
-      else: {:noreply, socket}
+    if key == socket.assigns.selected do
+      # Replace the lingering "Compacting..." notice with a done one (which auto-dismisses).
+      {:noreply,
+       socket
+       |> assign(messages: history(key))
+       |> clear_flash()
+       |> put_flash(:info, gettext("🧠 History compacted."))}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_info(:refresh_sessions, socket),
     do: {:noreply, assign(socket, sessions: list_sessions())}
 
+  def handle_info(:clear_activity, socket) do
+    # Only clear once the run is really over (a new run may have started meanwhile).
+    if socket.assigns.running,
+      do: {:noreply, socket},
+      else: {:noreply, assign(socket, activity: [])}
+  end
+
   defp apply_event({:assistant_delta, text}, socket),
     do: update(socket, :streaming, &(&1 <> text))
 
   defp apply_event({:tool_call, name, _args}, socket),
-    do: update(socket, :messages, &(&1 ++ [%{role: "tool_call", content: name}]))
+    do: update(socket, :activity, &(&1 ++ [gettext("Running %{tool}", tool: name)]))
 
   defp apply_event({:permission_request, id, name, requester}, socket),
     do: assign(socket, pending_perm: %{id: id, tool: name, pid: requester})
 
-  defp apply_event({:done, _content}, socket) do
+  defp apply_event({:done, content}, socket) do
+    # Keep the activity strip briefly, then drop it - so the answer is already there to
+    # read and only the machine chatter disappears (never a blank gap).
+    Process.send_after(self(), :clear_activity, 2000)
+
     assign(socket,
-      messages: history(socket.assigns.selected),
+      messages: ensure_reply(history(socket.assigns.selected), content),
       streaming: "",
       running: false,
       pending_perm: nil,
@@ -323,11 +372,25 @@ defmodule PepeWeb.ChatLive do
 
   defp apply_event({:error, _reason}, socket) do
     socket
-    |> assign(running: false, streaming: "", pending_perm: nil)
+    |> assign(running: false, streaming: "", activity: [], pending_perm: nil)
     |> put_flash(:error, gettext("The run failed. Check the model connection."))
   end
 
   defp apply_event(_event, socket), do: socket
+
+  # Never end blank (which reads as an error): if the turn produced no visible answer,
+  # show the final content, or a small acknowledgement when it's genuinely empty.
+  defp ensure_reply(messages, content) do
+    case List.last(messages) do
+      %{role: "assistant", content: c} when c != "" ->
+        messages
+
+      _ ->
+        text = content |> to_string() |> String.trim()
+        note = if text == "", do: gettext("✓ Done."), else: text
+        messages ++ [%{role: "assistant", content: note}]
+    end
+  end
 
   ## session helpers
 
@@ -341,7 +404,8 @@ defmodule PepeWeb.ChatLive do
       agent: status(key).agent,
       messages: history(key),
       streaming: "",
-      running: false
+      running: false,
+      activity: []
     )
   end
 
@@ -386,6 +450,7 @@ defmodule PepeWeb.ChatLive do
           messages: history(key),
           streaming: "",
           running: false,
+          activity: [],
           pending_perm: nil,
           input: ""
         )
@@ -393,7 +458,7 @@ defmodule PepeWeb.ChatLive do
 
       "/stop" ->
         Session.stop(key)
-        assign(socket, running: false, streaming: "", input: "")
+        assign(socket, running: false, streaming: "", activity: [], input: "")
 
       "/compact" ->
         parent = self()

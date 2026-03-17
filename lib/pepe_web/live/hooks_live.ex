@@ -62,7 +62,7 @@ defmodule PepeWeb.HooksLive do
           <% else %>
             <p class="mb-4 max-w-4xl text-sm leading-relaxed text-zinc-500">
               <span class="text-zinc-400">{gettext("PII = personally identifiable information")}</span>
-              {gettext(": any data that points to a specific person - name, CPF/CNPJ, email, phone, card, address. These hooks hide it before the text reaches a model, so the provider never sees the real data.")}
+              {gettext(": any data that points to a specific person, like name, CPF/CNPJ, email, phone, card, address. These hooks hide it before the text reaches a model, so the provider never sees the real data.")}
             </p>
             <div class="grid max-w-4xl gap-3 sm:grid-cols-2">
               <div :for={name <- Hooks.names()} class={card()}>
@@ -143,7 +143,7 @@ defmodule PepeWeb.HooksLive do
         />
         <div class="flex gap-2">
           <select name="model" class={fld()} title={gettext("Model used to generate the config")}>
-            <option :if={Config.models() == []} value="">{gettext("- no models configured -")}</option>
+            <option :if={Config.models() == []} value="">{gettext("no models configured")}</option>
             <option :for={m <- Config.models()} value={m.name} selected={m.name == @gen_model}>{m.name}</option>
           </select>
           <button type="submit" disabled={@gen_busy} class={[btn(), "shrink-0", @gen_busy && "opacity-60"]}>
@@ -197,10 +197,10 @@ defmodule PepeWeb.HooksLive do
     <div>
       <label class={lbl()}>{gettext("Model")}</label>
       <select name="model" class={fld()}>
-        <option value="">{gettext("- pick a configured model -")}</option>
+        <option value="">{gettext("pick a configured model")}</option>
         <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
-      <p class={hlp()}>{gettext("A local/cheap model is ideal - it only rewrites PII into pseudonyms.")}</p>
+      <p class={hlp()}>{gettext("A local/cheap model is ideal: it only rewrites PII into pseudonyms.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-[15px] text-zinc-300">
@@ -265,7 +265,7 @@ defmodule PepeWeb.HooksLive do
         <div><span class="text-zinc-500">{gettext("model sees")}: </span><span class="text-orange-300">meu CPF é [CPF_1]</span></div>
         <div><span class="text-zinc-500">{gettext("reply")}: </span><span class="text-zinc-300">boleto do CPF 123.456.789-09 ✓</span></div>
       </div>
-      <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: one-way - the model and you keep the masked version.")}</p>
+      <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: one-way, the model and you keep the masked version.")}</p>
     </div>
     """
   end
@@ -282,8 +282,7 @@ defmodule PepeWeb.HooksLive do
   def handle_event("clear", %{"name" => name}, socket) do
     Config.put_hook_settings(name, %{})
 
-    {:noreply,
-     socket |> load() |> put_flash(:info, gettext("Cleared %{h}.", h: meta_title(name)))}
+    {:noreply, socket |> load() |> put_flash(:info, gettext("Cleared %{h}.", h: meta_title(name)))}
   end
 
   def handle_event("save", params, socket) do
@@ -329,7 +328,7 @@ defmodule PepeWeb.HooksLive do
   def handle_async(:generate, {:ok, {:ok, config, dropped}}, socket) do
     msg =
       if dropped == [],
-        do: gettext("Generated a config below - review and Save."),
+        do: gettext("Generated a config below. Review and Save."),
         else:
           gettext("Generated (dropped invalid: %{d}) - review and Save.",
             d: Enum.join(dropped, ", ")
@@ -509,19 +508,13 @@ defmodule PepeWeb.HooksLive do
   defp meta_title("presidio"), do: gettext("Presidio")
 
   defp meta_desc("pii_redact"),
-    do:
-      gettext(
-        "Deterministic structured PII (CPF, CNPJ, email, cards, phones) via named recognizers and your own regex."
-      )
+    do: gettext("Deterministic structured PII (CPF, CNPJ, email, cards, phones) via named recognizers and your own regex.")
 
   defp meta_desc("llm_redact"),
     do: gettext("A local model swaps names and free text for realistic, reversible pseudonyms.")
 
   defp meta_desc("http_redact"),
-    do:
-      gettext(
-        "Send text to your own redaction service (one endpoint, or separate inbound/outbound)."
-      )
+    do: gettext("Send text to your own redaction service (one endpoint, or separate inbound/outbound).")
 
   defp meta_desc("presidio"), do: gettext("Microsoft Presidio analyzer + anonymizer over HTTP.")
 end

@@ -46,12 +46,9 @@ defmodule Pepe.Tools.ConfigSet do
       {"default_model", "an existing model connection name", &set_default_model/1},
       {"default_agent", "an existing agent name", &set_default_agent/1},
       {"language", "system-message language: #{Enum.join(@locales, " | ")}", &set_language/1},
-      {"timezone", "default IANA timezone for scheduled tasks (e.g. America/Sao_Paulo)",
-       &set_timezone/1},
-      {"telegram.require_mention", "true|false - in groups, reply only when @mentioned",
-       &set_tg_flag("require_mention", &1)},
-      {"telegram.enabled", "true|false - pause/resume the default bot without deleting it",
-       &set_tg_flag("enabled", &1)}
+      {"timezone", "default IANA timezone for scheduled tasks (e.g. America/Sao_Paulo)", &set_timezone/1},
+      {"telegram.require_mention", "true|false - in groups, reply only when @mentioned", &set_tg_flag("require_mention", &1)},
+      {"telegram.enabled", "true|false - pause/resume the default bot without deleting it", &set_tg_flag("enabled", &1)}
     ]
   end
 

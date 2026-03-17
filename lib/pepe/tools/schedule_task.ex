@@ -64,8 +64,7 @@ defmodule Pepe.Tools.ScheduleTask do
           "name" => %{"type" => "string", "description" => "Human label for the task."},
           "prompt" => %{
             "type" => "string",
-            "description" =>
-              "Self-contained instructions the task runs each time (no chat memory)."
+            "description" => "Self-contained instructions the task runs each time (no chat memory)."
           },
           "schedule" => %{
             "type" => "string",
@@ -73,8 +72,7 @@ defmodule Pepe.Tools.ScheduleTask do
           },
           "timezone" => %{
             "type" => "string",
-            "description" =>
-              "IANA timezone, e.g. \"America/Sao_Paulo\". Omit for the configured default."
+            "description" => "IANA timezone, e.g. \"America/Sao_Paulo\". Omit for the configured default."
           },
           "model" => %{
             "type" => "string",
@@ -82,8 +80,7 @@ defmodule Pepe.Tools.ScheduleTask do
           },
           "deliver" => %{
             "type" => "string",
-            "description" =>
-              "\"telegram:<chat_id>\", or \"none\". Omit to report back to this chat."
+            "description" => "\"telegram:<chat_id>\", or \"none\". Omit to report back to this chat."
           }
         },
         "required" => ["action"]
@@ -120,7 +117,9 @@ defmodule Pepe.Tools.ScheduleTask do
         schedule: schedule,
         timezone: args["timezone"] || Config.default_timezone(),
         model: blank_to_nil(args["model"]),
-        deliver: args["deliver"] || default_deliver(ctx),
+        # An empty string is "omitted", not a real target - fall back to this chat.
+        # (In Elixir `"" || x` keeps the "", so normalize blanks to nil first.)
+        deliver: blank_to_nil(args["deliver"]) || default_deliver(ctx),
         enabled: true
       }
 

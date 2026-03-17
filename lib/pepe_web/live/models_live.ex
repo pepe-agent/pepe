@@ -67,7 +67,7 @@ defmodule PepeWeb.ModelsLive do
             )
 
           nil ->
-            gettext("no price - set one to bill for this model")
+            gettext("no price. Set one to bill for this model")
         end
 
       {i, o} ->
@@ -113,11 +113,13 @@ defmodule PepeWeb.ModelsLive do
         <.view_header
           icon="🔌"
           title={gettext("Model connections")}
-          desc={gettext("The AI providers your agents run on - any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model...). Pick a provider and we fill in the rest.")}
+          desc={gettext("The AI providers your agents run on: any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model...). Pick a provider and we fill in the rest.")}
         >
-          <button phx-click="model_new" class={btn()}>{gettext("+ New connection")}</button>
+          <button :if={!@edit_model} phx-click="model_new" class={btn()}>{gettext("+ New connection")}</button>
+          <button :if={@edit_model} phx-click="model_cancel" class={btn_ghost()}>&larr; {gettext("Back to models")}</button>
         </.view_header>
-        <div class="flex-1 space-y-3 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-6">
+          <div :if={!@edit_model} class="space-y-3">
           <div :for={m <- scoped_models(@models, @scope)} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
@@ -133,10 +135,12 @@ defmodule PepeWeb.ModelsLive do
             <div class="mt-1 text-sm text-zinc-400">{m.model} · {m.base_url}</div>
             <div class="mt-0.5 text-sm text-zinc-500">{price_line(m, @currency)}</div>
           </div>
+          </div>
 
+          <div :if={@edit_model} class="max-w-2xl">
           <%!-- Editing an existing connection: fields shown directly (no provider picker). --%>
-          <form :if={@edit_model && @edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-[15px] font-medium">{gettext("Edit %{name}", name: @edit_model.name)}</div>
+          <form :if={@edit_model.edit} phx-submit="model_save" class="space-y-4">
+            <div class="text-lg font-semibold">{gettext("Edit %{name}", name: @edit_model.name)}</div>
             <input type="hidden" name="name" value={@edit_model.name} />
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
@@ -157,7 +161,7 @@ defmodule PepeWeb.ModelsLive do
             <.price_fields edit_model={@edit_model} currency={@currency} />
             <label class="flex items-center gap-2 border-t border-zinc-800/60 pt-3 text-sm text-zinc-300">
               <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} />
-              {gettext("Require redaction - refuse to send raw PII to this provider (the agent must run a redaction hook)")}
+              {gettext("Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)")}
             </label>
             <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
@@ -166,8 +170,8 @@ defmodule PepeWeb.ModelsLive do
           </form>
 
           <%!-- Creating a new connection: provider-driven. --%>
-          <form :if={@edit_model && !@edit_model.edit} phx-submit="model_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-[15px] font-medium">{gettext("+ New model connection")}</div>
+          <form :if={!@edit_model.edit} phx-submit="model_save" class="space-y-4">
+            <div class="text-lg font-semibold">{gettext("+ New model connection")}</div>
 
             <div>
               <label class={lbl()}>{gettext("Provider")}</label>
@@ -217,6 +221,7 @@ defmodule PepeWeb.ModelsLive do
               <button type="button" phx-click="model_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>
           </form>
+          </div>
         </div>
       </main>
     </div>
@@ -322,8 +327,7 @@ defmodule PepeWeb.ModelsLive do
   def handle_event("model_delete", %{"name" => name}, socket) do
     Config.delete_model(name)
 
-    {:noreply,
-     assign(socket, models: Config.models(), default_model: Config.default_model_name())}
+    {:noreply, assign(socket, models: Config.models(), default_model: Config.default_model_name())}
   end
 
   def handle_event("model_default", %{"name" => name}, socket) do

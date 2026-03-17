@@ -12,7 +12,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n>1);\n"
 
 msgid "can't be blank"
-msgstr ""
+msgstr "não pode ficar em branco"
 
 msgid "has already been taken"
 msgstr ""

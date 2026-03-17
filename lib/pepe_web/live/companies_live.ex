@@ -11,6 +11,7 @@ defmodule PepeWeb.CompaniesLive do
   import PepeWeb.DashUI
   import PepeWeb.DashData
 
+  alias Ecto.Changeset
   alias Pepe.Config
 
   @impl true
@@ -21,9 +22,18 @@ defmodule PepeWeb.CompaniesLive do
        scope: params["scope"] || "all",
        companies: Config.companies(),
        new_company: false,
-       editing: nil
+       editing: nil,
+       form: company_form("")
      )}
   end
+
+  defp company_changeset(name) do
+    {%{}, %{name: :string}}
+    |> Changeset.cast(%{"name" => name}, [:name])
+    |> Changeset.validate_required([:name])
+  end
+
+  defp company_form(name), do: to_form(company_changeset(name), as: :company)
 
   @impl true
   def render(assigns) do
@@ -37,10 +47,12 @@ defmodule PepeWeb.CompaniesLive do
           title={gettext("Companies")}
           desc={gettext("A company is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Root is the default, non-company workspace.")}
         >
-          <button phx-click="company_new" class={btn()}>{gettext("+ New company")}</button>
+          <button :if={!@editing} phx-click="company_new" class={btn()}>{gettext("+ New company")}</button>
+          <button :if={@editing} phx-click="company_cancel" class={btn_ghost()}>&larr; {gettext("Back to companies")}</button>
         </.view_header>
 
-        <div class="flex-1 space-y-3 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-6">
+          <div :if={!@editing} class="space-y-3">
           <div :for={name <- @companies} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
@@ -68,72 +80,49 @@ defmodule PepeWeb.CompaniesLive do
             </div>
           </div>
           <p :if={@companies == []} class="text-[15px] text-zinc-500">
-            {gettext("No companies yet - everything lives in the root workspace. Create one to isolate a client or team.")}
+            {gettext("No companies yet. Everything lives in the root workspace. Create one to isolate a client or team.")}
           </p>
+          </div>
 
-          <form :if={@editing} phx-submit="company_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-[15px] font-medium">
-              {if @editing.new?, do: gettext("+ New company"), else: gettext("Edit %{name}", name: @editing.name)}
-            </div>
-            <div>
-              <label class={lbl()}>{gettext("Name")}</label>
-              <input
-                name="name"
-                value={@editing.name}
-                placeholder="acme"
-                readonly={!@editing.new?}
-                class={[fld(), !@editing.new? && "opacity-60"]}
-              />
-              <p class={hlp()}>
-                {if @editing.new?,
-                  do:
-                    gettext(
-                      "Letters, digits, - and _ only. Becomes the prefix for its agents (e.g. acme/sales)."
-                    ),
-                  else:
-                    gettext(
-                      "This name keys every agent, workspace and binding - use Rename below to change it safely."
-                    )}
-              </p>
-            </div>
-            <div>
-              <label class={lbl()}>
-                {gettext("Description")} <span class="text-zinc-600">{gettext("(optional)")}</span>
-              </label>
-              <input
-                name="description"
-                value={@editing.description}
-                placeholder={gettext("Acme Inc - sales team")}
-                class={fld()}
-              />
-            </div>
-            <div>
-              <label class={lbl()}>
-                {gettext("Billing markup")} <span class="text-zinc-600">{gettext("(optional)")}</span>
-              </label>
-              <input name="markup" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
-              <p class={hlp()}>
-                {gettext("Multiplier applied to provider cost to get the amount to bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
-              </p>
-            </div>
-            <div class="flex gap-2 pt-1">
-              <button type="submit" class={btn()}>{gettext("Save")}</button>
-              <button type="button" phx-click="company_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
-            </div>
-          </form>
-
-          <form :if={@editing && !@editing.new?} phx-submit="company_rename"
-            class="space-y-3 rounded-xl border border-amber-900/50 bg-amber-950/10 p-5">
-            <div class="text-[15px] font-medium">{gettext("Rename company")}</div>
-            <input type="hidden" name="old" value={@editing.name} />
-            <div>
-              <input name="new" placeholder={gettext("new name")} class={fld()} />
-              <p class={hlp()}>
-                {gettext("Re-keys all of this company's agents, models, routes, automations, tokens and files to the new name. Free text (prompts, descriptions) is left as-is.")}
-              </p>
-            </div>
-            <button type="submit" class={[btn(), "bg-amber-700 hover:bg-amber-600"]}>{gettext("Rename")}</button>
-          </form>
+          <div :if={@editing} class="max-w-2xl">
+            <.form for={@form} phx-submit="company_save" class="space-y-4">
+              <div class="text-lg font-semibold">
+                {if @editing.new?, do: gettext("+ New company"), else: gettext("Edit %{name}", name: @editing.name)}
+              </div>
+              <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
+                {gettext("Please fix the errors below.")}
+              </div>
+              <div>
+                <.input field={@form[:name]} label={gettext("Name")} placeholder="acme" />
+                <p class={hlp()}>
+                  {if @editing.new?,
+                    do:
+                      gettext("Letters, digits, - and _ only. Becomes the prefix for its agents (e.g. acme/sales)."),
+                    else:
+                      gettext("This name keys every agent, model, route, automation, token and file. Changing it re-keys them all.")}
+                </p>
+              </div>
+              <div>
+                <label class={lbl()}>
+                  {gettext("Description")} <span class="text-zinc-600">{gettext("(optional)")}</span>
+                </label>
+                <input name="company[description]" value={@editing.description} placeholder={gettext("Acme Inc, sales team")} class={fld()} />
+              </div>
+              <div>
+                <label class={lbl()}>
+                  {gettext("Billing markup")} <span class="text-zinc-600">{gettext("(optional)")}</span>
+                </label>
+                <input name="company[markup]" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
+                <p class={hlp()}>
+                  {gettext("Multiplier applied to provider cost to get the amount to bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
+                </p>
+              </div>
+              <div class="flex gap-2 border-t border-zinc-800 pt-4">
+                <button type="submit" class={btn()}>{gettext("Save")}</button>
+                <button type="button" phx-click="company_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
+              </div>
+            </.form>
+          </div>
         </div>
       </main>
     </div>
@@ -142,7 +131,12 @@ defmodule PepeWeb.CompaniesLive do
 
   @impl true
   def handle_event("company_new", _p, socket),
-    do: {:noreply, assign(socket, editing: %{new?: true, name: "", description: "", markup: ""})}
+    do:
+      {:noreply,
+       assign(socket,
+         editing: %{new?: true, name: "", description: "", markup: ""},
+         form: company_form("")
+       )}
 
   def handle_event("company_edit", %{"name" => name}, socket) do
     {:noreply,
@@ -152,39 +146,26 @@ defmodule PepeWeb.CompaniesLive do
          name: name,
          description: desc_of(name) || "",
          markup: markup_field(name)
-       }
+       },
+       form: company_form(name)
      )}
   end
 
   def handle_event("company_cancel", _p, socket), do: {:noreply, assign(socket, editing: nil)}
 
-  def handle_event("company_rename", %{"old" => old, "new" => new}, socket) do
-    case Config.rename_company(old, String.trim(new)) do
-      :ok ->
-        {:noreply,
-         socket
-         |> assign(companies: Config.companies(), editing: nil)
-         |> put_flash(
-           :info,
-           gettext("Company %{old} renamed to %{new}.", old: old, new: String.trim(new))
-         )}
+  def handle_event("company_save", %{"company" => p}, socket) do
+    cs = company_changeset(p["name"] || "")
 
-      {:error, :already_exists} ->
-        {:noreply, put_flash(socket, :error, gettext("That company already exists."))}
+    cond do
+      not cs.valid? ->
+        {:noreply, assign(socket, form: to_form(%{cs | action: :validate}, as: :company))}
 
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, gettext("That company no longer exists."))}
+      socket.assigns.editing.new? ->
+        create_company(p, socket)
 
-      {:error, _} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("Invalid name - use letters, digits, - and _."))}
+      true ->
+        edit_company(p, socket)
     end
-  end
-
-  def handle_event("company_save", params, socket) do
-    if socket.assigns.editing && socket.assigns.editing.new?,
-      do: create_company(params, socket),
-      else: edit_company(params, socket)
   end
 
   def handle_event("company_delete", %{"name" => name}, socket) do
@@ -204,13 +185,13 @@ defmodule PepeWeb.CompaniesLive do
 
   def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
 
-  defp create_company(params, socket) do
-    name = String.trim(params["name"] || "")
+  defp create_company(p, socket) do
+    name = String.trim(p["name"] || "")
 
     meta =
       %{}
-      |> put_if(blank(params["description"]), "description")
-      |> put_if(parse_markup(params["markup"]), "markup")
+      |> put_if(blank(p["description"]), "description")
+      |> put_if(parse_markup(p["markup"]), "markup")
 
     case Config.add_company(name, meta) do
       :ok ->
@@ -223,24 +204,38 @@ defmodule PepeWeb.CompaniesLive do
         {:noreply, put_flash(socket, :error, gettext("That company already exists."))}
 
       {:error, _} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("Invalid name - use letters, digits, - and _."))}
+        {:noreply, put_flash(socket, :error, gettext("Invalid name. Use letters, digits, - and _."))}
     end
   end
 
-  defp edit_company(params, socket) do
-    name = socket.assigns.editing.name
+  # Save an edit: if the name changed, re-key everything (rename), then update the meta.
+  defp edit_company(p, socket) do
+    old = socket.assigns.editing.name
+    new = String.trim(p["name"] || "")
+    meta = %{"description" => blank(p["description"]), "markup" => parse_markup(p["markup"])}
 
-    Config.update_company(name, %{
-      "description" => blank(params["description"]),
-      "markup" => parse_markup(params["markup"])
-    })
+    case maybe_rename(old, new) do
+      :ok ->
+        Config.update_company(new, meta)
 
-    {:noreply,
-     socket
-     |> assign(companies: Config.companies(), editing: nil)
-     |> put_flash(:info, gettext("Company %{name} updated.", name: name))}
+        {:noreply,
+         socket
+         |> assign(companies: Config.companies(), editing: nil)
+         |> put_flash(:info, save_flash(old, new))}
+
+      {:error, :already_exists} ->
+        {:noreply, put_flash(socket, :error, gettext("That company already exists."))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Invalid name. Use letters, digits, - and _."))}
+    end
   end
+
+  defp maybe_rename(old, old), do: :ok
+  defp maybe_rename(old, new), do: Config.rename_company(old, new)
+
+  defp save_flash(old, old), do: gettext("Company %{name} updated.", name: old)
+  defp save_flash(old, new), do: gettext("Company %{old} renamed to %{new}.", old: old, new: new)
 
   defp desc_of(name), do: (Config.get_company(name) || %{})["description"]
 

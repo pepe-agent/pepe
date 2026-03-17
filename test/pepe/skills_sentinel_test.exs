@@ -5,9 +5,7 @@ defmodule Pepe.Skills.SentinelTest do
 
   test "safe content passes clean" do
     assert %{verdict: :safe, findings: []} =
-             Sentinel.scan(
-               "Use when the user asks for a weather report.\n\nCall the API and reply."
-             )
+             Sentinel.scan("Use when the user asks for a weather report.\n\nCall the API and reply.")
   end
 
   test "flags secret exfiltration as danger" do

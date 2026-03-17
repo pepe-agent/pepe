@@ -32,7 +32,7 @@ defmodule PepeWeb.ConfigLive do
         <.view_header
           icon="⚙️"
           title={gettext("Configuration file")}
-          desc={gettext("The raw config.json the runtime reads. Edit and save - it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
+          desc={gettext("The raw config.json the runtime reads. Edit and save; it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
         >
           <button phx-click="config_reload" class={btn_ghost()}>{gettext("Reload from disk")}</button>
         </.view_header>
@@ -70,12 +70,10 @@ defmodule PepeWeb.ConfigLive do
          |> put_flash(:info, gettext("Config saved."))}
 
       {:ok, _} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("The top level must be a JSON object { ... }."))}
+        {:noreply, put_flash(socket, :error, gettext("The top level must be a JSON object { ... }."))}
 
       {:error, err} ->
-        {:noreply,
-         put_flash(socket, :error, gettext("Invalid JSON: %{msg}", msg: Exception.message(err)))}
+        {:noreply, put_flash(socket, :error, gettext("Invalid JSON: %{msg}", msg: Exception.message(err)))}
     end
   end
 

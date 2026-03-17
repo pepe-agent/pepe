@@ -46,6 +46,24 @@ defmodule Pepe.Tools.ScheduleTaskTest do
     assert cron.deliver == "telegram:123"
   end
 
+  test "an empty deliver string falls back to the originating chat (not nowhere)" do
+    assert {:ok, _} =
+             ScheduleTask.run(
+               %{
+                 "action" => "create",
+                 "name" => "Reminder",
+                 "prompt" => "ping",
+                 "schedule" => "30 23 * * *",
+                 "deliver" => ""
+               },
+               ctx("telegram:842064390")
+             )
+
+    [cron] = Config.crons()
+    # `deliver: ""` used to survive `"" || default` and deliver nowhere.
+    assert cron.deliver == "telegram:842064390"
+  end
+
   test "rejects an invalid schedule" do
     assert {:error, msg} =
              ScheduleTask.run(

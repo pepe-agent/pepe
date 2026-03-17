@@ -222,6 +222,14 @@ defmodule Pepe.Agent.Workspace do
     Your *identity* lives in `SOUL.md`/`IDENTITY.md` - edit those to change it. Your
     *handle* is this directory's name; if the user wants you renamed, call
     `rename_agent` (it renames your config entry and moves the directory together).
+
+    ## Discretion about your limits
+    If something you try turns out not to be available to you (a tool reports it's
+    unavailable, or an action is out of your reach), simply tell the user you can't help
+    with that - naturally, as if it's just not part of what you do. Do not explain Pepe's
+    permission or authority model, do not say you are "not allowed" or "blocked", and do
+    not describe capabilities you don't have. A limit you can't act on is not something
+    the user needs to hear about.
     """
   end
 

@@ -424,9 +424,7 @@ defmodule Mix.Tasks.Pepe do
         Enum.each(models, fn m ->
           mark = if m.name == default, do: " #{green("(default)")}", else: ""
 
-          IO.puts(
-            "#{bold(m.name)}#{mark}\n  url:   #{m.base_url}\n  model: #{m.model}\n  api:   #{m.api}"
-          )
+          IO.puts("#{bold(m.name)}#{mark}\n  url:   #{m.base_url}\n  model: #{m.model}\n  api:   #{m.api}")
         end)
     end
   end
@@ -621,9 +619,7 @@ defmodule Mix.Tasks.Pepe do
     }
 
     if api_key && Pepe.Config.interpolate(api_key) in [nil, ""] do
-      info(
-        dim("note: api key #{api_key} resolves to empty - export the env var, or this may 401")
-      )
+      info(dim("note: api key #{api_key} resolves to empty - export the env var, or this may 401"))
     end
 
     Pepe.LLM.list_models(probe)
@@ -939,9 +935,7 @@ defmodule Mix.Tasks.Pepe do
   defp company_cmd(["list" | _]) do
     case Config.companies() do
       [] ->
-        info(
-          "no companies. everything runs in the root scope. add one:\n  mix pepe company add acme"
-        )
+        info("no companies. everything runs in the root scope. add one:\n  mix pepe company add acme")
 
       companies ->
         Enum.each(companies, fn name ->
@@ -1098,9 +1092,7 @@ defmodule Mix.Tasks.Pepe do
 
     case opts[:probe] do
       nil ->
-        error(
-          "watch add needs --probe \"<command>\" (agent-checked watches are created from chat)"
-        )
+        error("watch add needs --probe \"<command>\" (agent-checked watches are created from chat)")
 
       cmd ->
         success = if opts[:contains], do: %{"contains" => opts[:contains]}, else: "exit_zero"
@@ -1119,18 +1111,14 @@ defmodule Mix.Tasks.Pepe do
 
         Config.put_watch(watch)
 
-        ok(
-          "watch #{green(watch.id)} created (probe every #{watch.interval_s}s -> #{watch.origin["channel"]})"
-        )
+        ok("watch #{green(watch.id)} created (probe every #{watch.interval_s}s -> #{watch.origin["channel"]})")
     end
   end
 
   defp watch_cmd(["list" | _]) do
     case Config.watches() do
       [] ->
-        info(
-          "no watches. create one from chat, or: mix pepe watch add \"site up\" --probe \"curl -sf https://x\""
-        )
+        info("no watches. create one from chat, or: mix pepe watch add \"site up\" --probe \"curl -sf https://x\"")
 
       watches ->
         Enum.each(watches, fn w ->
@@ -1321,9 +1309,7 @@ defmodule Mix.Tasks.Pepe do
 
           manages = manages_line(a.can_manage)
 
-          IO.puts(
-            "#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}#{manages}"
-          )
+          IO.puts("#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}#{manages}")
         end)
     end
   end
@@ -1484,9 +1470,7 @@ defmodule Mix.Tasks.Pepe do
 
     case agent_name && Config.get_agent(agent_name) do
       nil ->
-        error(
-          "no agent. create one with `mix pepe agent add ...` or pass one: mix pepe tui [--agent NAME]"
-        )
+        error("no agent. create one with `mix pepe agent add ...` or pass one: mix pepe tui [--agent NAME]")
 
       agent ->
         Pepe.Gateways.TUI.start(agent.name, opts[:session])
@@ -1524,31 +1508,21 @@ defmodule Mix.Tasks.Pepe do
         ok("dashboard: password protected (login required)")
 
       loopback? ->
-        info(
-          dim(
-            "   dashboard: open on localhost only; remote clients are blocked until you set a password"
-          )
-        )
+        info(dim("   dashboard: open on localhost only; remote clients are blocked until you set a password"))
 
       true ->
         info("")
         info(yellow("   dashboard: bound to a public interface with NO password."))
         info(yellow("   Remote access is blocked (fail-closed). To allow it:"))
 
-        info(
-          yellow(
-            "     mix pepe dashboard password '<pass>'   (or bind to 127.0.0.1 and tunnel in)"
-          )
-        )
+        info(yellow("     mix pepe dashboard password '<pass>'   (or bind to 127.0.0.1 and tunnel in)"))
     end
   end
 
   defp gateway_cmd(["whatsapp", "list" | _]) do
     case Config.webhooks() |> Enum.filter(fn {_s, e} -> e["provider"] == "whatsapp" end) do
       [] ->
-        info(
-          "no WhatsApp connections. Add one:\n  mix pepe gateway whatsapp add support --agent <handle>"
-        )
+        info("no WhatsApp connections. Add one:\n  mix pepe gateway whatsapp add support --agent <handle>")
 
       conns ->
         Enum.each(conns, fn {slug, e} ->
@@ -2183,9 +2157,7 @@ defmodule Mix.Tasks.Pepe do
     Config.save(Map.put(cfg, "dashboard", dash))
 
     if System.get_env("PEPE_DASHBOARD_PASSWORD") do
-      ok(
-        "cleared the config password (but PEPE_DASHBOARD_PASSWORD is still set in the environment)"
-      )
+      ok("cleared the config password (but PEPE_DASHBOARD_PASSWORD is still set in the environment)")
     else
       ok("dashboard password cleared - the dashboard is open again")
     end
@@ -2232,16 +2204,10 @@ defmodule Mix.Tasks.Pepe do
     else
       info("dashboard auth: off - open to localhost only (remote clients are blocked)")
 
-      info(
-        dim(
-          "   enable it: mix pepe dashboard password '<pass>'   (or export PEPE_DASHBOARD_PASSWORD)"
-        )
-      )
+      info(dim("   enable it: mix pepe dashboard password '<pass>'   (or export PEPE_DASHBOARD_PASSWORD)"))
     end
 
-    info(
-      "   allowed hosts  : #{list_or(Config.dashboard_allowed_hosts(), "loopback names only")}"
-    )
+    info("   allowed hosts  : #{list_or(Config.dashboard_allowed_hosts(), "loopback names only")}")
 
     info("   trusted proxies: #{list_or(Config.dashboard_trusted_proxies(), "none")}")
     info(dim("   set with: mix pepe dashboard hosts <h1,h2>  |  trusted-proxies <cidr,...>"))
@@ -2296,9 +2262,7 @@ defmodule Mix.Tasks.Pepe do
             info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
             report_backup_secrets(home)
 
-            info(
-              "\nRestore: extract into #{Path.dirname(home)}/ and re-export your secret env vars."
-            )
+            info("\nRestore: extract into #{Path.dirname(home)}/ and re-export your secret env vars.")
 
           {msg, _} ->
             error("backup failed: #{String.trim(msg)}")

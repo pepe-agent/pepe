@@ -66,8 +66,7 @@ defmodule Pepe.Tools.ManageChannel do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" =>
-              ~w(add list set_agent set_trainers set_heartbeat set_progress enable disable remove),
+            "enum" => ~w(add list set_agent set_trainers set_heartbeat set_progress enable disable remove),
             "description" => "What to do."
           },
           "mode" => %{
@@ -78,8 +77,7 @@ defmodule Pepe.Tools.ManageChannel do
           "name" => %{"type" => "string", "description" => "The bot's name (never \"default\")."},
           "token_env" => %{
             "type" => "string",
-            "description" =>
-              "NAME of the env var holding the bot token, e.g. \"SALES_BOT_TOKEN\". Never the token itself."
+            "description" => "NAME of the env var holding the bot token, e.g. \"SALES_BOT_TOKEN\". Never the token itself."
           },
           "agent" => %{"type" => "string", "description" => "Existing agent to bind the bot to."},
           "trainers" => %{

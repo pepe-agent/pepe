@@ -191,10 +191,9 @@ defmodule PepeWeb.UsageLive do
           put_flash(socket, :info, gettext("Refreshed %{count} live prices.", count: count))
 
         {:error, _} ->
-          put_flash(socket, :error, gettext("Couldn't refresh prices - check the connection."))
+          put_flash(socket, :error, gettext("Couldn't refresh prices. Check the connection."))
       end
 
-    {:noreply,
-     socket |> assign(refreshing: false, cache_info: Pricing.cache_info()) |> load_summary()}
+    {:noreply, socket |> assign(refreshing: false, cache_info: Pricing.cache_info()) |> load_summary()}
   end
 end

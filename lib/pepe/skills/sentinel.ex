@@ -29,8 +29,7 @@ defmodule Pepe.Skills.Sentinel do
   # {severity, category, regex}. Order doesn't matter; findings are deduped by category.
   @patterns [
     # --- exfiltration: sending local secrets/files somewhere external ---
-    {:danger, "exfiltration",
-     ~r/\b(curl|wget)\b[^\n]{0,80}\$\{?(?:[A-Z0-9_]*_)?(?:TOKEN|SECRET|KEY|PASSWORD|API_KEY)\}?/i},
+    {:danger, "exfiltration", ~r/\b(curl|wget)\b[^\n]{0,80}\$\{?(?:[A-Z0-9_]*_)?(?:TOKEN|SECRET|KEY|PASSWORD|API_KEY)\}?/i},
     {:danger, "exfiltration", ~r/\bcat\s+~?\/?\.(ssh|aws|gnupg)\//i},
     {:danger, "exfiltration", ~r/\b(cat|read_file)\b[^\n]{0,40}(id_rsa|credentials|\.env\b)/i},
 
@@ -51,8 +50,7 @@ defmodule Pepe.Skills.Sentinel do
     # --- persistence: trying to survive/spread beyond this one skill run ---
     {:danger, "persistence", ~r/\bcrontab\s+-/i},
     {:danger, "persistence", ~r/>>\s*~?\/?\.(bashrc|zshrc|profile|bash_profile)\b/i},
-    {:danger, "persistence",
-     ~r/\b(CLAUDE|AGENTS?|SOUL|IDENTITY)\.md\b[^\n]{0,40}(write|append|edit)/i},
+    {:danger, "persistence", ~r/\b(CLAUDE|AGENTS?|SOUL|IDENTITY)\.md\b[^\n]{0,40}(write|append|edit)/i},
 
     # --- obfuscation ---
     {:caution, "obfuscation", ~r/\bbase64\s+-d(ecode)?\b[^\n]{0,40}\|\s*(sh|bash|python)/i},

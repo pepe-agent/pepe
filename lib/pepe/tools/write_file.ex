@@ -14,8 +14,7 @@ defmodule Pepe.Tools.WriteFile do
       "properties" => %{
         "path" => %{
           "type" => "string",
-          "description" =>
-            "File path (relative = your workspace; shared/... = shared space; or absolute)."
+          "description" => "File path (relative = your workspace; shared/... = shared space; or absolute)."
         },
         "content" => %{"type" => "string", "description" => "The full file contents to write."}
       },

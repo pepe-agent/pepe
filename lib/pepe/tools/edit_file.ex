@@ -17,8 +17,7 @@ defmodule Pepe.Tools.EditFile do
         "properties" => %{
           "path" => %{
             "type" => "string",
-            "description" =>
-              "File path (relative = your workspace; shared/... = shared space; or absolute)."
+            "description" => "File path (relative = your workspace; shared/... = shared space; or absolute)."
           },
           "old_string" => %{"type" => "string", "description" => "Exact text to find."},
           "new_string" => %{"type" => "string", "description" => "Replacement text."}

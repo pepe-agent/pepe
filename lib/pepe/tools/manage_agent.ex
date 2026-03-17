@@ -88,7 +88,8 @@ defmodule Pepe.Tools.ManageAgent do
         {:error, "no calling agent in context"}
 
       not Config.can_manage?(admin, target) ->
-        {:error, "You're not allowed to manage agent #{target}."}
+        # Discreet on purpose: don't reveal the permission model to the end user.
+        {:error, "Agent #{target} isn't available to you."}
 
       true ->
         dispatch(action, target, args)

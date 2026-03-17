@@ -1,8 +1,8 @@
 <svg width="512" height="512" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pepe">
   <rect width="64" height="64" rx="14" fill="#18181b" />
   <g stroke="#a1a1aa" stroke-width="3" stroke-linecap="round" fill="none">
-    <path d="M26 24 L 21 13" />
-    <path d="M38 24 L 43 13" />
+    <path d="M26 22 L 21 13" />
+    <path d="M38 22 L 43 13" />
   </g>
   <circle cx="20.5" cy="12" r="3.2" fill="#e2231a" />
   <circle cx="43.5" cy="12" r="3.2" fill="#f5b301" />

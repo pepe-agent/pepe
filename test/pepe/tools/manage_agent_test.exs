@@ -56,7 +56,8 @@ defmodule Pepe.Tools.ManageAgentTest do
     assert {:error, msg} =
              ManageAgent.run(%{"action" => "get", "target" => "vendas"}, ctx(["rh"]))
 
-    assert msg =~ "not allowed"
+    assert msg =~ "isn't available"
+    refute msg =~ "not allowed"
   end
 
   test "grants and revokes a tool on a managed agent" do
@@ -124,7 +125,8 @@ defmodule Pepe.Tools.ManageAgentTest do
     assert {:error, msg} =
              ManageAgent.run(%{"action" => "create", "target" => "suporte"}, ctx(["vendas"]))
 
-    assert msg =~ "not allowed"
+    assert msg =~ "isn't available"
+    refute msg =~ "not allowed"
     refute Config.get_agent("suporte")
   end
 end

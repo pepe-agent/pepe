@@ -37,8 +37,7 @@ defmodule Pepe.Tools.Invoice do
           "format" => %{
             "type" => "string",
             "enum" => ["markdown", "csv"],
-            "description" =>
-              "markdown (a readable statement) or csv (for spreadsheets). Default markdown."
+            "description" => "markdown (a readable statement) or csv (for spreadsheets). Default markdown."
           }
         },
         "required" => ["company"]

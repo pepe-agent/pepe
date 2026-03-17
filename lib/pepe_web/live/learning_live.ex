@@ -39,7 +39,7 @@ defmodule PepeWeb.LearningLive do
         <.view_header
           icon="✦"
           title={gettext("Learning")}
-          desc={gettext("What this agent has picked up - skills it can run and memory it saved, newest first. Click any item to read and edit it.")}
+          desc={gettext("What this agent has picked up: skills it can run and memory it saved, newest first. Click any item to read and edit it.")}
         >
           <form :if={!@editing} phx-change="pick_learn_agent">
             <select name="agent" class={fld()}>
@@ -140,7 +140,7 @@ defmodule PepeWeb.LearningLive do
       title: title,
       path: user,
       content: read(if(File.exists?(user), do: user, else: builtin)),
-      note: override? && gettext("editing the built-in - saving creates your own copy")
+      note: override? && gettext("editing the built-in: saving creates your own copy")
     }
   end
 

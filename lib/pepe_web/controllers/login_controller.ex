@@ -94,7 +94,7 @@ defmodule PepeWeb.LoginController do
         <div class="brand">
           <svg width="26" height="35" viewBox="16 8 32 44">
             <g stroke="#71717a" stroke-width="3" stroke-linecap="round" fill="none">
-              <path d="M26 24 L 21 13"/><path d="M38 24 L 43 13"/></g>
+              <path d="M26 22 L 21 13"/><path d="M38 22 L 43 13"/></g>
             <circle cx="20.5" cy="12" r="3.2" fill="#e2231a"/><circle cx="43.5" cy="12" r="3.2" fill="#f5b301"/>
             <rect x="18" y="22" width="28" height="27" rx="9" fill="none" stroke="#71717a" stroke-width="3.4"/>
           </svg>

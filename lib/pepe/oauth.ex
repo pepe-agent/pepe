@@ -277,10 +277,7 @@ defmodule Pepe.OAuth do
     IO.puts("Opening your browser... if it doesn't open, click or paste this URL:\n  " <> link)
 
     if server?,
-      do:
-        IO.puts(
-          IO.ANSI.faint() <> "Waiting for you to authorize in the browser..." <> IO.ANSI.reset()
-        )
+      do: IO.puts(IO.ANSI.faint() <> "Waiting for you to authorize in the browser..." <> IO.ANSI.reset())
 
     IO.puts("")
   end

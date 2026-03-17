@@ -88,8 +88,7 @@ defmodule Pepe.Tools.ManageMcp do
         "env" => args["env"] || %{}
       })
 
-      {:ok,
-       "MCP server #{name} saved. Run `tools` on it to validate, then grant an agent its read tools."}
+      {:ok, "MCP server #{name} saved. Run `tools` on it to validate, then grant an agent its read tools."}
     end
   end
 

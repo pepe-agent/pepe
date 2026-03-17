@@ -7,26 +7,24 @@
 </h1>
 
 <p align="center">
-  <strong>An Elixir/OTP AI agent runtime</strong> - define agents, connect to any model, and run a tool-calling loop.
+  <strong>An Elixir/OTP AI agent runtime.</strong> Define agents, connect to any model, and run a tool-calling loop.
 </p>
 
 <p align="center">
   Web dashboard &nbsp;·&nbsp; OpenAI-compatible HTTP &nbsp;·&nbsp; WebSocket &nbsp;·&nbsp; Telegram &nbsp;·&nbsp; WhatsApp &nbsp;·&nbsp; CLI
 </p>
 
-> **Why "Pepe"?** A character from Chespirito's beloved Mexican comedy universe
-> (*El Chapulin Colorado* - in Brazil, the adored *Chapolin Colorado* - and
-> *El Chavo del Ocho*), the shows generations across Latin America grew up with.
-> His whole thing? **He did exactly what he was told** - no arguing, no improvising
-> beyond the order. Which is, funnily enough, a perfect description of an AI agent
-> runtime. The project used to be called *Cortex*; now it's **Pepe** - same engine,
-> better name. 🫡
+> **Why "Pepe"?** He comes from Chespirito's beloved Mexican comedy universe
+> (*El Chapulín Colorado*, adored in Brazil as the *Chapolin Colorado*, plus
+> *El Chavo del Ocho*): the shows generations across Latin America grew up with.
+> His whole thing? **He did exactly what he was told.** No arguing, no improvising
+> beyond the order. Which, funnily enough, describes an AI agent runtime perfectly.
+> The project was once called *Cortex*; now it's **Pepe**. Same engine, better name. 🫡
 
-**Pepe is an Elixir/OTP AI agent runtime** - define agents, connect to any model,
-and run a tool-calling loop. It leans on what Elixir is good at: a lightweight
-process per conversation (so many run side by side), supervision that isolates
-crashes (one conversation failing never takes the rest down), and a small
-streaming HTTP stack.
+**Pepe is an Elixir/OTP AI agent runtime.** Define agents, connect to any model, and
+run a tool-calling loop. It leans on what Elixir is good at: a lightweight process per
+conversation (so many run side by side), supervision that isolates crashes (one
+conversation failing never takes the rest down), and a small streaming HTTP stack.
 
 It exposes those core capabilities several ways:
 
@@ -97,3 +95,32 @@ Pepe is meant to be embedded. A few common paths:
 - **Customer support on WhatsApp** - connect a number and bind it to a support agent; see [WhatsApp](docs/whatsapp.md). Redact PII before it reaches any model with [Privacy hooks](docs/privacy-hooks.md).
 - **Bill your clients** - every model call is metered per company; export invoices from [Usage & billing](docs/billing.md).
 - **Automate** - recurring jobs with [Scheduled tasks](docs/scheduled-tasks.md), one-shot "notify me when X" with [Watches](docs/watches.md).
+
+---
+
+## Contributing - help wanted 🙌
+
+Pepe is young and **help is genuinely welcome** - bug reports, docs fixes, features,
+and especially **confirming providers work**. Small, focused PRs are the easiest to
+review and merge.
+
+Get set up in a minute (no database, no API keys needed for the test suite):
+
+```bash
+git clone https://github.com/jhonathas/pepe.git && cd pepe
+mix deps.get
+mix test          # the whole suite, over real TCP - no DB, no keys
+```
+
+Then fork, branch off `master`, make your change (match the style in `AGENTS.md`),
+run `mix precommit`, and open a PR against `master`. Adding a tool? Follow
+[Adding a tool](docs/adding-a-tool.md).
+
+**The single most useful thing you can do:** I run Pepe day-to-day on one setup
+(the ChatGPT/Codex OAuth subscription), so most providers are unverified. If you use
+OpenRouter, Groq, DeepSeek, Together, Mistral, Ollama, LM Studio, the Claude Pro/Max
+sign-in, or anything else - run `mix pepe model test`, try one prompt, and open an
+issue saying whether **streaming** and **tool-calling** worked. That feedback is worth
+a lot.
+
+Full guide, including everything that needs testing: [Contributing & help wanted](docs/contributing.md).

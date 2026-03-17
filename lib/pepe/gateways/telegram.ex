@@ -324,10 +324,20 @@ defmodule Pepe.Gateways.Telegram do
       %{"bot_token" => raw} ->
         token = Config.interpolate(raw)
 
-        case Req.post(api_url(token, "sendMessage"), json: %{chat_id: chat_id, text: text}) do
-          {:ok, %{status: 200}} -> :ok
-          {:ok, %{status: status}} -> {:error, {:telegram, status}}
-          {:error, reason} -> {:error, reason}
+        url = api_url(token, "sendMessage")
+        html = Pepe.Gateways.Telegram.Markdown.to_html(text)
+
+        case Req.post(url, json: %{chat_id: chat_id, text: html, parse_mode: "HTML"}) do
+          {:ok, %{status: 200}} ->
+            :ok
+
+          _ ->
+            # formatting rejected: fall back to plain text so the alert still lands
+            case Req.post(url, json: %{chat_id: chat_id, text: text}) do
+              {:ok, %{status: 200}} -> :ok
+              {:ok, %{status: status}} -> {:error, {:telegram, status}}
+              {:error, reason} -> {:error, reason}
+            end
         end
 
       _ ->
@@ -1239,14 +1249,27 @@ defmodule Pepe.Gateways.Telegram do
 
   defp send_message(chat_id, text) do
     unless dead_target?(chat_id) do
-      # Telegram caps messages at 4096 chars.
+      # Telegram caps messages at 4096 chars. Chunk the plain text, then render each
+      # chunk as HTML so a split never lands inside a tag.
       text
       |> chunk(4000)
-      |> Enum.each(fn part ->
-        api_url(token(), "sendMessage")
-        |> Req.post(json: %{chat_id: chat_id, text: part})
-        |> track_delivery(chat_id)
-      end)
+      |> Enum.each(fn part -> post_part(chat_id, part) end)
+    end
+  end
+
+  # Send one chunk as Telegram HTML (so **bold**/`code`/links render); if the API
+  # rejects the formatting, resend it as plain text so the message still arrives.
+  defp post_part(chat_id, part) do
+    url = api_url(token(), "sendMessage")
+    html = Pepe.Gateways.Telegram.Markdown.to_html(part)
+    result = Req.post(url, json: %{chat_id: chat_id, text: html, parse_mode: "HTML"})
+
+    case result do
+      {:ok, %{status: 200}} ->
+        track_delivery(result, chat_id)
+
+      _ ->
+        url |> Req.post(json: %{chat_id: chat_id, text: part}) |> track_delivery(chat_id)
     end
   end
 

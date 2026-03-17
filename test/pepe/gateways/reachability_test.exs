@@ -29,9 +29,7 @@ defmodule Pepe.Gateways.ReachabilityTest do
     end
 
     test "400 with a known permanent description is permanent" do
-      assert Reachability.permanent_failure?(
-               {:ok, %{status: 400, body: %{"description" => "Bad Request: chat not found"}}}
-             )
+      assert Reachability.permanent_failure?({:ok, %{status: 400, body: %{"description" => "Bad Request: chat not found"}}})
     end
 
     test "other errors (rate limit, transport) are NOT permanent" do

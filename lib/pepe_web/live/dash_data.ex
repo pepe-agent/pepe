@@ -170,7 +170,7 @@ defmodule PepeWeb.DashData do
   def key_status(env) do
     if System.get_env(env),
       do: gettext("✓ it's set."),
-      else: gettext("⚠ not set yet - export it before use.")
+      else: gettext("⚠ not set yet. Export it before use.")
   end
 
   def watch_origin_label(%{"channel" => "telegram"}), do: "telegram"
@@ -255,7 +255,7 @@ defmodule PepeWeb.DashData do
   def tokens(_), do: "0"
 
   @doc "A short label for how fresh the live price cache is."
-  def price_cache_label(nil), do: gettext("using built-in seed prices - never refreshed")
+  def price_cache_label(nil), do: gettext("using built-in seed prices (never refreshed)")
 
   def price_cache_label(%{fetched_at: at, count: count}) do
     date = at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")

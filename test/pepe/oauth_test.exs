@@ -55,8 +55,7 @@ defmodule Pepe.OAuthTest do
 
       {:ok, server} =
         Bandit.start_link(
-          plug:
-            {Pepe.OAuth.Callback, owner: self(), ref: ref, state: "st-ok", path: "/auth/callback"},
+          plug: {Pepe.OAuth.Callback, owner: self(), ref: ref, state: "st-ok", path: "/auth/callback"},
           scheme: :http,
           ip: {127, 0, 0, 1},
           port: 0
@@ -74,9 +73,7 @@ defmodule Pepe.OAuthTest do
 
       {:ok, server} =
         Bandit.start_link(
-          plug:
-            {Pepe.OAuth.Callback,
-             owner: self(), ref: ref, state: "expected", path: "/auth/callback"},
+          plug: {Pepe.OAuth.Callback, owner: self(), ref: ref, state: "expected", path: "/auth/callback"},
           scheme: :http,
           ip: {127, 0, 0, 1},
           port: 0

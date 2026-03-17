@@ -6,6 +6,7 @@ defmodule PepeWeb.ToolServersLive do
   import PepeWeb.DashUI
   import PepeWeb.DashData
 
+  alias Ecto.Changeset
   alias Pepe.Config
 
   @impl true
@@ -18,9 +19,20 @@ defmodule PepeWeb.ToolServersLive do
        new_company: false,
        mcp: Config.mcp_servers(),
        mcp_tools: %{},
-       edit_mcp: nil
+       edit_mcp: nil,
+       form: mcp_form(%{"command" => "npx"})
      )}
   end
+
+  defp mcp_changeset(attrs) do
+    types = %{name: :string, command: :string, args: :string}
+
+    {%{}, types}
+    |> Changeset.cast(attrs, Map.keys(types))
+    |> Changeset.validate_required([:name, :command])
+  end
+
+  defp mcp_form(attrs), do: to_form(mcp_changeset(attrs), as: :mcp)
 
   @impl true
   def render(assigns) do
@@ -32,11 +44,13 @@ defmodule PepeWeb.ToolServersLive do
         <.view_header
           icon="🧰"
           title="MCP"
-          desc={gettext("Give agents extra abilities from external tool servers - MCP (Sentry, GitHub, ...). Keep secrets safe by writing tokens as ${ENV_VAR}.")}
+          desc={gettext("Give agents extra abilities from external tool servers like MCP (Sentry, GitHub, ...). Keep secrets safe by writing tokens as ${ENV_VAR}.")}
         >
-          <button phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
+          <button :if={!@edit_mcp} phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
+          <button :if={@edit_mcp} phx-click="mcp_cancel" class={btn_ghost()}>&larr; {gettext("Back to servers")}</button>
         </.view_header>
-        <div class="flex-1 space-y-3 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-6">
+          <div :if={!@edit_mcp} class="space-y-3">
           <div :for={{name, cfg} <- @mcp} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <span class="font-medium">{name}</span>
@@ -55,31 +69,31 @@ defmodule PepeWeb.ToolServersLive do
               <p class="text-sm text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only.")}</p>
             </div>
             <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-sm text-red-400">
-              {gettext("couldn't connect - check the command and the env var token")}
+              {gettext("couldn't connect. Check the command and the env var token")}
             </div>
           </div>
-          <p :if={@mcp == %{}} class="text-[15px] text-zinc-500">{gettext("No MCP servers yet - add one below.")}</p>
+          <p :if={@mcp == %{}} class="text-[15px] text-zinc-500">{gettext("No MCP servers yet. Add one with “+ New server”.")}</p>
+          </div>
 
-          <form :if={@edit_mcp} phx-submit="mcp_save" class="space-y-4 rounded-xl border border-orange-900/60 bg-orange-950/10 p-5">
-            <div class="text-[15px] font-medium">{gettext("+ New MCP server")}</div>
-            <div>
-              <label class={lbl()}>{gettext("Name")}</label>
-              <input name="name" placeholder="sentry" class={fld()} />
+          <div :if={@edit_mcp} class="max-w-2xl">
+          <.form for={@form} phx-submit="mcp_save" phx-change="mcp_change" class="space-y-4">
+            <div class="text-lg font-semibold">{gettext("+ New MCP server")}</div>
+            <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
+              {gettext("Please fix the errors below.")}
             </div>
+            <.input field={@form[:name]} label={gettext("Name")} placeholder="sentry" />
+            <.input field={@form[:command]} label={gettext("Command")} />
             <div>
-              <label class={lbl()}>{gettext("Command")}</label>
-              <input name="command" value="npx" class={fld()} />
+              <.input field={@form[:args]} label={gettext("Arguments")} class={[fld(), "font-mono"]}
+                placeholder={"-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"} />
+              <p class={hlp()}>{gettext("Put the token as ${ENV_VAR}. The secret stays out of the config file.")}</p>
             </div>
-            <div>
-              <label class={lbl()}>{gettext("Arguments")}</label>
-              <input name="args" placeholder={"-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"} class={[fld(), "font-mono"]} />
-              <p class={hlp()}>{gettext("Put the token as ${ENV_VAR} - the secret stays out of the config file.")}</p>
-            </div>
-            <div class="flex gap-2 pt-1">
+            <div class="flex gap-2 border-t border-zinc-800 pt-4">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="mcp_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>
-          </form>
+          </.form>
+          </div>
         </div>
       </main>
     </div>
@@ -87,18 +101,23 @@ defmodule PepeWeb.ToolServersLive do
   end
 
   @impl true
-  def handle_event("mcp_new", _p, socket), do: {:noreply, assign(socket, edit_mcp: %{})}
+  def handle_event("mcp_new", _p, socket),
+    do: {:noreply, assign(socket, edit_mcp: %{}, form: mcp_form(%{"command" => "npx"}))}
+
   def handle_event("mcp_cancel", _p, socket), do: {:noreply, assign(socket, edit_mcp: nil)}
 
-  def handle_event("mcp_save", %{"name" => name, "command" => command, "args" => args}, socket) do
-    name = String.trim(name)
+  def handle_event("mcp_change", %{"mcp" => p}, socket),
+    do: {:noreply, assign(socket, form: to_form(%{mcp_changeset(p) | action: :validate}, as: :mcp))}
 
-    if name == "" or String.trim(command) == "" do
-      {:noreply, put_flash(socket, :error, gettext("Name and command are required."))}
-    else
+  def handle_event("mcp_save", %{"mcp" => p}, socket) do
+    cs = mcp_changeset(p)
+
+    if cs.valid? do
+      name = Changeset.get_field(cs, :name)
+
       Config.put_mcp_server(name, %{
-        "command" => String.trim(command),
-        "args" => String.split(args, " ", trim: true),
+        "command" => String.trim(Changeset.get_field(cs, :command)),
+        "args" => String.split(p["args"] || "", " ", trim: true),
         "env" => %{}
       })
 
@@ -106,6 +125,8 @@ defmodule PepeWeb.ToolServersLive do
        socket
        |> assign(mcp: Config.mcp_servers(), edit_mcp: nil)
        |> put_flash(:info, gettext("MCP server %{name} saved - validate it.", name: name))}
+    else
+      {:noreply, assign(socket, form: to_form(%{cs | action: :validate}, as: :mcp))}
     end
   end
 
