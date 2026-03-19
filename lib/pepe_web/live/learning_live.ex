@@ -10,6 +10,7 @@ defmodule PepeWeb.LearningLive do
   import PepeWeb.DashUI
   import PepeWeb.DashData
 
+  alias Pepe.Agent.Reflect
   alias Pepe.Agent.Workspace
   alias Pepe.Config
 
@@ -25,6 +26,8 @@ defmodule PepeWeb.LearningLive do
        new_company: false,
        learn_agent: agent,
        learn_nodes: Pepe.Learning.timeline(agent),
+       auto?: agent && Reflect.auto?(agent),
+       consolidating: false,
        editing: nil
      )}
   end
@@ -41,11 +44,21 @@ defmodule PepeWeb.LearningLive do
           title={gettext("Learning")}
           desc={gettext("What this agent has picked up: skills it can run and memory it saved, newest first. Click any item to read and edit it.")}
         >
-          <form :if={!@editing} phx-change="pick_learn_agent">
-            <select name="agent" class={fld()}>
-              <option :for={a <- scoped_agent_names(@scope)} value={a} selected={a == @learn_agent}>{a}</option>
-            </select>
-          </form>
+          <div :if={!@editing} class="flex items-center gap-2">
+            <button phx-click="consolidate_now" disabled={@consolidating || is_nil(@learn_agent)} class={btn_ghost()}
+              title={gettext("The agent re-reads its own memory and skills and tidies them (dedupe, prune, merge).")}>
+              {if @consolidating, do: gettext("consolidating..."), else: gettext("Consolidate now")}
+            </button>
+            <button phx-click="toggle_auto" disabled={is_nil(@learn_agent)} class={btn_ghost()}
+              title={gettext("Run a consolidation pass automatically every night.")}>
+              {if @auto?, do: gettext("Nightly: on"), else: gettext("Nightly: off")}
+            </button>
+            <form phx-change="pick_learn_agent">
+              <select name="agent" class={fld()}>
+                <option :for={a <- scoped_agent_names(@scope)} value={a} selected={a == @learn_agent}>{a}</option>
+              </select>
+            </form>
+          </div>
           <button :if={@editing} phx-click="learn_close" class={btn_ghost()}>{gettext("<- Back")}</button>
         </.view_header>
 
@@ -92,8 +105,32 @@ defmodule PepeWeb.LearningLive do
 
   @impl true
   def handle_event("pick_learn_agent", %{"agent" => name}, socket) do
-    {:noreply, assign(socket, learn_agent: name, learn_nodes: Pepe.Learning.timeline(name))}
+    {:noreply, assign(socket, learn_agent: name, learn_nodes: Pepe.Learning.timeline(name), auto?: Reflect.auto?(name))}
   end
+
+  def handle_event("consolidate_now", _p, %{assigns: %{learn_agent: name}} = socket) when is_binary(name) do
+    parent = self()
+    Task.start(fn -> send(parent, {:consolidated, name, Pepe.Agent.consolidate(name)}) end)
+    {:noreply, assign(socket, consolidating: true)}
+  end
+
+  def handle_event("consolidate_now", _p, socket), do: {:noreply, socket}
+
+  def handle_event("toggle_auto", _p, %{assigns: %{learn_agent: name}} = socket) when is_binary(name) do
+    if Reflect.auto?(name) do
+      Reflect.unschedule_auto(name)
+      {:noreply, socket |> assign(auto?: false) |> put_flash(:info, gettext("Nightly consolidation off for %{agent}.", agent: name))}
+    else
+      {:ok, cron} = Reflect.schedule_auto(name)
+
+      {:noreply,
+       socket
+       |> assign(auto?: true)
+       |> put_flash(:info, gettext("Nightly consolidation on for %{agent} at %{at}.", agent: name, at: cron.schedule))}
+    end
+  end
+
+  def handle_event("toggle_auto", _p, socket), do: {:noreply, socket}
 
   def handle_event("learn_open", %{"kind" => kind, "title" => title}, socket) do
     {:noreply, assign(socket, editing: load_node(kind, title, socket.assigns.learn_agent))}
@@ -127,6 +164,22 @@ defmodule PepeWeb.LearningLive do
     do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
 
   def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+
+  @impl true
+  def handle_info({:consolidated, name, result}, socket) do
+    flash =
+      case result do
+        {:ok, summary, _} -> {:info, gettext("Consolidated: %{summary}", summary: String.slice(to_string(summary), 0, 160))}
+        {:error, _} -> {:error, gettext("Consolidation could not run.")}
+      end
+
+    socket =
+      socket
+      |> assign(consolidating: false, learn_nodes: Pepe.Learning.timeline(name))
+      |> put_flash(elem(flash, 0), elem(flash, 1))
+
+    {:noreply, socket}
+  end
 
   # Resolve a learning node to the file to show and where an edit is written. A skill
   # edit is saved as a user override (never the read-only built-in copy); memory edits

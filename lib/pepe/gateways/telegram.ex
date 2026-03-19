@@ -577,6 +577,9 @@ defmodule Pepe.Gateways.Telegram do
   defp friendly_error({:http_error, _status, _}),
     do: gettext("The model returned an error just now. Could you try again?")
 
+  defp friendly_error(:budget_exceeded),
+    do: gettext("This workspace has hit its monthly spending limit. It resumes next month, or an admin can raise the cap.")
+
   defp friendly_error(_),
     do: gettext("Sorry, something went wrong on my end. Try again in a moment?")
 

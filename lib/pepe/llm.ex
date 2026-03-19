@@ -36,6 +36,9 @@ defmodule Pepe.LLM do
   def chat(%Model{api: "openai-responses"} = model, messages, opts),
     do: Pepe.LLM.Responses.chat(model, messages, opts)
 
+  def chat(%Model{api: "anthropic-messages"} = model, messages, opts),
+    do: Pepe.LLM.Messages.chat(model, messages, opts)
+
   def chat(%Model{} = model, messages, opts) do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts, false)
@@ -73,6 +76,10 @@ defmodule Pepe.LLM do
   def stream_chat(%Model{api: "openai-responses"} = model, messages, on_delta, opts)
       when is_function(on_delta, 1),
       do: Pepe.LLM.Responses.stream_chat(model, messages, on_delta, opts)
+
+  def stream_chat(%Model{api: "anthropic-messages"} = model, messages, on_delta, opts)
+      when is_function(on_delta, 1),
+      do: Pepe.LLM.Messages.stream_chat(model, messages, on_delta, opts)
 
   def stream_chat(%Model{} = model, messages, on_delta, opts)
       when is_function(on_delta, 1) do
@@ -118,6 +125,9 @@ defmodule Pepe.LLM do
   @spec list_models(Model.t()) :: {:ok, [String.t()]} | {:error, term()}
   def list_models(%Model{api: "openai-responses"} = model),
     do: Pepe.LLM.Responses.list_models(model)
+
+  def list_models(%Model{api: "anthropic-messages"} = model),
+    do: Pepe.LLM.Messages.list_models(model)
 
   def list_models(%Model{} = model) do
     url = String.trim_trailing(model.base_url, "/") <> "/models"

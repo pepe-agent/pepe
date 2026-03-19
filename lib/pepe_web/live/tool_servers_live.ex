@@ -56,6 +56,7 @@ defmodule PepeWeb.ToolServersLive do
               <span class="font-medium">{name}</span>
               <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="mcp_validate" phx-value-name={name} class={btn_ghost()}>{gettext("Validate (list tools)")}</button>
+                <button phx-click="mcp_restart" phx-value-name={name} class={btn_ghost()} title={gettext("Recovery: reconnect if this server seems stuck")}>↻ {gettext("Restart")}</button>
                 <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
@@ -133,6 +134,15 @@ defmodule PepeWeb.ToolServersLive do
   def handle_event("mcp_remove", %{"name" => name}, socket) do
     Config.delete_mcp_server(name)
     {:noreply, assign(socket, mcp: Config.mcp_servers())}
+  end
+
+  def handle_event("mcp_restart", %{"name" => name}, socket) do
+    Pepe.MCP.restart(name)
+
+    {:noreply,
+     socket
+     |> update(:mcp_tools, &Map.delete(&1, name))
+     |> put_flash(:info, gettext("MCP server %{name} restarted (reconnects on next use).", name: name))}
   end
 
   def handle_event("mcp_validate", %{"name" => name}, socket) do

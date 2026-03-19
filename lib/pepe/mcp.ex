@@ -33,6 +33,17 @@ defmodule Pepe.MCP do
     end
   end
 
+  @doc """
+  Stop the running client for `server`, if any - it respawns lazily on the next use.
+  A recovery lever for a wedged tool-server connection. No-op when nothing is running.
+  """
+  def restart(server) do
+    case Registry.lookup(@registry, server) do
+      [{pid, _}] -> DynamicSupervisor.terminate_child(@sup, pid)
+      [] -> :ok
+    end
+  end
+
   defp start(server) do
     case Config.mcp_server(server) do
       nil ->

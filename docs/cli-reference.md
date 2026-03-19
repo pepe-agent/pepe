@@ -29,7 +29,12 @@ mix pepe model default openai
 
 ChatGPT/Codex and Claude Pro/Max can be added by **subscription sign-in** -
 `mix pepe model add openai` -> "ChatGPT / Codex subscription" opens your browser
-(OAuth PKCE), captures the token, and refreshes it automatically.
+(OAuth PKCE), captures the token, and refreshes it automatically. Both work for
+inference, not just sign-in: neither subscription speaks the OpenAI Chat protocol, so
+Pepe translates transparently. ChatGPT/Codex goes through the OpenAI **Responses API**
+and Claude Pro/Max through the Anthropic **Messages API**, both mapped to the same
+tool-calling loop, so agents, tools and every surface behave identically. The Anthropic
+**API key** path uses the Messages API too (Anthropic is not OpenAI-compatible).
 
 ### Agents
 

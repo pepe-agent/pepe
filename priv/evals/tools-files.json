@@ -1,0 +1,17 @@
+[
+  {
+    "name": "writes a file with its file tools",
+    "prompt": "Create a file at /tmp/pepe_eval.txt containing the text eval-ok. Use your file tools.",
+    "expect": { "tool_called": ["write_file"] }
+  },
+  {
+    "name": "writes then reads a file back",
+    "prompt": "Write the text ping123 into the file /tmp/pepe_eval_ping.txt, then read that file back and tell me its contents.",
+    "expect": { "tool_called": ["write_file", "read_file"], "contains": ["ping123"] }
+  },
+  {
+    "name": "lists a directory",
+    "prompt": "Using your list_dir tool specifically (not the shell), show me the entries in the /tmp directory.",
+    "expect": { "tool_called": ["list_dir"] }
+  }
+]

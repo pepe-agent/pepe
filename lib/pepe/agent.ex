@@ -21,6 +21,17 @@ defmodule Pepe.Agent do
   end
 
   @doc """
+  Run a memory-housekeeping pass: the agent re-reads and consolidates its own standing
+  memory and skills (no conversation). Returns `{:ok, summary, messages}`.
+  """
+  def consolidate(agent_name) do
+    case resolve_agent(agent_name) do
+      {:ok, agent} -> Pepe.Agent.Reflect.consolidate(agent)
+      error -> error
+    end
+  end
+
+  @doc """
   Send a message within a persistent, keyed session (creating it on first use).
   """
   @spec chat(String.t(), String.t() | nil, String.t(), keyword()) ::

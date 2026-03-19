@@ -1,0 +1,22 @@
+[
+  {
+    "name": "answers arithmetic directly without a tool",
+    "prompt": "What is 8 times 9? Answer directly from your own knowledge.",
+    "expect": { "matches": "\\b72\\b", "tool_not_called": ["bash", "web_search", "run_script"] }
+  },
+  {
+    "name": "answers a static fact without searching",
+    "prompt": "What is the capital of Italy? You already know this, answer directly without looking it up.",
+    "expect": { "contains": ["rome"], "tool_not_called": ["web_search", "fetch_url"] }
+  },
+  {
+    "name": "defines a word without a tool",
+    "prompt": "Define the word ephemeral in one sentence, from your own knowledge.",
+    "expect": { "tool_not_called": ["web_search", "fetch_url", "bash"] }
+  },
+  {
+    "name": "reaches for a tool when only the system can answer",
+    "prompt": "What is the current date and time on this machine? Use a tool to read the system clock, do not guess.",
+    "expect": { "tool_called": ["bash"] }
+  }
+]

@@ -15,6 +15,7 @@ defmodule PepeWeb.ChatLive do
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
   alias Pepe.Permissions.Prompt
+  alias Pepe.Session.Focus
 
   defp slash_commands do
     [
@@ -42,7 +43,8 @@ defmodule PepeWeb.ChatLive do
        running: false,
        activity: [],
        input: "",
-       pending_perm: nil
+       pending_perm: nil,
+       focus: nil
      )}
   end
 
@@ -104,6 +106,8 @@ defmodule PepeWeb.ChatLive do
               </div>
             </header>
 
+            <.focus_panel :if={@focus} focus={@focus} />
+
             <div class="flex-1 space-y-3 overflow-y-auto p-5">
               <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-[15px] text-zinc-600">
                 {gettext("Fresh conversation. Send a message to start.")}
@@ -151,6 +155,40 @@ defmodule PepeWeb.ChatLive do
     </div>
     """
   end
+
+  attr :focus, :map, required: true
+
+  # A slim panel under the header showing the session's current goal and plan checklist.
+  defp focus_panel(assigns) do
+    ~H"""
+    <div class="border-b border-zinc-800 bg-zinc-900/40 px-5 py-3 text-[15px]">
+      <div :if={@focus.goal} class="flex items-start gap-2">
+        <span class="mt-0.5 text-zinc-500">🎯</span>
+        <div class="min-w-0">
+          <span class="font-medium">{@focus.goal["objective"]}</span>
+          <span class={["ml-2 rounded-full px-2 py-0.5 text-xs font-medium", goal_badge(@focus.goal["status"])]}>
+            {@focus.goal["status"] || "active"}
+          </span>
+        </div>
+      </div>
+      <ul :if={is_list(@focus.plan) and @focus.plan != []} class={["space-y-0.5 text-sm", @focus.goal && "mt-2"]}>
+        <li :for={s <- @focus.plan} class="flex items-center gap-2 text-zinc-400">
+          <span class="w-4 text-center">{plan_box(s["status"])}</span>
+          <span class={s["status"] == "done" && "text-zinc-600 line-through"}>{s["title"]}</span>
+        </li>
+      </ul>
+    </div>
+    """
+  end
+
+  defp goal_badge("complete"), do: "bg-green-500/15 text-green-400"
+  defp goal_badge("blocked"), do: "bg-red-500/15 text-red-400"
+  defp goal_badge("paused"), do: "bg-zinc-600/30 text-zinc-400"
+  defp goal_badge(_), do: "bg-orange-500/15 text-orange-300"
+
+  defp plan_box("done"), do: "✅"
+  defp plan_box("in_progress"), do: "⏳"
+  defp plan_box(_), do: "▫️"
 
   attr :role, :string, required: true
   attr :content, :string, required: true
@@ -338,7 +376,7 @@ defmodule PepeWeb.ChatLive do
   end
 
   def handle_info(:refresh_sessions, socket),
-    do: {:noreply, assign(socket, sessions: list_sessions())}
+    do: {:noreply, assign(socket, sessions: list_sessions(), focus: load_focus(socket.assigns.selected))}
 
   def handle_info(:clear_activity, socket) do
     # Only clear once the run is really over (a new run may have started meanwhile).
@@ -405,8 +443,19 @@ defmodule PepeWeb.ChatLive do
       messages: history(key),
       streaming: "",
       running: false,
-      activity: []
+      activity: [],
+      focus: load_focus(key)
     )
+  end
+
+  # The session's current goal + plan (from the disposable store), for the focus panel.
+  defp load_focus(nil), do: nil
+
+  defp load_focus(key) do
+    case {Focus.get_goal(key), Focus.get_plan(key)} do
+      {nil, nil} -> nil
+      {goal, plan} -> %{goal: goal, plan: plan}
+    end
   end
 
   defp stream_reply(key, text) do

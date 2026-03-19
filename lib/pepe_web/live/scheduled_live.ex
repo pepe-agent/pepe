@@ -20,6 +20,7 @@ defmodule PepeWeb.ScheduledLive do
        crons: Config.crons(),
        cron_custom: false,
        creating: false,
+       edit_cron: nil,
        form: cron_form(%{})
      )}
   end
@@ -33,6 +34,13 @@ defmodule PepeWeb.ScheduledLive do
   end
 
   defp cron_form(attrs), do: to_form(cron_changeset(attrs), as: :cron)
+
+  # The schedule of the cron being edited (or nil), for pre-selecting the preset option.
+  defp cron_sched(nil), do: nil
+  defp cron_sched(cron), do: cron.schedule
+
+  # A preset schedule matches one of the dropdown options; anything else is "custom".
+  @cron_presets ["0 8 * * *", "0 * * * *", "*/15 * * * *", "0 9 * * 1", "0 0 1 * *"]
 
   @impl true
   def render(assigns) do
@@ -53,6 +61,9 @@ defmodule PepeWeb.ScheduledLive do
         <div :if={@creating} class="min-h-0 flex-1 overflow-y-auto p-6">
           <div class="max-w-2xl">
             <.form for={@form} phx-submit="cron_create" phx-change="cron_validate" class="space-y-4">
+              <div class="text-lg font-semibold">
+                {if @edit_cron, do: gettext("Edit %{name}", name: @edit_cron.name), else: gettext("+ New task")}
+              </div>
               <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
                 {gettext("Please fix the errors below.")}
               </div>
@@ -66,14 +77,14 @@ defmodule PepeWeb.ScheduledLive do
                 <div>
                   <label class={lbl()}>{gettext("When")} <span class="text-zinc-600">{gettext("(cron)")}</span></label>
                   <select name="cron[schedule]" class={fld()}>
-                    <option value="0 8 * * *">{gettext("Every day at 08:00")}</option>
-                    <option value="0 * * * *">{gettext("Every hour")}</option>
-                    <option value="*/15 * * * *">{gettext("Every 15 minutes")}</option>
-                    <option value="0 9 * * 1">{gettext("Every Monday 09:00")}</option>
-                    <option value="0 0 1 * *">{gettext("First of the month")}</option>
+                    <option value="0 8 * * *" selected={cron_sched(@edit_cron) == "0 8 * * *"}>{gettext("Every day at 08:00")}</option>
+                    <option value="0 * * * *" selected={cron_sched(@edit_cron) == "0 * * * *"}>{gettext("Every hour")}</option>
+                    <option value="*/15 * * * *" selected={cron_sched(@edit_cron) == "*/15 * * * *"}>{gettext("Every 15 minutes")}</option>
+                    <option value="0 9 * * 1" selected={cron_sched(@edit_cron) == "0 9 * * 1"}>{gettext("Every Monday 09:00")}</option>
+                    <option value="0 0 1 * *" selected={cron_sched(@edit_cron) == "0 0 1 * *"}>{gettext("First of the month")}</option>
                     <option value="custom" selected={@cron_custom}>{gettext("Custom...")}</option>
                   </select>
-                  <input :if={@cron_custom} name="cron[schedule_custom]" placeholder="*/5 * * * *" class={[fld(), "mt-2 font-mono"]} />
+                  <input :if={@cron_custom} name="cron[schedule_custom]" value={@edit_cron && @edit_cron.schedule} placeholder="*/5 * * * *" class={[fld(), "mt-2 font-mono"]} />
                   <p :if={se = @form.source.errors[:schedule]} class="mt-1.5 text-sm text-red-400">{elem(se, 0)}</p>
                   <p :if={@cron_custom} class={hlp()}>
                     {gettext("5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" = 09:30 on weekdays. Invalid expressions are rejected.")}
@@ -82,7 +93,7 @@ defmodule PepeWeb.ScheduledLive do
                 <div>
                   <label class={lbl()}>{gettext("Timezone")}</label>
                   <select name="cron[timezone]" class={fld()}>
-                    <option :for={tz <- timezone_options()} value={tz}>{tz}</option>
+                    <option :for={tz <- timezone_options()} value={tz} selected={@edit_cron && @edit_cron.timezone == tz}>{tz}</option>
                   </select>
                 </div>
               </div>
@@ -90,29 +101,29 @@ defmodule PepeWeb.ScheduledLive do
                 <div>
                   <label class={lbl()}>{gettext("Agent")}</label>
                   <select name="cron[agent]" class={fld()}>
-                    <option :for={a <- scoped_agent_names(@scope)} value={a}>{a}</option>
+                    <option :for={a <- scoped_agent_names(@scope)} value={a} selected={@edit_cron && @edit_cron.agent == a}>{a}</option>
                   </select>
                 </div>
                 <div>
                   <label class={lbl()}>{gettext("Model")}</label>
                   <select name="cron[model]" class={fld()}>
-                    <option value="">{gettext("agent's default")}</option>
-                    <option :for={m <- model_names()} value={m}>{m}</option>
+                    <option value="" selected={@edit_cron && @edit_cron.model in [nil, ""]}>{gettext("agent's default")}</option>
+                    <option :for={m <- model_names()} value={m} selected={@edit_cron && @edit_cron.model == m}>{m}</option>
                   </select>
                 </div>
               </div>
               <div>
                 <label class={lbl()}>{gettext("Report the result to")}</label>
                 <select name="cron[deliver]" class={fld()}>
-                  <option value="none">{gettext("Nowhere (just keep the run history)")}</option>
-                  <option value="log">{gettext("The app log")}</option>
-                  <option :for={t <- telegram_targets()} value={t}>{deliver_label(t)}</option>
+                  <option value="none" selected={@edit_cron && @edit_cron.deliver in ["none", nil, ""]}>{gettext("Nowhere (just keep the run history)")}</option>
+                  <option value="log" selected={@edit_cron && @edit_cron.deliver == "log"}>{gettext("The app log")}</option>
+                  <option :for={t <- telegram_targets()} value={t} selected={@edit_cron && @edit_cron.deliver == t}>{deliver_label(t)}</option>
                 </select>
                 <input :if={telegram_targets() == []} name="cron[deliver_chat]"
                   placeholder={gettext("No Telegram chats yet. Paste a chat id (find it with /whoami)")} class={[fld(), "mt-2"]} />
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
-                <button type="submit" class={btn()}>{gettext("Create task")}</button>
+                <button type="submit" class={btn()}>{if @edit_cron, do: gettext("Save"), else: gettext("Create task")}</button>
                 <button type="button" phx-click="cron_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
             </.form>
@@ -130,6 +141,7 @@ defmodule PepeWeb.ScheduledLive do
               </div>
               <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="cron_run" phx-value-id={c.id} class={btn_ghost()}>{gettext("Run now")}</button>
+                <button phx-click="cron_edit" phx-value-id={c.id} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button phx-click="cron_toggle" phx-value-id={c.id} class={btn_ghost()}>{(c.enabled && gettext("Disable")) || gettext("Enable")}</button>
                 <button phx-click="cron_remove" phx-value-id={c.id} data-confirm={gettext("Remove scheduled task %{name}?", name: c.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
@@ -182,10 +194,26 @@ defmodule PepeWeb.ScheduledLive do
   end
 
   def handle_event("cron_new", _p, socket),
-    do: {:noreply, assign(socket, creating: true, form: cron_form(%{}), cron_custom: false)}
+    do: {:noreply, assign(socket, creating: true, edit_cron: nil, form: cron_form(%{}), cron_custom: false)}
+
+  def handle_event("cron_edit", %{"id" => id}, socket) do
+    case Config.get_cron(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, gettext("Task not found."))}
+
+      cron ->
+        {:noreply,
+         assign(socket,
+           creating: true,
+           edit_cron: cron,
+           form: cron_form(%{"name" => cron.name, "prompt" => cron.prompt}),
+           cron_custom: cron.schedule not in @cron_presets
+         )}
+    end
+  end
 
   def handle_event("cron_cancel", _p, socket),
-    do: {:noreply, assign(socket, creating: false)}
+    do: {:noreply, assign(socket, creating: false, edit_cron: nil)}
 
   def handle_event("cron_validate", %{"cron" => p}, socket) do
     cs = %{cron_changeset(p) | action: :validate}
@@ -207,9 +235,10 @@ defmodule PepeWeb.ScheduledLive do
 
     if cs.valid? do
       name = Changeset.get_field(cs, :name)
+      editing = socket.assigns.edit_cron
 
       Config.put_cron(%Pepe.Config.Cron{
-        id: new_cron_id(name),
+        id: (editing && editing.id) || new_cron_id(name),
         name: name,
         agent: blank(p["agent"]) || Config.default_agent_name(),
         prompt: Changeset.get_field(cs, :prompt),
@@ -217,13 +246,14 @@ defmodule PepeWeb.ScheduledLive do
         timezone: blank(p["timezone"]) || Config.default_timezone(),
         model: blank(p["model"]),
         deliver: deliver_from(p),
-        enabled: true
+        # Preserve the enabled flag when editing; new tasks start enabled.
+        enabled: (editing && editing.enabled) || is_nil(editing)
       })
 
       {:noreply,
        socket
-       |> assign(crons: Config.crons(), creating: false)
-       |> put_flash(:info, gettext("Task created."))}
+       |> assign(crons: Config.crons(), creating: false, edit_cron: nil)
+       |> put_flash(:info, (editing && gettext("Task updated.")) || gettext("Task created."))}
     else
       {:noreply, assign(socket, form: to_form(%{cs | action: :validate}, as: :cron))}
     end

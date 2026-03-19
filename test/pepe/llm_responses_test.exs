@@ -74,4 +74,38 @@ defmodule Pepe.LLM.ResponsesTest do
     assert res.finish_reason == "tool_calls"
     assert res.usage["input_tokens"] == 5
   end
+
+  defmodule FakeRefusal do
+    @behaviour Plug
+    import Plug.Conn
+
+    @impl true
+    def init(opts), do: opts
+
+    @impl true
+    def call(conn, _opts) do
+      events = [
+        ~s({"type":"response.refusal.delta","delta":"I can't help "}),
+        ~s({"type":"response.refusal.delta","delta":"with that."}),
+        ~s({"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":9,"output_tokens":4}}})
+      ]
+
+      body = Enum.map_join(events, "", fn e -> "data: " <> e <> "\n\n" end)
+      conn |> put_resp_content_type("text/event-stream") |> send_resp(200, body)
+    end
+  end
+
+  test "a refusal surfaces as assistant text instead of an empty reply" do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {:ok, server} = Bandit.start_link(plug: FakeRefusal, scheme: :http, ip: {127, 0, 0, 1}, port: 0)
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    model = %Model{name: "codex", base_url: "http://127.0.0.1:#{port}/codex", api: "openai-responses", api_key: "x", model: "gpt-5.5"}
+
+    {:ok, res} = Responses.stream_chat(model, [%{"role" => "user", "content" => "do something bad"}], fn _ -> :ok end)
+
+    assert res.content == "I can't help with that."
+    assert res.tool_calls == []
+  end
 end

@@ -78,9 +78,9 @@ One topic per page - open just what you need.
 
 **Talk to it** &nbsp; [Web dashboard](docs/dashboard.md) · [Dashboard auth](docs/authentication.md) · [HTTP API](docs/http-api.md) · [WebSocket](docs/websocket.md) · [Telegram](docs/telegram.md) · [WhatsApp](docs/whatsapp.md)
 
-**Agents** &nbsp; [Admin agents](docs/admin-agents.md) · [Permissions](docs/permissions.md) · [Agent-to-agent routing](docs/routing.md) · [Companies](docs/companies.md) · [Skills](docs/skills.md) · [Learning](docs/learning.md) · [Adding a tool](docs/adding-a-tool.md) · [Self-management](docs/self-management.md)
+**Agents** &nbsp; [Admin agents](docs/admin-agents.md) · [Permissions](docs/permissions.md) · [Agent-to-agent routing](docs/routing.md) · [Companies](docs/companies.md) · [Skills](docs/skills.md) · [Learning](docs/learning.md) · [Goals & plans](docs/goals-and-plans.md) · [Adding a tool](docs/adding-a-tool.md) · [Self-management](docs/self-management.md)
 
-**Automation & ops** &nbsp; [MCP servers](docs/mcp.md) · [Scheduled tasks](docs/scheduled-tasks.md) · [Watches](docs/watches.md) · [Usage & billing](docs/billing.md) · [Privacy hooks](docs/privacy-hooks.md)
+**Automation & ops** &nbsp; [MCP servers](docs/mcp.md) · [Scheduled tasks](docs/scheduled-tasks.md) · [Watches](docs/watches.md) · [Usage & billing](docs/billing.md) · [Traces](docs/traces.md) · [Evals](docs/evals.md) · [Privacy hooks](docs/privacy-hooks.md)
 
 **Contribute** &nbsp; [Contributing & help wanted](docs/contributing.md) · [Tests](docs/tests.md)
 

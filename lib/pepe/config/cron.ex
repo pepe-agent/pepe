@@ -13,6 +13,9 @@ defmodule Pepe.Config.Cron do
             name: nil,
             agent: nil,
             prompt: nil,
+            # "prompt" (run the agent on `prompt`) or "consolidate" (a memory-housekeeping
+            # pass over the agent's standing memory, ignoring `prompt`).
+            kind: "prompt",
             # standard cron expression, e.g. "0 8 * * *"
             schedule: nil,
             timezone: "Etc/UTC",
@@ -33,6 +36,7 @@ defmodule Pepe.Config.Cron do
       name: map["name"],
       agent: map["agent"],
       prompt: map["prompt"],
+      kind: map["kind"] || "prompt",
       schedule: map["schedule"],
       timezone: map["timezone"] || "Etc/UTC",
       model: map["model"],

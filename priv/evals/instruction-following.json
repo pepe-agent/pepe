@@ -1,0 +1,22 @@
+[
+  {
+    "name": "returns only what was asked",
+    "prompt": "Reply with only the number 7 and no other words or punctuation.",
+    "expect": { "matches": "^\\D*7\\D*$" }
+  },
+  {
+    "name": "answers a strict yes/no",
+    "prompt": "Is water wet? Answer with only the single word yes or no.",
+    "expect": { "matches": "(?i)^\\W*(yes|no)\\W*$" }
+  },
+  {
+    "name": "obeys a count constraint",
+    "prompt": "Give exactly two synonyms for the word happy, separated by a comma.",
+    "expect": { "matches": ".+,.+" }
+  },
+  {
+    "name": "picks from a constrained set",
+    "prompt": "Name a fruit that is yellow. Reply with one word.",
+    "expect": { "matches": "(?i)banana|lemon|mango|pineapple|papaya" }
+  }
+]

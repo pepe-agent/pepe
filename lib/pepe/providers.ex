@@ -65,6 +65,10 @@ defmodule Pepe.Providers do
           type: :oauth,
           env: "ANTHROPIC_OAUTH_TOKEN",
           featured: true,
+          # Anthropic speaks the Messages API, not Chat Completions - even with an API key.
+          base_url: "https://api.anthropic.com/v1",
+          api: "anthropic-messages",
+          models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"],
           oauth_flow: %{
             authorize_url: "https://claude.ai/oauth/authorize",
             token_url: "https://platform.claude.com/v1/oauth/token",
@@ -78,7 +82,14 @@ defmodule Pepe.Providers do
             extra_params: %{"code" => "true"}
           }
         },
-        %{key: "api", label: "API key", type: :api_key}
+        %{
+          key: "api",
+          label: "API key",
+          type: :api_key,
+          base_url: "https://api.anthropic.com/v1",
+          api: "anthropic-messages",
+          models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"]
+        }
       ]
     },
     %{

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "fetches a URL and reads its content",
+    "prompt": "Fetch the page at https://example.com and tell me the main heading text on it.",
+    "expect": { "tool_called": ["fetch_url"], "contains": ["example domain"] }
+  },
+  {
+    "name": "searches the web for fresh information",
+    "prompt": "Search the web for today's weather in Tokyo and give me a one sentence summary.",
+    "expect": { "tool_called": ["web_search"] }
+  },
+  {
+    "name": "looks up a current fact online",
+    "prompt": "Look up online who is the current secretary-general of the United Nations.",
+    "expect": { "tool_called": ["web_search"] }
+  }
+]

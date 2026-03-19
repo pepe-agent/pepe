@@ -1,0 +1,22 @@
+[
+  {
+    "name": "transitive syllogism",
+    "prompt": "If all Bloops are Razzies and all Razzies are Lazzies, are all Bloops definitely Lazzies? Answer yes or no.",
+    "expect": { "matches": "(?i)\\byes\\b" }
+  },
+  {
+    "name": "continues a sequence",
+    "prompt": "What number comes next in the sequence 2, 4, 6, 8? Reply with just the number.",
+    "expect": { "matches": "\\b10\\b" }
+  },
+  {
+    "name": "compares decimals correctly",
+    "prompt": "Which is larger, 9.9 or 9.11? Answer with just the larger number.",
+    "expect": { "contains": ["9.9"], "not_contains": ["9.11 is larger", "9.11 is bigger"] }
+  },
+  {
+    "name": "counts letters",
+    "prompt": "How many times does the letter r appear in the word strawberry? Reply with the number.",
+    "expect": { "matches": "\\b3\\b" }
+  }
+]

@@ -81,10 +81,13 @@ defmodule Mix.Tasks.Pepe do
 
       mix pepe tools                           # list built-in tools
       mix pepe timelearn [AGENT]               # what the agent has learned, on a timeline
+      mix pepe learn consolidate|auto [AGENT]    # tidy memory now, or schedule nightly consolidation
       mix pepe cron list|add|run|logs ...        # scheduled tasks (recurring agent jobs)
       mix pepe usage [--company CO] ...          # token usage & cost by cycle (billing)
       mix pepe usage export --company CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
+      mix pepe traces [--company CO] [ID]        # inspect/replay recent agent runs
+      mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe setup                           # scaffold ~/.pepe/config.json
@@ -150,6 +153,14 @@ defmodule Mix.Tasks.Pepe do
       ["timelearn" | rest] ->
         with_config(fn -> timelearn_cmd(rest) end)
 
+      # `learn consolidate` calls the model (needs the app); `auto`/`status` only read
+      # and write config.
+      ["learn", "consolidate" | rest] ->
+        with_app([], fn -> learn_cmd(["consolidate" | rest]) end)
+
+      ["learn" | rest] ->
+        with_config(fn -> learn_cmd(rest) end)
+
       # `cron list/history` only read files; `cron run` needs the full app to call
       # the model, so route everything through with_app.
       ["cron", sub | rest] when sub in ["list", "history", "logs"] ->
@@ -176,6 +187,9 @@ defmodule Mix.Tasks.Pepe do
       ["usage" | rest] ->
         with_config(fn -> usage_cmd(rest) end)
 
+      ["traces" | rest] ->
+        with_config(fn -> traces_cmd(rest) end)
+
       ["company" | rest] ->
         with_config(fn -> company_cmd(rest) end)
 
@@ -185,6 +199,9 @@ defmodule Mix.Tasks.Pepe do
 
       ["hooks" | rest] ->
         with_config(fn -> hooks_cmd(rest) end)
+
+      ["eval" | rest] ->
+        with_app([], fn -> eval_cmd(rest) end)
 
       ["token" | rest] ->
         with_config(fn -> token_cmd(rest) end)
@@ -840,6 +857,100 @@ defmodule Mix.Tasks.Pepe do
   defp fmt_money(amount, currency),
     do: "#{currency} #{:erlang.float_to_binary(amount / 1, decimals: 2)}"
 
+  # `traces` - list recent agent runs, or replay one by id.
+  defp traces_cmd(["help"]), do: traces_help()
+
+  defp traces_cmd(rest) do
+    {opts, args} = OptionParser.parse!(rest, strict: [company: :string, limit: :integer])
+    scope = opts[:company] || :all
+
+    case args do
+      [id] -> print_trace(find_trace(scope, id))
+      [] -> print_trace_list(scope, opts[:limit] || 30)
+      _ -> error("usage: mix pepe traces [--company NAME] [--limit N] [ID]")
+    end
+  end
+
+  defp print_trace_list(scope, limit) do
+    scopes = if scope == :all, do: Pepe.Trace.scopes(), else: [to_string(scope)]
+
+    traces =
+      scopes
+      |> Enum.flat_map(fn s -> Enum.map(Pepe.Trace.recent(s, limit), &Map.put(&1, "scope", s)) end)
+      |> Enum.sort_by(& &1["at"], :desc)
+      |> Enum.take(limit)
+
+    label = if scope == :all, do: "all scopes", else: scope
+    IO.puts("#{bold("traces")} · #{label}\n")
+
+    if traces == [] do
+      info("no runs recorded yet.")
+    else
+      Enum.each(traces, fn t ->
+        kind = get_in(t, ["outcome", "kind"]) || "?"
+        mark = if kind == "error", do: red("✗"), else: green("✓")
+
+        IO.puts(
+          "  #{mark} #{dim(t["id"])}  #{String.pad_trailing(t["agent"], 20)} " <>
+            "#{String.pad_leading("#{t["ms"]}ms", 8)}  #{dim(Enum.join(t["tools"] || [], ","))}"
+        )
+      end)
+
+      IO.puts("\n#{dim("replay one: mix pepe traces ID")}")
+    end
+  end
+
+  defp find_trace(:all, id) do
+    Enum.find_value(Pepe.Trace.scopes(), fn s -> Pepe.Trace.get(s, id) end)
+  end
+
+  defp find_trace(scope, id), do: Pepe.Trace.get(to_string(scope), id)
+
+  defp print_trace(nil), do: error("no trace with that id.")
+
+  defp print_trace(t) do
+    IO.puts("#{bold(t["agent"])}  #{dim("#{t["ms"]}ms")}  #{trace_outcome(t["outcome"])}")
+    if t["session"], do: IO.puts(dim("session: #{t["session"]}"))
+    if t["prompt"], do: IO.puts("\n#{bold("prompt")}\n  #{t["prompt"]}")
+    IO.puts("")
+
+    Enum.each(t["events"] || [], fn ev ->
+      case ev["t"] do
+        "tool_call" -> IO.puts("  #{yellow("→")} #{bold(ev["name"])} #{dim(ev["args"] || "")}")
+        "tool_result" -> IO.puts("    #{dim(clip_line(ev["out"]))}")
+        "tool_denied" -> IO.puts("  #{red("⨯")} #{ev["name"]} #{dim("blocked")}")
+        "assistant" -> IO.puts("  #{green("•")} #{ev["text"]}")
+        "failover" -> IO.puts("  #{dim("failover #{ev["from"]} → #{ev["to"]}")}")
+        "usage" -> IO.puts("  #{dim("#{ev["model"]}: in #{ev["in"]} / out #{ev["out"]} tok")}")
+        "error" -> IO.puts("  #{red("!")} #{ev["reason"]}")
+        _ -> :ok
+      end
+    end)
+  end
+
+  defp trace_outcome(%{"kind" => "error", "reason" => r}), do: red("error: #{r}")
+  defp trace_outcome(%{"kind" => "ok"}), do: green("ok")
+  defp trace_outcome(_), do: dim("?")
+
+  defp clip_line(nil), do: ""
+
+  defp clip_line(s) do
+    s = s |> to_string() |> String.replace("\n", " ")
+    if String.length(s) > 120, do: String.slice(s, 0, 120) <> " ...", else: s
+  end
+
+  defp traces_help do
+    IO.puts("""
+    #{bold("mix pepe traces")} - inspect and replay recent agent runs
+
+      traces [--company NAME] [--limit N]   list recent runs (any surface)
+      traces ID                             replay one run step by step
+
+    Every run is recorded under <PEPE_HOME>/data/traces; the dashboard has the same
+    view under Traces.
+    """)
+  end
+
   defp usage_help do
     IO.puts("""
     #{bold("mix pepe usage")} - token metering & billing
@@ -907,6 +1018,79 @@ defmodule Mix.Tasks.Pepe do
                                     let a model build a pii_redact config (packs +
                                     custom regex), validated before it's saved
     """)
+  end
+
+  ###
+  ### eval
+  ###
+
+  defp eval_cmd([]) do
+    case Pepe.Eval.suites() do
+      [] ->
+        info("No eval suites yet. Add JSON files under #{Pepe.Eval.dir()}, for example:")
+
+        info(dim(~s(  [{"name":"greets","agent":"assistant","prompt":"say hi","expect":{"contains":["hi"]}}])))
+
+      suites ->
+        eval_report(Enum.flat_map(suites, &run_and_print_suite/1))
+    end
+  end
+
+  defp eval_cmd(["list"]) do
+    case Pepe.Eval.suites() do
+      [] -> info("No eval suites found.")
+      suites -> Enum.each(suites, fn s -> info("  #{s}  #{dim("(#{length(Pepe.Eval.load(s))} cases)")}") end)
+    end
+  end
+
+  defp eval_cmd(["--seed"]) do
+    case Pepe.Eval.seed() do
+      [] -> info("Nothing to seed: every bundled suite is already in #{Pepe.Eval.dir()}.")
+      names -> ok("Seeded #{length(names)} suite(s) into #{Pepe.Eval.dir()}: #{Enum.join(names, ", ")}")
+    end
+  end
+
+  defp eval_cmd(["help"]), do: eval_help()
+  defp eval_cmd([suite]), do: eval_report(run_and_print_suite(suite))
+  defp eval_cmd(_), do: error("usage: mix pepe eval [SUITE | list | --seed]")
+
+  defp eval_help do
+    IO.puts("""
+    #{bold("mix pepe eval")} - replay prompts through an agent and assert on the result
+
+      eval                 run every suite (bundled + your own)
+      eval SUITE           run one suite by name
+      eval list            list available suites and their case counts
+      eval --seed          copy the bundled suites into #{Pepe.Eval.dir()} to edit
+
+    Suites are JSON under #{Pepe.Eval.dir()} (yours) or shipped with Pepe; a case asserts
+    the reply (contains / not_contains / matches) and the tools it used (tool_called /
+    tool_not_called). Omit a case's "agent" to run it against your default agent.
+    """)
+  end
+
+  defp run_and_print_suite(suite) do
+    results = Pepe.Eval.run_suite(suite)
+    info(bold("▸ #{suite}"))
+
+    Enum.each(results, fn r ->
+      if r.passed do
+        info("  " <> green("✓") <> " #{r.name}")
+      else
+        info("  " <> red("✗") <> " #{r.name}")
+        Enum.each(r.failures, &info(dim("      #{&1}")))
+      end
+    end)
+
+    info(dim("  #{Enum.count(results, & &1.passed)}/#{length(results)} passed"))
+    results
+  end
+
+  defp eval_report(results) do
+    passed = Enum.count(results, & &1.passed)
+    info("")
+    info(bold("total: #{passed}/#{length(results)} passed"))
+    if passed != length(results), do: System.at_exit(fn _ -> exit({:shutdown, 1}) end)
   end
 
   ###
@@ -1481,7 +1665,8 @@ defmodule Mix.Tasks.Pepe do
   ### serve / gateway
   ###
 
-  defp serve_cmd(_rest) do
+  defp serve_cmd(rest) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [tunnel: :boolean])
     port = PepeWeb.Endpoint.config(:http)[:port] || 4000
 
     ok("Pepe serving on http://localhost:#{port}  (override with PORT=NNNN)")
@@ -1494,6 +1679,7 @@ defmodule Mix.Tasks.Pepe do
     """)
 
     dashboard_posture()
+    if opts[:tunnel], do: start_tunnel(port)
     Process.sleep(:infinity)
   end
 
@@ -1516,6 +1702,24 @@ defmodule Mix.Tasks.Pepe do
         info(yellow("   Remote access is blocked (fail-closed). To allow it:"))
 
         info(yellow("     mix pepe dashboard password '<pass>'   (or bind to 127.0.0.1 and tunnel in)"))
+    end
+  end
+
+  # Expose the running server through a Cloudflare quick tunnel and print the public URL.
+  defp start_tunnel(port) do
+    if Pepe.Tunnel.available?() do
+      info(dim("   opening a public tunnel via cloudflared..."))
+
+      Pepe.Tunnel.open(port, fn url ->
+        info("")
+        ok("Public URL: #{url}")
+
+        unless Config.dashboard_auth_required?() do
+          info(yellow("   the dashboard is fail-closed over the tunnel until you set a password: mix pepe dashboard password '<pass>'"))
+        end
+      end)
+    else
+      info(yellow("   --tunnel needs cloudflared. Install it (brew install cloudflared) or see the Cloudflare docs."))
     end
   end
 
@@ -2341,6 +2545,70 @@ defmodule Mix.Tasks.Pepe do
     meta = dim("· #{node.source} · #{learn_date(node.at)}")
     info("\n#{icon} #{bold(node.title)} #{meta}")
     info(dim("   " <> (node.summary |> String.replace("\n", " ") |> String.slice(0, 96))))
+  end
+
+  # `mix pepe learn ...` - active memory maintenance (the agent consolidates its own
+  # standing memory/skills), plus scheduling it.
+  alias Pepe.Agent.Reflect
+
+  defp learn_cmd(["help"]), do: learn_help()
+
+  defp learn_cmd(["consolidate" | rest]) do
+    case List.first(rest) || Config.default_agent_name() do
+      nil ->
+        error("no agent. pass one: mix pepe learn consolidate AGENT")
+
+      name ->
+        info(dim("Consolidating #{name}'s memory..."))
+
+        case Pepe.Agent.consolidate(name) do
+          {:ok, summary, _} -> ok("done. #{String.slice(to_string(summary), 0, 200)}")
+          {:error, reason} -> error("consolidation failed: #{inspect(reason)}")
+        end
+    end
+  end
+
+  defp learn_cmd(["auto", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [at: :string, off: :boolean])
+
+    cond do
+      opts[:off] ->
+        Reflect.unschedule_auto(name)
+        ok("scheduled consolidation off for #{green(name)}")
+
+      true ->
+        {:ok, cron} = Reflect.schedule_auto(name, schedule: opts[:at])
+        ok("scheduled consolidation on for #{green(name)} at #{bold(cron.schedule)} (#{cron.timezone})")
+    end
+  end
+
+  defp learn_cmd(["status"]) do
+    scheduled = Config.crons() |> Enum.filter(&(&1.kind == "consolidate"))
+
+    if scheduled == [] do
+      info(dim("No agent has scheduled consolidation. Turn it on: mix pepe learn auto AGENT"))
+    else
+      info(bold("scheduled memory consolidation"))
+      Enum.each(scheduled, fn c -> info("  #{green(c.agent)}  #{dim("#{c.schedule} · #{c.timezone}")}") end)
+    end
+  end
+
+  defp learn_cmd([]), do: learn_help()
+  defp learn_cmd(_), do: error("usage: mix pepe learn consolidate|auto|status")
+
+  defp learn_help do
+    IO.puts("""
+    #{bold("mix pepe learn")} - active memory maintenance (the agent tidies its own memory)
+
+      learn consolidate [AGENT]     run a consolidation pass now (dedupe/prune/merge)
+      learn auto AGENT [--at CRON]  schedule nightly consolidation (default 0 3 * * *)
+      learn auto AGENT --off        stop scheduled consolidation
+      learn status                  show which agents consolidate on a schedule
+
+    This complements the per-conversation learning the agent already does (memory and
+    skills after a session): consolidation is a standalone pass over everything it has
+    saved. See #{bold("mix pepe timelearn")} for what an agent has learned so far.
+    """)
   end
 
   defp learn_date(0), do: "-"

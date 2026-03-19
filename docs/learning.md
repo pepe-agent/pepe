@@ -44,6 +44,28 @@ mix pepe timelearn zak               # in the terminal
 ...or the **Learn** tab in the web dashboard (with an agent picker). The generator
 (reflect) produces; TimeLearn displays.
 
+## Consolidation
+
+The per-conversation review keeps memory lean as it goes, but each run only sees its
+own session. Over many conversations, an agent's memory can still accumulate overlap.
+**Consolidation** is a standalone housekeeping pass: the agent re-reads its *whole*
+standing memory and skills (no conversation) and tidies them, merging duplicates,
+dropping stale or contradicted lines, and combining overlapping skills, without losing
+any durable fact. It uses the same restricted, file-only reviewer.
+
+```bash
+mix pepe learn consolidate zak            # run a pass now
+mix pepe learn auto zak                    # schedule it nightly (default 0 3 * * *)
+mix pepe learn auto zak --at "0 */12 * * *"   # or a custom schedule
+mix pepe learn auto zak --off              # stop the schedule
+mix pepe learn status                      # which agents consolidate on a schedule
+```
+
+In the dashboard, the **Learn** tab has **Consolidate now** and a **Nightly** toggle.
+The nightly schedule is a managed entry on the [Scheduled tasks](scheduled-tasks.md)
+page (a `consolidate` job), and each run is recorded like any other run, visible in
+[Traces](traces.md).
+
 ---
 
 [Back to the docs index](../README.md#documentation)

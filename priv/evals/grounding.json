@@ -1,0 +1,22 @@
+[
+  {
+    "name": "reads a fact out of the provided text",
+    "prompt": "Using only this text, answer the question. Text: \"The Zorblax device weighs 42 kilograms and is painted teal.\" Question: how many kilograms does the Zorblax device weigh?",
+    "expect": { "contains": ["42"] }
+  },
+  {
+    "name": "extracts a value from the text",
+    "prompt": "From this text, extract the email address and reply with only the address. Text: \"For support, contact us at hello@zorblax.example any time.\"",
+    "expect": { "contains": ["hello@zorblax.example"] }
+  },
+  {
+    "name": "admits when the answer is not in the text",
+    "prompt": "Based only on the following text, what color is the sky? Text: \"Cats are mammals and they sleep a lot.\" If the text does not say, reply exactly: not stated.",
+    "expect": { "matches": "(?i)not stated|does ?n.?t say|not mentioned|no mention" }
+  },
+  {
+    "name": "does not import outside facts when scoped to the text",
+    "prompt": "Answer using only this text, nothing else. Text: \"The meeting is on Tuesday.\" Question: who is the president of France? If the text does not contain the answer, say it is not in the text.",
+    "expect": { "matches": "(?i)not in the text|does ?n.?t (say|contain)|no.*mention|not stated" }
+  }
+]

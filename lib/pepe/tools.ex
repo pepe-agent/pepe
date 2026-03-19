@@ -20,12 +20,14 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.EnableTool
   alias Pepe.Tools.EndSession
   alias Pepe.Tools.FetchUrl
+  alias Pepe.Tools.Goal
   alias Pepe.Tools.Invoice
   alias Pepe.Tools.ListDir
   alias Pepe.Tools.ManageAgent
   alias Pepe.Tools.ManageChannel
   alias Pepe.Tools.ManageMcp
   alias Pepe.Tools.MoveFile
+  alias Pepe.Tools.Plan
   alias Pepe.Tools.ReadFile
   alias Pepe.Tools.RenameAgent
   alias Pepe.Tools.RunScript
@@ -50,6 +52,8 @@ defmodule Pepe.Tools do
     WebSearch,
     Invoice,
     EndSession,
+    Goal,
+    Plan,
     Skill,
     Docs,
     Doctor,

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "replies in Portuguese",
+    "prompt": "Responda em português, em uma palavra: qual é a cor do céu em um dia limpo?",
+    "expect": { "contains": ["azul"] }
+  },
+  {
+    "name": "replies in Spanish",
+    "prompt": "Responde en español, en una palabra: ¿de qué color es la hierba?",
+    "expect": { "contains": ["verde"] }
+  },
+  {
+    "name": "replies in English",
+    "prompt": "Answer in English, one word: what is the opposite of hot?",
+    "expect": { "contains": ["cold"] }
+  },
+  {
+    "name": "translates a phrase",
+    "prompt": "Translate 'good morning' into Portuguese. Reply with only the translation.",
+    "expect": { "matches": "(?i)bom dia" }
+  }
+]

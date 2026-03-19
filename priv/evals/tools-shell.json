@@ -1,0 +1,17 @@
+[
+  {
+    "name": "runs a shell command and reports its output",
+    "prompt": "Use the shell to run exactly: echo pepe-eval-ok  then tell me what it printed.",
+    "expect": { "tool_called": ["bash"], "contains": ["pepe-eval-ok"] }
+  },
+  {
+    "name": "reads the current directory via the shell",
+    "prompt": "Using the shell, list the files in the current directory and summarize what you see.",
+    "expect": { "tool_called": ["bash"] }
+  },
+  {
+    "name": "computes something with a shell command",
+    "prompt": "Use the shell to evaluate the expression 12 * 12 and tell me the result.",
+    "expect": { "tool_called": ["bash"], "contains": ["144"] }
+  }
+]

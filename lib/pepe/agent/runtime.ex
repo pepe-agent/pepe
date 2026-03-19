@@ -44,6 +44,22 @@ defmodule Pepe.Agent.Runtime do
   @spec run(Agent.t(), [map()], opts()) ::
           {:ok, String.t(), [map()]} | {:error, term()}
   def run(%Agent{} = agent, messages, opts \\ []) do
+    own_trace? = Pepe.Trace.start(agent.name, opts[:session_key], last_user_text(messages)) == :started
+    result = do_run(agent, messages, opts)
+    if own_trace?, do: Pepe.Trace.finish(result)
+    result
+  end
+
+  # The most recent user message text, to label a trace with what triggered it.
+  defp last_user_text(messages) do
+    Enum.reduce(messages, nil, fn m, acc ->
+      role = Map.get(m, :role) || Map.get(m, "role")
+      content = Map.get(m, :content) || Map.get(m, "content")
+      if role == "user" and is_binary(content), do: content, else: acc
+    end)
+  end
+
+  defp do_run(%Agent{} = agent, messages, opts) do
     # The failover chain: an explicit :model wins (single-entry chain); otherwise the
     # agent's model followed by that model's `fallbacks`. Transient errors advance.
     chain =
@@ -59,6 +75,10 @@ defmodule Pepe.Agent.Runtime do
       # A model marked `require_redaction` refuses to run unless the agent redacts.
       Enum.any?(chain, & &1.require_redaction) and not Pepe.Hooks.any?(agent) ->
         {:error, :redaction_required}
+
+      # A company at its monthly spend cap stops here (no new model calls).
+      Pepe.Usage.over_budget?(Pepe.Company.of(agent.name)) ->
+        {:error, :budget_exceeded}
 
       true ->
         run_chain(agent, chain, messages, opts)
@@ -194,6 +214,8 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp emit(opts, event) do
+    Pepe.Trace.event(event)
+
     case opts[:on_event] do
       fun when is_function(fun, 1) -> fun.(event)
       _ -> :ok

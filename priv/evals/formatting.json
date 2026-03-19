@@ -1,0 +1,22 @@
+[
+  {
+    "name": "answers in one word",
+    "prompt": "Answer in exactly one word: what color is a clear daytime sky?",
+    "expect": { "contains": ["blue"] }
+  },
+  {
+    "name": "respects uppercase instruction",
+    "prompt": "Reply with the word yes in all capital letters, nothing else.",
+    "expect": { "contains": ["YES"] }
+  },
+  {
+    "name": "emits a small JSON object",
+    "prompt": "Reply with only a JSON object with a single key ok set to the boolean true. No prose, no code fence.",
+    "expect": { "matches": "\\{\\s*\"ok\"\\s*:\\s*true\\s*\\}" }
+  },
+  {
+    "name": "lists the requested items",
+    "prompt": "List three primary colors of light, one per line.",
+    "expect": { "matches": "(?i)red", "contains": ["blue"] }
+  }
+]

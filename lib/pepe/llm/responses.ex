@@ -315,6 +315,24 @@ defmodule Pepe.LLM.Responses do
     %{state | content: state.content <> delta}
   end
 
+  # A refusal arrives on its own channel; surface it as assistant text so the reply is
+  # never blank (otherwise a declined request returns an empty completion).
+  defp handle_event("response.refusal.delta", %{"delta" => delta}, state, on_delta)
+       when is_binary(delta) do
+    on_delta.(delta)
+    %{state | content: state.content <> delta}
+  end
+
+  defp handle_event("response.refusal.done", %{"refusal" => text}, state, on_delta)
+       when is_binary(text) and text != "" do
+    if state.content == "" do
+      on_delta.(text)
+      %{state | content: text}
+    else
+      state
+    end
+  end
+
   # a new output item - register function calls so we can stream their arguments
   defp handle_event(
          "response.output_item.added",

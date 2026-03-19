@@ -106,9 +106,8 @@ defmodule Pepe.Cron do
 
   def run(%Cron{} = cron, source) do
     Config.put_locale()
-    opts = if cron.model, do: [model: Config.get_model(cron.model)], else: []
 
-    case Pepe.Agent.oneshot(cron.agent, cron.prompt, opts) do
+    case run_job(cron) do
       {:ok, output, _messages} ->
         record(cron, source, true, output)
         deliver(cron.deliver, format(cron, output))
@@ -119,6 +118,15 @@ defmodule Pepe.Cron do
         record(cron, source, false, "⚠️ error: #{inspect(reason)}")
         {:error, reason}
     end
+  end
+
+  # A "consolidate" cron runs the restricted memory-housekeeping pass; a normal cron runs
+  # the agent on its stored prompt.
+  defp run_job(%Cron{kind: "consolidate"} = cron), do: Pepe.Agent.consolidate(cron.agent)
+
+  defp run_job(%Cron{} = cron) do
+    opts = if cron.model, do: [model: Config.get_model(cron.model)], else: []
+    Pepe.Agent.oneshot(cron.agent, cron.prompt, opts)
   end
 
   @doc """

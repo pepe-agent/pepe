@@ -958,6 +958,21 @@ defmodule Pepe.Config do
     end
   end
 
+  @doc """
+  A company's monthly spend cap in the billing currency, or `nil` for no cap. When set,
+  the runtime refuses new model calls for that company once the month-to-date billable
+  total reaches it. Root (nil company) never has a cap.
+  """
+  @spec company_budget(String.t() | nil) :: float() | nil
+  def company_budget(nil), do: nil
+
+  def company_budget(company) do
+    case (get_company(company) || %{})["budget"] do
+      n when is_number(n) and n > 0 -> n / 1
+      _ -> nil
+    end
+  end
+
   @doc "Locale for fixed system messages (default \"en\")."
   def locale, do: load()["locale"] || "en"
 

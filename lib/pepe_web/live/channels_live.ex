@@ -62,6 +62,10 @@ defmodule PepeWeb.ChannelsLive do
         >
           <button :if={!@edit_bot and @adding == nil} phx-click="add" phx-value-kind="bot" class={btn()}>{gettext("+ Telegram bot")}</button>
           <button :if={!@edit_bot and @adding == nil} phx-click="add" phx-value-kind="wa" class={btn_ghost()}>{gettext("+ WhatsApp")}</button>
+          <button :if={!@edit_bot and @adding == nil} phx-click="restart_gateway"
+            data-confirm={gettext("Restart the Telegram gateway now?")} class={btn_ghost()} title={gettext("Recovery: respawn the pollers if the gateway seems stuck")}>
+            ↻ {gettext("Restart gateway")}
+          </button>
           <button :if={@edit_bot} phx-click="bot_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
           <button :if={@adding != nil} phx-click="add_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
         </.view_header>
@@ -242,6 +246,11 @@ defmodule PepeWeb.ChannelsLive do
     Config.delete_telegram_bot(name)
     reload_gateways()
     {:noreply, assign(socket, bots: Config.telegram_bots())}
+  end
+
+  def handle_event("restart_gateway", _p, socket) do
+    Pepe.Gateways.Supervisor.restart_telegram()
+    {:noreply, put_flash(socket, :info, gettext("Telegram gateway restarted."))}
   end
 
   def handle_event("bot_edit", %{"name" => name}, socket) do

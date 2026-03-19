@@ -82,7 +82,7 @@ defmodule PepeWeb.DashUI do
         <label class="mb-1 block px-1 text-xs font-semibold uppercase tracking-wider text-zinc-600">
           {gettext("Company")}
         </label>
-        <form phx-change="set_scope">
+        <form id="scope-form" phx-change="set_scope">
           <select name="scope" class={fld()}>
             <option value="all" selected={@scope == "all"}>{gettext("All companies")}</option>
             <option value="root" selected={@scope == "root"}>{gettext("Root (no company)")}</option>
@@ -123,6 +123,7 @@ defmodule PepeWeb.DashUI do
           <div class={nav_group_cls()}>{gettext("Insight")}</div>
           <.nav_item active={@active} scope={@scope} to="learn" icon="✦" label={gettext("Learning")} />
           <.nav_item active={@active} scope={@scope} to="usage" icon="📊" label={gettext("Usage & billing")} />
+          <.nav_item active={@active} scope={@scope} to="traces" icon="🧵" label={gettext("Traces")} />
           <.nav_item active={@active} scope={@scope} to="hooks" icon="🛡️" label={gettext("Privacy")} />
         </div>
         <div class="space-y-1">

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "adds two numbers",
+    "prompt": "What is 17 plus 25? Reply with just the number.",
+    "expect": { "matches": "\\b42\\b" }
+  },
+  {
+    "name": "multiplies",
+    "prompt": "What is 6 times 7? Answer with digits only.",
+    "expect": { "matches": "\\b42\\b" }
+  },
+  {
+    "name": "solves a word problem",
+    "prompt": "A box holds 3 rows of 4 apples each. How many apples in total? Reply with the number.",
+    "expect": { "matches": "\\b12\\b" }
+  },
+  {
+    "name": "computes a percentage",
+    "prompt": "What is 10% of 200? Give just the number.",
+    "expect": { "matches": "\\b20\\b" }
+  },
+  {
+    "name": "handles subtraction with a negative result",
+    "prompt": "What is 8 minus 13? Reply with just the number.",
+    "expect": { "matches": "-\\s?5\\b" }
+  }
+]

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "answers a greeting",
+    "prompt": "Reply with exactly the word: hello",
+    "expect": { "contains": ["hello"] }
+  },
+  {
+    "name": "echoes a token back",
+    "prompt": "Repeat this exact word back to me and nothing else: banana",
+    "expect": { "contains": ["banana"] }
+  },
+  {
+    "name": "answers a simple fact without claiming it cannot",
+    "prompt": "What is the capital of France? Answer in one word.",
+    "expect": {
+      "contains": ["paris"],
+      "not_contains": ["i don't have access", "i cannot", "as an ai", "não tenho acesso"]
+    }
+  },
+  {
+    "name": "is not blank",
+    "prompt": "Say the single word: ready",
+    "expect": { "matches": "(?i)ready" }
+  }
+]

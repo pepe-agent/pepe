@@ -55,6 +55,32 @@ defmodule Pepe.Usage do
 
   def record(_agent, _model, _usage), do: :ok
 
+  @doc "Billable spend (in the billing currency) for `company` in the current month."
+  @spec month_to_date(String.t() | nil) :: float()
+  def month_to_date(company) do
+    tz = Config.default_timezone()
+    key = bucket_key(System.os_time(:second), :month, tz)
+    cache = Pricing.load_cache()
+    models = Map.new(Config.models(), &{&1.name, &1})
+
+    company
+    |> Log.entries()
+    |> Enum.filter(&(bucket_key(&1["at"], :month, tz) == key))
+    |> Enum.reduce(0.0, fn e, acc -> acc + price(e, models, cache)["billable"] end)
+  end
+
+  @doc """
+  Is `company` at or over its monthly spend cap? Always `false` when no cap is set
+  (see `Pepe.Config.company_budget/1`). This is the runtime's pre-flight budget gate.
+  """
+  @spec over_budget?(String.t() | nil) :: boolean()
+  def over_budget?(company) do
+    case Config.company_budget(company) do
+      nil -> false
+      budget -> month_to_date(company) >= budget
+    end
+  end
+
   @doc """
   Aggregate a scope's usage into buckets at `granularity`.
 

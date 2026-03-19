@@ -77,6 +77,16 @@ defmodule PepeWeb.CompaniesLive do
               <span :if={Config.company_markup(name) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
                 {gettext("markup ×%{m}", m: Config.company_markup(name))}
               </span>
+              <span
+                :if={Config.company_budget(name)}
+                class={[
+                  "rounded px-1.5",
+                  (Pepe.Usage.over_budget?(name) && "bg-red-800/60 text-red-200") ||
+                    "bg-emerald-900/40 text-emerald-200"
+                ]}
+              >
+                {gettext("budget %{cur} %{n}", cur: Config.currency(), n: Config.company_budget(name))}
+              </span>
             </div>
           </div>
           <p :if={@companies == []} class="text-[15px] text-zinc-500">
@@ -117,6 +127,15 @@ defmodule PepeWeb.CompaniesLive do
                   {gettext("Multiplier applied to provider cost to get the amount to bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
                 </p>
               </div>
+              <div>
+                <label class={lbl()}>
+                  {gettext("Monthly budget")} <span class="text-zinc-600">{gettext("(optional)")}</span>
+                </label>
+                <input name="company[budget]" value={@editing.budget} placeholder="100" inputmode="decimal" class={fld()} />
+                <p class={hlp()}>
+                  {gettext("Spend cap for the month in %{currency}. When reached, this company's agents stop making model calls until next month. Blank = no cap.", currency: Config.currency())}
+                </p>
+              </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
                 <button type="button" phx-click="company_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -134,7 +153,7 @@ defmodule PepeWeb.CompaniesLive do
     do:
       {:noreply,
        assign(socket,
-         editing: %{new?: true, name: "", description: "", markup: ""},
+         editing: %{new?: true, name: "", description: "", markup: "", budget: ""},
          form: company_form("")
        )}
 
@@ -145,7 +164,8 @@ defmodule PepeWeb.CompaniesLive do
          new?: false,
          name: name,
          description: desc_of(name) || "",
-         markup: markup_field(name)
+         markup: markup_field(name),
+         budget: budget_field(name)
        },
        form: company_form(name)
      )}
@@ -192,6 +212,7 @@ defmodule PepeWeb.CompaniesLive do
       %{}
       |> put_if(blank(p["description"]), "description")
       |> put_if(parse_markup(p["markup"]), "markup")
+      |> put_if(parse_budget(p["budget"]), "budget")
 
     case Config.add_company(name, meta) do
       :ok ->
@@ -212,7 +233,12 @@ defmodule PepeWeb.CompaniesLive do
   defp edit_company(p, socket) do
     old = socket.assigns.editing.name
     new = String.trim(p["name"] || "")
-    meta = %{"description" => blank(p["description"]), "markup" => parse_markup(p["markup"])}
+
+    meta = %{
+      "description" => blank(p["description"]),
+      "markup" => parse_markup(p["markup"]),
+      "budget" => parse_budget(p["budget"])
+    }
 
     case maybe_rename(old, new) do
       :ok ->
@@ -244,6 +270,28 @@ defmodule PepeWeb.CompaniesLive do
     case Config.company_markup(name) do
       1.0 -> ""
       m -> to_string(m)
+    end
+  end
+
+  # The monthly budget as a form value: blank when unset.
+  defp budget_field(name) do
+    case Config.company_budget(name) do
+      nil -> ""
+      b -> to_string(b)
+    end
+  end
+
+  # Parse a budget cap; only a positive number is worth storing.
+  defp parse_budget(value) do
+    case value |> to_string() |> String.trim() |> String.replace(",", ".") do
+      "" ->
+        nil
+
+      s ->
+        case Float.parse(s) do
+          {f, _} when f > 0 -> f
+          _ -> nil
+        end
     end
   end
 

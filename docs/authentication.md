@@ -67,14 +67,18 @@ Two safe options:
 2. **Keep it loopback and tunnel in** - nothing is opened to the network:
 
    ```bash
-   ssh -L 4000:localhost:4000 you@server        # then browse http://localhost:4000
-   multipass exec my-vm -- ...                   # or forward the VM port to your host
-   tailscale serve 4000                          # private tailnet, no public port
+   mix pepe serve --tunnel                       # built-in Cloudflare quick tunnel (needs cloudflared)
+   ssh -L 4000:localhost:4000 you@server         # then browse http://localhost:4000
+   multipass exec my-vm -- ...                    # or forward the VM port to your host
+   tailscale serve 4000                           # private tailnet, no public port
    ```
 
-   Over a tunnel the connection arrives on loopback, so it just works - no password
-   needed. A VM like Multipass, accessed across its virtual network, looks like a
-   remote client and is blocked; port-forward it to `localhost` instead.
+   `mix pepe serve --tunnel` runs `cloudflared` and prints a public
+   `https://<...>.trycloudflare.com` URL for the life of the process. Because the tunnel
+   is a proxy, a tunneled request counts as public, so set a dashboard password before
+   using it. `ssh -L` and a Multipass port-forward instead arrive on loopback, so they
+   just work with no password; a VM accessed across its virtual network looks remote and
+   is blocked, so port-forward it to `localhost`.
 
 ### Serving behind a domain or a reverse proxy
 

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "capital of Japan",
+    "prompt": "What is the capital of Japan? One word.",
+    "expect": { "contains": ["tokyo"] }
+  },
+  {
+    "name": "number of continents",
+    "prompt": "How many continents are there on Earth? Reply with the number.",
+    "expect": { "matches": "\\b7\\b|(?i)seven" }
+  },
+  {
+    "name": "photosynthesis input",
+    "prompt": "Which gas do plants take in from the air for photosynthesis?",
+    "expect": { "matches": "(?i)carbon dioxide|CO2|di[oó]xido" }
+  },
+  {
+    "name": "largest planet",
+    "prompt": "What is the largest planet in our solar system? One word.",
+    "expect": { "contains": ["jupiter"] }
+  },
+  {
+    "name": "does not fabricate uncertainty on a known fact",
+    "prompt": "In what year did humans first land on the Moon?",
+    "expect": { "contains": ["1969"], "not_contains": ["i don't know", "não sei"] }
+  }
+]

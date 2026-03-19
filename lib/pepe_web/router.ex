@@ -66,6 +66,7 @@ defmodule PepeWeb.Router do
       live "/watches", WatchesLive
       live "/learn", LearningLive
       live "/usage", UsageLive
+      live "/traces", TracesLive
       live "/mcp", ToolServersLive
       live "/hooks", HooksLive
       live "/config", ConfigLive
