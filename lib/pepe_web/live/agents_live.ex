@@ -138,25 +138,6 @@ defmodule PepeWeb.AgentsLive do
     """
   end
 
-  attr :name, :string, required: true
-  attr :value, :string, required: true
-  attr :checked, :boolean, default: false
-  attr :hint, :string, default: ""
-
-  # A roomy checkbox toggle: a bigger box, the identifier, and a one-line hint below.
-  defp check_card(assigns) do
-    ~H"""
-    <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 transition hover:border-zinc-700">
-      <input type="checkbox" name={@name} value={@value} checked={@checked}
-        class="mt-0.5 h-4 w-4 shrink-0 accent-orange-500" />
-      <div class="min-w-0">
-        <div class="font-mono text-sm text-zinc-200">{@value}</div>
-        <div :if={@hint != ""} class="mt-0.5 text-xs leading-snug text-zinc-500">{@hint}</div>
-      </div>
-    </label>
-    """
-  end
-
   # A short, one-line description for a tool, taken from its spec.
   defp tool_hint(name) do
     case Pepe.Tools.get(name) do

@@ -62,12 +62,14 @@ defmodule PepeWeb.Router do
       live "/agents", AgentsLive
       live "/models", ModelsLive
       live "/bots", ChannelsLive
+      live "/integrations", IntegrationsLive
       live "/cron", ScheduledLive
       live "/watches", WatchesLive
       live "/learn", LearningLive
       live "/usage", UsageLive
       live "/traces", TracesLive
       live "/mcp", ToolServersLive
+      live "/plugins", PluginsLive
       live "/hooks", HooksLive
       live "/config", ConfigLive
     end

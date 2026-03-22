@@ -9,8 +9,6 @@ defmodule Pepe.Tools do
   restart. Built-ins win on a name collision.
   """
 
-  require Logger
-
   alias Pepe.Tools.Bash
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
@@ -90,60 +88,10 @@ defmodule Pepe.Tools do
   ###
 
   @doc "Directory scanned for plugin tools."
-  def plugins_dir, do: Path.join(Pepe.Config.home(), "plugins")
+  def plugins_dir, do: Pepe.Plugins.dir()
 
-  defp plugins do
-    case File.ls(plugins_dir()) do
-      {:ok, entries} ->
-        entries
-        |> Enum.filter(&String.ends_with?(&1, ".exs"))
-        |> Enum.sort()
-        |> Enum.flat_map(&load_plugin/1)
-
-      _ ->
-        []
-    end
-  end
-
-  # Load a plugin file, recompiling only when it changed since last time.
-  defp load_plugin(file) do
-    path = Path.join(plugins_dir(), file)
-    key = {__MODULE__, :plugin, path}
-
-    case File.stat(path) do
-      {:ok, %{mtime: mtime}} ->
-        case :persistent_term.get(key, nil) do
-          {^mtime, mods} ->
-            mods
-
-          _ ->
-            mods = compile_plugin(path)
-            :persistent_term.put(key, {mtime, mods})
-            mods
-        end
-
-      _ ->
-        []
-    end
-  end
-
-  defp compile_plugin(path) do
-    path
-    |> Code.compile_file()
-    |> Enum.map(&elem(&1, 0))
-    |> Enum.filter(&tool_module?/1)
-  rescue
-    error ->
-      Logger.warning("[plugins] failed to load #{path}: #{Exception.message(error)}")
-      []
-  end
-
-  defp tool_module?(mod) do
-    Code.ensure_loaded?(mod) and
-      function_exported?(mod, :name, 0) and
-      function_exported?(mod, :spec, 0) and
-      function_exported?(mod, :run, 2)
-  end
+  # A tool plugin is any plugin module exporting the tool shape (name/spec/run).
+  defp plugins, do: Pepe.Plugins.implementing([{:name, 0}, {:spec, 0}, {:run, 2}])
 
   @doc """
   Build the list of OpenAI tool specs for a list of tool names. Unknown names

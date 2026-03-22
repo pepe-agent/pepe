@@ -49,6 +49,25 @@ defmodule PepeWeb.DashUI do
     """
   end
 
+  attr :name, :string, required: true
+  attr :value, :string, required: true
+  attr :checked, :boolean, default: false
+  attr :hint, :string, default: ""
+
+  @doc "A roomy checkbox toggle: a bigger box, the identifier, and a one-line hint below."
+  def check_card(assigns) do
+    ~H"""
+    <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 transition hover:border-zinc-700">
+      <input type="checkbox" name={@name} value={@value} checked={@checked}
+        class="mt-0.5 h-4 w-4 shrink-0 accent-orange-500" />
+      <div class="min-w-0">
+        <div class="font-mono text-sm text-zinc-200">{@value}</div>
+        <div :if={@hint != ""} class="mt-0.5 text-xs leading-snug text-zinc-500">{@hint}</div>
+      </div>
+    </label>
+    """
+  end
+
   attr :active, :string, required: true
   attr :scope, :string, default: "all"
   attr :companies, :list, default: []
@@ -112,12 +131,14 @@ defmodule PepeWeb.DashUI do
           <.nav_item active={@active} scope={@scope} to="agents" icon="🧩" label={gettext("Agents")} />
           <.nav_item active={@active} scope={@scope} to="models" icon="🔌" label={gettext("Models")} />
           <.nav_item active={@active} scope={@scope} to="mcp" icon="🧰" label="MCP" />
+          <.nav_item active={@active} scope={@scope} to="plugins" icon="🧩" label={gettext("Plugins")} />
         </div>
         <div class="space-y-1">
           <div class={nav_group_cls()}>{gettext("Automation")}</div>
           <.nav_item active={@active} scope={@scope} to="cron" icon="🕒" label={gettext("Scheduled")} />
           <.nav_item active={@active} scope={@scope} to="watches" icon="🔭" label={gettext("Watches")} />
           <.nav_item active={@active} scope={@scope} to="bots" icon="📡" label={gettext("Channels")} />
+          <.nav_item active={@active} scope={@scope} to="integrations" icon="🔌" label={gettext("Integrations")} />
         </div>
         <div class="space-y-1">
           <div class={nav_group_cls()}>{gettext("Insight")}</div>

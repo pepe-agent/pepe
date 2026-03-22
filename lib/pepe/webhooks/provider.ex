@@ -13,6 +13,25 @@ defmodule Pepe.Webhooks.Provider do
   @type inbound :: %{from: String.t(), text: String.t(), id: String.t() | nil}
 
   @doc """
+  The provider's registry name, e.g. `\"whatsapp\"`. This is the `:provider` segment of
+  the webhook URL and the key a plugin provider is registered under.
+  """
+  @callback name() :: String.t()
+
+  @doc "A human label for the dashboard (defaults to `name/0` when not given)."
+  @callback label() :: String.t()
+
+  @doc """
+  Fields the dashboard should render to configure a connection to this provider, each a
+  map like `%{\"key\" => \"api_token\", \"label\" => \"API token\", \"type\" => \"secret\"}`.
+  `type` is one of `\"text\"`, `\"secret\"`, `\"select\"` (with `\"options\"`). Providers
+  configured only from the CLI can omit this.
+  """
+  @callback config_schema() :: [map()]
+
+  @optional_callbacks label: 0, config_schema: 0
+
+  @doc """
   Answer the provider's verification handshake (a `GET` when the webhook URL is
   registered). Return `{:ok, challenge_to_echo}` when it checks out, `:error`
   otherwise. Providers without a handshake return `:error`.

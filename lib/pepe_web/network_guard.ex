@@ -1,9 +1,10 @@
 defmodule PepeWeb.NetworkGuard do
   @moduledoc """
-  Fail-closed network guard for the dashboard. The rule (a posture matured after a real exposure incident, where an unauthenticated public bind was scanned and abused): **the dashboard is
-  only reachable without a password from a genuine loopback client**. Everything else -
-  LAN, a VM (Multipass/Docker), a reverse proxy - counts as public and must
-  authenticate.
+  Fail-closed network guard for the dashboard. The rule (a posture matured after a real
+  exposure incident where an unauthenticated public bind was scanned and abused): **the
+  dashboard is only reachable without a password from a genuine loopback client**.
+  Everything else - LAN, a VM (Multipass/Docker), a reverse proxy - counts as public and
+  must authenticate.
 
   Two checks, in order:
 

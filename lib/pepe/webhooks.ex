@@ -21,13 +21,23 @@ defmodule Pepe.Webhooks do
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
 
-  @providers %{"whatsapp" => Pepe.Webhooks.WhatsApp}
+  @builtin_providers %{"whatsapp" => Pepe.Webhooks.WhatsApp}
 
-  @doc "The provider module for a name, or nil."
-  def provider(name), do: Map.get(@providers, name)
+  @doc "The provider module for a name (built-in or plugin), or nil."
+  def provider(name), do: Map.get(registry(), name)
 
-  @doc "Known provider names."
-  def providers, do: Map.keys(@providers)
+  @doc "Known provider names (built-in plus installed plugins), sorted."
+  def providers, do: registry() |> Map.keys() |> Enum.sort()
+
+  @doc "The `%{name => module}` map of every provider, built-in plugins last (they win)."
+  def registry, do: Map.merge(@builtin_providers, plugin_providers())
+
+  # A plugin provider is any plugin module exporting `name/0` plus the Provider callbacks.
+  defp plugin_providers do
+    [{:name, 0}, {:verify, 2}, {:authenticate, 3}, {:parse, 1}, {:deliver, 3}]
+    |> Pepe.Plugins.implementing()
+    |> Map.new(fn mod -> {mod.name(), mod} end)
+  end
 
   @doc """
   Resolve a connection by its `(company, provider, slug)` path. The `slug` is the

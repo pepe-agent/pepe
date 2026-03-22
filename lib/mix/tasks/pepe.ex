@@ -87,6 +87,8 @@ defmodule Mix.Tasks.Pepe do
       mix pepe usage export --company CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
       mix pepe traces [--company CO] [ID]        # inspect/replay recent agent runs
+      mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
+      mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
       mix pepe doctor [--offline]              # health-check the whole setup
@@ -189,6 +191,16 @@ defmodule Mix.Tasks.Pepe do
 
       ["traces" | rest] ->
         with_config(fn -> traces_cmd(rest) end)
+
+      # `plugin install`/`scan` may fetch a URL (needs Req); list/remove only touch files.
+      ["plugin", sub | rest] when sub in ["install", "scan"] ->
+        with_app([], fn -> plugin_cmd([sub | rest]) end)
+
+      ["plugin" | rest] ->
+        with_config(fn -> plugin_cmd(rest) end)
+
+      ["migrate" | rest] ->
+        with_config(fn -> migrate_cmd(rest) end)
 
       ["company" | rest] ->
         with_config(fn -> company_cmd(rest) end)
@@ -948,6 +960,138 @@ defmodule Mix.Tasks.Pepe do
 
     Every run is recorded under <PEPE_HOME>/data/traces; the dashboard has the same
     view under Traces.
+    """)
+  end
+
+  # `plugin` - install/list/remove user plugins (`.exs` under <PEPE_HOME>/plugins).
+  defp plugin_cmd(["help"]), do: plugin_help()
+  defp plugin_cmd([]), do: plugin_list()
+  defp plugin_cmd(["list"]), do: plugin_list()
+
+  defp plugin_cmd(["install" | rest]) do
+    {opts, args, _} = OptionParser.parse(rest, strict: [force: :boolean])
+
+    case args do
+      [src] -> plugin_install(src, force: opts[:force] == true)
+      _ -> error("usage: mix pepe plugin install SRC [--force]")
+    end
+  end
+
+  defp plugin_cmd(["scan", src]) do
+    case Pepe.Plugins.scan(src) do
+      %{} = scan -> info(Pepe.Skills.Sentinel.report(scan))
+      {:error, reason} -> error("scan failed: #{inspect(reason)}")
+    end
+  end
+
+  defp plugin_cmd(["remove", name]) do
+    case Pepe.Plugins.remove(name) do
+      {:ok, _} -> ok("removed #{name}")
+      {:error, :not_found} -> error("no plugin named #{name}")
+    end
+  end
+
+  defp plugin_cmd(_), do: error("usage: mix pepe plugin list|install SRC [--force]|scan SRC|remove NAME")
+
+  defp plugin_install(src, force: force?) do
+    case Pepe.Plugins.install(src, force: force?) do
+      {:ok, name, scan} ->
+        ok("installed #{green(name)} into #{Pepe.Plugins.dir()}")
+        if scan.verdict != :safe, do: info(Pepe.Skills.Sentinel.report(scan))
+        info(dim("A plugin runs with full access to the app; review what it does before trusting it."))
+
+      {:error, {:unsafe, scan}} ->
+        error("refused: the Sentinel flagged this plugin as dangerous.")
+        info(Pepe.Skills.Sentinel.report(scan))
+        info(dim("If you have reviewed it and trust the source, re-run with --force."))
+
+      {:error, reason} ->
+        error("install failed: #{inspect(reason)}")
+    end
+  end
+
+  defp plugin_list do
+    case Pepe.Plugins.packages() do
+      [] ->
+        info("No plugins installed. Add one: mix pepe plugin install <path|url|tar.gz>")
+
+      pkgs ->
+        info(bold("installed plugins") <> dim("  (#{Pepe.Plugins.dir()})"))
+
+        Enum.each(pkgs, fn p ->
+          desc = get_in(p.manifest || %{}, ["description"])
+          info("  #{green(p.name)} #{dim("(#{p.kind})")}#{if desc, do: dim(" - " <> desc), else: ""}")
+        end)
+
+        providers = Pepe.Webhooks.providers() -- ["whatsapp"]
+        if providers != [], do: info(dim("\nchannel providers from plugins: #{Enum.join(providers, ", ")}"))
+    end
+  end
+
+  # `migrate` - import an existing setup from another agent runtime.
+  defp migrate_cmd(["help"]), do: migrate_help()
+
+  defp migrate_cmd(rest) do
+    {opts, args, _} = OptionParser.parse(rest, strict: [from: :string, dry_run: :boolean])
+
+    case args do
+      [source] -> run_migrate(source, opts)
+      _ -> error("usage: mix pepe migrate #{Enum.join(Pepe.Migrate.sources(), "|")} [--from PATH] [--dry-run]")
+    end
+  end
+
+  defp run_migrate(source, opts) do
+    case Pepe.Migrate.run(source, from: opts[:from], dry_run: opts[:dry_run] == true) do
+      {:ok, report} ->
+        print_migrate_report(report)
+
+      {:error, {:unknown_source, s}} ->
+        error("unknown source #{inspect(s)}; try: #{Enum.join(Pepe.Migrate.sources(), ", ")}")
+
+      {:error, {:home_not_found, home}} ->
+        error("nothing to import: #{home} not found (point at it with --from)")
+    end
+  end
+
+  defp print_migrate_report(report) do
+    tag = if report.dry_run, do: dim(" [dry-run, nothing written]"), else: ""
+    info("#{bold("migrate " <> report.source)} #{dim(report.home)}#{tag}\n")
+
+    Enum.each(report.applied, fn a -> info("  #{green("✓")} #{a.kind} #{bold(a.name)}") end)
+    Enum.each(report.skipped, fn s -> info("  #{dim("·")} #{dim("skipped #{s.what}: #{s.reason}")}") end)
+
+    info("\n#{bold("#{length(report.applied)} imported")}, #{length(report.skipped)} skipped.")
+    if report.dry_run, do: info(dim("Re-run without --dry-run to apply."))
+    unless report.dry_run, do: info(dim("Review secrets (${ENV_VAR} refs) and each agent's tools before running."))
+  end
+
+  defp migrate_help do
+    IO.puts("""
+    #{bold("mix pepe migrate")} - import an existing setup from another agent runtime
+
+      migrate #{Enum.join(Pepe.Migrate.sources(), "|")} [--from PATH] [--dry-run]
+
+    Reads the source's on-disk config and maps its models and agents into Pepe (personas,
+    memory and a Telegram token come along; tools default and other channels are reported
+    for you to set up). `--from` points at the source home; `--dry-run` shows the plan
+    without writing anything.
+    """)
+  end
+
+  defp plugin_help do
+    IO.puts("""
+    #{bold("mix pepe plugin")} - install and manage user plugins
+
+      plugin list                 list installed plugins and what they add
+      plugin install SRC [--force]  install from a .exs, a directory, a .tar.gz, or an
+                                  http(s) URL (incl. a GitHub repo). The code is scanned
+                                  first; a dangerous verdict is refused unless --force.
+      plugin scan SRC             security-scan a plugin without installing it
+      plugin remove NAME          delete an installed plugin
+
+    Plugins are Elixir loaded at runtime (no rebuild). One can add tools or channels (a
+    webhook provider). A plugin runs with full access to the app, so only install from a
+    source you trust. Example: the Chatwoot channel in examples/plugins.
     """)
   end
 

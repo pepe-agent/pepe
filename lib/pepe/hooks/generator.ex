@@ -31,6 +31,44 @@ defmodule Pepe.Hooks.Generator do
     end
   end
 
+  @doc """
+  Generate a single custom PII pattern from a plain-language rule, for filling one
+  entry of the custom-patterns field. Returns `{:ok, %{"name","pattern","replace"}}`
+  with a validated regex, or `{:error, reason}`.
+  """
+  @spec pattern(String.t(), String.t()) :: {:ok, map()} | {:error, term()}
+  def pattern(description, model_name) do
+    with model when not is_nil(model) <- Config.get_model(model_name),
+         {:ok, %{content: content}} when is_binary(content) <-
+           Pepe.LLM.chat(model, pattern_prompt(description), []),
+         {:ok, %{"pattern" => p} = raw} when is_binary(p) <- decode(content),
+         true <- Recognizers.valid_pattern?(p) do
+      {:ok, %{"name" => name_of(raw), "pattern" => p, "replace" => replace_of(raw)}}
+    else
+      nil -> {:error, :unknown_model}
+      false -> {:error, :invalid_pattern}
+      _ -> {:error, :generation_failed}
+    end
+  end
+
+  defp pattern_prompt(description) do
+    system = """
+    Write ONE regular expression that matches the data the user describes, for a PII
+    redactor. Reply with ONLY a JSON object, no prose:
+    {"name": "snake_case_label", "pattern": "<regex>", "replace": "[LABEL]"}
+    The pattern must be valid regex, and specific enough to avoid false matches.
+    """
+
+    [Message.system(system), Message.user(description)]
+  end
+
+  defp name_of(m), do: (is_binary(m["name"]) and m["name"] != "" and m["name"]) || "custom"
+
+  defp replace_of(m) do
+    (is_binary(m["replace"]) and m["replace"] != "" and m["replace"]) ||
+      "[#{String.upcase(name_of(m))}]"
+  end
+
   defp prompt(description) do
     system = """
     You configure a PII redactor. Choose from these built-in pieces, and only add a

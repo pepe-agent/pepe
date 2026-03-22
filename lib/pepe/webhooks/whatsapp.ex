@@ -21,6 +21,9 @@ defmodule Pepe.Webhooks.WhatsApp do
   @graph "https://graph.facebook.com/v21.0"
 
   @impl true
+  def name, do: "whatsapp"
+
+  @impl true
   def verify(config, params) do
     token = provider_config(config)["verify_token"]
 

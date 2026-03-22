@@ -106,18 +106,34 @@ defmodule Pepe.Cron do
 
   def run(%Cron{} = cron, source) do
     Config.put_locale()
+    notify({:cron_run, :started, cron.id})
 
-    case run_job(cron) do
-      {:ok, output, _messages} ->
-        record(cron, source, true, output)
-        deliver(cron.deliver, format(cron, output))
-        {:ok, output}
+    result =
+      case run_job(cron) do
+        {:ok, output, _messages} ->
+          record(cron, source, true, output)
+          deliver(cron.deliver, format(cron, output))
+          {:ok, output}
 
-      {:error, reason} ->
-        Logger.warning("cron #{cron.id} failed: #{inspect(reason)}")
-        record(cron, source, false, "⚠️ error: #{inspect(reason)}")
-        {:error, reason}
-    end
+        {:error, reason} ->
+          Logger.warning("cron #{cron.id} failed: #{inspect(reason)}")
+          record(cron, source, false, "⚠️ error: #{inspect(reason)}")
+          {:error, reason}
+      end
+
+    notify({:cron_run, :finished, cron.id})
+    result
+  end
+
+  @doc "PubSub topic that carries `{:cron_run, :started | :finished, id}` for every run."
+  def runs_topic, do: "crons:runs"
+
+  # Announce a run's lifecycle so any live surface can show it as running, from any source
+  # (dashboard button or the scheduler firing on its own). Best-effort: never break a run.
+  defp notify(message) do
+    Phoenix.PubSub.broadcast(Pepe.PubSub, runs_topic(), message)
+  rescue
+    _ -> :ok
   end
 
   # A "consolidate" cron runs the restricted memory-housekeeping pass; a normal cron runs

@@ -1,0 +1,7 @@
+{
+  "name": "chatwoot",
+  "version": "0.1.0",
+  "description": "Chatwoot channel: run Pepe behind a Chatwoot inbox, with native human handoff.",
+  "provides": ["channel:chatwoot"],
+  "files": ["chatwoot.exs"]
+}

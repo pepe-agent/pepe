@@ -3,17 +3,19 @@ defmodule PepeWeb.HooksLive do
   Configure the privacy (redaction) hooks. Hooks are turned *on* per agent (Agents
   page); this is where each hook's settings live: recognizers/packs for the regex
   redactor, a model for the LLM redactor, or endpoints for the HTTP / Presidio ones.
-  It also carries the "describe what to hide and let a model build it" generator for
-  `pii_redact`.
+  The regex redactor's custom-patterns field carries a per-line "describe it and let
+  AI write the regex" star.
   """
   use PepeWeb, :live_view
   use Gettext, backend: Pepe.Gettext
 
+  import PepeWeb.AiFill, only: [ai_star: 1, ai_popup: 1]
   import PepeWeb.DashUI
 
   alias Pepe.Config
   alias Pepe.Hooks
   alias Pepe.Hooks.PII.Recognizers
+  alias PepeWeb.AiFill
 
   @icons %{
     "pii_redact" => "🧩",
@@ -33,9 +35,7 @@ defmodule PepeWeb.HooksLive do
        new_company: false,
        editing: nil,
        edit: %{},
-       gen_desc: "",
-       gen_model: Config.default_model_name(),
-       gen_busy: false
+       ai: AiFill.init()
      )
      |> load()}
   end
@@ -115,8 +115,6 @@ defmodule PepeWeb.HooksLive do
         </div>
       </div>
 
-      {generator(assigns)}
-
       <form phx-submit="save" class="space-y-4">
         {fields(assigns)}
         <div class="flex items-center gap-2 border-t border-zinc-800 pt-4">
@@ -124,68 +122,42 @@ defmodule PepeWeb.HooksLive do
           <button type="button" phx-click="cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
         </div>
       </form>
+      <.ai_popup ai={@ai} models={Enum.map(Config.models(), & &1.name)} default_model={Config.default_model_name()} />
     </div>
     """
   end
-
-  # The AI generator box, only for the regex redactor.
-  defp generator(%{editing: "pii_redact"} = assigns) do
-    ~H"""
-    <div class="mb-5 rounded-xl border border-orange-600/30 bg-orange-600/5 p-4">
-      <div class="mb-1 text-[15px] font-medium text-orange-300">✨ {gettext("Generate with AI")}</div>
-      <p class={hlp()}>{gettext("Describe what to hide in plain words; a model builds the recognizers + regex below (validated). Review, then Save.")}</p>
-      <form phx-submit="generate" class="mt-2 space-y-2">
-        <input
-          name="desc"
-          value={@gen_desc}
-          placeholder={gettext("e.g. hide CPF, email and Brazilian phone numbers")}
-          class={fld()}
-        />
-        <div class="flex gap-2">
-          <select name="model" class={fld()} title={gettext("Model used to generate the config")}>
-            <option :if={Config.models() == []} value="">{gettext("no models configured")}</option>
-            <option :for={m <- Config.models()} value={m.name} selected={m.name == @gen_model}>{m.name}</option>
-          </select>
-          <button type="submit" disabled={@gen_busy} class={[btn(), "shrink-0", @gen_busy && "opacity-60"]}>
-            {(@gen_busy && gettext("Working...")) || gettext("Generate")}
-          </button>
-        </div>
-      </form>
-    </div>
-    """
-  end
-
-  defp generator(assigns), do: ~H""
 
   defp fields(%{editing: "pii_redact"} = assigns) do
     ~H"""
     <div>
       <label class={lbl()}>{gettext("Recognizer packs")}</label>
-      <div class="flex flex-wrap gap-3">
-        <label :for={p <- Map.keys(Recognizers.packs())} class="flex items-center gap-1.5 text-sm text-zinc-300">
-          <input type="checkbox" name="packs[]" value={p} checked={p in list(@edit, "packs")} /> {p}
-        </label>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <.check_card :for={p <- Map.keys(Recognizers.packs())} name="packs[]" value={p}
+          checked={p in list(@edit, "packs")} hint={pack_hint(p)} />
       </div>
-      <p class={hlp()}>{gettext("Region bundles: intl (email/card/ip), br (cpf/cnpj/cep/phone), us (ssn/phone).")}</p>
+      <p class={hlp()}>{gettext("Region bundles of common recognizers.")}</p>
     </div>
 
     <div>
       <label class={lbl()}>{gettext("Individual recognizers")}</label>
-      <div class="flex flex-wrap gap-x-3 gap-y-1.5">
-        <label :for={r <- Recognizers.builtin_names()} class="flex items-center gap-1.5 text-sm text-zinc-300">
-          <input type="checkbox" name="recognizers[]" value={r} checked={r in list(@edit, "recognizers")} /> {r}
-        </label>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <.check_card :for={r <- Recognizers.builtin_names()} name="recognizers[]" value={r}
+          checked={r in list(@edit, "recognizers")} />
       </div>
     </div>
 
     <div>
       <label class={lbl()}>{gettext("Custom patterns")}</label>
-      <textarea name="custom" rows="3" spellcheck="false" placeholder="name|pattern|REPLACE" class={fld() <> " font-mono text-sm"}>{custom_text(@edit)}</textarea>
+      <div class="flex items-start gap-2">
+        <textarea name="custom" rows="3" spellcheck="false" placeholder="name|pattern|REPLACE" class={fld() <> " font-mono text-sm"}>{AiFill.value(@ai, "custom", custom_text(@edit))}</textarea>
+        <.ai_star field="custom" kind="pii_pattern" ai={@ai}
+          placeholder={gettext("e.g. hide Brazilian medical license numbers (CRM)")} />
+      </div>
       <p class={hlp()}>{gettext("One per line: name|regex|REPLACE_LABEL. Invalid regex is dropped on save.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-      <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} />
+      <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} class="h-4 w-4 accent-orange-500" />
       {gettext("Reversible (restore the real values on the reply)")}
     </label>
     <.reversible_note />
@@ -204,7 +176,7 @@ defmodule PepeWeb.HooksLive do
     </div>
 
     <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-      <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} />
+      <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} class="h-4 w-4 accent-orange-500" />
       {gettext("Reversible (restore the real values on the reply)")}
     </label>
     <.reversible_note />
@@ -262,9 +234,11 @@ defmodule PepeWeb.HooksLive do
       <div class="mb-1.5 text-sm font-medium text-zinc-400">{gettext("How reversible works")}</div>
       <div class="space-y-0.5 font-mono text-xs leading-relaxed">
         <div><span class="text-zinc-500">{gettext("you")}: </span><span class="text-zinc-300">meu CPF é 123.456.789-09</span></div>
-        <div><span class="text-zinc-500">{gettext("model sees")}: </span><span class="text-orange-300">meu CPF é [CPF_1]</span></div>
-        <div><span class="text-zinc-500">{gettext("reply")}: </span><span class="text-zinc-300">boleto do CPF 123.456.789-09 ✓</span></div>
+        <div><span class="text-zinc-500">{gettext("the model sees")}: </span><span class="text-orange-300">meu CPF é [CPF_1]</span></div>
+        <div><span class="text-zinc-500">{gettext("the model replies")}: </span><span class="text-orange-300">boleto do [CPF_1]</span></div>
+        <div><span class="text-zinc-500">{gettext("you get back")}: </span><span class="text-zinc-300">boleto do CPF 123.456.789-09</span> <span class="text-green-400">✓</span></div>
       </div>
+      <p class={hlp()}>{gettext("The swap back happens locally, so the model only ever handled the placeholder, never the real value.")}</p>
       <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: one-way, the model and you keep the masked version.")}</p>
     </div>
     """
@@ -274,7 +248,7 @@ defmodule PepeWeb.HooksLive do
 
   @impl true
   def handle_event("edit", %{"name" => name}, socket) do
-    {:noreply, assign(socket, editing: name, edit: Config.hook_settings(name), gen_desc: "")}
+    {:noreply, assign(socket, editing: name, edit: Config.hook_settings(name))}
   end
 
   def handle_event("cancel", _p, socket), do: {:noreply, assign(socket, editing: nil, edit: %{})}
@@ -297,16 +271,22 @@ defmodule PepeWeb.HooksLive do
      |> put_flash(:info, gettext("Saved %{h}.", h: meta_title(name)))}
   end
 
-  def handle_event("generate", %{"desc" => desc} = params, socket) do
-    case blank(params["model"]) || Config.default_model_name() do
-      nil ->
-        {:noreply, put_flash(socket, :error, gettext("Add a model first to use the generator."))}
+  def handle_event("ai_toggle", %{"field" => field} = p, socket),
+    do: {:noreply, assign(socket, ai: AiFill.toggle(socket.assigns.ai, field, p["kind"], p["placeholder"] || ""))}
 
-      model ->
+  def handle_event("ai_generate", %{"field" => field, "kind" => kind, "desc" => desc, "model" => model}, socket) do
+    cond do
+      desc == "" ->
+        {:noreply, put_flash(socket, :error, gettext("Describe what you want first."))}
+
+      model in [nil, ""] ->
+        {:noreply, put_flash(socket, :error, gettext("Add a model first."))}
+
+      true ->
         {:noreply,
          socket
-         |> assign(gen_busy: true, gen_desc: desc, gen_model: model)
-         |> start_async(:generate, fn -> Hooks.Generator.generate(desc, model) end)}
+         |> assign(ai: AiFill.busy(socket.assigns.ai))
+         |> start_async({:ai_fill, field}, fn -> AiFill.generate(kind, desc, model) end)}
     end
   end
 
@@ -324,34 +304,27 @@ defmodule PepeWeb.HooksLive do
     end
   end
 
+  # A generated custom pattern is appended to whatever is already in the field.
   @impl true
-  def handle_async(:generate, {:ok, {:ok, config, dropped}}, socket) do
-    msg =
-      if dropped == [],
-        do: gettext("Generated a config below. Review and Save."),
-        else:
-          gettext("Generated (dropped invalid: %{d}) - review and Save.",
-            d: Enum.join(dropped, ", ")
-          )
+  def handle_async({:ai_fill, "custom"}, {:ok, {:ok, line}}, socket) do
+    base = AiFill.value(socket.assigns.ai, "custom", custom_text(socket.assigns.edit))
+    new = String.trim(base <> "\n" <> line)
 
     {:noreply,
      socket
-     |> assign(edit: Map.merge(socket.assigns.edit, config), gen_busy: false)
-     |> put_flash(:info, msg)}
+     |> assign(ai: AiFill.put(socket.assigns.ai, "custom", new))
+     |> put_flash(:info, gettext("Added a pattern. Review and Save."))}
   end
 
-  def handle_async(:generate, {:ok, {:error, reason}}, socket) do
-    {:noreply,
-     socket
-     |> assign(gen_busy: false)
-     |> put_flash(:error, gettext("Generator failed: %{r}", r: inspect(reason)))}
+  def handle_async({:ai_fill, field}, {:ok, {:ok, value}}, socket) do
+    {:noreply, assign(socket, ai: AiFill.put(socket.assigns.ai, field, value))}
   end
 
-  def handle_async(:generate, {:exit, reason}, socket) do
+  def handle_async({:ai_fill, _field}, _other, socket) do
     {:noreply,
      socket
-     |> assign(gen_busy: false)
-     |> put_flash(:error, gettext("Generator crashed: %{r}", r: inspect(reason)))}
+     |> assign(ai: AiFill.idle(socket.assigns.ai))
+     |> put_flash(:error, gettext("AI couldn't produce a valid value. Try rephrasing."))}
   end
 
   # ---- build settings from form params ------------------------------------
@@ -434,10 +407,6 @@ defmodule PepeWeb.HooksLive do
     |> Map.new()
   end
 
-  defp blank(nil), do: nil
-  defp blank(""), do: nil
-  defp blank(s), do: s
-
   defp split_csv(nil), do: []
 
   defp split_csv(s),
@@ -457,6 +426,12 @@ defmodule PepeWeb.HooksLive do
   end
 
   # ---- view helpers -------------------------------------------------------
+
+  # A short hint describing what a recognizer pack bundles.
+  defp pack_hint("intl"), do: gettext("email, card, IP")
+  defp pack_hint("br"), do: gettext("CPF, CNPJ, CEP, phone")
+  defp pack_hint("us"), do: gettext("SSN, phone")
+  defp pack_hint(_), do: ""
 
   defp configured?(settings, name), do: Map.get(settings, name, %{}) not in [nil, %{}]
 
