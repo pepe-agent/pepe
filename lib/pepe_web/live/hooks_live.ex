@@ -75,7 +75,7 @@ defmodule PepeWeb.HooksLive do
                     (configured?(@settings, name) && "bg-orange-600/20 text-orange-300") ||
                       "bg-zinc-800 text-zinc-500"
                   ]}>
-                    {(configured?(@settings, name) && gettext("configured")) || gettext("not set")}
+                    {(configured?(@settings, name) && gettext("configured")) || gettext("Not set")}
                   </span>
                 </div>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-500">{meta_desc(name)}</p>
@@ -169,7 +169,7 @@ defmodule PepeWeb.HooksLive do
     <div>
       <label class={lbl()}>{gettext("Model")}</label>
       <select name="model" class={fld()}>
-        <option value="">{gettext("pick a configured model")}</option>
+        <option value="">{gettext("Pick a configured model")}</option>
         <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
       <p class={hlp()}>{gettext("A local/cheap model is ideal: it only rewrites PII into pseudonyms.")}</p>
@@ -439,8 +439,8 @@ defmodule PepeWeb.HooksLive do
     names = agents |> Enum.filter(&(name in (&1.hooks || []))) |> Enum.map(& &1.name)
 
     case names do
-      [] -> gettext("not used by any agent yet")
-      list -> gettext("used by: %{a}", a: Enum.join(list, ", "))
+      [] -> gettext("Not used by any agent yet")
+      list -> gettext("Used by: %{a}", a: Enum.join(list, ", "))
     end
   end
 

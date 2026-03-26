@@ -92,7 +92,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
       mix pepe doctor [--offline]              # health-check the whole setup
-      mix pepe setup                           # scaffold ~/.pepe/config.json
+      mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
       mix pepe backup [--output FILE.tgz]      # archive ~/.pepe + list the secret env vars to save
   """
@@ -765,8 +765,7 @@ defmodule Mix.Tasks.Pepe do
         )
 
       %{fetched_at: at, count: c} ->
-        date = at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
-        info("#{c} live prices cached · refreshed #{date}")
+        info("#{c} live prices cached · refreshed #{local_datetime(at)}")
     end
   end
 
@@ -2237,9 +2236,14 @@ defmodule Mix.Tasks.Pepe do
     options = [
       {:model, "Model connection - add or switch the default"},
       {:agent, "Agent - add or set the default"},
-      {:telegram, "Telegram gateway"},
+      {:channel, "Channels - Telegram, Slack, Discord, WhatsApp, ..."},
+      {:dashboard, "Dashboard - password and remote access"},
+      {:migrate, "Import from another runtime (openclaw / hermes)"},
+      {:plugin, "Plugins - install a channel or tool"},
+      {:privacy, "Privacy - redact PII before it reaches a model"},
       {:language, "Language for system messages"},
       {:timezone, "Default timezone for scheduled tasks"},
+      {:sandbox, "Sandbox - isolate the shell tools (bash / run_script)"},
       {:full, "Run the full guided setup"},
       {:done, "Done"}
     ]
@@ -2251,32 +2255,105 @@ defmodule Mix.Tasks.Pepe do
       )
 
     case action do
-      :done ->
-        ok("Done.")
-
-      :full ->
-        first_run_setup()
-
-      :model ->
-        model_cmd([])
-        config_menu()
-
-      :agent ->
-        add_agent()
-        config_menu()
-
-      :telegram ->
-        telegram_setup()
-        config_menu()
-
-      :language ->
-        setup_language()
-        config_menu()
-
-      :timezone ->
-        setup_timezone()
-        config_menu()
+      :done -> ok("Done.")
+      :full -> first_run_setup()
+      :model -> then_menu(fn -> model_cmd([]) end)
+      :agent -> then_menu(fn -> add_agent() end)
+      :channel -> then_menu(&setup_channel/0)
+      :dashboard -> then_menu(&setup_dashboard/0)
+      :migrate -> then_menu(&setup_migrate/0)
+      :plugin -> then_menu(&setup_plugin/0)
+      :privacy -> then_menu(&setup_privacy/0)
+      :language -> then_menu(&setup_language/0)
+      :timezone -> then_menu(&setup_timezone/0)
+      :sandbox -> then_menu(&setup_sandbox/0)
     end
+  end
+
+  defp then_menu(fun) do
+    fun.()
+    config_menu()
+  end
+
+  # --- setup: channels --------------------------------------------------------------
+
+  defp setup_channel do
+    options = [{"telegram", "Telegram (bot poller)"} | Enum.map(Pepe.Webhooks.providers(), &{&1, channel_label(&1)})]
+    {which, _} = Pepe.TUI.select(options, label: bold("\nWhich channel?"), render_as: fn {_a, l} -> l end)
+    if which == "telegram", do: telegram_setup(), else: setup_webhook_connection(which)
+  end
+
+  defp channel_label(name) do
+    mod = Pepe.Webhooks.provider(name)
+    label = if function_exported?(mod, :label, 0), do: mod.label(), else: name
+    "#{label} (webhook)"
+  end
+
+  defp setup_webhook_connection(provider) do
+    mod = Pepe.Webhooks.provider(provider)
+    schema = if function_exported?(mod, :config_schema, 0), do: mod.config_schema(), else: []
+    slug = Owl.IO.input(label: "Connection name (slug):", optional: true) |> blank_default(provider)
+    agent = pick_setup_agent()
+
+    config =
+      Enum.reduce(schema, %{}, fn field, acc ->
+        hint = if field["type"] == "secret", do: dim(" (a ${ENV_VAR} reference is fine)"), else: ""
+        value = Owl.IO.input(label: "#{field["label"]}#{hint}:", optional: true)
+        if value in [nil, ""], do: acc, else: Map.put(acc, field["key"], value)
+      end)
+
+    Config.put_webhook(slug, %{"provider" => provider, "agent" => agent, "mode" => "support", "config" => config})
+    ok("channel #{green(provider)} connected as #{slug}")
+    info(dim("Paste this into #{provider} as its webhook URL:\n  #{webhook_host()}/webhooks/root/#{provider}/#{slug}"))
+  end
+
+  defp pick_setup_agent do
+    case agent_names() do
+      [] ->
+        Config.default_agent_name()
+
+      names ->
+        {agent, _} = Pepe.TUI.select(Enum.map(names, &{&1, &1}), label: "Which agent handles it?", render_as: fn {_a, l} -> l end)
+        agent
+    end
+  end
+
+  # --- setup: dashboard, migrate, plugins, privacy ----------------------------------
+
+  defp setup_dashboard do
+    dashboard_cmd([])
+
+    if not Config.dashboard_auth_required?() and Owl.IO.confirm(message: "\nSet a dashboard password now?", default: false) do
+      pass = Owl.IO.input(label: "Password (or a ${ENV_VAR} reference):", secret: true)
+      if pass not in [nil, ""], do: dashboard_cmd(["password", pass])
+    end
+  end
+
+  defp setup_migrate do
+    case detected_sources() do
+      [] ->
+        info("No importable install found in the default locations.")
+        info(dim("Point at one: mix pepe migrate <source> --from PATH"))
+
+      detected ->
+        {src, _} = Pepe.TUI.select(Enum.map(detected, &{&1, &1}), label: bold("\nImport from:"), render_as: fn {_a, l} -> l end)
+        run_migrate(src, dry_run: true)
+        if Owl.IO.confirm(message: "\nApply this import?", default: false), do: run_migrate(src, [])
+    end
+  end
+
+  defp detected_sources, do: Pepe.Migrate.detected()
+
+  defp setup_plugin do
+    src = Owl.IO.input(label: "Plugin source (a local path, a .tar.gz, or a GitHub repo URL):", optional: true)
+    if src not in [nil, ""], do: plugin_install(src, force: false)
+  end
+
+  defp setup_privacy do
+    info("Privacy hooks redact PII before it reaches a model.")
+    info(dim("Configure them in the dashboard (Privacy tab), or with: mix pepe hooks"))
+
+    if Owl.IO.confirm(message: "Show the current hooks now?", default: false), do: hooks_cmd(["list"])
   end
 
   defp first_run_setup do
@@ -2315,7 +2392,10 @@ defmodule Mix.Tasks.Pepe do
             info("\n" <> bold("Step 2/2 · Agent"))
             add_agent(true)
             maybe_setup_telegram()
+            maybe_setup_migrate()
+            maybe_setup_dashboard()
             info("\n" <> green("✓ All set!") <> "  Try:  " <> bold("pepe run \"hello\""))
+            info(dim("More anytime: rerun " <> bold("mix pepe setup") <> dim(" for channels, plugins, privacy and dashboard.")))
         end
     end
   end
@@ -2358,6 +2438,68 @@ defmodule Mix.Tasks.Pepe do
 
       _ ->
         error("unknown timezone: #{tz} - keeping #{Config.default_timezone()}")
+    end
+  end
+
+  # Choose how the shell tools (bash/run_script) run. Guardrails (blocking catastrophic
+  # commands) and the approval gate are always on; this adds strong OS-level isolation.
+  defp setup_sandbox do
+    info(
+      dim(
+        "The shell tools always run behind the approval gate and guardrails. " <>
+          "A sandbox adds real isolation, so an auto-approved agent can't touch the host."
+      )
+    )
+
+    options =
+      [
+        {"none", "None - run on the host (approval + guardrails still apply)"},
+        {"docker", "Docker/Podman container - portable (Linux/macOS/Windows)"}
+      ] ++
+        case :os.type() do
+          {:unix, :darwin} -> [{"macos", "sandbox-exec (macOS, lightweight)"}]
+          {:unix, _} -> [{"firejail", "firejail (Linux, lightweight)"}]
+          _ -> []
+        end
+
+    {kind, _} =
+      Pepe.TUI.select(options,
+        label: bold("Sandbox for the shell tools:"),
+        render_as: fn {_k, label} -> label end
+      )
+
+    case kind do
+      "none" ->
+        Config.set_sandbox(nil)
+        ok("sandbox -> none (host)")
+
+      _ ->
+        case Pepe.Sandbox.install_wrapper(kind) do
+          {:ok, path} ->
+            Config.set_sandbox(path)
+            ok("sandbox -> #{kind}  (#{path})")
+            check_sandbox_tool(kind)
+
+          {:error, _} ->
+            error("could not set up the #{kind} wrapper")
+        end
+    end
+  end
+
+  # Warn (don't auto-install) if the chosen sandbox's tool isn't on PATH.
+  defp check_sandbox_tool(kind) do
+    {tool, hint} =
+      case kind do
+        "docker" -> {"docker", "install Docker Desktop / Podman, or set PEPE_SANDBOX_RUNTIME=podman"}
+        "firejail" -> {"firejail", "install it, e.g. `sudo apt install firejail`"}
+        "macos" -> {"sandbox-exec", "it ships with macOS; nothing to install"}
+        _ -> {nil, nil}
+      end
+
+    cond do
+      is_nil(tool) -> :ok
+      System.find_executable(tool) -> ok("#{tool} is available")
+      true -> error("#{tool} is not on PATH yet - #{hint}")
     end
   end
 
@@ -2409,6 +2551,25 @@ defmodule Mix.Tasks.Pepe do
          ) do
       [] -> Pepe.Tools.names()
       picked -> picked
+    end
+  end
+
+  defp maybe_setup_migrate do
+    case detected_sources() do
+      [] ->
+        :ok
+
+      detected ->
+        if Owl.IO.confirm(message: "\nFound an existing #{Enum.join(detected, " / ")} setup. Import it?", default: false),
+          do: setup_migrate()
+    end
+  end
+
+  defp maybe_setup_dashboard do
+    if not Config.dashboard_auth_required?() and
+         Owl.IO.confirm(message: "\nSet a dashboard password (needed to reach it from another machine)?", default: false) do
+      pass = Owl.IO.input(label: "Password (or a ${ENV_VAR} reference):", secret: true)
+      if pass not in [nil, ""], do: dashboard_cmd(["password", pass])
     end
   end
 
@@ -2756,13 +2917,19 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp learn_date(0), do: "-"
+  defp learn_date(ts), do: local_datetime(ts)
 
-  defp learn_date(ts) do
-    case DateTime.from_unix(ts) do
-      {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+  # Format a unix timestamp in the configured timezone (from `mix pepe setup`), not UTC.
+  defp local_datetime(ts) when is_integer(ts) do
+    with {:ok, utc} <- DateTime.from_unix(ts),
+         {:ok, dt} <- DateTime.shift_zone(utc, Pepe.Config.default_timezone()) do
+      Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+    else
       _ -> "-"
     end
   end
+
+  defp local_datetime(_), do: "-"
 
   ###
   ### cron (scheduled tasks)

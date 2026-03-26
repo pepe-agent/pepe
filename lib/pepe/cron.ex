@@ -141,7 +141,7 @@ defmodule Pepe.Cron do
   defp run_job(%Cron{kind: "consolidate"} = cron), do: Pepe.Agent.consolidate(cron.agent)
 
   defp run_job(%Cron{} = cron) do
-    opts = if cron.model, do: [model: Config.get_model(cron.model)], else: []
+    opts = [source: "cron"] ++ if(cron.model, do: [model: Config.get_model(cron.model)], else: [])
     Pepe.Agent.oneshot(cron.agent, cron.prompt, opts)
   end
 

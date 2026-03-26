@@ -61,17 +61,17 @@ defmodule PepeWeb.ModelsLive do
       {nil, nil} ->
         case Pricing.lookup(m.model) do
           {i, o} ->
-            gettext("auto price · in %{in} · out %{out}",
+            gettext("Auto price · in %{in} · out %{out}",
               in: money(i, currency),
               out: money(o, currency)
             )
 
           nil ->
-            gettext("no price. Set one to bill for this model")
+            gettext("No price. Set one to bill for this model")
         end
 
       {i, o} ->
-        gettext("price · in %{in} · out %{out}",
+        gettext("Price · in %{in} · out %{out}",
           in: money(i || 0.0, currency),
           out: money(o || 0.0, currency)
         )
@@ -196,7 +196,7 @@ defmodule PepeWeb.ModelsLive do
 
                 <div>
                   <label class={lbl()}>{gettext("Model")}</label>
-                  <div :if={@edit_model.models == :loading} class="text-sm text-zinc-500">{gettext("loading models...")}</div>
+                  <div :if={@edit_model.models == :loading} class="text-sm text-zinc-500">{gettext("Loading models...")}</div>
                   <select :if={is_list(@edit_model.models) and @edit_model.models != []} name="model" class={fld()}>
                     <option :for={id <- @edit_model.models} value={id}>{id}</option>
                   </select>

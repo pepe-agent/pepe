@@ -63,9 +63,9 @@ defmodule PepeWeb.AgentsLive do
                 <button phx-click="agent_delete" phx-value-name={a.name} data-confirm={gettext("Delete agent %{name}?", name: a.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-sm text-zinc-400">{gettext("model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
-            <div :if={a.can_message != []} class="text-sm text-zinc-500">-> {gettext("messages:")} {Enum.join(a.can_message, ", ")}</div>
-            <div :if={a.can_manage} class="text-sm text-zinc-500">⚙ {gettext("manages:")} {manages_text(a.can_manage)}</div>
+            <div class="mt-1 text-sm text-zinc-400">{gettext("Model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
+            <div :if={a.can_message != []} class="text-sm text-zinc-500">-> {gettext("Messages:")} {Enum.join(a.can_message, ", ")}</div>
+            <div :if={a.can_manage} class="text-sm text-zinc-500">⚙ {gettext("Manages:")} {manages_text(a.can_manage)}</div>
           </div>
           </div>
 

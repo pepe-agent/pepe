@@ -31,6 +31,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.RunScript
   alias Pepe.Tools.ScanSkill
   alias Pepe.Tools.ScheduleTask
+  alias Pepe.Tools.SendFile
   alias Pepe.Tools.SendToAgent
   alias Pepe.Tools.SetRoute
   alias Pepe.Tools.Skill
@@ -48,6 +49,7 @@ defmodule Pepe.Tools do
     ListDir,
     FetchUrl,
     WebSearch,
+    SendFile,
     Invoice,
     EndSession,
     Goal,

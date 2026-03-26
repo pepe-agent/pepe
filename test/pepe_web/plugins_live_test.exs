@@ -68,4 +68,24 @@ defmodule PepeWeb.PluginsLiveTest do
     render_async(view)
     assert Pepe.Plugins.packages() != []
   end
+
+  test "a plugin that declares config fields can be configured from the dashboard" do
+    {:ok, view, _} = live(conn(), "/plugins")
+    render_click(view, "toggle_trust")
+    view |> form("form[phx-submit=install]", %{src: "examples/plugins/google"}) |> render_submit()
+    html = render_async(view)
+
+    # the manifest declares config, so a Configure button shows
+    assert html =~ "google"
+    assert html =~ "Configure"
+
+    # open the settings and save a token
+    render_click(view, "configure", %{"name" => "google"})
+
+    view
+    |> form("form[phx-submit=settings_save]", %{"cfg" => %{"access_token" => "${GOOGLE_TOKEN}"}})
+    |> render_submit()
+
+    assert Pepe.Config.plugin_config("google")["access_token"] == "${GOOGLE_TOKEN}"
+  end
 end

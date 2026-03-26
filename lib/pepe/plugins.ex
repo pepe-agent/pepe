@@ -64,6 +64,30 @@ defmodule Pepe.Plugins do
   end
 
   @doc """
+  A plugin's declared settings schema: the `"config"` array from its `manifest.json`
+  (a list of `%{"key", "label", "type", "hint"}` fields), or `[]` if it declares none.
+  Lets a plugin surface its own credentials/options form on the dashboard.
+  """
+  def config_schema(name) do
+    case Enum.find(packages(), &(&1.name == name)) do
+      %{manifest: %{"config" => fields}} when is_list(fields) -> fields
+      _ -> []
+    end
+  end
+
+  @doc """
+  Read one saved setting for a plugin, interpolating `${ENV_VAR}` refs. Returns `default`
+  when unset. This is what a plugin's own code calls to get its dashboard-entered config.
+  """
+  def config(name, key, default \\ nil) do
+    case Pepe.Config.plugin_config(name)[key] do
+      nil -> default
+      "" -> default
+      value -> Pepe.Config.interpolate(value)
+    end
+  end
+
+  @doc """
   Install a plugin from `src`: a local `.exs`, a local directory, a `.tar.gz`/`.tgz`, or
   an `http(s)` URL to any of those (a GitHub repo URL is fetched as its source archive).
 

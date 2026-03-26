@@ -18,6 +18,17 @@ defmodule Pepe.Migrate do
   @doc "Names of the sources that can be imported."
   def sources, do: @sources |> Map.keys() |> Enum.sort()
 
+  @doc "The default home directory a source reads from (for detecting an existing install)."
+  def default_home(source), do: (m = @sources[source]) && m.default_home()
+
+  @doc "Sources whose default home directory exists on this machine (an importable install)."
+  def detected do
+    Enum.filter(sources(), fn source ->
+      home = default_home(source)
+      is_binary(home) and File.dir?(home)
+    end)
+  end
+
   @doc """
   Import from `source`. `opts`: `:from` (the source home dir, else the source default),
   `:dry_run` (report without writing). Returns `{:ok, report}` or `{:error, reason}`.

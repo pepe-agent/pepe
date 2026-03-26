@@ -28,7 +28,10 @@ defmodule PepeWeb.PluginsLive do
        scan: nil,
        blocked: nil,
        trust: false,
-       working: false
+       working: false,
+       settings_name: nil,
+       settings_schema: [],
+       settings_values: %{}
      )}
   end
 
@@ -49,12 +52,12 @@ defmodule PepeWeb.PluginsLive do
           <div class={card()}>
             <label class={lbl()}>{gettext("Install a plugin")}</label>
 
-            <div class="mb-3 flex items-start gap-2 rounded-lg border border-amber-600/50 bg-amber-950/30 p-3 text-[15px] text-amber-200">
+            <p class="mb-3 flex items-start gap-2 text-[15px] text-amber-300">
               <span class="mt-0.5">⚠️</span>
-              <div>
+              <span>
                 {gettext("A plugin is code that runs with full access to your data and this machine. Install one only from a source you know and trust, and review it first (use Scan). Never paste a link you don't understand.")}
-              </div>
-            </div>
+              </span>
+            </p>
 
             <form id="plugin-install" phx-submit="install" phx-change="src_change" class="flex gap-2">
               <input name="src" value={@src} autocomplete="off"
@@ -93,13 +96,41 @@ defmodule PepeWeb.PluginsLive do
                 </div>
                 <div :if={manifest_desc(p)} class="mt-0.5 truncate text-[15px] text-zinc-400">{manifest_desc(p)}</div>
               </div>
-              <button phx-click="remove" phx-value-name={p.name}
-                data-confirm={gettext("Remove plugin %{name}?", name: p.name)}
-                class={[btn_ghost(), "shrink-0 text-red-400 hover:text-red-300"]}>{gettext("Remove")}</button>
+              <div class="flex shrink-0 gap-1">
+                <button :if={configurable?(p)} phx-click="configure" phx-value-name={p.name} class={btn_ghost()}>{gettext("Configure")}</button>
+                <button phx-click="remove" phx-value-name={p.name}
+                  data-confirm={gettext("Remove plugin %{name}?", name: p.name)}
+                  class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>{gettext("Remove")}</button>
+              </div>
             </div>
           </div>
         </div>
       </main>
+
+      <%!-- Plugin settings, driven by the manifest's config schema --%>
+      <div :if={@settings_name} class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div class="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-zinc-800 bg-zinc-950" phx-click-away="settings_cancel">
+          <div class="border-b border-zinc-800 px-6 py-4 text-lg font-semibold">{gettext("Configure %{name}", name: @settings_name)}</div>
+          <form phx-submit="settings_save" class="flex min-h-0 flex-1 flex-col">
+            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+              <div :for={f <- @settings_schema}>
+                <label class={lbl()}>{f["label"]}</label>
+                <select :if={f["type"] == "select"} name={"cfg[" <> f["key"] <> "]"} class={fld()}>
+                  <option :for={o <- f["options"] || []} value={o} selected={settings_val(@settings_values, f["key"]) == o}>{o}</option>
+                </select>
+                <input :if={f["type"] != "select"} name={"cfg[" <> f["key"] <> "]"}
+                  value={settings_val(@settings_values, f["key"])} class={[fld(), f["type"] == "secret" && "font-mono"]} />
+                <p :if={f["hint"]} class={hlp()}>{f["hint"]}</p>
+                <p :if={f["type"] == "secret" and !f["hint"]} class={hlp()}>{gettext("Secret: write ${ENV_VAR} to keep it out of the config file.")}</p>
+              </div>
+            </div>
+            <div class="flex gap-2 border-t border-zinc-800 px-6 py-4">
+              <button type="submit" class={btn()}>{gettext("Save")}</button>
+              <button type="button" phx-click="settings_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
     """
   end
@@ -113,7 +144,7 @@ defmodule PepeWeb.PluginsLive do
         <span class={["rounded-full px-2.5 py-0.5 text-xs font-medium", verdict_badge(@scan.verdict)]}>
           {verdict_label(@scan.verdict)}
         </span>
-        <span class="text-zinc-500">{gettext("security scan")}</span>
+        <span class="text-zinc-500">{gettext("Security scan")}</span>
       </div>
       <div :if={@scan.findings == []} class="text-sm text-zinc-500">{gettext("Nothing flagged.")}</div>
       <ul class="space-y-1 text-sm">
@@ -163,6 +194,33 @@ defmodule PepeWeb.PluginsLive do
     {:noreply, socket |> assign(packages: Plugins.packages()) |> put_flash(:info, gettext("Removed %{name}.", name: name))}
   end
 
+  def handle_event("configure", %{"name" => name}, socket) do
+    {:noreply,
+     assign(socket,
+       settings_name: name,
+       settings_schema: Plugins.config_schema(name),
+       settings_values: Config.plugin_config(name)
+     )}
+  end
+
+  def handle_event("settings_cancel", _p, socket), do: {:noreply, assign(socket, settings_name: nil)}
+
+  def handle_event("settings_save", params, socket) do
+    name = socket.assigns.settings_name
+
+    cleaned =
+      (params["cfg"] || %{})
+      |> Enum.reject(fn {_k, v} -> v in [nil, ""] end)
+      |> Map.new()
+
+    Config.put_plugin_config(name, cleaned)
+
+    {:noreply,
+     socket
+     |> assign(settings_name: nil)
+     |> put_flash(:info, gettext("Saved settings for %{name}.", name: name))}
+  end
+
   def handle_event("set_scope", params, socket), do: {:noreply, set_scope(socket, params, "/plugins")}
 
   def handle_event("toggle_new_company", _p, socket),
@@ -207,6 +265,11 @@ defmodule PepeWeb.PluginsLive do
 
   defp manifest_desc(%{manifest: %{"description" => d}}) when is_binary(d), do: d
   defp manifest_desc(_), do: nil
+
+  defp configurable?(%{manifest: %{"config" => fields}}) when is_list(fields), do: fields != []
+  defp configurable?(_), do: false
+
+  defp settings_val(values, key), do: to_string(Map.get(values, key, ""))
 
   defp finding_where(%{file: file, line: line}) when is_binary(file), do: "#{file}:#{line}"
   defp finding_where(%{line: line}), do: "line #{line}"

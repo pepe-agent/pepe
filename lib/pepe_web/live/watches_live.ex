@@ -41,7 +41,7 @@ defmodule PepeWeb.WatchesLive do
               <div class="min-w-0">
                 <span class="font-medium">{w.description}</span>
                 <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{w.state}</span>
-                <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("fired · delivering")}</span>
+                <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("Fired · delivering")}</span>
               </div>
               <div class="flex shrink-0 gap-1 text-sm">
                 <button :if={w.state == "pending"} phx-click="watch_pause" phx-value-id={w.id} class={btn_ghost()}>{gettext("Pause")}</button>

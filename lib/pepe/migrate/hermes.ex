@@ -182,8 +182,35 @@ defmodule Pepe.Migrate.Hermes do
 
   defp channels(config, env) do
     platforms = Map.get(config, "platforms", %{})
-    telegram(platforms, env) ++ whatsapp(platforms) ++ other_platforms(platforms)
+    telegram(platforms, env) ++ whatsapp(platforms) ++ slack(env) ++ teams(env) ++ other_platforms(platforms)
   end
+
+  defp slack(env) do
+    case env["SLACK_BOT_TOKEN"] do
+      token when is_binary(token) and token != "" ->
+        [webhook("slack", drop_nil(%{"bot_token" => token, "signing_secret" => env["SLACK_SIGNING_SECRET"]}))]
+
+      _ ->
+        []
+    end
+  end
+
+  defp teams(env) do
+    case env["TEAMS_CLIENT_ID"] do
+      id when is_binary(id) and id != "" ->
+        cfg = drop_nil(%{"app_id" => id, "app_password" => env["TEAMS_CLIENT_SECRET"], "tenant_id" => env["TEAMS_TENANT_ID"]})
+        [webhook("msteams", cfg)]
+
+      _ ->
+        []
+    end
+  end
+
+  defp webhook(provider, config) do
+    %{kind: :webhook, slug: provider, entry: %{"provider" => provider, "agent" => "assistant", "mode" => "support", "config" => config}}
+  end
+
+  defp drop_nil(map), do: for({k, v} <- map, not is_nil(v), into: %{}, do: {k, v})
 
   defp telegram(platforms, env) do
     case env["TELEGRAM_BOT_TOKEN"] || get_in(platforms, ["telegram", "token"]) do

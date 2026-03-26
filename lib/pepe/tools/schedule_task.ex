@@ -199,16 +199,20 @@ defmodule Pepe.Tools.ScheduleTask do
   end
 
   defp format_entry(%{"at" => at, "ok" => ok?, "source" => src, "output" => out}) do
-    when_str =
-      case DateTime.from_unix(at) do
-        {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
-        _ -> to_string(at)
-      end
-
-    "#{if ok?, do: "✅", else: "⚠️"} #{when_str} (#{src})\n#{String.slice(to_string(out), 0, 300)}"
+    "#{if ok?, do: "✅", else: "⚠️"} #{local_time(at)} (#{src})\n#{String.slice(to_string(out), 0, 300)}"
   end
 
   defp format_entry(entry), do: inspect(entry)
+
+  # A run's timestamp in the configured timezone (not UTC).
+  defp local_time(at) do
+    with {:ok, utc} <- DateTime.from_unix(at),
+         {:ok, dt} <- DateTime.shift_zone(utc, Config.default_timezone()) do
+      Calendar.strftime(dt, "%Y-%m-%d %H:%M %Z")
+    else
+      _ -> to_string(at)
+    end
+  end
 
   # Report back to the originating chat by default, else nowhere.
   defp default_deliver(ctx) do

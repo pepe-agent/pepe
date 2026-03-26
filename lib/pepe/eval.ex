@@ -109,8 +109,10 @@ defmodule Pepe.Eval do
       _ -> :ok
     end
 
+    run_opts = opts |> Keyword.put(:on_event, on_event) |> Keyword.put_new(:source, "eval")
+
     reply =
-      case Pepe.Agent.oneshot(c["agent"], c["prompt"] || "", Keyword.put(opts, :on_event, on_event)) do
+      case Pepe.Agent.oneshot(c["agent"], c["prompt"] || "", run_opts) do
         {:ok, content, _msgs} -> to_string(content)
         {:error, reason} -> "ERROR: #{inspect(reason)}"
       end

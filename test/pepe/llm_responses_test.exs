@@ -72,7 +72,8 @@ defmodule Pepe.LLM.ResponsesTest do
 
     # a turn with tool calls reports tool_calls so the runtime keeps looping
     assert res.finish_reason == "tool_calls"
-    assert res.usage["input_tokens"] == 5
+    # usage is normalized to the canonical prompt/completion key names
+    assert res.usage["prompt_tokens"] == 5
   end
 
   defmodule FakeRefusal do

@@ -99,6 +99,9 @@ defmodule Pepe.LLM do
         headers: headers(model),
         json: body,
         receive_timeout: opts[:receive_timeout] || 120_000,
+        # Retry transient failures, notably a stale pooled connection the server
+        # already closed (`%Req.TransportError{reason: :closed}` on the first call).
+        retry: :transient,
         into: collector
       )
 

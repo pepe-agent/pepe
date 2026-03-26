@@ -881,6 +881,16 @@ defmodule Pepe.Config do
     |> save()
   end
 
+  @doc "Saved settings for a plugin (by name) as a `%{key => value}` map. Secrets may be `${ENV_VAR}` refs."
+  def plugin_config(name), do: load() |> get_in(["plugins", name]) || %{}
+
+  @doc "Create or replace a plugin's settings map."
+  def put_plugin_config(name, map) when is_binary(name) and is_map(map) do
+    load()
+    |> update_in(["plugins"], fn m -> Map.put(m || %{}, name, map) end)
+    |> save()
+  end
+
   def server do
     load() |> Map.get("server", %{"port" => 4000})
   end
@@ -893,6 +903,22 @@ defmodule Pepe.Config do
 
   @doc "Set the default timezone for scheduled tasks."
   def set_default_timezone(tz), do: load() |> Map.put("timezone", tz) |> save()
+
+  @doc """
+  Path to the sandbox wrapper program that `bash`/`run_script` run commands through
+  (Docker, firejail, sandbox-exec, ...), or `nil` to run directly on the host. See
+  `Pepe.Sandbox`.
+  """
+  def sandbox do
+    case load()["sandbox"] do
+      p when is_binary(p) and p != "" -> p
+      _ -> nil
+    end
+  end
+
+  @doc "Set (or clear, with nil) the sandbox wrapper program."
+  def set_sandbox(nil), do: load() |> Map.delete("sandbox") |> save()
+  def set_sandbox(path) when is_binary(path), do: load() |> Map.put("sandbox", path) |> save()
 
   @doc """
   The billing currency symbol/code used to label costs (default `\"USD\"`). Prices

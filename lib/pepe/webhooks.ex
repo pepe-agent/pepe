@@ -21,13 +21,22 @@ defmodule Pepe.Webhooks do
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
 
-  @builtin_providers %{"whatsapp" => Pepe.Webhooks.WhatsApp}
+  @builtin_providers %{
+    "whatsapp" => Pepe.Webhooks.WhatsApp,
+    "slack" => Pepe.Webhooks.Slack,
+    "discord" => Pepe.Webhooks.Discord,
+    "msteams" => Pepe.Webhooks.MsTeams,
+    "googlechat" => Pepe.Webhooks.GoogleChat
+  }
 
   @doc "The provider module for a name (built-in or plugin), or nil."
   def provider(name), do: Map.get(registry(), name)
 
   @doc "Known provider names (built-in plus installed plugins), sorted."
   def providers, do: registry() |> Map.keys() |> Enum.sort()
+
+  @doc "Whether a provider name is one of the native, built-in channels."
+  def builtin?(name), do: Map.has_key?(@builtin_providers, name)
 
   @doc "The `%{name => module}` map of every provider, built-in plugins last (they win)."
   def registry, do: Map.merge(@builtin_providers, plugin_providers())
@@ -75,15 +84,34 @@ defmodule Pepe.Webhooks do
     with entry when is_map(entry) <- resolve(company, provider, slug),
          mod when not is_nil(mod) <- provider(provider),
          :ok <- mod.authenticate(entry, raw_body, headers) do
-      case mod.parse(payload) do
-        {:ok, messages} -> Enum.each(messages, &dispatch(entry, mod, &1))
-        :ignore -> :ok
-      end
+      case sync_respond(mod, entry, payload, headers) do
+        {:reply, status, content_type, body} ->
+          {:respond, status, content_type, body}
 
-      :ok
+        {:reply_async, status, content_type, body} ->
+          run_parse(mod, entry, payload)
+          {:respond, status, content_type, body}
+
+        :cont ->
+          run_parse(mod, entry, payload)
+          :ok
+      end
     else
       :error -> {:error, :unauthorized}
       _ -> {:error, :unknown_connection}
+    end
+  end
+
+  # A provider whose protocol needs a synchronous answer to the POST (Slack's challenge,
+  # Discord's PING/ack) implements `respond/3`; others fall through to the async flow.
+  defp sync_respond(mod, entry, payload, headers) do
+    if function_exported?(mod, :respond, 3), do: mod.respond(entry, payload, headers), else: :cont
+  end
+
+  defp run_parse(mod, entry, payload) do
+    case mod.parse(payload) do
+      {:ok, messages} -> Enum.each(messages, &dispatch(entry, mod, &1))
+      :ignore -> :ok
     end
   end
 

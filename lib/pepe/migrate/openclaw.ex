@@ -126,24 +126,61 @@ defmodule Pepe.Migrate.Openclaw do
 
   defp channels(config) do
     channels = config["channels"] || %{}
-
-    telegram =
-      case get_in(channels, ["telegram", "botToken"]) do
-        token when is_binary(token) and token != "" ->
-          [%{kind: :telegram, token: token, allowed_chats: get_in(channels, ["telegram", "allowFrom"])}]
-
-        _ ->
-          []
-      end
-
-    others =
-      channels
-      |> Map.drop(["telegram"])
-      |> Enum.filter(fn {_k, v} -> is_map(v) and v["enabled"] == true end)
-      |> Enum.map(fn {k, _v} -> %{kind: :skip, what: "channel #{k}", reason: "set it up in Channels/Integrations"} end)
-
-    telegram ++ others
+    telegram(channels) ++ slack(channels) ++ msteams(channels) ++ leftover(channels)
   end
+
+  defp telegram(channels) do
+    case get_in(channels, ["telegram", "botToken"]) do
+      token when is_binary(token) and token != "" ->
+        [%{kind: :telegram, token: token, allowed_chats: get_in(channels, ["telegram", "allowFrom"])}]
+
+      _ ->
+        []
+    end
+  end
+
+  defp slack(channels) do
+    case get_in(channels, ["slack", "botToken"]) do
+      token when is_binary(token) and token != "" ->
+        cfg = drop_nil(%{"bot_token" => token, "signing_secret" => get_in(channels, ["slack", "signingSecret"])})
+        [webhook("slack", cfg)]
+
+      _ ->
+        []
+    end
+  end
+
+  defp msteams(channels) do
+    case get_in(channels, ["msteams", "appId"]) do
+      app_id when is_binary(app_id) and app_id != "" ->
+        cfg =
+          drop_nil(%{
+            "app_id" => app_id,
+            "app_password" => get_in(channels, ["msteams", "appPassword"]),
+            "tenant_id" => get_in(channels, ["msteams", "tenant"])
+          })
+
+        [webhook("msteams", cfg)]
+
+      _ ->
+        []
+    end
+  end
+
+  # Discord (gateway token, not the interactions model) and Google Chat (service account)
+  # do not fit Pepe's webhook credentials, so they are reported for a fresh setup.
+  defp leftover(channels) do
+    channels
+    |> Map.drop(["telegram", "slack", "msteams"])
+    |> Enum.filter(fn {_k, v} -> is_map(v) and v["enabled"] == true end)
+    |> Enum.map(fn {k, _v} -> %{kind: :skip, what: "channel #{k}", reason: "set it up in Integrations (credentials differ)"} end)
+  end
+
+  defp webhook(provider, config) do
+    %{kind: :webhook, slug: provider, entry: %{"provider" => provider, "agent" => "assistant", "mode" => "support", "config" => config}}
+  end
+
+  defp drop_nil(map), do: for({k, v} <- map, not is_nil(v), into: %{}, do: {k, v})
 
   # --- skills -----------------------------------------------------------------------
 

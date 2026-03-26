@@ -47,6 +47,9 @@ defmodule Pepe.LLM.Responses do
         headers: headers(model),
         json: body,
         receive_timeout: opts[:receive_timeout] || 120_000,
+        # Retry transient failures, notably a stale pooled connection the server
+        # already closed (`%Req.TransportError{reason: :closed}` on the first call).
+        retry: :transient,
         into: collector
       )
 
@@ -417,7 +420,18 @@ defmodule Pepe.LLM.Responses do
       content: (state.content != "" && state.content) || nil,
       tool_calls: tool_calls,
       finish_reason: if(tool_calls != [], do: "tool_calls", else: state.finish),
-      usage: state.usage
+      usage: normalize_usage(state.usage)
     }
   end
+
+  # The Responses API reports `input_tokens`/`output_tokens`; expose the canonical
+  # `prompt_tokens`/`completion_tokens` shape the rest of Pepe (trace, billing) reads.
+  defp normalize_usage(%{} = usage) do
+    %{
+      "prompt_tokens" => usage["input_tokens"] || usage["prompt_tokens"],
+      "completion_tokens" => usage["output_tokens"] || usage["completion_tokens"]
+    }
+  end
+
+  defp normalize_usage(other), do: other
 end

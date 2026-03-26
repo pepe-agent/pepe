@@ -76,7 +76,7 @@ One topic per page - open just what you need.
 
 **Get going** &nbsp; [Architecture](docs/architecture.md) · [CLI reference](docs/cli-reference.md) · [Configuration](docs/configuration.md) · [Migrating from another runtime](docs/migrating.md)
 
-**Talk to it** &nbsp; [Web dashboard](docs/dashboard.md) · [Dashboard auth](docs/authentication.md) · [HTTP API](docs/http-api.md) · [WebSocket](docs/websocket.md) · [Telegram](docs/telegram.md) · [WhatsApp](docs/whatsapp.md)
+**Talk to it** &nbsp; [Web dashboard](docs/dashboard.md) · [Dashboard auth](docs/authentication.md) · [HTTP API](docs/http-api.md) · [WebSocket](docs/websocket.md) · [Telegram](docs/telegram.md) · [WhatsApp](docs/whatsapp.md) · [Channels (Slack/Discord/Teams/Chat)](docs/channels.md)
 
 **Agents** &nbsp; [Admin agents](docs/admin-agents.md) · [Permissions](docs/permissions.md) · [Agent-to-agent routing](docs/routing.md) · [Companies](docs/companies.md) · [Skills](docs/skills.md) · [Learning](docs/learning.md) · [Goals & plans](docs/goals-and-plans.md) · [Adding a tool](docs/adding-a-tool.md) · [Plugins](docs/plugins.md) · [Self-management](docs/self-management.md)
 

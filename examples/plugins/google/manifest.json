@@ -1,0 +1,13 @@
+{
+  "name": "google",
+  "version": "0.1.0",
+  "description": "Google Workspace tools: read/create Calendar events and search/send Gmail, as agent tools.",
+  "provides": ["tool:gcal_upcoming", "tool:gcal_create_event", "tool:gmail_search", "tool:gmail_send"],
+  "files": ["google.exs"],
+  "config": [
+    {"key": "access_token", "label": "Access token", "type": "secret", "hint": "ya29... (expires in ~1h); or fill the refresh trio below. Store as ${ENV_VAR} to keep it out of the file."},
+    {"key": "client_id", "label": "OAuth client ID", "type": "text", "hint": "...apps.googleusercontent.com"},
+    {"key": "client_secret", "label": "OAuth client secret", "type": "secret"},
+    {"key": "refresh_token", "label": "Refresh token", "type": "secret", "hint": "minted once from the consent flow; survives access-token expiry"}
+  ]
+}

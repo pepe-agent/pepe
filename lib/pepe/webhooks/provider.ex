@@ -29,8 +29,6 @@ defmodule Pepe.Webhooks.Provider do
   """
   @callback config_schema() :: [map()]
 
-  @optional_callbacks label: 0, config_schema: 0
-
   @doc """
   Answer the provider's verification handshake (a `GET` when the webhook URL is
   registered). Return `{:ok, challenge_to_echo}` when it checks out, `:error`
@@ -55,4 +53,25 @@ defmodule Pepe.Webhooks.Provider do
   @doc "Send a text message back to `to` (a provider address, e.g. a phone number)."
   @callback deliver(config :: map(), to :: String.t(), text :: String.t()) ::
               :ok | {:error, term()}
+
+  @doc """
+  Optional: produce a **synchronous** HTTP response to an inbound `POST`, for providers
+  whose protocol needs one before any agent work (Slack's `url_verification` challenge,
+  Discord's interaction `PING` and deferred acknowledgement). Return
+  `{:reply, status, content_type, body}` to answer immediately (no agent run this call),
+  or `:cont` to fall through to `parse/1` and the normal async flow. A provider that
+  never needs this can omit it.
+  """
+  @callback respond(config :: map(), payload :: map(), headers :: map()) ::
+              {:reply, non_neg_integer(), String.t(), String.t()} | :cont
+
+  @doc """
+  Optional: send a local file to `to` as an attachment/document, with an optional
+  caption. A provider whose platform can't receive files can omit it (the `send_file`
+  tool then reports the channel doesn't support attachments).
+  """
+  @callback deliver_file(config :: map(), to :: String.t(), path :: String.t(), caption :: String.t() | nil) ::
+              :ok | {:error, term()}
+
+  @optional_callbacks label: 0, config_schema: 0, respond: 3, deliver_file: 4
 end

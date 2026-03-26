@@ -9,6 +9,42 @@ defmodule PepeWeb.DashData do
 
   alias Pepe.Company
   alias Pepe.Config
+  alias Pepe.Webhooks
+
+  ## channel/webhook providers
+
+  @doc """
+  Build the `%{name, label, schema}` cards for the given provider names, keeping only
+  those that declare a `config_schema/0` (i.e. can be configured from the dashboard).
+  """
+  def webhook_provider_cards(names) do
+    names
+    |> Enum.map(fn name -> {name, Webhooks.provider(name)} end)
+    |> Enum.filter(fn {_name, mod} -> mod && exports?(mod, :config_schema, 0) end)
+    |> Enum.map(fn {name, mod} ->
+      %{name: name, label: provider_label(mod, name), schema: mod.config_schema()}
+    end)
+  end
+
+  # function_exported?/3 is false for a not-yet-loaded module; load it first.
+  defp exports?(mod, fun, arity), do: Code.ensure_loaded?(mod) and function_exported?(mod, fun, arity)
+
+  @doc "The native channels: built-in webhook providers (WhatsApp, Slack, Discord, Teams, Google Chat)."
+  def native_channel_cards do
+    Webhooks.providers()
+    |> Enum.filter(&Webhooks.builtin?/1)
+    |> webhook_provider_cards()
+  end
+
+  @doc "Installed plugin channel providers (everything that is not a built-in channel)."
+  def plugin_channel_cards do
+    Webhooks.providers()
+    |> Enum.reject(&Webhooks.builtin?/1)
+    |> webhook_provider_cards()
+  end
+
+  defp provider_label(mod, name),
+    do: if(exports?(mod, :label, 0), do: mod.label(), else: name)
 
   ## scope filtering
 
@@ -31,7 +67,7 @@ defmodule PepeWeb.DashData do
   def agent_names, do: Config.agents() |> Enum.map(& &1.name) |> Enum.sort()
 
   def agents_title("all"), do: gettext("Agents")
-  def agents_title("root"), do: gettext("Agents · Root")
+  def agents_title("root"), do: gettext("Agents · Principal")
   def agents_title(company), do: gettext("Agents · %{c}", c: company)
   def model_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
 
@@ -111,7 +147,7 @@ defmodule PepeWeb.DashData do
   def model_suffix(nil), do: ""
   def model_suffix(model), do: " · #{model}"
 
-  def deliver_label("none"), do: gettext("not sent")
+  def deliver_label("none"), do: gettext("Not sent")
   def deliver_label("telegram:" <> id), do: "Telegram #{id}"
   def deliver_label(other), do: other
 
@@ -181,13 +217,24 @@ defmodule PepeWeb.DashData do
   def learn_icon(_memory), do: "📝"
 
   def learn_date(0), do: "-"
+  def learn_date(ts), do: local_datetime(ts)
 
-  def learn_date(ts) do
-    case DateTime.from_unix(ts) do
-      {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+  @doc """
+  Format a unix timestamp in the operator's configured timezone (from `mix pepe setup`,
+  falling back to UTC), so the dashboard shows local time, not UTC.
+  """
+  def local_datetime(ts, fmt \\ "%Y-%m-%d %H:%M")
+
+  def local_datetime(ts, fmt) when is_integer(ts) do
+    with {:ok, utc} <- DateTime.from_unix(ts),
+         {:ok, dt} <- DateTime.shift_zone(utc, Config.default_timezone()) do
+      Calendar.strftime(dt, fmt)
+    else
       _ -> "-"
     end
   end
+
+  def local_datetime(_ts, _fmt), do: "-"
 
   @doc "Known Telegram chat targets (from persisted sessions), for the cron delivery field."
   def telegram_targets do
@@ -255,10 +302,9 @@ defmodule PepeWeb.DashData do
   def tokens(_), do: "0"
 
   @doc "A short label for how fresh the live price cache is."
-  def price_cache_label(nil), do: gettext("using built-in seed prices (never refreshed)")
+  def price_cache_label(nil), do: gettext("Using built-in seed prices (never refreshed)")
 
   def price_cache_label(%{fetched_at: at, count: count}) do
-    date = at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
-    gettext("%{count} live prices · refreshed %{date}", count: count, date: date)
+    gettext("%{count} live prices · refreshed %{date}", count: count, date: local_datetime(at))
   end
 end

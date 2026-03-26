@@ -61,7 +61,7 @@ defmodule PepeWeb.ToolServersLive do
               </div>
             </div>
             <div class="mt-1 text-sm text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
-            <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("connecting...")}</div>
+            <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("Connecting...")}</div>
             <div :if={is_list(@mcp_tools[name])} class="mt-2 space-y-1">
               <div :for={t <- @mcp_tools[name]} class="text-sm text-zinc-400">
                 <code class="text-zinc-300">mcp__{name}__{t["name"]}</code>
@@ -70,7 +70,7 @@ defmodule PepeWeb.ToolServersLive do
               <p class="text-sm text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only.")}</p>
             </div>
             <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-sm text-red-400">
-              {gettext("couldn't connect. Check the command and the env var token")}
+              {gettext("Couldn't connect. Check the command and the env var token")}
             </div>
           </div>
           <p :if={@mcp == %{}} class="text-[15px] text-zinc-500">{gettext("No MCP servers yet. Add one with “+ New server”.")}</p>

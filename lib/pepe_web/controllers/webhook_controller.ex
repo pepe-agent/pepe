@@ -24,6 +24,7 @@ defmodule PepeWeb.WebhookController do
 
     case Webhooks.handle_inbound(c, p, s, raw_body(conn), payload, headers) do
       :ok -> send_resp(conn, 200, "ok")
+      {:respond, status, content_type, body} -> conn |> put_resp_content_type(content_type) |> send_resp(status, body)
       {:error, :unauthorized} -> send_resp(conn, 401, "unauthorized")
       {:error, _} -> send_resp(conn, 404, "not found")
     end

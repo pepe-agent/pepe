@@ -34,6 +34,7 @@ defmodule Pepe.Agent.Runtime do
           stream: boolean(),
           cwd: String.t(),
           session_key: String.t() | nil,
+          source: String.t() | nil,
           authorize: (String.t(), term(), map() -> Pepe.Permissions.decision()) | nil
         ]
 
@@ -44,7 +45,10 @@ defmodule Pepe.Agent.Runtime do
   @spec run(Agent.t(), [map()], opts()) ::
           {:ok, String.t(), [map()]} | {:error, term()}
   def run(%Agent{} = agent, messages, opts \\ []) do
-    own_trace? = Pepe.Trace.start(agent.name, opts[:session_key], last_user_text(messages)) == :started
+    own_trace? =
+      Pepe.Trace.start(agent.name, opts[:session_key], last_user_text(messages), opts[:source]) ==
+        :started
+
     result = do_run(agent, messages, opts)
     if own_trace?, do: Pepe.Trace.finish(result)
     result

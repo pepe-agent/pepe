@@ -93,7 +93,7 @@ defmodule PepeWeb.DashUI do
         </svg>
         <div class="leading-tight">
           <div class="text-lg font-semibold">Pepe</div>
-          <div class="text-xs text-zinc-500">agent runtime</div>
+          <div class="text-xs text-zinc-500">{gettext("agent runtime")}</div>
         </div>
       </.link>
 
@@ -104,7 +104,7 @@ defmodule PepeWeb.DashUI do
         <form id="scope-form" phx-change="set_scope">
           <select name="scope" class={fld()}>
             <option value="all" selected={@scope == "all"}>{gettext("All companies")}</option>
-            <option value="root" selected={@scope == "root"}>{gettext("Root (no company)")}</option>
+            <option value="root" selected={@scope == "root"}>{gettext("Principal")}</option>
             <option :for={c <- @companies} value={c} selected={@scope == c}>{c}</option>
           </select>
         </form>

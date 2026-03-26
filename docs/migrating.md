@@ -25,13 +25,15 @@ skipped, without touching your config.
   the rest are dropped and the agent falls back to a sensible default set. Review each
   agent's tools after importing.
 - **Skills** (each source's `SKILL.md` folders) are copied into Pepe's skills.
-- **Channels**: a **Telegram** bot token (and allowed chats) is set as the default bot; a
-  **WhatsApp** connection (phone number id + access token) becomes a webhook connection.
+- **Channels**: a **Telegram** bot token (and allowed chats) is set as the default bot;
+  **WhatsApp**, **Slack** and **Microsoft Teams** connections are created from the source's
+  credentials as webhook connections (finish any missing field on the Integrations page).
 
 ## What is reported, not mapped
 
-- **Other channels** (Discord, Slack, Signal, ...) have no Pepe gateway yet, so they are
-  listed for you to wire up on the Channels / Integrations pages.
+- **Discord** and **Google Chat** in the sources use a gateway/service-account model whose
+  credentials do not fit Pepe's webhook setup, so they are listed for a fresh setup rather
+  than half-migrated. Other channels (Signal, ...) are listed too.
 - Anything the source stored in a shape with no Pepe equivalent is noted in the report,
   never silently dropped.
 

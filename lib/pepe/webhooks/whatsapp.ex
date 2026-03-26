@@ -24,6 +24,29 @@ defmodule Pepe.Webhooks.WhatsApp do
   def name, do: "whatsapp"
 
   @impl true
+  def label, do: "WhatsApp (Meta Cloud API)"
+
+  @impl true
+  def config_schema do
+    [
+      %{"key" => "phone_number_id", "label" => "Phone number ID", "type" => "text", "hint" => "the sending endpoint id from Meta"},
+      %{"key" => "access_token", "label" => "Access token", "type" => "secret", "hint" => "Graph API bearer token; store as ${ENV_VAR}"},
+      %{
+        "key" => "app_secret",
+        "label" => "App secret",
+        "type" => "secret",
+        "hint" => "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}"
+      },
+      %{
+        "key" => "verify_token",
+        "label" => "Verify token",
+        "type" => "text",
+        "hint" => "any string you choose; echoed during the subscribe handshake"
+      }
+    ]
+  end
+
+  @impl true
   def verify(config, params) do
     token = provider_config(config)["verify_token"]
 
@@ -119,6 +142,51 @@ defmodule Pepe.Webhooks.WhatsApp do
     do: [%{from: from, text: body, id: m["id"]}]
 
   defp normalize(_), do: []
+
+  @impl true
+  def deliver_file(config, to, path, caption) do
+    pc = provider_config(config)
+    token = Config.interpolate(pc["access_token"])
+    phone_id = pc["phone_number_id"]
+
+    cond do
+      is_nil(token) or token == "" ->
+        {:error, :no_access_token}
+
+      is_nil(phone_id) ->
+        {:error, :no_phone_number_id}
+
+      true ->
+        with {:ok, media_id} <- upload_media(phone_id, token, path) do
+          doc =
+            %{"id" => media_id, "filename" => Path.basename(path)}
+            |> then(fn d -> if caption in [nil, ""], do: d, else: Map.put(d, "caption", caption) end)
+
+          body = %{"messaging_product" => "whatsapp", "to" => to, "type" => "document", "document" => doc}
+
+          case Req.post("#{@graph}/#{phone_id}/messages", auth: {:bearer, token}, json: body, receive_timeout: 30_000) do
+            {:ok, %{status: s}} when s in 200..299 -> :ok
+            {:ok, %{status: s, body: b}} -> {:error, {:http, s, b}}
+            {:error, reason} -> {:error, reason}
+          end
+        end
+    end
+  end
+
+  # Upload media to the Cloud API and return its media id (referenced when sending).
+  defp upload_media(phone_id, token, path) do
+    parts = [
+      messaging_product: "whatsapp",
+      type: MIME.from_path(path),
+      file: {File.stream!(path), filename: Path.basename(path)}
+    ]
+
+    case Req.post("#{@graph}/#{phone_id}/media", auth: {:bearer, token}, form_multipart: parts, receive_timeout: 120_000) do
+      {:ok, %{status: s, body: %{"id" => id}}} when s in 200..299 -> {:ok, id}
+      {:ok, %{status: s, body: b}} -> {:error, {:http, s, b}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   defp provider_config(config), do: config["config"] || %{}
 

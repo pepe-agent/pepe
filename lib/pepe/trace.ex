@@ -36,7 +36,7 @@ defmodule Pepe.Trace do
   (the one that owns the trace and must call `finish/1`) or `:nested` for a sub-agent run
   sharing the same process, whose events fold into the outer trace.
   """
-  def start(agent_name, session, prompt \\ nil) do
+  def start(agent_name, session, prompt \\ nil, source \\ nil) do
     case Process.get(@key) do
       nil ->
         Process.put(@key, %{
@@ -45,6 +45,7 @@ defmodule Pepe.Trace do
           agent: agent_name,
           scope: Company.of(agent_name),
           session: session,
+          source: source || source_from_session(session),
           prompt: clip(prompt),
           t0: System.monotonic_time(:millisecond),
           events: []
@@ -56,6 +57,16 @@ defmodule Pepe.Trace do
         :nested
     end
   end
+
+  @doc """
+  What triggered a run, derived from its session key. Channel sessions carry their
+  surface as the first segment (`telegram:...`, `api:...`, `chatwoot:...`); a stateless
+  run (cron, eval, CLI) has no session and passes its source explicitly instead.
+  """
+  def source_from_session(key) when is_binary(key) and key != "",
+    do: key |> String.split(":", parts: 2) |> hd()
+
+  def source_from_session(_), do: "manual"
 
   @doc "Append one runtime lifecycle event to the in-progress trace (no-op if none)."
   def event(ev) do
@@ -82,6 +93,7 @@ defmodule Pepe.Trace do
           "at" => t.at,
           "agent" => t.agent,
           "session" => t.session,
+          "source" => t.source,
           "prompt" => t.prompt,
           "ms" => System.monotonic_time(:millisecond) - t.t0,
           "outcome" => outcome(result),
@@ -144,7 +156,7 @@ defmodule Pepe.Trace do
     case File.read(Path.join(scope_dir(scope), file)) do
       {:ok, body} ->
         case Jason.decode(body) do
-          {:ok, m} -> Map.drop(m, ["events"]) |> Map.put("tools", tool_names(m))
+          {:ok, m} -> Map.drop(m, ["events"]) |> Map.put("tools", tool_names(m)) |> Map.put("usage", usage_list(m))
           _ -> nil
         end
 
@@ -158,6 +170,14 @@ defmodule Pepe.Trace do
   end
 
   defp tool_names(_), do: []
+
+  # Compact per-model token usage for the light index (full events dropped from summaries).
+  defp usage_list(%{"events" => events}) when is_list(events) do
+    for %{"t" => "usage"} = e <- events,
+        do: %{"model" => e["model"], "in" => e["in"] || 0, "out" => e["out"] || 0}
+  end
+
+  defp usage_list(_), do: []
 
   defp write(scope, entry) do
     d = scope_dir(scope)
@@ -202,8 +222,8 @@ defmodule Pepe.Trace do
     %{
       "t" => "usage",
       "model" => model,
-      "in" => usage[:prompt_tokens] || usage["prompt_tokens"],
-      "out" => usage[:completion_tokens] || usage["completion_tokens"]
+      "in" => usage[:prompt_tokens] || usage["prompt_tokens"] || usage[:input_tokens] || usage["input_tokens"],
+      "out" => usage[:completion_tokens] || usage["completion_tokens"] || usage[:output_tokens] || usage["output_tokens"]
     }
   end
 

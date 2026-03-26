@@ -1088,6 +1088,31 @@ defmodule Pepe.Gateways.Telegram do
     :ok
   end
 
+  @doc "Send a local file as a Telegram document to `target` (a session/delivery key)."
+  def deliver_file(target, path, caption \\ nil) do
+    case resolve_delivery(target) do
+      {bot, chat_id} ->
+        put_bot(bot)
+        if token(), do: send_document(chat_id, path, caption), else: {:error, :no_token}
+
+      :error ->
+        {:error, :no_bot}
+    end
+  end
+
+  defp send_document(chat_id, path, caption) do
+    fields =
+      [chat_id: to_string(chat_id)]
+      |> then(fn f -> if caption in [nil, ""], do: f, else: f ++ [caption: caption] end)
+      |> Kernel.++(document: {File.stream!(path), filename: Path.basename(path)})
+
+    case Req.post(api_url(token(), "sendDocument"), form_multipart: fields, receive_timeout: 120_000) do
+      {:ok, %{status: 200}} -> :ok
+      {:ok, %{status: status, body: body}} -> {:error, {:telegram, status, body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp resolve_delivery(target) do
     case String.split(to_string(target), ":", parts: 2) do
       [name, chat_id] ->

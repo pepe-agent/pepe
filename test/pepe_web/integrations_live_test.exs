@@ -39,8 +39,8 @@ defmodule PepeWeb.IntegrationsLiveTest do
   test "creating a connection persists a webhook entry and shows its URL" do
     {:ok, view, _html} = live(conn(), "/integrations")
 
-    # open the new-connection form for Chatwoot
-    render_click(view, "new", %{"name" => "chatwoot"})
+    # open the new-connection form for Chatwoot (event lives on the shared component)
+    view |> element("button[phx-value-name='chatwoot']") |> render_click()
 
     html =
       view

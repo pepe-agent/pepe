@@ -59,7 +59,7 @@ defmodule PepeWeb.UsageLive do
           <div class="flex items-center gap-2">
             <span class="hidden text-xs text-zinc-500 sm:inline">{price_cache_label(@cache_info)}</span>
             <button phx-click="refresh_prices" disabled={@refreshing} class={btn_ghost()}>
-              {if @refreshing, do: gettext("refreshing..."), else: gettext("Refresh prices")}
+              {if @refreshing, do: gettext("Refreshing..."), else: gettext("Refresh prices")}
             </button>
           </div>
         </.view_header>
@@ -158,7 +158,7 @@ defmodule PepeWeb.UsageLive do
             <span class="w-20 text-right font-medium">{money((@bill? && billable) || cost, @currency)}</span>
           </span>
         </div>
-        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("nothing yet")}</p>
+        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("Nothing yet")}</p>
       </div>
     </div>
     """

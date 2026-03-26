@@ -145,7 +145,7 @@ defmodule PepeWeb.ScheduledLive do
                 <div>
                   <label class={lbl()}>{gettext("Model")}</label>
                   <select name="cron[model]" class={fld()}>
-                    <option value="" selected={@edit_cron && @edit_cron.model in [nil, ""]}>{gettext("agent's default")}</option>
+                    <option value="" selected={@edit_cron && @edit_cron.model in [nil, ""]}>{gettext("Agent's default")}</option>
                     <option :for={m <- model_names()} value={m} selected={@edit_cron && @edit_cron.model == m}>{m}</option>
                   </select>
                 </div>
@@ -175,21 +175,26 @@ defmodule PepeWeb.ScheduledLive do
             <div class="text-lg font-semibold">{cron.name}</div>
             <div class="mt-0.5 text-sm text-zinc-500"><code>{cron.schedule}</code> · {cron.timezone} · {cron.agent}{model_suffix(cron.model)}</div>
 
-            <div class="mt-4">
-              <div class="mb-1.5 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Prompt")}</div>
-              <pre class="whitespace-pre-wrap rounded-lg bg-zinc-900 p-3 text-sm text-zinc-300">{cron.prompt}</pre>
-            </div>
+            <details class="group mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40">
+              <summary class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">
+                <span class="text-zinc-600 transition group-open:rotate-90">▸</span> {gettext("Prompt")}
+              </summary>
+              <pre class="whitespace-pre-wrap border-t border-zinc-800 p-3 text-sm text-zinc-300">{cron.prompt}</pre>
+            </details>
 
-            <div class="mt-5">
-              <div class="mb-1.5 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Run log")}</div>
+            <div class="mt-6 border-t border-zinc-800 pt-5">
+              <div class="mb-3 flex items-baseline gap-2">
+                <span class="text-sm font-semibold uppercase tracking-wider text-zinc-400">{gettext("Run log")}</span>
+                <span class="text-sm text-zinc-600">{length(cron_log_entries(@viewing_log))}</span>
+              </div>
               <p :if={cron_log_entries(@viewing_log) == []} class="text-[15px] text-zinc-500">{gettext("No runs yet.")}</p>
-              <div :for={e <- cron_log_entries(@viewing_log)} class="mb-2 rounded-lg border border-zinc-800 p-3">
-                <div class="flex items-center gap-2 text-sm">
+              <div :for={e <- cron_log_entries(@viewing_log)} class="mb-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+                <div class="mb-2 flex items-center gap-2 border-b border-zinc-800/70 pb-2 text-sm">
                   <span>{(e["ok"] && "✅") || "⚠️"}</span>
-                  <span class="text-zinc-300">{learn_date(e["at"])}</span>
+                  <span class="font-medium text-zinc-300">{learn_date(e["at"])}</span>
                   <span class="text-zinc-500">· {e["source"]}</span>
                 </div>
-                <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-zinc-950/60 p-2.5 text-sm text-zinc-400">{e["output"]}</pre>
+                <pre class="max-h-96 overflow-auto whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-300">{e["output"]}</pre>
               </div>
             </div>
           </div>
@@ -214,7 +219,7 @@ defmodule PepeWeb.ScheduledLive do
               <div class="flex shrink-0 gap-1 text-sm">
                 <button phx-click="cron_run" phx-value-id={c.id} disabled={MapSet.member?(@running, c.id)}
                   class={[btn_ghost(), "disabled:opacity-50"]}>
-                  {if MapSet.member?(@running, c.id), do: gettext("running..."), else: gettext("Run now")}
+                  {if MapSet.member?(@running, c.id), do: gettext("Running..."), else: gettext("Run now")}
                 </button>
                 <button phx-click="cron_log" phx-value-id={c.id} class={btn_ghost()}>{gettext("Log")}</button>
                 <button phx-click="cron_edit" phx-value-id={c.id} class={btn_ghost()}>{gettext("Edit")}</button>
@@ -225,8 +230,8 @@ defmodule PepeWeb.ScheduledLive do
             <div class="mt-1 text-sm text-zinc-400"><code>{c.schedule}</code> · {c.timezone} · {gettext("next")} {cron_next(c)}</div>
             <div class="text-sm text-zinc-500">{c.agent}{model_suffix(c.model)} · -> {deliver_label(c.deliver)}</div>
             <div :if={cron_last(c.id)} class="mt-1 text-sm text-zinc-500">
-              {cron_last_icon(c.id)} {gettext("last run")} {learn_date(cron_last(c.id)["at"])} ·
-              <button phx-click="cron_log" phx-value-id={c.id} class="text-orange-400 hover:text-orange-300">{gettext("see log")}</button>
+              {cron_last_icon(c.id)} {gettext("Last run")} {learn_date(cron_last(c.id)["at"])} ·
+              <button phx-click="cron_log" phx-value-id={c.id} class="text-orange-400 hover:text-orange-300">{gettext("See log")}</button>
             </div>
           </div>
           <p :if={@crons == []} class="text-[15px] text-zinc-500">{gettext("No scheduled tasks yet. Create one with “+ New task”.")}</p>

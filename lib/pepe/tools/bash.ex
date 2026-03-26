@@ -31,9 +31,18 @@ defmodule Pepe.Tools.Bash do
     cwd = ctx[:cwd] || File.cwd!()
     timeout = args["timeout_ms"] || 60_000
 
+    case Pepe.Sandbox.guard(command) do
+      {:block, why} -> {:error, "refused: #{why}"}
+      :ok -> run_guarded(command, cwd, timeout)
+    end
+  end
+
+  def run(_, _), do: {:error, "missing 'command'"}
+
+  defp run_guarded(command, cwd, timeout) do
     task =
       Task.async(fn ->
-        System.cmd("sh", ["-c", command], cd: cwd, stderr_to_stdout: true)
+        Pepe.Sandbox.cmd("sh", ["-c", command], cd: cwd, stderr_to_stdout: true)
       end)
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
@@ -44,8 +53,6 @@ defmodule Pepe.Tools.Bash do
         {:error, "command timed out after #{timeout}ms"}
     end
   end
-
-  def run(_, _), do: {:error, "missing 'command'"}
 
   defp truncate(text, max \\ 30_000) do
     if byte_size(text) > max do

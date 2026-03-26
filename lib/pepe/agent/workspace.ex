@@ -114,9 +114,26 @@ defmodule Pepe.Agent.Workspace do
     persona = read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
 
-    [persona, identity, knowledge_index(name), docs_index(), skills_index(), convention_note()]
+    [persona, identity, now_note(), knowledge_index(name), docs_index(), skills_index(), convention_note()]
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n\n")
+  end
+
+  # Ground the agent in the operator's local time so "today"/"tomorrow" and any
+  # scheduling are computed in the configured timezone, never assumed to be UTC.
+  defp now_note do
+    tz = Pepe.Config.default_timezone()
+
+    case DateTime.now(tz) do
+      {:ok, dt} ->
+        "## Current time\n" <>
+          Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S") <>
+          " (#{tz}). Treat this as \"now\" for anything time-relative — today, " <>
+          "tomorrow, scheduling. Do not assume UTC."
+
+      _ ->
+        nil
+    end
   end
 
   # List Pepe's own how-to docs. They are authoritative for how Pepe works - the

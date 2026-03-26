@@ -47,7 +47,7 @@ defmodule PepeWeb.LearningLive do
           <div :if={!@editing} class="flex items-center gap-2">
             <button phx-click="consolidate_now" disabled={@consolidating || is_nil(@learn_agent)} class={btn_ghost()}
               title={gettext("The agent re-reads its own memory and skills and tidies them (dedupe, prune, merge).")}>
-              {if @consolidating, do: gettext("consolidating..."), else: gettext("Consolidate now")}
+              {if @consolidating, do: gettext("Consolidating..."), else: gettext("Consolidate now")}
             </button>
             <button phx-click="toggle_auto" disabled={is_nil(@learn_agent)} class={btn_ghost()}
               title={gettext("Run a consolidation pass automatically every night.")}>
@@ -193,7 +193,7 @@ defmodule PepeWeb.LearningLive do
       title: title,
       path: user,
       content: read(if(File.exists?(user), do: user, else: builtin)),
-      note: override? && gettext("editing the built-in: saving creates your own copy")
+      note: override? && gettext("Editing the built-in: saving creates your own copy")
     }
   end
 

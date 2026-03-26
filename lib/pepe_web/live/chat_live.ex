@@ -17,6 +17,9 @@ defmodule PepeWeb.ChatLive do
   alias Pepe.Permissions.Prompt
   alias Pepe.Session.Focus
 
+  # How many of the most recent messages to render before "Load earlier messages".
+  @window 40
+
   defp slash_commands do
     [
       {"/new", gettext("Start a fresh conversation")},
@@ -26,19 +29,25 @@ defmodule PepeWeb.ChatLive do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     if connected?(socket), do: :timer.send_interval(3000, self(), :refresh_sessions)
+
+    scope = params["scope"] || "all"
 
     {:ok,
      assign(socket,
        page_title: "Pepe · Chat",
-       scope: "all",
+       scope: scope,
        companies: Config.companies(),
        new_company: false,
-       sessions: list_sessions(),
+       f_agent: "",
+       f_channel: "",
+       f_q: "",
+       sessions: list_sessions(scope),
        selected: nil,
        agent: nil,
        messages: [],
+       window: @window,
        streaming: "",
        running: false,
        activity: [],
@@ -59,13 +68,15 @@ defmodule PepeWeb.ChatLive do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :visible, filter_sessions(assigns.sessions, assigns.f_agent, assigns.f_channel, assigns.f_q))
+
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
       <.sidebar active="chat" scope={@scope} companies={@companies} new_company={@new_company} />
       <main class="flex min-w-0 flex-1 flex-col">
         <div class="flex h-full min-w-0">
-          <div class="flex w-72 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30">
+          <div class="flex w-80 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30">
             <div class="border-b border-zinc-800 p-3">
               <button phx-click="new_chat" class="w-full rounded-lg bg-orange-600 px-3 py-2 text-[15px] font-medium transition hover:bg-orange-500">
                 + {gettext("New chat")}
@@ -74,8 +85,30 @@ defmodule PepeWeb.ChatLive do
                 {gettext("Every conversation (web, Telegram, API and console) appears here.")}
               </p>
             </div>
+
+            <form :if={@sessions != []} phx-change="filter_chats" class="space-y-2 border-b border-zinc-800 p-3">
+              <input
+                name="q"
+                value={@f_q}
+                autocomplete="off"
+                phx-debounce="200"
+                placeholder={gettext("Search conversations")}
+                class="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600"
+              />
+              <div class="grid grid-cols-2 gap-2">
+                <select name="agent" class="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200">
+                  <option value="">{gettext("All agents")}</option>
+                  <option :for={a <- session_agents(@sessions)} value={a} selected={a == @f_agent}>{a}</option>
+                </select>
+                <select name="channel" class="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200">
+                  <option value="">{gettext("All channels")}</option>
+                  <option :for={c <- session_channels(@sessions)} value={c} selected={c == @f_channel}>{type_label(c)}</option>
+                </select>
+              </div>
+            </form>
+
             <div class="flex-1 overflow-y-auto py-1">
-              <div :for={{type, items} <- grouped(@sessions)}>
+              <div :for={{type, items} <- grouped(@visible)}>
                 <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-zinc-600">
                   {type_label(type)} <span class="text-zinc-700">· {length(items)}</span>
                 </div>
@@ -90,6 +123,9 @@ defmodule PepeWeb.ChatLive do
               </div>
               <p :if={@sessions == []} class="px-4 py-6 text-[15px] text-zinc-500">
                 {gettext("No conversations yet. Start one with “New chat”.")}
+              </p>
+              <p :if={@sessions != [] and @visible == []} class="px-4 py-6 text-[15px] text-zinc-500">
+                {gettext("No conversations match these filters.")}
               </p>
             </div>
           </div>
@@ -108,11 +144,14 @@ defmodule PepeWeb.ChatLive do
 
             <.focus_panel :if={@focus} focus={@focus} />
 
-            <div class="flex-1 space-y-3 overflow-y-auto p-5">
+            <div id="chat-scroll" phx-hook=".ChatScroll" class="flex-1 space-y-3 overflow-y-auto p-5">
               <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-[15px] text-zinc-600">
                 {gettext("Fresh conversation. Send a message to start.")}
               </div>
-              <.bubble :for={m <- @messages} role={m.role} content={m.content} />
+              <div :if={length(@messages) > @window} class="flex justify-center">
+                <button phx-click="load_older" class={btn_ghost()}>{gettext("Load earlier messages")}</button>
+              </div>
+              <.bubble :for={m <- visible(@messages, @window)} role={m.role} content={m.content} />
               <.bubble :if={@running and @streaming != ""} role="assistant" content={@streaming} />
               <.activity :if={(@running or @activity != []) and !@pending_perm} running={@running} steps={@activity} />
 
@@ -153,6 +192,27 @@ defmodule PepeWeb.ChatLive do
         </div>
       </main>
     </div>
+
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".ChatScroll">
+      export default {
+        atBottom() {
+          return this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight < 80
+        },
+        toBottom() {
+          this.el.scrollTop = this.el.scrollHeight
+        },
+        mounted() {
+          this.stick = true
+          this.toBottom()
+        },
+        beforeUpdate() {
+          this.stick = this.atBottom()
+        },
+        updated() {
+          if (this.stick) this.toBottom()
+        }
+      }
+    </script>
     """
   end
 
@@ -246,13 +306,15 @@ defmodule PepeWeb.ChatLive do
   @impl true
   def handle_event("type", %{"text" => text}, socket), do: {:noreply, assign(socket, input: text)}
 
+  def handle_event("load_older", _p, socket), do: {:noreply, assign(socket, window: socket.assigns.window + @window)}
+
   def handle_event("select", %{"key" => key}, socket) do
     {:noreply, push_patch(socket, to: ~p"/chat?chat=#{key}")}
   end
 
   def handle_event("delete", %{"key" => key}, socket) do
     SessionSupervisor.terminate(key)
-    socket = assign(socket, sessions: list_sessions())
+    socket = assign(socket, sessions: list_sessions(socket.assigns.scope))
 
     if socket.assigns.selected == key do
       unsubscribe(key)
@@ -274,12 +336,12 @@ defmodule PepeWeb.ChatLive do
   end
 
   def handle_event("new_chat", _params, socket) do
-    agent = Config.default_agent_name()
+    agent = default_agent_for(socket.assigns.scope)
     key = "web:" <> Integer.to_string(System.unique_integer([:positive]))
 
     case agent && SessionSupervisor.ensure(key, agent) do
       {:ok, _pid} ->
-        {:noreply, socket |> assign(sessions: list_sessions()) |> push_patch(to: ~p"/chat?chat=#{key}")}
+        {:noreply, socket |> assign(sessions: list_sessions(socket.assigns.scope)) |> push_patch(to: ~p"/chat?chat=#{key}")}
 
       _ ->
         {:noreply, put_flash(socket, :error, gettext("No default agent configured."))}
@@ -345,6 +407,15 @@ defmodule PepeWeb.ChatLive do
     end
   end
 
+  def handle_event("filter_chats", params, socket) do
+    {:noreply,
+     assign(socket,
+       f_agent: params["agent"] || "",
+       f_channel: params["channel"] || "",
+       f_q: params["q"] || ""
+     )}
+  end
+
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/chat")}
 
@@ -376,7 +447,7 @@ defmodule PepeWeb.ChatLive do
   end
 
   def handle_info(:refresh_sessions, socket),
-    do: {:noreply, assign(socket, sessions: list_sessions(), focus: load_focus(socket.assigns.selected))}
+    do: {:noreply, assign(socket, sessions: list_sessions(socket.assigns.scope), focus: load_focus(socket.assigns.selected))}
 
   def handle_info(:clear_activity, socket) do
     # Only clear once the run is really over (a new run may have started meanwhile).
@@ -404,7 +475,7 @@ defmodule PepeWeb.ChatLive do
       streaming: "",
       running: false,
       pending_perm: nil,
-      sessions: list_sessions()
+      sessions: list_sessions(socket.assigns.scope)
     )
   end
 
@@ -441,12 +512,18 @@ defmodule PepeWeb.ChatLive do
       selected: key,
       agent: status(key).agent,
       messages: history(key),
+      window: @window,
       streaming: "",
       running: false,
       activity: [],
       focus: load_focus(key)
     )
   end
+
+  # Render only the most recent `window` messages (a long chat is slow to render all at
+  # once); "Load earlier messages" widens the window on demand.
+  defp visible(messages, window) when length(messages) <= window, do: messages
+  defp visible(messages, window), do: Enum.take(messages, -window)
 
   # The session's current goal + plan (from the disposable store), for the focus panel.
   defp load_focus(nil), do: nil
@@ -533,13 +610,18 @@ defmodule PepeWeb.ChatLive do
       else: []
   end
 
-  defp list_sessions do
+  # A default agent for the current scope: the company's own, else the global default.
+  defp default_agent_for(scope) when scope in [nil, "all", "root"], do: Config.default_agent_name()
+  defp default_agent_for(company), do: Config.default_agent_for(company) || Config.default_agent_name()
+
+  defp list_sessions(scope) do
     live = MapSet.new(SessionSupervisor.list())
     persisted = SessionPersistence.all() |> Enum.map(&elem(&1, 0))
 
     (MapSet.to_list(live) ++ persisted)
     |> Enum.uniq()
     |> Enum.map(&session_card(&1, MapSet.member?(live, &1)))
+    |> Enum.filter(&in_scope?(&1.agent, scope))
     |> Enum.sort_by(& &1.key)
   end
 
@@ -573,6 +655,25 @@ defmodule PepeWeb.ChatLive do
     else
       _ -> nil
     end
+  end
+
+  defp filter_sessions(sessions, f_agent, f_channel, f_q) do
+    q = f_q |> to_string() |> String.trim() |> String.downcase()
+
+    Enum.filter(sessions, fn s ->
+      (f_agent == "" or s.agent == f_agent) and
+        (f_channel == "" or s.type == f_channel) and
+        (q == "" or String.contains?(String.downcase(s.key), q) or
+           String.contains?(String.downcase(to_string(s.agent)), q))
+    end)
+  end
+
+  defp session_agents(sessions) do
+    sessions |> Enum.map(& &1.agent) |> Enum.reject(&(&1 in [nil, ""])) |> Enum.uniq() |> Enum.sort()
+  end
+
+  defp session_channels(sessions) do
+    sessions |> Enum.map(& &1.type) |> Enum.uniq() |> Enum.sort()
   end
 
   @type_order ~w(telegram web tui api)

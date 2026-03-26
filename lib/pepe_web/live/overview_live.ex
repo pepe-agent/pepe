@@ -64,7 +64,7 @@ defmodule PepeWeb.OverviewLive do
 
         <div class="flex-1 space-y-6 overflow-y-auto p-6">
           <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <.stat label={gettext("Live sessions")} value={Integer.to_string(@live_sessions)} sub={gettext("open right now")} />
+            <.stat label={gettext("Live sessions")} value={Integer.to_string(@live_sessions)} sub={gettext("Open right now")} />
             <.stat label={gettext("Messages this month")} value={tokens(@month.totals.count)} sub={gettext("model calls")} />
             <.stat label={gettext("Tokens this month")} value={tokens(@month.totals.total)} sub={gettext("in + out")} />
             <.stat label={gettext("To bill this month")} value={money(@month.totals.billable, @month.currency)} sub={gettext("cost %{c}", c: money(@month.totals.cost, @month.currency))} accent />
@@ -85,7 +85,7 @@ defmodule PepeWeb.OverviewLive do
                 <div :for={b <- @days} class="group relative flex-1" title={"#{b.key}: #{tokens(b.total)} tok"}>
                   <div class="w-full rounded-t bg-orange-600/70" style={"height: #{bar_pct(b.total, @days)}%"}></div>
                 </div>
-                <p :if={@days == []} class="m-auto text-sm text-zinc-600">{gettext("no usage yet")}</p>
+                <p :if={@days == []} class="m-auto text-sm text-zinc-600">{gettext("No usage yet")}</p>
               </div>
             </div>
 
@@ -99,7 +99,7 @@ defmodule PepeWeb.OverviewLive do
                     <span class="w-20 text-right font-medium">{money(c.billable, @month.currency)}</span>
                   </span>
                 </div>
-                <p :if={@month.by_company == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("no usage yet")}</p>
+                <p :if={@month.by_company == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("No usage yet")}</p>
               </div>
             </div>
           </div>
@@ -157,7 +157,7 @@ defmodule PepeWeb.OverviewLive do
             <span class="w-20 text-right font-medium">{money(r.cost, @currency)}</span>
           </span>
         </div>
-        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("nothing yet")}</p>
+        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("Nothing yet")}</p>
       </div>
     </div>
     """
@@ -171,7 +171,7 @@ defmodule PepeWeb.OverviewLive do
   end
 
   defp scope_label("all"), do: gettext("all scopes")
-  defp scope_label("root"), do: gettext("the root scope")
+  defp scope_label("root"), do: gettext("the Principal scope")
   defp scope_label(company), do: company
 
   @impl true

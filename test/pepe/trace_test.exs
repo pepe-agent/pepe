@@ -30,6 +30,8 @@ defmodule Pepe.TraceTest do
     [summary] = Trace.recent("acme")
     assert summary["agent"] == "acme/bot"
     assert summary["session"] == "api:123"
+    # source is derived from the session key's first segment when not given explicitly
+    assert summary["source"] == "api"
     assert summary["outcome"]["kind"] == "ok"
     assert summary["tools"] == ["read_file"]
     refute Map.has_key?(summary, "events")
@@ -46,6 +48,41 @@ defmodule Pepe.TraceTest do
     [summary] = Trace.recent("root")
     assert summary["outcome"]["kind"] == "error"
     assert summary["outcome"]["reason"] =~ "budget_exceeded"
+  end
+
+  test "the summary carries compact per-model token usage" do
+    assert Trace.start("bot", nil) == :started
+    Trace.event({:usage, "gpt", %{prompt_tokens: 100, completion_tokens: 40}})
+    Trace.event({:usage, "gpt", %{prompt_tokens: 10, completion_tokens: 5}})
+    Trace.finish({:ok, "done", []})
+
+    [summary] = Trace.recent("root")
+    assert summary["usage"] == [%{"model" => "gpt", "in" => 100, "out" => 40}, %{"model" => "gpt", "in" => 10, "out" => 5}]
+    refute Map.has_key?(summary, "events")
+  end
+
+  test "usage accepts the Responses-API token key names" do
+    assert Trace.start("bot", nil) == :started
+    Trace.event({:usage, "gpt", %{"input_tokens" => 80, "output_tokens" => 20}})
+    Trace.finish({:ok, "x", []})
+
+    [s] = Trace.recent("root")
+    assert s["usage"] == [%{"model" => "gpt", "in" => 80, "out" => 20}]
+  end
+
+  test "an explicit source overrides the session-derived one" do
+    assert Trace.start("bot", nil, "housekeeping", "cron") == :started
+    Trace.finish({:ok, "done", []})
+
+    [summary] = Trace.recent("root")
+    assert summary["source"] == "cron"
+  end
+
+  test "source_from_session reads the surface off the session key" do
+    assert Trace.source_from_session("telegram:42") == "telegram"
+    assert Trace.source_from_session("telegram:sales:42") == "telegram"
+    assert Trace.source_from_session("chatwoot:assistant:c1") == "chatwoot"
+    assert Trace.source_from_session(nil) == "manual"
   end
 
   test "a nested run folds its events into the outer trace, not a second one" do

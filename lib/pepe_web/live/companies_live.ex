@@ -45,7 +45,7 @@ defmodule PepeWeb.CompaniesLive do
         <.view_header
           icon="🏢"
           title={gettext("Companies")}
-          desc={gettext("A company is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Root is the default, non-company workspace.")}
+          desc={gettext("A company is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Principal is the default, non-company workspace.")}
         >
           <button :if={!@editing} phx-click="company_new" class={btn()}>{gettext("+ New company")}</button>
           <button :if={@editing} phx-click="company_cancel" class={btn_ghost()}>&larr; {gettext("Back to companies")}</button>
