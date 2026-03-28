@@ -1,0 +1,30 @@
+---
+import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import type { Locale } from "../i18n/ui";
+
+const { title, description, lang, docs = false } = Astro.props as {
+  title: string;
+  description?: string;
+  lang: Locale;
+  docs?: boolean;
+};
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <link rel="icon" type="image/svg+xml" href="/pepe-icon.svg" />
+    <meta name="theme-color" content="#0a0a0b" />
+  </head>
+  <body>
+    <Nav lang={lang} docs={docs} />
+    <slot />
+    <Footer lang={lang} />
+  </body>
+</html>

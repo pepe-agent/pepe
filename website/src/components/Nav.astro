@@ -1,0 +1,31 @@
+---
+import { t, type Locale } from "../i18n/ui";
+import { withLocale } from "../i18n/utils";
+import LangSwitcher from "./LangSwitcher.astro";
+
+const { lang, docs = false } = Astro.props as { lang: Locale; docs?: boolean };
+const tr = t(lang);
+const home = withLocale(lang, "/");
+---
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href={home}>
+      <img class="logo" src="/pepe-icon.svg" width="42" height="42" alt="Pepe" />
+      <span class="brand-text">
+        <span class="brand-name">Pepe</span>
+        <span class="tag">{docs ? "docs" : "agent runtime"}</span>
+      </span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu"
+      onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+    <nav class="nav-links">
+      {!docs && <a href={`${home}#features`}>{tr("nav.features")}</a>}
+      {!docs && <a href={`${home}#surfaces`}>{tr("nav.surfaces")}</a>}
+      {!docs && <a href={`${home}#channels`}>{tr("nav.channels")}</a>}
+      <a href={withLocale(lang, "/docs/")}>{tr("nav.docs")}</a>
+      <LangSwitcher lang={lang} />
+      <a class="nav-cta" href="https://github.com/jhonathas/pepe">GitHub</a>
+    </nav>
+  </div>
+</header>

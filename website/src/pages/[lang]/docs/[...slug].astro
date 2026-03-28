@@ -1,0 +1,68 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { locales, type Locale } from "../../../i18n/ui";
+import { withLocale } from "../../../i18n/utils";
+import { docsNav, allSlugs, groupLabels } from "../../../docs/nav";
+
+// Eager-load every doc markdown; key by "<lang>/<slug>".
+const mods = import.meta.glob("../../../docs/**/*.md", { eager: true }) as Record<string, any>;
+
+function docFor(lang: string, slug: string) {
+  const key = Object.keys(mods).find((k) => k.endsWith(`/${lang}/${slug}.md`));
+  if (key) return mods[key];
+  const en = Object.keys(mods).find((k) => k.endsWith(`/en/${slug}.md`));
+  return en ? mods[en] : null;
+}
+
+export function getStaticPaths() {
+  const paths: any[] = [];
+  for (const lang of locales) {
+    for (const slug of allSlugs) {
+      paths.push({ params: { lang, slug: slug === "index" ? undefined : slug } });
+    }
+  }
+  return paths;
+}
+
+const lang = Astro.params.lang as Locale;
+const slug = (Astro.params.slug as string | undefined) ?? "index";
+const mod = docFor(lang, slug);
+const { Content, frontmatter } = mod;
+
+const hrefOf = (s: string) => withLocale(lang, s === "index" ? "/docs/" : `/docs/${s}/`);
+const titleOf = (s: string) => docFor(lang, s)?.frontmatter?.title ?? s;
+
+const sidebar = docsNav.map((g) => ({
+  label: groupLabels[lang][g.group],
+  items: g.slugs.map((s) => ({ slug: s, title: titleOf(s), href: hrefOf(s) })),
+}));
+
+const idx = allSlugs.indexOf(slug);
+const prev = idx > 0 ? allSlugs[idx - 1] : null;
+const next = idx < allSlugs.length - 1 ? allSlugs[idx + 1] : null;
+---
+
+<Base title={`${frontmatter.title} · Pepe docs`} description={frontmatter.description} lang={lang} docs={true}>
+  <div class="container docs">
+    <aside class="docs-nav">
+      {sidebar.map((g) => (
+        <div>
+          <h4>{g.label}</h4>
+          {g.items.map((it) => (
+            <a href={it.href} class={it.slug === slug ? "active" : ""}>{it.title}</a>
+          ))}
+        </div>
+      ))}
+    </aside>
+
+    <article class="doc-content">
+      <h1>{frontmatter.title}</h1>
+      {frontmatter.description && <p class="sub">{frontmatter.description}</p>}
+      <Content />
+      <div class="doc-foot">
+        {prev ? <a href={hrefOf(prev)}>← {titleOf(prev)}</a> : <span></span>}
+        {next ? <a href={hrefOf(next)}>{titleOf(next)} →</a> : <span></span>}
+      </div>
+    </article>
+  </div>
+</Base>

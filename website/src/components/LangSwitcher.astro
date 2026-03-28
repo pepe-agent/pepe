@@ -1,0 +1,39 @@
+---
+import { locales, localeNames, type Locale } from "../i18n/ui";
+import { swapLocale } from "../i18n/utils";
+
+const { lang } = Astro.props as { lang: Locale };
+const here = Astro.url.pathname;
+---
+
+<div class="lang">
+  <button class="lang-btn" aria-haspopup="true" aria-expanded="false"
+    onclick="this.parentElement.classList.toggle('open')">
+    🌐 <span>{lang.toUpperCase()}</span> <span class="caret">▾</span>
+  </button>
+  <div class="lang-menu">
+    {locales.map((l) => (
+      <a href={swapLocale(here, l as Locale)} class={l === lang ? "on" : ""}>{localeNames[l as Locale]}</a>
+    ))}
+  </div>
+</div>
+
+<style>
+  .lang { position: relative; }
+  .lang-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 10px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .lang-btn:hover { color: var(--text); }
+  .caret { font-size: 10px; }
+  .lang-menu {
+    display: none; position: absolute; right: 0; top: 40px; z-index: 60;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 11px;
+    padding: 6px; min-width: 170px; box-shadow: 0 20px 50px -20px rgba(0,0,0,.7);
+  }
+  .lang.open .lang-menu { display: block; }
+  .lang-menu a { display: block; padding: 8px 12px; border-radius: 8px; color: var(--muted); font-size: 14px; }
+  .lang-menu a:hover { background: var(--panel-2); color: var(--text); }
+  .lang-menu a.on { color: var(--accent-soft); font-weight: 600; }
+</style>

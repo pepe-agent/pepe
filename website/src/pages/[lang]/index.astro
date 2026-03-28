@@ -1,0 +1,164 @@
+---
+import Base from "../../layouts/Base.astro";
+import { ui, t, locales, type Locale } from "../../i18n/ui";
+import { withLocale } from "../../i18n/utils";
+
+export function getStaticPaths() {
+  return locales.map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Locale;
+const tr = t(lang);
+const d = (p: string) => withLocale(lang, p);
+
+const surfaces = [
+  { ico: "⌨️", t: "surf.cli.t", d: "surf.cli.d" },
+  { ico: "🔌", t: "surf.http.t", d: "surf.http.d" },
+  { ico: "🔗", t: "surf.ws.t", d: "surf.ws.d" },
+  { ico: "💬", t: "surf.ch.t", d: "surf.ch.d" },
+] as const;
+
+const features = [
+  { ico: "🧠", t: "f.model.t", d: "f.model.d" },
+  { ico: "🛠️", t: "f.tools.t", d: "f.tools.d" },
+  { ico: "📡", t: "f.channels.t", d: "f.channels.d" },
+  { ico: "🕒", t: "f.cron.t", d: "f.cron.d" },
+  { ico: "🧩", t: "f.plugins.t", d: "f.plugins.d" },
+  { ico: "🛡️", t: "f.sandbox.t", d: "f.sandbox.d" },
+  { ico: "🏢", t: "f.tenant.t", d: "f.tenant.d" },
+  { ico: "🧵", t: "f.traces.t", d: "f.traces.d" },
+  { ico: "🗄️", t: "f.nodb.t", d: "f.nodb.d" },
+] as const;
+
+const steps = [
+  { t: "how.1.t", d: "how.1.d" },
+  { t: "how.2.t", d: "how.2.d" },
+  { t: "how.3.t", d: "how.3.d" },
+  { t: "how.4.t", d: "how.4.d" },
+] as const;
+
+const channels = ["Telegram", "WhatsApp", "Slack", "Discord", "Microsoft Teams", "Google Chat"];
+type K = keyof (typeof ui)["en"];
+---
+
+<Base title="Pepe, the AI agent runtime you run yourself" description={tr("hero.lead")} lang={lang}>
+  <section class="hero">
+    <div class="container">
+      <h1 set:html={tr("hero.title")} />
+      <p class="lead">{tr("hero.lead")}</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href={d("/docs/quickstart/")}>{tr("hero.cta_start")}</a>
+        <a class="btn btn-ghost" href={d("/docs/")}>{tr("hero.cta_docs")}</a>
+      </div>
+
+      <div class="terminal">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <pre><code><span class="c-dim"># install (one line)</span>
+curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
+
+<span class="c-dim"># scaffold, connect a model, add an agent</span>
+<span class="c-key">pepe</span> setup
+<span class="c-key">pepe</span> model add openrouter --base-url <span class="c-str">$URL</span> --model <span class="c-str">gpt-5</span>
+<span class="c-key">pepe</span> agent add assistant --tools bash,web_search,send_file
+
+<span class="c-dim"># talk to it, or serve it to every surface</span>
+<span class="c-key">pepe</span> run assistant <span class="c-str">"summarize this repo"</span>
+<span class="c-key">pepe</span> serve <span class="c-dim">--port 4000</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section id="surfaces">
+    <div class="container">
+      <div class="section-head">
+        <h2>{tr("surfaces.title")}</h2>
+        <p>{tr("surfaces.sub")}</p>
+      </div>
+      <div class="surfaces">
+        {surfaces.map((s) => (
+          <div class="surface">
+            <div class="ico">{s.ico}</div>
+            <h3>{tr(s.t as K)}</h3>
+            <p>{tr(s.d as K)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <h2>{tr("features.title")}</h2>
+        <p>{tr("features.sub")}</p>
+      </div>
+      <div class="grid">
+        {features.map((f) => (
+          <div class="card">
+            <div class="ico">{f.ico}</div>
+            <h3>{tr(f.t as K)}</h3>
+            <p>{tr(f.d as K)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section id="channels">
+    <div class="container">
+      <div class="section-head">
+        <h2>{tr("channels.title")}</h2>
+        <p>{tr("channels.sub")}</p>
+      </div>
+      <div class="channels">
+        {channels.map((c) => (
+          <span class="chip"><span class="dot"></span> {c}</span>
+        ))}
+        <span class="chip">+ plugins</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="section-head">
+        <h2>{tr("how.title")}</h2>
+        <p>{tr("how.sub")}</p>
+      </div>
+      <div class="steps">
+        {steps.map((s, i) => (
+          <div class="step">
+            <div class="n">{i + 1}</div>
+            <h3>{tr(s.t as K)}</h3>
+            <p>{tr(s.d as K)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="why">
+    <div class="container why-grid">
+      <img src="/pepe.jpg" alt="Pepe" class="why-img" width="220" height="220" />
+      <div>
+        <h2>{tr("why.title")}</h2>
+        <p>{tr("why.body")}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="container">
+      <h2>{tr("cta.title")}</h2>
+      <p>{tr("cta.sub")}</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href={d("/docs/quickstart/")}>{tr("cta.start")}</a>
+        <a class="btn btn-ghost" href="https://github.com/jhonathas/pepe">{tr("cta.github")}</a>
+      </div>
+    </div>
+  </section>
+</Base>
