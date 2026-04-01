@@ -65,6 +65,16 @@ Um unico carater universal `"*"` em `auto_approve` significa que o agente execut
 
 <div class="note"><strong>As superficies sem uma pessoa correm livremente.</strong> A API HTTP nao tem a quem perguntar, por isso nao fornece nenhum aprovador e as ferramentas arriscadas correm sem perguntar. Trate a API como totalmente fidedigna, e proteja-a com um token (ver abaixo) antes de a expor.</div>
 
+### O proprietario pode conduzir a CLI por chat
+
+A ferramenta `manage_pepe` executa os mesmos comandos `pepe` nao interativos que o utilizador escreveria num terminal (acrescentar um modelo, definir um agente, cunhar um token, agendar uma tarefa, gerir empresas), para que um agente proprietario fidedigno consiga operar todo o runtime a partir de uma conversa.
+
+> Utilizador: Acrescenta um agente chamado researcher com as ferramentas web_search e read_file.
+>
+> Agente: (pede-lhe confirmacao e depois executa `pepe agent add researcher --tools web_search,read_file`) Pronto. O agente researcher esta pronto.
+
+E a ferramenta mais poderosa que existe. Conceda-a apenas a um agente proprietario em quem confie totalmente, nunca a um exposto a entradas nao fidedignas. Como todas as ferramentas que atuam, passa pela barreira de permissao, e os comandos interativos ou de longa duracao (`setup`, `chat`, `serve` e os gateways em primeiro plano) sao recusados porque nao conseguem correr como uma execucao unica. Para um unico trabalho mais estreito, prefira as ferramentas focadas: `manage_token` para tokens, `manage_channel` para canais, `schedule_task` para crons.
+
 ## Protecoes de comandos
 
 As ferramentas de shell (`bash` e `run_script`) passam cada comando por uma guarda primeiro. A guarda recusa um conjunto pequeno e deliberadamente estreito de operacoes catastroficas que nunca sao legitimas:
@@ -150,7 +160,7 @@ Um agente ao qual sejam concedidas as ferramentas de leitura apenas `config_get`
 
 A ferramenta `doctor` faz uma verificacao de saude de toda a configuracao e sinaliza segredos `${ENV}` por definir, agentes a apontar para modelos em falta, agendamentos invalidos e ligacoes inalcancaveis. Passe `live: true` para tambem sondar a rede.
 
-<div class="note"><strong>As definicoes sensiveis a seguranca nao sao editaveis por conversa.</strong> A ferramenta protegida `config_set` fecha por predefinicao: so mexe numa lista de permissoes curta (o modelo e o agente predefinidos, o idioma, o fuso horario e algumas opcoes do Telegram). Os segredos, as listas de ferramentas permitidas, os tokens de bot, o invólucro do ambiente isolado, a palavra-passe do painel e os tokens da API ficam de proposito fora dessa lista. Um agente nao os consegue alterar em conversa; esses e o utilizador que os define atraves da CLI ou editando a configuracao.</div>
+<div class="note"><strong>As definicoes sensiveis a seguranca nao sao editaveis pela ferramenta geral de configuracao.</strong> A ferramenta protegida `config_set` fecha por predefinicao: so mexe numa lista de permissoes curta (o modelo e o agente predefinidos, o idioma, o fuso horario e algumas opcoes do Telegram). Os segredos, as listas de ferramentas permitidas, os tokens de bot, o involucro do ambiente isolado e a palavra-passe do painel ficam de proposito fora dessa lista, pelo que o `config_set` nao os consegue alterar. Esses e o utilizador que os define, atraves da CLI ou do painel. Os tokens da API sao a unica coisa que um agente consegue cunhar por conversa, mas apenas atraves da ferramenta separada e protegida por permissoes `manage_token`, nunca atraves do `config_set`.</div>
 
 ## Hooks de censura (limpeza opcional de dados pessoais)
 
@@ -211,13 +221,13 @@ Vinculado a uma interface publica sem palavra-passe, o painel fecha por predefin
 
 ## Tokens da API
 
-A API HTTP fica aberta quando nenhum token existe, o que mantem simples uma configuracao de um so inquilino. Criar o primeiro token muda-a para fechada: dai em diante cada pedido a `/v1` precisa de um cabecalho `Authorization: Bearer` a transportar um token valido. Gere um com:
+Sem nenhum token, a API HTTP responde apenas a quem chama a partir de loopback (localhost). O primeiro token fecha-a para toda a gente, local ou remoto: dai em diante cada pedido a `/v1` precisa de um cabecalho `Authorization: Bearer` a transportar um token valido. Gere um com:
 
 ```bash
 pepe token add --label "ci pipeline"
 ```
 
-O token em bruto e mostrado uma unica vez e apenas o seu hash SHA-256 e armazenado, nunca o token em si. Um token pode ter ambito: `--company` limita-o aos agentes de um inquilino, e `--agent` limita-o a um unico agente (que tem de residir dentro dessa empresa). Faca a sua gestao com `pepe token list` e `pepe token revoke ID`. Para os formatos dos pedidos e a utilizacao do SDK, consulte a [pagina da API HTTP](./api/).
+O token em bruto e mostrado uma unica vez e apenas o seu hash SHA-256 e armazenado, nunca o token em si. Um token pode ter ambito: `--company` limita-o aos agentes de um inquilino, e `--agent` limita-o a um unico agente (que tem de residir dentro dessa empresa). Faca a sua gestao com `pepe token list` e `pepe token revoke ID`, a partir da pagina de tokens de API do painel, ou por conversa com um agente que tenha a ferramenta protegida `manage_token`. Para os formatos dos pedidos e a utilizacao do SDK, consulte a [pagina da API HTTP](./api/).
 
 ## Isolamento multi-inquilino
 

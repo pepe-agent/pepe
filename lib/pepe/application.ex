@@ -39,7 +39,9 @@ defmodule Pepe.Application do
         # Messaging gateways (Telegram, ...). No-ops when not configured.
         Pepe.Gateways.Supervisor,
         # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).
-        PepeWeb.LoginThrottle
+        PepeWeb.LoginThrottle,
+        # Per-session rate limiter for the embeddable chat widget (in-memory ETS, no DB).
+        PepeWeb.WidgetThrottle
       ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Pepe.Supervisor]

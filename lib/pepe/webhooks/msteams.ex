@@ -31,7 +31,14 @@ defmodule Pepe.Webhooks.MsTeams do
     [
       %{"key" => "app_id", "label" => "App id", "type" => "text", "hint" => "the bot's Microsoft app (client) id"},
       %{"key" => "app_password", "label" => "App password", "type" => "secret", "hint" => "the client secret; store as ${ENV_VAR}"},
-      %{"key" => "tenant_id", "label" => "Tenant id", "type" => "text", "hint" => "the Azure tenant id (or botframework.com)"}
+      %{"key" => "tenant_id", "label" => "Tenant id", "type" => "text", "hint" => "the Azure tenant id (or botframework.com)"},
+      %{
+        "key" => "require_mention",
+        "label" => "Require mention in channels",
+        "type" => "select",
+        "options" => ["true", "false"],
+        "hint" => "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
+      }
     ]
   end
 
@@ -61,6 +68,31 @@ defmodule Pepe.Webhooks.MsTeams do
   end
 
   def parse(_payload), do: :ignore
+
+  # A 1:1 chat always reaches the agent. In a team channel or group chat, optionally
+  # require the bot be @mentioned (a native `mention` entity targeting the bot's own
+  # recipient id) so it doesn't answer every message.
+  @impl true
+  def addressed?(config, %{"type" => "message"} = activity) do
+    cond do
+      get_in(activity, ["conversation", "conversationType"]) == "personal" -> true
+      mentions_bot?(activity) -> true
+      require_mention?(config) == false -> true
+      true -> false
+    end
+  end
+
+  def addressed?(_config, _payload), do: true
+
+  defp mentions_bot?(activity) do
+    bot_id = get_in(activity, ["recipient", "id"])
+
+    activity
+    |> Map.get("entities", [])
+    |> Enum.any?(fn e -> e["type"] == "mention" and get_in(e, ["mentioned", "id"]) == bot_id end)
+  end
+
+  defp require_mention?(config), do: provider_config(config)["require_mention"] != "false"
 
   defp strip_mention(text), do: text |> String.replace(~r{<at>.*?</at>}, "") |> String.trim()
 

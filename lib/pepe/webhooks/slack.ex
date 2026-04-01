@@ -35,6 +35,13 @@ defmodule Pepe.Webhooks.Slack do
         "label" => "Signing secret",
         "type" => "secret",
         "hint" => "from the app's Basic Information; store as ${ENV_VAR}"
+      },
+      %{
+        "key" => "require_mention",
+        "label" => "Require mention in channels",
+        "type" => "select",
+        "options" => ["true", "false"],
+        "hint" => "in a channel, reply only when the bot is @mentioned (default true); a direct message always replies"
       }
     ]
   end
@@ -85,6 +92,25 @@ defmodule Pepe.Webhooks.Slack do
   end
 
   defp user_message?(_), do: false
+
+  # A direct message always reaches the agent. In a channel, `app_mention` is Slack's
+  # own unambiguous "the bot was mentioned" event; a plain `message` event in a
+  # channel only counts when require_mention is off (set up both subscriptions, per
+  # the moduledoc, so a real mention always also arrives as app_mention).
+  @impl true
+  def addressed?(_config, %{"type" => "event_callback", "event" => %{"type" => "app_mention"}}),
+    do: true
+
+  def addressed?(_config, %{"type" => "event_callback", "event" => %{"channel_type" => "im"}}),
+    do: true
+
+  def addressed?(config, %{"type" => "event_callback", "event" => %{"type" => "message"} = event}) do
+    require_mention?(config) == false or String.starts_with?(event["channel"] || "", "D")
+  end
+
+  def addressed?(_config, _payload), do: true
+
+  defp require_mention?(config), do: provider_config(config)["require_mention"] != "false"
 
   @impl true
   def deliver(config, channel, text) do

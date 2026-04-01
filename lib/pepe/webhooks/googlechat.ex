@@ -34,6 +34,13 @@ defmodule Pepe.Webhooks.GoogleChat do
         "label" => "Access token",
         "type" => "secret",
         "hint" => "an OAuth token for the Chat API; store as ${ENV_VAR}"
+      },
+      %{
+        "key" => "require_mention",
+        "label" => "Require mention in spaces",
+        "type" => "select",
+        "options" => ["true", "false"],
+        "hint" => "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
       }
     ]
   end
@@ -61,6 +68,31 @@ defmodule Pepe.Webhooks.GoogleChat do
   end
 
   def parse(_payload), do: :ignore
+
+  # DMs always reach the agent. In a multi-person space, optionally require the app
+  # be @mentioned (native USER_MENTION annotation targeting the app itself) so it
+  # doesn't answer every message.
+  @impl true
+  def addressed?(config, %{"type" => "MESSAGE", "message" => message, "space" => space}) do
+    cond do
+      space["type"] in ["DM", "DIRECT_MESSAGE"] -> true
+      mentions_app?(message) -> true
+      require_mention?(config) == false -> true
+      true -> false
+    end
+  end
+
+  def addressed?(_config, _payload), do: true
+
+  defp mentions_app?(message) do
+    message
+    |> Map.get("annotations", [])
+    |> Enum.any?(fn a ->
+      a["type"] == "USER_MENTION" and get_in(a, ["userMention", "user", "name"]) == "users/app"
+    end)
+  end
+
+  defp require_mention?(config), do: provider_config(config)["require_mention"] != "false"
 
   @impl true
   def deliver(config, space, text) do

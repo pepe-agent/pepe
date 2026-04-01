@@ -172,7 +172,7 @@ defmodule PepeWeb.HooksLive do
         <option value="">{gettext("Pick a configured model")}</option>
         <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
-      <p class={hlp()}>{gettext("A local/cheap model is ideal: it only rewrites PII into pseudonyms.")}</p>
+      <p class={hlp()}>{gettext("Use a local model (e.g. Ollama). Picking a remote/hosted model here sends the raw, unredacted PII to that provider first, which defeats the purpose of this hook.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-[15px] text-zinc-300">
@@ -486,7 +486,10 @@ defmodule PepeWeb.HooksLive do
     do: gettext("Deterministic structured PII (CPF, CNPJ, email, cards, phones) via named recognizers and your own regex.")
 
   defp meta_desc("llm_redact"),
-    do: gettext("A local model swaps names and free text for realistic, reversible pseudonyms.")
+    do:
+      gettext(
+        "A model swaps names and free text for realistic, reversible pseudonyms. Use a local model, or the raw PII reaches whichever provider you pick."
+      )
 
   defp meta_desc("http_redact"),
     do: gettext("Send text to your own redaction service (one endpoint, or separate inbound/outbound).")

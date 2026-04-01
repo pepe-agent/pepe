@@ -88,6 +88,66 @@ defmodule Pepe.Plugins do
   end
 
   @doc """
+  A servable static asset package: a directory (user-installed under `dir()`, or a
+  first-party one bundled under `priv/builtin_plugins/`, user wins on a name collision -
+  same override rule as `Pepe.Skills`) whose `manifest.json` declares an `"assets"` array.
+
+  Unlike tools/channels (inferred from exported functions), asset exposure is always an
+  explicit allowlist: a package only serves the exact file names it lists, so a plugin
+  can never accidentally expose its `.exs` source or other files over HTTP.
+  """
+  def assets(name) do
+    case package_dir(name) do
+      nil ->
+        []
+
+      dir ->
+        case read_manifest(dir) do
+          %{"assets" => list} when is_list(list) -> Enum.filter(list, &is_binary/1)
+          _ -> []
+        end
+    end
+  end
+
+  @doc """
+  Resolve a servable asset for `name`/`requested_path` (e.g. `"pepe-widget"`, `"widget.js"`).
+  The path must be declared in that package's `"assets"` list and must not escape the
+  package directory. Returns `{:ok, absolute_path}` or `{:error, :not_found}`.
+  """
+  def asset_path(name, requested_path) do
+    with dir when is_binary(dir) <- package_dir(name),
+         true <- requested_path in assets(name),
+         abs = Path.join(dir, requested_path),
+         true <- within?(dir, abs),
+         true <- File.regular?(abs) do
+      {:ok, abs}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp builtin_dir, do: Application.app_dir(:pepe, "priv/builtin_plugins")
+
+  # A user-installed package wins over a built-in one of the same name.
+  defp package_dir(name) do
+    user = Path.join(dir(), name)
+    builtin = Path.join(builtin_dir(), name)
+
+    cond do
+      File.dir?(user) -> user
+      File.dir?(builtin) -> builtin
+      true -> nil
+    end
+  end
+
+  # Guards `..`/absolute-path escapes: the expanded path must still live inside dir.
+  defp within?(dir, path) do
+    expanded_dir = Path.expand(dir)
+    expanded_path = Path.expand(path)
+    expanded_path == expanded_dir or String.starts_with?(expanded_path, expanded_dir <> "/")
+  end
+
+  @doc """
   Install a plugin from `src`: a local `.exs`, a local directory, a `.tar.gz`/`.tgz`, or
   an `http(s)` URL to any of those (a GitHub repo URL is fetched as its source archive).
 

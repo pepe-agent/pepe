@@ -65,6 +65,16 @@ A single wildcard `"*"` in `auto_approve` means the agent runs every tool withou
 
 <div class="note"><strong>Surfaces with no human run freely.</strong> The HTTP API has nobody to prompt, so it supplies no approver and risky tools run without asking. Treat the API as fully trusted, and lock it with a token (see below) before exposing it.</div>
 
+### The owner can drive the CLI by chat
+
+The `manage_pepe` tool runs the same non-interactive `pepe` commands you would type in a terminal (add a model, define an agent, mint a token, schedule a task, manage companies), so a trusted owner agent can operate the whole runtime from a conversation.
+
+> You: Add an agent called researcher with the web_search and read_file tools.
+>
+> Agent: (asks you to confirm, then runs `pepe agent add researcher --tools web_search,read_file`) Done. The researcher agent is ready.
+
+It is the most powerful tool there is. Give it only to an owner agent you fully trust, never to one exposed to untrusted input. Like every acting tool it passes the permission gate, and the interactive or long-running commands (`setup`, `chat`, `serve`, and foreground gateways) are refused because they cannot run as a one-shot. For a single, narrower job, prefer the focused tools: `manage_token` for tokens, `manage_channel` for channels, `schedule_task` for crons.
+
 ## Command guardrails
 
 The shell tools (`bash` and `run_script`) run every command through a guard first. The guard refuses a small, deliberately narrow set of catastrophic, never-legitimate operations:
@@ -150,7 +160,7 @@ An agent granted the read-only `config_get` and `doctor` tools can report on you
 
 The `doctor` tool health-checks the whole setup and flags unset `${ENV}` secrets, agents pointing at missing models, invalid schedules, and unreachable connections. Pass `live: true` to also probe the network.
 
-<div class="note"><strong>Security-sensitive settings are not editable by chat.</strong> The guarded `config_set` tool is fail-closed: it only touches a short allowlist (the default model and agent, language, timezone, and a couple of Telegram flags). Secrets, tool allowlists, bot tokens, the sandbox wrapper, the dashboard password, and API tokens are deliberately off that list. An agent cannot change them by talking to it; you set those yourself with the CLI or by editing the config.</div>
+<div class="note"><strong>Security-sensitive settings are not editable by the general config tool.</strong> The guarded `config_set` tool is fail-closed: it only touches a short allowlist (the default model and agent, language, timezone, and a couple of Telegram flags). Secrets, tool allowlists, bot tokens, the sandbox wrapper, and the dashboard password are deliberately off that list, so `config_set` cannot change them. You set those yourself with the CLI or the dashboard. API tokens are the one thing an agent can mint by chat, but only through the separate, permission-gated `manage_token` tool, never through `config_set`.</div>
 
 ## Redaction hooks (opt-in PII scrubbing)
 
@@ -211,13 +221,13 @@ Bound to a public interface with no password, the dashboard fails closed and blo
 
 ## API tokens
 
-The HTTP API is open when no token exists, which keeps a single-tenant setup simple. Creating the first token flips it to closed: from then on every request to `/v1` needs an `Authorization: Bearer` header carrying a valid token. Mint one with:
+With no token, the HTTP API answers only loopback (localhost) callers, so a local setup stays simple while a network-exposed server is never anonymous. Creating the first token flips it to closed for everyone: from then on every request to `/v1`, local or remote, needs an `Authorization: Bearer` header carrying a valid token. Mint one with:
 
 ```bash
 pepe token add --label "ci pipeline"
 ```
 
-The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--company` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that company). Manage them with `pepe token list` and `pepe token revoke ID`. For request shapes and SDK usage, see the [HTTP API page](./api/).
+The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--company` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that company). Manage them with `pepe token list` and `pepe token revoke ID`, from the dashboard's API tokens page, or by chat with an agent that has the guarded `manage_token` tool. For request shapes and SDK usage, see the [HTTP API page](./api/).
 
 ## Multi-tenant scoping
 

@@ -33,7 +33,9 @@ defmodule PepeWeb.WatchWsDeliveryTest do
   end
 
   test "a watch created from a ws session is pushed back to that session when it fires" do
-    {:ok, socket} = connect(PepeWeb.AgentSocket, %{})
+    {:ok, socket} =
+      connect(PepeWeb.AgentSocket, %{}, connect_info: %{peer_data: %{address: {127, 0, 0, 1}}})
+
     {:ok, _reply, _socket} = subscribe_and_join(socket, "agent:default", %{"session" => "sess1"})
 
     Config.put_watch(%Watch{

@@ -36,13 +36,19 @@ defmodule Mix.Tasks.Pepe do
 
   ## API access tokens
 
-  Bearer tokens for the `/v1` HTTP API. With no tokens the API is open (legacy
-  behaviour); creating the first one locks it - every call then needs a valid token.
-  Scope a token to a company (`--company`) or a single agent (`--agent HANDLE`).
+  Bearer tokens for the `/v1` HTTP API and the WebSocket. With no tokens, only
+  same-machine (loopback) callers reach either; creating the first one locks both -
+  every call, local or remote, then needs a valid token. Scope a token to a company
+  (`--company`) or a single agent (`--agent HANDLE`).
 
       mix pepe token add [--company CO] [--agent HANDLE] [--label "..."]
+      mix pepe token add --agent HANDLE --widget --allowed-origin https://example.com
       mix pepe token list
       mix pepe token revoke ID
+
+  `--widget` mints a token meant to sit in public page source (an embedded chat
+  widget's script tag), so it must be `--agent`-locked. `--allowed-origin` registers
+  the browser origin (scheme+host) the WebSocket accepts it from.
 
   ## Watches (one-shot "notify me when X")
 
@@ -370,13 +376,18 @@ defmodule Mix.Tasks.Pepe do
     if validate_scope(name, opts[:company]) == :ok do
       handle = Company.handle(opts[:company], name)
 
-      # Guided flow: no --base-url ⇒ pick a provider from the catalog, resolve its
-      # URL + API key, then pick a model. --base-url ⇒ use it directly.
+      # Guided flow: no --base-url ⇒ use a matching known provider name, or let
+      # the user pick one from the catalog. --base-url ⇒ use it directly.
       {base_url, api_key, oauth} =
-        if opts[:base_url] do
-          {opts[:base_url], opts[:api_key], nil}
-        else
-          choose_provider()
+        cond do
+          opts[:base_url] ->
+            {opts[:base_url], opts[:api_key], nil}
+
+          provider = Pepe.Providers.get(name) ->
+            choose_auth(provider, opts)
+
+          true ->
+            choose_provider()
         end
 
       cond do
@@ -445,9 +456,7 @@ defmodule Mix.Tasks.Pepe do
 
     case models do
       [] ->
-        info(
-          "no model connections. add one:\n  mix pepe model add openrouter --base-url https://openrouter.ai/api/v1 --api-key '${OPENROUTER_API_KEY}' --model anthropic/claude-3.5-sonnet"
-        )
+        info("no model connections. add one:\n  mix pepe model add openrouter --api-key '${OPENROUTER_API_KEY}' --model openai/gpt-5-chat")
 
       models ->
         Enum.each(models, fn m ->
@@ -480,7 +489,7 @@ defmodule Mix.Tasks.Pepe do
         {:ok, _} = Application.ensure_all_started(:req)
         info("pinging #{bold(name)} (#{model.model})...")
 
-        case Pepe.LLM.chat(model, [%{"role" => "user", "content" => "ping"}], max_tokens: 5) do
+        case Pepe.LLM.chat(model, [%{"role" => "user", "content" => "Reply with exactly: pong"}], max_tokens: 64) do
           {:ok, res} ->
             ok("#{green(name)} works - reply: #{String.slice(res.content || "", 0, 60)}")
 
@@ -547,6 +556,28 @@ defmodule Mix.Tasks.Pepe do
           )
 
         apply_auth(provider, method)
+    end
+  end
+
+  defp choose_auth(provider, opts) do
+    cond do
+      opts[:api_key] ->
+        {provider.base_url, opts[:api_key], nil}
+
+      provider[:base_url] == nil ->
+        choose_auth(provider)
+
+      true ->
+        case Pepe.Providers.auth_methods(provider) do
+          [%{type: :none}] ->
+            {provider.base_url, nil, nil}
+
+          [%{type: :api_key} = method] ->
+            {method[:base_url] || provider.base_url, prompt_secret(method[:env] || provider.env), nil}
+
+          _ ->
+            choose_auth(provider)
+        end
     end
   end
 
@@ -1338,9 +1369,17 @@ defmodule Mix.Tasks.Pepe do
 
   defp token_cmd(["add" | rest]) do
     {opts, _} =
-      OptionParser.parse!(rest, strict: [company: :string, agent: :string, label: :string])
+      OptionParser.parse!(rest,
+        strict: [company: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string]
+      )
 
-    attrs = [company: opts[:company], agent: opts[:agent], label: opts[:label]]
+    attrs = [
+      company: opts[:company],
+      agent: opts[:agent],
+      label: opts[:label],
+      widget: opts[:widget] == true,
+      allowed_origin: opts[:allowed_origin]
+    ]
 
     case Config.add_api_token(attrs) do
       {:ok, raw, id} ->
@@ -1351,9 +1390,13 @@ defmodule Mix.Tasks.Pepe do
             true -> "root"
           end
 
-        ok("API token created (id #{green(id)}, scope: #{scope})")
+        kind = if opts[:widget], do: " (widget)", else: ""
+        ok("API token created (id #{green(id)}, scope: #{scope}#{kind})")
         IO.puts("\n  #{bold(raw)}\n")
         info("Save it now - it is shown only once and stored only as a hash.")
+
+      {:error, :widget_needs_agent} ->
+        error("a --widget token must be --agent-locked (a public embed always pins to one agent)")
 
       {:error, :unknown_company} ->
         error("unknown company: #{opts[:company]}")
@@ -1375,7 +1418,8 @@ defmodule Mix.Tasks.Pepe do
         Enum.each(tokens, fn t ->
           scope = t["agent"] || t["company"] || "root"
           label = if t["label"], do: " - #{t["label"]}", else: ""
-          IO.puts("#{bold(t["id"])}  #{t["prefix"]}  [#{scope}]#{label}")
+          kind = if t["kind"] == "widget", do: " (widget, #{t["allowed_origin"] || "no origin set"})", else: ""
+          IO.puts("#{bold(t["id"])}  #{t["prefix"]}  [#{scope}]#{kind}#{label}")
         end)
     end
   end

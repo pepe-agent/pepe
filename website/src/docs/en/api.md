@@ -152,13 +152,15 @@ To go stateless, simply omit all three id sources and send the full `messages` a
 
 ## Authentication and tokens
 
-With **zero tokens configured, the API is open**. This is the single-tenant default: run it on your own machine or inside a trusted network and skip auth entirely.
+With **zero tokens configured, the API answers only same-machine (loopback) callers**. A local `curl` or the dashboard works with no token, but any remote caller is refused with `401`, so a server you expose on a network is never anonymous.
 
-Creating the first token flips a switch. Once any token exists, every request must present a valid one, or it is refused with `401`. There is no half-open state; the first token you mint locks the door.
+Creating the first token flips the switch for everyone. Once any token exists, every request, local or remote, must present a valid one or it is refused with `401`. Minting the first token is what unlocks remote access.
 
 ### Minting and managing tokens
 
-Tokens are created from the CLI:
+You can mint, list, and revoke tokens three ways: the CLI, the dashboard, or by chat.
+
+From the CLI:
 
 ```bash
 pepe token add [--company CO] [--agent HANDLE] [--label "..."]
@@ -166,7 +168,17 @@ pepe token list
 pepe token revoke ID
 ```
 
+In the dashboard, the API tokens page has a form to generate a token (with a company and optional agent scope) and a list to revoke existing ones.
+
 A token is a random string prefixed `ctx_`. Only its SHA-256 hash is stored in the config file; the raw token is printed once at creation and never again. Copy it then. If you lose it, revoke it and mint a new one.
+
+#### Do it by chat
+
+An agent granted the guarded `manage_token` tool can mint, list, and revoke tokens from a conversation. Because a token grants API access, the tool is not read-only: it goes through the permission gate, so you confirm before a token is created, and the raw secret is returned once for you to copy.
+
+> You: Create a token for the buskaza company, labeled chatwoot.
+>
+> Agent: (asks you to confirm, then mints it) API token created, scope company buskaza. Copy it now, it will not be shown again: `ctx_9f2a...`
 
 ### Presenting a token
 

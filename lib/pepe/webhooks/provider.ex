@@ -73,5 +73,16 @@ defmodule Pepe.Webhooks.Provider do
   @callback deliver_file(config :: map(), to :: String.t(), path :: String.t(), caption :: String.t() | nil) ::
               :ok | {:error, term()}
 
-  @optional_callbacks label: 0, config_schema: 0, respond: 3, deliver_file: 4
+  @doc """
+  Optional: does this inbound payload address the bot, so it should be answered?
+  Checked before `parse/1` runs. A provider whose platform supports group/channel
+  conversations implements this to honor the connection's `require_mention` setting
+  (native mention detection, e.g. Slack's `app_mention` event or Teams' mention
+  entities - default when unset is `true`, reply only when mentioned or in a 1:1
+  DM). A provider that is always 1:1, or hasn't added gating yet, can omit it
+  (default: always addressed, today's behavior).
+  """
+  @callback addressed?(config :: map(), payload :: map()) :: boolean()
+
+  @optional_callbacks label: 0, config_schema: 0, respond: 3, deliver_file: 4, addressed?: 2
 end

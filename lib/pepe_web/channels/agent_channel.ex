@@ -68,6 +68,35 @@ defmodule PepeWeb.AgentChannel do
   end
 
   def handle_in("prompt", %{"text" => text}, socket) do
+    case widget_rate_limit(socket) do
+      :ok ->
+        run_prompt(socket, text)
+
+      {:error, retry_ms} ->
+        # A channel reply (`{:reply, {:error, ...}, socket}`) is the "proper" Phoenix
+        # way to answer a push, but the widget's minimal client (no `phoenix` package)
+        # never inspects a `phx_reply`'s status - only whether it is "ok" - so an error
+        # reply there would be silently swallowed. Use the same "error" event the rest
+        # of a run's failures already push, which the widget does render.
+        push(socket, "error", %{reason: rate_limit_message(retry_ms)})
+        {:noreply, socket}
+    end
+  end
+
+  # A widget-scoped connection's token sits in public page source, so its prompts
+  # are rate-limited; every other scope (a plain API token, a same-host tool) is
+  # unaffected. Keyed by this connection's own session, so one visitor can't exhaust
+  # another's budget.
+  defp widget_rate_limit(socket) do
+    case socket.assigns[:api_scope] do
+      %{kind: "widget"} -> PepeWeb.WidgetThrottle.check(socket.assigns.watch_key)
+      _ -> :ok
+    end
+  end
+
+  defp rate_limit_message(retry_ms), do: "rate limited, try again in #{Integer.floor_div(retry_ms, 1000)}s"
+
+  defp run_prompt(socket, text) do
     agent = socket.assigns.agent
     messages = socket.assigns.messages ++ [Message.user(text)]
     channel = self()

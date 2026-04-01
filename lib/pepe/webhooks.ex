@@ -109,10 +109,20 @@ defmodule Pepe.Webhooks do
   end
 
   defp run_parse(mod, entry, payload) do
-    case mod.parse(payload) do
-      {:ok, messages} -> Enum.each(messages, &dispatch(entry, mod, &1))
-      :ignore -> :ok
+    if addressed?(mod, entry, payload) do
+      case mod.parse(payload) do
+        {:ok, messages} -> Enum.each(messages, &dispatch(entry, mod, &1))
+        :ignore -> :ok
+      end
+    else
+      :ok
     end
+  end
+
+  # A provider that implements `addressed?/2` gates on it (mention-in-group / DM
+  # rules); one that hasn't added gating yet is always addressed (today's behavior).
+  defp addressed?(mod, entry, payload) do
+    if function_exported?(mod, :addressed?, 2), do: mod.addressed?(entry, payload), else: true
   end
 
   # Run one inbound message through the bound agent, off the request process.

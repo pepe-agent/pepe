@@ -1,0 +1,6 @@
+{
+  "name": "pepe-widget",
+  "version": "0.1.0",
+  "description": "An embeddable chat bubble for your website, connected to a Pepe agent.",
+  "assets": ["widget.js", "widget.css"]
+}

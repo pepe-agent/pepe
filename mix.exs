@@ -94,6 +94,8 @@ defmodule Pepe.MixProject do
       # (`tz` builds the zone data at compile time - no hackney/runtime download).
       {:crontab, "~> 1.1"},
       {:tz, "~> 0.28"},
+      # Rate limiting (the widget's public, unauthenticated-by-design endpoint).
+      {:hammer, "~> 7.0"},
       {:mimic, "~> 1.11", only: :test},
       {:lazy_html, ">= 0.1.0", only: :test}
     ]

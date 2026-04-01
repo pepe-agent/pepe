@@ -12,7 +12,7 @@ msgstr ""
 msgid "(default)"
 msgstr "(predeterminado)"
 
-#: lib/pepe/gateways/telegram.ex:1365
+#: lib/pepe/gateways/telegram.ex:1390
 #, elixir-autogen, elixir-format
 msgid "(empty response)"
 msgstr "(respuesta vacía)"
@@ -340,7 +340,7 @@ msgstr "💬 Permitido en esta sesión."
 msgid "🛑 Stopped."
 msgstr "🛑 Detenido."
 
-#: lib/pepe/agent/workspace.ex:146
+#: lib/pepe/agent/workspace.ex:163
 #, elixir-autogen, elixir-format
 msgid "You are Pepe, an AI agent, but your identity isn't set up yet - you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Pepe and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the rename_agent tool. Always reply in the user's language."
 msgstr "Eres Pepe, un agente de IA, pero tu identidad aún no está configurada - no tienes nombre, persona ni rasgos propios definidos. Si el usuario pregunta quién eres, dile que eres Pepe y que aún no tienes nombre ni personalidad definidos, y luego ofrécete a configurarlo ahora. Si acepta, ayúdale a elegir un nombre y algunos rasgos, y guárdalo: escribe tu persona en SOUL.md y, si elige un nombre, renómbrate con la herramienta rename_agent. Responde siempre en el idioma del usuario."
@@ -357,6 +357,7 @@ msgstr "/help para comandos · /exit para salir"
 
 #: lib/pepe/gateways/tui.ex:66
 #: lib/pepe_web/live/scheduled_live.ex:140
+#: lib/pepe_web/live/tokens_live.ex:77
 #: lib/pepe_web/live/traces_live.ex:185
 #: lib/pepe_web/live/traces_live.ex:264
 #, elixir-autogen, elixir-format
@@ -1189,6 +1190,8 @@ msgstr "%{count} agentes"
 #: lib/pepe_web/live/companies_live.ex:117
 #: lib/pepe_web/live/companies_live.ex:123
 #: lib/pepe_web/live/companies_live.ex:132
+#: lib/pepe_web/live/tokens_live.ex:63
+#: lib/pepe_web/live/tokens_live.ex:77
 #, elixir-autogen, elixir-format
 msgid "(optional)"
 msgstr "(opcional)"
@@ -1279,7 +1282,7 @@ msgstr "Empresa %{name} creada."
 msgid "Company %{name} removed."
 msgstr "Empresa %{name} eliminada."
 
-#: lib/pepe_web/live/dash_ui.ex:152
+#: lib/pepe_web/live/dash_ui.ex:153
 #, elixir-autogen, elixir-format
 msgid "Config file"
 msgstr "Archivo de configuración"
@@ -1320,7 +1323,7 @@ msgid "Invalid JSON: %{msg}"
 msgstr "JSON inválido: %{msg}"
 
 #: lib/pepe_web/live/config_live.ex:98
-#: lib/pepe_web/live/dash_data.ex:251
+#: lib/pepe_web/live/dash_data.ex:262
 #: lib/pepe_web/live/hooks_live.ex:303
 #, elixir-autogen, elixir-format
 msgid "Invalid or duplicate company name."
@@ -1337,7 +1340,7 @@ msgstr "Aprendizaje"
 msgid "Letters, digits, - and _ only. Becomes the prefix for its agents (e.g. acme/sales)."
 msgstr "Solo letras, dígitos, - y _. Se convierte en el prefijo de sus agentes (ej.: acme/sales)."
 
-#: lib/pepe_web/live/dash_ui.ex:159
+#: lib/pepe_web/live/dash_ui.ex:160
 #, elixir-autogen, elixir-format
 msgid "Local dashboard · localhost"
 msgstr "Panel local · localhost"
@@ -1445,7 +1448,7 @@ msgstr "Consejo: usa una referencia de variable de entorno como ${MY_BOT_TOKEN} 
 msgid "Watches"
 msgstr "Watches"
 
-#: lib/pepe/gateways/telegram.ex:1187
+#: lib/pepe/gateways/telegram.ex:1212
 #, elixir-autogen, elixir-format
 msgid "checking with another agent..."
 msgstr "consultando con otro agente..."
@@ -1465,7 +1468,7 @@ msgstr "nombre de la empresa"
 msgid "every"
 msgstr "cada"
 
-#: lib/pepe/gateways/telegram.ex:1178
+#: lib/pepe/gateways/telegram.ex:1203
 #, elixir-autogen, elixir-format
 msgid "fetching a page..."
 msgstr "obteniendo una página..."
@@ -1475,27 +1478,27 @@ msgstr "obteniendo una página..."
 msgid "Fired · delivering"
 msgstr "Disparado · entregando"
 
-#: lib/pepe/gateways/telegram.ex:1175
+#: lib/pepe/gateways/telegram.ex:1200
 #, elixir-autogen, elixir-format
 msgid "looking things up..."
 msgstr "buscando información..."
 
-#: lib/pepe/gateways/telegram.ex:1181
+#: lib/pepe/gateways/telegram.ex:1206
 #, elixir-autogen, elixir-format
 msgid "running something..."
 msgstr "ejecutando algo..."
 
-#: lib/pepe/gateways/telegram.ex:1190
+#: lib/pepe/gateways/telegram.ex:1215
 #, elixir-autogen, elixir-format
 msgid "using a connected tool..."
 msgstr "usando una herramienta conectada..."
 
-#: lib/pepe/gateways/telegram.ex:1193
+#: lib/pepe/gateways/telegram.ex:1218
 #, elixir-autogen, elixir-format
 msgid "working on it..."
 msgstr "trabajando en ello..."
 
-#: lib/pepe/gateways/telegram.ex:1184
+#: lib/pepe/gateways/telegram.ex:1209
 #, elixir-autogen, elixir-format
 msgid "working with files..."
 msgstr "trabajando con archivos..."
@@ -1515,7 +1518,7 @@ msgstr "Empresa %{name} actualizada."
 msgid "Delete"
 msgstr "Eliminar"
 
-#: lib/pepe_web/live/dash_data.ex:298
+#: lib/pepe_web/live/dash_data.ex:308
 #, elixir-autogen, elixir-format
 msgid "%{count} live prices · refreshed %{date}"
 msgstr "%{count} precios en tiempo real · actualizado el %{date}"
@@ -1569,12 +1572,12 @@ msgstr "Costo"
 msgid "Cycle"
 msgstr "Ciclo"
 
-#: lib/pepe_web/live/dash_data.ex:261
+#: lib/pepe_web/live/dash_data.ex:272
 #, elixir-autogen, elixir-format
 msgid "Day"
 msgstr "Día"
 
-#: lib/pepe_web/live/dash_data.ex:260
+#: lib/pepe_web/live/dash_data.ex:271
 #, elixir-autogen, elixir-format
 msgid "Hour"
 msgstr "Hora"
@@ -1590,7 +1593,7 @@ msgstr "Entrada"
 msgid "Input price"
 msgstr "Precio de entrada"
 
-#: lib/pepe_web/live/dash_data.ex:263
+#: lib/pepe_web/live/dash_data.ex:274
 #, elixir-autogen, elixir-format
 msgid "Month"
 msgstr "Mes"
@@ -1663,12 +1666,12 @@ msgstr "Total de tokens"
 msgid "Usage & billing"
 msgstr "Uso y facturación"
 
-#: lib/pepe_web/live/dash_data.ex:262
+#: lib/pepe_web/live/dash_data.ex:273
 #, elixir-autogen, elixir-format
 msgid "Week"
 msgstr "Semana"
 
-#: lib/pepe_web/live/dash_data.ex:264
+#: lib/pepe_web/live/dash_data.ex:275
 #, elixir-autogen, elixir-format
 msgid "Year"
 msgstr "Año"
@@ -1807,11 +1810,6 @@ msgstr "Sin uso todavía"
 msgid "Open right now"
 msgstr "Abiertas ahora"
 
-#: lib/pepe_web/live/hooks_live.ex:489
-#, elixir-autogen, elixir-format
-msgid "A local model swaps names and free text for realistic, reversible pseudonyms."
-msgstr ""
-
 #: lib/pepe_web/live/hooks_live.ex:205
 #, elixir-autogen, elixir-format
 msgid "Analyzer URL"
@@ -1919,7 +1917,7 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
-#: lib/pepe_web/live/hooks_live.ex:494
+#: lib/pepe_web/live/hooks_live.ex:497
 #, elixir-autogen, elixir-format
 msgid "Microsoft Presidio analyzer + anonymizer over HTTP."
 msgstr ""
@@ -1990,7 +1988,7 @@ msgstr "%{title} guardado."
 msgid "Score threshold"
 msgstr ""
 
-#: lib/pepe_web/live/hooks_live.ex:492
+#: lib/pepe_web/live/hooks_live.ex:495
 #, elixir-autogen, elixir-format
 msgid "Send text to your own redaction service (one endpoint, or separate inbound/outbound)."
 msgstr ""
@@ -2005,7 +2003,7 @@ msgstr ""
 msgid "Sign in to the dashboard"
 msgstr ""
 
-#: lib/pepe_web/live/dash_ui.ex:157
+#: lib/pepe_web/live/dash_ui.ex:158
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Sign out"
 msgstr "entrada + salida"
@@ -2074,6 +2072,7 @@ msgstr "Todos los ámbitos"
 
 #: lib/pepe_web/live/connections_component.ex:133
 #: lib/pepe_web/live/dash_ui.ex:102
+#: lib/pepe_web/live/tokens_live.ex:68
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Company"
 msgstr "Empresas"
@@ -2207,11 +2206,6 @@ msgstr ""
 msgid ": any data that points to a specific person, like name, CPF/CNPJ, email, phone, card, address. These hooks hide it before the text reaches a model, so the provider never sees the real data."
 msgstr ""
 
-#: lib/pepe_web/live/hooks_live.ex:175
-#, elixir-autogen, elixir-format, fuzzy
-msgid "A local/cheap model is ideal: it only rewrites PII into pseudonyms."
-msgstr ""
-
 #: lib/pepe_web/live/companies_live.ex:119
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Acme Inc, sales team"
@@ -2323,7 +2317,7 @@ msgstr "Sin precio - define uno para facturar este modelo"
 msgid "pick another name"
 msgstr ""
 
-#: lib/pepe_web/live/dash_data.ex:294
+#: lib/pepe_web/live/dash_data.ex:305
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Using built-in seed prices (never refreshed)"
 msgstr "Usando precios base integrados - nunca actualizado"
@@ -2959,6 +2953,8 @@ msgstr ""
 
 #: lib/pepe_web/live/connections_component.ex:135
 #: lib/pepe_web/live/dash_ui.ex:107
+#: lib/pepe_web/live/tokens_live.ex:70
+#: lib/pepe_web/live/tokens_live.ex:192
 #, elixir-autogen, elixir-format
 msgid "Principal"
 msgstr ""
@@ -3141,3 +3137,149 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "agent runtime"
 msgstr ""
+
+#: lib/pepe_web/live/hooks_live.ex:490
+#, elixir-autogen, elixir-format
+msgid "A model swaps names and free text for realistic, reversible pseudonyms. Use a local model, or the raw PII reaches whichever provider you pick."
+msgstr "Un modelo cambia nombres y texto libre por pseudónimos realistas y reversibles. Usa un modelo local, o el PII sin ocultar llega al proveedor que elijas."
+
+#: lib/pepe_web/live/dash_ui.ex:152
+#: lib/pepe_web/live/tokens_live.ex:40
+#, elixir-autogen, elixir-format
+msgid "API tokens"
+msgstr "Tokens de API"
+
+#: lib/pepe_web/live/tokens_live.ex:80
+#, elixir-autogen, elixir-format
+msgid "Any agent in scope"
+msgstr "Cualquier agente en el ámbito"
+
+#: lib/pepe_web/live/tokens_live.ex:41
+#, elixir-autogen, elixir-format
+msgid "Bearer tokens for the OpenAI-compatible /v1 API. With no token the API answers only loopback (localhost) callers; any remote caller must present a token. Once any token exists, every caller (local or remote) needs one. Minting the first token is what secures a network-exposed server."
+msgstr "Tokens Bearer para la API /v1 compatible con OpenAI. Sin ningún token, la API solo responde a quien llama desde la misma máquina (localhost); cualquier llamada remota debe presentar un token. En cuanto existe un token, toda llamada (local o remota) necesita uno. Crear el primer token es lo que asegura un servidor expuesto en red."
+
+#: lib/pepe_web/live/tokens_live.ex:65
+#, elixir-autogen, elixir-format
+msgid "CI pipeline, teammate laptop..."
+msgstr "Pipeline de CI, portátil de un compañero..."
+
+#: lib/pepe_web/live/tokens_live.ex:48
+#, elixir-autogen, elixir-format
+msgid "Copy this token now."
+msgstr "Copia este token ahora."
+
+#: lib/pepe_web/live/tokens_live.ex:54
+#, elixir-autogen, elixir-format
+msgid "Dismiss"
+msgstr "Descartar"
+
+#: lib/pepe_web/live/tokens_live.ex:105
+#, elixir-autogen, elixir-format
+msgid "Generate token"
+msgstr "Generar token"
+
+#: lib/pepe_web/live/tokens_live.ex:127
+#, elixir-autogen, elixir-format
+msgid "Id %{id}"
+msgstr "Id %{id}"
+
+#: lib/pepe_web/live/tokens_live.ex:63
+#, elixir-autogen, elixir-format
+msgid "Label"
+msgstr "Etiqueta"
+
+#: lib/pepe_web/live/tokens_live.ex:83
+#, elixir-autogen, elixir-format
+msgid "Lock the token to one agent, or leave it open to any agent in the scope above."
+msgstr "Fija el token a un agente, o déjalo abierto a cualquier agente del ámbito de arriba."
+
+#: lib/pepe_web/live/tokens_live.ex:59
+#, elixir-autogen, elixir-format
+msgid "New token"
+msgstr "Nuevo token"
+
+#: lib/pepe_web/live/tokens_live.ex:130
+#, elixir-autogen, elixir-format
+msgid "No tokens yet. The /v1 API is open to localhost only. Create one to require a token from every caller."
+msgstr "Aún no hay tokens. La API /v1 está abierta solo para localhost. Crea uno para exigir un token a cada llamada."
+
+#: lib/pepe_web/live/tokens_live.ex:123
+#, elixir-autogen, elixir-format
+msgid "Revoke"
+msgstr "Revocar"
+
+#: lib/pepe_web/live/tokens_live.ex:120
+#, elixir-autogen, elixir-format
+msgid "Revoke this token? Callers using it will be locked out immediately."
+msgstr "¿Revocar este token? Quien lo use quedará bloqueado de inmediato."
+
+#: lib/pepe_web/live/tokens_live.ex:73
+#, elixir-autogen, elixir-format
+msgid "Scopes the token to a single workspace. Principal is the default, non-company workspace."
+msgstr "Limita el token a un único espacio de trabajo. Principal es el espacio por defecto, sin empresa."
+
+#: lib/pepe_web/live/tokens_live.ex:204
+#, elixir-autogen, elixir-format
+msgid "That agent does not exist."
+msgstr "Ese agente no existe."
+
+#: lib/pepe_web/live/tokens_live.ex:203
+#, elixir-autogen, elixir-format
+msgid "That agent is not in the chosen company."
+msgstr "Ese agente no está en la empresa elegida."
+
+#: lib/pepe_web/live/tokens_live.ex:202
+#, elixir-autogen, elixir-format
+msgid "That company does not exist."
+msgstr "Esa empresa no existe."
+
+#: lib/pepe_web/live/tokens_live.ex:50
+#, elixir-autogen, elixir-format
+msgid "This is the only time the full token is shown. It cannot be retrieved again. Store it somewhere safe before you leave this page."
+msgstr "Esta es la única vez que se muestra el token completo. No podrás recuperarlo después. Guárdalo en un lugar seguro antes de salir de esta página."
+
+#: lib/pepe_web/live/tokens_live.ex:162
+#, elixir-autogen, elixir-format
+msgid "Token created. Copy it now, it will not be shown again."
+msgstr "Token creado. Cópialo ahora, no se mostrará de nuevo."
+
+#: lib/pepe_web/live/tokens_live.ex:114
+#, elixir-autogen, elixir-format
+msgid "Unlabeled"
+msgstr "Sin etiqueta"
+
+#: lib/pepe_web/live/hooks_live.ex:175
+#, elixir-autogen, elixir-format
+msgid "Use a local model (e.g. Ollama). Picking a remote/hosted model here sends the raw, unredacted PII to that provider first, which defeats the purpose of this hook."
+msgstr "Usa un modelo local (p. ej. Ollama). Elegir un modelo remoto/alojado aquí envía el PII sin ocultar a ese proveedor primero, lo que anula el propósito de este hook."
+
+#: lib/pepe_web/live/tokens_live.ex:207
+#, elixir-autogen, elixir-format
+msgid "A public widget token must be locked to one agent - pick one above."
+msgstr "Un token de widget público debe estar fijado a un agente - elige uno arriba."
+
+#: lib/pepe_web/live/tokens_live.ex:99
+#, elixir-autogen, elixir-format
+msgid "Allowed origin"
+msgstr "Origen permitido"
+
+#: lib/pepe_web/live/tokens_live.ex:95
+#, elixir-autogen, elixir-format
+msgid "Public widget token (for the embeddable chat widget)"
+msgstr "Token de widget público (para el widget de chat incrustable)"
+
+#: lib/pepe_web/live/tokens_live.ex:101
+#, elixir-autogen, elixir-format
+msgid "The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above - a public token always pins to one."
+msgstr "El origen del sitio (esquema + host). El WebSocket del widget solo conecta desde un origen de navegador que coincida. Requiere un agente arriba - un token público siempre se fija a uno."
+
+#: lib/pepe_web/live/tokens_live.ex:196
+#, elixir-autogen, elixir-format
+msgid "no origin set"
+msgstr "sin origen definido"
+
+#: lib/pepe_web/live/tokens_live.ex:196
+#, elixir-autogen, elixir-format
+msgid "widget (%{origin})"
+msgstr "widget (%{origin})"

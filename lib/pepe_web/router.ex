@@ -40,6 +40,14 @@ defmodule PepeWeb.Router do
     post "/:company/:provider/:slug", WebhookController, :receive
   end
 
+  # Static assets a plugin package declares (e.g. the built-in chat widget's JS/CSS).
+  # One route for every package, resolved at request time - see Pepe.Plugins.asset_path/2.
+  scope "/plugin-assets", PepeWeb do
+    pipe_through :api
+
+    get "/:plugin/*path", AssetController, :show
+  end
+
   # The web dashboard. Each section is a clean path; a specific conversation adds
   # `?chat=<key>` (session keys carry ":", so they ride in the query). The section is
   # carried by the live_action.
@@ -71,6 +79,7 @@ defmodule PepeWeb.Router do
       live "/mcp", ToolServersLive
       live "/plugins", PluginsLive
       live "/hooks", HooksLive
+      live "/tokens", TokensLive
       live "/config", ConfigLive
     end
   end

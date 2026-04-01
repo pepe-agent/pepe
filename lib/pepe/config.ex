@@ -677,12 +677,24 @@ defmodule Pepe.Config do
   Mint an API token scoped to `company` (nil = root) and optionally `agent` (a full
   handle). Returns `{raw_token, id}`; the raw token is shown once and only its hash is
   stored. `agent` must be within `company`.
+
+  Pass `widget: true` to mint a **widget token**: meant to sit in public page source
+  (an embedded chat bubble's script tag), so it must be `agent`-locked (never
+  company-wide or root - a public credential always pins to one known-safe agent).
+  Give it `allowed_origin` (a scheme+host, e.g. `"https://example.com"`); the
+  WebSocket only accepts connections whose browser `Origin` matches some registered
+  widget token's origin (see `PepeWeb.AgentSocket.check_origin?/1`) - a coarse gate in
+  front of the token itself, which still carries the real per-request authorization.
   """
   def add_api_token(opts \\ []) do
     company = opts[:company]
     agent = opts[:agent]
+    widget? = opts[:widget] == true
 
     cond do
+      widget? and is_nil(agent) ->
+        {:error, :widget_needs_agent}
+
       company && not company_exists?(company) ->
         {:error, :unknown_company}
 
@@ -696,13 +708,16 @@ defmodule Pepe.Config do
         raw = Pepe.ApiToken.generate()
         id = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
 
-        entry = %{
-          "hash" => Pepe.ApiToken.hash(raw),
-          "company" => company,
-          "agent" => agent,
-          "label" => opts[:label],
-          "prefix" => Pepe.ApiToken.fingerprint(raw)
-        }
+        entry =
+          %{
+            "hash" => Pepe.ApiToken.hash(raw),
+            "company" => company,
+            "agent" => agent,
+            "label" => opts[:label],
+            "prefix" => Pepe.ApiToken.fingerprint(raw)
+          }
+          |> maybe_put("kind", widget? && "widget")
+          |> maybe_put("allowed_origin", widget? && blank_to_nil(opts[:allowed_origin]))
 
         load()
         |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
@@ -711,6 +726,12 @@ defmodule Pepe.Config do
         {:ok, raw, id}
     end
   end
+
+  defp maybe_put(map, _key, falsy) when falsy in [false, nil], do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: String.trim(v))
+  defp blank_to_nil(v), do: v
 
   @doc "Revoke a token by id."
   def revoke_api_token(id) do
@@ -723,15 +744,16 @@ defmodule Pepe.Config do
   end
 
   @doc """
-  Verify a raw bearer token. Returns its scope `%{company: c, agent: a}` (either may
-  be nil) when it matches a stored hash, or `nil` when it doesn't.
+  Verify a raw bearer token. Returns its scope `%{company: c, agent: a, kind: k}`
+  (`company`/`agent` may be nil; `kind` is `"widget"` for a widget token, else nil)
+  when it matches a stored hash, or `nil` when it doesn't.
   """
   def verify_api_token(raw) when is_binary(raw) do
     hash = Pepe.ApiToken.hash(raw)
 
     case Enum.find(api_tokens(), &(&1["hash"] == hash)) do
       nil -> nil
-      t -> %{company: t["company"], agent: t["agent"]}
+      t -> %{company: t["company"], agent: t["agent"], kind: t["kind"]}
     end
   end
 

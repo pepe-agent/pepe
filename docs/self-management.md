@@ -15,7 +15,18 @@ hand-holding, and without ever being dangerous:
   editable set is a **fail-closed allowlist** (`default_model`, `default_agent`,
   `language`, `timezone`, `telegram.require_mention/enabled`); anything else is
   refused with a pointer to the right guarded tool (`manage_agent`, `manage_channel`,
-  `manage_mcp`, `schedule_task`). Secrets are never editable from chat.
+  `manage_mcp`, `schedule_task`, `manage_token`). Secrets are never editable from chat.
+
+- **It can hand out API access.** The guarded `manage_token` tool mints, lists, and
+  revokes `/v1` bearer tokens from chat (scoped to a company or a single agent), so an
+  agent can give an integration access without you dropping to a terminal. Like the
+  other guarded tools it is not read-only, so it passes the permission gate first.
+
+- **The owner can run the whole CLI.** For an owner-style agent you fully trust,
+  `manage_pepe` runs any non-interactive `mix pepe` command from chat (the same
+  dispatcher the CLI uses). Interactive and blocking commands (`setup`, `chat`,
+  `serve`, foreground gateways) are refused, and it stays behind the permission gate.
+  Give it only to a trusted owner agent, never to one exposed to untrusted input.
 
 - **It verifies its own work.** After changing something, the agent (or you) runs the
   **doctor**: offline checks (every `${ENV}` ref resolves, agents point at real

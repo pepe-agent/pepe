@@ -149,6 +149,7 @@ defmodule PepeWeb.DashUI do
         </div>
         <div class="space-y-1">
           <div class={nav_group_cls()}>{gettext("System")}</div>
+          <.nav_item active={@active} scope={@scope} to="tokens" icon="🔑" label={gettext("API tokens")} />
           <.nav_item active={@active} scope={@scope} to="config" icon="⚙️" label={gettext("Config file")} />
         </div>
       </nav>

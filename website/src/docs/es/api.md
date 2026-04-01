@@ -152,13 +152,15 @@ Para volver a modo sin estado, simplemente omite las tres fuentes de id y envia 
 
 ## Autenticacion y tokens
 
-Con **cero tokens configurados, la API esta abierta**. Este es el valor por defecto para un solo inquilino: ejecutala en tu propia maquina o dentro de una red de confianza y saltate la autenticacion por completo.
+Con **cero tokens configurados, la API responde solo a los llamantes de la misma maquina (loopback)**. Un `curl` local o el panel funcionan sin token, pero cualquier llamante remoto se rechaza con `401`, asi que un servidor que expones en una red nunca es anonimo.
 
-Crear el primer token acciona un interruptor. Una vez que existe cualquier token, cada peticion debe presentar uno valido o se rechaza con `401`. No hay estado intermedio; el primer token que acuñas cierra la puerta.
+Crear el primer token requiere entonces un token de todos (locales o remotos). Una vez que existe cualquier token, cada peticion, local o remota, debe presentar uno valido o se rechaza con `401`. Acuñar el primer token es lo que desbloquea el acceso remoto.
 
 ### Acuñar y gestionar tokens
 
-Los tokens se crean desde la CLI:
+Puedes acuñar, listar y revocar tokens de tres formas: la CLI, el panel o por chat.
+
+Desde la CLI:
 
 ```bash
 pepe token add [--company CO] [--agent HANDLE] [--label "..."]
@@ -166,7 +168,17 @@ pepe token list
 pepe token revoke ID
 ```
 
+En el panel, la pagina de tokens de la API tiene un formulario para generar un token (con un alcance de empresa y agente opcional) y una lista para revocar los existentes.
+
 Un token es una cadena aleatoria con el prefijo `ctx_`. En el archivo de configuracion solo se guarda su hash SHA-256; el token en bruto se imprime una vez al crearlo y nunca mas. Copialo en ese momento. Si lo pierdes, revocalo y acuña uno nuevo.
+
+#### Hazlo por chat
+
+Un agente al que se le otorga la herramienta protegida `manage_token` puede acuñar, listar y revocar tokens desde una conversacion. Como un token concede acceso a la API, la herramienta no es de solo lectura: pasa por la barrera de permisos, asi que confirmas antes de que se cree un token, y el secreto en bruto se devuelve una sola vez para que lo copies.
+
+> Tu: Crea un token para la empresa buskaza, con la etiqueta chatwoot.
+>
+> Agente: (te pide confirmacion y luego lo acuña) Token de API creado, alcance empresa buskaza. Copialo ahora, no se volvera a mostrar: `ctx_9f2a...`
 
 ### Presentar un token
 

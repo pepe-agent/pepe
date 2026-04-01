@@ -15,9 +15,13 @@ defmodule PepeWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  # Streaming agent conversations over WebSocket.
+  # Streaming agent conversations over WebSocket. `peer_data` gives the socket the
+  # caller's address so it can allow loopback and refuse remote when no tokens exist.
+  # `check_origin` is custom (not the Phoenix default of "same host as this server")
+  # so a registered widget token's own site can also open a cross-origin connection -
+  # see PepeWeb.AgentSocket.check_origin?/1 for what it actually allows.
   socket "/socket", PepeWeb.AgentSocket,
-    websocket: true,
+    websocket: [connect_info: [:peer_data], check_origin: {PepeWeb.AgentSocket, :check_origin?, []}],
     longpoll: false
 
   # Serve at "/" the static files from "priv/static" directory.
