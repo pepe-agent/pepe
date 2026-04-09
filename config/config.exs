@@ -12,7 +12,11 @@ import Config
 # available if you want to add persistence later.
 config :pepe,
   ecto_repos: [],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  # A runtime-readable Mix.env(), so code that must never touch disk under test
+  # (Pepe.Agent.Session's persistence guard) can check it without depending on
+  # the Mix module at runtime (unavailable in a release build).
+  env: config_env()
 
 # Configure the endpoint
 config :pepe, PepeWeb.Endpoint,

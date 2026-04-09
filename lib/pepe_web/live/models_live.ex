@@ -92,10 +92,28 @@ defmodule PepeWeb.ModelsLive do
   end
 
   # A fresh new-connection form state (provider-driven, not editing).
+  # A free, human-editable suggestion for a new connection's name: the provider
+  # key itself if unused, else "key-2", "key-3", ... so naming a second account
+  # on the same provider never silently collides with (and overwrites) the first.
+  defp unique_suggestion(key, scope) do
+    taken = Config.models() |> Enum.map(& &1.name)
+
+    if scope_name(key, scope) not in taken do
+      key
+    else
+      Stream.iterate(2, &(&1 + 1))
+      |> Enum.find_value(fn n ->
+        candidate = "#{key}-#{n}"
+        if scope_name(candidate, scope) not in taken, do: candidate
+      end)
+    end
+  end
+
   defp blank_model,
     do: %{
       edit: false,
       provider: nil,
+      name: nil,
       base_url: nil,
       env: nil,
       api_key: nil,
@@ -140,11 +158,12 @@ defmodule PepeWeb.ModelsLive do
           <div :if={@edit_model} class="max-w-2xl">
           <%!-- Editing an existing connection: fields shown directly (no provider picker). --%>
           <form :if={@edit_model.edit} phx-submit="model_save" class="space-y-4">
-            <div class="text-lg font-semibold">{gettext("Edit %{name}", name: @edit_model.name)}</div>
-            <input type="hidden" name="name" value={@edit_model.name} />
+            <div class="text-lg font-semibold">{gettext("Edit %{name}", name: @edit_model.original_name)}</div>
+            <input type="hidden" name="original_name" value={@edit_model.original_name} />
             <div>
               <label class={lbl()}>{gettext("Name")}</label>
-              <input value={@edit_model.name} readonly class={[fld(), "opacity-60"]} />
+              <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
+              <p class={hlp()}>{gettext("Renaming updates every agent, cron, hook and default pointing at this connection.")}</p>
             </div>
             <div>
               <label class={lbl()}>{gettext("Base URL")}</label>
@@ -185,7 +204,7 @@ defmodule PepeWeb.ModelsLive do
               <div class="space-y-3">
                 <div>
                   <label class={lbl()}>{gettext("Name")} <span class="text-zinc-600">{gettext("(this connection)")}</span></label>
-                  <input name="name" value={@edit_model.provider} class={fld()} />
+                  <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
                 </div>
 
                 <input :if={@edit_model.base_url} type="hidden" name="base_url" value={@edit_model.base_url} />
@@ -247,6 +266,7 @@ defmodule PepeWeb.ModelsLive do
              env: nil,
              models: [],
              name: m.name,
+             original_name: m.name,
              base_url: m.base_url,
              model_id: m.model,
              api_key: m.api_key,
@@ -272,6 +292,10 @@ defmodule PepeWeb.ModelsLive do
     state = %{
       blank_model()
       | provider: key,
+        # A starting suggestion, not a permanent binding: the input below is
+        # freely editable, so you can name a second connection to the same
+        # provider (a different account/key) whatever you like, e.g. "OR-key2".
+        name: unique_suggestion(key, socket.assigns.scope),
         base_url: base,
         env: env,
         api_key: if(env, do: "${#{env}}", else: nil),
@@ -280,6 +304,13 @@ defmodule PepeWeb.ModelsLive do
 
     spawn_model_fetch(key, base, env && System.get_env(env))
     {:noreply, assign(socket, edit_model: state)}
+  end
+
+  # Keeps edit_model.name in sync with what's actually typed, so a later
+  # server-driven re-render (e.g. the async model list arriving) can never
+  # silently revert the field back to its initial suggestion.
+  def handle_event("model_name_change", %{"name" => name}, socket) do
+    {:noreply, assign(socket, edit_model: %{socket.assigns.edit_model | name: name})}
   end
 
   def handle_event("model_key", %{"value" => raw}, socket) do
@@ -294,33 +325,18 @@ defmodule PepeWeb.ModelsLive do
   end
 
   def handle_event("model_save", params, socket) do
-    name = params["name"] |> to_string() |> String.trim() |> scope_name(socket.assigns.scope)
+    raw_name = params["name"] |> to_string() |> String.trim()
+    creating? = !socket.assigns.edit_model.edit
 
-    if name == "" or blank(params["base_url"]) == nil or blank(params["model"]) == nil do
-      {:noreply, put_flash(socket, :error, gettext("Name, base URL and model id are required."))}
-    else
-      # Merge onto any existing connection so an edit keeps fallbacks, headers, etc.
-      existing = Config.get_model(name) || %Pepe.Config.Model{name: name}
+    cond do
+      raw_name == "" or blank(params["base_url"]) == nil or blank(params["model"]) == nil ->
+        {:noreply, put_flash(socket, :error, gettext("Name, base URL and model id are required."))}
 
-      Config.put_model(%{
-        existing
-        | name: name,
-          base_url: params["base_url"],
-          api_key: blank(params["api_key"]),
-          model: params["model"],
-          input_price: parse_price(params["input_price"]),
-          output_price: parse_price(params["output_price"]),
-          require_redaction: params["require_redaction"] == "on" || nil
-      })
+      creating? ->
+        save_new_model(socket, raw_name, params)
 
-      {:noreply,
-       socket
-       |> assign(
-         models: Config.models(),
-         edit_model: nil,
-         default_model: Config.default_model_name()
-       )
-       |> put_flash(:info, gettext("Model %{name} saved.", name: name))}
+      true ->
+        save_edited_model(socket, raw_name, params)
     end
   end
 
@@ -342,6 +358,81 @@ defmodule PepeWeb.ModelsLive do
     do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
 
   def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+
+  # Never overwrite an existing connection on create: auto-suffix instead
+  # (openrouter -> openrouter-2 -> ...), same as the CLI, then tell the user
+  # what it actually landed on so they can rename it if they want.
+  defp save_new_model(socket, raw_name, params) do
+    scope = socket.assigns.scope
+    final_raw = unique_suggestion(raw_name, scope)
+    name = scope_name(final_raw, scope)
+
+    socket =
+      if final_raw != raw_name do
+        put_flash(
+          socket,
+          :info,
+          gettext("A model connection named %{name} already exists - saved this one as %{final} instead.",
+            name: scope_name(raw_name, scope),
+            final: name
+          )
+        )
+      else
+        socket
+      end
+
+    write_model(socket, name, params, gettext("Model %{name} saved.", name: name))
+  end
+
+  defp save_edited_model(socket, raw_name, params) do
+    scope = socket.assigns.scope
+    original = params["original_name"] |> to_string() |> String.trim()
+    name = scope_name(raw_name, scope)
+
+    cond do
+      name != original and Config.get_model(name) != nil ->
+        {:noreply,
+         put_flash(socket, :error, gettext("A model connection named %{name} already exists. Choose a different name.", name: name))}
+
+      name != original ->
+        case Config.rename_model(original, name) do
+          :ok ->
+            write_model(socket, name, params, gettext("Model %{old} renamed to %{name} and saved.", old: original, name: name))
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, gettext("Couldn't rename %{old}.", old: original))}
+        end
+
+      true ->
+        write_model(socket, name, params, gettext("Model %{name} saved.", name: name))
+    end
+  end
+
+  # Merges onto the existing connection (by then-current name) so a save keeps
+  # fallbacks and any other field this form doesn't expose.
+  defp write_model(socket, name, params, message) do
+    base = Config.get_model(name) || %Pepe.Config.Model{name: name}
+
+    Config.put_model(%{
+      base
+      | name: name,
+        base_url: params["base_url"],
+        api_key: blank(params["api_key"]),
+        model: params["model"],
+        input_price: parse_price(params["input_price"]),
+        output_price: parse_price(params["output_price"]),
+        require_redaction: params["require_redaction"] == "on" || nil
+    })
+
+    {:noreply,
+     socket
+     |> assign(
+       models: Config.models(),
+       edit_model: nil,
+       default_model: Config.default_model_name()
+     )
+     |> put_flash(:info, message)}
+  end
 
   @impl true
   def handle_info({:models_loaded, provider, ids}, socket) do

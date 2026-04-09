@@ -42,7 +42,9 @@ defmodule Pepe.Agent.SessionSupervisor do
     :ok
   end
 
-  defp persist?, do: Application.get_env(:pepe, :persist_sessions, false)
+  # See the matching guard (and its rationale) in Pepe.Agent.Session.
+  defp persist?,
+    do: Application.get_env(:pepe, :env) != :test and Application.get_env(:pepe, :persist_sessions, false)
 
   @doc """
   Start (or return the existing) session process for the given key. `opts` are

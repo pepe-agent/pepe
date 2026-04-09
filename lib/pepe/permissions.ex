@@ -79,9 +79,14 @@ defmodule Pepe.Permissions do
     end
   end
 
-  # Persist an `:always` grant on the agent; keep a `:session` grant in memory.
-  defp remember(:always, name, %{agent: %{name: agent_name}}) when is_binary(agent_name) do
+  # Persist an `:always` grant on the agent, and also grant it for the current
+  # session right away: `ctx.agent` is a snapshot taken at the start of this run
+  # and never refreshed mid-loop, so without this a second risky call later in
+  # the very same turn would still see the old auto_approve list and re-prompt -
+  # the persisted grant would only actually take effect on the *next* turn.
+  defp remember(:always, name, %{agent: %{name: agent_name}} = ctx) when is_binary(agent_name) do
     Config.allow_tool(agent_name, name)
+    if key = ctx[:session_key], do: SessionStore.allow(key, name)
     :always
   end
 

@@ -161,13 +161,65 @@ defmodule Pepe.WebhooksTest do
 
     test "slash commands only fire for admin connections that enable them" do
       admin = entry(%{"mode" => "admin", "commands" => true})
-      assert {:reset, _} = Webhooks.command(admin, "/new")
-      assert :chat = Webhooks.command(admin, "hello")
+      assert {:reset, _} = Webhooks.command(admin, "/new", "5511999")
+      assert :chat = Webhooks.command(admin, "hello", "5511999")
 
       # support treats "/new" as plain text (no commands)
-      assert :chat = Webhooks.command(entry(%{"mode" => "support"}), "/new")
+      assert :chat = Webhooks.command(entry(%{"mode" => "support"}), "/new", "5511999")
       # admin with commands disabled also passes it through
-      assert :chat = Webhooks.command(entry(%{"mode" => "admin", "commands" => false}), "/new")
+      assert :chat = Webhooks.command(entry(%{"mode" => "admin", "commands" => false}), "/new", "5511999")
+    end
+  end
+
+  describe "/models and /model" do
+    setup do
+      Pepe.Config.put_model(%Pepe.Config.Model{name: "acme/model-a", base_url: "https://x", model: "gpt-a"})
+      Pepe.Config.put_model(%Pepe.Config.Model{name: "globex/model-b", base_url: "https://x", model: "gpt-b"})
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "acme/model-a"})
+      :ok
+    end
+
+    defp admin(overrides \\ %{}),
+      do: entry(Map.merge(%{"mode" => "admin", "commands" => true, "trainers" => ["boss"]}, overrides))
+
+    test "/models is scoped to the connection's company" do
+      assert {:reply, text} = Webhooks.command(admin(), "/models", "boss")
+      assert text =~ "model-a"
+      refute text =~ "model-b"
+    end
+
+    test "/model with no args asks the session for its current model" do
+      assert {:model_show} = Webhooks.command(admin(), "/model", "boss")
+    end
+
+    test "a trainer changing the model with no scope is asked to confirm" do
+      assert {:model_set, "acme/model-a", nil, :global} = Webhooks.command(admin(), "/model acme/model-a", "boss")
+    end
+
+    test "a trainer stating a scope applies directly" do
+      assert {:model_set, "acme/model-a", "session", :global} =
+               Webhooks.command(admin(), "/model acme/model-a session", "boss")
+
+      assert {:model_set, "acme/model-a", "global", :global} =
+               Webhooks.command(admin(), "/model acme/model-a global", "boss")
+    end
+
+    test "a non-trainer gets :session permission - no asking, even with no scope stated" do
+      assert {:model_set, "acme/model-a", nil, :session} =
+               Webhooks.command(admin(), "/model acme/model-a", "5511999")
+    end
+
+    test "model_switch_locked drops non-trainers to :none" do
+      locked = admin(%{"model_switch_locked" => true})
+      assert {:model_set, "acme/model-a", nil, :none} = Webhooks.command(locked, "/model acme/model-a", "5511999")
+      # a trainer is unaffected by the lock
+      assert {:model_set, "acme/model-a", nil, :global} = Webhooks.command(locked, "/model acme/model-a", "boss")
+    end
+
+    test "support connections never get the model commands, locked or not" do
+      support = entry(%{"mode" => "support"})
+      assert :chat = Webhooks.command(support, "/models", "5511999")
+      assert :chat = Webhooks.command(support, "/model acme/model-a", "5511999")
     end
   end
 end

@@ -3,8 +3,9 @@ defmodule Pepe.Tools.ConfigSet do
   Change a Pepe setting from chat - **fail-closed** config self-management.
 
   Only settings on the explicit allowlist below are editable; anything else is
-  refused (secrets, tool allowlists, bot tokens and agent definitions have their own
-  guarded tools - `manage_agent`, `manage_channel`, `manage_mcp`). Every value is
+  refused (secrets, tool allowlists, bot tokens, agent definitions, and plugins have
+  their own guarded tools - `manage_agent`, `manage_channel`, `manage_mcp`,
+  `manage_plugin`). Every value is
   validated before it's written. Calling with no `setting` returns the schema -
   the editable settings, their current values and what's accepted - so the agent
   can discover what's possible instead of guessing.
@@ -25,7 +26,7 @@ defmodule Pepe.Tools.ConfigSet do
   def spec do
     function(
       "config_set",
-      "Change a Pepe setting. Call with no arguments first to see the editable settings (the schema), their current values and accepted values. Only allowlisted settings can be changed - secrets and structural config go through their own tools (manage_agent, manage_channel, manage_mcp).",
+      "Change a Pepe setting. Call with no arguments first to see the editable settings (the schema), their current values and accepted values. Only allowlisted settings can be changed - secrets and structural config go through their own tools (manage_agent, manage_channel, manage_mcp, manage_plugin).",
       %{
         "type" => "object",
         "properties" => %{
@@ -129,7 +130,7 @@ defmodule Pepe.Tools.ConfigSet do
       end) <>
       "\n\nNot editable here: secrets/tokens (${ENV} refs, set by the user), agent " <>
       "definitions (manage_agent), bots (manage_channel), MCP servers (manage_mcp), " <>
-      "scheduled tasks (schedule_task)."
+      "plugins (manage_plugin), scheduled tasks (schedule_task)."
   end
 
   defp current("default_model"), do: Config.default_model_name() || "(none)"

@@ -10,7 +10,8 @@ defmodule Pepe.Config.Model do
   """
 
   @derive Jason.Encoder
-  defstruct name: nil,
+  defstruct id: nil,
+            name: nil,
             base_url: "https://api.openai.com/v1",
             api_key: nil,
             model: nil,
@@ -39,6 +40,7 @@ defmodule Pepe.Config.Model do
   @doc "Build a Model struct from a string-keyed map (as loaded from JSON)."
   def from_map(map) when is_map(map) do
     %__MODULE__{
+      id: map["id"],
       name: map["name"],
       base_url: map["base_url"] || "https://api.openai.com/v1",
       api_key: map["api_key"],

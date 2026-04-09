@@ -48,6 +48,15 @@ defmodule Pepe.Agent.Session do
   @doc "Switch the bound agent."
   def set_agent(key, agent_name), do: GenServer.call(via(key), {:set_agent, agent_name})
 
+  @doc """
+  Override the model connection for this session only - the agent's own config on
+  disk is never touched. `model_name` is a connection name (as stored on
+  `Pepe.Config.Agent.model`); pass `nil` to clear the override and fall back to the
+  agent's own model. Deliberately in-memory only (lost on process restart) - a
+  "just for now" experiment, not a durable setting.
+  """
+  def set_model(key, model_name), do: GenServer.call(via(key), {:set_model, model_name})
+
   @doc "Drop the last user turn (and its responses) from the history."
   @spec undo(term()) :: :ok
   def undo(key), do: GenServer.call(via(key), :undo)
@@ -127,6 +136,7 @@ defmodule Pepe.Agent.Session do
       state
       |> Map.put_new(:idle_ref, nil)
       |> Map.put_new(:learn_allowed, true)
+      |> Map.put_new(:model_override, nil)
       |> Map.merge(%{
         ttl_ms: Keyword.get(opts, :ttl_ms),
         ephemeral: Keyword.get(opts, :ephemeral, false),
@@ -141,8 +151,13 @@ defmodule Pepe.Agent.Session do
   end
 
   # Sessions are only persisted in long-running surfaces (serve/gateway), so local
-  # `run`/`tui` and tests don't write files.
-  defp persist?, do: Application.get_env(:pepe, :persist_sessions, false)
+  # `run`/`tui` and tests don't write files. The :env check is a hard backstop on
+  # top of :persist_sessions - a test that inadvertently ends up with that flag
+  # true (a stray `with_app(serve: true, ...)` call, a race on the shared
+  # Application env between concurrent test files, ...) must never be able to
+  # write into a real ~/.pepe.
+  defp persist?,
+    do: Application.get_env(:pepe, :env) != :test and Application.get_env(:pepe, :persist_sessions, false)
 
   defp persist(state) do
     if persist?() and not Map.get(state, :ephemeral, false),
@@ -169,9 +184,10 @@ defmodule Pepe.Agent.Session do
   end
 
   def handle_call({:chat, text, opts}, from, state) do
-    # Resolve the agent fresh each turn (fall back to the default if it was renamed),
-    # so tools/model changes apply live without breaking the session.
-    case Config.get_agent(state.agent_name) || Config.default_agent() do
+    # Resolve the agent fresh each turn (fall back to the default if it was renamed,
+    # and apply this session's model override, if any), so tools/model changes apply
+    # live without breaking the session.
+    case resolve_agent(state) do
       nil ->
         {:reply, {:error, :no_agent}, state}
 
@@ -218,7 +234,7 @@ defmodule Pepe.Agent.Session do
   end
 
   def handle_call(:heartbeat, _from, state) do
-    case Config.get_agent(state.agent_name) || Config.default_agent() do
+    case resolve_agent(state) do
       nil ->
         {:reply, {:error, :no_agent}, state}
 
@@ -245,7 +261,7 @@ defmodule Pepe.Agent.Session do
   end
 
   def handle_call({:aside, text, opts}, _from, state) do
-    case Config.get_agent(state.agent_name) || Config.default_agent() do
+    case resolve_agent(state) do
       nil ->
         {:reply, {:error, :no_agent}, state}
 
@@ -277,13 +293,21 @@ defmodule Pepe.Agent.Session do
     {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name)})}
   end
 
+  # Not `persist/1`-wrapped: SessionPersistence only saves agent_name/messages, and
+  # a model override is deliberately ephemeral - reverting to the agent's own model
+  # on a process restart is correct, not a bug.
+  def handle_call({:set_model, model_name}, _from, state) do
+    {:reply, :ok, %{state | model_override: model_name}}
+  end
+
   def handle_call(:undo, _from, state) do
     {:reply, :ok, persist(%{state | messages: drop_last_turn(state.messages)})}
   end
 
   def handle_call(:status, _from, state) do
     turns = Enum.count(state.messages, &(&1["role"] == "user"))
-    {:reply, %{agent: state.agent_name, model: model_id(state.agent_name), turns: turns}, state}
+
+    {:reply, %{agent: state.agent_name, model: model_id(state.agent_name, state.model_override), turns: turns}, state}
   end
 
   def handle_call(:compact, _from, state) do
@@ -292,6 +316,7 @@ defmodule Pepe.Agent.Session do
         {:reply, {:error, :no_agent}, state}
 
       agent ->
+        agent = apply_model_override(agent, state.model_override)
         # Review before compacting, while the full detail is still here.
         if state.learn_allowed, do: Pepe.Agent.Reflect.review_async(agent, state.messages)
 
@@ -477,9 +502,25 @@ defmodule Pepe.Agent.Session do
     end
   end
 
-  defp model_id(agent_name) do
+  # Resolve the bound agent (falling back to the default), with this session's model
+  # override applied, if any. Used by every handler that runs a live turn (`:chat`,
+  # `:heartbeat`, `:aside`) - `:learn`'s background review deliberately calls
+  # `Config.get_agent/1` directly instead, so a session's ephemeral model experiment
+  # never changes what model teaches the agent long-term.
+  defp resolve_agent(state) do
+    case Config.get_agent(state.agent_name) || Config.default_agent() do
+      nil -> nil
+      agent -> apply_model_override(agent, state.model_override)
+    end
+  end
+
+  defp apply_model_override(agent, nil), do: agent
+  defp apply_model_override(agent, model_name), do: %{agent | model: model_name}
+
+  defp model_id(agent_name, override) do
     with name when is_binary(name) <- agent_name,
          %{} = agent <- Config.get_agent(name),
+         agent = apply_model_override(agent, override),
          %{model: model} <- Config.model_for_agent(agent) do
       model
     else

@@ -11,7 +11,7 @@ defmodule Pepe.Tools.ManageToken do
     * **Not read-only, so it is permission-gated** - each call goes through the human
       authorize step (unless pre-approved), which is the confirmation before a token is
       minted or revoked.
-    * **The secret is shown once** - `create` returns the raw `ctx_...` token a single
+    * **The secret is shown once** - `create` returns the raw `pepe_...` token a single
       time (only its hash is stored), so it lands in the reply for the user to copy and
       is never retrievable again.
 

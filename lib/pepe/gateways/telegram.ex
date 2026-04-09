@@ -37,7 +37,9 @@ defmodule Pepe.Gateways.Telegram do
 
   require Logger
 
+  alias Pepe.Company
   alias Pepe.Config
+  alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
 
   @poll_timeout 30
@@ -396,6 +398,23 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
+  # A tapped button from the `/models` picker. Runs straight in this bot's own
+  # process (like the "perm:" callback above) - fast, no LLM call, no need for a
+  # Task. Permission is recomputed fresh from the presser's id every time, never
+  # trusted from when the picker was first sent (`learn?/0`'s per-message cache
+  # doesn't apply here - button taps don't go through `respond/4`).
+  defp handle_update(%{"callback_query" => %{"data" => "model:" <> _ = data} = cq}) do
+    answer_callback(cq["id"])
+    chat_id = get_in(cq, ["message", "chat", "id"])
+    user_id = get_in(cq, ["from", "id"])
+    message_id = get_in(cq, ["message", "message_id"])
+
+    if active?() and allowed?(chat_id, user_id) do
+      Config.put_locale()
+      handle_model_callback(chat_id, message_id, user_id, data)
+    end
+  end
+
   # Non-text messages: download the file into the agent's workspace and hand it the
   # path, so it can figure out how to understand it (transcribe, read, ...) with its
   # own tools - installing whatever it needs. We don't hardcode transcription.
@@ -479,12 +498,16 @@ defmodule Pepe.Gateways.Telegram do
   # Agent-facing instruction (English; the agent replies in the user's language).
   defp media_prompt("voice", path, caption),
     do:
-      "The user sent a voice message. The audio is saved in your workspace at `#{path}`. Transcribe it, then respond to what they actually said." <>
+      "The user sent a voice message, saved in your workspace at `#{path}` (Telegram's OGG/Opus format)." <>
+        transcription_hint() <>
+        " Once you have the text, respond to what they actually said." <>
         caption_line(caption)
 
   defp media_prompt("audio", path, caption),
     do:
-      "The user sent an audio file, saved at `#{path}`. Transcribe it and respond to its content." <>
+      "The user sent an audio file, saved at `#{path}`." <>
+        transcription_hint() <>
+        " Once you have the text, respond to its content." <>
         caption_line(caption)
 
   defp media_prompt("photo", path, caption),
@@ -496,6 +519,20 @@ defmodule Pepe.Gateways.Telegram do
     do:
       "The user sent a file, saved at `#{path}`. Inspect it and help with whatever they need." <>
         caption_line(caption)
+
+  # A concrete playbook, not just "transcribe it" - the agent has bash, so give it an
+  # actual path to a working transcription instead of leaving it to guess. Installing a
+  # local tool goes through the normal risky-command permission prompt like any other
+  # bash use - nothing audio-specific about that gate.
+  defp transcription_hint do
+    " To transcribe it, try in order: a speech-to-text tool already on this machine " <>
+      "(`whisper-cli`, `whisper`); if none is available, install one yourself " <>
+      "(`pip install -q openai-whisper` or `pipx install openai-whisper`, then run " <>
+      "`whisper <path> --model tiny --fp16 False` - the first run downloads a small model, " <>
+      "that's normal and can take a minute); or, if a configured model connection's provider " <>
+      "exposes an OpenAI-compatible `/audio/transcriptions` endpoint (e.g. Groq, or OpenAI with " <>
+      "a real API key), call that directly instead of installing anything."
+  end
 
   defp caption_line(""), do: ""
   defp caption_line(caption), do: "\n\nTheir caption: #{caption}"
@@ -778,10 +815,16 @@ defmodule Pepe.Gateways.Telegram do
     )
   end
 
-  defp run_command(chat_id, "models", _args), do: send_html(chat_id, models_text())
+  defp run_command(chat_id, "models", _args), do: send_model_picker(chat_id)
 
-  defp run_command(chat_id, "model", ""), do: show_model(chat_id)
-  defp run_command(chat_id, "model", name), do: set_model(chat_id, name)
+  defp run_command(chat_id, "model", args) do
+    case String.split(args, ~r/\s+/, trim: true) do
+      [] -> show_model(chat_id)
+      [name] -> change_model(chat_id, name, nil)
+      [name, scope] -> change_model(chat_id, name, scope)
+      _ -> send_message(chat_id, gettext("Usage: /model NAME [session|global]"))
+    end
+  end
 
   defp run_command(chat_id, "tools", _args), do: send_html(chat_id, tools_text())
 
@@ -871,43 +914,201 @@ defmodule Pepe.Gateways.Telegram do
     )
   end
 
-  defp models_text do
-    case Config.models() do
-      [] ->
-        gettext("No models are configured yet.")
-
-      models ->
-        htmlb(gettext("Available models")) <>
-          "\n" <>
-          Enum.map_join(models, "\n", fn m -> "• " <> htmlb(m.name) <> " - " <> esc(m.model) end)
-    end
-  end
-
   defp show_model(chat_id) do
     ensure_session(chat_id)
     s = Pepe.Agent.Session.status(session_key(chat_id))
+    model = s.model || gettext("(unset)")
 
-    send_message(
-      chat_id,
-      gettext("Current model: %{model}", model: s.model || gettext("(unset)"))
+    text =
+      gettext("Current: %{model}", model: model) <>
+        "\n\n" <>
+        gettext("Tap below to browse models, or use:") <>
+        "\n/model <name> [session|global] - " <>
+        gettext("switch") <>
+        "\n/models - " <> gettext("list them all")
+
+    Req.post(api_url(token(), "sendMessage"),
+      json: %{
+        chat_id: chat_id,
+        text: text,
+        reply_markup: %{inline_keyboard: [[%{text: gettext("Browse models"), callback_data: "model:browse"}]]}
+      }
     )
   end
 
-  defp set_model(chat_id, name) do
-    agent_name = agent_default()
+  # `learn?/0` is already computed per-message from the bot's `trainers` allowlist
+  # (see `learn_allowed?/1`/`put_learn/1`) - the same list gates memory AND, here,
+  # who may change the model globally. Only valid from the `respond/4` path (a
+  # typed `/model ...`) - a button tap recomputes it fresh via `learns_from?/2`
+  # instead, see `handle_model_callback/4`.
+  defp change_model(chat_id, name, scope) do
+    ensure_session(chat_id)
+    perm = ModelSwitch.permission(learn?(), bot()["model_switch_locked"] == true)
+    deliver = fn text -> send_message(chat_id, text) end
 
     cond do
       is_nil(Config.get_model(name)) ->
-        send_message(chat_id, gettext("Unknown model: %{name}", name: name))
+        deliver.(gettext("Unknown model: %{name}", name: name))
 
-      is_nil(Config.get_agent(agent_name)) ->
-        send_message(chat_id, gettext("There's no agent to set the model on."))
+      perm == :none ->
+        deliver.(gettext("You don't have permission to change the model here."))
+
+      perm == :session or scope == "session" ->
+        report_model_change(name, :session, session_key(chat_id), agent_default(), deliver)
+
+      scope == "global" ->
+        report_model_change(name, :global, session_key(chat_id), agent_default(), deliver)
+
+      scope in [nil, ""] ->
+        deliver.(
+          gettext(
+            "Change to %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global.",
+            name: name
+          )
+        )
 
       true ->
-        agent = Config.get_agent(agent_name)
-        Config.put_agent(%{agent | model: name})
-        send_message(chat_id, gettext("Model set to %{name}.", name: name))
+        deliver.(gettext("Usage: /model NAME [session|global]"))
     end
+  end
+
+  # Shared by the typed `/model NAME [scope]` and the button-tap flow below -
+  # `deliver` is a 1-arity function so each caller decides how the outcome is
+  # shown (a new message vs. editing the picker message in place).
+  defp report_model_change(name, scope, session_key, agent, deliver) do
+    case ModelSwitch.apply(session_key, agent, name, scope) do
+      :ok ->
+        deliver.(gettext("Model set to %{name} (%{scope}).", name: name, scope: scope_label(scope)))
+
+      {:error, :unknown_model} ->
+        deliver.(gettext("Unknown model: %{name}", name: name))
+
+      {:error, :unknown_agent} ->
+        deliver.(gettext("There's no agent to set the model on."))
+    end
+  end
+
+  defp scope_label(:session), do: gettext("this conversation only")
+  defp scope_label(:global), do: gettext("everyone")
+
+  ###
+  ### the /models picker (inline keyboard)
+  ###
+
+  # Same upstream id shown twice (two connections pointing at the same model) would
+  # both get a checkmark - a harmless cosmetic edge case, not worth a bigger lookup
+  # just to compare by connection name instead.
+  defp send_model_picker(chat_id) do
+    ensure_session(chat_id)
+
+    case ModelSwitch.list_for(Company.of(agent_default())) do
+      [] ->
+        send_message(chat_id, gettext("No models are configured for this company."))
+
+      models ->
+        current = Pepe.Agent.Session.status(session_key(chat_id)).model
+
+        Req.post(api_url(token(), "sendMessage"),
+          json: %{
+            chat_id: chat_id,
+            text: models_picker_text(models),
+            reply_markup: %{inline_keyboard: model_buttons(models, current)}
+          }
+        )
+    end
+  end
+
+  defp edit_model_picker(chat_id, message_id) do
+    ensure_session(chat_id)
+
+    case ModelSwitch.list_for(Company.of(agent_default())) do
+      [] ->
+        edit_message(chat_id, message_id, gettext("No models are configured for this company."))
+
+      models ->
+        current = Pepe.Agent.Session.status(session_key(chat_id)).model
+        edit_message(chat_id, message_id, models_picker_text(models), model_buttons(models, current))
+    end
+  end
+
+  defp models_picker_text(models),
+    do: gettext("Available models") <> " — #{length(models)}"
+
+  defp model_buttons(models, current) do
+    Enum.map(models, fn m ->
+      label = if m.model == current, do: "#{m.name} ✓", else: m.name
+      [%{text: label, callback_data: "model:pick:#{m.name}"}]
+    end)
+  end
+
+  # "model:pick:<name>" - tapped a model. A `:session`-only presser has nothing to
+  # choose, so it applies right away; a trainer (`:global`) is offered the
+  # session-vs-everyone submenu; `:none` is refused.
+  defp handle_model_callback(chat_id, message_id, user_id, "model:pick:" <> name) do
+    ensure_session(chat_id)
+    perm = ModelSwitch.permission(learns_from?(bot(), user_id), bot()["model_switch_locked"] == true)
+
+    cond do
+      is_nil(Config.get_model(name)) ->
+        edit_message(chat_id, message_id, gettext("Unknown model: %{name}", name: name))
+
+      perm == :none ->
+        edit_message(chat_id, message_id, gettext("You don't have permission to change the model here."))
+
+      perm == :session ->
+        deliver = fn text -> edit_message(chat_id, message_id, text) end
+        report_model_change(name, :session, session_key(chat_id), agent_default(), deliver)
+
+      perm == :global ->
+        edit_model_scope_picker(chat_id, message_id, name)
+    end
+  end
+
+  # "model:apply:<name>:<scope>" - tapped a scope in the submenu. Permission is
+  # rechecked (never trust the tap alone - config may have changed since the
+  # picker was sent).
+  defp handle_model_callback(chat_id, message_id, user_id, "model:apply:" <> rest) do
+    ensure_session(chat_id)
+    perm = ModelSwitch.permission(learns_from?(bot(), user_id), bot()["model_switch_locked"] == true)
+    deliver = fn text -> edit_message(chat_id, message_id, text) end
+
+    case {String.split(rest, ":", parts: 2), perm} do
+      {[name, "session"], p} when p in [:session, :global] ->
+        report_model_change(name, :session, session_key(chat_id), agent_default(), deliver)
+
+      {[name, "global"], :global} ->
+        report_model_change(name, :global, session_key(chat_id), agent_default(), deliver)
+
+      _ ->
+        deliver.(gettext("You don't have permission to change the model here."))
+    end
+  end
+
+  defp handle_model_callback(chat_id, message_id, _user_id, cb) when cb in ["model:back", "model:browse"] do
+    edit_model_picker(chat_id, message_id)
+  end
+
+  defp handle_model_callback(_chat_id, _message_id, _user_id, _data), do: :ok
+
+  defp edit_model_scope_picker(chat_id, message_id, name) do
+    buttons = [
+      [%{text: gettext("This conversation only"), callback_data: "model:apply:#{name}:session"}],
+      [%{text: gettext("Everyone"), callback_data: "model:apply:#{name}:global"}],
+      [%{text: gettext("<< Back"), callback_data: "model:back"}]
+    ]
+
+    edit_message(
+      chat_id,
+      message_id,
+      gettext("Change to %{name} for this conversation only, or for everyone?", name: name),
+      buttons
+    )
+  end
+
+  defp edit_message(chat_id, message_id, text, buttons \\ nil) do
+    body = %{chat_id: chat_id, message_id: message_id, text: text}
+    body = if buttons, do: Map.put(body, :reply_markup, %{inline_keyboard: buttons}), else: body
+    Req.post(api_url(token(), "editMessageText"), json: body)
   end
 
   defp tools_text do

@@ -18,12 +18,38 @@ defmodule PepeWeb.ChannelsLive do
        companies: Config.companies(),
        new_company: false,
        bots: Config.telegram_bots(),
+       widget_tokens: Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget")),
+       widget_raw: nil,
+       host: connected?(socket) && request_host(socket),
        edit_bot: nil,
        adding: nil,
        adding_channel: false,
        form: nil,
        native_channels: native_channel_cards()
      )}
+  end
+
+  # The address this dashboard is being accessed at right now, so a widget's embed
+  # snippet can be filled in with the real host instead of a placeholder.
+  defp request_host(socket) do
+    case get_connect_info(socket, :uri) do
+      %URI{scheme: scheme, host: host, port: port} ->
+        if port in [80, 443], do: "#{scheme}://#{host}", else: "#{scheme}://#{host}:#{port}"
+
+      _ ->
+        nil
+    end
+  end
+
+  defp widget_snippet(host, agent, token) do
+    """
+    <script src="#{host || "https://your-pepe-host"}/plugin-assets/pepe-widget/widget.js"
+            data-agent="#{agent}"
+            data-token="#{token}"
+            data-color="#ea580c"
+            data-greeting="Hi! How can I help?"
+            data-position="right"></script>\
+    """
   end
 
   defp bot_changeset(attrs) do
@@ -38,6 +64,7 @@ defmodule PepeWeb.ChannelsLive do
   @impl true
   def render(assigns) do
     assigns = assign(assigns, :scoped_bots, scoped_by_agent(assigns.bots, assigns.scope, & &1["agent"]))
+    assigns = assign(assigns, :scoped_widget_tokens, scoped_by_agent(assigns.widget_tokens, assigns.scope, & &1["agent"]))
 
     ~H"""
     <Layouts.flash_group flash={@flash} />
@@ -59,6 +86,28 @@ defmodule PepeWeb.ChannelsLive do
         <div class="flex-1 overflow-y-auto p-6">
           <%!-- LIST: channel groups only for what exists, plus one "Add a channel" picker --%>
           <div :if={!@edit_bot and @adding == nil} class="space-y-6">
+            <%!-- Just-minted widget token: shown once, with a ready-to-paste snippet --%>
+            <div :if={@widget_raw} class="rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0 text-sm">
+                  <span class="font-semibold text-amber-200">{gettext("Widget created - copy this token now")}</span>
+                  <span class="text-amber-200/70">— {gettext("shown only once, store it somewhere safe.")}</span>
+                </div>
+                <button phx-click="widget_dismiss" class="shrink-0 text-sm text-amber-200/70 hover:text-amber-200">{gettext("Dismiss")}</button>
+              </div>
+              <div class="mt-2 flex items-center gap-2">
+                <code class="min-w-0 flex-1 select-all truncate rounded-lg border border-amber-800/60 bg-zinc-950 px-3 py-2 font-mono text-sm text-amber-100">{@widget_raw.raw}</code>
+                <.copy_button id="copy-widget-token" value={@widget_raw.raw} class="shrink-0" />
+              </div>
+              <div class="mt-3">
+                <div class="mb-1 text-sm text-amber-200/80">{gettext("Paste this on your site:")}</div>
+                <div class="flex items-start gap-2">
+                  <pre class="min-w-0 flex-1 overflow-x-auto rounded-lg border border-amber-800/60 bg-zinc-950 px-3 py-2 font-mono text-xs text-amber-100">{widget_snippet(@host, @widget_raw.agent, @widget_raw.raw)}</pre>
+                  <.copy_button id="copy-widget-snippet" value={widget_snippet(@host, @widget_raw.agent, @widget_raw.raw)} class="shrink-0" />
+                </div>
+              </div>
+            </div>
+
             <%!-- Telegram group (long-poll gateway): only when it has bots --%>
             <div :if={not @adding_channel and @scoped_bots != []}>
               <div class="mb-2 flex items-center gap-2 font-medium">
@@ -85,6 +134,34 @@ defmodule PepeWeb.ChannelsLive do
               </div>
             </div>
 
+            <%!-- Widget group: only when a widget token exists in this scope --%>
+            <div :if={not @adding_channel and @scoped_widget_tokens != []}>
+              <div class="mb-2 flex items-center gap-2 font-medium">
+                <span>{gettext("Widget")}</span>
+                <span class="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">widget</span>
+              </div>
+
+              <div :for={t <- @scoped_widget_tokens} class={[card(), "mb-2"]}>
+                <div class="flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <span class="font-medium">{t["label"] || gettext("Unlabeled")}</span>
+                  </div>
+                  <.link navigate={~p"/tokens?scope=#{@scope}"} class={btn_ghost()}>{gettext("Manage token")}</.link>
+                </div>
+                <div class="mt-1 text-sm text-zinc-400">{gettext("Agent:")} {t["agent"] || gettext("(default)")}</div>
+                <div class="text-sm text-zinc-500">{gettext("Origin:")} {t["allowed_origin"] || gettext("no origin set")}</div>
+                <p class={hlp()}>{gettext("To point this widget at a different agent or origin, create a new one and revoke this one - a token can't be edited after minting.")}</p>
+                <details class="mt-2">
+                  <summary class="cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">{gettext("Embed snippet")}</summary>
+                  <p class={hlp()}>{gettext("The token was only shown once, at creation - swap in your saved copy below.")}</p>
+                  <div class="mt-1 flex items-start gap-2">
+                    <pre class="min-w-0 flex-1 overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-300">{widget_snippet(@host, t["agent"], "pepe_YOUR_TOKEN_HERE")}</pre>
+                    <.copy_button id={"copy-widget-snippet-#{t["id"]}"} value={widget_snippet(@host, t["agent"], "pepe_YOUR_TOKEN_HERE")} class="shrink-0" />
+                  </div>
+                </details>
+              </div>
+            </div>
+
             <%!-- Webhook groups (only those with a connection) or the open connection form --%>
             <.live_component
               module={PepeWeb.ConnectionsComponent}
@@ -103,11 +180,40 @@ defmodule PepeWeb.ChannelsLive do
                 <button :for={p <- @native_channels} phx-click="add_channel" phx-value-name={p.name} class={btn_ghost()}>
                   + {p.label}
                 </button>
+                <button phx-click="add" phx-value-kind="widget" class={btn_ghost()}>{gettext("+ Widget")}</button>
               </div>
               <p class="mt-2 text-sm text-zinc-500">
-                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook. Fill in the credentials, then register the Webhook URL shown in the provider.")}
+                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook. Fill in the credentials, then register the Webhook URL shown in the provider. A widget is a chat bubble you embed with a script tag.")}
               </p>
             </div>
+          </div>
+
+          <%!-- ADD A WIDGET --%>
+          <div :if={@adding == :widget} class="max-w-2xl">
+            <form phx-submit="widget_add" class="space-y-4">
+              <div class="text-lg font-semibold">{gettext("+ Add a widget")}</div>
+              <div>
+                <label class={lbl()}>{gettext("Label")} <span class="text-zinc-600">{gettext("(optional)")}</span></label>
+                <input name="widget[label]" placeholder={gettext("example.com widget")} class={fld()} />
+              </div>
+              <div>
+                <label class={lbl()}>{gettext("Agent")}</label>
+                <select name="widget[agent]" class={fld()}>
+                  <option value="">{gettext("Choose an agent...")}</option>
+                  <option :for={a <- scoped_agent_names(@scope)} value={a}>{a}</option>
+                </select>
+                <p class={hlp()}>{gettext("A widget always pins to one agent - never a whole workspace.")}</p>
+              </div>
+              <div>
+                <label class={lbl()}>{gettext("Allowed origin")}</label>
+                <input name="widget[allowed_origin]" placeholder="https://example.com" class={fld()} />
+                <p class={hlp()}>{gettext("The site's scheme + host. The widget's connection is refused from anywhere else.")}</p>
+              </div>
+              <div class="flex gap-2 border-t border-zinc-800 pt-4">
+                <button type="submit" class={btn()}>{gettext("Create widget")}</button>
+                <button type="button" phx-click="add_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
+              </div>
+            </form>
           </div>
 
           <%!-- EDIT A TELEGRAM BOT --%>
@@ -167,11 +273,39 @@ defmodule PepeWeb.ChannelsLive do
   end
 
   @impl true
+  def handle_event("add", %{"kind" => "widget"}, socket) do
+    {:noreply, assign(socket, adding: :widget, edit_bot: nil)}
+  end
+
   def handle_event("add", %{"kind" => _kind}, socket) do
     {:noreply, assign(socket, adding: :bot, edit_bot: nil, form: bot_form(%{}))}
   end
 
   def handle_event("add_cancel", _p, socket), do: {:noreply, assign(socket, adding: nil)}
+
+  def handle_event("widget_add", %{"widget" => p}, socket) do
+    opts = [
+      label: blank(p["label"]),
+      agent: blank(p["agent"]),
+      widget: true,
+      allowed_origin: blank(p["allowed_origin"])
+    ]
+
+    case Config.add_api_token(opts) do
+      {:ok, raw, _id} ->
+        {:noreply,
+         assign(socket,
+           widget_tokens: Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget")),
+           widget_raw: %{raw: raw, agent: blank(p["agent"])},
+           adding: nil
+         )}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, widget_error(reason))}
+    end
+  end
+
+  def handle_event("widget_dismiss", _p, socket), do: {:noreply, assign(socket, widget_raw: nil)}
 
   # Open a webhook channel's form inside the shared component (which lives in this page).
   def handle_event("add_channel", %{"name" => name}, socket) do
@@ -270,4 +404,9 @@ defmodule PepeWeb.ChannelsLive do
     |> Enum.reject(&(&1["name"] == exclude_name))
     |> Enum.any?(fn b -> (Config.interpolate(b["bot_token"]) || b["bot_token"]) == want end)
   end
+
+  defp widget_error(:unknown_company), do: gettext("That company does not exist.")
+  defp widget_error(:agent_out_of_scope), do: gettext("That agent is not in the chosen company.")
+  defp widget_error(:unknown_agent), do: gettext("That agent does not exist.")
+  defp widget_error(:widget_needs_agent), do: gettext("Pick an agent for this widget.")
 end

@@ -1,8 +1,8 @@
 # Configuring Pepe - overview
 
 How Pepe is configured, and how you (an agent) can change it safely. Read the
-focused docs (`agents`, `channels`, `scheduled-tasks`, `mcp`, `permissions`) for
-each area.
+focused docs (`agents`, `channels`, `scheduled-tasks`, `mcp`, `plugins`,
+`permissions`) for each area.
 
 ## Where config lives
 
@@ -45,6 +45,7 @@ set that env var - do not paste the secret.
 - `manage_channel` - add/manage Telegram bots. See `channels`.
 - `schedule_task` - create recurring tasks. See `scheduled-tasks`.
 - `manage_mcp` - connect external MCP tool servers. See `mcp`.
+- `manage_plugin` - install/scan/remove community plugins (tools, channels). See `plugins`.
 - Generic tools (`bash`, `read_file`, `write_file`, `edit_file`, ...) for anything not
   covered by a structured tool.
 

@@ -100,4 +100,17 @@ defmodule Pepe.PermissionsTest do
     ctx2 = %{agent: reloaded, authorize: fn _, _, _ -> flunk("should not ask") end}
     assert Permissions.gate("write_file", "{}", ctx2) == :allow
   end
+
+  test "always also takes effect immediately within the same run, not just the next one",
+       %{agent: agent} do
+    Config.put_agent(agent)
+    ctx = %{agent: agent, session_key: "s4", authorize: fn _, _, _ -> :always end}
+
+    assert Permissions.gate("bash", "{}", ctx) == :allow
+
+    # Still the *same* (stale) ctx.agent, as a real agentic loop would reuse for the
+    # rest of this turn - a second bash call must not re-prompt.
+    ctx_still_stale = %{ctx | authorize: fn _, _, _ -> flunk("should not ask again") end}
+    assert Permissions.gate("bash", "{}", ctx_still_stale) == :allow
+  end
 end

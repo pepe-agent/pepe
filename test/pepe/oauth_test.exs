@@ -1,6 +1,8 @@
 defmodule Pepe.OAuthTest do
   use ExUnit.Case, async: false
 
+  alias Pepe.Config
+  alias Pepe.Config.Model
   alias Pepe.OAuth
 
   test "pkce challenge is the unpadded base64url SHA-256 of the verifier" do
@@ -84,6 +86,46 @@ defmodule Pepe.OAuthTest do
 
       assert_receive {:oauth_error, ^ref, :state_mismatch}, 2_000
       Process.exit(server, :normal)
+    end
+  end
+
+  describe "reconnect/1" do
+    setup do
+      home = Path.join(System.tmp_dir!(), "pepe_oauth_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(home)
+      prev = System.get_env("PEPE_HOME")
+      System.put_env("PEPE_HOME", home)
+
+      on_exit(fn ->
+        if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
+        File.rm_rf(home)
+      end)
+
+      :ok
+    end
+
+    test "unknown connection name" do
+      assert {:error, :not_found} = OAuth.reconnect("ghost")
+    end
+
+    test "a plain API-key connection has nothing to reconnect" do
+      Config.put_model(%Model{name: "openrouter", base_url: "https://openrouter.ai/api/v1", api_key: "sk-x", model: "gpt"})
+
+      assert {:error, :not_oauth} = OAuth.reconnect("openrouter")
+    end
+
+    test "an oauth connection whose provider no longer exists is refused cleanly" do
+      Config.put_model(%Model{
+        name: "stale",
+        base_url: "https://example.com",
+        api_key: "old-token",
+        model: "gpt",
+        oauth: %{"provider" => "no-such-provider", "refresh" => "r", "expires_at" => 0}
+      })
+
+      assert {:error, :unsupported_provider} = OAuth.reconnect("stale")
+      # Refused before touching anything - the stale connection is untouched.
+      assert Config.get_model("stale").api_key == "old-token"
     end
   end
 end

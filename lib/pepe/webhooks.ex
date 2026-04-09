@@ -13,13 +13,20 @@ defmodule Pepe.Webhooks do
     * `support` - customer-facing: slash commands off, open to anyone, never learns
       (`trainers: []`), and best paired with a locked-down agent (safe tools only,
       since there's no human to approve risky ones) and an ephemeral session TTL.
+
+  `/model`/`/models` (admin connections only) go through `Pepe.ModelSwitch`: a
+  `trainers` member may change the model globally or just for their own
+  conversation; anyone else may only change their own. Set `model_switch_locked`
+  on the entry to keep non-trainers from touching it at all.
   """
 
   require Logger
 
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionSupervisor
+  alias Pepe.Company
   alias Pepe.Config
+  alias Pepe.ModelSwitch
 
   @builtin_providers %{
     "whatsapp" => Pepe.Webhooks.WhatsApp,
@@ -140,10 +147,22 @@ defmodule Pepe.Webhooks do
     agent = entry["agent"]
     key = "#{entry["provider"]}:#{agent}:#{from}"
 
-    case command(entry, text) do
+    case command(entry, text, from) do
       {:reset, reply} ->
         Session.reset(key)
         mod.deliver(entry, from, reply)
+
+      {:reply, reply} ->
+        mod.deliver(entry, from, reply)
+
+      {:model_show} ->
+        SessionSupervisor.ensure(key, agent, session_opts(entry))
+        %{model: model} = Session.status(key)
+        mod.deliver(entry, from, "Current model: #{model || "(unset)"}")
+
+      {:model_set, name, scope, perm} ->
+        SessionSupervisor.ensure(key, agent, session_opts(entry))
+        mod.deliver(entry, from, apply_model_change(key, agent, name, scope, perm))
 
       :chat ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
@@ -162,22 +181,75 @@ defmodule Pepe.Webhooks do
   end
 
   @doc """
-  Decide how to treat a message: `{:reset, ack}` for a recognized slash command, or
-  `:chat` (the default). Slash commands are honoured only for `admin` connections
-  that enable them; a `support` channel treats `/new` as ordinary text.
+  Decide how to treat a message: `{:reset, ack}` for `/new`, `{:reply, text}` for a
+  read-only command answered right here (`/models`), `{:model_show}` /
+  `{:model_set, name, scope, perm}` for `/model` (needs a live session, so
+  `converse/4` executes it), or `:chat` (the default - also what a `support`
+  connection or an unrecognized slash command gets). A pure decision function -
+  the model-*change* actually happens in `converse/4`, not here.
   """
-  def command(entry, "/" <> _ = text) do
+  def command(entry, "/" <> _ = text, from) do
     if entry["mode"] == "admin" and Map.get(entry, "commands", true) do
-      case text |> String.trim_leading("/") |> String.split(~r/\s+/, parts: 2) |> hd() do
-        "new" -> {:reset, "🧹 New conversation."}
-        _ -> :chat
-      end
+      [cmd | rest] = text |> String.trim_leading("/") |> String.split(~r/\s+/, parts: 2)
+      dispatch_command(entry, cmd, List.first(rest) || "", from)
     else
       :chat
     end
   end
 
-  def command(_entry, _text), do: :chat
+  def command(_entry, _text, _from), do: :chat
+
+  defp dispatch_command(_entry, "new", _args, _from), do: {:reset, "🧹 New conversation."}
+
+  defp dispatch_command(entry, "models", _args, _from) do
+    {:reply, render_models(ModelSwitch.list_for(Company.of(entry["agent"])))}
+  end
+
+  defp dispatch_command(entry, "model", args, from) do
+    perm = ModelSwitch.permission(learn?(entry, from), entry["model_switch_locked"] == true)
+
+    case String.split(args, ~r/\s+/, trim: true) do
+      [] -> {:model_show}
+      [name] -> {:model_set, name, nil, perm}
+      [name, scope] -> {:model_set, name, scope, perm}
+      _ -> {:reply, "Usage: /model NAME [session|global]"}
+    end
+  end
+
+  defp dispatch_command(_entry, _other, _args, _from), do: :chat
+
+  defp render_models([]), do: "No models are configured for this company."
+
+  defp render_models(models),
+    do: "Available models:\n" <> Enum.map_join(models, "\n", &"- #{&1.name} (#{&1.model})")
+
+  # `perm` was already computed in `command/3` (pure); this just applies it.
+  defp apply_model_change(key, agent, name, scope, perm) do
+    cond do
+      is_nil(Config.get_model(name)) ->
+        "Unknown model: #{name}"
+
+      perm == :none ->
+        "You don't have permission to change the model here."
+
+      perm == :session or scope == "session" ->
+        model_result(ModelSwitch.apply(key, agent, name, :session), name, :session)
+
+      scope == "global" ->
+        model_result(ModelSwitch.apply(key, agent, name, :global), name, :global)
+
+      scope in [nil, ""] ->
+        "Change #{name} for this conversation only, or for everyone? " <>
+          "Reply /model #{name} session or /model #{name} global."
+
+      true ->
+        "Usage: /model NAME [session|global]"
+    end
+  end
+
+  defp model_result(:ok, name, scope), do: "Model set to #{name} (#{scope})."
+  defp model_result({:error, :unknown_model}, name, _scope), do: "Unknown model: #{name}"
+  defp model_result({:error, :unknown_agent}, _name, _scope), do: "No agent to set the model on."
 
   # Per-connection session behaviour: an idle TTL (minutes -> ms; nil = never) and
   # whether history is ephemeral (support) or kept (admin).

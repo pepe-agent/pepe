@@ -42,16 +42,17 @@ defmodule PepeWeb.TokensLive do
         />
 
         <div class="flex-1 overflow-y-auto p-6">
-          <div :if={@raw} class="mb-6 rounded-xl border border-amber-700/60 bg-amber-950/40 p-5">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="font-semibold text-amber-200">{gettext("Copy this token now.")}</div>
-                <p class="mt-1 text-sm text-amber-200/80">
-                  {gettext("This is the only time the full token is shown. It cannot be retrieved again. Store it somewhere safe before you leave this page.")}
-                </p>
-                <code class="mt-3 block select-all break-all rounded-lg border border-amber-800/60 bg-zinc-950 px-3.5 py-2.5 font-mono text-sm text-amber-100">{@raw}</code>
+          <div :if={@raw} class="mb-6 max-w-2xl rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="min-w-0 text-sm">
+                <span class="font-semibold text-amber-200">{gettext("Copy this token now")}</span>
+                <span class="text-amber-200/70">— {gettext("shown only once, store it somewhere safe.")}</span>
               </div>
-              <button phx-click="token_dismiss" class={btn_ghost()}>{gettext("Dismiss")}</button>
+              <button phx-click="token_dismiss" class="shrink-0 text-sm text-amber-200/70 hover:text-amber-200">{gettext("Dismiss")}</button>
+            </div>
+            <div class="mt-2 flex items-center gap-2">
+              <code class="min-w-0 flex-1 select-all truncate rounded-lg border border-amber-800/60 bg-zinc-950 px-3 py-2 font-mono text-sm text-amber-100">{@raw}</code>
+              <.copy_button id="copy-raw-token" value={@raw} class="shrink-0" />
             </div>
           </div>
 

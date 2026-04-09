@@ -4,19 +4,25 @@ defmodule Pepe.Gateways.TUI do
 
   Like `mix pepe run`, but it *holds* the session: the conversation keeps context
   across turns and the same slash commands as the other gateways work - `/new`,
-  `/undo`, `/compact`, `/status`, `/agent`, `/help`, `/exit`. Replies stream to
-  stdout and risky tools prompt through the shared arrow-key permission menu
-  (`Pepe.Permissions.Prompt`), scoped to the console session.
+  `/undo`, `/compact`, `/status`, `/agent`, `/models`, `/model`, `/help`, `/exit`.
+  Replies stream to stdout and risky tools prompt through the shared arrow-key
+  permission menu (`Pepe.Permissions.Prompt`), scoped to the console session.
 
   It also exposes that console rendering - `stream_events/0` and `authorizer/0` -
   so the one-shot `run` command shares exactly the same output and prompt.
+
+  There's no multi-user concept here - whoever runs `mix pepe chat` is the sole
+  operator - so `/model` always offers the session-vs-global choice (no
+  trainers/locked distinction like Telegram or the webhook channels).
   """
 
   use Gettext, backend: Pepe.Gettext
 
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionSupervisor
+  alias Pepe.Company
   alias Pepe.Config
+  alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
 
   @default_session_key "tui:local"
@@ -243,16 +249,88 @@ defmodule Pepe.Gateways.TUI do
     end
   end
 
+  defp run_command(key, "models", _rest) do
+    company = key |> Session.status() |> Map.get(:agent) |> Company.of()
+
+    case ModelSwitch.list_for(company) do
+      [] ->
+        info(gettext("No models are configured for this company."))
+
+      models ->
+        info(
+          gettext("Available models:") <>
+            "\n" <> Enum.map_join(models, "\n", &"- #{&1.name} (#{&1.model})")
+        )
+    end
+  end
+
+  defp run_command(key, "model", "") do
+    s = Session.status(key)
+    info(gettext("Current model: %{model}", model: s.model || gettext("(unset)")))
+  end
+
+  defp run_command(key, "model", args) do
+    case String.split(args, ~r/\s+/, trim: true) do
+      [name] -> change_model(key, name, nil)
+      [name, scope] -> change_model(key, name, scope)
+      _ -> info(gettext("Usage: /model NAME [session|global]"))
+    end
+  end
+
   defp run_command(_key, "help", _rest) do
     info(
       gettext("Commands:") <>
-        "\n/new  /undo  /compact  /learn  /status  /agent <name>  /help  /exit"
+        "\n/new  /undo  /compact  /learn  /status  /agent <name>  /models  /model <name> [session|global]  /help  /exit"
     )
   end
 
   defp run_command(_key, cmd, _rest) do
     info(gettext("Unknown command: /%{cmd}", cmd: cmd))
   end
+
+  # No trainers/locked distinction here (single-operator console) - always the
+  # `:global`-eligible ask-flow, same reasoning as the dashboard chat.
+  defp change_model(key, name, scope) do
+    cond do
+      is_nil(Config.get_model(name)) ->
+        info(gettext("Unknown model: %{name}", name: name))
+
+      scope == "session" ->
+        report_model_change(key, name, :session)
+
+      scope == "global" ->
+        report_model_change(key, name, :global)
+
+      scope in [nil, ""] ->
+        info(
+          gettext(
+            "Change to %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global.",
+            name: name
+          )
+        )
+
+      true ->
+        info(gettext("Usage: /model NAME [session|global]"))
+    end
+  end
+
+  defp report_model_change(key, name, scope) do
+    agent_name = Session.status(key).agent
+
+    case ModelSwitch.apply(key, agent_name, name, scope) do
+      :ok ->
+        info(gettext("Model set to %{name} (%{scope}).", name: name, scope: scope_label(scope)))
+
+      {:error, :unknown_model} ->
+        info(gettext("Unknown model: %{name}", name: name))
+
+      {:error, :unknown_agent} ->
+        info(gettext("There's no agent to set the model on."))
+    end
+  end
+
+  defp scope_label(:session), do: gettext("this conversation only")
+  defp scope_label(:global), do: gettext("everyone")
 
   ###
   ### output

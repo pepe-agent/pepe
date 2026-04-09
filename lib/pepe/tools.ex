@@ -25,6 +25,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ManageChannel
   alias Pepe.Tools.ManageMcp
   alias Pepe.Tools.ManagePepe
+  alias Pepe.Tools.ManagePlugin
   alias Pepe.Tools.ManageToken
   alias Pepe.Tools.MoveFile
   alias Pepe.Tools.Plan
@@ -65,6 +66,7 @@ defmodule Pepe.Tools do
     ManageAgent,
     ManageMcp,
     ManagePepe,
+    ManagePlugin,
     ManageToken,
     ScanSkill,
     RenameAgent,

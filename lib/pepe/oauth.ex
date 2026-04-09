@@ -113,6 +113,50 @@ defmodule Pepe.OAuth do
     end
   end
 
+  @doc """
+  Redo the OAuth subscription sign-in for an existing model connection, by
+  name, replacing its access/refresh token **in place** - every other field
+  (base_url, model id, pricing, headers, fallbacks, ...) is left untouched.
+
+  Use this when the refresh token itself died (subscription lapsed mid-call,
+  was revoked, ...) - `ensure_fresh/1`'s silent refresh-grant can't recover
+  from that, it just keeps handing back the same dead token. This runs a full
+  fresh login instead, then merges only the credentials back onto the
+  existing connection - nothing else about it changes, so every agent/cron
+  already pointing at this connection name keeps working with no edits.
+  """
+  @spec reconnect(String.t()) :: {:ok, Pepe.Config.Model.t()} | {:error, term()}
+  def reconnect(name) when is_binary(name) do
+    case Pepe.Config.get_model(name) do
+      nil ->
+        {:error, :not_found}
+
+      %Pepe.Config.Model{oauth: oauth} when not is_map(oauth) ->
+        {:error, :not_oauth}
+
+      %Pepe.Config.Model{oauth: oauth} = model ->
+        do_reconnect(model, oauth)
+    end
+  end
+
+  defp do_reconnect(model, oauth) do
+    with provider when not is_nil(provider) <- Pepe.Providers.get(oauth["provider"]),
+         flow when is_map(flow) <- oauth_flow(provider),
+         {:ok, tokens} <- login(flow) do
+      {:ok, persist_refresh(model, oauth, tokens)}
+    else
+      nil -> {:error, :unsupported_provider}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp oauth_flow(provider) do
+    case Enum.find(Pepe.Providers.auth_methods(provider), &(&1[:type] == :oauth and is_map(&1[:oauth_flow]))) do
+      %{oauth_flow: flow} -> flow
+      _ -> nil
+    end
+  end
+
   defp persist_refresh(model, oauth, tokens) do
     new_oauth =
       oauth

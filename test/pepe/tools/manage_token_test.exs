@@ -33,7 +33,7 @@ defmodule Pepe.Tools.ManageTokenTest do
 
   test "create mints a token, shows the raw secret once, and locks the API" do
     assert {:ok, out} = ManageToken.run(%{"action" => "create", "label" => "chatwoot"}, ctx())
-    assert out =~ "ctx_"
+    assert out =~ "pepe_"
     assert out =~ "not be shown again"
     # The token is now stored (only its hash) and the API is locked.
     assert Config.api_auth_required?()
@@ -60,7 +60,7 @@ defmodule Pepe.Tools.ManageTokenTest do
     {:ok, _} = ManageToken.run(%{"action" => "create", "label" => "one"}, ctx())
     assert {:ok, out} = ManageToken.run(%{"action" => "list"}, ctx())
     assert out =~ "one"
-    assert out =~ "ctx_"
+    assert out =~ "pepe_"
     refute out =~ "hash"
   end
 

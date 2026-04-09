@@ -25,6 +25,11 @@ mix pepe plugin install https://host/plugin.tar.gz    # a remote archive
 mix pepe plugin remove NAME                       # delete one
 ```
 
+An agent holding the `manage_plugin` tool can do the same from a conversation
+(`scan`/`install`/`list`/`remove`) - useful when you'd rather ask than open a
+terminal. It runs the same scan below, but with no `--force`: a dangerous
+verdict is always refused from chat, on purpose.
+
 `install` unrolls the source into the plugins dir. A **GitHub repo URL** is fetched as its
 source archive (the default branch, `main` then `master`; add `/tree/<branch>` for another)
 and extracted; a `.tar.gz` (local or a URL) is extracted and the package placed under its
@@ -69,7 +74,7 @@ network) are shown but do not block. Scan without installing with `mix pepe plug
 
 ## Example: Chatwoot channel
 
-`examples/plugins/chatwoot.exs` registers a `chatwoot` provider so Pepe can sit behind a
+`examples/plugins/chatwoot/chatwoot.exs` registers a `chatwoot` provider so Pepe can sit behind a
 [Chatwoot](https://www.chatwoot.com) inbox as the AI agent, across every channel Chatwoot
 owns (WhatsApp, web widget, Instagram, ...). Install it:
 

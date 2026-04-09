@@ -51,3 +51,6 @@ CLAUDE.md
 
 # Stray test-approval artifacts
 arquivo_teste_aprovacao_*.txt
+
+# Local Playwright MCP output (screenshots/snapshots from browser-driven checks)
+/.playwright-mcp/

@@ -29,6 +29,42 @@ defmodule PepeWeb.DashUI do
   defp nav_group_cls,
     do: "px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-zinc-600"
 
+  # A button that copies `@value` to the clipboard, swapping to a checkmark for 1.5s.
+  attr :value, :string, required: true
+  attr :id, :string, required: true
+  attr :class, :any, default: nil
+
+  def copy_button(assigns) do
+    ~H"""
+    <button type="button" id={@id} phx-hook=".CopyToClipboard" data-copy={@value} class={[btn_ghost(), @class]} title={gettext("Copy")}>
+      <.icon name="hero-clipboard-document" class="copy-icon size-4" />
+      <.icon name="hero-check" class="copied-icon hidden size-4" />
+    </button>
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".CopyToClipboard">
+      export default {
+        mounted() {
+          const copyIcon = this.el.querySelector(".copy-icon")
+          const copiedIcon = this.el.querySelector(".copied-icon")
+
+          this.el.addEventListener("click", () => {
+            navigator.clipboard.writeText(this.el.dataset.copy)
+            copyIcon.classList.add("hidden")
+            copiedIcon.classList.remove("hidden")
+            clearTimeout(this._t)
+            this._t = setTimeout(() => {
+              copiedIcon.classList.add("hidden")
+              copyIcon.classList.remove("hidden")
+            }, 1500)
+          })
+        },
+        destroyed() {
+          clearTimeout(this._t)
+        }
+      }
+    </script>
+    """
+  end
+
   attr :icon, :string, required: true
   attr :title, :string, required: true
   attr :desc, :string, required: true

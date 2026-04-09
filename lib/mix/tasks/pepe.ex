@@ -358,66 +358,22 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  defp model_cmd(["add", name | rest]) do
-    {opts, _} =
-      OptionParser.parse!(rest,
-        strict: [
-          company: :string,
-          base_url: :string,
-          api_key: :string,
-          model: :string,
-          api: :string,
-          max_tokens: :integer,
-          temperature: :float,
-          default: :boolean
-        ]
-      )
-
-    if validate_scope(name, opts[:company]) == :ok do
-      handle = Company.handle(opts[:company], name)
-
-      # Guided flow: no --base-url ⇒ use a matching known provider name, or let
-      # the user pick one from the catalog. --base-url ⇒ use it directly.
-      {base_url, api_key, oauth} =
-        cond do
-          opts[:base_url] ->
-            {opts[:base_url], opts[:api_key], nil}
-
-          provider = Pepe.Providers.get(name) ->
-            choose_auth(provider, opts)
-
-          true ->
-            choose_provider()
+  # NAME is optional on the command line: if it's missing (or the first token
+  # is actually a flag, e.g. `model add --base-url ...`), prompt for it the
+  # same way an omitted --model id falls through to an interactive picker.
+  defp model_cmd(["add" | rest]) do
+    case rest do
+      [maybe_name | flags] ->
+        if String.starts_with?(maybe_name, "-") do
+          # prompt_name/0 already resolved uniqueness (replace-or-rename), so
+          # model_add's own auto-rename-on-collision would be redundant here.
+          model_add(prompt_name(), rest, false)
+        else
+          model_add(maybe_name, flags)
         end
 
-      cond do
-        is_nil(base_url) ->
-          error("no provider selected; aborting.")
-
-        true ->
-          model_id = opts[:model] || pick_model(base_url, api_key)
-
-          case model_id do
-            nil ->
-              error("no model selected; aborting.")
-
-            id ->
-              model = %Model{
-                name: handle,
-                base_url: base_url,
-                api_key: api_key,
-                oauth: oauth,
-                model: id,
-                api: opts[:api] || api_for(base_url),
-                max_tokens: opts[:max_tokens],
-                temperature: opts[:temperature]
-              }
-
-              Config.put_model(model)
-              if opts[:default], do: Config.set_default_model_for(opts[:company], name)
-              ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
-          end
-      end
+      [] ->
+        model_add(prompt_name(), [], false)
     end
   end
 
@@ -472,9 +428,50 @@ defmodule Mix.Tasks.Pepe do
     ok("removed model connection #{name}")
   end
 
+  defp model_cmd(["rename", old, new | _]) do
+    case Config.rename_model(old, new) do
+      :ok ->
+        ok("model connection #{green(old)} -> #{green(new)} (every agent, cron and default pointing at it still resolves correctly)")
+
+      {:error, :not_found} ->
+        error("unknown model connection: #{old}")
+
+      {:error, :already_exists} ->
+        error("a model connection named #{new} already exists")
+
+      {:error, :scope_mismatch} ->
+        error("can't rename across a company boundary")
+    end
+  end
+
   defp model_cmd(["default", name | _]) do
     Config.set_default_model(name)
     ok("default model -> #{name}")
+  end
+
+  # Redo the OAuth sign-in in place - same name, same base_url/model/pricing/
+  # fallbacks/etc., only the access+refresh token is replaced. For when the
+  # refresh token itself died (not just expired) and ensure_fresh/1's silent
+  # refresh-grant can't recover it.
+  defp model_cmd(["reconnect", name | _]) do
+    info("reconnecting #{bold(name)} - your browser will open to sign in again...")
+
+    case Pepe.OAuth.reconnect(name) do
+      {:ok, _model} ->
+        ok("#{green(name)} reconnected - new token saved, nothing else on the connection changed")
+
+      {:error, :not_found} ->
+        error("unknown model connection: #{name}")
+
+      {:error, :not_oauth} ->
+        error("#{name} is a plain API-key connection, not a subscription sign-in - nothing to reconnect")
+
+      {:error, :unsupported_provider} ->
+        error("#{name}'s provider has no subscription sign-in flow registered")
+
+      {:error, reason} ->
+        error("reconnect failed: #{describe(reason)}")
+    end
   end
 
   # Preflight: send a tiny real request to confirm the connection works.
@@ -509,20 +506,113 @@ defmodule Mix.Tasks.Pepe do
       models --base-url URL --api-key KEY    list a provider's models
       list                                   list saved connections
       test [NAME]                            ping a connection
+      reconnect NAME                         redo a subscription sign-in (same connection, new token)
       remove NAME
+      rename OLD NEW                         rename it, updating every reference
       default NAME                           set the default model
     """)
   end
 
   defp model_cmd(_),
-    do: error("usage: mix pepe model [add|list|models|providers|test|remove|default] (or: help)")
+    do: error("usage: mix pepe model [add|list|models|providers|test|reconnect|remove|rename|default] (or: help)")
 
-  defp add_model_interactively do
-    name =
-      Owl.IO.input(label: "Name for this connection:")
-      |> ensure_unique(model_names(), "model connection")
+  defp add_model_interactively, do: model_add(prompt_name(), ["--default"], false)
 
-    model_cmd(["add", name, "--default"])
+  defp prompt_name do
+    Owl.IO.input(label: "Name for this connection:")
+    |> ensure_unique(model_names(), "model connection")
+  end
+
+  # Auto-renames on collision instead of silently overwriting: "openrouter"
+  # once taken becomes "openrouter-2", "openrouter-3", ... The bare `name` is
+  # kept around for provider auto-detection (matching e.g. the "openrouter"
+  # catalog entry); only the stored handle gets suffixed.
+  defp unique_handle(name, company) do
+    taken = model_names()
+    handle = Company.handle(company, name)
+
+    if handle in taken do
+      Stream.iterate(2, &(&1 + 1))
+      |> Enum.find_value(fn n ->
+        candidate = "#{name}-#{n}"
+        h = Company.handle(company, candidate)
+        if h not in taken, do: {candidate, h}
+      end)
+    else
+      {name, handle}
+    end
+  end
+
+  # dedupe?: false when `name` already went through prompt_name/0's own
+  # replace-or-rename confirmation - re-checking here would be redundant.
+  defp model_add(name, rest, dedupe? \\ true) do
+    {opts, _} =
+      OptionParser.parse!(rest,
+        strict: [
+          company: :string,
+          base_url: :string,
+          api_key: :string,
+          model: :string,
+          api: :string,
+          max_tokens: :integer,
+          temperature: :float,
+          default: :boolean
+        ]
+      )
+
+    if validate_scope(name, opts[:company]) == :ok do
+      {store_name, handle} =
+        if dedupe?, do: unique_handle(name, opts[:company]), else: {name, Company.handle(opts[:company], name)}
+
+      if store_name != name do
+        info(
+          dim("a connection named \"#{Company.handle(opts[:company], name)}\" already exists - saving this one as \"#{handle}\" instead.")
+        )
+      end
+
+      # Guided flow: no --base-url ⇒ use a matching known provider name, or let
+      # the user pick one from the catalog. --base-url ⇒ use it directly.
+      {base_url, api_key, oauth} =
+        cond do
+          opts[:base_url] ->
+            {opts[:base_url], opts[:api_key], nil}
+
+          provider = Pepe.Providers.get(name) ->
+            choose_auth(provider, opts)
+
+          true ->
+            choose_provider()
+        end
+
+      cond do
+        is_nil(base_url) ->
+          error("no provider selected; aborting.")
+
+        true ->
+          model_id = opts[:model] || pick_model(base_url, api_key)
+
+          case model_id do
+            nil ->
+              error("no model selected; aborting.")
+
+            id ->
+              model = %Model{
+                name: handle,
+                base_url: base_url,
+                api_key: api_key,
+                oauth: oauth,
+                model: id,
+                api: opts[:api] || api_for(base_url),
+                max_tokens: opts[:max_tokens],
+                temperature: opts[:temperature]
+              }
+
+              Config.put_model(model)
+              if opts[:default], do: Config.set_default_model_for(opts[:company], store_name)
+              ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
+          end
+      end
+    end
   end
 
   # Step 1: "Select a provider" - interactive catalog of known providers.
@@ -1122,6 +1212,9 @@ defmodule Mix.Tasks.Pepe do
     Plugins are Elixir loaded at runtime (no rebuild). One can add tools or channels (a
     webhook provider). A plugin runs with full access to the app, so only install from a
     source you trust. Example: the Chatwoot channel in examples/plugins.
+
+    An agent holding the manage_plugin tool can scan/install/list/remove the same way
+    from a chat - with no --force escape hatch; a dangerous verdict always stays here.
     """)
   end
 
@@ -1440,7 +1533,7 @@ defmodule Mix.Tasks.Pepe do
       revoke ID                                             revoke a token
 
     No tokens ⇒ the /v1 API is open. The first token locks it: every call then needs
-    `Authorization: Bearer ctx_...`. A token scoped to a company reaches only its
+    `Authorization: Bearer pepe_...`. A token scoped to a company reaches only its
     agents; scoped to an agent, only that one.
     """)
   end

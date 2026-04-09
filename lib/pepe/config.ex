@@ -9,13 +9,21 @@ defmodule Pepe.Config do
   The on-disk shape:
 
       {
-        "default_model": "openrouter",
-        "models": { "openrouter": { ...Pepe.Config.Model } },
+        "default_model": "a1b2c3d4",
+        "models": { "a1b2c3d4": { "name": "openrouter", ...Pepe.Config.Model } },
         "default_agent": "assistant",
-        "agents": { "assistant": { ...Pepe.Config.Agent } },
+        "agents": { "assistant": { "model": "a1b2c3d4", ...Pepe.Config.Agent } },
         "telegram": { "bot_token": "${TELEGRAM_BOT_TOKEN}", "allowed_chats": [] },
         "server": { "port": 4000 }
       }
+
+  Model connections are the one thing keyed by a stable id rather than by name:
+  `name` is a free-form, renamable display label, while every reference to a
+  model (`default_model`, an agent's/cron's `model`) stores the id, so renaming
+  a connection never requires touching anything that points at it. Reading a
+  model back through this module (`get_model/1`, an agent's/cron's `.model`
+  field) always resolves the id to whatever name is current, so callers never
+  see a raw id. See `rename_model/2`.
 
   Secrets may be written literally or as `${ENV_VAR}` placeholders; they are
   interpolated against the environment at read time, never persisted expanded.
@@ -41,7 +49,7 @@ defmodule Pepe.Config do
     case File.read(path()) do
       {:ok, body} ->
         case Jason.decode(body) do
-          {:ok, map} when is_map(map) -> map
+          {:ok, map} when is_map(map) -> map |> migrate()
           _ -> default()
         end
 
@@ -71,60 +79,236 @@ defmodule Pepe.Config do
   ###
   ### Models
   ###
+  # A model connection's identity is a stable, never-changing `id` (the map key
+  # in the config file) - `name` is just a display label, free to rename without
+  # ever touching the default_model/agent.model/cron.model references that
+  # point at it. `get_model/1` accepts either an id or a (current) name, so
+  # every existing caller that passes a human-typed name keeps working.
 
   @doc "List all model connections as structs."
   def models do
     load()
     |> Map.get("models", %{})
-    |> Enum.map(fn {name, m} -> Model.from_map(Map.put(m, "name", name)) end)
+    |> Enum.map(fn {id, m} -> Model.from_map(Map.put(m, "id", id)) end)
   end
 
-  @doc "Fetch a model connection by name."
-  def get_model(name) do
-    case load() |> get_in(["models", name]) do
-      nil -> nil
-      m -> Model.from_map(Map.put(m, "name", name))
+  @doc "Fetch a model connection by id or by its current name."
+  def get_model(id_or_name) do
+    case load() |> get_in(["models", id_or_name]) do
+      nil -> Enum.find(models(), &(&1.name == id_or_name))
+      m -> Model.from_map(Map.put(m, "id", id_or_name))
     end
   end
 
-  def get_model!(name) do
-    get_model(name) || raise "unknown model connection: #{inspect(name)}"
+  def get_model!(id_or_name) do
+    get_model(id_or_name) || raise "unknown model connection: #{inspect(id_or_name)}"
   end
 
-  @doc "Insert or update a model connection."
+  @doc "The stable id for a model given its current name or its id, or nil if unknown."
+  def model_id_for(nil), do: nil
+  def model_id_for(id_or_name), do: (get_model(id_or_name) || %{id: nil}).id
+
+  @doc """
+  The current display name for a model id. Falls back to the input unchanged
+  when it isn't a known id, so a stale/foreign reference stays visible (e.g.
+  for `Pepe.Doctor` to flag) instead of silently vanishing.
+  """
+  def model_name_for(nil), do: nil
+  def model_name_for(id), do: (get_model(id) || %{name: id}).name
+
+  @doc "Insert or update a model connection (matched by id, falling back to its current name)."
   def put_model(%Model{name: name} = model) do
+    id = model.id || model_id_for(name) || generate_model_id()
+
     load()
-    |> update_in(["models"], fn m -> Map.put(m || %{}, name, encode(model)) end)
-    |> maybe_default_root("default_model", name)
+    |> update_in(["models"], fn m -> Map.put(m || %{}, id, encode_model(%{model | id: id})) end)
+    |> maybe_default_root("default_model", id)
     |> save()
   end
 
-  def delete_model(name) do
+  def delete_model(id_or_name) do
+    id = model_id_for(id_or_name) || id_or_name
+
     load()
-    |> update_in(["models"], &Map.delete(&1 || %{}, name))
-    |> clear_default_if("default_model", name)
+    |> update_in(["models"], &Map.delete(&1 || %{}, id))
+    |> clear_default_if("default_model", id)
     |> save()
   end
 
-  def default_model_name, do: load()["default_model"]
+  @doc """
+  Rename a model connection: since every reference to it is id-based, this is
+  just a field update - the default_model/agent.model/cron.model pointers
+  aiming at its id are entirely unaffected. Only the two fields that are still
+  name-based (other models' `fallbacks`, the llm_redact hook's model) get
+  rewritten. A rename can't cross company scope (a model's `acme/` prefix, if
+  any, must stay put - that's how a model's tenant is determined).
+  """
+  def rename_model(old, new) do
+    cond do
+      get_model(old) == nil -> {:error, :not_found}
+      old == new -> :ok
+      Company.of(old) != Company.of(new) -> {:error, :scope_mismatch}
+      not is_nil(model = get_model(new)) and model.id != model_id_for(old) -> {:error, :already_exists}
+      true -> do_rename_model(old, new)
+    end
+  end
+
+  defp do_rename_model(old, new) do
+    put_model(%{get_model(old) | name: new})
+
+    load()
+    |> remap_fallbacks_everywhere(old, new)
+    |> model_rename_in_hook("llm_redact", "model", old, new)
+    |> save()
+
+    :ok
+  end
+
+  defp remap_fallbacks_everywhere(config, old, new) do
+    case Map.get(config, "models") do
+      m when is_map(m) ->
+        Map.put(config, "models", Map.new(m, fn {k, v} -> {k, model_rename_list(v, "fallbacks", old, new)} end))
+
+      _ ->
+        config
+    end
+  end
+
+  defp model_rename_in_hook(config, hook, field, old, new) do
+    case get_in(config, ["hooks", hook]) do
+      m when is_map(m) -> put_in(config, ["hooks", hook], model_rename_exact(m, field, old, new))
+      _ -> config
+    end
+  end
+
+  # Strict equality only - unlike remap_handle/remap_field (used for company
+  # renames), a model name isn't a hierarchical "company/thing" handle, so no
+  # prefix-matching is appropriate here.
+  defp model_rename_exact(map, field, old, new) do
+    case Map.get(map, field) do
+      ^old -> Map.put(map, field, new)
+      _ -> map
+    end
+  end
+
+  defp model_rename_list(map, field, old, new) do
+    case Map.get(map, field) do
+      list when is_list(list) -> Map.put(map, field, Enum.map(list, &if(&1 == old, do: new, else: &1)))
+      _ -> map
+    end
+  end
+
+  defp generate_model_id, do: :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+
+  # One-time, idempotent upgrade from the old models-keyed-by-name shape to the
+  # current id-keyed shape. Runs on every load/0; a no-op after the first
+  # (successful) run, since the shape check below then reads false.
+  defp migrate(config) do
+    if needs_model_id_migration?(config) do
+      config |> migrate_model_ids() |> save()
+    else
+      config
+    end
+  end
+
+  defp needs_model_id_migration?(config) do
+    case Map.get(config, "models") do
+      m when is_map(m) and map_size(m) > 0 ->
+        {_k, v} = Enum.at(m, 0)
+        not Map.has_key?(v, "name")
+
+      _ ->
+        false
+    end
+  end
+
+  defp migrate_model_ids(config) do
+    old_models = Map.get(config, "models", %{})
+    id_map = Map.new(old_models, fn {name, _v} -> {name, generate_model_id()} end)
+    new_models = Map.new(old_models, fn {name, v} -> {id_map[name], Map.put(v, "name", name)} end)
+
+    config
+    |> Map.put("models", new_models)
+    |> migrate_ref("default_model", id_map)
+    |> migrate_company_defaults(id_map)
+    |> migrate_owned_refs("agents", "model", id_map)
+    |> migrate_owned_refs("crons", "model", id_map)
+  end
+
+  defp migrate_ref(config, field, id_map) do
+    case Map.get(config, field) do
+      name when is_binary(name) -> Map.put(config, field, Map.get(id_map, name, name))
+      _ -> config
+    end
+  end
+
+  defp migrate_company_defaults(config, id_map) do
+    case Map.get(config, "companies") do
+      m when is_map(m) ->
+        Map.put(config, "companies", Map.new(m, fn {co, v} -> {co, migrate_company_default(v, co, id_map)} end))
+
+      _ ->
+        config
+    end
+  end
+
+  defp migrate_company_default(v, co, id_map) do
+    case Map.get(v, "default_model") do
+      nil ->
+        v
+
+      ref ->
+        id = Map.get(id_map, Company.handle(co, ref)) || Map.get(id_map, ref)
+        Map.put(v, "default_model", id || ref)
+    end
+  end
+
+  defp migrate_owned_refs(config, section, field, id_map) do
+    case Map.get(config, section) do
+      m when is_map(m) ->
+        Map.put(config, section, Map.new(m, fn {k, v} -> {k, migrate_owned_ref(v, field, k, id_map)} end))
+
+      _ ->
+        config
+    end
+  end
+
+  defp migrate_owned_ref(v, field, owner_key, id_map) do
+    case Map.get(v, field) do
+      nil ->
+        v
+
+      ref when is_binary(ref) ->
+        scope = Company.of(Map.get(v, "agent") || owner_key)
+        id = Map.get(id_map, Company.handle(scope, ref)) || Map.get(id_map, ref)
+        Map.put(v, field, id || ref)
+
+      _ ->
+        v
+    end
+  end
+
+  def default_model_name, do: model_name_for(load()["default_model"])
 
   def default_model do
-    case default_model_name() do
+    case load()["default_model"] do
       nil -> nil
-      name -> get_model(name)
+      id -> get_model(id)
     end
   end
 
-  def set_default_model(name) do
-    load() |> Map.put("default_model", name) |> save()
+  def set_default_model(name_or_id) do
+    load() |> Map.put("default_model", model_id_for(name_or_id) || name_or_id) |> save()
   end
 
   @doc "Set the default model for a scope: global for root, or the company's own."
   def set_default_model_for(nil, name), do: set_default_model(name)
 
-  def set_default_model_for(company, name) do
+  def set_default_model_for(company, name_or_id) do
+    id = model_id_for(name_or_id) || name_or_id
+
     load()
-    |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_model", name) end)
+    |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_model", id) end)
     |> save()
   end
 
@@ -249,7 +433,7 @@ defmodule Pepe.Config do
     load()
     |> rename_company_entry(old, new)
     |> rekey_section("agents", old, new, &rewrite_agent_refs(&1, old, new))
-    |> rekey_section("models", old, new, & &1)
+    |> remap_model_names(old, new)
     |> rewrite_agent_binding("crons", old, new)
     |> rewrite_agent_binding("watches", old, new)
     |> rewrite_bot_bindings(old, new)
@@ -287,6 +471,19 @@ defmodule Pepe.Config do
     case Map.get(config, section) do
       m when is_map(m) ->
         Map.put(config, section, Map.new(m, fn {k, v} -> {remap_handle(k, old, new), tx.(v)} end))
+
+      _ ->
+        config
+    end
+  end
+
+  # Models are id-keyed (their map key never changes), so a company rename
+  # rewrites each affected model's `name` field in place instead of re-keying
+  # the section the way rekey_section/5 does for agents.
+  defp remap_model_names(config, old, new) do
+    case Map.get(config, "models") do
+      m when is_map(m) ->
+        Map.put(config, "models", Map.new(m, fn {id, v} -> {id, remap_field(v, "name", old, new)} end))
 
       _ ->
         config
@@ -388,13 +585,13 @@ defmodule Pepe.Config do
   def agents do
     load()
     |> Map.get("agents", %{})
-    |> Enum.map(fn {name, a} -> Agent.from_map(Map.put(a, "name", name)) end)
+    |> Enum.map(fn {name, a} -> Agent.from_map(Map.put(a, "name", name)) |> resolve_agent_model() end)
   end
 
   def get_agent(name) do
     case load() |> get_in(["agents", name]) do
       nil -> nil
-      a -> Agent.from_map(Map.put(a, "name", name))
+      a -> Agent.from_map(Map.put(a, "name", name)) |> resolve_agent_model()
     end
   end
 
@@ -403,11 +600,20 @@ defmodule Pepe.Config do
   end
 
   def put_agent(%Agent{name: name} = agent) do
+    stored = %{agent | model: model_id_for(agent.model) || agent.model}
+
     load()
-    |> update_in(["agents"], fn a -> Map.put(a || %{}, name, encode(agent)) end)
+    |> update_in(["agents"], fn a -> Map.put(a || %{}, name, encode(stored)) end)
     |> maybe_default_root("default_agent", name)
     |> save()
   end
+
+  # An agent's stored `model` is a model id (rename-safe); resolve it back to
+  # the model's current name so every caller of Config.get_agent/agents (which
+  # all expect `.model` to be a name, same as before model ids existed) sees
+  # no difference.
+  defp resolve_agent_model(%Agent{model: nil} = agent), do: agent
+  defp resolve_agent_model(%Agent{model: id} = agent), do: %{agent | model: model_name_for(id)}
 
   @doc "Persistently approve `tool` for `agent_name` (the `:always` permission grant)."
   def allow_tool(agent_name, tool) do
@@ -532,7 +738,7 @@ defmodule Pepe.Config do
   def default_model_for(company) do
     case (get_company(company) || %{})["default_model"] do
       nil -> default_model()
-      ref -> get_model(Company.handle(company, ref)) || get_model(ref) || default_model()
+      id -> get_model(id) || default_model()
     end
   end
 
@@ -586,7 +792,7 @@ defmodule Pepe.Config do
   def crons do
     load()
     |> Map.get("crons", %{})
-    |> Enum.map(fn {id, map} -> Cron.from_map(Map.put(map, "id", id)) end)
+    |> Enum.map(fn {id, map} -> Cron.from_map(Map.put(map, "id", id)) |> resolve_cron_model() end)
     |> Enum.sort_by(& &1.id)
   end
 
@@ -594,18 +800,24 @@ defmodule Pepe.Config do
   def get_cron(id) do
     case load() |> get_in(["crons", id]) do
       nil -> nil
-      map -> Cron.from_map(Map.put(map, "id", id))
+      map -> Cron.from_map(Map.put(map, "id", id)) |> resolve_cron_model()
     end
   end
 
   @doc "Create or replace a cron (keyed by its `id`)."
   def put_cron(%Cron{id: id} = cron) when is_binary(id) do
-    map = cron |> Map.from_struct() |> Map.delete(:id) |> stringify()
+    stored = %{cron | model: model_id_for(cron.model) || cron.model}
+    map = stored |> Map.from_struct() |> Map.delete(:id) |> stringify()
 
     load()
     |> update_in(["crons"], fn c -> Map.put(c || %{}, id, map) end)
     |> save()
   end
+
+  # Same rename-safety trick as resolve_agent_model/1: a cron's stored `model`
+  # is an id, resolved back to a display name for every existing caller.
+  defp resolve_cron_model(%Cron{model: nil} = cron), do: cron
+  defp resolve_cron_model(%Cron{model: id} = cron), do: %{cron | model: model_name_for(id)}
 
   @doc "Delete a cron by id."
   def delete_cron(id) do
@@ -1064,6 +1276,12 @@ defmodule Pepe.Config do
 
   defp encode(struct) do
     struct |> Map.from_struct() |> Map.delete(:name) |> stringify()
+  end
+
+  # Models are id-keyed (unlike agents/companies, which are still name-keyed),
+  # so it's :id that's redundant with the map key here, not :name.
+  defp encode_model(%Model{} = model) do
+    model |> Map.from_struct() |> Map.delete(:id) |> stringify()
   end
 
   defp stringify(map) do

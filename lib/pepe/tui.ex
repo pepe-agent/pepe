@@ -15,6 +15,9 @@ defmodule Pepe.TUI do
   """
 
   @esc "\e"
+  # Cap the rendered rows so a long list (e.g. OpenRouter's 300+ models) never
+  # exceeds the terminal height; past this, only a scrolling window is drawn.
+  @max_visible 15
 
   @doc "Pick one item with `↑`/`↓` + Enter. Returns the chosen item."
   def select(items, opts \\ [])
@@ -119,12 +122,16 @@ defmodule Pepe.TUI do
 
   defp lines(items, render, label, cursor, mode, selected) do
     header = if label, do: String.split(label, "\n"), else: []
-    header ++ [hint(mode)] ++ rows(items, render, cursor, mode, selected)
+    header ++ [hint(mode, cursor, length(items))] ++ rows(items, render, cursor, mode, selected)
   end
 
   defp rows(items, render, cursor, mode, selected) do
+    total = length(items)
+    start = window_start(cursor, total)
+
     items
     |> Enum.with_index()
+    |> Enum.slice(start, @max_visible)
     |> Enum.map(fn {item, i} ->
       pointer = if i == cursor, do: cyan("›"), else: " "
       box = mark(mode, i, cursor, selected)
@@ -133,17 +140,34 @@ defmodule Pepe.TUI do
     end)
   end
 
+  # Keeps the cursor centered in a fixed-size window, clamped to the list bounds,
+  # so the visible rows scroll with the cursor instead of the whole list being drawn.
+  defp window_start(_cursor, total) when total <= @max_visible, do: 0
+
+  defp window_start(cursor, total) do
+    cursor
+    |> Kernel.-(div(@max_visible, 2))
+    |> max(0)
+    |> min(total - @max_visible)
+  end
+
   defp mark(:select, i, cursor, _selected), do: if(i == cursor, do: "(#{cyan("•")})", else: "( )")
 
   defp mark(:multi, i, _cursor, selected),
     do: if(MapSet.member?(selected, i), do: "[#{green("x")}]", else: "[ ]")
 
-  defp hint(:select), do: dim("  ↑/↓ mover · enter selecionar")
-  defp hint(:multi), do: dim("  ↑/↓ mover · espaço marcar · enter confirmar")
+  defp hint(mode, cursor, total),
+    do: dim("  #{position(cursor, total)}#{hint_text(mode)}")
+
+  defp hint_text(:select), do: "↑/↓ mover · enter selecionar"
+  defp hint_text(:multi), do: "↑/↓ mover · espaço marcar · enter confirmar"
+
+  defp position(_cursor, total) when total <= @max_visible, do: ""
+  defp position(cursor, total), do: "(#{cursor + 1}/#{total}) · "
 
   defp menu_height(items, label) do
     header = if label, do: length(String.split(label, "\n")), else: 0
-    header + 1 + length(items)
+    header + 1 + min(length(items), @max_visible)
   end
 
   defp clear_block(height) do

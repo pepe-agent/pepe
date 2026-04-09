@@ -192,6 +192,16 @@ defmodule Pepe.LLM do
   ### non-streaming parsing
   ###
 
+  defp parse_completion(resp) when is_binary(resp) do
+    resp
+    |> String.trim()
+    |> Jason.decode()
+    |> case do
+      {:ok, decoded} -> parse_completion(decoded)
+      {:error, _} -> %{content: resp, tool_calls: [], finish_reason: "error", usage: nil}
+    end
+  end
+
   defp parse_completion(%{"choices" => [choice | _]} = resp) do
     message = choice["message"] || %{}
 

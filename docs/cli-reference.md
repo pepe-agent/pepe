@@ -23,6 +23,7 @@ mix pepe model providers             # list known providers (OpenAI, Anthropic, 
 mix pepe model models --base-url https://api.openai.com/v1 --api-key '${OPENAI_API_KEY}'
 mix pepe model list                  # list saved connections
 mix pepe model test [NAME]           # ping a connection to verify the key/endpoint work
+mix pepe model reconnect openai      # redo a subscription sign-in in place (new token, nothing else changes)
 mix pepe model remove openrouter
 mix pepe model default openai
 ```
@@ -35,6 +36,17 @@ Pepe translates transparently. ChatGPT/Codex goes through the OpenAI **Responses
 and Claude Pro/Max through the Anthropic **Messages API**, both mapped to the same
 tool-calling loop, so agents, tools and every surface behave identically. The Anthropic
 **API key** path uses the Messages API too (Anthropic is not OpenAI-compatible).
+
+**When the refresh token itself dies** (subscription lapsed mid-session, revoked,
+...) the model returns 401/403 and `ensure_fresh/1`'s silent refresh-grant can't
+recover it - it just keeps handing back the same dead token. `mix pepe model
+reconnect NAME` redoes the full browser sign-in and swaps in a fresh
+access+refresh token **without touching anything else** on the connection
+(base_url, model id, pricing, headers, fallbacks, name - all untouched), so
+every agent/cron already pointing at that name keeps working with no edits.
+Don't `model remove` + `model add` to "fix" a dead token - `add` builds a brand
+new connection from scratch and drops any pricing/headers/fallbacks you'd set on
+the old one; `reconnect` is the non-destructive path.
 
 ### Agents
 
@@ -82,8 +94,11 @@ mix pepe serve --port 4000           # OpenAI-compatible HTTP API + WebSocket
 `tui` (alias: `chat`) opens a session-backed console - it keeps context across
 turns and prints a summary box (agent · model · session) on open. The same slash
 commands as the other gateways work: `/new`, `/undo`, `/compact`, `/status`,
-`/agent <name>`, `/help`, `/exit`. Replies stream as they arrive, and a risky tool
-asks for permission through an arrow-key menu (see **Permissions**).
+`/agent <name>`, `/models`, `/model <name> [session|global]`, `/help`, `/exit`.
+Replies stream as they arrive, and a risky tool asks for permission through an
+arrow-key menu (see **Permissions**). There's no multi-user concept in a local
+console, so `/model` always offers the session-vs-global choice - see
+**Model connections** above for what that means.
 
 ### Telegram gateway
 

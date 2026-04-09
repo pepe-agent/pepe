@@ -3,7 +3,7 @@ defmodule Pepe.ApiToken do
   Bearer tokens for the OpenAI-compatible HTTP API, each scoped to a company (or
   root) and optionally a single agent.
 
-  A token is a random string prefixed `ctx_`. Only its **SHA-256 hash** is stored in
+  A token is a random string prefixed `pepe_`. Only its **SHA-256 hash** is stored in
   the config - the raw token is shown once at creation and never persisted, so a
   leaked config can't be replayed. Verification hashes the presented token and looks
   it up.
@@ -17,7 +17,7 @@ defmodule Pepe.ApiToken do
     * neither   - the root scope (root agents + bare model connections).
   """
 
-  @prefix "ctx_"
+  @prefix "pepe_"
 
   @doc "Generate a fresh raw token (shown once, never stored)."
   @spec generate() :: String.t()

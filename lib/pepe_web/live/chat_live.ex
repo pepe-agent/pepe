@@ -14,6 +14,7 @@ defmodule PepeWeb.ChatLive do
   alias Pepe.Agent.SessionPersistence
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
+  alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
   alias Pepe.Session.Focus
 
@@ -24,7 +25,9 @@ defmodule PepeWeb.ChatLive do
     [
       {"/new", gettext("Start a fresh conversation")},
       {"/stop", gettext("Stop the current run")},
-      {"/compact", gettext("Summarize history to free up context")}
+      {"/compact", gettext("Summarize history to free up context")},
+      {"/models", gettext("List models available to this company")},
+      {"/model", gettext("Show or change the model - NAME [session|global]")}
     ]
   end
 
@@ -596,6 +599,18 @@ defmodule PepeWeb.ChatLive do
 
         socket |> assign(input: "") |> put_flash(:info, gettext("Compacting history..."))
 
+      "/models" ->
+        text =
+          case ModelSwitch.list_for(scope_company(socket.assigns.scope)) do
+            [] -> gettext("No models are configured for this company.")
+            models -> gettext("Available models:") <> " " <> Enum.map_join(models, ", ", & &1.name)
+          end
+
+        socket |> assign(input: "") |> put_flash(:info, text)
+
+      "/model" ->
+        change_model(socket, key, slash_args(cmd))
+
       _ ->
         put_flash(socket, :error, gettext("Unknown command %{cmd}", cmd: cmd))
     end
@@ -603,6 +618,67 @@ defmodule PepeWeb.ChatLive do
 
   defp slash?(text), do: String.starts_with?(text, "/")
   defp slash_name(text), do: text |> String.split(~r/\s+/, parts: 2) |> List.first()
+  defp slash_args(text), do: text |> String.split(~r/\s+/, trim: true) |> tl()
+
+  # The dashboard has no untrusted-participant tier - a logged-in operator always
+  # gets `:global` permission (may change the model for everyone, or just this
+  # tab) - so, unlike Telegram/webhooks, there's no `:none`/`:session`-only case
+  # to gate here. The ask-flow (missing scope -> ask to confirm) still applies.
+  defp change_model(socket, key, []) do
+    s = status(key)
+    socket |> assign(input: "") |> put_flash(:info, gettext("Current model: %{model}", model: s.model || gettext("(unset)")))
+  end
+
+  defp change_model(socket, key, [name]), do: ask_or_apply(socket, key, name, nil)
+  defp change_model(socket, key, [name, scope]), do: ask_or_apply(socket, key, name, scope)
+
+  defp change_model(socket, _key, _args),
+    do: put_flash(socket, :error, gettext("Usage: /model NAME [session|global]"))
+
+  defp ask_or_apply(socket, key, name, scope) do
+    cond do
+      is_nil(Config.get_model(name)) ->
+        put_flash(socket, :error, gettext("Unknown model: %{name}", name: name))
+
+      scope == "session" ->
+        report_model_result(socket, ModelSwitch.apply(key, socket.assigns.agent, name, :session), name, "session")
+
+      scope == "global" ->
+        report_model_result(socket, ModelSwitch.apply(key, socket.assigns.agent, name, :global), name, "global")
+
+      scope in [nil, ""] ->
+        socket
+        |> assign(input: "")
+        |> put_flash(
+          :info,
+          gettext(
+            "Change to %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global.",
+            name: name
+          )
+        )
+
+      true ->
+        put_flash(socket, :error, gettext("Usage: /model NAME [session|global]"))
+    end
+  end
+
+  defp report_model_result(socket, :ok, name, scope) do
+    socket
+    |> assign(input: "")
+    |> put_flash(:info, gettext("Model set to %{name} (%{scope}).", name: name, scope: scope_label(scope)))
+  end
+
+  defp report_model_result(socket, {:error, :unknown_model}, name, _scope),
+    do: put_flash(socket, :error, gettext("Unknown model: %{name}", name: name))
+
+  defp report_model_result(socket, {:error, :unknown_agent}, _name, _scope),
+    do: put_flash(socket, :error, gettext("There's no agent to set the model on."))
+
+  defp scope_label("session"), do: gettext("this conversation only")
+  defp scope_label("global"), do: gettext("everyone")
+
+  defp scope_company(scope) when scope in [nil, "all", "root"], do: nil
+  defp scope_company(scope), do: scope
 
   defp slash_matches(input) do
     if slash?(input),

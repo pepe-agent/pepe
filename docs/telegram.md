@@ -14,8 +14,8 @@ menu, in your configured language):
 ```
 /new        start a fresh conversation        /status   show session info
 /undo       undo your last message            /whoami   show your user/chat id
-/compact    summarize history to free context /model    show or set the model
-/stop       cancel the current run            /models   list configured models
+/compact    summarize history to free context /model    show, or set by name
+/stop       cancel the current run            /models   pick a model (buttons)
 /agent X    switch agent                      /tools    list runtime tools
 /skill [X]  list skills, or run one by name   /approve  manage saved permissions
 /btw <q>    ask a side question (not saved)    /help     list commands
@@ -23,6 +23,14 @@ menu, in your configured language):
 
 Installed **skills are also surfaced as their own slash commands** (e.g. a
 `weather` skill shows up as `/weather`), so they're discoverable from the "/" menu.
+
+`/models` opens an inline-button picker scoped to your company, with a checkmark on
+the current model - tap one to switch. A **trainer** (the bot's `trainers`
+allowlist, same one that gates `/learn`) is then asked *this conversation only* or
+*everyone*; anyone else in an allowed chat just switches their own conversation, no
+asking. Set `model_switch_locked: true` on the bot to keep non-trainers from
+touching it at all. `/model NAME [session|global]` is the typed equivalent, for
+when you already know the name.
 
 `/whoami` is the easy way to find the ids for the allowlists. Config keys under
 `"telegram"`: `bot_token`, `enabled`, `allowed_chats`, `allowed_users`,

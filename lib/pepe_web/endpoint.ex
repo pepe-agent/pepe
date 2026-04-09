@@ -11,9 +11,11 @@ defmodule PepeWeb.Endpoint do
     same_site: "Lax"
   ]
 
+  # :uri lets the dashboard read back the host it's being accessed at (e.g. to
+  # fill in a widget embed snippet with the real address, not a placeholder).
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [session: @session_options]],
-    longpoll: [connect_info: [session: @session_options]]
+    websocket: [connect_info: [:uri, session: @session_options]],
+    longpoll: [connect_info: [:uri, session: @session_options]]
 
   # Streaming agent conversations over WebSocket. `peer_data` gives the socket the
   # caller's address so it can allow loopback and refuse remote when no tokens exist.
