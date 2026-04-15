@@ -2,7 +2,7 @@
 import "../styles/global.css";
 import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
-import type { Locale } from "../i18n/ui";
+import { locales, type Locale } from "../i18n/ui";
 
 const { title, description, lang, docs = false } = Astro.props as {
   title: string;
@@ -10,6 +10,25 @@ const { title, description, lang, docs = false } = Astro.props as {
   lang: Locale;
   docs?: boolean;
 };
+
+const siteName = "Pepe";
+const defaultDescription =
+  "Self-hosted AI agent runtime. Define agents, connect OpenAI-compatible models, and reach them from your terminal, HTTP API, WebSocket, dashboard, and messaging channels.";
+const metaDescription = description || defaultDescription;
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin);
+const imageUrl = new URL("/social-card.png", canonicalUrl);
+const localeMap: Record<Locale, string> = {
+  en: "en_US",
+  es: "es_ES",
+  "pt-br": "pt_BR",
+  "pt-pt": "pt_PT",
+};
+
+function localizedPath(to: Locale) {
+  const parts = Astro.url.pathname.split("/");
+  if (locales.includes(parts[1] as Locale)) parts[1] = to;
+  return parts.join("/") || `/${to}/`;
+}
 ---
 
 <!doctype html>
@@ -18,9 +37,37 @@ const { title, description, lang, docs = false } = Astro.props as {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    {description && <meta name="description" content={description} />}
+    <meta name="description" content={metaDescription} />
+    <meta name="application-name" content={siteName} />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={canonicalUrl.href} />
+    {locales.map((locale) => (
+      <link rel="alternate" hreflang={locale} href={new URL(localizedPath(locale), canonicalUrl).href} />
+    ))}
+    <link rel="alternate" hreflang="x-default" href={new URL("/en/", canonicalUrl).href} />
     <link rel="icon" type="image/svg+xml" href="/pepe-icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0a0a0b" />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={metaDescription} />
+    <meta property="og:url" content={canonicalUrl.href} />
+    <meta property="og:image" content={imageUrl.href} />
+    <meta property="og:image:secure_url" content={imageUrl.href} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Pepe, a self-hosted AI agent runtime" />
+    <meta property="og:locale" content={localeMap[lang]} />
+    {locales.filter((locale) => locale !== lang).map((locale) => (
+      <meta property="og:locale:alternate" content={localeMap[locale]} />
+    ))}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={metaDescription} />
+    <meta name="twitter:image" content={imageUrl.href} />
+    <meta name="twitter:image:alt" content="Pepe, a self-hosted AI agent runtime" />
   </head>
   <body>
     <Nav lang={lang} docs={docs} />

@@ -16,22 +16,24 @@ const d = (p: string) => withLocale(lang, p);
     <div class="cols">
       <div>
         <h4>{tr("foot.docs")}</h4>
-        <a href={d("/docs/")}>Introduction</a>
-        <a href={d("/docs/quickstart/")}>Quickstart</a>
-        <a href={d("/docs/agents/")}>Agents &amp; tools</a>
-        <a href={d("/docs/channels/")}>Channels</a>
+        <a href={d("/docs/")}>{tr("foot.intro")}</a>
+        <a href={d("/docs/quickstart/")}>{tr("foot.quickstart")}</a>
+        <a href={d("/docs/agents/")}>{tr("foot.agents")}</a>
+        <a href={d("/docs/channels/")}>{tr("foot.channels")}</a>
       </div>
       <div>
         <h4>{tr("foot.guides")}</h4>
-        <a href={d("/docs/plugins/")}>Plugins</a>
-        <a href={d("/docs/scheduled/")}>Scheduled tasks</a>
-        <a href={d("/docs/security/")}>Security &amp; sandbox</a>
-        <a href={d("/docs/api/")}>HTTP API</a>
+        <a href={d("/docs/plugins/")}>{tr("foot.plugins")}</a>
+        <a href={d("/docs/scheduled/")}>{tr("foot.scheduled")}</a>
+        <a href={d("/docs/security/")}>{tr("foot.security")}</a>
+        <a href={d("/docs/api/")}>{tr("foot.api")}</a>
       </div>
       <div>
         <h4>{tr("foot.project")}</h4>
         <a href="https://github.com/jhonathas/pepe">GitHub</a>
-        <a href={d("/docs/")}>Documentation</a>
+        <a href={d("/docs/")}>{tr("foot.documentation")}</a>
+        <a href={d("/terms/")}>{tr("foot.terms")}</a>
+        <a href={d("/privacy/")}>{tr("foot.privacy")}</a>
       </div>
     </div>
   </div>

@@ -44,7 +44,7 @@ defmodule PepeWeb.WatchWsDeliveryTest do
       interval_s: 120,
       trigger: %{"type" => "probe", "command" => "exit 0"},
       on_fire: %{"type" => "template", "text" => "deploy done"},
-      origin: %{"channel" => "ws", "key" => "ws:sess1"}
+      origin: %{"channel" => "ws", "key" => "web:sess1"}
     })
 
     send(Scheduler, :tick)

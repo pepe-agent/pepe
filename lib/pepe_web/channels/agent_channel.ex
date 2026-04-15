@@ -4,17 +4,26 @@ defmodule PepeWeb.AgentChannel do
 
   Topic: `agent:<agent_name>` - use `agent:default` for the default agent.
 
+  The join reply carries `%{history: [%{role:, content:}, ...]}` - the session's
+  prior turns (system/tool messages stripped), if any, so a client can rehydrate its
+  view of an already-live session instead of starting blank.
+
   Inbound events:
     * `"prompt"`  %{"text" => "..."}  - send a message; streams the reply
     * `"reset"`                        - clear the conversation history
 
   Outbound events:
-    * `"delta"`        %{"text" => "..."}        - streamed text fragment
-    * `"tool_call"`    %{"name", "arguments"}    - a tool is being invoked
-    * `"tool_result"`  %{"name", "output"}       - tool output
-    * `"done"`         %{"content" => "..."}      - final answer
-    * `"watch"`        %{"text" => "..."}         - a fired watch's notification
-    * `"error"`        %{"reason" => "..."}
+    * `"delta"`         %{"text" => "..."}        - streamed text fragment
+    * `"tool_call"`     %{"name", "arguments"}    - a tool is being invoked
+    * `"tool_result"`   %{"name", "output"}       - tool output
+    * `"done"`          %{"content" => "..."}      - final answer
+    * `"session_ended"` %{}                        - the agent called `end_session`;
+      its reply (already delivered via the preceding `"done"`) was the last one on
+      the old context, the NEXT prompt starts fresh. Sent as an explicit event (not
+      left for the client to infer from a `tool_result`'s `name`) so a client doesn't
+      need to know anything about tool internals to show that the conversation ended.
+    * `"watch"`         %{"text" => "..."}         - a fired watch's notification
+    * `"error"`         %{"reason" => "..."}
 
   A watch created from this connection (via the `watch` tool) delivers back here as a
   `"watch"` event. Pass a stable `session` in the join payload to keep the same watch
@@ -22,9 +31,9 @@ defmodule PepeWeb.AgentChannel do
   """
   use PepeWeb, :channel
 
-  alias Pepe.Agent.Runtime
+  alias Pepe.Agent.Session
+  alias Pepe.Agent.SessionSupervisor
   alias Pepe.ApiScope
-  alias Pepe.LLM.Message
   alias Pepe.Watch.Delivery
 
   @impl true
@@ -40,17 +49,63 @@ defmodule PepeWeb.AgentChannel do
         {:error, %{reason: "agent not accessible: #{inspect(topic)}"}}
 
       agent ->
-        key = "ws:" <> to_string(payload["session"] || System.unique_integer([:positive]))
+        key = session_key(scope, payload)
         subscribe_watches(key)
+        # Routed through Pepe.Agent.Session (not Runtime.run directly), same as every
+        # other channel: shows up in the dashboard's live session list, picks up the
+        # agent's full system prompt (SOUL.md/BOOT.md/docs index, not just the bare
+        # config prompt), and gets restart-recovery for free. A "widget:" key is
+        # ephemeral + TTL'd by default (Pepe.Agent.Session.default_ephemeral?/1) - an
+        # anonymous visitor's chat isn't meant to accumulate on disk forever, and
+        # there's no "trainers" concept here yet, so it never feeds memory
+        # (`learn: false` at the call site in `run_prompt/2`). Not passed explicitly
+        # here: the policy needs to hold even when some OTHER caller (e.g. the
+        # dashboard's own session viewer) reaches `ensure/3` for this key first.
+        {:ok, _pid} = SessionSupervisor.ensure(key, agent.name)
 
-        {:ok,
-         assign(socket,
-           agent: agent,
-           messages: [Message.system(agent.system_prompt)],
-           watch_key: key
-         )}
+        # The join reply carries prior history (if any) so a client can rehydrate its
+        # view of an already-live session (e.g. after a page reload, which drops the
+        # client's own in-memory transcript but not the server-side one) instead of
+        # looking like the conversation was lost.
+        {:ok, %{history: visible_history(key)}, assign(socket, agent: agent, watch_key: key)}
     end
   end
+
+  defp visible_history(key) do
+    key
+    |> Session.history()
+    |> Enum.reject(&(&1["role"] in ["system", "tool"]))
+    |> Enum.map(&%{role: &1["role"], content: to_string(&1["content"] || "")})
+    |> Enum.reject(&(&1.content == "" and &1.role == "assistant"))
+  end
+
+  # A widget token's origin becomes part of the key ("widget:example.com:<id>"), so
+  # someone running more than one widget (several sites) can tell their conversations
+  # apart in the dashboard's session list instead of everything piling into one
+  # generic "Web" group indistinguishable from the dashboard's own built-in chat.
+  # Anything else (a same-host tool, a plain non-widget token) keeps the existing
+  # "web:" prefix.
+  defp session_key(%{kind: "widget", allowed_origin: origin}, payload) do
+    "widget:" <> site(origin) <> ":" <> to_string(payload["session"] || System.unique_integer([:positive]))
+  end
+
+  defp session_key(_scope, payload) do
+    "web:" <> to_string(payload["session"] || System.unique_integer([:positive]))
+  end
+
+  defp site(origin) when is_binary(origin) do
+    case URI.parse(origin) do
+      %URI{host: host} when is_binary(host) -> host <> port_suffix(URI.parse(origin))
+      _ -> "unknown-site"
+    end
+  end
+
+  defp site(_origin), do: "unknown-site"
+
+  defp port_suffix(%URI{port: nil}), do: ""
+  defp port_suffix(%URI{scheme: "https", port: 443}), do: ""
+  defp port_suffix(%URI{scheme: "http", port: 80}), do: ""
+  defp port_suffix(%URI{port: port}), do: ":#{port}"
 
   # Listen for this connection's fired watches, and register so the scheduler knows a
   # live surface is here (the Registry entry is tied to this process and cleared on
@@ -63,8 +118,8 @@ defmodule PepeWeb.AgentChannel do
 
   @impl true
   def handle_in("reset", _payload, socket) do
-    agent = socket.assigns.agent
-    {:reply, :ok, assign(socket, messages: [Message.system(agent.system_prompt)])}
+    Session.reset(socket.assigns.watch_key)
+    {:reply, :ok, socket}
   end
 
   def handle_in("prompt", %{"text" => text}, socket) do
@@ -97,8 +152,7 @@ defmodule PepeWeb.AgentChannel do
   defp rate_limit_message(retry_ms), do: "rate limited, try again in #{Integer.floor_div(retry_ms, 1000)}s"
 
   defp run_prompt(socket, text) do
-    agent = socket.assigns.agent
-    messages = socket.assigns.messages ++ [Message.user(text)]
+    key = socket.assigns.watch_key
     channel = self()
 
     on_event = fn
@@ -109,12 +163,19 @@ defmodule PepeWeb.AgentChannel do
     end
 
     Task.start(fn ->
-      opts = [stream: true, on_event: on_event, session_key: socket.assigns.watch_key]
+      # No human on the other end of a public/anonymous connection to approve a risky
+      # tool call - `authorize: nil` runs freely, exactly like a WhatsApp `support`
+      # connection; the mitigation is binding the widget's token to a narrow, safe
+      # agent (see the widget docs). `learn: false` until there's a real "who counts
+      # as a trainer" concept for an anonymous visitor.
+      opts = [stream: true, on_event: on_event, authorize: nil, learn: false]
 
-      case Runtime.run(agent, messages, opts) do
-        {:ok, content, all} ->
+      case Session.chat(key, text, opts) do
+        {:ok, content} ->
           push_event(channel, "done", %{content: content})
-          send(channel, {:update_messages, all})
+
+        {:error, :busy} ->
+          push_event(channel, "error", %{reason: "already answering, please wait"})
 
         {:error, reason} ->
           push_event(channel, "error", %{reason: inspect(reason)})
@@ -125,13 +186,15 @@ defmodule PepeWeb.AgentChannel do
   end
 
   @impl true
-  def handle_info({:push_event, event, payload}, socket) do
-    push(socket, event, payload)
+  def handle_info({:push_event, "tool_result", %{name: "end_session"} = payload}, socket) do
+    push(socket, "tool_result", payload)
+    push(socket, "session_ended", %{})
     {:noreply, socket}
   end
 
-  def handle_info({:update_messages, messages}, socket) do
-    {:noreply, assign(socket, messages: messages)}
+  def handle_info({:push_event, event, payload}, socket) do
+    push(socket, event, payload)
+    {:noreply, socket}
   end
 
   # A watch created from this connection fired - push its message to the client.

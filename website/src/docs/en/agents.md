@@ -95,7 +95,7 @@ The agent calls `manage_agent` with `action: "create"`, then `set_persona`,
 passes through the permission gate, so on a surface that can ask (the console, a chat
 channel) the runtime asks you to authorize the change before it is written, and the
 tool itself is instructed to confirm the plan with you first. An agent may only
-manage the agents inside its `can_manage` scope (covered under "Administering agents"
+manage the agents inside its `can_manage` scope (covered under [Administering agents](#administering-agents)
 below); asking it to touch one outside that scope is politely refused.
 
 ## The fields, one by one
@@ -109,7 +109,7 @@ below); asking it to touch one outside that scope is politely refused.
 | `tools` | The list of tool names this agent may call. Only these are offered to the model. | all tools when `--tools` is omitted at creation |
 | `auto_approve` | Tools this agent may run without asking for permission. `["*"]` means every tool. | `[]` |
 | `can_message` | Other agents this one may send messages to (a directed route). | `[]` |
-| `can_manage` | Which agents this one may administer. See "Administering agents". | `null` (itself only) |
+| `can_manage` | Which agents this one may administer. See [Administering agents](#administering-agents). | `null` (itself only) |
 | `hooks` | Message-flow transforms to apply, such as PII redaction. | `[]` |
 | `max_iterations` | The hard cap on how many model-plus-tool rounds one turn may take. | `12` |
 | `temperature` | Sampling temperature passed to the model. Unset uses the provider's own default. | provider default |
@@ -172,6 +172,7 @@ The built-in set covers the common ground:
 | `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Manage agents, tools, and routing from chat. |
 | `manage_channel`, `end_session` | Connect and close messaging channels from chat. |
 | `manage_mcp`, `scan_skill`, `skill` | Add external tool servers and skills. |
+| `manage_plugin` | Install, scan, list, and remove community plugins (tools, channels) from chat. |
 | `config_get`, `config_set`, `doctor` | Inspect and change configuration under guardrails, run diagnostics. |
 
 Some tools are read-only and run freely: `read_file`, `list_dir`, `fetch_url`,

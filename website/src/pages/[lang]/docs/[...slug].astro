@@ -37,22 +37,75 @@ const sidebar = docsNav.map((g) => ({
   items: g.slugs.map((s) => ({ slug: s, title: titleOf(s), href: hrefOf(s) })),
 }));
 
+const searchCopy: Record<Locale, { label: string; placeholder: string; empty: string; loading: string; error: string }> = {
+  en: {
+    label: "Search docs",
+    placeholder: "Search docs...",
+    empty: "No results",
+    loading: "Searching...",
+    error: "Search unavailable",
+  },
+  es: {
+    label: "Buscar en la documentación",
+    placeholder: "Buscar en la documentación...",
+    empty: "Sin resultados",
+    loading: "Buscando...",
+    error: "Búsqueda no disponible",
+  },
+  "pt-br": {
+    label: "Buscar na documentação",
+    placeholder: "Buscar na documentação...",
+    empty: "Nenhum resultado",
+    loading: "Buscando...",
+    error: "Busca indisponível",
+  },
+  "pt-pt": {
+    label: "Pesquisar na documentação",
+    placeholder: "Pesquisar na documentação...",
+    empty: "Sem resultados",
+    loading: "A pesquisar...",
+    error: "Pesquisa indisponível",
+  },
+};
+
 const idx = allSlugs.indexOf(slug);
 const prev = idx > 0 ? allSlugs[idx - 1] : null;
 const next = idx < allSlugs.length - 1 ? allSlugs[idx + 1] : null;
+const search = searchCopy[lang];
 ---
 
 <Base title={`${frontmatter.title} · Pepe docs`} description={frontmatter.description} lang={lang} docs={true}>
   <div class="container docs">
     <aside class="docs-nav">
-      {sidebar.map((g) => (
-        <div>
-          <h4>{g.label}</h4>
-          {g.items.map((it) => (
-            <a href={it.href} class={it.slug === slug ? "active" : ""}>{it.title}</a>
-          ))}
-        </div>
-      ))}
+      <div
+        class="doc-search"
+        data-doc-search
+        data-index-url={`/${lang}/docs/search.json`}
+        data-empty-label={search.empty}
+        data-loading-label={search.loading}
+        data-error-label={search.error}
+      >
+        <label for="doc-search-input">{search.label}</label>
+        <input
+          id="doc-search-input"
+          type="search"
+          placeholder={search.placeholder}
+          autocomplete="off"
+          spellcheck="false"
+          data-doc-search-input
+        />
+        <div class="doc-search-results" data-doc-search-results hidden></div>
+      </div>
+      <div class="docs-nav-scroll">
+        {sidebar.map((g) => (
+          <div>
+            <h4>{g.label}</h4>
+            {g.items.map((it) => (
+              <a href={it.href} class={it.slug === slug ? "active" : ""}>{it.title}</a>
+            ))}
+          </div>
+        ))}
+      </div>
     </aside>
 
     <article class="doc-content">
@@ -65,4 +118,5 @@ const next = idx < allSlugs.length - 1 ? allSlugs[idx + 1] : null;
       </div>
     </article>
   </div>
+  <script src="/docs-search.js" defer></script>
 </Base>

@@ -1,0 +1,39 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pepe social preview">
+  <defs>
+    <radialGradient id="glow" cx="26%" cy="22%" r="70%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.32"/>
+      <stop offset="58%" stop-color="#ea580c" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#0a0a0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#0a0a0b"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="54" y="54" width="1092" height="522" rx="34" fill="#101012" stroke="#26262b" stroke-width="2"/>
+
+  <g transform="translate(92 98)">
+    <rect width="118" height="118" rx="27" fill="#18181b"/>
+    <g stroke="#a1a1aa" stroke-width="6" stroke-linecap="round" fill="none">
+      <path d="M48 42 L 37 22"/>
+      <path d="M70 42 L 81 22"/>
+    </g>
+    <circle cx="36" cy="20" r="7" fill="#e2231a"/>
+    <circle cx="82" cy="20" r="7" fill="#f5b301"/>
+    <rect x="32" y="43" width="54" height="52" rx="17" fill="none" stroke="#e4e4e7" stroke-width="7"/>
+  </g>
+
+  <text x="240" y="150" fill="#f4f4f5" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="800" letter-spacing="-1">Pepe</text>
+  <text x="240" y="204" fill="#a1a1aa" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="30" font-weight="600">Self-hosted AI agent runtime</text>
+
+  <text x="92" y="334" fill="#f4f4f5" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="54" font-weight="800" letter-spacing="-0.5">Agents, tools, APIs, and channels</text>
+  <text x="92" y="392" fill="#d4d4d8" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="31" font-weight="500">Run the same agent from your terminal, HTTP API, WebSocket,</text>
+  <text x="92" y="435" fill="#d4d4d8" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="31" font-weight="500">dashboard, Telegram, WhatsApp, and more.</text>
+
+  <g transform="translate(92 498)">
+    <rect width="182" height="44" rx="10" fill="rgba(234,88,12,0.14)" stroke="rgba(234,88,12,0.45)"/>
+    <text x="22" y="30" fill="#fb923c" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="700">pepe-agent.com</text>
+  </g>
+</svg>

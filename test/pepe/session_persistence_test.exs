@@ -20,17 +20,17 @@ defmodule Pepe.Agent.SessionPersistenceTest do
   test "save/load round-trips a session" do
     msgs = [%{"role" => "system", "content" => "x"}, %{"role" => "user", "content" => "hi"}]
     assert :ok = P.save("telegram:42", "zak", msgs)
-    assert {:ok, "zak", ^msgs} = P.load("telegram:42")
+    assert {:ok, "zak", ^msgs, nil} = P.load("telegram:42")
   end
 
   test "load returns :error when absent" do
     assert P.load("web:nope") == :error
   end
 
-  test "all lists every saved session as {key, agent}" do
+  test "all lists every saved session as {key, agent, pending}" do
     P.save("web:1", "zak", [])
     P.save("telegram:9", "vega", [])
-    assert Enum.sort(P.all()) == [{"telegram:9", "vega"}, {"web:1", "zak"}]
+    assert Enum.sort(P.all()) == [{"telegram:9", "vega", nil}, {"web:1", "zak", nil}]
   end
 
   test "delete removes the file" do
@@ -42,6 +42,42 @@ defmodule Pepe.Agent.SessionPersistenceTest do
 
   test "keys with ':' and '/' get a safe filename" do
     assert :ok = P.save("api:a/b:c", "zak", [])
-    assert {:ok, "zak", []} = P.load("api:a/b:c")
+    assert {:ok, "zak", [], nil} = P.load("api:a/b:c")
+  end
+
+  test "mark_pending sets the marker without touching agent/messages" do
+    msgs = [%{"role" => "user", "content" => "hi"}]
+    P.save("web:1", "zak", msgs)
+
+    assert :ok = P.mark_pending("web:1", "are you there?")
+    assert {:ok, "zak", ^msgs, "are you there?"} = P.load("web:1")
+  end
+
+  test "mark_pending on a session with no prior save still records the marker" do
+    assert :ok = P.mark_pending("web:2", "first message")
+    assert {:ok, nil, [], "first message"} = P.load("web:2")
+  end
+
+  test "clear_pending drops the marker, keeps history" do
+    msgs = [%{"role" => "user", "content" => "hi"}]
+    P.save("web:1", "zak", msgs)
+    P.mark_pending("web:1", "are you there?")
+
+    assert :ok = P.clear_pending("web:1")
+    assert {:ok, "zak", ^msgs, nil} = P.load("web:1")
+  end
+
+  test "a normal save implicitly clears any pending marker" do
+    P.mark_pending("web:1", "are you there?")
+    P.save("web:1", "zak", [])
+
+    assert {:ok, "zak", [], nil} = P.load("web:1")
+  end
+
+  test "all() surfaces the pending marker" do
+    P.save("web:1", "zak", [])
+    P.mark_pending("web:1", "are you there?")
+
+    assert P.all() == [{"web:1", "zak", "are you there?"}]
   end
 end

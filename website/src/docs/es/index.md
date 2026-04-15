@@ -11,6 +11,11 @@ conexión a un modelo), y Pepe lo ejecuta: envía la conversación al modelo,
 ejecuta cualquier herramienta que el modelo pida, le devuelve los resultados y
 repite hasta que el modelo produce una respuesta final.
 
+Elixir/OTP importa porque los agentes son conversaciones largas, canales y tareas
+en segundo plano, no solo una petición HTTP. Pepe puede mantener muchas sesiones
+supervisadas con poco overhead, lo que ayuda a alojar un equipo de agentes sin
+inflar la memoria ni la CPU del servidor.
+
 Ese bucle interno es la razón de ser de todo. Una simple llamada de chat devuelve
 texto. Un agente puede realmente hacer cosas: leer un archivo, ejecutar un
 comando, buscar en la web, llamar a tu API, y luego razonar sobre lo que encontró
@@ -18,15 +23,15 @@ y continuar. Pepe te entrega ese bucle como un runtime terminado, en lugar de
 algo que tienes que armar a mano en cada proyecto.
 
 ```bash
-pepe run "read package.json and tell me which dependencies are outdated"
+pepe run "lee package.json y dime qué dependencias están desactualizadas"
 ```
 
 Defines el comportamiento una vez, y el mismo agente queda accesible de cuatro
 formas: desde la terminal, mediante una API HTTP compatible con OpenAI, a través
 de un WebSocket con streaming, y desde canales de mensajería como Telegram y
 WhatsApp. También hay un panel web para navegar y conversar desde el navegador.
-Atiende cada caso de uso allí donde ya vive, sin reconstruir el agente para cada
-uno.
+Atiende cada caso de uso allí donde ya vive, sin crear un agente separado para
+cada canal.
 
 ## El bucle de llamadas a herramientas
 
@@ -67,12 +72,12 @@ natural con un agente que posee la herramienta de gestión adecuada).
 ### CLI
 
 El comando `pepe` es la forma de configurar las cosas y de ejecutar agentes desde
-una terminal. Las ejecuciones puntuales transmiten su respuesta directamente a la
+una terminal. Las ejecuciónes puntuales transmiten su respuesta directamente a la
 salida estándar, y `pepe chat` abre una sesión interactiva que recuerda la
 conversación.
 
 ```bash
-pepe run assistant "summarize the git log from the last week"
+pepe run assistant "resume el git log de la última semana"
 pepe chat assistant
 ```
 
@@ -86,13 +91,13 @@ contraseña de operador cuando lo expongas.
 
 ```bash
 pepe serve --port 4000
-# then open http://localhost:4000
+# luego abre http://localhost:4000
 ```
 
 ### API HTTP compatible con OpenAI
 
 Arranca el servidor y Pepe habla el protocolo Chat Completions de OpenAI, así que
-cualquier SDK de OpenAI, LangChain o un simple `curl` pueden comunicarse con él
+cualquier SDK de OpenAI, LangChain o un simple `curl` pueden comúnicarse con él
 sin adaptador. Sirve `POST /v1/chat/completions` y `GET /v1/models`.
 
 ```bash
@@ -100,7 +105,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "assistant",
-    "messages": [{"role": "user", "content": "what files are in this project?"}]
+    "messages": [{"role": "user", "content": "qué archivos hay en este proyecto?"}]
   }'
 ```
 
@@ -131,7 +136,7 @@ herramientas y un modelo. Crea uno desde la CLI:
 
 ```bash
 pepe agent add assistant \
-  --prompt "You are Pepe, a helpful coding agent." \
+  --prompt "Eres Pepe, un agente de programación útil." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search \
   --default
 ```
@@ -161,7 +166,6 @@ compatible con OpenAI mediante una conexión a un modelo:
 
 ```bash
 pepe model add openrouter \
-  --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
   --model anthropic/claude-3.5-sonnet \
   --default
@@ -196,7 +200,7 @@ variable de entorno que contiene el token, nunca el token en sí, de modo que el
 secreto nunca pasa por el chat ni por el modelo. Tras el cambio, el bot en marcha
 arranca en vivo, sin reiniciar.
 
-## Por qué no se interpone en tu camino
+## Decisiones de arquitectura que simplifican el uso
 
 ### Autoalojado, tus claves, tus datos
 
@@ -243,10 +247,10 @@ identificado por un id de sesión. Muchas corren en paralelo, y una caída en un
 nunca toca a otra, así que un solo turno defectuoso no puede tumbar al resto de
 tus agentes.
 
-### Multi-tenant cuando lo necesitas
+### Multiempresa cuando la necesitas
 
 El trabajo puede acotarse a una **empresa**, aislando agentes, canales, modelos y
-uso por inquilino. Si nunca lo activas, todo vive en el ámbito predeterminado,
+uso por empresa. Si nunca lo activas, todo vive en el ámbito predeterminado,
 llamado **Principal**, y puedes ignorar las empresas por completo.
 
 ## A dónde ir después

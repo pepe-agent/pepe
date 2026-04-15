@@ -40,6 +40,14 @@ defmodule PepeWeb.Router do
     post "/:company/:provider/:slug", WebhookController, :receive
   end
 
+  # The chat widget's dashboard-managed appearance - must come before the generic
+  # asset route below, or "config" would be looked up as a static file and 404.
+  scope "/plugin-assets/pepe-widget", PepeWeb do
+    pipe_through :api
+
+    get "/config", WidgetConfigController, :show
+  end
+
   # Static assets a plugin package declares (e.g. the built-in chat widget's JS/CSS).
   # One route for every package, resolved at request time - see Pepe.Plugins.asset_path/2.
   scope "/plugin-assets", PepeWeb do

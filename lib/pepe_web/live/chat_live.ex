@@ -708,7 +708,7 @@ defmodule PepeWeb.ChatLive do
 
   defp session_card(key, false) do
     case SessionPersistence.load(key) do
-      {:ok, agent, messages} ->
+      {:ok, agent, messages, _pending} ->
         %{
           key: key,
           type: session_type(key),
@@ -752,7 +752,7 @@ defmodule PepeWeb.ChatLive do
     sessions |> Enum.map(& &1.type) |> Enum.uniq() |> Enum.sort()
   end
 
-  @type_order ~w(telegram web tui api)
+  @type_order ~w(telegram widget web tui api)
 
   defp grouped(sessions) do
     sessions
@@ -775,6 +775,7 @@ defmodule PepeWeb.ChatLive do
   end
 
   defp type_label("telegram"), do: gettext("Telegram")
+  defp type_label("widget"), do: gettext("Widget")
   defp type_label("web"), do: gettext("Web")
   defp type_label("tui"), do: gettext("Console")
   defp type_label("api"), do: gettext("API")

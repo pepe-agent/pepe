@@ -14,6 +14,7 @@ export const localeNames: Record<Locale, string> = {
 
 export const ui = {
   en: {
+    "seo.title": "Pepe, the AI agent runtime you run yourself",
     "nav.features": "Features",
     "nav.surfaces": "Surfaces",
     "nav.channels": "Channels",
@@ -22,60 +23,85 @@ export const ui = {
     "hero.eyebrow": "Elixir / OTP · self-hosted",
     "hero.title": 'The AI agent runtime<br/>you <span class="grad">run yourself</span>.',
     "hero.lead":
-      "Define agents, connect any OpenAI-compatible model, and run a real tool-calling loop. Reach the same agents from your terminal, an HTTP API, a WebSocket, and messaging channels. No vendor, no database, your keys.",
+      "Define agents, connect any OpenAI-compatible model, and let Pepe run the tool loop. Use the same agents from the CLI, HTTP, WebSocket, or chat channels. Self-hosted, no database, your keys.",
     "hero.cta_start": "Get started →",
     "hero.cta_docs": "Read the docs",
 
     "surfaces.title": "One agent, four surfaces",
     "surfaces.sub":
-      "Every agent you define is reachable the same way from wherever you need it. Same loop, same memory, same tools.",
+      "Define an agent once. Use it from the surface that fits the job, with the same tools and memory.",
     "surf.cli.t": "CLI",
     "surf.cli.d": "One-shot runs and an interactive REPL.",
     "surf.http.t": "HTTP API",
-    "surf.http.d": "OpenAI-compatible /v1/chat/completions and /v1/models.",
+    "surf.http.d":
+      "OpenAI-compatible /v1/chat/completions and /v1/models, usable from any HTTP client.",
     "surf.ws.t": "WebSocket",
-    "surf.ws.d": "A Phoenix channel for live, streaming conversations.",
+    "surf.ws.d": "A WebSocket connection for live, streaming conversations.",
     "surf.ch.t": "Channels",
     "surf.ch.d": "Telegram, WhatsApp, Slack, Discord, Teams, Google Chat.",
 
-    "features.title": "Everything an agent needs, nothing it doesn't",
+    "features.title": "The essentials for real agents",
     "features.sub":
-      "A small, honest runtime. Config lives in files, secrets are env references, and there is no database to run.",
+      "Model access, tools, automation, plugins, and control in a small self-hosted runtime.",
     "f.model.t": "Any model, with failover",
     "f.model.d":
       "Connect any OpenAI-compatible endpoint. Set a fallback chain that advances on transient errors.",
+    "f.efficient.t": "Lightweight by design",
+    "f.efficient.d":
+      "Elixir/OTP runs many supervised sessions with low memory and CPU overhead, keeping a team of agents inexpensive to host.",
     "f.tools.t": "Real tool-calling loop",
     "f.tools.d":
-      "Built-in tools for shell, files, web, running scripts, and sending files back to the chat. Add your own in minutes.",
+      "Built-in tools for shell, files, web, scripts, and file delivery. Add your own in minutes.",
     "f.channels.t": "Messaging channels",
     "f.channels.d":
-      "Bind an agent to a Telegram bot or a webhook channel, with native handoff, admin vs support modes, and per-connection scoping.",
+      "Bind an agent to Telegram or webhook channels, with handoff, admin/support modes, and per-connection scope.",
     "f.cron.t": "Scheduled tasks",
     "f.cron.d":
-      "Timezone-aware cron in an in-app scheduler. The agent can create its own from a conversation, gated by your approval.",
+      "Timezone-aware cron inside Pepe. Agents can propose schedules from chat, gated by your approval.",
     "f.plugins.t": "Plugins at runtime",
     "f.plugins.d":
-      "Drop in new tools or channels with no rebuild. A deep security scan runs on install, and providers declare their own config form.",
-    "f.sandbox.t": "Sandbox & permissions",
+      "Install a plugin, fill in its settings, and give agents new tools or channels right away.",
+    "f.sandbox.t": "Control & safety",
     "f.sandbox.d":
-      "Risky tools pass an approval gate by default. Guardrails block catastrophic commands, and an opt-in wrapper adds real isolation.",
+      "Risky tools ask first. Runs are traced, command guardrails stay on, and optional companies isolate work.",
     "f.tenant.t": "Multi-tenant",
     "f.tenant.d":
-      "Optional companies wall off agents, models, channels and automations per tenant, with per-company usage and billing.",
+      "Optional companies isolate agents, models, channels, automations, usage, and billing.",
     "f.traces.t": "Traces & usage",
     "f.traces.d":
-      "Every run is recorded. What triggered it, the tools it called, tokens and cost. Open one to replay it step by step.",
-    "f.nodb.t": "No database",
-    "f.nodb.d":
-      "Config is a single JSON file at ~/.pepe. Secrets are written as ${ENV_VAR} and resolved at read time.",
+      "Every run records its trigger, tool calls, tokens, and cost. Open a trace to replay it step by step.",
+    "f.support.t": "Full customer support",
+    "f.support.d":
+      "Answer customers on WhatsApp, Telegram, Slack, or Chatwoot, with human handoff when needed.",
 
     "channels.title": "Meet people where they are",
     "channels.sub":
-      "Connect an agent to a channel and people just chat with it. Files, handoff and scoping come built in.",
+      "Connect a channel and the agent answers there. Files, handoff, and scoping are built in.",
+
+    "usecases.title": "What people build with Pepe",
+    "usecases.sub": "Common jobs once the right tools are connected.",
+    "uc.social.t": "Social media management",
+    "uc.social.d": "Schedule posts, answer comments, and track mentions across platforms.",
+    "uc.email.t": "Inbox triage",
+    "uc.email.d": "Read your inbox, draft replies, and file messages by topic.",
+    "uc.ads.t": "Ad campaign ops",
+    "uc.ads.d": "Watch spend and performance across Meta, Google, and LinkedIn Ads, then report daily.",
+    "uc.support.t": "Customer support",
+    "uc.support.d": "Answer people on WhatsApp, Slack, or Telegram, with human handoff when it matters.",
+    "uc.sched.t": "Scheduling & reminders",
+    "uc.sched.d": "Recurring tasks and one-shot watches that notify you when something changes.",
+    "uc.reports.t": "Reports & analytics",
+    "uc.reports.d": "Pull numbers from your own tools and ship a summary on a schedule.",
+    "uc.monitor.t": "Error monitoring",
+    "uc.monitor.d": "Watch Sentry, AppSignal, and other monitoring tools, then surface what actually needs a human.",
+    "uc.insights.t": "Database insights",
+    "uc.insights.d": "Query your database and turn raw numbers into useful next steps.",
+    "uc.notes.t": "Meeting notes & recaps",
+    "uc.notes.d": "Turn a transcript into a summary and action items, delivered where the team already talks.",
 
     "how.title": "How the loop works",
     "how.sub":
-      "The runtime calls the model, runs any tool calls, feeds the results back, and repeats until a final answer.",
+      "Pepe calls the model, runs tool calls, feeds results back, and stops when the answer is ready.",
     "how.1.t": "Call the model",
     "how.1.d": "Send the conversation and the agent's tool specs to the model (with failover).",
     "how.2.t": "Run tool calls",
@@ -83,23 +109,35 @@ export const ui = {
     "how.3.t": "Feed results back",
     "how.3.d": "Append each tool result to the conversation and call the model again.",
     "how.4.t": "Answer & deliver",
-    "how.4.d": "Return the final reply on whatever surface asked. And record the whole run as a trace.",
+    "how.4.d": "Return the final reply on the surface that asked, then record the run as a trace.",
 
     "cta.title": "Run your own agents in minutes",
-    "cta.sub": "Open source. Bring your own model. Your machine, your keys, your data.",
+    "cta.sub": "Open source. Bring your model. Keep the runtime, keys, and data under your control.",
     "cta.start": "Quickstart",
     "cta.github": "Star on GitHub",
     "why.title": "Why \"Pepe\"?",
-    "why.body": "He comes from Chespirito's beloved comedy universe (El Chapulín Colorado, adored across Brazil as the Chapolin, plus El Chavo del Ocho) that generations across Latin America grew up with. His whole thing? He did exactly what he was told. No arguing, no improvising beyond the order. Which, funnily enough, describes an AI agent runtime perfectly.",
+    "why.body": "The name nods to Chespirito's comedy universe, loved across Latin America. Pepe's joke was simple: he did exactly what he was told. No debate, no freelancing. That is a pretty good brief for an agent runtime.",
 
     "foot.tagline":
       "An Elixir/OTP AI agent runtime. Self-hosted, model-agnostic, no database. Not affiliated with any model provider.",
     "foot.docs": "Docs",
     "foot.guides": "Guides",
     "foot.project": "Project",
+    "foot.terms": "Terms",
+    "foot.privacy": "Privacy",
+    "foot.intro": "Introduction",
+    "foot.quickstart": "Quickstart",
+    "foot.agents": "Agents & tools",
+    "foot.channels": "Channels",
+    "foot.plugins": "Plugins",
+    "foot.scheduled": "Scheduled tasks",
+    "foot.security": "Security & sandbox",
+    "foot.api": "HTTP API",
+    "foot.documentation": "Documentation",
   },
 
   es: {
+    "seo.title": "Pepe, el runtime de agentes de IA que ejecutas tú mismo",
     "nav.features": "Características",
     "nav.surfaces": "Superficies",
     "nav.channels": "Canales",
@@ -108,60 +146,85 @@ export const ui = {
     "hero.eyebrow": "Elixir / OTP · autoalojado",
     "hero.title": 'El runtime de agentes IA<br/>que <span class="grad">ejecutas tú mismo</span>.',
     "hero.lead":
-      "Define agentes, conecta cualquier modelo compatible con OpenAI y ejecuta un bucle real de llamada a herramientas. Alcanza los mismos agentes desde tu terminal, una API HTTP, un WebSocket y canales de mensajería. Sin proveedor, sin base de datos, con tus claves.",
+      "Define agentes, conecta cualquier modelo compatible con OpenAI y deja que Pepe ejecute el bucle de herramientas. Usa los mismos agentes desde la CLI, HTTP, WebSocket o canales de chat. Autoalojado, sin base de datos, con tus claves.",
     "hero.cta_start": "Empezar →",
     "hero.cta_docs": "Leer la documentación",
 
     "surfaces.title": "Un agente, cuatro superficies",
     "surfaces.sub":
-      "Cada agente que defines es accesible de la misma forma desde donde lo necesites. Mismo bucle, misma memoria, mismas herramientas.",
+      "Define un agente una vez. Úsalo desde la superficie que encaje con la tarea, con las mismas herramientas y memoria.",
     "surf.cli.t": "CLI",
     "surf.cli.d": "Ejecuciones puntuales y un REPL interactivo.",
     "surf.http.t": "API HTTP",
-    "surf.http.d": "/v1/chat/completions y /v1/models compatibles con OpenAI.",
+    "surf.http.d":
+      "/v1/chat/completions y /v1/models compatibles con OpenAI, desde cualquier cliente HTTP.",
     "surf.ws.t": "WebSocket",
-    "surf.ws.d": "Un canal Phoenix para conversaciones en vivo por streaming.",
+    "surf.ws.d": "Una conexión WebSocket para conversaciones en vivo por streaming.",
     "surf.ch.t": "Canales",
     "surf.ch.d": "Telegram, WhatsApp, Slack, Discord, Teams, Google Chat.",
 
-    "features.title": "Todo lo que un agente necesita, nada más",
+    "features.title": "Lo esencial para ejecutar agentes",
     "features.sub":
-      "Un runtime pequeño y honesto. La configuración vive en archivos, los secretos son referencias a variables de entorno y no hay base de datos que ejecutar.",
+      "Modelos, herramientas, automatización, plugins y control en un runtime pequeño y autoalojado.",
     "f.model.t": "Cualquier modelo, con failover",
     "f.model.d":
       "Conecta cualquier endpoint compatible con OpenAI. Define una cadena de respaldo que avanza ante errores transitorios.",
+    "f.efficient.t": "Ligero por diseño",
+    "f.efficient.d":
+      "Elixir/OTP ejecuta muchas sesiones supervisadas con bajo consumo de memoria y CPU, así que alojar un equipo de agentes exige menos infraestructura.",
     "f.tools.t": "Bucle real de herramientas",
     "f.tools.d":
-      "Herramientas integradas para shell, archivos, web, ejecutar scripts y enviar archivos al chat. Añade las tuyas en minutos.",
+      "Herramientas integradas para shell, archivos, web, scripts y envío de archivos. Añade las tuyas en minutos.",
     "f.channels.t": "Canales de mensajería",
     "f.channels.d":
-      "Vincula un agente a un bot de Telegram o a un canal por webhook, con traspaso nativo, modos admin/soporte y alcance por conexión.",
+      "Vincula un agente a Telegram o a canales por webhook, con traspaso, modos admin/soporte y alcance por conexión.",
     "f.cron.t": "Tareas programadas",
     "f.cron.d":
-      "Cron con zona horaria en un planificador interno. El agente puede crear las suyas desde una conversación, con tu aprobación.",
+      "Cron con zona horaria dentro de Pepe. Los agentes pueden proponer tareas desde el chat, con tu aprobación.",
     "f.plugins.t": "Plugins en tiempo de ejecución",
     "f.plugins.d":
-      "Añade herramientas o canales sin recompilar. Un escaneo de seguridad profundo corre al instalar y los proveedores declaran su propio formulario.",
-    "f.sandbox.t": "Sandbox y permisos",
+      "Instala un plugin, completa su configuración y da a los agentes nuevas herramientas o canales al instante.",
+    "f.sandbox.t": "Control y seguridad",
     "f.sandbox.d":
-      "Las herramientas riesgosas pasan por una aprobación por defecto. Los guardrails bloquean comandos catastróficos y un wrapper opcional añade aislamiento real.",
-    "f.tenant.t": "Multiinquilino",
+      "Las herramientas riesgosas preguntan primero. Las ejecuciones quedan trazadas, las protecciones siguen activas y las empresas opcionales aíslan el trabajo.",
+    "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Las empresas opcionales aíslan agentes, modelos, canales y automatizaciones por inquilino, con uso y facturación por empresa.",
+      "Las empresas opcionales aíslan agentes, modelos, canales, automatizaciones, uso y facturación.",
     "f.traces.t": "Trazas y uso",
     "f.traces.d":
-      "Cada ejecución se registra. Qué la disparó, las herramientas usadas, tokens y coste. Abre una para reproducirla paso a paso.",
-    "f.nodb.t": "Sin base de datos",
-    "f.nodb.d":
-      "La configuración es un único JSON en ~/.pepe. Los secretos se escriben como ${ENV_VAR} y se resuelven al leer.",
+      "Cada ejecución registra disparador, herramientas, tokens y coste. Abre una traza para reproducirla paso a paso.",
+    "f.support.t": "Atención al cliente completa",
+    "f.support.d":
+      "Atiende clientes en WhatsApp, Telegram, Slack o Chatwoot, con traspaso humano cuando haga falta.",
 
-    "channels.title": "Encuentra a las personas donde están",
+    "channels.title": "Conecta con las personas donde están",
     "channels.sub":
-      "Conecta un agente a un canal y la gente simplemente chatea con él. Archivos, traspaso y alcance vienen incluidos.",
+      "Conecta un canal y el agente responde allí. Archivos, traspaso y alcance vienen incluidos.",
+
+    "usecases.title": "Qué construye la gente con Pepe",
+    "usecases.sub": "Trabajos habituales cuando conectas las herramientas adecuadas.",
+    "uc.social.t": "Gestión de redes sociales",
+    "uc.social.d": "Programa publicaciones, responde comentarios y sigue menciones en todas las plataformas.",
+    "uc.email.t": "Priorización de correo",
+    "uc.email.d": "Lee tu bandeja, redacta respuestas y archiva mensajes por tema.",
+    "uc.ads.t": "Campañas publicitarias",
+    "uc.ads.d": "Vigila el gasto y el rendimiento en Meta, Google y LinkedIn Ads, y reporta a diario.",
+    "uc.support.t": "Atención al cliente",
+    "uc.support.d": "Responde a la gente en WhatsApp, Slack o Telegram, con traspaso humano cuando importa.",
+    "uc.sched.t": "Programación y avisos",
+    "uc.sched.d": "Tareas recurrentes y avisos puntuales cuando algo cambia.",
+    "uc.reports.t": "Informes y analítica",
+    "uc.reports.d": "Extrae números de tus propias herramientas y envía un resumen en un horario.",
+    "uc.monitor.t": "Monitoreo de errores",
+    "uc.monitor.d": "Vigila Sentry, AppSignal y otras herramientas de monitoreo, y señala lo que de verdad necesita atención humana.",
+    "uc.insights.t": "Análisis de datos",
+    "uc.insights.d": "Consulta tu base de datos y convierte números en próximos pasos.",
+    "uc.notes.t": "Notas y resúmenes de reuniones",
+    "uc.notes.d": "Convierte una transcripción en un resumen y tareas, entregado donde tu equipo ya conversa.",
 
     "how.title": "Cómo funciona el bucle",
     "how.sub":
-      "El runtime llama al modelo, ejecuta las herramientas, devuelve los resultados y repite hasta una respuesta final.",
+      "Pepe llama al modelo, ejecuta herramientas, devuelve resultados y se detiene cuando la respuesta está lista.",
     "how.1.t": "Llamar al modelo",
     "how.1.d": "Envía la conversación y las herramientas del agente al modelo (con failover).",
     "how.2.t": "Ejecutar herramientas",
@@ -169,23 +232,35 @@ export const ui = {
     "how.3.t": "Devolver resultados",
     "how.3.d": "Añade cada resultado a la conversación y vuelve a llamar al modelo.",
     "how.4.t": "Responder y entregar",
-    "how.4.d": "Devuelve la respuesta final en la superficie que preguntó. Y registra la ejecución como una traza.",
+    "how.4.d": "Devuelve la respuesta final donde se pidió y registra la ejecución como traza.",
 
     "cta.title": "Ejecuta tus propios agentes en minutos",
-    "cta.sub": "Código abierto. Trae tu propio modelo. Tu máquina, tus claves, tus datos.",
+    "cta.sub": "Código abierto. Trae tu modelo. Mantén runtime, claves y datos bajo tu control.",
     "cta.start": "Inicio rápido",
     "cta.github": "Estrella en GitHub",
     "why.title": "¿Por qué \"Pepe\"?",
-    "why.body": "Viene del querido universo de comedia de Chespirito (El Chapulín Colorado y El Chavo del Ocho) con el que crecieron generaciones en toda América Latina. ¿Su sello? Hacía exactamente lo que le pedían. Sin discutir, sin improvisar más allá de la orden. Lo que, curiosamente, describe a la perfección un runtime de agentes de IA.",
+    "why.body": "El nombre guiña un ojo al universo de Chespirito, querido en toda América Latina. El chiste de Pepe era simple: hacía exactamente lo que le pedían. Sin discutir ni improvisar. Una buena descripción para un runtime de agentes.",
 
     "foot.tagline":
       "Un runtime de agentes IA en Elixir/OTP. Autoalojado, agnóstico de modelo, sin base de datos. Sin afiliación con ningún proveedor de modelos.",
     "foot.docs": "Docs",
     "foot.guides": "Guías",
     "foot.project": "Proyecto",
+    "foot.terms": "Términos",
+    "foot.privacy": "Privacidad",
+    "foot.intro": "Introducción",
+    "foot.quickstart": "Inicio rápido",
+    "foot.agents": "Agentes y herramientas",
+    "foot.channels": "Canales",
+    "foot.plugins": "Plugins",
+    "foot.scheduled": "Tareas programadas",
+    "foot.security": "Seguridad y sandbox",
+    "foot.api": "API HTTP",
+    "foot.documentation": "Documentación",
   },
 
   "pt-br": {
+    "seo.title": "Pepe, o runtime de agentes de IA que você mesmo roda",
     "nav.features": "Recursos",
     "nav.surfaces": "Superfícies",
     "nav.channels": "Canais",
@@ -194,60 +269,85 @@ export const ui = {
     "hero.eyebrow": "Elixir / OTP · auto-hospedado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">você mesmo roda</span>.',
     "hero.lead":
-      "Defina agentes, conecte qualquer modelo compatível com OpenAI e rode um loop real de chamada de ferramentas. Alcance os mesmos agentes pelo terminal, uma API HTTP, um WebSocket e canais de mensagem. Sem fornecedor, sem banco de dados, com suas chaves.",
+      "Defina agentes, conecte qualquer modelo compatível com OpenAI e deixe o Pepe rodar o loop de ferramentas. Use os mesmos agentes pela CLI, HTTP, WebSocket ou canais de chat. Auto-hospedado, sem banco de dados, com suas chaves.",
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
     "surfaces.title": "Um agente, quatro superfícies",
     "surfaces.sub":
-      "Cada agente que você define é alcançável do mesmo jeito de onde precisar. Mesmo loop, mesma memória, mesmas ferramentas.",
+      "Defina um agente uma vez. Use pela superfície certa para a tarefa, com as mesmas ferramentas e memória.",
     "surf.cli.t": "CLI",
     "surf.cli.d": "Execuções pontuais e um REPL interativo.",
     "surf.http.t": "API HTTP",
-    "surf.http.d": "/v1/chat/completions e /v1/models compatíveis com OpenAI.",
+    "surf.http.d":
+      "/v1/chat/completions e /v1/models compatíveis com OpenAI, a partir de qualquer cliente HTTP.",
     "surf.ws.t": "WebSocket",
-    "surf.ws.d": "Um canal Phoenix para conversas ao vivo com streaming.",
+    "surf.ws.d": "Uma conexão WebSocket para conversas ao vivo com streaming.",
     "surf.ch.t": "Canais",
     "surf.ch.d": "Telegram, WhatsApp, Slack, Discord, Teams, Google Chat.",
 
-    "features.title": "Tudo que um agente precisa, nada além",
+    "features.title": "O essencial para rodar agentes",
     "features.sub":
-      "Um runtime pequeno e honesto. A config vive em arquivos, segredos são referências de env, e não há banco de dados pra rodar.",
+      "Modelos, ferramentas, automação, plugins e controle em um runtime pequeno e auto-hospedado.",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
       "Conecte qualquer endpoint compatível com OpenAI. Defina uma cadeia de fallback que avança em erros transitórios.",
+    "f.efficient.t": "Leve por design",
+    "f.efficient.d":
+      "Elixir/OTP roda muitas sessões supervisionadas com baixo consumo de memória e CPU, então hospedar uma equipe de agentes exige menos infraestrutura.",
     "f.tools.t": "Loop real de ferramentas",
     "f.tools.d":
-      "Ferramentas nativas para shell, arquivos, web, rodar scripts e enviar arquivos de volta ao chat. Adicione as suas em minutos.",
+      "Ferramentas nativas para shell, arquivos, web, scripts e envio de arquivos. Adicione as suas em minutos.",
     "f.channels.t": "Canais de mensagem",
     "f.channels.d":
-      "Vincule um agente a um bot do Telegram ou a um canal por webhook, com handoff nativo, modos admin/suporte e escopo por conexão.",
+      "Vincule um agente ao Telegram ou a canais por webhook, com handoff, modos admin/suporte e escopo por conexão.",
     "f.cron.t": "Tarefas agendadas",
     "f.cron.d":
-      "Cron com fuso horário num agendador interno. O agente pode criar as próprias por conversa, com a sua aprovação.",
+      "Cron com fuso horário dentro do Pepe. Agentes podem propor tarefas pelo chat, com a sua aprovação.",
     "f.plugins.t": "Plugins em runtime",
     "f.plugins.d":
-      "Adicione ferramentas ou canais sem recompilar. Uma varredura de segurança profunda roda na instalação, e cada provider declara seu formulário.",
-    "f.sandbox.t": "Sandbox e permissões",
+      "Instale um plugin, preencha a configuração e dê aos agentes novas ferramentas ou canais na hora.",
+    "f.sandbox.t": "Controle e segurança",
     "f.sandbox.d":
-      "Ferramentas arriscadas passam por aprovação por padrão. Guardrails bloqueiam comandos catastróficos, e um wrapper opcional adiciona isolamento real.",
+      "Ferramentas arriscadas perguntam primeiro. Execuções ficam rastreadas, proteções seguem ligadas e empresas opcionais isolam o trabalho.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Empresas opcionais isolam agentes, modelos, canais e automações por tenant, com uso e cobrança por empresa.",
+      "Empresas opcionais isolam agentes, modelos, canais, automações, uso e cobrança.",
     "f.traces.t": "Traces e uso",
     "f.traces.d":
-      "Toda execução é registrada. O que a disparou, as ferramentas usadas, tokens e custo. Abra uma para dar replay passo a passo.",
-    "f.nodb.t": "Sem banco de dados",
-    "f.nodb.d":
-      "A config é um único JSON em ~/.pepe. Segredos são escritos como ${ENV_VAR} e resolvidos na leitura.",
+      "Cada execução registra gatilho, ferramentas, tokens e custo. Abra um trace para rever passo a passo.",
+    "f.support.t": "Atendimento ao cliente completo",
+    "f.support.d":
+      "Atenda clientes no WhatsApp, Telegram, Slack ou Chatwoot, com handoff humano quando precisar.",
 
-    "channels.title": "Encontre as pessoas onde elas estão",
+    "channels.title": "Conecte-se com as pessoas onde elas estão",
     "channels.sub":
-      "Conecte um agente a um canal e as pessoas simplesmente conversam com ele. Arquivos, handoff e escopo já vêm prontos.",
+      "Conecte um canal e o agente responde por lá. Arquivos, handoff e escopo vêm prontos.",
+
+    "usecases.title": "O que as pessoas constroem com o Pepe",
+    "usecases.sub": "Trabalhos comuns quando você conecta as ferramentas certas.",
+    "uc.social.t": "Gestão de redes sociais",
+    "uc.social.d": "Agende posts, responda comentários e acompanhe menções em todas as plataformas.",
+    "uc.email.t": "Priorização de e-mail",
+    "uc.email.d": "Lê sua caixa de entrada, rascunha respostas e organiza mensagens por assunto.",
+    "uc.ads.t": "Campanhas de anúncios",
+    "uc.ads.d": "Acompanhe gasto e desempenho no Meta, Google e LinkedIn Ads, com relatório diário.",
+    "uc.support.t": "Atendimento ao cliente",
+    "uc.support.d": "Responda no WhatsApp, Slack ou Telegram, com handoff humano quando importa.",
+    "uc.sched.t": "Agendamento e lembretes",
+    "uc.sched.d": "Tarefas recorrentes e avisos pontuais quando algo muda.",
+    "uc.reports.t": "Relatórios e análises",
+    "uc.reports.d": "Puxe números das suas próprias ferramentas e envie um resumo periodicamente.",
+    "uc.monitor.t": "Monitoramento de erros",
+    "uc.monitor.d": "Acompanhe Sentry, AppSignal e outras ferramentas de observabilidade, e aponte o que realmente precisa de atenção humana.",
+    "uc.insights.t": "Insights de dados",
+    "uc.insights.d": "Consulte seu banco de dados e transforme números em próximos passos.",
+    "uc.notes.t": "Notas e resumos de reuniões",
+    "uc.notes.d": "Transforme uma transcrição em resumo e itens de ação, entregues onde o time já conversa.",
 
     "how.title": "Como o loop funciona",
     "how.sub":
-      "O runtime chama o modelo, roda as chamadas de ferramenta, devolve os resultados e repete até uma resposta final.",
+      "O Pepe chama o modelo, roda ferramentas, devolve resultados e para quando a resposta está pronta.",
     "how.1.t": "Chamar o modelo",
     "how.1.d": "Envia a conversa e as ferramentas do agente ao modelo (com failover).",
     "how.2.t": "Rodar ferramentas",
@@ -255,85 +355,122 @@ export const ui = {
     "how.3.t": "Devolver resultados",
     "how.3.d": "Anexa cada resultado à conversa e chama o modelo de novo.",
     "how.4.t": "Responder e entregar",
-    "how.4.d": "Devolve a resposta final na superfície que pediu. E registra a execução como um trace.",
+    "how.4.d": "Devolve a resposta final onde ela foi pedida e registra a execução como trace.",
 
     "cta.title": "Rode seus próprios agentes em minutos",
-    "cta.sub": "Código aberto. Traga seu modelo. Sua máquina, suas chaves, seus dados.",
+    "cta.sub": "Código aberto. Traga seu modelo. Mantenha runtime, chaves e dados sob seu controle.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
     "why.title": "Por que \"Pepe\"?",
-    "why.body": "Ele vem do querido universo de comédia do Chespirito (o Chapolin Colorado e o Chaves) com que gerações da América Latina cresceram. A marca dele? Fazia exatamente o que mandavam. Sem discutir, sem improvisar além da ordem. O que, curiosamente, descreve um runtime de agentes de IA perfeitamente.",
+    "why.body": "O nome é uma piscada para o universo do Chespirito, querido na América Latina. A piada do Pepe era simples: fazia exatamente o que mandavam. Sem discutir, sem inventar moda. Um bom resumo para um runtime de agentes.",
 
     "foot.tagline":
       "Um runtime de agentes de IA em Elixir/OTP. Auto-hospedado, agnóstico de modelo, sem banco de dados. Sem afiliação a qualquer fornecedor de modelos.",
     "foot.docs": "Docs",
     "foot.guides": "Guias",
     "foot.project": "Projeto",
+    "foot.terms": "Termos",
+    "foot.privacy": "Privacidade",
+    "foot.intro": "Introdução",
+    "foot.quickstart": "Início rápido",
+    "foot.agents": "Agentes e ferramentas",
+    "foot.channels": "Canais",
+    "foot.plugins": "Plugins",
+    "foot.scheduled": "Tarefas agendadas",
+    "foot.security": "Segurança e sandbox",
+    "foot.api": "API HTTP",
+    "foot.documentation": "Documentação",
   },
 
   "pt-pt": {
+    "seo.title": "Pepe, o runtime de agentes de IA que corres tu próprio",
     "nav.features": "Funcionalidades",
     "nav.surfaces": "Superfícies",
     "nav.channels": "Canais",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · auto-alojado",
-    "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">executas tu próprio</span>.',
+    "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">corres tu próprio</span>.',
     "hero.lead":
-      "Define agentes, liga qualquer modelo compatível com OpenAI e corre um ciclo real de chamada de ferramentas. Alcança os mesmos agentes pelo terminal, uma API HTTP, um WebSocket e canais de mensagens. Sem fornecedor, sem base de dados, com as tuas chaves.",
+      "Define agentes, liga qualquer modelo compatível com OpenAI e deixa o Pepe correr o ciclo de ferramentas. Usa os mesmos agentes pela CLI, HTTP, WebSocket ou canais de chat. Autoalojado, sem base de dados, com as tuas chaves.",
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
     "surfaces.title": "Um agente, quatro superfícies",
     "surfaces.sub":
-      "Cada agente que defines é acessível da mesma forma a partir de onde precisares. Mesmo ciclo, mesma memória, mesmas ferramentas.",
+      "Define um agente uma vez. Usa-o pela superfície certa para a tarefa, com as mesmas ferramentas e memória.",
     "surf.cli.t": "CLI",
     "surf.cli.d": "Execuções pontuais e um REPL interativo.",
     "surf.http.t": "API HTTP",
-    "surf.http.d": "/v1/chat/completions e /v1/models compatíveis com OpenAI.",
+    "surf.http.d":
+      "/v1/chat/completions e /v1/models compatíveis com OpenAI, a partir de qualquer cliente HTTP.",
     "surf.ws.t": "WebSocket",
-    "surf.ws.d": "Um canal Phoenix para conversas ao vivo com streaming.",
+    "surf.ws.d": "Uma ligação WebSocket para conversas ao vivo com streaming.",
     "surf.ch.t": "Canais",
     "surf.ch.d": "Telegram, WhatsApp, Slack, Discord, Teams, Google Chat.",
 
-    "features.title": "Tudo o que um agente precisa, nada além",
+    "features.title": "O essencial para correr agentes",
     "features.sub":
-      "Um runtime pequeno e honesto. A configuração vive em ficheiros, os segredos são referências de ambiente, e não há base de dados para correr.",
+      "Modelos, ferramentas, automação, plugins e controlo num runtime pequeno e auto-alojado.",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
       "Liga qualquer endpoint compatível com OpenAI. Define uma cadeia de recurso que avança em erros transitórios.",
+    "f.efficient.t": "Leve por desenho",
+    "f.efficient.d":
+      "Elixir/OTP corre muitas sessões supervisionadas com baixo consumo de memória e CPU, por isso alojar uma equipa de agentes exige menos infraestrutura.",
     "f.tools.t": "Ciclo real de ferramentas",
     "f.tools.d":
-      "Ferramentas nativas para shell, ficheiros, web, correr scripts e enviar ficheiros de volta ao chat. Adiciona as tuas em minutos.",
+      "Ferramentas nativas para shell, ficheiros, web, scripts e envio de ficheiros. Adiciona as tuas em minutos.",
     "f.channels.t": "Canais de mensagens",
     "f.channels.d":
-      "Liga um agente a um bot do Telegram ou a um canal por webhook, com transferência nativa, modos admin/suporte e âmbito por ligação.",
+      "Liga um agente ao Telegram ou a canais por webhook, com transferência, modos admin/suporte e âmbito por ligação.",
     "f.cron.t": "Tarefas agendadas",
     "f.cron.d":
-      "Cron com fuso horário num agendador interno. O agente pode criar as próprias por conversa, com a tua aprovação.",
+      "Cron com fuso horário dentro do Pepe. Os agentes podem propor tarefas pelo chat, com a tua aprovação.",
     "f.plugins.t": "Plugins em tempo de execução",
     "f.plugins.d":
-      "Adiciona ferramentas ou canais sem recompilar. Uma análise de segurança profunda corre na instalação, e cada provider declara o seu formulário.",
-    "f.sandbox.t": "Sandbox e permissões",
+      "Instala um plugin, preenche a configuração e dá aos agentes novas ferramentas ou canais de imediato.",
+    "f.sandbox.t": "Controlo e segurança",
     "f.sandbox.d":
-      "Ferramentas arriscadas passam por aprovação por omissão. As guardas bloqueiam comandos catastróficos, e um wrapper opcional adiciona isolamento real.",
-    "f.tenant.t": "Multi-inquilino",
+      "Ferramentas arriscadas perguntam primeiro. Execuções ficam rastreadas, proteções continuam ligadas e empresas opcionais isolam o trabalho.",
+    "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Empresas opcionais isolam agentes, modelos, canais e automações por inquilino, com utilização e faturação por empresa.",
+      "Empresas opcionais isolam agentes, modelos, canais, automações, utilização e faturação.",
     "f.traces.t": "Traces e utilização",
     "f.traces.d":
-      "Cada execução é registada. O que a despoletou, as ferramentas usadas, tokens e custo. Abre uma para a repetir passo a passo.",
-    "f.nodb.t": "Sem base de dados",
-    "f.nodb.d":
-      "A configuração é um único JSON em ~/.pepe. Os segredos são escritos como ${ENV_VAR} e resolvidos na leitura.",
+      "Cada execução regista o gatilho, ferramentas, tokens e custo. Abre um trace para rever passo a passo.",
+    "f.support.t": "Apoio ao cliente completo",
+    "f.support.d":
+      "Atende clientes no WhatsApp, Telegram, Slack ou Chatwoot, com transferência humana quando for preciso.",
 
-    "channels.title": "Encontra as pessoas onde elas estão",
+    "channels.title": "Liga-te às pessoas onde elas estão",
     "channels.sub":
-      "Liga um agente a um canal e as pessoas simplesmente falam com ele. Ficheiros, transferência e âmbito já vêm prontos.",
+      "Liga um canal e o agente responde por lá. Ficheiros, transferência e âmbito vêm prontos.",
+
+    "usecases.title": "O que as pessoas constroem com o Pepe",
+    "usecases.sub": "Trabalhos comuns quando ligas as ferramentas certas.",
+    "uc.social.t": "Gestão de redes sociais",
+    "uc.social.d": "Agenda publicações, responde a comentários e acompanha menções em todas as plataformas.",
+    "uc.email.t": "Priorização de e-mail",
+    "uc.email.d": "Lê a tua caixa de entrada, rascunha respostas e organiza mensagens por assunto.",
+    "uc.ads.t": "Campanhas de anúncios",
+    "uc.ads.d": "Acompanha o gasto e o desempenho no Meta, Google e LinkedIn Ads, com relatório diário.",
+    "uc.support.t": "Apoio ao cliente",
+    "uc.support.d": "Responde no WhatsApp, Slack ou Telegram, com transferência humana quando importa.",
+    "uc.sched.t": "Agendamento e lembretes",
+    "uc.sched.d": "Tarefas recorrentes e avisos pontuais quando algo muda.",
+    "uc.reports.t": "Relatórios e análises",
+    "uc.reports.d": "Extrai números das tuas próprias ferramentas e envia um resumo periodicamente.",
+    "uc.monitor.t": "Monitorização de erros",
+    "uc.monitor.d": "Acompanha o Sentry, o AppSignal e outras ferramentas de observabilidade, e aponta o que precisa mesmo de atenção humana.",
+    "uc.insights.t": "Insights de dados",
+    "uc.insights.d": "Consulta a tua base de dados e transforma números em próximos passos.",
+    "uc.notes.t": "Notas e resumos de reuniões",
+    "uc.notes.d": "Transforma uma transcrição em resumo e itens de ação, entregues onde a equipa já fala.",
 
     "how.title": "Como funciona o ciclo",
     "how.sub":
-      "O runtime chama o modelo, corre as chamadas de ferramenta, devolve os resultados e repete até uma resposta final.",
+      "O Pepe chama o modelo, corre ferramentas, devolve resultados e para quando a resposta está pronta.",
     "how.1.t": "Chamar o modelo",
     "how.1.d": "Envia a conversa e as ferramentas do agente ao modelo (com failover).",
     "how.2.t": "Correr ferramentas",
@@ -341,20 +478,31 @@ export const ui = {
     "how.3.t": "Devolver resultados",
     "how.3.d": "Anexa cada resultado à conversa e chama o modelo de novo.",
     "how.4.t": "Responder e entregar",
-    "how.4.d": "Devolve a resposta final na superfície que pediu. E regista a execução como um trace.",
+    "how.4.d": "Devolve a resposta final onde ela foi pedida e regista a execução como trace.",
 
     "cta.title": "Corre os teus próprios agentes em minutos",
-    "cta.sub": "Código aberto. Traz o teu modelo. A tua máquina, as tuas chaves, os teus dados.",
+    "cta.sub": "Código aberto. Traz o teu modelo. Mantém runtime, chaves e dados sob teu controlo.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
     "why.title": "Porquê \"Pepe\"?",
-    "why.body": "Vem do adorado universo de comédia do Chespirito (o Chapulín Colorado e o Chaves) com que gerações da América Latina cresceram. A imagem de marca dele? Fazia exatamente o que lhe mandavam. Sem discutir, sem improvisar além da ordem. O que, curiosamente, descreve na perfeição um runtime de agentes de IA.",
+    "why.body": "O nome pisca o olho ao universo de Chespirito, querido na América Latina. A piada do Pepe era simples: fazia exatamente o que lhe mandavam. Sem discutir nem inventar. Um bom resumo para um runtime de agentes.",
 
     "foot.tagline":
       "Um runtime de agentes de IA em Elixir/OTP. Auto-alojado, agnóstico de modelo, sem base de dados. Sem afiliação a qualquer fornecedor de modelos.",
     "foot.docs": "Docs",
     "foot.guides": "Guias",
     "foot.project": "Projeto",
+    "foot.terms": "Termos",
+    "foot.privacy": "Privacidade",
+    "foot.intro": "Introdução",
+    "foot.quickstart": "Início rápido",
+    "foot.agents": "Agentes e ferramentas",
+    "foot.channels": "Canais",
+    "foot.plugins": "Plugins",
+    "foot.scheduled": "Tarefas agendadas",
+    "foot.security": "Segurança e sandbox",
+    "foot.api": "API HTTP",
+    "foot.documentation": "Documentação",
   },
 } as const;
 

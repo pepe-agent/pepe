@@ -25,6 +25,13 @@
 .pepe-widget-bubble.pepe-widget-right { right: 20px; }
 .pepe-widget-bubble.pepe-widget-left { left: 20px; }
 
+.pepe-widget-bubble img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .pepe-widget-panel {
   position: fixed;
   bottom: 90px;
@@ -55,8 +62,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
+.pepe-widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pepe-widget-header-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.pepe-widget-newchat,
 .pepe-widget-close {
   background: none;
   border: 0;
@@ -65,8 +92,13 @@
   line-height: 1;
   cursor: pointer;
   opacity: 0.85;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.pepe-widget-newchat:hover,
 .pepe-widget-close:hover { opacity: 1; }
 
 .pepe-widget-messages {
@@ -76,6 +108,26 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a40 transparent;
+}
+
+.pepe-widget-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pepe-widget-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pepe-widget-messages::-webkit-scrollbar-thumb {
+  background: #3a3a40;
+  border-radius: 8px;
+  border: 2px solid #17171a;
+}
+
+.pepe-widget-messages::-webkit-scrollbar-thumb:hover {
+  background: #4a4a52;
 }
 
 .pepe-widget-msg {
@@ -105,6 +157,30 @@
   font-size: 12.5px;
   background: none;
   padding: 2px 8px;
+}
+
+.pepe-widget-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.pepe-widget-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+  animation: pepe-widget-bounce 1.2s infinite ease-in-out;
+}
+
+.pepe-widget-typing span:nth-child(2) { animation-delay: 0.15s; }
+.pepe-widget-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes pepe-widget-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
 
 .pepe-widget-form {
@@ -139,3 +215,42 @@
 }
 
 .pepe-widget-send:disabled { opacity: 0.5; cursor: default; }
+
+/* Light theme - the header keeps the accent color; everything below it flips. */
+
+.pepe-widget-panel.pepe-widget-theme-light {
+  background: #ffffff;
+  color: #18181b;
+}
+
+.pepe-widget-theme-light .pepe-widget-messages {
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.pepe-widget-theme-light .pepe-widget-messages::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-color: #ffffff;
+}
+
+.pepe-widget-theme-light .pepe-widget-messages::-webkit-scrollbar-thumb:hover {
+  background: #b8b8c0;
+}
+
+.pepe-widget-theme-light .pepe-widget-msg.pepe-widget-assistant {
+  background: #f1f1f4;
+  color: #18181b;
+}
+
+.pepe-widget-theme-light .pepe-widget-msg.pepe-widget-system {
+  color: #6b6b76;
+}
+
+.pepe-widget-theme-light .pepe-widget-form {
+  border-top-color: #e6e6ea;
+}
+
+.pepe-widget-theme-light .pepe-widget-input {
+  background: #f7f7f9;
+  border-color: #dcdce2;
+  color: #18181b;
+}

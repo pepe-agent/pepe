@@ -20,14 +20,11 @@ const surfaces = [
 
 const features = [
   { ico: "🧠", t: "f.model.t", d: "f.model.d" },
+  { ico: "⚡", t: "f.efficient.t", d: "f.efficient.d" },
   { ico: "🛠️", t: "f.tools.t", d: "f.tools.d" },
-  { ico: "📡", t: "f.channels.t", d: "f.channels.d" },
   { ico: "🕒", t: "f.cron.t", d: "f.cron.d" },
   { ico: "🧩", t: "f.plugins.t", d: "f.plugins.d" },
   { ico: "🛡️", t: "f.sandbox.t", d: "f.sandbox.d" },
-  { ico: "🏢", t: "f.tenant.t", d: "f.tenant.d" },
-  { ico: "🧵", t: "f.traces.t", d: "f.traces.d" },
-  { ico: "🗄️", t: "f.nodb.t", d: "f.nodb.d" },
 ] as const;
 
 const steps = [
@@ -37,11 +34,23 @@ const steps = [
   { t: "how.4.t", d: "how.4.d" },
 ] as const;
 
+const useCases = [
+  { ico: "📱", t: "uc.social.t", d: "uc.social.d" },
+  { ico: "📧", t: "uc.email.t", d: "uc.email.d" },
+  { ico: "📊", t: "uc.ads.t", d: "uc.ads.d" },
+  { ico: "🎧", t: "uc.support.t", d: "uc.support.d" },
+  { ico: "⏰", t: "uc.sched.t", d: "uc.sched.d" },
+  { ico: "📈", t: "uc.reports.t", d: "uc.reports.d" },
+  { ico: "🚨", t: "uc.monitor.t", d: "uc.monitor.d" },
+  { ico: "🔎", t: "uc.insights.t", d: "uc.insights.d" },
+  { ico: "📝", t: "uc.notes.t", d: "uc.notes.d" },
+] as const;
+
 const channels = ["Telegram", "WhatsApp", "Slack", "Discord", "Microsoft Teams", "Google Chat"];
 type K = keyof (typeof ui)["en"];
 ---
 
-<Base title="Pepe, the AI agent runtime you run yourself" description={tr("hero.lead")} lang={lang}>
+<Base title={tr("seo.title")} description={tr("hero.lead")} lang={lang}>
   <section class="hero">
     <div class="container">
       <h1 set:html={tr("hero.title")} />
@@ -58,7 +67,7 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
 
 <span class="c-dim"># scaffold, connect a model, add an agent</span>
 <span class="c-key">pepe</span> setup
-<span class="c-key">pepe</span> model add openrouter --base-url <span class="c-str">$URL</span> --model <span class="c-str">gpt-5</span>
+<span class="c-key">pepe</span> model add openrouter --api-key <span class="c-str">{"'${OPENROUTER_API_KEY}'"}</span> --model <span class="c-str">openai/gpt-5-chat</span>
 <span class="c-key">pepe</span> agent add assistant --tools bash,web_search,send_file
 
 <span class="c-dim"># talk to it, or serve it to every surface</span>
@@ -87,6 +96,26 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
       </div>
     </div>
   </section>
+
+  <section id="usecases">
+    <div class="container">
+      <div class="section-head">
+        <h2>{tr("usecases.title")}</h2>
+        <p>{tr("usecases.sub")}</p>
+      </div>
+      <div class="grid">
+        {useCases.map((u) => (
+          <div class="card">
+            <div class="ico">{u.ico}</div>
+            <h3>{tr(u.t as K)}</h3>
+            <p>{tr(u.d as K)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
 
   <section id="features">
     <div class="container">

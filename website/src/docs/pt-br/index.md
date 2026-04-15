@@ -11,6 +11,11 @@ uma conexão com um modelo), e o Pepe o executa: envia a conversa para o modelo,
 executa qualquer ferramenta que o modelo pedir, devolve os resultados e repete
 até o modelo produzir uma resposta final.
 
+Elixir/OTP importa aqui porque agentes são conversas longas, canais e tarefas em
+segundo plano, não só uma requisição HTTP. O Pepe consegue manter muitas sessões
+supervisionadas com pouco overhead, o que ajuda a hospedar uma equipe de agentes
+sem inflar memória nem CPU do servidor.
+
 Esse loop interno é o ponto central de tudo. Uma simples chamada de chat devolve
 texto. Um agente pode de fato fazer coisas: ler um arquivo, rodar um comando,
 pesquisar na web, chamar sua API, e então raciocinar sobre o que encontrou e
@@ -18,14 +23,14 @@ seguir em frente. O Pepe entrega esse loop como um runtime pronto, em vez de alg
 que você monta na mão em cada projeto.
 
 ```bash
-pepe run "read package.json and tell me which dependencies are outdated"
+pepe run "leia o package.json e diga quais dependências estão desatualizadas"
 ```
 
 Você define o comportamento uma vez, e o mesmo agente fica acessível de quatro
 formas: pelo terminal, por uma API HTTP compatível com OpenAI, por um WebSocket
 com streaming, e por canais de mensagem como Telegram e WhatsApp. Também há um
 painel web para navegar e conversar pelo navegador. Atenda cada caso de uso ali
-onde ele já vive, sem reconstruir o agente para cada um.
+onde ele já vive, sem criar um agente separado para cada canal.
 
 ## O loop de chamada de ferramentas
 
@@ -59,17 +64,17 @@ consentimento.
 
 Você constrói um agente uma vez. O Pepe então o expõe pela superfície que melhor
 serve à tarefa. A configuração e o gerenciamento, por sua vez, acontecem de três
-maneiras: a CLI `pepe`, o painel web e por chat (falando em linguagem natural com
+maneiras: a CLI `pepe`, o painel web e pela conversa (falando em linguagem natural com
 um agente que possui a ferramenta de gerenciamento certa).
 
 ### CLI
 
 O comando `pepe` é como você configura as coisas e como roda agentes a partir de
-um terminal. Execuções pontuais transmitem a resposta direto para a saída padrão,
+um terminal. Execuções pontuais transmitem a resposta direto para à saída padrão,
 e `pepe chat` abre uma sessão interativa que lembra a conversa.
 
 ```bash
-pepe run assistant "summarize the git log from the last week"
+pepe run assistant "resuma o git log da última semana"
 pepe chat assistant
 ```
 
@@ -83,7 +88,7 @@ operador quando o expuser.
 
 ```bash
 pepe serve --port 4000
-# then open http://localhost:4000
+# então abra http://localhost:4000
 ```
 
 ### API HTTP compatível com OpenAI
@@ -97,7 +102,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "assistant",
-    "messages": [{"role": "user", "content": "what files are in this project?"}]
+    "messages": [{"role": "user", "content": "quais arquivos existem neste projeto?"}]
   }'
 ```
 
@@ -110,7 +115,7 @@ streaming, eventos de ferramentas e autenticação.
 Para conversas ao vivo, token a token, em um app web ou mobile, conecte-se por um
 WebSocket e assine o tópico do seu agente (`agent:<name>`). Você recebe o texto do
 assistente conforme ele é transmitido, além de eventos para cada chamada e
-resultado de ferramenta. Os detalhes e um exemplo de cliente estão em [a página da
+resultado de ferramenta. Os detalhes e um exemplo de cliente estão na [página da
 API](./api/).
 
 ### Canais de mensagem
@@ -128,7 +133,7 @@ modelo. Crie um pela CLI:
 
 ```bash
 pepe agent add assistant \
-  --prompt "You are Pepe, a helpful coding agent." \
+  --prompt "Você é o Pepe, um agente de programação prestativo." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search \
   --default
 ```
@@ -136,7 +141,7 @@ pepe agent add assistant \
 Você também pode fazer isso no painel web, na página **Agents**, que inclui um
 formulário para a persona, o modelo e a seleção de ferramentas.
 
-### Faça por chat
+### Faça pela conversa
 
 Um agente que possui a ferramenta `manage_agent` pode criar e moldar outros
 agentes direto de uma conversa. Mande uma mensagem simples para ele:
@@ -158,7 +163,6 @@ compatível com OpenAI por meio de uma conexão de modelo:
 
 ```bash
 pepe model add openrouter \
-  --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
   --model anthropic/claude-3.5-sonnet \
   --default
@@ -176,7 +180,7 @@ onde já estão. No painel, a página **Channels** guia você pela conexão de u
 pela escolha de qual agente ele conversa. O canal então mantém uma memória de
 conversa separada por usuário.
 
-### Faça por chat
+### Faça pela conversa
 
 Um agente que possui a ferramenta `manage_channel` pode subir um bot do Telegram
 a partir de uma conversa:
@@ -193,7 +197,7 @@ contém o token, nunca o token em si, de modo que o segredo nunca passa pelo cha
 nem pelo modelo. Depois da mudança, o bot em execução entra no ar ao vivo, sem
 reiniciar.
 
-## Por que ele não atrapalha
+## Decisões de arquitetura que simplificam o uso
 
 ### Auto-hospedado, suas chaves, seus dados
 
@@ -239,10 +243,10 @@ Cada conversa roda como seu próprio processo leve e supervisionado, identificad
 por um id de sessão. Muitas correm lado a lado, e uma queda em uma nunca toca a
 outra, então um único turno ruim não pode derrubar o resto dos seus agentes.
 
-### Multi-tenant quando você precisa
+### Multiempresa quando você precisa
 
 O trabalho pode ser limitado a uma **empresa**, isolando agentes, canais, modelos
-e uso por locatário. Se você nunca ativar, tudo vive no escopo padrão, chamado
+e uso por cliente. Se você nunca ativar, tudo vive no escopo padrão, chamado
 **Principal**, e você pode ignorar as empresas por completo.
 
 ## Para onde ir depois

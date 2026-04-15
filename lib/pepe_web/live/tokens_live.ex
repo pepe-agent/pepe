@@ -2,8 +2,11 @@ defmodule PepeWeb.TokensLive do
   @moduledoc """
   API tokens section: mint, list and revoke the bearer tokens the `/v1` API accepts.
   With no token the API is open only to loopback; the first token locks it down, so
-  every caller (local or remote) must then present one. The raw secret is shown once
-  on creation and never stored - only its hash and a safe fingerprint prefix are kept.
+  every caller (local or remote) must then present one. A regular token's raw secret
+  is shown once on creation and never stored - only its hash and a safe fingerprint
+  prefix are kept. A **widget** token is the exception: it's meant to sit in public
+  page source anyway, so its raw value stays retrievable here instead of forcing a
+  rotation the moment someone loses their copy of the embed snippet.
   """
   use PepeWeb, :live_view
   use Gettext, backend: Pepe.Gettext
@@ -124,7 +127,11 @@ defmodule PepeWeb.TokensLive do
                   {gettext("Revoke")}
                 </button>
               </div>
-              <div class="mt-1 font-mono text-sm text-zinc-400">{t["prefix"]}</div>
+              <div :if={t["kind"] == "widget"} class="mt-1 flex items-center gap-2">
+                <code class="min-w-0 flex-1 select-all truncate rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 font-mono text-sm text-zinc-300">{t["token"]}</code>
+                <.copy_button id={"copy-token-#{t["id"]}"} value={t["token"]} class="shrink-0" />
+              </div>
+              <div :if={t["kind"] != "widget"} class="mt-1 font-mono text-sm text-zinc-400">{t["prefix"]}</div>
               <div class="mt-0.5 text-sm text-zinc-500">{gettext("Id %{id}", id: t["id"])}</div>
             </div>
             <p :if={@tokens == []} class="text-[15px] text-zinc-500">

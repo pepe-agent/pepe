@@ -26,6 +26,35 @@ conhecido e seguro, nunca em uma empresa inteira ou no escopo raiz.
 recusada de qualquer outro lugar. Veja [Autenticação e tokens](./auth/) para o
 modelo geral de tokens sobre o qual isso se apoia.
 
+### Ou faça pelo painel
+
+A seção Channels tem um botão **+ Widget** que abre um formulário ali mesmo -
+rótulo, agente, origem permitida e aparência - sem precisar ir até a página
+de tokens. Depois de criar um, o painel mostra a tag `<script>` completa já
+preenchida com o token real, o agente e o endereço do seu próprio servidor,
+pronta pra copiar e colar. Widgets existentes também mantêm um trecho
+recolhível, e o token bruto deles fica visível a qualquer momento - diferente
+de um token de API normal, o valor de um token de widget não é um segredo
+que vale a pena esconder (veja [Segurança](#segurança) mais abaixo), então
+não tem aquele "copie agora, você não vai ver de novo". Trocar qual agente
+ou origem um widget usa ainda significa criar um novo e revogar o antigo
+(isso continua só por rotação), mas a aparência pode ser editada no lugar a
+qualquer momento.
+
+### Defina a aparência pelo painel
+
+Título, logo, cor, tema, saudação e posição não precisam morar na tag
+`<script>` de jeito nenhum - defina no token do widget em vez disso (na
+criação, ou depois pelo botão **Edit appearance** num widget existente) e o
+script busca isso ao carregar. A prioridade é por campo, não tudo-ou-nada:
+**o valor do token vence sempre que estiver definido**; um campo não
+definido no token cai pro próprio atributo `data-*` da tag, e depois pro
+padrão embutido. Então isso é totalmente opcional (uma incorporação simples
+só com `data-token` continua funcionando exatamente como antes), e os dois
+podem se misturar livremente - cor vindo do painel, saudação fixa na tag,
+por exemplo. A ideia é que um ajuste de cor ou saudação nunca precise de um
+novo deploy do site: muda no painel, recarrega a página, pronto.
+
 ### Incorpore
 
 Cole a tag script na página, apontando para o seu servidor Pepe:
@@ -33,8 +62,11 @@ Cole a tag script na página, apontando para o seu servidor Pepe:
 ```html
 <script src="https://your-pepe-host/plugin-assets/pepe-widget/widget.js"
         data-agent="support"
-        data-token="ctx_your_widget_token"
+        data-token="pepe_your_widget_token"
+        data-title="Chat"
+        data-logo="https://example.com/logo.png"
         data-color="#ea580c"
+        data-theme="dark"
         data-greeting="Hi! How can I help?"
         data-position="right"></script>
 ```
@@ -44,7 +76,10 @@ Cole a tag script na página, apontando para o seu servidor Pepe:
 | `data-agent` | Qual agente responde. Precisa bater com o agente do próprio token. | `default` |
 | `data-token` | O token de widget de `token add --widget`. | nenhum |
 | `data-server` | O host para conectar. | o próprio host do script |
-| `data-color` | Cor de destaque da bolha e dos botões. | `#ea580c` |
+| `data-title` | O texto do cabeçalho do painel. | "Chat" |
+| `data-logo` | Uma imagem quadrada pequena, usada como ícone da bolha e ao lado do título no cabeçalho. Omita pra manter a bolha com o emoji simples. | nenhum |
+| `data-color` | Cor de destaque da bolha, do cabeçalho e dos botões. | `#ea580c` |
+| `data-theme` | `dark` ou `light` - as cores base do painel abaixo do cabeçalho. | `dark` |
 | `data-greeting` | A primeira mensagem mostrada antes de o visitante enviar algo. | "Hi! How can I help?" |
 | `data-position` | `left` ou `right`. | `right` |
 
@@ -60,6 +95,16 @@ continue a mesma conversa. Por baixo dos panos, o widget fala o mesmo
 protocolo descrito em [WebSocket](./websocket/): `prompt` de entrada, `delta`
 / `done` / `error` / `watch` de saída.
 
+O botão 🧹 no cabeçalho começa uma conversa nova na hora: fecha a conexão
+atual, limpa o painel e reconecta com um id de sessão novo. Esse id já fica
+salvo na hora, então mesmo um reload completo da página continua falando com
+a conversa nova, não com a antiga.
+
+Na página Chat do painel, conversas do widget se agrupam em **Widget**, um
+subgrupo por site (o `allowed_origin` do token) - assim, ter mais de um
+widget em sites diferentes mantém as conversas fáceis de distinguir,
+separadas do chat próprio do painel.
+
 ### Segurança
 
 - **Vinculado à origem.** O WebSocket só aceita uma conexão de widget cujo
@@ -74,6 +119,11 @@ protocolo descrito em [WebSocket](./websocket/): `prompt` de entrada, `delta`
   widget_rate_limit:` / `widget_rate_window_s:` se você se auto-hospeda e
   precisa ajustar), pra que um token público que vive no código-fonte da
   página não possa ser bombardeado. Nenhuma outra superfície é afetada.
+- **Não é tratado como segredo.** O valor bruto de um token de widget já
+  mora em HTML público, legível com "exibir código-fonte" no site que o
+  incorpora - então, diferente de um token de API normal, ele é guardado
+  recuperável e continua visível no painel/`manage_token list`. O que
+  realmente protege ele são os três pontos acima, não esconder a string.
 
 <div class="note"><strong>Dê um agente restrito.</strong> Um widget fica de
 cara pra internet pública, sem nenhum humano aprovando chamadas de
@@ -91,4 +141,16 @@ conversa:
 O agente chama `manage_token` com `action: "create"`, `agent: "support"`,
 `widget: true`, e `allowed_origin: "https://example.com"`. Criar um token não
 é somente leitura, então a chamada passa pela barreira de permissão; o token
-bruto volta uma vez na resposta pra você copiar na tag script.
+bruto volta na resposta pra você copiar na tag script - e continua disponível
+a qualquer momento com `action: "list"`, já que um token de widget não é um
+segredo que vale a pena esconder.
+
+A aparência funciona do mesmo jeito, em qualquer uma das duas ações: passe
+qualquer um de `title`, `logo`, `color`, `theme`, `greeting`, `position` no
+`create`, ou depois com `action: "update"` e o `id` do token:
+
+> Muda a saudação do widget do support pra "Oi! Precisa de ajuda?" e a cor pra #2563eb.
+
+O agente chama `manage_token` com `action: "update"`, `id: "<o id do
+token>"`, `greeting: "Oi! Precisa de ajuda?"`, e `color: "#2563eb"` - um
+campo deixado de fora da chamada mantém o valor atual.

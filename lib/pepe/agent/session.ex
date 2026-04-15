@@ -65,6 +65,17 @@ defmodule Pepe.Agent.Session do
   @spec stop(term()) :: :ok | {:error, :not_running}
   def stop(key), do: GenServer.call(via(key), :stop)
 
+  @doc """
+  Resume a turn that was cut off mid-run by a process restart (a `pending` marker
+  survived to this session's init - see `Pepe.Agent.SessionPersistence`). Runs an
+  internal, invisible prompt referencing the interrupted message and returns
+  whatever the agent replies; like `heartbeat/1`, only the reply joins the visible
+  history, not the internal prompt. Returns `{:ok, text}`, `:nothing_pending` (the
+  session ended cleanly, nothing to resume), or `{:error, reason}`.
+  """
+  @spec resume(term()) :: {:ok, String.t()} | :nothing_pending | {:error, term()}
+  def resume(key), do: GenServer.call(via(key), :resume, 120_000)
+
   @doc "Run the memory/skill review now over this session (the `/learn` trigger)."
   @spec learn(term()) :: :ok | {:error, :no_agent}
   def learn(key), do: GenServer.call(via(key), :learn)
@@ -104,6 +115,18 @@ defmodule Pepe.Agent.Session do
 
   alias Pepe.Agent.SessionPersistence
 
+  # An anonymous widget visitor's tab left open doesn't need to hold a live session
+  # (or accumulate on disk) forever - see the moduledoc note on `init/1`'s merge.
+  @widget_idle_ttl_ms 30 * 60_000
+
+  @doc false
+  @spec default_ephemeral?(String.t()) :: boolean()
+  def default_ephemeral?(key), do: String.starts_with?(key, "widget:")
+
+  @doc false
+  @spec default_ttl_ms(String.t()) :: pos_integer() | nil
+  def default_ttl_ms(key), do: if(default_ephemeral?(key), do: @widget_idle_ttl_ms, else: nil)
+
   @impl true
   def init(opts) do
     key = Keyword.fetch!(opts, :key)
@@ -111,8 +134,8 @@ defmodule Pepe.Agent.Session do
 
     state =
       case persist?() && SessionPersistence.load(key) do
-        {:ok, name, messages} ->
-          %{key: key, agent_name: name || default_agent, messages: messages, running: nil}
+        {:ok, name, messages, pending} ->
+          %{key: key, agent_name: name || default_agent, messages: messages, running: nil, pending_resume: pending}
 
         _ ->
           %{
@@ -120,7 +143,8 @@ defmodule Pepe.Agent.Session do
             agent_name: default_agent,
             messages: init_messages(default_agent),
             running: nil,
-            idle_ref: nil
+            idle_ref: nil,
+            pending_resume: nil
           }
       end
 
@@ -131,15 +155,22 @@ defmodule Pepe.Agent.Session do
     #
     # `ttl_ms` evicts the session after that much inactivity (nil = never, the
     # default). `ephemeral` skips persistence and clears on eviction - used by
-    # customer-facing channels so support conversations don't accumulate.
+    # customer-facing channels so support conversations don't accumulate. Falls back
+    # to a key-derived default (see `default_ephemeral?/1`), not just `false`: a
+    # session is a Registry-wide singleton keyed by `key` - "the already-running
+    # session keeps the options it was created with" (see SessionSupervisor.ensure/3)
+    # means whichever caller reaches `ensure/3` FIRST for a given key wins, and not
+    # every caller passes ephemeral/ttl_ms explicitly (e.g. the dashboard's own
+    # session viewer just wants to look at whatever's there). Deriving the default
+    # from the key itself makes the policy the key's own property, not a race.
     state =
       state
       |> Map.put_new(:idle_ref, nil)
       |> Map.put_new(:learn_allowed, true)
       |> Map.put_new(:model_override, nil)
       |> Map.merge(%{
-        ttl_ms: Keyword.get(opts, :ttl_ms),
-        ephemeral: Keyword.get(opts, :ephemeral, false),
+        ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
+        ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
         reset_pending: false,
         ttl_ref: nil,
         # Reversible redaction map (pseudonym -> real) accumulated by inbound hooks and
@@ -164,6 +195,35 @@ defmodule Pepe.Agent.Session do
       do: SessionPersistence.save(state.key, state.agent_name, state.messages)
 
     state
+  end
+
+  # Mark a turn as in flight right before running it, so a crash mid-turn leaves a
+  # durable trace `Pepe.Agent.SessionSupervisor.restore/0` can pick up on the next
+  # boot. Same persist?/ephemeral guard as `persist/1`.
+  defp mark_pending(state, text) do
+    if persist?() and not Map.get(state, :ephemeral, false), do: SessionPersistence.mark_pending(state.key, text)
+  end
+
+  # A run ended without going through the normal `persist/1` path (stopped, crashed,
+  # or errored) - clear the pending marker on disk too, so it isn't mistaken for an
+  # interrupted turn on the next boot.
+  defp clear_pending(state) do
+    if persist?() and not Map.get(state, :ephemeral, false), do: SessionPersistence.clear_pending(state.key)
+    %{state | pending_resume: nil}
+  end
+
+  defp resume_prompt(pending_text) do
+    """
+    [Automatic recovery - the user does not see this note, only your reply if you send one.]
+
+    The conversation was interrupted by a server restart before you could respond to the user's last message:
+
+    "#{pending_text}"
+
+    You may have already taken some action for it before being cut off. If you're unsure whether something \
+    risky was already done (a message sent, a file changed, an email sent), check before repeating it rather \
+    than assuming a clean slate. Pick up naturally from here and reply to the user now.
+    """
   end
 
   # Seed a session with the system prompt built from the agent's CURRENT config/soul.
@@ -202,8 +262,9 @@ defmodule Pepe.Agent.Session do
         # user text and the reversible map go in; the task redacts (inbound hooks)
         # before the model sees anything and restores the reply on the way out.
         base = ensure_system(state.messages, agent)
+        mark_pending(state, text)
         {pid, ref} = spawn_run(agent, base, text, state.pii_map, opts)
-        {:noreply, %{state | running: %{task: pid, ref: ref, from: from}}}
+        {:noreply, %{state | running: %{task: pid, ref: ref, from: from}, pending_resume: text}}
     end
   end
 
@@ -225,6 +286,51 @@ defmodule Pepe.Agent.Session do
       agent ->
         Pepe.Agent.Reflect.review_async(agent, state.messages)
         {:reply, :ok, cancel_idle(state)}
+    end
+  end
+
+  def handle_call(:resume, _from, %{pending_resume: nil} = state) do
+    {:reply, :nothing_pending, state}
+  end
+
+  def handle_call(:resume, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
+  def handle_call(:resume, _from, state) do
+    case resolve_agent(state) do
+      nil ->
+        {:reply, {:error, :no_agent}, state}
+
+      agent ->
+        # The interrupted text is real user input captured before the crash, so it
+        # goes through the same inbound/outbound redaction hooks a normal turn
+        # applies (spawn_run) - a resume must not be the one path that leaks PII a
+        # configured hook would otherwise have caught.
+        {redacted, entries} = Pepe.Hooks.transform(:inbound, state.pending_resume, agent, %{"map" => state.pii_map})
+        messages = ensure_system(state.messages, agent) ++ [Message.user(resume_prompt(redacted))]
+        opts = [session_key: state.key]
+
+        case Runtime.run(agent, messages, opts) do
+          {:ok, reply, _all} ->
+            map = state.pii_map ++ entries
+            {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
+            text = Pepe.Hooks.restore(shown, map)
+
+            # Only the agent's own reply joins the visible history - the internal
+            # recovery note stays invisible, like a heartbeat pulse.
+            new_state = %{
+              state
+              | messages: state.messages ++ [Message.assistant(text)],
+                pending_resume: nil,
+                pii_map: map
+            }
+
+            {:reply, {:ok, text}, persist(new_state)}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, clear_pending(state)}
+        end
     end
   end
 
@@ -354,14 +460,15 @@ defmodule Pepe.Agent.Session do
               messages: messages,
               running: nil,
               reset_pending: false,
-              pii_map: pii_map
+              pii_map: pii_map,
+              pending_resume: nil
           }
           |> persist()
           |> maybe_schedule_idle()
 
         {:error, reason} ->
           GenServer.reply(from, {:error, reason})
-          %{state | running: nil}
+          clear_pending(%{state | running: nil})
       end
 
     {:noreply, state}
@@ -376,7 +483,7 @@ defmodule Pepe.Agent.Session do
         %{running: %{ref: ref, from: from}} = state
       ) do
     GenServer.reply(from, {:error, :stopped})
-    {:noreply, %{state | running: nil}}
+    {:noreply, clear_pending(%{state | running: nil})}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
@@ -446,7 +553,7 @@ defmodule Pepe.Agent.Session do
     Process.demonitor(ref, [:flush])
     Process.exit(pid, :kill)
     GenServer.reply(from, reply)
-    %{state | running: nil}
+    clear_pending(%{state | running: nil})
   end
 
   defp cancel_running(state, _reply), do: state

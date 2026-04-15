@@ -123,4 +123,15 @@ defmodule Pepe.Agent.WorkspaceTest do
 
     assert Workspace.system_prompt(agent) =~ "name: ZakAI"
   end
+
+  test "BOOT.md is loaded fresh into every new session, not just listed by name" do
+    agent = %{name: "zak", system_prompt: "seed"}
+    File.mkdir_p!(Workspace.dir("zak"))
+    File.write!(Path.join(Workspace.dir("zak"), "BOOT.md"), "Follow up with Jho about the invoice.")
+
+    prompt = Workspace.system_prompt(agent)
+
+    assert prompt =~ "Follow up with Jho about the invoice."
+    refute prompt =~ "- BOOT.md"
+  end
 end

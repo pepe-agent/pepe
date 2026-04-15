@@ -61,10 +61,11 @@ defmodule PepeWeb.AgentChannelRateLimitTest do
     session = "widget-#{System.unique_integer([:positive])}"
     socket = join_as("ctx_widget", session)
 
-    # Exhaust the (budget of 1) directly, keyed exactly as the channel keys it
-    # ("ws:" <> session), so this assertion never races the first prompt's own
-    # (async, model-call-failure) error push.
-    assert :ok = PepeWeb.WidgetThrottle.check("ws:" <> session)
+    # Exhaust the (budget of 1) directly, keyed exactly as the channel keys a widget
+    # connection ("widget:<site>:" <> session, site from the token's allowed_origin),
+    # so this assertion never races the first prompt's own (async, model-call-failure)
+    # error push.
+    assert :ok = PepeWeb.WidgetThrottle.check("widget:example.com:" <> session)
 
     push(socket, "prompt", %{"text" => "hi"})
     assert_push "error", %{reason: reason}, 2_000

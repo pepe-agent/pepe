@@ -13,9 +13,11 @@ defmodule Pepe.Agent.Workspace do
       `shared/` path prefix.
 
   A few filenames are **conventions** (`SOUL.md`, `IDENTITY.md`, `USER.md`,
-  `AGENTS.md`, `MEMORY.md`, `BOOT.md`): when present their content is injected into
-  the system prompt, and the agent is told it may create/update them itself.
-  `SOUL.md` (or the config `system_prompt` seed) is the persona.
+  `AGENTS.md`, `MEMORY.md`, `BOOT.md`), and the agent is told it may create/update
+  them itself. `SOUL.md`, `IDENTITY.md` and `BOOT.md` are small and session-start
+  scoped, so their content is loaded straight into the system prompt; the rest are
+  merely listed by name and read on demand, so a growing `MEMORY.md` never bloats
+  the context. `SOUL.md` (or the config `system_prompt` seed) is the persona.
   """
 
   use Gettext, backend: Pepe.Gettext
@@ -105,16 +107,20 @@ defmodule Pepe.Agent.Workspace do
   end
 
   @doc """
-  Build an agent's system prompt. Only the small, stable identity is *loaded*
-  (`SOUL.md` persona + `IDENTITY.md`); the rest of the knowledge files are merely
-  *listed by name* and read on demand - so a growing `MEMORY.md`/`people.md` never
-  bloats the context. A note teaches the agent when to read each.
+  Build an agent's system prompt. Only the small, session-start-scoped files are
+  *loaded* (`SOUL.md` persona, `IDENTITY.md`, `BOOT.md`); the rest of the
+  knowledge files are merely *listed by name* and read on demand - so a growing
+  `MEMORY.md`/`people.md` never bloats the context. A note teaches the agent when
+  to read each. This is built once per session (see `Pepe.Agent.Session`), so
+  `BOOT.md` is picked up fresh on every new conversation without costing anything
+  on later turns.
   """
   def system_prompt(%{name: name, system_prompt: seed}) do
     persona = read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
+    boot = read(name, "BOOT.md") |> labeled("BOOT.md")
 
-    [persona, identity, now_note(), knowledge_index(name), docs_index(), skills_index(), convention_note()]
+    [persona, identity, boot, now_note(), knowledge_index(name), docs_index(), skills_index(), convention_note()]
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n\n")
   end
@@ -199,7 +205,7 @@ defmodule Pepe.Agent.Workspace do
       {:ok, entries} ->
         entries
         |> Enum.filter(&String.ends_with?(&1, ".md"))
-        |> Enum.reject(&(&1 in ["SOUL.md", "IDENTITY.md"]))
+        |> Enum.reject(&(&1 in ["SOUL.md", "IDENTITY.md", "BOOT.md"]))
         |> Enum.sort()
 
       _ ->
@@ -231,10 +237,13 @@ defmodule Pepe.Agent.Workspace do
     - `USER.md` - read to recall who you're talking to.
     - `MEMORY.md` - read to recall durable facts/decisions; append lasting learnings.
     - `AGENTS.md` - read for operating rules/house rules.
-    - `BOOT.md` - read at the very start of a session for anything to do/recall.
     You may create any other files to organize what you learn; put cross-agent
-    knowledge under `shared/`. Only `SOUL.md` (your persona) and `IDENTITY.md` are
-    always in context.
+    knowledge under `shared/`. `SOUL.md` (your persona), `IDENTITY.md` and
+    `BOOT.md` are always in context already, loaded fresh at the start of each
+    conversation - write anything you want yourself to see at the start of your
+    NEXT conversation into `BOOT.md` (things to do, follow up on, or recall);
+    it is not re-read mid-conversation, so update it when something comes up,
+    not just at the end.
 
     Your *identity* lives in `SOUL.md`/`IDENTITY.md` - edit those to change it. Your
     *handle* is this directory's name; if the user wants you renamed, call

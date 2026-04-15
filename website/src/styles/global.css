@@ -157,12 +157,62 @@ footer { border-top: 1px solid var(--border); padding: 46px 0; color: var(--dim)
 
 /* ---- docs layout ---- */
 .docs { display: grid; grid-template-columns: 240px 1fr; gap: 48px; align-items: start; padding: 40px 0 80px; }
-.docs-nav { position: sticky; top: 82px; }
-.docs-nav h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin: 22px 0 10px; }
-.docs-nav h4:first-child { margin-top: 0; }
+.docs-nav { position: sticky; top: 72px; align-self: start; height: calc(100vh - 84px); min-height: 0; display: flex; flex-direction: column; gap: 18px; }
+.docs-nav-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; padding-right: 8px; padding-bottom: 18px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+.docs-nav-scroll::-webkit-scrollbar { width: 8px; }
+.docs-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.docs-nav-scroll::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
+.docs-nav-scroll > div + div { margin-top: 34px; }
+.docs-nav h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin: 0 0 6px; }
 .docs-nav a { display: block; padding: 6px 12px; border-radius: 8px; color: var(--muted); font-size: 14.5px; }
 .docs-nav a:hover { background: var(--panel); color: var(--text); }
 .docs-nav a.active { background: rgba(234,88,12,.12); color: var(--accent-soft); font-weight: 600; }
+.doc-search { position: relative; }
+.doc-search label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin: 0 0 8px; }
+.doc-search input {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  padding: 0 12px;
+  transition: border-color .15s, background .15s;
+}
+.doc-search input:focus { border-color: rgba(251,146,60,.75); background: var(--panel-2); }
+.doc-search input::placeholder { color: var(--dim); }
+.doc-search-results {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  max-height: min(420px, calc(100vh - 180px));
+  overflow-y: auto;
+  background: #101012;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px -30px rgba(0,0,0,.9);
+  padding: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.doc-search-results a {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-radius: 9px;
+  color: var(--muted);
+}
+.doc-search-results a:hover,
+.doc-search-results a[aria-selected="true"] { background: var(--panel-2); color: var(--muted); }
+.doc-search-results a[aria-selected="true"] { outline: 1px solid rgba(251,146,60,.45); }
+.doc-search-results strong { color: var(--text); font-size: 14px; line-height: 1.35; }
+.doc-search-results span { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.doc-search-empty { padding: 10px; color: var(--dim); }
 
 .doc-content { min-width: 0; max-width: 760px; }
 .doc-content h1 { font-size: 36px; letter-spacing: -0.02em; margin: 0 0 8px; }
@@ -172,7 +222,8 @@ footer { border-top: 1px solid var(--border); padding: 46px 0; color: var(--dim)
 .doc-content p, .doc-content li { color: #cfcfd4; }
 .doc-content ul { padding-left: 22px; }
 .doc-content li { margin-bottom: 7px; }
-.doc-content code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 13.5px; color: var(--accent-soft); }
+.doc-content code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 13.5px; color: var(--accent-soft); white-space: nowrap; }
+.doc-content pre code { white-space: pre; }
 .doc-content pre { background: #0e0e10; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; overflow-x: auto; margin: 16px 0; }
 .doc-content pre code { background: none; border: 0; padding: 0; color: #d4d4d8; }
 .doc-content table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; }
@@ -183,15 +234,31 @@ footer { border-top: 1px solid var(--border); padding: 46px 0; color: var(--dim)
 .doc-foot { display: flex; justify-content: space-between; margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); }
 .doc-foot a { font-weight: 600; }
 
+/* ---- legal pages ---- */
+.legal-page { padding: 76px 24px 96px; }
+.legal-content { max-width: 860px; margin: 0 auto; }
+.legal-hero { padding-bottom: 34px; border-bottom: 1px solid var(--border); }
+.legal-updated { margin: 0 0 14px; color: var(--dim); font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.legal-hero h1 { margin: 0 0 16px; font-size: clamp(40px, 6vw, 64px); line-height: 1; letter-spacing: -0.02em; }
+.legal-hero p:not(.legal-updated) { max-width: 680px; margin: 0; color: var(--muted); font-size: 21px; line-height: 1.55; }
+.legal-sections { display: grid; gap: 16px; margin-top: 30px; }
+.legal-section { padding: 26px 0; border-bottom: 1px solid var(--border); }
+.legal-section h2 { margin: 0 0 10px; font-size: 24px; letter-spacing: -0.01em; }
+.legal-section p { max-width: 760px; margin: 0; color: #d4d4d8; font-size: 18px; line-height: 1.75; }
+
 /* ---- responsive ---- */
 @media (max-width: 900px) {
   .surfaces, .grid, .steps { grid-template-columns: 1fr 1fr; }
   .docs { grid-template-columns: 1fr; gap: 20px; }
-  .docs-nav { position: static; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+  .docs-nav { position: static; height: auto; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+  .docs-nav-scroll { height: auto; overflow: visible; padding-right: 0; padding-bottom: 0; }
+  .doc-search-results { max-height: 360px; }
 }
 @media (max-width: 640px) {
   .nav-links { display: none; }
   .nav-links.open { display: flex; position: absolute; top: 62px; left: 0; right: 0; flex-direction: column; align-items: flex-start; gap: 4px; background: var(--bg); border-bottom: 1px solid var(--border); padding: 14px 24px; }
   .nav-toggle { display: block; margin-left: auto; }
   .surfaces, .grid, .steps { grid-template-columns: 1fr; }
+  .legal-page { padding-top: 54px; }
+  .legal-section p { font-size: 16.5px; }
 }

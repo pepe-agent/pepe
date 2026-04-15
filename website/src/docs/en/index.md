@@ -10,6 +10,11 @@ Pepe is a self-hosted AI agent runtime built in Elixir. You define an **agent**
 it: it sends the conversation to the model, executes any tools the model asks
 for, feeds the results back, and repeats until the model produces a final answer.
 
+Elixir/OTP matters here because agents are long-lived conversations, channels and
+background jobs, not just one HTTP request. Pepe can keep many supervised sessions
+running with low runtime overhead, which helps keep a team of agents inexpensive
+to host in terms of server memory and CPU.
+
 That inner loop is the whole point. A plain chat call returns text. An agent can
 actually do things: read a file, run a command, search the web, call your API,
 and then reason about what it found and keep going. Pepe gives you that loop as a
@@ -23,7 +28,7 @@ You define the behavior once, and the same agent is reachable four ways: from th
 terminal, over an OpenAI-compatible HTTP API, over a streaming WebSocket, and
 from messaging channels like Telegram and WhatsApp. There is also a web dashboard
 for browsing and chatting from the browser. Meet each use case where it already
-lives, without rebuilding the agent for each one.
+lives, without creating a separate agent for each channel.
 
 ## The tool-calling loop
 
@@ -150,7 +155,6 @@ with a model connection:
 
 ```bash
 pepe model add openrouter \
-  --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
   --model anthropic/claude-3.5-sonnet \
   --default
@@ -184,7 +188,7 @@ give the **name** of an environment variable that holds the token, never the
 token itself, so the secret never passes through the chat or the model. After the
 change the running bot starts live, with no restart.
 
-## Why it stays out of your way
+## Design choices that keep it simple
 
 ### Self-hosted, your keys, your data
 

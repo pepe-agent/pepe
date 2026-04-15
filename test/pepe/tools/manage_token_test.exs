@@ -119,5 +119,51 @@ defmodule Pepe.Tools.ManageTokenTest do
       assert out =~ "widget"
       assert out =~ "https://example.com"
     end
+
+    test "create accepts appearance fields, and list shows the raw token (not just a fingerprint)" do
+      args = %{
+        "action" => "create",
+        "widget" => true,
+        "agent" => "assistant",
+        "title" => "Support",
+        "color" => "#123456"
+      }
+
+      assert {:ok, out} = ManageToken.run(args, ctx())
+      refute out =~ "not be shown again"
+      assert out =~ "list shows it again"
+
+      [token] = Config.api_tokens()
+      assert token["title"] == "Support"
+      assert token["color"] == "#123456"
+
+      assert {:ok, list_out} = ManageToken.run(%{"action" => "list"}, ctx())
+      assert list_out =~ token["token"]
+    end
+
+    test "update edits appearance in place without needing the id twice" do
+      {:ok, create_out} = ManageToken.run(%{"action" => "create", "widget" => true, "agent" => "assistant"}, ctx())
+      [token] = Config.api_tokens()
+      assert create_out =~ token["token"]
+
+      args = %{"action" => "update", "id" => token["id"], "title" => "New title", "theme" => "light"}
+      assert {:ok, _out} = ManageToken.run(args, ctx())
+
+      [updated] = Config.api_tokens()
+      assert updated["title"] == "New title"
+      assert updated["theme"] == "light"
+      # The secret itself never changes.
+      assert updated["token"] == token["token"]
+    end
+
+    test "update refuses a non-widget token or an unknown id" do
+      {:ok, _} = ManageToken.run(%{"action" => "create", "label" => "plain"}, ctx())
+      [token] = Config.api_tokens()
+
+      assert {:error, msg} = ManageToken.run(%{"action" => "update", "id" => token["id"], "title" => "x"}, ctx())
+      assert msg =~ "isn't a widget token"
+
+      assert {:error, _} = ManageToken.run(%{"action" => "update", "id" => "nope", "title" => "x"}, ctx())
+    end
   end
 end

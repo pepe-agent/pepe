@@ -887,8 +887,9 @@ defmodule Pepe.Config do
 
   @doc """
   Mint an API token scoped to `company` (nil = root) and optionally `agent` (a full
-  handle). Returns `{raw_token, id}`; the raw token is shown once and only its hash is
-  stored. `agent` must be within `company`.
+  handle). Returns `{raw_token, id}`; for a regular token, the raw value is shown once
+  and only its hash is stored - a leaked config can't be replayed. `agent` must be
+  within `company`.
 
   Pass `widget: true` to mint a **widget token**: meant to sit in public page source
   (an embedded chat bubble's script tag), so it must be `agent`-locked (never
@@ -897,7 +898,23 @@ defmodule Pepe.Config do
   WebSocket only accepts connections whose browser `Origin` matches some registered
   widget token's origin (see `PepeWeb.AgentSocket.check_origin?/1`) - a coarse gate in
   front of the token itself, which still carries the real per-request authorization.
+  Unlike a regular token, a widget token's raw value IS also stored (not just its
+  hash) and stays retrievable via `widget_token/1` - it sits in public HTML already
+  (anyone can read it with "view source" on the embedding site), so treating it as a
+  secret that can never be shown again only costs a needless rotation the moment
+  someone loses their copy of the snippet, with no real confidentiality gained. Its
+  actual protection is `allowed_origin` + the agent lock + the rate limit, not secrecy
+  of the string itself.
+
+  A widget token also optionally carries its own **appearance** - `title`, `logo`,
+  `color`, `theme`, `greeting`, `position` - fetched by the widget script at load time
+  (`PepeWeb.WidgetConfigController`) and merged over the embed snippet's `data-*`
+  attributes. Unlike the token's security-relevant fields (hash, scope, origin), these
+  are freely editable in place afterwards via `update_widget_token/2` - tweaking a
+  greeting or color is not a rotate-worthy change.
   """
+  @widget_appearance_fields ~w(title logo color theme greeting position)a
+
   def add_api_token(opts \\ []) do
     company = opts[:company]
     agent = opts[:agent]
@@ -930,6 +947,8 @@ defmodule Pepe.Config do
           }
           |> maybe_put("kind", widget? && "widget")
           |> maybe_put("allowed_origin", widget? && blank_to_nil(opts[:allowed_origin]))
+          |> maybe_put("token", widget? && raw)
+          |> put_appearance(widget?, opts)
 
         load()
         |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
@@ -937,6 +956,47 @@ defmodule Pepe.Config do
 
         {:ok, raw, id}
     end
+  end
+
+  defp put_appearance(entry, false, _opts), do: entry
+
+  defp put_appearance(entry, true, opts) do
+    Enum.reduce(@widget_appearance_fields, entry, fn field, acc ->
+      maybe_put(acc, to_string(field), blank_to_nil(opts[field]))
+    end)
+  end
+
+  @doc """
+  Update a widget token's **appearance** (`title`/`logo`/`color`/`theme`/`greeting`/
+  `position`) in place - never its hash, scope, or `allowed_origin`, which stay
+  rotate-only (see `add_api_token/1`). Every appearance field is always set to
+  whatever `opts` gives it (blank clears it) - the appearance form always submits all
+  of them together. `label` is different: only touched if `opts` actually has that
+  key, so a caller that only edits appearance (no label field in its form) can't
+  accidentally wipe an existing one. Returns `:ok`, `{:error, :not_found}`, or
+  `{:error, :not_widget}` (a regular token has no appearance to edit).
+  """
+  def update_widget_token(id, opts) do
+    case get_in(load(), ["api_tokens", id]) do
+      nil ->
+        {:error, :not_found}
+
+      %{"kind" => "widget"} = entry ->
+        updated =
+          @widget_appearance_fields
+          |> Enum.reduce(entry, fn field, acc -> Map.put(acc, to_string(field), blank_to_nil(opts[field])) end)
+          |> maybe_put_label(opts)
+
+        load() |> put_in(["api_tokens", id], updated) |> save()
+        :ok
+
+      _ ->
+        {:error, :not_widget}
+    end
+  end
+
+  defp maybe_put_label(entry, opts) do
+    if Keyword.has_key?(opts, :label), do: Map.put(entry, "label", blank_to_nil(opts[:label])), else: entry
   end
 
   defp maybe_put(map, _key, falsy) when falsy in [false, nil], do: map
@@ -956,16 +1016,55 @@ defmodule Pepe.Config do
   end
 
   @doc """
-  Verify a raw bearer token. Returns its scope `%{company: c, agent: a, kind: k}`
-  (`company`/`agent` may be nil; `kind` is `"widget"` for a widget token, else nil)
-  when it matches a stored hash, or `nil` when it doesn't.
+  The raw value of a **widget** token by id, or `nil` if the id doesn't exist or
+  isn't a widget token (a regular token's raw value was never stored - see
+  `add_api_token/1`).
+  """
+  @spec widget_token(String.t()) :: String.t() | nil
+  def widget_token(id) do
+    case get_in(load(), ["api_tokens", id]) do
+      %{"kind" => "widget", "token" => raw} -> raw
+      _ -> nil
+    end
+  end
+
+  @doc """
+  A widget token's appearance config, looked up by its raw value (as the widget
+  script itself would present it) - `%{title:, logo:, color:, theme:, greeting:,
+  position:, allowed_origin:}`, each field `nil` if never set. `nil` if `raw` doesn't
+  match any widget token. Used by `PepeWeb.WidgetConfigController`, so the widget can
+  fetch its look from the dashboard instead of needing it baked into the embed
+  snippet.
+  """
+  @spec widget_config(String.t()) :: map() | nil
+  def widget_config(raw) when is_binary(raw) do
+    hash = Pepe.ApiToken.hash(raw)
+
+    case Enum.find(api_tokens(), &(&1["kind"] == "widget" and &1["hash"] == hash)) do
+      nil ->
+        nil
+
+      t ->
+        @widget_appearance_fields
+        |> Map.new(&{&1, t[to_string(&1)]})
+        |> Map.put(:allowed_origin, t["allowed_origin"])
+    end
+  end
+
+  def widget_config(_raw), do: nil
+
+  @doc """
+  Verify a raw bearer token. Returns its scope `%{company: c, agent: a, kind: k,
+  allowed_origin: o}` (`company`/`agent`/`allowed_origin` may be nil; `kind` is
+  `"widget"` for a widget token, else nil) when it matches a stored hash, or `nil`
+  when it doesn't.
   """
   def verify_api_token(raw) when is_binary(raw) do
     hash = Pepe.ApiToken.hash(raw)
 
     case Enum.find(api_tokens(), &(&1["hash"] == hash)) do
       nil -> nil
-      t -> %{company: t["company"], agent: t["agent"], kind: t["kind"]}
+      t -> %{company: t["company"], agent: t["agent"], kind: t["kind"], allowed_origin: t["allowed_origin"]}
     end
   end
 

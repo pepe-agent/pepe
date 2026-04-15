@@ -11,6 +11,11 @@ ligação a um modelo), e o Pepe corre-o: envia a conversa para o modelo, execut
 qualquer ferramenta que o modelo peça, devolve os resultados e repete até o modelo
 produzir uma resposta final.
 
+Elixir/OTP importa aqui porque agentes são conversas longas, canais e tarefas em
+segundo plano, não apenas um pedido HTTP. O Pepe consegue manter muitas sessões
+supervisionadas com pouco overhead, o que ajuda a alojar uma equipa de agentes sem
+inflacionar a memória nem a CPU do servidor.
+
 Esse ciclo interno é a razão de ser de tudo. Uma simples chamada de chat devolve
 texto. Um agente consegue mesmo fazer coisas: ler um ficheiro, correr um comando,
 pesquisar na web, chamar a tua API, e depois raciocinar sobre o que encontrou e
@@ -18,14 +23,14 @@ continuar. O Pepe entrega-te esse ciclo como um runtime acabado, em vez de algo
 que montas à mão em cada projeto.
 
 ```bash
-pepe run "read package.json and tell me which dependencies are outdated"
+pepe run "lê o package.json e diz que dependências estão desatualizadas"
 ```
 
 Defines o comportamento uma vez, e o mesmo agente fica acessível de quatro formas:
 a partir do terminal, por uma API HTTP compatível com OpenAI, por um WebSocket com
 streaming, e a partir de canais de mensagens como o Telegram e o WhatsApp. Existe
 ainda um painel web para navegar e conversar a partir do browser. Responde a cada
-caso de uso ali onde ele já vive, sem reconstruir o agente para cada um.
+caso de uso ali onde ele já vive, sem criar um agente separado para cada canal.
 
 ## O ciclo de chamada de ferramentas
 
@@ -59,18 +64,18 @@ teu consentimento.
 
 Constróis um agente uma vez. O Pepe expõe-o depois pela superfície que melhor
 serve a tarefa. A configuração e a gestão, por sua vez, acontecem de três
-maneiras: a CLI `pepe`, o painel web e por chat (falando em linguagem natural com
+maneiras: a CLI `pepe`, o painel web e pela conversa (falando em linguagem natural com
 um agente que possui a ferramenta de gestão adequada).
 
 ### CLI
 
 O comando `pepe` é a forma de configurares as coisas e de correres agentes a
 partir de um terminal. As execuções pontuais transmitem a resposta diretamente
-para a saída padrão, e `pepe chat` abre uma sessão interativa que se lembra da
+para à saída padrão, e `pepe chat` abre uma sessão interativa que se lembra da
 conversa.
 
 ```bash
-pepe run assistant "summarize the git log from the last week"
+pepe run assistant "resume o git log da última semana"
 pepe chat assistant
 ```
 
@@ -84,7 +89,7 @@ quando o expuseres.
 
 ```bash
 pepe serve --port 4000
-# then open http://localhost:4000
+# depois abre http://localhost:4000
 ```
 
 ### API HTTP compatível com OpenAI
@@ -98,7 +103,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "assistant",
-    "messages": [{"role": "user", "content": "what files are in this project?"}]
+    "messages": [{"role": "user", "content": "que ficheiros existem neste projeto?"}]
   }'
 ```
 
@@ -111,7 +116,7 @@ streaming, eventos de ferramentas e autenticação.
 Para conversas ao vivo, token a token, numa app web ou móvel, liga-te por um
 WebSocket e subscreve o tópico do teu agente (`agent:<name>`). Recebes o texto do
 assistente à medida que é transmitido, além de eventos para cada chamada e
-resultado de ferramenta. Os detalhes e um exemplo de cliente estão em [a página da
+resultado de ferramenta. Os detalhes e um exemplo de cliente estão na [página da
 API](./api/).
 
 ### Canais de mensagens
@@ -129,7 +134,7 @@ modelo. Cria um pela CLI:
 
 ```bash
 pepe agent add assistant \
-  --prompt "You are Pepe, a helpful coding agent." \
+  --prompt "És o Pepe, um agente de programação prestável." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search \
   --default
 ```
@@ -137,7 +142,7 @@ pepe agent add assistant \
 Também podes fazê-lo no painel web, na página **Agents**, que inclui um formulário
 para a persona, o modelo e a seleção de ferramentas.
 
-### Fá-lo por chat
+### Fá-lo pela conversa
 
 Um agente que possui a ferramenta `manage_agent` consegue criar e moldar outros
 agentes diretamente a partir de uma conversa. Envia-lhe uma mensagem simples:
@@ -150,7 +155,7 @@ adicionar cada ferramenta. `manage_agent` é uma capacidade protegida: o agente 
 pode mexer nos agentes da sua própria lista de permitidos, é instruído a confirmar
 as alterações contigo primeiro, e por ser uma ferramenta arriscada, cada chamada
 passa ainda pelo portão de permissão antes de algo ser escrito. Assim vês a
-alteração proposta e aprova-la antes de ela ter efeito.
+alteração proposta e aprová-la antes de ela ter efeito.
 
 ## Ligar um modelo
 
@@ -159,7 +164,6 @@ compatível com OpenAI através de uma ligação de modelo:
 
 ```bash
 pepe model add openrouter \
-  --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
   --model anthropic/claude-3.5-sonnet \
   --default
@@ -177,7 +181,7 @@ onde já estão. No painel, a página **Channels** guia-te pela ligação de um 
 pela escolha de com que agente ele conversa. O canal mantém então uma memória de
 conversa separada por utilizador.
 
-### Fá-lo por chat
+### Fá-lo pela conversa
 
 Um agente que possui a ferramenta `manage_channel` consegue levantar um bot do
 Telegram a partir de uma conversa:
@@ -193,7 +197,7 @@ mais importante: dás o **nome** de uma variável de ambiente que contém o toke
 nunca o token em si, de modo que o segredo nunca passa pelo chat nem pelo modelo.
 Depois da alteração, o bot em execução entra no ar ao vivo, sem reiniciar.
 
-## Porque é que fica fora do teu caminho
+## Decisões de arquitetura que simplificam a utilização
 
 ### Auto-alojado, as tuas chaves, os teus dados
 
@@ -240,10 +244,10 @@ identificado por um id de sessão. Muitas correm lado a lado, e uma falha numa
 nunca toca noutra, por isso um único turno defeituoso não consegue deitar abaixo o
 resto dos teus agentes.
 
-### Multi-tenant quando precisas
+### Multiempresa quando precisas
 
 O trabalho pode ser limitado a uma **empresa**, isolando agentes, canais, modelos
-e utilização por inquilino. Se nunca ativares, tudo vive no âmbito predefinido,
+e utilização por empresa. Se nunca ativares, tudo vive no âmbito predefinido,
 chamado **Principal**, e podes ignorar as empresas por completo.
 
 ## Para onde ir a seguir

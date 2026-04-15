@@ -1,0 +1,82 @@
+---
+import Base from "../../layouts/Base.astro";
+import { locales, type Locale } from "../../i18n/ui";
+
+export function getStaticPaths() {
+  return locales.map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Locale;
+
+const copy = {
+  en: {
+    title: "Terms of Use",
+    description: "Terms for using the Pepe website and open-source project.",
+    updated: "Last updated: July 2026",
+    sections: [
+      ["Use of the site", "This website documents Pepe, an open-source, self-hosted agent runtime. You may read, link to, and share the documentation as long as you do not misrepresent the project or its maintainers."],
+      ["Software license", "Pepe itself is governed by the license in the project repository. These website terms do not replace that license."],
+      ["No hosted service", "Unless a separate hosted offering is explicitly provided, Pepe runs on infrastructure you control. You are responsible for your own configuration, credentials, models, channels, and data."],
+      ["No warranty", "The website and documentation are provided as-is. Examples may need adaptation before production use."],
+      ["Contact", "For issues, corrections, or security reports, use the project repository or the contact channel published there."],
+    ],
+  },
+  es: {
+    title: "Términos de uso",
+    description: "Términos para usar el sitio web y el proyecto open source Pepe.",
+    updated: "Última actualización: julio de 2026",
+    sections: [
+      ["Uso del sitio", "Este sitio documenta Pepe, un runtime de agentes open source y autoalojado. Puedes leer, enlazar y compartir la documentación siempre que no tergiverses el proyecto ni a sus mantenedores."],
+      ["Licencia del software", "Pepe se rige por la licencia del repositorio del proyecto. Estos términos del sitio no reemplazan esa licencia."],
+      ["Sin servicio alojado", "Salvo que se ofrezca explícitamente un servicio alojado aparte, Pepe se ejecuta en infraestructura que tú controlas. Tú eres responsable de tu configuración, credenciales, modelos, canales y datos."],
+      ["Sin garantía", "El sitio y la documentación se ofrecen tal cual. Los ejemplos pueden requerir adaptación antes de usarlos en producción."],
+      ["Contacto", "Para incidencias, correcciones o reportes de seguridad, usa el repositorio del proyecto o el canal de contacto publicado allí."],
+    ],
+  },
+  "pt-br": {
+    title: "Termos de uso",
+    description: "Termos para usar o site e o projeto open source Pepe.",
+    updated: "Última atualização: julho de 2026",
+    sections: [
+      ["Uso do site", "Este site documenta o Pepe, um runtime de agentes open source e auto-hospedado. Você pode ler, linkar e compartilhar a documentação, desde que não deturpe o projeto nem seus mantenedores."],
+      ["Licença do software", "O Pepe em si é regido pela licença do repositório do projeto. Estes termos do site não substituem essa licença."],
+      ["Sem serviço hospedado", "A menos que uma oferta hospedada separada seja explicitamente fornecida, o Pepe roda em infraestrutura que você controla. Você é responsável por configuração, credenciais, modelos, canais e dados."],
+      ["Sem garantia", "O site e a documentação são fornecidos como estão. Exemplos podem exigir adaptação antes do uso em produção."],
+      ["Contato", "Para problemas, correções ou relatos de segurança, use o repositório do projeto ou o canal de contato publicado lá."],
+    ],
+  },
+  "pt-pt": {
+    title: "Termos de utilização",
+    description: "Termos para usar o site e o projeto open source Pepe.",
+    updated: "Última atualização: julho de 2026",
+    sections: [
+      ["Utilização do site", "Este site documenta o Pepe, um runtime de agentes open source e autoalojado. Podes ler, ligar e partilhar a documentação, desde que não deturpes o projeto nem os seus mantenedores."],
+      ["Licença do software", "O Pepe é regido pela licença do repositório do projeto. Estes termos do site não substituem essa licença."],
+      ["Sem serviço alojado", "Salvo se for disponibilizada explicitamente uma oferta alojada separada, o Pepe corre em infraestrutura que controlas. És responsável pela configuração, credenciais, modelos, canais e dados."],
+      ["Sem garantia", "O site e a documentação são fornecidos tal como estão. Os exemplos podem exigir adaptação antes de uso em produção."],
+      ["Contacto", "Para problemas, correções ou relatos de segurança, usa o repositório do projeto ou o canal de contacto publicado aí."],
+    ],
+  },
+}[lang];
+---
+
+<Base title={`${copy.title} · Pepe`} description={copy.description} lang={lang}>
+  <main class="container legal-page">
+    <article class="legal-content">
+      <header class="legal-hero">
+        <p class="legal-updated">{copy.updated}</p>
+        <h1>{copy.title}</h1>
+        <p>{copy.description}</p>
+      </header>
+
+      <div class="legal-sections">
+        {copy.sections.map(([title, body]) => (
+          <section class="legal-section">
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </section>
+        ))}
+      </div>
+    </article>
+  </main>
+</Base>

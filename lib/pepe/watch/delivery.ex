@@ -57,6 +57,11 @@ defmodule Pepe.Watch.Delivery do
       "telegram:" <> _ = key -> telegram_origin(key)
       "tui:" <> _ = key -> %{"channel" => "tui", "key" => key}
       "ws:" <> _ = key -> %{"channel" => "ws", "key" => key}
+      # "web:" (the dashboard's own built-in chat) and "widget:" (an embedded chat
+      # widget - see PepeWeb.AgentChannel) reach a live surface the same way "ws:"
+      # does: both subscribe to the "ws" PubSub channel/Watch.Subscribers registry.
+      "web:" <> _ = key -> %{"channel" => "ws", "key" => key}
+      "widget:" <> _ = key -> %{"channel" => "ws", "key" => key}
       key when is_binary(key) -> %{"channel" => "log", "key" => key}
       _ -> %{"channel" => "log"}
     end

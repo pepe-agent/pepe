@@ -1,6 +1,7 @@
 defmodule Pepe.Agent.SessionSupervisor do
   @moduledoc "Dynamic supervisor for live conversation sessions."
   use DynamicSupervisor
+  require Logger
 
   def start_link(init_arg) do
     DynamicSupervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
@@ -30,16 +31,48 @@ defmodule Pepe.Agent.SessionSupervisor do
   @doc """
   Re-spawn the persisted sessions on boot, so conversations survive a restart.
   No-op unless session persistence is on (serve/gateway). Each session restores
-  its own history in `init/1`.
+  its own history in `init/1`. A session left with a **pending** marker (its last
+  turn was still running when the process went down - see
+  `Pepe.Agent.SessionPersistence`) gets its interrupted turn resumed and the reply
+  pushed back to wherever it came from, so a crash/restart mid-answer doesn't just
+  leave the user hanging.
   """
   def restore do
     if persist?() do
-      for {key, agent_name} <- Pepe.Agent.SessionPersistence.all() do
-        ensure(key, agent_name)
+      for {key, agent_name, pending} <- Pepe.Agent.SessionPersistence.all() do
+        {:ok, _pid} = ensure(key, agent_name)
+        if pending, do: resume_and_deliver(key)
       end
     end
 
     :ok
+  end
+
+  # Best-effort: replay the interruption as an internal turn (see
+  # `Pepe.Agent.Session.resume/1`) and push whatever the agent replies to the
+  # channel the session came from, reusing the same origin/delivery Pepe.Watch
+  # uses for fired watches. Unlike a watch, there's no durable retry queue here -
+  # a delivery that fails (e.g. the channel isn't reachable yet at boot) is logged
+  # and dropped, though the reply itself is still saved into the session's history
+  # either way, so it's there next time the conversation is opened.
+  defp resume_and_deliver(key) do
+    Task.start(fn ->
+      case Pepe.Agent.Session.resume(key) do
+        {:ok, text} ->
+          origin = Pepe.Watch.Delivery.origin_from_ctx(%{session_key: key})
+
+          case Pepe.Watch.Delivery.deliver(origin, text) do
+            :ok -> :ok
+            {:error, reason} -> Logger.warning("[session] #{key} resume reply undelivered: #{inspect(reason)}")
+          end
+
+        :nothing_pending ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning("[session] #{key} resume failed: #{inspect(reason)}")
+      end
+    end)
   end
 
   # See the matching guard (and its rationale) in Pepe.Agent.Session.

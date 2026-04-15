@@ -30,7 +30,7 @@ Así se ve un agente completo tal como queda en disco:
     "assistant": {
       "description": "General-purpose helper",
       "model": "openrouter",
-      "system_prompt": "You are a concise, helpful assistant.",
+      "system_prompt": "Eres un asistente útil y directo.",
       "tools": ["bash", "read_file", "write_file", "web_search"],
       "auto_approve": [],
       "can_message": [],
@@ -58,7 +58,7 @@ Después define un agente con un prompt y algunas herramientas:
 ```bash
 pepe agent add assistant \
   --model openrouter \
-  --prompt "You are a concise, helpful assistant." \
+  --prompt "Eres un asistente útil y directo." \
   --tools bash,read_file,write_file,web_search
 ```
 
@@ -66,7 +66,7 @@ Ejecuta un prompt de una sola vez contra él. La respuesta se transmite a tu
 terminal a medida que se produce:
 
 ```bash
-pepe run assistant "What files are in the current directory?"
+pepe run assistant "Qué archivos hay en el directorio actual?"
 ```
 
 Ese único comando dispara el ciclo completo. El agente decide que necesita mirar
@@ -87,8 +87,8 @@ propietario" más abajo) te deja construir el resto de tu flota sin tocar la CLI
 mensaje como:
 
 ```text
-Create a new agent called researcher. Give it a persona focused on careful
-web research, point it at the openrouter model, and turn on web_search and
+Crea un agente llamado researcher. Dale una persona enfocada en investigación
+web cuidadosa, apúntalo al modelo openrouter y activa web_search y
 fetch_url.
 ```
 
@@ -98,7 +98,7 @@ riesgo: pasa por la puerta de permisos, así que en una superficie que puede
 preguntar (la consola, un canal de chat) el runtime te pide autorizar el cambio
 antes de escribirlo, y la propia herramienta tiene la instrucción de confirmar el
 plan contigo primero. Un agente solo puede gestionar los agentes dentro de su
-alcance `can_manage` (que se trata en "Administrar agentes" más abajo); pedirle que
+alcance `can_manage` (que se trata en [Administrar agentes](#administrar-agentes) más abajo); pedirle que
 toque uno fuera de ese alcance se rechaza con cortesía.
 
 ## Los campos, uno por uno
@@ -108,11 +108,11 @@ toque uno fuera de ese alcance se rechaza con cortesía.
 | `name` | La identidad del agente, y la clave bajo la que se guarda y se direcciona. Dentro de una empresa se convierte en un identificador como `acme/assistant` (mira más abajo). | obligatorio |
 | `description` | Una nota breve para humanos. Nunca se envía al modelo. | ninguno |
 | `model` | El nombre de una conexión de modelo. Déjalo sin definir para usar el modelo predeterminado del alcance. | predeterminado del alcance |
-| `system_prompt` | La personalidad y las instrucciones con las que corre el agente. | `You are Pepe, a helpful AI agent.` (un prompt inicial) |
+| `system_prompt` | La personalidad y las instrucciones con las que corre el agente. | `Eres Pepe, un agente de IA útil.` (un prompt inicial) |
 | `tools` | La lista de nombres de herramientas que este agente puede llamar. Solo estas se ofrecen al modelo. | todas las herramientas cuando se omite `--tools` al crear |
 | `auto_approve` | Herramientas que este agente puede ejecutar sin pedir permiso. `["*"]` significa todas. | `[]` |
 | `can_message` | Otros agentes a los que este puede enviar mensajes (una ruta dirigida). | `[]` |
-| `can_manage` | Qué agentes puede administrar este. Mira "Administrar agentes". | `null` (solo a sí mismo) |
+| `can_manage` | Qué agentes puede administrar este. Mira [Administrar agentes](#administrar-agentes). | `null` (solo a sí mismo) |
 | `hooks` | Transformaciones del flujo de mensajes a aplicar, como la redacción de datos personales. | `[]` |
 | `max_iterations` | El tope máximo de rondas de modelo más herramienta que puede tener un turno. | `12` |
 | `temperature` | Temperatura de muestreo pasada al modelo. Sin definir usa el valor predeterminado del proveedor. | predeterminado del proveedor |
@@ -180,6 +180,7 @@ El conjunto integrado cubre lo esencial:
 | `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gestiona agentes, herramientas y enrutamiento desde el chat. |
 | `manage_channel`, `end_session` | Conecta y cierra canales de mensajería desde el chat. |
 | `manage_mcp`, `scan_skill`, `skill` | Añade servidores de herramientas externas y habilidades. |
+| `manage_plugin` | Instala, escanea, lista y elimina plugins de la comunidad (herramientas, canales) desde el chat. |
 | `config_get`, `config_set`, `doctor` | Inspecciona y cambia la configuración bajo salvaguardas, ejecuta diagnósticos. |
 
 Algunas herramientas son de solo lectura y corren libremente: `read_file`,
@@ -193,7 +194,7 @@ puede preguntar a una persona (la consola, un canal de chat), el runtime te pide
 autorizar la llamada. Puedes responder:
 
 - Permitir una vez. Vuelve a preguntar la próxima vez.
-- Permitir durante el resto de esta sesión. Se guarda en memoria y se olvida al
+- Permitir durante el resto de está sesión. Se guarda en memoria y se olvida al
   reiniciar.
 - Permitir siempre. Se persiste en el agente añadiendo la herramienta a su lista
   `auto_approve`.
@@ -253,7 +254,7 @@ Un agente por alcance puede ser el predeterminado. El predeterminado es el que c
 cuando no nombras a un agente:
 
 ```bash
-pepe run "summarize this repository"
+pepe run "resume este repositorio"
 ```
 
 El primer agente que creas en el alcance predeterminado (sin empresa) se convierte
@@ -332,8 +333,8 @@ alcance. Sus acciones son `list`, `get`, `create`, `set_persona`, `set_model`,
 destino). Por ejemplo:
 
 ```text
-Give the support agent the send_file tool and add a note to its memory that
-refunds over 200 need a human.
+Dale al agente de soporte la herramienta send_file y registra en su memoria que
+los reembolsos superiores a 200 necesitan una persona.
 ```
 
 El agente llama a `manage_agent` con `action: "add_tool"` y luego con
@@ -343,11 +344,11 @@ también puede renombrarse a sí mismo con la herramienta aparte `rename_agent` 
 ahora en adelante, llámate scout"), que mueve su directorio de espacio de trabajo y
 surte efecto en el siguiente mensaje.
 
-## Agentes multiinquilino con empresas
+## Agentes multiempresa con empresas
 
 Las empresas son opcionales. Sin una, todo vive en el alcance predeterminado,
 llamado Principal, exactamente como siempre ha funcionado una instalación de un solo
-inquilino. Añade una empresa para aislar a un inquilino: sus agentes, espacios de
+empresa. Añade una empresa para aislar a una empresa: sus agentes, espacios de
 trabajo, espacio compartido, conexiones de modelo y enrutamiento quedan aislados de
 cualquier otra empresa.
 
@@ -364,14 +365,14 @@ pepe company add acme --description "Acme Corp"
 pepe agent add support \
   --company acme \
   --model openrouter \
-  --prompt "You are Acme's support agent." \
+  --prompt "Eres el agente de soporte de Acme." \
   --tools read_file,web_search
 ```
 
 Añade `--company acme` a cualquier comando de agente para actuar dentro de ese
 alcance. Los nombres de pares a secas en `--can-message` y `--can-manage` se
 resuelven dentro de la propia empresa del agente, así que las rutas nunca cruzan por
-accidente la frontera de un inquilino. Cada empresa puede fijar su propio modelo
+accidente la frontera de una empresa. Cada empresa puede fijar su propio modelo
 predeterminado y su agente predeterminado, o compartir el proveedor global del
 operador. Un agente de empresa nunca se promueve a predeterminado global (Principal)
 solo por ser el primero creado dentro de su empresa.
@@ -379,7 +380,7 @@ solo por ser el primero creado dentro de su empresa.
 ## Gestionar agentes desde la CLI
 
 ```bash
-# Create an agent. Omit --tools to grant all tools; pass --tools "" for none.
+# Crea un agente. Omite --tools para conceder todas las herramientas; pasa --tools "" para ninguna.
 pepe agent add NAME \
   --model MODEL \
   --prompt "..." \
@@ -393,7 +394,7 @@ pepe agent add NAME \
   [--default] \
   [--company CO]
 
-# List agents in a scope, or every agent everywhere.
+# Lista agentes en un alcance, o todos los agentes.
 pepe agent list [--company CO | --all]
 
 # Directed messaging: let FROM message TO.
@@ -452,4 +453,4 @@ de estado en `GET /health`.
 
 **Por un canal de mensajería.** Vincula un agente a una conexión de Telegram,
 WhatsApp, Slack, Discord, Microsoft Teams o Google Chat, o a un webhook entrante
-genérico, y responde allí con el mismo ciclo y las mismas herramientas.
+genérico, y responde allí con el mismo ciclo y las mismás herramientas.

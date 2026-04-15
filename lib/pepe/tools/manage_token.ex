@@ -13,13 +13,15 @@ defmodule Pepe.Tools.ManageToken do
       minted or revoked.
     * **The secret is shown once** - `create` returns the raw `pepe_...` token a single
       time (only its hash is stored), so it lands in the reply for the user to copy and
-      is never retrievable again.
+      is never retrievable again. A **widget** token is the exception: it sits in
+      public page source anyway, so its raw value stays retrievable via `list` (and
+      editable via `update`), instead of forcing a rotation the moment a copy is lost.
 
   Minting the first token also flips the API from "loopback only" to "token required",
-  so a remote caller can then reach it. `list` and `revoke` never expose the secret,
-  only a short fingerprint.
+  so a remote caller can then reach it. `list` and `revoke` never expose a regular
+  token's secret, only a short fingerprint.
 
-  Actions: `create`, `list`, `revoke`.
+  Actions: `create`, `list`, `revoke`, `update` (widget appearance only).
   """
 
   @behaviour Pepe.Tools.Tool
@@ -36,10 +38,11 @@ defmodule Pepe.Tools.ManageToken do
     function(
       "manage_token",
       """
-      Mint, list and revoke API tokens for the /v1 HTTP API. A token grants API access, \
-      so confirm the scope with the user before you create one. The raw token is shown \
-      exactly once in the result; tell the user to copy it, because it can't be shown \
-      again.
+      Mint, list, revoke and (widget-only) update API tokens for the /v1 HTTP API. A \
+      token grants API access, so confirm the scope with the user before you create \
+      one. A regular token's raw value is shown exactly once in the result and can't \
+      be retrieved again; a widget token's stays retrievable (it sits in public page \
+      source anyway) and its appearance stays editable.
 
       actions:
       - create: mint a token. Optional `company` (omit for the root/Principal scope), \
@@ -50,16 +53,26 @@ defmodule Pepe.Tools.ManageToken do
         sit in public page source (an embedded chat widget's script tag) - it then \
         REQUIRES `agent` (a public credential always pins to one agent) and should \
         carry `allowed_origin` (the site's scheme+host, e.g. "https://example.com"); \
-        the WebSocket only accepts that widget from a matching browser origin.
-      - list: show existing tokens (label, scope, fingerprint, id). Never shows the secret.
+        the WebSocket only accepts that widget from a matching browser origin. Optional \
+        appearance for a widget token - `title`, `logo` (an image URL), `color` (hex), \
+        `theme` ("dark" or "light"), `greeting`, `position` ("left" or "right") - fetched \
+        by the widget script at load time, so it never needs to be baked into the site's \
+        embed snippet.
+      - list: show existing tokens (label, scope, id; a widget token's full value, a \
+        regular token's safe fingerprint only).
       - revoke: delete a token - needs `id` (from `list`).
+      - update: change a **widget** token's appearance in place - needs `id`, plus \
+        whichever of `title`/`logo`/`color`/`theme`/`greeting`/`position` should \
+        change (omitted ones are left as they are). Never touches the token's secret, \
+        agent, or allowed_origin - those are rotate-only (create a new one, revoke the \
+        old).
       """,
       %{
         "type" => "object",
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(create list revoke),
+            "enum" => ~w(create list revoke update),
             "description" => "What to do."
           },
           "company" => %{
@@ -82,7 +95,24 @@ defmodule Pepe.Tools.ManageToken do
             "type" => "string",
             "description" => "For create with widget: the site's origin, e.g. \"https://example.com\"."
           },
-          "id" => %{"type" => "string", "description" => "For revoke: the token id from list."}
+          "title" => %{"type" => "string", "description" => "For create/update with widget: the chat panel's header text."},
+          "logo" => %{
+            "type" => "string",
+            "description" => "For create/update with widget: a small square image URL for the bubble/header icon."
+          },
+          "color" => %{"type" => "string", "description" => "For create/update with widget: accent color, e.g. \"#ea580c\"."},
+          "theme" => %{
+            "type" => "string",
+            "enum" => ~w(dark light),
+            "description" => "For create/update with widget: the panel's base color scheme."
+          },
+          "greeting" => %{"type" => "string", "description" => "For create/update with widget: the first message shown to a visitor."},
+          "position" => %{
+            "type" => "string",
+            "enum" => ~w(left right),
+            "description" => "For create/update with widget: which corner the bubble sits in."
+          },
+          "id" => %{"type" => "string", "description" => "For revoke/update: the token id from list."}
         },
         "required" => ["action"]
       }
@@ -99,16 +129,20 @@ defmodule Pepe.Tools.ManageToken do
   defp dispatch("create", args), do: create(args)
   defp dispatch("list", _args), do: {:ok, render_list(Config.api_tokens())}
   defp dispatch("revoke", args), do: revoke(args)
+  defp dispatch("update", args), do: update(args)
   defp dispatch(other, _args), do: {:error, "unknown or incomplete action: #{other}"}
 
+  @appearance_keys ~w(title logo color theme greeting position)
+
   defp create(args) do
-    opts = [
-      company: blank_to_nil(args["company"]),
-      agent: blank_to_nil(args["agent"]),
-      label: blank_to_nil(args["label"]),
-      widget: args["widget"] == true,
-      allowed_origin: blank_to_nil(args["allowed_origin"])
-    ]
+    opts =
+      [
+        company: blank_to_nil(args["company"]),
+        agent: blank_to_nil(args["agent"]),
+        label: blank_to_nil(args["label"]),
+        widget: args["widget"] == true,
+        allowed_origin: blank_to_nil(args["allowed_origin"])
+      ] ++ appearance_opts(args)
 
     case Config.add_api_token(opts) do
       {:ok, raw, id} -> {:ok, created_message(raw, id, opts)}
@@ -132,6 +166,24 @@ defmodule Pepe.Tools.ManageToken do
     end
   end
 
+  defp update(args) do
+    case blank_to_nil(args["id"]) do
+      nil ->
+        {:error, "update needs an `id` (see list)"}
+
+      id ->
+        case Config.update_widget_token(id, appearance_opts(args)) do
+          :ok -> {:ok, "Widget token #{id} updated."}
+          {:error, :not_found} -> {:error, "no token with id #{id}"}
+          {:error, :not_widget} -> {:error, "token #{id} isn't a widget token - only a widget's appearance can be updated"}
+        end
+    end
+  end
+
+  defp appearance_opts(args) do
+    for key <- @appearance_keys, Map.has_key?(args, key), do: {String.to_existing_atom(key), blank_to_nil(args[key])}
+  end
+
   ###
   ### rendering
   ###
@@ -139,10 +191,11 @@ defmodule Pepe.Tools.ManageToken do
   defp created_message(raw, id, opts) do
     kind = if opts[:widget], do: " (widget, origin: #{opts[:allowed_origin] || "not set"})", else: ""
 
-    """
-    API token created (id #{id}, scope: #{scope_text(opts[:company], opts[:agent])}#{kind}).
+    retrievable =
+      if opts[:widget], do: " list shows it again any time, since it's a widget token.", else: " Copy it now - it will not be shown again."
 
-    Copy it now, it will not be shown again:
+    """
+    API token created (id #{id}, scope: #{scope_text(opts[:company], opts[:agent])}#{kind}).#{retrievable}
 
         #{raw}
 
@@ -158,7 +211,11 @@ defmodule Pepe.Tools.ManageToken do
       Enum.map_join(tokens, "\n", fn t ->
         note = if t["label"], do: " - #{t["label"]}", else: ""
         kind = if t["kind"] == "widget", do: " (widget, #{t["allowed_origin"] || "no origin set"})", else: ""
-        "• #{t["id"]} [#{scope_text(t["company"], t["agent"])}]#{kind} #{t["prefix"]}#{note}"
+        # A widget token's raw value is retrievable (it sits in public page source
+        # anyway - see Config.add_api_token/1); a regular token only ever shows its
+        # safe fingerprint prefix, since its raw value was never stored.
+        shown = if t["kind"] == "widget", do: t["token"], else: t["prefix"]
+        "• #{t["id"]} [#{scope_text(t["company"], t["agent"])}]#{kind} #{shown}#{note}"
       end)
   end
 

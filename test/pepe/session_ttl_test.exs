@@ -46,4 +46,27 @@ defmodule Pepe.SessionTtlTest do
     assert Process.alive?(pid)
     SessionSupervisor.terminate(k)
   end
+
+  describe "key-derived ephemeral/TTL defaults" do
+    test "a widget: key defaults to ephemeral, everything else doesn't" do
+      assert Session.default_ephemeral?("widget:example.com:abc")
+      refute Session.default_ephemeral?("web:1")
+      refute Session.default_ephemeral?("telegram:42")
+      refute Session.default_ephemeral?("test:ttl:1")
+    end
+
+    test "a widget: key defaults to a non-nil TTL, everything else defaults to none" do
+      assert Session.default_ttl_ms("widget:example.com:abc")
+      refute Session.default_ttl_ms("web:1")
+    end
+
+    test "an explicit opt still overrides the key-derived default either way" do
+      refute Session.default_ephemeral?("web:1")
+      k = "web:#{System.unique_integer([:positive])}"
+      {:ok, pid} = SessionSupervisor.ensure(k, "ttl-agent", ttl_ms: 150)
+      assert Process.alive?(pid)
+      Process.sleep(400)
+      refute Process.alive?(pid)
+    end
+  end
 end

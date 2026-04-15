@@ -1,0 +1,82 @@
+---
+import Base from "../../layouts/Base.astro";
+import { locales, type Locale } from "../../i18n/ui";
+
+export function getStaticPaths() {
+  return locales.map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Locale;
+
+const copy = {
+  en: {
+    title: "Privacy Policy",
+    description: "How the Pepe website and self-hosted project handle data.",
+    updated: "Last updated: July 2026",
+    sections: [
+      ["Website data", "This static website is intended to serve documentation. It does not require an account and does not intentionally collect personal data through forms."],
+      ["Hosting logs", "The hosting provider may process basic request logs such as IP address, user agent, URL, and timestamp for security and operations."],
+      ["Self-hosted runtime", "When you run Pepe yourself, your prompts, model outputs, files, channel messages, API tokens, and logs stay in the environment you configure. You control that deployment and the model providers or channels you connect."],
+      ["Secrets", "Pepe documentation recommends storing secrets as environment-variable references, not plaintext values in shared files."],
+      ["Contact", "For privacy questions or corrections, use the project repository or the contact channel published there."],
+    ],
+  },
+  es: {
+    title: "Política de privacidad",
+    description: "Cómo manejan datos el sitio web de Pepe y el proyecto autoalojado.",
+    updated: "Última actualización: julio de 2026",
+    sections: [
+      ["Datos del sitio", "Este sitio estático sirve documentación. No requiere cuenta y no recopila intencionalmente datos personales mediante formularios."],
+      ["Registros de hosting", "El proveedor de hosting puede procesar registros básicos de petición, como dirección IP, user agent, URL y fecha, para seguridad y operación."],
+      ["Runtime autoalojado", "Cuando ejecutas Pepe tú mismo, tus prompts, salidas de modelo, archivos, mensajes de canal, tokens de API y logs quedan en el entorno que configures. Tú controlas ese despliegue y los proveedores de modelos o canales que conectes."],
+      ["Secretos", "La documentación de Pepe recomienda guardar secretos como referencias a variables de entorno, no como valores en texto plano en archivos compartidos."],
+      ["Contacto", "Para preguntas o correcciones de privacidad, usa el repositorio del proyecto o el canal de contacto publicado allí."],
+    ],
+  },
+  "pt-br": {
+    title: "Política de privacidade",
+    description: "Como o site do Pepe e o projeto auto-hospedado lidam com dados.",
+    updated: "Última atualização: julho de 2026",
+    sections: [
+      ["Dados do site", "Este site estático serve documentação. Ele não exige conta e não coleta intencionalmente dados pessoais por formulários."],
+      ["Logs de hospedagem", "O provedor de hospedagem pode processar logs básicos de requisição, como endereço IP, user agent, URL e horário, para segurança e operação."],
+      ["Runtime auto-hospedado", "Quando você roda o Pepe, seus prompts, saídas de modelo, arquivos, mensagens de canal, tokens de API e logs ficam no ambiente que você configura. Você controla esse deploy e os provedores de modelo ou canais conectados."],
+      ["Segredos", "A documentação do Pepe recomenda guardar segredos como referências a variáveis de ambiente, não como valores em texto puro em arquivos compartilhados."],
+      ["Contato", "Para dúvidas ou correções sobre privacidade, use o repositório do projeto ou o canal de contato publicado lá."],
+    ],
+  },
+  "pt-pt": {
+    title: "Política de privacidade",
+    description: "Como o site do Pepe e o projeto autoalojado lidam com dados.",
+    updated: "Última atualização: julho de 2026",
+    sections: [
+      ["Dados do site", "Este site estático serve documentação. Não exige conta e não recolhe intencionalmente dados pessoais por formulários."],
+      ["Registos de alojamento", "O fornecedor de alojamento pode processar registos básicos de pedido, como endereço IP, user agent, URL e data, para segurança e operação."],
+      ["Runtime autoalojado", "Quando corres o Pepe, os teus prompts, saídas de modelo, ficheiros, mensagens de canal, tokens de API e logs ficam no ambiente que configurares. Controlas essa instalação e os fornecedores de modelo ou canais ligados."],
+      ["Segredos", "A documentação do Pepe recomenda guardar segredos como referências a variáveis de ambiente, não como valores em texto puro em ficheiros partilhados."],
+      ["Contacto", "Para dúvidas ou correções sobre privacidade, usa o repositório do projeto ou o canal de contacto publicado aí."],
+    ],
+  },
+}[lang];
+---
+
+<Base title={`${copy.title} · Pepe`} description={copy.description} lang={lang}>
+  <main class="container legal-page">
+    <article class="legal-content">
+      <header class="legal-hero">
+        <p class="legal-updated">{copy.updated}</p>
+        <h1>{copy.title}</h1>
+        <p>{copy.description}</p>
+      </header>
+
+      <div class="legal-sections">
+        {copy.sections.map(([title, body]) => (
+          <section class="legal-section">
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </section>
+        ))}
+      </div>
+    </article>
+  </main>
+</Base>

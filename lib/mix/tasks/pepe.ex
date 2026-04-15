@@ -44,11 +44,15 @@ defmodule Mix.Tasks.Pepe do
       mix pepe token add [--company CO] [--agent HANDLE] [--label "..."]
       mix pepe token add --agent HANDLE --widget --allowed-origin https://example.com
       mix pepe token list
+      mix pepe token update ID [--title ...] [--greeting ...] ...
       mix pepe token revoke ID
 
   `--widget` mints a token meant to sit in public page source (an embedded chat
   widget's script tag), so it must be `--agent`-locked. `--allowed-origin` registers
-  the browser origin (scheme+host) the WebSocket accepts it from.
+  the browser origin (scheme+host) the WebSocket accepts it from. Optional
+  appearance (`--title`/`--logo`/`--color`/`--theme`/`--greeting`/`--position`) on
+  `add` or later `update` is fetched by the widget script at load time, so it never
+  needs to be baked into the embed snippet.
 
   ## Watches (one-shot "notify me when X")
 
@@ -1460,19 +1464,23 @@ defmodule Mix.Tasks.Pepe do
   ### API token commands
   ###
 
+  @token_appearance_switches [title: :string, logo: :string, color: :string, theme: :string, greeting: :string, position: :string]
+
   defp token_cmd(["add" | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
-        strict: [company: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string]
+        strict: [company: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string] ++
+                  @token_appearance_switches
       )
 
-    attrs = [
-      company: opts[:company],
-      agent: opts[:agent],
-      label: opts[:label],
-      widget: opts[:widget] == true,
-      allowed_origin: opts[:allowed_origin]
-    ]
+    attrs =
+      [
+        company: opts[:company],
+        agent: opts[:agent],
+        label: opts[:label],
+        widget: opts[:widget] == true,
+        allowed_origin: opts[:allowed_origin]
+      ] ++ Keyword.take(opts, Keyword.keys(@token_appearance_switches))
 
     case Config.add_api_token(attrs) do
       {:ok, raw, id} ->
@@ -1486,7 +1494,12 @@ defmodule Mix.Tasks.Pepe do
         kind = if opts[:widget], do: " (widget)", else: ""
         ok("API token created (id #{green(id)}, scope: #{scope}#{kind})")
         IO.puts("\n  #{bold(raw)}\n")
-        info("Save it now - it is shown only once and stored only as a hash.")
+
+        if opts[:widget] do
+          info("A widget token isn't a secret worth hiding - see it again any time with `mix pepe token list`.")
+        else
+          info("Save it now - it is shown only once and stored only as a hash.")
+        end
 
       {:error, :widget_needs_agent} ->
         error("a --widget token must be --agent-locked (a public embed always pins to one agent)")
@@ -1512,7 +1525,10 @@ defmodule Mix.Tasks.Pepe do
           scope = t["agent"] || t["company"] || "root"
           label = if t["label"], do: " - #{t["label"]}", else: ""
           kind = if t["kind"] == "widget", do: " (widget, #{t["allowed_origin"] || "no origin set"})", else: ""
-          IO.puts("#{bold(t["id"])}  #{t["prefix"]}  [#{scope}]#{kind}#{label}")
+          # A widget token's raw value is retrievable (public page source anyway);
+          # a regular token only ever shows its safe fingerprint prefix.
+          shown = if t["kind"] == "widget", do: t["token"], else: t["prefix"]
+          IO.puts("#{bold(t["id"])}  #{shown}  [#{scope}]#{kind}#{label}")
         end)
     end
   end
@@ -1524,17 +1540,40 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp token_cmd(["update", id | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: @token_appearance_switches)
+
+    case Config.update_widget_token(id, Keyword.take(opts, Keyword.keys(@token_appearance_switches))) do
+      :ok -> ok("widget token #{id} updated")
+      {:error, :not_found} -> error("unknown token id: #{id}")
+      {:error, :not_widget} -> error("token #{id} isn't a widget token - only a widget's appearance can be updated")
+    end
+  end
+
   defp token_cmd(_) do
     IO.puts("""
     #{bold("mix pepe token")} - API access tokens for /v1
 
-      add [--company CO] [--agent HANDLE] [--label "..."]   mint a token (shown once)
-      list                                                  list tokens (scope + fingerprint)
+      add [--company CO] [--agent HANDLE] [--label "..."]   mint a token (shown once
+                                                              for a regular token;
+                                                              retrievable via `list`
+                                                              for --widget)
+      list                                                  list tokens (scope + fingerprint,
+                                                              or a widget token's full value)
       revoke ID                                             revoke a token
+      update ID [--title ...] [--logo ...] [--color ...]    edit a WIDGET token's
+             [--theme dark|light] [--greeting ...]           appearance in place -
+             [--position left|right]                         never its secret/scope
 
     No tokens ⇒ the /v1 API is open. The first token locks it: every call then needs
     `Authorization: Bearer pepe_...`. A token scoped to a company reaches only its
     agents; scoped to an agent, only that one.
+
+    --widget mints a public, embeddable-chat-widget token (see `mix pepe token add
+    --agent HANDLE --widget --allowed-origin https://example.com`); add appearance
+    with --title/--logo/--color/--theme/--greeting/--position on either `add` or
+    `update` - a widget token's raw value stays retrievable since it sits in public
+    page source already, unlike a regular token's.
     """)
   end
 
