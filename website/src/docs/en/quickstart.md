@@ -82,7 +82,7 @@ pepe gateway telegram
 ```
 
 After that, anyone messaging the bot talks to the same agent. WhatsApp, Slack,
-Discord, Teams, and Google Chat are covered in [Channels](./channels/).
+Discord, Teams, and Google Chat are covered in [Channels](../channels/).
 
 ## 6. Automate
 
@@ -96,9 +96,9 @@ when a condition changes.
 
 ## Next steps
 
-- [Agents and tools](./agents/)
-- [HTTP API](./api/)
-- [Channels](./channels/)
-- [Scheduled tasks](./scheduled/)
-- [Security and permissions](./security/)
-- [Plugins](./plugins/)
+- [Agents and tools](../agents/)
+- [HTTP API](../api/)
+- [Channels](../channels/)
+- [Scheduled tasks](../scheduled/)
+- [Security and permissions](../security/)
+- [Plugins](../plugins/)

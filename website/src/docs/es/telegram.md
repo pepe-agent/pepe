@@ -30,7 +30,7 @@ Las opciones de `telegram add`:
 - `--token` (obligatorio): el token del bot, literal o `${ENV_VAR}`.
 - `--agent`: qué agente responde. Omítelo para usar tu agente predeterminado.
 - `--trainers`: de quién puede aprender este bot hacia su memoria. Omítelo para
-  todos, `none` para nadie, o una lista separada por comás de ids de usuario
+  todos, `none` para nadie, o una lista separada por comas de ids de usuario
   para solo esos.
 - `--heartbeat-minutes` y `--heartbeat-hours`: una ventana periódica opcional de
   activación (para agentes que revisan cosas según un horario). Las horas son
@@ -75,11 +75,11 @@ models** para elegir otro; `/models` va directo a ese selector. Uso escrito:
 
 Cualquiera en una conversación permitida puede cambiar su propia sesión;
 cambiarlo **globalmente** (para todas las conversaciones de este bot) está
-reservado para **entrenadores** - la misma lista que rige `/learn` y la
-memoria - así que un miembro cualquiera del chat no puede reapuntar en
+reservado para **entrenadores**, la misma lista que rige `/learn` y la
+memoria, así que un miembro cualquiera del chat no puede reapuntar en
 silencio todo el bot a otro modelo. Pon `model_switch_locked: true` en el bot
 para desactivar el cambio de modelo por completo para quien no sea entrenador.
-Un cambio de sesión vive solo en memoria - se reinicia con `/new` o al
+Un cambio de sesión vive solo en memoria, se reinicia con `/new` o al
 reiniciar el servidor, volviendo a lo que diga la configuración propia del
 agente.
 

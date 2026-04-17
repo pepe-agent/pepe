@@ -18,7 +18,7 @@ pepe model add openrouter \
   --default
 ```
 
-Verás una confirmación como está:
+Verás una confirmación como esta:
 
 ```bash
 ✓ model connection openrouter saved -> https://openrouter.ai/api/v1 (openai/gpt-5-chat)
@@ -55,14 +55,14 @@ pepe model rename openrouter OR-trabajo
 ```
 
 Cada agente, cron y valor predeterminado que apunte a la conexión sigue
-funcionando - renombrar solo cambia el nombre visible, no el id estable con
+funcionando. Renombrar solo cambia el nombre visible, no el id estable con
 el que cada referencia se guarda de verdad, así que no hay nada que arreglar
 después.
 
 ### Cambiar de modelo en medio de una conversación
 
 `/model` y `/models` funcionan igual en Telegram, la consola (`pepe chat`) y
-el propio chat del panel - consulta [Telegram](./telegram/) para la
+el propio chat del panel. Consulta [Telegram](../telegram/) para la
 referencia completa de comandos. Cualquiera en una conversación permitida
 puede cambiar el modelo solo para su sesión; un entrenador (la misma lista
 que rige `/learn`) también puede cambiarlo para todos.
@@ -83,6 +83,10 @@ ya que otro endpoint no lo arreglaría.
 
 Pepe habla con los proveedores mediante el protocolo Chat Completions de OpenAI, así
 que cualquier endpoint compatible con OpenAI funciona sin cambiar código.
+
+Una sesión también puede bajar sola a un modelo más barato automáticamente, en su
+propio primer turno, cuando una llamada de triaje rápida juzga que la
+conversación es lo bastante simple. Mira [Enrutamiento de modelo por complejidad](../agents/#enrutamiento-de-modelo-por-complejidad).
 
 ### Hazlo por chat
 

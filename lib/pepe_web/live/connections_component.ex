@@ -121,45 +121,47 @@ defmodule PepeWeb.ConnectionsComponent do
           {gettext("Please fix the errors below.")}
         </div>
 
-        <div>
-          <label class={lbl()}>{gettext("Slug (URL id)")}</label>
-          <input name="slug" value={fval(@form_values, "slug")} class={fld()} placeholder="support" />
-          <p :if={@form_errors["slug"]} class="mt-1.5 text-sm text-red-400">{@form_errors["slug"]}</p>
-          <p :if={!@form_errors["slug"]} class={hlp()}>{gettext("A unique id used in the webhook URL.")}</p>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
+        <.form_section title={gettext("Connection")}>
           <div>
-            <label class={lbl()}>{gettext("Company")}</label>
-            <select name="company" class={fld()}>
-              <option value="root" selected={fval(@form_values, "company") in ["", "root"]}>{gettext("Principal")}</option>
-              <option :for={c <- @companies} value={c} selected={fval(@form_values, "company") == c}>{c}</option>
-            </select>
+            <label class={lbl()}>{gettext("Slug (URL id)")}</label>
+            <input name="slug" value={fval(@form_values, "slug")} class={fld()} placeholder="support" />
+            <p :if={@form_errors["slug"]} class="mt-1.5 text-sm text-red-400">{@form_errors["slug"]}</p>
+            <p :if={!@form_errors["slug"]} class={hlp()}>{gettext("A unique id used in the webhook URL.")}</p>
           </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class={lbl()}>{gettext("Company")}</label>
+              <select name="company" class={fld()}>
+                <option value="root" selected={fval(@form_values, "company") in ["", "root"]}>{gettext("Principal")}</option>
+                <option :for={c <- @companies} value={c} selected={fval(@form_values, "company") == c}>{c}</option>
+              </select>
+            </div>
+            <div>
+              <label class={lbl()}>{gettext("Mode")}</label>
+              <select name="mode" class={fld()}>
+                <option value="support" selected={fval(@form_values, "mode") != "admin"}>{gettext("Support (customer-facing)")}</option>
+                <option value="admin" selected={fval(@form_values, "mode") == "admin"}>{gettext("Admin (yours)")}</option>
+              </select>
+            </div>
+          </div>
+
+          <p class={[hlp(), "-mt-2 flex items-start gap-1.5"]}>
+            <span>{(fval(@form_values, "mode") == "admin" && "🛠️") || "🙋"}</span>
+            <span>{mode_hint(fval(@form_values, "mode"))}</span>
+          </p>
+
           <div>
-            <label class={lbl()}>{gettext("Mode")}</label>
-            <select name="mode" class={fld()}>
-              <option value="support" selected={fval(@form_values, "mode") != "admin"}>{gettext("Support (customer-facing)")}</option>
-              <option value="admin" selected={fval(@form_values, "mode") == "admin"}>{gettext("Admin (yours)")}</option>
+            <label class={lbl()}>{gettext("This connection talks to")}</label>
+            <select name="agent" class={fld()}>
+              <option value="">{gettext("Choose an agent")}</option>
+              <option :for={a <- scoped_agent_names(form_company(@form_values))} value={a} selected={fval(@form_values, "agent") == a}>{a}</option>
             </select>
+            <p :if={@form_errors["agent"]} class="mt-1.5 text-sm text-red-400">{@form_errors["agent"]}</p>
           </div>
-        </div>
+        </.form_section>
 
-        <p class={[hlp(), "-mt-2 flex items-start gap-1.5"]}>
-          <span>{(fval(@form_values, "mode") == "admin" && "🛠️") || "🙋"}</span>
-          <span>{mode_hint(fval(@form_values, "mode"))}</span>
-        </p>
-
-        <div>
-          <label class={lbl()}>{gettext("This connection talks to")}</label>
-          <select name="agent" class={fld()}>
-            <option value="">{gettext("Choose an agent")}</option>
-            <option :for={a <- scoped_agent_names(form_company(@form_values))} value={a} selected={fval(@form_values, "agent") == a}>{a}</option>
-          </select>
-          <p :if={@form_errors["agent"]} class="mt-1.5 text-sm text-red-400">{@form_errors["agent"]}</p>
-        </div>
-
-        <div class="space-y-4 border-t border-zinc-800 pt-4">
+        <.form_section title={gettext("Provider credentials")}>
           <div :for={f <- @form_schema}>
             <label class={lbl()}>{f["label"]}</label>
             <select :if={f["type"] == "select"} name={"cfg[" <> f["key"] <> "]"} class={fld()}>
@@ -176,9 +178,9 @@ defmodule PepeWeb.ConnectionsComponent do
               {gettext("Secret: you can write ${ENV_VAR} to keep it out of the config file.")}
             </p>
           </div>
-        </div>
+        </.form_section>
 
-        <div class="flex gap-2 border-t border-zinc-800 pt-4">
+        <div class="flex gap-2 pt-1">
           <button type="submit" class={btn()}>{gettext("Save connection")}</button>
           <button type="button" phx-click="cancel" phx-target={@myself} class={btn_ghost()}>{gettext("Cancel")}</button>
         </div>

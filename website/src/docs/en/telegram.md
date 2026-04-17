@@ -75,10 +75,10 @@ picker. Typed usage:
 
 Anyone in an allowed conversation may switch their own session; changing it
 **globally** (for every conversation this bot serves) is reserved for
-**trainers** - the same allowlist that gates `/learn` and memory - so a random
+**trainers** (the same allowlist that gates `/learn` and memory), so a random
 chat member cannot silently repoint the whole bot at a different model. Set
 `model_switch_locked: true` on the bot to turn model-switching off entirely for
-non-trainers. A session override lives only in memory - it resets on `/new`
+non-trainers. A session override lives only in memory; it resets on `/new`
 or a server restart, back to whatever the agent's own config says.
 
 ### Do it by chat

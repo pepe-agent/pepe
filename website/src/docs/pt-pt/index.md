@@ -71,7 +71,7 @@ um agente que possui a ferramenta de gestão adequada).
 
 O comando `pepe` é a forma de configurares as coisas e de correres agentes a
 partir de um terminal. As execuções pontuais transmitem a resposta diretamente
-para à saída padrão, e `pepe chat` abre uma sessão interativa que se lembra da
+para a saída padrão, e `pepe chat` abre uma sessão interativa que se lembra da
 conversa.
 
 ```bash
@@ -108,7 +108,7 @@ curl http://localhost:4000/v1/chat/completions \
 ```
 
 Aponta um cliente OpenAI existente para `http://localhost:4000/v1` e o nome do
-modelo passa a ser o nome do teu agente. Vê [a página da API HTTP](./api/) para
+modelo passa a ser o nome do teu agente. Vê [a página da API HTTP](../api/) para
 streaming, eventos de ferramentas e autenticação.
 
 ### WebSocket
@@ -117,7 +117,7 @@ Para conversas ao vivo, token a token, numa app web ou móvel, liga-te por um
 WebSocket e subscreve o tópico do teu agente (`agent:<name>`). Recebes o texto do
 assistente à medida que é transmitido, além de eventos para cada chamada e
 resultado de ferramenta. Os detalhes e um exemplo de cliente estão na [página da
-API](./api/).
+API](../api/).
 
 ### Canais de mensagens
 
@@ -125,7 +125,7 @@ Coloca o mesmo agente à frente de utilizadores reais nas plataformas que eles j
 usam. O Pepe traz gateways para Telegram, WhatsApp, Slack, Discord, Microsoft
 Teams e Google Chat, além de um webhook de entrada genérico para qualquer outra
 coisa. Cada canal liga-se a um agente e mantém a sua própria memória de conversa
-por utilizador. Vê [a página de canais](./channels/).
+por utilizador. Vê [a página de canais](../channels/).
 
 ## Definir um agente
 
@@ -155,11 +155,11 @@ adicionar cada ferramenta. `manage_agent` é uma capacidade protegida: o agente 
 pode mexer nos agentes da sua própria lista de permitidos, é instruído a confirmar
 as alterações contigo primeiro, e por ser uma ferramenta arriscada, cada chamada
 passa ainda pelo portão de permissão antes de algo ser escrito. Assim vês a
-alteração proposta e aprová-la antes de ela ter efeito.
+alteração proposta e podes aprová-la antes de ela ter efeito.
 
 ## Ligar um modelo
 
-O Pepe nunca inclui um modelo ou uma chave. Aponta-lo para qualquer fornecedor
+O Pepe nunca inclui um modelo ou uma chave. Aponta-o para qualquer fornecedor
 compatível com OpenAI através de uma ligação de modelo:
 
 ```bash
@@ -201,7 +201,7 @@ Depois da alteração, o bot em execução entra no ar ao vivo, sem reiniciar.
 
 ### Auto-alojado, as tuas chaves, os teus dados
 
-O Pepe nunca inclui um modelo ou uma chave de API. Corre-lo na tua própria máquina
+O Pepe nunca inclui um modelo ou uma chave de API. Corre-o na tua própria máquina
 ou servidor, e apontas para o fornecedor que quiseres. Nada de uma conversa sai da
 tua infraestrutura, exceto as chamadas que configuras para o endpoint do modelo
 que escolheste.
@@ -252,13 +252,13 @@ chamado **Principal**, e podes ignorar as empresas por completo.
 
 ## Para onde ir a seguir
 
-- [Início rápido](./quickstart/). Instala o Pepe, liga um modelo e corre o teu
+- [Início rápido](../quickstart/). Instala o Pepe, liga um modelo e corre o teu
   primeiro agente em poucos minutos.
-- [Agentes e ferramentas](./agents/). De que é feito um agente e como ele decide
+- [Agentes e ferramentas](../agents/). De que é feito um agente e como ele decide
   usar ferramentas.
-- [API HTTP](./api/). Comanda o Pepe a partir de qualquer cliente compatível com
+- [API HTTP](../api/). Comanda o Pepe a partir de qualquer cliente compatível com
   OpenAI, tanto pela via de pedido/resposta como pela de streaming.
-- [Canais](./channels/). Coloca um agente no Telegram, WhatsApp, Slack e mais.
-- [Tarefas agendadas](./scheduled/). Corre agentes num agendamento recorrente.
-- [Segurança e permissões](./security/). O portão de permissão, o sandbox e como
+- [Canais](../channels/). Coloca um agente no Telegram, WhatsApp, Slack e mais.
+- [Tarefas agendadas](../scheduled/). Corre agentes num agendamento recorrente.
+- [Segurança e permissões](../security/). O portão de permissão, o sandbox e como
   manter um agente dentro de limites seguros.

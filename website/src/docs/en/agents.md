@@ -113,6 +113,8 @@ below); asking it to touch one outside that scope is politely refused.
 | `hooks` | Message-flow transforms to apply, such as PII redaction. | `[]` |
 | `max_iterations` | The hard cap on how many model-plus-tool rounds one turn may take. | `12` |
 | `temperature` | Sampling temperature passed to the model. Unset uses the provider's own default. | provider default |
+| `triage_model` | A model connection, judging complexity before a session's first turn. See [Complexity-based model routing](#complexity-based-model-routing). | none (off) |
+| `simple_model` | The model connection to downgrade to when `triage_model` judges a chat simple. | none |
 
 ## How the tool-calling loop runs
 
@@ -234,6 +236,45 @@ Point the researcher agent at the groq-fast model.
 The agent calls `manage_agent` with `action: "set_model"`. The target model must be
 a configured connection, and the change goes through the permission gate like any
 other config edit.
+
+## Complexity-based model routing
+
+An agent's own `model` is treated as the good default. Optionally, a cheap raw
+classification call can judge whether a chat is simple enough to *downgrade* to
+something cheaper, before the real turn even starts. No extra agent to configure,
+just two fields:
+
+- `triage_model`: a model connection that classifies the incoming message with a
+  fixed, built-in prompt (not a persona you write); Pepe just looks for the word
+  "SIMPLE" in its reply.
+- `simple_model`: the model connection to downgrade to (and keep, for the rest of
+  the session) once the triage verdict is simple.
+
+```bash
+pepe agent add assistant \
+  --model strong-expensive-model \
+  --triage-model cheap-fast-model \
+  --simple-model everyday-model \
+  --prompt "..." \
+  --tools bash,read_file,web_search
+```
+
+Triage runs once, on a session's first-ever turn, never again for that same
+session; once a chat is judged simple it stays on the cheaper model for the
+rest of the conversation (the same mechanism the `/model` command uses to switch
+a session's model, just triggered automatically instead of by hand). A complex
+verdict changes nothing: the session runs on the agent's own model exactly as it
+would with no `triage_model` set at all.
+
+Triage is a best-effort optimization, never a dependency. If the triage model
+does not exist, is unreachable, or just takes too long (capped at a few
+seconds), the turn proceeds on the agent's own model, silently; a triage
+outage never blocks or breaks a conversation. `simple_model` must also be set
+for triage to run at all; there would be nowhere to downgrade to otherwise.
+
+Every verdict shows up as its own step on that turn's Trace (the dashboard's
+per-run replay), alongside any privacy hook that ran on the message, so you
+can see exactly why a session ended up on one model instead of the other.
 
 ## The default agent
 
@@ -369,6 +410,8 @@ pepe agent add NAME \
   [--hooks pii_redact] \
   [--max-iterations 12] \
   [--temperature 0.7] \
+  [--triage-model MODEL] \
+  [--simple-model MODEL] \
   [--default] \
   [--company CO]
 

@@ -25,7 +25,7 @@ El socket habla un protocolo de tramas JSON simple. Cada mensaje, en ambas direc
 [join_ref, ref, topic, event, payload]
 ```
 
-`join_ref` y `ref` son cadenas que eliges para correlacionar respuestas con peticiones. `topic` nombra con qué estás hablando. El ciclo de vida es: unirte a un tópico, enviar prompts, opcionalmente reiniciar, y enviar un latido cada 30 segúndos aproximadamente para mantener la conexión viva.
+`join_ref` y `ref` son cadenas que eliges para correlacionar respuestas con peticiones. `topic` nombra con qué estás hablando. El ciclo de vida es: unirte a un tópico, enviar prompts, opcionalmente reiniciar, y enviar un latido cada 30 segundos aproximadamente para mantener la conexión viva.
 
 ```json
 // 1. Join a topic. "agent:<name>", or "agent:default" for the default agent.
@@ -43,11 +43,11 @@ El socket habla un protocolo de tramas JSON simple. Cada mensaje, en ambas direc
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Unirse a `agent:<name>` selecciona y autoriza ese agente contra el ámbito de tu token, exactamente como el campo `model` por HTTP. Un tópico al que no tienes permiso de unirte se rechaza. Pasa `{"session": "some-stable-id"}` en el payload de unión para mantener el mismo canal de vigilancia/notificación entre reconexiones; de lo contrario se usa un id nuevo por conexión.
+Unirse a `agent:<name>` selecciona y autoriza ese agente contra el ámbito de tu token, exactamente como el campo `model` por HTTP. Un tópico al que no tienes permiso de unirte se rechaza. Pasa `{"session": "some-stable-id"}` en el payload de unión para mantener el mismo canal de vigilancia/notificación entre reconexiones; de lo contrario se usa un id nuevo por conexión. Pasa también `{"lang": "pt-BR"}` y eso empuja la primera respuesta del agente hacia ese idioma (un aviso de sistema único en el primer turno de la sesión), así es como el atributo `data-lang` del [widget incrustable](../widget/) llega al agente.
 
 ### Eventos
 
-**Envias** dos eventos entrantes:
+**Envías** dos eventos entrantes:
 
 * `prompt` con `{ "text": "..." }`: envía un mensaje y transmite la respuesta.
 * `reset` con `{}`: limpia el historial de la conversación.
@@ -58,10 +58,10 @@ Unirse a `agent:<name>` selecciona y autoriza ese agente contra el ámbito de tu
 * `tool_call` `{ "name": "...", "arguments": {...} }`: el agente está invocando una herramienta.
 * `tool_result` `{ "name": "...", "output": "..." }`: la salida de esa herramienta.
 * `done` `{ "content": "..." }`: la respuesta final; el turno está completo.
-* `session_ended` `{}`: el agente llamó a `end_session` - su respuesta de cierre ya
+* `session_ended` `{}`: el agente llamó a `end_session`. Su respuesta de cierre ya
   llegó por el `done` anterior, y el *siguiente* prompt empieza con contexto nuevo.
 * `watch` `{ "text": "..." }`: una vigilancia creada desde esta conexión se ha disparado.
-* `error` `{ "reason": "..." }`: algo salio mal en este turno.
+* `error` `{ "reason": "..." }`: algo salió mal en este turno.
 
 ### JavaScript (el cliente phoenix)
 
@@ -90,10 +90,10 @@ channel.on("session_ended", () => console.log("[sesión terminada]"));
 channel.on("watch", ({ text }) => console.log("[watch]", text));
 channel.on("error", ({ reason }) => console.error("[error]", reason));
 
-channel.push("prompt", { text: "Qué archivos hay en el directorio actual?" });
+channel.push("prompt", { text: "¿Qué archivos hay en el directorio actual?" });
 ```
 
-### Tramás crudas (cualquier lenguaje)
+### Tramas crudas (cualquier lenguaje)
 
 Sin el paquete `phoenix`, habla el protocolo de tramas directamente sobre cualquier cliente WebSocket. Este ejemplo en Python se une, envía un prompt, imprime los deltas en streaming y se detiene cuando llega `done`. Fíjate en el latido que debes enviar periódicamente en una conexión de larga duración.
 
@@ -127,4 +127,4 @@ while True:
 ws.close()
 ```
 
-Envia una trama de latido, `[null, "h", "phoenix", "heartbeat", {}]`, aproximadamente cada 30 segúndos para mantener abierta una conexión de larga duración.
+Envía una trama de latido, `[null, "h", "phoenix", "heartbeat", {}]`, aproximadamente cada 30 segundos para mantener abierta una conexión de larga duración.

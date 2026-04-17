@@ -72,7 +72,7 @@ natural con un agente que posee la herramienta de gestión adecuada).
 ### CLI
 
 El comando `pepe` es la forma de configurar las cosas y de ejecutar agentes desde
-una terminal. Las ejecuciónes puntuales transmiten su respuesta directamente a la
+una terminal. Las ejecuciones puntuales transmiten su respuesta directamente a la
 salida estándar, y `pepe chat` abre una sesión interactiva que recuerda la
 conversación.
 
@@ -97,7 +97,7 @@ pepe serve --port 4000
 ### API HTTP compatible con OpenAI
 
 Arranca el servidor y Pepe habla el protocolo Chat Completions de OpenAI, así que
-cualquier SDK de OpenAI, LangChain o un simple `curl` pueden comúnicarse con él
+cualquier SDK de OpenAI, LangChain o un simple `curl` pueden comunicarse con él
 sin adaptador. Sirve `POST /v1/chat/completions` y `GET /v1/models`.
 
 ```bash
@@ -105,13 +105,13 @@ curl http://localhost:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "assistant",
-    "messages": [{"role": "user", "content": "qué archivos hay en este proyecto?"}]
+    "messages": [{"role": "user", "content": "¿Qué archivos hay en este proyecto?"}]
   }'
 ```
 
 Apunta un cliente de OpenAI existente a `http://localhost:4000/v1` y el nombre del
 modelo pasa a ser el nombre de tu agente. Consulta [la página de la API
-HTTP](./api/) para streaming, eventos de herramientas y autenticación.
+HTTP](../api/) para streaming, eventos de herramientas y autenticación.
 
 ### WebSocket
 
@@ -119,7 +119,7 @@ Para conversaciones en vivo, token a token, en una app web o móvil, conéctate 
 un WebSocket y suscríbete al tema de tu agente (`agent:<name>`). Recibes el texto
 del asistente a medida que se transmite, más eventos por cada llamada y resultado
 de herramienta. Los detalles y un ejemplo de cliente están en [la página de la
-API](./api/).
+API](../api/).
 
 ### Canales de mensajería
 
@@ -127,7 +127,7 @@ Pon el mismo agente frente a usuarios reales en las plataformas que ya usan. Pep
 incluye pasarelas para Telegram, WhatsApp, Slack, Discord, Microsoft Teams y
 Google Chat, además de un webhook de entrada genérico para cualquier otra cosa.
 Cada canal se vincula a un agente y mantiene su propia memoria de conversación por
-usuario. Consulta [la página de canales](./channels/).
+usuario. Consulta [la página de canales](../channels/).
 
 ## Definir un agente
 
@@ -255,14 +255,14 @@ llamado **Principal**, y puedes ignorar las empresas por completo.
 
 ## A dónde ir después
 
-- [Inicio rápido](./quickstart/). Instala Pepe, conecta un modelo y ejecuta tu
+- [Inicio rápido](../quickstart/). Instala Pepe, conecta un modelo y ejecuta tu
   primer agente en unos minutos.
-- [Agentes y herramientas](./agents/). De qué se compone un agente y cómo decide
+- [Agentes y herramientas](../agents/). De qué se compone un agente y cómo decide
   usar herramientas.
-- [API HTTP](./api/). Maneja Pepe desde cualquier cliente compatible con OpenAI,
+- [API HTTP](../api/). Maneja Pepe desde cualquier cliente compatible con OpenAI,
   tanto por la vía de petición/respuesta como por la de streaming.
-- [Canales](./channels/). Pon un agente en Telegram, WhatsApp, Slack y más.
-- [Tareas programadas](./scheduled/). Ejecuta agentes con una programación
+- [Canales](../channels/). Pon un agente en Telegram, WhatsApp, Slack y más.
+- [Tareas programadas](../scheduled/). Ejecuta agentes con una programación
   recurrente.
-- [Seguridad y permisos](./security/). La barrera de permisos, el aislamiento, y
+- [Seguridad y permisos](../security/). La barrera de permisos, el aislamiento, y
   cómo mantener a un agente dentro de límites seguros.

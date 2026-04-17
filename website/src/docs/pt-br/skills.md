@@ -55,7 +55,7 @@ pode fazer isso com a ação `add_tool`. Essa ferramenta é limitada aos agentes
 o agente que age tem permissão para gerenciar, e as instruções dele mandam
 confirmar a mudança com você antes de aplicar.
 
-> Você: de ao agente de suporte a ferramenta gmail_search
+> Você: dê ao agente de suporte a ferramenta gmail_search
 >
 > Agente: Vou adicionar gmail_search ao agente "support". Confirma?
 >

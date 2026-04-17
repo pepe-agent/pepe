@@ -48,9 +48,26 @@ const useCases = [
 
 const channels = ["Telegram", "WhatsApp", "Slack", "Discord", "Microsoft Teams", "Google Chat"];
 type K = keyof (typeof ui)["en"];
+
+// Minimal, honest SoftwareApplication facts only - no fabricated license or
+// star-rating schema (Google penalizes fake review markup); `offers` with a
+// price of 0 is the one factual claim self-hosted software can always make.
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Pepe",
+  description: tr("hero.lead"),
+  url: new URL(d("/"), Astro.site ?? Astro.url.origin).href,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Self-hosted (Linux, macOS, Windows)",
+  codeRepository: "https://github.com/jhonathas/pepe",
+  inLanguage: lang,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
 ---
 
 <Base title={tr("seo.title")} description={tr("hero.lead")} lang={lang}>
+  <script type="application/ld+json" set:html={JSON.stringify(softwareJsonLd)} />
   <section class="hero">
     <div class="container">
       <h1 set:html={tr("hero.title")} />
@@ -151,6 +168,19 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
       </div>
     </div>
   </section>
+
+  <section class="widget-promo">
+    <div class="container widget-promo-grid">
+      <div>
+        <h2>{tr("widget.title")}</h2>
+        <p>{tr("widget.body")}</p>
+        <a class="btn btn-ghost" href={d("/docs/widget/")}>{tr("widget.cta")}</a>
+      </div>
+      <img class="widget-shot" src={`/screenshots/widget-${lang}.png`} alt={tr("widget.title")} width="280" height="417" />
+    </div>
+  </section>
+
+  <hr class="divider" />
 
   <section>
     <div class="container">

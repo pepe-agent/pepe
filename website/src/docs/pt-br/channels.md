@@ -49,7 +49,7 @@ Uma conexão por webhook também tem um `mode` que muda como o motor se comporta
 | Público | Voltado ao cliente, aberto a qualquer um | Você, restrito a remetentes autorizados |
 | Histórico | Efêmero, cada chat isolado | Mantido entre mensagens |
 | Memória | Nunca aprende | Conversas podem virar memória |
-| Comandos de barra | Tratados como texto puro | Habilitados (por exemplo `/new` reinicia) |
+| Comandos de barra | Tratados como texto puro | Habilitados (por exemplo `/new` reinicia, `/model` troca de modelo) |
 
 Suporte é o padrão seguro para qualquer coisa que o público possa alcançar.
 Combine com um agente restrito (só ferramentas seguras, já que não há uma pessoa
@@ -59,7 +59,7 @@ e a memória são úteis.
 
 Alguns campos ajustam isso por conexão:
 
-- `agent`: o agente ao qual está conexão está vinculada.
+- `agent`: o agente ao qual esta conexão está vinculada.
 - `mode`: `support` ou `admin`.
 - `trainers`: quem pode transformar uma conversa em memória. `["*"]` é todos,
   `[]` é ninguém, uma lista são apenas aqueles remetentes, ausente é o padrão

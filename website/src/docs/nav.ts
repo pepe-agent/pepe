@@ -7,7 +7,10 @@ import type { Locale } from "../i18n/ui";
 export const docsNav: { group: string; slugs: string[] }[] = [
   { group: "start", slugs: ["index", "install", "quickstart"] },
   { group: "configure", slugs: ["models", "agents", "config"] },
-  { group: "channels", slugs: ["channels", "telegram", "whatsapp", "webhooks", "widget"] },
+  {
+    group: "channels",
+    slugs: ["channels", "telegram", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],
+  },
   { group: "automate", slugs: ["scheduled", "watches"] },
   { group: "api", slugs: ["api", "sessions", "auth", "websocket", "clients"] },
   { group: "extend", slugs: ["plugins", "skills"] },

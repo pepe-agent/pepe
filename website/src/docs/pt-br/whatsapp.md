@@ -53,3 +53,23 @@ acima. O painel adiciona e edita conexões do WhatsApp pela mesma seção Channe
 respostas em formato livre dentro de 24 horas da última mensagem do usuário. O
 suporte reativo se encaixa nisso de forma natural. Mensagens proativas fora da
 janela precisam de modelos pré-aprovados, que este canal não envia.</div>
+
+### Trocando de modelo
+
+`/model` e `/models` só disparam numa conexão em modo `admin` (veja a
+comparação de modos em [Channels](../channels/)); no `support`, viram texto
+puro como qualquer outro comando de barra. `/models` lista os modelos
+disponíveis para a empresa dessa conexão; `/model` mostra o que está ativo
+agora, ou troca:
+
+```text
+/model openrouter               # pergunta se troca só esse chat ou todos
+/model openrouter session       # troca só para esta conversa
+/model openrouter global        # troca para todos com quem essa conexão fala
+```
+
+Qualquer pessoa numa conversa permitida pode trocar sua própria sessão;
+trocar **globalmente** é reservado para **treinadores**, a mesma lista que
+controla a memória. Defina `model_switch_locked: true` na conexão para
+desativar totalmente a troca de modelo por quem não é treinador. O WhatsApp
+não tem um seletor com botões como o do Telegram; aqui é só digitado.

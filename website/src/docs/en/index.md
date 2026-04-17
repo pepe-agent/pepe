@@ -100,7 +100,7 @@ curl http://localhost:4000/v1/chat/completions \
 ```
 
 Point an existing OpenAI client at `http://localhost:4000/v1` and the model name
-becomes your agent name. See [the HTTP API page](./api/) for streaming, tool
+becomes your agent name. See [the HTTP API page](../api/) for streaming, tool
 events, and authentication.
 
 ### WebSocket
@@ -108,7 +108,7 @@ events, and authentication.
 For live, token-by-token conversations in a web or mobile app, connect over a
 WebSocket and subscribe to the topic for your agent (`agent:<name>`). You receive
 assistant text as it streams, plus events for each tool call and result. Details
-and a client example are on [the API page](./api/).
+and a client example are on [the API page](../api/).
 
 ### Messaging channels
 
@@ -116,7 +116,7 @@ Put the same agent in front of real users on the platforms they already use.
 Pepe ships gateways for Telegram, WhatsApp, Slack, Discord, Microsoft Teams, and
 Google Chat, plus a generic inbound webhook for anything else. Each channel binds
 to an agent and keeps its own conversation memory per user. See
-[the channels page](./channels/).
+[the channels page](../channels/).
 
 ## Defining an agent
 
@@ -240,13 +240,13 @@ called **Principal**, and you can ignore companies entirely.
 
 ## Where to go next
 
-- [Quickstart](./quickstart/). Install Pepe, connect a model, and run your first
+- [Quickstart](../quickstart/). Install Pepe, connect a model, and run your first
   agent in a few minutes.
-- [Agents and tools](./agents/). What an agent is made of and how it decides to
+- [Agents and tools](../agents/). What an agent is made of and how it decides to
   use tools.
-- [HTTP API](./api/). Drive Pepe from any OpenAI-compatible client, over both the
+- [HTTP API](../api/). Drive Pepe from any OpenAI-compatible client, over both the
   request/response and streaming paths.
-- [Channels](./channels/). Put an agent on Telegram, WhatsApp, Slack, and more.
-- [Scheduled tasks](./scheduled/). Run agents on a recurring schedule.
-- [Security and permissions](./security/). The permission gate, sandboxing, and
+- [Channels](../channels/). Put an agent on Telegram, WhatsApp, Slack, and more.
+- [Scheduled tasks](../scheduled/). Run agents on a recurring schedule.
+- [Security and permissions](../security/). The permission gate, sandboxing, and
   how to keep an agent inside safe boundaries.

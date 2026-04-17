@@ -57,10 +57,10 @@ adicionar `"stream": true`.
 ### Recuperação depois de um reinício
 
 Se o Pepe cair a meio de um turno (um deploy, uma falha) com a persistência de
-sessões activada, a conversa interrompida não fica simplesmente perdida. No
+sessões ativada, a conversa interrompida não fica simplesmente perdida. No
 arranque seguinte, o Pepe deteta qualquer sessão cujo último turno não terminou,
 reproduz-o como um seguimento interno e entrega a resposta onde a conversa
-estava a decorrer - Telegram, o painel, seja qual for o canal - para que uma
+estava a decorrer (Telegram, o painel, seja qual for o canal), para que uma
 mensagem interrompida ainda receba resposta em vez de desaparecer em silêncio.
 Isto só se aplica a sessões persistidas (`serve`/`gateway`), não a chamadas
 avulsas de `pepe run`.

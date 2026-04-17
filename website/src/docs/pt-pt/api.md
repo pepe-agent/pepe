@@ -3,13 +3,13 @@ title: API HTTP
 description: Chama o Pepe pela API Chat Completions compatível com OpenAI.
 ---
 
-O Pepe disponibiliza os seus agentes através de uma API HTTP que fala o protocolo Chat Completions da OpenAI. Qualquer ferramenta ou SDK capaz de comunicar com a OpenAI consegue comunicar com o Pepe sem alterar uma linha de código: aponte o respetivo `base_url` para o seu servidor Pepe e utilize o nome de um agente onde normalmente colocaria um id de modelo. Também pode chamar o endpoint com pedidos HTTP diretos a partir dos seus próprios projetos, sites, backends, jobs ou integrações; usar um SDK de LLM é conveniente, mas não obrigatório. Existe também um WebSocket para streaming em direto, token a token, com visibilidade das chamadas de ferramenta.
+O Pepe disponibiliza os seus agentes através de uma API HTTP que fala o protocolo Chat Completions da OpenAI. Qualquer ferramenta ou SDK capaz de comunicar com a OpenAI consegue comunicar com o Pepe sem alterar uma linha de código: aponta o respetivo `base_url` para o teu servidor Pepe e utiliza o nome de um agente onde normalmente colocarias um id de modelo. Também podes chamar o endpoint com pedidos HTTP diretos a partir dos teus próprios projetos, sites, backends, jobs ou integrações; usar um SDK de LLM é conveniente, mas não obrigatório. Existe também um WebSocket para streaming em direto, token a token, com visibilidade das chamadas de ferramenta.
 
 As duas superfícies cobrem duas necessidades. A API HTTP é a escolha por omissão para trabalho de pedido/resposta e de servidor a servidor. O WebSocket destina-se a interfaces interativas em que o utilizador quer renderizar as chamadas de ferramenta e o texto em streaming à medida que acontecem.
 
 ## Uma primeira requisição
 
-Inicie o servidor e depois envie uma chat completion. Isto funciona de imediato, sem autenticação (consulte [Autenticação](#autenticação-e-tokens) para o trancar):
+Inicia o servidor e depois envia uma chat completion. Isto funciona de imediato, sem autenticação (consulta [Autenticação](../auth/#autenticação-e-tokens) para o trancar):
 
 ```bash
 pepe serve --port 4000
@@ -127,16 +127,16 @@ Esta é a ideia que faz todo o resto encaixar. O campo `model` de um pedido de c
 A resolução do campo `model` acontece por esta ordem:
 
 1. Se o nome corresponder a um agente, esse agente é executado.
-2. Se nenhum agente corresponder mas o nome corresponder a uma ligação de modelo pura, o Pepe embrulha-a num agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Esta alternativa só está disponível no âmbito aberto ou raiz (consulte [Âmbitos de token](#âmbitos-de-token)).
+2. Se nenhum agente corresponder mas o nome corresponder a uma ligação de modelo pura, o Pepe embrulha-a num agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Esta alternativa só está disponível no âmbito aberto ou raiz (consulta [Âmbitos de token](../auth/#âmbitos-de-token)).
 3. Se nenhum corresponder, o agente por omissão é executado.
 
-<div class="note"><strong>Conclusão prática.</strong> O conjunto de "modelos" que um cliente pode escolher é o seu conjunto de agentes. Dê a um agente um nome descritivo, ligue as ferramentas dele uma vez e todos os clientes compatíveis com OpenAI passam a vê-lo como um modelo selecionável.</div>
+<div class="note"><strong>Conclusão prática.</strong> O conjunto de "modelos" que um cliente pode escolher é o teu conjunto de agentes. Dá a um agente um nome descritivo, liga as ferramentas dele uma vez e todos os clientes compatíveis com OpenAI passam a vê-lo como um modelo selecionável.</div>
 
 ## Chat completions
 
 ### Sem streaming
 
-Envie `messages` no formato da OpenAI. Pode incluir uma mensagem `system`; se a omitir, o próprio prompt de sistema do agente é utilizado automaticamente.
+Envia `messages` no formato da OpenAI. Podes incluir uma mensagem `system`; se a omitires, o próprio prompt de sistema do agente é utilizado automaticamente.
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
@@ -151,7 +151,7 @@ curl http://localhost:4000/v1/chat/completions \
 
 ### Streaming (Server-Sent Events)
 
-Defina `"stream": true` para receber a resposta à medida que é gerada. O formato no fio é idêntico ao streaming da OpenAI: uma sequência de linhas `data:`, cada uma transportando um objeto `chat.completion.chunk`, terminada por `data: [DONE]`.
+Define `"stream": true` para receber a resposta à medida que é gerada. O formato no fio é idêntico ao streaming da OpenAI: uma sequência de linhas `data:`, cada uma transportando um objeto `chat.completion.chunk`, terminada por `data: [DONE]`.
 
 ```bash
 curl -N http://localhost:4000/v1/chat/completions \
@@ -182,7 +182,7 @@ O fragmento final transporta um delta vazio e `"finish_reason": "stop"`, seguido
 Os erros regressam no formato de erro da OpenAI (um objeto `error` de nível superior com uma `message`), pelo que o tratamento de erros existente funciona. Os códigos de estado:
 
 * `401` quando um token é exigido mas está ausente ou inválido.
-* `403` quando nomeia um agente que existe mas está fora do âmbito do seu token.
+* `403` quando nomeias um agente que existe mas está fora do âmbito do teu token.
 * `400` quando o campo `model` não resolve para nenhum agente nem nenhum modelo.
 * `502` quando o agente ou uma sessão com estado falha durante a execução.
 
@@ -226,4 +226,4 @@ curl http://localhost:4000/v1/models \
 }
 ```
 
-Os agentes são etiquetados como `pepe:agent`. No âmbito aberto ou raiz, as ligações de modelo puras também aparecem, etiquetadas como `pepe:model`. Como isto é uma lista de modelos padrão, as ferramentas da OpenAI que oferecem um seletor de modelo preenchem-no com os seus agentes.
+Os agentes são etiquetados como `pepe:agent`. No âmbito aberto ou raiz, as ligações de modelo puras também aparecem, etiquetadas como `pepe:model`. Como isto é uma lista de modelos padrão, as ferramentas da OpenAI que oferecem um seletor de modelo preenchem-no com os teus agentes.

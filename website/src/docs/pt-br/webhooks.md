@@ -3,7 +3,7 @@ title: Webhooks
 description: Configure Slack, Discord, Microsoft Teams, Google Chat e canais por webhook genéricos.
 ---
 
-## Cómo funciona um canal por webhook
+## Como funciona um canal por webhook
 
 Todo canal por webhook, seja qual for a plataforma, é acessível em uma única
 rota:
@@ -48,65 +48,31 @@ pepe setup
 ```
 
 Escolha a opção de canal, escolha o provedor e o agente, e informe as
-credenciais (uma referência `${ENV_VAR}` é aceita para qualquer segredo). Os
-campos obrigatórios de cada provedor estão abaixo.
+credenciais (uma referência `${ENV_VAR}` é aceita para qualquer segredo). Cada
+um tem sua própria página com os campos e passos de configuração específicos:
+[Slack](../slack/), [Discord](../discord/), [Microsoft Teams](../msteams/),
+[Google Chat](../googlechat/). Esta página cobre o que é compartilhado por
+todos eles (e pelo WhatsApp).
 
-### Slack
+## Trocando de modelo
 
-O Slack usa a Events API. O `config` de uma conexão contém:
+`/model` e `/models` só disparam numa conexão em modo `admin` com `commands`
+habilitado (veja a comparação de modos em [Channels](../channels/)); no
+`support`, viram texto puro. `/models` lista os modelos disponíveis para a
+empresa da conexão; `/model` mostra o atual, ou troca:
 
-- `bot_token`: o token OAuth do usuário bot (`xoxb-...`), usado como bearer nas
-  respostas.
-- `signing_secret`: verifica o `X-Slack-Signature` nas requisições de entrada.
-
-No app do Slack, defina a URL de requisição de Event Subscriptions com a URL da
-conexão e assine `message.channels` e `app_mention`. O primeiro salvamento
-dispara um aperto de mão `url_verification`, que o Pepe responde na hora. As
-respostas são publicadas com `chat.postMessage`. Formato da URL de retorno:
-
+```text
+/model openrouter               # pergunta se troca só esse chat ou todos
+/model openrouter session       # troca só para esta conversa
+/model openrouter global        # troca para todos com quem essa conexão fala
 ```
-https://YOUR_HOST/webhooks/root/slack/<slug>
-```
 
-### Discord
-
-O Discord é ligado pelo ponto de acesso de Interactions (comandos de barra),
-então ele se encaixa no gateway de webhook em vez de uma conexão persistente. O
-`config` de uma conexão contém:
-
-- `public_key`: a chave pública do app (hex), para a verificação de assinatura
-  Ed25519 exigida.
-- `application_id`: usado para publicar a resposta de acompanhamento.
-
-No app do Discord, aponte "Interactions Endpoint URL" para a URL da conexão e
-adicione um comando de barra com uma opção de texto (por exemplo
-`/ask prompt:...`). O Discord exige um retorno em três segundos, então o Pepe
-responde com uma resposta adiada e pública a resposta real como acompanhamento
-assim que o agente termina.
-
-### Microsoft Teams
-
-O Teams usa o Bot Framework. O `config` de uma conexão contém:
-
-- `app_id`: o id do app (cliente) Microsoft do bot.
-- `app_password`: o segredo de cliente. Guarde como `${ENV_VAR}`.
-- `tenant_id`: o tenant ID do Azure (ou `botframework.com`).
-
-As atividades de entrada chegam como `POST`s. As respostas voltam para a URL de
-serviço da atividade com um token de acesso de app gerado a partir das
-credenciais de cliente. A menção ao bot é retirada do texto de entrada antes de
-o agente ver.
-
-### Google Chat
-
-O Google Chat publica eventos de espaço na URL de retorno. O `config` de uma
-conexão contém:
-
-- `access_token`: um token OAuth para a Chat API, usado como bearer nas
-  respostas. Guarde como `${ENV_VAR}` e renove por fora.
-
-Só eventos `MESSAGE` de uma pessoa são atendidos. As respostas são publicadas de
-volta no espaço pela Chat REST API.
+Trocar **globalmente** é reservado para **treinadores** (a mesma lista que
+controla a memória); qualquer outra pessoa numa conversa permitida só pode
+trocar sua própria sessão. Defina `model_switch_locked: true` na conexão para
+desativar isso totalmente para quem não é treinador. É o mesmo mecanismo que o
+WhatsApp usa; a versão do Telegram acrescenta um seletor com botões em vez de
+comandos digitados.
 
 ## Por baixo dos panos: o contrato do provedor
 

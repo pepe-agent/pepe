@@ -18,7 +18,7 @@ Isso imprime o caminho da configuração e um resumo do que está definido.
 
 ## Os segredos ficam como referências
 
-A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não ha banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe as interpola contra o ambiente no momento da leitura e nunca persiste o valor expandido.
+A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não há banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe as interpola contra o ambiente no momento da leitura e nunca persiste o valor expandido.
 
 ```json
 {
@@ -47,7 +47,7 @@ Um marcador de string inteira que resolve para nada (a variável não está defi
 
 Um agente que recebe as ferramentas somente leitura `config_get` e `doctor` consegue relatar a sua configuração e pegar um segredo ausente numa conversa normal. Ambas são somente leitura, então nunca disparam a barreira de permissão.
 
-> Você: Esta tudo configurado corretamente?
+> Você: Está tudo configurado corretamente?
 >
 > Agente: (roda `doctor`) Encontrei um problema: a conexão de modelo "openrouter" referencia `${OPENROUTER_API_KEY}`, mas essa variável não está definida no ambiente. Exporte-a antes de servir.
 

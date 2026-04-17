@@ -116,6 +116,8 @@ fora desse âmbito é recusado com cortesia.
 | `hooks` | Transformações do fluxo de mensagens a aplicar, como a redação de dados pessoais. | `[]` |
 | `max_iterations` | O limite máximo de quantas rondas de modelo mais ferramenta um turno pode ter. | `12` |
 | `temperature` | Temperatura de amostragem passada ao modelo. Por definir usa a predefinição do próprio fornecedor. | predefinição do fornecedor |
+| `triage_model` | Uma ligação de modelo que julga a complexidade antes do primeiro turno de uma sessão. Vê [Encaminhamento de modelo por complexidade](#encaminhamento-de-modelo-por-complexidade). | nenhum (desligado) |
+| `simple_model` | A ligação de modelo para a qual desce quando `triage_model` julga uma conversa simples. | nenhum |
 
 ## Como corre o ciclo de chamada de ferramentas
 
@@ -245,6 +247,48 @@ Point the researcher agent at the groq-fast model.
 O agente chama `manage_agent` com `action: "set_model"`. O modelo de destino tem de
 ser uma ligação configurada, e a alteração passa pela barreira de permissão como
 qualquer outra edição de configuração.
+
+## Encaminhamento de modelo por complexidade
+
+O próprio `model` de um agente é tratado como a boa predefinição. Opcionalmente,
+uma chamada de classificação barata e direta pode julgar se uma conversa é
+simples o suficiente para *descer* para algo mais barato, antes mesmo de o
+turno a sério começar. Sem agente extra para configurar, só dois campos:
+
+- `triage_model`: uma ligação de modelo que classifica a mensagem recebida com
+  um prompt fixo e incorporado (não uma persona que escreves); o Pepe só
+  procura a palavra "SIMPLE" na resposta.
+- `simple_model`: a ligação de modelo para a qual desce (e fica, durante o
+  resto da sessão) assim que o veredito da triagem for simples.
+
+```bash
+pepe agent add assistant \
+  --model modelo-forte-e-caro \
+  --triage-model modelo-barato-e-rapido \
+  --simple-model modelo-do-dia-a-dia \
+  --prompt "..." \
+  --tools bash,read_file,web_search
+```
+
+A triagem corre uma única vez, no primeiro turno de uma sessão, nunca mais
+naquela mesma sessão. Assim que uma conversa é julgada simples, fica no
+modelo mais barato durante o resto da conversa (o mesmo mecanismo que o
+comando `/model` usa para mudar o modelo de uma sessão, só que acionado
+automaticamente em vez de à mão). Um veredito complexo não muda nada: a sessão
+corre no próprio modelo do agente exatamente como correria sem `triage_model`
+definido.
+
+A triagem é uma otimização de melhor esforço, nunca uma dependência. Se o
+modelo de triagem não existe, está inacessível, ou demora demasiado tempo (com
+um limite de poucos segundos), o turno segue no próprio modelo do agente, em
+silêncio. Uma falha na triagem nunca bloqueia nem quebra uma conversa.
+`simple_model` também precisa de estar definido para a triagem correr; senão
+não haveria para onde descer.
+
+Cada veredito aparece como um passo próprio no Trace desse turno (o replay de
+cada execução no painel), junto de qualquer hook de privacidade que tenha
+corrido sobre a mensagem. Assim vês exatamente porque é que uma sessão
+acabou num modelo e não noutro.
 
 ## O agente predefinido
 
@@ -387,6 +431,8 @@ pepe agent add NAME \
   [--hooks pii_redact] \
   [--max-iterations 12] \
   [--temperature 0.7] \
+  [--triage-model MODEL] \
+  [--simple-model MODEL] \
   [--default] \
   [--company CO]
 

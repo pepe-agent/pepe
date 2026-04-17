@@ -70,7 +70,7 @@ um agente que possui a ferramenta de gerenciamento certa).
 ### CLI
 
 O comando `pepe` é como você configura as coisas e como roda agentes a partir de
-um terminal. Execuções pontuais transmitem a resposta direto para à saída padrão,
+um terminal. Execuções pontuais transmitem a resposta direto para a saída padrão,
 e `pepe chat` abre uma sessão interativa que lembra a conversa.
 
 ```bash
@@ -107,7 +107,7 @@ curl http://localhost:4000/v1/chat/completions \
 ```
 
 Aponte um cliente OpenAI existente para `http://localhost:4000/v1` e o nome do
-modelo passa a ser o nome do seu agente. Veja [a página da API HTTP](./api/) para
+modelo passa a ser o nome do seu agente. Veja [a página da API HTTP](../api/) para
 streaming, eventos de ferramentas e autenticação.
 
 ### WebSocket
@@ -116,7 +116,7 @@ Para conversas ao vivo, token a token, em um app web ou mobile, conecte-se por u
 WebSocket e assine o tópico do seu agente (`agent:<name>`). Você recebe o texto do
 assistente conforme ele é transmitido, além de eventos para cada chamada e
 resultado de ferramenta. Os detalhes e um exemplo de cliente estão na [página da
-API](./api/).
+API](../api/).
 
 ### Canais de mensagem
 
@@ -124,7 +124,7 @@ Coloque o mesmo agente na frente de usuários reais nas plataformas que eles já
 usam. O Pepe traz gateways para Telegram, WhatsApp, Slack, Discord, Microsoft
 Teams e Google Chat, além de um webhook de entrada genérico para qualquer outra
 coisa. Cada canal se vincula a um agente e mantém sua própria memória de conversa
-por usuário. Veja [a página de canais](./channels/).
+por usuário. Veja [a página de canais](../channels/).
 
 ## Definindo um agente
 
@@ -251,13 +251,13 @@ e uso por cliente. Se você nunca ativar, tudo vive no escopo padrão, chamado
 
 ## Para onde ir depois
 
-- [Início rápido](./quickstart/). Instale o Pepe, conecte um modelo e rode seu
+- [Início rápido](../quickstart/). Instale o Pepe, conecte um modelo e rode seu
   primeiro agente em alguns minutos.
-- [Agentes e ferramentas](./agents/). Do que um agente é feito e como ele decide
+- [Agentes e ferramentas](../agents/). Do que um agente é feito e como ele decide
   usar ferramentas.
-- [API HTTP](./api/). Comande o Pepe a partir de qualquer cliente compatível com
+- [API HTTP](../api/). Comande o Pepe a partir de qualquer cliente compatível com
   OpenAI, tanto pela via de requisição/resposta quanto pela de streaming.
-- [Canais](./channels/). Coloque um agente no Telegram, WhatsApp, Slack e mais.
-- [Tarefas agendadas](./scheduled/). Rode agentes em um agendamento recorrente.
-- [Segurança e permissões](./security/). O portão de permissão, o sandbox e como
+- [Canais](../channels/). Coloque um agente no Telegram, WhatsApp, Slack e mais.
+- [Tarefas agendadas](../scheduled/). Rode agentes em um agendamento recorrente.
+- [Segurança e permissões](../security/). O portão de permissão, o sandbox e como
   manter um agente dentro de limites seguros.

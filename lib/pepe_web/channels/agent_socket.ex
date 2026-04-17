@@ -10,6 +10,11 @@ defmodule PepeWeb.AgentSocket do
   `PepeWeb.AgentChannel` enforces when joining an agent topic. With no tokens
   configured, only same-machine (loopback) connections are accepted; a remote connection
   is refused, so an exposed server is never anonymous.
+
+  A widget-scoped token additionally must match its OWN `allowed_origin`, checked
+  here (not just `check_origin?/1`'s coarser "some registered widget origin" gate -
+  see that function's doc) against the real Origin header `PepeWeb.Endpoint.call/2`
+  stashes for us, since Phoenix's own `:connect_info` has no key for it.
   """
   use Phoenix.Socket
 
@@ -23,7 +28,7 @@ defmodule PepeWeb.AgentSocket do
     cond do
       Config.api_auth_required?() ->
         case Config.verify_api_token(params["token"] || "") do
-          scope when is_map(scope) -> {:ok, assign(socket, :api_scope, scope)}
+          scope when is_map(scope) -> connect_widget_scope(scope, socket)
           _ -> :error
         end
 
@@ -34,6 +39,24 @@ defmodule PepeWeb.AgentSocket do
         :error
     end
   end
+
+  # A widget token is bound to one specific allowed_origin, but check_origin?/1
+  # (necessarily, per its own doc) only confirmed the connecting browser matches
+  # SOME registered widget origin, not this token's own - otherwise a widget token
+  # leaked from one origin could be replayed from any other origin this Pepe
+  # instance also happens to serve a widget from. Enforce the precise match here,
+  # now that the token (and so its scope) is actually known. Only applies when the
+  # connecting client sent an Origin header at all (a real browser always does) -
+  # a non-browser caller presenting a widget token is unaffected, same as before.
+  defp connect_widget_scope(%{kind: "widget", allowed_origin: allowed} = scope, socket)
+       when is_binary(allowed) do
+    case Process.get(:pepe_ws_request_origin) do
+      nil -> {:ok, assign(socket, :api_scope, scope)}
+      origin -> if normalize_origin(origin) == normalize_origin(allowed), do: {:ok, assign(socket, :api_scope, scope)}, else: :error
+    end
+  end
+
+  defp connect_widget_scope(scope, socket), do: {:ok, assign(socket, :api_scope, scope)}
 
   defp loopback?(%{peer_data: %{address: address}}), do: ApiAuth.loopback?(address)
   defp loopback?(_), do: false
@@ -49,11 +72,12 @@ defmodule PepeWeb.AgentSocket do
   can't yet know which token (if any) will be presented. This allows an origin that
   either (a) matches this server's own configured host (today's default, unchanged -
   same-host tools/consoles keep working), or (b) matches the `allowed_origin` of *some*
-  registered widget token (`Pepe.Config.add_api_token/1`, `kind: "widget"`). That is a
-  coarse "is this a known origin at all" gate, not a per-token binding - the bearer
-  token itself remains the real per-request authorization boundary, exactly as it is
-  for every other token today. A non-browser client sends no `Origin` header at all,
-  so Phoenix never calls this for it (see `Phoenix.Socket.Transport.check_origin/5`).
+  registered widget token (`Pepe.Config.add_api_token/1`, `kind: "widget"`). That is
+  necessarily a coarse "is this a known origin at all" gate here, not a per-token
+  binding, since the token itself isn't known yet - `connect_widget_scope/2` below is
+  what enforces the precise, per-token match once it is. A non-browser client sends no
+  `Origin` header at all, so Phoenix never calls this for it (see
+  `Phoenix.Socket.Transport.check_origin/5`).
   """
   @spec check_origin?(URI.t()) :: boolean()
   def check_origin?(%URI{host: nil}), do: false

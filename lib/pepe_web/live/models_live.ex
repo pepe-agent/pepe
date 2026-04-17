@@ -32,7 +32,7 @@ defmodule PepeWeb.ModelsLive do
     assigns = assign(assigns, :suggest, Pricing.lookup(assigns.edit_model[:model_id]))
 
     ~H"""
-    <div class="grid grid-cols-2 gap-3 border-t border-zinc-800/60 pt-3">
+    <div class="grid grid-cols-2 gap-3">
       <div>
         <label class={lbl()}>{gettext("Input price")} <span class="text-zinc-600">{gettext("/ 1M tok")}</span></label>
         <input name="input_price" value={@edit_model[:input_price]} placeholder={suggest_ph(@suggest, 0)} inputmode="decimal" class={fld()} />
@@ -118,8 +118,34 @@ defmodule PepeWeb.ModelsLive do
       env: nil,
       api_key: nil,
       models: [],
-      model_id: nil
+      model_id: nil,
+      fallbacks: []
     }
+
+  # Other connections this one may fall back to: not itself, not already chosen.
+  defp fallback_candidates(models, scope, edit_model) do
+    taken = MapSet.new([edit_model.original_name | edit_model.fallbacks])
+
+    models
+    |> scoped_models(scope)
+    |> Enum.reject(&MapSet.member?(taken, &1.name))
+  end
+
+  defp update_fallbacks(socket, fun) do
+    edit_model = socket.assigns.edit_model
+    assign(socket, edit_model: %{edit_model | fallbacks: fun.(edit_model.fallbacks)})
+  end
+
+  defp move(list, name, dir) do
+    i = Enum.find_index(list, &(&1 == name))
+    j = if dir == "up", do: i - 1, else: i + 1
+
+    if i && j >= 0 && j < length(list) do
+      list |> List.delete_at(i) |> List.insert_at(j, name)
+    else
+      list
+    end
+  end
 
   @impl true
   def render(assigns) do
@@ -160,28 +186,60 @@ defmodule PepeWeb.ModelsLive do
           <form :if={@edit_model.edit} phx-submit="model_save" class="space-y-4">
             <div class="text-lg font-semibold">{gettext("Edit %{name}", name: @edit_model.original_name)}</div>
             <input type="hidden" name="original_name" value={@edit_model.original_name} />
-            <div>
-              <label class={lbl()}>{gettext("Name")}</label>
-              <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
-              <p class={hlp()}>{gettext("Renaming updates every agent, cron, hook and default pointing at this connection.")}</p>
-            </div>
-            <div>
-              <label class={lbl()}>{gettext("Base URL")}</label>
-              <input name="base_url" value={@edit_model.base_url} class={fld()} />
-            </div>
-            <div>
-              <label class={lbl()}>{gettext("Model")}</label>
-              <input name="model" value={@edit_model.model_id} class={fld()} />
-            </div>
-            <div>
-              <label class={lbl()}>{gettext("API key")}</label>
-              <input name="api_key" value={@edit_model.api_key} class={fld()} />
-            </div>
-            <.price_fields edit_model={@edit_model} currency={@currency} />
-            <label class="flex items-center gap-2 border-t border-zinc-800/60 pt-3 text-sm text-zinc-300">
-              <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} />
-              {gettext("Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)")}
-            </label>
+
+            <.form_section title={gettext("Connection")}>
+              <div>
+                <label class={lbl()}>{gettext("Name")}</label>
+                <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
+                <p class={hlp()}>{gettext("Renaming updates every agent, cron, hook and default pointing at this connection.")}</p>
+              </div>
+              <div>
+                <label class={lbl()}>{gettext("Base URL")}</label>
+                <input name="base_url" value={@edit_model.base_url} class={fld()} />
+              </div>
+              <div>
+                <label class={lbl()}>{gettext("API key")}</label>
+                <input name="api_key" value={@edit_model.api_key} class={fld()} />
+              </div>
+            </.form_section>
+
+            <.form_section title={gettext("Model & fallbacks")}>
+              <div>
+                <label class={lbl()}>{gettext("Model")}</label>
+                <input name="model" value={@edit_model.model_id} class={fld()} />
+              </div>
+              <div>
+                <label class={lbl()}>{gettext("Fallbacks")}</label>
+                <p class={hlp()}>
+                  {gettext("Tried in this order when %{name} errors transiently (rate limit, 5xx, network) - the agent never sees the failure.", name: @edit_model.original_name)}
+                </p>
+                <div :if={@edit_model.fallbacks != []} class="mt-2 flex flex-wrap gap-2">
+                  <span :for={{name, i} <- Enum.with_index(@edit_model.fallbacks)} class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 py-1 pl-2.5 pr-1.5 text-sm">
+                    <span class="text-zinc-600">{i + 1}.</span>
+                    {name}
+                    <button type="button" phx-click="fallback_move" phx-value-name={name} phx-value-dir="up" disabled={i == 0} class="text-zinc-500 hover:text-zinc-200 disabled:opacity-20" title={gettext("Move earlier")}>↑</button>
+                    <button type="button" phx-click="fallback_move" phx-value-name={name} phx-value-dir="down" disabled={i == length(@edit_model.fallbacks) - 1} class="text-zinc-500 hover:text-zinc-200 disabled:opacity-20" title={gettext("Move later")}>↓</button>
+                    <button type="button" phx-click="fallback_remove" phx-value-name={name} class="text-zinc-500 hover:text-red-400" title={gettext("Remove")}>✕</button>
+                  </span>
+                </div>
+                <select :if={fallback_candidates(@models, @scope, @edit_model) != []} name="fallback_candidate" phx-change="fallback_add" class={[fld(), "mt-2"]}>
+                  <option value="">{gettext("+ Add a fallback...")}</option>
+                  <option :for={m <- fallback_candidates(@models, @scope, @edit_model)} value={m.name}>{m.name}</option>
+                </select>
+              </div>
+            </.form_section>
+
+            <.form_section title={gettext("Billing")}>
+              <.price_fields edit_model={@edit_model} currency={@currency} />
+            </.form_section>
+
+            <.form_section title={gettext("Security")}>
+              <label class="flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} />
+                {gettext("Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)")}
+              </label>
+            </.form_section>
+
             <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="model_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -200,8 +258,8 @@ defmodule PepeWeb.ModelsLive do
               </select>
             </div>
 
-            <div :if={@edit_model.provider}>
-              <div class="space-y-3">
+            <div :if={@edit_model.provider} class="space-y-4">
+              <.form_section title={gettext("Connection")}>
                 <div>
                   <label class={lbl()}>{gettext("Name")} <span class="text-zinc-600">{gettext("(this connection)")}</span></label>
                   <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
@@ -213,15 +271,6 @@ defmodule PepeWeb.ModelsLive do
                   <input name="base_url" placeholder="https://.../v1" class={fld()} />
                 </div>
 
-                <div>
-                  <label class={lbl()}>{gettext("Model")}</label>
-                  <div :if={@edit_model.models == :loading} class="text-sm text-zinc-500">{gettext("Loading models...")}</div>
-                  <select :if={is_list(@edit_model.models) and @edit_model.models != []} name="model" class={fld()}>
-                    <option :for={id <- @edit_model.models} value={id}>{id}</option>
-                  </select>
-                  <input :if={@edit_model.models == []} name="model" placeholder={gettext("model id (e.g. gpt-5)")} class={fld()} />
-                </div>
-
                 <div :if={@edit_model.env}>
                   <label class={lbl()}>{gettext("API key")}</label>
                   <input name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
@@ -230,9 +279,19 @@ defmodule PepeWeb.ModelsLive do
                       env: @edit_model.env, status: key_status(@edit_model.env))}
                   </p>
                 </div>
+              </.form_section>
 
+              <.form_section title={gettext("Model")}>
+                <div :if={@edit_model.models == :loading} class="text-sm text-zinc-500">{gettext("Loading models...")}</div>
+                <select :if={is_list(@edit_model.models) and @edit_model.models != []} name="model" class={fld()}>
+                  <option :for={id <- @edit_model.models} value={id}>{id}</option>
+                </select>
+                <input :if={@edit_model.models == []} name="model" placeholder={gettext("model id (e.g. gpt-5)")} class={fld()} />
+              </.form_section>
+
+              <.form_section title={gettext("Billing")}>
                 <.price_fields edit_model={@edit_model} currency={@currency} />
-              </div>
+              </.form_section>
             </div>
 
             <div class="flex gap-2 pt-1">
@@ -272,7 +331,8 @@ defmodule PepeWeb.ModelsLive do
              api_key: m.api_key,
              input_price: m.input_price,
              output_price: m.output_price,
-             require_redaction: m.require_redaction
+             require_redaction: m.require_redaction,
+             fallbacks: m.fallbacks || []
            }
          )}
     end
@@ -351,6 +411,23 @@ defmodule PepeWeb.ModelsLive do
     {:noreply, assign(socket, default_model: name)}
   end
 
+  # The chip list lives in `edit_model` (LiveView state), not the native form -
+  # it's not a plain input, so `model_save` reads it straight from assigns
+  # instead of parsing a synthetic multi-value form field.
+  def handle_event("fallback_add", %{"fallback_candidate" => name}, socket) when name != "" do
+    {:noreply, update_fallbacks(socket, &(&1 ++ [name]))}
+  end
+
+  def handle_event("fallback_add", _params, socket), do: {:noreply, socket}
+
+  def handle_event("fallback_remove", %{"name" => name}, socket) do
+    {:noreply, update_fallbacks(socket, &List.delete(&1, name))}
+  end
+
+  def handle_event("fallback_move", %{"name" => name, "dir" => dir}, socket) do
+    {:noreply, update_fallbacks(socket, &move(&1, name, dir))}
+  end
+
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/models")}
 
@@ -409,7 +486,8 @@ defmodule PepeWeb.ModelsLive do
   end
 
   # Merges onto the existing connection (by then-current name) so a save keeps
-  # fallbacks and any other field this form doesn't expose.
+  # any field this form doesn't expose. `fallbacks` lives in `edit_model`
+  # (chip-list state), not `params` - it's not a plain form input.
   defp write_model(socket, name, params, message) do
     base = Config.get_model(name) || %Pepe.Config.Model{name: name}
 
@@ -421,7 +499,8 @@ defmodule PepeWeb.ModelsLive do
         model: params["model"],
         input_price: parse_price(params["input_price"]),
         output_price: parse_price(params["output_price"]),
-        require_redaction: params["require_redaction"] == "on" || nil
+        require_redaction: params["require_redaction"] == "on" || nil,
+        fallbacks: socket.assigns.edit_model[:fallbacks] || []
     })
 
     {:noreply,

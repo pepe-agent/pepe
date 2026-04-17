@@ -53,7 +53,8 @@ defmodule Pepe.Tools.ManageToken do
         sit in public page source (an embedded chat widget's script tag) - it then \
         REQUIRES `agent` (a public credential always pins to one agent) and should \
         carry `allowed_origin` (the site's scheme+host, e.g. "https://example.com"); \
-        the WebSocket only accepts that widget from a matching browser origin. Optional \
+        a browser connecting with this token is refused unless its real Origin header \
+        matches that value. Optional \
         appearance for a widget token - `title`, `logo` (an image URL), `color` (hex), \
         `theme` ("dark" or "light"), `greeting`, `position` ("left" or "right") - fetched \
         by the widget script at load time, so it never needs to be baked into the site's \

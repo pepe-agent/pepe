@@ -55,3 +55,24 @@ respuestas de formato libre dentro de las 24 horas del último mensaje del
 usuario. El soporte reactivo encaja con esto de forma natural. Los mensajes
 proactivos fuera de la ventana necesitan plantillas preaprobadas, que este canal
 no envía.</div>
+
+### Cambiar de modelo
+
+`/model` y `/models` solo se activan en una conexión en modo `admin` (ver la
+comparación de modos en [Channels](../channels/)); en `support`, son texto
+plano como cualquier otro comando de barra. `/models` lista los modelos
+disponibles para la empresa de esta conexión; `/model` muestra el que está
+activo, o lo cambia:
+
+```text
+/model openrouter               # pregunta si cambiar solo este chat o todos
+/model openrouter session       # cambia solo para esta conversación
+/model openrouter global        # cambia para todos con los que habla esta conexión
+```
+
+Cualquiera en una conversación permitida puede cambiar su propia sesión;
+cambiarlo **globalmente** está reservado para **entrenadores**, la misma
+lista que rige la memoria. Pon `model_switch_locked: true` en la conexión para
+desactivar el cambio de modelo por completo para quien no sea entrenador.
+WhatsApp no tiene un selector con botones como el de Telegram; aquí es solo
+escrito.

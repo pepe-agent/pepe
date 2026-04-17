@@ -54,6 +54,12 @@ defmodule Pepe.Gateways.Telegram do
   # How long to wait for a button press before denying.
   @perm_timeout 120_000
 
+  # Tool-approval prompts already answered this turn (chat_id => message_id), so
+  # they can be deleted once the turn ends - each has already served its purpose
+  # (confirming the tap), and leaving it in the transcript afterward is just
+  # permission-bookkeeping clutter next to the actual conversation.
+  @prompt_log :pepe_tg_prompt_log
+
   # The built-in slash commands. Descriptions are built at runtime so they're
   # translated in the active locale. Installed skills are appended dynamically by
   # `full_menu/0`, so they show up in Telegram's "/" popup too.
@@ -172,6 +178,7 @@ defmodule Pepe.Gateways.Telegram do
     # Fresh start: forget any cached bot username (the token may be a new bot).
     :persistent_term.erase({__MODULE__, :username, bot_name()})
     if :ets.whereis(@pending) == :undefined, do: :ets.new(@pending, [:set, :public, :named_table])
+    if :ets.whereis(@prompt_log) == :undefined, do: :ets.new(@prompt_log, [:bag, :public, :named_table])
     b = bot()
 
     Task.start(fn ->
@@ -594,8 +601,20 @@ defmodule Pepe.Gateways.Telegram do
       end
     after
       stop_typing(typing)
+      cleanup_prompts(chat_id)
       if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, nil)
     end
+  end
+
+  # Once a turn ends (however it ends), delete the tool-approval bubbles it left
+  # behind - each already served its purpose (confirming the tap), so keeping them
+  # around afterward is just permission-bookkeeping clutter, not conversation.
+  defp cleanup_prompts(chat_id) do
+    @prompt_log
+    |> :ets.take(chat_id)
+    |> Enum.each(fn {^chat_id, message_id} ->
+      Req.post(api_url(token(), "deleteMessage"), json: %{chat_id: chat_id, message_id: message_id})
+    end)
   end
 
   # Map internal errors to a short, user-safe message (no structs/stacktraces).
@@ -745,6 +764,8 @@ defmodule Pepe.Gateways.Telegram do
     message_id = get_in(cq, ["message", "message_id"])
 
     if chat_id && message_id do
+      :ets.insert(@prompt_log, {chat_id, message_id})
+
       Req.post(api_url(token(), "editMessageText"),
         json: %{chat_id: chat_id, message_id: message_id, text: Prompt.outcome(decision)}
       )
@@ -875,6 +896,8 @@ defmodule Pepe.Gateways.Telegram do
         Logger.warning("[telegram] aside error: #{safe_inspect(reason)}")
         send_message(chat_id, friendly_error(reason))
     end
+
+    cleanup_prompts(chat_id)
   end
 
   defp run_command(chat_id, "start", _args) do

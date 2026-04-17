@@ -65,6 +65,23 @@ defmodule PepeWeb.DashUI do
     """
   end
 
+  attr :title, :string, required: true
+  slot :inner_block, required: true
+
+  @doc """
+  A titled group of related fields inside a form - groups a long flat form into
+  scannable chunks (e.g. "Connection", "Reliability", "Billing") instead of one
+  undifferentiated list of inputs.
+  """
+  def form_section(assigns) do
+    ~H"""
+    <div class="space-y-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
+      <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
   attr :icon, :string, required: true
   attr :title, :string, required: true
   attr :desc, :string, required: true

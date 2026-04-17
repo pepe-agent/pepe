@@ -9,8 +9,8 @@ Un agente que puede ejecutar un comando o escribir un archivo es útil precisame
 
 Las capas, de la más débil pero siempre activa a la más fuerte pero opcional:
 
-1. La barrera de permisos. Una persona aprueba cualquier herramienta que actue.
-2. Protecciones de comandos. Un filtro incorporado que rechaza unos pocos comandos catastroficos.
+1. La barrera de permisos. Una persona aprueba cualquier herramienta que actúe.
+2. Protecciones de comandos. Un filtro incorporado que rechaza unos pocos comandos catastróficos.
 3. El entorno aislado. Un envoltorio opcional que ejecuta comandos de shell en aislamiento real.
 4. Referencias a secretos. Las credenciales viven como `${ENV_VAR}`, nunca expandidas en disco.
 5. Hooks de censura. Limpieza opcional de datos personales antes de que el texto llegue a un modelo.
@@ -26,7 +26,7 @@ Las herramientas que nunca preguntan son las de solo lectura: `read_file`, `list
 
 Cuando una herramienta riesgosa no ha sido aprobada de antemano, el runtime pregunta a la persona al otro lado. Cada superficie muestra ese aviso a su manera nativa (botones en línea en un canal de chat, un menú con flechas del teclado en la CLI), pero la decisión siempre es una de cuatro:
 
-- `once`: permite solo está llamada, pregunta de nuevo la proxima vez.
+- `once`: permite solo esta llamada, pregunta de nuevo la próxima vez.
 - `session`: permite durante el resto de esta conversación. Se guarda en memoria y se olvida cuando inicias una nueva sesión o reinicias. Las demás sesiones siguen preguntando.
 - `always`: permite de ahora en adelante. Se guarda en el agente en `config.json`.
 - `deny`: rechaza. Nunca se recuerda, así que la misma llamada se pregunta otra vez más adelante.
@@ -82,7 +82,7 @@ Las herramientas de shell (`bash` y `run_script`) pasan cada comando por una gua
 - Borrados recursivos de una ruta del sistema, `/`, `~` o `$HOME`.
 - Formatear un sistema de archivos (`mkfs`).
 - Escribir en crudo o sobrescribir un dispositivo de disco (`dd of=/dev/...`, o redirigir hacia `/dev/sda` y similares).
-- Bombas de bifurcacion (fork bombs).
+- Bombas de bifurcación (fork bombs).
 - Apagar o reiniciar el equipo (`shutdown`, `reboot`, `halt`, `poweroff`, `init 0`).
 
 Es pura, multiplataforma, sin configuración y siempre activa. No cuesta nada, así que nunca hay que habilitarla.
@@ -103,7 +103,7 @@ pepe setup
 
 Elige el paso Sandbox y escoge tu aislamiento. Pepe ofrece lo que tu anfitrión soporta:
 
-| Anfitrion | Opciones |
+| Anfitrión | Opciones |
 |------|------|
 | Linux | firejail (ligero, espacios de nombres) o Docker/Podman |
 | macOS | sandbox-exec (viene con macOS) o Docker Desktop |
@@ -154,11 +154,11 @@ Un marcador de cadena completa que se resuelve en nada (la variable no está def
 
 Un agente al que se le otorgan las herramientas de solo lectura `config_get` y `doctor` puede informar sobre tu configuración y detectar un secreto ausente en una conversación normal. Ambas son de solo lectura, así que nunca activan la barrera de permisos.
 
-> Tú: Esta todo configurado correctamente?
+> Tú: ¿Está todo configurado correctamente?
 >
 > Agente: (ejecuta `doctor`) Encontré un problema: la conexión de modelo "openrouter" referencia `${OPENROUTER_API_KEY}`, pero esa variable no está definida en el entorno. Expórtala antes de servir.
 
-La herramienta `doctor` hace un chequeo de salud de toda la configuración y marca secretos `${ENV}` sin definir, agentes que apuntan a modelos ausentes, programaciones invalidas y conexiones inalcanzables. Pasa `live: true` para también sondear la red.
+La herramienta `doctor` hace un chequeo de salud de toda la configuración y marca secretos `${ENV}` sin definir, agentes que apuntan a modelos ausentes, programaciones inválidas y conexiones inalcanzables. Pasa `live: true` para también sondear la red.
 
 <div class="note"><strong>Los ajustes sensibles a la seguridad no se pueden editar por chat.</strong> La herramienta protegida `config_set` está cerrada por defecto: solo toca una lista blanca corta (el modelo y el agente por defecto, el idioma, la zona horaria y un par de opciones de Telegram). Los secretos, las listas de herramientas permitidas, los tokens de bot, el envoltorio del entorno aislado y la contraseña del panel quedan a propósito fuera de esa lista, así que `config_set` no puede cambiarlos. Esos los defines tú con la CLI o el panel. Los tokens de la API son lo único que un agente puede generar por chat, pero solo a través de la herramienta separada y protegida por la barrera de permisos `manage_token`, nunca mediante `config_set`.</div>
 
@@ -176,7 +176,7 @@ pepe agent add support \
 Vienen cuatro hooks de fábrica:
 
 - `pii_redact`: un censor de expresiones regulares, sin conexión y sin dependencias. Reemplaza datos personales estructurados (correo, número de tarjeta e identificaciones nacionales como el CPF o el CNPJ) con un token estable como `[CPF_1]`. Por defecto es reversible: registra `token -> real` para que la tubería pueda restaurar el valor real en la respuesta de salida.
-- `llm_redact`: usa un modelo local o configurado para reemplazar nombres, direcciones y texto libre con seudonimos realistas, y luego los restaura a la salida. Va mejor junto a `pii_redact`, que maneja las identificaciones estructuradas de forma determinista mientras el modelo se ocupa de las partes desordenadas en cualquier idioma.
+- `llm_redact`: usa un modelo local o configurado para reemplazar nombres, direcciones y texto libre con seudónimos realistas, y luego los restaura a la salida. Va mejor junto a `pii_redact`, que maneja las identificaciones estructuradas de forma determinista mientras el modelo se ocupa de las partes desordenadas en cualquier idioma.
 - `presidio`: envía el texto a través de tus propios contenedores autoalojados de análisis y anonimización de Microsoft Presidio, así los datos quedan bajo tu control.
 - `http_redact`: la válvula de escape genérica. Pepe publica el mensaje en tu propio endpoint, que devuelve el texto transformado, así cualquier servicio de censura se conecta sin un adaptador dedicado.
 
@@ -215,9 +215,9 @@ Puedes pasar una contraseña literal o una referencia `${ENV_VAR}` para que el s
 La contraseña se lee de `dashboard.password` en la configuración (interpolada), con respaldo en la variable de entorno `PEPE_DASHBOARD_PASSWORD`. Dos ajustes relacionados endurecen un panel servido detrás de un dominio:
 
 - `pepe dashboard hosts app.example.com,dash.example.com` define los valores adicionales del encabezado `Host` que el panel acepta. Esto sirve también como lista blanca contra el reataque de DNS (DNS rebinding).
-- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista los proxies inversos cuyo encabezado `X-Forwarded-For` puede considerarse confiable. Vacio por defecto, lo que significa que no se confia en ningún encabezado de reenvio.
+- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista los proxies inversos cuyo encabezado `X-Forwarded-For` puede considerarse confiable. Vacío por defecto, lo que significa que no se confía en ningún encabezado de reenvío.
 
-Vinculado a una interfaz publica sin contraseña, el panel se cierra por defecto y bloquea a los clientes remotos hasta que definas una.
+Vinculado a una interfaz pública sin contraseña, el panel se cierra por defecto y bloquea a los clientes remotos hasta que definas una.
 
 ## Tokens de la API
 
@@ -227,8 +227,8 @@ Sin ningún token, la API HTTP responde solo a los llamantes de loopback (localh
 pepe token add --label "ci pipeline"
 ```
 
-El token en crudo se muestra una sola vez y solo se guarda su hash SHA-256, nunca el token en sí. Un token puede acotarse: `--company` lo limita a los agentes de una empresa, y `--agent` lo limita a un único agente (que debe vivir dentro de esa empresa). Adminístralos con `pepe token list` y `pepe token revoke ID`, desde la página de tokens de la API del panel, o por chat con un agente que tenga la herramienta protegida `manage_token`. Para las formas de las peticiones y el uso del SDK, consulta la [página de la API HTTP](./api/).
+El token en crudo se muestra una sola vez y solo se guarda su hash SHA-256, nunca el token en sí. Un token puede acotarse: `--company` lo limita a los agentes de una empresa, y `--agent` lo limita a un único agente (que debe vivir dentro de esa empresa). Adminístralos con `pepe token list` y `pepe token revoke ID`, desde la página de tokens de la API del panel, o por chat con un agente que tenga la herramienta protegida `manage_token`. Para las formas de las peticiones y el uso del SDK, consulta la [página de la API HTTP](../api/).
 
 ## Aislamiento multiempresa
 
-El trabajo puede aislarse por empresa (un ámbito de empresa basado en un identificador). El ámbito por defecto, sin empresa, se llama Principal. Los agentes, modelos y claves de proveedor de una empresa quedan invisibles para las demás empresas, y un token de API acotado a una empresa alcanza solo a los agentes de esa empresa. Esto evita que las credenciales y conversaciones de una empresa se filtren jamás a las de otro, lo cual importa cuando alojas agentes en nombre de varios clientes desde una sola instancia de Pepe.
+El trabajo puede aislarse por empresa (un ámbito de empresa basado en un identificador). El ámbito por defecto, sin empresa, se llama Principal. Los agentes, modelos y claves de proveedor de una empresa quedan invisibles para las demás empresas, y un token de API acotado a una empresa alcanza solo a los agentes de esa empresa. Esto evita que las credenciales y conversaciones de una empresa se filtren jamás a las de otra, lo cual importa cuando alojas agentes en nombre de varios clientes desde una sola instancia de Pepe.

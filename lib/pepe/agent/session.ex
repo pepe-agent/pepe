@@ -14,6 +14,7 @@ defmodule Pepe.Agent.Session do
   alias Pepe.Agent.Runtime
   alias Pepe.Agent.Workspace
   alias Pepe.Config
+  alias Pepe.LLM
   alias Pepe.LLM.Message
 
   ###
@@ -56,6 +57,9 @@ defmodule Pepe.Agent.Session do
   "just for now" experiment, not a durable setting.
   """
   def set_model(key, model_name), do: GenServer.call(via(key), {:set_model, model_name})
+
+  # Internal-only variant used by the triage downgrade - see the handle_call clause.
+  defp set_model_if_unset(key, model_name), do: GenServer.call(via(key), {:set_model_if_unset, model_name})
 
   @doc "Drop the last user turn (and its responses) from the history."
   @spec undo(term()) :: :ok
@@ -261,9 +265,18 @@ defmodule Pepe.Agent.Session do
         # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
         # user text and the reversible map go in; the task redacts (inbound hooks)
         # before the model sees anything and restores the reply on the way out.
-        base = ensure_system(state.messages, agent)
+        base = state.messages |> ensure_system(agent) |> maybe_add_lang_hint(opts, state.messages)
         mark_pending(state, text)
-        {pid, ref} = spawn_run(agent, base, text, state.pii_map, opts)
+        # Complexity-triage only ever runs on a session's first-ever turn (same
+        # boundary as the lang hint above), never when a model override is already
+        # in play (an explicit `/model` switch always wins over an automatic one),
+        # and only when there's actually somewhere to downgrade to on a SIMPLE
+        # verdict.
+        should_triage? =
+          agent.triage_model && agent.simple_model && is_nil(state.model_override) &&
+            length(state.messages) <= 1
+
+        {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
         {:noreply, %{state | running: %{task: pid, ref: ref, from: from}, pending_resume: text}}
     end
   end
@@ -303,16 +316,25 @@ defmodule Pepe.Agent.Session do
         {:reply, {:error, :no_agent}, state}
 
       agent ->
+        # Own the trace here too (same reasoning as spawn_run): started BEFORE the
+        # inbound hook, with the raw text as a placeholder, so the hook's own
+        # Trace.event/1 call actually lands instead of silently no-op'ing on a
+        # not-yet-started trace. Runtime.run then sees :nested and leaves finishing
+        # to this handler.
+        Pepe.Trace.start(agent.name, state.key, state.pending_resume, "resume")
+
         # The interrupted text is real user input captured before the crash, so it
         # goes through the same inbound/outbound redaction hooks a normal turn
         # applies (spawn_run) - a resume must not be the one path that leaks PII a
         # configured hook would otherwise have caught.
         {redacted, entries} = Pepe.Hooks.transform(:inbound, state.pending_resume, agent, %{"map" => state.pii_map})
+        Pepe.Trace.set_prompt(redacted)
         messages = ensure_system(state.messages, agent) ++ [Message.user(resume_prompt(redacted))]
         opts = [session_key: state.key]
 
         case Runtime.run(agent, messages, opts) do
-          {:ok, reply, _all} ->
+          {:ok, reply, _all} = result ->
+            Pepe.Trace.finish(result)
             map = state.pii_map ++ entries
             {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
             text = Pepe.Hooks.restore(shown, map)
@@ -328,7 +350,8 @@ defmodule Pepe.Agent.Session do
 
             {:reply, {:ok, text}, persist(new_state)}
 
-          {:error, reason} ->
+          {:error, reason} = result ->
+            Pepe.Trace.finish(result)
             {:reply, {:error, reason}, clear_pending(state)}
         end
     end
@@ -404,6 +427,18 @@ defmodule Pepe.Agent.Session do
   # on a process restart is correct, not a bug.
   def handle_call({:set_model, model_name}, _from, state) do
     {:reply, :ok, %{state | model_override: model_name}}
+  end
+
+  # Same effect as :set_model, but only when nothing else already set an override -
+  # used by the triage downgrade below so it can never clobber an explicit /model
+  # the caller issued while a triage classification (up to @triage_timeout_ms) was
+  # still in flight for the current turn.
+  def handle_call({:set_model_if_unset, model_name}, _from, %{model_override: nil} = state) do
+    {:reply, :ok, %{state | model_override: model_name}}
+  end
+
+  def handle_call({:set_model_if_unset, _model_name}, _from, state) do
+    {:reply, :ok, state}
   end
 
   def handle_call(:undo, _from, state) do
@@ -558,18 +593,108 @@ defmodule Pepe.Agent.Session do
 
   defp cancel_running(state, _reply), do: state
 
+  # Complexity triage is best-effort only: it must never make a turn wait longer
+  # than this, and a slow/unreachable triage model is treated the same as a
+  # "not simple" verdict (i.e. do nothing), never surfaced as an error.
+  @triage_timeout_ms 6_000
+
+  # Fixed, Pepe-authored classification prompt - no per-agent policy to configure,
+  # unlike a real agent's own system prompt. Plain-text sentinel verdict (only
+  # "SIMPLE" is ever looked for in the reply), the same convention
+  # Pepe.Heartbeat.silent?/1 already uses instead of structured output.
+  @triage_prompt """
+  Classify the complexity of the user's message that follows. Reply with exactly \
+  one word and nothing else: SIMPLE if it is a quick, everyday question a basic \
+  model can answer well; COMPLEX if it needs deep reasoning, multi-step planning, \
+  or expert-level knowledge to answer well.
+  """
+
+  # A raw, one-off classification call directly against a model connection - no
+  # agent, no session, no tools. Returns :simple, :complex, or :failed (no such
+  # model, unreachable, or slower than @triage_timeout_ms - always treated the
+  # same as :complex by the caller, i.e. proceed on the agent's own model
+  # unchanged, but kept distinct here so it shows up honestly on the trace).
+  defp triage_verdict(triage_model_name, text) do
+    task =
+      Task.async(fn ->
+        try do
+          case Config.get_model(triage_model_name) do
+            nil -> {:error, :no_such_model}
+            model -> LLM.chat(model, [Message.system(@triage_prompt), Message.user(text)])
+          end
+        rescue
+          e -> {:error, Exception.message(e)}
+        catch
+          kind, reason -> {:error, "triage #{kind}: #{inspect(reason)}"}
+        end
+      end)
+
+    case Task.yield(task, @triage_timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {:ok, %{content: content}}} ->
+        if content |> to_string() |> String.trim() |> String.upcase() =~ "SIMPLE", do: :simple, else: :complex
+
+      _ ->
+        :failed
+    end
+  rescue
+    _ -> :failed
+  catch
+    _, _ -> :failed
+  end
+
   # Run the loop in an unlinked, monitored process so a crash or a `/stop` kill can't
   # take the session down. It always reports back, turning a raise/exit into `{:error, _}`.
-  defp spawn_run(agent, base_messages, text, pii_map, opts) do
+  defp spawn_run(key, agent, base_messages, text, pii_map, opts, should_triage?) do
     parent = self()
 
     {:ok, pid} =
       Task.start(fn ->
         result =
           try do
+            # Own the trace here (rather than leaving Runtime.run to start its own)
+            # so hook activity and a triage verdict - both of which happen before
+            # Runtime.run is even called - fold into the same trace instead of
+            # being invisible. Started BEFORE redaction (with the raw text as a
+            # placeholder prompt) so the inbound hook's own event below actually
+            # gets recorded; set_prompt/1 corrects the recorded prompt to the
+            # redacted text right after, so what ends up on disk never differs
+            # from today's behavior. Runtime.run's own Trace.start then always
+            # sees :nested and never finishes it, so this spawned task is now the
+            # sole owner: finish is called unconditionally below, matching what
+            # Runtime.run used to do for this exact call.
+            Pepe.Trace.start(agent.name, opts[:session_key], text, opts[:source])
+
             # Inbound hooks redact the user text (and grow the reversible map) before
             # the model - off the GenServer, so an LLM-backed redactor never blocks it.
+            # Triage below sees this same redacted text, never the raw one.
             {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => pii_map})
+            Pepe.Trace.set_prompt(redacted)
+
+            # A SIMPLE verdict downgrades THIS turn's model right away (the same
+            # struct-field swap apply_model_override/2 uses) and, via the public
+            # set_model_if_unset/2 API, makes it stick for every later turn too - the
+            # session GenServer's mailbox is free to service that call because
+            # handle_call({:chat, ...}) already replied :noreply before this task
+            # started (the same reason /stop works mid-turn). The "if unset" variant
+            # is deliberate: an explicit /model issued while this triage call was
+            # still in flight must win over the downgrade, not get silently
+            # overwritten by it. Anything else (COMPLEX, or triage failing open)
+            # leaves the agent on its own already-configured model, unchanged.
+            agent =
+              if should_triage? do
+                case triage_verdict(agent.triage_model, redacted) do
+                  :simple ->
+                    Pepe.Trace.event({:triage, :simple, agent.triage_model, agent.simple_model})
+                    set_model_if_unset(key, agent.simple_model)
+                    %{agent | model: agent.simple_model}
+
+                  verdict ->
+                    Pepe.Trace.event({:triage, verdict, agent.triage_model, nil})
+                    agent
+                end
+              else
+                agent
+              end
 
             case Runtime.run(agent, base_messages ++ [Message.user(redacted)], opts) do
               {:ok, reply, all_messages} ->
@@ -586,6 +711,7 @@ defmodule Pepe.Agent.Session do
             kind, reason -> {:error, "run #{kind}: #{inspect(reason)}"}
           end
 
+        Pepe.Trace.finish(result)
         send(parent, {:run_done, result, agent.name})
       end)
 
@@ -597,6 +723,28 @@ defmodule Pepe.Agent.Session do
 
   defp ensure_system(messages, agent),
     do: [Message.system(Workspace.system_prompt(agent)) | messages]
+
+  # A `lang` opt (the widget's `data-lang`, threaded from the join payload) nudges the
+  # agent to reply in the site's declared language from its very first turn, before
+  # there's enough of the visitor's own text to infer it. Injected as a system message
+  # (invisible in `visible_history`, since system/tool roles are filtered there) and
+  # only on the session's first-ever turn (`prior_messages` holding just the base
+  # system prompt) - later turns already have enough of the visitor's own language to
+  # go on, and re-injecting every turn would fight a conversation that has since
+  # switched languages.
+  defp maybe_add_lang_hint(base, opts, prior_messages) do
+    with lang when is_binary(lang) and lang != "" <- Keyword.get(opts, :lang),
+         true <- length(prior_messages) <= 1 do
+      base ++
+        [
+          Message.system(
+            "The site embedding this chat declares its language as \"#{lang}\" - reply in that language unless the visitor writes in a different one."
+          )
+        ]
+    else
+      _ -> base
+    end
+  end
 
   # Truncate back to just before the last user message.
   defp drop_last_turn(messages) do

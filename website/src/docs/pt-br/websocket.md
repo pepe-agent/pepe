@@ -43,7 +43,7 @@ O socket fala um protocolo simples de frames JSON. Cada mensagem, nas duas dire�
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. Um tópico no qual você não tem permissão de entrar é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado.
+Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. Um tópico no qual você não tem permissão de entrar é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado. Passe também `{"lang": "pt-BR"}` e isso empurra a primeira resposta do agente para esse idioma (uma dica de sistema única, no primeiro turno da sessão). É assim que o atributo `data-lang` do [widget incorporável](../widget/) chega ao agente.
 
 ### Eventos
 
@@ -56,9 +56,9 @@ Você **recebe** estes eventos de saída, cada um chegando como um frame cujo pa
 
 * `delta` `{ "text": "..." }`: um fragmento em streaming da resposta.
 * `tool_call` `{ "name": "...", "arguments": {...} }`: o agente está invocando uma ferramenta.
-* `tool_result` `{ "name": "...", "output": "..." }`: à saída daquela ferramenta.
+* `tool_result` `{ "name": "...", "output": "..." }`: a saída daquela ferramenta.
 * `done` `{ "content": "..." }`: a resposta final; o turno está completo.
-* `session_ended` `{}`: o agente chamou `end_session` - a resposta de fechamento já
+* `session_ended` `{}`: o agente chamou `end_session`; a resposta de fechamento já
   chegou pelo `done` acima, e o *próximo* prompt começa com contexto novo.
 * `watch` `{ "text": "..." }`: uma vigilância criada a partir desta conexão foi disparada.
 * `error` `{ "reason": "..." }`: algo deu errado neste turno.

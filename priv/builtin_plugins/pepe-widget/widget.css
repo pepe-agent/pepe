@@ -44,15 +44,31 @@
   color: #e4e4e7;
   border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  display: none;
+  display: flex;
   flex-direction: column;
   overflow: hidden;
   font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(16px) scale(0.96);
+  transform-origin: bottom;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    visibility 0s linear 0.2s;
 }
 
 .pepe-widget-panel.pepe-widget-right { right: 20px; }
 .pepe-widget-panel.pepe-widget-left { left: 20px; }
-.pepe-widget-panel.pepe-widget-open { display: flex; }
+
+.pepe-widget-panel.pepe-widget-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
 
 .pepe-widget-header {
   padding: 14px 16px;
@@ -151,6 +167,29 @@
   border-bottom-right-radius: 4px;
 }
 
+.pepe-widget-msg code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.pepe-widget-msg.pepe-widget-user code {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pepe-widget-msg a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  opacity: 0.9;
+}
+
+.pepe-widget-msg a:hover {
+  opacity: 1;
+}
+
 .pepe-widget-msg.pepe-widget-system {
   align-self: center;
   color: #8b8b93;
@@ -239,6 +278,10 @@
 .pepe-widget-theme-light .pepe-widget-msg.pepe-widget-assistant {
   background: #f1f1f4;
   color: #18181b;
+}
+
+.pepe-widget-theme-light .pepe-widget-msg.pepe-widget-assistant code {
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .pepe-widget-theme-light .pepe-widget-msg.pepe-widget-system {

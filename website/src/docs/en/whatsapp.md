@@ -54,3 +54,22 @@ Channels section.
 replies within 24 hours of the user's last message. Reactive support fits this
 naturally. Proactive messages outside the window need pre-approved templates,
 which this channel does not send.</div>
+
+### Switching models
+
+`/model` and `/models` only fire on an `admin`-mode connection (see the mode
+comparison in [Channels](../channels/)); on `support`, they are plain text like
+any other slash command. `/models` lists the models available to this
+connection's company; `/model` shows the one currently active, or changes it:
+
+```text
+/model openrouter               # ask whether to switch just this chat or everyone
+/model openrouter session       # switch for this conversation only
+/model openrouter global        # switch for everyone this connection talks to
+```
+
+Anyone in an allowed conversation may switch their own session; switching it
+**globally** is reserved for **trainers**, the same allowlist that gates
+memory. Set `model_switch_locked: true` on the connection to turn
+model-switching off entirely for non-trainers. WhatsApp has no button picker
+like Telegram's; this is typed only.

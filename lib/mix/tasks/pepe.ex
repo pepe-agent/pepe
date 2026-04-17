@@ -1469,8 +1469,9 @@ defmodule Mix.Tasks.Pepe do
   defp token_cmd(["add" | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
-        strict: [company: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string] ++
-                  @token_appearance_switches
+        strict:
+          [company: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string] ++
+            @token_appearance_switches
       )
 
     attrs =
@@ -1724,6 +1725,8 @@ defmodule Mix.Tasks.Pepe do
           hooks: :string,
           max_iterations: :integer,
           temperature: :float,
+          triage_model: :string,
+          simple_model: :string,
           default: :boolean
         ]
       )
@@ -1771,7 +1774,9 @@ defmodule Mix.Tasks.Pepe do
         can_manage: can_manage,
         hooks: hooks,
         max_iterations: opts[:max_iterations] || 12,
-        temperature: opts[:temperature]
+        temperature: opts[:temperature],
+        triage_model: opts[:triage_model],
+        simple_model: opts[:simple_model]
       }
 
       Config.put_agent(agent)

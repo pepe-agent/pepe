@@ -61,4 +61,19 @@ defmodule PepeWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
   plug PepeWeb.Router
+
+  # Phoenix's socket :connect_info only exposes a fixed key set (:uri is this
+  # server's OWN address, not the browser's cross-origin header; :x_headers only
+  # covers "x-"-prefixed headers), and the WebSocket upgrade's check_origin callback
+  # runs before the query string (and thus the token) is available - see
+  # PepeWeb.AgentSocket's moduledoc. So a widget token's own allowed_origin can't be
+  # verified against the real Origin header at either of those points. This plug
+  # pipeline is what the "/socket" upgrade itself runs through (see
+  # do_socket_dispatch/2 in Phoenix.Endpoint - it's a synchronous plug.call in the
+  # same process, not a spawn), so stash the raw header here; AgentSocket.connect/3
+  # reads it back via the process dictionary to enforce it per-token.
+  def call(conn, opts) do
+    Process.put(:pepe_ws_request_origin, conn |> Plug.Conn.get_req_header("origin") |> List.first())
+    super(conn, opts)
+  end
 end

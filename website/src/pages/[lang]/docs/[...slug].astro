@@ -72,9 +72,31 @@ const idx = allSlugs.indexOf(slug);
 const prev = idx > 0 ? allSlugs[idx - 1] : null;
 const next = idx < allSlugs.length - 1 ? allSlugs[idx + 1] : null;
 const search = searchCopy[lang];
+
+// Home > Docs > this page - the three levels that always have a real,
+// navigable URL. Not attempting a 4th "section" level: a nav group's label
+// (e.g. "Configure") doesn't reliably map to one of its own pages, so a
+// breadcrumb entry for it would have nowhere honest to link. On the docs
+// index itself, "Docs" and "this page" are the same URL, so that case only
+// gets two levels - a third identical entry would just be noise.
+const site = Astro.site ?? Astro.url.origin;
+const breadcrumbItems = [
+  { "@type": "ListItem", position: 1, name: "Pepe", item: new URL(withLocale(lang, "/"), site).href },
+  { "@type": "ListItem", position: 2, name: "Docs", item: new URL(hrefOf("index"), site).href },
+];
+if (slug !== "index") {
+  breadcrumbItems.push({
+    "@type": "ListItem",
+    position: 3,
+    name: frontmatter.title,
+    item: new URL(hrefOf(slug), site).href,
+  });
+}
+const breadcrumbJsonLd = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: breadcrumbItems };
 ---
 
 <Base title={`${frontmatter.title} · Pepe docs`} description={frontmatter.description} lang={lang} docs={true}>
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
   <div class="container docs">
     <aside class="docs-nav">
       <div

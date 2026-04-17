@@ -46,64 +46,30 @@ pepe setup
 ```
 
 Choose the channel option, pick the provider and the agent, and enter the
-credentials (a `${ENV_VAR}` reference is accepted for any secret). Each
-provider's required fields are below.
+credentials (a `${ENV_VAR}` reference is accepted for any secret). Each has its
+own page with its provider-specific fields and setup steps:
+[Slack](../slack/), [Discord](../discord/), [Microsoft Teams](../msteams/),
+[Google Chat](../googlechat/). This page covers what's shared by all of them
+(and by WhatsApp).
 
-### Slack
+## Switching models
 
-Slack uses the Events API. A connection's `config` holds:
+`/model` and `/models` fire only on an `admin`-mode connection with `commands`
+enabled (see the mode comparison in [Channels](../channels/)); on `support`,
+they are plain text. `/models` lists the models available to the connection's
+company; `/model` shows the current one, or changes it:
 
-- `bot_token`: the bot user OAuth token (`xoxb-...`), used as the bearer for
-  replies.
-- `signing_secret`: verifies the `X-Slack-Signature` on inbound requests.
-
-In the Slack app, set the Event Subscriptions request URL to the connection URL
-and subscribe to `message.channels` and `app_mention`. The first save triggers
-a `url_verification` handshake, which Pepe answers immediately. Replies are
-posted with `chat.postMessage`. Callback URL shape:
-
+```text
+/model openrouter               # ask whether to switch just this chat or everyone
+/model openrouter session       # switch for this conversation only
+/model openrouter global        # switch for everyone this connection talks to
 ```
-https://YOUR_HOST/webhooks/root/slack/<slug>
-```
 
-### Discord
-
-Discord is wired through the Interactions endpoint (slash commands), so it fits
-the webhook gateway rather than a persistent connection. A connection's
-`config` holds:
-
-- `public_key`: the app's public key (hex), for the required Ed25519 signature
-  check.
-- `application_id`: used to post the follow-up answer.
-
-In the Discord app, point "Interactions Endpoint URL" at the connection URL and
-add a slash command with a text option (for example `/ask prompt:...`). Discord
-requires an acknowledgement within three seconds, so Pepe replies with a
-deferred response and posts the real answer as a follow-up once the agent
-finishes.
-
-### Microsoft Teams
-
-Teams uses the Bot Framework. A connection's `config` holds:
-
-- `app_id`: the bot's Microsoft app (client) id.
-- `app_password`: the client secret. Store it as `${ENV_VAR}`.
-- `tenant_id`: the Azure tenant id (or `botframework.com`).
-
-Inbound activities arrive as `POST`s. Replies go back to the activity's service
-URL with an app access token minted from the client credentials. The bot
-mention is stripped from the incoming text before the agent sees it.
-
-### Google Chat
-
-Google Chat posts space events to the callback URL. A connection's `config`
-holds:
-
-- `access_token`: an OAuth token for the Chat API, used as the bearer for
-  replies. Store it as `${ENV_VAR}` and refresh it out of band.
-
-Only `MESSAGE` events from a human are acted on. Replies are posted back to the
-space through the Chat REST API.
+Switching **globally** is reserved for **trainers** (the same allowlist that
+gates memory); everyone else in an allowed conversation can only switch their
+own session. Set `model_switch_locked: true` on the connection to turn it off
+entirely for non-trainers. This is the same mechanism WhatsApp uses; Telegram's
+version adds a tappable picker instead of typed commands.
 
 ## Under the hood: the provider contract
 

@@ -5,7 +5,7 @@ description: Llama a Pepe desde JavaScript, Python, Ruby, PHP, Java, Elixir y We
 
 ## Ejemplos de cliente
 
-Cada ejemplo apunta al servidor local. Donde se muestre un token, quitalo si tu API está abierta.
+Cada ejemplo apunta al servidor local. Donde se muestre un token, quítalo si tu API está abierta.
 
 **curl**
 

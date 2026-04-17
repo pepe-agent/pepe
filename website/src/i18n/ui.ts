@@ -78,6 +78,11 @@ export const ui = {
     "channels.sub":
       "Connect a channel and the agent answers there. Files, handoff, and scoping are built in.",
 
+    "widget.title": "Or drop it straight on your site",
+    "widget.body":
+      "Paste one script tag on your page and this exact bubble goes live: no backend to write, no build step. A handful of optional attributes set the color, greeting, and language, so every visitor gets answered in the site's own language from the first message.",
+    "widget.cta": "See the widget docs →",
+
     "usecases.title": "What people build with Pepe",
     "usecases.sub": "Common jobs once the right tools are connected.",
     "uc.social.t": "Social media management",
@@ -197,9 +202,14 @@ export const ui = {
     "f.support.d":
       "Atiende clientes en WhatsApp, Telegram, Slack o Chatwoot, con traspaso humano cuando haga falta.",
 
-    "channels.title": "Conecta con las personas donde están",
+    "channels.title": "Conecta con las personas donde estén",
     "channels.sub":
       "Conecta un canal y el agente responde allí. Archivos, traspaso y alcance vienen incluidos.",
+
+    "widget.title": "O colócalo directo en tu sitio",
+    "widget.body":
+      "Pega una sola etiqueta script en tu página y esta misma burbuja queda activa, sin backend que programar, sin paso de compilación. Unos pocos atributos opcionales definen el color, el saludo y el idioma, así cada visitante recibe respuesta en el idioma propio del sitio desde el primer mensaje.",
+    "widget.cta": "Ver la documentación del widget →",
 
     "usecases.title": "Qué construye la gente con Pepe",
     "usecases.sub": "Trabajos habituales cuando conectas las herramientas adecuadas.",
@@ -260,14 +270,14 @@ export const ui = {
   },
 
   "pt-br": {
-    "seo.title": "Pepe, o runtime de agentes de IA que você mesmo roda",
+    "seo.title": "Pepe, o runtime de agentes de IA que você mesmo executa",
     "nav.features": "Recursos",
     "nav.surfaces": "Superfícies",
     "nav.channels": "Canais",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · auto-hospedado",
-    "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">você mesmo roda</span>.',
+    "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">você mesmo executa</span>.',
     "hero.lead":
       "Defina agentes, conecte qualquer modelo compatível com OpenAI e deixe o Pepe rodar o loop de ferramentas. Use os mesmos agentes pela CLI, HTTP, WebSocket ou canais de chat. Auto-hospedado, sem banco de dados, com suas chaves.",
     "hero.cta_start": "Começar →",
@@ -320,16 +330,21 @@ export const ui = {
     "f.support.d":
       "Atenda clientes no WhatsApp, Telegram, Slack ou Chatwoot, com handoff humano quando precisar.",
 
-    "channels.title": "Conecte-se com as pessoas onde elas estão",
+    "channels.title": "Conecte-se com as pessoas onde elas estiverem",
     "channels.sub":
       "Conecte um canal e o agente responde por lá. Arquivos, handoff e escopo vêm prontos.",
+
+    "widget.title": "Ou coloque direto no seu site",
+    "widget.body":
+      "Cole uma única tag script na sua página e essa mesma bolha já fica no ar, sem backend pra escrever, sem passo de build. Alguns atributos opcionais definem a cor, a saudação e o idioma, então cada visitante é respondido no idioma do próprio site já na primeira mensagem.",
+    "widget.cta": "Ver a documentação do widget →",
 
     "usecases.title": "O que as pessoas constroem com o Pepe",
     "usecases.sub": "Trabalhos comuns quando você conecta as ferramentas certas.",
     "uc.social.t": "Gestão de redes sociais",
     "uc.social.d": "Agende posts, responda comentários e acompanhe menções em todas as plataformas.",
     "uc.email.t": "Priorização de e-mail",
-    "uc.email.d": "Lê sua caixa de entrada, rascunha respostas e organiza mensagens por assunto.",
+    "uc.email.d": "Leia sua caixa de entrada, rascunhe respostas e organize mensagens por assunto.",
     "uc.ads.t": "Campanhas de anúncios",
     "uc.ads.d": "Acompanhe gasto e desempenho no Meta, Google e LinkedIn Ads, com relatório diário.",
     "uc.support.t": "Atendimento ao cliente",
@@ -357,12 +372,12 @@ export const ui = {
     "how.4.t": "Responder e entregar",
     "how.4.d": "Devolve a resposta final onde ela foi pedida e registra a execução como trace.",
 
-    "cta.title": "Rode seus próprios agentes em minutos",
+    "cta.title": "Execute seus próprios agentes em minutos",
     "cta.sub": "Código aberto. Traga seu modelo. Mantenha runtime, chaves e dados sob seu controle.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
     "why.title": "Por que \"Pepe\"?",
-    "why.body": "O nome é uma piscada para o universo do Chespirito, querido na América Latina. A piada do Pepe era simples: fazia exatamente o que mandavam. Sem discutir, sem inventar moda. Um bom resumo para um runtime de agentes.",
+    "why.body": "O nome pisca o olho para o universo do Chespirito, querido em toda a América Latina. A piada do Pepe era simples: ele fazia exatamente o que mandavam. Sem discutir, sem inventar moda. Um bom resumo para um runtime de agentes.",
 
     "foot.tagline":
       "Um runtime de agentes de IA em Elixir/OTP. Auto-hospedado, agnóstico de modelo, sem banco de dados. Sem afiliação a qualquer fornecedor de modelos.",
@@ -383,14 +398,14 @@ export const ui = {
   },
 
   "pt-pt": {
-    "seo.title": "Pepe, o runtime de agentes de IA que corres tu próprio",
+    "seo.title": "Pepe, o runtime de agentes de IA que executas tu próprio",
     "nav.features": "Funcionalidades",
     "nav.surfaces": "Superfícies",
     "nav.channels": "Canais",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · auto-alojado",
-    "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">corres tu próprio</span>.',
+    "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">executas tu próprio</span>.',
     "hero.lead":
       "Define agentes, liga qualquer modelo compatível com OpenAI e deixa o Pepe correr o ciclo de ferramentas. Usa os mesmos agentes pela CLI, HTTP, WebSocket ou canais de chat. Autoalojado, sem base de dados, com as tuas chaves.",
     "hero.cta_start": "Começar →",
@@ -443,9 +458,14 @@ export const ui = {
     "f.support.d":
       "Atende clientes no WhatsApp, Telegram, Slack ou Chatwoot, com transferência humana quando for preciso.",
 
-    "channels.title": "Liga-te às pessoas onde elas estão",
+    "channels.title": "Liga-te às pessoas onde elas estiverem",
     "channels.sub":
       "Liga um canal e o agente responde por lá. Ficheiros, transferência e âmbito vêm prontos.",
+
+    "widget.title": "Ou coloca-o direto no teu site",
+    "widget.body":
+      "Cola uma única tag script na tua página e esta mesma bolha fica logo ativa, sem backend para escrever, sem passo de build. Alguns atributos opcionais definem a cor, a saudação e o idioma, para que cada visitante seja respondido no idioma do próprio site já na primeira mensagem.",
+    "widget.cta": "Ver a documentação do widget →",
 
     "usecases.title": "O que as pessoas constroem com o Pepe",
     "usecases.sub": "Trabalhos comuns quando ligas as ferramentas certas.",
@@ -480,7 +500,7 @@ export const ui = {
     "how.4.t": "Responder e entregar",
     "how.4.d": "Devolve a resposta final onde ela foi pedida e regista a execução como trace.",
 
-    "cta.title": "Corre os teus próprios agentes em minutos",
+    "cta.title": "Executa os teus próprios agentes em minutos",
     "cta.sub": "Código aberto. Traz o teu modelo. Mantém runtime, chaves e dados sob teu controlo.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",

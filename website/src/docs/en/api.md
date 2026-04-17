@@ -9,7 +9,7 @@ The two surfaces cover two needs. The HTTP API is the right default for request/
 
 ## A first call
 
-Start the server, then send a chat completion. This works out of the box with no authentication (see [Authentication](#authentication-and-tokens) for locking it down):
+Start the server, then send a chat completion. This works out of the box with no authentication (see [Authentication](../auth/#authentication-and-tokens) for locking it down):
 
 ```bash
 pepe serve --port 4000
@@ -127,7 +127,7 @@ This is the one idea that makes everything else click. The `model` field in a ch
 Resolution of the `model` field happens in this order:
 
 1. If the name matches an agent, that agent runs.
-2. If no agent matches but the name matches a bare model connection, Pepe wraps it in a minimal pass-through agent (no tools, single turn) and calls that model directly. This fallback is only available in the open or root scope (see [Token scopes](#token-scopes)).
+2. If no agent matches but the name matches a bare model connection, Pepe wraps it in a minimal pass-through agent (no tools, single turn) and calls that model directly. This fallback is only available in the open or root scope (see [Token scopes](../auth/#token-scopes)).
 3. If neither matches, the default agent runs.
 
 <div class="note"><strong>Practical upshot.</strong> The set of "models" a client can pick from is your set of agents. Give an agent a descriptive name, wire up its tools once, and every OpenAI-compatible client sees it as a selectable model.</div>

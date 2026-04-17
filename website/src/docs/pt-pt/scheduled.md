@@ -65,11 +65,11 @@ Define o teu fuso predefinido uma vez durante o `pepe setup`. As tarefas que nã
 
 ### Para onde vai o resultado
 
-O destino do `deliver` decide o que acontece com à saída de uma execução:
+O destino do `deliver` decide o que acontece com a saída de uma execução:
 
 - `telegram:<chat_id>` envia-a para essa conversa do Telegram. A mensagem leva o nome da tarefa como prefixo, para que uma conversa que recebe várias tarefas as consiga distinguir.
 - `none` não a envia a lado nenhum. A execução ainda corre e continua registada no histórico. Bom para tarefas cujo único objetivo é um efeito secundário (escrever um ficheiro, chamar uma ferramenta).
-- Qualquer outra coisa (incluindo `log`) escreve à saída no registo da aplicação.
+- Qualquer outra coisa (incluindo `log`) escreve a saída no registo da aplicação.
 
 Independentemente do destino, cada execução é acrescentada ao ficheiro de histórico da própria tarefa, por isso podes sempre reler o que aconteceu.
 
@@ -99,7 +99,7 @@ pepe cron logs morning-brief
 
 O campo `source` de cada linha é um de entre `scheduler` (o cronómetro disparou), `manual` (forçaste-o pela linha de comandos ou pelo painel) ou `agent` (uma conversa forçou-o).
 
-### Faça pela conversa
+### Fá-lo pela conversa
 
 Um agente pode criar e gerir as suas próprias tarefas agendadas durante uma conversa, no chat da linha de comandos ou em qualquer canal ligado, se tiver a ferramenta `schedule_task` no seu conjunto. Pede em linguagem natural:
 

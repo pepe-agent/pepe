@@ -25,7 +25,7 @@ Só `--name`, `--prompt` e `--schedule` são obrigatórios. O resto tem padrões
 | --- | --- | --- |
 | `--agent` | Qual agente roda o prompt | Seu agente padrão |
 | `--timezone` | Fuso horário IANA em que o horário é lido | O configurado como padrão (veja abaixo) |
-| `--model` | Roda está tarefa com uma conexão de modelo específica | O modelo do próprio agente |
+| `--model` | Roda esta tarefa com uma conexão de modelo específica | O modelo do próprio agente |
 | `--deliver` | Para onde vai o resultado | `none` (registrado, não enviado a lugar nenhum) |
 
 O conjunto completo de comandos:
@@ -65,11 +65,11 @@ Defina seu fuso padrão uma vez durante o `pepe setup`. Tarefas que não nomeiam
 
 ### Para onde vai o resultado
 
-O destino do `deliver` decide o que acontece com à saída de uma execução:
+O destino do `deliver` decide o que acontece com a saída de uma execução:
 
 - `telegram:<chat_id>` envia para aquele chat do Telegram. A mensagem leva o nome da tarefa como prefixo, para que um chat que recebe várias tarefas consiga diferenciá-las.
 - `none` não envia a lugar nenhum. A execução ainda roda e ainda fica registrada no histórico. Bom para tarefas cujo único objetivo é um efeito colateral (escrever um arquivo, chamar uma ferramenta).
-- Qualquer outra coisa (incluindo `log`) escreve à saída no log da aplicação.
+- Qualquer outra coisa (incluindo `log`) escreve a saída no log da aplicação.
 
 Independentemente do destino, cada execução é acrescentada ao arquivo de histórico da própria tarefa, então você sempre pode reler o que aconteceu.
 
@@ -81,7 +81,7 @@ Se o processo estava fora do ar no momento em que uma tarefa deveria disparar, o
 
 ### Histórico de execuções
 
-Cada disparo, seja do cronômetro, de um `pepe cron run` forçado, de um botão do painel ou de um chat, acrescenta uma linha ao arquivo de histórico da tarefa (`<PEPE_HOME>/data/cron_logs/<id>.jsonl`). Cada linha registra o horário, a origem, se teve sucesso e à saída (cortada).
+Cada disparo, seja do cronômetro, de um `pepe cron run` forçado, de um botão do painel ou de um chat, acrescenta uma linha ao arquivo de histórico da tarefa (`<PEPE_HOME>/data/cron_logs/<id>.jsonl`). Cada linha registra o horário, a origem, se teve sucesso e a saída (cortada).
 
 ```bash
 pepe cron logs morning-brief

@@ -1,6 +1,6 @@
 ---
 title: Vigias
-description: Crie monitores duráveis de uma única vez que avisam quando uma condição acontece.
+description: Crie monitores duráveis que avisam uma única vez quando uma condição se torna verdadeira.
 ---
 
 ## Vigias

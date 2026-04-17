@@ -82,7 +82,7 @@ que mudou e liga a issue, se houver.
 
 ## Bons PRs
 
-Um bom PR é pequeno, tem escopo claro e facilita a revisão. Para código, inclui
+Um bom PR é pequeno, tem âmbito claro e facilita a revisão. Para código, inclui
 um teste quando muda comportamento. Para documentação, prefere frases curtas,
 exemplos reais e links para páginas mais detalhadas em vez de repetir tudo.
 

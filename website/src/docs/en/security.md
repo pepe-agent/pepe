@@ -227,7 +227,7 @@ With no token, the HTTP API answers only loopback (localhost) callers, so a loca
 pepe token add --label "ci pipeline"
 ```
 
-The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--company` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that company). Manage them with `pepe token list` and `pepe token revoke ID`, from the dashboard's API tokens page, or by chat with an agent that has the guarded `manage_token` tool. For request shapes and SDK usage, see the [HTTP API page](./api/).
+The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--company` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that company). Manage them with `pepe token list` and `pepe token revoke ID`, from the dashboard's API tokens page, or by chat with an agent that has the guarded `manage_token` tool. For request shapes and SDK usage, see the [HTTP API page](../api/).
 
 ## Multi-tenant scoping
 

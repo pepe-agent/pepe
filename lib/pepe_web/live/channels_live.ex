@@ -95,8 +95,8 @@ defmodule PepeWeb.ChannelsLive do
       <div>
         <label class={lbl()}>{gettext("Theme")}</label>
         <select name={"#{@prefix}[theme]"} class={fld()}>
-          <option value="" selected={blank(@values["theme"]) == nil}>{gettext("Dark (default)")}</option>
-          <option value="light" selected={@values["theme"] == "light"}>{gettext("Light")}</option>
+          <option value="" selected={blank(@values["theme"]) == nil}>{gettext("Light (default)")}</option>
+          <option value="dark" selected={@values["theme"] == "dark"}>{gettext("Dark")}</option>
         </select>
       </div>
       <div class="col-span-2">
@@ -148,6 +148,22 @@ defmodule PepeWeb.ChannelsLive do
         <div class="flex-1 overflow-y-auto p-6">
           <%!-- LIST: channel groups only for what exists, plus one "Add a channel" picker --%>
           <div :if={!@edit_bot and @adding == nil} class="space-y-6">
+            <%!-- One picker for every channel type: Telegram plus each webhook provider - kept at
+                 the top so it's never buried below a growing list of existing channels --%>
+            <div :if={not @adding_channel} class="border-b border-zinc-800 pb-5">
+              <div class="mb-2 text-sm font-medium text-zinc-400">{gettext("Add a channel")}</div>
+              <div class="flex flex-wrap gap-2">
+                <button phx-click="add" phx-value-kind="bot" class={btn_ghost()}>{gettext("+ Telegram bot")}</button>
+                <button :for={p <- @native_channels} phx-click="add_channel" phx-value-name={p.name} class={btn_ghost()}>
+                  + {p.label}
+                </button>
+                <button phx-click="add" phx-value-kind="widget" class={btn_ghost()}>{gettext("+ Widget")}</button>
+              </div>
+              <p class="mt-2 text-sm text-zinc-500">
+                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook. Fill in the credentials, then register the Webhook URL shown in the provider. A widget is a chat bubble you embed with a script tag.")}
+              </p>
+            </div>
+
             <%!-- Just-minted widget token, with a ready-to-paste snippet --%>
             <div :if={@widget_raw} class="rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
               <div class="flex items-center justify-between gap-2">
@@ -247,20 +263,6 @@ defmodule PepeWeb.ChannelsLive do
               show_picker={false}
             />
 
-            <%!-- One picker for every channel type: Telegram plus each webhook provider --%>
-            <div :if={not @adding_channel} class="border-t border-zinc-800 pt-5">
-              <div class="mb-2 text-sm font-medium text-zinc-400">{gettext("Add a channel")}</div>
-              <div class="flex flex-wrap gap-2">
-                <button phx-click="add" phx-value-kind="bot" class={btn_ghost()}>{gettext("+ Telegram bot")}</button>
-                <button :for={p <- @native_channels} phx-click="add_channel" phx-value-name={p.name} class={btn_ghost()}>
-                  + {p.label}
-                </button>
-                <button phx-click="add" phx-value-kind="widget" class={btn_ghost()}>{gettext("+ Widget")}</button>
-              </div>
-              <p class="mt-2 text-sm text-zinc-500">
-                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook. Fill in the credentials, then register the Webhook URL shown in the provider. A widget is a chat bubble you embed with a script tag.")}
-              </p>
-            </div>
           </div>
 
           <%!-- ADD A WIDGET --%>

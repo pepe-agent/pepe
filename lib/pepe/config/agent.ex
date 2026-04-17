@@ -24,7 +24,30 @@ defmodule Pepe.Config.Agent do
             # ...), by name - see `Pepe.Hooks`. Empty = none (raw, the default).
             hooks: [],
             max_iterations: 12,
-            temperature: nil
+            temperature: nil,
+            # Per-agent override of the model connection's own `fallbacks` chain (see
+            # Pepe.Config.Model): nil = inherit the connection's chain (the default),
+            # [] = explicitly no fallback for this agent even if the connection has
+            # one, [names] = use exactly this chain instead. See
+            # Pepe.Config.model_chain_for_agent/1.
+            fallbacks: nil,
+            # Complexity-based model routing: nil = off (the default). When set, a raw
+            # classification call to this model connection judges a session's first
+            # message before the real turn starts (a fixed, Pepe-authored prompt - no
+            # agent, no persona to configure). This agent's own `model` is treated as
+            # the "good" default; a SIMPLE verdict downgrades the session to
+            # `simple_model` (and keeps it there) to save cost, instead of the more
+            # common "upgrade on complex" framing - most agents are already set up on
+            # a model worth defaulting to. A best-effort optimization, never a
+            # blocking dependency: any triage failure (bad name, network error,
+            # timeout) just means the turn proceeds on this agent's own model exactly
+            # as if triage weren't configured at all.
+            triage_model: nil,
+            # The model connection to downgrade to (and stay on, for the rest of the
+            # session) when `triage_model` judges a chat simple. Only meaningful when
+            # `triage_model` is set - triage is skipped entirely if this is unset,
+            # since there would be nowhere to switch to on a SIMPLE verdict.
+            simple_model: nil
 
   @type t :: %__MODULE__{}
 
@@ -46,7 +69,11 @@ defmodule Pepe.Config.Agent do
       can_manage: map["can_manage"],
       hooks: map["hooks"] || [],
       max_iterations: map["max_iterations"] || 12,
-      temperature: map["temperature"]
+      temperature: map["temperature"],
+      # Preserve nil (inherit the connection's chain) vs [] (explicitly none).
+      fallbacks: map["fallbacks"],
+      triage_model: map["triage_model"],
+      simple_model: map["simple_model"]
     }
   end
 end

@@ -28,6 +28,11 @@ defmodule Pepe.Agent.Runtime do
   alias Pepe.LLM.Message
   alias Pepe.Tools
 
+  @stopped_message "(stopped: max iterations reached)"
+  @out_of_turns_nudge "You're out of turns for this task. Do not call any more tools - " <>
+                        "reply now with your best summary of what you found or accomplished " <>
+                        "so far, and what (if anything) is left unfinished."
+
   @type opts :: [
           model: Model.t(),
           on_event: (term() -> any()),
@@ -113,9 +118,23 @@ defmodule Pepe.Agent.Runtime do
     run(agent, messages, opts)
   end
 
-  defp loop(_agent, _chain, messages, _specs, _ctx, opts, 0) do
-    emit(opts, {:done, "(stopped: max iterations reached)"})
-    {:ok, "(stopped: max iterations reached)", messages}
+  # Out of turns: rather than a bare hard stop, spend one last call with no
+  # tools offered (so the model can't ask for yet another turn) forcing it to
+  # summarize whatever it found/did instead of leaving the user with nothing.
+  defp loop(agent, chain, messages, _specs, ctx, opts, 0) do
+    nudge = Message.user(@out_of_turns_nudge)
+    chat_opts = [temperature: agent.temperature]
+
+    case chat_with_failover(chain, messages ++ [nudge], chat_opts, ctx, opts) do
+      {:ok, %{content: content}} when is_binary(content) and content != "" ->
+        emit(opts, {:assistant, content})
+        emit(opts, {:done, content})
+        {:ok, content, messages ++ [nudge, Message.assistant(content)]}
+
+      _ ->
+        emit(opts, {:done, @stopped_message})
+        {:ok, @stopped_message, messages}
+    end
   end
 
   defp loop(agent, chain, messages, specs, ctx, opts, iterations_left) do

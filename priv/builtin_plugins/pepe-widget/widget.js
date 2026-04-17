@@ -9,13 +9,20 @@
  *           data-color="#ea580c"
  *           data-theme="dark"
  *           data-greeting="Hi! How can I help?"
- *           data-position="right"></script>
+ *           data-position="right"
+ *           data-lang="pt-BR"></script>
  *
  * data-server defaults to the host this script was loaded from. data-logo (a small
- * square image) replaces the default bubble emoji and appears next to the header
- * title; omit it to keep the plain emoji bubble. data-theme is "dark" (default) or
- * "light". No build step, no dependency: this file speaks the raw Phoenix Channels
- * frame protocol documented at /docs/websocket/ directly over a plain WebSocket.
+ * square image) replaces the default bubble icon and appears next to the header
+ * title; omit it to keep the plain chat icon. data-theme is "light" (default) or
+ * "dark". data-lang is the SITE's own language (not detected from the visitor's
+ * browser - a site knows its own language, a browser locale is only a guess about
+ * the visitor) - it picks the built-in greeting's language when data-greeting isn't
+ * set, localizes the widget's own UI chrome (placeholder, button labels), and is
+ * sent once at join so the agent leans toward replying in that language from its
+ * very first reply, before it has enough of the visitor's own text to infer it. No
+ * build step, no dependency: this file speaks the raw Phoenix Channels frame
+ * protocol documented at /docs/websocket/ directly over a plain WebSocket.
  *
  * Everything above the script tag can ALSO be set from the dashboard (per widget
  * token) instead of edited into the site's HTML - a title/logo/color/theme/greeting
@@ -30,16 +37,55 @@
   var thisScript = document.currentScript;
   if (!thisScript) return;
 
+  // Built-in strings per language (matching Pepe's own dashboard/CLI locales) -
+  // the greeting (used when neither the dashboard nor data-greeting set one) AND
+  // every other bit of UI chrome the widget itself renders (placeholder, button
+  // labels). data-lang picks the visitor's reply language from the agent, so the
+  // chrome around it has to follow, not stay in English regardless. Falls back to
+  // English for an unset or unrecognized data-lang.
+  var STRINGS = {
+    en: {
+      greeting: "Hi! How can I help?",
+      openChat: "Open chat",
+      closeChat: "Close chat",
+      newConversation: "New conversation",
+      placeholder: "Type a message...",
+      send: "Send",
+    },
+    es: {
+      greeting: "¡Hola! ¿En qué puedo ayudarte?",
+      openChat: "Abrir chat",
+      closeChat: "Cerrar chat",
+      newConversation: "Nueva conversación",
+      placeholder: "Escribe un mensaje...",
+      send: "Enviar",
+    },
+    pt: {
+      greeting: "Oi! Como posso ajudar?",
+      openChat: "Abrir chat",
+      closeChat: "Fechar chat",
+      newConversation: "Nova conversa",
+      placeholder: "Digite uma mensagem...",
+      send: "Enviar",
+    },
+  };
+
+  function stringsFor(lang) {
+    var code = (lang || "").toLowerCase().split("-")[0];
+    return STRINGS[code] || STRINGS.en;
+  }
+
   var cfg = {
     agent: thisScript.getAttribute("data-agent") || "default",
     token: thisScript.getAttribute("data-token") || "",
     title: thisScript.getAttribute("data-title") || "Chat",
     logo: thisScript.getAttribute("data-logo") || "",
     color: thisScript.getAttribute("data-color") || "#ea580c",
-    theme: thisScript.getAttribute("data-theme") === "light" ? "light" : "dark",
-    greeting: thisScript.getAttribute("data-greeting") || "Hi! How can I help?",
+    theme: thisScript.getAttribute("data-theme") === "dark" ? "dark" : "light",
+    greeting: thisScript.getAttribute("data-greeting") || "",
     position: thisScript.getAttribute("data-position") === "left" ? "left" : "right",
     server: thisScript.getAttribute("data-server") || new URL(thisScript.src).host,
+    lang: thisScript.getAttribute("data-lang") || "",
   };
 
   var scriptBase = thisScript.src.replace(/\/widget\.js(\?.*)?$/, "");
@@ -52,6 +98,13 @@
     document.head.appendChild(link);
   }
 
+  // A greeting set nowhere (not the dashboard, not data-greeting) falls back to the
+  // built-in dictionary, picked by data-lang - "en" if that's unset/unrecognized too.
+  function finalizeGreeting() {
+    if (cfg.greeting) return;
+    cfg.greeting = stringsFor(cfg.lang).greeting;
+  }
+
   // Merge the dashboard-managed config (if any field was set there) over the data-*
   // attributes, then build the widget - once, so the DOM is only ever built with its
   // final look, no visible swap partway through. A slow/failed fetch just proceeds
@@ -61,6 +114,7 @@
     var fallbackTimer = setTimeout(function () {
       if (!built) {
         built = true;
+        finalizeGreeting();
         buildWidget();
       }
     }, 1000);
@@ -79,16 +133,19 @@
         if (remote.title) cfg.title = remote.title;
         if (remote.logo) cfg.logo = remote.logo;
         if (remote.color) cfg.color = remote.color;
-        if (remote.theme) cfg.theme = remote.theme === "light" ? "light" : "dark";
+        if (remote.theme) cfg.theme = remote.theme === "dark" ? "dark" : "light";
         if (remote.greeting) cfg.greeting = remote.greeting;
         if (remote.position) cfg.position = remote.position === "left" ? "left" : "right";
+        finalizeGreeting();
         buildWidget();
       });
   } else {
+    finalizeGreeting();
     buildWidget();
   }
 
   function buildWidget() {
+    var ui = stringsFor(cfg.lang);
     var sessionKey = "pepe_widget_session_" + cfg.agent;
 
     function newSessionId() {
@@ -118,7 +175,7 @@
 
     var bubble = document.createElement("button");
     bubble.className = "pepe-widget-bubble pepe-widget-" + cfg.position;
-    bubble.setAttribute("aria-label", "Open chat");
+    bubble.setAttribute("aria-label", ui.openChat);
     if (cfg.logo) {
       var bubbleLogo = document.createElement("img");
       bubbleLogo.src = cfg.logo;
@@ -149,12 +206,12 @@
     titleWrap.appendChild(titleText);
     var newChatBtn = document.createElement("button");
     newChatBtn.className = "pepe-widget-newchat";
-    newChatBtn.setAttribute("aria-label", "New conversation");
-    newChatBtn.title = "New conversation";
+    newChatBtn.setAttribute("aria-label", ui.newConversation);
+    newChatBtn.title = ui.newConversation;
     newChatBtn.innerHTML = ICON_NEW;
     var closeBtn = document.createElement("button");
     closeBtn.className = "pepe-widget-close";
-    closeBtn.setAttribute("aria-label", "Close chat");
+    closeBtn.setAttribute("aria-label", ui.closeChat);
     closeBtn.textContent = "✕";
     header.appendChild(titleWrap);
     header.appendChild(newChatBtn);
@@ -168,11 +225,11 @@
     var input = document.createElement("textarea");
     input.className = "pepe-widget-input";
     input.rows = 1;
-    input.placeholder = "Type a message...";
+    input.placeholder = ui.placeholder;
     var sendBtn = document.createElement("button");
     sendBtn.type = "submit";
     sendBtn.className = "pepe-widget-send";
-    sendBtn.textContent = "Send";
+    sendBtn.textContent = ui.send;
     form.appendChild(input);
     form.appendChild(sendBtn);
 
@@ -183,10 +240,34 @@
     document.body.appendChild(bubble);
     document.body.appendChild(panel);
 
+    // A model naturally writes **bold**, `code`, and [links](url) - rendering that
+    // as literal asterisks/brackets reads as broken. HTML is escaped FIRST so
+    // nothing from the model (or a visitor echoed back) can inject a real tag;
+    // only our own <strong>/<em>/<code>/<a>/<br> are ever added on top of the
+    // already-escaped text.
+    function escapeHtml(s) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function renderMarkdown(text) {
+      var html = escapeHtml(text);
+      html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+      html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+      html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      return html.replace(/\n/g, "<br>");
+    }
+
     function addMessage(text, role) {
       var el = document.createElement("div");
       el.className = "pepe-widget-msg pepe-widget-" + role;
-      el.textContent = text;
+      el.dataset.raw = text;
+      el.innerHTML = renderMarkdown(text);
       messages.appendChild(el);
       messages.scrollTop = messages.scrollHeight;
       return el;
@@ -210,6 +291,30 @@
       if (typingEl) {
         typingEl.remove();
         typingEl = null;
+      }
+    }
+
+    // Split after the first sentence-ending punctuation + space, e.g. "Hi! How can
+    // I help?" -> ["Hi!", "How can I help?"]. No match (a greeting with no natural
+    // break, or a single short word) just means nothing to animate.
+    function splitGreeting(text) {
+      var m = /^(.*?[.!?])\s+(\S.*)$/.exec(text);
+      return m ? [m[1], m[2]] : [text, null];
+    }
+
+    // A visitor's very first look at the widget is a static, pre-filled bubble -
+    // reads like a placeholder, not a live chat. Splitting the greeting and
+    // pausing on a typing indicator between the two halves makes that first
+    // moment feel like joining a conversation already in progress instead.
+    function showGreeting() {
+      var parts = splitGreeting(cfg.greeting);
+      addMessage(parts[0], "assistant");
+      if (parts[1]) {
+        showTyping();
+        setTimeout(function () {
+          hideTyping();
+          addMessage(parts[1], "assistant");
+        }, 2000);
       }
     }
 
@@ -249,7 +354,7 @@
       currentAssistantEl = null;
       greeted = true;
       historyLoaded = true;
-      addMessage(cfg.greeting, "assistant");
+      showGreeting();
       if (opened) connect();
     }
 
@@ -295,7 +400,9 @@
 
       socket.onopen = function () {
         joined = false;
-        socket.send(JSON.stringify(["1", "1", topic, "phx_join", { session: sessionId }]));
+        var joinPayload = { session: sessionId };
+        if (cfg.lang) joinPayload.lang = cfg.lang;
+        socket.send(JSON.stringify(["1", "1", topic, "phx_join", joinPayload]));
         heartbeatTimer = setInterval(function () {
           if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify([null, "h", "phoenix", "heartbeat", {}]));
@@ -331,7 +438,7 @@
                 });
               } else if (!greeted) {
                 greeted = true;
-                addMessage(cfg.greeting, "assistant");
+                showGreeting();
               }
             }
           }
@@ -356,7 +463,8 @@
       if (event === "delta") {
         hideTyping();
         if (!currentAssistantEl) currentAssistantEl = addMessage("", "assistant");
-        currentAssistantEl.textContent += payload.text || "";
+        currentAssistantEl.dataset.raw += payload.text || "";
+        currentAssistantEl.innerHTML = renderMarkdown(currentAssistantEl.dataset.raw);
         messages.scrollTop = messages.scrollHeight;
       } else if (event === "done") {
         hideTyping();

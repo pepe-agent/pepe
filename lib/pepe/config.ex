@@ -766,22 +766,27 @@ defmodule Pepe.Config do
   end
 
   @doc """
-  The failover chain for an agent: its model followed by that model's `fallbacks`
-  (resolved, deduped, missing names dropped). Transient errors walk down the chain.
+  The failover chain for an agent: its model followed by a fallback list
+  (resolved, deduped, missing names dropped). Transient errors walk down the
+  chain. The fallback list is the agent's own `fallbacks` when it has
+  overridden one (a list, even `[]` for "none") - otherwise the model
+  connection's own `fallbacks`, so every agent sharing a connection gets its
+  reliability behavior for free unless it opts out.
   """
+  def model_chain_for_agent(%Agent{fallbacks: override} = agent) when is_list(override) do
+    build_chain(model_for_agent(agent), override)
+  end
+
   def model_chain_for_agent(%Agent{} = agent) do
-    case model_for_agent(agent) do
-      nil ->
-        []
+    primary = model_for_agent(agent)
+    build_chain(primary, primary && primary.fallbacks)
+  end
 
-      primary ->
-        fallbacks =
-          primary.fallbacks
-          |> Enum.map(&get_model/1)
-          |> Enum.reject(&is_nil/1)
+  defp build_chain(nil, _names), do: []
 
-        Enum.uniq_by([primary | fallbacks], & &1.name)
-    end
+  defp build_chain(primary, names) do
+    fallbacks = (names || []) |> Enum.map(&get_model/1) |> Enum.reject(&is_nil/1)
+    Enum.uniq_by([primary | fallbacks], & &1.name)
   end
 
   ###

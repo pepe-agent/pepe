@@ -75,11 +75,11 @@ para escolher outro; `/models` vai direto para esse seletor. Uso digitado:
 
 Qualquer pessoa em uma conversa permitida pode trocar sua própria sessão;
 trocar **globalmente** (para todas as conversas que esse bot atende) é
-reservado para **treinadores** - a mesma lista que controla o `/learn` e a
-memória - então um membro qualquer do chat não consegue reapontar o bot
+reservado para **treinadores**, a mesma lista que controla o `/learn` e a
+memória, então um membro qualquer do chat não consegue reapontar o bot
 inteiro para outro modelo em silêncio. Defina `model_switch_locked: true` no
 bot para desativar totalmente a troca de modelo por quem não é treinador.
-Uma troca de sessão vive só na memória - ela reseta com `/new` ou com um
+Uma troca de sessão vive só na memória; ela reseta com `/new` ou com um
 reinício do servidor, voltando ao que a configuração do próprio agente diz.
 
 ### Faça pela conversa

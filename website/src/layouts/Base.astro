@@ -29,6 +29,20 @@ function localizedPath(to: Locale) {
   if (locales.includes(parts[1] as Locale)) parts[1] = to;
   return parts.join("/") || `/${to}/`;
 }
+
+// Site-wide WebSite entity, declared on every page (normal for this schema
+// type - it's meant to be repeated) but always pointing at the site's own
+// root for this locale, never the current page - that's what `url` means
+// for a WebSite entity. No `potentialAction`/SearchAction: the docs search
+// is client-side only, with no bookmarkable results URL, so a SearchAction
+// here would describe a feature that doesn't actually work.
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: siteName,
+  url: new URL(`/${lang}/`, canonicalUrl).href,
+  inLanguage: lang,
+};
 ---
 
 <!doctype html>
@@ -68,6 +82,7 @@ function localizedPath(to: Locale) {
     <meta name="twitter:description" content={metaDescription} />
     <meta name="twitter:image" content={imageUrl.href} />
     <meta name="twitter:image:alt" content="Pepe, a self-hosted AI agent runtime" />
+    <script type="application/ld+json" set:html={JSON.stringify(websiteJsonLd)} />
   </head>
   <body>
     <Nav lang={lang} docs={docs} />

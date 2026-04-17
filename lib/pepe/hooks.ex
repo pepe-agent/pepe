@@ -31,17 +31,24 @@ defmodule Pepe.Hooks do
   @doc """
   Run an agent's `stage` hooks over `text`. Returns `{text, entries}` where `entries`
   are new reversible-map items to remember for `restore/2`. Never raises - a hook
-  failure falls back to the current text.
+  failure falls back to the current text. Each hook that actually runs for this
+  stage is recorded on the in-progress trace (a no-op if none - see
+  `Pepe.Trace.event/1`), so redaction activity shows up in the trace UI without
+  ever including the redacted values themselves.
   """
   @spec transform(atom(), String.t(), Pepe.Config.Agent.t() | nil, map()) ::
           {String.t(), [map()]}
   def transform(stage, text, agent, ctx \\ %{}) do
-    Enum.reduce(hooks_for(agent), {text, []}, fn {mod, settings}, {txt, entries} ->
+    Enum.reduce(hooks_for(agent), {text, []}, fn {name, mod, settings}, {txt, entries} ->
       if stage in mod.stages() do
-        case safe_run(mod, stage, txt, settings, ctx) do
-          {:ok, new_txt} -> {new_txt, entries}
-          {:ok, new_txt, new_entries} -> {new_txt, entries ++ new_entries}
-        end
+        {new_txt, new_entries} =
+          case safe_run(mod, stage, txt, settings, ctx) do
+            {:ok, t} -> {t, []}
+            {:ok, t, e} -> {t, e}
+          end
+
+        Pepe.Trace.event({:hook, stage, name, new_txt != txt, length(new_entries)})
+        {new_txt, entries ++ new_entries}
       else
         {txt, entries}
       end
@@ -63,7 +70,7 @@ defmodule Pepe.Hooks do
   @doc "Does this agent run any hooks at all? (fast path: skip the pipeline if not.)"
   def any?(agent), do: hooks_for(agent) != []
 
-  @doc "The `{module, settings}` list of hooks an agent runs - its own + company defaults."
+  @doc "The `{name, module, settings}` list of hooks an agent runs - its own + company defaults."
   def hooks_for(nil), do: []
 
   def hooks_for(agent) do
@@ -71,8 +78,8 @@ defmodule Pepe.Hooks do
 
     agent
     |> hook_names()
-    |> Enum.map(fn name -> {provider(name), Map.get(settings, name, %{})} end)
-    |> Enum.reject(fn {mod, _} -> is_nil(mod) end)
+    |> Enum.map(fn name -> {name, provider(name), Map.get(settings, name, %{})} end)
+    |> Enum.reject(fn {_name, mod, _settings} -> is_nil(mod) end)
   end
 
   # An agent's own hooks plus any inherited from its company's `default_hooks`.

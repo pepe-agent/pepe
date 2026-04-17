@@ -19,6 +19,7 @@ defmodule PepeWeb.AgentsLive do
        new_company: false,
        agents: Config.agents(),
        default_agent: Config.default_agent_name(),
+       models: Config.models(),
        edit_agent: nil,
        form: agent_form("")
      )}
@@ -31,6 +32,33 @@ defmodule PepeWeb.AgentsLive do
   end
 
   defp agent_form(name), do: to_form(agent_changeset(name), as: :agent)
+
+  # Other connections this agent's own override chain may use: not its primary
+  # model, not already chosen. Only meaningful once `fallbacks` is a list (the
+  # agent has opted out of inheriting the connection's own chain).
+  defp agent_fallback_candidates(models, scope, edit_agent) do
+    taken = MapSet.new([edit_agent.model | edit_agent.fallbacks || []])
+
+    models
+    |> scoped_models(scope)
+    |> Enum.reject(&MapSet.member?(taken, &1.name))
+  end
+
+  defp update_agent_fallbacks(socket, fun) do
+    edit_agent = socket.assigns.edit_agent
+    assign(socket, edit_agent: %{edit_agent | fallbacks: fun.(edit_agent.fallbacks || [])})
+  end
+
+  defp move_fallback(list, name, dir) do
+    i = Enum.find_index(list, &(&1 == name))
+    j = if dir == "up", do: i - 1, else: i + 1
+
+    if i && j >= 0 && j < length(list) do
+      list |> List.delete_at(i) |> List.insert_at(j, name)
+    else
+      list
+    end
+  end
 
   @impl true
   def render(assigns) do
@@ -76,57 +104,116 @@ defmodule PepeWeb.AgentsLive do
               {gettext("Please fix the errors below.")}
             </div>
 
-            <.input field={@form[:name]} label={gettext("Name")} placeholder={gettext("assistant")}
-              readonly={!@edit_agent.new?} class={[fld(), !@edit_agent.new? && "opacity-60"]} />
+            <.form_section title={gettext("Persona")}>
+              <.input field={@form[:name]} label={gettext("Name")} placeholder={gettext("assistant")}
+                readonly={!@edit_agent.new?} class={[fld(), !@edit_agent.new? && "opacity-60"]} />
 
-            <div>
-              <label class={lbl()}>{gettext("Persona (system prompt)")}</label>
-              <textarea name="system_prompt" rows="3" placeholder={gettext("You are ...")} class={fld()}>{@edit_agent.system_prompt}</textarea>
-            </div>
-
-            <div>
-              <label class={lbl()}>{gettext("Model")}</label>
-              <select name="model" class={fld()}>
-                <option value="">{gettext("(use default model)")}</option>
-                <option :for={m <- model_names()} value={m} selected={m == @edit_agent.model}>{m}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span></label>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <.check_card :for={t <- Pepe.Tools.names()} name="tools[]" value={t}
-                  checked={t in @edit_agent.tools} hint={tool_hint(t)} />
+              <div>
+                <label class={lbl()}>{gettext("Persona (system prompt)")}</label>
+                <textarea name="system_prompt" rows="3" placeholder={gettext("You are ...")} class={fld()}>{@edit_agent.system_prompt}</textarea>
               </div>
-            </div>
+            </.form_section>
 
-            <div>
-              <label class={lbl()}>{gettext("Privacy hooks")} <span class="text-zinc-600">{gettext("(redact PII on the message flow)")}</span></label>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <.check_card :for={h <- Pepe.Hooks.names()} name="hooks[]" value={h}
-                  checked={h in (@edit_agent.hooks || [])} hint={hook_hint(h)} />
+            <.form_section title={gettext("Model & fallbacks")}>
+              <div>
+                <label class={lbl()}>{gettext("Model")}</label>
+                <select name="model" class={fld()}>
+                  <option value="">{gettext("(use default model)")}</option>
+                  <option :for={m <- model_names()} value={m} selected={m == @edit_agent.model}>{m}</option>
+                </select>
               </div>
-              <p class={hlp()}>{gettext("Configure each hook (packs, model, ...) under Privacy; empty = no redaction (raw).")}</p>
-            </div>
 
-            <div>
-              <label class={lbl()}>{gettext("Can message (agents it may talk to)")}</label>
-              <input name="can_message" value={Enum.join(@edit_agent.can_message, ",")} placeholder={gettext("e.g. helper, researcher")} class={fld()} />
-              <p class={hlp()}>{gettext("Comma-separated agent names. Blank = talks to no one.")}</p>
-            </div>
+              <div>
+                <label class={lbl()}>{gettext("Fallbacks")}</label>
+                <p class={hlp()}>
+                  {gettext("By default this agent uses its model connection's own fallback chain. Override it to give this agent a different one.")}
+                </p>
 
-            <div>
-              <label class={lbl()}>{gettext("Admin scope (which agents it can manage & train)")}</label>
-              <input name="can_manage" value={manage_field(@edit_agent.can_manage)} placeholder={gettext("blank")} class={fld()} />
+                <div :if={@edit_agent.fallbacks == nil} class="mt-2 flex items-center justify-between gap-3 text-sm">
+                  <span class="text-zinc-400">{gettext("Inherits the connection's own fallback chain.")}</span>
+                  <button type="button" phx-click="agent_fallback_override" class="shrink-0 font-medium text-orange-400 hover:text-orange-300">{gettext("Override for this agent")}</button>
+                </div>
+
+                <div :if={@edit_agent.fallbacks != nil}>
+                  <div :if={@edit_agent.fallbacks != []} class="mt-2 flex flex-wrap gap-2">
+                    <span :for={{name, i} <- Enum.with_index(@edit_agent.fallbacks)} class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 py-1 pl-2.5 pr-1.5 text-sm">
+                      <span class="text-zinc-600">{i + 1}.</span>
+                      {name}
+                      <button type="button" phx-click="agent_fallback_move" phx-value-name={name} phx-value-dir="up" disabled={i == 0} class="text-zinc-500 hover:text-zinc-200 disabled:opacity-20" title={gettext("Move earlier")}>↑</button>
+                      <button type="button" phx-click="agent_fallback_move" phx-value-name={name} phx-value-dir="down" disabled={i == length(@edit_agent.fallbacks) - 1} class="text-zinc-500 hover:text-zinc-200 disabled:opacity-20" title={gettext("Move later")}>↓</button>
+                      <button type="button" phx-click="agent_fallback_remove" phx-value-name={name} class="text-zinc-500 hover:text-red-400" title={gettext("Remove")}>✕</button>
+                    </span>
+                  </div>
+                  <select :if={agent_fallback_candidates(@models, @scope, @edit_agent) != []} name="agent_fallback_candidate" phx-change="agent_fallback_add" class={[fld(), "mt-2"]}>
+                    <option value="">{gettext("+ Add a fallback...")}</option>
+                    <option :for={m <- agent_fallback_candidates(@models, @scope, @edit_agent)} value={m.name}>{m.name}</option>
+                  </select>
+                  <button type="button" phx-click="agent_fallback_inherit" class="mt-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">{gettext("Use the connection's default instead")}</button>
+                </div>
+              </div>
+            </.form_section>
+
+            <.form_section title={gettext("Complexity routing")}>
               <p class={hlp()}>
-                <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("itself only")} ·
-                <code class="text-zinc-300">none</code> = {gettext("nobody")} ·
-                <code class="text-zinc-300">*</code> = {gettext("all agents")} ·
-                <code class="text-zinc-300">a,b</code> = {gettext("only those")}
+                {gettext("Optional: checks if the chat is simple or complex before the first reply. Simple -> the model below handles it. Complex -> this agent's own model (above) handles it. Best-effort: if the check fails, this agent's own model answers directly.")}
               </p>
-            </div>
 
-            <div class="flex gap-2 border-t border-zinc-800 pt-4">
+              <div>
+                <label class={lbl()}>{gettext("Triage model")}</label>
+                <select name="triage_model" class={fld()}>
+                  <option value="">{gettext("(off)")}</option>
+                  <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:triage_model]}>{m}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class={lbl()}>{gettext("Simple model")}</label>
+                <select name="simple_model" class={fld()}>
+                  <option value="">{gettext("(none)")}</option>
+                  <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:simple_model]}>{m}</option>
+                </select>
+              </div>
+            </.form_section>
+
+            <.form_section title={gettext("Capabilities")}>
+              <div>
+                <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span></label>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <.check_card :for={t <- Pepe.Tools.names()} name="tools[]" value={t}
+                    checked={t in @edit_agent.tools} hint={tool_hint(t)} />
+                </div>
+              </div>
+
+              <div>
+                <label class={lbl()}>{gettext("Privacy hooks")} <span class="text-zinc-600">{gettext("(redact PII on the message flow)")}</span></label>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <.check_card :for={h <- Pepe.Hooks.names()} name="hooks[]" value={h}
+                    checked={h in (@edit_agent.hooks || [])} hint={hook_hint(h)} />
+                </div>
+                <p class={hlp()}>{gettext("Configure each hook (packs, model, ...) under Privacy; empty = no redaction (raw).")}</p>
+              </div>
+            </.form_section>
+
+            <.form_section title={gettext("Access")}>
+              <div>
+                <label class={lbl()}>{gettext("Can message (agents it may talk to)")}</label>
+                <input name="can_message" value={Enum.join(@edit_agent.can_message, ",")} placeholder={gettext("e.g. helper, researcher")} class={fld()} />
+                <p class={hlp()}>{gettext("Comma-separated agent names. Blank = talks to no one.")}</p>
+              </div>
+
+              <div>
+                <label class={lbl()}>{gettext("Admin scope (which agents it can manage & train)")}</label>
+                <input name="can_manage" value={manage_field(@edit_agent.can_manage)} placeholder={gettext("blank")} class={fld()} />
+                <p class={hlp()}>
+                  <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("itself only")} ·
+                  <code class="text-zinc-300">none</code> = {gettext("nobody")} ·
+                  <code class="text-zinc-300">*</code> = {gettext("all agents")} ·
+                  <code class="text-zinc-300">a,b</code> = {gettext("only those")}
+                </p>
+              </div>
+            </.form_section>
+
+            <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="agent_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>
@@ -173,7 +260,10 @@ defmodule PepeWeb.AgentsLive do
       tools: [],
       can_message: [],
       can_manage: nil,
-      hooks: []
+      hooks: [],
+      fallbacks: nil,
+      triage_model: nil,
+      simple_model: nil
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -212,7 +302,12 @@ defmodule PepeWeb.AgentsLive do
           tools: params["tools"] || [],
           can_message: parse_list(params["can_message"]),
           can_manage: parse_manage(params["can_manage"]),
-          hooks: params["hooks"] || []
+          hooks: params["hooks"] || [],
+          # Chip-list state lives in `edit_agent` (LiveView state), not `params` -
+          # read from there so nil (inherit) vs [] (explicit none) survives.
+          fallbacks: socket.assigns.edit_agent[:fallbacks],
+          triage_model: blank(params["triage_model"]),
+          simple_model: blank(params["simple_model"])
       }
 
       Config.put_agent(agent)
@@ -236,7 +331,9 @@ defmodule PepeWeb.AgentsLive do
           tools: params["tools"] || [],
           can_message: parse_list(params["can_message"]),
           can_manage: parse_manage(params["can_manage"]),
-          hooks: params["hooks"] || []
+          hooks: params["hooks"] || [],
+          triage_model: blank(params["triage_model"]),
+          simple_model: blank(params["simple_model"])
       }
 
       {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}
@@ -252,6 +349,28 @@ defmodule PepeWeb.AgentsLive do
   def handle_event("agent_default", %{"name" => name}, socket) do
     Config.set_default_agent(name)
     {:noreply, assign(socket, default_agent: name)}
+  end
+
+  def handle_event("agent_fallback_override", _p, socket) do
+    {:noreply, assign(socket, edit_agent: %{socket.assigns.edit_agent | fallbacks: []})}
+  end
+
+  def handle_event("agent_fallback_inherit", _p, socket) do
+    {:noreply, assign(socket, edit_agent: %{socket.assigns.edit_agent | fallbacks: nil})}
+  end
+
+  def handle_event("agent_fallback_add", %{"agent_fallback_candidate" => name}, socket) when name != "" do
+    {:noreply, update_agent_fallbacks(socket, &(&1 ++ [name]))}
+  end
+
+  def handle_event("agent_fallback_add", _params, socket), do: {:noreply, socket}
+
+  def handle_event("agent_fallback_remove", %{"name" => name}, socket) do
+    {:noreply, update_agent_fallbacks(socket, &List.delete(&1, name))}
+  end
+
+  def handle_event("agent_fallback_move", %{"name" => name, "dir" => dir}, socket) do
+    {:noreply, update_agent_fallbacks(socket, &move_fallback(&1, name, dir))}
   end
 
   # Shared sidebar events.

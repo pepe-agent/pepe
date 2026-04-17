@@ -68,6 +68,22 @@ defmodule Pepe.Trace do
 
   def source_from_session(_), do: "manual"
 
+  @doc """
+  Replace the in-progress trace's recorded prompt (no-op if none) - for a caller
+  that must `start/4` before it has the final prompt text (e.g. Pepe.Agent.Session
+  starting the trace before inbound hooks redact it, so hook activity itself gets
+  recorded too), then corrects it once available. The very first `start/4` call
+  still decides ownership; this only ever touches the `prompt` field.
+  """
+  def set_prompt(prompt) do
+    case Process.get(@key) do
+      nil -> :ok
+      t -> Process.put(@key, %{t | prompt: clip(prompt)})
+    end
+
+    :ok
+  end
+
   @doc "Append one runtime lifecycle event to the in-progress trace (no-op if none)."
   def event(ev) do
     case {Process.get(@key), encode_event(ev)} do
@@ -203,6 +219,8 @@ defmodule Pepe.Trace do
   defp new_id, do: Integer.to_string(System.os_time(:microsecond))
 
   defp outcome({:ok, _content, _messages}), do: %{"kind" => "ok"}
+  # Pepe.Agent.Session's spawn_run/7 success shape: {:ok, content, messages, redaction entries}.
+  defp outcome({:ok, _content, _messages, _entries}), do: %{"kind" => "ok"}
   defp outcome({:error, reason}), do: %{"kind" => "error", "reason" => inspect(reason)}
   defp outcome(_), do: %{"kind" => "unknown"}
 
@@ -214,6 +232,19 @@ defmodule Pepe.Trace do
   defp encode_event({:tool_result, name, out}), do: %{"t" => "tool_result", "name" => name, "out" => clip(out)}
   defp encode_event({:tool_denied, name}), do: %{"t" => "tool_denied", "name" => name}
   defp encode_event({:failover, from, to}), do: %{"t" => "failover", "from" => from, "to" => to}
+  # Complexity-routing verdict, recorded before Runtime.run even starts - see
+  # Pepe.Agent.Session's spawn_run/7. `chosen_model` is only set on a :simple
+  # verdict (the session downgraded); :complex and :failed leave the agent on
+  # its own model, so there is nothing to name there.
+  defp encode_event({:triage, verdict, triage_model, chosen_model}),
+    do: %{"t" => "triage", "verdict" => to_string(verdict), "triage_model" => triage_model, "chosen_model" => chosen_model}
+
+  # A privacy/redaction hook ran (see Pepe.Hooks.transform/4). Never carries the
+  # redacted text itself or the reversible map - only that it ran, whether it
+  # changed anything, and how many reversible entries it added.
+  defp encode_event({:hook, stage, name, changed?, entries_count}),
+    do: %{"t" => "hook", "stage" => to_string(stage), "name" => name, "changed" => changed?, "entries" => entries_count}
+
   defp encode_event({:usage, model, usage}), do: usage_event(model, usage)
   defp encode_event({:error, reason}), do: %{"t" => "error", "reason" => inspect(reason)}
   defp encode_event(_), do: nil

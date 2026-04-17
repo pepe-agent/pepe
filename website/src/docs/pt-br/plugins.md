@@ -4,8 +4,8 @@ description: Estenda o Pepe com ferramentas e canais próprios instalando plugin
 ---
 
 Um plugin adiciona uma **ferramenta** que o modelo pode chamar, ou um
-**provedor de canal** (uma nova plataforma de mensagens), ou os dois - Elixir
-compilado em tempo de execução a partir de `~/.pepe/plugins/`, sem rebuild.
+**provedor de canal** (uma nova plataforma de mensagens), ou os dois. Ambos são
+Elixir compilado em tempo de execução a partir de `~/.pepe/plugins/`, sem rebuild.
 Esses são os únicos dois formatos que um plugin pode ter hoje; um módulo é
 comparado com o formato que ele implementa.
 
@@ -20,14 +20,14 @@ comparado com o formato que ele implementa.
 
 | Callback | Finalidade |
 |---|---|
-| `name/0` | O nome de função que o modelo chama, por exemplo `"read_file"`. Precisa ser único entre todas as ferramentas - um plugin nunca ganha uma colisão de nome contra uma ferramenta embutida. |
+| `name/0` | O nome de função que o modelo chama, por exemplo `"read_file"`. Precisa ser único entre todas as ferramentas; um plugin nunca ganha uma colisão de nome contra uma ferramenta embutida. |
 | `spec/0` | A especificação de função no estilo OpenAI: nome, descrição em linguagem simples e um JSON Schema para os parâmetros. É isso que o modelo lê para decidir quando e como chamar a ferramenta. |
-| `run/2` | Executa a chamada. `args` são os argumentos decodificados (um mapa com chaves em string); `ctx` carrega o contexto da execução atual (abaixo). Devolva `{:ok, text}` ou `{:error, message}` - de qualquer forma vira uma string e volta ao modelo, então escreva para que o modelo leia. |
+| `run/2` | Executa a chamada. `args` são os argumentos decodificados (um mapa com chaves em string); `ctx` carrega o contexto da execução atual (abaixo). Devolva `{:ok, text}` ou `{:error, message}`; de qualquer forma vira uma string e volta ao modelo, então escreva para que o modelo leia. |
 
 `Pepe.Tools.Tool.function/3` monta o envelope da especificação para você, então
 você só preenche o nome, a descrição e os parâmetros.
 
-Uma ferramenta completa e funcional - salve como um `.exs` e instale (veja
+Uma ferramenta completa e funcional. Salve como um `.exs` e instale (veja
 abaixo):
 
 ```elixir
@@ -70,13 +70,13 @@ na próxima rodada).
 `ctx[:cwd]` (o diretório de trabalho). Trate cada chave como opcional.
 Ferramentas que leem/escrevem arquivos resolvem caminhos via
 `Pepe.Agent.Workspace`; ferramentas que chamam uma API externa costumam
-ignorar `ctx` por completo e usar direto o cliente HTTP `Req` já incluso - sem
+ignorar `ctx` por completo e usar direto o cliente HTTP `Req` já incluso, sem
 dependência extra.
 
 ## O comportamento Channel provider
 
 Um provedor de canal ensina o Pepe a falar uma nova plataforma de mensagens
-sobre o webhook de entrada genérico já existente - nenhuma rota nova, só um
+sobre o webhook de entrada genérico já existente: nenhuma rota nova, só um
 módulo novo no registro.
 
 ```elixir
@@ -93,9 +93,9 @@ módulo novo no registro.
 | `verify/2` | sim | Responde o handshake `GET` da plataforma quando você registra a URL do webhook. `{:ok, challenge}` ou `:error` se o provedor não tiver um. |
 | `authenticate/3` | sim | Confere a assinatura de um `POST` de entrada contra o segredo da conexão. `:ok` para aceitar, `:error` para descartar. |
 | `parse/1` | sim | Normaliza um payload decodificado em zero ou mais mensagens `%{from, text, id}`, ou `:ignore` para o que não tem nada a fazer (recibos, atualizações de status). |
-| `deliver/3` | sim | Envia uma resposta em texto para `to` (um endereço do provedor - número de telefone, id de canal, ...). |
+| `deliver/3` | sim | Envia uma resposta em texto para `to` (um endereço do provedor: número de telefone, id de canal, ...). |
 | `label/0` | não | Rótulo humano para o painel (usa `name/0` por padrão). |
-| `config_schema/0` | não | Campos que o painel renderiza para configurar uma conexão - mesmo formato do array `config` de um manifesto de plugin (abaixo). |
+| `config_schema/0` | não | Campos que o painel renderiza para configurar uma conexão, mesmo formato do array `config` de um manifesto de plugin (abaixo). |
 | `respond/3` | não | Uma resposta HTTP **síncrona** ao `POST` bruto, para protocolos que precisam de uma antes de qualquer trabalho do agente (o desafio de verificação de URL do Slack, o `PING` do Discord). `{:reply, status, content_type, body}` ou `:cont` para cair em `parse/1`. |
 | `deliver_file/4` | não | Envia um arquivo como anexo. Omita e o `send_file` simplesmente reporta que o canal não recebe arquivos. |
 | `addressed?/2` | não | Esse payload se dirige ao bot, então deve receber resposta? Permite que um provedor honre `require_mention` em grupos (padrão quando omitido: sempre endereçado). |
@@ -110,13 +110,13 @@ do resto de `pepe tools`.
 
 ### Conceder uma ferramenta a um agente
 
-Instalar um plugin não entrega suas ferramentas a todo agente - só as
+Instalar um plugin não entrega suas ferramentas a todo agente; só as
 ferramentas listadas em um agente ficam expostas a ele, com o mesmo controle
 de uma embutida.
 
 **CLI:** `pepe agent add assistant --tools reverse_text,web_search,read_file`
 
-**Painel:** abra o agente em Agentes e marque a ferramenta - as ferramentas de
+**Painel:** abra o agente em Agentes e marque a ferramenta; as ferramentas de
 plugin aparecem ao lado das embutidas.
 
 **Pela conversa:** um agente com `enable_tool` pode ligar uma ferramenta para
@@ -138,11 +138,11 @@ gerenciar, e confirma com você antes):
 
 Os plugins ficam em `~/.pepe/plugins/` (segue `PEPE_HOME`). O Pepe varre essa
 pasta recursivamente atrás de arquivos `.exs`, compila cada um uma vez e só
-recompila quando a data de modificação muda - solte um arquivo e funciona sem
+recompila quando a data de modificação muda: solte um arquivo e funciona sem
 reiniciar; edite e a mudança vale na próxima chamada de ferramenta. Um arquivo
 pode definir vários módulos (o exemplo do Google abaixo traz quatro).
 
-Um plugin tem um de dois formatos: um arquivo `.exs` solto, ou um **pacote** -
+Um plugin tem um de dois formatos: um arquivo `.exs` solto, ou um **pacote**,
 um diretório com um `manifest.json` e um ou mais arquivos `.exs`.
 
 ## Instalar um plugin
@@ -167,7 +167,7 @@ clica em Instalar. Plugins instalados aparecem com um botão Remover e, quando
 o plugin declara configurações, um botão Configurar.
 
 **Pela conversa, com `manage_plugin`:** um agente com essa ferramenta pode
-instalar em seu nome - faça `scan` de uma fonte primeiro para ver o que ela
+instalar em seu nome: faça `scan` de uma fonte primeiro para ver o que ela
 faz, depois `install`, `list`, `remove`. Passa pela mesma varredura de
 segurança da CLI, mas sem a saída de emergência `--force`: um veredito
 perigoso é sempre recusado pela conversa, e o agente vai te dizer para
@@ -176,7 +176,7 @@ quiser.
 
 ## A varredura de segurança
 
-Um plugin é Elixir comum com acesso total ao aplicativo em execução -
+Um plugin é Elixir comum com acesso total ao aplicativo em execução:
 instalar um é uma decisão de confiança, igual a adicionar qualquer
 dependência. Antes de ser colocado em disco, o `Pepe.Skills.Sentinel` varre o
 código de forma estática, lendo a árvore de sintaxe atrás de padrões
@@ -184,10 +184,10 @@ perigosos (lançar shells, eval dinâmico, chamadas destrutivas no sistema de
 arquivos, leitura de segredos, acesso à rede). Ele nunca executa o código, e
 devolve um de três vereditos:
 
-- **limpo** - nenhum achado.
-- **cautela** - sinalizado mas muitas vezes legítimo (um plugin de canal
+- **limpo**: nenhum achado.
+- **cautela**: sinalizado mas muitas vezes legítimo (um plugin de canal
   *deveria* fazer chamadas de rede); é mostrado, mas não bloqueia.
-- **perigo** - nenhum bom motivo para estar ali; bloqueia a instalação.
+- **perigo**: nenhum bom motivo para estar ali; bloqueia a instalação.
 
 ```bash
 pepe plugin scan ./my_plugin.exs        # varre sem instalar
@@ -200,7 +200,7 @@ mesmo.</div>
 
 ## O manifesto e o diálogo de Configurar
 
-O `manifest.json` de um pacote o nomeia, o descreve e - o mais útil - declara
+O `manifest.json` de um pacote o nomeia, o descreve e, o mais útil, declara
 as configurações de que precisa. Do exemplo do Google, incluso:
 
 ```json
@@ -222,7 +222,7 @@ as configurações de que precisa. Do exemplo do Google, incluso:
 Cada entrada de `config` é um campo: `key` (o nome que seu código lê),
 `label` (mostrado no formulário), `type` (`"text"`, `"secret"` para uma
 entrada mascarada, ou `"select"` com uma lista `"options"`), e um `hint`
-opcional. O painel lê esse array e renderiza o diálogo de Configurar - um
+opcional. O painel lê esse array e renderiza o diálogo de Configurar; um
 plugin novo não precisa de tela nova. Um valor pode ser uma referência
 `${ENV_VAR}`, guardada literalmente e resolvida a partir do ambiente só na
 leitura, então segredos nunca ficam expandidos no arquivo de configuração.
@@ -258,7 +258,7 @@ pepe plugin install ./examples/plugins/google
 pepe agent add assistant --tools gcal_upcoming,gcal_create_event,gmail_search,gmail_send
 ```
 
-Ele se autentica com um token bearer OAuth2 resolvido na hora da chamada -
+Ele se autentica com um token bearer OAuth2 resolvido na hora da chamada:
 nada sensível embutido no código. Exporte um token de acesso pronto (mais
 rápido, expira em ~1h):
 
@@ -328,7 +328,7 @@ end
 
 ## Exemplo: o plugin de canal Chatwoot
 
-`examples/plugins/chatwoot/` mostra o outro formato - um **canal**, não uma
+`examples/plugins/chatwoot/` mostra o outro formato: um **canal**, não uma
 ferramenta. Ele registra um provedor `chatwoot` para que o Pepe fique atrás
 de uma caixa de entrada do [Chatwoot](https://www.chatwoot.com) como o agente
 de IA, em todo canal que o Chatwoot já cobre (WhatsApp, widget web,
@@ -347,7 +347,7 @@ implementa `parse/1` para responder só conversas marcadas como `pending`
 **Configuração, no Chatwoot:** crie um AgentBot, aponte o webhook de saída
 dele para `https://SEU_HOST/webhooks/<company>/chatwoot/<slug>`. A conexão
 guarda `base_url`, `account_id` e um `api_token` (como `${ENV_VAR}`) via
-`config_schema/0` - preenchidos pelo painel, o mesmo padrão de Configurar de
+`config_schema/0`, preenchidos pelo painel, o mesmo padrão de Configurar de
 qualquer plugin.
 
 > Essa é uma de duas formas mutuamente exclusivas de rodar o WhatsApp: **ou**
@@ -359,7 +359,7 @@ qualquer plugin.
 
 O `run/2` de uma ferramenta só devolve texto. Para entregar um arquivo de
 verdade (uma planilha, um PDF) para a pessoa na conversa, não reinvente a
-entrega - chame a ferramenta embutida `send_file` com um caminho; o Pepe
+entrega: chame a ferramenta embutida `send_file` com um caminho; o Pepe
 resolve o canal a partir da sessão e entrega o arquivo lá. Conceda `send_file`
 a um agente e ele simplesmente funciona pela conversa, em qualquer canal cujo
 provedor implemente `deliver_file/4`.
@@ -387,5 +387,5 @@ provedor implemente `deliver_file/4`.
 **De qualquer forma:** faça a varredura (`pepe plugin scan SRC` ou
 `manage_plugin scan`), instale, revise o que a varredura encontrou, e então
 conceda a ferramenta a um agente (CLI, painel, ou `enable_tool`/`manage_agent`
-pela conversa) - um canal não precisa de concessão, fica ativo assim que é
+pela conversa); um canal não precisa de concessão, fica ativo assim que é
 instalado.

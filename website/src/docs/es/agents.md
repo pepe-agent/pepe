@@ -66,7 +66,7 @@ Ejecuta un prompt de una sola vez contra él. La respuesta se transmite a tu
 terminal a medida que se produce:
 
 ```bash
-pepe run assistant "Qué archivos hay en el directorio actual?"
+pepe run assistant "¿Qué archivos hay en el directorio actual?"
 ```
 
 Ese único comando dispara el ciclo completo. El agente decide que necesita mirar
@@ -116,6 +116,8 @@ toque uno fuera de ese alcance se rechaza con cortesía.
 | `hooks` | Transformaciones del flujo de mensajes a aplicar, como la redacción de datos personales. | `[]` |
 | `max_iterations` | El tope máximo de rondas de modelo más herramienta que puede tener un turno. | `12` |
 | `temperature` | Temperatura de muestreo pasada al modelo. Sin definir usa el valor predeterminado del proveedor. | predeterminado del proveedor |
+| `triage_model` | Una conexión de modelo que juzga la complejidad antes del primer turno de una sesión. Mira [Enrutamiento de modelo por complejidad](#enrutamiento-de-modelo-por-complejidad). | ninguno (desactivado) |
+| `simple_model` | La conexión de modelo a la que bajar cuando `triage_model` juzga una conversación simple. | ninguno |
 
 ## Cómo corre el ciclo de llamada de herramientas
 
@@ -194,7 +196,7 @@ puede preguntar a una persona (la consola, un canal de chat), el runtime te pide
 autorizar la llamada. Puedes responder:
 
 - Permitir una vez. Vuelve a preguntar la próxima vez.
-- Permitir durante el resto de está sesión. Se guarda en memoria y se olvida al
+- Permitir durante el resto de esta sesión. Se guarda en memoria y se olvida al
   reiniciar.
 - Permitir siempre. Se persiste en el agente añadiendo la herramienta a su lista
   `auto_approve`.
@@ -247,6 +249,49 @@ Point the researcher agent at the groq-fast model.
 El agente llama a `manage_agent` con `action: "set_model"`. El modelo destino debe
 ser una conexión configurada, y el cambio pasa por la puerta de permisos como
 cualquier otra edición de configuración.
+
+## Enrutamiento de modelo por complejidad
+
+El propio `model` de un agente se trata como el buen valor por defecto.
+Opcionalmente, una llamada de clasificación barata y directa puede juzgar si una
+conversación es lo bastante simple como para *bajar* a algo más barato, antes de
+que empiece el turno de verdad. Sin agente adicional que configurar, solo dos
+campos:
+
+- `triage_model`: una conexión de modelo que clasifica el mensaje entrante con un
+  prompt fijo e integrado (no una persona que escribas tú). Pepe solo busca la
+  palabra "SIMPLE" en su respuesta.
+- `simple_model`: la conexión de modelo a la que bajar (y mantener, durante el
+  resto de la sesión) en cuanto el veredicto de triaje sea simple.
+
+```bash
+pepe agent add assistant \
+  --model modelo-fuerte-y-caro \
+  --triage-model modelo-barato-y-rapido \
+  --simple-model modelo-de-uso-diario \
+  --prompt "..." \
+  --tools bash,read_file,web_search
+```
+
+El triaje corre una sola vez, en el primer turno de una sesión, nunca de nuevo
+para esa misma sesión. En cuanto una conversación se juzga simple, se queda en
+el modelo más barato durante el resto de la conversación (el mismo mecanismo que
+usa el comando `/model` para cambiar el modelo de una sesión, solo que activado
+automáticamente en vez de a mano). Un veredicto complejo no cambia nada: la
+sesión corre en el modelo propio del agente exactamente igual que si
+`triage_model` no estuviera definido.
+
+El triaje es una optimización de mejor esfuerzo, nunca una dependencia. Si el
+modelo de triaje no existe, no es alcanzable, o simplemente tarda demasiado (con
+un tope de pocos segundos), el turno sigue adelante con el modelo propio del
+agente, en silencio. Una caída del triaje nunca bloquea ni rompe una
+conversación. `simple_model` también tiene que estar definido para que el
+triaje corra; si no, no habría a dónde bajar.
+
+Cada veredicto aparece como su propio paso en el Trace de ese turno (el replay
+de cada ejecución en el panel), junto a cualquier hook de privacidad que se
+haya ejecutado sobre el mensaje, así puedes ver exactamente por qué una
+sesión terminó en un modelo y no en otro.
 
 ## El agente predeterminado
 
@@ -347,7 +392,7 @@ surte efecto en el siguiente mensaje.
 ## Agentes multiempresa con empresas
 
 Las empresas son opcionales. Sin una, todo vive en el alcance predeterminado,
-llamado Principal, exactamente como siempre ha funcionado una instalación de un solo
+llamado Principal, exactamente como siempre ha funcionado una instalación de una sola
 empresa. Añade una empresa para aislar a una empresa: sus agentes, espacios de
 trabajo, espacio compartido, conexiones de modelo y enrutamiento quedan aislados de
 cualquier otra empresa.
@@ -391,6 +436,8 @@ pepe agent add NAME \
   [--hooks pii_redact] \
   [--max-iterations 12] \
   [--temperature 0.7] \
+  [--triage-model MODEL] \
+  [--simple-model MODEL] \
   [--default] \
   [--company CO]
 
@@ -453,4 +500,4 @@ de estado en `GET /health`.
 
 **Por un canal de mensajería.** Vincula un agente a una conexión de Telegram,
 WhatsApp, Slack, Discord, Microsoft Teams o Google Chat, o a un webhook entrante
-genérico, y responde allí con el mismo ciclo y las mismás herramientas.
+genérico, y responde allí con el mismo ciclo y las mismas herramientas.

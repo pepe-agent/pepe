@@ -25,7 +25,7 @@ referencia como `${OPENROUTER_API_KEY}` para que el secreto no quede en el archi
 ## 3. Habla
 
 ```bash
-pepe run assistant "qué archivos hay en este directorio?"
+pepe run assistant "¿Qué archivos hay en este directorio?"
 ```
 
 Si marcaste un agente como predeterminado, omite el nombre:
@@ -82,7 +82,7 @@ pepe gateway telegram
 ```
 
 Después, quien escriba al bot habla con el mismo agente. WhatsApp, Slack, Discord,
-Teams y Google Chat están en [Canales](./channels/).
+Teams y Google Chat están en [Canales](../channels/).
 
 ## 6. Automatiza
 
@@ -96,9 +96,9 @@ cuando una condición cambie.
 
 ## Siguientes pasos
 
-- [Agentes y herramientas](./agents/)
-- [API HTTP](./api/)
-- [Canales](./channels/)
-- [Tareas programadas](./scheduled/)
-- [Seguridad y permisos](./security/)
-- [Plugins](./plugins/)
+- [Agentes y herramientas](../agents/)
+- [API HTTP](../api/)
+- [Canales](../channels/)
+- [Tareas programadas](../scheduled/)
+- [Seguridad y permisos](../security/)
+- [Plugins](../plugins/)

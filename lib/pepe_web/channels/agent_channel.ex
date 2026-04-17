@@ -67,7 +67,8 @@ defmodule PepeWeb.AgentChannel do
         # view of an already-live session (e.g. after a page reload, which drops the
         # client's own in-memory transcript but not the server-side one) instead of
         # looking like the conversation was lost.
-        {:ok, %{history: visible_history(key)}, assign(socket, agent: agent, watch_key: key)}
+        socket = assign(socket, agent: agent, watch_key: key, lang: blank_to_nil(payload["lang"]))
+        {:ok, %{history: visible_history(key)}, socket}
     end
   end
 
@@ -106,6 +107,9 @@ defmodule PepeWeb.AgentChannel do
   defp port_suffix(%URI{scheme: "https", port: 443}), do: ""
   defp port_suffix(%URI{scheme: "http", port: 80}), do: ""
   defp port_suffix(%URI{port: port}), do: ":#{port}"
+
+  defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: v)
+  defp blank_to_nil(_v), do: nil
 
   # Listen for this connection's fired watches, and register so the scheduler knows a
   # live surface is here (the Registry entry is tied to this process and cleared on
@@ -167,8 +171,10 @@ defmodule PepeWeb.AgentChannel do
       # tool call - `authorize: nil` runs freely, exactly like a WhatsApp `support`
       # connection; the mitigation is binding the widget's token to a narrow, safe
       # agent (see the widget docs). `learn: false` until there's a real "who counts
-      # as a trainer" concept for an anonymous visitor.
-      opts = [stream: true, on_event: on_event, authorize: nil, learn: false]
+      # as a trainer" concept for an anonymous visitor. `lang` (the site's declared
+      # language, from the join payload) nudges the agent's first reply - see
+      # Session's own first-turn-only guard.
+      opts = [stream: true, on_event: on_event, authorize: nil, learn: false, lang: socket.assigns[:lang]]
 
       case Session.chat(key, text, opts) do
         {:ok, content} ->

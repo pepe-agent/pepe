@@ -9,7 +9,7 @@ As duas superfícies cobrem necessidades diferentes. A API HTTP é a escolha pad
 
 ## Uma primeira requisição
 
-Suba o servidor e então envie uma chat completion. Isso funciona de imediato, sem autenticação (veja [Autenticação](#autenticação-e-tokens) para trancar tudo):
+Suba o servidor e então envie uma chat completion. Isso funciona de imediato, sem autenticação (veja [Autenticação](../auth/#autenticação-e-tokens) para trancar tudo):
 
 ```bash
 pepe serve --port 4000
@@ -127,7 +127,7 @@ Essa é a ideia que faz todo o resto se encaixar. O campo `model` de uma requisi
 A resolução do campo `model` acontece nesta ordem:
 
 1. Se o nome corresponder a um agente, esse agente é executado.
-2. Se nenhum agente corresponder mas o nome corresponder a uma conexão de modelo pura, o Pepe a embrulha em um agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Essa alternativa só está disponível no escopo aberto ou raiz (veja [Escopos de token](#escopos-de-token)).
+2. Se nenhum agente corresponder mas o nome corresponder a uma conexão de modelo pura, o Pepe a embrulha em um agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Essa alternativa só está disponível no escopo aberto ou raiz (veja [Escopos de token](../auth/#escopos-de-token)).
 3. Se nenhum corresponder, o agente padrão é executado.
 
 <div class="note"><strong>Conclusão prática.</strong> O conjunto de "modelos" que um cliente pode escolher é o seu conjunto de agentes. Dê a um agente um nome descritivo, conecte as ferramentas dele uma vez e todo cliente compatível com OpenAI o enxerga como um modelo selecionável.</div>

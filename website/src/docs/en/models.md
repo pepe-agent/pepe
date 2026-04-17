@@ -52,14 +52,14 @@ over the command line.
 pepe model rename openrouter OR-work
 ```
 
-Every agent, cron, and default that points at the connection keeps working -
+Every agent, cron, and default that points at the connection keeps working;
 renaming only changes the display name, not the stable id every reference is
 actually stored against, so nothing needs fixing up afterward.
 
 ### Switch models mid-conversation
 
 `/model` and `/models` work the same way in Telegram, the console (`pepe chat`),
-and the dashboard's own chat - see [Telegram](./telegram/) for the full command
+and the dashboard's own chat; see [Telegram](../telegram/) for the full command
 reference. Anyone in an allowed conversation can switch the model for just their
 own session; a trainer (the same allowlist that governs `/learn`) can also change
 it for everyone.
@@ -78,6 +78,10 @@ instead, since another endpoint would not fix it.
 
 Pepe talks to providers over the OpenAI Chat Completions protocol, so any
 OpenAI-compatible endpoint works with no code change.
+
+A session can also downgrade itself to a cheaper model automatically, on its own
+first turn, when a quick triage call judges the chat simple enough to warrant it;
+see [Complexity-based model routing](../agents/#complexity-based-model-routing).
 
 ### Do it by chat
 

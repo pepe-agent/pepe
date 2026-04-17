@@ -14,7 +14,7 @@ https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
 
 - `<company>` es el ámbito de empresa. Usa `root` para el ámbito
   predeterminado (que aparece como "Principal" en el panel), o el identificador
-  de una empresa para aislar una conexión a ese empresa.
+  de una empresa para aislar una conexión a esa empresa.
 - `<provider>` es el nombre de la plataforma: `whatsapp`, `slack`, `discord`,
   `msteams` o `googlechat`.
 - `<slug>` es el nombre único que le diste a la conexión.
@@ -24,7 +24,7 @@ devuelve el desafío que la plataforma envía cuando registras la URL por primer
 vez). Un `POST` es un evento entrante. En un `POST`, Pepe resuelve la conexión,
 verifica la firma de la petición contra el secreto que configuraste, extrae el
 mensaje, ejecuta el agente vinculado y entrega la respuesta a través de la
-propia API del proveedor. El trabajo del agente corre en segúndo plano para que
+propia API del proveedor. El trabajo del agente corre en segundo plano para que
 la plataforma reciba su acuse de inmediato (proveedores como Meta reintentan un
 webhook lento).
 
@@ -48,65 +48,31 @@ pepe setup
 ```
 
 Elige la opción de canal, escoge el proveedor y el agente, e ingresa las
-credenciales (se acepta una referencia `${ENV_VAR}` para cualquier secreto). Los
-campos obligatorios de cada proveedor están abajo.
+credenciales (se acepta una referencia `${ENV_VAR}` para cualquier secreto).
+Cada uno tiene su propia página con sus campos y pasos de configuración
+específicos: [Slack](../slack/), [Discord](../discord/),
+[Microsoft Teams](../msteams/), [Google Chat](../googlechat/). Esta página
+cubre lo que comparten todos ellos (y WhatsApp).
 
-### Slack
+## Cambiar de modelo
 
-Slack usa la Events API. El `config` de una conexión contiene:
+`/model` y `/models` solo se activan en una conexión en modo `admin` con
+`commands` habilitado (ver la comparación de modos en [Channels](../channels/))
+- en `support`, son texto plano. `/models` lista los modelos disponibles para
+la empresa de la conexión; `/model` muestra el actual, o lo cambia:
 
-- `bot_token`: el token OAuth del usuario bot (`xoxb-...`), usado como bearer
-  para las respuestas.
-- `signing_secret`: verifica el `X-Slack-Signature` en las peticiones entrantes.
-
-En la app de Slack, define la URL de petición de Event Subscriptions con la URL
-de la conexión y suscríbete a `message.channels` y `app_mention`. El primer
-guardado dispara un saludo `url_verification`, que Pepe responde de inmediato.
-Las respuestas se publican con `chat.postMessage`. Forma de la URL de retorno:
-
+```text
+/model openrouter               # pregunta si cambiar solo este chat o todos
+/model openrouter session       # cambia solo para esta conversación
+/model openrouter global        # cambia para todos con los que habla esta conexión
 ```
-https://YOUR_HOST/webhooks/root/slack/<slug>
-```
 
-### Discord
-
-Discord se conecta a través del punto de acceso de Interactions (comandos de
-barra), así que encaja en la pasarela de webhook y no en una conexión
-persistente. El `config` de una conexión contiene:
-
-- `public_key`: la clave pública de la app (hex), para la verificación de firma
-  Ed25519 requerida.
-- `application_id`: se usa para publicar la respuesta de seguimiento.
-
-En la app de Discord, apunta "Interactions Endpoint URL" a la URL de la conexión
-y agrega un comando de barra con una opción de texto (por ejemplo
-`/ask prompt:...`). Discord exige un acuse en tres segúndos, así que Pepe
-responde con una respuesta diferida y publica la respuesta real como seguimiento
-una vez que el agente termina.
-
-### Microsoft Teams
-
-Teams usa el Bot Framework. El `config` de una conexión contiene:
-
-- `app_id`: el id de la app (cliente) de Microsoft del bot.
-- `app_password`: el secreto de cliente. Guárdalo como `${ENV_VAR}`.
-- `tenant_id`: el id de empresa de Azure (o `botframework.com`).
-
-Las actividades entrantes llegan como `POST`s. Las respuestas vuelven a la URL de
-servicio de la actividad con un token de acceso de app generado a partir de las
-credenciales de cliente. La mención al bot se quita del texto entrante antes de
-que el agente lo vea.
-
-### Google Chat
-
-Google Chat publica eventos de espacio en la URL de retorno. El `config` de una
-conexión contiene:
-
-- `access_token`: un token OAuth para la Chat API, usado como bearer para las
-  respuestas. Guárdalo como `${ENV_VAR}` y renuévalo por fuera.
-
-Solo se atienden los eventos `MESSAGE` de una persona. Las respuestas se
-publican de vuelta al espacio a través de la Chat REST API.
+Cambiarlo **globalmente** está reservado para **entrenadores** (la misma
+lista que rige la memoria); cualquier otra persona en una conversación
+permitida solo puede cambiar su propia sesión. Pon `model_switch_locked: true`
+en la conexión para desactivarlo por completo para quien no sea entrenador.
+Es el mismo mecanismo que usa WhatsApp; la versión de Telegram añade un
+selector con botones en vez de comandos escritos.
 
 ## Por dentro: el contrato del proveedor
 

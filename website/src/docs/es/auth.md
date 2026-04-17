@@ -7,7 +7,7 @@ description: Protege el acceso remoto a la API con tokens acotados.
 
 Con **cero tokens configurados, la API responde solo a los llamantes de la misma máquina (loopback)**. Un `curl` local o el panel funcionan sin token, pero cualquier llamante remoto se rechaza con `401`, así que un servidor que expones en una red nunca es anónimo.
 
-Crear el primer token requiere entonces un token de todos (locales o remotos). Una vez que existe cualquier token, cada petición, local o remota, debe presentar uno válido o se rechaza con `401`. Generar el primer token es lo que desbloquea el acceso remoto.
+Crear el primer token cambia la regla para todos. Una vez que existe cualquier token, cada petición, local o remota, debe presentar uno válido o se rechaza con `401`. Generar el primer token es lo que desbloquea el acceso remoto.
 
 ### Generar y gestionar tokens
 

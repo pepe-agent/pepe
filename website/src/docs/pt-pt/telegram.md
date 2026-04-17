@@ -6,19 +6,19 @@ description: Cria e gere bots do Telegram ligados a agentes do Pepe.
 ## Telegram
 
 O Telegram é o canal mais rápido de pôr de pé porque não precisa de qualquer URL
-público. Crie um bot com o @BotFather, copie o respectivo token e registe-o.
+público. Cria um bot com o @BotFather, copia o respetivo token e regista-o.
 
-Configure o bot predefinido de forma interactiva:
+Configura o bot predefinido de forma interativa:
 
 ```bash
 pepe gateway telegram setup
 ```
 
-Isto pede o token (pode colar um token literal ou uma referência `${ENV_VAR}`),
+Isto pede o token (podes colar um token literal ou uma referência `${ENV_VAR}`),
 um agente opcional para associar e uma lista opcional de ids de conversa
 autorizados a falar com ele.
 
-Pode executar mais do que um bot, cada um associado a um agente diferente:
+Podes executar mais do que um bot, cada um associado a um agente diferente:
 
 ```bash
 pepe gateway telegram add support --token "${SUPPORT_BOT_TOKEN}" --agent helpdesk --trainers none
@@ -28,17 +28,17 @@ pepe gateway telegram add ops --token "${OPS_BOT_TOKEN}" --agent operator --hear
 As opções do `telegram add`:
 
 - `--token` (obrigatória): o token do bot, literal ou `${ENV_VAR}`.
-- `--agent`: qual o agente que responde. Omita para usar o seu agente
+- `--agent`: qual o agente que responde. Omite para usar o teu agente
   predefinido.
-- `--trainers`: de quem este bot pode aprender para a memória. Omita para todos,
+- `--trainers`: de quem este bot pode aprender para a memória. Omite para todos,
   `none` para ninguém, ou uma lista separada por vírgulas de ids de utilizador
   para apenas esses.
 - `--heartbeat-minutes` e `--heartbeat-hours`: uma janela periódica opcional de
-  activação (para agentes que verificam coisas segundo um horário). As horas são
+  ativação (para agentes que verificam coisas segundo um horário). As horas são
   uma janela local como `8-22`.
 - `--progress`: como o bot sinaliza que está a trabalhar enquanto uma execução
-  decorre. Uma entre `reaction` (uma reacção na sua mensagem), `ambient` (uma
-  linha de actividade), `off` (apenas o indicador de escrita) ou `verbose` (um
+  decorre. Uma entre `reaction` (uma reação na tua mensagem), `ambient` (uma
+  linha de atividade), `off` (apenas o indicador de escrita) ou `verbose` (um
   detalhe por ferramenta).
 
 Listar e remover bots:
@@ -48,25 +48,25 @@ pepe gateway telegram list
 pepe gateway telegram remove support
 ```
 
-Execute o consultador em primeiro plano (um consultador por bot):
+Executa o consultador em primeiro plano (um consultador por bot):
 
 ```bash
 pepe gateway telegram
 ```
 
-Normalmente não precisa de executar isto em separado. O `pepe serve` arranca com
+Normalmente não precisas de executar isto em separado. O `pepe serve` arranca com
 os bots do Telegram configurados a par da API HTTP, por isso um único servidor em
 execução cobre todos os canais de uma vez.
 
 <div class="note"><strong>Painel.</strong> A secção Channels do painel lista os
-seus bots com um distintivo ao vivo de activo/inactivo, permite-lhe adicionar um
+teus bots com um distintivo ao vivo de ativo/inativo, permite-te adicionar um
 bot, editar com que agente ele fala e removê-lo. Grava a mesma configuração que a
 linha de comandos.</div>
 
 ### Muda de modelo a meio de uma conversa
 
-`/model` mostra o modelo activo nesse chat, com um botão **Browse models**
-para escolher outro; `/models` vai directo a esse selector. Utilização
+`/model` mostra o modelo ativo nesse chat, com um botão **Browse models**
+para escolher outro; `/models` vai direto a esse seletor. Utilização
 escrita:
 
 ```text
@@ -77,22 +77,22 @@ escrita:
 
 Qualquer pessoa numa conversa permitida pode mudar a sua própria sessão;
 mudá-lo **globalmente** (para todas as conversas que este bot atende) está
-reservado a **formadores** - a mesma lista que rege o `/learn` e a memória -
+reservado a **formadores** (a mesma lista que rege o `/learn` e a memória),
 por isso um membro qualquer do chat não consegue reapontar todo o bot para
-outro modelo em silêncio. Defina `model_switch_locked: true` no bot para
-desactivar por completo a mudança de modelo para quem não é formador. Uma
-alteração de sessão vive só em memória - repõe-se com `/new` ou com um
+outro modelo em silêncio. Define `model_switch_locked: true` no bot para
+desativar por completo a mudança de modelo para quem não é formador. Uma
+alteração de sessão vive só em memória; repõe-se com `/new` ou com um
 reinício do servidor, voltando ao que a configuração própria do agente
 disser.
 
-### Faça pela conversa
+### Fá-lo pela conversa
 
 Um agente que tenha a ferramenta `manage_channel` consegue criar e reassociar
 bots do Telegram a partir de uma conversa. Como edita a configuração, cada
-chamada passa pela cancela de permissão: o agente propõe a alteração e o
-utilizador confirma antes de ela ser aplicada.
+chamada passa pela cancela de permissão: o agente propõe a alteração e tu
+confirmas antes de ela ser aplicada.
 
-Diria:
+Dirias:
 
 > Adiciona um bot do Telegram chamado sales que fale com o agente de vendas. O
 > token está na variável de ambiente SALES_BOT_TOKEN.
@@ -109,7 +109,7 @@ salvaguardas:
 - **O bot predefinido protegido é intocável.** A ferramenta só mexe em bots com
   nome, nunca no `default`.
 
-Outras acções do `manage_channel` são `list`, `set_agent` (reassociar um bot a
+Outras ações do `manage_channel` são `list`, `set_agent` (reassociar um bot a
 outro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`,
 `disable` e `remove`. Após qualquer alteração, reconcilia os consultadores em
 execução, por isso um bot arranca ou pára ao vivo, sem reinício.

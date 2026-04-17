@@ -4,7 +4,7 @@ description: Extend Pepe with your own tools and channels by installing plugins 
 ---
 
 A plugin adds a **tool** the model can call, or a **channel provider** (a new
-messaging platform), or both - Elixir compiled at runtime from
+messaging platform), or both: Elixir compiled at runtime from
 `~/.pepe/plugins/`, no rebuild. These are the only two shapes a plugin can take
 today; a module is matched against whichever shape it implements.
 
@@ -19,14 +19,14 @@ today; a module is matched against whichever shape it implements.
 
 | Callback | Purpose |
 |---|---|
-| `name/0` | The function name the model calls, e.g. `"read_file"`. Must be unique across all tools - a plugin never wins a name collision with a built-in. |
+| `name/0` | The function name the model calls, e.g. `"read_file"`. Must be unique across all tools; a plugin never wins a name collision with a built-in. |
 | `spec/0` | The OpenAI-style function spec: name, plain-language description, and a JSON Schema for the parameters. This is what the model reads to decide when and how to call the tool. |
-| `run/2` | Runs the call. `args` is the decoded arguments (a string-keyed map); `ctx` carries the current run's context (below). Return `{:ok, text}` or `{:error, message}` - either way it's turned into a string and fed back to the model, so write it for the model to read. |
+| `run/2` | Runs the call. `args` is the decoded arguments (a string-keyed map); `ctx` carries the current run's context (below). Return `{:ok, text}` or `{:error, message}`; either way it's turned into a string and fed back to the model, so write it for the model to read. |
 
 `Pepe.Tools.Tool.function/3` builds the spec envelope for you, so you only
 supply the name, description, and parameters.
 
-A complete, working tool - save as an `.exs` and install it (see below):
+A complete, working tool, saved as an `.exs` and installed (see below):
 
 ```elixir
 defmodule MyPlugin.Reverse do
@@ -66,13 +66,13 @@ a tailored message helps the model recover on the next turn).
 conversation, absent for one-shot runs), `ctx[:cwd]` (the working directory).
 Treat every key as optional. Tools that read/write files resolve paths through
 `Pepe.Agent.Workspace`; tools that call an outside API usually ignore `ctx`
-entirely and just reach for the bundled `Req` HTTP client - no extra dependency
+entirely and just reach for the bundled `Req` HTTP client, no extra dependency
 needed.
 
 ## The Channel provider behaviour
 
 A channel provider teaches Pepe to speak a new messaging platform over the
-existing generic inbound webhook - no new route, just a new module in the
+existing generic inbound webhook: no new route, just a new module in the
 registry.
 
 ```elixir
@@ -89,9 +89,9 @@ registry.
 | `verify/2` | yes | Answers the platform's handshake `GET` when you register the webhook URL. `{:ok, challenge}` or `:error` if the provider has none. |
 | `authenticate/3` | yes | Checks an inbound `POST`'s signature against the connection's secret. `:ok` to accept, `:error` to drop it. |
 | `parse/1` | yes | Normalizes a decoded payload into zero or more `%{from, text, id}` messages, or `:ignore` for things with nothing to act on (receipts, status updates). |
-| `deliver/3` | yes | Sends a text reply to `to` (a provider address - phone number, channel id, ...). |
+| `deliver/3` | yes | Sends a text reply to `to` (a provider address: phone number, channel id, ...). |
 | `label/0` | no | Human label for the dashboard (defaults to `name/0`). |
-| `config_schema/0` | no | Fields the dashboard renders to configure a connection - same shape as a plugin manifest's `config` array (below). |
+| `config_schema/0` | no | Fields the dashboard renders to configure a connection, same shape as a plugin manifest's `config` array (below). |
 | `respond/3` | no | A **synchronous** HTTP reply to the raw `POST`, for protocols that need one before any agent work (Slack's URL-verification challenge, Discord's `PING`). `{:reply, status, content_type, body}` or `:cont` to fall through to `parse/1`. |
 | `deliver_file/4` | no | Sends a file as an attachment. Omit it and `send_file` just reports the channel can't receive files. |
 | `addressed?/2` | no | Does this payload address the bot, so it should get a reply? Lets a provider honor `require_mention` in group chats (default when omitted: always addressed). |
@@ -105,12 +105,12 @@ built-in always wins a name collision, so pick a tool name distinct from
 
 ### Granting a tool to an agent
 
-Installing a plugin does not hand its tools to every agent - only the tools
+Installing a plugin does not hand its tools to every agent; only the tools
 listed on an agent are exposed to it, gated the same as a built-in.
 
 **CLI:** `pepe agent add assistant --tools reverse_text,web_search,read_file`
 
-**Dashboard:** open the agent under Agents and tick the tool - plugin tools
+**Dashboard:** open the agent under Agents and tick the tool; plugin tools
 appear alongside built-ins.
 
 **By chat:** an agent with `enable_tool` can turn on a tool for itself:
@@ -131,12 +131,12 @@ first):
 
 Plugins live under `~/.pepe/plugins/` (follows `PEPE_HOME`). Pepe scans that
 folder recursively for `.exs` files, compiles each once, and recompiles only
-when its mtime changes - drop a file in, it works with no restart; edit it,
+when its mtime changes. Drop a file in, it works with no restart; edit it,
 the change lands on the next tool call. One file can define several modules
 (the Google example below ships four).
 
-A plugin is one of two shapes: a bare `.exs` file, or a **package** - a
-directory with a `manifest.json` and one or more `.exs` files.
+A plugin is one of two shapes: a bare `.exs` file, or a **package** (a
+directory with a `manifest.json` and one or more `.exs` files).
 
 ## Installing a plugin
 
@@ -159,7 +159,7 @@ plugins list with a Remove button and, when the plugin declares settings, a
 Configure button.
 
 **From chat, with `manage_plugin`:** an agent holding this tool can install on
-your behalf - `scan` a source first to see what it does, then `install`,
+your behalf: `scan` a source first to see what it does, then `install`,
 `list`, `remove`. It runs the same security scan as the CLI, but with no
 `--force` escape hatch: a dangerous verdict is always refused from chat, and
 the agent will tell you to review the code and run `--force` yourself at a
@@ -167,17 +167,17 @@ terminal if you still want it.
 
 ## The security scan
 
-A plugin is ordinary Elixir with full access to the running app - installing
+A plugin is ordinary Elixir with full access to the running app; installing
 one is a trust decision, like adding any dependency. Before it's placed on
 disk, `Pepe.Skills.Sentinel` statically scans it, reading the syntax tree for
 dangerous patterns (spawning shells, dynamic eval, destructive filesystem
 calls, reading secrets, network access). It never executes the code, and
 returns one of three verdicts:
 
-- **clean** - no findings.
-- **caution** - flagged but often legitimate (a channel plugin *should* make
+- **clean**: no findings.
+- **caution**: flagged but often legitimate (a channel plugin *should* make
   network calls); shown, doesn't block.
-- **danger** - no good reason to be here; blocks the install.
+- **danger**: no good reason to be here; blocks the install.
 
 ```bash
 pepe plugin scan ./my_plugin.exs        # scan without installing
@@ -189,7 +189,7 @@ a safety net, not a substitute for reading the code yourself.</div>
 
 ## The manifest and the Configure dialog
 
-A package's `manifest.json` names it, describes it, and - most usefully -
+A package's `manifest.json` names it, describes it, and, most usefully,
 declares the settings it needs. From the bundled Google example:
 
 ```json
@@ -211,7 +211,7 @@ declares the settings it needs. From the bundled Google example:
 Each `config` entry is one field: `key` (the name your code reads), `label`
 (shown in the form), `type` (`"text"`, `"secret"` for a masked input, or
 `"select"` with an `"options"` list), and an optional `hint`. The dashboard
-reads this array and renders the Configure dialog - a new plugin needs no new
+reads this array and renders the Configure dialog; a new plugin needs no new
 screen. A value can be a `${ENV_VAR}` reference, stored literally and resolved
 from the environment only when read, so secrets never sit expanded in the
 config file.
@@ -244,7 +244,7 @@ pepe plugin install ./examples/plugins/google
 pepe agent add assistant --tools gcal_upcoming,gcal_create_event,gmail_search,gmail_send
 ```
 
-It authenticates with an OAuth2 bearer token resolved at call time - nothing
+It authenticates with an OAuth2 bearer token resolved at call time; nothing
 sensitive baked into the code. Either export a ready access token (quickest,
 expires in ~1h):
 
@@ -312,7 +312,7 @@ end
 
 ## Example: the Chatwoot channel plugin
 
-`examples/plugins/chatwoot/` shows the other shape - a **channel**, not a tool.
+`examples/plugins/chatwoot/` shows the other shape: a **channel**, not a tool.
 It registers a `chatwoot` provider so Pepe can sit behind a
 [Chatwoot](https://www.chatwoot.com) inbox as the AI agent, across every
 channel Chatwoot owns (WhatsApp, web widget, Instagram, ...).
@@ -330,7 +330,7 @@ agent takes over (`open`), Pepe goes quiet, and resumes when it's back to
 **Setup, in Chatwoot:** create an AgentBot, point its outgoing webhook at
 `https://YOUR_HOST/webhooks/<company>/chatwoot/<slug>`. The connection holds
 `base_url`, `account_id`, and an `api_token` (as a `${ENV_VAR}`) via
-`config_schema/0` - filled from the dashboard, same Configure pattern as any
+`config_schema/0`, filled from the dashboard, same Configure pattern as any
 plugin.
 
 > This is one of two mutually exclusive ways to run WhatsApp: **either**
@@ -341,7 +341,7 @@ plugin.
 ## Delivering a file, not just text
 
 A tool's `run/2` only ever returns text. To hand the person in the
-conversation an actual file (a spreadsheet, a PDF), don't reinvent delivery -
+conversation an actual file (a spreadsheet, a PDF), don't reinvent delivery;
 call the built-in `send_file` tool with a path; Pepe resolves the channel from
 the session and delivers it there. Grant `send_file` to an agent and it just
 works from chat, on any channel whose provider implements `deliver_file/4`.
@@ -366,5 +366,5 @@ works from chat, on any channel whose provider implements `deliver_file/4`.
 
 **Either way:** scan it (`pepe plugin scan SRC` or `manage_plugin scan`),
 install it, review what the scan found, then grant the tool to an agent (CLI,
-dashboard, or `enable_tool`/`manage_agent` from chat) - a channel needs no
+dashboard, or `enable_tool`/`manage_agent` from chat); a channel needs no
 grant, it's live the moment it's installed.

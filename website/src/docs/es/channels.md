@@ -9,12 +9,12 @@ herramientas y leyendo la respuesta), y la respuesta se entrega por ese mismo
 canal. No escribes nada de código de conexión. Agregas una conexión, la apuntas
 a un agente y funciona.
 
-Todo en está página da por sentado que ya tienes al menos un agente definido. Si
+Todo en esta página da por sentado que ya tienes al menos un agente definido. Si
 no lo tienes, consulta primero la guía de agentes.
 
 ## Tres maneras de configurarlo
 
-Como el resto de Pepe, los canales se gestionan de tres maneras, y está página
+Como el resto de Pepe, los canales se gestionan de tres maneras, y esta página
 muestra cada una donde corresponde:
 
 1. La línea de comandos `pepe`.
@@ -51,7 +51,7 @@ motor:
 | Público | De cara al cliente, abierto a cualquiera | Tú, restringido a remitentes autorizados |
 | Historial | Efímero, cada chat aislado | Se conserva entre mensajes |
 | Memoria | Nunca aprende | Las conversaciones pueden volverse memoria |
-| Comandos de barra | Tratados como texto plano | Habilitados (por ejemplo `/new` reinicia) |
+| Comandos de barra | Tratados como texto plano | Habilitados (por ejemplo `/new` reinicia, `/model` cambia de modelo) |
 
 Soporte es el valor predeterminado seguro para cualquier cosa a la que el
 público pueda llegar. Combínalo con un agente restringido (solo herramientas

@@ -46,7 +46,7 @@ pinging openrouter (openai/gpt-5-chat)...
 ✓ openrouter works - reply: pong
 ```
 
-O painel também consegue fazer tudo isto, no seu separador Modelos, se preferires um
+O painel também consegue fazer tudo isto, no teu separador Modelos, se preferires um
 formulário à linha de comandos.
 
 ### Renomeia uma ligação
@@ -56,13 +56,13 @@ pepe model rename openrouter OR-trabalho
 ```
 
 Todo agente, cron e valor predefinido que aponte para a ligação continua a
-funcionar - renomear só muda o nome apresentado, não o id estável a que cada
+funcionar: renomear só muda o nome apresentado, não o id estável a que cada
 referência está realmente amarrada, por isso não há nada para corrigir depois.
 
 ### Muda de modelo a meio de uma conversa
 
 `/model` e `/models` funcionam da mesma forma no Telegram, na consola
-(`pepe chat`) e no próprio chat do painel - consulta [Telegram](./telegram/)
+(`pepe chat`) e no próprio chat do painel; consulta [Telegram](../telegram/)
 para a referência completa de comandos. Qualquer pessoa numa conversa
 permitida pode trocar o modelo só para a sua sessão; um formador (a mesma
 lista que rege o `/learn`) também pode trocá-lo para todos.
@@ -84,7 +84,11 @@ endpoint não o resolveria.
 O Pepe fala com os fornecedores através do protocolo Chat Completions da OpenAI, por
 isso qualquer endpoint compatível com OpenAI funciona sem alteração de código.
 
-### Faça pela conversa
+Uma sessão também se pode fazer descer sozinha para um modelo mais barato
+automaticamente, no seu próprio primeiro turno, quando uma chamada de triagem
+rápida julga a conversa simples o suficiente; vê [Encaminhamento de modelo por complexidade](../agents/#encaminhamento-de-modelo-por-complexidade).
+
+### Fá-lo pela conversa
 
 Um agente com a ferramenta `manage_agent` pode reapontar um modelo que administra:
 

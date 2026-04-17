@@ -48,7 +48,7 @@ A webhook connection also has a `mode` that changes how the runtime behaves:
 | Audience | Customer-facing, open to anyone | You, restricted to allowed senders |
 | History | Ephemeral, each chat isolated | Kept across messages |
 | Memory | Never learns | Conversations can become memory |
-| Slash commands | Treated as plain text | Enabled (for example `/new` resets) |
+| Slash commands | Treated as plain text | Enabled (for example `/new` resets, `/model` switches models) |
 
 Support is the safe default for anything the public can reach. Pair it with a
 locked-down agent (safe tools only, since there is no human on your side to

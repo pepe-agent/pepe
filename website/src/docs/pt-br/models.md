@@ -54,14 +54,14 @@ linha de comando.
 pepe model rename openrouter OR-trabalho
 ```
 
-Todo agente, cron e padrão que aponta pra conexão continua funcionando -
+Todo agente, cron e padrão que aponta pra conexão continua funcionando:
 renomear só muda o nome de exibição, não o id estável que cada referência
 guarda de verdade, então não tem nada pra consertar depois.
 
 ### Trocar de modelo no meio da conversa
 
 `/model` e `/models` funcionam do mesmo jeito no Telegram, no console
-(`pepe chat`) e no próprio chat do painel - veja [Telegram](./telegram/) pra
+(`pepe chat`) e no próprio chat do painel; veja [Telegram](../telegram/) pra
 a referência completa de comandos. Qualquer um numa conversa permitida pode
 trocar o modelo só pra sua sessão; um treinador (a mesma lista que controla
 `/learn`) também pode trocar pra todo mundo.
@@ -82,6 +82,10 @@ resolveria.
 
 O Pepe fala com os provedores pelo protocolo Chat Completions da OpenAI, então
 qualquer endpoint compatível com OpenAI funciona sem mudança de código.
+
+Uma sessão também pode descer sozinha pra um modelo mais barato automaticamente,
+no seu próprio primeiro turno, quando uma chamada rápida de triagem julga a
+conversa simples o bastante. Veja [Roteamento de modelo por complexidade](../agents/#roteamento-de-modelo-por-complexidade).
 
 ### Faça pela conversa
 

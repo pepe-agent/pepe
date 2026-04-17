@@ -43,7 +43,7 @@ The socket speaks a simple JSON framing protocol. Every message, in both directi
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Joining `agent:<name>` selects and authorizes that agent against your token scope, exactly like the `model` field over HTTP. A topic you are not allowed to join is refused. Pass `{"session": "some-stable-id"}` in the join payload to keep the same watch/notification channel across reconnects; otherwise a fresh per-connection id is used.
+Joining `agent:<name>` selects and authorizes that agent against your token scope, exactly like the `model` field over HTTP. A topic you are not allowed to join is refused. Pass `{"session": "some-stable-id"}` in the join payload to keep the same watch/notification channel across reconnects; otherwise a fresh per-connection id is used. Pass `{"lang": "pt-BR"}` too and it nudges the agent's very first reply toward that language (a one-time system hint on the session's first turn). This is how the [embeddable widget](../widget/)'s `data-lang` reaches the agent.
 
 ### Events
 
@@ -58,7 +58,7 @@ You **receive** these outbound events, each arriving as a frame whose payload is
 * `tool_call` `{ "name": "...", "arguments": {...} }`: the agent is invoking a tool.
 * `tool_result` `{ "name": "...", "output": "..." }`: that tool's output.
 * `done` `{ "content": "..." }`: the final answer; the turn is complete.
-* `session_ended` `{}`: the agent called `end_session` - its closing reply already
+* `session_ended` `{}`: the agent called `end_session`; its closing reply already
   arrived via the `done` above, and the *next* prompt starts on a fresh context.
 * `watch` `{ "text": "..." }`: a watch created from this connection has fired.
 * `error` `{ "reason": "..." }`: something went wrong on this turn.

@@ -65,7 +65,7 @@ Um token carrega um escopo que decide quais agentes ele pode alcançar. Do mais 
 
 `GET /v1/models` respeita o escopo: um token de empresa ou de agente vê apenas os próprios agentes, nunca os de outra empresa, e nunca as conexões de modelo puras.
 
-## Roteamento multiempresa: de a empresa X seu próprio acesso
+## Roteamento multiempresa: dê à empresa X seu próprio acesso
 
 Escopos são a forma de distribuir acesso à API por empresa. Para dar a uma empresa a chave dela, gere um token com escopo de empresa:
 

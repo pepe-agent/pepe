@@ -1,11 +1,11 @@
 ---
 title: Vigilancias
-description: Crea monitores duraderos de una sola vez que avisan cuando una condición se cumple.
+description: Crea monitores duraderos que avisan una sola vez cuando una condición se cumple.
 ---
 
 ## Vigilancias
 
-Una vigilancia responde a una pregunta distinta: no "haz esto según el reloj" sino "mantén un ojo en algo y avisame en el momento en que pase". Una vigilancia recomprueba una condición con un temporizador y te notifica **una vez** cuando se vuelve verdadera, y luego se detiene. Es duradera: sobrevive a un reinicio y al cierre de la sesión que la creó, y siempre responde en el canal desde el que se creó.
+Una vigilancia responde a una pregunta distinta: no "haz esto según el reloj" sino "mantén un ojo en algo y avísame en el momento en que pase". Una vigilancia recomprueba una condición con un temporizador y te notifica **una vez** cuando se vuelve verdadera, y luego se detiene. Es duradera: sobrevive a un reinicio y al cierre de la sesión que la creó, y siempre responde en el canal desde el que se creó.
 
 ### Disparadores por sonda y por agente
 
@@ -14,7 +14,7 @@ La parte barata de una vigilancia es el **disparador**, que corre en cada interv
 - Una **sonda** ejecuta un comando de shell y no cuesta tokens por comprobación. El éxito es el código de salida 0 por defecto, o puedes exigir que aparezca una cadena en la salida del comando. Usa una sonda siempre que la condición sea scriptable (una URL está accesible, un trabajo escribió un archivo, un log contiene una línea).
 - Un disparador de **agente** le vuelve a preguntar al agente una pregunta de sí/no en cada intervalo, una llamada al modelo por comprobación. Úsalo solo cuando decidir si la condición se cumple requiere verdadero criterio.
 
-Como las comprobaciones de agente cuestan tokens, su intervalo mínimo es más alto: 300 segúndos para disparadores de agente, 30 segúndos para sondas. El intervalo por defecto es de 120 segúndos.
+Como las comprobaciones de agente cuestan tokens, su intervalo mínimo es más alto: 300 segundos para disparadores de agente, 30 segundos para sondas. El intervalo por defecto es de 120 segundos.
 
 ### Qué envía cuando se dispara
 
@@ -36,7 +36,7 @@ pepe watch add "api-up" \
 - `--probe` es el comando de shell a sondear. Sin `--contains`, el éxito significa que el comando sale con 0.
 - `--contains STR` en su lugar hace que el éxito signifique que `STR` aparece en la salida del comando.
 - `--message` es el texto a enviar cuando se dispara. Omítelo para una confirmación por defecto.
-- `--every` es el intervalo de sondeo en segúndos (mínimo 30).
+- `--every` es el intervalo de sondeo en segundos (mínimo 30).
 - `--deliver telegram:<chat>` envía la notificación a ese chat. Omítelo y la notificación va al log de la aplicación.
 
 Gestionar vigilancias:
@@ -56,7 +56,7 @@ Abre la página **Watches** bajo `pepe serve` para ver cada vigilancia con su es
 
 Pídelo en lenguaje natural y el agente crea la vigilancia a través de su herramienta `watch`. Igual que `schedule_task`, la herramienta `watch` tiene que estar en el conjunto del agente y pasa por el mismo aviso de permiso en cada creación, así que aplica la misma doble aprobación.
 
-> Avisame cuando termine el despliegue. Revisa cada pocos minutos.
+> Avísame cuando termine el despliegue. Revisa cada pocos minutos.
 
 Para una comprobación scriptable el agente configura una sonda. Para algo que necesita criterio configura un disparador de agente, formulando una pregunta de sí/no que responde en cada intervalo. También puede optar por componer el mensaje de disparo con el modelo en lugar de una plantilla fija, para que la notificación lleve un resumen real en vez de una línea enlatada. Las acciones de la herramienta `watch` son `create`, `list`, `pause`, `resume` y `cancel`.
 
@@ -73,4 +73,4 @@ Dos garantías lo hacen fiable:
 
 Una vigilancia pasa por un pequeño conjunto de estados a lo largo de su vida: `pending` (aún vigilando), `paused`, `done` (disparada y entregada), `expired` (agotó su presupuesto de comprobaciones) o `cancelled`.
 
-<div class="note"><strong>Sin base de datos, sin crontab.</strong> Las tareas y las vigilancias son registros simples en <code>~/.pepe/config.json</code>, y el historial de ejecuciónes de las tareas es un archivo JSONL por tarea bajo <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. No hay nada más que instalar ni mantener corriendo. Todo el programador es un temporizador dentro del proceso que arranca cuando ejecutas <code>pepe serve</code> o un gateway, y se detiene cuando los detienes.</div>
+<div class="note"><strong>Sin base de datos, sin crontab.</strong> Las tareas y las vigilancias son registros simples en <code>~/.pepe/config.json</code>, y el historial de ejecuciones de las tareas es un archivo JSONL por tarea bajo <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. No hay nada más que instalar ni mantener corriendo. Todo el programador es un temporizador dentro del proceso que arranca cuando ejecutas <code>pepe serve</code> o un gateway, y se detiene cuando los detienes.</div>

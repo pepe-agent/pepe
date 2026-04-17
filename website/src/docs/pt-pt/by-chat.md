@@ -26,7 +26,7 @@ Concede autoridade de gestão diretamente:
 pepe agent manage supervisor "*"
 ```
 
-### Faça pela conversa
+### Fá-lo pela conversa
 
 Um agente administrador usa `manage_agent` para moldar os agentes do seu âmbito. As
 suas ações são `list`, `get`, `create`, `set_persona`, `set_model`, `add_tool`,

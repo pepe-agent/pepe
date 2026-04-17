@@ -398,6 +398,21 @@ defmodule PepeWeb.TracesLive do
     """
   end
 
+  defp event(%{ev: %{"t" => "triage"}} = assigns) do
+    ~H"""
+    <div class="text-sm text-zinc-400">
+      {gettext("Triage")} ({@ev["triage_model"]}): {triage_verdict_label(@ev["verdict"])}
+      <span :if={@ev["chosen_model"]}>→ {@ev["chosen_model"]}</span>
+    </div>
+    """
+  end
+
+  defp event(%{ev: %{"t" => "hook"}} = assigns) do
+    ~H"""
+    <div class="text-sm text-zinc-400">{gettext("Hook")} · {@ev["name"]} ({@ev["stage"]}): {hook_result_label(@ev)}</div>
+    """
+  end
+
   defp event(%{ev: %{"t" => "usage"}} = assigns) do
     ~H"""
     <div class="text-sm text-zinc-500">
@@ -413,6 +428,18 @@ defmodule PepeWeb.TracesLive do
   end
 
   defp event(assigns), do: ~H""
+
+  defp triage_verdict_label("simple"), do: gettext("simple")
+  defp triage_verdict_label("complex"), do: gettext("complex")
+  defp triage_verdict_label("failed"), do: gettext("unreachable, skipped")
+  defp triage_verdict_label(v), do: v
+
+  defp hook_result_label(%{"changed" => false}), do: gettext("no change")
+
+  defp hook_result_label(%{"changed" => true, "entries" => n}) when is_integer(n) and n > 0,
+    do: gettext("changed, %{n} reversible", n: n)
+
+  defp hook_result_label(%{"changed" => true}), do: gettext("changed")
 
   attr :outcome, :map, default: nil
 
@@ -553,6 +580,8 @@ defmodule PepeWeb.TracesLive do
   defp event_icon(%{"t" => "assistant"}), do: "💬"
   defp event_icon(%{"t" => "tool_denied"}), do: "🚫"
   defp event_icon(%{"t" => "failover"}), do: "⇄"
+  defp event_icon(%{"t" => "triage"}), do: "🧭"
+  defp event_icon(%{"t" => "hook"}), do: "🛡"
   defp event_icon(%{"t" => "usage"}), do: "◷"
   defp event_icon(%{"t" => "error"}), do: "⚠"
   defp event_icon(_), do: "·"
