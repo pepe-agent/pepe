@@ -1,249 +1,225 @@
 defmodule Pepe.TUI do
   @moduledoc """
-  Interactive terminal menus - arrow-key `select` and space-toggle `multiselect`.
+  Interactive terminal menus: a paginated, numbered `select` (one choice) and
+  `multiselect` (several). You type the number(s) and press Enter; long lists
+  (e.g. OpenRouter's 300+ models) page with `n`/`p` instead of scrolling off
+  the top.
 
-  Pure Elixir, no NIF. Uses OTP 28's native **raw terminal mode**
-  (`:shell.start_interactive({:noshell, :raw})`) to read keystrokes without echo
-  or waiting for Enter, then decodes the `↑`/`↓` escape sequences.
+  Plain line-based input (via `Owl.IO.input`), so it works identically over a
+  real terminal, an SSH session, a pipe, or CI - no raw-terminal mode, nothing
+  to detect or fall back from. Localized via `Pepe.Gettext`, following the
+  language chosen at setup.
 
-  When raw mode isn't available (older OTP, no TTY, an active shell that won't
-  hand over the terminal, pipes/CI/tests) it transparently falls back to Owl's
-  numbered prompts, so the same calls keep working everywhere.
-
-  Options mirror `Owl.IO`: `:label` and `:render_as` (a 1-arity function turning an
-  item into the text/iodata to show).
+  Options mirror `Owl.IO`: `:label` and `:render_as` (a 1-arity function turning
+  an item into the text/iodata to show).
   """
 
-  @esc "\e"
-  # Cap the rendered rows so a long list (e.g. OpenRouter's 300+ models) never
-  # exceeds the terminal height; past this, only a scrolling window is drawn.
-  @max_visible 15
+  use Gettext, backend: Pepe.Gettext
 
-  @doc "Pick one item with `↑`/`↓` + Enter. Returns the chosen item."
+  @page_size 20
+
+  @doc "Pick one item by number. Returns the chosen item."
   def select(items, opts \\ [])
   def select([single], _opts), do: single
-  def select([_ | _] = items, opts), do: run(items, opts, :select)
+  def select([_ | _] = items, opts), do: paginated_select(items, render(opts), label(opts))
 
-  @doc "Toggle items with Space, confirm with Enter. Returns the chosen list."
+  @doc "Toggle items by number, Enter to finish. Returns the chosen list."
   def multiselect(items, opts \\ [])
   def multiselect([], _opts), do: []
-  def multiselect([_ | _] = items, opts), do: run(items, opts, :multi)
+  def multiselect([_ | _] = items, opts), do: paginated_multiselect(items, render(opts), label(opts))
 
-  ###
-  ### entry: raw-mode interactive, or Owl fallback
-  ###
-
-  defp run(items, opts, mode) do
-    if tty?() and start_raw() == :ok do
-      IO.write("#{@esc}[?25l")
-
-      try do
-        draw(items, render(opts), label(opts), 0, mode, MapSet.new())
-        loop(items, render(opts), label(opts), 0, mode, MapSet.new())
-      after
-        IO.write("#{@esc}[?25h")
-        restore()
-      end
-    else
-      fallback(items, opts, mode)
-    end
-  end
-
-  defp fallback(items, opts, :select), do: Owl.IO.select(items, owl_opts(opts))
-  defp fallback(items, opts, :multi), do: Owl.IO.multiselect(items, owl_opts(opts))
-
-  defp owl_opts(opts), do: Keyword.take(opts, [:label, :render_as, :min, :max])
   defp render(opts), do: Keyword.get(opts, :render_as, &to_string/1)
   defp label(opts), do: opts[:label] && to_string(opts[:label])
 
   ###
-  ### loop
+  ### paginated numbered list
+  ###
+  ###   Deliberately NOT overloading Enter for pagination: Enter is the universal
+  ###   "submit what I typed", so `select` uses explicit `n`/`p` to page and a bare
+  ###   Enter is a harmless no-op (never a hidden "next page"). `multiselect` keeps
+  ###   the conventional bare-Enter = finish, since there numbers *toggle* rather
+  ###   than pick, so "empty line = done" reads naturally and doesn't clash.
   ###
 
-  defp loop(items, render, label, cursor, mode, selected) do
-    last = length(items) - 1
+  defp paginated_select(items, render, label) do
+    total = length(items)
+    select_page(items, render, label, total, 0)
+  end
 
-    case read_key() do
-      :up ->
-        cursor = dec(cursor, last)
-        redraw(items, render, label, cursor, mode, selected)
-        loop(items, render, label, cursor, mode, selected)
+  defp select_page(items, render, label, total, page) do
+    print_page(items, render, label, page, page_count(total))
+    ask_select(items, render, label, total, page)
+  end
 
-      :down ->
-        cursor = inc(cursor, last)
-        redraw(items, render, label, cursor, mode, selected)
-        loop(items, render, label, cursor, mode, selected)
+  # Re-ask on the same page without reprinting the list (so a stray Enter or an
+  # invalid entry doesn't spam the whole page again).
+  defp ask_select(items, render, label, total, page) do
+    pages = page_count(total)
 
-      :space when mode == :multi ->
-        selected = toggle(selected, cursor)
-        redraw(items, render, label, cursor, mode, selected)
-        loop(items, render, label, cursor, mode, selected)
-
-      key when key in [:enter, :cancel, :eof] ->
-        clear_block(menu_height(items, label))
-        finish(items, mode, cursor, selected)
-
-      _ ->
-        loop(items, render, label, cursor, mode, selected)
+    case Owl.IO.input(label: select_hint(page, pages, total), cast: &parse_nav(&1, total), optional: true) do
+      :same -> ask_select(items, render, label, total, page)
+      :next -> select_page(items, render, label, total, next_page(page, pages))
+      :prev -> select_page(items, render, label, total, prev_page(page, pages))
+      {:pick, n} -> Enum.at(items, n - 1)
     end
   end
 
-  defp finish(items, :select, cursor, _selected), do: Enum.at(items, cursor)
+  defp paginated_multiselect(items, render, label) do
+    total = length(items)
+    multiselect_page(items, render, label, total, 0, MapSet.new())
+  end
 
-  defp finish(items, :multi, _cursor, selected) do
+  defp multiselect_page(items, render, label, total, page, chosen) do
+    print_page(items, render, label, page, page_count(total), chosen)
+    ask_multi(items, render, label, total, page, chosen)
+  end
+
+  defp ask_multi(items, render, label, total, page, chosen) do
+    pages = page_count(total)
+
+    case Owl.IO.input(label: multi_hint(page, pages, total, chosen), cast: &parse_multi(&1, total), optional: true) do
+      :done ->
+        finish_multi(items, chosen)
+
+      :next ->
+        select_page_or(items, render, label, total, page < pages - 1, next_page(page, pages), chosen)
+
+      :prev ->
+        multiselect_page(items, render, label, total, prev_page(page, pages), chosen)
+
+      {:toggle, numbers} ->
+        chosen = Enum.reduce(numbers, chosen, &toggle_index/2)
+        # re-render the same page so the [x] marks update
+        multiselect_page(items, render, label, total, page, chosen)
+    end
+  end
+
+  defp select_page_or(items, render, label, total, true, next, chosen),
+    do: multiselect_page(items, render, label, total, next, chosen)
+
+  defp select_page_or(items, _render, _label, _total, false, _next, chosen),
+    do: finish_multi(items, chosen)
+
+  defp finish_multi(items, chosen) do
     items
-    |> Enum.with_index()
-    |> Enum.filter(fn {_item, i} -> MapSet.member?(selected, i) end)
+    |> Enum.with_index(1)
+    |> Enum.filter(fn {_item, i} -> MapSet.member?(chosen, i) end)
     |> Enum.map(&elem(&1, 0))
   end
 
-  defp toggle(set, i),
-    do: if(MapSet.member?(set, i), do: MapSet.delete(set, i), else: MapSet.put(set, i))
+  defp toggle_index(i, set), do: if(MapSet.member?(set, i), do: MapSet.delete(set, i), else: MapSet.put(set, i))
 
-  defp dec(0, last), do: last
-  defp dec(c, _last), do: c - 1
-  defp inc(c, last) when c >= last, do: 0
-  defp inc(c, _last), do: c + 1
+  defp page_count(total), do: div(total + @page_size - 1, @page_size)
+  defp next_page(page, pages), do: rem(page + 1, pages)
+  defp prev_page(page, pages), do: rem(page - 1 + pages, pages)
 
-  ###
-  ### rendering
-  ###
-
-  defp redraw(items, render, label, cursor, mode, selected) do
-    IO.write("#{@esc}[#{menu_height(items, label)}A")
-    draw(items, render, label, cursor, mode, selected)
-  end
-
-  defp draw(items, render, label, cursor, mode, selected) do
-    for line <- lines(items, render, label, cursor, mode, selected) do
-      IO.write("#{@esc}[2K" <> line <> "\r\n")
-    end
-  end
-
-  defp lines(items, render, label, cursor, mode, selected) do
-    header = if label, do: String.split(label, "\n"), else: []
-    header ++ [hint(mode, cursor, length(items))] ++ rows(items, render, cursor, mode, selected)
-  end
-
-  defp rows(items, render, cursor, mode, selected) do
-    total = length(items)
-    start = window_start(cursor, total)
+  defp print_page(items, render, label, page, pages, chosen \\ nil) do
+    # A blank line first, so the menu is visually separated from whatever prompt
+    # came before it (a preceding question, a confirm, the previous page).
+    Owl.IO.puts([])
+    if label, do: Owl.IO.puts(label)
 
     items
-    |> Enum.with_index()
-    |> Enum.slice(start, @max_visible)
-    |> Enum.map(fn {item, i} ->
-      pointer = if i == cursor, do: cyan("›"), else: " "
-      box = mark(mode, i, cursor, selected)
-      text = item |> render.() |> IO.iodata_to_binary()
-      "#{pointer} #{box} #{text}"
+    |> Enum.slice(page * @page_size, @page_size)
+    |> Enum.with_index(page * @page_size + 1)
+    |> Enum.each(fn {item, i} ->
+      prefix = if chosen, do: "[#{if MapSet.member?(chosen, i), do: "x", else: " "}] ", else: ""
+      Owl.IO.puts("#{prefix}#{i}. #{item |> render.() |> IO.iodata_to_binary()}")
     end)
+
+    if pages > 1, do: Owl.IO.puts([dim(gettext("page %{page}/%{pages}", page: page + 1, pages: pages))])
+    Owl.IO.puts([])
   end
 
-  # Keeps the cursor centered in a fixed-size window, clamped to the list bounds,
-  # so the visible rows scroll with the cursor instead of the whole list being drawn.
-  defp window_start(_cursor, total) when total <= @max_visible, do: 0
-
-  defp window_start(cursor, total) do
-    cursor
-    |> Kernel.-(div(@max_visible, 2))
-    |> max(0)
-    |> min(total - @max_visible)
-  end
-
-  defp mark(:select, i, cursor, _selected), do: if(i == cursor, do: "(#{cyan("•")})", else: "( )")
-
-  defp mark(:multi, i, _cursor, selected),
-    do: if(MapSet.member?(selected, i), do: "[#{green("x")}]", else: "[ ]")
-
-  defp hint(mode, cursor, total),
-    do: dim("  #{position(cursor, total)}#{hint_text(mode)}")
-
-  defp hint_text(:select), do: "↑/↓ mover · enter selecionar"
-  defp hint_text(:multi), do: "↑/↓ mover · espaço marcar · enter confirmar"
-
-  defp position(_cursor, total) when total <= @max_visible, do: ""
-  defp position(cursor, total), do: "(#{cursor + 1}/#{total}) · "
-
-  defp menu_height(items, label) do
-    header = if label, do: length(String.split(label, "\n")), else: 0
-    header + 1 + min(length(items), @max_visible)
-  end
-
-  defp clear_block(height) do
-    IO.write("#{@esc}[#{height}A")
-    for _ <- 1..height, do: IO.write("#{@esc}[2K\r\n")
-    IO.write("#{@esc}[#{height}A")
-  end
-
-  ###
-  ### terminal / input (OTP 28 raw mode)
-  ###
-
-  # A TTY reports its width; pipes/files return an error.
-  defp tty?, do: match?({:ok, _}, :io.columns())
-
-  defp start_raw do
-    case :shell.start_interactive({:noshell, :raw}) do
-      :ok -> :ok
-      _ -> :error
-    end
-  catch
-    _, _ -> :error
-  end
-
-  defp restore do
-    _ = :shell.start_interactive({:noshell, :cooked})
-    :ok
-  catch
-    _, _ -> :ok
-  end
-
-  defp read_key do
-    case getc() do
-      @esc -> read_escape()
-      "\r" -> :enter
-      "\n" -> :enter
-      " " -> :space
-      "k" -> :up
-      "j" -> :down
-      "q" -> :cancel
-      <<3>> -> :cancel
-      :eof -> :eof
-      _ -> :other
+  # Single-select: number picks; n/p page. Enter is NOT a pagination command.
+  # Spell out "type the number and press Enter" - a first-timer won't assume it.
+  defp select_hint(page, pages, total) do
+    if pages > 1 do
+      gettext("Type the number of the option and press Enter.") <>
+        "\n" <> dim("(#{range(page, total)}  ·  " <> gettext("n = next page  ·  p = previous page") <> ")")
+    else
+      gettext("Type the number of the option (1-%{total}) and press Enter.", total: total)
     end
   end
 
-  defp read_escape do
-    case getc() do
-      "[" -> read_arrow()
-      "O" -> read_arrow()
-      _ -> :other
+  # Multi-select: numbers toggle; n/p page; a blank line (just Enter) finishes.
+  defp multi_hint(page, pages, total, chosen) do
+    picked =
+      case MapSet.size(chosen) do
+        0 -> ""
+        n -> "  ·  " <> gettext("%{count} marked", count: n)
+      end
+
+    nav = if pages > 1, do: "  ·  " <> gettext("n = next page  ·  p = previous"), else: ""
+
+    gettext("Type the numbers you want to mark (e.g. 1 3) and press Enter.") <>
+      "\n" <> dim("(#{range(page, total)}#{nav}  ·  " <> gettext("empty Enter to finish") <> ")#{picked}")
+  end
+
+  defp range(page, total) do
+    first = page * @page_size + 1
+    last = min(first + @page_size - 1, total)
+    gettext("%{first}-%{last} of %{total}", first: first, last: last, total: total)
+  end
+
+  # Bare Enter is a no-op here (re-ask), never a hidden "next page".
+  defp parse_nav(nil, _total), do: {:ok, :same}
+
+  defp parse_nav(input, total) do
+    case input |> String.trim() |> String.downcase() do
+      "" -> {:ok, :same}
+      c when c in ["n", "next", "próxima", "proxima"] -> {:ok, :next}
+      c when c in ["p", "b", "prev", "back", "anterior"] -> {:ok, :prev}
+      other -> parse_pick(other, total)
     end
   end
 
-  defp read_arrow do
-    case getc() do
-      "A" -> :up
-      "B" -> :down
-      _ -> :other
+  defp parse_pick(other, total) do
+    case Integer.parse(other) do
+      {n, ""} when n >= 1 and n <= total ->
+        {:ok, {:pick, n}}
+
+      _ ->
+        {:error, gettext("I didn't get that. Type a number from 1 to %{total} and press Enter (or n/p to change page).", total: total)}
     end
   end
 
-  # Read a single character (raw mode -> returns immediately, no echo).
-  defp getc do
-    case IO.getn(:stdio, "", 1) do
-      :eof -> :eof
-      {:error, _} -> :eof
-      data -> to_string(data)
+  # Bare Enter finishes a multiselect (numbers toggle, so an empty line = done).
+  defp parse_multi(nil, _total), do: {:ok, :done}
+
+  defp parse_multi(input, total) do
+    case input |> String.trim() |> String.downcase() do
+      "" -> {:ok, :done}
+      c when c in ["d", "done", "ok", "fim"] -> {:ok, :done}
+      c when c in ["n", "next", "próxima", "proxima"] -> {:ok, :next}
+      c when c in ["p", "b", "prev", "back", "anterior"] -> {:ok, :prev}
+      other -> parse_toggle_numbers(other, total)
     end
   end
 
-  ###
-  ### colors
-  ###
+  defp parse_toggle_numbers(input, total) do
+    parts = String.split(input, ~r/[,\s]+/, trim: true)
 
-  defp cyan(s), do: IO.ANSI.cyan() <> s <> IO.ANSI.reset()
-  defp green(s), do: IO.ANSI.green() <> s <> IO.ANSI.reset()
+    numbers =
+      Enum.reduce_while(parts, [], fn part, acc ->
+        case Integer.parse(part) do
+          {n, ""} when n >= 1 and n <= total -> {:cont, [n | acc]}
+          _ -> {:halt, :error}
+        end
+      end)
+
+    case numbers do
+      :error ->
+        {:error,
+         gettext(
+           "I didn't get that. Type numbers from 1 to %{total} separated by spaces and press Enter (n/p changes page · empty Enter finishes).",
+           total: total
+         )}
+
+      nums ->
+        {:ok, {:toggle, Enum.reverse(nums)}}
+    end
+  end
+
   defp dim(s), do: IO.ANSI.faint() <> s <> IO.ANSI.reset()
 end

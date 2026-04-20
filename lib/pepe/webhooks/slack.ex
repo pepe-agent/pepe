@@ -76,7 +76,7 @@ defmodule Pepe.Webhooks.Slack do
   @impl true
   def parse(%{"type" => "event_callback", "event" => event}) do
     if user_message?(event) do
-      {:ok, [%{from: event["channel"], text: event["text"], id: event["ts"]}]}
+      {:ok, [%{from: event["channel"], text: strip_mention(event["text"]), id: event["ts"]}]}
     else
       :ignore
     end
@@ -92,6 +92,12 @@ defmodule Pepe.Webhooks.Slack do
   end
 
   defp user_message?(_), do: false
+
+  # An app_mention's text leads with the bot's own <@U...> mention (Slack doesn't
+  # strip it the way MS Teams'/Google Chat's own APIs do) - drop it so "@bot /new"
+  # and "@bot /mention off" parse as the command they are, not plain chat text that
+  # happens to start with a mention.
+  defp strip_mention(text), do: text |> String.replace(~r/^\s*<@[A-Z0-9]+>\s*/, "") |> String.trim()
 
   # A direct message always reaches the agent. In a channel, `app_mention` is Slack's
   # own unambiguous "the bot was mentioned" event; a plain `message` event in a
@@ -137,8 +143,10 @@ defmodule Pepe.Webhooks.Slack do
 
     if is_binary(token) and token != "" do
       parts =
-        [channels: channel, filename: Path.basename(path), file: {File.stream!(path), filename: Path.basename(path)}]
-        |> then(fn f -> if caption in [nil, ""], do: f, else: [{:initial_comment, caption} | f] end)
+        with_initial_comment(
+          [channels: channel, filename: Path.basename(path), file: {File.stream!(path), filename: Path.basename(path)}],
+          caption
+        )
 
       case Req.post("#{@api}/files.upload", auth: {:bearer, token}, form_multipart: parts, receive_timeout: 120_000) do
         {:ok, %{status: s, body: %{"ok" => true}}} when s in 200..299 -> :ok
@@ -149,6 +157,9 @@ defmodule Pepe.Webhooks.Slack do
       {:error, :no_bot_token}
     end
   end
+
+  defp with_initial_comment(parts, caption) when caption in [nil, ""], do: parts
+  defp with_initial_comment(parts, caption), do: [{:initial_comment, caption} | parts]
 
   defp provider_config(config), do: config["config"] || %{}
 

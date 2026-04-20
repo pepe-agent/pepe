@@ -109,6 +109,8 @@ La respuesta es un objeto estándar de chat completion de OpenAI:
 }
 ```
 
+`pepe serve` corre en primer plano - para un despliegue de verdad, consulta [Panel](../dashboard/#mantenerlo-en-marcha) para instalarlo como servicio persistente en segundo plano.
+
 ## Endpoints
 
 Hay dos:

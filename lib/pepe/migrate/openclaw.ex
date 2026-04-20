@@ -65,22 +65,24 @@ defmodule Pepe.Migrate.Openclaw do
           [%{kind: :skip, what: "provider #{provider_id}", reason: "no models listed"}]
 
         list ->
-          Enum.map(list, fn m ->
-            model = %Model{
-              name: "#{provider_id}/#{m["id"]}",
-              base_url: base,
-              api_key: key,
-              model: m["id"],
-              api: "openai-completions",
-              context_window: m["contextWindow"],
-              max_tokens: m["maxTokens"]
-            }
-
-            action = %{kind: :model, model: model}
-            if note, do: Map.put(action, :note, note), else: action
-          end)
+          Enum.map(list, &model_action(&1, provider_id, base, key, note))
       end
     end)
+  end
+
+  defp model_action(m, provider_id, base, key, note) do
+    model = %Model{
+      name: "#{provider_id}/#{m["id"]}",
+      base_url: base,
+      api_key: key,
+      model: m["id"],
+      api: "openai-completions",
+      context_window: m["contextWindow"],
+      max_tokens: m["maxTokens"]
+    }
+
+    action = %{kind: :model, model: model}
+    if note, do: Map.put(action, :note, note), else: action
   end
 
   # --- agents -----------------------------------------------------------------------

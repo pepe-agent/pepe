@@ -137,18 +137,22 @@ defmodule Pepe.Doctor do
           {"telegram", name, {:warn, "disabled"}}
 
         true ->
-          case Req.get("https://api.telegram.org/bot#{token}/getMe", receive_timeout: 10_000) do
-            {:ok, %{status: 200, body: %{"ok" => true, "result" => %{"username" => u}}}} ->
-              {"telegram", name, {:warn, "ok (@#{u})"} |> ok_if_ok()}
-
-            {:ok, %{status: 401}} ->
-              {"telegram", name, {:error, "invalid token (401)"}}
-
-            other ->
-              {"telegram", name, {:error, "unreachable: #{describe(other)}"}}
-          end
+          telegram_getme(name, token)
       end
     end)
+  end
+
+  defp telegram_getme(name, token) do
+    case Req.get("https://api.telegram.org/bot#{token}/getMe", receive_timeout: 10_000) do
+      {:ok, %{status: 200, body: %{"ok" => true, "result" => %{"username" => u}}}} ->
+        {"telegram", name, {:warn, "ok (@#{u})"} |> ok_if_ok()}
+
+      {:ok, %{status: 401}} ->
+        {"telegram", name, {:error, "invalid token (401)"}}
+
+      other ->
+        {"telegram", name, {:error, "unreachable: #{describe(other)}"}}
+    end
   end
 
   # A successful getMe is :ok, not a warning - helper keeps the branch tidy.

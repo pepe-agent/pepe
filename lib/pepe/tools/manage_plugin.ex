@@ -118,10 +118,12 @@ defmodule Pepe.Tools.ManagePlugin do
         "No plugins installed."
 
       pkgs ->
-        Enum.map_join(pkgs, "\n", fn p ->
-          desc = get_in(p.manifest || %{}, ["description"])
-          "• #{p.name} (#{p.kind})#{if desc, do: " - " <> desc, else: ""}"
-        end)
+        Enum.map_join(pkgs, "\n", &package_line/1)
     end
+  end
+
+  defp package_line(p) do
+    desc = get_in(p.manifest || %{}, ["description"])
+    "• #{p.name} (#{p.kind})#{if desc, do: " - " <> desc, else: ""}"
   end
 end

@@ -81,7 +81,7 @@ defmodule Pepe.EvalTest do
     suites = Eval.suites()
     assert "arithmetic" in suites
     assert "safety" in suites
-    assert length(Eval.load("arithmetic")) > 0
+    assert Eval.load("arithmetic") != []
   end
 
   test "a user suite shadows the bundled one with the same name" do

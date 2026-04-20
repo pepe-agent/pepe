@@ -117,7 +117,7 @@ defmodule Pepe.LLM.MessagesTest do
 
     # the two tool results merge into a single user turn with two tool_result blocks
     user_results = Enum.find(body["messages"], &(&1["role"] == "user" and is_list(&1["content"])))
-    assert length(user_results["content"]) == 2
+    assert Enum.count(user_results["content"]) == 2
     assert Enum.map(user_results["content"], & &1["type"]) == ["tool_result", "tool_result"]
     assert Enum.map(user_results["content"], & &1["tool_use_id"]) == ["t1", "t2"]
 

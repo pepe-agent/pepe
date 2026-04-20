@@ -37,4 +37,19 @@ defmodule Pepe.NetTest do
     refute Net.trusted?({8, 8, 8, 8}, [])
     refute Net.cidr_match?({8, 8, 8, 8}, "not-an-ip")
   end
+
+  test "internal? covers loopback, RFC1918, link-local/cloud-metadata, and IPv6 equivalents" do
+    assert Net.internal?({127, 0, 0, 1})
+    assert Net.internal?({10, 1, 2, 3})
+    assert Net.internal?({172, 16, 0, 1})
+    assert Net.internal?({192, 168, 1, 1})
+    assert Net.internal?({169, 254, 169, 254})
+    assert Net.internal?({0, 0, 0, 0, 0, 0, 0, 1})
+    assert Net.internal?({0xFC00, 0, 0, 0, 0, 0, 0, 1})
+    assert Net.internal?({0xFE80, 0, 0, 0, 0, 0, 0, 1})
+    # IPv4-mapped IPv6 private address
+    assert Net.internal?({0, 0, 0, 0, 0, 0xFFFF, 0x0A00, 0x0001})
+    refute Net.internal?({8, 8, 8, 8})
+    refute Net.internal?({0x2001, 0xDB8, 0, 0, 0, 0, 0, 5})
+  end
 end

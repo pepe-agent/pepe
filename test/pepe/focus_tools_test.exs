@@ -57,7 +57,7 @@ defmodule Pepe.FocusToolsTest do
     assert out =~ "[x] design"
     assert out =~ "[~] build"
     assert out =~ "[ ] ship"
-    assert length(Focus.get_plan(key)) == 3
+    assert Enum.count(Focus.get_plan(key)) == 3
 
     assert {:ok, "Plan cleared."} = Plan.run(%{"steps" => []}, ctx)
     assert Focus.get_plan(key) == nil
@@ -73,5 +73,35 @@ defmodule Pepe.FocusToolsTest do
 
   test "plan without a session errors" do
     assert {:error, _} = Plan.run(%{"steps" => [%{"title" => "x"}]}, %{})
+  end
+
+  test "context_line is nil with neither goal nor plan set", %{key: key} do
+    assert Focus.context_line(key) == nil
+    assert Focus.context_line(nil) == nil
+  end
+
+  test "context_line summarizes goal only", %{ctx: ctx, key: key} do
+    Goal.run(%{"action" => "set", "objective" => "ship the release"}, ctx)
+    assert Focus.context_line(key) == "Goal: ship the release (active)"
+  end
+
+  test "context_line summarizes plan only", %{ctx: ctx, key: key} do
+    Plan.run(%{"steps" => [%{"title" => "design", "status" => "done"}, %{"title" => "build", "status" => "in_progress"}]}, ctx)
+    assert Focus.context_line(key) == "Plan: 1/2 steps done - now: build"
+  end
+
+  test "context_line combines goal and plan", %{ctx: ctx, key: key} do
+    Goal.run(%{"action" => "set", "objective" => "ship the release"}, ctx)
+    Plan.run(%{"steps" => [%{"title" => "build", "status" => "in_progress"}]}, ctx)
+
+    assert Focus.context_line(key) ==
+             "Goal: ship the release (active) | Plan: 0/1 steps done - now: build"
+  end
+
+  test "context_line is clipped to a bounded length", %{ctx: ctx, key: key} do
+    Goal.run(%{"action" => "set", "objective" => String.duplicate("x", 1000)}, ctx)
+    line = Focus.context_line(key)
+    assert String.length(line) == 503
+    assert String.ends_with?(line, "...")
   end
 end

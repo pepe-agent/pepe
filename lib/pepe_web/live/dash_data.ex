@@ -179,12 +179,17 @@ defmodule PepeWeb.DashData do
 
     taken = Enum.map(Config.crons(), & &1.id)
 
-    if base not in taken do
-      base
-    else
+    if base in taken do
       Stream.iterate(2, &(&1 + 1))
-      |> Enum.find_value(fn n -> if "#{base}-#{n}" not in taken, do: "#{base}-#{n}" end)
+      |> Enum.find_value(&suffixed_cron_id(base, &1, taken))
+    else
+      base
     end
+  end
+
+  defp suffixed_cron_id(base, n, taken) do
+    candidate = "#{base}-#{n}"
+    if candidate not in taken, do: candidate
   end
 
   ## models / providers / misc

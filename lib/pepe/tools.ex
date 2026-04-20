@@ -132,13 +132,30 @@ defmodule Pepe.Tools do
         execute_builtin(name, raw_args, ctx)
       end
 
-    spill_large(result, name, ctx)
+    result
+    |> redact(ctx)
+    |> spill_large(name, ctx)
   end
+
+  # A tool result can surface PII a human never typed (a DB query, a file read) -
+  # redact it before it ever joins the conversation or gets spilled to disk, using
+  # the same reversible-map hooks as the inbound message. Grows the calling
+  # process's accumulator (Pepe.Hooks.start_map/1) so repeated PII across several
+  # tool calls in one turn gets the same token, and so the final entries flow back
+  # to whoever owns the turn (Pepe.Agent.Session) for the closing restore/2.
+  defp redact(result, %{agent: %Pepe.Config.Agent{} = agent}) do
+    {redacted, entries} = Pepe.Hooks.transform(:tool_result, result, agent, %{"map" => Pepe.Hooks.current_map()})
+    Pepe.Hooks.add_entries(entries)
+    redacted
+  end
+
+  defp redact(result, _ctx), do: result
 
   # Keep huge tool output out of the context window: past the threshold, save the
   # full text to a file in the agent's workspace and hand the model a preview + the
   # path (it can `read_file` slices on demand). Protects the window from a single
   # noisy command; `read_file` itself is exempt (reading a file back would loop).
+  # Runs on the already-redacted text, so a spilled file never carries raw PII either.
   @spill_threshold 16_000
   @spill_preview 2_000
 

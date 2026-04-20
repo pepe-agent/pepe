@@ -165,7 +165,7 @@ compatível com OpenAI através de uma ligação de modelo:
 ```bash
 pepe model add openrouter \
   --api-key '${OPENROUTER_API_KEY}' \
-  --model anthropic/claude-3.5-sonnet \
+  --model openai/gpt-5-chat \
   --default
 ```
 
@@ -231,7 +231,7 @@ no disco em texto simples.
     "openrouter": {
       "base_url": "https://openrouter.ai/api/v1",
       "api_key": "${OPENROUTER_API_KEY}",
-      "model": "anthropic/claude-3.5-sonnet"
+      "model": "openai/gpt-5-chat"
     }
   }
 }

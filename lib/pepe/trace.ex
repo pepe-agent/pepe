@@ -230,7 +230,10 @@ defmodule Pepe.Trace do
   defp encode_event({:assistant_delta, _}), do: nil
   defp encode_event({:tool_call, name, args}), do: %{"t" => "tool_call", "name" => name, "args" => clip(args)}
   defp encode_event({:tool_result, name, out}), do: %{"t" => "tool_result", "name" => name, "out" => clip(out)}
-  defp encode_event({:tool_denied, name}), do: %{"t" => "tool_denied", "name" => name}
+
+  defp encode_event({:tool_denied, name, reason}),
+    do: %{"t" => "tool_denied", "name" => name, "reason" => reason}
+
   defp encode_event({:failover, from, to}), do: %{"t" => "failover", "from" => from, "to" => to}
   # Complexity-routing verdict, recorded before Runtime.run even starts - see
   # Pepe.Agent.Session's spawn_run/7. `chosen_model` is only set on a :simple
@@ -250,11 +253,13 @@ defmodule Pepe.Trace do
   defp encode_event(_), do: nil
 
   defp usage_event(model, %{} = usage) do
+    usage = Map.new(usage, fn {k, v} -> {to_string(k), v} end)
+
     %{
       "t" => "usage",
       "model" => model,
-      "in" => usage[:prompt_tokens] || usage["prompt_tokens"] || usage[:input_tokens] || usage["input_tokens"],
-      "out" => usage[:completion_tokens] || usage["completion_tokens"] || usage[:output_tokens] || usage["output_tokens"]
+      "in" => usage["prompt_tokens"] || usage["input_tokens"],
+      "out" => usage["completion_tokens"] || usage["output_tokens"]
     }
   end
 

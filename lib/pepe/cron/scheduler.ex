@@ -59,13 +59,13 @@ defmodule Pepe.Cron.Scheduler do
       {:ok, naive, key} ->
         cond do
           Cron.due?(cron, naive) and fired[cron.id] != key ->
-            Task.start(fn -> Cron.run(cron, :scheduler) end)
+            fire(cron)
             Map.put(fired, cron.id, key)
 
           # Catch-up: the scheduled time passed while we were down - fire once,
           # deduped on the missed slot so one recovery never double-fires.
           catchup = catch_up_key(cron, fired) ->
-            Task.start(fn -> Cron.run(cron, :scheduler) end)
+            fire(cron)
             Map.put(fired, cron.id, catchup)
 
           true ->
@@ -76,6 +76,13 @@ defmodule Pepe.Cron.Scheduler do
         Logger.warning("cron #{cron.id}: unknown timezone #{inspect(cron.timezone)}")
         fired
     end
+  end
+
+  # Supervised (not a bare Task.start) so a graceful shutdown can see and drain
+  # in-flight jobs instead of just killing them with the VM - see
+  # Pepe.Application.prep_stop/1.
+  defp fire(cron) do
+    Task.Supervisor.start_child(Pepe.Cron.TaskSupervisor, fn -> Cron.run(cron, :scheduler) end)
   end
 
   defp catch_up_key(cron, fired) do

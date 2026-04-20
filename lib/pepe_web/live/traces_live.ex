@@ -98,13 +98,19 @@ defmodule PepeWeb.TracesLive do
     from_unix = day_start(from)
     to_unix = day_end(to)
 
-    Enum.filter(traces, fn t ->
-      (agent == "" or t["agent"] == agent) and
-        (source == "" or trace_source(t) == source) and
-        outcome_matches?(t["outcome"], outcome) and
-        (is_nil(from_unix) or (is_integer(t["at"]) and t["at"] >= from_unix)) and
-        (is_nil(to_unix) or (is_integer(t["at"]) and t["at"] <= to_unix))
-    end)
+    Enum.filter(traces, &trace_matches?(&1, agent, source, outcome, from_unix, to_unix))
+  end
+
+  defp trace_matches?(t, agent, source, outcome, from_unix, to_unix) do
+    (agent == "" or t["agent"] == agent) and
+      (source == "" or trace_source(t) == source) and
+      outcome_matches?(t["outcome"], outcome) and
+      within?(t["at"], from_unix, to_unix)
+  end
+
+  defp within?(at, from_unix, to_unix) do
+    (is_nil(from_unix) or (is_integer(at) and at >= from_unix)) and
+      (is_nil(to_unix) or (is_integer(at) and at <= to_unix))
   end
 
   # The trigger of a run: an explicit source, or derived from the session key (older traces).
@@ -388,7 +394,10 @@ defmodule PepeWeb.TracesLive do
 
   defp event(%{ev: %{"t" => "tool_denied"}} = assigns) do
     ~H"""
-    <div class="text-[15px] text-yellow-400">{gettext("Blocked")} · {@ev["name"]}</div>
+    <div class="text-[15px] text-yellow-400">
+      {gettext("Blocked")} · {@ev["name"]}
+      <span :if={@ev["reason"]} class="text-zinc-400">— {@ev["reason"]}</span>
+    </div>
     """
   end
 

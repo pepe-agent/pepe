@@ -56,4 +56,56 @@ defmodule Pepe.BudgetTest do
 
     refute Usage.over_budget?("free")
   end
+
+  test "reset_budget zeroes month_to_date without touching the ledger's audit trail" do
+    Usage.record("acme/bot", "m", %{"prompt_tokens" => 100_000, "completion_tokens" => 100_000})
+    assert Usage.over_budget?("acme")
+
+    Usage.reset_budget("acme")
+    assert Usage.month_to_date("acme") == 0.0
+    refute Usage.over_budget?("acme")
+
+    # The original usage entry is still in the ledger (audit trail/invoicing intact).
+    entries = Pepe.Usage.Log.entries("acme")
+    assert entries != []
+  end
+
+  test "only spend recorded after a reset counts toward the cap again" do
+    Config.add_company("shift", %{"budget" => 0.05})
+    Config.put_agent(%Agent{name: "shift/bot", model: "m", tools: []})
+
+    Usage.record("shift/bot", "m", %{"prompt_tokens" => 10_000, "completion_tokens" => 10_000})
+    Usage.reset_budget("shift")
+    :timer.sleep(1100)
+    Usage.record("shift/bot", "m", %{"prompt_tokens" => 10_000, "completion_tokens" => 10_000})
+
+    # Only the post-reset call's ~0.02 counts, still under the 0.05 cap.
+    refute Usage.over_budget?("shift")
+    assert_in_delta Usage.month_to_date("shift"), 0.02, 0.001
+  end
+
+  test "reset_budget on an unknown company returns not_found" do
+    assert Usage.reset_budget("ghost") == {:error, :not_found}
+  end
+
+  test "budget_reset_at is nil until a reset happens, then reflects it" do
+    assert Usage.budget_reset_at("acme") == nil
+    Usage.reset_budget("acme")
+    assert_in_delta Usage.budget_reset_at("acme"), System.system_time(:second), 2
+  end
+
+  test "root can have its own budget cap, reset independently of any company's" do
+    Config.put_agent(%Agent{name: "bot", model: "m", tools: []})
+    Config.update_scope(nil, %{"budget" => 0.01})
+    assert Config.company_budget(nil) == 0.01
+
+    refute Usage.over_budget?(nil)
+    Usage.record("bot", "m", %{"prompt_tokens" => 100_000, "completion_tokens" => 100_000})
+    assert Usage.over_budget?(nil)
+    # A company's spend/cap is unaffected by root's.
+    refute Usage.over_budget?("acme")
+
+    assert Usage.reset_budget(nil) == :ok
+    refute Usage.over_budget?(nil)
+  end
 end

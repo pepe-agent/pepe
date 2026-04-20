@@ -321,21 +321,8 @@ defmodule PepeWeb.ScheduledLive do
       |> validate_cron_schedule(schedule)
 
     if cs.valid? do
-      name = Changeset.get_field(cs, :name)
       editing = socket.assigns.edit_cron
-
-      Config.put_cron(%Pepe.Config.Cron{
-        id: (editing && editing.id) || new_cron_id(name),
-        name: name,
-        agent: blank(p["agent"]) || Config.default_agent_name(),
-        prompt: Changeset.get_field(cs, :prompt),
-        schedule: schedule,
-        timezone: blank(p["timezone"]) || Config.default_timezone(),
-        model: blank(p["model"]),
-        deliver: deliver_from(p),
-        # Preserve the enabled flag when editing; new tasks start enabled.
-        enabled: (editing && editing.enabled) || is_nil(editing)
-      })
+      Config.put_cron(build_cron(p, cs, schedule, editing))
 
       {:noreply,
        socket
@@ -372,6 +359,23 @@ defmodule PepeWeb.ScheduledLive do
     do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
 
   def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+
+  defp build_cron(p, cs, schedule, editing) do
+    name = Changeset.get_field(cs, :name)
+
+    %Pepe.Config.Cron{
+      id: (editing && editing.id) || new_cron_id(name),
+      name: name,
+      agent: blank(p["agent"]) || Config.default_agent_name(),
+      prompt: Changeset.get_field(cs, :prompt),
+      schedule: schedule,
+      timezone: blank(p["timezone"]) || Config.default_timezone(),
+      model: blank(p["model"]),
+      deliver: deliver_from(p),
+      # Preserve the enabled flag when editing; new tasks start enabled.
+      enabled: (editing && editing.enabled) || is_nil(editing)
+    }
+  end
 
   defp validate_cron_schedule(cs, schedule) do
     case Pepe.Cron.parse(schedule) do

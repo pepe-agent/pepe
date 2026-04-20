@@ -61,6 +61,33 @@ dashboard lists your bots with a live active/inactive badge, lets you add a
 bot, edit which agent it talks to, and remove it. It writes the same config the
 CLI does.</div>
 
+### In groups
+
+In a 1:1 chat the bot always replies. Added to a group, it only replies when
+@mentioned or given a `/command`, by default - otherwise it would answer every
+message in a busy group. Turn that requirement off entirely for a bot (every
+group it's in) by setting `require_mention: false` during
+`pepe gateway telegram setup`.
+
+For a single group, without touching the bot's own setting, run:
+
+```text
+/mention off   # this group only, until /new - no @mention needed to be answered
+/mention on    # back to requiring an @mention
+/mention       # show the current setting
+```
+
+The waiver lives on that group's own conversation, not the bot, so it never
+leaks into any other group the same bot is in, and a fresh conversation
+(`/new`) forgets it.
+
+A group conversation is one shared session across everyone in it, with no
+per-sender labeling - if your agent needs to tell people apart, say so in its
+prompt. The bot is also blind to anything not addressed to it: a message that
+doesn't @mention it (and isn't waived by `/mention off`) never reaches the
+agent at all, not even as silent context, so it can't "catch up" on chatter
+that happened before it was brought in.
+
 ### Switch models mid-conversation
 
 `/model` shows the model currently active in this chat, with a **Browse

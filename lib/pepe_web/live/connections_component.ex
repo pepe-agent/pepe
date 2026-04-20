@@ -247,34 +247,10 @@ defmodule PepeWeb.ConnectionsComponent do
     agent = blank(params["agent"])
     editing = socket.assigns.editing_slug
 
-    errors =
-      %{}
-      |> maybe_error("slug", slug == "" && gettext("A slug is required."))
-      |> maybe_error("slug", slug != "" && slug != editing && Config.webhook_exists?(slug) && gettext("This slug is already in use."))
-      |> maybe_error("agent", is_nil(agent) && gettext("Choose an agent."))
+    errors = save_errors(slug, agent, editing)
 
     if errors == %{} do
-      mode = (params["mode"] == "admin" && "admin") || "support"
-      support? = mode == "support"
-
-      entry =
-        reject_nil(%{
-          "provider" => name,
-          "company" => company_value(params["company"]),
-          "agent" => agent,
-          "mode" => mode,
-          # A support channel is customer-facing: history is ephemeral and it never
-          # trains memory; an admin channel keeps history and enables slash commands.
-          "commands" => mode == "admin",
-          "trainers" => if(support?, do: [], else: nil),
-          "ephemeral" => support?,
-          "config" => build_config(schema, params["cfg"] || %{})
-        })
-
-      if editing && editing != slug, do: Config.delete_webhook(editing)
-      Config.put_webhook(slug, entry)
-      send(self(), {:flash, :info, gettext("Saved connection %{s}.", s: slug)})
-      send(self(), {:channel_form, :closed})
+      persist_connection(name, schema, slug, agent, editing, params)
 
       {:noreply,
        assign(socket,
@@ -288,6 +264,37 @@ defmodule PepeWeb.ConnectionsComponent do
       send(self(), {:flash, :error, gettext("Please fix the errors below.")})
       {:noreply, assign(socket, form_values: params, form_errors: errors)}
     end
+  end
+
+  defp save_errors(slug, agent, editing) do
+    %{}
+    |> maybe_error("slug", slug == "" && gettext("A slug is required."))
+    |> maybe_error("slug", slug != "" && slug != editing && Config.webhook_exists?(slug) && gettext("This slug is already in use."))
+    |> maybe_error("agent", is_nil(agent) && gettext("Choose an agent."))
+  end
+
+  defp persist_connection(name, schema, slug, agent, editing, params) do
+    mode = (params["mode"] == "admin" && "admin") || "support"
+    support? = mode == "support"
+
+    entry =
+      reject_nil(%{
+        "provider" => name,
+        "company" => company_value(params["company"]),
+        "agent" => agent,
+        "mode" => mode,
+        # A support channel is customer-facing: history is ephemeral and it never
+        # trains memory; an admin channel keeps history and enables slash commands.
+        "commands" => mode == "admin",
+        "trainers" => if(support?, do: [], else: nil),
+        "ephemeral" => support?,
+        "config" => build_config(schema, params["cfg"] || %{})
+      })
+
+    if editing && editing != slug, do: Config.delete_webhook(editing)
+    Config.put_webhook(slug, entry)
+    send(self(), {:flash, :info, gettext("Saved connection %{s}.", s: slug)})
+    send(self(), {:channel_form, :closed})
   end
 
   # ---- helpers -----------------------------------------------------------------------
@@ -350,7 +357,6 @@ defmodule PepeWeb.ConnectionsComponent do
   end
 
   defp maybe_error(errors, _field, false), do: errors
-  defp maybe_error(errors, _field, nil), do: errors
   defp maybe_error(errors, field, msg) when is_binary(msg), do: Map.put_new(errors, field, msg)
 
   defp fval(values, key), do: to_string(Map.get(values, key, ""))

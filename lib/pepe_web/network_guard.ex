@@ -34,15 +34,26 @@ defmodule PepeWeb.NetworkGuard do
   @impl true
   def call(conn, _opts) do
     cond do
-      not host_allowed?(conn) -> conn |> bad_host() |> halt()
+      not host_allowed?(conn.host |> to_string()) -> conn |> bad_host() |> halt()
       Config.dashboard_auth_required?() -> conn
       RemoteClient.local_direct?(conn) -> conn
       true -> conn |> locked() |> halt()
     end
   end
 
-  defp host_allowed?(conn) do
-    host = conn.host |> to_string() |> String.downcase()
+  @doc """
+  The Host-header policy above, exposed for reuse: `PepeWeb.Endpoint`'s LiveView
+  socket has the same "which origins can legitimately reach the dashboard" question
+  to answer for its `check_origin`, and needs to reach the exact same verdict this
+  Plug already reached for the page's own HTTP request - otherwise a host this Plug
+  allowed through (a `--tunnel` origin, an allowlisted domain) could still get its
+  LiveView socket rejected by Phoenix's unrelated, stricter default (single
+  configured host only), breaking every interactive feature on a page that
+  otherwise loaded fine.
+  """
+  @spec host_allowed?(String.t()) :: boolean()
+  def host_allowed?(host) do
+    host = String.downcase(host)
     allowed = Config.dashboard_allowed_hosts() |> Enum.map(&String.downcase/1)
 
     cond do

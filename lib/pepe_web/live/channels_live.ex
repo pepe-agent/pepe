@@ -490,7 +490,7 @@ defmodule PepeWeb.ChannelsLive do
         (Config.telegram_bot(name) || %{})
         |> Map.delete("name")
         |> put_or_delete("agent", blank(params["agent"]))
-        |> then(fn b -> if new_token, do: Map.put(b, "bot_token", new_token), else: b end)
+        |> maybe_put_token(new_token)
 
       save_bot(name, bot)
       reload_gateways()
@@ -517,6 +517,9 @@ defmodule PepeWeb.ChannelsLive do
 
   # Does another bot (any but `exclude_name`) already resolve to this token? Compares
   # interpolated values so two ${ENV_VAR} refs to the same secret are caught too.
+  defp maybe_put_token(bot, nil), do: bot
+  defp maybe_put_token(bot, token), do: Map.put(bot, "bot_token", token)
+
   defp token_taken?(token, exclude_name) do
     want = Config.interpolate(token) || token
 

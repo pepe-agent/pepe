@@ -1,9 +1,31 @@
 defmodule Pepe.WebhooksTest do
   use ExUnit.Case, async: false
+  use Mimic
 
   alias Pepe.Config
   alias Pepe.Webhooks
   alias Pepe.Webhooks.WhatsApp
+
+  # A minimal chat-completions mock, for round-tripping a real Session.chat/2 call:
+  # the actual model request happens deep inside the session's own
+  # (DynamicSupervisor-started) process and its internally spawned run task,
+  # neither of which inherit this test process's Mimic stubs (private mode only
+  # covers a call's own $callers chain) - so it needs a real HTTP server, not Req
+  # mocking, the same way test/pepe/agent/session_model_override_test.exs does.
+  defmodule FixedReplyPlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, reply: reply) do
+      payload = %{
+        "choices" => [%{"index" => 0, "message" => %{"role" => "assistant", "content" => reply}, "finish_reason" => "stop"}]
+      }
+
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+    end
+  end
 
   setup do
     home = Path.join(System.tmp_dir!(), "pepe_wh_#{System.unique_integer([:positive])}")
@@ -220,6 +242,64 @@ defmodule Pepe.WebhooksTest do
       support = entry(%{"mode" => "support"})
       assert :chat = Webhooks.command(support, "/models", "5511999")
       assert :chat = Webhooks.command(support, "/model acme/model-a", "5511999")
+    end
+  end
+
+  describe "/mention" do
+    test "on/off/status/invalid decisions" do
+      a = admin()
+      assert {:mention, true} = Webhooks.command(a, "/mention off", "C1")
+      assert {:mention, false} = Webhooks.command(a, "/mention on", "C1")
+      assert {:mention_status} = Webhooks.command(a, "/mention", "C1")
+      assert {:reply, "Usage: /mention on|off"} = Webhooks.command(a, "/mention sideways", "C1")
+    end
+
+    test "invoked via an @mention (the only way to reach a command in a gated Slack channel), then waives mention for later plain messages" do
+      {:ok, server} = Bandit.start_link(plug: {FixedReplyPlug, reply: "hello!"}, port: 0, scheme: :http)
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      Pepe.Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:#{port}", model: "gpt"})
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
+
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      Pepe.Config.put_webhook("acme-slack", slack_entry)
+
+      channel_message = %{
+        "type" => "event_callback",
+        "event" => %{"type" => "message", "text" => "just chatting, not mentioning anyone", "channel" => "C1", "ts" => "1.0"}
+      }
+
+      # Without the waiver: a plain channel message (no app_mention, not a DM) never
+      # reaches the agent.
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, %{})
+      refute_receive {:delivered, _url, _opts}, 200
+
+      # A slash command in a channel still needs to be addressed like any other
+      # message - Slack only marks it addressed via a real app_mention event, and
+      # (unlike plain "message" text) the mention prefix must be stripped for it to
+      # parse as "/mention off" rather than chat text (see Slack.parse/1).
+      mention_off = %{
+        "type" => "event_callback",
+        "event" => %{"type" => "app_mention", "text" => "<@U0BOT123> /mention off", "channel" => "C1", "ts" => "2.0"}
+      }
+
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", mention_off, %{})
+      assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts}, 1000
+      assert opts[:json]["text"] =~ "without being @mentioned"
+
+      # With the waiver now set for channel C1, the earlier plain (unaddressed)
+      # message shape reaches the agent and gets a real reply delivered back.
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, %{})
+      assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts2}, 1000
+      assert opts2[:json]["text"] == "hello!"
     end
   end
 end

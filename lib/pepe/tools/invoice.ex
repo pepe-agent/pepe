@@ -47,9 +47,7 @@ defmodule Pepe.Tools.Invoice do
 
   @impl true
   def run(%{"company" => company} = args, _ctx) do
-    unless Config.company_exists?(company) do
-      {:error, "unknown company: #{company}"}
-    else
+    if Config.company_exists?(company) do
       inv = Usage.invoice(company, month: args["month"])
       format = if args["format"] == "csv", do: :csv, else: :markdown
 
@@ -65,6 +63,8 @@ defmodule Pepe.Tools.Invoice do
       File.write!(path, body)
 
       {:ok, "Saved invoice to #{path}\n\n#{body}"}
+    else
+      {:error, "unknown company: #{company}"}
     end
   end
 end

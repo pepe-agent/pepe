@@ -17,6 +17,12 @@ defmodule Pepe.Agent.Session do
   alias Pepe.LLM
   alias Pepe.LLM.Message
 
+  # Sources that are the owner/operator using their own runtime, not a customer
+  # messaging it - never counted or blocked by Pepe.Config.company_message_limit/1.
+  # Everything else (telegram, a webhook provider, widget:...) counts by default,
+  # so a newly added channel is covered without having to list it here.
+  @internal_sources ~w(tui web api)
+
   ###
   ### client API
   ###
@@ -61,6 +67,21 @@ defmodule Pepe.Agent.Session do
   # Internal-only variant used by the triage downgrade - see the handle_call clause.
   defp set_model_if_unset(key, model_name), do: GenServer.call(via(key), {:set_model_if_unset, model_name})
 
+  @doc """
+  Whether this session currently waives its surface's normal "must be addressed"
+  gate (e.g. Telegram's @mention-in-groups requirement - see `mention_optional?/1`
+  and Gateways.Telegram's `/mention` command). Lives on the session, not the bot, so
+  toggling it in one group chat never affects any other; `reset/1` clears it back to
+  the default (required), the same way a fresh conversation forgets everything else
+  turn-scoped.
+  """
+  @spec mention_optional?(term()) :: boolean()
+  def mention_optional?(key), do: GenServer.call(via(key), :mention_optional?)
+
+  @doc "Set/clear this session's mention-optional waiver (see `mention_optional?/1`)."
+  @spec set_mention_optional(term(), boolean()) :: :ok
+  def set_mention_optional(key, waived?), do: GenServer.call(via(key), {:set_mention_optional, waived?})
+
   @doc "Drop the last user turn (and its responses) from the history."
   @spec undo(term()) :: :ok
   def undo(key), do: GenServer.call(via(key), :undo)
@@ -81,7 +102,7 @@ defmodule Pepe.Agent.Session do
   def resume(key), do: GenServer.call(via(key), :resume, 120_000)
 
   @doc "Run the memory/skill review now over this session (the `/learn` trigger)."
-  @spec learn(term()) :: :ok | {:error, :no_agent}
+  @spec learn(term()) :: :ok | {:error, :no_agent | :not_allowed}
   def learn(key), do: GenServer.call(via(key), :learn)
 
   @doc """
@@ -172,6 +193,7 @@ defmodule Pepe.Agent.Session do
       |> Map.put_new(:idle_ref, nil)
       |> Map.put_new(:learn_allowed, true)
       |> Map.put_new(:model_override, nil)
+      |> Map.put_new(:mention_optional, false)
       |> Map.merge(%{
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
@@ -256,28 +278,14 @@ defmodule Pepe.Agent.Session do
         {:reply, {:error, :no_agent}, state}
 
       agent ->
-        # Tag the run with this session's key so `:session` approvals are scoped to it.
-        opts = Keyword.put(opts, :session_key, state.key)
-        # Whether this conversation may feed the memory/skill review (set by the surface).
-        state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
-        # A new message cancels any pending idle review and re-arms the TTL.
-        state = state |> cancel_idle() |> arm_ttl()
-        # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
-        # user text and the reversible map go in; the task redacts (inbound hooks)
-        # before the model sees anything and restores the reply on the way out.
-        base = state.messages |> ensure_system(agent) |> maybe_add_lang_hint(opts, state.messages)
-        mark_pending(state, text)
-        # Complexity-triage only ever runs on a session's first-ever turn (same
-        # boundary as the lang hint above), never when a model override is already
-        # in play (an explicit `/model` switch always wins over an automatic one),
-        # and only when there's actually somewhere to downgrade to on a SIMPLE
-        # verdict.
-        should_triage? =
-          agent.triage_model && agent.simple_model && is_nil(state.model_override) &&
-            length(state.messages) <= 1
+        company = Pepe.Company.of(agent.name)
+        counts? = customer_message?(state.key, agent)
 
-        {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
-        {:noreply, %{state | running: %{task: pid, ref: ref, from: from}, pending_resume: text}}
+        if counts? and Pepe.Usage.over_message_limit?(company) do
+          {:reply, {:error, :message_limit_exceeded}, state}
+        else
+          start_chat_run(state, agent, company, counts?, text, opts, from)
+        end
     end
   end
 
@@ -329,13 +337,19 @@ defmodule Pepe.Agent.Session do
         # configured hook would otherwise have caught.
         {redacted, entries} = Pepe.Hooks.transform(:inbound, state.pending_resume, agent, %{"map" => state.pii_map})
         Pepe.Trace.set_prompt(redacted)
-        messages = ensure_system(state.messages, agent) ++ [Message.user(resume_prompt(redacted))]
+
+        messages =
+          ensure_system(state.messages, agent) ++
+            goal_reminder(state.key) ++ [Message.user(resume_prompt(redacted))]
+
         opts = [session_key: state.key]
+
+        Pepe.Hooks.start_map(state.pii_map ++ entries)
 
         case Runtime.run(agent, messages, opts) do
           {:ok, reply, _all} = result ->
             Pepe.Trace.finish(result)
-            map = state.pii_map ++ entries
+            map = Pepe.Hooks.take_map()
             {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
             text = Pepe.Hooks.restore(shown, map)
 
@@ -351,6 +365,7 @@ defmodule Pepe.Agent.Session do
             {:reply, {:ok, text}, persist(new_state)}
 
           {:error, reason} = result ->
+            Pepe.Hooks.take_map()
             Pepe.Trace.finish(result)
             {:reply, {:error, reason}, clear_pending(state)}
         end
@@ -372,18 +387,17 @@ defmodule Pepe.Agent.Session do
         messages = ensure_system(state.messages, agent) ++ [Message.user(prompt)]
         opts = [session_key: state.key]
 
+        # The pulse prompt itself is internal (never user text, so no inbound
+        # transform), but the agent can still call tools during a heartbeat - same
+        # tool_result protection and restore as a normal turn.
+        Pepe.Hooks.start_map(state.pii_map)
+
         case Runtime.run(agent, messages, opts) do
           {:ok, reply, _all} ->
-            if Pepe.Heartbeat.silent?(reply) do
-              {:reply, :silent, state}
-            else
-              # Only the agent's own message joins the visible history - the
-              # internal pulse prompt stays invisible, like a cron/system trigger.
-              new_state = %{state | messages: state.messages ++ [Message.assistant(reply)]}
-              {:reply, {:ok, reply}, persist(new_state)}
-            end
+            handle_pulse_reply(reply, agent, state)
 
           {:error, reason} ->
+            Pepe.Hooks.take_map()
             {:reply, {:error, reason}, state}
         end
     end
@@ -411,7 +425,8 @@ defmodule Pepe.Agent.Session do
     # session wedged on `:busy`) and forgets "allow for this session" grants.
     Pepe.Permissions.SessionStore.clear(state.key)
     state = cancel_running(state, {:error, :stopped})
-    {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name), pii_map: []})}
+
+    {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], mention_optional: false})}
   end
 
   def handle_call(:history, _from, state) do
@@ -441,6 +456,17 @@ defmodule Pepe.Agent.Session do
     {:reply, :ok, state}
   end
 
+  def handle_call(:mention_optional?, _from, state) do
+    {:reply, state.mention_optional, state}
+  end
+
+  # Not `persist/1`-wrapped, same reasoning as :set_model: a live-conversation
+  # waiver, not a durable setting - reverting to "must be addressed" on a process
+  # restart is correct, not a bug (and :reset clears it explicitly too, see above).
+  def handle_call({:set_mention_optional, waived?}, _from, state) do
+    {:reply, :ok, %{state | mention_optional: waived?}}
+  end
+
   def handle_call(:undo, _from, state) do
     {:reply, :ok, persist(%{state | messages: drop_last_turn(state.messages)})}
   end
@@ -468,6 +494,52 @@ defmodule Pepe.Agent.Session do
           {:error, reason} ->
             {:reply, {:error, reason}, state}
         end
+    end
+  end
+
+  defp start_chat_run(state, agent, company, counts?, text, opts, from) do
+    if counts?, do: Pepe.Usage.record_message(company)
+
+    # Tag the run with this session's key so `:session` approvals are scoped to it.
+    opts = Keyword.put(opts, :session_key, state.key)
+    # Whether this conversation may feed the memory/skill review (set by the surface).
+    state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
+    # A new message cancels any pending idle review and re-arms the TTL.
+    state = state |> cancel_idle() |> arm_ttl()
+    # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
+    # user text and the reversible map go in; the task redacts (inbound hooks)
+    # before the model sees anything and restores the reply on the way out.
+    base = state.messages |> ensure_system(agent) |> maybe_add_lang_hint(opts, state.messages)
+    mark_pending(state, text)
+    # Complexity-triage only ever runs on a session's first-ever turn (same
+    # boundary as the lang hint above), never when a model override is already
+    # in play (an explicit `/model` switch always wins over an automatic one),
+    # and only when there's actually somewhere to downgrade to on a SIMPLE
+    # verdict.
+    should_triage? =
+      agent.triage_model && agent.simple_model && is_nil(state.model_override) &&
+        first_turn?(state.messages)
+
+    {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
+    {:noreply, %{state | running: %{task: pid, ref: ref, from: from}, pending_resume: text}}
+  end
+
+  # True on a session's first-ever turn: an empty history or just the base system prompt.
+  defp first_turn?(messages), do: Enum.count_until(messages, 2) <= 1
+
+  defp handle_pulse_reply(reply, agent, state) do
+    map = Pepe.Hooks.take_map()
+
+    if Pepe.Heartbeat.silent?(reply) do
+      {:reply, :silent, %{state | pii_map: map}}
+    else
+      {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
+      text = Pepe.Hooks.restore(shown, map)
+
+      # Only the agent's own message joins the visible history - the
+      # internal pulse prompt stays invisible, like a cron/system trigger.
+      new_state = %{state | messages: state.messages ++ [Message.assistant(text)], pii_map: map}
+      {:reply, {:ok, text}, persist(new_state)}
     end
   end
 
@@ -696,13 +768,28 @@ defmodule Pepe.Agent.Session do
                 agent
               end
 
-            case Runtime.run(agent, base_messages ++ [Message.user(redacted)], opts) do
+            # A goal/plan reminder is prepended to *this call only*, right before the
+            # user's turn - never persisted, so it always reflects the live state
+            # instead of freezing a snapshot into history (see Focus.context_line/1).
+            reminder = goal_reminder(key)
+            call_messages = base_messages ++ reminder ++ [Message.user(redacted)]
+
+            # Seed the tool_result redaction accumulator with what's already known
+            # (session history + this turn's inbound entries) so a tool call that
+            # surfaces a name already tokenized earlier in the conversation reuses
+            # the same token. Tools.execute grows it as calls happen during the run.
+            Pepe.Hooks.start_map(pii_map ++ entries)
+
+            case Runtime.run(agent, call_messages, opts) do
               {:ok, reply, all_messages} ->
-                map = pii_map ++ entries
+                new_turn = Enum.drop(all_messages, length(base_messages) + length(reminder))
+                map = Pepe.Hooks.take_map()
+                new_entries = Enum.drop(map, length(pii_map))
                 {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
-                {:ok, Pepe.Hooks.restore(shown, map), all_messages, entries}
+                {:ok, Pepe.Hooks.restore(shown, map), base_messages ++ new_turn, new_entries}
 
               other ->
+                Pepe.Hooks.take_map()
                 other
             end
           rescue
@@ -716,6 +803,23 @@ defmodule Pepe.Agent.Session do
       end)
 
     {pid, Process.monitor(pid)}
+  end
+
+  # Whether this turn is a real customer message against the company's monthly
+  # message cap - not the owner's own TUI console, dashboard test chat, or direct
+  # API use, and not an agent explicitly exempted from the cap.
+  defp customer_message?(key, agent) do
+    not agent.exempt_message_limit and Pepe.Trace.source_from_session(key) not in @internal_sources
+  end
+
+  # Wrapped as a <system-reminder> user-turn (not a second "system" message) so it
+  # reaches every provider the same way - the Anthropic adapter only ever looks at
+  # the *first* system-role message and silently drops any later one.
+  defp goal_reminder(key) do
+    case Pepe.Session.Focus.context_line(key) do
+      nil -> []
+      line -> [Message.user("<system-reminder>\n#{line}\n</system-reminder>")]
+    end
   end
 
   # A session started before any agent existed has no system message yet - seed one.
@@ -734,7 +838,7 @@ defmodule Pepe.Agent.Session do
   # switched languages.
   defp maybe_add_lang_hint(base, opts, prior_messages) do
     with lang when is_binary(lang) and lang != "" <- Keyword.get(opts, :lang),
-         true <- length(prior_messages) <= 1 do
+         true <- first_turn?(prior_messages) do
       base ++
         [
           Message.system(

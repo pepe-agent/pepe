@@ -220,12 +220,10 @@ defmodule Pepe.MCP.Client do
   # Flatten an MCP tool result's content blocks into text.
   defp tool_result(%{"result" => %{"content" => content}}) when is_list(content) do
     text =
-      content
-      |> Enum.map(fn
+      Enum.map_join(content, "\n", fn
         %{"type" => "text", "text" => t} -> t
         other -> Jason.encode!(other)
       end)
-      |> Enum.join("\n")
 
     {:ok, text}
   end
@@ -235,7 +233,7 @@ defmodule Pepe.MCP.Client do
   defp tool_result(_), do: {:error, :bad_response}
 
   defp safe_close(port) do
-    if is_port(port) and Port.info(port), do: Port.close(port)
+    if Port.info(port), do: Port.close(port)
   rescue
     _ -> :ok
   end

@@ -45,9 +45,8 @@ defmodule Pepe.OAuth do
     open_browser(url)
 
     result =
-      with {:ok, code} <- await_code(ref, server, opts),
-           {:ok, tokens} <- exchange(flow, code, verifier, state) do
-        {:ok, tokens}
+      with {:ok, code} <- await_code(ref, server, opts) do
+        exchange(flow, code, verifier, state)
       end
 
     stop_callback(server)

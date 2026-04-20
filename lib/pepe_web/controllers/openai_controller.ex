@@ -38,10 +38,8 @@ defmodule PepeWeb.OpenAIController do
 
   def chat_completions(conn, params) do
     messages = normalize_messages(params["messages"] || [])
-    stream? = params["stream"] == true
     scope = conn.assigns[:api_scope] || :unrestricted
     {agent, model} = resolve(params["model"], scope)
-    session_id = params["session_id"] || params["user"] || session_header(conn)
 
     cond do
       # A named agent that resolved to nothing under a real (non-open) scope is out of
@@ -52,6 +50,16 @@ defmodule PepeWeb.OpenAIController do
       is_nil(agent) ->
         error(conn, 400, "no agent or model resolved for #{inspect(params["model"])}")
 
+      true ->
+        respond(conn, params, agent, model, messages)
+    end
+  end
+
+  defp respond(conn, params, agent, model, messages) do
+    stream? = params["stream"] == true
+    session_id = params["session_id"] || params["user"] || session_header(conn)
+
+    cond do
       # Stateful mode: a session id was provided, so the server keeps the
       # conversation. Only the latest user message is needed each call.
       is_binary(session_id) and session_id != "" ->

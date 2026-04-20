@@ -140,9 +140,11 @@ que un agente confundido dé vueltas para siempre.
 
 Otras dos barreras se sitúan delante de la llamada al modelo. Un agente cuyo modelo
 exige redacción se niega a correr salvo que el agente tenga un hook de redacción
-activado, y una empresa que ha alcanzado su tope de gasto mensual se detiene aquí
-sin nuevas llamadas al modelo. Ambas fallan el turno de forma limpia en lugar de
-seguir en silencio.
+activado, y una empresa que ha alcanzado su tope de gasto mensual - o su tope de
+mensajes de clientes al mes, un límite independiente - se detiene aquí sin nuevas
+llamadas al modelo ni respuestas. Ambas fallan el turno de forma limpia en lugar de
+seguir en silencio; consulta Facturación y límites para ver cómo configurar esos
+topes.
 
 <div class="note"><strong>Transmisión y eventos.</strong> A medida que el ciclo
 corre emite eventos de ciclo de vida: un fragmento de texto transmitido

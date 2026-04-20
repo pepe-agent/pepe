@@ -35,3 +35,16 @@ If you prefer manual steps, use the model, agent, and channel pages. Both paths
 write the same config.
 
 <div class="note"><strong>Secrets stay out of the file.</strong> When Pepe asks for an API key it accepts a <code>${ENV_VAR}</code> reference, for example <code>${OPENROUTER_API_KEY}</code>. The reference is what gets written to <code>~/.pepe/config.json</code>. The real value is read from your environment at run time and is never stored expanded.</div>
+
+## Uninstall
+
+Remove the binary; add the config directory to also drop every model, agent
+and credential you set up.
+
+```bash
+rm ~/.local/bin/pepe
+rm -rf ~/.pepe   # optional - also drops your config
+```
+
+(`~/.local/bin` is the default install dir; it's wherever `$PEPE_BIN_DIR` pointed
+to if you overrode it.)

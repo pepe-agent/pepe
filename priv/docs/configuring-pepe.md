@@ -20,6 +20,37 @@ All configuration is a single JSON file at `~/.pepe/config.json` (overridable wi
 You rarely edit this file directly - prefer the structured tools (below), which
 validate and keep it consistent.
 
+## What the file looks like
+
+A small, realistic `~/.pepe/config.json` (secrets are `${ENV}` refs, never raw):
+
+```jsonc
+{
+  "default_model": "gpt",
+  "models": {
+    "gpt": { "base_url": "https://api.openai.com/v1", "api_key": "${OPENAI_API_KEY}", "model": "gpt-4o" }
+  },
+  "default_agent": "assistant",
+  "agents": {
+    "assistant": {
+      "model": "gpt",
+      "system_prompt": "You are a helpful assistant.",
+      "tools": ["bash", "read_file", "write_file", "web_search"],
+      "can_message": [],
+      "can_manage": null
+    }
+  },
+  "companies": { "acme": { "description": "Acme Inc", "default_model": "gpt" } },
+  "telegram": { "bot_token": "${TELEGRAM_BOT_TOKEN}", "allowed_chats": [] },
+  "server": { "port": 4000 },
+  "timezone": "America/Sao_Paulo"
+}
+```
+
+An agent references a model by name (`"model": "gpt"`); `can_message` is its routing
+allowlist and `can_manage` its admin scope (`null` = itself only - see `permissions`).
+Keys you don't use are simply absent.
+
 ## Secrets - never in plaintext
 
 Any secret (API key, bot token, MCP access token) is stored as a **`${ENV_VAR}`
@@ -48,6 +79,44 @@ set that env var - do not paste the secret.
 - `manage_plugin` - install/scan/remove community plugins (tools, channels). See `plugins`.
 - Generic tools (`bash`, `read_file`, `write_file`, `edit_file`, ...) for anything not
   covered by a structured tool.
+
+## Your workspace on disk
+
+Beyond `config.json`, each agent has a private, persistent **workspace** directory -
+`~/.pepe/agents/<name>/` for a root agent, `~/.pepe/companies/<co>/agents/<name>/` for
+a company one. Relative paths in your file tools land there and survive across
+conversations. A cross-agent `~/.pepe/shared/` (per-company under
+`companies/<co>/shared/`) is reachable via a `shared/...` path.
+
+A few filenames are **conventions** you may create and maintain yourself:
+
+- `SOUL.md` - your persona. It (or the config `system_prompt` seed) is what defines
+  who you are; small and loaded straight into the system prompt at session start.
+- `IDENTITY.md`, `BOOT.md` - also small and loaded at session start (`BOOT.md` is
+  re-read fresh each new conversation - write things to pick up next time there).
+- `MEMORY.md`, `AGENTS.md`, `USER.md`, `people.md` - larger knowledge files that are
+  only **listed by name**, not preloaded, so a growing `MEMORY.md` never bloats your
+  context. Read them on demand with `read_file`, append to them with `write_file` /
+  `edit_file` as you learn.
+
+This is autonomy by convention, not hardcoded code: ordinary file tools plus a place
+where files persist. Rename yourself with `rename_agent` (it moves this directory too).
+
+## Backup and restore
+
+`mix pepe backup` tars the durable parts of `~/.pepe` - `config.json`, every agent and
+company workspace, `shared`, and sessions - into a `.tgz`, skipping the disposable
+Mnesia cache (it rebuilds itself). Optional `--output FILE.tgz` picks the path.
+
+```bash
+mix pepe backup                          # writes pepe-backup-YYYY-MM-DD.tgz
+mix pepe backup --output ~/pepe-safe.tgz
+```
+
+Because every secret is a `${ENV_VAR}` reference, **no secret is in the archive** - the
+command prints the env-var names it found (and whether each is currently set) so you
+save them separately. There is no `restore` subcommand: recover by extracting the tar
+back into the parent of `~/.pepe` and re-exporting those env vars.
 
 ## The safe pattern
 

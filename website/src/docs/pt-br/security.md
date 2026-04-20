@@ -173,6 +173,8 @@ pepe agent add support \
   --hooks pii_redact
 ```
 
+Três pontos do fluxo são censurados: a mensagem de entrada do humano, **o resultado bruto de qualquer tool** (uma consulta ao banco, a leitura de um arquivo, uma busca na web - qualquer coisa que uma tool traga, não só o que um humano digitou), e a resposta de saída do agente. O resultado da tool é censurado antes de entrar na conversa e antes de ser gravado em disco - então um resultado grande que acabe salvo num arquivo do workspace (veja Agentes) já sai gravado censurado, nunca cru. Peça "liste os 10 pacientes mais recentes com diagnóstico cardíaco" contra o seu próprio banco e, com `pii_redact` habilitado, o modelo raciocina sobre `[PERSON_1]`, `[PERSON_2]`, ...; só a resposta final pra você recebe os nomes reais de volta.
+
 Quatro hooks vêm de fábrica:
 
 - `pii_redact`: um censor de expressões regulares, offline e sem dependências. Ele substitui dados pessoais estruturados (email, número de cartão e documentos nacionais como CPF ou CNPJ) por um token estável como `[CPF_1]`. Por padrão é reversível: registra `token -> real` para que o pipeline consiga restaurar o valor real na resposta de saída.
@@ -210,14 +212,7 @@ O painel web fica aberto em localhost por padrão, o que é conveniente para o d
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Você pode passar uma senha literal ou uma referência `${ENV_VAR}` para que o segredo fique fora do arquivo. Uma vez definida a senha, o painel exige entrar em `/login`. Limpe-a com `pepe dashboard password --clear`.
-
-A senha é lida de `dashboard.password` na configuração (interpolada), com um recuo para a variável de ambiente `PEPE_DASHBOARD_PASSWORD`. Dois ajustes relacionados reforçam um painel servido atrás de um domínio:
-
-- `pepe dashboard hosts app.example.com,dash.example.com` define os valores extras do cabeçalho `Host` que o painel aceita. Isso serve também como a lista de permissão contra o reataque de DNS (DNS rebinding).
-- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista os proxies reversos cujo cabeçalho `X-Forwarded-For` pode ser considerado confiável. Vazio por padrão, o que significa que nenhum cabeçalho de encaminhamento é confiável.
-
-Vinculado a uma interface pública sem senha, o painel se fecha por padrão e bloqueia clientes remotos até que você defina uma.
+Vinculado a uma interface pública sem senha, o painel se fecha por padrão e bloqueia clientes remotos até que você defina uma. Detalhes completos - a lista de permissão de `Host` e os ajustes de trusted-proxies pra servir atrás de um domínio, e como rodar como serviço persistente - estão na página [Painel](../dashboard/).
 
 ## Tokens da API
 

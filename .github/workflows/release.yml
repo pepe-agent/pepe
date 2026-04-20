@@ -29,13 +29,20 @@ jobs:
       - name: Install Erlang/Elixir
         uses: erlef/setup-beam@v1
         with:
-          otp-version: "27"
+          # 28+: Pepe.TUI's arrow-key select/multiselect needs OTP 28's raw
+          # terminal mode (:shell.start_interactive({:noshell, :raw})) to
+          # actually suppress echo - on 27 the call still returns :ok, so the
+          # fancy menu draws, but keystrokes (arrow-key escape sequences) leak
+          # onto the screen instead of being captured. Burrito bundles this
+          # exact OTP series' ERTS into every target, so the version here is
+          # what end users actually run, not just what builds it.
+          otp-version: "28"
           elixir-version: "1.18"
 
       - name: Install Zig (Burrito cross-compiler)
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
-          version: "0.14.0"
+          version: "0.15.2"
 
       - name: Install packagers Burrito shells out to
         run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
@@ -45,14 +52,34 @@ jobs:
         env:
           MIX_ENV: prod
 
+      - name: Build and digest the dashboard's static assets
+        run: mix assets.setup && mix compile && mix assets.deploy
+        env:
+          MIX_ENV: prod
+
       - name: Build the self-contained binaries
         run: mix release
         env:
           MIX_ENV: prod
+
+      - name: Extract this version's CHANGELOG.md section
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") { found=1; next }
+              next
+            }
+            found && /^\[.+\]:/ { exit }
+            found { print }
+          ' CHANGELOG.md | sed '/./,$!d' > release_notes.md
+          cat release_notes.md
 
       - name: Publish binaries to the release
         uses: softprops/action-gh-release@v2
         with:
           files: burrito_out/pepe_*
           fail_on_unmatched_files: true
+          body_path: release_notes.md
           generate_release_notes: true

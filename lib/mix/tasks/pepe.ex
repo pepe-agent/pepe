@@ -66,7 +66,7 @@ defmodule Mix.Tasks.Pepe do
 
   ## Agents
 
-      mix pepe agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--default] [--company CO]
+      mix pepe agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--company CO]
       mix pepe agent list [--company CO | --all]
       mix pepe agent route FROM TO [--remove] [--company CO]   # let FROM message TO (directed)
       mix pepe agent manage ADMIN TARGET [--remove]  # let ADMIN administer TARGET ("*" = all)
@@ -118,7 +118,19 @@ defmodule Mix.Tasks.Pepe do
   def run(argv) do
     # Ensure the project is compiled (mix tasks don't recompile by default).
     Mix.Task.run("compile", ["--no-deps-check"])
+    apply_locale()
     dispatch(argv)
+  end
+
+  # Apply the language chosen at setup so every CLI string Pepe emits (prompts,
+  # menu hints, confirmations) comes out in it. Best-effort: a missing/unreadable
+  # config just leaves the default (en). Called by both entry points (this task
+  # and Pepe.CLI for the escript/release).
+  @doc false
+  def apply_locale do
+    Config.put_locale()
+  catch
+    _, _ -> :ok
   end
 
   @doc """
@@ -126,147 +138,100 @@ defmodule Mix.Tasks.Pepe do
   task and the standalone `pepe` escript (`Pepe.CLI`), so both entry points
   behave identically. The escript calls this directly (no Mix at runtime).
   """
-  def dispatch(argv) do
-    case argv do
-      [] ->
-        help()
+  def dispatch([]), do: help()
+  def dispatch(["help"]), do: help()
 
-      ["help"] ->
-        help()
+  # `pepe help <group>` mirrors `pepe <group> help`.
+  def dispatch(["help", "agent" | _]), do: agent_cmd(["help"])
+  def dispatch(["help", "model" | _]), do: model_cmd(["help"])
+  def dispatch(["help", "gateway" | _]), do: gateway_cmd(["help"])
+  def dispatch(["help", "company" | _]), do: company_cmd(["help"])
+  def dispatch(["help", "serve" | _]), do: serve_help()
+  def dispatch(["help", "run" | _]), do: run_help()
+  def dispatch(["help", "backup" | _]), do: backup_help()
 
-      # `pepe help <group>` mirrors `pepe <group> help`.
-      ["help", "agent" | _] ->
-        agent_cmd(["help"])
+  def dispatch(["setup" | _]), do: with_config(&setup/0)
+  def dispatch(["config" | rest]), do: with_config(fn -> config_cmd(rest) end)
+  def dispatch(["dashboard" | rest]), do: with_config(fn -> dashboard_cmd(rest) end)
+  def dispatch(["backup", "help" | _]), do: backup_help()
+  def dispatch(["backup" | rest]), do: with_config(fn -> backup_cmd(rest) end)
+  def dispatch(["tools" | _]), do: with_config(&tools/0)
+  def dispatch(["timelearn" | rest]), do: with_config(fn -> timelearn_cmd(rest) end)
 
-      ["help", "model" | _] ->
-        model_cmd(["help"])
+  # `learn consolidate` calls the model (needs the app); `auto`/`status` only read
+  # and write config.
+  def dispatch(["learn", "consolidate" | rest]),
+    do: with_app([], fn -> learn_cmd(["consolidate" | rest]) end)
 
-      ["help", "gateway" | _] ->
-        gateway_cmd(["help"])
+  def dispatch(["learn" | rest]), do: with_config(fn -> learn_cmd(rest) end)
 
-      ["help", "company" | _] ->
-        company_cmd(["help"])
+  # `cron list/history` only read files; `cron run` needs the full app to call
+  # the model, so route everything through with_app.
+  def dispatch(["cron", sub | rest]) when sub in ["list", "history", "logs"],
+    do: with_config(fn -> cron_cmd([sub | rest]) end)
 
-      ["setup" | _] ->
-        with_config(&setup/0)
+  def dispatch(["cron" | rest]), do: with_app([], fn -> cron_cmd(rest) end)
+  def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
 
-      ["config" | rest] ->
-        with_config(fn -> config_cmd(rest) end)
+  # `mcp tools` launches the server (needs the app); the rest just edit config.
+  def dispatch(["mcp", "tools" | rest]), do: with_app([], fn -> mcp_cmd(["tools" | rest]) end)
+  def dispatch(["mcp" | rest]), do: with_config(fn -> mcp_cmd(rest) end)
 
-      ["dashboard" | rest] ->
-        with_config(fn -> dashboard_cmd(rest) end)
+  # `usage prices --refresh` fetches over the network (needs Req/the app);
+  # reporting just reads the ledger files.
+  def dispatch(["usage", "prices" | rest]),
+    do: with_app([], fn -> usage_cmd(["prices" | rest]) end)
 
-      ["backup" | rest] ->
-        with_config(fn -> backup_cmd(rest) end)
+  def dispatch(["usage" | rest]), do: with_config(fn -> usage_cmd(rest) end)
+  def dispatch(["traces" | rest]), do: with_config(fn -> traces_cmd(rest) end)
 
-      ["tools" | _] ->
-        with_config(&tools/0)
+  # `plugin install`/`scan` may fetch a URL (needs Req); list/remove only touch files.
+  def dispatch(["plugin", sub | rest]) when sub in ["install", "scan"],
+    do: with_app([], fn -> plugin_cmd([sub | rest]) end)
 
-      ["timelearn" | rest] ->
-        with_config(fn -> timelearn_cmd(rest) end)
+  def dispatch(["plugin" | rest]), do: with_config(fn -> plugin_cmd(rest) end)
+  def dispatch(["migrate" | rest]), do: with_config(fn -> migrate_cmd(rest) end)
+  def dispatch(["company" | rest]), do: with_config(fn -> company_cmd(rest) end)
 
-      # `learn consolidate` calls the model (needs the app); `auto`/`status` only read
-      # and write config.
-      ["learn", "consolidate" | rest] ->
-        with_app([], fn -> learn_cmd(["consolidate" | rest]) end)
+  # `hooks generate` calls a model (needs the app); `list` just reads.
+  def dispatch(["hooks", "generate" | rest]),
+    do: with_app([], fn -> hooks_cmd(["generate" | rest]) end)
 
-      ["learn" | rest] ->
-        with_config(fn -> learn_cmd(rest) end)
+  def dispatch(["hooks" | rest]), do: with_config(fn -> hooks_cmd(rest) end)
+  def dispatch(["eval" | rest]), do: with_app([], fn -> eval_cmd(rest) end)
+  def dispatch(["token" | rest]), do: with_config(fn -> token_cmd(rest) end)
+  def dispatch(["watch" | rest]), do: with_config(fn -> watch_cmd(rest) end)
+  def dispatch(["model" | rest]), do: with_config(fn -> model_cmd(rest) end)
+  def dispatch(["agent" | rest]), do: with_config(fn -> agent_cmd(rest) end)
+  def dispatch(["run", "help" | _]), do: run_help()
+  def dispatch(["run" | rest]), do: with_app([], fn -> run_cmd(rest) end)
+  def dispatch(["chat" | rest]), do: with_app([persist: true], fn -> tui_cmd(rest) end)
+  def dispatch(["tui" | rest]), do: with_app([persist: true], fn -> tui_cmd(rest) end)
 
-      # `cron list/history` only read files; `cron run` needs the full app to call
-      # the model, so route everything through with_app.
-      ["cron", sub | rest] when sub in ["list", "history", "logs"] ->
-        with_config(fn -> cron_cmd([sub | rest]) end)
+  def dispatch(["serve", "help" | _]), do: serve_help()
 
-      ["cron" | rest] ->
-        with_app([], fn -> cron_cmd(rest) end)
+  def dispatch(["serve", sub | rest]) when sub in ["install", "uninstall", "status"],
+    do: with_config(fn -> serve_service_cmd(sub, rest) end)
 
-      ["doctor" | rest] ->
-        with_app([], fn -> doctor_cmd(rest) end)
+  def dispatch(["serve" | rest]),
+    do: with_app([serve: true, gateways: true, port: serve_port(rest)], fn -> serve_cmd(rest) end)
 
-      # `mcp tools` launches the server (needs the app); the rest just edit config.
-      ["mcp", "tools" | rest] ->
-        with_app([], fn -> mcp_cmd(["tools" | rest]) end)
+  # Configuring a gateway only touches the config file - no app needed.
+  def dispatch(["gateway", "telegram", "setup" | _]), do: with_config(&telegram_setup/0)
 
-      ["mcp" | rest] ->
-        with_config(fn -> mcp_cmd(rest) end)
+  def dispatch(["gateway", "telegram", sub | rest]) when sub in ["add", "remove", "list"],
+    do: with_config(fn -> gateway_cmd(["telegram", sub | rest]) end)
 
-      # `usage prices --refresh` fetches over the network (needs Req/the app);
-      # reporting just reads the ledger files.
-      ["usage", "prices" | rest] ->
-        with_app([], fn -> usage_cmd(["prices" | rest]) end)
+  # WhatsApp connections are webhook-based - served by `mix pepe serve`, so the
+  # CLI just edits config (no running poller).
+  def dispatch(["gateway", "whatsapp" | rest]),
+    do: with_config(fn -> gateway_cmd(["whatsapp" | rest]) end)
 
-      ["usage" | rest] ->
-        with_config(fn -> usage_cmd(rest) end)
+  def dispatch(["gateway" | rest]), do: with_app([gateways: true], fn -> gateway_cmd(rest) end)
 
-      ["traces" | rest] ->
-        with_config(fn -> traces_cmd(rest) end)
-
-      # `plugin install`/`scan` may fetch a URL (needs Req); list/remove only touch files.
-      ["plugin", sub | rest] when sub in ["install", "scan"] ->
-        with_app([], fn -> plugin_cmd([sub | rest]) end)
-
-      ["plugin" | rest] ->
-        with_config(fn -> plugin_cmd(rest) end)
-
-      ["migrate" | rest] ->
-        with_config(fn -> migrate_cmd(rest) end)
-
-      ["company" | rest] ->
-        with_config(fn -> company_cmd(rest) end)
-
-      # `hooks generate` calls a model (needs the app); `list` just reads.
-      ["hooks", "generate" | rest] ->
-        with_app([], fn -> hooks_cmd(["generate" | rest]) end)
-
-      ["hooks" | rest] ->
-        with_config(fn -> hooks_cmd(rest) end)
-
-      ["eval" | rest] ->
-        with_app([], fn -> eval_cmd(rest) end)
-
-      ["token" | rest] ->
-        with_config(fn -> token_cmd(rest) end)
-
-      ["watch" | rest] ->
-        with_config(fn -> watch_cmd(rest) end)
-
-      ["model" | rest] ->
-        with_config(fn -> model_cmd(rest) end)
-
-      ["agent" | rest] ->
-        with_config(fn -> agent_cmd(rest) end)
-
-      ["run" | rest] ->
-        with_app([], fn -> run_cmd(rest) end)
-
-      ["chat" | rest] ->
-        with_app([persist: true], fn -> tui_cmd(rest) end)
-
-      ["tui" | rest] ->
-        with_app([persist: true], fn -> tui_cmd(rest) end)
-
-      ["serve" | rest] ->
-        with_app([serve: true, gateways: true, port: serve_port(rest)], fn -> serve_cmd(rest) end)
-
-      # Configuring a gateway only touches the config file - no app needed.
-      ["gateway", "telegram", "setup" | _] ->
-        with_config(&telegram_setup/0)
-
-      ["gateway", "telegram", sub | rest] when sub in ["add", "remove", "list"] ->
-        with_config(fn -> gateway_cmd(["telegram", sub | rest]) end)
-
-      # WhatsApp connections are webhook-based - served by `mix pepe serve`, so the
-      # CLI just edits config (no running poller).
-      ["gateway", "whatsapp" | rest] ->
-        with_config(fn -> gateway_cmd(["whatsapp" | rest]) end)
-
-      ["gateway" | rest] ->
-        with_app([gateways: true], fn -> gateway_cmd(rest) end)
-
-      other ->
-        error("unknown command: #{Enum.join(other, " ")}\n") && help()
-    end
+  def dispatch(other) do
+    error("unknown command: #{Enum.join(other, " ")}\n")
+    help()
   end
 
   ###
@@ -387,7 +352,7 @@ defmodule Mix.Tasks.Pepe do
     Pepe.Providers.all()
     |> Enum.each(fn p ->
       key = p.env || "no key"
-      IO.puts("  #{bold(p.label)}\n    base-url: #{p.base_url || "(custom)"}  ·  key: #{key}")
+      puts("  #{bold(p.label)}\n    base-url: #{p.base_url || "(custom)"}  ·  key: #{key}")
     end)
   end
 
@@ -398,7 +363,7 @@ defmodule Mix.Tasks.Pepe do
     case fetch_models(base_url, opts[:api_key]) do
       {:ok, ids} ->
         info("#{length(ids)} models at #{base_url}:")
-        Enum.each(ids, &IO.puts("  #{&1}"))
+        Enum.each(ids, &puts("  #{&1}"))
 
       {:error, reason} ->
         error("could not fetch models: #{describe(reason)}")
@@ -419,11 +384,7 @@ defmodule Mix.Tasks.Pepe do
         info("no model connections. add one:\n  mix pepe model add openrouter --api-key '${OPENROUTER_API_KEY}' --model openai/gpt-5-chat")
 
       models ->
-        Enum.each(models, fn m ->
-          mark = if m.name == default, do: " #{green("(default)")}", else: ""
-
-          IO.puts("#{bold(m.name)}#{mark}\n  url:   #{m.base_url}\n  model: #{m.model}\n  api:   #{m.api}")
-        end)
+        Enum.each(models, &print_model_line(&1, default))
     end
   end
 
@@ -520,6 +481,11 @@ defmodule Mix.Tasks.Pepe do
   defp model_cmd(_),
     do: error("usage: mix pepe model [add|list|models|providers|test|reconnect|remove|rename|default] (or: help)")
 
+  defp print_model_line(m, default) do
+    mark = if m.name == default, do: " #{green("(default)")}", else: ""
+    puts("#{bold(m.name)}#{mark}\n  url:   #{m.base_url}\n  model: #{m.model}\n  api:   #{m.api}")
+  end
+
   defp add_model_interactively, do: model_add(prompt_name(), ["--default"], false)
 
   defp prompt_name do
@@ -536,15 +502,18 @@ defmodule Mix.Tasks.Pepe do
     handle = Company.handle(company, name)
 
     if handle in taken do
-      Stream.iterate(2, &(&1 + 1))
-      |> Enum.find_value(fn n ->
-        candidate = "#{name}-#{n}"
-        h = Company.handle(company, candidate)
-        if h not in taken, do: {candidate, h}
-      end)
+      2
+      |> Stream.iterate(&(&1 + 1))
+      |> Enum.find_value(&candidate_handle(&1, name, company, taken))
     else
       {name, handle}
     end
+  end
+
+  defp candidate_handle(n, name, company, taken) do
+    candidate = "#{name}-#{n}"
+    h = Company.handle(company, candidate)
+    if h not in taken, do: {candidate, h}
   end
 
   # dedupe?: false when `name` already went through prompt_name/0's own
@@ -564,58 +533,63 @@ defmodule Mix.Tasks.Pepe do
         ]
       )
 
-    if validate_scope(name, opts[:company]) == :ok do
-      {store_name, handle} =
-        if dedupe?, do: unique_handle(name, opts[:company]), else: {name, Company.handle(opts[:company], name)}
-
-      if store_name != name do
-        info(
-          dim("a connection named \"#{Company.handle(opts[:company], name)}\" already exists - saving this one as \"#{handle}\" instead.")
-        )
-      end
+    with :ok <- validate_scope(name, opts[:company]) do
+      {store_name, handle} = resolve_handle(name, opts[:company], dedupe?)
+      warn_if_renamed(name, store_name, handle, opts[:company])
 
       # Guided flow: no --base-url ⇒ use a matching known provider name, or let
       # the user pick one from the catalog. --base-url ⇒ use it directly.
-      {base_url, api_key, oauth} =
-        cond do
-          opts[:base_url] ->
-            {opts[:base_url], opts[:api_key], nil}
+      {base_url, api_key, oauth} = resolve_connection(name, opts)
+      save_model(base_url, api_key, oauth, handle, store_name, opts)
+    end
+  end
 
-          provider = Pepe.Providers.get(name) ->
-            choose_auth(provider, opts)
+  defp resolve_handle(name, company, true), do: unique_handle(name, company)
+  defp resolve_handle(name, company, false), do: {name, Company.handle(company, name)}
 
-          true ->
-            choose_provider()
-        end
+  defp warn_if_renamed(name, store_name, _handle, _company) when store_name == name, do: :ok
 
-      cond do
-        is_nil(base_url) ->
-          error("no provider selected; aborting.")
+  defp warn_if_renamed(name, _store_name, handle, company) do
+    info(dim("a connection named \"#{Company.handle(company, name)}\" already exists - saving this one as \"#{handle}\" instead."))
+  end
 
-        true ->
-          model_id = opts[:model] || pick_model(base_url, api_key)
+  defp resolve_connection(name, opts) do
+    cond do
+      opts[:base_url] ->
+        {opts[:base_url], opts[:api_key], nil}
 
-          case model_id do
-            nil ->
-              error("no model selected; aborting.")
+      provider = Pepe.Providers.get(name) ->
+        choose_auth(provider, opts)
 
-            id ->
-              model = %Model{
-                name: handle,
-                base_url: base_url,
-                api_key: api_key,
-                oauth: oauth,
-                model: id,
-                api: opts[:api] || api_for(base_url),
-                max_tokens: opts[:max_tokens],
-                temperature: opts[:temperature]
-              }
+      true ->
+        choose_provider()
+    end
+  end
 
-              Config.put_model(model)
-              if opts[:default], do: Config.set_default_model_for(opts[:company], store_name)
-              ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
-          end
-      end
+  defp save_model(nil, _api_key, _oauth, _handle, _store_name, _opts) do
+    error("no provider selected; aborting.")
+  end
+
+  defp save_model(base_url, api_key, oauth, handle, store_name, opts) do
+    case opts[:model] || pick_model(base_url, api_key) do
+      nil ->
+        error("no model selected; aborting.")
+
+      id ->
+        model = %Model{
+          name: handle,
+          base_url: base_url,
+          api_key: api_key,
+          oauth: oauth,
+          model: id,
+          api: opts[:api] || api_for(base_url),
+          max_tokens: opts[:max_tokens],
+          temperature: opts[:temperature]
+        }
+
+        Config.put_model(model)
+        if opts[:default], do: Config.set_default_model_for(opts[:company], store_name)
+        ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
     end
   end
 
@@ -823,25 +797,24 @@ defmodule Mix.Tasks.Pepe do
   defp choose_model(ids) do
     # Long catalogs (OpenRouter has 300+) get an optional substring filter before
     # the picker so the numbered list stays navigable.
-    ids =
-      if length(ids) > 20 do
-        case Owl.IO.input(label: "Filter models (substring, blank for all):", optional: true) do
-          blank when blank in [nil, ""] ->
-            ids
-
-          filter ->
-            down = String.downcase(filter)
-
-            case Enum.filter(ids, &String.contains?(String.downcase(&1), down)) do
-              [] -> ids
-              filtered -> filtered
-            end
-        end
-      else
-        ids
-      end
-
+    ids = if Enum.count_until(ids, 21) > 20, do: filter_ids(ids), else: ids
     Pepe.TUI.select(ids, label: bold("Select the default model:"))
+  end
+
+  defp filter_ids(ids) do
+    case Owl.IO.input(label: "Filter models (substring, blank for all):", optional: true) do
+      blank when blank in [nil, ""] -> ids
+      filter -> apply_filter(ids, filter)
+    end
+  end
+
+  defp apply_filter(ids, filter) do
+    down = String.downcase(filter)
+
+    case Enum.filter(ids, &String.contains?(String.downcase(&1), down)) do
+      [] -> ids
+      filtered -> filtered
+    end
   end
 
   defp prompt_model_id do
@@ -917,7 +890,7 @@ defmodule Mix.Tasks.Pepe do
 
         case opts[:output] do
           nil ->
-            IO.puts(body)
+            puts(body)
 
           path ->
             File.write!(path, body)
@@ -947,13 +920,13 @@ defmodule Mix.Tasks.Pepe do
 
   defp print_usage(s, scope) do
     label = if scope == :all, do: "all scopes", else: scope
-    IO.puts("#{bold("usage")} · #{label} · by #{s.granularity} · #{s.currency}\n")
+    puts("#{bold("usage")} · #{label} · by #{s.granularity} · #{s.currency}\n")
 
     if s.buckets == [] do
       info("no usage recorded yet for this scope.")
     else
       Enum.each(s.buckets, fn b ->
-        IO.puts(
+        puts(
           "  #{String.pad_trailing(b.key, 18)} " <>
             "#{String.pad_leading(fmt_tok(b.total), 10)} tok  " <>
             "cost #{String.pad_leading(fmt_money(b.cost, s.currency), 12)}  " <>
@@ -963,7 +936,7 @@ defmodule Mix.Tasks.Pepe do
 
       t = s.totals
 
-      IO.puts(
+      puts(
         "\n  #{bold(String.pad_trailing("TOTAL", 18))} " <>
           "#{String.pad_leading(fmt_tok(t.total), 10)} tok  " <>
           "cost #{String.pad_leading(fmt_money(t.cost, s.currency), 12)}  " <>
@@ -972,18 +945,19 @@ defmodule Mix.Tasks.Pepe do
     end
 
     if scope == :all and s.by_company != [] do
-      IO.puts("\n#{bold("by company")}")
-
-      Enum.each(s.by_company, fn c ->
-        markup = if c.markup != 1.0, do: " (×#{c.markup})", else: ""
-
-        IO.puts(
-          "  #{String.pad_trailing(c.key, 16)} " <>
-            "cost #{String.pad_leading(fmt_money(c.cost, s.currency), 12)}  " <>
-            "bill #{String.pad_leading(fmt_money(c.billable, s.currency), 12)}#{markup}"
-        )
-      end)
+      puts("\n#{bold("by company")}")
+      Enum.each(s.by_company, &print_company_line(&1, s.currency))
     end
+  end
+
+  defp print_company_line(c, currency) do
+    markup = if c.markup != 1.0, do: " (×#{c.markup})", else: ""
+
+    puts(
+      "  #{String.pad_trailing(c.key, 16)} " <>
+        "cost #{String.pad_leading(fmt_money(c.cost, currency), 12)}  " <>
+        "bill #{String.pad_leading(fmt_money(c.billable, currency), 12)}#{markup}"
+    )
   end
 
   defp fmt_tok(n) when n >= 1_000_000, do: "#{Float.round(n / 1_000_000, 1)}M"
@@ -1017,23 +991,25 @@ defmodule Mix.Tasks.Pepe do
       |> Enum.take(limit)
 
     label = if scope == :all, do: "all scopes", else: scope
-    IO.puts("#{bold("traces")} · #{label}\n")
+    puts("#{bold("traces")} · #{label}\n")
 
     if traces == [] do
       info("no runs recorded yet.")
     else
-      Enum.each(traces, fn t ->
-        kind = get_in(t, ["outcome", "kind"]) || "?"
-        mark = if kind == "error", do: red("✗"), else: green("✓")
+      Enum.each(traces, &print_trace_line/1)
 
-        IO.puts(
-          "  #{mark} #{dim(t["id"])}  #{String.pad_trailing(t["agent"], 20)} " <>
-            "#{String.pad_leading("#{t["ms"]}ms", 8)}  #{dim(Enum.join(t["tools"] || [], ","))}"
-        )
-      end)
-
-      IO.puts("\n#{dim("replay one: mix pepe traces ID")}")
+      puts("\n#{dim("replay one: mix pepe traces ID")}")
     end
+  end
+
+  defp print_trace_line(t) do
+    kind = get_in(t, ["outcome", "kind"]) || "?"
+    mark = if kind == "error", do: red("✗"), else: green("✓")
+
+    puts(
+      "  #{mark} #{dim(t["id"])}  #{String.pad_trailing(t["agent"], 20)} " <>
+        "#{String.pad_leading("#{t["ms"]}ms", 8)}  #{dim(Enum.join(t["tools"] || [], ","))}"
+    )
   end
 
   defp find_trace(:all, id) do
@@ -1045,24 +1021,32 @@ defmodule Mix.Tasks.Pepe do
   defp print_trace(nil), do: error("no trace with that id.")
 
   defp print_trace(t) do
-    IO.puts("#{bold(t["agent"])}  #{dim("#{t["ms"]}ms")}  #{trace_outcome(t["outcome"])}")
-    if t["session"], do: IO.puts(dim("session: #{t["session"]}"))
-    if t["prompt"], do: IO.puts("\n#{bold("prompt")}\n  #{t["prompt"]}")
-    IO.puts("")
+    puts("#{bold(t["agent"])}  #{dim("#{t["ms"]}ms")}  #{trace_outcome(t["outcome"])}")
+    if t["session"], do: puts(dim("session: #{t["session"]}"))
+    if t["prompt"], do: puts("\n#{bold("prompt")}\n  #{t["prompt"]}")
+    puts("")
 
-    Enum.each(t["events"] || [], fn ev ->
-      case ev["t"] do
-        "tool_call" -> IO.puts("  #{yellow("→")} #{bold(ev["name"])} #{dim(ev["args"] || "")}")
-        "tool_result" -> IO.puts("    #{dim(clip_line(ev["out"]))}")
-        "tool_denied" -> IO.puts("  #{red("⨯")} #{ev["name"]} #{dim("blocked")}")
-        "assistant" -> IO.puts("  #{green("•")} #{ev["text"]}")
-        "failover" -> IO.puts("  #{dim("failover #{ev["from"]} → #{ev["to"]}")}")
-        "usage" -> IO.puts("  #{dim("#{ev["model"]}: in #{ev["in"]} / out #{ev["out"]} tok")}")
-        "error" -> IO.puts("  #{red("!")} #{ev["reason"]}")
-        _ -> :ok
-      end
-    end)
+    Enum.each(t["events"] || [], &print_trace_event/1)
   end
+
+  defp print_trace_event(%{"t" => "tool_call"} = ev),
+    do: puts("  #{yellow("→")} #{bold(ev["name"])} #{dim(ev["args"] || "")}")
+
+  defp print_trace_event(%{"t" => "tool_result"} = ev), do: puts("    #{dim(clip_line(ev["out"]))}")
+
+  defp print_trace_event(%{"t" => "tool_denied"} = ev),
+    do: puts("  #{red("⨯")} #{ev["name"]} #{dim("blocked")}")
+
+  defp print_trace_event(%{"t" => "assistant"} = ev), do: puts("  #{green("•")} #{ev["text"]}")
+
+  defp print_trace_event(%{"t" => "failover"} = ev),
+    do: puts("  #{dim("failover #{ev["from"]} → #{ev["to"]}")}")
+
+  defp print_trace_event(%{"t" => "usage"} = ev),
+    do: puts("  #{dim("#{ev["model"]}: in #{ev["in"]} / out #{ev["out"]} tok")}")
+
+  defp print_trace_event(%{"t" => "error"} = ev), do: puts("  #{red("!")} #{ev["reason"]}")
+  defp print_trace_event(_ev), do: :ok
 
   defp trace_outcome(%{"kind" => "error", "reason" => r}), do: red("error: #{r}")
   defp trace_outcome(%{"kind" => "ok"}), do: green("ok")
@@ -1076,7 +1060,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp traces_help do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe traces")} - inspect and replay recent agent runs
 
       traces [--company NAME] [--limit N]   list recent runs (any surface)
@@ -1142,14 +1126,16 @@ defmodule Mix.Tasks.Pepe do
       pkgs ->
         info(bold("installed plugins") <> dim("  (#{Pepe.Plugins.dir()})"))
 
-        Enum.each(pkgs, fn p ->
-          desc = get_in(p.manifest || %{}, ["description"])
-          info("  #{green(p.name)} #{dim("(#{p.kind})")}#{if desc, do: dim(" - " <> desc), else: ""}")
-        end)
+        Enum.each(pkgs, &print_plugin_line/1)
 
         providers = Pepe.Webhooks.providers() -- ["whatsapp"]
         if providers != [], do: info(dim("\nchannel providers from plugins: #{Enum.join(providers, ", ")}"))
     end
+  end
+
+  defp print_plugin_line(p) do
+    desc = get_in(p.manifest || %{}, ["description"])
+    info("  #{green(p.name)} #{dim("(#{p.kind})")}#{if desc, do: dim(" - " <> desc), else: ""}")
   end
 
   # `migrate` - import an existing setup from another agent runtime.
@@ -1190,7 +1176,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp migrate_help do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe migrate")} - import an existing setup from another agent runtime
 
       migrate #{Enum.join(Pepe.Migrate.sources(), "|")} [--from PATH] [--dry-run]
@@ -1203,7 +1189,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp plugin_help do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe plugin")} - install and manage user plugins
 
       plugin list                 list installed plugins and what they add
@@ -1223,7 +1209,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp usage_help do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe usage")} - token metering & billing
 
       usage [--company NAME] [--granularity CYCLE] [--limit N]
@@ -1255,28 +1241,10 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} = OptionParser.parse!(rest, strict: [model: :string, save: :boolean])
     model = opts[:model] || Config.default_model_name()
 
-    cond do
-      is_nil(model) ->
-        error("no model to generate with - pass --model NAME (or set a default model)")
-
-      true ->
-        info("asking #{model} to build a pii_redact config...")
-
-        case Pepe.Hooks.Generator.generate(desc, model) do
-          {:ok, config, dropped} ->
-            IO.puts(Jason.encode!(config, pretty: true))
-            if dropped != [], do: info(dim("dropped (invalid): #{Enum.join(dropped, ", ")}"))
-
-            if opts[:save] do
-              Config.put_hook_settings("pii_redact", config)
-              ok("saved to hooks.pii_redact")
-            else
-              info(dim("re-run with --save to store it, or paste it under \"hooks\" yourself"))
-            end
-
-          {:error, reason} ->
-            error("couldn't generate: #{inspect(reason)}")
-        end
+    if is_nil(model) do
+      error("no model to generate with - pass --model NAME (or set a default model)")
+    else
+      generate_hook(desc, model, opts)
     end
   end
 
@@ -1289,6 +1257,29 @@ defmodule Mix.Tasks.Pepe do
                                     let a model build a pii_redact config (packs +
                                     custom regex), validated before it's saved
     """)
+  end
+
+  defp generate_hook(desc, model, opts) do
+    info("asking #{model} to build a pii_redact config...")
+
+    case Pepe.Hooks.Generator.generate(desc, model) do
+      {:ok, config, dropped} ->
+        puts(Jason.encode!(config, pretty: true))
+        if dropped != [], do: info(dim("dropped (invalid): #{Enum.join(dropped, ", ")}"))
+        save_or_hint_hook(config, opts[:save])
+
+      {:error, reason} ->
+        error("couldn't generate: #{inspect(reason)}")
+    end
+  end
+
+  defp save_or_hint_hook(config, true) do
+    Config.put_hook_settings("pii_redact", config)
+    ok("saved to hooks.pii_redact")
+  end
+
+  defp save_or_hint_hook(_config, _save?) do
+    info(dim("re-run with --save to store it, or paste it under \"hooks\" yourself"))
   end
 
   ###
@@ -1326,7 +1317,7 @@ defmodule Mix.Tasks.Pepe do
   defp eval_cmd(_), do: error("usage: mix pepe eval [SUITE | list | --seed]")
 
   defp eval_help do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe eval")} - replay prompts through an agent and assert on the result
 
       eval                 run every suite (bundled + your own)
@@ -1387,18 +1378,74 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp company_cmd(["set", name | rest]) do
+    {opts, _} =
+      OptionParser.parse!(rest,
+        strict: [budget: :string, message_limit: :string, markup: :string, description: :string]
+      )
+
+    if opts == [] do
+      error(
+        "usage: mix pepe company set NAME [--budget N|none] [--message-limit N|none] " <>
+          "[--markup N|none] [--description \"...\"|none]"
+      )
+    else
+      meta =
+        %{}
+        |> put_company_opt(opts, :budget, "budget", &parse_money_opt/1)
+        |> put_company_opt(opts, :message_limit, "message_limit", &parse_count_opt/1)
+        |> put_company_opt(opts, :markup, "markup", &parse_money_opt/1)
+        |> put_company_opt(opts, :description, "description", &parse_description_opt/1)
+
+      case Config.update_scope(scope_arg(name), meta) do
+        :ok -> ok("updated #{green(name)}")
+        {:error, :not_found} -> error("unknown company: #{name}")
+      end
+    end
+  end
+
+  defp company_cmd(["set" | _]),
+    do:
+      error(
+        "usage: mix pepe company set NAME|root [--budget N|none] [--message-limit N|none] " <>
+          "[--markup N|none] [--description \"...\"|none]"
+      )
+
+  defp company_cmd(["reset-messages", name | _]) do
+    if name == "root" or Config.company_exists?(name) do
+      scope = scope_arg(name)
+      before = Pepe.Usage.message_count_month_to_date(scope)
+      Pepe.Usage.reset_messages(scope)
+      ok("reset #{green(name)}'s message count (was #{before}) for the rest of this month")
+    else
+      error("unknown company: #{name}")
+    end
+  end
+
+  defp company_cmd(["reset-messages" | _]),
+    do: error("usage: mix pepe company reset-messages NAME|root")
+
+  defp company_cmd(["reset-budget", name | _]) do
+    if name == "root" or Config.company_exists?(name) do
+      scope = scope_arg(name)
+      before = :erlang.float_to_binary(Pepe.Usage.month_to_date(scope) / 1, decimals: 2)
+      Pepe.Usage.reset_budget(scope)
+      ok("reset #{green(name)}'s spend count (was #{Config.currency()} #{before}) for the rest of this month")
+    else
+      error("unknown company: #{name}")
+    end
+  end
+
+  defp company_cmd(["reset-budget" | _]),
+    do: error("usage: mix pepe company reset-budget NAME|root")
+
   defp company_cmd(["list" | _]) do
     case Config.companies() do
       [] ->
         info("no companies. everything runs in the root scope. add one:\n  mix pepe company add acme")
 
       companies ->
-        Enum.each(companies, fn name ->
-          count = length(Config.agents_in(name))
-          desc = (Config.get_company(name) || %{})["description"]
-          suffix = if desc, do: " - #{desc}", else: ""
-          IO.puts("#{bold(name)} (#{count} agent#{if count == 1, do: "", else: "s"})#{suffix}")
-        end)
+        Enum.each(companies, &print_company_summary/1)
     end
   end
 
@@ -1443,22 +1490,90 @@ defmodule Mix.Tasks.Pepe do
     do: error("usage: mix pepe company rename OLD NEW")
 
   defp company_cmd(cmd) when cmd in [[], ["help"]] do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe company")} - multi-tenant scopes
 
       add NAME [--description "..."]   create a company (an isolated tenant)
+      set NAME|root [--budget N|none] [--message-limit N|none] [--markup N|none] [--description "..."|none]
+                                       update caps/markup/description (only the flags given change)
+      reset-messages NAME|root        zero the message count early, before the month rolls over
+      reset-budget NAME|root          zero the spend count early, before the month rolls over
       list                            list companies + how many agents each has
       rename OLD NEW                  rename a company (re-keys all its agents & bindings)
       remove NAME [--force]           delete a company (--force also drops its agents)
 
-    Without --company, every command uses the root scope (the single-tenant default).
-    Add --company NAME to an agent/model command to act inside that company; its
-    agents, workspaces, shared/ space and models are isolated from other companies.
+    --budget is a monthly spend cap (in the billing currency); --message-limit is a
+    monthly cap on customer-originated messages. Either blocks that scope's agents
+    once reached, until next month - independent caps, set either, both, or neither.
+    "root" is the single-tenant default (every command without --company) - it isn't
+    a real company (it never shows in `list`, can't be renamed/removed) but it can
+    have its own budget/message-limit/markup just like a company can, via
+    `company set root ...`. An agent can be exempted from --message-limit
+    individually: pass --exempt-message-limit when creating it with `agent add`, or
+    toggle it later on the dashboard's agent edit page (there's no CLI way to flip
+    it on an existing agent without touching its other settings - `agent add` on an
+    existing name replaces the whole agent, it doesn't patch one field).
+
+    Without --company, every command uses the root scope. Add --company NAME to an
+    agent/model command to act inside that company; its agents, workspaces,
+    shared/ space and models are isolated from other companies.
     """)
   end
 
   defp company_cmd(other),
     do: error("unknown company command: #{Enum.join(other, " ")} (try: mix pepe company help)")
+
+  defp print_company_summary(name) do
+    count = length(Config.agents_in(name))
+    desc = (Config.get_company(name) || %{})["description"]
+    suffix = if desc, do: " - #{desc}", else: ""
+    puts("#{bold(name)} (#{count} agent#{if count == 1, do: "", else: "s"})#{suffix}")
+  end
+
+  # The CLI's "root" sentinel -> the nil scope every Config/Usage function expects.
+  defp scope_arg("root"), do: nil
+  defp scope_arg(name), do: name
+
+  defp put_company_opt(meta, opts, key, field, parse) do
+    case Keyword.fetch(opts, key) do
+      :error -> meta
+      {:ok, raw} -> Map.put(meta, field, parse.(raw))
+    end
+  end
+
+  # "none" (or blank) clears the field; only a positive number is worth storing.
+  defp parse_money_opt(raw) do
+    case raw |> to_string() |> String.trim() |> String.downcase() do
+      v when v in ["", "none"] ->
+        nil
+
+      v ->
+        case Float.parse(String.replace(v, ",", ".")) do
+          {f, _} when f > 0 -> f
+          _ -> nil
+        end
+    end
+  end
+
+  defp parse_count_opt(raw) do
+    case raw |> to_string() |> String.trim() |> String.downcase() do
+      v when v in ["", "none"] ->
+        nil
+
+      v ->
+        case Integer.parse(v) do
+          {n, ""} when n > 0 -> n
+          _ -> nil
+        end
+    end
+  end
+
+  defp parse_description_opt(raw) do
+    case raw |> to_string() |> String.trim() do
+      v when v in ["", "none"] -> nil
+      v -> v
+    end
+  end
 
   ###
   ### API token commands
@@ -1484,35 +1599,8 @@ defmodule Mix.Tasks.Pepe do
       ] ++ Keyword.take(opts, Keyword.keys(@token_appearance_switches))
 
     case Config.add_api_token(attrs) do
-      {:ok, raw, id} ->
-        scope =
-          cond do
-            opts[:agent] -> "agent #{opts[:agent]}"
-            opts[:company] -> "company #{opts[:company]}"
-            true -> "root"
-          end
-
-        kind = if opts[:widget], do: " (widget)", else: ""
-        ok("API token created (id #{green(id)}, scope: #{scope}#{kind})")
-        IO.puts("\n  #{bold(raw)}\n")
-
-        if opts[:widget] do
-          info("A widget token isn't a secret worth hiding - see it again any time with `mix pepe token list`.")
-        else
-          info("Save it now - it is shown only once and stored only as a hash.")
-        end
-
-      {:error, :widget_needs_agent} ->
-        error("a --widget token must be --agent-locked (a public embed always pins to one agent)")
-
-      {:error, :unknown_company} ->
-        error("unknown company: #{opts[:company]}")
-
-      {:error, :unknown_agent} ->
-        error("unknown agent: #{opts[:agent]}")
-
-      {:error, :agent_out_of_scope} ->
-        error("agent #{opts[:agent]} is not in company #{opts[:company] || "(root)"}")
+      {:ok, raw, id} -> print_new_token(raw, id, opts)
+      {:error, reason} -> print_token_add_error(reason, opts)
     end
   end
 
@@ -1522,15 +1610,7 @@ defmodule Mix.Tasks.Pepe do
         info("no API tokens - the /v1 API is open. lock it with: mix pepe token add")
 
       tokens ->
-        Enum.each(tokens, fn t ->
-          scope = t["agent"] || t["company"] || "root"
-          label = if t["label"], do: " - #{t["label"]}", else: ""
-          kind = if t["kind"] == "widget", do: " (widget, #{t["allowed_origin"] || "no origin set"})", else: ""
-          # A widget token's raw value is retrievable (public page source anyway);
-          # a regular token only ever shows its safe fingerprint prefix.
-          shown = if t["kind"] == "widget", do: t["token"], else: t["prefix"]
-          IO.puts("#{bold(t["id"])}  #{shown}  [#{scope}]#{kind}#{label}")
-        end)
+        Enum.each(tokens, &print_token_line/1)
     end
   end
 
@@ -1552,7 +1632,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp token_cmd(_) do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe token")} - API access tokens for /v1
 
       add [--company CO] [--agent HANDLE] [--label "..."]   mint a token (shown once
@@ -1576,6 +1656,46 @@ defmodule Mix.Tasks.Pepe do
     `update` - a widget token's raw value stays retrievable since it sits in public
     page source already, unlike a regular token's.
     """)
+  end
+
+  defp print_new_token(raw, id, opts) do
+    scope = token_scope_label(opts)
+    kind = if opts[:widget], do: " (widget)", else: ""
+    ok("API token created (id #{green(id)}, scope: #{scope}#{kind})")
+    puts("\n  #{bold(raw)}\n")
+
+    if opts[:widget] do
+      info("A widget token isn't a secret worth hiding - see it again any time with `mix pepe token list`.")
+    else
+      info("Save it now - it is shown only once and stored only as a hash.")
+    end
+  end
+
+  defp token_scope_label(opts) do
+    cond do
+      opts[:agent] -> "agent #{opts[:agent]}"
+      opts[:company] -> "company #{opts[:company]}"
+      true -> "root"
+    end
+  end
+
+  defp print_token_add_error(:widget_needs_agent, _opts),
+    do: error("a --widget token must be --agent-locked (a public embed always pins to one agent)")
+
+  defp print_token_add_error(:unknown_company, opts), do: error("unknown company: #{opts[:company]}")
+  defp print_token_add_error(:unknown_agent, opts), do: error("unknown agent: #{opts[:agent]}")
+
+  defp print_token_add_error(:agent_out_of_scope, opts),
+    do: error("agent #{opts[:agent]} is not in company #{opts[:company] || "(root)"}")
+
+  defp print_token_line(t) do
+    scope = t["agent"] || t["company"] || "root"
+    label = if t["label"], do: " - #{t["label"]}", else: ""
+    kind = if t["kind"] == "widget", do: " (widget, #{t["allowed_origin"] || "no origin set"})", else: ""
+    # A widget token's raw value is retrievable (public page source anyway);
+    # a regular token only ever shows its safe fingerprint prefix.
+    shown = if t["kind"] == "widget", do: t["token"], else: t["prefix"]
+    puts("#{bold(t["id"])}  #{shown}  [#{scope}]#{kind}#{label}")
   end
 
   ###
@@ -1628,7 +1748,7 @@ defmodule Mix.Tasks.Pepe do
         Enum.each(watches, fn w ->
           detail = w.trigger["command"] || w.trigger["prompt"] || ""
 
-          IO.puts(
+          puts(
             "#{bold(w.id)} [#{w.state}] - #{w.description}\n  #{w.trigger["type"]} every #{w.interval_s}s · checks #{w.checks}/#{w.max_checks} · #{String.slice(to_string(detail), 0, 60)}"
           )
         end)
@@ -1660,7 +1780,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp watch_cmd(_) do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe watch")} - one-shot "notify me when X" watches
 
       add DESC --probe "<cmd>" [--contains STR] [--message "..."] [--every SECS] [--deliver telegram:<chat>|log]
@@ -1706,9 +1826,9 @@ defmodule Mix.Tasks.Pepe do
 
     taken = Enum.map(Config.watches(), & &1.id)
 
-    if base not in taken,
-      do: base,
-      else: base <> "-" <> Integer.to_string(System.unique_integer([:positive]))
+    if base in taken,
+      do: base <> "-" <> Integer.to_string(System.unique_integer([:positive])),
+      else: base
   end
 
   defp agent_cmd(["add", name | rest]) do
@@ -1727,61 +1847,35 @@ defmodule Mix.Tasks.Pepe do
           temperature: :float,
           triage_model: :string,
           simple_model: :string,
-          default: :boolean
+          default: :boolean,
+          exempt_message_limit: :boolean,
+          admin: :boolean
         ]
       )
 
-    if validate_scope(name, opts[:company]) == :ok do
+    with :ok <- validate_scope(name, opts[:company]) do
       handle = Company.handle(opts[:company], name)
-
-      tools =
-        case opts[:tools] do
-          nil -> Pepe.Tools.names()
-          "" -> []
-          str -> str |> String.split(",") |> Enum.map(&String.trim/1)
-        end
-
-      # Routes are scoped: a bare peer name resolves into this agent's own company.
-      can_message =
-        case opts[:can_message] do
-          v when v in [nil, ""] -> []
-          str -> str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
-        end
-
-      # --can-manage: omitted -> nil (itself only); "none" -> [] (nobody); "*" or a
-      # comma list -> those. Mirrors Pepe.Config.can_manage?/2.
-      can_manage =
-        case opts[:can_manage] do
-          nil -> nil
-          "none" -> []
-          "*" -> ["*"]
-          str -> str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
-        end
-
-      hooks =
-        case opts[:hooks] do
-          v when v in [nil, ""] -> []
-          str -> str |> String.split(",") |> Enum.map(&String.trim/1)
-        end
 
       agent = %Agent{
         name: handle,
         description: opts[:description],
         model: opts[:model],
         system_prompt: opts[:prompt] || "You are Pepe, a helpful AI agent.",
-        tools: tools,
-        can_message: can_message,
-        can_manage: can_manage,
-        hooks: hooks,
+        tools: parse_tools_opt(opts[:tools]),
+        can_message: parse_can_message_opt(opts[:can_message], handle),
+        can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle),
+        hooks: parse_hooks_opt(opts[:hooks]),
         max_iterations: opts[:max_iterations] || 12,
         temperature: opts[:temperature],
         triage_model: opts[:triage_model],
-        simple_model: opts[:simple_model]
+        simple_model: opts[:simple_model],
+        exempt_message_limit: opts[:exempt_message_limit] || false
       }
 
       Config.put_agent(agent)
       if opts[:default], do: Config.set_default_agent_for(opts[:company], name)
-      ok("agent #{green(handle)} saved (tools: #{Enum.join(tools, ", ")})")
+      admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
+      ok("agent #{green(handle)} saved (tools: #{Enum.join(agent.tools, ", ")})#{admin_note}")
     end
   end
 
@@ -1789,11 +1883,7 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} = OptionParser.parse!(rest, strict: [company: :string, all: :boolean])
     default = Config.default_agent_name()
 
-    agents =
-      cond do
-        opts[:all] -> Config.agents()
-        true -> Config.agents_in(opts[:company])
-      end
+    agents = if opts[:all], do: Config.agents(), else: Config.agents_in(opts[:company])
 
     scope_note =
       cond do
@@ -1809,16 +1899,7 @@ defmodule Mix.Tasks.Pepe do
         )
 
       agents ->
-        Enum.each(agents, fn a ->
-          mark = if a.name == default, do: " #{green("(default)")}", else: ""
-
-          routes =
-            if a.can_message == [], do: "", else: "\n  -> #{Enum.join(a.can_message, ", ")}"
-
-          manages = manages_line(a.can_manage)
-
-          IO.puts("#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}#{manages}")
-        end)
+        Enum.each(agents, &print_agent_line(&1, default))
     end
   end
 
@@ -1906,7 +1987,7 @@ defmodule Mix.Tasks.Pepe do
     mix pepe agent - manage agents
 
       add NAME [--model M] [--prompt "..."] [--tools t1,t2]
-               [--can-message b,c] [--can-manage x,y|*|none] [--default] [--company CO]
+               [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--company CO]
       list [--company CO | --all]                          list agents (+ routes)
       route FROM TO [--remove] [--company CO]              directed A->B messaging
       manage ADMIN TARGET [--remove] [--company CO]        let ADMIN administer TARGET (or "*")
@@ -1915,13 +1996,51 @@ defmodule Mix.Tasks.Pepe do
       default NAME [--company CO]                           set the (scope) default agent
 
     Capabilities are controlled by an agent's --tools (a capability = having its
-    tool); learning is controlled per-conversation by a bot's `trainers` list.
+    tool - omit --tools to grant every tool); learning is controlled per-conversation
+    by a bot's `trainers` list. --admin is shorthand for --can-manage "*" (this agent
+    can administer/train every other agent, e.g. the one bootstrap "boss" agent you
+    train the rest through) - it does NOT skip the human-approval gate on risky tool
+    calls, only widens which agents it's allowed to reach with manage_agent.
     Add --company CO to scope any of these to a company; without it, the root scope.
     """)
   end
 
   defp agent_cmd(other),
     do: error("unknown: mix pepe agent #{Enum.join(other, " ")}  (try: mix pepe agent help)")
+
+  defp print_agent_line(a, default) do
+    mark = if a.name == default, do: " #{green("(default)")}", else: ""
+    routes = if a.can_message == [], do: "", else: "\n  -> #{Enum.join(a.can_message, ", ")}"
+    manages = manages_line(a.can_manage)
+
+    puts("#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}#{manages}")
+  end
+
+  defp parse_tools_opt(nil), do: Pepe.Tools.names()
+  defp parse_tools_opt(""), do: []
+  defp parse_tools_opt(str), do: str |> String.split(",") |> Enum.map(&String.trim/1)
+
+  # Routes are scoped: a bare peer name resolves into this agent's own company.
+  defp parse_can_message_opt(v, _handle) when v in [nil, ""], do: []
+
+  defp parse_can_message_opt(str, handle),
+    do: str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
+
+  # --can-manage: omitted -> nil (itself only); "none" -> [] (nobody); "*" or a
+  # comma list -> those. Mirrors Pepe.Config.can_manage?/2. --admin is a shortcut
+  # for --can-manage "*" (administer every agent) and wins if both are passed -
+  # it does NOT touch auto_approve, so risky tool calls this agent makes still go
+  # through the normal human authorization gate on any surface with a human to ask.
+  defp parse_can_manage_opt(true, _can_manage, _handle), do: ["*"]
+  defp parse_can_manage_opt(_admin, nil, _handle), do: nil
+  defp parse_can_manage_opt(_admin, "none", _handle), do: []
+  defp parse_can_manage_opt(_admin, "*", _handle), do: ["*"]
+
+  defp parse_can_manage_opt(_admin, str, handle),
+    do: str |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> qualify(handle)))
+
+  defp parse_hooks_opt(v) when v in [nil, ""], do: []
+  defp parse_hooks_opt(str), do: str |> String.split(",") |> Enum.map(&String.trim/1)
 
   # Only surface management scope when it's beyond the default (itself only).
   defp manages_line(nil), do: ""
@@ -1932,6 +2051,17 @@ defmodule Mix.Tasks.Pepe do
   ###
   ### run / chat
   ###
+
+  defp run_help do
+    info("""
+    mix pepe run - one-shot prompt, streams the reply to stdout
+
+      run [AGENT] "your prompt"    # AGENT defaults to the default agent
+
+    Sends "your prompt" to the model right away - there's no interactive
+    back-and-forth (see `mix pepe chat` for that).
+    """)
+  end
 
   defp run_cmd([]), do: error("usage: mix pepe run [AGENT] \"prompt\"")
 
@@ -1953,7 +2083,7 @@ defmodule Mix.Tasks.Pepe do
            on_event: Pepe.Gateways.TUI.stream_events(),
            authorize: Pepe.Gateways.TUI.authorizer()
          ) do
-      {:ok, _content, _msgs} -> IO.puts("")
+      {:ok, _content, _msgs} -> puts("")
       {:error, reason} -> error("\n#{inspect(reason)}")
     end
   end
@@ -1967,14 +2097,7 @@ defmodule Mix.Tasks.Pepe do
       OptionParser.parse!(args, strict: [agent: :string, session: :string, company: :string])
 
     raw = opts[:agent] || List.first(rest)
-
-    agent_name =
-      cond do
-        raw && opts[:company] -> Company.handle(opts[:company], raw)
-        raw -> raw
-        opts[:company] -> Config.default_agent_for(opts[:company])
-        true -> Config.default_agent_name()
-      end
+    agent_name = resolve_tui_agent_name(raw, opts[:company])
 
     case agent_name && Config.get_agent(agent_name) do
       nil ->
@@ -1985,9 +2108,73 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp resolve_tui_agent_name(raw, company) do
+    cond do
+      raw && company -> Company.handle(company, raw)
+      raw -> raw
+      company -> Config.default_agent_for(company)
+      true -> Config.default_agent_name()
+    end
+  end
+
   ###
   ### serve / gateway
   ###
+
+  defp serve_help do
+    # The "not `mix pepe serve install`" caveat only makes sense when this text is
+    # actually shown with the "mix pepe" prefix - substituting it away (standalone
+    # mode) would leave a self-contradictory "not `pepe serve install`" right after
+    # instructions for running `pepe serve install`. Drop the caveat there instead.
+    install_note =
+      if Process.get(:pepe_cli_standalone, false) do
+        "`install` registers `serve` with launchd (macOS) or systemd --user (Linux) " <>
+          "so it survives logout/reboot and restarts itself if it crashes."
+      else
+        "`install` registers `serve` with launchd (macOS) or systemd --user (Linux)\n" <>
+          "so it survives logout/reboot and restarts itself if it crashes - only\n" <>
+          "works from the installed pepe binary, not `mix pepe serve install`."
+      end
+
+    info("""
+    mix pepe serve - run the OpenAI-compatible HTTP API + WebSocket server
+
+      serve [--port 4000] [--tunnel]        run in the foreground
+      serve install [--port 4000]           install as a persistent background service
+      serve uninstall                       stop and remove the service
+      serve status                          is the service installed/running?
+
+    $PORT overrides the default port too; --port takes precedence. --tunnel
+    opens a public tunnel to the running server (handy for testing webhooks
+    without deploying). Binds to 0.0.0.0 by default - set a dashboard password
+    (mix pepe dashboard password) before exposing it beyond localhost, or bind
+    to 127.0.0.1 and tunnel in.
+
+    Also starts the messaging gateways (Telegram, ...) alongside the endpoint.
+
+    #{install_note}
+    """)
+  end
+
+  defp serve_service_cmd(sub, rest) do
+    result =
+      case sub do
+        "install" ->
+          {opts, _} = OptionParser.parse!(rest, strict: [port: :integer])
+          Pepe.ServiceInstall.install(opts)
+
+        "uninstall" ->
+          Pepe.ServiceInstall.uninstall()
+
+        "status" ->
+          Pepe.ServiceInstall.status()
+      end
+
+    case result do
+      {:ok, msg} -> ok(msg)
+      {:error, msg} -> error(msg)
+    end
+  end
 
   defp serve_cmd(rest) do
     {opts, _, _} = OptionParser.parse(rest, strict: [tunnel: :boolean])
@@ -2034,16 +2221,43 @@ defmodule Mix.Tasks.Pepe do
     if Pepe.Tunnel.available?() do
       info(dim("   opening a public tunnel via cloudflared..."))
 
-      Pepe.Tunnel.open(port, fn url ->
-        info("")
-        ok("Public URL: #{url}")
-
-        unless Config.dashboard_auth_required?() do
-          info(yellow("   the dashboard is fail-closed over the tunnel until you set a password: mix pepe dashboard password '<pass>'"))
-        end
-      end)
+      Pepe.Tunnel.open(port, &print_tunnel_url/1)
     else
-      info(yellow("   --tunnel needs cloudflared. Install it (brew install cloudflared) or see the Cloudflare docs."))
+      info(yellow("   --tunnel needs cloudflared. #{cloudflared_install_hint()}"))
+    end
+  end
+
+  defp cloudflared_install_hint do
+    case :os.type() do
+      {:unix, :darwin} ->
+        "Install it: brew install cloudflared"
+
+      {:unix, :linux} ->
+        asset = "cloudflared-linux-#{linux_arch()}.deb"
+
+        "Install it:\n" <>
+          "     curl -LO https://github.com/cloudflare/cloudflared/releases/latest/download/#{asset}\n" <>
+          "     sudo dpkg -i #{asset}"
+
+      _ ->
+        "See https://pkg.cloudflare.com/ for install instructions."
+    end
+  end
+
+  defp linux_arch do
+    case :erlang.system_info(:system_architecture) |> to_string() do
+      "aarch64" <> _ -> "arm64"
+      "arm" <> _ -> "arm64"
+      _ -> "amd64"
+    end
+  end
+
+  defp print_tunnel_url(url) do
+    info("")
+    ok("Public URL: #{url}")
+
+    unless Config.dashboard_auth_required?() do
+      info(yellow("   the dashboard is fail-closed over the tunnel until you set a password: mix pepe dashboard password '<pass>'"))
     end
   end
 
@@ -2053,11 +2267,7 @@ defmodule Mix.Tasks.Pepe do
         info("no WhatsApp connections. Add one:\n  mix pepe gateway whatsapp add support --agent <handle>")
 
       conns ->
-        Enum.each(conns, fn {slug, e} ->
-          co = e["company"] || "root"
-          IO.puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}")
-          IO.puts(dim("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
-        end)
+        Enum.each(conns, &print_whatsapp_conn_line/1)
     end
   end
 
@@ -2092,39 +2302,11 @@ defmodule Mix.Tasks.Pepe do
         error("whatsapp add needs --phone-number-id (from the Meta app)")
 
       true ->
-        # support defaults: never learn + ephemeral; admin: learns + persisted.
-        support? = mode == "support"
-
-        entry =
-          %{
-            "provider" => "whatsapp",
-            "company" => blank_default(opts[:company], nil),
-            "agent" => opts[:agent],
-            "mode" => mode,
-            "commands" => Keyword.get(opts, :commands, mode == "admin"),
-            "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
-            "ephemeral" => Keyword.get(opts, :ephemeral, support?),
-            "session_ttl_min" => opts[:ttl_min],
-            "config" =>
-              %{
-                "phone_number_id" => opts[:phone_number_id],
-                "access_token" => opts[:access_token] || "${WA_TOKEN_#{String.upcase(slug)}}",
-                "app_secret" => opts[:app_secret] || "${WA_APP_SECRET_#{String.upcase(slug)}}",
-                "verify_token" => opts[:verify_token] || slug
-              }
-              |> reject_nil_values()
-          }
-          |> reject_nil_values()
-
-        Config.put_webhook(slug, entry)
-        co = entry["company"] || "root"
-        ok("whatsapp #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
-        info("register this Callback URL in the Meta app:")
-        info(bold("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
-        info(dim("   verify token: #{entry["config"]["verify_token"]}"))
+        save_whatsapp_connection(slug, mode, opts)
     end
   end
 
+  # support defaults: never learn + ephemeral; admin: learns + persisted.
   defp gateway_cmd(["whatsapp", "set-agent", slug, agent | _]) do
     case Config.get_webhook(slug) do
       nil ->
@@ -2168,15 +2350,7 @@ defmodule Mix.Tasks.Pepe do
       bots ->
         info(bold("✦ Telegram bots") <> dim(" - one poller per bot, each bound to an agent"))
 
-        Enum.each(bots, fn b ->
-          state =
-            if Pepe.Gateways.Telegram.bot_active?(b), do: green("active"), else: dim("inactive")
-
-          info("\n#{bold(b["name"])}  [#{state}]")
-          info(dim("   agent:    #{b["agent"] || "(default)"}"))
-          info(dim("   token:    #{token_hint(b["bot_token"])}"))
-          info(dim("   learns from: #{trainers_hint(b["trainers"])}"))
-        end)
+        Enum.each(bots, &print_telegram_bot_line/1)
     end
   end
 
@@ -2263,6 +2437,52 @@ defmodule Mix.Tasks.Pepe do
 
   defp gateway_cmd(_),
     do: error("usage: mix pepe gateway telegram [setup|add|list|remove]  (or: help)")
+
+  defp print_whatsapp_conn_line({slug, e}) do
+    co = e["company"] || "root"
+    puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}")
+    puts(dim("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
+  end
+
+  defp save_whatsapp_connection(slug, mode, opts) do
+    support? = mode == "support"
+
+    entry =
+      %{
+        "provider" => "whatsapp",
+        "company" => blank_default(opts[:company], nil),
+        "agent" => opts[:agent],
+        "mode" => mode,
+        "commands" => Keyword.get(opts, :commands, mode == "admin"),
+        "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
+        "ephemeral" => Keyword.get(opts, :ephemeral, support?),
+        "session_ttl_min" => opts[:ttl_min],
+        "config" =>
+          %{
+            "phone_number_id" => opts[:phone_number_id],
+            "access_token" => opts[:access_token] || "${WA_TOKEN_#{String.upcase(slug)}}",
+            "app_secret" => opts[:app_secret] || "${WA_APP_SECRET_#{String.upcase(slug)}}",
+            "verify_token" => opts[:verify_token] || slug
+          }
+          |> reject_nil_values()
+      }
+      |> reject_nil_values()
+
+    Config.put_webhook(slug, entry)
+    co = entry["company"] || "root"
+    ok("whatsapp #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
+    info("register this Callback URL in the Meta app:")
+    info(bold("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
+    info(dim("   verify token: #{entry["config"]["verify_token"]}"))
+  end
+
+  defp print_telegram_bot_line(b) do
+    state = if Pepe.Gateways.Telegram.bot_active?(b), do: green("active"), else: dim("inactive")
+    info("\n#{bold(b["name"])}  [#{state}]")
+    info(dim("   agent:    #{b["agent"] || "(default)"}"))
+    info(dim("   token:    #{token_hint(b["bot_token"])}"))
+    info(dim("   learns from: #{trainers_hint(b["trainers"])}"))
+  end
 
   defp token_hint(nil), do: "(none)"
   defp token_hint("${" <> _ = env), do: env
@@ -2376,8 +2596,7 @@ defmodule Mix.Tasks.Pepe do
       str ->
         str
         |> String.split(",")
-        |> Enum.map(&String.trim/1)
-        |> Enum.map(&Integer.parse/1)
+        |> Enum.map(&(&1 |> String.trim() |> Integer.parse()))
         |> Enum.flat_map(fn
           {n, _} -> [n]
           :error -> []
@@ -2419,7 +2638,7 @@ defmodule Mix.Tasks.Pepe do
       {:agent, "Agent - add or set the default"},
       {:channel, "Channels - Telegram, Slack, Discord, WhatsApp, ..."},
       {:dashboard, "Dashboard - password and remote access"},
-      {:migrate, "Import from another runtime (openclaw / hermes)"},
+      {:migrate, "Import from another runtime - existing agents and models"},
       {:plugin, "Plugins - install a channel or tool"},
       {:privacy, "Privacy - redact PII before it reaches a model"},
       {:language, "Language for system messages"},
@@ -2435,21 +2654,21 @@ defmodule Mix.Tasks.Pepe do
         render_as: fn {_a, label} -> label end
       )
 
-    case action do
-      :done -> ok("Done.")
-      :full -> first_run_setup()
-      :model -> then_menu(fn -> model_cmd([]) end)
-      :agent -> then_menu(fn -> add_agent() end)
-      :channel -> then_menu(&setup_channel/0)
-      :dashboard -> then_menu(&setup_dashboard/0)
-      :migrate -> then_menu(&setup_migrate/0)
-      :plugin -> then_menu(&setup_plugin/0)
-      :privacy -> then_menu(&setup_privacy/0)
-      :language -> then_menu(&setup_language/0)
-      :timezone -> then_menu(&setup_timezone/0)
-      :sandbox -> then_menu(&setup_sandbox/0)
-    end
+    handle_config_action(action)
   end
+
+  defp handle_config_action(:done), do: ok("Done.")
+  defp handle_config_action(:full), do: first_run_setup()
+  defp handle_config_action(:model), do: then_menu(fn -> model_cmd([]) end)
+  defp handle_config_action(:agent), do: then_menu(fn -> add_agent() end)
+  defp handle_config_action(:channel), do: then_menu(&setup_channel/0)
+  defp handle_config_action(:dashboard), do: then_menu(&setup_dashboard/0)
+  defp handle_config_action(:migrate), do: then_menu(&setup_migrate/0)
+  defp handle_config_action(:plugin), do: then_menu(&setup_plugin/0)
+  defp handle_config_action(:privacy), do: then_menu(&setup_privacy/0)
+  defp handle_config_action(:language), do: then_menu(&setup_language/0)
+  defp handle_config_action(:timezone), do: then_menu(&setup_timezone/0)
+  defp handle_config_action(:sandbox), do: then_menu(&setup_sandbox/0)
 
   defp then_menu(fun) do
     fun.()
@@ -2466,26 +2685,66 @@ defmodule Mix.Tasks.Pepe do
 
   defp channel_label(name) do
     mod = Pepe.Webhooks.provider(name)
-    label = if function_exported?(mod, :label, 0), do: mod.label(), else: name
+    # Code.ensure_loaded? first: function_exported?/3 is false for a not-yet-loaded
+    # module, which under `mix pepe` (lazy loading) would silently skip the label.
+    label = if Code.ensure_loaded?(mod) and function_exported?(mod, :label, 0), do: mod.label(), else: name
     "#{label} (webhook)"
   end
 
   defp setup_webhook_connection(provider) do
     mod = Pepe.Webhooks.provider(provider)
-    schema = if function_exported?(mod, :config_schema, 0), do: mod.config_schema(), else: []
+    # Code.ensure_loaded? first (see channel_label): otherwise, under `mix pepe`,
+    # the provider module isn't loaded yet, function_exported?/3 returns false, and
+    # the schema comes back empty - so NO credential fields get prompted and a
+    # broken, empty-config connection is saved. Embedded releases preload modules
+    # so they dodged this, but the guard was still wrong.
+    schema =
+      if Code.ensure_loaded?(mod) and function_exported?(mod, :config_schema, 0),
+        do: mod.config_schema(),
+        else: []
+
     slug = Owl.IO.input(label: "Connection name (slug):", optional: true) |> blank_default(provider)
     agent = pick_setup_agent()
 
     config =
       Enum.reduce(schema, %{}, fn field, acc ->
-        hint = if field["type"] == "secret", do: dim(" (a ${ENV_VAR} reference is fine)"), else: ""
-        value = Owl.IO.input(label: "#{field["label"]}#{hint}:", optional: true)
-        if value in [nil, ""], do: acc, else: Map.put(acc, field["key"], value)
+        case prompt_config_field(field) do
+          "" -> acc
+          value -> Map.put(acc, field["key"], value)
+        end
       end)
 
     Config.put_webhook(slug, %{"provider" => provider, "agent" => agent, "mode" => "support", "config" => config})
     ok("channel #{green(provider)} connected as #{slug}")
     info(dim("Paste this into #{provider} as its webhook URL:\n  #{webhook_host()}/webhooks/root/#{provider}/#{slug}"))
+  end
+
+  # A channel config field is required unless it's a `select` (those carry a
+  # default) or explicitly opts out with `"required" => false`. So every
+  # credential/id (bot token, signing secret, ...) must be filled - a blank one
+  # would silently create a broken, non-authenticating connection.
+  @doc false
+  def required_config_field?(field), do: field["type"] != "select" and field["required"] != false
+
+  # A `${ENV_VAR}` reference counts as filled (that's how secrets are meant to be
+  # given). On a blank required field, re-prompt with a clear, localized message.
+  defp prompt_config_field(field) do
+    required? = required_config_field?(field)
+    hint = if field["type"] == "secret", do: dim(gettext(" (a ${ENV_VAR} reference is fine)")), else: ""
+    tag = if required?, do: "", else: dim(gettext(" (optional)"))
+    value = Owl.IO.input(label: "#{field["label"]}#{tag}#{hint}:", optional: true) |> to_string() |> String.trim()
+
+    cond do
+      value != "" ->
+        value
+
+      required? ->
+        error(gettext("\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine).", field: field["label"]))
+        prompt_config_field(field)
+
+      true ->
+        ""
+    end
   end
 
   defp pick_setup_agent do
@@ -2596,7 +2855,10 @@ defmodule Mix.Tasks.Pepe do
       )
 
     Config.set_locale(code)
-    ok("language -> #{code}")
+    # Apply immediately so the rest of the wizard (and every menu hint) is shown
+    # in the language just picked, not the previous one.
+    Config.put_locale()
+    ok(gettext("language set to %{code}", code: code))
   end
 
   # Default timezone for scheduled tasks that don't name their own. Free-text so any
@@ -2833,8 +3095,8 @@ defmodule Mix.Tasks.Pepe do
     info("config file: #{Config.path()}")
     info("default model: #{Config.default_model_name() || "(none)"}")
     info("default agent: #{Config.default_agent_name() || "(none)"}")
-    info("models: #{Config.models() |> Enum.map(& &1.name) |> Enum.join(", ")}")
-    info("agents: #{Config.agents() |> Enum.map(& &1.name) |> Enum.join(", ")}")
+    info("models: #{Config.models() |> Enum.map_join(", ", & &1.name)}")
+    info("agents: #{Config.agents() |> Enum.map_join(", ", & &1.name)}")
   end
 
   ###
@@ -2929,6 +3191,17 @@ defmodule Mix.Tasks.Pepe do
   ### backup
   ###
 
+  defp backup_help do
+    info("""
+    mix pepe backup - archive ~/.pepe (config + agent/company workspaces + sessions)
+
+      backup [--output FILE.tgz]    # defaults to pepe-backup-YYYY-MM-DD.tgz
+
+    Also lists the ${ENV_VAR} secrets referenced in your config - they live
+    outside the files (never written expanded) and must be saved separately.
+    """)
+  end
+
   # Tar up the durable parts of PEPE_HOME (config + agent/company workspaces +
   # sessions), skip the disposable Mnesia cache, then list the ${ENV_VAR} secrets that
   # live outside the files and must be saved separately.
@@ -2936,27 +3209,29 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} = OptionParser.parse!(rest, strict: [output: :string])
     home = Config.home()
 
-    cond do
-      not File.dir?(home) ->
-        error("nothing to back up - #{home} doesn't exist yet (run `mix pepe setup`)")
+    if File.dir?(home) do
+      run_backup(home, opts[:output])
+    else
+      error("nothing to back up - #{home} doesn't exist yet (run `mix pepe setup`)")
+    end
+  end
 
-      true ->
-        out = Path.expand(opts[:output] || "pepe-backup-#{Date.utc_today()}.tgz")
-        base = Path.basename(home)
-        args = ["--exclude", "#{base}/data/mnesia", "-czf", out, "-C", Path.dirname(home), base]
+  defp run_backup(home, output) do
+    out = Path.expand(output || "pepe-backup-#{Date.utc_today()}.tgz")
+    base = Path.basename(home)
+    args = ["--exclude", "#{base}/data/mnesia", "-czf", out, "-C", Path.dirname(home), base]
 
-        case System.cmd("tar", args, stderr_to_stdout: true) do
-          {_, 0} ->
-            ok("backup written to #{green(out)}#{backup_size(out)}")
-            info("  included: config.json · agent & company workspaces · shared · sessions")
-            info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
-            report_backup_secrets(home)
+    case System.cmd("tar", args, stderr_to_stdout: true) do
+      {_, 0} ->
+        ok("backup written to #{green(out)}#{backup_size(out)}")
+        info("  included: config.json · agent & company workspaces · shared · sessions")
+        info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
+        report_backup_secrets(home)
 
-            info("\nRestore: extract into #{Path.dirname(home)}/ and re-export your secret env vars.")
+        info("\nRestore: extract into #{Path.dirname(home)}/ and re-export your secret env vars.")
 
-          {msg, _} ->
-            error("backup failed: #{String.trim(msg)}")
-        end
+      {msg, _} ->
+        error("backup failed: #{String.trim(msg)}")
     end
   end
 
@@ -2986,13 +3261,15 @@ defmodule Mix.Tasks.Pepe do
     if vars == [] do
       info("\nNo ${ENV_VAR} secrets referenced - nothing extra to save.")
     else
-      IO.puts("\n" <> bold("⚠ Secrets are NOT in the backup - save these env vars separately:"))
+      puts("\n" <> bold("⚠ Secrets are NOT in the backup - save these env vars separately:"))
 
-      Enum.each(vars, fn v ->
-        status = if System.get_env(v), do: green("set"), else: red("UNSET")
-        IO.puts("  #{v}  (#{status})")
-      end)
+      Enum.each(vars, &print_secret_var_line/1)
     end
+  end
+
+  defp print_secret_var_line(v) do
+    status = if System.get_env(v), do: green("set"), else: red("UNSET")
+    puts("  #{v}  (#{status})")
   end
 
   defp tools do
@@ -3000,7 +3277,7 @@ defmodule Mix.Tasks.Pepe do
 
     Enum.each(Pepe.Tools.all(), fn mod ->
       %{"function" => %{"description" => desc}} = mod.spec()
-      IO.puts("  #{bold(mod.name())} - #{desc}")
+      puts("  #{bold(mod.name())} - #{desc}")
     end)
   end
 
@@ -3057,14 +3334,12 @@ defmodule Mix.Tasks.Pepe do
   defp learn_cmd(["auto", name | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: [at: :string, off: :boolean])
 
-    cond do
-      opts[:off] ->
-        Reflect.unschedule_auto(name)
-        ok("scheduled consolidation off for #{green(name)}")
-
-      true ->
-        {:ok, cron} = Reflect.schedule_auto(name, schedule: opts[:at])
-        ok("scheduled consolidation on for #{green(name)} at #{bold(cron.schedule)} (#{cron.timezone})")
+    if opts[:off] do
+      Reflect.unschedule_auto(name)
+      ok("scheduled consolidation off for #{green(name)}")
+    else
+      {:ok, cron} = Reflect.schedule_auto(name, schedule: opts[:at])
+      ok("scheduled consolidation on for #{green(name)} at #{bold(cron.schedule)} (#{cron.timezone})")
     end
   end
 
@@ -3083,7 +3358,7 @@ defmodule Mix.Tasks.Pepe do
   defp learn_cmd(_), do: error("usage: mix pepe learn consolidate|auto|status")
 
   defp learn_help do
-    IO.puts("""
+    puts("""
     #{bold("mix pepe learn")} - active memory maintenance (the agent tidies its own memory)
 
       learn consolidate [AGENT]     run a consolidation pass now (dedupe/prune/merge)
@@ -3222,17 +3497,7 @@ defmodule Mix.Tasks.Pepe do
       entries ->
         info(bold("✦ Runs of ") <> green(id))
 
-        Enum.each(entries, fn e ->
-          mark = if e["ok"], do: "✅", else: "⚠️"
-          info("\n#{mark} #{dim(learn_date(e["at"]))} #{dim("· " <> e["source"])}")
-
-          info(
-            dim(
-              "   " <>
-                (to_string(e["output"]) |> String.replace("\n", " ") |> String.slice(0, 120))
-            )
-          )
-        end)
+        Enum.each(entries, &print_cron_log_line/1)
     end
   end
 
@@ -3252,6 +3517,18 @@ defmodule Mix.Tasks.Pepe do
     Schedule is a standard 5-field cron expression. Timezone is any IANA name
     (default: #{Config.default_timezone()}). Tasks fire only while `serve`/`gateway` runs.
     """)
+  end
+
+  defp print_cron_log_line(e) do
+    mark = if e["ok"], do: "✅", else: "⚠️"
+    info("\n#{mark} #{dim(learn_date(e["at"]))} #{dim("· " <> e["source"])}")
+
+    info(
+      dim(
+        "   " <>
+          (to_string(e["output"]) |> String.replace("\n", " ") |> String.slice(0, 120))
+      )
+    )
   end
 
   defp print_cron(%Pepe.Config.Cron{} = c) do
@@ -3284,12 +3561,18 @@ defmodule Mix.Tasks.Pepe do
     base = if base == "", do: "task", else: base
     taken = Enum.map(Config.crons(), & &1.id)
 
-    if base not in taken do
-      base
+    if base in taken do
+      2
+      |> Stream.iterate(&(&1 + 1))
+      |> Enum.find_value(&unique_cron_suffix(&1, base, taken))
     else
-      Stream.iterate(2, &(&1 + 1))
-      |> Enum.find_value(fn n -> if "#{base}-#{n}" not in taken, do: "#{base}-#{n}" end)
+      base
     end
+  end
+
+  defp unique_cron_suffix(n, base, taken) do
+    candidate = "#{base}-#{n}"
+    if candidate not in taken, do: candidate
   end
 
   ###
@@ -3304,25 +3587,20 @@ defmodule Mix.Tasks.Pepe do
       servers ->
         info(bold("✦ MCP servers"))
 
-        Enum.each(servers, fn {name, cfg} ->
-          info("\n#{bold(name)}")
-          info(dim("   #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"))
-        end)
+        Enum.each(servers, &print_mcp_server_line/1)
     end
   end
 
   defp mcp_cmd(["add", name | rest]) do
     {opts, _, _} = OptionParser.parse(rest, strict: [command: :string, args: :string])
 
-    cond do
-      is_nil(opts[:command]) ->
-        error("mcp add needs --command (e.g. npx)")
-
-      true ->
-        args = if opts[:args], do: String.split(opts[:args], " ", trim: true), else: []
-        Config.put_mcp_server(name, %{"command" => opts[:command], "args" => args, "env" => %{}})
-        ok("MCP server #{green(name)} saved")
-        info(dim("validate: mix pepe mcp tools #{name}"))
+    if is_nil(opts[:command]) do
+      error("mcp add needs --command (e.g. npx)")
+    else
+      args = if opts[:args], do: String.split(opts[:args], " ", trim: true), else: []
+      Config.put_mcp_server(name, %{"command" => opts[:command], "args" => args, "env" => %{}})
+      ok("MCP server #{green(name)} saved")
+      info(dim("validate: mix pepe mcp tools #{name}"))
     end
   end
 
@@ -3333,19 +3611,7 @@ defmodule Mix.Tasks.Pepe do
 
       _ ->
         info(dim("connecting to #{name}..."))
-
-        case Pepe.MCP.tools(name) do
-          {:ok, tools} ->
-            info(bold("✦ #{name} tools") <> dim(" (grant read ones to an agent)"))
-
-            Enum.each(tools, fn t ->
-              info("\n#{bold("mcp__#{name}__#{t["name"]}")}")
-              info(dim("   #{String.slice(to_string(t["description"]), 0, 120)}"))
-            end)
-
-          {:error, reason} ->
-            error("couldn't reach #{name}: #{inspect(reason)}")
-        end
+        print_mcp_tools(name)
     end
   end
 
@@ -3374,6 +3640,27 @@ defmodule Mix.Tasks.Pepe do
     """)
   end
 
+  defp print_mcp_server_line({name, cfg}) do
+    info("\n#{bold(name)}")
+    info(dim("   #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"))
+  end
+
+  defp print_mcp_tools(name) do
+    case Pepe.MCP.tools(name) do
+      {:ok, tools} ->
+        info(bold("✦ #{name} tools") <> dim(" (grant read ones to an agent)"))
+        Enum.each(tools, &print_mcp_tool_line(name, &1))
+
+      {:error, reason} ->
+        error("couldn't reach #{name}: #{inspect(reason)}")
+    end
+  end
+
+  defp print_mcp_tool_line(name, t) do
+    info("\n#{bold("mcp__#{name}__#{t["name"]}")}")
+    info(dim("   #{String.slice(to_string(t["description"]), 0, 120)}"))
+  end
+
   # `mix pepe doctor [--offline]` - health-check the setup (live probes by default).
   defp doctor_cmd(rest) do
     live? = "--offline" not in rest
@@ -3399,16 +3686,26 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp help do
-    IO.puts(@moduledoc |> String.replace(~r/^## /m, ""))
+    puts(@moduledoc |> String.replace(~r/^## /m, ""))
   end
 
   ###
   ### output helpers
   ###
 
-  defp ok(msg), do: IO.puts(green("✓ ") <> msg)
-  defp info(msg), do: IO.puts(msg)
-  defp error(msg), do: IO.puts(:stderr, red("✗ ") <> msg)
+  # The escript/release entry point (Pepe.CLI) sets this - there's no `mix`
+  # there, so usage/help text (written once, for `mix pepe ...`) should read
+  # as `pepe ...` instead. Every stdout call in this module goes through
+  # `puts/1` so this applies uniformly, not just to the top-level help text.
+  defp cli_text(msg) do
+    if Process.get(:pepe_cli_standalone, false), do: String.replace(msg, "mix pepe", "pepe"), else: msg
+  end
+
+  defp puts(msg), do: IO.puts(cli_text(msg))
+
+  defp ok(msg), do: puts(green("✓ ") <> msg)
+  defp info(msg), do: puts(msg)
+  defp error(msg), do: IO.puts(:stderr, red("✗ ") <> cli_text(msg))
 
   defp green(s), do: IO.ANSI.green() <> s <> IO.ANSI.reset()
   defp red(s), do: IO.ANSI.red() <> s <> IO.ANSI.reset()

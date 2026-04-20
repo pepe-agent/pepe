@@ -156,16 +156,18 @@ defmodule Pepe.Migrate.Hermes do
       {:ok, names} ->
         names
         |> Enum.filter(&File.dir?(Path.join(dir, &1)))
-        |> Enum.map(fn name ->
-          soul = Migrate.read(Path.join([dir, name, "SOUL.md"]))
-          memory = Migrate.read(Path.join([dir, name, "MEMORY.md"]))
-          files = if memory, do: [{"MEMORY.md", memory}], else: []
-          agent(name, soul, model_name, files)
-        end)
+        |> Enum.map(&profile_agent(dir, &1, model_name))
 
       _ ->
         []
     end
+  end
+
+  defp profile_agent(dir, name, model_name) do
+    soul = Migrate.read(Path.join([dir, name, "SOUL.md"]))
+    memory = Migrate.read(Path.join([dir, name, "MEMORY.md"]))
+    files = if memory, do: [{"MEMORY.md", memory}], else: []
+    agent(name, soul, model_name, files)
   end
 
   defp agent(name, prompt, model_name, files) do

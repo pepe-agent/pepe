@@ -47,7 +47,12 @@ defmodule Pepe.Config.Agent do
             # session) when `triage_model` judges a chat simple. Only meaningful when
             # `triage_model` is set - triage is skipped entirely if this is unset,
             # since there would be nowhere to switch to on a SIMPLE verdict.
-            simple_model: nil
+            simple_model: nil,
+            # Skip the company's monthly customer-message cap for this agent (see
+            # Pepe.Config.company_message_limit/1) - an always-on agent (e.g. an
+            # escalation/on-call agent) that must never be throttled by it. Doesn't
+            # affect the company's separate spend cap (over_budget?/1).
+            exempt_message_limit: false
 
   @type t :: %__MODULE__{}
 
@@ -73,7 +78,8 @@ defmodule Pepe.Config.Agent do
       # Preserve nil (inherit the connection's chain) vs [] (explicitly none).
       fallbacks: map["fallbacks"],
       triage_model: map["triage_model"],
-      simple_model: map["simple_model"]
+      simple_model: map["simple_model"],
+      exempt_message_limit: map["exempt_message_limit"] || false
     }
   end
 end

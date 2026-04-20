@@ -31,6 +31,11 @@ defmodule Pepe.Gateways.Telegram do
         "require_mention": true,       // optional; in groups only reply when @mentioned
         "agent": "assistant"           // the agent this bot talks to
       }
+
+  `require_mention` is bot-wide (every group that bot is in). Any single group can
+  waive it for itself with `/mention off` (back on with `/mention on`) - the waiver
+  lives on that group's own session, so it never affects other groups the same bot
+  serves, and is forgotten on `/new`.
   """
   use GenServer
   use Gettext, backend: Pepe.Gettext
@@ -68,6 +73,7 @@ defmodule Pepe.Gateways.Telegram do
     [
       {"new", gettext("Start a fresh conversation")},
       {"undo", gettext("Undo your last message")},
+      {"mention", gettext("In a group, require an @mention or not - /mention on|off")},
       {"compact", gettext("Summarize history to free up context")},
       {"agent", gettext("Switch agent - /agent <name>")},
       {"model", gettext("Show or set the model - /model <name>")},
@@ -241,28 +247,34 @@ defmodule Pepe.Gateways.Telegram do
     b = bot()
     now = System.system_time(:second)
 
-    state =
-      case b["heartbeat_minutes"] do
-        minutes when is_integer(minutes) and minutes > 0 ->
-          if now - state.heartbeat_last >= minutes * 60 and heartbeat_hour_ok?(b) do
-            for key <- bot_session_keys(b) do
-              Task.start(fn ->
-                put_bot(b)
-                deliver_heartbeat(key)
-              end)
-            end
-
-            %{state | heartbeat_last: now}
-          else
-            state
-          end
-
-        _ ->
-          state
-      end
+    state = maybe_pulse_heartbeat(state, b, now)
 
     schedule_heartbeat_tick()
     {:noreply, state}
+  end
+
+  defp maybe_pulse_heartbeat(state, b, now) do
+    case b["heartbeat_minutes"] do
+      minutes when is_integer(minutes) and minutes > 0 ->
+        if now - state.heartbeat_last >= minutes * 60 and heartbeat_hour_ok?(b) do
+          pulse_sessions(b)
+          %{state | heartbeat_last: now}
+        else
+          state
+        end
+
+      _ ->
+        state
+    end
+  end
+
+  defp pulse_sessions(b) do
+    for key <- bot_session_keys(b) do
+      Task.start(fn ->
+        put_bot(b)
+        deliver_heartbeat(key)
+      end)
+    end
   end
 
   defp schedule_heartbeat_tick, do: Process.send_after(self(), :heartbeat_tick, 60_000)
@@ -332,22 +344,8 @@ defmodule Pepe.Gateways.Telegram do
     case Config.telegram_bot(bot_name) do
       %{"bot_token" => raw} ->
         token = Config.interpolate(raw)
-
         url = api_url(token, "sendMessage")
-        html = Pepe.Gateways.Telegram.Markdown.to_html(text)
-
-        case Req.post(url, json: %{chat_id: chat_id, text: html, parse_mode: "HTML"}) do
-          {:ok, %{status: 200}} ->
-            :ok
-
-          _ ->
-            # formatting rejected: fall back to plain text so the alert still lands
-            case Req.post(url, json: %{chat_id: chat_id, text: text}) do
-              {:ok, %{status: 200}} -> :ok
-              {:ok, %{status: status}} -> {:error, {:telegram, status}}
-              {:error, reason} -> {:error, reason}
-            end
-        end
+        send_watch_message(url, chat_id, text)
 
       _ ->
         {:error, :unknown_bot}
@@ -355,6 +353,27 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   def deliver_watch(_origin, _text), do: {:error, :no_chat}
+
+  defp send_watch_message(url, chat_id, text) do
+    html = Pepe.Gateways.Telegram.Markdown.to_html(text)
+
+    case Req.post(url, json: %{chat_id: chat_id, text: html, parse_mode: "HTML"}) do
+      {:ok, %{status: 200}} ->
+        :ok
+
+      _ ->
+        # formatting rejected: fall back to plain text so the alert still lands
+        send_watch_plain(url, chat_id, text)
+    end
+  end
+
+  defp send_watch_plain(url, chat_id, text) do
+    case Req.post(url, json: %{chat_id: chat_id, text: text}) do
+      {:ok, %{status: 200}} -> :ok
+      {:ok, %{status: status}} -> {:error, {:telegram, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   # The bot token rides in the URL *path* (`/bot<id>:<secret>/method`), so a Req/Mint
   # error that embeds the request URL leaks it verbatim through `inspect/1`. Mask the
@@ -383,7 +402,7 @@ defmodule Pepe.Gateways.Telegram do
     chat_id = chat["id"]
     user_id = get_in(message, ["from", "id"])
 
-    if active?() and allowed?(chat_id, user_id) and addressed?(text, chat["type"]) do
+    if active?() and allowed?(chat_id, user_id) and addressed?(text, chat["type"], chat_id) do
       b = bot()
 
       Task.start(fn ->
@@ -448,7 +467,7 @@ defmodule Pepe.Gateways.Telegram do
     user_id = get_in(message, ["from", "id"])
     caption = message["caption"] || ""
 
-    if active?() and allowed?(chat_id, user_id) and addressed?(caption, chat["type"]) do
+    if active?() and allowed?(chat_id, user_id) and addressed?(caption, chat["type"], chat_id) do
       b = bot()
 
       learn = learn_allowed?(user_id)
@@ -636,6 +655,9 @@ defmodule Pepe.Gateways.Telegram do
   defp friendly_error(:budget_exceeded),
     do: gettext("This workspace has hit its monthly spending limit. It resumes next month, or an admin can raise the cap.")
 
+  defp friendly_error(:message_limit_exceeded),
+    do: gettext("This workspace has hit its monthly message limit. It resumes next month, or an admin can raise the cap.")
+
   defp friendly_error(_),
     do: gettext("Sorry, something went wrong on my end. Try again in a moment?")
 
@@ -745,8 +767,12 @@ defmodule Pepe.Gateways.Telegram do
 
         case :ets.take(@pending, id) do
           [{^id, pid}] ->
-            send(pid, {:perm_reply, id, decision})
+            # close_prompt/2 inserts into @prompt_log before send/2 wakes the
+            # waiting session - if send ran first, a turn that finishes fast
+            # enough could run cleanup_prompts/1 before the insert lands,
+            # missing this round's cleanup (self-heals next turn, but avoid it).
             close_prompt(cq, decision)
+            send(pid, {:perm_reply, id, decision})
 
           _ ->
             :ok
@@ -792,6 +818,32 @@ defmodule Pepe.Gateways.Telegram do
     ensure_session(chat_id)
     Pepe.Agent.Session.undo(session_key(chat_id))
     send_message(chat_id, gettext("↩️ Undid your last message."))
+  end
+
+  # A per-chat waiver of the group @mention requirement (see addressed?/3) - lives
+  # on the session, so it's scoped to this chat only and forgotten on /new. No-op
+  # in DMs and in groups where require_mention is already off; harmless either way.
+  defp run_command(chat_id, "mention", args) do
+    ensure_session(chat_id)
+    key = session_key(chat_id)
+
+    case args |> String.trim() |> String.downcase() do
+      "off" ->
+        Pepe.Agent.Session.set_mention_optional(key, true)
+        send_message(chat_id, gettext("👂 I'll reply here without being @mentioned, until /new."))
+
+      "on" ->
+        Pepe.Agent.Session.set_mention_optional(key, false)
+        send_message(chat_id, gettext("📣 @mention required again in this chat."))
+
+      _ ->
+        status =
+          if Pepe.Agent.Session.mention_optional?(key),
+            do: gettext("off (I reply without being mentioned)"),
+            else: gettext("on (I need an @mention)")
+
+        send_message(chat_id, gettext("Mention requirement is currently: %{status}.\nUse /mention on or /mention off.", status: status))
+    end
   end
 
   defp run_command(chat_id, "compact", _args) do
@@ -1219,10 +1271,10 @@ defmodule Pepe.Gateways.Telegram do
   # skill via its `skill` tool and follows the steps (replying in the user's tongue).
   defp run_skill(chat_id, name, args) do
     case Pepe.Skills.read(name) do
-      nil ->
+      {:error, _reason} ->
         send_message(chat_id, gettext("Unknown skill: %{name}", name: name))
 
-      _content ->
+      {:ok, _content} ->
         extra = if args == "", do: "", else: "\n\nInput: #{args}"
         chat_with_agent(chat_id, nil, "Carry out the \"#{name}\" skill now." <> extra)
     end
@@ -1631,14 +1683,27 @@ defmodule Pepe.Gateways.Telegram do
   defp allowlisted?(_no_restriction, _id), do: true
 
   # DMs always reach the agent. In groups, optionally require an @mention (or a
-  # /command) so the bot doesn't answer every message.
-  defp addressed?(_text, "private"), do: true
+  # /command) so the bot doesn't answer every message - unless this chat waived
+  # that for itself with /mention (see mention_waived?/1).
+  defp addressed?(_text, "private", _chat_id), do: true
 
-  defp addressed?(text, _group) do
-    if require_mention?(), do: mentions_bot?(text) or command?(text), else: true
+  defp addressed?(text, _group, chat_id) do
+    if require_mention?() do
+      mentions_bot?(text) or command?(text) or mention_waived?(chat_id)
+    else
+      true
+    end
   end
 
   defp require_mention?, do: bot()["require_mention"] != false
+
+  # A session-scoped, per-chat waiver of the mention requirement above - lives on
+  # the session (not the bot, unlike require_mention? itself), so /mention only
+  # affects the group it was run in, and resets with the conversation (/new).
+  defp mention_waived?(chat_id) do
+    ensure_session(chat_id)
+    Pepe.Agent.Session.mention_optional?(session_key(chat_id))
+  end
 
   @doc """
   Whether a conversation may feed the memory/skill review, from a bot's `trainers`

@@ -93,18 +93,19 @@ defmodule Pepe.Learning do
       path = Path.join(dir, file)
 
       case File.read(path) do
-        {:ok, content} ->
-          at = mtime(path)
-
-          content
-          |> entries()
-          |> Enum.map(fn entry ->
-            %{kind: :memory, title: file, summary: entry, source: file_source(file), at: at}
-          end)
-
-        _ ->
-          []
+        {:ok, content} -> memory_entries(file, path, content)
+        _ -> []
       end
+    end)
+  end
+
+  defp memory_entries(file, path, content) do
+    at = mtime(path)
+
+    content
+    |> entries()
+    |> Enum.map(fn entry ->
+      %{kind: :memory, title: file, summary: entry, source: file_source(file), at: at}
     end)
   end
 

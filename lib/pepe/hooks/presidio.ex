@@ -12,10 +12,10 @@ defmodule Pepe.Hooks.Presidio do
   @behaviour Pepe.Hooks.Hook
 
   @impl true
-  def stages, do: [:inbound]
+  def stages, do: [:inbound, :tool_result]
 
   @impl true
-  def run(:inbound, text, settings, _ctx) do
+  def run(stage, text, settings, _ctx) when stage in [:inbound, :tool_result] do
     with a when is_binary(a) <- settings["analyzer_url"],
          an when is_binary(an) <- settings["anonymizer_url"],
          {:ok, %{status: 200, body: results}} when is_list(results) <-

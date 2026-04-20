@@ -30,20 +30,29 @@ defmodule Pepe.Sandbox do
 
   # Patterns that are catastrophic and never part of a legitimate agent task. Kept
   # deliberately narrow to avoid blocking real work (installing deps, querying a DB).
-  @blocked [
-    {~r{\brm\s+-[a-zA-Z]*[rf][a-zA-Z]*\s+(-[a-zA-Z]+\s+)*(/(\s|$|\*)|~(/|\s|$)|\$\{?HOME\}?|/(etc|usr|bin|sbin|lib|lib64|boot|var|opt|root|home|dev|System|Library|Applications)(/|\s|$))},
-     "recursive delete of a system path, / ~ or $HOME"},
-    {~r{\bmkfs(\.\w+)?\b}, "formatting a filesystem"},
-    {~r{\bdd\b[^\n]*\bof=/dev/(sd|disk|nvme|hd|xvd|mmcblk)}, "writing raw to a disk device"},
-    {~r{>\s*/dev/(sd|disk|nvme|hd|xvd|mmcblk)}, "overwriting a disk device"},
-    {~r{:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:}, "fork bomb"},
-    {~r{\b(shutdown|reboot|halt|poweroff|init\s+0)\b}, "powering off or rebooting the host"}
-  ]
+  #
+  # A function, not a module attribute: OTP 28 changed compiled regexes to hold a
+  # NIF resource reference internally, which can no longer be "escaped" into a
+  # module attribute (baked into the compiled .beam as a literal) - only a small,
+  # fixed set of term shapes can be. Building the list at call time compiles these
+  # same 6 patterns fresh per call instead of once at compile time, which is
+  # negligible next to actually running the shell command being guarded.
+  defp blocked_patterns do
+    [
+      {~r{\brm\s+-[a-zA-Z]*[rf][a-zA-Z]*\s+(-[a-zA-Z]+\s+)*(/(\s|$|\*)|~(/|\s|$)|\$\{?HOME\}?|/(etc|usr|bin|sbin|lib|lib64|boot|var|opt|root|home|dev|System|Library|Applications)(/|\s|$))},
+       "recursive delete of a system path, / ~ or $HOME"},
+      {~r{\bmkfs(\.\w+)?\b}, "formatting a filesystem"},
+      {~r{\bdd\b[^\n]*\bof=/dev/(sd|disk|nvme|hd|xvd|mmcblk)}, "writing raw to a disk device"},
+      {~r{>\s*/dev/(sd|disk|nvme|hd|xvd|mmcblk)}, "overwriting a disk device"},
+      {~r{:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:}, "fork bomb"},
+      {~r{\b(shutdown|reboot|halt|poweroff|init\s+0)\b}, "powering off or rebooting the host"}
+    ]
+  end
 
   @doc "Refuse a catastrophic command. Returns `:ok` or `{:block, reason}`."
   @spec guard(String.t()) :: :ok | {:block, String.t()}
   def guard(command) when is_binary(command) do
-    Enum.find_value(@blocked, :ok, fn {re, why} ->
+    Enum.find_value(blocked_patterns(), :ok, fn {re, why} ->
       if Regex.match?(re, command), do: {:block, why}
     end)
   end

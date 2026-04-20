@@ -54,6 +54,12 @@ defmodule Pepe.HooksTest do
       assert Recognizers.valid_pattern?("APOL-\\d+")
       assert Recognizers.resolve(%{"custom" => [%{"name" => "bad", "pattern" => "([oops"}]}) == []
     end
+
+    test "phone_br and phone_us use distinct labels (no shared counter if both packs are active)" do
+      recs = Recognizers.resolve(%{"packs" => ["br", "us"]})
+      labels = recs |> Enum.filter(&(&1.name in ["phone_br", "phone_us"])) |> Enum.map(& &1.label)
+      assert Enum.sort(labels) == ["PHONE_BR", "PHONE_US"]
+    end
   end
 
   describe "pii_redact hook + pipeline" do
@@ -105,6 +111,29 @@ defmodule Pepe.HooksTest do
 
       {redacted, _} = Hooks.transform(:inbound, "CPF #{@cpf}", agent)
       assert redacted =~ "[CPF_1]"
+    end
+  end
+
+  describe "llm_redact hook fail-open" do
+    import ExUnit.CaptureLog
+
+    test "no model configured: passes text through and logs why" do
+      log =
+        capture_log(fn ->
+          assert {:ok, "CPF 999"} = Pepe.Hooks.LlmRedact.run(:inbound, "CPF 999", %{}, %{})
+        end)
+
+      assert log =~ "[llm_redact] failing open (no model configured)"
+    end
+
+    test "unknown model connection: passes text through and logs why" do
+      log =
+        capture_log(fn ->
+          assert {:ok, "CPF 999"} =
+                   Pepe.Hooks.LlmRedact.run(:inbound, "CPF 999", %{"model" => "ghost"}, %{})
+        end)
+
+      assert log =~ ~s|[llm_redact] failing open (unknown model connection "ghost")|
     end
   end
 

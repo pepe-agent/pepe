@@ -13,14 +13,16 @@ defmodule Pepe.Hooks.LlmRedact do
   """
   @behaviour Pepe.Hooks.Hook
 
+  require Logger
+
   alias Pepe.Config
   alias Pepe.LLM.Message
 
   @impl true
-  def stages, do: [:inbound]
+  def stages, do: [:inbound, :tool_result]
 
   @impl true
-  def run(:inbound, text, settings, ctx) do
+  def run(stage, text, settings, ctx) when stage in [:inbound, :tool_result] do
     with name when is_binary(name) <- settings["model"],
          model when not is_nil(model) <- Config.get_model(name),
          {:ok, %{content: content}} when is_binary(content) <-
@@ -28,11 +30,32 @@ defmodule Pepe.Hooks.LlmRedact do
          {:ok, redacted, entries} <- parse(content) do
       {:ok, redacted, entries}
     else
-      _ -> {:ok, text}
+      failure ->
+        log_fail_open(failure, settings)
+        {:ok, text}
     end
   end
 
   def run(_stage, text, _settings, _ctx), do: {:ok, text}
+
+  # Fail-open never leaks the raw text into logs (that's the PII this hook exists to
+  # protect) - only the reason, so an operator can tell "silently passed through
+  # unredacted" from "working as intended" instead of it being invisible.
+  defp log_fail_open(failure, settings) do
+    Logger.warning("[llm_redact] failing open (#{fail_reason(failure, settings)}) - text passed through unredacted")
+  end
+
+  defp fail_reason(nil, settings) do
+    case Map.get(settings, "model") do
+      name when is_binary(name) -> "unknown model connection #{inspect(name)}"
+      _ -> "no model configured"
+    end
+  end
+
+  defp fail_reason({:error, reason}, _settings), do: "model call failed: #{inspect(reason)}"
+  defp fail_reason({:ok, _}, _settings), do: "model returned a non-text response"
+  defp fail_reason(:error, _settings), do: "could not parse the model's redaction response as JSON"
+  defp fail_reason(_other, _settings), do: "unexpected failure"
 
   @impl true
   def config_schema do

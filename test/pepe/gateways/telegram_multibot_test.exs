@@ -43,7 +43,7 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     Config.put_telegram(%{"bot_token" => "same"})
     Config.put_telegram_bot("dup", %{"bot_token" => "same", "agent" => "x"})
 
-    assert length(Config.telegram_bots()) == 1
+    assert match?([_], Config.telegram_bots())
   end
 
   test "delete removes a named bot" do

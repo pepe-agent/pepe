@@ -98,15 +98,17 @@ defmodule PepeWeb.ModelsLive do
   defp unique_suggestion(key, scope) do
     taken = Config.models() |> Enum.map(& &1.name)
 
-    if scope_name(key, scope) not in taken do
-      key
-    else
+    if scope_name(key, scope) in taken do
       Stream.iterate(2, &(&1 + 1))
-      |> Enum.find_value(fn n ->
-        candidate = "#{key}-#{n}"
-        if scope_name(candidate, scope) not in taken, do: candidate
-      end)
+      |> Enum.find_value(&suffixed_suggestion(key, &1, scope, taken))
+    else
+      key
     end
+  end
+
+  defp suffixed_suggestion(key, n, scope, taken) do
+    candidate = "#{key}-#{n}"
+    if scope_name(candidate, scope) not in taken, do: candidate
   end
 
   defp blank_model,
@@ -137,13 +139,18 @@ defmodule PepeWeb.ModelsLive do
   end
 
   defp move(list, name, dir) do
-    i = Enum.find_index(list, &(&1 == name))
-    j = if dir == "up", do: i - 1, else: i + 1
+    case Enum.find_index(list, &(&1 == name)) do
+      nil ->
+        list
 
-    if i && j >= 0 && j < length(list) do
-      list |> List.delete_at(i) |> List.insert_at(j, name)
-    else
-      list
+      i ->
+        j = if dir == "up", do: i - 1, else: i + 1
+
+        if j >= 0 and j < length(list) do
+          list |> List.delete_at(i) |> List.insert_at(j, name)
+        else
+          list
+        end
     end
   end
 

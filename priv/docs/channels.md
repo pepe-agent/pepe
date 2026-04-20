@@ -56,6 +56,44 @@ replies with exactly `HEARTBEAT_OK` when there's nothing worth saying - that's
 expected most of the time and nothing is sent. A cooldown gate (min 30s spacing, a
 flood breaker at 5 fires/60s) makes a runaway proactive loop impossible.
 
+## In-chat slash commands (Telegram)
+
+Inside a Telegram chat the user drives the session with slash commands - they don't
+reach you as prompts, the gateway handles them. Know they exist so you can point a
+user at the right one instead of trying to do it yourself:
+
+- `/new` - start a fresh conversation (clears context). `/undo` - drop the last
+  message. `/compact` - summarize history to reclaim context.
+- `/agent <name>` - switch which agent this chat talks to. `/model <name>
+  [session|global]` / `/models` - show or change the model (a trainer may set it
+  globally, others only for their own conversation). `/tools` - list runtime tools.
+- `/skill <name>` - list or run a skill. `/btw <question>` - ask a one-off side
+  question that isn't saved to history. `/learn` - save what was learned to
+  memory/skills. `/approve` - inspect or clear the "always allow" tool grants.
+- `/status` - session info. `/whoami` - the user's Telegram user and chat ids (this
+  is how they find the ids for `allowed_users` / `trainers`). `/stop` - cancel the
+  current run. `/help` - the full list. Installed skills also appear as their own
+  `/`-commands.
+
+## Working-activity display (`tool_progress`)
+
+Per Telegram bot, you can tune how much of your tool activity the user sees while you
+work. Set it with `manage_channel`:
+
+```
+manage_channel set_progress name: "sales" mode: "ambient"
+```
+
+- `reaction` - **the default.** No status message at all; just a 👀 reaction on the
+  user's own message while working, cleared when the answer lands. The quietest.
+- `ambient` - one vague "what kind of work is happening" line (e.g. "🔎 looking
+  things up..."), edited in place - no tool names, args or per-step ledger.
+- `off` - nothing but the native typing indicator.
+- `verbose` - a detailed per-tool breadcrumb list, for power users.
+
+The message-based modes (`ambient`/`verbose`) use a single message that's edited as
+tools run and deleted when the turn ends, so only the final answer stays in the chat.
+
 ## WhatsApp (Meta Cloud API)
 
 WhatsApp connects over a webhook, not polling. Each connection has its own URL -
@@ -78,3 +116,55 @@ uses `send_to_agent` - no special routing in the webhook layer.
 
 Tokens are `${ENV_VAR}` refs (`access_token`, `app_secret`). Note Meta's 24-hour
 rule: free-form replies only within 24h of the customer's last message.
+
+## Other webhook channels
+
+Slack, Discord, Microsoft Teams and Google Chat are all inbound-webhook channels
+like WhatsApp - each is a connection at `/webhooks/<company>/<provider>/<slug>`
+served by `mix pepe serve`, binding an agent to a session keyed
+`<provider>:<agent>:<from>`, with the same `admin` / `support` modes. Unlike Telegram
+(`manage_channel`) and WhatsApp (`mix pepe gateway whatsapp add`), these four have no
+agent tool or CLI to set them up - a human configures them on the dashboard
+Integrations tab (which shows the URL to paste into the platform). If a user asks you
+to "add a Slack channel", point them there rather than reaching for a tool. All
+secrets below are `${ENV_VAR}` refs, resolved at read time, never stored expanded.
+
+### Slack (Events API)
+
+Config: `bot_token` (the `xoxb-...` bot user token, the Bearer for replies) and
+`signing_secret` (verifies the `X-Slack-Signature` on each inbound POST). Point the
+Slack app's Event Subscriptions request URL at the connection URL - the first save
+triggers a `url_verification` handshake, answered synchronously. Subscribe to
+`message.channels` and `app_mention`. In a channel the bot replies only when
+`@mentioned` (the default; `require_mention: "false"` answers every message); a direct
+message always replies.
+
+### Discord (Interactions endpoint)
+
+Discord runs over slash commands, not a gateway bot. Config: `public_key` (the app's
+public key, hex, for the required Ed25519 signature check) and `application_id` (used
+to post the follow-up answer). Set the app's "Interactions Endpoint URL" to the
+connection URL and add a slash command with a text option (e.g. `/ask prompt:...`) -
+the option's value is the prompt you receive. Discord demands a synchronous ack within
+3s, so the command is answered with a deferred response and your real reply is posted
+as a follow-up once you finish. A `from` here is the interaction token, not a user id.
+
+### Microsoft Teams (Bot Framework)
+
+Config: `app_id` (the bot's Microsoft app/client id), `app_password` (the client
+secret) and `tenant_id` (the Azure tenant, or `botframework.com`). Set the bot's
+messaging endpoint to the connection URL. Replies go back to the activity's
+`serviceUrl` with an app access token minted via client credentials. The inbound JWT
+is **not** validated here - keep the endpoint behind a proxy/secret. A 1:1 chat always
+replies; in a team channel or group chat the bot replies only when `@mentioned`
+(default; `require_mention: "false"` to answer all). The bot @mention is stripped from
+the text before it reaches you.
+
+### Google Chat (Chat API)
+
+Config: `access_token` (an OAuth token for the Chat API, the Bearer for replies -
+refresh it out of band). Point the app's webhook (HTTP) endpoint at the connection URL.
+Only human `MESSAGE` events become a turn; replies post back to the space. The inbound
+Google JWT is not validated here - keep it behind a proxy. A DM always replies; in a
+multi-person space the app replies only when `@mentioned` (default;
+`require_mention: "false"` to answer all).

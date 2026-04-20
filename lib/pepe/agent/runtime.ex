@@ -11,7 +11,7 @@ defmodule Pepe.Agent.Runtime do
       {:assistant_delta, text}      # streamed text fragment (streaming only)
       {:assistant, text}            # a full assistant turn
       {:tool_call, name, args}      # the agent decided to call a tool
-      {:tool_denied, name}          # the user refused to authorize the tool
+      {:tool_denied, name, reason}  # the user refused to authorize the tool (reason may be nil)
       {:tool_result, name, output}  # the tool returned
       {:done, content}              # final answer
       {:error, reason}
@@ -62,9 +62,8 @@ defmodule Pepe.Agent.Runtime do
   # The most recent user message text, to label a trace with what triggered it.
   defp last_user_text(messages) do
     Enum.reduce(messages, nil, fn m, acc ->
-      role = Map.get(m, :role) || Map.get(m, "role")
-      content = Map.get(m, :content) || Map.get(m, "content")
-      if role == "user" and is_binary(content), do: content, else: acc
+      m = Map.new(m, fn {k, v} -> {to_string(k), v} end)
+      if m["role"] == "user" and is_binary(m["content"]), do: m["content"], else: acc
     end)
   end
 
@@ -113,6 +112,7 @@ defmodule Pepe.Agent.Runtime do
   Convenience: start a fresh conversation from a single user prompt.
   Returns `{:ok, final_content, all_messages}`.
   """
+  @spec converse(Agent.t(), String.t(), opts()) :: {:ok, String.t(), [map()]} | {:error, term()}
   def converse(%Agent{} = agent, prompt, opts \\ []) do
     messages = [Message.system(Pepe.Agent.Workspace.system_prompt(agent)), Message.user(prompt)]
     run(agent, messages, opts)
@@ -130,6 +130,10 @@ defmodule Pepe.Agent.Runtime do
         emit(opts, {:assistant, content})
         emit(opts, {:done, content})
         {:ok, content, messages ++ [nudge, Message.assistant(content)]}
+
+      {:error, reason} ->
+        emit(opts, {:error, reason})
+        {:error, reason}
 
       _ ->
         emit(opts, {:done, @stopped_message})
@@ -228,8 +232,12 @@ defmodule Pepe.Agent.Runtime do
           Tools.execute(call, ctx)
 
         :deny ->
-          emit(opts, {:tool_denied, name})
+          emit(opts, {:tool_denied, name, nil})
           Pepe.Permissions.denied_message(name)
+
+        {:deny, reason} ->
+          emit(opts, {:tool_denied, name, reason})
+          Pepe.Permissions.denied_message(name, reason)
       end
 
     emit(opts, {:tool_result, name, output})

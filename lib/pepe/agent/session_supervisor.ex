@@ -38,14 +38,15 @@ defmodule Pepe.Agent.SessionSupervisor do
   leave the user hanging.
   """
   def restore do
-    if persist?() do
-      for {key, agent_name, pending} <- Pepe.Agent.SessionPersistence.all() do
-        {:ok, _pid} = ensure(key, agent_name)
-        if pending, do: resume_and_deliver(key)
-      end
-    end
-
+    if persist?(), do: restore_sessions()
     :ok
+  end
+
+  defp restore_sessions do
+    for {key, agent_name, pending} <- Pepe.Agent.SessionPersistence.all() do
+      {:ok, _pid} = ensure(key, agent_name)
+      if pending, do: resume_and_deliver(key)
+    end
   end
 
   # Best-effort: replay the interruption as an internal turn (see
@@ -59,12 +60,7 @@ defmodule Pepe.Agent.SessionSupervisor do
     Task.start(fn ->
       case Pepe.Agent.Session.resume(key) do
         {:ok, text} ->
-          origin = Pepe.Watch.Delivery.origin_from_ctx(%{session_key: key})
-
-          case Pepe.Watch.Delivery.deliver(origin, text) do
-            :ok -> :ok
-            {:error, reason} -> Logger.warning("[session] #{key} resume reply undelivered: #{inspect(reason)}")
-          end
+          deliver_resumed(key, text)
 
         :nothing_pending ->
           :ok
@@ -73,6 +69,15 @@ defmodule Pepe.Agent.SessionSupervisor do
           Logger.warning("[session] #{key} resume failed: #{inspect(reason)}")
       end
     end)
+  end
+
+  defp deliver_resumed(key, text) do
+    origin = Pepe.Watch.Delivery.origin_from_ctx(%{session_key: key})
+
+    case Pepe.Watch.Delivery.deliver(origin, text) do
+      :ok -> :ok
+      {:error, reason} -> Logger.warning("[session] #{key} resume reply undelivered: #{inspect(reason)}")
+    end
   end
 
   # See the matching guard (and its rationale) in Pepe.Agent.Session.

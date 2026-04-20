@@ -28,26 +28,34 @@ defmodule Pepe.Skills.Sentinel do
 
   # --- skill markdown patterns (text) -----------------------------------------------
 
-  @patterns [
-    {:danger, "exfiltration", ~r/\b(curl|wget)\b[^\n]{0,80}\$\{?(?:[A-Z0-9_]*_)?(?:TOKEN|SECRET|KEY|PASSWORD|API_KEY)\}?/i},
-    {:danger, "exfiltration", ~r/\bcat\s+~?\/?\.(ssh|aws|gnupg)\//i},
-    {:danger, "exfiltration", ~r/\b(cat|read_file)\b[^\n]{0,40}(id_rsa|credentials|\.env\b)/i},
-    {:danger, "prompt-injection", ~r/ignore\s+(all\s+)?(previous|prior|above)\s+instructions/i},
-    {:danger, "prompt-injection", ~r/disregard\s+(your|all)\s+(previous\s+)?instructions/i},
-    {:danger, "prompt-injection", ~r/\bdo\s+not\s+(tell|inform|mention\s+to)\s+the\s+user\b/i},
-    {:danger, "prompt-injection", ~r/\byou\s+are\s+now\s+(DAN|in\s+developer\s+mode)\b/i},
-    {:caution, "hidden-content", ~r/display:\s*none/i},
-    {:caution, "hidden-content", ~r/<!--.*(ignore|instead|actually).*-->/is},
-    {:danger, "destructive", ~r/\brm\s+-[a-z]*r[a-z]*f\b/i},
-    {:danger, "destructive", ~r/\bgit\s+push\s+(-f|--force)\b/i},
-    {:danger, "destructive", ~r/\bDROP\s+(TABLE|DATABASE)\b/i},
-    {:danger, "destructive", ~r/:(){ ?:\|:& ?};:/},
-    {:danger, "persistence", ~r/\bcrontab\s+-/i},
-    {:danger, "persistence", ~r/>>\s*~?\/?\.(bashrc|zshrc|profile|bash_profile)\b/i},
-    {:danger, "persistence", ~r/\b(CLAUDE|AGENTS?|SOUL|IDENTITY)\.md\b[^\n]{0,40}(write|append|edit)/i},
-    {:caution, "obfuscation", ~r/\bbase64\s+-d(ecode)?\b[^\n]{0,40}\|\s*(sh|bash|python)/i},
-    {:caution, "obfuscation", ~r/\beval\s*\(/i}
-  ]
+  # A function, not a module attribute: OTP 28 changed compiled regexes to hold a
+  # NIF resource reference internally, which can no longer be "escaped" into a
+  # module attribute (baked into the compiled .beam as a literal) - only a small,
+  # fixed set of term shapes can be. Building the list at call time compiles these
+  # same patterns fresh per call instead of once at compile time, which is
+  # negligible next to actually scanning a skill's text.
+  defp patterns do
+    [
+      {:danger, "exfiltration", ~r/\b(curl|wget)\b[^\n]{0,80}\$\{?(?:[A-Z0-9_]*_)?(?:TOKEN|SECRET|KEY|PASSWORD|API_KEY)\}?/i},
+      {:danger, "exfiltration", ~r/\bcat\s+~?\/?\.(ssh|aws|gnupg)\//i},
+      {:danger, "exfiltration", ~r/\b(cat|read_file)\b[^\n]{0,40}(id_rsa|credentials|\.env\b)/i},
+      {:danger, "prompt-injection", ~r/ignore\s+(all\s+)?(previous|prior|above)\s+instructions/i},
+      {:danger, "prompt-injection", ~r/disregard\s+(your|all)\s+(previous\s+)?instructions/i},
+      {:danger, "prompt-injection", ~r/\bdo\s+not\s+(tell|inform|mention\s+to)\s+the\s+user\b/i},
+      {:danger, "prompt-injection", ~r/\byou\s+are\s+now\s+(DAN|in\s+developer\s+mode)\b/i},
+      {:caution, "hidden-content", ~r/display:\s*none/i},
+      {:caution, "hidden-content", ~r/<!--.*(ignore|instead|actually).*-->/is},
+      {:danger, "destructive", ~r/\brm\s+-[a-z]*r[a-z]*f\b/i},
+      {:danger, "destructive", ~r/\bgit\s+push\s+(-f|--force)\b/i},
+      {:danger, "destructive", ~r/\bDROP\s+(TABLE|DATABASE)\b/i},
+      {:danger, "destructive", ~r/:(){ ?:\|:& ?};:/},
+      {:danger, "persistence", ~r/\bcrontab\s+-/i},
+      {:danger, "persistence", ~r/>>\s*~?\/?\.(bashrc|zshrc|profile|bash_profile)\b/i},
+      {:danger, "persistence", ~r/\b(CLAUDE|AGENTS?|SOUL|IDENTITY)\.md\b[^\n]{0,40}(write|append|edit)/i},
+      {:caution, "obfuscation", ~r/\bbase64\s+-d(ecode)?\b[^\n]{0,40}\|\s*(sh|bash|python)/i},
+      {:caution, "obfuscation", ~r/\beval\s*\(/i}
+    ]
+  end
 
   # --- plugin code: dangerous calls (matched on the AST, by {module, function}) ------
 
@@ -92,13 +100,16 @@ defmodule Pepe.Skills.Sentinel do
   @bare_calls %{"apply" => {:caution, "dynamic-dispatch"}}
 
   # Text patterns applied to plugin source (things the AST can't see: string literals).
-  @code_text_patterns [
-    {:danger, "reads-secrets", ~r/\.(ssh|aws|gnupg)\b/},
-    {:danger, "reads-secrets", ~r/\b(id_rsa|id_ed25519|credentials)\b|\.env\b/},
-    {:danger, "reads-secrets", ~r/\.pepe\/config\.json/},
-    {:danger, "obfuscation", ~r/Base\.decode(64|32|16)[^\n]{0,80}(eval|compile|binary_to_term)/},
-    {:caution, "obfuscation", ~r/Base\.decode(64|32|16)!?\s*\(/}
-  ]
+  # A function, not a module attribute - see the comment on patterns/0 above.
+  defp code_text_patterns do
+    [
+      {:danger, "reads-secrets", ~r/\.(ssh|aws|gnupg)\b/},
+      {:danger, "reads-secrets", ~r/\b(id_rsa|id_ed25519|credentials)\b|\.env\b/},
+      {:danger, "reads-secrets", ~r/\.pepe\/config\.json/},
+      {:danger, "obfuscation", ~r/Base\.decode(64|32|16)[^\n]{0,80}(eval|compile|binary_to_term)/},
+      {:caution, "obfuscation", ~r/Base\.decode(64|32|16)!?\s*\(/}
+    ]
+  end
 
   @doc """
   Scan skill **markdown** text. Returns findings and an overall verdict (the worst
@@ -106,7 +117,7 @@ defmodule Pepe.Skills.Sentinel do
   """
   @spec scan(String.t()) :: %{verdict: verdict(), findings: [finding()]}
   def scan(text) when is_binary(text) do
-    findings = text |> text_findings(@patterns) |> dedupe()
+    findings = text |> text_findings(patterns()) |> dedupe()
     %{verdict: overall(findings), findings: findings}
   end
 
@@ -117,7 +128,7 @@ defmodule Pepe.Skills.Sentinel do
   @spec scan_code(String.t(), String.t() | nil) :: %{verdict: verdict(), findings: [finding()]}
   def scan_code(source, file \\ nil) when is_binary(source) do
     findings =
-      (ast_findings(source, file) ++ text_findings(source, @code_text_patterns, file)) |> dedupe()
+      (ast_findings(source, file) ++ text_findings(source, code_text_patterns(), file)) |> dedupe()
 
     %{verdict: overall(findings), findings: findings}
   end
@@ -133,19 +144,19 @@ defmodule Pepe.Skills.Sentinel do
   defp ast_findings(source, file) do
     case Code.string_to_quoted(source, columns: false) do
       {:ok, ast} ->
-        {_ast, acc} =
-          Macro.prewalk(ast, [], fn node, acc ->
-            case call_danger(node, file) do
-              nil -> {node, acc}
-              finding -> {node, [finding | acc]}
-            end
-          end)
-
+        {_ast, acc} = Macro.prewalk(ast, [], &collect_danger(&1, &2, file))
         Enum.reverse(acc)
 
       _ ->
         # Unparseable source: the compile step will reject it; fall back to text only.
         []
+    end
+  end
+
+  defp collect_danger(node, acc, file) do
+    case call_danger(node, file) do
+      nil -> {node, acc}
+      finding -> {node, [finding | acc]}
     end
   end
 

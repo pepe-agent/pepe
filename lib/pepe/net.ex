@@ -12,6 +12,25 @@ defmodule Pepe.Net do
   def loopback?({0, 0, 0, 0, 0, 0xFFFF, hi, _lo}), do: bsr(hi, 8) == 127
   def loopback?(_), do: false
 
+  @internal_v4 ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "0.0.0.0/8"]
+  @internal_v6 ["fc00::/7", "fe80::/10"]
+
+  @doc """
+  True for loopback plus private (RFC1918), link-local, and cloud-metadata
+  (169.254.0.0/16) ranges - IPv4, IPv6, and IPv4-mapped IPv6. Meant for
+  outbound-fetch SSRF guards, not just the dashboard's inbound trusted-proxy checks.
+  """
+  def internal?(ip) when is_tuple(ip) do
+    loopback?(ip) or trusted?(ip, @internal_v4) or trusted?(ip, @internal_v6) or
+      case unmap(ip) do
+        {_, _, _, _} = v4 -> trusted?(v4, @internal_v4)
+        _ -> false
+      end
+  end
+
+  defp unmap({0, 0, 0, 0, 0, 0xFFFF, hi, lo}), do: {bsr(hi, 8), band(hi, 0xFF), bsr(lo, 8), band(lo, 0xFF)}
+  defp unmap(ip), do: ip
+
   @doc "Parse a string into an `:inet` address tuple. `{:ok, tuple}` or `:error`."
   def parse_address(s) when is_binary(s) do
     case :inet.parse_address(String.to_charlist(String.trim(s))) do

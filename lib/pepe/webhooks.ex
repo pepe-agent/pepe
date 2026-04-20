@@ -115,12 +115,20 @@ defmodule Pepe.Webhooks do
     if function_exported?(mod, :respond, 3), do: mod.respond(entry, payload, headers), else: :cont
   end
 
+  # Parses first (pure, no side effects in any provider today), THEN gates each
+  # parsed message - addressed?/2 needs the raw payload, but the per-conversation
+  # mention waiver (mention_waived?/2) needs `from`, which only parse/1 knows how
+  # to extract, so the gate can't run before parsing the way it used to.
   defp run_parse(mod, entry, payload) do
-    if addressed?(mod, entry, payload) do
-      case mod.parse(payload) do
-        {:ok, messages} -> Enum.each(messages, &dispatch(entry, mod, &1))
-        :ignore -> :ok
-      end
+    case mod.parse(payload) do
+      {:ok, messages} -> Enum.each(messages, &maybe_dispatch(mod, entry, payload, &1))
+      :ignore -> :ok
+    end
+  end
+
+  defp maybe_dispatch(mod, entry, payload, %{from: from} = message) do
+    if addressed?(mod, entry, payload) or mention_waived?(entry, from) do
+      dispatch(entry, mod, message)
     else
       :ok
     end
@@ -131,6 +139,18 @@ defmodule Pepe.Webhooks do
   defp addressed?(mod, entry, payload) do
     if function_exported?(mod, :addressed?, 2), do: mod.addressed?(entry, payload), else: true
   end
+
+  # A per-conversation waiver of the addressed?/2 gate above (see the `/mention`
+  # command in dispatch_command/4) - lives on the session, not the connection, so
+  # toggling it in one channel/DM never affects any other, and a fresh conversation
+  # (`/new`) forgets it, same as Telegram's own `/mention`.
+  defp mention_waived?(entry, from) do
+    key = session_key(entry, from)
+    SessionSupervisor.ensure(key, entry["agent"], session_opts(entry))
+    Session.mention_optional?(key)
+  end
+
+  defp session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
 
   # Run one inbound message through the bound agent, off the request process.
   defp dispatch(entry, mod, %{from: from, text: text}) do
@@ -145,7 +165,7 @@ defmodule Pepe.Webhooks do
 
   defp converse(entry, mod, from, text) do
     agent = entry["agent"]
-    key = "#{entry["provider"]}:#{agent}:#{from}"
+    key = session_key(entry, from)
 
     case command(entry, text, from) do
       {:reset, reply} ->
@@ -164,19 +184,31 @@ defmodule Pepe.Webhooks do
         SessionSupervisor.ensure(key, agent, session_opts(entry))
         mod.deliver(entry, from, apply_model_change(key, agent, name, scope, perm))
 
+      {:mention, waived?} ->
+        SessionSupervisor.ensure(key, agent, session_opts(entry))
+        Session.set_mention_optional(key, waived?)
+        mod.deliver(entry, from, mention_reply(waived?))
+
+      {:mention_status} ->
+        SessionSupervisor.ensure(key, agent, session_opts(entry))
+        mod.deliver(entry, from, mention_status_reply(Session.mention_optional?(key)))
+
       :chat ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
+        run_chat(entry, mod, key, from, text)
+    end
+  end
 
-        case Session.chat(key, text, learn: learn?(entry, from), authorize: nil) do
-          {:ok, reply} ->
-            mod.deliver(entry, from, reply)
+  defp run_chat(entry, mod, key, from, text) do
+    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil) do
+      {:ok, reply} ->
+        mod.deliver(entry, from, reply)
 
-          {:error, :busy} ->
-            :ok
+      {:error, :busy} ->
+        :ok
 
-          {:error, reason} ->
-            Logger.warning("[webhooks] #{entry["slug"]}: run failed: #{inspect(reason)}")
-        end
+      {:error, reason} ->
+        Logger.warning("[webhooks] #{entry["slug"]}: run failed: #{inspect(reason)}")
     end
   end
 
@@ -216,7 +248,28 @@ defmodule Pepe.Webhooks do
     end
   end
 
+  # A per-conversation waiver of the connection's require_mention gate (see
+  # addressed?/3 and mention_waived?/2 above) - only matters for a provider that
+  # actually implements addressed?/2 gating (Slack, MS Teams, Google Chat today);
+  # a no-op where the connection already answers everything.
+  defp dispatch_command(_entry, "mention", args, _from) do
+    case args |> String.trim() |> String.downcase() do
+      "off" -> {:mention, true}
+      "on" -> {:mention, false}
+      "" -> {:mention_status}
+      _ -> {:reply, "Usage: /mention on|off"}
+    end
+  end
+
   defp dispatch_command(_entry, _other, _args, _from), do: :chat
+
+  defp mention_reply(true), do: "👂 I'll reply here without being @mentioned, until /new."
+  defp mention_reply(false), do: "📣 @mention required again in this chat."
+
+  defp mention_status_reply(true),
+    do: "Mention requirement is currently: off (I reply without being mentioned).\nUse /mention on or /mention off."
+
+  defp mention_status_reply(false), do: "Mention requirement is currently: on (I need an @mention).\nUse /mention on or /mention off."
 
   defp render_models([]), do: "No models are configured for this company."
 

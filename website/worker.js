@@ -7,11 +7,16 @@
 //
 // This runs before assets because wrangler.jsonc sets assets.run_worker_first.
 
+// Paths that must stay reachable by `curl | sh` even while the site is
+// password-gated - a script can't type a Basic Auth password.
+const UNGATED_PATHS = new Set(["/install.sh"]);
+
 export default {
   async fetch(request, env) {
     const password = env.SITE_PASSWORD;
+    const { pathname } = new URL(request.url);
 
-    if (password) {
+    if (password && !UNGATED_PATHS.has(pathname)) {
       const expectedUser = env.SITE_USER || "pepe";
       const header = request.headers.get("Authorization") || "";
       const [scheme, encoded] = header.split(" ");

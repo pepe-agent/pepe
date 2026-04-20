@@ -1,10 +1,8 @@
 <p align="center">
-  <img src="images/pepe.jpg" alt="Pepe" width="420">
+  <img src="assets/brand/pepe-mark.svg" alt="Pepe" width="120">
 </p>
 
-<h1 align="center">
-  <img src="assets/brand/pepe-mark.svg" alt="" height="30" valign="middle">&nbsp; Pepe
-</h1>
+<h1 align="center">Pepe</h1>
 
 <p align="center">
   <strong>An Elixir/OTP AI agent runtime.</strong> Define agents, connect to any model, and run a tool-calling loop.
@@ -14,11 +12,10 @@
   Web dashboard &nbsp;·&nbsp; OpenAI-compatible HTTP &nbsp;·&nbsp; WebSocket &nbsp;·&nbsp; Telegram &nbsp;·&nbsp; WhatsApp &nbsp;·&nbsp; CLI
 </p>
 
-> **Why "Pepe"?** He comes from Chespirito's beloved Mexican comedy universe
-> (*El Chapulín Colorado*, adored in Brazil as the *Chapolin Colorado*, plus
-> *El Chavo del Ocho*): the shows generations across Latin America grew up with.
-> His whole thing? **He did exactly what he was told.** No arguing, no improvising
-> beyond the order. Which, funnily enough, describes an AI agent runtime perfectly.
+> **Why "Pepe"?** The name nods to Chespirito's comedy universe, loved across
+> Latin America generations grew up with. The character's whole thing? **He
+> did exactly what he was told.** No arguing, no improvising beyond the
+> order. Which, funnily enough, describes an AI agent runtime perfectly.
 > The project was once called *Cortex*; now it's **Pepe**. Same engine, better name. 🫡
 
 **Pepe is an Elixir/OTP AI agent runtime.** Define agents, connect to any model, and
@@ -52,18 +49,13 @@ mix deps.get
 # 1) scaffold ~/.pepe/config.json
 mix pepe setup
 
-# 2) add a model connection (any OpenAI-compatible provider)
-mix pepe model add openrouter \
-  --base-url https://openrouter.ai/api/v1 \
-  --api-key '${OPENROUTER_API_KEY}' \
-  --model anthropic/claude-3.5-sonnet \
-  --default
+# 2) add a model connection (any OpenAI-compatible provider; openrouter is a
+#    known provider, so its base URL is filled in automatically)
+mix pepe model add openrouter --api-key '${OPENROUTER_API_KEY}' --model openai/gpt-5-chat
 
-# 3) define an agent (defaults to all built-in tools)
-mix pepe agent add assistant \
-  --prompt "You are Pepe, a helpful coding agent." \
-  --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search \
-  --default
+# 3) define an agent (defaults to all built-in tools; the first model/agent
+#    you add becomes the default automatically)
+mix pepe agent add assistant --prompt "You are Pepe, a helpful coding agent."
 
 # 4) run it
 export OPENROUTER_API_KEY=sk-...

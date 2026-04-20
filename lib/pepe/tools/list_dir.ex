@@ -30,17 +30,18 @@ defmodule Pepe.Tools.ListDir do
         listing =
           entries
           |> Enum.sort()
-          |> Enum.map(fn e ->
-            kind = if File.dir?(Path.join(path, e)), do: "dir ", else: "file"
-            "#{kind}  #{e}"
-          end)
-          |> Enum.join("\n")
+          |> Enum.map_join("\n", &entry_line(path, &1))
 
         {:ok, "#{path}\n#{listing}"}
 
       {:error, reason} ->
         {:error, "cannot list #{path}: #{:file.format_error(reason)}"}
     end
+  end
+
+  defp entry_line(path, e) do
+    kind = if File.dir?(Path.join(path, e)), do: "dir ", else: "file"
+    "#{kind}  #{e}"
   end
 
   defp resolve(path, ctx), do: Pepe.Agent.Workspace.resolve_in_ctx(path, ctx)

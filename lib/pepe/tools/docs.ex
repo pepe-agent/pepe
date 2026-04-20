@@ -45,5 +45,5 @@ defmodule Pepe.Tools.Docs do
     end
   end
 
-  defp names, do: Pepe.Docs.list() |> Enum.map(&elem(&1, 0)) |> Enum.join(", ")
+  defp names, do: Pepe.Docs.list() |> Enum.map_join(", ", &elem(&1, 0))
 end

@@ -36,9 +36,10 @@ defmodule PepeWeb.RemoteClient do
   def local_direct?(conn) do
     proxies = Config.dashboard_trusted_proxies()
 
-    cond do
-      forwarded?(conn) and not via_trusted_proxy?(conn, proxies) -> false
-      true -> Net.loopback?(ip(conn))
+    if forwarded?(conn) and not via_trusted_proxy?(conn, proxies) do
+      false
+    else
+      Net.loopback?(ip(conn))
     end
   end
 
@@ -53,15 +54,17 @@ defmodule PepeWeb.RemoteClient do
         xff
         |> String.split(",")
         |> Enum.reverse()
-        |> Enum.find_value(fn part ->
-          case Net.parse_address(part) do
-            {:ok, tuple} -> if Net.trusted?(tuple, proxies), do: false, else: tuple
-            :error -> false
-          end
-        end)
+        |> Enum.find_value(&real_client(&1, proxies))
 
       [] ->
         nil
+    end
+  end
+
+  defp real_client(part, proxies) do
+    case Net.parse_address(part) do
+      {:ok, tuple} -> if Net.trusted?(tuple, proxies), do: false, else: tuple
+      :error -> false
     end
   end
 end

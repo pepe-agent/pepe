@@ -29,16 +29,17 @@ defmodule Pepe.Permissions do
   # listed - including drop-in plugin tools - requires approval (the safe default).
   @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent)
 
-  @type decision :: :once | :session | :always | :deny
+  @type decision :: :once | :session | :always | :deny | {:deny, String.t()}
 
   @doc "Whether a tool needs authorization before it can run."
   def requires_approval?(name), do: name not in @always_safe
 
   @doc """
-  Decide whether `name` may run for this call. Returns `:allow` or `:deny`,
-  asking the user via `ctx.authorize` when needed and remembering the grant.
+  Decide whether `name` may run for this call. Returns `:allow`, `:deny`, or
+  `{:deny, reason}` when the human attached a reason - asking the user via
+  `ctx.authorize` when needed and remembering the grant.
   """
-  @spec gate(String.t(), term(), map()) :: :allow | :deny
+  @spec gate(String.t(), term(), map()) :: :allow | :deny | {:deny, String.t()}
   def gate(name, args, ctx) do
     cond do
       not requires_approval?(name) -> :allow
@@ -48,8 +49,15 @@ defmodule Pepe.Permissions do
   end
 
   @doc "The message handed back to the model when a tool call was refused."
-  def denied_message(name) do
+  def denied_message(name, reason \\ nil)
+
+  def denied_message(name, nil) do
     "Error: the user did not authorize running `#{name}`. Do not retry it - " <>
+      "consider a different approach or ask the user what to do instead."
+  end
+
+  def denied_message(name, reason) when is_binary(reason) do
+    "Error: the user did not authorize running `#{name}` (reason: #{reason}). Do not retry it - " <>
       "consider a different approach or ask the user what to do instead."
   end
 
@@ -98,5 +106,6 @@ defmodule Pepe.Permissions do
   defp remember(decision, _name, _ctx), do: decision
 
   defp to_allow(:deny), do: :deny
+  defp to_allow({:deny, reason}) when is_binary(reason), do: {:deny, reason}
   defp to_allow(_grant), do: :allow
 end

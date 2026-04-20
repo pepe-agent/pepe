@@ -50,13 +50,18 @@ defmodule PepeWeb.AgentsLive do
   end
 
   defp move_fallback(list, name, dir) do
-    i = Enum.find_index(list, &(&1 == name))
-    j = if dir == "up", do: i - 1, else: i + 1
+    case Enum.find_index(list, &(&1 == name)) do
+      nil ->
+        list
 
-    if i && j >= 0 && j < length(list) do
-      list |> List.delete_at(i) |> List.insert_at(j, name)
-    else
-      list
+      i ->
+        j = if dir == "up", do: i - 1, else: i + 1
+
+        if j >= 0 and j < length(list) do
+          list |> List.delete_at(i) |> List.insert_at(j, name)
+        else
+          list
+        end
     end
   end
 
@@ -213,6 +218,16 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
+            <.form_section title={gettext("Limits")}>
+              <label class="flex items-start gap-2.5 text-sm">
+                <input type="checkbox" name="exempt_message_limit" value="true" checked={@edit_agent[:exempt_message_limit]} class="mt-0.5" />
+                <span>
+                  {gettext("Exempt from the company's monthly message limit")}
+                  <p class={hlp()}>{gettext("This agent keeps replying even after the company (see Companies) hits its monthly customer-message cap. Doesn't affect the separate spend cap.")}</p>
+                </span>
+              </label>
+            </.form_section>
+
             <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="agent_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -263,7 +278,8 @@ defmodule PepeWeb.AgentsLive do
       hooks: [],
       fallbacks: nil,
       triage_model: nil,
-      simple_model: nil
+      simple_model: nil,
+      exempt_message_limit: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -307,7 +323,8 @@ defmodule PepeWeb.AgentsLive do
           # read from there so nil (inherit) vs [] (explicit none) survives.
           fallbacks: socket.assigns.edit_agent[:fallbacks],
           triage_model: blank(params["triage_model"]),
-          simple_model: blank(params["simple_model"])
+          simple_model: blank(params["simple_model"]),
+          exempt_message_limit: params["exempt_message_limit"] == "true"
       }
 
       Config.put_agent(agent)
@@ -333,7 +350,8 @@ defmodule PepeWeb.AgentsLive do
           can_manage: parse_manage(params["can_manage"]),
           hooks: params["hooks"] || [],
           triage_model: blank(params["triage_model"]),
-          simple_model: blank(params["simple_model"])
+          simple_model: blank(params["simple_model"]),
+          exempt_message_limit: params["exempt_message_limit"] == "true"
       }
 
       {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}

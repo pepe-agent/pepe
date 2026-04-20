@@ -52,6 +52,28 @@ own page with its provider-specific fields and setup steps:
 [Google Chat](../googlechat/). This page covers what's shared by all of them
 (and by WhatsApp).
 
+## Group @mentions
+
+Slack, Microsoft Teams and Google Chat support group/channel conversations,
+where the connection answers only when @mentioned by default (a direct
+message always reaches the agent regardless). Set `require_mention: false` on
+the connection to answer every message in every channel it's in - or, without
+touching that connection-wide setting, waive it for a single channel from
+inside that channel:
+
+```text
+/mention off   # this channel only, until /new - no @mention needed to be answered
+/mention on    # back to requiring an @mention
+/mention       # show the current setting
+```
+
+Since a channel command still has to be addressed to run in the first place,
+the *first* `/mention off` needs an actual @mention (`@bot /mention off`);
+after that, the channel no longer needs one until `/new`. The waiver lives on
+that channel's own conversation, not the connection, so it never leaks into
+any other channel. WhatsApp and Discord don't gate on mentions today (always
+answered), so `/mention` is a no-op there.
+
 ## Switching models
 
 `/model` and `/models` fire only on an `admin`-mode connection with `commands`

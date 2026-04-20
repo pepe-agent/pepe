@@ -157,21 +157,28 @@ defmodule Pepe.Webhooks.WhatsApp do
         {:error, :no_phone_number_id}
 
       true ->
-        with {:ok, media_id} <- upload_media(phone_id, token, path) do
-          doc =
-            %{"id" => media_id, "filename" => Path.basename(path)}
-            |> then(fn d -> if caption in [nil, ""], do: d, else: Map.put(d, "caption", caption) end)
-
-          body = %{"messaging_product" => "whatsapp", "to" => to, "type" => "document", "document" => doc}
-
-          case Req.post("#{@graph}/#{phone_id}/messages", auth: {:bearer, token}, json: body, receive_timeout: 30_000) do
-            {:ok, %{status: s}} when s in 200..299 -> :ok
-            {:ok, %{status: s, body: b}} -> {:error, {:http, s, b}}
-            {:error, reason} -> {:error, reason}
-          end
-        end
+        send_document(phone_id, token, to, path, caption)
     end
   end
+
+  defp send_document(phone_id, token, to, path, caption) do
+    with {:ok, media_id} <- upload_media(phone_id, token, path) do
+      doc = document_payload(media_id, path, caption)
+      body = %{"messaging_product" => "whatsapp", "to" => to, "type" => "document", "document" => doc}
+
+      case Req.post("#{@graph}/#{phone_id}/messages", auth: {:bearer, token}, json: body, receive_timeout: 30_000) do
+        {:ok, %{status: s}} when s in 200..299 -> :ok
+        {:ok, %{status: s, body: b}} -> {:error, {:http, s, b}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp document_payload(media_id, path, caption) when caption in [nil, ""],
+    do: %{"id" => media_id, "filename" => Path.basename(path)}
+
+  defp document_payload(media_id, path, caption),
+    do: %{"id" => media_id, "filename" => Path.basename(path), "caption" => caption}
 
   # Upload media to the Cloud API and return its media id (referenced when sending).
   defp upload_media(phone_id, token, path) do

@@ -13,7 +13,9 @@ defmodule Pepe.MixProject do
       deps: deps(),
       escript: escript(),
       releases: releases(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      test_coverage: [tool: ExCoveralls],
+      dialyzer: [plt_add_apps: [:mix, :ex_unit], plt_local_path: "priv/plts", plt_core_path: "priv/plts"]
     ]
   end
 
@@ -58,7 +60,15 @@ defmodule Pepe.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [
+        precommit: :test,
+        predeploy: :test,
+        coveralls: :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test,
+        dialyzer: :dev,
+        credo: :dev
+      ]
     ]
   end
 
@@ -97,7 +107,11 @@ defmodule Pepe.MixProject do
       # Rate limiting (the widget's public, unauthenticated-by-design endpoint).
       {:hammer, "~> 7.0"},
       {:mimic, "~> 1.11", only: :test},
-      {:lazy_html, ">= 0.1.0", only: :test}
+      {:lazy_html, ">= 0.1.0", only: :test},
+      {:excoveralls, "~> 0.18", only: :test},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -119,7 +133,11 @@ defmodule Pepe.MixProject do
         "esbuild pepe --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"],
+      # Run before pushing: everything precommit does, plus the two static-analysis
+      # gates that are cheap to skip locally but too easy to let rot - both must
+      # exit clean (no findings/warnings), not just run.
+      predeploy: ["precommit", "credo", "dialyzer"]
     ]
   end
 end

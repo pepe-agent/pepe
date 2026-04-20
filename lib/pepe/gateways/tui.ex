@@ -118,7 +118,8 @@ defmodule Pepe.Gateways.TUI do
     fn
       {:assistant_delta, text} -> IO.write(text)
       {:tool_call, name, args} -> IO.write(dim("\n[-> #{name} #{one_line(args)}]\n"))
-      {:tool_denied, name} -> IO.write(dim("[✗ #{name} #{gettext("not allowed")}]\n"))
+      {:tool_denied, name, nil} -> IO.write(dim("[✗ #{name} #{gettext("not allowed")}]\n"))
+      {:tool_denied, name, reason} -> IO.write(dim("[✗ #{name} #{gettext("not allowed")}: #{reason}]\n"))
       {:tool_result, name, _out} -> IO.write(dim("[✓ #{name}]\n"))
       _ -> :ok
     end
@@ -130,7 +131,20 @@ defmodule Pepe.Gateways.TUI do
     fn name, args, _ctx ->
       Config.put_locale()
       label = bold(Prompt.question(name)) <> risk_lines(name, args) <> "\n" <> dim(one_line(args))
-      Pepe.TUI.select(Prompt.options(), label: label, render_as: &Prompt.label/1)
+
+      case Pepe.TUI.select(Prompt.options(), label: label, render_as: &Prompt.label/1) do
+        :deny -> maybe_deny_reason()
+        decision -> decision
+      end
+    end
+  end
+
+  # Give a denial an optional free-text reason, threaded back into the agent's
+  # context (see Pepe.Permissions.denied_message/2) instead of a bare refusal.
+  defp maybe_deny_reason do
+    case Owl.IO.input(label: "Reason (optional):", optional: true) do
+      blank when blank in [nil, ""] -> :deny
+      reason -> {:deny, reason}
     end
   end
 

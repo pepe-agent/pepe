@@ -276,35 +276,31 @@ defmodule Pepe.LLM do
   defp apply_tool_call_deltas(nil, state), do: state
 
   defp apply_tool_call_deltas(deltas, state) when is_list(deltas) do
-    tool_calls =
-      Enum.reduce(deltas, state.tool_calls, fn d, acc ->
-        idx = d["index"] || 0
-
-        existing =
-          Map.get(acc, idx, %{
-            "id" => nil,
-            "type" => "function",
-            "function" => %{"name" => "", "arguments" => ""}
-          })
-
-        fun = existing["function"]
-        d_fun = d["function"] || %{}
-
-        merged_fun = %{
-          "name" => (fun["name"] || "") <> (d_fun["name"] || ""),
-          "arguments" => (fun["arguments"] || "") <> (d_fun["arguments"] || "")
-        }
-
-        merged = %{
-          "id" => d["id"] || existing["id"],
-          "type" => d["type"] || existing["type"] || "function",
-          "function" => merged_fun
-        }
-
-        Map.put(acc, idx, merged)
-      end)
-
+    tool_calls = Enum.reduce(deltas, state.tool_calls, &merge_tool_call/2)
     %{state | tool_calls: tool_calls}
+  end
+
+  defp merge_tool_call(d, acc) do
+    idx = d["index"] || 0
+    existing = Map.get(acc, idx, empty_tool_call())
+
+    merged = %{
+      "id" => d["id"] || existing["id"],
+      "type" => d["type"] || existing["type"] || "function",
+      "function" => merge_tool_fun(existing["function"], d["function"] || %{})
+    }
+
+    Map.put(acc, idx, merged)
+  end
+
+  defp empty_tool_call,
+    do: %{"id" => nil, "type" => "function", "function" => %{"name" => "", "arguments" => ""}}
+
+  defp merge_tool_fun(fun, d_fun) do
+    %{
+      "name" => (fun["name"] || "") <> (d_fun["name"] || ""),
+      "arguments" => (fun["arguments"] || "") <> (d_fun["arguments"] || "")
+    }
   end
 
   defp finalize(state) do

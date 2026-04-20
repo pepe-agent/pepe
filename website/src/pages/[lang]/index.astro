@@ -11,20 +11,59 @@ const lang = Astro.params.lang as Locale;
 const tr = t(lang);
 const d = (p: string) => withLocale(lang, p);
 
+// Minimal line icons matching the pepe-mark.svg brand style (thin stroke,
+// no color fill) instead of OS emoji, which render differently per platform
+// and read as dated/cartoonish. `currentColor` so a wrapper tints them via CSS.
+function svg(inner: string) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+}
+
+const ICONS = {
+  terminal: svg(`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/>`),
+  link: svg(`<path d="M9 15l6-6"/><path d="M8 12l-2 2a3 3 0 0 0 4 4l2-2"/><path d="M16 12l2-2a3 3 0 0 0-4-4l-2 2"/>`),
+  signal: svg(
+    `<circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none"/><path d="M8.5 13.5a5 5 0 0 1 7 0"/><path d="M5.5 10.5a9 9 0 0 1 13 0"/>`,
+  ),
+  message: svg(
+    `<path d="M4 5h16v11H9l-4 4V5z"/><circle cx="9" cy="10.5" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="10.5" r=".6" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r=".6" fill="currentColor" stroke="none"/>`,
+  ),
+  chip: svg(
+    `<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M9 3v3M12 3v3M15 3v3M9 18v3M12 18v3M15 18v3M3 9h3M3 12h3M3 15h3M18 9h3M18 12h3M18 15h3"/>`,
+  ),
+  compass: svg(`<circle cx="12" cy="12" r="9"/><path d="M15 9l-2 6-6 2 2-6 6-2z"/>`),
+  bolt: svg(`<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>`),
+  wrench: svg(`<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2-2 2.8-2.8z"/>`),
+  clock: svg(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>`),
+  squares: svg(`<rect x="4" y="4" width="9" height="9" rx="2"/><rect x="11" y="11" width="9" height="9" rx="2"/>`),
+  shield: svg(`<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>`),
+  lock: svg(`<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>`),
+  unlock: svg(`<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none"/>`),
+  phone: svg(`<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>`),
+  envelope: svg(`<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>`),
+  barChart: svg(`<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`),
+  headset: svg(`<path d="M4 13a8 8 0 0 1 16 0"/><rect x="3" y="13" width="4" height="6" rx="2"/><rect x="17" y="13" width="4" height="6" rx="2"/>`),
+  calendar: svg(`<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>`),
+  lineChart: svg(`<path d="M3 17l5-5 4 4 8-9"/><path d="M15 6h5v5"/>`),
+  warning: svg(`<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/>`),
+  search: svg(`<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/>`),
+  document: svg(`<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>`),
+} as const;
+
 const surfaces = [
-  { ico: "⌨️", t: "surf.cli.t", d: "surf.cli.d" },
-  { ico: "🔌", t: "surf.http.t", d: "surf.http.d" },
-  { ico: "🔗", t: "surf.ws.t", d: "surf.ws.d" },
-  { ico: "💬", t: "surf.ch.t", d: "surf.ch.d" },
+  { ico: ICONS.terminal, t: "surf.cli.t", d: "surf.cli.d", shot: null },
+  { ico: ICONS.link, t: "surf.http.t", d: "surf.http.d", shot: null },
+  { ico: ICONS.signal, t: "surf.ws.t", d: "surf.ws.d", shot: null },
+  { ico: ICONS.message, t: "surf.ch.t", d: "surf.ch.d", shot: null },
 ] as const;
 
 const features = [
-  { ico: "🧠", t: "f.model.t", d: "f.model.d" },
-  { ico: "⚡", t: "f.efficient.t", d: "f.efficient.d" },
-  { ico: "🛠️", t: "f.tools.t", d: "f.tools.d" },
-  { ico: "🕒", t: "f.cron.t", d: "f.cron.d" },
-  { ico: "🧩", t: "f.plugins.t", d: "f.plugins.d" },
-  { ico: "🛡️", t: "f.sandbox.t", d: "f.sandbox.d" },
+  { ico: ICONS.chip, t: "f.model.t", d: "f.model.d", shot: "models" },
+  { ico: ICONS.compass, t: "f.routing.t", d: "f.routing.d", shot: "agent-edit" },
+  { ico: ICONS.bolt, t: "f.efficient.t", d: "f.efficient.d", shot: "efficient" },
+  { ico: ICONS.wrench, t: "f.tools.t", d: "f.tools.d", shot: "trace-detail" },
+  { ico: ICONS.clock, t: "f.cron.t", d: "f.cron.d", shot: "cron" },
+  { ico: ICONS.squares, t: "f.plugins.t", d: "f.plugins.d", shot: "plugins" },
+  { ico: ICONS.shield, t: "f.sandbox.t", d: "f.sandbox.d", shot: "traces" },
 ] as const;
 
 const steps = [
@@ -34,16 +73,38 @@ const steps = [
   { t: "how.4.t", d: "how.4.d" },
 ] as const;
 
+const securitySteps = [
+  { ico: ICONS.message, t: "security.1.t" },
+  { ico: ICONS.lock, t: "security.2.t" },
+  { ico: ICONS.chip, t: "security.3.t" },
+  { ico: ICONS.unlock, t: "security.4.t" },
+] as const;
+
+// A concrete example threaded through the 4 steps above, instead of just
+// describing the mechanism in prose: the same PII value, shown transforming
+// at each stage (raw -> tokenized -> what the model actually sees -> restored).
+// Field + value are locale-specific (CPF/NIF/DNI/SSN); the token label is
+// derived from the field name, matching pii_redact's own [FIELD_n] format.
+const exampleField = tr("security.example.field" as never);
+const exampleValue = tr("security.example.value" as never);
+const exampleToken = `[${exampleField}_1]`;
+const exampleChips = [
+  `${exampleField}: ${exampleValue}`,
+  `${exampleField}: ${exampleToken}`,
+  exampleToken,
+  `${exampleField}: ${exampleValue}`,
+];
+
 const useCases = [
-  { ico: "📱", t: "uc.social.t", d: "uc.social.d" },
-  { ico: "📧", t: "uc.email.t", d: "uc.email.d" },
-  { ico: "📊", t: "uc.ads.t", d: "uc.ads.d" },
-  { ico: "🎧", t: "uc.support.t", d: "uc.support.d" },
-  { ico: "⏰", t: "uc.sched.t", d: "uc.sched.d" },
-  { ico: "📈", t: "uc.reports.t", d: "uc.reports.d" },
-  { ico: "🚨", t: "uc.monitor.t", d: "uc.monitor.d" },
-  { ico: "🔎", t: "uc.insights.t", d: "uc.insights.d" },
-  { ico: "📝", t: "uc.notes.t", d: "uc.notes.d" },
+  { ico: ICONS.phone, t: "uc.social.t", d: "uc.social.d" },
+  { ico: ICONS.envelope, t: "uc.email.t", d: "uc.email.d" },
+  { ico: ICONS.barChart, t: "uc.ads.t", d: "uc.ads.d" },
+  { ico: ICONS.headset, t: "uc.support.t", d: "uc.support.d" },
+  { ico: ICONS.calendar, t: "uc.sched.t", d: "uc.sched.d" },
+  { ico: ICONS.lineChart, t: "uc.reports.t", d: "uc.reports.d" },
+  { ico: ICONS.warning, t: "uc.monitor.t", d: "uc.monitor.d" },
+  { ico: ICONS.search, t: "uc.insights.t", d: "uc.insights.d" },
+  { ico: ICONS.document, t: "uc.notes.t", d: "uc.notes.d" },
 ] as const;
 
 const channels = ["Telegram", "WhatsApp", "Slack", "Discord", "Microsoft Teams", "Google Chat"];
@@ -104,11 +165,29 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
       </div>
       <div class="surfaces">
         {surfaces.map((s) => (
-          <div class="surface">
-            <div class="ico">{s.ico}</div>
-            <h3>{tr(s.t as K)}</h3>
-            <p>{tr(s.d as K)}</p>
-          </div>
+          s.shot ? (
+            <div class="surface card-shot">
+              <img class="card-bg" src={`/screenshots/dash-${s.shot}-${lang}.png`} alt="" loading="lazy" />
+              <div class="card-overlay">
+                <h3>{tr(s.t as K)}</h3>
+                <p class="card-desc">{tr(s.d as K)}</p>
+                <button
+                  type="button"
+                  class="card-enlarge"
+                  data-lightbox-src={`/screenshots/dash-${s.shot}-${lang}.png`}
+                  data-lightbox-alt={tr(s.t as K)}
+                >
+                  {tr("features.enlarge")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div class="surface">
+              <div class="ico" set:html={s.ico} />
+              <h3>{tr(s.t as K)}</h3>
+              <p>{tr(s.d as K)}</p>
+            </div>
+          )
         ))}
       </div>
     </div>
@@ -123,7 +202,7 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
       <div class="grid">
         {useCases.map((u) => (
           <div class="card">
-            <div class="ico">{u.ico}</div>
+            <div class="ico" set:html={u.ico} />
             <h3>{tr(u.t as K)}</h3>
             <p>{tr(u.d as K)}</p>
           </div>
@@ -142,15 +221,70 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
       </div>
       <div class="grid">
         {features.map((f) => (
-          <div class="card">
-            <div class="ico">{f.ico}</div>
-            <h3>{tr(f.t as K)}</h3>
-            <p>{tr(f.d as K)}</p>
-          </div>
+          f.shot ? (
+            <div class="card card-shot">
+              <img class="card-bg" src={`/screenshots/dash-${f.shot}-${lang}.png`} alt="" loading="lazy" />
+              <div class="card-overlay">
+                <h3>{tr(f.t as K)}</h3>
+                <p class="card-desc">{tr(f.d as K)}</p>
+                <button
+                  type="button"
+                  class="card-enlarge"
+                  data-lightbox-src={`/screenshots/dash-${f.shot}-${lang}.png`}
+                  data-lightbox-alt={tr(f.t as K)}
+                >
+                  {tr("features.enlarge")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div class="card">
+              <div class="ico" set:html={f.ico} />
+              <h3>{tr(f.t as K)}</h3>
+              <p>{tr(f.d as K)}</p>
+            </div>
+          )
         ))}
       </div>
     </div>
+    <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" hidden>
+      <button type="button" class="lightbox-close" aria-label="Close">&times;</button>
+      <img id="lightbox-img" src="" alt="" />
+    </div>
   </section>
+
+  <script>
+    const lightbox = document.getElementById("lightbox") as HTMLDivElement;
+    const lightboxImg = document.getElementById("lightbox-img") as HTMLImageElement;
+    const closeBtn = lightbox.querySelector(".lightbox-close") as HTMLButtonElement;
+
+    function openLightbox(src: string, alt: string) {
+      lightboxImg.src = src;
+      lightboxImg.alt = alt;
+      lightbox.hidden = false;
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeLightbox() {
+      lightbox.hidden = true;
+      lightboxImg.src = "";
+      document.body.style.overflow = "";
+    }
+
+    document.querySelectorAll<HTMLButtonElement>(".card-enlarge").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        openLightbox(btn.dataset.lightboxSrc ?? "", btn.dataset.lightboxAlt ?? "");
+      });
+    });
+
+    closeBtn.addEventListener("click", closeLightbox);
+    lightbox.addEventListener("click", (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !lightbox.hidden) closeLightbox();
+    });
+  </script>
 
   <hr class="divider" />
 
@@ -166,6 +300,14 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
         ))}
         <span class="chip">+ plugins</span>
       </div>
+      <img
+        class="dash-shot"
+        src={`/screenshots/dash-channels-${lang}.png`}
+        alt={tr("channels.title")}
+        width="1440"
+        height="900"
+        loading="lazy"
+      />
     </div>
   </section>
 
@@ -177,6 +319,37 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
         <a class="btn btn-ghost" href={d("/docs/widget/")}>{tr("widget.cta")}</a>
       </div>
       <img class="widget-shot" src={`/screenshots/widget-${lang}.png`} alt={tr("widget.title")} width="280" height="417" />
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section id="security">
+    <div class="container">
+      <div class="section-head">
+        <h2>{tr("security.title")}</h2>
+        <p>{tr("security.sub")}</p>
+      </div>
+      <div class="flow">
+        {securitySteps.map((s, i) => (
+          <>
+            <div class="flow-step">
+              <div class="flow-ico" set:html={s.ico} />
+              <h3>{tr(s.t as K)}</h3>
+              <code class="flow-chip">{exampleChips[i]}</code>
+            </div>
+            {i < securitySteps.length - 1 && <div class="flow-arrow" aria-hidden="true">→</div>}
+          </>
+        ))}
+      </div>
+      <img
+        class="dash-shot"
+        src={`/screenshots/dash-hooks-${lang}.png`}
+        alt={tr("security.title")}
+        width="1440"
+        height="900"
+        loading="lazy"
+      />
     </div>
   </section>
 
@@ -202,7 +375,7 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
 
   <section class="why">
     <div class="container why-grid">
-      <img src="/pepe.jpg" alt="Pepe" class="why-img" width="220" height="220" />
+      <img src="/pepe-mark.svg" alt="Pepe" class="why-img" width="220" height="220" />
       <div>
         <h2>{tr("why.title")}</h2>
         <p>{tr("why.body")}</p>

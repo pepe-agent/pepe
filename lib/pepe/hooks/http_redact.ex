@@ -6,23 +6,24 @@ defmodule Pepe.Hooks.HttpRedact do
 
   Request (Pepe -> your endpoint):
 
-      {"stage": "inbound|outbound", "text": "...", "session": "...", "map": [...]}
+      {"stage": "inbound|outbound|tool_result", "text": "...", "session": "...", "map": [...]}
 
   Response (your endpoint -> Pepe):
 
       {"text": "transformed text", "map": [{"fake": "...", "real": "...", "type": "..."}]}
 
   `text` is required; `map` optional (reversible). If it can't process, return the
-  original `text`. One `url` (which switches on `stage`) or separate
-  `inbound_url`/`outbound_url`. Auth: `basic_auth` (`{user, password}`) and/or
-  arbitrary `headers` (name -> value), all `${ENV}`-interpolated.
+  original `text`. One `url` (used for every stage) or separate
+  `inbound_url`/`outbound_url`/`tool_result_url`. Auth: `basic_auth`
+  (`{user, password}`) and/or arbitrary `headers` (name -> value), all
+  `${ENV}`-interpolated.
   """
   @behaviour Pepe.Hooks.Hook
 
   alias Pepe.Config
 
   @impl true
-  def stages, do: [:inbound, :outbound]
+  def stages, do: [:inbound, :outbound, :tool_result]
 
   @impl true
   def run(stage, text, settings, ctx) do
@@ -48,6 +49,7 @@ defmodule Pepe.Hooks.HttpRedact do
       %{"field" => "url", "type" => "string"},
       %{"field" => "inbound_url", "type" => "string"},
       %{"field" => "outbound_url", "type" => "string"},
+      %{"field" => "tool_result_url", "type" => "string"},
       %{"field" => "basic_auth", "type" => "map", "fields" => ["user", "password"]},
       %{"field" => "headers", "type" => "map"}
     ]
@@ -72,6 +74,7 @@ defmodule Pepe.Hooks.HttpRedact do
 
   defp url_for(:inbound, s), do: s["inbound_url"] || s["url"]
   defp url_for(:outbound, s), do: s["outbound_url"] || s["url"]
+  defp url_for(:tool_result, s), do: s["tool_result_url"] || s["url"]
   defp url_for(_, s), do: s["url"]
 
   defp headers(settings) do

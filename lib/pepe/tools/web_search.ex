@@ -50,8 +50,7 @@ defmodule Pepe.Tools.WebSearch do
         _ -> []
       end)
       |> Enum.take(8)
-      |> Enum.map(&("- " <> &1))
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", &("- " <> &1))
 
     [abstract, related]
     |> Enum.reject(&(&1 in [nil, ""]))

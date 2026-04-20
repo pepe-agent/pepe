@@ -4,6 +4,7 @@ defmodule Pepe.Application do
   @moduledoc false
 
   use Application
+  require Logger
 
   @impl true
   def start(_type, _args) do
@@ -11,6 +12,53 @@ defmodule Pepe.Application do
       start_release_cli()
     else
       start_supervisor(maybe_endpoint())
+    end
+  end
+
+  # Runs while the supervision tree is still up, before it's torn down - the
+  # only point where we can still see and wait on in-flight cron jobs. Without
+  # this, a job mid-run (agent call, tool side effects, delivery) is just killed
+  # with the VM: no record, no delivery, and any side effect it already started
+  # (a message sent, a file written) is left half-done with nothing to show for it.
+  @impl true
+  def prep_stop(state) do
+    drain_cron_tasks()
+    state
+  end
+
+  @cron_drain_timeout_ms 25_000
+
+  defp drain_cron_tasks do
+    case Process.whereis(Pepe.Cron.TaskSupervisor) do
+      nil ->
+        :ok
+
+      _pid ->
+        case Task.Supervisor.children(Pepe.Cron.TaskSupervisor) do
+          [] ->
+            :ok
+
+          pids ->
+            Logger.info("draining #{length(pids)} in-flight cron job(s) before shutdown")
+            deadline = System.monotonic_time(:millisecond) + @cron_drain_timeout_ms
+            pids |> Enum.map(&Process.monitor/1) |> await_all_down(deadline)
+        end
+    end
+  end
+
+  defp await_all_down([], _deadline), do: :ok
+
+  defp await_all_down(refs, deadline) do
+    remaining = deadline - System.monotonic_time(:millisecond)
+
+    if remaining <= 0 do
+      Logger.warning("cron drain timed out with #{length(refs)} job(s) still running; shutting down anyway")
+    else
+      receive do
+        {:DOWN, ref, :process, _pid, _reason} -> await_all_down(List.delete(refs, ref), deadline)
+      after
+        remaining -> await_all_down(refs, deadline)
+      end
     end
   end
 
@@ -75,7 +123,11 @@ defmodule Pepe.Application do
     # Cron fires only on the server surfaces; watches also run on an interactive
     # console (`tui`/`chat`) so a standalone REPL can fire and deliver its own watches.
     # (Run a single long-lived surface at a time - two schedulers on one config double-fire.)
-    crons = if serve? or gateways?, do: [Pepe.Cron.Scheduler], else: []
+    crons =
+      if serve? or gateways?,
+        do: [{Task.Supervisor, name: Pepe.Cron.TaskSupervisor}, Pepe.Cron.Scheduler],
+        else: []
+
     watches = if serve? or gateways? or persist?, do: [Pepe.Watch.Scheduler], else: []
     crons ++ watches
   end
@@ -96,9 +148,21 @@ defmodule Pepe.Application do
 
   # OTP/Burrito releases boot the application automatically. Under `mix` the app
   # is only started by the commands that need it, so this path is release-only.
-  defp release_cli?, do: System.get_env("RELEASE_NAME") != nil
+  #
+  # `RELEASE_NAME` is set by the standard `mix release` boot scripts
+  # (`bin/RELNAME start`), which Burrito's Zig wrapper doesn't go through - it
+  # execs the extracted ERTS directly and sets `__BURRITO=1` instead, so
+  # `RELEASE_NAME` is never present in a real packaged binary. Checking it here
+  # meant `release_cli?/0` was always false in the shipped binaries: the CLI
+  # dispatch never ran, the app booted with the default (endpoint-on)
+  # supervision tree, and the process just sat there instead of running the
+  # command and exiting.
+  defp release_cli?, do: Burrito.Util.running_standalone?()
 
   # Read the user's argv, start only what the command needs, dispatch, and exit.
+  # The spawned fn genuinely never returns (it ends in System.halt/1) - that's the
+  # point, not a bug, so silence dialyzer's no_return check for it.
+  @dialyzer {:no_return, start_release_cli: 0}
   defp start_release_cli do
     argv = Burrito.Util.Args.argv()
     serve? = serve_command?(argv)

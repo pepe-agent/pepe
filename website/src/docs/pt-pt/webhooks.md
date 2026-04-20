@@ -54,6 +54,28 @@ específicos: [Slack](../slack/), [Discord](../discord/),
 [Microsoft Teams](../msteams/), [Google Chat](../googlechat/); esta página
 cobre o que é partilhado por todos eles (e pelo WhatsApp).
 
+## @Menções em grupos
+
+Slack, Microsoft Teams e Google Chat suportam conversas em grupo/canal, onde
+por padrão a ligação só responde quando é @mencionada (uma mensagem direta
+chega sempre ao agente, independentemente da configuração). Define
+`require_mention: false` na ligação para que responda a todas as mensagens
+em todos os canais em que está - ou, sem mexer nessa configuração de toda a
+ligação, dispensa isso para um único canal a partir desse canal:
+
+```text
+/mention off   # só neste canal, até ao /new - não é preciso @mencionar para responder
+/mention on    # volta a exigir uma @menção
+/mention       # mostra a configuração atual
+```
+
+Como um comando de canal ainda tem de estar dirigido ao bot para correr, o
+*primeiro* `/mention off` precisa de uma @menção real (`@bot /mention off`);
+depois disso, o canal deixa de precisar até ao `/new`. A dispensa vive na
+conversa desse canal, não na ligação, por isso nunca se propaga para nenhum
+outro canal. WhatsApp e Discord não filtram por menção hoje (respondem
+sempre), por isso `/mention` não tem efeito nenhum aí.
+
 ## Mudar de modelo
 
 `/model` e `/models` só disparam numa ligação em modo `admin` com `commands`

@@ -12,6 +12,8 @@ its topic comes up, so they don't bloat every prompt.
   - `manage-routing` - change agent-to-agent routes with `set_route`.
   - `handle-media` - understand a voice/audio/image/file (transcribe, read), installing
     what it needs.
+  - `install-skill` - install a skill from a URL, a gist, a repo, or another Pepe.
+  - `create-watch` - set up a durable "check X and notify me when it happens" watch.
 
 - **User** skills live in `~/.pepe/skills/*.md` and override a built-in of the
   same name. The first non-empty line is the summary; the rest is the procedure.

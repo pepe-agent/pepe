@@ -38,7 +38,7 @@ defmodule Pepe.LearningTest do
     # Built-in skills are picked up too.
     assert Enum.any?(skills, &(&1.source == :builtin))
     # MEMORY.md split into two entries + USER.md one entry.
-    assert length(Enum.filter(memory, &(&1.source == :memory))) == 2
+    assert Enum.count(memory, &(&1.source == :memory)) == 2
     assert Enum.any?(memory, &(&1.source == :user and &1.summary =~ "Jho"))
   end
 

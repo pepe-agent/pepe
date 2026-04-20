@@ -173,6 +173,8 @@ pepe agent add support \
   --hooks pii_redact
 ```
 
+Three points in the flow get redacted: the human's inbound message, **any tool's raw output** (a database query, a file read, a web fetch - anything a tool surfaces, not just what a human typed), and the agent's outbound reply. Tool output is redacted before it joins the conversation and before it's ever written to disk - so a large result that gets spilled to a workspace file (see Agents) is spilled already-redacted, never raw. Ask "list the 10 most recent patients with a cardiac diagnosis" against your own database and, with `pii_redact` enabled, the model reasons over `[PERSON_1]`, `[PERSON_2]`, ...; only the final reply back to you gets the real names restored.
+
 Four hooks ship in the box:
 
 - `pii_redact`: an offline, zero-dependency regex redactor. It replaces structured PII (email, card number, and national ids such as CPF or CNPJ) with a stable token like `[CPF_1]`. By default it is reversible: it records `token -> real` so the pipeline can restore the real value in the reply on the way out.
@@ -210,14 +212,7 @@ The web dashboard is open on localhost by default, which is convenient for local
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-You can pass a literal password or a `${ENV_VAR}` reference so the secret stays out of the file. Once a password is set, the dashboard requires signing in at `/login`. Clear it with `pepe dashboard password --clear`.
-
-The password is read from `dashboard.password` in the config (interpolated), with a fallback to the `PEPE_DASHBOARD_PASSWORD` environment variable. Two related settings harden a dashboard served behind a domain:
-
-- `pepe dashboard hosts app.example.com,dash.example.com` sets the extra `Host` header values the dashboard accepts. This doubles as the anti DNS-rebinding allowlist.
-- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lists the reverse proxies whose `X-Forwarded-For` header may be trusted. Empty by default, meaning no forwarding header is trusted.
-
-Bound to a public interface with no password, the dashboard fails closed and blocks remote clients until you set one.
+Bound to a public interface with no password, the dashboard fails closed and blocks remote clients until you set one. Full details - the `Host` allowlist and trusted-proxies settings for serving it behind a domain, and running it as a persistent service - live on the [Dashboard](../dashboard/) page.
 
 ## API tokens
 

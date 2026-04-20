@@ -588,6 +588,7 @@ defmodule Pepe.Config do
     |> Enum.map(fn {name, a} -> Agent.from_map(Map.put(a, "name", name)) |> resolve_agent_model() end)
   end
 
+  @spec get_agent(String.t()) :: Agent.t() | nil
   def get_agent(name) do
     case load() |> get_in(["agents", name]) do
       nil -> nil
@@ -693,15 +694,18 @@ defmodule Pepe.Config do
 
         config
         |> Map.put("agents", agents)
-        |> then(fn c ->
-          if c["default_agent"] == old, do: Map.put(c, "default_agent", new), else: c
-        end)
+        |> rename_default_agent(old, new)
         |> save()
 
       :error ->
         {:error, :not_found}
     end
   end
+
+  defp rename_default_agent(%{"default_agent" => old} = config, old, new),
+    do: Map.put(config, "default_agent", new)
+
+  defp rename_default_agent(config, _old, _new), do: config
 
   def default_agent_name, do: load()["default_agent"]
 
@@ -925,42 +929,48 @@ defmodule Pepe.Config do
     agent = opts[:agent]
     widget? = opts[:widget] == true
 
-    cond do
-      widget? and is_nil(agent) ->
-        {:error, :widget_needs_agent}
-
-      company && not company_exists?(company) ->
-        {:error, :unknown_company}
-
-      agent && Company.of(agent) != company ->
-        {:error, :agent_out_of_scope}
-
-      agent && is_nil(get_agent(agent)) ->
-        {:error, :unknown_agent}
-
-      true ->
-        raw = Pepe.ApiToken.generate()
-        id = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
-
-        entry =
-          %{
-            "hash" => Pepe.ApiToken.hash(raw),
-            "company" => company,
-            "agent" => agent,
-            "label" => opts[:label],
-            "prefix" => Pepe.ApiToken.fingerprint(raw)
-          }
-          |> maybe_put("kind", widget? && "widget")
-          |> maybe_put("allowed_origin", widget? && blank_to_nil(opts[:allowed_origin]))
-          |> maybe_put("token", widget? && raw)
-          |> put_appearance(widget?, opts)
-
-        load()
-        |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
-        |> save()
-
-        {:ok, raw, id}
+    case validate_api_token(company, agent, widget?) do
+      :ok -> create_api_token(company, agent, widget?, opts)
+      error -> error
     end
+  end
+
+  defp validate_api_token(company, agent, widget?) do
+    cond do
+      widget? and is_nil(agent) -> {:error, :widget_needs_agent}
+      unknown_company?(company) -> {:error, :unknown_company}
+      agent_out_of_scope?(agent, company) -> {:error, :agent_out_of_scope}
+      unknown_agent?(agent) -> {:error, :unknown_agent}
+      true -> :ok
+    end
+  end
+
+  defp unknown_company?(company), do: company && not company_exists?(company)
+  defp agent_out_of_scope?(agent, company), do: agent && Company.of(agent) != company
+  defp unknown_agent?(agent), do: agent && is_nil(get_agent(agent))
+
+  defp create_api_token(company, agent, widget?, opts) do
+    raw = Pepe.ApiToken.generate()
+    id = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+
+    entry =
+      %{
+        "hash" => Pepe.ApiToken.hash(raw),
+        "company" => company,
+        "agent" => agent,
+        "label" => opts[:label],
+        "prefix" => Pepe.ApiToken.fingerprint(raw)
+      }
+      |> maybe_put("kind", widget? && "widget")
+      |> maybe_put("allowed_origin", widget? && blank_to_nil(opts[:allowed_origin]))
+      |> maybe_put("token", widget? && raw)
+      |> put_appearance(widget?, opts)
+
+    load()
+    |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
+    |> save()
+
+    {:ok, raw, id}
   end
 
   defp put_appearance(entry, false, _opts), do: entry
@@ -1308,34 +1318,85 @@ defmodule Pepe.Config do
     end
   end
 
+  # The metadata map for a billing/limits scope: root's own top-level "root" key,
+  # or a company's entry under "companies". Root always "exists" (it's the implicit
+  # default every command uses without --company), so root reads/writes here never
+  # hit the {:error, :not_found} a company update can.
+  defp scope_config(nil), do: load()["root"] || %{}
+  defp scope_config(company), do: get_company(company) || %{}
+
   @doc """
-  A company's billing markup: the multiplier applied to provider cost to get the
-  amount to charge. Unset (or root) means `1.0` - bill exactly the provider cost.
+  Update a billing/limits scope's metadata: root's own top-level config, or a
+  company's (same as `update_company/2`, `{:error, :not_found}` if unknown). Root
+  always succeeds - it always "exists", there's nothing to look up.
+  """
+  @spec update_scope(String.t() | nil, map()) :: :ok | {:error, :not_found}
+  def update_scope(nil, meta) do
+    merged =
+      scope_config(nil) |> Map.merge(meta) |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
+
+    load() |> Map.put("root", merged) |> save()
+    :ok
+  end
+
+  def update_scope(company, meta), do: update_company(company, meta)
+
+  @doc """
+  A scope's billing markup: the multiplier applied to provider cost to get the
+  amount to charge. Unset means `1.0` - bill exactly the provider cost.
   """
   @spec company_markup(String.t() | nil) :: float()
-  def company_markup(nil), do: 1.0
-
   def company_markup(company) do
-    case (get_company(company) || %{})["markup"] do
+    case scope_config(company)["markup"] do
       n when is_number(n) and n > 0 -> n / 1
       _ -> 1.0
     end
   end
 
   @doc """
-  A company's monthly spend cap in the billing currency, or `nil` for no cap. When set,
-  the runtime refuses new model calls for that company once the month-to-date billable
-  total reaches it. Root (nil company) never has a cap.
+  A scope's monthly spend cap in the billing currency, or `nil` for no cap. When
+  set, the runtime refuses new model calls for that scope once the month-to-date
+  billable total reaches it. Root has its own cap (stored outside "companies",
+  since it isn't one), independent of every company's.
   """
   @spec company_budget(String.t() | nil) :: float() | nil
-  def company_budget(nil), do: nil
-
   def company_budget(company) do
-    case (get_company(company) || %{})["budget"] do
+    case scope_config(company)["budget"] do
       n when is_number(n) and n > 0 -> n / 1
       _ -> nil
     end
   end
+
+  @doc """
+  A scope's monthly cap on customer-originated messages, or `nil` for no cap.
+  Independent of `company_budget/1` (the spend cap) - a scope can have either,
+  both, or neither. See `Pepe.Usage.over_message_limit?/1`.
+  """
+  @spec company_message_limit(String.t() | nil) :: pos_integer() | nil
+  def company_message_limit(company) do
+    case scope_config(company)["message_limit"] do
+      n when is_integer(n) and n > 0 -> n
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Unix timestamp of `scope`'s last manual budget reset (see
+  `Pepe.Usage.reset_budget/1`), or `nil` if it's never been reset. Once a new
+  billing month starts, this naturally stops mattering - `Pepe.Usage.month_to_date/1`
+  only ever looks at the current month's entries in the first place.
+  """
+  @spec company_budget_reset_at(String.t() | nil) :: integer() | nil
+  def company_budget_reset_at(company) do
+    case scope_config(company)["budget_reset_at"] do
+      n when is_integer(n) -> n
+      _ -> nil
+    end
+  end
+
+  @doc "Stamp `scope`'s budget as reset right now. `{:error, :not_found}` if an unknown company."
+  @spec reset_company_budget(String.t() | nil) :: :ok | {:error, :not_found}
+  def reset_company_budget(scope), do: update_scope(scope, %{"budget_reset_at" => System.system_time(:second)})
 
   @doc "Locale for fixed system messages (default \"en\")."
   def locale, do: load()["locale"] || "en"

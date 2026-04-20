@@ -8,12 +8,25 @@ defmodule Pepe.Hooks do
   the reversible map (pseudonym -> real). `restore/2` puts the real values back on the
   way out. Both are applied by `Pepe.Agent.Session`, so every surface (WhatsApp,
   Telegram, API, console) gets it uniformly - like token metering.
+
+  A third stage, `:tool_result`, runs on every tool's raw output before it ever
+  joins the conversation or gets spilled to disk (see `Pepe.Tools.execute/2`) - a
+  database query or file read can surface PII a human never typed, so it needs the
+  same treatment as the inbound message. Its reversible-map entries accumulate in
+  this process's dictionary (`start_map/1`/`current_map/0`/`add_entries/1`/
+  `take_map/0`, the same ownership shape `Pepe.Trace` uses) rather than being
+  threaded through every function's return value, since tool calls happen deep
+  inside `Pepe.Agent.Runtime`'s loop - including nested ones from `send_to_agent`,
+  which share the caller's process and so the same accumulator, with no extra
+  wiring needed.
   """
 
   require Logger
 
   alias Pepe.Company
   alias Pepe.Config
+
+  @map_key :pepe_hooks_map
 
   @providers %{
     "pii_redact" => Pepe.Hooks.PiiRedact,
@@ -41,18 +54,22 @@ defmodule Pepe.Hooks do
   def transform(stage, text, agent, ctx \\ %{}) do
     Enum.reduce(hooks_for(agent), {text, []}, fn {name, mod, settings}, {txt, entries} ->
       if stage in mod.stages() do
-        {new_txt, new_entries} =
-          case safe_run(mod, stage, txt, settings, ctx) do
-            {:ok, t} -> {t, []}
-            {:ok, t, e} -> {t, e}
-          end
-
-        Pepe.Trace.event({:hook, stage, name, new_txt != txt, length(new_entries)})
-        {new_txt, entries ++ new_entries}
+        apply_hook(stage, name, mod, settings, ctx, txt, entries)
       else
         {txt, entries}
       end
     end)
+  end
+
+  defp apply_hook(stage, name, mod, settings, ctx, txt, entries) do
+    {new_txt, new_entries} =
+      case safe_run(mod, stage, txt, settings, ctx) do
+        {:ok, t} -> {t, []}
+        {:ok, t, e} -> {t, e}
+      end
+
+    Pepe.Trace.event({:hook, stage, name, new_txt != txt, length(new_entries)})
+    {new_txt, entries ++ new_entries}
   end
 
   @doc "Restore real values into `text` from the reversible map (longest token first)."
@@ -65,6 +82,37 @@ defmodule Pepe.Hooks do
     |> Enum.reduce(text, fn e, acc ->
       String.replace(acc, e["fake"] || "", to_string(e["real"]))
     end)
+  end
+
+  @doc """
+  Start this process's `:tool_result` reversible-map accumulator, seeded with
+  `initial_entries` (typically the turn's already-known map: session history plus
+  this turn's inbound entries). Call once, before `Pepe.Agent.Runtime.run/3` - tool
+  calls made during the run (including nested ones, e.g. via `send_to_agent`, which
+  share this process) fold their own discoveries in via `add_entries/1`. Read the
+  result back with `take_map/0` once the run returns.
+  """
+  @spec start_map([map()]) :: :ok
+  def start_map(initial_entries \\ []) when is_list(initial_entries) do
+    Process.put(@map_key, initial_entries)
+    :ok
+  end
+
+  @doc "The accumulator's current entries (`[]` if `start_map/1` was never called)."
+  @spec current_map() :: [map()]
+  def current_map, do: Process.get(@map_key) || []
+
+  @doc "Append newly discovered entries to the accumulator. A no-op if none started."
+  @spec add_entries([map()]) :: :ok
+  def add_entries([]), do: :ok
+  def add_entries(entries) when is_list(entries), do: Process.put(@map_key, current_map() ++ entries)
+
+  @doc "Read the accumulator and clear it - call once, after the owning run completes."
+  @spec take_map() :: [map()]
+  def take_map do
+    map = current_map()
+    Process.delete(@map_key)
+    map
   end
 
   @doc "Does this agent run any hooks at all? (fast path: skip the pipeline if not.)"

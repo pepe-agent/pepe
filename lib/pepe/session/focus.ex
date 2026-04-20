@@ -5,7 +5,9 @@ defmodule Pepe.Session.Focus do
   keyed by session, so it survives a restart but is regenerable, not a source of truth.
 
   The `goal` and `update_plan` tools read and write this; surfaces (dashboard, CLI) can
-  read it to show what a session is working toward.
+  read it to show what a session is working toward. `Pepe.Agent.Session` also injects
+  `context_line/1` into every non-heartbeat turn, so the model doesn't have to call
+  `goal show`/`update_plan` itself just to stay oriented.
   """
 
   alias Pepe.Store
@@ -33,6 +35,41 @@ defmodule Pepe.Session.Focus do
 
   @doc "Clear the session's plan."
   def clear_plan(key) when is_binary(key), do: update(key, &Map.delete(&1, "plan"))
+
+  @max_line_chars 500
+
+  @doc """
+  A single bounded reminder line summarizing the goal and/or plan, or `nil` when
+  neither is set. Meant to be injected fresh into a turn's context and never
+  persisted into session history - see `Pepe.Agent.Session`'s goal_reminder/1 - so
+  it always reflects the *current* state and can't go stale or pile up across turns.
+  """
+  @spec context_line(String.t() | nil) :: String.t() | nil
+  def context_line(nil), do: nil
+
+  def context_line(key) do
+    case {get_goal(key), get_plan(key)} do
+      {nil, nil} -> nil
+      {goal, nil} -> clip("Goal: " <> goal_summary(goal))
+      {nil, plan} -> clip("Plan: " <> plan_summary(plan))
+      {goal, plan} -> clip("Goal: " <> goal_summary(goal) <> " | Plan: " <> plan_summary(plan))
+    end
+  end
+
+  defp goal_summary(goal), do: "#{goal["objective"]} (#{goal["status"] || "active"})"
+
+  defp plan_summary(plan) do
+    done = Enum.count(plan, &(&1["status"] == "done"))
+    current = Enum.find(plan, &(&1["status"] == "in_progress"))
+    now = if current, do: " - now: #{current["title"]}", else: ""
+    "#{done}/#{length(plan)} steps done#{now}"
+  end
+
+  defp clip(text) do
+    if String.length(text) > @max_line_chars,
+      do: String.slice(text, 0, @max_line_chars) <> "...",
+      else: text
+  end
 
   defp get(key), do: Store.get(@ns, key) || %{}
 

@@ -33,4 +33,42 @@ admin scope - see below).
 - **`["*"]`** -> every agent (an explicit super-admin).
 
 An agent can only `manage_agent` a target inside its `can_manage`. Authority defaults
-to closed. Grant it deliberately (CLI: `mix pepe agent manage ADMIN TARGET`).
+to closed. Grant it deliberately (CLI: `mix pepe agent manage ADMIN TARGET`). For the
+full admin-agent playbook, read `admin-agents.md`; for agent-to-agent routing read
+`routing.md`.
+
+## Complexity-based model routing (`triage_model` / `simple_model`)
+
+An agent can run its own model *most* of the time and drop to a cheaper one when a
+chat is clearly simple - saving cost without you thinking about it. Two optional
+fields turn it on:
+
+- **`triage_model`** - a configured model connection used to *classify* the first
+  message. It runs a fixed, Pepe-authored prompt ("reply with one word: SIMPLE or
+  COMPLEX") - not the agent, not the persona, nothing you configure.
+- **`simple_model`** - the connection to drop to when the verdict is SIMPLE.
+
+Both must be set - triage is skipped entirely if either is missing, since there'd be
+nowhere to switch to. Note the framing is a *downgrade*, not an upgrade: the agent's
+own `model` is treated as the good default, and SIMPLE downgrades away from it.
+
+How it behaves:
+
+- It only ever fires on a **session's first turn** - never again for the rest of that
+  session, and never when an explicit `/model` override is already in play (a manual
+  switch always wins).
+- A **SIMPLE** verdict downgrades this turn to `simple_model` **and makes it stick** -
+  every later turn in the session stays on the cheap model too.
+- **COMPLEX**, or **any triage failure** (unknown model, network error, or slower than
+  the ~6s timeout), just proceeds on the agent's own model unchanged. It is fail-open
+  by design: triage is a best-effort optimization and never blocks or delays a turn
+  beyond its short timeout.
+
+Configure it when creating the agent:
+
+```bash
+mix pepe agent add support --model gpt-4o --triage-model gpt-4o-mini --simple-model gpt-4o-mini
+```
+
+Here a cheap model both judges the message and answers it when the chat is simple,
+while anything needing real reasoning runs on `gpt-4o`.

@@ -140,9 +140,10 @@ um agente confuso ande em ciclo para sempre.
 
 Outras duas barreiras ficam à frente da chamada ao modelo. Um agente cujo modelo
 exige redação recusa-se a correr a menos que o agente tenha um hook de redação
-ativado, e uma empresa que atingiu o seu limite de gasto mensal para aqui sem novas
-chamadas ao modelo. Ambas falham o turno de forma limpa em vez de prosseguir em
-silêncio.
+ativado, e uma empresa que atingiu o seu limite de gasto mensal - ou o seu limite de
+mensagens de clientes por mês, um limite separado - para aqui sem novas chamadas ao
+modelo nem respostas. Ambas falham o turno de forma limpa em vez de prosseguir em
+silêncio; ver Faturação e limites para saber como configurar esses limites.
 
 <div class="note"><strong>Transmissão e eventos.</strong> À medida que o ciclo corre,
 emite eventos de ciclo de vida: um fragmento de texto transmitido

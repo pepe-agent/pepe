@@ -74,7 +74,7 @@ defmodule Pepe.Providers do
             token_url: "https://platform.claude.com/v1/oauth/token",
             client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
             redirect_uri: "http://localhost:53692/callback",
-            callback_port: 53692,
+            callback_port: 53_692,
             callback_path: "/callback",
             scope: "org:create_api_key user:profile user:inference",
             token_content_type: :json,

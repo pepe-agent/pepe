@@ -25,11 +25,11 @@ defmodule PepeWeb.LoginThrottle do
   `{:error, seconds_left}` when the window is exhausted.
   """
   def check(key) do
-    if not table?() do
+    if table?() do
+      do_check(key)
+    else
       # limiter not running (e.g. a one-shot CLI): fail open rather than crash.
       :ok
-    else
-      do_check(key)
     end
   end
 

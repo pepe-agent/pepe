@@ -6,7 +6,7 @@ import type { Locale } from "../i18n/ui";
 // same docs) can load just the one they need.
 export const docsNav: { group: string; slugs: string[] }[] = [
   { group: "start", slugs: ["index", "install", "quickstart"] },
-  { group: "configure", slugs: ["models", "agents", "config"] },
+  { group: "configure", slugs: ["models", "agents", "billing", "config"] },
   {
     group: "channels",
     slugs: ["channels", "telegram", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],

@@ -36,3 +36,16 @@ Se preferir fazer tudo manualmente, use as páginas de modelos, agentes e canais
 Os dois caminhos escrevem a mesma configuração.
 
 <div class="note"><strong>Os segredos ficam fora do arquivo.</strong> Quando o Pepe pede uma chave de API, ele aceita uma referência <code>${ENV_VAR}</code>, por exemplo <code>${OPENROUTER_API_KEY}</code>. O que é escrito em <code>~/.pepe/config.json</code> é a referência. O valor real é lido do seu ambiente em tempo de execução e nunca é guardado expandido.</div>
+
+## Desinstalar
+
+Remova o binário; apague também a pasta de configuração pra descartar todo
+modelo, agente e credencial que você configurou.
+
+```bash
+rm ~/.local/bin/pepe
+rm -rf ~/.pepe   # opcional - também descarta sua configuração
+```
+
+(`~/.local/bin` é a pasta padrão de instalação; se você sobrescreveu com
+`$PEPE_BIN_DIR`, é onde ele apontar.)

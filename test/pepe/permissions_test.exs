@@ -57,6 +57,22 @@ defmodule Pepe.PermissionsTest do
     assert_received :asked
   end
 
+  test "deny with a reason carries the reason through and is never remembered", %{agent: agent} do
+    ctx = %{agent: agent, session_key: "s1b", authorize: fn _, _, _ -> {:deny, "too risky right now"} end}
+    assert Permissions.gate("bash", "{}", ctx) == {:deny, "too risky right now"}
+    refute SessionStore.member?("s1b", "bash")
+  end
+
+  test "denied_message includes the reason when present, generic without one" do
+    generic = Permissions.denied_message("bash")
+    assert generic =~ "did not authorize running `bash`"
+    refute generic =~ "reason:"
+
+    with_reason = Permissions.denied_message("bash", "credentials aren't ready yet")
+    assert with_reason =~ "did not authorize running `bash`"
+    assert with_reason =~ "reason: credentials aren't ready yet"
+  end
+
   test "once allows this call only, remembers nothing", %{agent: agent} do
     ctx = %{agent: agent, session_key: "s2", authorize: fn _, _, _ -> :once end}
     assert Permissions.gate("bash", "{}", ctx) == :allow

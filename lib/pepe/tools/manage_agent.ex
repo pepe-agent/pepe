@@ -103,18 +103,16 @@ defmodule Pepe.Tools.ManageAgent do
   ###
 
   defp dispatch("create", target, args) do
-    cond do
-      Config.get_agent(target) ->
-        {:error, "agent #{target} already exists"}
+    if Config.get_agent(target) do
+      {:error, "agent #{target} already exists"}
+    else
+      Config.put_agent(%Agent{
+        name: target,
+        system_prompt: blank(args["value"]) || Agent.default_prompt(),
+        tools: []
+      })
 
-      true ->
-        Config.put_agent(%Agent{
-          name: target,
-          system_prompt: blank(args["value"]) || Agent.default_prompt(),
-          tools: []
-        })
-
-        {:ok, "Created agent #{target}. Set its persona, model and tools next."}
+      {:ok, "Created agent #{target}. Set its persona, model and tools next."}
     end
   end
 

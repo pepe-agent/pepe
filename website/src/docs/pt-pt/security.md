@@ -173,6 +173,8 @@ pepe agent add support \
   --hooks pii_redact
 ```
 
+Três pontos do fluxo são censurados: a mensagem de entrada do humano, **o resultado bruto de qualquer tool** (uma consulta à base de dados, a leitura de um ficheiro, uma pesquisa na web - qualquer coisa que uma tool traga, não só o que um humano escreveu), e a resposta de saída do agente. O resultado da tool é censurado antes de entrar na conversa e antes de ser gravado em disco - por isso um resultado grande que acabe guardado num ficheiro do workspace (ver Agentes) já sai gravado censurado, nunca em bruto. Pede "lista os 10 doentes mais recentes com diagnóstico cardíaco" contra a tua própria base de dados e, com `pii_redact` ativado, o modelo raciocina sobre `[PERSON_1]`, `[PERSON_2]`, ...; só a resposta final para ti recebe os nomes reais de volta.
+
 Vem quatro hooks de fábrica:
 
 - `pii_redact`: um censor de expressões regulares, offline e sem dependências. Substitui dados pessoais estruturados (correio eletrónico, número de cartão e documentos nacionais como o CPF ou o CNPJ) por um token estável como `[CPF_1]`. Por predefinição é reversível: regista `token -> real` para que o fluxo consiga restaurar o valor real na resposta à saída.
@@ -210,14 +212,7 @@ O painel web fica aberto em localhost por predefinição, o que é cómodo para 
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Podes passar uma palavra-passe literal ou uma referência `${ENV_VAR}` para que o segredo fique fora do ficheiro. Uma vez definida a palavra-passe, o painel exige iniciar sessão em `/login`. Limpa-a com `pepe dashboard password --clear`.
-
-A palavra-passe é lida de `dashboard.password` na configuração (interpolada), com recurso a variável de ambiente `PEPE_DASHBOARD_PASSWORD`. Duas definições relacionadas reforçam um painel servido atrás de um domínio:
-
-- `pepe dashboard hosts app.example.com,dash.example.com` define os valores adicionais do cabeçalho `Host` que o painel aceita. Isto serve também de lista de permissões contra o reataque de DNS (DNS rebinding).
-- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista os proxies inversos cujo cabeçalho `X-Forwarded-For` pode ser considerado fidedigno. Vazio por predefinição, o que significa que nenhum cabeçalho de encaminhamento é considerado fidedigno.
-
-Vinculado a uma interface pública sem palavra-passe, o painel fecha por predefinição e bloqueia os clientes remotos até definires uma.
+Vinculado a uma interface pública sem palavra-passe, o painel fecha por predefinição e bloqueia os clientes remotos até definires uma. Detalhes completos - a lista de permissões de `Host` e as definições de trusted-proxies para servir atrás de um domínio, e como o correr como serviço persistente - estão na página [Painel](../dashboard/).
 
 ## Tokens da API
 

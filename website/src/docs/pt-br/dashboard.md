@@ -5,6 +5,18 @@ description: Use a interface web local para inspecionar e gerenciar agentes, mod
 
 O painel é a interface web local iniciada por `pepe serve`. Use-o para conversar com agentes, inspecionar traces, gerenciar conexões de modelo, configurar canais, revisar tarefas agendadas e gerar tokens de API sem editar JSON à mão.
 
+## Mantendo ele no ar
+
+O `pepe serve` roda em primeiro plano - fechar o terminal ou sair da sessão para o processo, e o painel junto. Pra um deploy de verdade, instale como serviço persistente em segundo plano: launchd no macOS, systemd `--user` no Linux. Ele sobrevive a logout/reboot e reinicia sozinho se cair.
+
+```bash
+pepe serve install [--port 4000]
+pepe serve status
+pepe serve uninstall
+```
+
+Só funciona no binário `pepe` instalado, não em `mix pepe serve install`. Se suas conexões de modelo referenciam segredos `${ENV_VAR}`, o `install` lista quais são - o serviço sobe com um ambiente mínimo, então eles precisam ser adicionados à mão no arquivo gerado.
+
 ## Acesso ao painel
 
 O painel web fica aberto em localhost por padrão, o que é conveniente para o desenvolvimento local. No momento em que você o expõe além da sua máquina, coloque-o atrás de uma senha:

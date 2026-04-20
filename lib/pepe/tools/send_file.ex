@@ -44,8 +44,6 @@ defmodule Pepe.Tools.SendFile do
          {:ok, session} <- fetch_session(ctx),
          :ok <- deliver(session, full, caption) do
       {:ok, "Sent #{Path.basename(full)} to the conversation."}
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 

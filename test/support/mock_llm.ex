@@ -85,22 +85,10 @@ defmodule Pepe.Test.MockLLM do
       |> send_chunked(200)
 
     chunks =
-      cond do
-        tool_calls ->
-          [delta_chunk(%{"tool_calls" => tool_calls}), finish_chunk("tool_calls")]
-
-        true ->
-          words = String.split(content, " ")
-
-          word_chunks =
-            words
-            |> Enum.with_index()
-            |> Enum.map(fn {w, i} ->
-              text = if i == 0, do: w, else: " " <> w
-              delta_chunk(%{"content" => text})
-            end)
-
-          word_chunks ++ [finish_chunk("stop")]
+      if tool_calls do
+        [delta_chunk(%{"tool_calls" => tool_calls}), finish_chunk("tool_calls")]
+      else
+        content_chunks(content) ++ [finish_chunk("stop")]
       end
 
     Enum.each(chunks ++ ["data: [DONE]\n\n"], fn c ->
@@ -108,6 +96,16 @@ defmodule Pepe.Test.MockLLM do
     end)
 
     conn
+  end
+
+  defp content_chunks(content) do
+    content
+    |> String.split(" ")
+    |> Enum.with_index()
+    |> Enum.map(fn {w, i} ->
+      text = if i == 0, do: w, else: " " <> w
+      delta_chunk(%{"content" => text})
+    end)
   end
 
   defp delta_chunk(delta) do

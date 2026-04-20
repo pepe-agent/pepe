@@ -45,15 +45,24 @@ defmodule Pepe.Tools.SetRoute do
     to = args["to"]
     action = args["action"] || "allow"
 
+    case validate(from, to) do
+      :ok -> apply_action(action, from, to)
+      {:error, _} = err -> err
+    end
+  end
+
+  defp validate(from, to) do
     cond do
       is_nil(from) -> {:error, "no `from` agent (and none in context)"}
       not is_binary(to) -> {:error, "`to` is required"}
       is_nil(Config.get_agent(from)) -> {:error, "Unknown agent: #{from}"}
       is_nil(Config.get_agent(to)) -> {:error, "Unknown agent: #{to}"}
-      action == "deny" -> remove(from, to)
-      true -> add(from, to)
+      true -> :ok
     end
   end
+
+  defp apply_action("deny", from, to), do: remove(from, to)
+  defp apply_action(_action, from, to), do: add(from, to)
 
   defp add(from, to) do
     Config.allow_message(from, to)

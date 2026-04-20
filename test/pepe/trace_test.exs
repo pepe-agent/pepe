@@ -41,6 +41,19 @@ defmodule Pepe.TraceTest do
     assert kinds == ["tool_call", "tool_result", "assistant"]
   end
 
+  test "tool_denied carries the reason (or nil) through to the stored event" do
+    assert Trace.start("acme/bot", "api:456") == :started
+    Trace.event({:tool_denied, "bash", "too risky"})
+    Trace.event({:tool_denied, "write_file", nil})
+    id = Trace.finish({:ok, "done", []})
+
+    full = Trace.get("acme", id)
+    denied = Enum.filter(full["events"], &(&1["t"] == "tool_denied"))
+
+    assert %{"t" => "tool_denied", "name" => "bash", "reason" => "too risky"} in denied
+    assert %{"t" => "tool_denied", "name" => "write_file", "reason" => nil} in denied
+  end
+
   test "an error outcome is captured" do
     assert Trace.start("bot", nil) == :started
     Trace.finish({:error, :budget_exceeded})
@@ -97,7 +110,7 @@ defmodule Pepe.TraceTest do
     full = Trace.get("acme", id)
     names = for %{"t" => "tool_call", "name" => n} <- full["events"], do: n
     assert names == ["send_to_agent", "bash"]
-    assert length(Trace.recent("acme")) == 1
+    assert match?([_], Trace.recent("acme"))
   end
 
   test "streaming deltas are dropped from the trace" do

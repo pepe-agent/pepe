@@ -13,9 +13,17 @@ defmodule PepeWeb.Endpoint do
 
   # :uri lets the dashboard read back the host it's being accessed at (e.g. to
   # fill in a widget embed snippet with the real address, not a placeholder).
+  #
+  # check_origin is custom (not Phoenix's default of "same host as this server") so
+  # this socket allows exactly what PepeWeb.NetworkGuard already allowed through at
+  # the HTTP layer for the page itself - a loopback host, a `dashboard.allowed_hosts`
+  # entry, or (once a password is set) anything, which is what makes the dashboard's
+  # interactive features actually work behind a reverse proxy, a custom domain, or a
+  # `--tunnel` session (a fresh, unconfigurable *.trycloudflare.com host every time).
+  # Without this, the page loads but every LiveView feature on it silently breaks.
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [:uri, session: @session_options]],
-    longpoll: [connect_info: [:uri, session: @session_options]]
+    websocket: [connect_info: [:uri, session: @session_options], check_origin: {__MODULE__, :check_live_origin?, []}],
+    longpoll: [connect_info: [:uri, session: @session_options], check_origin: {__MODULE__, :check_live_origin?, []}]
 
   # Streaming agent conversations over WebSocket. `peer_data` gives the socket the
   # caller's address so it can allow loopback and refuse remote when no tokens exist.
@@ -76,4 +84,9 @@ defmodule PepeWeb.Endpoint do
     Process.put(:pepe_ws_request_origin, conn |> Plug.Conn.get_req_header("origin") |> List.first())
     super(conn, opts)
   end
+
+  @doc false
+  @spec check_live_origin?(URI.t()) :: boolean()
+  def check_live_origin?(%URI{host: nil}), do: false
+  def check_live_origin?(%URI{host: host}), do: PepeWeb.NetworkGuard.host_allowed?(host)
 end

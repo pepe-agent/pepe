@@ -63,6 +63,34 @@ teus bots com um distintivo ao vivo de ativo/inativo, permite-te adicionar um
 bot, editar com que agente ele fala e removê-lo. Grava a mesma configuração que a
 linha de comandos.</div>
 
+### Em grupos
+
+Num chat 1:1 o bot responde sempre. Adicionado a um grupo, por padrão só
+responde quando é @mencionado ou recebe um `/comando` - caso contrário,
+responderia a todas as mensagens num grupo movimentado. Desliga essa
+exigência por completo para um bot (em todos os grupos em que está) com
+`require_mention: false` durante o `pepe gateway telegram setup`.
+
+Para um único grupo, sem mexer na configuração do bot inteiro, corre:
+
+```text
+/mention off   # só neste grupo, até ao /new - não precisa de @menção para responder
+/mention on    # volta a exigir uma @menção
+/mention       # mostra a configuração atual
+```
+
+A dispensa vive na conversa desse grupo, não no bot, por isso nunca se
+propaga para nenhum outro grupo em que o mesmo bot esteja, e uma conversa
+nova (`/new`) esquece-a.
+
+Uma conversa de grupo é uma única sessão partilhada entre todos os que estão
+nela, sem identificar quem disse o quê - se o teu agente precisar de
+distinguir as pessoas, indica isso no prompt dele. O bot também é cego ao que
+não lhe é dirigido: uma mensagem que não o @menciona (e não está dispensada
+com `/mention off`) nunca chega ao agente, nem como contexto silencioso, por
+isso não consegue "pôr-se a par" do que se falou antes de ele ser trazido
+para a conversa.
+
 ### Muda de modelo a meio de uma conversa
 
 `/model` mostra o modelo ativo nesse chat, com um botão **Browse models**

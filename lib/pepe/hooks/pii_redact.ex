@@ -10,10 +10,10 @@ defmodule Pepe.Hooks.PiiRedact do
   alias Pepe.Hooks.PII.Recognizers
 
   @impl true
-  def stages, do: [:inbound]
+  def stages, do: [:inbound, :tool_result]
 
   @impl true
-  def run(:inbound, text, settings, _ctx) do
+  def run(stage, text, settings, _ctx) when stage in [:inbound, :tool_result] do
     reversible = Map.get(settings, "reversible", true)
 
     {redacted, entries, _counters} =

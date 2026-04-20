@@ -53,6 +53,15 @@ defmodule Pepe.Tools.SendToAgent do
     # A bare target resolves to a peer in the sender's own company.
     to = from_name && Company.qualify(to, from_name)
 
+    case authorize(from, from_name, to, chain) do
+      :ok -> deliver(to, from_name, message, chain, ctx)
+      {:error, _} = err -> err
+    end
+  end
+
+  def run(_args, _ctx), do: {:error, "send_to_agent needs `to` and `message`"}
+
+  defp authorize(from, from_name, to, chain) do
     cond do
       is_nil(from) ->
         {:error, "no calling agent in context"}
@@ -76,25 +85,32 @@ defmodule Pepe.Tools.SendToAgent do
         {:error, "Agent message chain too deep (max #{@max_hops})."}
 
       true ->
-        deliver(to, from_name, message, chain, ctx)
+        :ok
     end
   end
 
-  def run(_args, _ctx), do: {:error, "send_to_agent needs `to` and `message`"}
-
+  @spec deliver(String.t(), String.t() | nil, String.t(), [String.t()], map()) ::
+          {:ok, String.t()} | {:error, String.t()}
   defp deliver(to, from_name, message, chain, ctx) do
-    agent = Config.get_agent(to)
-    prompt = "Message from agent #{from_name}:\n\n#{message}"
+    # Re-checked here (not just by the `is_nil(Config.get_agent(to))` cond clause
+    # in run/2) so this function's own contract holds regardless of caller.
+    case Config.get_agent(to) do
+      nil ->
+        {:error, "Unknown agent: #{to}"}
 
-    opts = [
-      agent_chain: chain ++ [to],
-      authorize: ctx[:authorize],
-      session_key: ctx[:session_key]
-    ]
+      agent ->
+        prompt = "Message from agent #{from_name}:\n\n#{message}"
 
-    case Runtime.converse(agent, prompt, opts) do
-      {:ok, reply, _msgs} -> {:ok, "#{to} replied:\n#{reply}"}
-      {:error, reason} -> {:error, "#{to} could not reply: #{inspect(reason)}"}
+        opts = [
+          agent_chain: chain ++ [to],
+          authorize: ctx[:authorize],
+          session_key: ctx[:session_key]
+        ]
+
+        case Runtime.converse(agent, prompt, opts) do
+          {:ok, reply, _msgs} -> {:ok, "#{to} replied:\n#{reply}"}
+          {:error, reason} -> {:error, "#{to} could not reply: #{inspect(reason)}"}
+        end
     end
   end
 end

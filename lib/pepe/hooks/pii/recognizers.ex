@@ -17,17 +17,29 @@ defmodule Pepe.Hooks.PII.Recognizers do
         }
 
   # name => {regex, LABEL, validator | nil}
-  @builtin %{
-    "email" => {~r/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, "EMAIL", nil},
-    "ip" => {~r/\b(?:\d{1,3}\.){3}\d{1,3}\b/, "IP", nil},
-    "credit_card" => {~r/\b(?:\d[ -]*?){13,16}\b/, "CARD", :luhn},
-    "cpf" => {~r/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/, "CPF", :cpf},
-    "cnpj" => {~r|\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b|, "CNPJ", :cnpj},
-    "cep" => {~r/\b\d{5}-?\d{3}\b/, "CEP", nil},
-    "phone_br" => {~r/(?:\+?55\s?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s-]?\d{4}\b/, "PHONE", nil},
-    "ssn_us" => {~r/\b\d{3}-\d{2}-\d{4}\b/, "SSN", nil},
-    "phone_us" => {~r/(?:\+?1[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/, "PHONE", nil}
-  }
+  #
+  # A function, not a module attribute: OTP 28 changed compiled regexes to hold a
+  # NIF resource reference internally, which can no longer be "escaped" into a
+  # module attribute (baked into the compiled .beam as a literal) - only a small,
+  # fixed set of term shapes can be. Building the map at call time compiles these
+  # same ~9 small patterns fresh per call instead of once at compile time, which is
+  # negligible next to an actual redaction pass.
+  defp builtin_map do
+    %{
+      "email" => {~r/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, "EMAIL", nil},
+      "ip" => {~r/\b(?:\d{1,3}\.){3}\d{1,3}\b/, "IP", nil},
+      "credit_card" => {~r/\b(?:\d[ -]*?){13,16}\b/, "CARD", :luhn},
+      "cpf" => {~r/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/, "CPF", :cpf},
+      "cnpj" => {~r|\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b|, "CNPJ", :cnpj},
+      "cep" => {~r/\b\d{5}-?\d{3}\b/, "CEP", nil},
+      # Distinct labels (not both "PHONE") - if both packs are active at once, a
+      # shared label would interleave their counters (PHONE_1 = BR, PHONE_2 = US, ...),
+      # confusing but harmless; splitting them keeps [PHONE_BR_N]/[PHONE_US_N] honest.
+      "phone_br" => {~r/(?:\+?55\s?)?(?:\(?\d{2}\)?[\s-]?)?9?\d{4}[\s-]?\d{4}\b/, "PHONE_BR", nil},
+      "ssn_us" => {~r/\b\d{3}-\d{2}-\d{4}\b/, "SSN", nil},
+      "phone_us" => {~r/(?:\+?1[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/, "PHONE_US", nil}
+    }
+  end
 
   @packs %{
     "intl" => ["email", "credit_card", "ip"],
@@ -36,7 +48,7 @@ defmodule Pepe.Hooks.PII.Recognizers do
   }
 
   @doc "The built-in recognizer names."
-  def builtin_names, do: Map.keys(@builtin)
+  def builtin_names, do: Map.keys(builtin_map())
 
   @doc "The named packs (region bundles)."
   def packs, do: @packs
@@ -57,7 +69,7 @@ defmodule Pepe.Hooks.PII.Recognizers do
   end
 
   defp builtin(name) do
-    case Map.get(@builtin, name) do
+    case Map.get(builtin_map(), name) do
       {regex, label, validator} ->
         [%{name: name, regex: regex, label: label, validate: validator_fun(validator)}]
 
@@ -99,31 +111,30 @@ defmodule Pepe.Hooks.PII.Recognizers do
 
   def luhn?(s) do
     ds = digits(s)
+    Enum.count_until(ds, 13) == 13 and luhn_valid?(ds)
+  end
 
-    if length(ds) < 13 do
-      false
-    else
-      ds
-      |> Enum.reverse()
-      |> Enum.with_index()
-      |> Enum.map(fn {d, i} -> if rem(i, 2) == 1, do: double(d), else: d end)
-      |> Enum.sum()
-      |> rem(10) == 0
-    end
+  defp luhn_valid?(ds) do
+    ds
+    |> Enum.reverse()
+    |> Enum.with_index()
+    |> Enum.map(fn {d, i} -> if rem(i, 2) == 1, do: double(d), else: d end)
+    |> Enum.sum()
+    |> rem(10) == 0
   end
 
   defp double(d), do: (d * 2) |> then(&if(&1 > 9, do: &1 - 9, else: &1))
 
   def cpf?(s) do
     ds = digits(s)
-    length(ds) == 11 and not all_same?(ds) and check_digit(ds, 9, 10) and check_digit(ds, 10, 11)
+    Enum.count_until(ds, 12) == 11 and not all_same?(ds) and check_digit(ds, 9, 10) and check_digit(ds, 10, 11)
   end
 
   def cnpj?(s) do
     ds = digits(s)
     w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
     w2 = [6 | w1]
-    length(ds) == 14 and not all_same?(ds) and cnpj_digit(ds, w1, 12) and cnpj_digit(ds, w2, 13)
+    Enum.count_until(ds, 15) == 14 and not all_same?(ds) and cnpj_digit(ds, w1, 12) and cnpj_digit(ds, w2, 13)
   end
 
   defp all_same?([h | t]), do: Enum.all?(t, &(&1 == h))

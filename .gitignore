@@ -3,6 +3,7 @@
 
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
+*.coverdata
 
 # The directory Mix downloads your dependencies sources to.
 /deps/
@@ -28,14 +29,22 @@ pepe-*.tar
 # Ignore the escript binary (built via "mix escript.build").
 /pepe
 
-# Ignore any stray local Mnesia dir (the real store lives in ~/.pepe/data).
+# Ignore any stray local Mnesia dir/crash dump (the real store lives in ~/.pepe/data).
 /Mnesia.*
+MnesiaCore.*
 
 # Ignore assets that are produced by build tools.
 /priv/static/assets/
 
 # Ignore digested assets cache.
 /priv/static/cache_manifest.json
+
+# phx.digest also writes hashed copies of static/ root files (favicon, robots)
+# straight into priv/static/ - ignore those, keep the plain source files.
+/priv/static/favicon-*.ico
+/priv/static/robots-*.txt
+/priv/static/robots-*.txt.gz
+/priv/static/robots.txt.gz
 
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
@@ -54,3 +63,6 @@ arquivo_teste_aprovacao_*.txt
 
 # Local Playwright MCP output (screenshots/snapshots from browser-driven checks)
 /.playwright-mcp/
+
+# Dialyzer's cached PLT (rebuilt locally/in CI, not versioned).
+/priv/plts/

@@ -18,12 +18,13 @@ export const ui = {
     "nav.features": "Features",
     "nav.surfaces": "Surfaces",
     "nav.channels": "Channels",
+    "nav.security": "Security",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · self-hosted",
     "hero.title": 'The AI agent runtime<br/>you <span class="grad">run yourself</span>.',
     "hero.lead":
-      "Define agents, connect any OpenAI-compatible model, and let Pepe run the tool loop. Use the same agents from the CLI, HTTP, WebSocket, or chat channels. Self-hosted, no database, your keys.",
+      "Build a team of virtual employees that handles your inbox, answers customers, digs through your site's data, and runs your Google and Meta ad campaigns: practically anything you'd do yourself. It runs on your own server, with your own keys, under your control.",
     "hero.cta_start": "Get started →",
     "hero.cta_docs": "Read the docs",
 
@@ -43,9 +44,13 @@ export const ui = {
     "features.title": "The essentials for real agents",
     "features.sub":
       "Model access, tools, automation, plugins, and control in a small self-hosted runtime.",
+    "features.enlarge": "Enlarge image",
     "f.model.t": "Any model, with failover",
     "f.model.d":
       "Connect any OpenAI-compatible endpoint. Set a fallback chain that advances on transient errors.",
+    "f.routing.t": "Complexity-based routing",
+    "f.routing.d":
+      "A cheap classification call judges each new conversation. Simple questions downgrade automatically to a lighter model; full power stays for what actually needs it.",
     "f.efficient.t": "Lightweight by design",
     "f.efficient.d":
       "Elixir/OTP runs many supervised sessions with low memory and CPU overhead, keeping a team of agents inexpensive to host.",
@@ -62,11 +67,10 @@ export const ui = {
     "f.plugins.d":
       "Install a plugin, fill in its settings, and give agents new tools or channels right away.",
     "f.sandbox.t": "Control & safety",
-    "f.sandbox.d":
-      "Risky tools ask first. Runs are traced, command guardrails stay on, and optional companies isolate work.",
+    "f.sandbox.d": "Risky tools ask for approval first. Every run is traced, and command guardrails stay on by default.",
     "f.tenant.t": "Multi-tenant",
     "f.tenant.d":
-      "Optional companies isolate agents, models, channels, automations, usage, and billing.",
+      "Optional companies isolate agents, models, channels, and automations, with a per-tenant spend cap and message cap you can reset anytime.",
     "f.traces.t": "Traces & usage",
     "f.traces.d":
       "Every run records its trigger, tool calls, tokens, and cost. Open a trace to replay it step by step.",
@@ -77,6 +81,20 @@ export const ui = {
     "channels.title": "Meet people where they are",
     "channels.sub":
       "Connect a channel and the agent answers there. Files, handoff, and scoping are built in.",
+
+    "security.title": "Privacy by design",
+    "security.sub":
+      "Sensitive data is never sent to an external model in the clear, helping you meet requirements like LGPD, GDPR, and HIPAA.",
+    "security.1.t": "Message arrives",
+    "security.1.d": "Reaches your Pepe first",
+    "security.2.t": "Becomes a token",
+    "security.2.d": "PII swapped before it leaves",
+    "security.3.t": "Answers blind",
+    "security.3.d": "Never sees the real values",
+    "security.4.t": "Pepe restores it",
+    "security.4.d": "Restored in your reply",
+    "security.example.field": "SSN",
+    "security.example.value": "123-45-6789",
 
     "widget.title": "Or drop it straight on your site",
     "widget.body":
@@ -146,12 +164,13 @@ export const ui = {
     "nav.features": "Características",
     "nav.surfaces": "Superficies",
     "nav.channels": "Canales",
+    "nav.security": "Seguridad",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · autoalojado",
     "hero.title": 'El runtime de agentes IA<br/>que <span class="grad">ejecutas tú mismo</span>.',
     "hero.lead":
-      "Define agentes, conecta cualquier modelo compatible con OpenAI y deja que Pepe ejecute el bucle de herramientas. Usa los mismos agentes desde la CLI, HTTP, WebSocket o canales de chat. Autoalojado, sin base de datos, con tus claves.",
+      "Monta un equipo de empleados virtuales que gestiona tu correo, atiende a tus clientes, analiza los datos de tu sitio y lleva tus campañas en Google y Meta: prácticamente todo lo que harías tú mismo. Corre en tu propio servidor, con tus propias claves, bajo tu control.",
     "hero.cta_start": "Empezar →",
     "hero.cta_docs": "Leer la documentación",
 
@@ -171,9 +190,13 @@ export const ui = {
     "features.title": "Lo esencial para ejecutar agentes",
     "features.sub":
       "Modelos, herramientas, automatización, plugins y control en un runtime pequeño y autoalojado.",
+    "features.enlarge": "Ampliar imagen",
     "f.model.t": "Cualquier modelo, con failover",
     "f.model.d":
       "Conecta cualquier endpoint compatible con OpenAI. Define una cadena de respaldo que avanza ante errores transitorios.",
+    "f.routing.t": "Enrutamiento por complejidad",
+    "f.routing.d":
+      "Una llamada de clasificación barata evalúa cada conversación nueva. Las preguntas simples bajan de forma automática a un modelo más ligero; toda la potencia queda para lo que de verdad la necesita.",
     "f.efficient.t": "Ligero por diseño",
     "f.efficient.d":
       "Elixir/OTP ejecuta muchas sesiones supervisadas con bajo consumo de memoria y CPU, así que alojar un equipo de agentes exige menos infraestructura.",
@@ -190,11 +213,10 @@ export const ui = {
     "f.plugins.d":
       "Instala un plugin, completa su configuración y da a los agentes nuevas herramientas o canales al instante.",
     "f.sandbox.t": "Control y seguridad",
-    "f.sandbox.d":
-      "Las herramientas riesgosas preguntan primero. Las ejecuciones quedan trazadas, las protecciones siguen activas y las empresas opcionales aíslan el trabajo.",
+    "f.sandbox.d": "Las herramientas riesgosas piden aprobación primero. Cada ejecución queda trazada, con las protecciones de comandos siempre activas.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Las empresas opcionales aíslan agentes, modelos, canales, automatizaciones, uso y facturación.",
+      "Las empresas opcionales aíslan agentes, modelos, canales y automatizaciones, con un tope de gasto y un tope de mensajes por empresa que puedes reiniciar cuando quieras.",
     "f.traces.t": "Trazas y uso",
     "f.traces.d":
       "Cada ejecución registra disparador, herramientas, tokens y coste. Abre una traza para reproducirla paso a paso.",
@@ -205,6 +227,20 @@ export const ui = {
     "channels.title": "Conecta con las personas donde estén",
     "channels.sub":
       "Conecta un canal y el agente responde allí. Archivos, traspaso y alcance vienen incluidos.",
+
+    "security.title": "Privacidad por diseño",
+    "security.sub":
+      "Los datos sensibles nunca se envían en claro a un modelo externo, lo que te ayuda a cumplir exigencias como la LGPD, el GDPR y la HIPAA.",
+    "security.1.t": "El mensaje llega",
+    "security.1.d": "Llega primero a tu Pepe",
+    "security.2.t": "Se vuelve un token",
+    "security.2.d": "El dato se sustituye antes de salir",
+    "security.3.t": "Responde a ciegas",
+    "security.3.d": "Nunca ve el valor real",
+    "security.4.t": "Pepe lo restaura",
+    "security.4.d": "Restaurado en tu respuesta",
+    "security.example.field": "DNI",
+    "security.example.value": "12345678A",
 
     "widget.title": "O colócalo directo en tu sitio",
     "widget.body":
@@ -274,12 +310,13 @@ export const ui = {
     "nav.features": "Recursos",
     "nav.surfaces": "Superfícies",
     "nav.channels": "Canais",
+    "nav.security": "Segurança",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · auto-hospedado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">você mesmo executa</span>.',
     "hero.lead":
-      "Defina agentes, conecte qualquer modelo compatível com OpenAI e deixe o Pepe rodar o loop de ferramentas. Use os mesmos agentes pela CLI, HTTP, WebSocket ou canais de chat. Auto-hospedado, sem banco de dados, com suas chaves.",
+      "Monte uma equipe de funcionários virtuais que cuida do e-mail, atende clientes, analisa os dados do seu site e toca campanhas no Google e no Meta: praticamente tudo que você faria. Fica no seu servidor, com suas chaves, sob seu controle.",
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
@@ -299,9 +336,13 @@ export const ui = {
     "features.title": "O essencial para rodar agentes",
     "features.sub":
       "Modelos, ferramentas, automação, plugins e controle em um runtime pequeno e auto-hospedado.",
+    "features.enlarge": "Ampliar imagem",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
       "Conecte qualquer endpoint compatível com OpenAI. Defina uma cadeia de fallback que avança em erros transitórios.",
+    "f.routing.t": "Roteamento por complexidade",
+    "f.routing.d":
+      "Uma chamada de classificação barata avalia cada conversa nova. Pergunta simples desce sozinha pra um modelo mais leve; a força total fica reservada pro que realmente precisa dela.",
     "f.efficient.t": "Leve por design",
     "f.efficient.d":
       "Elixir/OTP roda muitas sessões supervisionadas com baixo consumo de memória e CPU, então hospedar uma equipe de agentes exige menos infraestrutura.",
@@ -318,11 +359,10 @@ export const ui = {
     "f.plugins.d":
       "Instale um plugin, preencha a configuração e dê aos agentes novas ferramentas ou canais na hora.",
     "f.sandbox.t": "Controle e segurança",
-    "f.sandbox.d":
-      "Ferramentas arriscadas perguntam primeiro. Execuções ficam rastreadas, proteções seguem ligadas e empresas opcionais isolam o trabalho.",
+    "f.sandbox.d": "Ferramentas arriscadas pedem aprovação antes. Toda execução fica rastreada, com proteções de comando sempre ligadas.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Empresas opcionais isolam agentes, modelos, canais, automações, uso e cobrança.",
+      "Empresas opcionais isolam agentes, modelos, canais e automações, com um teto de gasto e um teto de mensagens por empresa que você pode resetar quando quiser.",
     "f.traces.t": "Traces e uso",
     "f.traces.d":
       "Cada execução registra gatilho, ferramentas, tokens e custo. Abra um trace para rever passo a passo.",
@@ -333,6 +373,20 @@ export const ui = {
     "channels.title": "Conecte-se com as pessoas onde elas estiverem",
     "channels.sub":
       "Conecte um canal e o agente responde por lá. Arquivos, handoff e escopo vêm prontos.",
+
+    "security.title": "Privacidade desde o design",
+    "security.sub":
+      "Dado sensível nunca é enviado em claro pra um modelo externo, o que ajuda a atender exigências como LGPD, GDPR e HIPAA.",
+    "security.1.t": "A mensagem chega",
+    "security.1.d": "Chega primeiro no seu Pepe",
+    "security.2.t": "Vira um token",
+    "security.2.d": "Dado é trocado antes de sair",
+    "security.3.t": "Responde às cegas",
+    "security.3.d": "Nunca vê o valor real",
+    "security.4.t": "O Pepe restaura",
+    "security.4.d": "Restaurado na sua resposta",
+    "security.example.field": "CPF",
+    "security.example.value": "123.456.789-00",
 
     "widget.title": "Ou coloque direto no seu site",
     "widget.body":
@@ -377,7 +431,7 @@ export const ui = {
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
     "why.title": "Por que \"Pepe\"?",
-    "why.body": "O nome pisca o olho para o universo do Chespirito, querido em toda a América Latina. A piada do Pepe era simples: ele fazia exatamente o que mandavam. Sem discutir, sem inventar moda. Um bom resumo para um runtime de agentes.",
+    "why.body": "O nome é uma referência ao universo do Chespirito, querido em toda a América Latina. A piada do Pepe era simples: ele fazia exatamente o que mandavam. Sem discutir, sem inventar moda. Um bom resumo para um runtime de agentes.",
 
     "foot.tagline":
       "Um runtime de agentes de IA em Elixir/OTP. Auto-hospedado, agnóstico de modelo, sem banco de dados. Sem afiliação a qualquer fornecedor de modelos.",
@@ -402,12 +456,13 @@ export const ui = {
     "nav.features": "Funcionalidades",
     "nav.surfaces": "Superfícies",
     "nav.channels": "Canais",
+    "nav.security": "Segurança",
     "nav.docs": "Docs",
 
     "hero.eyebrow": "Elixir / OTP · auto-alojado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">executas tu próprio</span>.',
     "hero.lead":
-      "Define agentes, liga qualquer modelo compatível com OpenAI e deixa o Pepe correr o ciclo de ferramentas. Usa os mesmos agentes pela CLI, HTTP, WebSocket ou canais de chat. Autoalojado, sem base de dados, com as tuas chaves.",
+      "Monta uma equipa de funcionários virtuais que trata do teu email, atende clientes, analisa os dados do teu site e gere campanhas no Google e no Meta: praticamente tudo o que tu farias. Corre no teu próprio servidor, com as tuas chaves, sob o teu controlo.",
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
@@ -427,9 +482,13 @@ export const ui = {
     "features.title": "O essencial para correr agentes",
     "features.sub":
       "Modelos, ferramentas, automação, plugins e controlo num runtime pequeno e auto-alojado.",
+    "features.enlarge": "Ampliar imagem",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
       "Liga qualquer endpoint compatível com OpenAI. Define uma cadeia de recurso que avança em erros transitórios.",
+    "f.routing.t": "Encaminhamento por complexidade",
+    "f.routing.d":
+      "Uma chamada de classificação barata avalia cada conversa nova. Perguntas simples descem sozinhas para um modelo mais leve; a força toda fica reservada para o que precisa mesmo dela.",
     "f.efficient.t": "Leve por desenho",
     "f.efficient.d":
       "Elixir/OTP corre muitas sessões supervisionadas com baixo consumo de memória e CPU, por isso alojar uma equipa de agentes exige menos infraestrutura.",
@@ -446,11 +505,10 @@ export const ui = {
     "f.plugins.d":
       "Instala um plugin, preenche a configuração e dá aos agentes novas ferramentas ou canais de imediato.",
     "f.sandbox.t": "Controlo e segurança",
-    "f.sandbox.d":
-      "Ferramentas arriscadas perguntam primeiro. Execuções ficam rastreadas, proteções continuam ligadas e empresas opcionais isolam o trabalho.",
+    "f.sandbox.d": "Ferramentas arriscadas pedem aprovação antes. Toda execução fica rastreada, com proteções de comando sempre ligadas.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Empresas opcionais isolam agentes, modelos, canais, automações, utilização e faturação.",
+      "Empresas opcionais isolam agentes, modelos, canais e automações, com um limite de despesa e um limite de mensagens por empresa que pode repor quando quiser.",
     "f.traces.t": "Traces e utilização",
     "f.traces.d":
       "Cada execução regista o gatilho, ferramentas, tokens e custo. Abre um trace para rever passo a passo.",
@@ -461,6 +519,20 @@ export const ui = {
     "channels.title": "Liga-te às pessoas onde elas estiverem",
     "channels.sub":
       "Liga um canal e o agente responde por lá. Ficheiros, transferência e âmbito vêm prontos.",
+
+    "security.title": "Privacidade desde a conceção",
+    "security.sub":
+      "Dados sensíveis nunca são enviados em claro para um modelo externo, o que ajuda a cumprir exigências como o RGPD, a LGPD e a HIPAA.",
+    "security.1.t": "A mensagem chega",
+    "security.1.d": "Chega primeiro ao teu Pepe",
+    "security.2.t": "Vira um token",
+    "security.2.d": "O dado é trocado antes de sair",
+    "security.3.t": "Responde às cegas",
+    "security.3.d": "Nunca vê o valor real",
+    "security.4.t": "O Pepe restaura-o",
+    "security.4.d": "Restaurado na tua resposta",
+    "security.example.field": "NIF",
+    "security.example.value": "123 456 789",
 
     "widget.title": "Ou coloca-o direto no teu site",
     "widget.body":

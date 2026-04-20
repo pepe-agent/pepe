@@ -47,7 +47,7 @@ defmodule Pepe.MCPTest do
     assert name == "mcp__#{server}__find_organizations"
 
     all = MCP.specs_for(["mcp__#{server}__*"])
-    assert length(all) == 2
+    assert match?([_, _], all)
   end
 
   test "read-only scoping: only listed tools get specs (mutating one excluded)", %{server: server} do

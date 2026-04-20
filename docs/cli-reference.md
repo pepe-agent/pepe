@@ -18,7 +18,7 @@ mix pepe model add openai            # guided: pick provider -> auth method -> m
 mix pepe model add openrouter \
   --base-url https://openrouter.ai/api/v1 \
   --api-key '${OPENROUTER_API_KEY}' \
-  --model anthropic/claude-3.5-sonnet --default      # fully manual
+  --model openai/gpt-5-chat --default      # fully manual
 mix pepe model providers             # list known providers (OpenAI, Anthropic, Gemini, ...)
 mix pepe model models --base-url https://api.openai.com/v1 --api-key '${OPENAI_API_KEY}'
 mix pepe model list                  # list saved connections
@@ -89,7 +89,17 @@ mix pepe run assistant "hello"                                 # pick an agent e
 mix pepe tui                         # interactive console, keeps the session
 mix pepe tui --agent zak             # ...with a specific agent (or: mix pepe tui zak)
 mix pepe serve --port 4000           # OpenAI-compatible HTTP API + WebSocket
+pepe serve install [--port 4000]     # install as a persistent background service
+pepe serve status                    # is the service installed/running?
+pepe serve uninstall                 # stop and remove it
 ```
+
+`serve install` registers `pepe serve` with launchd (macOS) or systemd `--user`
+(Linux) so it survives logout/reboot and restarts itself if it crashes - only
+works from the installed `pepe` binary, not `mix pepe serve install` (it needs
+a stable path to point the service at). `${ENV_VAR}` secrets referenced in your
+config aren't inherited by the service's environment automatically; `install`
+lists them so you can add them to the generated unit/plist by hand.
 
 `tui` (alias: `chat`) opens a session-backed console - it keeps context across
 turns and prints a summary box (agent · model · session) on open. The same slash

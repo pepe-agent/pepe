@@ -55,18 +55,36 @@ defmodule Pepe.Usage do
 
   def record(_agent, _model, _usage), do: :ok
 
-  @doc "Billable spend (in the billing currency) for `company` in the current month."
+  @doc """
+  Billable spend (in the billing currency) for `company` in the current month, since
+  the later of: the month's start, or its last `reset_budget/1` call (if any fell
+  within it). This is what the pre-flight budget gate and the dashboard badge use -
+  `Pepe.Usage.Invoice`/`summary/3` read the ledger directly and are never affected
+  by a reset, so the real accounting record stays intact.
+  """
   @spec month_to_date(String.t() | nil) :: float()
   def month_to_date(company) do
     tz = Config.default_timezone()
     key = bucket_key(System.os_time(:second), :month, tz)
+    reset_at = Config.company_budget_reset_at(company)
     cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
 
-    company
-    |> Log.entries()
-    |> Enum.filter(&(bucket_key(&1["at"], :month, tz) == key))
-    |> Enum.reduce(0.0, fn e, acc -> acc + price(e, models, cache)["billable"] end)
+    # Strictly-after (not >=): entries only have second resolution, and
+    # reset_budget/1 can't record its own position in the ledger (it's stored on
+    # the company, not appended as a marker) - a usage record and a reset landing
+    # in the same wall-clock second must resolve as "recorded before the reset",
+    # never the reverse, or the reset would look like it silently did nothing.
+    entries =
+      company
+      |> Log.entries()
+      |> Enum.filter(fn e ->
+        bucket_key(e["at"], :month, tz) == key and (is_nil(reset_at) or e["at"] > reset_at)
+      end)
+
+    prices = price_lookup(entries, models, cache)
+    markups = markup_lookup(entries)
+    Enum.reduce(entries, 0.0, fn e, acc -> acc + price(e, prices, markups)["billable"] end)
   end
 
   @doc """
@@ -78,6 +96,43 @@ defmodule Pepe.Usage do
     case Config.company_budget(company) do
       nil -> false
       budget -> month_to_date(company) >= budget
+    end
+  end
+
+  @doc "Reset `company`'s budget counter early, before the natural month boundary."
+  @spec reset_budget(String.t() | nil) :: :ok | {:error, :not_found}
+  def reset_budget(company), do: Config.reset_company_budget(company)
+
+  @doc "Unix timestamp of `company`'s last budget reset, or `nil` if it's never been reset."
+  @spec budget_reset_at(String.t() | nil) :: integer() | nil
+  def budget_reset_at(company), do: Config.company_budget_reset_at(company)
+
+  @doc "Unix timestamp of `company`'s last message-count reset this month, or `nil`."
+  @spec messages_reset_at(String.t() | nil) :: integer() | nil
+  def messages_reset_at(company), do: Pepe.Usage.Messages.last_reset_at(company)
+
+  @doc "Record one customer-originated message against `company`'s monthly counter."
+  @spec record_message(String.t() | nil) :: :ok
+  def record_message(company), do: Pepe.Usage.Messages.record(company)
+
+  @doc "How many customer messages `company` has been recorded for this month."
+  @spec message_count_month_to_date(String.t() | nil) :: non_neg_integer()
+  def message_count_month_to_date(company), do: Pepe.Usage.Messages.month_to_date(company)
+
+  @doc "Reset `company`'s message counter early, before the natural month boundary."
+  @spec reset_messages(String.t() | nil) :: :ok
+  def reset_messages(company), do: Pepe.Usage.Messages.reset(company)
+
+  @doc """
+  Is `company` at or over its monthly customer-message cap? Always `false` when no
+  cap is set (see `Pepe.Config.company_message_limit/1`). Independent of
+  `over_budget?/1` - a company can have either, both, or neither cap.
+  """
+  @spec over_message_limit?(String.t() | nil) :: boolean()
+  def over_message_limit?(company) do
+    case Config.company_message_limit(company) do
+      nil -> false
+      limit -> message_count_month_to_date(company) >= limit
     end
   end
 
@@ -96,11 +151,16 @@ defmodule Pepe.Usage do
     tz = opts[:tz] || Config.default_timezone()
     limit = opts[:limit] || 60
 
-    # Load the live price cache and every model's manual price once, up front, so
-    # pricing thousands of ledger entries never touches disk per row.
+    # Load the live price cache and every model's manual price once, up front, and
+    # resolve price/markup per distinct model/company (not per row - see
+    # price_lookup/3), so pricing thousands of ledger entries never touches disk or
+    # rescans the price book per row.
     cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
-    priced = scope |> load_entries() |> Enum.map(&price(&1, models, cache))
+    entries = load_entries(scope)
+    prices = price_lookup(entries, models, cache)
+    markups = markup_lookup(entries)
+    priced = Enum.map(entries, &price(&1, prices, markups))
 
     buckets =
       priced
@@ -134,11 +194,14 @@ defmodule Pepe.Usage do
     cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
 
-    entries =
+    raw_entries =
       company
       |> Log.entries()
       |> Enum.filter(fn e -> is_integer(e["at"]) and e["at"] >= from and e["at"] < to end)
-      |> Enum.map(&price(&1, models, cache))
+
+    prices = price_lookup(raw_entries, models, cache)
+    markups = markup_lookup(raw_entries)
+    entries = Enum.map(raw_entries, &price(&1, prices, markups))
 
     line_items =
       entries
@@ -198,11 +261,28 @@ defmodule Pepe.Usage do
   defp load_entries(scope) when scope in [:all, "all"], do: Log.entries_for(:all)
   defp load_entries(scope), do: Log.entries(scope)
 
-  # Decorate an entry with cost (provider) and billable (cost × company markup).
-  defp price(e, models, cache) do
-    {ip, op} = price_for(e["model"], models, cache)
+  # {model name => {input_price, output_price}} for just the distinct models present
+  # in `entries`, resolved once - a ledger has thousands of rows but usually a
+  # handful of distinct models, and price_for/3's cache-miss fallback does an O(cache
+  # size) scan, so re-resolving per row (not per distinct model) made pricing a
+  # month of usage scale with row count × price-book size instead of just row count.
+  defp price_lookup(entries, models, cache) do
+    entries |> Enum.map(& &1["model"]) |> Enum.uniq() |> Map.new(&{&1, price_for(&1, models, cache)})
+  end
+
+  # {company => markup} for just the distinct companies present in `entries`, same
+  # reasoning as price_lookup/3 (a handful of distinct companies, not one lookup
+  # per row).
+  defp markup_lookup(entries) do
+    entries |> Enum.map(& &1["company"]) |> Enum.uniq() |> Map.new(&{&1, Config.company_markup(nil_scope(&1))})
+  end
+
+  # Decorate an entry with cost (provider) and billable (cost × company markup),
+  # from the lookup tables built by price_lookup/3 and markup_lookup/1.
+  defp price(e, prices, markups) do
+    {ip, op} = Map.fetch!(prices, e["model"])
     cost = Pricing.cost(e["in"], e["out"], ip, op)
-    markup = Config.company_markup(nil_scope(e["company"]))
+    markup = Map.fetch!(markups, e["company"])
 
     e
     |> Map.put("cost", cost)

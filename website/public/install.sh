@@ -5,13 +5,13 @@
 #     curl -fsSL https://pepe-agent.com/install.sh | sh
 #
 # Overrides (env vars):
-#   PEPE_REPO      GitHub repo to pull from      (default jhonathas/pepe)
+#   PEPE_REPO      GitHub repo to pull from      (default pepe-agent/pepe)
 #   PEPE_VERSION   release tag to install         (default latest)
 #   PEPE_BIN_DIR   where to place the binary       (default ~/.local/bin)
 
 set -eu
 
-REPO="${PEPE_REPO:-jhonathas/pepe}"
+REPO="${PEPE_REPO:-pepe-agent/pepe}"
 VERSION="${PEPE_VERSION:-latest}"
 BIN_DIR="${PEPE_BIN_DIR:-$HOME/.local/bin}"
 
@@ -66,15 +66,40 @@ chmod +x "$tmp"
 mv "$tmp" "$BIN_DIR/pepe"
 ok "Installed pepe to $BIN_DIR/pepe"
 
-# Nudge the user if the install dir is not on their PATH.
+# If the install dir isn't on PATH, prepend it to whichever shell rc files
+# exist (so new shells pick it up automatically), falling back to creating
+# ~/.bashrc if neither is present.
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
   *)
+    path_line="export PATH=\"$BIN_DIR:\$PATH\""
+    written=""
+    first_rc=""
+    for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+      if [ -f "$rc" ]; then
+        if ! grep -qxF "$path_line" "$rc" 2>/dev/null; then
+          rc_tmp="$(mktemp)"
+          { printf '%s\n' "$path_line"; cat "$rc"; } >"$rc_tmp"
+          mv "$rc_tmp" "$rc"
+        fi
+        written="$written $rc"
+        [ -z "$first_rc" ] && first_rc="$rc"
+      fi
+    done
+    if [ -z "$written" ]; then
+      printf '%s\n' "$path_line" >>"$HOME/.bashrc"
+      written=" $HOME/.bashrc"
+      first_rc="$HOME/.bashrc"
+    fi
+
     echo
-    info "Add $BIN_DIR to your PATH, e.g.:"
-    echo "  echo 'export PATH=\"$BIN_DIR:\$PATH\"' >> ~/.profile && . ~/.profile"
+    ok "Added $BIN_DIR to PATH in:$written"
+    echo
+    info "Open a new terminal, or run:  . $first_rc"
     ;;
 esac
 
 echo
 ok "Done. Next:  pepe setup"
+echo
+info "Uninstall anytime:  rm $BIN_DIR/pepe   (and rm -rf ~/.pepe to also drop your config)"
