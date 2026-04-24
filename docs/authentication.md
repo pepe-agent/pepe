@@ -80,6 +80,25 @@ Two safe options:
    just work with no password; a VM accessed across its virtual network looks remote and
    is blocked, so port-forward it to `localhost`.
 
+   The quick tunnel's URL is random and changes every run. For a **stable URL you
+   choose**, use a named tunnel:
+
+   ```bash
+   # Headless (best on a server): create the tunnel + hostname in the Cloudflare
+   # Zero Trust dashboard, point its service at http://localhost:4000, copy the token.
+   CLOUDFLARE_TUNNEL_TOKEN=eyJ... mix pepe serve --tunnel \
+     --token '${CLOUDFLARE_TUNNEL_TOKEN}' --hostname pepe.example.com
+
+   # Or via a one-time browser login (stores a cert.pem), no token:
+   cloudflared tunnel login
+   mix pepe serve --tunnel --hostname pepe.example.com
+   ```
+
+   With `--token`, the public hostname and its service mapping live in the Cloudflare
+   dashboard; `--hostname` is optional there, used only to print the URL at startup. The
+   token is a secret, so pass it as a `${ENV_VAR}` reference. Either way the URL is public,
+   so keep a dashboard password on.
+
 ### Serving behind a domain or a reverse proxy
 
 Two optional settings make a real deployment behave correctly:

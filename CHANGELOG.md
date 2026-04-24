@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-24
+
+### Added
+- Tunnel: `pepe serve --tunnel` can now open a named Cloudflare tunnel with a stable URL you choose, via `--token <TOKEN>` (headless) or `--hostname <HOST>` (after `cloudflared tunnel login`); with no options it stays a random quick tunnel.
+
+### Changed
+- Dashboard: clearer pt-PT label for the monthly-usage reset button ("repor" is now "reiniciar").
+- Website: homepage feature grid expanded to nine cards (added spend & message caps and learning & memory) and reordered from simplest to most advanced.
+
 ## [0.1.0] - 2026-04-20
 
 First public release.
@@ -87,5 +96,6 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/pepe-agent/pepe/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pepe-agent/pepe/releases/tag/v0.1.0

@@ -28,6 +28,28 @@ defmodule Pepe.TunnelTest do
     end
   end
 
+  describe "cloudflared_args/3 (tunnel mode)" do
+    test "quick tunnel: just --url to the local port" do
+      assert Tunnel.cloudflared_args(4000, nil, nil) ==
+               ["tunnel", "--no-autoupdate", "--loglevel", "info", "--url", "http://localhost:4000"]
+    end
+
+    test "login/cert.pem named tunnel: --hostname bound to the local --url" do
+      assert Tunnel.cloudflared_args(4000, nil, "pepe.example.com") ==
+               ["tunnel", "--no-autoupdate", "--loglevel", "info", "--hostname", "pepe.example.com", "--url", "http://localhost:4000"]
+    end
+
+    test "token named tunnel: `run --token`, no local --url (routing is dashboard-side)" do
+      assert Tunnel.cloudflared_args(4000, "tok123", nil) ==
+               ["tunnel", "--no-autoupdate", "--loglevel", "info", "run", "--token", "tok123"]
+    end
+
+    test "token wins over hostname for the connection (hostname is display-only)" do
+      assert Tunnel.cloudflared_args(4000, "tok123", "pepe.example.com") ==
+               ["tunnel", "--no-autoupdate", "--loglevel", "info", "run", "--token", "tok123"]
+    end
+  end
+
   describe "truncate/2" do
     test "leaves a binary shorter than max untouched" do
       assert Tunnel.truncate("hello", 100) == "hello"

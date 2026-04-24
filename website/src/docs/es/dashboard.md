@@ -33,3 +33,28 @@ La contraseña se lee de `dashboard.password` en la configuración (interpolada)
 - `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista los proxies inversos cuyo encabezado `X-Forwarded-For` puede considerarse confiable. Vacío por defecto, lo que significa que no se confía en ningún encabezado de reenvío.
 
 Vinculado a una interfaz pública sin contraseña, el panel se cierra por defecto y bloquea a los clientes remotos hasta que definas una.
+
+## Acceso remoto
+
+Para llegar al panel o a la API desde fuera de tu máquina sin abrir un puerto ni montar un proxy inverso, `pepe serve` puede abrir un túnel de [Cloudflare](https://www.cloudflare.com/) (necesita `cloudflared` instalado):
+
+```bash
+pepe serve --tunnel
+```
+
+Es un **túnel rápido**: imprime una URL aleatoria `https://<algo>.trycloudflare.com` que solo dura mientras corre el proceso y cambia cada vez. No hace falta cuenta de Cloudflare.
+
+Para una **URL fija que tú eliges** en tu propio dominio, usa un túnel con nombre. Dos formas:
+
+```bash
+# Sin navegador (ideal en un servidor): crea el túnel y su hostname público en el
+# panel de Cloudflare Zero Trust, apunta su servicio a http://localhost:4000,
+# copia el token del conector y luego:
+pepe serve --tunnel --token '${CLOUDFLARE_TUNNEL_TOKEN}' --hostname pepe.example.com
+
+# O con un inicio de sesión único en el navegador (guarda un cert.pem), sin token:
+cloudflared tunnel login
+pepe serve --tunnel --hostname pepe.example.com
+```
+
+Con `--token`, el hostname y su mapeo de servicio viven en el panel de Cloudflare; ahí `--hostname` es opcional, solo para imprimir la URL al arrancar. El token es un secreto, así que pásalo como referencia `${ENV_VAR}`. Una petición por el túnel siempre se trata como pública, así que define una contraseña del panel antes de depender de cualquiera de estos modos.

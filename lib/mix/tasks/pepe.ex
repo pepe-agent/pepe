@@ -2144,11 +2144,18 @@ defmodule Mix.Tasks.Pepe do
       serve uninstall                       stop and remove the service
       serve status                          is the service installed/running?
 
-    $PORT overrides the default port too; --port takes precedence. --tunnel
-    opens a public tunnel to the running server (handy for testing webhooks
-    without deploying). Binds to 0.0.0.0 by default - set a dashboard password
-    (mix pepe dashboard password) before exposing it beyond localhost, or bind
-    to 127.0.0.1 and tunnel in.
+    $PORT overrides the default port too; --port takes precedence.
+
+    Tunnel (expose the server publicly via cloudflared, handy for webhooks):
+      --tunnel                 quick tunnel with a random trycloudflare.com URL
+      --token <TOKEN>          named tunnel with a stable URL you chose in the
+                               Cloudflare dashboard (headless; a ${ENV_VAR} ref
+                               is interpolated). Add --hostname to print the URL.
+      --hostname <HOST>        named tunnel on your own domain after a one-time
+                               `cloudflared tunnel login` (no token needed)
+
+    Binds to 0.0.0.0 by default - set a dashboard password (mix pepe dashboard
+    password) before exposing it beyond localhost, or bind to 127.0.0.1 and tunnel in.
 
     Also starts the messaging gateways (Telegram, ...) alongside the endpoint.
 
@@ -2177,7 +2184,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp serve_cmd(rest) do
-    {opts, _, _} = OptionParser.parse(rest, strict: [tunnel: :boolean])
+    {opts, _, _} = OptionParser.parse(rest, strict: [tunnel: :boolean, hostname: :string, token: :string])
     port = PepeWeb.Endpoint.config(:http)[:port] || 4000
 
     ok("Pepe serving on http://localhost:#{port}  (override with PORT=NNNN)")
@@ -2190,7 +2197,7 @@ defmodule Mix.Tasks.Pepe do
     """)
 
     dashboard_posture()
-    if opts[:tunnel], do: start_tunnel(port)
+    if opts[:tunnel] || opts[:hostname] || opts[:token], do: start_tunnel(port, opts)
     Process.sleep(:infinity)
   end
 
@@ -2216,14 +2223,28 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  # Expose the running server through a Cloudflare quick tunnel and print the public URL.
-  defp start_tunnel(port) do
+  # Expose the running server through a Cloudflare tunnel and print the public URL. A
+  # quick tunnel (random URL) by default; a stable named tunnel when --token or
+  # --hostname is given. --token is a secret, so a ${ENV_VAR} reference is interpolated.
+  defp start_tunnel(port, opts) do
     if Pepe.Tunnel.available?() do
-      info(dim("   opening a public tunnel via cloudflared..."))
+      token = opts[:token] && Config.interpolate(opts[:token])
+      hostname = opts[:hostname]
 
-      Pepe.Tunnel.open(port, &print_tunnel_url/1)
+      info(dim("   #{tunnel_opening_line(token, hostname)}"))
+
+      Pepe.Tunnel.open(port, &print_tunnel_url/1, token: token, hostname: hostname)
     else
       info(yellow("   --tunnel needs cloudflared. #{cloudflared_install_hint()}"))
+    end
+  end
+
+  defp tunnel_opening_line(token, hostname) do
+    cond do
+      token && hostname -> "opening a named tunnel to #{hostname} via cloudflared (token)..."
+      token -> "opening a named tunnel via cloudflared (token)..."
+      hostname -> "opening a named tunnel to #{hostname} via cloudflared..."
+      true -> "opening a public tunnel via cloudflared..."
     end
   end
 
@@ -2252,10 +2273,19 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  defp print_tunnel_url(url) do
+  defp print_tunnel_url(:connected) do
+    info("")
+    ok("Tunnel connected. Reachable at the public hostname configured for this tunnel in Cloudflare.")
+    tunnel_password_warning()
+  end
+
+  defp print_tunnel_url(url) when is_binary(url) do
     info("")
     ok("Public URL: #{url}")
+    tunnel_password_warning()
+  end
 
+  defp tunnel_password_warning do
     unless Config.dashboard_auth_required?() do
       info(yellow("   the dashboard is fail-closed over the tunnel until you set a password: mix pepe dashboard password '<pass>'"))
     end

@@ -3809,7 +3809,7 @@ msgstr "Repor a contagem de mensagens de %{name} (atualmente %{n}) para o resto 
 #: lib/pepe_web/live/companies_live.ex:187
 #, elixir-autogen, elixir-format
 msgid "reset"
-msgstr "repor"
+msgstr "reiniciar"
 
 #: lib/pepe_web/live/companies_live.ex:324
 #, elixir-autogen, elixir-format

@@ -66,6 +66,12 @@ export const ui = {
     "f.plugins.t": "Plugins at runtime",
     "f.plugins.d":
       "Install a plugin, fill in its settings, and give agents new tools or channels right away.",
+    "f.learn.t": "Learning & memory",
+    "f.learn.d":
+      "The agent remembers what it learns (facts, preferences, the people it deals with) and reuses it in later conversations. Read and edit any memory from the dashboard.",
+    "f.usage.t": "Spend & message caps",
+    "f.usage.d":
+      "Cap each company by spend and by messages: a monthly budget in US dollars and a monthly message limit. Both metered live, turning red on the dashboard as they run out.",
     "f.sandbox.t": "Control & safety",
     "f.sandbox.d": "Risky tools ask for approval first. Every run is traced, and command guardrails stay on by default.",
     "f.tenant.t": "Multi-tenant",
@@ -212,6 +218,12 @@ export const ui = {
     "f.plugins.t": "Plugins en tiempo de ejecución",
     "f.plugins.d":
       "Instala un plugin, completa su configuración y da a los agentes nuevas herramientas o canales al instante.",
+    "f.learn.t": "Aprendizaje y memoria",
+    "f.learn.d":
+      "El agente recuerda lo que aprende (hechos, preferencias, las personas con las que trata) y lo reutiliza en conversaciones posteriores. Lee y edita cualquier memoria desde el panel.",
+    "f.usage.t": "Límites de gasto y mensajes",
+    "f.usage.d":
+      "Limita cada empresa por gasto y por mensajes: un presupuesto mensual en dólares y un límite mensual de mensajes. Ambos medidos en vivo, poniéndose en rojo en el panel a medida que se agotan.",
     "f.sandbox.t": "Control y seguridad",
     "f.sandbox.d": "Las herramientas riesgosas piden aprobación primero. Cada ejecución queda trazada, con las protecciones de comandos siempre activas.",
     "f.tenant.t": "Multiempresa",
@@ -358,6 +370,12 @@ export const ui = {
     "f.plugins.t": "Plugins em runtime",
     "f.plugins.d":
       "Instale um plugin, preencha a configuração e dê aos agentes novas ferramentas ou canais na hora.",
+    "f.learn.t": "Aprendizado e memória",
+    "f.learn.d":
+      "O agente lembra o que aprende (fatos, preferências, as pessoas com quem fala) e reaproveita nas próximas conversas. Leia e edite qualquer memória pelo painel.",
+    "f.usage.t": "Limites de gasto e mensagens",
+    "f.usage.d":
+      "Limite cada empresa por gasto e por mensagens: um orçamento mensal em dólar e um limite mensal de mensagens. Ambos medidos ao vivo, ficando vermelhos no painel conforme se esgotam.",
     "f.sandbox.t": "Controle e segurança",
     "f.sandbox.d": "Ferramentas arriscadas pedem aprovação antes. Toda execução fica rastreada, com proteções de comando sempre ligadas.",
     "f.tenant.t": "Multiempresa",
@@ -504,6 +522,12 @@ export const ui = {
     "f.plugins.t": "Plugins em tempo de execução",
     "f.plugins.d":
       "Instala um plugin, preenche a configuração e dá aos agentes novas ferramentas ou canais de imediato.",
+    "f.learn.t": "Aprendizagem e memória",
+    "f.learn.d":
+      "O agente lembra o que aprende (factos, preferências, as pessoas com quem fala) e reaproveita nas conversas seguintes. Leia e edite qualquer memória pelo painel.",
+    "f.usage.t": "Limites de gasto e mensagens",
+    "f.usage.d":
+      "Limite cada empresa por gasto e por mensagens: um orçamento mensal em dólar e um limite mensal de mensagens. Ambos medidos ao vivo, ficando vermelhos no painel à medida que se esgotam.",
     "f.sandbox.t": "Controlo e segurança",
     "f.sandbox.d": "Ferramentas arriscadas pedem aprovação antes. Toda execução fica rastreada, com proteções de comando sempre ligadas.",
     "f.tenant.t": "Multiempresa",
