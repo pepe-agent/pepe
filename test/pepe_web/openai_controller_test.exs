@@ -93,4 +93,47 @@ defmodule PepeWeb.OpenAIControllerTest do
     roles = Enum.map(history, & &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
+
+  test "the standard OpenAI `user` field keys the session (preferred over session_id)" do
+    uid = "u-#{System.unique_integer([:positive])}"
+
+    post_msg = fn text ->
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "assistant",
+        "user" => uid,
+        "messages" => [%{"role" => "user", "content" => text}]
+      })
+    end
+
+    json_response(post_msg.("oi"), 200)
+    json_response(post_msg.("e agora?"), 200)
+
+    history = Pepe.Agent.Session.history("api:root:" <> uid)
+    roles = Enum.map(history, & &1["role"])
+    assert roles == ["system", "user", "assistant", "user", "assistant"]
+  end
+
+  test "user + session_id combine into a `user:session_id` key (independent threads per user)" do
+    uid = "u-#{System.unique_integer([:positive])}"
+
+    post_msg = fn sid, text ->
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "assistant",
+        "user" => uid,
+        "session_id" => sid,
+        "messages" => [%{"role" => "user", "content" => text}]
+      })
+    end
+
+    json_response(post_msg.("t1", "oi thread 1"), 200)
+    json_response(post_msg.("t2", "oi thread 2"), 200)
+
+    # The two threads of the same user are kept apart under composite keys.
+    assert Pepe.Agent.Session.history("api:root:#{uid}:t1") |> Enum.count(&(&1["role"] == "user")) == 1
+    assert Pepe.Agent.Session.history("api:root:#{uid}:t2") |> Enum.count(&(&1["role"] == "user")) == 1
+  end
 end

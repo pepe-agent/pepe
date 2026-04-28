@@ -20,7 +20,8 @@ defmodule PepeWeb.ModelsLive do
        currency: Config.currency(),
        models: Config.models(),
        default_model: Config.default_model_name(),
-       edit_model: nil
+       edit_model: nil,
+       oauth: nil
      )}
   end
 
@@ -171,6 +172,32 @@ defmodule PepeWeb.ModelsLive do
         </.view_header>
         <div class="flex-1 overflow-y-auto p-6">
           <div :if={!@edit_model} class="space-y-3">
+          <div :if={Pepe.Providers.subscription_methods() != []} class={card()}>
+            <div class="font-medium">{gettext("Sign in with a subscription")}</div>
+            <p class="mt-0.5 text-sm text-zinc-500">
+              {gettext("Use your ChatGPT or Claude subscription instead of an API key. Works when this dashboard runs on the same machine as your browser.")}
+            </p>
+
+            <div :if={!@oauth} class="mt-2 flex flex-wrap gap-2">
+              <button :for={s <- Pepe.Providers.subscription_methods()} phx-click="oauth_connect" phx-value-provider={s.provider} class={btn_ghost()}>
+                {gettext("Connect %{label}", label: s.label)}
+              </button>
+            </div>
+
+            <div :if={@oauth} class="mt-3 space-y-2 rounded-lg border border-zinc-800 p-3">
+              <div class="text-sm text-zinc-300">
+                {if @oauth.reconnect, do: gettext("Reconnecting %{name}", name: @oauth.reconnect), else: gettext("Connecting %{label}", label: @oauth.label)}
+              </div>
+              <a href={@oauth.url} target="_blank" rel="noopener" class={btn()}>{gettext("Open the sign-in page ↗")}</a>
+              <p class="text-sm text-zinc-500">{gettext("Authorize in the browser, then come back; this finishes on its own. If it doesn't, paste the redirect URL below.")}</p>
+              <form phx-submit="oauth_paste" class="flex gap-2">
+                <input name="pasted" placeholder={gettext("paste the redirect URL or code")} class={fld()} />
+                <button type="submit" class={btn_ghost()}>{gettext("Finish")}</button>
+              </form>
+              <button phx-click="oauth_cancel" class="text-sm text-zinc-500 hover:text-zinc-300">{gettext("Cancel")}</button>
+            </div>
+          </div>
+
           <div :for={m <- scoped_models(@models, @scope)} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
@@ -178,6 +205,7 @@ defmodule PepeWeb.ModelsLive do
                 <span :if={m.name == @default_model} class="ml-2 rounded bg-green-700 px-1.5 text-sm">{gettext("default")}</span>
               </div>
               <div class="flex shrink-0 gap-1 text-sm">
+                <button :if={is_map(m.oauth)} phx-click="oauth_reconnect" phx-value-name={m.name} class={btn_ghost()}>{gettext("Reconnect")}</button>
                 <button phx-click="model_edit" phx-value-name={m.name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button :if={m.name != @default_model} phx-click="model_default" phx-value-name={m.name} class={btn_ghost()}>{gettext("Set default")}</button>
                 <button phx-click="model_delete" phx-value-name={m.name} data-confirm={gettext("Delete model %{name}?", name: m.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
@@ -435,6 +463,29 @@ defmodule PepeWeb.ModelsLive do
     {:noreply, update_fallbacks(socket, &move(&1, name, dir))}
   end
 
+  # --- subscription (OAuth) sign-in ---------------------------------------------
+
+  def handle_event("oauth_connect", %{"provider" => key}, socket), do: start_oauth(socket, key, nil)
+
+  def handle_event("oauth_reconnect", %{"name" => name}, socket) do
+    case Config.get_model(name) do
+      %{oauth: %{"provider" => key}} -> start_oauth(socket, key, name)
+      _ -> {:noreply, put_flash(socket, :error, gettext("%{name} isn't a subscription connection.", name: name))}
+    end
+  end
+
+  def handle_event("oauth_paste", %{"pasted" => value}, socket) do
+    case {socket.assigns.oauth, String.trim(to_string(value))} do
+      {%{} = o, code} when code != "" -> complete_oauth(socket, o, Pepe.OAuth.extract_code(code))
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("oauth_cancel", _p, socket) do
+    if o = socket.assigns.oauth, do: Pepe.OAuth.cancel(o.session)
+    {:noreply, assign(socket, oauth: nil)}
+  end
+
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/models")}
 
@@ -442,6 +493,49 @@ defmodule PepeWeb.ModelsLive do
     do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
 
   def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+
+  defp start_oauth(socket, key, reconnect_name) do
+    case Enum.find(Pepe.Providers.subscription_methods(), &(&1.provider == key)) do
+      nil ->
+        {:noreply, put_flash(socket, :error, gettext("No subscription sign-in for that provider."))}
+
+      %{method: method, label: label} ->
+        if o = socket.assigns.oauth, do: Pepe.OAuth.cancel(o.session)
+        {:ok, session} = Pepe.OAuth.begin(method.oauth_flow, self())
+
+        name = reconnect_name || scope_name(unique_suggestion(key, socket.assigns.scope), socket.assigns.scope)
+
+        {:noreply,
+         assign(socket,
+           oauth: %{provider: key, label: label, method: method, session: session, url: session.url, name: name, reconnect: reconnect_name}
+         )}
+    end
+  end
+
+  defp complete_oauth(socket, oauth, code) do
+    case Pepe.OAuth.finish(oauth.session, code) do
+      {:ok, %{access: access} = tokens} when is_binary(access) ->
+        model =
+          case oauth.reconnect && Config.get_model(oauth.reconnect) do
+            %Pepe.Config.Model{} = existing -> Pepe.OAuth.apply_tokens(existing, tokens)
+            _ -> save_subscription(oauth, tokens)
+          end
+
+        {:noreply,
+         socket
+         |> assign(oauth: nil, models: Config.models(), default_model: Config.default_model_name())
+         |> put_flash(:info, gettext("Connected %{name}.", name: model.name))}
+
+      {:error, reason} ->
+        {:noreply, socket |> assign(oauth: nil) |> put_flash(:error, gettext("Sign-in failed: %{reason}", reason: inspect(reason)))}
+    end
+  end
+
+  defp save_subscription(oauth, tokens) do
+    conn = Pepe.OAuth.subscription_connection(oauth.provider, oauth.method, oauth.name, tokens)
+    Config.put_model(conn)
+    conn
+  end
 
   # Never overwrite an existing connection on create: auto-suffix instead
   # (openrouter -> openrouter-2 -> ...), same as the CLI, then tell the user
@@ -525,6 +619,24 @@ defmodule PepeWeb.ModelsLive do
     case socket.assigns.edit_model do
       %{provider: ^provider} = m -> {:noreply, assign(socket, edit_model: %{m | models: ids})}
       _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_info({:oauth_code, ref, code}, socket) do
+    case socket.assigns.oauth do
+      %{session: %{ref: ^ref}} = o -> complete_oauth(socket, o, code)
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_info({:oauth_error, ref, reason}, socket) do
+    case socket.assigns.oauth do
+      %{session: %{ref: ^ref}} = o ->
+        Pepe.OAuth.cancel(o.session)
+        {:noreply, socket |> assign(oauth: nil) |> put_flash(:error, gettext("Sign-in failed: %{reason}", reason: inspect(reason)))}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 

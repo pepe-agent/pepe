@@ -127,7 +127,7 @@ const softwareJsonLd = {
   url: new URL(d("/"), Astro.site ?? Astro.url.origin).href,
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Self-hosted (Linux, macOS, Windows)",
-  codeRepository: "https://github.com/jhonathas/pepe",
+  codeRepository: "https://github.com/pepe-agent/pepe",
   inLanguage: lang,
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
 };
@@ -395,7 +395,7 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
       <p>{tr("cta.sub")}</p>
       <div class="hero-cta">
         <a class="btn btn-primary" href={d("/docs/quickstart/")}>{tr("cta.start")}</a>
-        <a class="btn btn-ghost" href="https://github.com/jhonathas/pepe">{tr("cta.github")}</a>
+        <a class="btn btn-ghost" href="https://github.com/pepe-agent/pepe">{tr("cta.github")}</a>
       </div>
     </div>
   </section>

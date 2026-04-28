@@ -79,39 +79,95 @@ defmodule Pepe.Agent.SessionStopTest do
     assert Session.stop(key) == {:error, :not_running}
   end
 
-  test "a second message is rejected as busy, and /stop unblocks the first", %{key: key} do
+  test "a second message queues behind the running one, and /stop cancels both", %{key: key} do
     {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
 
     # An authorizer that never answers, so the run hangs in the permission gate.
     blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
 
-    caller = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
+    first = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
 
     # Give the run time to reach the blocked authorize call.
     Process.sleep(200)
 
-    # While busy, a new message is refused rather than interleaved.
-    assert Session.chat(key, "again") == {:error, :busy}
+    # A second message no longer bounces off :busy - it queues and waits its turn.
+    second = Task.async(fn -> Session.chat(key, "again", authorize: blocking) end)
+    Process.sleep(100)
 
-    # /stop cancels the run; the original caller is unblocked with :stopped.
+    # /stop cancels the in-flight run and drops the queued one; both callers get :stopped.
     assert Session.stop(key) == :ok
-    assert Task.await(caller) == {:error, :stopped}
+    assert Task.await(first) == {:error, :stopped}
+    assert Task.await(second) == {:error, :stopped}
 
     # The session is free again.
     assert Session.stop(key) == {:error, :not_running}
   end
 
-  test "/new recovers a session wedged on a stuck run", %{key: key} do
+  test "/new recovers a wedged run and clears the queue", %{key: key} do
     {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
     blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
 
+    first = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
+    Process.sleep(200)
+    second = Task.async(fn -> Session.chat(key, "again", authorize: blocking) end)
+    Process.sleep(100)
+
+    # /new cancels the stuck run and drops the queue; both callers are unblocked.
+    assert Session.reset(key) == :ok
+    assert Task.await(first) == {:error, :stopped}
+    assert Task.await(second) == {:error, :stopped}
+    assert Session.stop(key) == {:error, :not_running}
+  end
+
+  test "a queued message runs after the current turn finishes", %{key: key} do
+    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
+    allow = fn _name, _args, _ctx -> :once end
+
+    first = Task.async(fn -> Session.chat(key, "one", authorize: allow) end)
+    Process.sleep(50)
+    second = Task.async(fn -> Session.chat(key, "two", authorize: allow) end)
+
+    assert {:ok, _} = Task.await(first, 5000)
+    assert {:ok, _} = Task.await(second, 5000)
+    assert Session.stop(key) == {:error, :not_running}
+  end
+
+  test "fork seeds a new session with the history, then evolves independently", %{key: key} do
+    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
+    allow = fn _name, _args, _ctx -> :once end
+
+    {:ok, _reply} = Session.chat(key, "hello", authorize: allow)
+    original = Session.history(key)
+    assert length(original) > 0
+
+    new_key = key <> "-fork"
+    assert {:ok, ^new_key} = Session.fork(key, new_key)
+
+    # The branch starts as an exact copy of the source history...
+    assert Session.history(new_key) == original
+
+    # ...but is independent: a turn on the branch never touches the original.
+    {:ok, _} = Session.chat(new_key, "on the branch", authorize: allow)
+    assert length(Session.history(new_key)) > length(original)
+    assert Session.history(key) == original
+
+    SessionSupervisor.terminate(new_key)
+  end
+
+  test "/inline is refused when idle and accepted mid-run", %{key: key} do
+    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
+
+    # Nothing is running: /inline tells the caller to send it as a normal message.
+    assert Session.inline(key, "hi") == {:error, :not_running}
+
+    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
     caller = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
     Process.sleep(200)
-    assert Session.chat(key, "again") == {:error, :busy}
 
-    # /new cancels the stuck run and frees the session.
-    assert Session.reset(key) == :ok
+    # A turn is in flight: /inline is accepted (folded into that turn).
+    assert Session.inline(key, "also do X") == :ok
+
+    assert Session.stop(key) == :ok
     assert Task.await(caller) == {:error, :stopped}
-    assert Session.stop(key) == {:error, :not_running}
   end
 end

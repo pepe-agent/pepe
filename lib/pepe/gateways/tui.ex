@@ -206,6 +206,18 @@ defmodule Pepe.Gateways.TUI do
     end
   end
 
+  # Text of the most recent user message in a session, or nil (used by /retry).
+  defp last_user_text(key) do
+    key
+    |> Session.history()
+    |> Enum.reverse()
+    |> Enum.find_value(fn m -> m["role"] == "user" && m["content"] end)
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
   defp command(key, text) do
     {cmd, rest} =
       case String.split(text, ~r/\s+/, parts: 2) do
@@ -224,6 +236,24 @@ defmodule Pepe.Gateways.TUI do
   defp run_command(key, "undo", _rest) do
     Session.undo(key)
     info(gettext("↩️ Undid your last message."))
+  end
+
+  defp run_command(key, "retry", _rest) do
+    case last_user_text(key) do
+      nil ->
+        info(gettext("Nothing to retry yet."))
+
+      text ->
+        Session.undo(key)
+        say(key, text)
+    end
+  end
+
+  defp run_command(key, "usage", _rest) do
+    company = key |> Session.status() |> Map.get(:agent) |> Company.of()
+    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
+    count = Pepe.Usage.message_count_month_to_date(company)
+    info(gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
   end
 
   defp run_command(key, "learn", _rest) do
@@ -294,7 +324,7 @@ defmodule Pepe.Gateways.TUI do
   defp run_command(_key, "help", _rest) do
     info(
       gettext("Commands:") <>
-        "\n/new  /undo  /compact  /learn  /status  /agent <name>  /models  /model <name> [session|global]  /help  /exit"
+        "\n/new  /undo  /retry  /compact  /learn  /usage  /status  /agent <name>  /models  /model <name> [session|global]  /help  /exit"
     )
   end
 

@@ -91,6 +91,30 @@ defmodule Pepe.Agent.Session do
   def stop(key), do: GenServer.call(via(key), :stop)
 
   @doc """
+  Fold `text` into the turn already running (the `/inline` command): it's picked up as
+  a user message before the next model call of that same turn, instead of waiting in
+  the queue. Returns `{:error, :not_running}` when nothing is in flight (send it as a
+  normal `chat/3` message instead).
+  """
+  @spec inline(term(), String.t()) :: :ok | {:error, :not_running}
+  def inline(key, text), do: GenServer.call(via(key), {:inline, text})
+
+  @doc """
+  Fork this session into `new_key`: the new session starts with a copy of this
+  conversation's history (plus this session's model override and PII map) and then
+  evolves independently - the original is left untouched. Branching a conversation
+  to explore a different direction without losing where you were. Used by the
+  dashboard `/fork`. Returns `{:ok, new_key}` or `{:error, reason}`.
+  """
+  @spec fork(term(), term()) :: {:ok, term()} | {:error, term()}
+  def fork(key, new_key), do: GenServer.call(via(key), {:fork, new_key})
+
+  # Replace a session's history (and overrides) with a snapshot - the seeding half of
+  # fork/2, called on the freshly-spawned branch. Internal.
+  @doc false
+  def seed(key, snapshot), do: GenServer.call(via(key), {:seed, snapshot})
+
+  @doc """
   Resume a turn that was cut off mid-run by a process restart (a `pending` marker
   survived to this session's init - see `Pepe.Agent.SessionPersistence`). Runs an
   internal, invisible prompt referencing the interrupted message and returns
@@ -131,9 +155,6 @@ defmodule Pepe.Agent.Session do
   @spec aside(term(), String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def aside(key, text, opts \\ []), do: GenServer.call(via(key), {:aside, text, opts}, :infinity)
 
-  # Recent turns kept verbatim when compacting.
-  @keep_recent 4
-
   ###
   ### server
   ###
@@ -160,6 +181,9 @@ defmodule Pepe.Agent.Session do
     state =
       case persist?() && SessionPersistence.load(key) do
         {:ok, name, messages, pending} ->
+          # A crash mid-tool-call can persist an assistant turn whose tool calls were
+          # never answered; replaying it as-is makes the model loop. Repair it first.
+          messages = Pepe.LLM.Message.sanitize_replay(messages)
           %{key: key, agent_name: name || default_agent, messages: messages, running: nil, pending_resume: pending}
 
         _ ->
@@ -194,6 +218,10 @@ defmodule Pepe.Agent.Session do
       |> Map.put_new(:learn_allowed, true)
       |> Map.put_new(:model_override, nil)
       |> Map.put_new(:mention_optional, false)
+      # Messages sent while a turn is running wait here (FIFO) and run right after it,
+      # instead of being rejected - each carries its caller's `from` so the reply lands
+      # with whoever sent it. See handle_call({:chat...}) below.
+      |> Map.put_new(:queue, [])
       |> Map.merge(%{
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
@@ -265,35 +293,48 @@ defmodule Pepe.Agent.Session do
   # One run at a time per session. While a run is in flight, a new message is
   # rejected with `:busy` (the caller can `/stop` it) rather than interleaving.
   @impl true
-  def handle_call({:chat, _text, _opts}, _from, %{running: %{}} = state) do
-    {:reply, {:error, :busy}, state}
+  def handle_call({:chat, text, opts}, from, %{running: %{}} = state) do
+    # A turn is already running: queue this one to run right after (FIFO), holding the
+    # caller's `from` so it gets its reply when its turn runs. `/inline` is the escape
+    # hatch to fold a message into the running turn instead of waiting.
+    {:noreply, %{state | queue: state.queue ++ [{from, text, opts}]}}
   end
 
-  def handle_call({:chat, text, opts}, from, state) do
-    # Resolve the agent fresh each turn (fall back to the default if it was renamed,
-    # and apply this session's model override, if any), so tools/model changes apply
-    # live without breaking the session.
-    case resolve_agent(state) do
-      nil ->
-        {:reply, {:error, :no_agent}, state}
-
-      agent ->
-        company = Pepe.Company.of(agent.name)
-        counts? = customer_message?(state.key, agent)
-
-        if counts? and Pepe.Usage.over_message_limit?(company) do
-          {:reply, {:error, :message_limit_exceeded}, state}
-        else
-          start_chat_run(state, agent, company, counts?, text, opts, from)
-        end
-    end
-  end
+  def handle_call({:chat, text, opts}, from, state), do: start_turn(state, text, opts, from)
 
   def handle_call(:stop, _from, %{running: %{}} = state) do
-    {:reply, :ok, cancel_running(state, {:error, :stopped})}
+    # Stop cancels the in-flight turn and drops anything queued behind it.
+    {:reply, :ok, state |> cancel_queue({:error, :stopped}) |> cancel_running({:error, :stopped})}
   end
 
   def handle_call(:stop, _from, state), do: {:reply, {:error, :not_running}, state}
+
+  def handle_call({:inline, text}, _from, %{running: %{task: pid}} = state) do
+    send(pid, {:steer, text})
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:inline, _text}, _from, state), do: {:reply, {:error, :not_running}, state}
+
+  def handle_call({:fork, new_key}, _from, state) do
+    # Spawn the branch under its own key (same agent), then seed it with a snapshot of
+    # this conversation. Running in the source process, so `seed` is a call to a
+    # *different* GenServer - no self-deadlock. This session is left as-is.
+    case Pepe.Agent.SessionSupervisor.ensure(new_key, state.agent_name) do
+      {:ok, _pid} ->
+        snapshot = %{messages: state.messages, model_override: state.model_override, pii_map: state.pii_map}
+        :ok = seed(new_key, snapshot)
+        {:reply, {:ok, new_key}, state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:seed, snapshot}, _from, state) do
+    state = %{state | messages: snapshot.messages, model_override: snapshot.model_override, pii_map: snapshot.pii_map}
+    {:reply, :ok, persist(state)}
+  end
 
   def handle_call(:learn, _from, %{learn_allowed: false} = state) do
     {:reply, {:error, :not_allowed}, state}
@@ -422,9 +463,9 @@ defmodule Pepe.Agent.Session do
 
   def handle_call(:reset, _from, state) do
     # A fresh conversation cancels any in-flight run (so a stuck one can't leave the
-    # session wedged on `:busy`) and forgets "allow for this session" grants.
+    # session wedged) and any queued turns, and forgets "allow for this session" grants.
     Pepe.Permissions.SessionStore.clear(state.key)
-    state = cancel_running(state, {:error, :stopped})
+    state = state |> cancel_queue({:error, :stopped}) |> cancel_running({:error, :stopped})
 
     {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], mention_optional: false})}
   end
@@ -487,7 +528,7 @@ defmodule Pepe.Agent.Session do
         # Review before compacting, while the full detail is still here.
         if state.learn_allowed, do: Pepe.Agent.Reflect.review_async(agent, state.messages)
 
-        case compact_messages(agent, state.messages) do
+        case Pepe.Agent.Compaction.compact_now(state.messages, Config.model_for_agent(agent)) do
           {:ok, messages, summary} ->
             {:reply, {:ok, summary}, persist(%{state | messages: messages})}
 
@@ -578,7 +619,7 @@ defmodule Pepe.Agent.Session do
           clear_pending(%{state | running: nil})
       end
 
-    {:noreply, state}
+    {:noreply, run_next(state)}
   end
 
   def handle_info({:run_done, _result, _agent_name}, state), do: {:noreply, state}
@@ -590,7 +631,7 @@ defmodule Pepe.Agent.Session do
         %{running: %{ref: ref, from: from}} = state
       ) do
     GenServer.reply(from, {:error, :stopped})
-    {:noreply, clear_pending(%{state | running: nil})}
+    {:noreply, run_next(clear_pending(%{state | running: nil}))}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
@@ -664,6 +705,50 @@ defmodule Pepe.Agent.Session do
   end
 
   defp cancel_running(state, _reply), do: state
+
+  # Reply `reply` to every caller waiting in the queue and clear it, so a stop/reset
+  # doesn't leave them blocked until their GenServer.call times out.
+  defp cancel_queue(%{queue: queue} = state, reply) do
+    Enum.each(queue, fn {from, _text, _opts} -> GenServer.reply(from, reply) end)
+    %{state | queue: []}
+  end
+
+  # Resolve the agent fresh each turn (fall back to the default if it was renamed, and
+  # apply this session's model override), so tools/model changes apply live. Replies an
+  # error to `from` directly on a failure so it works both as a direct call and when
+  # draining the queue. Returns `{:noreply, state}` (running set on success).
+  defp start_turn(state, text, opts, from) do
+    case resolve_agent(state) do
+      nil ->
+        GenServer.reply(from, {:error, :no_agent})
+        {:noreply, state}
+
+      agent ->
+        company = Pepe.Company.of(agent.name)
+        counts? = customer_message?(state.key, agent)
+
+        if counts? and Pepe.Usage.over_message_limit?(company) do
+          GenServer.reply(from, {:error, :message_limit_exceeded})
+          {:noreply, state}
+        else
+          start_chat_run(state, agent, company, counts?, text, opts, from)
+        end
+    end
+  end
+
+  # After a turn ends, start the next queued one (if any). A queued turn that fails to
+  # start (agent gone / limit) has already replied its error, so we just try the next.
+  defp run_next(%{queue: [], running: nil} = state), do: state
+  defp run_next(%{running: %{}} = state), do: state
+
+  defp run_next(%{queue: [{from, text, opts} | rest]} = state) do
+    case start_turn(%{state | queue: rest}, text, opts, from) do
+      {:noreply, %{running: %{}} = started} -> started
+      {:noreply, idle} -> run_next(idle)
+    end
+  end
+
+  defp run_next(state), do: state
 
   # Complexity triage is best-effort only: it must never make a turn wait longer
   # than this, and a slow/unreachable triage model is treated the same as a
@@ -884,43 +969,6 @@ defmodule Pepe.Agent.Session do
       model
     else
       _ -> nil
-    end
-  end
-
-  # Summarize everything except the most recent `@keep_recent` turns into one
-  # system message; keep the system prompt and the recent turns verbatim.
-  defp compact_messages(agent, messages) do
-    {system, convo} = Enum.split_with(messages, &(&1["role"] == "system"))
-
-    if length(convo) <= @keep_recent do
-      {:ok, messages, "nothing to compact yet"}
-    else
-      {older, recent} = Enum.split(convo, length(convo) - @keep_recent)
-
-      case summarize(Config.model_for_agent(agent), older) do
-        {:ok, summary} ->
-          summary_msg = Message.system("Summary of earlier conversation:\n" <> summary)
-          {:ok, system ++ [summary_msg | recent], summary}
-
-        error ->
-          error
-      end
-    end
-  end
-
-  defp summarize(nil, _messages), do: {:error, :no_model}
-
-  defp summarize(model, messages) do
-    transcript = Enum.map_join(messages, "\n", fn m -> "#{m["role"]}: #{m["content"]}" end)
-
-    prompt =
-      "Summarize the conversation below concisely, preserving facts, decisions and context needed to continue it. Output only the summary.\n\n" <>
-        transcript
-
-    case Pepe.LLM.chat(model, [Message.user(prompt)], max_tokens: 600) do
-      {:ok, %{content: content}} when is_binary(content) and content != "" -> {:ok, content}
-      {:ok, _} -> {:error, :empty_summary}
-      error -> error
     end
   end
 end

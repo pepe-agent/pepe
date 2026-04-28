@@ -89,6 +89,57 @@ defmodule Pepe.OAuthTest do
     end
   end
 
+  test "extract_code accepts a bare code or a full redirect URL" do
+    assert OAuth.extract_code("abc123") == "abc123"
+    assert OAuth.extract_code("http://localhost:1455/auth/callback?code=xyz&state=s") == "xyz"
+  end
+
+  test "begin/2 returns a live session with the authorize link, and cancel stops it" do
+    flow = %{
+      authorize_url: "https://auth.example.com/authorize",
+      token_url: "https://auth.example.com/token",
+      client_id: "c-1",
+      redirect_uri: "http://localhost:14559/cb",
+      scope: "openid",
+      callback_port: 14_559,
+      callback_path: "/cb"
+    }
+
+    assert {:ok, session} = OAuth.begin(flow)
+    assert String.starts_with?(session.url, "https://auth.example.com/authorize?")
+    assert is_reference(session.ref)
+    assert OAuth.cancel(session)
+  end
+
+  test "subscription_connection builds a model from a method spec + tokens" do
+    method = %{
+      base_url: "https://chatgpt.com/backend-api/codex",
+      api: "openai-responses",
+      models: ["gpt-5.5", "gpt-5.4"],
+      oauth_flow: %{token_url: "https://auth.openai.com/oauth/token", client_id: "app_x", token_content_type: :form}
+    }
+
+    model = OAuth.subscription_connection("openai", method, "openai", %{access: "acc", refresh: "ref", expires_at: 123})
+
+    assert model.name == "openai"
+    assert model.base_url == "https://chatgpt.com/backend-api/codex"
+    assert model.api == "openai-responses"
+    assert model.api_key == "acc"
+    assert model.model == "gpt-5.5"
+    assert model.oauth["provider"] == "openai"
+    assert model.oauth["refresh"] == "ref"
+    assert model.oauth["token_content_type"] == "form"
+  end
+
+  test "Providers.subscription_methods lists the OAuth providers" do
+    methods = Pepe.Providers.subscription_methods()
+    providers = Enum.map(methods, & &1.provider)
+
+    assert "openai" in providers
+    assert "anthropic" in providers
+    assert Enum.all?(methods, &is_map(&1.method.oauth_flow))
+  end
+
   describe "reconnect/1" do
     setup do
       home = Path.join(System.tmp_dir!(), "pepe_oauth_#{System.unique_integer([:positive])}")

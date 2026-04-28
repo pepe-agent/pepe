@@ -112,7 +112,7 @@ defmodule PepeWeb.TokensLive do
           </div>
 
           <div class="space-y-3">
-            <div :for={t <- @tokens} class={card()}>
+            <div :for={t <- scoped_tokens(@tokens, @scope)} class={card()}>
               <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
                   <span class="font-medium">{t["label"] || gettext("Unlabeled")}</span>
@@ -134,7 +134,7 @@ defmodule PepeWeb.TokensLive do
               <div :if={t["kind"] != "widget"} class="mt-1 font-mono text-sm text-zinc-400">{t["prefix"]}</div>
               <div class="mt-0.5 text-sm text-zinc-500">{gettext("Id %{id}", id: t["id"])}</div>
             </div>
-            <p :if={@tokens == []} class="text-[15px] text-zinc-500">
+            <p :if={scoped_tokens(@tokens, @scope) == []} class="text-[15px] text-zinc-500">
               {gettext("No tokens yet. The /v1 API is open to localhost only. Create one to require a token from every caller.")}
             </p>
           </div>
@@ -190,6 +190,14 @@ defmodule PepeWeb.TokensLive do
   def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
 
   # Agents available for the chosen scope: nil = root/Principal, else the company's agents.
+  # A token carries its own company (nil = root), so scope by that directly - the
+  # dashboard must only show the selected workspace's tokens, never another company's.
+  defp scoped_tokens(tokens, scope), do: Enum.filter(tokens, &token_in_scope?(&1, scope))
+
+  defp token_in_scope?(_t, "all"), do: true
+  defp token_in_scope?(t, "root"), do: t["company"] in [nil, ""]
+  defp token_in_scope?(t, company), do: t["company"] == company
+
   defp agent_options(company) do
     Config.agents_in(company) |> Enum.map(& &1.name) |> Enum.sort()
   end

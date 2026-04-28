@@ -55,6 +55,20 @@ defmodule Pepe.Usage do
 
   def record(_agent, _model, _usage), do: :ok
 
+  @currency_symbols %{"USD" => "$", "BRL" => "R$", "EUR" => "€", "GBP" => "£"}
+
+  @doc "Format `amount` in the configured billing currency, e.g. `$13.55` or `R$ 226.80`."
+  def format_cost(amount) when is_number(amount) do
+    currency = Config.currency()
+    n = :erlang.float_to_binary(amount / 1, decimals: 2)
+
+    case @currency_symbols[currency] do
+      nil -> "#{currency} #{n}"
+      "$" -> "$#{n}"
+      sym -> "#{sym} #{n}"
+    end
+  end
+
   @doc """
   Billable spend (in the billing currency) for `company` in the current month, since
   the later of: the month's start, or its last `reset_budget/1` call (if any fell

@@ -97,7 +97,7 @@ defmodule Pepe.Agent.Reflect do
   @spec consolidate(Pepe.Config.Agent.t()) :: {:ok, String.t(), [map()]} | {:error, term()}
   def consolidate(agent) do
     reviewer = %{agent | tools: @review_tools, max_iterations: 8}
-    Runtime.converse(reviewer, @consolidate_prompt)
+    Runtime.converse(reviewer, @consolidate_prompt, review: Config.review_writes?())
   end
 
   ###

@@ -70,6 +70,52 @@ defmodule Pepe.DoctorTest do
     assert Enum.any?(checks, &match?({"cron", "bad agent", {:error, _}}, &1))
   end
 
+  test "security: flags a plaintext secret but not a ${ENV} reference, and a missing password" do
+    Config.put_model(%Config.Model{name: "raw", base_url: "x", api_key: "sk-plaintext-key", model: "id"})
+    Config.put_model(%Config.Model{name: "safe", base_url: "x", api_key: "${SOME_ENV}", model: "id2"})
+
+    checks = Doctor.checks()
+
+    plaintext = Enum.filter(checks, &match?({"security", "plaintext secret at" <> _, {:warn, _}}, &1))
+    assert length(plaintext) == 1
+    assert Enum.any?(checks, &match?({"security", "dashboard password", {:warn, _}}, &1))
+  end
+
+  test "channel: flags an unknown provider and a missing agent" do
+    Config.put_webhook("bad", %{"provider" => "nope", "agent" => "x", "config" => %{}})
+    Config.put_webhook("good", %{"provider" => "slack", "agent" => "ghost", "config" => %{}})
+
+    checks = Doctor.checks()
+    assert Enum.any?(checks, &match?({"channel", "bad", {:error, _}}, &1))
+    assert Enum.any?(checks, &match?({"channel", "good", {:error, _}}, &1))
+  end
+
+  test "state: flags an orphan agent directory on disk" do
+    home = System.get_env("PEPE_HOME")
+    File.mkdir_p!(Path.join([home, "agents", "ghostdir"]))
+
+    checks = Doctor.checks()
+    assert Enum.any?(checks, &match?({"state", "orphan agent dir ghostdir", {:warn, _}}, &1))
+  end
+
+  test "plugin: flags an .exs that doesn't parse" do
+    home = System.get_env("PEPE_HOME")
+    File.mkdir_p!(Path.join(home, "plugins"))
+    File.write!(Path.join([home, "plugins", "broken.exs"]), "defmodule Broken do def x(  end")
+
+    checks = Doctor.checks()
+    assert Enum.any?(checks, &match?({"plugin", "broken.exs", {:error, "doesn't parse"}}, &1))
+  end
+
+  test "skill: flags an empty user skill file" do
+    home = System.get_env("PEPE_HOME")
+    File.mkdir_p!(Path.join(home, "skills"))
+    File.write!(Path.join([home, "skills", "empty.md"]), "   \n")
+
+    checks = Doctor.checks()
+    assert Enum.any?(checks, &match?({"skill", "empty", {:warn, _}}, &1))
+  end
+
   test "the doctor tool summarizes problems" do
     Config.put_agent(%Config.Agent{name: "a", tools: [], model: "ghost"})
 

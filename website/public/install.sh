@@ -66,6 +66,15 @@ chmod +x "$tmp"
 mv "$tmp" "$BIN_DIR/pepe"
 ok "Installed pepe to $BIN_DIR/pepe"
 
+# Safety net on an update (config already exists): snapshot it before the new
+# binary runs, since a version's first launch may migrate the config's shape.
+cfg="${PEPE_CONFIG:-${PEPE_HOME:-$HOME/.pepe}/config.json}"
+if [ -f "$cfg" ]; then
+  if cp "$cfg" "$cfg.bak.$(date +%s)" 2>/dev/null; then
+    info "Backed up your existing config next to it (config.json.bak.*)"
+  fi
+fi
+
 # If the install dir isn't on PATH, prepend it to whichever shell rc files
 # exist (so new shells pick it up automatically), falling back to creating
 # ~/.bashrc if neither is present.

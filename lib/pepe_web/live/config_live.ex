@@ -18,7 +18,10 @@ defmodule PepeWeb.ConfigLive do
        scope: params["scope"] || "all",
        companies: Config.companies(),
        new_company: false,
-       config_text: read_config()
+       config_text: read_config(),
+       # nil = not checked yet · :checking · :up_to_date · a version string when newer.
+       update: nil,
+       can_self_update: not Pepe.Update.running_from_source?()
      )}
   end
 
@@ -34,6 +37,27 @@ defmodule PepeWeb.ConfigLive do
           title={gettext("Configuration file")}
           desc={gettext("The raw config.json the runtime reads. Edit and save; it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
         >
+          <button :if={@can_self_update and @update in [nil, :up_to_date]} phx-click="check_update" class={btn_ghost()}>
+            {gettext("Check for updates")}
+          </button>
+          <button :if={@update == :checking} disabled class={btn_ghost()}>{gettext("Checking...")}</button>
+          <a
+            :if={is_binary(@update)}
+            href={"https://github.com/pepe-agent/pepe/releases/tag/v#{@update}"}
+            target="_blank"
+            rel="noopener"
+            class={btn_ghost()}
+          >
+            {gettext("View changelog ↗")}
+          </a>
+          <button
+            :if={is_binary(@update)}
+            phx-click="do_update"
+            data-confirm={gettext("Download and install v%{v} now? Restart Pepe afterward to run it.", v: @update)}
+            class={btn()}
+          >
+            {gettext("Update to v%{v}", v: @update)}
+          </button>
           <button phx-click="config_reload" class={btn_ghost()}>{gettext("Reload from disk")}</button>
         </.view_header>
 
@@ -58,6 +82,42 @@ defmodule PepeWeb.ConfigLive do
   end
 
   @impl true
+  def handle_info({:update_result, {:newer, v}}, socket), do: {:noreply, assign(socket, update: v)}
+
+  def handle_info({:update_result, :up_to_date}, socket),
+    do: {:noreply, socket |> assign(update: :up_to_date) |> put_flash(:info, gettext("You're on the latest version."))}
+
+  def handle_info({:update_result, :error}, socket),
+    do: {:noreply, socket |> assign(update: nil) |> put_flash(:error, gettext("Couldn't check for updates."))}
+
+  @impl true
+  def handle_event("check_update", _p, socket) do
+    parent = self()
+
+    Task.start(fn ->
+      result =
+        case Pepe.Update.latest() do
+          {:ok, v} -> if Pepe.Update.newer?(v), do: {:newer, v}, else: :up_to_date
+          _ -> :error
+        end
+
+      send(parent, {:update_result, result})
+    end)
+
+    {:noreply, assign(socket, update: :checking)}
+  end
+
+  def handle_event("do_update", _p, socket) do
+    flash =
+      case Pepe.Update.run() do
+        {:ok, :updated, v} -> {:info, gettext("Updated to v%{v}. Restart Pepe to run the new version.", v: v)}
+        {:ok, :up_to_date, _} -> {:info, gettext("Already on the latest version.")}
+        {:error, _} -> {:error, gettext("Update failed. Try `pepe update` from a terminal.")}
+      end
+
+    {:noreply, socket |> assign(update: nil) |> put_flash(elem(flash, 0), elem(flash, 1))}
+  end
+
   def handle_event("config_save", %{"json" => json}, socket) do
     case Jason.decode(json) do
       {:ok, map} when is_map(map) ->

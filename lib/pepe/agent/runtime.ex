@@ -101,6 +101,9 @@ defmodule Pepe.Agent.Runtime do
       agent: agent,
       session_key: opts[:session_key],
       authorize: opts[:authorize],
+      # When true (autonomous consolidation), file writes are staged for review
+      # instead of applied - see Pepe.Approval.
+      review: opts[:review] == true,
       # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
       agent_chain: opts[:agent_chain]
     }
@@ -144,6 +147,15 @@ defmodule Pepe.Agent.Runtime do
   defp loop(agent, chain, messages, specs, ctx, opts, iterations_left) do
     chat_opts = [tools: specs, temperature: agent.temperature]
 
+    # Fold any /inline messages the caller injected mid-turn (`Session.inline/2`) into
+    # the history as user turns before this iteration's model call, so the agent reacts
+    # to them right away instead of only after the turn finishes.
+    messages = drain_steer(messages, opts)
+
+    # Keep the running history under the model's context window so long conversations
+    # don't fail once they outgrow it (a no-op until it's actually large).
+    messages = Pepe.Agent.Compaction.compact(messages, hd(chain))
+
     result = chat_with_failover(chain, messages, chat_opts, ctx, opts)
 
     case result do
@@ -154,7 +166,16 @@ defmodule Pepe.Agent.Runtime do
         tool_msgs = Enum.map(tool_calls, &run_tool(&1, ctx, opts))
 
         new_messages = messages ++ [assistant_msg] ++ tool_msgs
-        loop(agent, chain, new_messages, specs, ctx, opts, iterations_left - 1)
+
+        # Stuck-loop guard: if the model keeps issuing the exact same tool call, it's
+        # spinning with no progress (a failing command it won't stop retrying). Drop to
+        # the terminal branch, which strips tools and makes it summarize instead of
+        # looping to max_iterations.
+        if stuck?(tool_calls, messages) do
+          loop(agent, chain, new_messages, specs, ctx, opts, 0)
+        else
+          loop(agent, chain, new_messages, specs, ctx, opts, iterations_left - 1)
+        end
 
       {:ok, %{content: content}} ->
         content = content || ""
@@ -167,6 +188,43 @@ defmodule Pepe.Agent.Runtime do
         {:error, reason}
     end
   end
+
+  # Pull every pending `{:steer, text}` off the run task's mailbox (non-blocking) and
+  # append each as a user message. Emits a lifecycle event so a live surface can show
+  # the injected line was picked up.
+  defp drain_steer(messages, opts) do
+    receive do
+      {:steer, text} ->
+        emit(opts, {:inline, text})
+        drain_steer(messages ++ [Message.user(text)], opts)
+    after
+      0 -> messages
+    end
+  end
+
+  # The same tool call (name + arguments) issued this many times means the agent is
+  # stuck repeating it with no progress.
+  @stuck_repeats 3
+
+  @doc false
+  # True when any of `tool_calls` has already been issued identically enough times in
+  # `prior` that this one tips it over the repeat threshold.
+  def stuck?(tool_calls, prior) do
+    counts = tool_call_signatures(prior)
+    Enum.any?(tool_calls, fn c -> Map.get(counts, signature(c), 0) >= @stuck_repeats - 1 end)
+  end
+
+  defp tool_call_signatures(messages) do
+    for %{"role" => "assistant", "tool_calls" => calls} <- messages,
+        is_list(calls),
+        c <- calls,
+        reduce: %{} do
+      acc -> Map.update(acc, signature(c), 1, &(&1 + 1))
+    end
+  end
+
+  defp signature(%{"function" => %{"name" => name, "arguments" => args}}), do: {name, args}
+  defp signature(_), do: :unknown
 
   # Try each model in the chain; advance ONLY on transient failures (rate limit,
   # server error, network) - auth/request errors fail fast (a bad key on model B
@@ -227,21 +285,37 @@ defmodule Pepe.Agent.Runtime do
     emit(opts, {:tool_call, name, raw})
 
     output =
-      case Pepe.Permissions.gate(name, raw, ctx) do
-        :allow ->
-          Tools.execute(call, ctx)
+      cond do
+        ctx[:review] and stageable?(name) ->
+          stage_for_review(name, call, ctx)
 
-        :deny ->
-          emit(opts, {:tool_denied, name, nil})
-          Pepe.Permissions.denied_message(name)
+        true ->
+          case Pepe.Permissions.gate(name, raw, ctx) do
+            :allow ->
+              Tools.execute(call, ctx)
 
-        {:deny, reason} ->
-          emit(opts, {:tool_denied, name, reason})
-          Pepe.Permissions.denied_message(name, reason)
+            :deny ->
+              emit(opts, {:tool_denied, name, nil})
+              Pepe.Permissions.denied_message(name)
+
+            {:deny, reason} ->
+              emit(opts, {:tool_denied, name, reason})
+              Pepe.Permissions.denied_message(name, reason)
+          end
       end
 
     emit(opts, {:tool_result, name, output})
     Message.tool_result(id, name, output)
+  end
+
+  # Mutating file tools whose autonomous use we stage for review rather than apply.
+  @stageable ~w(write_file edit_file move_file)
+  defp stageable?(name), do: name in @stageable
+
+  defp stage_for_review(name, call, ctx) do
+    agent = (ctx[:agent] && ctx.agent.name) || "unknown"
+    {:ok, id, _} = Pepe.Approval.stage(agent, call)
+    "Staged this #{name} for review (id #{id}); it will be applied only after you approve it with `pepe review approve #{id}`."
   end
 
   defp emit(opts, event) do

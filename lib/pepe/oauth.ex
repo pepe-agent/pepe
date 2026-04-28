@@ -39,7 +39,7 @@ defmodule Pepe.OAuth do
     url = authorize_url(flow, challenge, state)
 
     ref = make_ref()
-    server = start_callback(flow, state, ref)
+    server = start_callback(flow, state, ref, self())
 
     announce(url, server != nil)
     open_browser(url)
@@ -52,6 +52,64 @@ defmodule Pepe.OAuth do
     stop_callback(server)
     result
   end
+
+  @doc """
+  Start a **non-blocking** sign-in (for the dashboard). Starts the loopback callback
+  and returns the authorize link plus a session to finish with. `owner` (default the
+  caller) receives `{:oauth_code, ref, code}` or `{:oauth_error, ref, reason}` from the
+  callback once the user authorizes in the browser. `session.pid` is `nil` if the
+  loopback port couldn't bind (remote/in-use) - then finish by pasting the code instead.
+  """
+  @spec begin(map(), pid()) :: {:ok, map()}
+  def begin(flow, owner \\ self()) do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {verifier, challenge} = pkce()
+    state = random_state()
+    url = authorize_url(flow, challenge, state)
+    ref = make_ref()
+    pid = start_callback(flow, state, ref, owner)
+    {:ok, %{flow: flow, url: url, verifier: verifier, state: state, ref: ref, pid: pid}}
+  end
+
+  @doc "Exchange `code` for tokens using a `begin/2` session, then stop its callback server."
+  @spec finish(map(), String.t()) :: {:ok, map()} | {:error, term()}
+  def finish(%{flow: flow, verifier: verifier, state: state} = session, code) do
+    result = exchange(flow, code, verifier, state)
+    cancel(session)
+    result
+  end
+
+  @doc "Stop a `begin/2` session's loopback callback (e.g. when the user cancels)."
+  def cancel(%{pid: pid}), do: stop_callback(pid)
+
+  @doc """
+  Build (not save) a `%Pepe.Config.Model{}` from a completed subscription sign-in:
+  the provider's OAuth `method` spec (carrying base_url/api/models) plus the captured
+  `tokens`. The model id defaults to the method's first offline fallback; edit later.
+  """
+  def subscription_connection(provider_key, method, name, tokens) do
+    flow = method.oauth_flow
+
+    %Pepe.Config.Model{
+      name: name,
+      base_url: method[:base_url] || Pepe.Providers.get(provider_key).base_url,
+      api_key: tokens.access,
+      model: List.first(method[:models] || []),
+      api: method[:api] || "openai-completions",
+      oauth: %{
+        "provider" => provider_key,
+        "refresh" => tokens.refresh,
+        "expires_at" => tokens.expires_at,
+        "token_url" => flow.token_url,
+        "client_id" => flow.client_id,
+        "token_content_type" => to_string(flow[:token_content_type] || :form)
+      }
+    }
+  end
+
+  @doc "Merge fresh `tokens` onto an existing OAuth connection (reconnect) and persist it."
+  def apply_tokens(%Pepe.Config.Model{oauth: oauth} = model, tokens) when is_map(oauth),
+    do: persist_refresh(model, oauth, tokens)
 
   @refresh_margin_seconds 60
 
@@ -202,10 +260,10 @@ defmodule Pepe.OAuth do
   ### loopback callback server
   ###
 
-  defp start_callback(flow, state, ref) do
+  defp start_callback(flow, state, ref, owner) do
     port = flow[:callback_port] || 1455
     path = flow[:callback_path] || "/auth/callback"
-    plug = {Callback, owner: self(), ref: ref, state: state, path: path}
+    plug = {Callback, owner: owner, ref: ref, state: state, path: path}
 
     opts = [plug: plug, scheme: :http, ip: {127, 0, 0, 1}, port: port, startup_log: false]
 
@@ -242,8 +300,8 @@ defmodule Pepe.OAuth do
     end
   end
 
-  # Accept a bare code, or a full redirect URL with `?code=...`.
-  defp extract_code(value) do
+  @doc "Pull the `code` out of a bare authorization code or a full redirect URL with `?code=...`."
+  def extract_code(value) do
     value = String.trim(value)
 
     case URI.parse(value) do

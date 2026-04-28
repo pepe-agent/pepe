@@ -57,7 +57,7 @@ defmodule PepeWeb.OpenAIController do
 
   defp respond(conn, params, agent, model, messages) do
     stream? = params["stream"] == true
-    session_id = params["session_id"] || params["user"] || session_header(conn)
+    session_id = session_from(params, conn)
 
     cond do
       # Stateful mode: a session id was provided, so the server keeps the
@@ -72,6 +72,34 @@ defmodule PepeWeb.OpenAIController do
         sync_response(conn, agent, model, messages)
     end
   end
+
+  # Build the server-side session key from the two dimensions a caller can send:
+  # the standard OpenAI `user` (who) and `session_id` / `X-Session-Id` (which
+  # conversation). Both present -> `user:session_id` (independent threads per user);
+  # one present -> that value alone; the same value in both -> deduped to one; neither
+  # (or blank) -> nil (stateless). So a plain OpenAI SDK, which only sends `user`, still
+  # keeps a conversation with no Pepe-specific field.
+  defp session_from(params, conn) do
+    user = present(params["user"])
+    sess = present(params["session_id"]) || present(session_header(conn))
+
+    case {user, sess} do
+      {nil, nil} -> nil
+      {u, nil} -> u
+      {nil, s} -> s
+      {u, u} -> u
+      {u, s} -> u <> ":" <> s
+    end
+  end
+
+  defp present(v) when is_binary(v) do
+    case String.trim(v) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp present(_), do: nil
 
   defp session_header(conn) do
     case get_req_header(conn, "x-session-id") do

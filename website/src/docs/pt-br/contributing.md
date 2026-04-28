@@ -35,7 +35,7 @@ cd pepe
 3. Adicione o repositório original como upstream:
 
 ```bash
-git remote add upstream https://github.com/jhonathas/pepe.git
+git remote add upstream https://github.com/pepe-agent/pepe.git
 git fetch upstream
 ```
 
@@ -77,7 +77,7 @@ git commit -m "Improve quickstart copy"
 git push origin docs-melhora-quickstart
 ```
 
-10. Abra um pull request contra `jhonathas/pepe:master`. Explique o que mudou, por
+10. Abra um pull request contra `pepe-agent/pepe:master`. Explique o que mudou, por
 que mudou e linke a issue, se houver.
 
 ## Bons PRs

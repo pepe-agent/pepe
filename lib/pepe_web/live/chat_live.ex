@@ -10,9 +10,11 @@ defmodule PepeWeb.ChatLive do
   import PepeWeb.DashUI
   import PepeWeb.DashData
 
+  alias Pepe.Agent.GoalLoop
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionPersistence
   alias Pepe.Agent.SessionSupervisor
+  alias Pepe.Agent.SessionTitles
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
@@ -25,6 +27,12 @@ defmodule PepeWeb.ChatLive do
     [
       {"/new", gettext("Start a fresh conversation")},
       {"/stop", gettext("Stop the current run")},
+      {"/inline", gettext("Feed a message into the running turn - TEXT")},
+      {"/goal", gettext("Pursue a goal until a reviewer approves - OBJECTIVE | SUCCESS CRITERION")},
+      {"/retry", gettext("Redo the last answer")},
+      {"/fork", gettext("Branch this conversation into a new one")},
+      {"/name", gettext("Label this conversation in the sidebar - TEXT")},
+      {"/usage", gettext("Show this month's spend and message count")},
       {"/compact", gettext("Summarize history to free up context")},
       {"/models", gettext("List models available to this company")},
       {"/model", gettext("Show or change the model - NAME [session|global]")}
@@ -117,7 +125,7 @@ defmodule PepeWeb.ChatLive do
                 </div>
                 <div :for={s <- items} class={["group mx-2 mb-0.5 flex items-center rounded-lg transition hover:bg-zinc-800/70", @selected == s.key && "bg-zinc-800"]}>
                   <button phx-click="select" phx-value-key={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
-                    <div class="truncate text-[15px] font-medium">{session_suffix(s.key)}</div>
+                    <div class="truncate text-[15px] font-medium">{s.title || session_suffix(s.key)}</div>
                     <div class="truncate text-sm text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
                   </button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
@@ -136,7 +144,7 @@ defmodule PepeWeb.ChatLive do
           <div :if={@selected} class="flex min-w-0 flex-1 flex-col">
             <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
               <div class="min-w-0 truncate">
-                <div class="truncate font-medium">{session_suffix(@selected)}</div>
+                <div class="truncate font-medium">{SessionTitles.get(@selected) || session_suffix(@selected)}</div>
                 <div class="truncate text-sm text-zinc-500">{@agent || "-"} · {@selected}</div>
               </div>
               <div class="flex gap-2">
@@ -232,6 +240,17 @@ defmodule PepeWeb.ChatLive do
           <span class={["ml-2 rounded-full px-2 py-0.5 text-xs font-medium", goal_badge(@focus.goal["status"])]}>
             {@focus.goal["status"] || "active"}
           </span>
+          <span :if={@focus.goal["attempt"]} class="ml-2 text-xs text-zinc-500">
+            {gettext("attempt %{n}/%{max}", n: @focus.goal["attempt"], max: @focus.goal["max_attempts"])}
+          </span>
+          <%!-- The success criterion and the judge's last verdict: what makes this a
+                goal loop rather than a note-to-self. --%>
+          <div :if={@focus.goal["criteria"]} class="mt-1 text-sm text-zinc-500">
+            {gettext("Done when:")} {@focus.goal["criteria"]}
+          </div>
+          <div :if={@focus.goal["verdict"]} class="mt-1 text-sm text-zinc-400">
+            <span class="text-zinc-600">{gettext("Reviewer:")}</span> {@focus.goal["verdict"]}
+          </div>
         </div>
       </div>
       <ul :if={is_list(@focus.plan) and @focus.plan != []} class={["space-y-0.5 text-sm", @focus.goal && "mt-2"]}>
@@ -317,6 +336,7 @@ defmodule PepeWeb.ChatLive do
 
   def handle_event("delete", %{"key" => key}, socket) do
     SessionSupervisor.terminate(key)
+    SessionTitles.delete(key)
     socket = assign(socket, sessions: list_sessions(socket.assigns.scope))
 
     if socket.assigns.selected == key do
@@ -539,6 +559,17 @@ defmodule PepeWeb.ChatLive do
   end
 
   defp stream_reply(key, text) do
+    {on_event, authorize} = session_callbacks(key)
+
+    spawn(fn ->
+      Session.chat(key, text, stream: true, on_event: on_event, authorize: authorize)
+    end)
+  end
+
+  # Stream a run's events to this chat over PubSub, and route its permission prompts to
+  # the operator. Shared by a normal turn and by a goal loop (whose attempts are just
+  # turns, so they stream the same way).
+  defp session_callbacks(key) do
     topic = topic(key)
 
     on_event = fn event ->
@@ -562,9 +593,34 @@ defmodule PepeWeb.ChatLive do
       end
     end
 
-    spawn(fn ->
-      Session.chat(key, text, stream: true, on_event: on_event, authorize: authorize)
-    end)
+    {on_event, authorize}
+  end
+
+  # `/goal <objective> | <success criterion>` - work, have an independent reviewer check
+  # the result, retry until it passes or the attempt cap is hit. The panel above the
+  # chat shows the criterion, the attempt count and the reviewer's last verdict.
+  defp start_goal(socket, key, cmd) do
+    parts =
+      cmd
+      |> String.replace_prefix("/goal", "")
+      |> String.split("|", parts: 2)
+      |> Enum.map(&String.trim/1)
+
+    case parts do
+      [objective, criteria] when objective != "" and criteria != "" ->
+        {on_event, authorize} = session_callbacks(key)
+
+        spawn(fn ->
+          GoalLoop.run(key, objective, criteria, stream: true, on_event: on_event, authorize: authorize)
+        end)
+
+        socket
+        |> assign(input: "", streaming: "", running: true, activity: [])
+        |> put_flash(:info, gettext("Pursuing the goal until a reviewer approves it."))
+
+      _ ->
+        put_flash(socket, :error, gettext("Usage: /goal OBJECTIVE | SUCCESS CRITERION"))
+    end
   end
 
   defp run_slash_command(socket, cmd) do
@@ -588,6 +644,43 @@ defmodule PepeWeb.ChatLive do
       "/stop" ->
         Session.stop(key)
         assign(socket, running: false, streaming: "", activity: [], input: "")
+
+      "/inline" ->
+        text = cmd |> String.replace_prefix("/inline", "") |> String.trim()
+
+        flash =
+          cond do
+            text == "" -> {:error, gettext("Usage: /inline TEXT")}
+            match?(:ok, Session.inline(key, text)) -> {:info, gettext("Fed into the running turn.")}
+            true -> {:error, gettext("Nothing is running - send it as a normal message.")}
+          end
+
+        socket |> assign(input: "") |> put_flash(elem(flash, 0), elem(flash, 1))
+
+      "/goal" ->
+        start_goal(socket, key, cmd)
+
+      "/retry" ->
+        retry_last(socket, key)
+
+      "/fork" ->
+        fork_session(socket, key)
+
+      "/name" ->
+        title = cmd |> String.replace_prefix("/name", "") |> String.trim()
+        Pepe.Agent.SessionTitles.set(key, title)
+
+        flash =
+          if title == "",
+            do: gettext("Label cleared."),
+            else: gettext("Labeled “%{title}”.", title: title)
+
+        socket
+        |> assign(input: "", sessions: list_sessions(socket.assigns.scope))
+        |> put_flash(:info, flash)
+
+      "/usage" ->
+        socket |> assign(input: "") |> put_flash(:info, usage_line(key))
 
       "/compact" ->
         parent = self()
@@ -614,6 +707,66 @@ defmodule PepeWeb.ChatLive do
       _ ->
         put_flash(socket, :error, gettext("Unknown command %{cmd}", cmd: cmd))
     end
+  end
+
+  # Branch the current conversation into a fresh session seeded with its history, then
+  # switch to it. The original stays live in the sidebar to return to. The `-fork`
+  # suffix marks the branch in the session list.
+  defp fork_session(socket, key) do
+    new_key = "web:" <> Integer.to_string(System.unique_integer([:positive])) <> "-fork"
+
+    case Session.fork(key, new_key) do
+      {:ok, ^new_key} ->
+        # Label the branch off the source so it's recognizable in the sidebar.
+        parent = SessionTitles.get(key) || session_suffix(key)
+        SessionTitles.set(new_key, gettext("%{name} (fork)", name: parent))
+
+        socket
+        |> assign(input: "", sessions: list_sessions(socket.assigns.scope))
+        |> put_flash(:info, gettext("Branched into a new conversation. The original stays in the sidebar."))
+        |> push_patch(to: ~p"/chat?chat=#{new_key}")
+
+      _ ->
+        put_flash(socket, :error, gettext("Couldn't branch this conversation."))
+    end
+  end
+
+  # Redo the last answer: drop the last user turn (and its responses), then re-send the
+  # same user message so the model tries again. No-op with a friendly note if there's
+  # no user turn yet, or if a turn is already running.
+  defp retry_last(socket, key) do
+    cond do
+      socket.assigns.running ->
+        put_flash(socket, :error, gettext("Wait for the current turn to finish."))
+
+      text = last_user_text(socket.assigns.messages) ->
+        Session.undo(key)
+        stream_reply(key, text)
+
+        socket
+        |> assign(
+          messages: history(key) ++ [%{role: "user", content: text}],
+          streaming: "",
+          running: true,
+          activity: [],
+          input: ""
+        )
+
+      true ->
+        put_flash(socket, :error, gettext("Nothing to retry yet."))
+    end
+  end
+
+  defp last_user_text(messages) do
+    messages |> Enum.reverse() |> Enum.find_value(fn m -> m.role == "user" && m.content end)
+  end
+
+  # This month's spend and message count for the company that owns this session's agent.
+  defp usage_line(key) do
+    company = key |> status() |> Map.get(:agent) |> Pepe.Company.of()
+    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
+    count = Pepe.Usage.message_count_month_to_date(company)
+    gettext("This month: %{cost} · %{count} messages", cost: cost, count: count)
   end
 
   defp slash?(text), do: String.starts_with?(text, "/")
@@ -703,7 +856,7 @@ defmodule PepeWeb.ChatLive do
 
   defp session_card(key, true) do
     s = status(key)
-    %{key: key, type: session_type(key), agent: s.agent, model: s.model, turns: s.turns}
+    %{key: key, title: SessionTitles.get(key), type: session_type(key), agent: s.agent, model: s.model, turns: s.turns}
   end
 
   defp session_card(key, false) do
@@ -711,6 +864,7 @@ defmodule PepeWeb.ChatLive do
       {:ok, agent, messages, _pending} ->
         %{
           key: key,
+          title: SessionTitles.get(key),
           type: session_type(key),
           agent: agent,
           model: model_of(agent),
@@ -718,7 +872,7 @@ defmodule PepeWeb.ChatLive do
         }
 
       :error ->
-        %{key: key, type: session_type(key), agent: nil, model: nil, turns: 0}
+        %{key: key, title: SessionTitles.get(key), type: session_type(key), agent: nil, model: nil, turns: 0}
     end
   end
 

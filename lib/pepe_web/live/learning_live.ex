@@ -28,7 +28,8 @@ defmodule PepeWeb.LearningLive do
        learn_nodes: Pepe.Learning.timeline(agent),
        auto?: agent && Reflect.auto?(agent),
        consolidating: false,
-       editing: nil
+       editing: nil,
+       pending: Pepe.Approval.list()
      )}
   end
 
@@ -79,6 +80,23 @@ defmodule PepeWeb.LearningLive do
         </div>
 
         <div :if={!@editing} class="flex-1 space-y-2 overflow-y-auto p-6">
+          <div :if={@pending != []} class="mb-4 rounded-xl border border-amber-800/50 bg-amber-950/20 p-3">
+            <div class="mb-2 text-sm font-semibold text-amber-200">
+              {gettext("%{count} write(s) awaiting your review", count: length(@pending))}
+              <span class="ml-1 font-normal text-amber-200/60">{gettext("(staged by consolidation, not yet applied)")}</span>
+            </div>
+            <div :for={p <- @pending} class="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-amber-900/20">
+              <div class="min-w-0">
+                <div class="text-[15px]"><span class="font-medium">{p["tool"]}</span> <span class="text-zinc-500">by {p["agent"]}</span></div>
+                <div class="truncate font-mono text-sm text-zinc-400">{String.slice(to_string(get_in(p, ["tool_call", "function", "arguments"]) || ""), 0, 200)}</div>
+              </div>
+              <div class="flex shrink-0 gap-1">
+                <button phx-click="approve_write" phx-value-id={p["id"]} class={btn_ghost()}>{gettext("Approve")}</button>
+                <button phx-click="reject_write" phx-value-id={p["id"]} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>{gettext("Reject")}</button>
+              </div>
+            </div>
+          </div>
+
           <button
             :for={n <- @learn_nodes}
             phx-click="learn_open"
@@ -155,6 +173,24 @@ defmodule PepeWeb.LearningLive do
       _ ->
         {:noreply, socket}
     end
+  end
+
+  def handle_event("approve_write", %{"id" => id}, socket) do
+    flash =
+      case Pepe.Approval.approve(id) do
+        {:ok, _} -> {:info, gettext("Approved and applied.")}
+        {:error, _} -> {:error, gettext("That write is no longer pending.")}
+      end
+
+    {:noreply,
+     socket
+     |> assign(pending: Pepe.Approval.list(), learn_nodes: Pepe.Learning.timeline(socket.assigns.learn_agent))
+     |> put_flash(elem(flash, 0), elem(flash, 1))}
+  end
+
+  def handle_event("reject_write", %{"id" => id}, socket) do
+    Pepe.Approval.reject(id)
+    {:noreply, socket |> assign(pending: Pepe.Approval.list()) |> put_flash(:info, gettext("Rejected, nothing was written."))}
   end
 
   def handle_event("set_scope", params, socket),

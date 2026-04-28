@@ -12,6 +12,14 @@
   Web dashboard &nbsp;·&nbsp; OpenAI-compatible HTTP &nbsp;·&nbsp; WebSocket &nbsp;·&nbsp; Telegram &nbsp;·&nbsp; WhatsApp &nbsp;·&nbsp; CLI
 </p>
 
+<p align="center">
+  <a href="https://pepe-agent.com"><strong>Website</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://pepe-agent.com/en/docs/">Documentation</a>
+  &nbsp;·&nbsp;
+  <a href="https://pepe-agent.com/en/docs/quickstart/">Quickstart</a>
+</p>
+
 > **Why "Pepe"?** The name nods to Chespirito's comedy universe, loved across
 > Latin America generations grew up with. The character's whole thing? **He
 > did exactly what he was told.** No arguing, no improvising beyond the
@@ -43,7 +51,59 @@ llama.cpp and any other compatible endpoint work with zero code changes.
 
 ## Quick start
 
+### Install and use
+
+Grab the self-contained `pepe` binary (macOS, Linux, Windows; no root, no runtime to install):
+
 ```bash
+curl -fsSL https://pepe-agent.com/install.sh | sh
+
+# 1) scaffold ~/.pepe/config.json (guided, interactive)
+pepe setup
+
+# 2) add a model connection (any OpenAI-compatible provider; openrouter is a
+#    known provider, so its base URL is filled in automatically)
+pepe model add openrouter --api-key '${OPENROUTER_API_KEY}' --model openai/gpt-5-chat
+
+# 3) define an agent (defaults to all built-in tools; the first model/agent
+#    you add becomes the default automatically)
+pepe agent add assistant --prompt "You are Pepe, a helpful assistant."
+
+# 4) run it
+export OPENROUTER_API_KEY=sk-...
+pepe run "summarize what this project does"
+
+# 5) or run it toward an outcome: it works, an independent reviewer checks the
+#    result against your criterion, and it retries until that criterion is met
+pepe goal "write a release note for v0.3" \
+  --criteria "mentions every change in CHANGELOG's Unreleased section, in one line each"
+```
+
+See the [quickstart guide](https://pepe-agent.com/en/docs/quickstart/) for the full walkthrough.
+
+### Run toward a goal, not just a prompt
+
+A prompt gets you one turn: the agent answers, and *you* decide whether it's good
+enough. A **goal** gets you an outcome: you state what "done" means, and Pepe keeps
+working until an **independent reviewer** (a separate model call that only sees your
+criterion and the result, never the working conversation) agrees it's met - or the
+attempt cap is reached.
+
+```bash
+pepe goal "OBJECTIVE" --criteria "how we know it's done" \
+  [--max-attempts 3] [--judge MODEL] [--agent NAME]
+```
+
+Also on the dashboard: `/goal <objective> | <success criterion>` in any chat. The
+panel above the conversation shows the criterion, the attempt count, and the
+reviewer's last verdict as it runs.
+
+### From source (development)
+
+Clone the repo and drive it with `mix` instead of the binary:
+
+```bash
+git clone https://github.com/pepe-agent/pepe.git && cd pepe
 mix deps.get
 
 # 1) scaffold ~/.pepe/config.json
@@ -99,7 +159,7 @@ review and merge.
 Get set up in a minute (no database, no API keys needed for the test suite):
 
 ```bash
-git clone https://github.com/jhonathas/pepe.git && cd pepe
+git clone https://github.com/pepe-agent/pepe.git && cd pepe
 mix deps.get
 mix test          # the whole suite, over real TCP - no DB, no keys
 ```

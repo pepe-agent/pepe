@@ -77,6 +77,8 @@ defmodule Mix.Tasks.Pepe do
   ## Running
 
       mix pepe run [AGENT] "your prompt"      # one-shot, streams to stdout
+      mix pepe goal "OBJECTIVE" --criteria "how we know it's done" [--max-attempts N] [--judge MODEL] [--agent NAME]
+                                               # work until an independent reviewer says the criterion is met
       mix pepe tui [AGENT | --agent NAME] [--session KEY]   # interactive console, keeps the session (alias: chat)
       mix pepe serve [--port 4000]             # OpenAI API + WebSocket server
       mix pepe gateway telegram setup          # configure the default Telegram bot
@@ -102,6 +104,8 @@ defmodule Mix.Tasks.Pepe do
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
       mix pepe doctor [--offline]              # health-check the whole setup
+      mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
+      mix pepe update                          # self-update the binary to the latest release
       mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
       mix pepe backup [--output FILE.tgz]      # archive ~/.pepe + list the secret env vars to save
@@ -172,6 +176,8 @@ defmodule Mix.Tasks.Pepe do
 
   def dispatch(["cron" | rest]), do: with_app([], fn -> cron_cmd(rest) end)
   def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
+  def dispatch(["review" | rest]), do: with_app([], fn -> review_cmd(rest) end)
+  def dispatch(["update" | _]), do: with_app([], fn -> update_cmd() end)
 
   # `mcp tools` launches the server (needs the app); the rest just edit config.
   def dispatch(["mcp", "tools" | rest]), do: with_app([], fn -> mcp_cmd(["tools" | rest]) end)
@@ -205,6 +211,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["agent" | rest]), do: with_config(fn -> agent_cmd(rest) end)
   def dispatch(["run", "help" | _]), do: run_help()
   def dispatch(["run" | rest]), do: with_app([], fn -> run_cmd(rest) end)
+  def dispatch(["goal" | rest]), do: with_app([persist: true], fn -> goal_cmd(rest) end)
   def dispatch(["chat" | rest]), do: with_app([persist: true], fn -> tui_cmd(rest) end)
   def dispatch(["tui" | rest]), do: with_app([persist: true], fn -> tui_cmd(rest) end)
 
@@ -2063,9 +2070,74 @@ defmodule Mix.Tasks.Pepe do
     """)
   end
 
+  # Run toward an outcome instead of for one turn: work, let an independent reviewer
+  # check the result against the criterion, retry until it passes or the cap is hit.
+  defp goal_cmd(args) do
+    {opts, rest, _} =
+      OptionParser.parse(args,
+        strict: [criteria: :string, max_attempts: :integer, judge: :string, agent: :string]
+      )
+
+    objective = Enum.join(rest, " ")
+    criteria = opts[:criteria]
+
+    cond do
+      objective == "" or is_nil(criteria) ->
+        error(~s(usage: mix pepe goal "OBJECTIVE" --criteria "how we know it's done" [--max-attempts N] [--judge MODEL] [--agent NAME]))
+
+      not ensure_configured?() ->
+        :ok
+
+      true ->
+        do_goal_cmd(objective, criteria, opts)
+    end
+  end
+
+  defp do_goal_cmd(objective, criteria, opts) do
+    agent = opts[:agent] || Config.default_agent_name()
+    key = "cli-goal:#{System.unique_integer([:positive])}"
+    {:ok, _pid} = Pepe.Agent.SessionSupervisor.ensure(key, agent)
+
+    loop_opts =
+      [
+        stream: true,
+        on_event: goal_events(),
+        authorize: Pepe.Gateways.TUI.authorizer(),
+        max_attempts: opts[:max_attempts]
+      ]
+      |> then(&if(opts[:judge], do: Keyword.put(&1, :judge_model, opts[:judge]), else: &1))
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
+    case Pepe.Agent.GoalLoop.run(key, objective, criteria, loop_opts) do
+      {:ok, :met, _answer, n} ->
+        puts("\n✅ Goal met after #{n} attempt(s).")
+
+      {:error, :max_attempts, _answer, missing} ->
+        error("\n🛑 Gave up at the attempt cap. Still missing: #{missing}")
+
+      {:error, reason} ->
+        error("\n#{inspect(reason)}")
+    end
+  end
+
+  # The turn's own events render as usual (the console gateway); the goal loop's extra
+  # events announce each attempt and the reviewer's verdict.
+  defp goal_events do
+    stream = Pepe.Gateways.TUI.stream_events()
+
+    fn
+      {:goal_attempt, n, max} -> puts("\n── attempt #{n}/#{max} ──")
+      {:goal_verdict, true, why} -> puts("\n✅ reviewer: #{why}")
+      {:goal_verdict, false, why} -> puts("\n↻ reviewer: #{why}")
+      event -> stream.(event)
+    end
+  end
+
   defp run_cmd([]), do: error("usage: mix pepe run [AGENT] \"prompt\"")
 
-  defp run_cmd(args) do
+  defp run_cmd(args), do: if(ensure_configured?(), do: do_run_cmd(args))
+
+  defp do_run_cmd(args) do
     {agent_name, prompt} =
       case args do
         [single] ->
@@ -2090,7 +2162,9 @@ defmodule Mix.Tasks.Pepe do
 
   # The interactive console gateway lives in Pepe.Gateways.TUI; just resolve the
   # agent and hand off. `chat` and `tui` both land here.
-  defp tui_cmd(args) do
+  defp tui_cmd(args), do: if(ensure_configured?(), do: do_tui_cmd(args))
+
+  defp do_tui_cmd(args) do
     # Accept the agent as a positional (`tui NAME`) or a flag (`tui --agent NAME`),
     # and an optional `--session KEY` to resume/separate console sessions.
     {opts, rest} =
@@ -2652,9 +2726,141 @@ defmodule Mix.Tasks.Pepe do
   # Owl (select / multiselect / input) so we don't hand-roll a TUI.
   # First run walks the full wizard; later runs open a menu to (re)configure parts.
   defp setup do
-    Config.load() |> Config.save()
+    if configured?() do
+      announce_backup(Config.backup())
+      Config.load() |> Config.save()
+      config_menu()
+    else
+      maybe_choose_home()
+      Config.load() |> Config.save()
+      first_run_setup()
+    end
+  end
 
-    if configured?(), do: config_menu(), else: first_run_setup()
+  defp announce_backup(nil), do: :ok
+
+  defp announce_backup(bak) do
+    info(
+      dim("backed up your config to #{Config.short_path(bak)}  (restore: cp #{Config.short_path(bak)} #{Config.short_path(Config.path())})")
+    )
+  end
+
+  # First run only: show where everything will be stored, and let the user relocate it.
+  # A chosen path is set for this process and offered for their shell profile so future
+  # runs (which read PEPE_HOME) find it - it can't live in the config, since the config
+  # is what lives at that path.
+  defp maybe_choose_home do
+    current = Config.home()
+    info(bold("Storage location"))
+    info("Pepe keeps its config, data and workspaces under:")
+    info("  " <> green(Config.short_path(current)) <> dim("  (#{current})"))
+
+    case Owl.IO.input(label: "Press Enter to use it, or type another folder:", optional: true) |> presence() do
+      nil ->
+        :ok
+
+      typed ->
+        expanded = Path.expand(typed)
+
+        if expanded != current do
+          File.mkdir_p!(expanded)
+          System.put_env("PEPE_HOME", expanded)
+          ok("storing everything under #{green(Config.short_path(expanded))}")
+          offer_persist_home(expanded)
+        end
+    end
+
+    info("")
+  end
+
+  defp print_storage_summary do
+    info("\n" <> bold("Where Pepe keeps everything") <> dim(" (all hand-editable):"))
+    info("  config : " <> Config.short_path(Config.path()))
+    info("  data   : " <> Config.short_path(Path.join(Config.home(), "data")))
+    info("  agents : " <> Config.short_path(Path.join(Config.home(), "agents")))
+  end
+
+  defp offer_persist_home(path) do
+    line = ~s(export PEPE_HOME="#{path}")
+
+    if ask_yes?("Add this to your shell profile so future runs use it?\n  " <> dim(line)) do
+      case persist_env_line(line) do
+        {:ok, rc} ->
+          ok("added to #{Config.short_path(rc)} - open a new shell, or run: source #{Config.short_path(rc)}")
+
+        :error ->
+          info(dim("couldn't find a shell profile - set it yourself: #{line}"))
+      end
+    else
+      info(dim("remember to set it, or future runs use the default location: #{line}"))
+    end
+  end
+
+  # Idempotent append of an env line to the user's shell rc (never duplicates it).
+  defp persist_env_line(line) do
+    case shell_rc() do
+      nil ->
+        :error
+
+      rc ->
+        body =
+          case File.read(rc) do
+            {:ok, b} -> b
+            _ -> ""
+          end
+
+        unless String.contains?(body, line) do
+          File.write!(rc, "\n# pepe storage location\n#{line}\n", [:append])
+        end
+
+        {:ok, rc}
+    end
+  end
+
+  defp shell_rc do
+    home = System.user_home!()
+    shell = System.get_env("SHELL") || ""
+
+    cond do
+      String.contains?(shell, "zsh") -> Path.join(home, ".zshrc")
+      String.contains?(shell, "bash") -> Path.join(home, ".bashrc")
+      File.exists?(Path.join(home, ".zshrc")) -> Path.join(home, ".zshrc")
+      File.exists?(Path.join(home, ".bashrc")) -> Path.join(home, ".bashrc")
+      true -> nil
+    end
+  end
+
+  # A model connection is the one thing every run/chat needs; offer setup right there
+  # (or, with no TTY, say what to run) instead of a bare "not configured" failure.
+  defp ensure_configured? do
+    cond do
+      configured?() ->
+        true
+
+      interactive?() ->
+        info(yellow("Pepe isn't set up yet") <> dim(" (no model connection)."))
+
+        if ask_yes?("Run setup now?") do
+          first_run_setup()
+          configured?()
+        else
+          info("Run " <> bold("mix pepe setup") <> " when you're ready.")
+          false
+        end
+
+      true ->
+        error("not configured - run `pepe setup` first (it needs a model connection)")
+        false
+    end
+  end
+
+  defp interactive?, do: match?({:ok, _}, :io.columns())
+
+  defp ask_yes?(question) do
+    case Owl.IO.input(label: question <> " [Y/n]", optional: true) do
+      v when v in [nil, ""] -> true
+      v -> String.downcase(String.trim(v)) in ["y", "yes", "s", "sim"]
+    end
   end
 
   defp configured?, do: Config.models() != [] or Config.agents() != []
@@ -2864,6 +3070,7 @@ defmodule Mix.Tasks.Pepe do
             maybe_setup_telegram()
             maybe_setup_migrate()
             maybe_setup_dashboard()
+            print_storage_summary()
             info("\n" <> green("✓ All set!") <> "  Try:  " <> bold("pepe run \"hello\""))
             info(dim("More anytime: rerun " <> bold("mix pepe setup") <> dim(" for channels, plugins, privacy and dashboard.")))
         end
@@ -3242,7 +3449,7 @@ defmodule Mix.Tasks.Pepe do
     if File.dir?(home) do
       run_backup(home, opts[:output])
     else
-      error("nothing to back up - #{home} doesn't exist yet (run `mix pepe setup`)")
+      error("nothing to back up - #{Config.short_path(home)} doesn't exist yet (run `mix pepe setup`)")
     end
   end
 
@@ -3691,6 +3898,60 @@ defmodule Mix.Tasks.Pepe do
     info(dim("   #{String.slice(to_string(t["description"]), 0, 120)}"))
   end
 
+  # `mix pepe review` - the queue of autonomous writes waiting for approval.
+  defp review_cmd(["approve", id | _]) do
+    case Pepe.Approval.approve(id) do
+      {:ok, _} -> ok("approved #{id} - the change was applied")
+      {:error, :not_found} -> error("no pending write with id #{id}")
+    end
+  end
+
+  defp review_cmd(["reject", id | _]) do
+    case Pepe.Approval.reject(id) do
+      :ok -> ok("rejected #{id} - discarded, nothing was written")
+      {:error, :not_found} -> error("no pending write with id #{id}")
+    end
+  end
+
+  defp review_cmd(_) do
+    case Pepe.Approval.list() do
+      [] ->
+        info(dim("no writes waiting for review."))
+        info(dim("(the queue only fills when review is on: mix pepe config set review_writes true)"))
+
+      entries ->
+        info(bold("Autonomous writes awaiting review:") <> dim(" approve/reject with `mix pepe review approve|reject ID`\n"))
+
+        Enum.each(entries, fn e ->
+          args = get_in(e, ["tool_call", "function", "arguments"]) || ""
+          info("#{green(e["id"])}  #{bold(e["tool"])} by #{e["agent"]}")
+          info(dim("   " <> String.slice(to_string(args), 0, 160)))
+        end)
+    end
+  end
+
+  # `mix pepe update` - self-update the packaged binary to the latest release.
+  defp update_cmd do
+    info(dim("checking for a newer release..."))
+
+    case Pepe.Update.run() do
+      {:ok, :updated, v} ->
+        ok("updated to v#{v}  (previous binary kept as pepe.old) - restart pepe to run it")
+
+      {:ok, :up_to_date, v} ->
+        ok("already on the latest version (v#{v})")
+
+      {:error, :from_source} ->
+        info(yellow("you're running from a source checkout, not the binary - update with `git pull`"))
+
+      {:error, :unsupported_platform} ->
+        error("no prebuilt binary for this platform - build from source or use `mix pepe`")
+
+      {:error, reason} ->
+        error("update failed: #{describe(reason)}")
+    end
+  end
+
   # `mix pepe doctor [--offline]` - health-check the setup (live probes by default).
   defp doctor_cmd(rest) do
     live? = "--offline" not in rest
@@ -3704,7 +3965,7 @@ defmodule Mix.Tasks.Pepe do
       Enum.each(checks, fn
         {area, subject, :ok} -> info("#{green("✓")} [#{area}] #{subject}")
         {area, subject, {:warn, msg}} -> info("#{dim("⚠")} [#{area}] #{subject} - #{msg}")
-        {area, subject, {:error, msg}} -> error("✗ [#{area}] #{subject} - #{msg}")
+        {area, subject, {:error, msg}} -> error("[#{area}] #{subject} - #{msg}")
       end)
 
       if Pepe.Doctor.healthy?(checks) do

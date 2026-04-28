@@ -86,6 +86,9 @@ defmodule Pepe.Gateways.Telegram do
       {"btw", gettext("Ask a side question that isn't saved - /btw <q>")},
       {"learn", gettext("Save what I learned to memory/skills")},
       {"stop", gettext("Stop the current run")},
+      {"inline", gettext("Feed a message into the running turn - /inline <text>")},
+      {"retry", gettext("Redo the last answer")},
+      {"usage", gettext("Show this month's spend and message count")},
       {"help", gettext("List commands")}
     ]
   end
@@ -865,41 +868,47 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "agent", name) do
-    if Config.get_agent(name) do
-      ensure_session(chat_id)
-      Pepe.Agent.Session.set_agent(session_key(chat_id), name)
-      send_message(chat_id, gettext("Switched to agent %{name}.", name: name))
-    else
-      send_message(chat_id, gettext("Unknown agent: %{name}", name: name))
-    end
+    operator_only(chat_id, fn ->
+      if Config.get_agent(name) do
+        ensure_session(chat_id)
+        Pepe.Agent.Session.set_agent(session_key(chat_id), name)
+        send_message(chat_id, gettext("Switched to agent %{name}.", name: name))
+      else
+        send_message(chat_id, gettext("Unknown agent: %{name}", name: name))
+      end
+    end)
   end
 
   defp run_command(chat_id, "status", _args) do
-    ensure_session(chat_id)
-    s = Pepe.Agent.Session.status(session_key(chat_id))
+    operator_only(chat_id, fn ->
+      ensure_session(chat_id)
+      s = Pepe.Agent.Session.status(session_key(chat_id))
 
-    send_message(
-      chat_id,
-      gettext("Agent: %{agent}\nModel: %{model}\nTurns: %{turns}",
-        agent: s.agent || gettext("(default)"),
-        model: s.model || gettext("(unset)"),
-        turns: s.turns
+      send_message(
+        chat_id,
+        gettext("Agent: %{agent}\nModel: %{model}\nTurns: %{turns}",
+          agent: s.agent || gettext("(default)"),
+          model: s.model || gettext("(unset)"),
+          turns: s.turns
+        )
       )
-    )
+    end)
   end
 
-  defp run_command(chat_id, "models", _args), do: send_model_picker(chat_id)
+  defp run_command(chat_id, "models", _args), do: operator_only(chat_id, fn -> send_model_picker(chat_id) end)
 
   defp run_command(chat_id, "model", args) do
     case String.split(args, ~r/\s+/, trim: true) do
-      [] -> show_model(chat_id)
+      # Showing the current model reveals infra; switching is already gated by
+      # ModelSwitch.permission (a non-trainer gets :none), so only guard the show path.
+      [] -> operator_only(chat_id, fn -> show_model(chat_id) end)
       [name] -> change_model(chat_id, name, nil)
       [name, scope] -> change_model(chat_id, name, scope)
       _ -> send_message(chat_id, gettext("Usage: /model NAME [session|global]"))
     end
   end
 
-  defp run_command(chat_id, "tools", _args), do: send_html(chat_id, tools_text())
+  defp run_command(chat_id, "tools", _args), do: operator_only(chat_id, fn -> send_html(chat_id, tools_text()) end)
 
   defp run_command(chat_id, "learn", _args) do
     if learn?() do
@@ -924,11 +933,46 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp run_command(chat_id, "skill", ""), do: send_html(chat_id, skills_text())
-  defp run_command(chat_id, "skill", name), do: run_skill(chat_id, name, "")
+  defp run_command(chat_id, "retry", _args) do
+    ensure_session(chat_id)
+
+    case last_user_text(session_key(chat_id)) do
+      nil ->
+        send_message(chat_id, gettext("Nothing to retry yet."))
+
+      text ->
+        Pepe.Agent.Session.undo(session_key(chat_id))
+        chat_with_agent(chat_id, nil, text)
+    end
+  end
+
+  defp run_command(chat_id, "usage", _args) do
+    operator_only(chat_id, fn ->
+      company = Company.of(agent_default())
+      cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
+      count = Pepe.Usage.message_count_month_to_date(company)
+      send_message(chat_id, gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
+    end)
+  end
+
+  defp run_command(chat_id, "inline", "") do
+    send_message(chat_id, gettext("Usage: /inline <message> - feed it into the running turn."))
+  end
+
+  defp run_command(chat_id, "inline", text) do
+    ensure_session(chat_id)
+
+    case Pepe.Agent.Session.inline(session_key(chat_id), text) do
+      :ok -> send_message(chat_id, gettext("➕ Fed into the running turn."))
+      _ -> send_message(chat_id, gettext("Nothing is running - just send it as a normal message."))
+    end
+  end
+
+  defp run_command(chat_id, "skill", ""), do: operator_only(chat_id, fn -> send_html(chat_id, skills_text()) end)
+  defp run_command(chat_id, "skill", name), do: operator_only(chat_id, fn -> run_skill(chat_id, name, "") end)
 
   defp run_command(chat_id, "approve", args) do
-    manage_approvals(chat_id, String.split(args))
+    operator_only(chat_id, fn -> manage_approvals(chat_id, String.split(args)) end)
   end
 
   defp run_command(chat_id, cmd, "") when cmd in ["btw", "side"] do
@@ -1336,6 +1380,18 @@ defmodule Pepe.Gateways.Telegram do
   # The default bot keeps the legacy `telegram:<chat_id>` key so existing sessions
   # and bindings survive; named bots are namespaced to avoid collisions and to let
   # cron delivery route back to the right bot.
+  # The text of the most recent user message in a session, or nil (used by /retry).
+  defp last_user_text(key) do
+    key
+    |> Pepe.Agent.Session.history()
+    |> Enum.reverse()
+    |> Enum.find_value(fn m -> m["role"] == "user" && m["content"] end)
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
   defp session_key(chat_id), do: session_key(bot_name(), chat_id)
   defp session_key("default", chat_id), do: "telegram:#{chat_id}"
   defp session_key(name, chat_id), do: "telegram:#{name}:#{chat_id}"
@@ -1721,6 +1777,14 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp learn_allowed?(user_id), do: learns_from?(bot(), user_id)
+
+  # Run an operator-only command (config, permissions, spend, internal inventory) only
+  # for the bot's trusted tier - the same `trainers` decision stashed as `learn?`:
+  # everyone on a personal bot with no list, no one who is just a client on a
+  # customer-facing bot. A non-trainer is refused, never shown operator internals.
+  defp operator_only(chat_id, fun) do
+    if learn?(), do: fun.(), else: send_message(chat_id, gettext("That command isn't available here."))
+  end
 
   # Stashed for this task process so downstream helpers (chat_with_agent, /learn)
   # see the decision without threading user_id everywhere.

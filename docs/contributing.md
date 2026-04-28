@@ -10,7 +10,7 @@ or your package manager). **No database is required** - the test suite starts it
 local mock model server, so there's nothing to provision.
 
 ```bash
-git clone https://github.com/jhonathas/pepe.git pepe && cd pepe
+git clone https://github.com/pepe-agent/pepe.git pepe && cd pepe
 mix deps.get
 mix test          # runs the whole suite over real TCP - no DB, no API keys
 ```

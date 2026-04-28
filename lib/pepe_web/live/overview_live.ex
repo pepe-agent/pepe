@@ -38,13 +38,13 @@ defmodule PepeWeb.OverviewLive do
     assign(socket,
       month: month,
       days: days.buckets,
-      live_sessions: length(SessionSupervisor.list()),
+      live_sessions: scoped_live_sessions(scope),
       counts: %{
         agents: length(scoped_agents(Config.agents(), scope)),
         companies: length(Config.companies()),
         models: length(scoped_models(Config.models(), scope)),
-        channels: length(Config.telegram_bots()) + map_size(Config.webhooks()),
-        automations: length(Config.crons()) + length(Config.watches())
+        channels: scoped_channels(scope),
+        automations: scoped_automations(scope)
       }
     )
   end
@@ -168,6 +168,35 @@ defmodule PepeWeb.OverviewLive do
   defp bar_pct(total, days) do
     max = days |> Enum.map(& &1.total) |> Enum.max(fn -> 0 end)
     if max > 0, do: max(round(total / max * 100), 2), else: 0
+  end
+
+  # Everything below is counted within the selected company scope (a bare count
+  # ignores which company is showing). `in_scope?` treats "all" as everything.
+  defp scoped_live_sessions(scope) do
+    Enum.count(SessionSupervisor.list(), fn key ->
+      agent = session_agent(key)
+      agent && in_scope?(agent, scope)
+    end)
+  end
+
+  defp session_agent(key) do
+    Pepe.Agent.Session.status(key).agent
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  defp scoped_channels(scope) do
+    telegram = Enum.count(Config.telegram_bots(), &in_scope?(&1["agent"], scope))
+    webhooks = Config.webhooks() |> Map.values() |> Enum.count(&in_scope?(&1["agent"], scope))
+    telegram + webhooks
+  end
+
+  defp scoped_automations(scope) do
+    crons = Enum.count(Config.crons(), &in_scope?(&1.agent, scope))
+    watches = Enum.count(Config.watches(), &in_scope?(&1.agent, scope))
+    crons + watches
   end
 
   defp scope_label("all"), do: gettext("all scopes")

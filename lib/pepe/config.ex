@@ -44,6 +44,71 @@ defmodule Pepe.Config do
     System.get_env("PEPE_CONFIG") || Path.join(home(), "config.json")
   end
 
+  @doc """
+  Shorten an absolute path for display: the Pepe home becomes `~/.pepe` (or `$PEPE_HOME`
+  when that override is set), and the user's home becomes `~`. Keeps diagnostic and setup
+  output readable instead of printing long absolute paths.
+  """
+  def short_path(path) do
+    path = to_string(path)
+    home = home()
+    user = user_home()
+
+    cond do
+      String.starts_with?(path, home) ->
+        marker = if System.get_env("PEPE_HOME"), do: "$PEPE_HOME", else: "~/.pepe"
+        marker <> String.replace_prefix(path, home, "")
+
+      user && String.starts_with?(path, user) ->
+        "~" <> String.replace_prefix(path, user, "")
+
+      true ->
+        path
+    end
+  end
+
+  defp user_home do
+    case System.user_home() do
+      nil -> nil
+      h -> h
+    end
+  end
+
+  @backups_kept 5
+
+  @doc """
+  Copy the current config file to a timestamped `.bak.<unix>` alongside it, keeping only
+  the last few, and return the backup path (or `nil` when there's no config yet). A cheap
+  safety net to call before a mutating operation (setup) or an upgrade.
+  """
+  def backup do
+    p = path()
+
+    if File.regular?(p) do
+      bak = "#{p}.bak.#{System.os_time(:second)}"
+      File.cp!(p, bak)
+      prune_backups(p)
+      bak
+    end
+  end
+
+  defp prune_backups(p) do
+    dir = Path.dirname(p)
+    prefix = Path.basename(p) <> ".bak."
+
+    case File.ls(dir) do
+      {:ok, entries} ->
+        entries
+        |> Enum.filter(&String.starts_with?(&1, prefix))
+        |> Enum.sort(:desc)
+        |> Enum.drop(@backups_kept)
+        |> Enum.each(&File.rm(Path.join(dir, &1)))
+
+      _ ->
+        :ok
+    end
+  end
+
   @doc "Load the raw config map, returning sane defaults when the file is absent."
   def load do
     case File.read(path()) do
@@ -1291,6 +1356,15 @@ defmodule Pepe.Config do
 
   @doc "Is the dashboard behind a password? (a dashboard password is configured)"
   def dashboard_auth_required?, do: not is_nil(dashboard_password())
+
+  @doc """
+  When on, autonomous writes (memory/skill consolidation) are staged for review via
+  `Pepe.Approval` instead of applied directly. Off by default (opt-in safety).
+  """
+  def review_writes?, do: load()["review_writes"] == true
+
+  @doc "Turn the autonomous-write review queue on or off."
+  def set_review_writes(on?), do: load() |> Map.put("review_writes", on? == true) |> save()
 
   @doc """
   Extra `Host` header values the dashboard accepts besides loopback names (for

@@ -31,6 +31,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Plan
   alias Pepe.Tools.ReadFile
   alias Pepe.Tools.RenameAgent
+  alias Pepe.Tools.Review
   alias Pepe.Tools.RunScript
   alias Pepe.Tools.ScanSkill
   alias Pepe.Tools.ScheduleTask
@@ -74,6 +75,7 @@ defmodule Pepe.Tools do
     ConfigSet,
     EnableTool,
     SetRoute,
+    Review,
     Watch
   ]
 

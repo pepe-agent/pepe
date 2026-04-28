@@ -5,6 +5,39 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- Goals: run an agent **toward an outcome** instead of for one turn. Give it an objective and a verifiable success criterion, and it works, has an **independent reviewer** (a separate model call that sees only the criterion and the result, never the working conversation) check whether the criterion is met, and retries with the reviewer's feedback until it passes or a mandatory attempt cap is reached. `pepe goal "OBJECTIVE" --criteria "how we know it's done" [--max-attempts N] [--judge MODEL]` on the CLI, and `/goal <objective> | <criterion>` on the dashboard, where the panel above the chat shows the criterion, the attempt count and the reviewer's last verdict live.
+
+### Changed
+- HTTP API: server-side sessions now key on two dimensions - the standard OpenAI `user` (who) and `session_id`/`X-Session-Id` (which conversation). Both given → `user:session_id` (independent threads per user, e.g. a WhatsApp number with several threads); one given → that value alone; the same value in both → deduped; neither → stateless. A plain OpenAI SDK, which only sends `user`, keeps a conversation with no Pepe-specific field.
+
+### Added
+- Commands: `/retry` redoes the last answer (drops the last exchange and re-sends your message) on the dashboard, Telegram, and CLI; `/usage` shows this month's spend and message count for the conversation's company (operator-only on Telegram: gated to the bot's `trainers` so a client on a customer-facing bot never sees billing); `/name <text>` labels a conversation in the dashboard sidebar (persisted), and a fork is auto-labeled after its source so branches are easy to tell apart.
+- Dashboard: `/fork` branches the current conversation into a new session seeded with a copy of its history, then switches to the branch, so you can explore a different direction without losing where you were. The original stays live in the sidebar to return to. Dashboard only (it relies on the session sidebar to switch and label branches).
+- Sessions: a message sent while a turn is running now queues and runs right after it (FIFO), instead of being rejected as busy, so nothing is dropped when you fire off a few messages in a row. Its reply still lands with the caller when its turn comes up. New `/inline <text>` command folds a message into the turn already running (the agent picks it up before its next step) for when you want to steer it now rather than wait; on the dashboard and Telegram.
+- Update: `pepe update` self-updates the binary to the latest release (downloads the build for your OS/arch, swaps it in place, keeps the old one as a backup). Also on the dashboard (a "Check for updates" button on the config page that becomes "Update to vX" with a link to the release notes) and by chat. From a source checkout it points you at `git pull` instead.
+- Approvals: autonomous writes can be gated for review. With `review_writes` on, memory/skill consolidation stages its file changes instead of applying them, and you approve or reject each from the CLI (`pepe review`), the dashboard (Learning page), or by chat (the `review` tool), so a hallucinated fact or a bad skill edit never persists silently. Off by default.
+- Runtime: long conversations are condensed automatically to stay under the model's context window. Once the history grows large, older turns are summarized by the model while the system prompt and recent turns are kept verbatim, so an agent can run indefinitely without a manual reset (the full transcript is still kept in traces). The manual `/compact` command now shares this single engine.
+
+### Fixed
+- Telegram: operator-only commands are now gated to the bot's `trainers` (like `/usage`), so a client on a customer-facing bot can't reach them or see internals: `/approve` (tool-permission grants), `/agent` (switch agent), `/status` and `/model` (reveal the agent/model), `/models`, `/tools`, and `/skill` (list/run). Switching the model was already permission-gated. Personal bots (no `trainers` list) are unaffected.
+- Dashboard: the overview's counts (live sessions, channels, automations) and the API tokens list now respect the selected company, instead of always showing totals across every workspace.
+- Runtime: a conversation resumed after a crash mid-tool-call no longer loops. Any tool call the model requested but never got an answer for is dropped from the replayed history instead of being re-issued forever.
+- Runtime: an agent that keeps issuing the exact same tool call with no progress now stops and summarizes what it found, instead of spinning to the iteration limit.
+
+### Added
+- Setup: `pepe setup` now shows where config and data are stored and lets you relocate it (sets `PEPE_HOME` and offers to persist it to your shell profile), and prints a "where everything lives" summary at the end.
+- Setup: auto-backs up your config before changing it (keeping the last few), and the installer snapshots your config on an update.
+- First run: `pepe run` / `pepe chat` with no model configured offers to run setup right there (or says what to run when there's no terminal).
+- Output: file paths are shortened to `~/.pepe` (or `$PEPE_HOME`) in setup and diagnostics.
+- Dashboard: sign in to a ChatGPT or Claude subscription (or reconnect an existing one) straight from the Models page via a browser OAuth flow that captures the token, no CLI needed.
+- Doctor: broader health checks. Adds a security audit (plaintext secrets in config, missing dashboard password), an update check against the latest GitHub release, channel/webhook config validation (provider, agent, required credentials), orphan agent directories on disk, and plugins/skills that won't load.
+- README: quick links to the website, documentation, and quickstart near the top.
+- README: two quick-start paths, install-and-use (the `pepe` binary via the installer) and from-source (`mix`) for development.
+
+### Fixed
+- Docs/website: repository links (clone URL, contributing guide, site nav/footer, JSON-LD) now point at `pepe-agent/pepe` instead of the old `jhonathas/pepe`.
+
 ## [0.2.0] - 2026-04-24
 
 ### Added

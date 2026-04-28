@@ -25,6 +25,7 @@ defmodule Pepe.Providers do
         %{
           key: "codex",
           label: "ChatGPT / Codex subscription (sign in with your browser)",
+          button: "ChatGPT / Codex",
           type: :oauth,
           env: "OPENAI_OAUTH_TOKEN",
           featured: true,
@@ -62,6 +63,7 @@ defmodule Pepe.Providers do
         %{
           key: "oauth",
           label: "Claude Pro / Max subscription (sign in with your browser)",
+          button: "Claude Pro / Max",
           type: :oauth,
           env: "ANTHROPIC_OAUTH_TOKEN",
           featured: true,
@@ -201,4 +203,21 @@ defmodule Pepe.Providers do
   @doc "Auth methods for a provider (defaults to a single API-key method)."
   def auth_methods(provider),
     do: provider[:auth] || [%{key: "api", label: "API key", type: :api_key}]
+
+  @doc """
+  Providers that offer a subscription (browser OAuth) sign-in, as
+  `[%{provider, label, method}]` where `method` is the OAuth auth method (carrying its
+  `:oauth_flow`, `:base_url`, `:api`, `:models`). Used to render "Sign in" buttons.
+  """
+  def subscription_methods do
+    Enum.flat_map(@providers, fn p ->
+      case Enum.find(p[:auth] || [], &(&1[:type] == :oauth and is_map(&1[:oauth_flow]))) do
+        nil -> []
+        # Label the button/panel by the subscription being connected (e.g. "ChatGPT /
+        # Codex"), not the bare provider name - clearer than "OpenAI", which also has an
+        # API-key path.
+        method -> [%{provider: p.key, label: method[:button] || p.label, method: method}]
+      end
+    end)
+  end
 end

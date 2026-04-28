@@ -61,13 +61,26 @@ By default the endpoint is stateless (you send the full `messages` array each
 time, like OpenAI). Pass a **session id** and the server keeps the whole
 conversation for you - then you only need to send the latest user message.
 
-Three equivalent ways (first match wins):
+Two dimensions, combined into the session key:
 
-* `"session_id": "abc"` in the JSON body, **or**
+* `"user": "abc"` - **who** is talking. The standard OpenAI field, so a plain OpenAI
+  SDK keeps a conversation with no Pepe-specific field.
 
-* `"user": "abc"` - the standard OpenAI field, **or**
+* `"session_id": "xyz"` in the JSON body (or an `X-Session-Id: xyz` header) - **which**
+  conversation of theirs.
 
-* an `X-Session-Id: abc` request header.
+How they combine:
+
+| Sent | Session key |
+| --- | --- |
+| `user` only | `abc` |
+| `session_id` only | `xyz` |
+| both | `abc:xyz` (independent threads per user) |
+| both, same value | deduped to one |
+| neither (or blank) | stateless |
+
+So on WhatsApp you can pass `user` = the phone number and `session_id` = a thread id,
+and each thread of each contact is its own conversation.
 
 ```bash
 # turn 1

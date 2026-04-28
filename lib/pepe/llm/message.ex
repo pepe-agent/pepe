@@ -23,4 +23,38 @@ defmodule Pepe.LLM.Message do
       "content" => content
     }
   end
+
+  @doc """
+  Repair a replayed history before it goes back to the model. If the process died
+  after the model asked for tool calls but before their results were saved, the
+  history ends with an `assistant` turn whose `tool_calls` have no matching `tool`
+  answers, and the model would just re-issue the same call, looping forever. This
+  drops any `assistant` turn whose tool calls aren't fully answered, plus any orphan
+  `tool` results left pointing at a turn that was dropped.
+  """
+  def sanitize_replay(messages) when is_list(messages) do
+    answered =
+      for %{"role" => "tool", "tool_call_id" => id} <- messages, is_binary(id), into: MapSet.new(), do: id
+
+    kept =
+      Enum.filter(messages, fn
+        %{"role" => "assistant", "tool_calls" => calls} when is_list(calls) ->
+          Enum.all?(calls, fn c -> MapSet.member?(answered, c["id"]) end)
+
+        _ ->
+          true
+      end)
+
+    valid_ids =
+      for %{"role" => "assistant", "tool_calls" => calls} <- kept,
+          is_list(calls),
+          c <- calls,
+          into: MapSet.new(),
+          do: c["id"]
+
+    Enum.reject(kept, fn
+      %{"role" => "tool", "tool_call_id" => id} -> not MapSet.member?(valid_ids, id)
+      _ -> false
+    end)
+  end
 end
