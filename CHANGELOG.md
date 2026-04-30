@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- Dashboard: a live **runtime footprint** on the overview (memory, CPU, open conversations, processes, uptime) and, per agent, how many conversations it has open and what they hold. "Lightweight by design" is now a number you can check rather than a claim: CPU comes from the scheduler counter and reads `-` until it can be known, never a fabricated zero.
+- Dashboard: the complexity-routing box now names the model each branch uses, including the complex one (the agent's own), so the whole route reads without scrolling back up.
+
+### Fixed
+- Goals: the loop's prompts appear as messages in the conversation, so they are now written in the configured language instead of always English.
+- Chat: a goal loop's retry turns appeared only after a page reload. The runtime emits `:done` before the session commits the turn, so the history read at that moment could be one turn behind and the new answer was silently dropped; the view now re-syncs from the session, which is the source of truth.
+
+### Added
 - Goals: run an agent **toward an outcome** instead of for one turn. Give it an objective and a verifiable success criterion, and it works, has an **independent reviewer** (a separate model call that sees only the criterion and the result, never the working conversation) check whether the criterion is met, and retries with the reviewer's feedback until it passes or a mandatory attempt cap is reached. `pepe goal "OBJECTIVE" --criteria "how we know it's done" [--max-attempts N] [--judge MODEL]` on the CLI, and `/goal <objective> | <criterion>` on the dashboard, where the panel above the chat shows the criterion, the attempt count and the reviewer's last verdict live.
 
 ### Changed

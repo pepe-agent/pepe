@@ -22,6 +22,8 @@ defmodule Pepe.Agent.GoalLoop do
   The cap is mandatory: a criterion the agent can never satisfy must cost a bounded
   number of attempts, not run forever.
   """
+  use Gettext, backend: Pepe.Gettext
+
   require Logger
 
   alias Pepe.Agent.Session
@@ -64,6 +66,11 @@ defmodule Pepe.Agent.GoalLoop do
     do: {:error, :no_criteria}
 
   def run(key, objective, criteria, opts) do
+    # The work prompts below become *visible messages* in the conversation, so they must
+    # be in the user's language. Gettext's locale is per-process and this runs in a
+    # spawned one, so apply the configured locale here rather than inheriting it.
+    Config.put_locale()
+
     max = opts |> Keyword.get(:max_attempts, @default_attempts) |> clamp()
 
     Focus.put_goal(key, %{
@@ -123,24 +130,31 @@ defmodule Pepe.Agent.GoalLoop do
   # First attempt states the goal and how it will be checked; later ones carry only the
   # judge's complaint, so the agent fixes what actually failed instead of restarting.
   defp work_prompt(_objective, _criteria, feedback) when is_binary(feedback) and feedback != "" do
-    """
-    That did not meet the success criterion yet. An independent reviewer said:
+    gettext(
+      """
+      That did not meet the success criterion yet. An independent reviewer said:
 
-    #{feedback}
+      %{feedback}
 
-    Address exactly that and produce the corrected result.
-    """
+      Address exactly that and produce the corrected result.
+      """,
+      feedback: feedback
+    )
   end
 
   defp work_prompt(objective, criteria, _feedback) do
-    """
-    #{objective}
+    gettext(
+      """
+      %{objective}
 
-    This will be checked against the following success criterion, so make sure your
-    final answer satisfies it:
+      This will be checked against the following success criterion, so make sure your
+      final answer satisfies it:
 
-    #{criteria}
-    """
+      %{criteria}
+      """,
+      objective: objective,
+      criteria: criteria
+    )
   end
 
   # The judge never sees the working conversation - only the criterion and the result.

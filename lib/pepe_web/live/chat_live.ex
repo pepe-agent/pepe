@@ -472,6 +472,12 @@ defmodule PepeWeb.ChatLive do
   def handle_info(:refresh_sessions, socket),
     do: {:noreply, assign(socket, sessions: list_sessions(socket.assigns.scope), focus: load_focus(socket.assigns.selected))}
 
+  def handle_info(:sync_messages, %{assigns: %{selected: key}} = socket) when is_binary(key) do
+    {:noreply, assign(socket, messages: history(key))}
+  end
+
+  def handle_info(:sync_messages, socket), do: {:noreply, socket}
+
   def handle_info(:clear_activity, socket) do
     # Only clear once the run is really over (a new run may have started meanwhile).
     if socket.assigns.running,
@@ -492,6 +498,13 @@ defmodule PepeWeb.ChatLive do
     # Keep the activity strip briefly, then drop it - so the answer is already there to
     # read and only the machine chatter disappears (never a blank gap).
     Process.send_after(self(), :clear_activity, 2000)
+
+    # The runtime emits :done *before* the session commits the turn, so the history we
+    # read here can still be one turn behind. Optimistically show the answer now, then
+    # re-sync from the session, which is the source of truth. Without this a goal loop's
+    # retry turns never appear until the page is reloaded: their answers land while the
+    # last message is still an assistant one, and `ensure_reply` leaves the list alone.
+    Process.send_after(self(), :sync_messages, 250)
 
     assign(socket,
       messages: ensure_reply(history(socket.assigns.selected), content),

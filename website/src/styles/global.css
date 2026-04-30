@@ -71,7 +71,7 @@ a:hover { color: #ffb877; }
   border: 1px solid rgba(234, 88, 12, 0.35); border-radius: 999px; padding: 5px 14px; margin-bottom: 22px;
 }
 .hero h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 20px; font-weight: 800; }
-.hero h1 .grad { background: linear-gradient(120deg, #fb923c, #f59e0b 60%, #eab308); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero h1 .grad, .section-head h2 .grad { background: linear-gradient(120deg, #fb923c, #f59e0b 60%, #eab308); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero p.lead { font-size: clamp(17px, 2.4vw, 21px); color: var(--muted); max-width: 720px; margin: 0 auto 34px; }
 .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
@@ -90,6 +90,8 @@ a:hover { color: #ffb877; }
 .terminal .bar { display: flex; gap: 7px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .terminal .bar i { width: 11px; height: 11px; border-radius: 50%; background: #3f3f46; display: inline-block; }
 .terminal pre { margin: 0; padding: 18px 20px; overflow-x: auto; }
+/* The loops section pairs a terminal with the three cards below it. */
+.terminal-tight { margin-bottom: 28px; }
 code, pre { font-family: var(--mono); font-size: 14px; }
 pre code { color: #d4d4d8; line-height: 1.7; }
 .c-dim { color: var(--dim); }
@@ -98,9 +100,13 @@ pre code { color: #d4d4d8; line-height: 1.7; }
 
 /* ---- sections ---- */
 section { padding: 70px 0; }
-.section-head { text-align: center; max-width: 700px; margin: 0 auto 46px; }
+/* The nav is sticky (62px), so an anchored jump would otherwise park the heading
+   underneath it. Leave the header's height plus a little breathing room. */
+section[id] { scroll-margin-top: 86px; }
+/* Headings get room to stay on one line; the paragraph keeps a readable measure. */
+.section-head { text-align: center; max-width: 820px; margin: 0 auto 46px; }
 .section-head h2 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.02em; margin: 0 0 14px; font-weight: 800; }
-.section-head p { color: var(--muted); font-size: 18px; margin: 0; }
+.section-head p { color: var(--muted); font-size: 18px; margin: 0 auto; max-width: 700px; }
 .divider { border: 0; border-top: 1px solid var(--border); margin: 0; }
 
 /* ---- surfaces strip ---- */
@@ -246,7 +252,7 @@ section { padding: 70px 0; }
 
 /* ---- security flow ---- */
 .flow { display: flex; align-items: flex-start; justify-content: center; gap: 6px; flex-wrap: wrap; }
-.flow-step { display: flex; flex-direction: column; align-items: center; text-align: center; width: 190px; }
+.flow-step { display: flex; flex-direction: column; align-items: center; text-align: center; width: 232px; }
 .flow-ico {
   width: 56px;
   height: 56px;
@@ -259,19 +265,33 @@ section { padding: 70px 0; }
   margin-bottom: 14px;
 }
 .flow-ico svg { width: 26px; height: 26px; }
-.flow-step h3 { margin: 0 0 10px; font-size: 15px; white-space: nowrap; }
+.flow-step h3 { margin: 0 0 10px; font-size: 15px; }
+/* The step's explanation, under the example. */
+.flow-desc { margin: 10px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--dim); }
 .flow-chip {
-  display: inline-block;
-  padding: 5px 10px;
+  /* Flex + centered so a 2-line example sits on the same optical line as a
+     3-line one, instead of hugging the top of its taller box. */
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
   border-radius: 8px;
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--accent-soft);
   font-family: var(--mono);
   font-size: 12.5px;
-  white-space: nowrap;
+  line-height: 1.6;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* The four examples wrap to 2-3 lines; a floor keeps the captions under them
+     on one baseline instead of stair-stepping. */
+  width: 100%;
+  /* Fits the longest example (3 lines) so all four boxes are the same height and
+     the captions under them share one baseline. */
+  min-height: 80px;
 }
-.flow-arrow { color: var(--dim); font-size: 22px; padding-top: 22px; flex-shrink: 0; }
+.flow-arrow { color: var(--dim); font-size: 22px; padding-top: 22px; flex-shrink: 0; align-self: flex-start; }
 
 /* ---- why pepe ---- */
 .why { border-top: 1px solid var(--border); }

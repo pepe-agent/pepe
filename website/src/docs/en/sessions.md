@@ -18,15 +18,22 @@ remember the previous command. To keep context in the terminal, use the console:
 pepe chat assistant --session my-session
 ```
 
-The HTTP API uses `session_id`, `user`, or `x-session-id`, as shown below.
+The HTTP API takes the session key from **two fields, and they compose**.
 
-You can pass the session id three ways. Pepe checks them in this order:
+- **`user`** — the OpenAI-standard field, so any stock OpenAI SDK gets server-side memory without leaving the standard shape. This is the one to reach for. It answers *who* is talking.
+- **`session_id`** in the JSON body (or an `x-session-id` header) — *which conversation* of theirs. Reach for it when one person can have several separate threads.
 
-1. A `session_id` field in the JSON body.
-2. The OpenAI-standard `user` field in the JSON body.
-3. An `x-session-id` HTTP header.
+How they combine:
 
-The `user` route is the interesting one: `user` is a real field in the OpenAI chat-completions schema, so you can reuse it as the session key from any stock OpenAI SDK and get server-side memory without leaving the standard shape.
+| Sent | Session key |
+| --- | --- |
+| `user` only | `user` |
+| `session_id` only | `session_id` |
+| both | `user:session_id` (independent threads per person) |
+| both, same value | deduped to one |
+| neither (or blank) | stateless |
+
+So on WhatsApp you can pass `user` = the phone number and `session_id` = a thread id, and every thread of every contact is its own conversation, isolated from the rest.
 
 ```bash
 # Turn 1: only the new message is needed; the server keeps the history.
@@ -34,7 +41,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
     "model": "assistant",
-    "session_id": "user-42",
+    "user": "user-42",
     "messages": [{"role": "user", "content": "My name is Ada."}]
   }'
 
@@ -43,7 +50,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
     "model": "assistant",
-    "session_id": "user-42",
+    "user": "user-42",
     "messages": [{"role": "user", "content": "What is my name?"}]
   }'
 ```

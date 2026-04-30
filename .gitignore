@@ -66,3 +66,5 @@ arquivo_teste_aprovacao_*.txt
 
 # Dialyzer's cached PLT (rebuilt locally/in CI, not versioned).
 /priv/plts/
+
+.playwright-mcp/

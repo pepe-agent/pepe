@@ -64,6 +64,10 @@ defmodule Pepe.Application do
 
   # Base supervision tree + (optionally) the Phoenix endpoint.
   defp start_supervisor(endpoint_children) do
+    # Scheduler utilization is a cumulative counter that has to be switched on before
+    # it counts anything - see Pepe.Runtime.Stats.
+    Pepe.Runtime.Stats.enable()
+
     children =
       [
         PepeWeb.Telemetry,

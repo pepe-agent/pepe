@@ -11,7 +11,7 @@ export const docsNav: { group: string; slugs: string[] }[] = [
     group: "channels",
     slugs: ["channels", "telegram", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],
   },
-  { group: "automate", slugs: ["scheduled", "watches"] },
+  { group: "automate", slugs: ["goals", "scheduled", "watches"] },
   { group: "api", slugs: ["api", "sessions", "auth", "websocket", "clients"] },
   { group: "extend", slugs: ["plugins", "skills"] },
   { group: "operate", slugs: ["security", "dashboard", "by-chat", "contributing"] },

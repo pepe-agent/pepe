@@ -22,13 +22,22 @@ anterior. Para manter contexto no terminal, usa a consola:
 pepe chat assistant --session minha-sessao
 ```
 
-A API HTTP usa `session_id`, `user` ou `x-session-id`.
+A API HTTP monta a chave de sessão a partir de **dois campos, e eles combinam-se**.
 
-Podes passar o id de sessão de três formas. O Pepe verifica-as por esta ordem:
+- **`user`** — o campo padrão da OpenAI, por isso qualquer SDK oficial da OpenAI obtém memória no servidor sem sair do formato padrão. É por aqui que deve começar. Responde a *quem* está a falar.
+- **`session_id`** no corpo JSON (ou um cabeçalho `x-session-id`) — *qual conversa* dessa pessoa. Use quando a mesma pessoa pode ter várias conversas separadas.
 
-1. Um campo `session_id` no corpo JSON.
-2. O campo padrão da OpenAI `user` no corpo JSON.
-3. Um cabeçalho HTTP `x-session-id`.
+Como se combinam:
+
+| Enviado | Chave de sessão |
+| --- | --- |
+| só `user` | `user` |
+| só `session_id` | `session_id` |
+| os dois | `user:session_id` (conversas independentes por pessoa) |
+| os dois, mesmo valor | fica apenas uma |
+| nenhum (ou vazio) | sem estado |
+
+Assim, no WhatsApp passa `user` = o telemóvel e `session_id` = um id de conversa, e cada conversa de cada contacto é independente, isolada das restantes.
 
 ```bash
 # Turno 1: só a mensagem nova é necessária; o servidor guarda o histórico.
@@ -36,7 +45,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
     "model": "assistant",
-    "session_id": "user-42",
+    "user": "user-42",
     "messages": [{"role": "user", "content": "O meu nome é Ada."}]
   }'
 
@@ -45,7 +54,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
     "model": "assistant",
-    "session_id": "user-42",
+    "user": "user-42",
     "messages": [{"role": "user", "content": "Qual é o meu nome?"}]
   }'
 ```

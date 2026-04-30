@@ -8,9 +8,14 @@ defmodule PepeWeb.AgentsLive do
 
   alias Ecto.Changeset
   alias Pepe.Config
+  alias Pepe.Runtime.Stats
 
   @impl true
   def mount(params, _session, socket) do
+    # What each agent's live conversations are holding, refreshed on a tick so the page
+    # shows the current cost of keeping them open, not a number from page load.
+    if connected?(socket), do: :timer.send_interval(3000, self(), :footprint)
+
     {:ok,
      assign(socket,
        page_title: "Pepe · Agents",
@@ -21,9 +26,13 @@ defmodule PepeWeb.AgentsLive do
        default_agent: Config.default_agent_name(),
        models: Config.models(),
        edit_agent: nil,
-       form: agent_form("")
+       form: agent_form(""),
+       footprint: Stats.by_agent()
      )}
   end
+
+  @impl true
+  def handle_info(:footprint, socket), do: {:noreply, assign(socket, footprint: Stats.by_agent())}
 
   defp agent_changeset(name) do
     {%{}, %{name: :string}}
@@ -97,6 +106,9 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </div>
             <div class="mt-1 text-sm text-zinc-400">{gettext("Model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
+            <div :if={@footprint[a.name]} class="text-sm text-zinc-500">
+              {gettext("%{count} live conversations", count: @footprint[a.name].sessions)} · {@footprint[a.name].memory_kb} KB
+            </div>
             <div :if={a.can_message != []} class="text-sm text-zinc-500">-> {gettext("Messages:")} {Enum.join(a.can_message, ", ")}</div>
             <div :if={a.can_manage} class="text-sm text-zinc-500">⚙ {gettext("Manages:")} {manages_text(a.can_manage)}</div>
           </div>
@@ -177,6 +189,16 @@ defmodule PepeWeb.AgentsLive do
                   <option value="">{gettext("(none)")}</option>
                   <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:simple_model]}>{m}</option>
                 </select>
+              </div>
+
+              <%!-- The complex branch isn't a choice - it's the agent's own model. Name it
+                    here anyway, so the box explains the whole route without scrolling up. --%>
+              <div>
+                <label class={lbl()}>{gettext("Complex model")}</label>
+                <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-sm">
+                  <span class="text-zinc-300">{@edit_agent[:model] || gettext("(the default model)")}</span>
+                  <span class="ml-1 text-zinc-600">{gettext("· this agent's own model, chosen above")}</span>
+                </div>
               </div>
             </.form_section>
 

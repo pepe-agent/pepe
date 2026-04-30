@@ -18,15 +18,22 @@ anterior. Para manter contexto no terminal, use o console:
 pepe chat assistant --session minha-sessao
 ```
 
-A API HTTP usa `session_id`, `user` ou `x-session-id`, como mostrado abaixo.
+A API HTTP monta a chave de sessão a partir de **dois campos, e eles se combinam**.
 
-Você pode passar o id de sessão de três formas. O Pepe as verifica nesta ordem:
+- **`user`** — o campo padrão da OpenAI, então qualquer SDK oficial da OpenAI ganha memória no servidor sem sair do formato padrão. É por ele que você deve começar. Responde *quem* está falando.
+- **`session_id`** no corpo JSON (ou um cabeçalho `x-session-id`) — *qual conversa* daquela pessoa. Use quando a mesma pessoa pode ter várias conversas separadas.
 
-1. Um campo `session_id` no corpo JSON.
-2. O campo padrão da OpenAI `user` no corpo JSON.
-3. Um cabeçalho HTTP `x-session-id`.
+Como eles se combinam:
 
-O caminho do `user` é o interessante: `user` e um campo real no esquema de chat-completions da OpenAI, então você pode reutilizá-lo como chave de sessão a partir de qualquer SDK padrão da OpenAI e ganhar memória no lado do servidor sem sair do formato padrão.
+| Enviado | Chave de sessão |
+| --- | --- |
+| só `user` | `user` |
+| só `session_id` | `session_id` |
+| os dois | `user:session_id` (conversas independentes por pessoa) |
+| os dois, mesmo valor | vira uma só |
+| nenhum (ou vazio) | sem estado |
+
+Assim, no WhatsApp você passa `user` = o telefone e `session_id` = um id de conversa, e cada conversa de cada contato é independente, isolada das outras.
 
 ```bash
 # Turno 1: só a mensagem nova é necessária; o servidor guarda o histórico.
@@ -34,7 +41,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
     "model": "assistant",
-    "session_id": "user-42",
+    "user": "user-42",
     "messages": [{"role": "user", "content": "Meu nome é Ada."}]
   }'
 
@@ -43,7 +50,7 @@ curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
     "model": "assistant",
-    "session_id": "user-42",
+    "user": "user-42",
     "messages": [{"role": "user", "content": "Qual é meu nome?"}]
   }'
 ```

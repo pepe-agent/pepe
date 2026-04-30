@@ -57,14 +57,23 @@ const surfaces = [
   { ico: ICONS.message, t: "surf.ch.t", d: "surf.ch.d", shot: null },
 ] as const;
 
+// The three loops, from the tightest to the longest-running: one answer, one
+// outcome, forever. The middle one is the argument - it's what a reviewer, not
+// the user, closes.
+const loops = [
+  { ico: ICONS.bolt, t: "loop.turn.t", d: "loop.turn.d" },
+  { ico: ICONS.compass, t: "loop.goal.t", d: "loop.goal.d" },
+  { ico: ICONS.clock, t: "loop.time.t", d: "loop.time.d" },
+] as const;
+
 // Ordered as a story, simplest capability to most advanced: connect a model →
 // it calls tools → it runs light → it routes smartly → it runs on a schedule →
 // it learns → you extend it → you govern spend → you lock it down.
 const features = [
   { ico: ICONS.chip, t: "f.model.t", d: "f.model.d", shot: "models" },
   { ico: ICONS.wrench, t: "f.tools.t", d: "f.tools.d", shot: "trace-detail" },
-  { ico: ICONS.bolt, t: "f.efficient.t", d: "f.efficient.d", shot: "efficient" },
-  { ico: ICONS.compass, t: "f.routing.t", d: "f.routing.d", shot: "agent-edit" },
+  { ico: ICONS.compass, t: "f.goal.t", d: "f.goal.d", shot: "goal" },
+  { ico: ICONS.bolt, t: "f.routing.t", d: "f.routing.d", shot: "agent-edit" },
   { ico: ICONS.clock, t: "f.cron.t", d: "f.cron.d", shot: "cron" },
   { ico: ICONS.sparkle, t: "f.learn.t", d: "f.learn.d", shot: "learn" },
   { ico: ICONS.squares, t: "f.plugins.t", d: "f.plugins.d", shot: "plugins" },
@@ -80,26 +89,16 @@ const steps = [
 ] as const;
 
 const securitySteps = [
-  { ico: ICONS.message, t: "security.1.t" },
-  { ico: ICONS.lock, t: "security.2.t" },
-  { ico: ICONS.chip, t: "security.3.t" },
-  { ico: ICONS.unlock, t: "security.4.t" },
+  { ico: ICONS.message, t: "security.1.t", d: "security.1.d", chip: "security.chip.1" },
+  { ico: ICONS.lock, t: "security.2.t", d: "security.2.d", chip: "security.chip.2" },
+  { ico: ICONS.chip, t: "security.3.t", d: "security.3.d", chip: "security.chip.3" },
+  { ico: ICONS.unlock, t: "security.4.t", d: "security.4.d", chip: "security.chip.4" },
 ] as const;
 
-// A concrete example threaded through the 4 steps above, instead of just
-// describing the mechanism in prose: the same PII value, shown transforming
-// at each stage (raw -> tokenized -> what the model actually sees -> restored).
-// Field + value are locale-specific (CPF/NIF/DNI/SSN); the token label is
-// derived from the field name, matching pii_redact's own [FIELD_n] format.
-const exampleField = tr("security.example.field" as never);
-const exampleValue = tr("security.example.value" as never);
-const exampleToken = `[${exampleField}_1]`;
-const exampleChips = [
-  `${exampleField}: ${exampleValue}`,
-  `${exampleField}: ${exampleToken}`,
-  exampleToken,
-  `${exampleField}: ${exampleValue}`,
-];
+// One real exchange threaded through the 4 steps: a customer's message and the
+// agent's reply, shown as each side actually sees them. The value is
+// locale-specific (CPF/NIF/DNI/SSN) and the token matches pii_redact's own
+// [FIELD_n] format, so what you read here is what the hook really produces.
 
 const useCases = [
   { ico: ICONS.phone, t: "uc.social.t", d: "uc.social.d" },
@@ -163,6 +162,37 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
 
   <hr class="divider" />
 
+  <section id="loops">
+    <div class="container">
+      <div class="section-head">
+        <h2 set:html={tr("loops.title")} />
+        <p>{tr("loops.sub")}</p>
+      </div>
+
+      <div class="terminal terminal-tight">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <pre><code><span class="c-dim">{tr("loops.code_prompt")}</span>
+<span class="c-key">pepe</span> run <span class="c-str">"{tr("loops.code_task")}"</span>
+
+<span class="c-dim">{tr("loops.code_goal")}</span>
+<span class="c-key">pepe</span> goal <span class="c-str">"{tr("loops.code_task")}"</span> \
+  --criteria <span class="c-str">"{tr("loops.code_crit")}"</span></code></pre>
+      </div>
+
+      <div class="grid">
+        {loops.map((l) => (
+          <div class="card">
+            <div class="ico" set:html={l.ico} />
+            <h3>{tr(l.t as K)}</h3>
+            <p>{tr(l.d as K)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <section id="surfaces">
     <div class="container">
       <div class="section-head">
@@ -191,7 +221,8 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
             <div class="surface">
               <div class="ico" set:html={s.ico} />
               <h3>{tr(s.t as K)}</h3>
-              <p>{tr(s.d as K)}</p>
+              {/* set:html so a description can mark up a field name as <code>. */}
+              <p set:html={tr(s.d as K)} />
             </div>
           )
         ))}
@@ -342,7 +373,8 @@ curl -fsSL <span class="c-str">https://pepe-agent.com/install.sh</span> | sh
             <div class="flow-step">
               <div class="flow-ico" set:html={s.ico} />
               <h3>{tr(s.t as K)}</h3>
-              <code class="flow-chip">{exampleChips[i]}</code>
+              <code class="flow-chip">{tr(s.chip as K)}</code>
+              <p class="flow-desc">{tr(s.d as K)}</p>
             </div>
             {i < securitySteps.length - 1 && <div class="flow-arrow" aria-hidden="true">→</div>}
           </>

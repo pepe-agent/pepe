@@ -12,10 +12,16 @@ defmodule PepeWeb.OverviewLive do
 
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
+  alias Pepe.Runtime.Stats
 
   @impl true
+  # How often the runtime footprint refreshes. CPU is a delta between two scheduler
+  # samples, so the first tick is what makes it knowable at all.
+  @footprint_ms 2000
+
   def mount(params, _session, socket) do
     scope = params["scope"] || "all"
+    if connected?(socket), do: :timer.send_interval(@footprint_ms, self(), :footprint)
 
     {:ok,
      socket
@@ -23,10 +29,31 @@ defmodule PepeWeb.OverviewLive do
        page_title: "Pepe · Overview",
        scope: scope,
        companies: Config.companies(),
-       new_company: false
+       new_company: false,
+       footprint: Stats.footprint(),
+       cpu: nil,
+       sched: Stats.sample()
      )
      |> load()}
   end
+
+  @impl true
+  def handle_info(:footprint, socket) do
+    curr = Stats.sample()
+
+    {:noreply,
+     assign(socket,
+       footprint: Stats.footprint(),
+       cpu: Stats.utilization(socket.assigns.sched, curr),
+       sched: curr
+     )}
+  end
+
+  # "3d 4h" / "2h 15m" / "48s" - the coarsest unit that still says something.
+  defp uptime(sec) when sec >= 86_400, do: "#{div(sec, 86_400)}d #{div(rem(sec, 86_400), 3600)}h"
+  defp uptime(sec) when sec >= 3600, do: "#{div(sec, 3600)}h #{div(rem(sec, 3600), 60)}m"
+  defp uptime(sec) when sec >= 60, do: "#{div(sec, 60)}m"
+  defp uptime(sec), do: "#{sec}s"
 
   defp load(socket) do
     scope = socket.assigns.scope
@@ -68,6 +95,20 @@ defmodule PepeWeb.OverviewLive do
             <.stat label={gettext("Messages this month")} value={tokens(@month.totals.count)} sub={gettext("model calls")} />
             <.stat label={gettext("Tokens this month")} value={tokens(@month.totals.total)} sub={gettext("in + out")} />
             <.stat label={gettext("To bill this month")} value={money(@month.totals.billable, @month.currency)} sub={gettext("cost %{c}", c: money(@month.totals.cost, @month.currency))} accent />
+          </div>
+
+          <%!-- What the runtime costs to run, measured live rather than asserted. --%>
+          <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+            <div class="mb-3 flex items-baseline justify-between">
+              <span class="text-sm font-medium text-zinc-300">{gettext("Runtime footprint")}</span>
+              <span class="text-xs text-zinc-600">{gettext("up %{t}", t: uptime(@footprint.uptime_seconds))}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <.mini label={gettext("Memory")} value={"#{@footprint.memory_mb} MB"} />
+              <.mini label={gettext("CPU")} value={if @cpu, do: "#{@cpu}%", else: "—"} />
+              <.mini label={gettext("Conversations")} value={@footprint.sessions} />
+              <.mini label={gettext("Processes")} value={@footprint.processes} />
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -130,7 +171,8 @@ defmodule PepeWeb.OverviewLive do
   end
 
   attr :label, :string, required: true
-  attr :value, :integer, required: true
+  # A count, or a formatted reading like "86.4 MB" / "2.1%" / "-".
+  attr :value, :any, required: true
 
   defp mini(assigns) do
     ~H"""

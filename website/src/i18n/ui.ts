@@ -28,6 +28,23 @@ export const ui = {
     "hero.cta_start": "Get started →",
     "hero.cta_docs": "Read the docs",
 
+    "loops.code_task": "clean up the customer list",
+    "loops.code_crit": "no duplicate emails, every row has a valid phone",
+    "loops.code_prompt": "# a prompt gets you one answer, and you grade it",
+    "loops.code_goal": "# a goal keeps working until a reviewer says it's actually done",
+    "loops.title": 'Stop prompting. <span class="grad">Define the outcome.</span>',
+    "loops.sub":
+      "A prompt buys one turn: the agent answers, and you decide whether it's good enough. That makes you the bottleneck, approver and quality inspector at once, and the work only moves while you're at the keyboard. Give it a goal instead: say what \"done\" means, and Pepe keeps working until an independent reviewer agrees it's met.",
+    "loop.turn.t": "Turn loop",
+    "loop.turn.d":
+      "Calls tools, reads the results, calls more. Stops when it has a real answer, not a guess.",
+    "loop.goal.t": "Goal loop",
+    "loop.goal.d":
+      "You set the objective and what counts as done. An independent reviewer decides, not the agent. Not there yet? It gets the feedback and tries again.",
+    "loop.time.t": "Time loop",
+    "loop.time.d":
+      "Recurring work on a schedule. Runs on its own and catches up on whatever it missed.",
+
     "surfaces.title": "One agent, four surfaces",
     "surfaces.sub":
       "Define an agent once. Use it from the surface that fits the job, with the same tools and memory.",
@@ -35,7 +52,7 @@ export const ui = {
     "surf.cli.d": "One-shot runs and an interactive REPL.",
     "surf.http.t": "HTTP API",
     "surf.http.d":
-      "OpenAI-compatible /v1/chat/completions and /v1/models, usable from any HTTP client.",
+      "OpenAI-compatible: <code>/chat/completions</code> and <code>/models</code>, from any SDK.",
     "surf.ws.t": "WebSocket",
     "surf.ws.d": "A WebSocket connection for live, streaming conversations.",
     "surf.ch.t": "Channels",
@@ -51,9 +68,9 @@ export const ui = {
     "f.routing.t": "Complexity-based routing",
     "f.routing.d":
       "A cheap classification call judges each new conversation. Simple questions downgrade automatically to a lighter model; full power stays for what actually needs it.",
-    "f.efficient.t": "Lightweight by design",
-    "f.efficient.d":
-      "Elixir/OTP runs many supervised sessions with low memory and CPU overhead, keeping a team of agents inexpensive to host.",
+    "f.goal.t": "Goals, not just prompts",
+    "f.goal.d":
+      "Give an objective and what counts as done. An independent reviewer decides whether it is met, and the agent retries with that feedback until it passes or hits your attempt cap.",
     "f.tools.t": "Real tool-calling loop",
     "f.tools.d":
       "Built-in tools for shell, files, web, scripts, and file delivery. Add your own in minutes.",
@@ -91,16 +108,18 @@ export const ui = {
     "security.title": "Privacy by design",
     "security.sub":
       "Sensitive data is never sent to an external model in the clear, helping you meet requirements like LGPD, GDPR, and HIPAA.",
-    "security.1.t": "Message arrives",
-    "security.1.d": "Reaches your Pepe first",
-    "security.2.t": "Becomes a token",
-    "security.2.d": "PII swapped before it leaves",
-    "security.3.t": "Answers blind",
-    "security.3.d": "Never sees the real values",
-    "security.4.t": "Pepe restores it",
-    "security.4.d": "Restored in your reply",
-    "security.example.field": "SSN",
-    "security.example.value": "123-45-6789",
+    "security.1.t": "What the user sends",
+    "security.1.d": "The message exactly as they typed it.",
+    "security.2.t": "What reaches the model",
+    "security.2.d": "Pepe swaps the sensitive value for a token before the request ever leaves your server.",
+    "security.3.t": "What the model answers",
+    "security.3.d": "It reasons over the token. It never saw the real value, and never stored it.",
+    "security.4.t": "What the user gets back",
+    "security.4.d": "Pepe puts the real value back, on your side only.",
+    "security.chip.1": "My SSN is 123-45-6789, can you check my order?",
+    "security.chip.2": "My SSN is [SSN_1], can you check my order?",
+    "security.chip.3": "Found the order for [SSN_1]: it ships tomorrow.",
+    "security.chip.4": "Found the order for 123-45-6789: it ships tomorrow.",
 
     "widget.title": "Or drop it straight on your site",
     "widget.body":
@@ -128,9 +147,9 @@ export const ui = {
     "uc.notes.t": "Meeting notes & recaps",
     "uc.notes.d": "Turn a transcript into a summary and action items, delivered where the team already talks.",
 
-    "how.title": "How the loop works",
+    "how.title": "Inside a single turn",
     "how.sub":
-      "Pepe calls the model, runs tool calls, feeds results back, and stops when the answer is ready.",
+      "Zooming into the turn loop: Pepe calls the model, runs the tool calls it asks for, feeds the results back, and stops when the answer is ready.",
     "how.1.t": "Call the model",
     "how.1.d": "Send the conversation and the agent's tool specs to the model (with failover).",
     "how.2.t": "Run tool calls",
@@ -180,6 +199,23 @@ export const ui = {
     "hero.cta_start": "Empezar →",
     "hero.cta_docs": "Leer la documentación",
 
+    "loops.code_task": "limpiar la lista de clientes",
+    "loops.code_crit": "sin correos duplicados, cada fila con un teléfono válido",
+    "loops.code_prompt": "# un prompt te da una respuesta, y tú la calificas",
+    "loops.code_goal": "# un objetivo sigue hasta que un revisor confirma que está hecho",
+    "loops.title": 'Deja de dar órdenes. <span class="grad">Define el resultado.</span>',
+    "loops.sub":
+      "Un prompt te da un turno: el agente responde y tú decides si está bien. Eso te convierte en el cuello de botella, aprobador e inspector de calidad a la vez, y el trabajo solo avanza mientras estás frente al teclado. Dale un objetivo: di qué significa \"terminado\", y Pepe sigue trabajando hasta que un revisor independiente confirme que se cumplió.",
+    "loop.turn.t": "Bucle de turno",
+    "loop.turn.d":
+      "Llama herramientas, lee los resultados, llama más. Para cuando tiene una respuesta real, no una suposición.",
+    "loop.goal.t": "Bucle de objetivo",
+    "loop.goal.d":
+      "Defines el objetivo y qué cuenta como hecho. Quien juzga es un revisor independiente, no el agente. ¿Aún no? Recibe el comentario y reintenta.",
+    "loop.time.t": "Bucle de tiempo",
+    "loop.time.d":
+      "Trabajo recurrente programado. Se ejecuta solo y recupera lo que se perdió mientras estuvo apagado.",
+
     "surfaces.title": "Un agente, cuatro superficies",
     "surfaces.sub":
       "Define un agente una vez. Úsalo desde la superficie que encaje con la tarea, con las mismas herramientas y memoria.",
@@ -187,7 +223,7 @@ export const ui = {
     "surf.cli.d": "Ejecuciones puntuales y un REPL interactivo.",
     "surf.http.t": "API HTTP",
     "surf.http.d":
-      "/v1/chat/completions y /v1/models compatibles con OpenAI, desde cualquier cliente HTTP.",
+      "Compatible con OpenAI: <code>/chat/completions</code> y <code>/models</code>, desde cualquier SDK.",
     "surf.ws.t": "WebSocket",
     "surf.ws.d": "Una conexión WebSocket para conversaciones en vivo por streaming.",
     "surf.ch.t": "Canales",
@@ -203,9 +239,9 @@ export const ui = {
     "f.routing.t": "Enrutamiento por complejidad",
     "f.routing.d":
       "Una llamada de clasificación barata evalúa cada conversación nueva. Las preguntas simples bajan de forma automática a un modelo más ligero; toda la potencia queda para lo que de verdad la necesita.",
-    "f.efficient.t": "Ligero por diseño",
-    "f.efficient.d":
-      "Elixir/OTP ejecuta muchas sesiones supervisadas con bajo consumo de memoria y CPU, así que alojar un equipo de agentes exige menos infraestructura.",
+    "f.goal.t": "Objetivos, no solo prompts",
+    "f.goal.d":
+      "Da un objetivo y qué cuenta como hecho. Un revisor independiente decide si se cumplió, y el agente reintenta con ese comentario hasta pasar o agotar tu límite de intentos.",
     "f.tools.t": "Bucle real de herramientas",
     "f.tools.d":
       "Herramientas integradas para shell, archivos, web, scripts y envío de archivos. Añade las tuyas en minutos.",
@@ -243,16 +279,18 @@ export const ui = {
     "security.title": "Privacidad por diseño",
     "security.sub":
       "Los datos sensibles nunca se envían en claro a un modelo externo, lo que te ayuda a cumplir exigencias como la LGPD, el GDPR y la HIPAA.",
-    "security.1.t": "El mensaje llega",
-    "security.1.d": "Llega primero a tu Pepe",
-    "security.2.t": "Se vuelve un token",
-    "security.2.d": "El dato se sustituye antes de salir",
-    "security.3.t": "Responde a ciegas",
-    "security.3.d": "Nunca ve el valor real",
-    "security.4.t": "Pepe lo restaura",
-    "security.4.d": "Restaurado en tu respuesta",
-    "security.example.field": "DNI",
-    "security.example.value": "12345678A",
+    "security.1.t": "Lo que envía el usuario",
+    "security.1.d": "El mensaje tal como lo escribió.",
+    "security.2.t": "Lo que llega al modelo",
+    "security.2.d": "Pepe cambia el dato sensible por un token antes de que la petición salga de tu servidor.",
+    "security.3.t": "Lo que responde el modelo",
+    "security.3.d": "Razona sobre el token. Nunca vio el valor real, ni lo guardó.",
+    "security.4.t": "Lo que recibe el usuario",
+    "security.4.d": "Pepe repone el valor real, solo de tu lado.",
+    "security.chip.1": "Mi DNI es 12345678A, ¿puedes ver mi pedido?",
+    "security.chip.2": "Mi DNI es [DNI_1], ¿puedes ver mi pedido?",
+    "security.chip.3": "Encontré el pedido de [DNI_1]: sale mañana.",
+    "security.chip.4": "Encontré el pedido de 12345678A: sale mañana.",
 
     "widget.title": "O colócalo directo en tu sitio",
     "widget.body":
@@ -280,9 +318,9 @@ export const ui = {
     "uc.notes.t": "Notas y resúmenes de reuniones",
     "uc.notes.d": "Convierte una transcripción en un resumen y tareas, entregado donde tu equipo ya conversa.",
 
-    "how.title": "Cómo funciona el bucle",
+    "how.title": "Dentro de un solo turno",
     "how.sub":
-      "Pepe llama al modelo, ejecuta herramientas, devuelve resultados y se detiene cuando la respuesta está lista.",
+      "Una ampliación del bucle de turno: Pepe llama al modelo, ejecuta las herramientas que pide, devuelve los resultados y se detiene cuando la respuesta está lista.",
     "how.1.t": "Llamar al modelo",
     "how.1.d": "Envía la conversación y las herramientas del agente al modelo (con failover).",
     "how.2.t": "Ejecutar herramientas",
@@ -332,6 +370,23 @@ export const ui = {
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
+    "loops.code_task": "limpar a lista de clientes",
+    "loops.code_crit": "sem e-mails duplicados, toda linha com telefone válido",
+    "loops.code_prompt": "# um prompt te dá uma resposta, e você que julga",
+    "loops.code_goal": "# um objetivo insiste até um revisor dizer que está pronto",
+    "loops.title": 'Pare de dar ordens. <span class="grad">Defina o resultado.</span>',
+    "loops.sub":
+      "Um prompt te dá um turno: o agente responde e você decide se ficou bom. Isso te transforma no gargalo, aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só anda enquanto você está na frente do teclado. Dê um objetivo: diga o que significa \"pronto\", e o Pepe continua trabalhando até um revisor independente concordar que chegou lá.",
+    "loop.turn.t": "Loop de turno",
+    "loop.turn.d":
+      "Chama ferramentas, lê os resultados, chama mais. Para quando tem uma resposta de verdade, não um chute.",
+    "loop.goal.t": "Loop de objetivo",
+    "loop.goal.d":
+      "Você define o objetivo e o que conta como pronto. Quem julga é um revisor independente, não o agente. Não chegou? Ele recebe o retorno e tenta de novo.",
+    "loop.time.t": "Loop de tempo",
+    "loop.time.d":
+      "Trabalho recorrente, no horário que você marcar. Roda sozinho e recupera o que perdeu enquanto esteve fora.",
+
     "surfaces.title": "Um agente, quatro superfícies",
     "surfaces.sub":
       "Defina um agente uma vez. Use pela superfície certa para a tarefa, com as mesmas ferramentas e memória.",
@@ -339,7 +394,7 @@ export const ui = {
     "surf.cli.d": "Execuções pontuais e um REPL interativo.",
     "surf.http.t": "API HTTP",
     "surf.http.d":
-      "/v1/chat/completions e /v1/models compatíveis com OpenAI, a partir de qualquer cliente HTTP.",
+      "Compatível com a OpenAI: <code>/chat/completions</code> e <code>/models</code>, de qualquer SDK.",
     "surf.ws.t": "WebSocket",
     "surf.ws.d": "Uma conexão WebSocket para conversas ao vivo com streaming.",
     "surf.ch.t": "Canais",
@@ -355,9 +410,9 @@ export const ui = {
     "f.routing.t": "Roteamento por complexidade",
     "f.routing.d":
       "Uma chamada de classificação barata avalia cada conversa nova. Pergunta simples desce sozinha pra um modelo mais leve; a força total fica reservada pro que realmente precisa dela.",
-    "f.efficient.t": "Leve por design",
-    "f.efficient.d":
-      "Elixir/OTP roda muitas sessões supervisionadas com baixo consumo de memória e CPU, então hospedar uma equipe de agentes exige menos infraestrutura.",
+    "f.goal.t": "Objetivos, não só prompts",
+    "f.goal.d":
+      "Dê um objetivo e o que conta como pronto. Um revisor independente decide se foi atingido, e o agente tenta de novo com esse retorno até passar ou bater o seu limite de tentativas.",
     "f.tools.t": "Loop real de ferramentas",
     "f.tools.d":
       "Ferramentas nativas para shell, arquivos, web, scripts e envio de arquivos. Adicione as suas em minutos.",
@@ -395,16 +450,18 @@ export const ui = {
     "security.title": "Privacidade desde o design",
     "security.sub":
       "Dado sensível nunca é enviado em claro pra um modelo externo, o que ajuda a atender exigências como LGPD, GDPR e HIPAA.",
-    "security.1.t": "A mensagem chega",
-    "security.1.d": "Chega primeiro no seu Pepe",
-    "security.2.t": "Vira um token",
-    "security.2.d": "Dado é trocado antes de sair",
-    "security.3.t": "Responde às cegas",
-    "security.3.d": "Nunca vê o valor real",
-    "security.4.t": "O Pepe restaura",
-    "security.4.d": "Restaurado na sua resposta",
-    "security.example.field": "CPF",
-    "security.example.value": "123.456.789-00",
+    "security.1.t": "O que o usuário envia",
+    "security.1.d": "A mensagem exatamente como ele digitou.",
+    "security.2.t": "O que chega no modelo",
+    "security.2.d": "O Pepe troca o dado sensível por um token antes de a requisição sair do seu servidor.",
+    "security.3.t": "O que o modelo responde",
+    "security.3.d": "Ele raciocina sobre o token. Nunca viu o valor real, e nunca o guardou.",
+    "security.4.t": "O que o usuário recebe",
+    "security.4.d": "O Pepe repõe o valor real, só do seu lado.",
+    "security.chip.1": "Meu CPF é 123.456.789-00, pode ver meu pedido?",
+    "security.chip.2": "Meu CPF é [CPF_1], pode ver meu pedido?",
+    "security.chip.3": "Achei o pedido do [CPF_1]: sai para entrega amanhã.",
+    "security.chip.4": "Achei o pedido do 123.456.789-00: sai para entrega amanhã.",
 
     "widget.title": "Ou coloque direto no seu site",
     "widget.body":
@@ -432,9 +489,9 @@ export const ui = {
     "uc.notes.t": "Notas e resumos de reuniões",
     "uc.notes.d": "Transforme uma transcrição em resumo e itens de ação, entregues onde o time já conversa.",
 
-    "how.title": "Como o loop funciona",
+    "how.title": "Por dentro de um turno",
     "how.sub":
-      "O Pepe chama o modelo, roda ferramentas, devolve resultados e para quando a resposta está pronta.",
+      "Um zoom no loop de turno: o Pepe chama o modelo, executa as ferramentas que ele pedir, devolve os resultados e para quando a resposta está pronta.",
     "how.1.t": "Chamar o modelo",
     "how.1.d": "Envia a conversa e as ferramentas do agente ao modelo (com failover).",
     "how.2.t": "Rodar ferramentas",
@@ -484,6 +541,23 @@ export const ui = {
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
+    "loops.code_task": "limpar a lista de clientes",
+    "loops.code_crit": "sem e-mails duplicados, todas as linhas com telefone válido",
+    "loops.code_prompt": "# um prompt dá-lhe uma resposta, e é você que a julga",
+    "loops.code_goal": "# um objetivo insiste até um revisor dizer que está concluído",
+    "loops.title": 'Pare de dar ordens. <span class="grad">Defina o resultado.</span>',
+    "loops.sub":
+      "Um prompt dá-lhe um turno: o agente responde e é você que decide se está bom. Isso torna-o no estrangulamento, aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só avança enquanto está à frente do teclado. Dê antes um objetivo: diga o que significa \"concluído\", e o Pepe continua a trabalhar até um revisor independente concordar que foi atingido.",
+    "loop.turn.t": "Ciclo de turno",
+    "loop.turn.d":
+      "Chama ferramentas, lê os resultados, chama mais. Para quando tem uma resposta a sério, não um palpite.",
+    "loop.goal.t": "Ciclo de objetivo",
+    "loop.goal.d":
+      "Define o objetivo e o que conta como concluído. Quem avalia é um revisor independente, não o agente. Ainda não? Recebe o retorno e tenta de novo.",
+    "loop.time.t": "Ciclo de tempo",
+    "loop.time.d":
+      "Trabalho recorrente agendado. Corre sozinho e recupera o que falhou enquanto esteve desligado.",
+
     "surfaces.title": "Um agente, quatro superfícies",
     "surfaces.sub":
       "Define um agente uma vez. Usa-o pela superfície certa para a tarefa, com as mesmas ferramentas e memória.",
@@ -491,7 +565,7 @@ export const ui = {
     "surf.cli.d": "Execuções pontuais e um REPL interativo.",
     "surf.http.t": "API HTTP",
     "surf.http.d":
-      "/v1/chat/completions e /v1/models compatíveis com OpenAI, a partir de qualquer cliente HTTP.",
+      "Compatível com a OpenAI: <code>/chat/completions</code> e <code>/models</code>, a partir de qualquer SDK.",
     "surf.ws.t": "WebSocket",
     "surf.ws.d": "Uma ligação WebSocket para conversas ao vivo com streaming.",
     "surf.ch.t": "Canais",
@@ -507,9 +581,9 @@ export const ui = {
     "f.routing.t": "Encaminhamento por complexidade",
     "f.routing.d":
       "Uma chamada de classificação barata avalia cada conversa nova. Perguntas simples descem sozinhas para um modelo mais leve; a força toda fica reservada para o que precisa mesmo dela.",
-    "f.efficient.t": "Leve por desenho",
-    "f.efficient.d":
-      "Elixir/OTP corre muitas sessões supervisionadas com baixo consumo de memória e CPU, por isso alojar uma equipa de agentes exige menos infraestrutura.",
+    "f.goal.t": "Objetivos, não apenas prompts",
+    "f.goal.d":
+      "Dê um objetivo e o que conta como concluído. Um revisor independente decide se foi cumprido, e o agente tenta de novo com esse retorno até passar ou atingir o seu limite de tentativas.",
     "f.tools.t": "Ciclo real de ferramentas",
     "f.tools.d":
       "Ferramentas nativas para shell, ficheiros, web, scripts e envio de ficheiros. Adiciona as tuas em minutos.",
@@ -547,16 +621,18 @@ export const ui = {
     "security.title": "Privacidade desde a conceção",
     "security.sub":
       "Dados sensíveis nunca são enviados em claro para um modelo externo, o que ajuda a cumprir exigências como o RGPD, a LGPD e a HIPAA.",
-    "security.1.t": "A mensagem chega",
-    "security.1.d": "Chega primeiro ao teu Pepe",
-    "security.2.t": "Vira um token",
-    "security.2.d": "O dado é trocado antes de sair",
-    "security.3.t": "Responde às cegas",
-    "security.3.d": "Nunca vê o valor real",
-    "security.4.t": "O Pepe restaura-o",
-    "security.4.d": "Restaurado na tua resposta",
-    "security.example.field": "NIF",
-    "security.example.value": "123 456 789",
+    "security.1.t": "O que o utilizador envia",
+    "security.1.d": "A mensagem tal como a escreveu.",
+    "security.2.t": "O que chega ao modelo",
+    "security.2.d": "O Pepe troca o dado sensível por um token antes de o pedido sair do seu servidor.",
+    "security.3.t": "O que o modelo responde",
+    "security.3.d": "Raciocina sobre o token. Nunca viu o valor real, nem o guardou.",
+    "security.4.t": "O que o utilizador recebe",
+    "security.4.d": "O Pepe repõe o valor real, apenas do seu lado.",
+    "security.chip.1": "O meu NIF é 123 456 789, pode ver a minha encomenda?",
+    "security.chip.2": "O meu NIF é [NIF_1], pode ver a minha encomenda?",
+    "security.chip.3": "Encontrei a encomenda do [NIF_1]: sai para entrega amanhã.",
+    "security.chip.4": "Encontrei a encomenda do 123 456 789: sai para entrega amanhã.",
 
     "widget.title": "Ou coloca-o direto no teu site",
     "widget.body":
@@ -584,9 +660,9 @@ export const ui = {
     "uc.notes.t": "Notas e resumos de reuniões",
     "uc.notes.d": "Transforma uma transcrição em resumo e itens de ação, entregues onde a equipa já fala.",
 
-    "how.title": "Como funciona o ciclo",
+    "how.title": "Por dentro de um turno",
     "how.sub":
-      "O Pepe chama o modelo, corre ferramentas, devolve resultados e para quando a resposta está pronta.",
+      "Uma ampliação do ciclo de turno: o Pepe chama o modelo, executa as ferramentas que pedir, devolve os resultados e para quando a resposta está pronta.",
     "how.1.t": "Chamar o modelo",
     "how.1.d": "Envia a conversa e as ferramentas do agente ao modelo (com failover).",
     "how.2.t": "Correr ferramentas",
