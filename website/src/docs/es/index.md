@@ -62,7 +62,7 @@ sobre tu máquina sin tu consentimiento.
 
 <div class="note"><strong>Herramientas integradas.</strong> A cada agente se le pueden dar herramientas como <code>bash</code>, <code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>list_dir</code>, <code>fetch_url</code> y <code>web_search</code>. Eliges cuáles recibe cada agente al crearlo, así un bot de soporte y un agente de programación pueden tener capacidades muy distintas.</div>
 
-## Las cuatro superficies
+## Las cinco superficies
 
 Construyes un agente una vez. Pepe lo expone luego a través de la superficie que
 mejor encaje con la tarea. La configuración y la gestión, por su parte, ocurren

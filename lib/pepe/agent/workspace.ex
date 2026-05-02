@@ -134,7 +134,7 @@ defmodule Pepe.Agent.Workspace do
       {:ok, dt} ->
         "## Current time\n" <>
           Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S") <>
-          " (#{tz}). Treat this as \"now\" for anything time-relative — today, " <>
+          " (#{tz}). Treat this as \"now\" for anything time-relative - today, " <>
           "tomorrow, scheduling. Do not assume UTC."
 
       _ ->

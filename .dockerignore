@@ -1,0 +1,21 @@
+# Keep the build context small and, more importantly, keep host state out of the
+# image: _build/deps compiled for the host would poison a Linux build, and
+# .pepe/config.json would bake someone's API keys into a published layer.
+.git
+.github
+_build
+deps
+node_modules
+.elixir_ls
+.lexical
+priv/static/assets
+priv/static/cache_manifest.json
+website
+docs
+test
+cover
+burrito_out
+*.tgz
+.DS_Store
+.env
+.pepe

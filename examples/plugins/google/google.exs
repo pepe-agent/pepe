@@ -238,7 +238,7 @@ defmodule Pepe.Plugins.GmailSearch do
 
     case API.get(url, token, format: "metadata", metadataHeaders: ["From", "Subject"]) do
       {:ok, %{"payload" => %{"headers" => hs}}} ->
-        "#{header(hs, "From")} — #{header(hs, "Subject")}"
+        "#{header(hs, "From")} - #{header(hs, "Subject")}"
 
       _ ->
         nil

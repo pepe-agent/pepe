@@ -161,5 +161,3 @@ The port also reads from the `PORT` environment variable. Add `--tunnel` to
 open a public tunnel for testing webhook channels without your own reverse
 proxy. Set `PEPE_PUBLIC_URL` so the callback URLs you register with each
 provider point at your real host.
-</content>
-</invoke>

@@ -3,62 +3,89 @@ title: Skills
 description: Instale instruções reutilizáveis que ensinam fluxos repetíveis aos agentes.
 ---
 
-Skills são instruções Markdown reutilizáveis que ensinam um agente a executar um fluxo de trabalho. As nativas ficam em `priv/skills/` e podem ser instaladas para que os agentes as descubram e apliquem durante uma execução.
+Uma skill é um documento de instruções sob demanda: um arquivo Markdown que
+ensina ao agente um *procedimento*, como instalar uma ferramenta ou lidar com
+uma mensagem de áudio. É assim que um agente aprende algo novo sem que uma linha
+de código mude.
 
-## O registro: como as ferramentas são encontradas
+## Listadas, não carregadas
 
-`Pepe.Tools` é o registro único. Ele combina duas fontes.
+Uma skill nunca é colada por inteiro no prompt do sistema. Só o nome e um resumo
+de uma linha aparecem no contexto do agente. Quando o assunto surge, o agente
+chama a ferramenta `skill` com esse nome, lê o documento completo e o segue.
 
-- O conjunto **embutido**, uma lista fixa em `Pepe.Tools`. Inclui `bash`,
-  `run_script`, `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir`,
-  `fetch_url`, `web_search`, `send_file` e as ferramentas de gestão que um agente
-  usa para operar o runtime pela conversa (`manage_agent`, `manage_channel`,
-  `enable_tool`, `schedule_task` e outras).
-- Os **plugins**, descobertos em tempo de execução a partir da pasta de plugins.
+É justamente essa indireção que importa. O agente carrega dezenas de
+procedimentos pagando apenas uma linha de contexto por cada um, e abre a versão
+longa exatamente quando o trabalho pede. O resumo é a primeira linha não vazia
+do arquivo, então essa linha de abertura deve dizer quando a skill se aplica.
 
-`Pepe.Tools.all/0` devolve as embutidas seguidas de cada ferramenta de plugin
-carregada. Quando você lista as ferramentas de um agente, cada nome é procurado
-aqui. Há uma regra que vale conhecer: em uma colisão de nomes, a embutida ganha.
-Você não consegue sobrepor `read_file` com um plugin de mesmo nome, então escolha
-um nome distinto para a sua ferramenta.
+<div class="note"><strong>A ferramenta skill.</strong> O agente precisa da ferramenta <code>skill</code> na sua lista de ferramentas para ler skills. Sem ela, as skills ficam listadas no contexto mas nunca são abertas.</div>
 
-### Conceder uma ferramenta a um agente
+## Skills nativas
 
-Um plugin instalado não entrega automaticamente suas ferramentas a todo agente.
-Só as ferramentas que você lista em um agente ficam expostas a ele, e cada
-chamada ainda passa pela mesma porteira de permissão de uma ferramenta embutida.
-Você concede uma ferramenta de três maneiras.
+Estas já vêm com o Pepe, em `priv/skills/`:
 
-**Com a CLI do pepe.** Liste a ferramenta no `--tools` do agente:
+- **`skill-creator`** - como criar, editar, auditar e melhorar skills (a meta-skill).
+- **`install-tool`** - escrever uma ferramenta em plugin e habilitá-la pela conversa.
+- **`write-a-script`** - resolver tarefas complexas escrevendo e salvando um programa para rodar.
+- **`manage-routing`** - alterar rotas entre agentes com `set_route`.
+- **`handle-media`** - entender uma entrada de voz, áudio, imagem ou arquivo (transcrever, ler), instalando o que for preciso.
+- **`install-skill`** - instalar uma skill a partir de uma URL, um gist, um repositório ou outro Pepe.
+- **`create-watch`** - criar um watch durável do tipo "verifique X e me avise quando acontecer".
+
+## Escrevendo as suas
+
+As skills do usuário ficam em `~/.pepe/skills/*.md`. Uma skill do usuário
+sobrepõe a nativa de mesmo nome, então escrever o seu próprio `handle-media.md`
+substitui a que vem com o Pepe. A primeira linha não vazia é o resumo; todo o
+resto é o procedimento, em Markdown puro, escrito para o agente ler e seguir.
 
 ```bash
-pepe agent add assistant --tools reverse_text,web_search,read_file
+~/.pepe/skills/publicar-release.md
 ```
 
-**No painel.** Abra o agente em Agentes e marque a ferramenta na lista de
-ferramentas dele. As ferramentas do plugin aparecem ao lado das embutidas.
+Não há passo de registro nem reinício. Basta colocar o arquivo lá e a skill
+aparece na lista do agente já na mensagem seguinte.
 
-#### Faça pela conversa
+### Deixe o agente escrever
 
-Um agente que tem a ferramenta embutida `enable_tool` pode ligar uma ferramenta
-para si mesmo depois que você instala um plugin, sem que você mexa na CLI ou no
-painel.
+Um agente pode escrever as próprias skills. Peça que ele guarde como skill o
+jeito de fazer alguma coisa e, guiado pelo `skill-creator`, ele grava um novo
+`skills/<nome>.md` que já aparece na sua própria lista.
 
-> Você: ative a ferramenta reverse_text
+> Você: funcionou. guarde como skill o processo de publicar uma release
 >
-> Agente: reverse_text ativada; você já pode usar a partir da sua próxima mensagem
+> Agente: salvei skills/publicar-release.md. Vou segui-lo na próxima vez que você pedir uma release.
 
-`enable_tool` só aceita uma ferramenta que já existe como embutida ou como plugin
-carregado, e a mudança vale a partir da próxima mensagem do agente. Para conceder
-uma ferramenta a um agente *diferente*, um agente com a ferramenta `manage_agent`
-pode fazer isso com a ação `add_tool`. Essa ferramenta é limitada aos agentes que
-o agente que age tem permissão para gerenciar, e as instruções dele mandam
-confirmar a mudança com você antes de aplicar.
+É isso que torna durável o conhecimento do agente. O procedimento que ele
+descobriu uma vez fica escrito, em vez de ser redescoberto a cada sessão.
 
-> Você: dê ao agente de suporte a ferramenta gmail_search
->
-> Agente: Vou adicionar gmail_search ao agente "support". Confirma?
->
-> Você: sim
->
-> Agente: gmail_search adicionada ao support.
+### Instalando uma de fora
+
+A skill `install-skill` ensina o agente a buscar uma skill em uma URL, um gist,
+um repositório ou outra instância do Pepe. Texto de skill vindo de fora é
+entrada não confiável, então o agente o escaneia com a ferramenta `scan_skill`
+antes de gravá-lo em disco. A varredura sinaliza injeção de prompt, exfiltração
+de segredos, comandos destrutivos, persistência e ofuscação. Ela é uma segunda
+checagem, e não um substituto para ler o conteúdo, e nunca instala nada por
+conta própria.
+
+## Skills, plugins e scripts
+
+Os três pontos de extensão se compõem, e juntos são o que permite pedir a um
+agente, em linguagem natural, algo que ele ainda não sabe fazer.
+
+Combinado com [plugins](../plugins/) e o `enable_tool`, dá para pedir pela
+conversa que o agente instale uma ferramenta que faça X. Ele lê a skill
+`install-tool`, escreve o plugin em `plugins/<nome>.exs`, habilita a ferramenta
+em si mesmo e passa a usá-la, sem reiniciar.
+
+Para trabalho complexo ou de várias etapas, o agente não faz tudo na mão. A
+ferramenta `run_script` deixa que ele escreva um programa curto (Python, Node,
+Ruby, Bash ou Elixir, sendo que Elixir está sempre disponível) e o execute,
+recebendo de volta stdout, stderr e o código de saída para iterar sobre os
+erros. Os scripts que valem a pena são salvos em `scripts/` e reexecutados
+depois, passando ao `run_script` uma referência `file:`. Quando o agente
+descobre *como* fazer uma tarefa recorrente, ler um PDF ou processar uma
+planilha, ele escreve para si uma skill em `skills/<nome>.md`. A skill
+`write-a-script` ensina todo esse ciclo.

@@ -20,8 +20,8 @@ pepe chat assistant --session minha-sessao
 
 A API HTTP monta a chave de sessão a partir de **dois campos, e eles se combinam**.
 
-- **`user`** — o campo padrão da OpenAI, então qualquer SDK oficial da OpenAI ganha memória no servidor sem sair do formato padrão. É por ele que você deve começar. Responde *quem* está falando.
-- **`session_id`** no corpo JSON (ou um cabeçalho `x-session-id`) — *qual conversa* daquela pessoa. Use quando a mesma pessoa pode ter várias conversas separadas.
+- **`user`** identifica *quem* está falando. É o campo padrão da OpenAI, então qualquer SDK oficial ganha memória no servidor sem sair do formato padrão. É por ele que você deve começar.
+- **`session_id`**, no corpo JSON ou num cabeçalho `x-session-id`, identifica *qual conversa* daquela pessoa. Use quando a mesma pessoa pode ter várias conversas separadas.
 
 Como eles se combinam:
 

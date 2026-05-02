@@ -3,60 +3,88 @@ title: Skills
 description: Install reusable instructions that teach agents repeatable workflows.
 ---
 
-Skills are reusable Markdown instructions that teach an agent how to perform a workflow. They live in `priv/skills/` for built-ins and can be installed so agents can discover and apply them during a run.
+A skill is an on-demand instruction doc: a Markdown file that teaches an agent a
+*procedure*, such as how to install a tool or how to deal with an audio message.
+Skills are how an agent learns to do something new without a single line of code
+changing.
 
-## The registry: how tools are found
+## Listed, not loaded
 
-`Pepe.Tools` is the single registry. It combines two sources.
+A skill is never pasted into the system prompt in full. Only its name and a
+one-line summary are listed in the agent's context. When the topic comes up, the
+agent calls the `skill` tool with that name, reads the whole document, and
+follows it.
 
-- The **built-in** set, a fixed list in `Pepe.Tools`. It includes `bash`,
-  `run_script`, `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir`,
-  `fetch_url`, `web_search`, `send_file`, and the management tools an agent uses
-  to run the runtime by chat (`manage_agent`, `manage_channel`, `enable_tool`,
-  `schedule_task`, and others).
-- **Plugins**, discovered at runtime from the plugins folder.
+That indirection is the entire point. An agent can carry dozens of procedures
+while paying only a line of context for each, and it opens the long version
+exactly when the work calls for it. The summary is simply the first non-empty
+line of the file, so that opening line should say when the skill applies.
 
-`Pepe.Tools.all/0` returns the built-ins followed by every loaded plugin tool.
-When you list an agent's tools, each name is looked up here. There is one rule to
-know: on a name collision, the built-in wins. You cannot shadow `read_file` with
-a plugin of the same name, so pick a distinct name for your tool.
+<div class="note"><strong>The skill tool.</strong> An agent needs the <code>skill</code> tool in its tool list to read skills. Without it the skills are listed in its context but never opened.</div>
 
-### Granting a tool to an agent
+## Built-in skills
 
-A plugin being installed does not automatically hand its tools to every agent.
-Only the tools you list on an agent are exposed to it, and each call still
-passes through the same permission gate as a built-in tool. You grant a tool
-three ways.
+These ship with Pepe, under `priv/skills/`:
 
-**With the pepe CLI.** List the tool in the agent's `--tools`:
+- **`skill-creator`** - how to create, edit, audit and improve skills (the meta-skill).
+- **`install-tool`** - write a plugin tool and enable it from chat.
+- **`write-a-script`** - solve complex tasks by writing and saving a program to run.
+- **`manage-routing`** - change agent-to-agent routes with `set_route`.
+- **`handle-media`** - understand a voice, audio, image or file input (transcribe, read), installing whatever it needs.
+- **`install-skill`** - install a skill from a URL, a gist, a repo, or another Pepe.
+- **`create-watch`** - set up a durable "check X and notify me when it happens" watch.
+
+## Writing your own
+
+User skills live in `~/.pepe/skills/*.md`. A user skill overrides a built-in of
+the same name, so writing a `handle-media.md` of your own replaces the one that
+ships with Pepe. The first non-empty line is the summary; everything after it is
+the procedure, in plain Markdown, written for the agent to read and follow.
 
 ```bash
-pepe agent add assistant --tools reverse_text,web_search,read_file
+~/.pepe/skills/cut-a-release.md
 ```
 
-**On the dashboard.** Open the agent under Agents and tick the tool in its tool
-list. The plugin's tools appear alongside the built-ins.
+There is no registration step and no restart. Drop the file in and the skill
+appears in the agent's list on its next message.
 
-#### Do it by chat
+### Let the agent write it
 
-An agent that has the `enable_tool` built-in can turn a tool on for itself
-after you install a plugin, without you touching the CLI or dashboard.
+An agent can author its own skills. Ask it to remember how to do something as a
+skill and, guided by `skill-creator`, it writes a new `skills/<name>.md` that
+shows up in its own list right away.
 
-> You: enable the reverse_text tool
+> You: that worked. remember how to cut a release as a skill
 >
-> Agent: enabled reverse_text; you can use it from your next message
+> Agent: saved skills/cut-a-release.md. I will follow it the next time you ask for a release.
 
-`enable_tool` only accepts a tool that already exists as a built-in or a loaded
-plugin, and the change takes effect on the agent's next message. To grant a tool
-to a *different* agent, an agent with the `manage_agent` tool can do it with the
-`add_tool` action. That tool is scoped to the agents the acting agent is allowed
-to manage, and its instructions tell it to confirm the change with you before
-applying it.
+This is what makes an agent's know-how durable. A procedure it worked out once
+gets written down instead of being rediscovered every session.
 
-> You: give the support agent the gmail_search tool
->
-> Agent: I will add gmail_search to the "support" agent. Confirm?
->
-> You: yes
->
-> Agent: added gmail_search to support.
+### Installing one from elsewhere
+
+The `install-skill` skill teaches an agent to pull a skill from a URL, a gist, a
+repo, or another Pepe instance. Skill text from outside is untrusted input, so
+the agent security-scans it with the `scan_skill` tool before writing it to
+disk. The scan flags prompt injection, secret exfiltration, destructive
+commands, persistence and obfuscation. It is a second check rather than a
+substitute for reading the content, and it never installs anything itself.
+
+## Skills, plugins and scripts
+
+The three extension points compose, and together they are what lets an agent be
+asked in plain language to do something it cannot do yet.
+
+Combined with [plugins](../plugins/) and `enable_tool`, an agent can be told in
+chat to install a tool that does X. It reads the `install-tool` skill, writes
+the plugin to `plugins/<name>.exs`, enables the tool on itself, and starts
+calling it, with no restart.
+
+For complex or multi-step work an agent does not grind through it by hand. The
+`run_script` tool lets it write a short program (Python, Node, Ruby, Bash or
+Elixir, and Elixir is always available) and run it, getting back stdout, stderr
+and the exit code so it can iterate on the errors. Worthwhile scripts are saved
+under `scripts/` and re-run later by passing `run_script` a `file:` reference.
+When the agent works out *how* to do a recurring task, reading a PDF or
+crunching a spreadsheet, it writes itself a skill under `skills/<name>.md`. The
+`write-a-script` skill teaches that whole loop.

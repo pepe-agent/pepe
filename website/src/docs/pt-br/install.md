@@ -37,6 +37,12 @@ Os dois caminhos escrevem a mesma configuração.
 
 <div class="note"><strong>Os segredos ficam fora do arquivo.</strong> Quando o Pepe pede uma chave de API, ele aceita uma referência <code>${ENV_VAR}</code>, por exemplo <code>${OPENROUTER_API_KEY}</code>. O que é escrito em <code>~/.pepe/config.json</code> é a referência. O valor real é lido do seu ambiente em tempo de execução e nunca é guardado expandido.</div>
 
+## Docker
+
+Prefere container? `docker pull ghcr.io/pepe-agent/pepe` (amd64 e arm64). Ele precisa de um
+volume e de uma senha do dashboard - os dois estão explicados, junto de como dar ferramentas
+extras ao agente dentro do container, na [página de Docker](/pt-br/docs/docker/).
+
 ## Desinstalar
 
 Remova o binário; apague também a pasta de configuração pra descartar todo

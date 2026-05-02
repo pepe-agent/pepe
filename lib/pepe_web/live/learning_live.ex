@@ -54,7 +54,7 @@ defmodule PepeWeb.LearningLive do
               title={gettext("Run a consolidation pass automatically every night.")}>
               {if @auto?, do: gettext("Nightly: on"), else: gettext("Nightly: off")}
             </button>
-            <form phx-change="pick_learn_agent">
+            <form id="learn-agent-picker" phx-change="pick_learn_agent">
               <select name="agent" class={fld()}>
                 <option :for={a <- scoped_agent_names(@scope)} value={a} selected={a == @learn_agent}>{a}</option>
               </select>

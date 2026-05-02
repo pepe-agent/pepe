@@ -4,7 +4,7 @@ defmodule Pepe.MixProject do
   def project do
     [
       app: :pepe,
-      version: "0.2.0",
+      version: "0.3.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
@@ -34,7 +34,7 @@ defmodule Pepe.MixProject do
   defp releases do
     [
       pepe: [
-        steps: [:assemble, &Burrito.wrap/1],
+        steps: release_steps(),
         burrito: [
           targets: [
             macos_arm: [os: :darwin, cpu: :aarch64],
@@ -46,6 +46,16 @@ defmodule Pepe.MixProject do
         ]
       ]
     ]
+  end
+
+  # Burrito exists to cross-compile a *portable* binary for someone else's machine.
+  # Inside a container there is nothing to be portable about - the image is the
+  # target - so the Docker build sets PEPE_PLAIN_RELEASE and gets a plain OTP
+  # release instead: same `bin/pepe`, no bundled ERTS-per-OS, a far smaller image.
+  defp release_steps do
+    if System.get_env("PEPE_PLAIN_RELEASE"),
+      do: [:assemble],
+      else: [:assemble, &Burrito.wrap/1]
   end
 
   # Configuration for the OTP application.

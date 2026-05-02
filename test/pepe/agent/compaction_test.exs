@@ -5,7 +5,60 @@ defmodule Pepe.Agent.CompactionTest do
   alias Pepe.Config.Model
   alias Pepe.LLM.Message
 
+  # The summarizer the compaction calls, with the misbehaviors it has to survive. A 4xx
+  # stands in for "the call failed": the client does not retry it, so the failure path is
+  # exercised at once instead of several seconds later.
+  defmodule SummaryPlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(mode), do: mode
+
+    def call(conn, mode) do
+      {:ok, _body, conn} = read_body(conn)
+
+      case mode do
+        :summary -> ok(conn, "SUMMARY: they agreed to ship on Friday.")
+        :empty -> ok(conn, "")
+        :no_content -> ok(conn, nil)
+        :failing -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error": "no"}))
+      end
+    end
+
+    defp ok(conn, content) do
+      payload = %{
+        "choices" => [
+          %{"index" => 0, "message" => %{"role" => "assistant", "content" => content}, "finish_reason" => "stop"}
+        ]
+      }
+
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+    end
+  end
+
   defp model(window \\ nil), do: %Model{name: "m", base_url: "x", model: "id", context_window: window}
+
+  # A model pointed at a live summarizer behaving as `mode`. The tiny context window is
+  # what puts the history over the compaction threshold without needing a huge fixture.
+  defp mock_model(mode) do
+    server = start_supervised!({Bandit, plug: {SummaryPlug, mode}, port: 0, scheme: :http})
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+
+    %Model{name: "m", base_url: "http://localhost:#{port}", api_key: "test", model: "id", context_window: 100}
+  end
+
+  # A history that splits into head (1 system) + middle (4) + tail (1) for a 100-token
+  # window: each turn is big enough that only the last one fits the verbatim tail.
+  defp long_history do
+    [
+      Message.system("You are helpful."),
+      Message.user("q1 " <> String.duplicate("a", 100)),
+      Message.assistant("a1 " <> String.duplicate("b", 100)),
+      Message.user("q2 " <> String.duplicate("c", 100)),
+      Message.assistant("a2 " <> String.duplicate("d", 100)),
+      Message.user("q3 " <> String.duplicate("e", 100))
+    ]
+  end
 
   test "estimate_tokens grows with content and is roughly bytes/4" do
     small = [Message.user(String.duplicate("x", 40))]
@@ -77,5 +130,50 @@ defmodule Pepe.Agent.CompactionTest do
     # Over the window, but almost everything is protected head/tail: nothing to summarize.
     msgs = [Message.system(String.duplicate("s", 40_000)), Message.user("hi")]
     assert Compaction.compact(msgs, model(8000)) == msgs
+  end
+
+  test "compact_now replaces the middle with the model's summary, keeping head and tail" do
+    msgs = long_history()
+    {head, middle, tail} = Compaction.split(msgs, 30)
+    assert length(middle) == 4
+
+    assert {:ok, compacted, "SUMMARY: they agreed to ship on Friday."} =
+             Compaction.compact_now(msgs, mock_model(:summary))
+
+    [kept_head] = head
+    assert [^kept_head, summary | ^tail] = compacted
+
+    # The condensed middle comes back as a single system message that says it is one.
+    assert summary["role"] == "system"
+    assert summary["content"] =~ "older turns were condensed"
+    assert summary["content"] =~ "ship on Friday"
+
+    # And the point of the exercise: it is smaller than what went in.
+    assert Compaction.estimate_tokens(compacted) < Compaction.estimate_tokens(msgs)
+  end
+
+  describe "compact_now surfaces a summarizer that didn't deliver" do
+    test "an empty summary is not a summary" do
+      assert {:error, :empty_summary} = Compaction.compact_now(long_history(), mock_model(:empty))
+    end
+
+    test "a reply with no content at all is not a summary either" do
+      assert {:error, :empty_summary} = Compaction.compact_now(long_history(), mock_model(:no_content))
+    end
+
+    test "a failed call is reported with its reason" do
+      assert {:error, {:http_error, 400, _body}} = Compaction.compact_now(long_history(), mock_model(:failing))
+    end
+  end
+
+  test "a failing summarizer never breaks the request: compact returns the history untouched" do
+    msgs = long_history()
+    model = mock_model(:failing)
+
+    # The history is over the threshold, so compaction really is attempted...
+    assert Compaction.needs?(msgs, model)
+
+    # ...and when it fails, the caller still gets its messages, intact and unraised.
+    assert Compaction.compact(msgs, model) == msgs
   end
 end

@@ -5,20 +5,20 @@ turns instead of reacting one message at a time. Both are **per-conversation**: 
 with the session (in the disposable store), and their tool results show in the chat and in
 [Traces](traces.md). They are opt-in, add `goal` and/or `update_plan` to an agent's tools.
 
-## Goal — the north star
+## Goal - the north star
 
 A **goal** is a persistent objective plus a status. The agent sets one at the start of a
 non-trivial task, re-reads it to stay oriented, and marks it done (or blocked) at the end.
 
 The `goal` tool actions:
 
-- `set` — an `objective` (what it is trying to achieve), and an optional advisory
+- `set` - an `objective` (what it is trying to achieve), and an optional advisory
   `budget_tokens` target to keep the effort proportionate.
-- `status` — mark `active`, `paused`, `blocked` or `complete`, with an optional `note`.
+- `status` - mark `active`, `paused`, `blocked` or `complete`, with an optional `note`.
   `blocked` is how the agent signals it is stuck and needs the user; `complete` when the
   objective is met.
-- `show` — return the current goal.
-- `clear` — drop it.
+- `show` - return the current goal.
+- `clear` - drop it.
 
 The objective and status persist across turns (and a restart), so a long or autonomous
 run does not drift off what it set out to do.
@@ -26,7 +26,7 @@ run does not drift off what it set out to do.
 > The `budget_tokens` is an **advisory target** the agent is told about, not a hard cap.
 > Hard spend limits are the per-company monthly cap in [Usage & billing](billing.md).
 
-## Plan — the live checklist
+## Plan - the live checklist
 
 `update_plan` maintains an ordered checklist of steps, each `pending`, `in_progress`, or
 `done`. Every call passes the **full** list and replaces the previous one, so there is

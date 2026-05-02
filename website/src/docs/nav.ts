@@ -5,11 +5,11 @@ import type { Locale } from "../i18n/ui";
 // kept small and cross-linked so both a human and the agent (which reads the
 // same docs) can load just the one they need.
 export const docsNav: { group: string; slugs: string[] }[] = [
-  { group: "start", slugs: ["index", "install", "quickstart"] },
+  { group: "start", slugs: ["index", "install", "docker", "quickstart"] },
   { group: "configure", slugs: ["models", "agents", "billing", "config"] },
   {
     group: "channels",
-    slugs: ["channels", "telegram", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],
+    slugs: ["channels", "telegram", "voice", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],
   },
   { group: "automate", slugs: ["goals", "scheduled", "watches"] },
   { group: "api", slugs: ["api", "sessions", "auth", "websocket", "clients"] },

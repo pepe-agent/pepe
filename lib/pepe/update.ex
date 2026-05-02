@@ -85,25 +85,63 @@ defmodule Pepe.Update do
 
   defp swap(version) do
     {:ok, _} = Application.ensure_all_started(:req)
-    url = "https://github.com/#{@repo}/releases/latest/download/#{target()}"
+
+    with {:ok, body} <- download(target()),
+         :ok <- verify(body, target()) do
+      install(body, version)
+    end
+  end
+
+  defp download(asset) do
+    url = "https://github.com/#{@repo}/releases/latest/download/#{asset}"
+
+    case Req.get(url, receive_timeout: 120_000, redirect: true) do
+      {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 -> {:ok, body}
+      {:ok, %{status: s}} -> {:error, {:http, s}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Check the download against the SHA256SUMS the release publishes. This is the only
+  # thing standing between a tampered asset and an overwritten binary on the user's box,
+  # so a checksum that is missing, unreadable, or simply absent for our asset is a
+  # refusal, never a shrug: passing on a sum we could not check would defeat having one.
+  defp verify(body, asset) do
+    with {:ok, sums} <- download("SHA256SUMS"),
+         {:ok, expected} <- sum_for(sums, asset) do
+      actual = :sha256 |> :crypto.hash(body) |> Base.encode16(case: :lower)
+
+      if Plug.Crypto.secure_compare(actual, expected),
+        do: :ok,
+        else: {:error, {:checksum_mismatch, asset}}
+    else
+      {:error, reason} -> {:error, {:checksum_unavailable, reason}}
+    end
+  end
+
+  # One `<sha256>  <filename>` per line, the format `sha256sum` itself writes.
+  defp sum_for(sums, asset) do
+    sums
+    |> String.split("\n", trim: true)
+    |> Enum.find_value({:error, {:no_checksum_for, asset}}, fn line ->
+      case String.split(line, ~r/\s+/, trim: true) do
+        [sum, ^asset] -> {:ok, String.downcase(sum)}
+        _ -> nil
+      end
+    end)
+  end
+
+  defp install(body, version) do
     path = binary_path()
     tmp = "#{path}.new"
 
-    case Req.get(url, receive_timeout: 120_000, redirect: true) do
-      {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
-        File.write!(tmp, body)
-        File.chmod!(tmp, 0o755)
-        # Move the running binary aside (kept as .old), then put the new one in place.
-        _ = File.rename(path, "#{path}.old")
-        File.rename!(tmp, path)
-        Logger.info("[update] updated pepe to v#{version} at #{path}")
-        {:ok, :updated, version}
-
-      {:ok, %{status: s}} ->
-        {:error, {:http, s}}
-
-      other ->
-        other
-    end
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(tmp, body)
+    File.chmod!(tmp, 0o755)
+    # Move the running binary aside (kept as .old), then put the new one in place.
+    _ = File.rename(path, "#{path}.old")
+    File.rename!(tmp, path)
+    Logger.info("[update] updated pepe to v#{version} at #{path}")
+    {:ok, :updated, version}
   end
 end

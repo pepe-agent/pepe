@@ -137,8 +137,8 @@ forever.
 
 Two other gates sit in front of the model call. An agent whose model requires
 redaction refuses to run unless the agent has a redaction hook enabled, and a company
-that has hit its monthly spend cap - or its monthly customer-message cap, a separate
-limit - stops here with no new model calls or replies. Both fail the turn cleanly
+that has hit its monthly spend cap (or its monthly customer-message cap, a separate
+limit) stops here with no new model calls or replies. Both fail the turn cleanly
 rather than silently proceeding; see Billing & limits for how those caps are set.
 
 <div class="note"><strong>Streaming and events.</strong> As the loop runs it emits

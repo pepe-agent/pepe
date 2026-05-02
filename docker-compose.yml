@@ -1,0 +1,40 @@
+# Run Pepe with one command:
+#
+#     docker compose up -d
+#
+# Then open http://localhost:4000 and finish setup from the dashboard (or run
+# `docker compose exec pepe bin/pepe remote` for an IEx shell into the node).
+
+services:
+  pepe:
+    image: ghcr.io/pepe-agent/pepe:latest
+    # To build from this checkout instead of pulling: `docker compose up --build`
+    # build: .
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      # State. Config, agents, conversations and Mnesia live here. This is the volume
+      # you back up, and the one `docker compose down -v` would erase.
+      - pepe-data:/data
+
+      # Cache. Single-file CLIs the agent installs for itself (op, gh, kubectl). Kept
+      # apart from /data so a backup carries state, not regenerable, architecture-
+      # specific binaries.
+      - pepe-tools:/tools
+    environment:
+      # Not optional. A container is not loopback, so Pepe's network guard treats it
+      # as a public network: with no password, every request gets a 403 and the
+      # dashboard refuses to serve.
+      PEPE_DASHBOARD_PASSWORD: ${PEPE_DASHBOARD_PASSWORD:?set this in a .env file}
+
+      # Secrets stay out of the image: the config file refers to them as ${VAR_NAME}
+      # and Pepe interpolates them at read time, so put the real values here (or in a
+      # .env file next to this one).
+      # OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      # TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TZ: UTC
+
+volumes:
+  pepe-data:
+  pepe-tools:

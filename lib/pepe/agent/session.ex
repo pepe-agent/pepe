@@ -562,7 +562,9 @@ defmodule Pepe.Agent.Session do
         first_turn?(state.messages)
 
     {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
-    {:noreply, %{state | running: %{task: pid, ref: ref, from: from}, pending_resume: text}}
+
+    running = %{task: pid, ref: ref, from: from, on_event: opts[:on_event]}
+    {:noreply, %{state | running: running, pending_resume: text}}
   end
 
   # True on a session's first-ever turn: an empty history or just the base system prompt.
@@ -587,7 +589,7 @@ defmodule Pepe.Agent.Session do
   # A finished run reports here. Reply to the waiting caller and absorb the new
   # history. A stale `:run_done` (the run was stopped meanwhile) is ignored.
   @impl true
-  def handle_info({:run_done, result, agent_name}, %{running: %{from: from, ref: ref}} = state) do
+  def handle_info({:run_done, result, agent_name}, %{running: %{from: from, ref: ref} = running} = state) do
     Process.demonitor(ref, [:flush])
 
     state =
@@ -602,17 +604,25 @@ defmodule Pepe.Agent.Session do
               do: {init_messages(agent_name), []},
               else: {all_messages, state.pii_map ++ entries}
 
-          %{
-            state
-            | agent_name: agent_name,
-              messages: messages,
-              running: nil,
-              reset_pending: false,
-              pii_map: pii_map,
-              pending_resume: nil
-          }
-          |> persist()
-          |> maybe_schedule_idle()
+          state =
+            %{
+              state
+              | agent_name: agent_name,
+                messages: messages,
+                running: nil,
+                reset_pending: false,
+                pii_map: pii_map,
+                pending_resume: nil
+            }
+            |> persist()
+            |> maybe_schedule_idle()
+
+          # Only now is the turn actually in `state.messages`. The runtime's `:done`
+          # fired much earlier, from inside the run task and before outbound redaction
+          # (which can itself call a model), so a listener that re-reads history on
+          # `:done` reads it one turn stale. `:committed` is the event to reconcile on.
+          emit(running[:on_event], :committed)
+          state
 
         {:error, reason} ->
           GenServer.reply(from, {:error, reason})
@@ -735,6 +745,17 @@ defmodule Pepe.Agent.Session do
         end
     end
   end
+
+  # A run's `:on_event` is optional, and a listener that crashes on an event it doesn't
+  # know must not take the session down with it.
+  defp emit(fun, event) when is_function(fun, 1) do
+    fun.(event)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp emit(_fun, _event), do: :ok
 
   # After a turn ends, start the next queued one (if any). A queued turn that fails to
   # start (agent gone / limit) has already replied its error, so we just try the next.

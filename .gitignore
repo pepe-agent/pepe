@@ -68,3 +68,13 @@ arquivo_teste_aprovacao_*.txt
 /priv/plts/
 
 .playwright-mcp/
+
+# Transcripts of voice notes dropped in the working tree while chatting.
+/voice_*.json
+/voice_*.srt
+/voice_*.tsv
+/voice_*.txt
+/voice_*.vtt
+
+# Local agent tooling state, not part of the project.
+/.claude/agent-memory/

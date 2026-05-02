@@ -57,7 +57,7 @@ own page with its provider-specific fields and setup steps:
 Slack, Microsoft Teams and Google Chat support group/channel conversations,
 where the connection answers only when @mentioned by default (a direct
 message always reaches the agent regardless). Set `require_mention: false` on
-the connection to answer every message in every channel it's in - or, without
+the connection to answer every message in every channel it's in. Or, without
 touching that connection-wide setting, waive it for a single channel from
 inside that channel:
 

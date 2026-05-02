@@ -20,6 +20,19 @@ if System.get_env("PHX_SERVER") do
   config :pepe, PepeWeb.Endpoint, server: true
 end
 
+# A plain OTP release (the Docker image) boots the app directly - there is no
+# `mix pepe serve` to flip the server surfaces on, and their defaults are off so a
+# CLI one-shot stays fast. `PEPE_SERVE=1` turns on exactly the set that `serve`
+# turns on: the HTTP endpoint, the channel gateways, and session persistence.
+if System.get_env("PEPE_SERVE") do
+  config :pepe,
+    serve_endpoint: true,
+    start_gateways: true,
+    persist_sessions: true
+
+  config :pepe, PepeWeb.Endpoint, server: true
+end
+
 config :pepe, PepeWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do

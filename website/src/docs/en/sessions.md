@@ -20,8 +20,8 @@ pepe chat assistant --session my-session
 
 The HTTP API takes the session key from **two fields, and they compose**.
 
-- **`user`** — the OpenAI-standard field, so any stock OpenAI SDK gets server-side memory without leaving the standard shape. This is the one to reach for. It answers *who* is talking.
-- **`session_id`** in the JSON body (or an `x-session-id` header) — *which conversation* of theirs. Reach for it when one person can have several separate threads.
+- **`user`** identifies *who* is talking. It is the OpenAI-standard field, so any stock OpenAI SDK gets server-side memory without leaving the standard shape. This is the one to reach for.
+- **`session_id`**, in the JSON body or an `x-session-id` header, identifies *which conversation* of theirs. Use it when one person can have several separate threads.
 
 How they combine:
 

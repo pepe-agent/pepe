@@ -86,7 +86,7 @@ See the [quickstart guide](https://pepe-agent.com/en/docs/quickstart/) for the f
 A prompt gets you one turn: the agent answers, and *you* decide whether it's good
 enough. A **goal** gets you an outcome: you state what "done" means, and Pepe keeps
 working until an **independent reviewer** (a separate model call that only sees your
-criterion and the result, never the working conversation) agrees it's met - or the
+criterion and the result, never the working conversation) agrees it's met, or the
 attempt cap is reached.
 
 ```bash
@@ -97,6 +97,71 @@ pepe goal "OBJECTIVE" --criteria "how we know it's done" \
 Also on the dashboard: `/goal <objective> | <success criterion>` in any chat. The
 panel above the conversation shows the criterion, the attempt count, and the
 reviewer's last verdict as it runs.
+
+### Talk to it out loud
+
+A voice note sent to a Telegram bot arrives as **text**. It is transcribed on the way in,
+before the agent runs, so the words are there in time for routing to read them: a slash
+command spoken out loud runs, and in a group that requires a mention the bot can be
+addressed by voice (a voice note carries no caption, so there was previously nothing to
+address it with).
+
+If you already have a model connection to OpenAI or Groq, this needs no configuration at
+all: Pepe reuses that credential and asks the provider for its transcription model
+(`whisper-1`, `whisper-large-v3-turbo`) rather than the chat model. To choose a connection
+yourself, set it under `media.audio` in `~/.pepe/config.json`:
+
+```json
+{
+  "media": {
+    "audio": {
+      "model": "groq",
+      "language": "en",
+      "echo": true
+    }
+  }
+}
+```
+
+`model` names a model connection to transcribe with, and that connection's `fallbacks`
+chain applies here too. Swap it for `command` (`whisper-cli -f {file}`, where `{file}`
+becomes the path) to keep audio on the machine: a configured command beats automatic
+detection, precisely so the audio never leaves. `echo` sends the transcript back to the
+chat so the speaker can see what was understood. With no route available, the old behavior
+remains as the safety net: the agent gets the file and works it out with its own tools.
+Full detail in the [Voice messages](https://pepe-agent.com/en/docs/voice/) docs.
+
+### Docker
+
+```bash
+docker run -d --name pepe -p 4000:4000 \
+  -v pepe-data:/data -v pepe-tools:/tools \
+  -e PEPE_DASHBOARD_PASSWORD=a-strong-password \
+  ghcr.io/pepe-agent/pepe
+```
+
+Open <http://localhost:4000>. Images are published for `amd64` and `arm64` from the
+same release tag, so `docker pull` resolves to the right one on an M-series Mac or a
+server.
+
+Two things are not optional, and both fail quietly if skipped:
+
+- **The volumes.** `/data` holds config, agents and conversations, and is what you
+  back up. `/tools` holds single-file CLIs the agent installs for itself, kept apart
+  so a backup carries state rather than regenerable, architecture-specific binaries.
+- **The dashboard password.** A container is not loopback, so Pepe's network guard
+  treats it as public: with no password, every request gets a 403.
+
+To give the agent a tool inside the container, a single-file CLI (`op`, `gh`,
+`kubectl`) goes in `/tools`, which is on the PATH, so it survives a new container
+without root or a rebuild. A system package (`psql`, `imagemagick`) has to go in the
+image, either through the `PEPE_IMAGE_APT_PACKAGES` build argument or a derived
+image, because anything `apt` installs dies with the container. `ffmpeg` is
+deliberately not in the image: neither transcription route needs it, and Debian's
+package pulls 204 packages to serve a GPU video stack a headless container never
+touches, which is what keeps the image at 408 MB rather than 945 MB. See the
+[Docker docs](https://pepe-agent.com/en/docs/docker/), and
+[`docker-compose.yml`](docker-compose.yml) if you'd rather `docker compose up -d`.
 
 ### From source (development)
 
@@ -124,7 +189,7 @@ mix pepe run "list the files here and summarize the project"
 
 ## Documentation
 
-One topic per page - open just what you need.
+One topic per page. Open just what you need.
 
 **Get going** &nbsp; [Architecture](docs/architecture.md) · [CLI reference](docs/cli-reference.md) · [Configuration](docs/configuration.md) · [Migrating from another runtime](docs/migrating.md)
 
@@ -150,9 +215,9 @@ Pepe is meant to be embedded. A few common paths:
 
 ---
 
-## Contributing - help wanted 🙌
+## Contributing: help wanted 🙌
 
-Pepe is young and **help is genuinely welcome** - bug reports, docs fixes, features,
+Pepe is young and **help is genuinely welcome**: bug reports, docs fixes, features,
 and especially **confirming providers work**. Small, focused PRs are the easiest to
 review and merge.
 
@@ -171,7 +236,7 @@ run `mix precommit`, and open a PR against `master`. Adding a tool? Follow
 **The single most useful thing you can do:** I run Pepe day-to-day on one setup
 (the ChatGPT/Codex OAuth subscription), so most providers are unverified. If you use
 OpenRouter, Groq, DeepSeek, Together, Mistral, Ollama, LM Studio, the Claude Pro/Max
-sign-in, or anything else - run `mix pepe model test`, try one prompt, and open an
+sign-in, or anything else, run `mix pepe model test`, try one prompt, and open an
 issue saying whether **streaming** and **tool-calling** worked. That feedback is worth
 a lot.
 

@@ -93,10 +93,37 @@ defmodule Pepe.Gateways.Telegram do
     ]
   end
 
+  # Commands that expose operator surface: config, permissions, spend, internal
+  # inventory. This list is the single source of truth - `run_command/3` is gated
+  # against it at the dispatch site, and it is also what keeps those commands out
+  # of the menus a client sees. Gating each clause individually is what let a skill
+  # reach a client once already: skills also become top-level commands, and the
+  # catch-all that dispatched them never passed through the gate.
+  #
+  # `model` is not here on purpose. Only its *show* path is operator surface (it
+  # reveals infra); switching goes through `Pepe.ModelSwitch.permission/2`, which
+  # deliberately lets a non-trainer pick a model for their own conversation
+  # (`:session`) unless the connection is locked. So `/model` gates itself, inline.
+  @operator_commands ~w(agent status models tools skill approve usage)
+
+  # Operator surface: a built-in from the list above, or any skill (a skill runs
+  # arbitrary instructions through the agent, which is operator surface by
+  # definition, whichever of its two names it is invoked under).
+  @spec operator_command?(String.t()) :: boolean()
+  defp operator_command?(cmd), do: cmd in @operator_commands or skill_for_command(cmd) != nil
+
   # Built-in commands plus one command per installed skill (so skills are
   # discoverable from the "/" menu too).
   @spec full_menu() :: [{String.t(), String.t()}]
   defp full_menu, do: menu() ++ skill_commands()
+
+  # What this caller may see listed. A client on a customer-facing bot is shown
+  # only the commands they can actually run: advertising an operator command just
+  # invites them to try it and get refused.
+  @spec visible_menu() :: [{String.t(), String.t()}]
+  defp visible_menu do
+    if learn?(), do: full_menu(), else: Enum.reject(menu(), &operator_command?(elem(&1, 0)))
+  end
 
   # Each skill as a `{command, description}`. Names are normalized to Telegram's
   # command charset; any that would collide with a built-in are dropped.
@@ -207,9 +234,20 @@ defmodule Pepe.Gateways.Telegram do
 
   # Publish the command list so it shows in Telegram's "/" menu, and clear any
   # stale command sets in the scopes we don't use, so ours are always what shows.
+  #
+  # This menu is per bot, not per user, so it is built for the *least* trusted
+  # person who can see it. A bot with a `trainers` allowlist is customer-facing:
+  # its popup lists only what a client may run. A bot without one trusts everyone
+  # it talks to, so it advertises everything, skills included.
   defp register_commands do
     Config.put_locale()
-    commands = Enum.map(full_menu(), fn {name, desc} -> %{command: name, description: desc} end)
+
+    menu =
+      if is_list(bot()["trainers"]),
+        do: Enum.reject(menu(), &operator_command?(elem(&1, 0))),
+        else: full_menu()
+
+    commands = Enum.map(menu, fn {name, desc} -> %{command: name, description: desc} end)
     Req.post(api_url(token(), "setMyCommands"), json: %{commands: commands})
 
     for scope <- @owned_scopes do
@@ -334,7 +372,11 @@ defmodule Pepe.Gateways.Telegram do
   ### telegram API
   ###
 
-  defp api_url(token, method), do: "https://api.telegram.org/bot#{token}/#{method}"
+  # The base is configurable so tests can point the gateway at a local mock server and
+  # exercise the real poll/dispatch/reply path, rather than reaching for Telegram.
+  defp api_url(token, method), do: "#{api_base()}/bot#{token}/#{method}"
+
+  defp api_base, do: Application.get_env(:pepe, :telegram_api_base, "https://api.telegram.org")
 
   @doc """
   Deliver a fired watch's message to a Telegram chat, resolving the bot token from
@@ -468,40 +510,91 @@ defmodule Pepe.Gateways.Telegram do
     chat = message["chat"] || %{}
     chat_id = chat["id"]
     user_id = get_in(message, ["from", "id"])
-    caption = message["caption"] || ""
 
-    if active?() and allowed?(chat_id, user_id) and addressed?(caption, chat["type"], chat_id) do
+    # `addressed?` is deliberately NOT checked here, as it is for a text message. In a
+    # group it would run against the caption, and a voice note usually has none, so a
+    # spoken "@bot, deploy it" could never reach the bot. It is checked below instead,
+    # against the words, once there are any. The allowlist still gates who gets this far.
+    if active?() and allowed?(chat_id, user_id) do
       b = bot()
-
       learn = learn_allowed?(user_id)
+
+      inbound = %{
+        chat_id: chat_id,
+        user_id: user_id,
+        msg_id: message["message_id"],
+        chat_type: chat["type"],
+        caption: message["caption"] || ""
+      }
 
       Task.start(fn ->
         put_bot(b)
         put_learn(learn)
-        ingest_media(chat_id, file_id, kind, caption)
+        ingest_media(inbound, file_id, kind)
       end)
     end
   end
 
-  defp ingest_media(chat_id, file_id, kind, caption) do
+  defp ingest_media(inbound, file_id, kind) do
     Config.put_locale()
-    send_chat_action(chat_id, "typing")
+    send_chat_action(inbound.chat_id, "typing")
 
     case download_file(file_id, kind) do
       {:ok, path} ->
-        chat_with_agent(chat_id, nil, media_prompt(kind, path, caption))
+        case speech(kind, path) do
+          {:ok, text} -> spoken(inbound, text)
+          :unavailable -> unread(inbound, kind, path)
+        end
 
       :error ->
         Logger.warning("[telegram] could not download #{kind} #{file_id}")
-        send_message(chat_id, friendly_error(:download))
+        send_message(inbound.chat_id, friendly_error(:download))
     end
   end
+
+  # Only speech becomes text at the door. A photo or a document still goes to the agent,
+  # which has eyes for one and tools for the other.
+  defp speech(kind, path) when kind in ["voice", "audio"],
+    do: Pepe.Media.transcribe(Path.join(Pepe.Agent.Workspace.dir(agent_default()), path))
+
+  defp speech(_kind, _path), do: :unavailable
+
+  # Silence, or audio with nothing said in it. The file was read; there was just nothing
+  # in it, and answering an empty message would only produce a confused reply.
+  defp spoken(inbound, "") do
+    send_message(inbound.chat_id, gettext("I couldn't make out any speech in that."))
+  end
+
+  # The transcript *is* the message, so it goes through the same door a typed one does.
+  # That is what makes a slash command work when it is spoken, and what lets the bot
+  # answer to its own name being said out loud in a group.
+  defp spoken(inbound, text) do
+    if Pepe.Media.echo?(), do: send_message(inbound.chat_id, "📝 " <> text)
+
+    said = join_caption(text, inbound.caption)
+
+    if addressed?(said, inbound.chat_type, inbound.chat_id) do
+      respond(inbound.chat_id, inbound.user_id, inbound.msg_id, strip_mention(said))
+    end
+  end
+
+  # No transcription route is configured and none could be worked out, so the agent gets
+  # the file and figures it out with the tools it has. This is the safety net, not the
+  # way in: it costs a permission prompt and a wait, and it is different every time.
+  defp unread(inbound, kind, path) do
+    if addressed?(inbound.caption, inbound.chat_type, inbound.chat_id) do
+      chat_with_agent(inbound.chat_id, nil, media_prompt(kind, path, inbound.caption))
+    end
+  end
+
+  defp join_caption(text, ""), do: text
+  defp join_caption(text, caption), do: text <> "\n\n" <> caption
 
   # Download the Telegram file into the agent's workspace under `media/`, returning
   # the workspace-relative path the agent's tools can use.
   defp download_file(file_id, kind) do
     with {:ok, file_path} <- telegram_file_path(file_id),
-         url = "https://api.telegram.org/file/bot#{token()}/#{file_path}",
+         url = "#{api_base()}/file/bot#{token()}/#{file_path}",
          {:ok, %{status: 200, body: body}} when is_binary(body) <- Req.get(url) do
       agent = agent_default()
       dir = Path.join(Pepe.Agent.Workspace.dir(agent), "media")
@@ -553,14 +646,22 @@ defmodule Pepe.Gateways.Telegram do
   # actual path to a working transcription instead of leaving it to guess. Installing a
   # local tool goes through the normal risky-command permission prompt like any other
   # bash use - nothing audio-specific about that gate.
+  # Ordered cheapest-first, and deliberately: an API call costs a second and no disk,
+  # while installing a transcriber costs a minute the first time. The local route is the
+  # fallback, not the default. `whisper` the CLI is not suggested at all: it writes five
+  # output files into the working directory as a side effect, which is how transcripts
+  # end up littering whatever directory Pepe happened to start in.
   defp transcription_hint do
-    " To transcribe it, try in order: a speech-to-text tool already on this machine " <>
-      "(`whisper-cli`, `whisper`); if none is available, install one yourself " <>
-      "(`pip install -q openai-whisper` or `pipx install openai-whisper`, then run " <>
-      "`whisper <path> --model tiny --fp16 False` - the first run downloads a small model, " <>
-      "that's normal and can take a minute); or, if a configured model connection's provider " <>
-      "exposes an OpenAI-compatible `/audio/transcriptions` endpoint (e.g. Groq, or OpenAI with " <>
-      "a real API key), call that directly instead of installing anything."
+    " To transcribe it, in this order: if a configured model connection's provider exposes " <>
+      "an OpenAI-compatible `/audio/transcriptions` endpoint (Groq, OpenAI), POST the file " <>
+      "there and use the text - no install, one second. Otherwise use a transcriber already " <>
+      "on this machine (`whisper-cli`). Otherwise install one, which is a minute the first " <>
+      "time and instant afterwards because it is cached: " <>
+      "`uv run --with faster-whisper python -c \"from faster_whisper import WhisperModel; " <>
+      "import sys; m = WhisperModel('base', device='cpu', compute_type='int8'); " <>
+      "print(''.join(s.text for s in m.transcribe(sys.argv[1])[0]))\" <path>` " <>
+      "(install `uv` first with `curl -LsSf https://astral.sh/uv/install.sh | sh` if missing). " <>
+      "Print the transcript to stdout; do not write transcript files to disk."
   end
 
   defp caption_line(""), do: ""
@@ -573,7 +674,7 @@ defmodule Pepe.Gateways.Telegram do
     case parse_command(text) do
       # /whoami is the one command that needs the sender id.
       {:command, "whoami", _args} -> whoami(chat_id, user_id)
-      {:command, name, args} -> run_command(chat_id, name, args)
+      {:command, name, args} -> dispatch(chat_id, name, args)
       :chat -> chat_with_agent(chat_id, msg_id, text)
     end
   end
@@ -811,6 +912,18 @@ defmodule Pepe.Gateways.Telegram do
   ### commands
   ###
 
+  # Every command goes through here, so the operator gate is applied in exactly one
+  # place. Do not gate inside a `run_command/3` clause: a command can be reached by
+  # more than one name (a skill answers both to `/skill <name>` and to `/<name>`),
+  # and a gate on one clause leaves the other open.
+  defp dispatch(chat_id, cmd, args) do
+    if operator_command?(cmd) do
+      operator_only(chat_id, fn -> run_command(chat_id, cmd, args) end)
+    else
+      run_command(chat_id, cmd, args)
+    end
+  end
+
   defp run_command(chat_id, cmd, _args) when cmd in ["new", "reset"] do
     ensure_session(chat_id)
     Pepe.Agent.Session.reset(session_key(chat_id))
@@ -868,39 +981,38 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "agent", name) do
-    operator_only(chat_id, fn ->
-      if Config.get_agent(name) do
-        ensure_session(chat_id)
-        Pepe.Agent.Session.set_agent(session_key(chat_id), name)
-        send_message(chat_id, gettext("Switched to agent %{name}.", name: name))
-      else
-        send_message(chat_id, gettext("Unknown agent: %{name}", name: name))
-      end
-    end)
+    if Config.get_agent(name) do
+      ensure_session(chat_id)
+      Pepe.Agent.Session.set_agent(session_key(chat_id), name)
+      send_message(chat_id, gettext("Switched to agent %{name}.", name: name))
+    else
+      send_message(chat_id, gettext("Unknown agent: %{name}", name: name))
+    end
   end
 
   defp run_command(chat_id, "status", _args) do
-    operator_only(chat_id, fn ->
-      ensure_session(chat_id)
-      s = Pepe.Agent.Session.status(session_key(chat_id))
+    ensure_session(chat_id)
+    s = Pepe.Agent.Session.status(session_key(chat_id))
 
-      send_message(
-        chat_id,
-        gettext("Agent: %{agent}\nModel: %{model}\nTurns: %{turns}",
-          agent: s.agent || gettext("(default)"),
-          model: s.model || gettext("(unset)"),
-          turns: s.turns
-        )
+    send_message(
+      chat_id,
+      gettext("Agent: %{agent}\nModel: %{model}\nTurns: %{turns}",
+        agent: s.agent || gettext("(default)"),
+        model: s.model || gettext("(unset)"),
+        turns: s.turns
       )
-    end)
+    )
   end
 
-  defp run_command(chat_id, "models", _args), do: operator_only(chat_id, fn -> send_model_picker(chat_id) end)
+  defp run_command(chat_id, "models", _args), do: send_model_picker(chat_id)
 
   defp run_command(chat_id, "model", args) do
     case String.split(args, ~r/\s+/, trim: true) do
-      # Showing the current model reveals infra; switching is already gated by
-      # ModelSwitch.permission (a non-trainer gets :none), so only guard the show path.
+      # `/model` is the one command that is only half operator surface, so it is not
+      # in @operator_commands and guards itself here. Showing the current model
+      # reveals infra, so it is trainers-only. Switching is not: ModelSwitch grants a
+      # non-trainer `:session`, letting a client pick a model for their own
+      # conversation unless the connection is locked, and that is by design.
       [] -> operator_only(chat_id, fn -> show_model(chat_id) end)
       [name] -> change_model(chat_id, name, nil)
       [name, scope] -> change_model(chat_id, name, scope)
@@ -908,7 +1020,7 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp run_command(chat_id, "tools", _args), do: operator_only(chat_id, fn -> send_html(chat_id, tools_text()) end)
+  defp run_command(chat_id, "tools", _args), do: send_html(chat_id, tools_text())
 
   defp run_command(chat_id, "learn", _args) do
     if learn?() do
@@ -947,12 +1059,10 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "usage", _args) do
-    operator_only(chat_id, fn ->
-      company = Company.of(agent_default())
-      cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
-      count = Pepe.Usage.message_count_month_to_date(company)
-      send_message(chat_id, gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
-    end)
+    company = Company.of(agent_default())
+    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
+    count = Pepe.Usage.message_count_month_to_date(company)
+    send_message(chat_id, gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
   end
 
   defp run_command(chat_id, "inline", "") do
@@ -968,11 +1078,11 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp run_command(chat_id, "skill", ""), do: operator_only(chat_id, fn -> send_html(chat_id, skills_text()) end)
-  defp run_command(chat_id, "skill", name), do: operator_only(chat_id, fn -> run_skill(chat_id, name, "") end)
+  defp run_command(chat_id, "skill", ""), do: send_html(chat_id, skills_text())
+  defp run_command(chat_id, "skill", name), do: run_skill(chat_id, name, "")
 
   defp run_command(chat_id, "approve", args) do
-    operator_only(chat_id, fn -> manage_approvals(chat_id, String.split(args)) end)
+    manage_approvals(chat_id, String.split(args))
   end
 
   defp run_command(chat_id, cmd, "") when cmd in ["btw", "side"] do
@@ -1018,7 +1128,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp help_text do
     gettext("Commands:") <>
-      "\n" <> Enum.map_join(full_menu(), "\n", fn {n, d} -> "/#{n} - #{d}" end)
+      "\n" <> Enum.map_join(visible_menu(), "\n", fn {n, d} -> "/#{n} - #{d}" end)
   end
 
   ###
@@ -1151,7 +1261,7 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp models_picker_text(models),
-    do: gettext("Available models") <> " — #{length(models)}"
+    do: gettext("Available models") <> " - #{length(models)}"
 
   defp model_buttons(models, current) do
     Enum.map(models, fn m ->
@@ -1808,14 +1918,27 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Cache the bot's @username (from getMe) for mention handling.
+  #
+  # A failed lookup is NOT cached, and that is the whole point of this shape. Not knowing
+  # our own name makes `mentions_bot?/1` answer true to everything, which is the right way
+  # to fail (a bot that stays silent because it forgot its name is worse than one that
+  # over-answers). But caching that failure would make it permanent: one network blip
+  # against getMe at boot and the bot replies to every message in every group it is in,
+  # mention requirement and all, until somebody restarts it. So a failure just means we
+  # ask again on the next message.
   defp bot_username do
     key = {__MODULE__, :username, bot_name()}
 
     case :persistent_term.get(key, :unset) do
       :unset ->
-        username = fetch_username()
-        :persistent_term.put(key, username)
-        username
+        case fetch_username() do
+          nil ->
+            nil
+
+          username ->
+            :persistent_term.put(key, username)
+            username
+        end
 
       username ->
         username

@@ -25,9 +25,12 @@ Works with the official OpenAI SDKs - just set the base URL to
 
 ### Access tokens (per company or per agent)
 
-The `/v1` API is **open until you create the first token** - then every call needs
-a valid `Authorization: Bearer ctx_...`. A token is stored only as a SHA-256 hash (the
-raw value is shown once), and its scope decides what it can reach:
+With **no tokens configured, the `/v1` API answers only same-machine (loopback)
+callers**: a local `curl` works with no token, but any remote caller is refused with
+`401`, so a network-exposed server is never anonymous. Creating the first token flips
+the switch for everyone: from then on every call, local or remote, needs a valid
+`Authorization: Bearer pepe_...`. A token is stored only as a SHA-256 hash (the raw
+value is shown once), and its scope decides what it can reach:
 
 | Scope | Created with | Can call |
 | --- | --- | --- |
@@ -36,14 +39,14 @@ raw value is shown once), and its scope decides what it can reach:
 | **Root** | neither | root agents + bare model connections |
 
 ```bash
-mix pepe token add --company acme --label "acme mobile app"   # prints ctx_... once
+mix pepe token add --company acme --label "acme mobile app"   # prints pepe_... once
 mix pepe token add --agent acme/vendas --label "single integration"
 mix pepe token list       # id · fingerprint · scope · label
 mix pepe token revoke <id>
 
 # then callers must authenticate
 curl http://localhost:4000/v1/chat/completions \
-  -H 'authorization: Bearer ctx_...' \
+  -H 'authorization: Bearer pepe_...' \
   -H 'content-type: application/json' \
   -d '{"model":"vendas","messages":[{"role":"user","content":"oi"}]}'   # "vendas" -> acme/vendas
 ```
@@ -53,7 +56,7 @@ official SDKs send) or, as a fallback, the Azure-style `api-key: ...` header.
 
 `GET /v1/models` is filtered to the token's scope, so a client only ever sees the
 agents it may use. This is what makes the [company isolation](companies.md)
-real over the network - without a token the API can reach any agent.
+real over the network: a remote caller reaches exactly the agents its token allows.
 
 ### Stateful sessions
 

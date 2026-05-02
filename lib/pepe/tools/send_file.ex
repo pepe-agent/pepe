@@ -6,7 +6,7 @@ defmodule Pepe.Tools.SendFile do
   The agent produces a file however it likes (e.g. a `bash` script that queries a
   database and writes an `.xlsx`), then calls this tool with the file's path. The
   file is delivered on whatever channel this conversation is on, resolved from the
-  session key — the agent doesn't need to know chat ids or tokens.
+  session key - the agent doesn't need to know chat ids or tokens.
   """
   @behaviour Pepe.Tools.Tool
 

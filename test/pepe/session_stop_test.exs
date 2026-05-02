@@ -74,61 +74,81 @@ defmodule Pepe.Agent.SessionStopTest do
     {:ok, key: "test:stop:#{System.unique_integer([:positive])}"}
   end
 
+  # An authorizer that parks the run inside the permission gate and says so first, so a
+  # test knows the turn is really in flight instead of guessing at it with a sleep. It
+  # hands out its own pid too, so a test that wants the turn to finish can release it.
+  defp gate(test_pid) do
+    fn _name, _args, _ctx ->
+      send(test_pid, {:at_gate, self()})
+      receive do: (:release -> :once)
+    end
+  end
+
+  # Hand the session a chat request straight from the TEST process instead of from a
+  # Task. Messages from one process reach a GenServer in send order, so whatever the
+  # test sends next (a /stop, a /new) is guaranteed to be handled *after* this message
+  # has already been queued; with a Task the two would race. Returns the tag the reply
+  # arrives with.
+  defp queue_chat(pid, text, opts) do
+    tag = make_ref()
+    send(pid, {:"$gen_call", {self(), tag}, {:chat, text, opts}})
+    tag
+  end
+
   test "stopping an idle session reports nothing is running", %{key: key} do
     {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
     assert Session.stop(key) == {:error, :not_running}
   end
 
   test "a second message queues behind the running one, and /stop cancels both", %{key: key} do
-    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
+    {:ok, pid} = SessionSupervisor.ensure(key, "stopper")
 
-    # An authorizer that never answers, so the run hangs in the permission gate.
-    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
-
+    blocking = gate(self())
     first = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
-
-    # Give the run time to reach the blocked authorize call.
-    Process.sleep(200)
+    assert_receive {:at_gate, _runner}
 
     # A second message no longer bounces off :busy - it queues and waits its turn.
-    second = Task.async(fn -> Session.chat(key, "again", authorize: blocking) end)
-    Process.sleep(100)
+    second = queue_chat(pid, "again", authorize: blocking)
 
     # /stop cancels the in-flight run and drops the queued one; both callers get :stopped.
     assert Session.stop(key) == :ok
     assert Task.await(first) == {:error, :stopped}
-    assert Task.await(second) == {:error, :stopped}
+    assert_receive {^second, {:error, :stopped}}
 
     # The session is free again.
     assert Session.stop(key) == {:error, :not_running}
   end
 
   test "/new recovers a wedged run and clears the queue", %{key: key} do
-    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
-    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
+    {:ok, pid} = SessionSupervisor.ensure(key, "stopper")
 
+    blocking = gate(self())
     first = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
-    Process.sleep(200)
-    second = Task.async(fn -> Session.chat(key, "again", authorize: blocking) end)
-    Process.sleep(100)
+    assert_receive {:at_gate, _runner}
+    second = queue_chat(pid, "again", authorize: blocking)
 
     # /new cancels the stuck run and drops the queue; both callers are unblocked.
     assert Session.reset(key) == :ok
     assert Task.await(first) == {:error, :stopped}
-    assert Task.await(second) == {:error, :stopped}
+    assert_receive {^second, {:error, :stopped}}
     assert Session.stop(key) == {:error, :not_running}
   end
 
   test "a queued message runs after the current turn finishes", %{key: key} do
-    {:ok, _pid} = SessionSupervisor.ensure(key, "stopper")
+    {:ok, pid} = SessionSupervisor.ensure(key, "stopper")
+
+    blocking = gate(self())
     allow = fn _name, _args, _ctx -> :once end
 
-    first = Task.async(fn -> Session.chat(key, "one", authorize: allow) end)
-    Process.sleep(50)
-    second = Task.async(fn -> Session.chat(key, "two", authorize: allow) end)
+    first = Task.async(fn -> Session.chat(key, "one", authorize: blocking) end)
+    assert_receive {:at_gate, runner}
 
+    # Queued while the first turn is provably still parked in the gate.
+    second = queue_chat(pid, "two", authorize: allow)
+
+    send(runner, :release)
     assert {:ok, _} = Task.await(first, 5000)
-    assert {:ok, _} = Task.await(second, 5000)
+    assert_receive {^second, {:ok, _}}, 5000
     assert Session.stop(key) == {:error, :not_running}
   end
 
@@ -160,9 +180,9 @@ defmodule Pepe.Agent.SessionStopTest do
     # Nothing is running: /inline tells the caller to send it as a normal message.
     assert Session.inline(key, "hi") == {:error, :not_running}
 
-    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
+    blocking = gate(self())
     caller = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
-    Process.sleep(200)
+    assert_receive {:at_gate, _runner}
 
     # A turn is in flight: /inline is accepted (folded into that turn).
     assert Session.inline(key, "also do X") == :ok

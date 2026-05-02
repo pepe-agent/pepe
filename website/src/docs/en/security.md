@@ -173,7 +173,7 @@ pepe agent add support \
   --hooks pii_redact
 ```
 
-Three points in the flow get redacted: the human's inbound message, **any tool's raw output** (a database query, a file read, a web fetch - anything a tool surfaces, not just what a human typed), and the agent's outbound reply. Tool output is redacted before it joins the conversation and before it's ever written to disk - so a large result that gets spilled to a workspace file (see Agents) is spilled already-redacted, never raw. Ask "list the 10 most recent patients with a cardiac diagnosis" against your own database and, with `pii_redact` enabled, the model reasons over `[PERSON_1]`, `[PERSON_2]`, ...; only the final reply back to you gets the real names restored.
+Three points in the flow get redacted: the human's inbound message, **any tool's raw output** (a database query, a file read, a web fetch, anything a tool surfaces, not just what a human typed), and the agent's outbound reply. Tool output is redacted before it joins the conversation and before it's ever written to disk, so a large result that gets spilled to a workspace file (see Agents) is spilled already-redacted, never raw. Ask "list the 10 most recent patients with a cardiac diagnosis" against your own database and, with `pii_redact` enabled, the model reasons over `[PERSON_1]`, `[PERSON_2]`, ...; only the final reply back to you gets the real names restored.
 
 Four hooks ship in the box:
 
@@ -212,7 +212,7 @@ The web dashboard is open on localhost by default, which is convenient for local
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Bound to a public interface with no password, the dashboard fails closed and blocks remote clients until you set one. Full details - the `Host` allowlist and trusted-proxies settings for serving it behind a domain, and running it as a persistent service - live on the [Dashboard](../dashboard/) page.
+Bound to a public interface with no password, the dashboard fails closed and blocks remote clients until you set one. Full details live on the [Dashboard](../dashboard/) page: the `Host` allowlist and trusted-proxies settings for serving it behind a domain, and running it as a persistent service.
 
 ## API tokens
 
@@ -227,5 +227,3 @@ The raw token is shown once and only its SHA-256 hash is stored, never the token
 ## Multi-tenant scoping
 
 Work can be walled off per company (a handle-based tenant scope). The default no-company scope is called Principal. A company's agents, models, and provider keys stay invisible to other companies, and an API token scoped to a company reaches only that company's agents. This keeps one tenant's credentials and conversations from ever leaking into another's, which matters when you host agents on behalf of several customers from one Pepe instance.
-</content>
-</invoke>

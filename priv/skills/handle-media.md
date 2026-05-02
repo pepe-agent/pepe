@@ -14,17 +14,18 @@ General loop for any unsupported input:
 
 ## Voice / audio -> transcribe it
 
-Prefer whichever is available:
+In this order. The first costs a second, the second costs a minute the first time.
 
-**A) A transcription API** - if a model connection exposes an OpenAI-style
-`/audio/transcriptions` endpoint (e.g. whisper-1, gpt-4o-transcribe), POST the file
-to it and use the text. Cheapest when you already have the key.
+**A) A transcription API.** If a model connection exposes an OpenAI-style
+`/audio/transcriptions` endpoint (Groq's `whisper-large-v3-turbo`, OpenAI's
+`whisper-1` or `gpt-4o-transcribe`), POST the file to it and use the text. Nothing to
+install, works anywhere. Try this first whenever you have the key.
 
-**B) Local transcription** with `faster-whisper` (Python). This is the fully
-self-contained path. Use [[write-a-script]]:
+**B) Local transcription** with `faster-whisper`. Self-contained, nothing leaves the
+machine. Use [[write-a-script]]:
 
 ```bash
-# Ensure a Python runner exists. uv gives you Python with no system install:
+# uv gives you Python without a system install:
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
@@ -38,9 +39,20 @@ print("".join(s.text for s in segments).strip())
 ```
 
 Run it with `run_script` (or bash): `uv run --with faster-whisper python scripts/transcribe.py media/voice_123.ogg`.
-The first run downloads uv + the model; later runs are fast. If decoding the `.ogg`
-fails, install `ffmpeg` and retry. Then **reply to what the transcript says**, in the
-user's language - don't just echo the transcript.
+The first run downloads uv and the model; **both are cached in your home directory, so
+every run after that is instant**, including in a fresh container, where home is on a
+volume for exactly this reason. Save the script so you never write it twice.
+
+Do **not** use the `whisper` CLI. It writes five transcript files into the working
+directory as a side effect, and you only want the text.
+
+You do not need `ffmpeg` for either route above: a transcription API takes the file as
+it is, and `faster-whisper` carries its own codecs. Only the `whisper.cpp` CLI shells out
+to it. If you truly need it, prefer a static single-file build in a directory on your
+PATH over a package install, which drags in a large dependency tree.
+
+Then **reply to what the transcript says**, in the user's language. Don't just echo the
+transcript back at them.
 
 ## Images -> look at them
 

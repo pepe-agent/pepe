@@ -36,6 +36,12 @@ write the same config.
 
 <div class="note"><strong>Secrets stay out of the file.</strong> When Pepe asks for an API key it accepts a <code>${ENV_VAR}</code> reference, for example <code>${OPENROUTER_API_KEY}</code>. The reference is what gets written to <code>~/.pepe/config.json</code>. The real value is read from your environment at run time and is never stored expanded.</div>
 
+## Docker
+
+Prefer a container? `docker pull ghcr.io/pepe-agent/pepe` (amd64 and arm64). It needs a
+volume and a dashboard password. Both are covered, along with how to give the agent
+extra tools inside the container, on the [Docker page](/en/docs/docker/).
+
 ## Uninstall
 
 Remove the binary; add the config directory to also drop every model, agent

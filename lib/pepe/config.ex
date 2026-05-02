@@ -1241,6 +1241,23 @@ defmodule Pepe.Config do
   ### Hooks (message-flow transforms - PII redaction, ...)
   ###
 
+  @doc """
+  How inbound attachments are turned into text before the agent sees them (`media`).
+
+  Today only `"audio"`, whose keys are read by `Pepe.Media`: `model` (a connection by
+  name), `command` (a local transcriber, `{file}` substituted), `language`, `max_mb`,
+  `timeout`, `echo`. All optional: with none of them set, a connection that already
+  serves transcription is used.
+  """
+  def media, do: load() |> Map.get("media", %{})
+
+  @doc "Replace the settings for one media kind (`\"audio\"`)."
+  def put_media(kind, settings) when is_binary(kind) and is_map(settings) do
+    load()
+    |> update_in(["media"], fn m -> Map.put(m || %{}, kind, settings) end)
+    |> save()
+  end
+
   @doc "Global per-hook settings (`name => settings`), e.g. `pii_redact`'s packs/custom."
   def hooks_settings, do: load() |> Map.get("hooks", %{})
 

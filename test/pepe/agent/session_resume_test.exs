@@ -74,10 +74,24 @@ defmodule Pepe.Agent.SessionResumeTest do
     assert Session.resume(key) == :nothing_pending
   end
 
+  # An authorize callback that reports when the run reaches the permission gate, then
+  # parks there. The test can then act on a fact ("the turn is running, and stuck") rather
+  # than on a guess about what 200ms buys on a busy machine.
+  defp gate do
+    test = self()
+
+    fn _name, _args, _ctx ->
+      send(test, :at_gate)
+      receive do: (:never -> :once)
+    end
+  end
+
   test "resume is refused while a turn is already running", %{key: key} do
-    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
-    caller = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
-    Process.sleep(200)
+    # gate() must be built here, not inside the task: it closes over self(), and inside
+    # the task self() is the task.
+    authorize = gate()
+    caller = Task.async(fn -> Session.chat(key, "go", authorize: authorize) end)
+    assert_receive :at_gate, 2_000
 
     assert Session.resume(key) == {:error, :busy}
 
@@ -86,9 +100,11 @@ defmodule Pepe.Agent.SessionResumeTest do
   end
 
   test "stopping a turn clears its pending marker - nothing left to resume", %{key: key} do
-    blocking = fn _name, _args, _ctx -> receive do: (:never -> :once) end
-    caller = Task.async(fn -> Session.chat(key, "go", authorize: blocking) end)
-    Process.sleep(200)
+    # gate() must be built here, not inside the task: it closes over self(), and inside
+    # the task self() is the task.
+    authorize = gate()
+    caller = Task.async(fn -> Session.chat(key, "go", authorize: authorize) end)
+    assert_receive :at_gate, 2_000
 
     assert Session.stop(key) == :ok
     assert Task.await(caller) == {:error, :stopped}

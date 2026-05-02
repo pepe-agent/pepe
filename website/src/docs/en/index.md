@@ -54,7 +54,7 @@ your machine without consent.
 
 <div class="note"><strong>Built-in tools.</strong> Every agent can be given tools like <code>bash</code>, <code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>list_dir</code>, <code>fetch_url</code>, and <code>web_search</code>. You choose which ones each agent gets when you create it, so a support bot and a coding agent can have very different powers.</div>
 
-## The four surfaces
+## The five surfaces
 
 You build an agent once. Pepe then exposes it through whichever surface fits the
 job. Setup and management themselves happen three ways: the `pepe` CLI, the web

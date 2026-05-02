@@ -8,7 +8,7 @@ so the agent executes isolated instead of straight on the host. Two layers:
   It's a thin net against accidents/injection, **not** a security boundary.
 - **Isolation (opt-in, strong):** point Pepe at a wrapper program below.
 
-There is no zero-config, cross-platform *true* sandbox — real isolation always needs
+There is no zero-config, cross-platform *true* sandbox - real isolation always needs
 an OS feature or an external tool. Pick the one your host supports.
 
 ## Enable

@@ -396,7 +396,7 @@ defmodule PepeWeb.TracesLive do
     ~H"""
     <div class="text-[15px] text-yellow-400">
       {gettext("Blocked")} · {@ev["name"]}
-      <span :if={@ev["reason"]} class="text-zinc-400">— {@ev["reason"]}</span>
+      <span :if={@ev["reason"]} class="text-zinc-400">- {@ev["reason"]}</span>
     </div>
     """
   end

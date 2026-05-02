@@ -49,7 +49,7 @@ defmodule PepeWeb.TokensLive do
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0 text-sm">
                 <span class="font-semibold text-amber-200">{gettext("Copy this token now")}</span>
-                <span class="text-amber-200/70">— {gettext("shown only once, store it somewhere safe.")}</span>
+                <span class="text-amber-200/70">- {gettext("shown only once, store it somewhere safe.")}</span>
               </div>
               <button phx-click="token_dismiss" class="shrink-0 text-sm text-amber-200/70 hover:text-amber-200">{gettext("Dismiss")}</button>
             </div>

@@ -22,19 +22,34 @@ defmodule Pepe.SessionTtlTest do
 
   defp key, do: "test:ttl:#{System.unique_integer([:positive])}"
 
+  # Watch the session and wait for the news, rather than sleeping past the deadline and
+  # hoping. It reports the moment the session goes, so it is both faster than a fixed
+  # sleep and immune to a loaded machine that misses one.
+  defp assert_evicted(pid) do
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2_000
+  end
+
+  # The opposite claim needs the same watch: that nothing happens for a while. A sleep
+  # followed by `Process.alive?` reads the same but proves less, since it only samples the
+  # one instant it wakes up on.
+  defp refute_evicted(pid, within) do
+    ref = Process.monitor(pid)
+    refute_receive {:DOWN, ^ref, :process, ^pid, _reason}, within
+    Process.demonitor(ref, [:flush])
+  end
+
   test "a session with a short idle TTL evicts itself" do
     k = key()
     {:ok, pid} = SessionSupervisor.ensure(k, "ttl-agent", ttl_ms: 150)
     assert Process.alive?(pid)
-    Process.sleep(400)
-    refute Process.alive?(pid)
+    assert_evicted(pid)
   end
 
   test "no TTL means the session lives (infinite)" do
     k = key()
     {:ok, pid} = SessionSupervisor.ensure(k, "ttl-agent")
-    Process.sleep(300)
-    assert Process.alive?(pid)
+    refute_evicted(pid, 300)
     SessionSupervisor.terminate(k)
   end
 
@@ -42,8 +57,7 @@ defmodule Pepe.SessionTtlTest do
     k = key()
     {:ok, pid} = SessionSupervisor.ensure(k, "ttl-agent")
     assert :ok = Session.end_session(k)
-    Process.sleep(50)
-    assert Process.alive?(pid)
+    refute_evicted(pid, 50)
     SessionSupervisor.terminate(k)
   end
 
@@ -65,8 +79,7 @@ defmodule Pepe.SessionTtlTest do
       k = "web:#{System.unique_integer([:positive])}"
       {:ok, pid} = SessionSupervisor.ensure(k, "ttl-agent", ttl_ms: 150)
       assert Process.alive?(pid)
-      Process.sleep(400)
-      refute Process.alive?(pid)
+      assert_evicted(pid)
     end
   end
 end

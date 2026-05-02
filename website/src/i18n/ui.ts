@@ -45,7 +45,7 @@ export const ui = {
     "loop.time.d":
       "Recurring work on a schedule. Runs on its own and catches up on whatever it missed.",
 
-    "surfaces.title": "One agent, four surfaces",
+    "surfaces.title": "One agent, every surface",
     "surfaces.sub":
       "Define an agent once. Use it from the surface that fits the job, with the same tools and memory.",
     "surf.cli.t": "CLI",
@@ -195,7 +195,7 @@ export const ui = {
     "hero.eyebrow": "Elixir / OTP · autoalojado",
     "hero.title": 'El runtime de agentes IA<br/>que <span class="grad">ejecutas tú mismo</span>.',
     "hero.lead":
-      "Monta un equipo de empleados virtuales que gestiona tu correo, atiende a tus clientes, analiza los datos de tu sitio y lleva tus campañas en Google y Meta: prácticamente todo lo que harías tú mismo. Corre en tu propio servidor, con tus propias claves, bajo tu control.",
+      "Monta un equipo de empleados virtuales que gestiona tu correo, atiende a tus clientes, analiza los datos de tu sitio y lleva tus campañas en Google y Meta: prácticamente todo lo que harías tú mismo. Se ejecuta en tu propio servidor, con tus propias claves, bajo tu control.",
     "hero.cta_start": "Empezar →",
     "hero.cta_docs": "Leer la documentación",
 
@@ -205,7 +205,7 @@ export const ui = {
     "loops.code_goal": "# un objetivo sigue hasta que un revisor confirma que está hecho",
     "loops.title": 'Deja de dar órdenes. <span class="grad">Define el resultado.</span>',
     "loops.sub":
-      "Un prompt te da un turno: el agente responde y tú decides si está bien. Eso te convierte en el cuello de botella, aprobador e inspector de calidad a la vez, y el trabajo solo avanza mientras estás frente al teclado. Dale un objetivo: di qué significa \"terminado\", y Pepe sigue trabajando hasta que un revisor independiente confirme que se cumplió.",
+      "Un prompt te da un turno: el agente responde y tú decides si está bien. Así eres tú el cuello de botella, quien aprueba y quien revisa la calidad a la vez, y el trabajo solo avanza mientras estás frente al teclado. Dale un objetivo: di qué significa \"terminado\", y Pepe sigue trabajando hasta que un revisor independiente confirme que se cumplió.",
     "loop.turn.t": "Bucle de turno",
     "loop.turn.d":
       "Llama herramientas, lee los resultados, llama más. Para cuando tiene una respuesta real, no una suposición.",
@@ -214,9 +214,9 @@ export const ui = {
       "Defines el objetivo y qué cuenta como hecho. Quien juzga es un revisor independiente, no el agente. ¿Aún no? Recibe el comentario y reintenta.",
     "loop.time.t": "Bucle de tiempo",
     "loop.time.d":
-      "Trabajo recurrente programado. Se ejecuta solo y recupera lo que se perdió mientras estuvo apagado.",
+      "Trabajo recurrente programado. Se ejecuta solo y recupera lo que quedó pendiente mientras estuvo apagado.",
 
-    "surfaces.title": "Un agente, cuatro superficies",
+    "surfaces.title": "Un agente, todas las superficies",
     "surfaces.sub":
       "Define un agente una vez. Úsalo desde la superficie que encaje con la tarea, con las mismas herramientas y memoria.",
     "surf.cli.t": "CLI",
@@ -235,13 +235,13 @@ export const ui = {
     "features.enlarge": "Ampliar imagen",
     "f.model.t": "Cualquier modelo, con failover",
     "f.model.d":
-      "Conecta cualquier endpoint compatible con OpenAI. Define una cadena de respaldo que avanza ante errores transitorios.",
+      "Conecta cualquier endpoint compatible con OpenAI. Define una cadena de fallback que avanza ante errores transitorios.",
     "f.routing.t": "Enrutamiento por complejidad",
     "f.routing.d":
       "Una llamada de clasificación barata evalúa cada conversación nueva. Las preguntas simples bajan de forma automática a un modelo más ligero; toda la potencia queda para lo que de verdad la necesita.",
     "f.goal.t": "Objetivos, no solo prompts",
     "f.goal.d":
-      "Da un objetivo y qué cuenta como hecho. Un revisor independiente decide si se cumplió, y el agente reintenta con ese comentario hasta pasar o agotar tu límite de intentos.",
+      "Define un objetivo y qué cuenta como hecho. Un revisor independiente decide si se cumplió, y el agente reintenta con esos comentarios hasta pasar o agotar tu límite de intentos.",
     "f.tools.t": "Bucle real de herramientas",
     "f.tools.d":
       "Herramientas integradas para shell, archivos, web, scripts y envío de archivos. Añade las tuyas en minutos.",
@@ -261,7 +261,7 @@ export const ui = {
     "f.usage.d":
       "Limita cada empresa por gasto y por mensajes: un presupuesto mensual en dólares y un límite mensual de mensajes. Ambos medidos en vivo, poniéndose en rojo en el panel a medida que se agotan.",
     "f.sandbox.t": "Control y seguridad",
-    "f.sandbox.d": "Las herramientas riesgosas piden aprobación primero. Cada ejecución queda trazada, con las protecciones de comandos siempre activas.",
+    "f.sandbox.d": "Las herramientas arriesgadas piden aprobación primero. Cada ejecución queda trazada, con las protecciones de comandos siempre activas.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
       "Las empresas opcionales aíslan agentes, modelos, canales y automatizaciones, con un tope de gasto y un tope de mensajes por empresa que puedes reiniciar cuando quieras.",
@@ -278,7 +278,7 @@ export const ui = {
 
     "security.title": "Privacidad por diseño",
     "security.sub":
-      "Los datos sensibles nunca se envían en claro a un modelo externo, lo que te ayuda a cumplir exigencias como la LGPD, el GDPR y la HIPAA.",
+      "Los datos sensibles nunca se envían en claro a un modelo externo, lo que te ayuda a cumplir normativas como el RGPD, la LGPD y la HIPAA.",
     "security.1.t": "Lo que envía el usuario",
     "security.1.d": "El mensaje tal como lo escribió.",
     "security.2.t": "Lo que llega al modelo",
@@ -310,13 +310,13 @@ export const ui = {
     "uc.sched.t": "Programación y avisos",
     "uc.sched.d": "Tareas recurrentes y avisos puntuales cuando algo cambia.",
     "uc.reports.t": "Informes y analítica",
-    "uc.reports.d": "Extrae números de tus propias herramientas y envía un resumen en un horario.",
-    "uc.monitor.t": "Monitoreo de errores",
-    "uc.monitor.d": "Vigila Sentry, AppSignal y otras herramientas de monitoreo, y señala lo que de verdad necesita atención humana.",
+    "uc.reports.d": "Extrae números de tus propias herramientas y envía un resumen de forma periódica.",
+    "uc.monitor.t": "Monitorización de errores",
+    "uc.monitor.d": "Vigila Sentry, AppSignal y otras herramientas de monitorización, y señala lo que necesita atención humana.",
     "uc.insights.t": "Análisis de datos",
     "uc.insights.d": "Consulta tu base de datos y convierte números en próximos pasos.",
     "uc.notes.t": "Notas y resúmenes de reuniones",
-    "uc.notes.d": "Convierte una transcripción en un resumen y tareas, entregado donde tu equipo ya conversa.",
+    "uc.notes.d": "Convierte una transcripción en un resumen con tareas y entrégalo donde tu equipo ya conversa.",
 
     "how.title": "Dentro de un solo turno",
     "how.sub":
@@ -331,11 +331,11 @@ export const ui = {
     "how.4.d": "Devuelve la respuesta final donde se pidió y registra la ejecución como traza.",
 
     "cta.title": "Ejecuta tus propios agentes en minutos",
-    "cta.sub": "Código abierto. Trae tu modelo. Mantén runtime, claves y datos bajo tu control.",
+    "cta.sub": "Código abierto. Trae tu modelo. Mantén el runtime, las claves y los datos bajo tu control.",
     "cta.start": "Inicio rápido",
-    "cta.github": "Estrella en GitHub",
+    "cta.github": "Dale una estrella en GitHub",
     "why.title": "¿Por qué \"Pepe\"?",
-    "why.body": "El nombre guiña un ojo al universo de Chespirito, querido en toda América Latina. El chiste de Pepe era simple: hacía exactamente lo que le pedían. Sin discutir ni improvisar. Una buena descripción para un runtime de agentes.",
+    "why.body": "El nombre es un guiño al universo de Chespirito, querido en toda América Latina. El chiste de Pepe era simple: hacía exactamente lo que le pedían. Sin discutir ni improvisar. Una buena descripción para un runtime de agentes.",
 
     "foot.tagline":
       "Un runtime de agentes IA en Elixir/OTP. Autoalojado, agnóstico de modelo, sin base de datos. Sin afiliación con ningún proveedor de modelos.",
@@ -366,30 +366,30 @@ export const ui = {
     "hero.eyebrow": "Elixir / OTP · auto-hospedado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">você mesmo executa</span>.',
     "hero.lead":
-      "Monte uma equipe de funcionários virtuais que cuida do e-mail, atende clientes, analisa os dados do seu site e toca campanhas no Google e no Meta: praticamente tudo que você faria. Fica no seu servidor, com suas chaves, sob seu controle.",
+      "Monte uma equipe de funcionários virtuais que cuida do e-mail, atende clientes, analisa os dados do seu site e gerencia campanhas no Google e no Meta: praticamente tudo o que você faria. Roda no seu próprio servidor, com as suas chaves, sob o seu controle.",
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
     "loops.code_task": "limpar a lista de clientes",
     "loops.code_crit": "sem e-mails duplicados, toda linha com telefone válido",
-    "loops.code_prompt": "# um prompt te dá uma resposta, e você que julga",
+    "loops.code_prompt": "# um prompt dá uma resposta, e quem julga é você",
     "loops.code_goal": "# um objetivo insiste até um revisor dizer que está pronto",
     "loops.title": 'Pare de dar ordens. <span class="grad">Defina o resultado.</span>',
     "loops.sub":
-      "Um prompt te dá um turno: o agente responde e você decide se ficou bom. Isso te transforma no gargalo, aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só anda enquanto você está na frente do teclado. Dê um objetivo: diga o que significa \"pronto\", e o Pepe continua trabalhando até um revisor independente concordar que chegou lá.",
+      "Um prompt dá um turno: o agente responde e você decide se ficou bom. Assim, é você o gargalo, quem aprova e quem faz o controle de qualidade ao mesmo tempo, e o trabalho só avança enquanto você está no teclado. Dê um objetivo: diga o que significa \"pronto\", e o Pepe continua trabalhando até um revisor independente concordar que chegou lá.",
     "loop.turn.t": "Loop de turno",
     "loop.turn.d":
-      "Chama ferramentas, lê os resultados, chama mais. Para quando tem uma resposta de verdade, não um chute.",
+      "Chama ferramentas, lê os resultados, chama mais. Para quando tem uma resposta de verdade, não um palpite.",
     "loop.goal.t": "Loop de objetivo",
     "loop.goal.d":
       "Você define o objetivo e o que conta como pronto. Quem julga é um revisor independente, não o agente. Não chegou? Ele recebe o retorno e tenta de novo.",
     "loop.time.t": "Loop de tempo",
     "loop.time.d":
-      "Trabalho recorrente, no horário que você marcar. Roda sozinho e recupera o que perdeu enquanto esteve fora.",
+      "Trabalho recorrente, no horário que você marcar. Roda sozinho e recupera o que ficou pendente enquanto esteve fora.",
 
-    "surfaces.title": "Um agente, quatro superfícies",
+    "surfaces.title": "Um agente, todas as superfícies",
     "surfaces.sub":
-      "Defina um agente uma vez. Use pela superfície certa para a tarefa, com as mesmas ferramentas e memória.",
+      "Defina um agente uma vez. Use-o na superfície certa para cada tarefa, com as mesmas ferramentas e memória.",
     "surf.cli.t": "CLI",
     "surf.cli.d": "Execuções pontuais e um REPL interativo.",
     "surf.http.t": "API HTTP",
@@ -409,10 +409,10 @@ export const ui = {
       "Conecte qualquer endpoint compatível com OpenAI. Defina uma cadeia de fallback que avança em erros transitórios.",
     "f.routing.t": "Roteamento por complexidade",
     "f.routing.d":
-      "Uma chamada de classificação barata avalia cada conversa nova. Pergunta simples desce sozinha pra um modelo mais leve; a força total fica reservada pro que realmente precisa dela.",
+      "Uma chamada de classificação barata avalia cada conversa nova. Perguntas simples caem sozinhas para um modelo mais leve; a força total fica reservada para o que realmente precisa dela.",
     "f.goal.t": "Objetivos, não só prompts",
     "f.goal.d":
-      "Dê um objetivo e o que conta como pronto. Um revisor independente decide se foi atingido, e o agente tenta de novo com esse retorno até passar ou bater o seu limite de tentativas.",
+      "Defina um objetivo e o que conta como pronto. Um revisor independente decide se foi atingido, e o agente tenta de novo com esse retorno até passar ou atingir o seu limite de tentativas.",
     "f.tools.t": "Loop real de ferramentas",
     "f.tools.d":
       "Ferramentas nativas para shell, arquivos, web, scripts e envio de arquivos. Adicione as suas em minutos.",
@@ -430,12 +430,12 @@ export const ui = {
       "O agente lembra o que aprende (fatos, preferências, as pessoas com quem fala) e reaproveita nas próximas conversas. Leia e edite qualquer memória pelo painel.",
     "f.usage.t": "Limites de gasto e mensagens",
     "f.usage.d":
-      "Limite cada empresa por gasto e por mensagens: um orçamento mensal em dólar e um limite mensal de mensagens. Ambos medidos ao vivo, ficando vermelhos no painel conforme se esgotam.",
+      "Limite cada empresa por gasto e por mensagens: um orçamento mensal em dólares e um limite mensal de mensagens. Ambos medidos ao vivo, ficando vermelhos no painel conforme se esgotam.",
     "f.sandbox.t": "Controle e segurança",
     "f.sandbox.d": "Ferramentas arriscadas pedem aprovação antes. Toda execução fica rastreada, com proteções de comando sempre ligadas.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Empresas opcionais isolam agentes, modelos, canais e automações, com um teto de gasto e um teto de mensagens por empresa que você pode resetar quando quiser.",
+      "Empresas opcionais isolam agentes, modelos, canais e automações, com um teto de gasto e um teto de mensagens por empresa que você pode zerar quando quiser.",
     "f.traces.t": "Traces e uso",
     "f.traces.d":
       "Cada execução registra gatilho, ferramentas, tokens e custo. Abra um trace para rever passo a passo.",
@@ -449,10 +449,10 @@ export const ui = {
 
     "security.title": "Privacidade desde o design",
     "security.sub":
-      "Dado sensível nunca é enviado em claro pra um modelo externo, o que ajuda a atender exigências como LGPD, GDPR e HIPAA.",
+      "Dados sensíveis nunca são enviados em claro para um modelo externo, o que ajuda a atender exigências como LGPD, GDPR e HIPAA.",
     "security.1.t": "O que o usuário envia",
     "security.1.d": "A mensagem exatamente como ele digitou.",
-    "security.2.t": "O que chega no modelo",
+    "security.2.t": "O que chega ao modelo",
     "security.2.d": "O Pepe troca o dado sensível por um token antes de a requisição sair do seu servidor.",
     "security.3.t": "O que o modelo responde",
     "security.3.d": "Ele raciocina sobre o token. Nunca viu o valor real, e nunca o guardou.",
@@ -465,7 +465,7 @@ export const ui = {
 
     "widget.title": "Ou coloque direto no seu site",
     "widget.body":
-      "Cole uma única tag script na sua página e essa mesma bolha já fica no ar, sem backend pra escrever, sem passo de build. Alguns atributos opcionais definem a cor, a saudação e o idioma, então cada visitante é respondido no idioma do próprio site já na primeira mensagem.",
+      "Cole uma única tag script na sua página e essa mesma bolha já fica no ar, sem backend para escrever, sem passo de build. Alguns atributos opcionais definem a cor, a saudação e o idioma, então cada visitante é respondido no idioma do próprio site já na primeira mensagem.",
     "widget.cta": "Ver a documentação do widget →",
 
     "usecases.title": "O que as pessoas constroem com o Pepe",
@@ -477,13 +477,13 @@ export const ui = {
     "uc.ads.t": "Campanhas de anúncios",
     "uc.ads.d": "Acompanhe gasto e desempenho no Meta, Google e LinkedIn Ads, com relatório diário.",
     "uc.support.t": "Atendimento ao cliente",
-    "uc.support.d": "Responda no WhatsApp, Slack ou Telegram, com handoff humano quando importa.",
+    "uc.support.d": "Responda no WhatsApp, Slack ou Telegram, com handoff humano quando for necessário.",
     "uc.sched.t": "Agendamento e lembretes",
     "uc.sched.d": "Tarefas recorrentes e avisos pontuais quando algo muda.",
     "uc.reports.t": "Relatórios e análises",
     "uc.reports.d": "Puxe números das suas próprias ferramentas e envie um resumo periodicamente.",
     "uc.monitor.t": "Monitoramento de erros",
-    "uc.monitor.d": "Acompanhe Sentry, AppSignal e outras ferramentas de observabilidade, e aponte o que realmente precisa de atenção humana.",
+    "uc.monitor.d": "Acompanhe Sentry, AppSignal e outras ferramentas de monitoramento, e aponte o que precisa de atenção humana.",
     "uc.insights.t": "Insights de dados",
     "uc.insights.d": "Consulte seu banco de dados e transforme números em próximos passos.",
     "uc.notes.t": "Notas e resumos de reuniões",
@@ -502,11 +502,11 @@ export const ui = {
     "how.4.d": "Devolve a resposta final onde ela foi pedida e registra a execução como trace.",
 
     "cta.title": "Execute seus próprios agentes em minutos",
-    "cta.sub": "Código aberto. Traga seu modelo. Mantenha runtime, chaves e dados sob seu controle.",
+    "cta.sub": "Código aberto. Traga seu modelo. Mantenha o runtime, as chaves e os dados sob seu controle.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
     "why.title": "Por que \"Pepe\"?",
-    "why.body": "O nome é uma referência ao universo do Chespirito, querido em toda a América Latina. A piada do Pepe era simples: ele fazia exatamente o que mandavam. Sem discutir, sem inventar moda. Um bom resumo para um runtime de agentes.",
+    "why.body": "O nome é uma referência ao universo do Chespirito, querido em toda a América Latina. A piada do Pepe era simples: ele fazia exatamente o que mandavam. Sem discutir, sem improvisar. Um bom resumo para um runtime de agentes.",
 
     "foot.tagline":
       "Um runtime de agentes de IA em Elixir/OTP. Auto-hospedado, agnóstico de modelo, sem banco de dados. Sem afiliação a qualquer fornecedor de modelos.",
@@ -537,30 +537,30 @@ export const ui = {
     "hero.eyebrow": "Elixir / OTP · auto-alojado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">executas tu próprio</span>.',
     "hero.lead":
-      "Monta uma equipa de funcionários virtuais que trata do teu email, atende clientes, analisa os dados do teu site e gere campanhas no Google e no Meta: praticamente tudo o que tu farias. Corre no teu próprio servidor, com as tuas chaves, sob o teu controlo.",
+      "Monta uma equipa de funcionários virtuais que trata do teu email, atende clientes, analisa os dados do teu site e gere as campanhas no Google e no Meta: praticamente tudo o que farias. Corre no teu próprio servidor, com as tuas chaves, sob o teu controlo.",
     "hero.cta_start": "Começar →",
     "hero.cta_docs": "Ler a documentação",
 
     "loops.code_task": "limpar a lista de clientes",
     "loops.code_crit": "sem e-mails duplicados, todas as linhas com telefone válido",
-    "loops.code_prompt": "# um prompt dá-lhe uma resposta, e é você que a julga",
+    "loops.code_prompt": "# um prompt dá uma resposta, e quem a julga és tu",
     "loops.code_goal": "# um objetivo insiste até um revisor dizer que está concluído",
-    "loops.title": 'Pare de dar ordens. <span class="grad">Defina o resultado.</span>',
+    "loops.title": 'Para de dar ordens. <span class="grad">Define o resultado.</span>',
     "loops.sub":
-      "Um prompt dá-lhe um turno: o agente responde e é você que decide se está bom. Isso torna-o no estrangulamento, aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só avança enquanto está à frente do teclado. Dê antes um objetivo: diga o que significa \"concluído\", e o Pepe continua a trabalhar até um revisor independente concordar que foi atingido.",
+      "Um prompt dá-te um turno: o agente responde e és tu que decides se está bom. Assim, és tu o ponto de estrangulamento, quem aprova e quem faz o controlo de qualidade ao mesmo tempo, e o trabalho só avança enquanto estás ao teclado. Dá-lhe antes um objetivo: diz o que significa \"concluído\", e o Pepe continua a trabalhar até um revisor independente concordar que foi atingido.",
     "loop.turn.t": "Ciclo de turno",
     "loop.turn.d":
       "Chama ferramentas, lê os resultados, chama mais. Para quando tem uma resposta a sério, não um palpite.",
     "loop.goal.t": "Ciclo de objetivo",
     "loop.goal.d":
-      "Define o objetivo e o que conta como concluído. Quem avalia é um revisor independente, não o agente. Ainda não? Recebe o retorno e tenta de novo.",
+      "Defines o objetivo e o que conta como concluído. Quem avalia é um revisor independente, não o agente. Ainda não? Recebe o retorno e tenta de novo.",
     "loop.time.t": "Ciclo de tempo",
     "loop.time.d":
-      "Trabalho recorrente agendado. Corre sozinho e recupera o que falhou enquanto esteve desligado.",
+      "Trabalho recorrente agendado. Corre sozinho e recupera o que ficou pendente enquanto esteve desligado.",
 
-    "surfaces.title": "Um agente, quatro superfícies",
+    "surfaces.title": "Um agente, todas as superfícies",
     "surfaces.sub":
-      "Define um agente uma vez. Usa-o pela superfície certa para a tarefa, com as mesmas ferramentas e memória.",
+      "Define um agente uma vez. Usa-o na superfície certa para cada tarefa, com as mesmas ferramentas e memória.",
     "surf.cli.t": "CLI",
     "surf.cli.d": "Execuções pontuais e um REPL interativo.",
     "surf.http.t": "API HTTP",
@@ -577,13 +577,13 @@ export const ui = {
     "features.enlarge": "Ampliar imagem",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
-      "Liga qualquer endpoint compatível com OpenAI. Define uma cadeia de recurso que avança em erros transitórios.",
+      "Liga qualquer endpoint compatível com OpenAI. Define uma cadeia de fallback que avança em erros transitórios.",
     "f.routing.t": "Encaminhamento por complexidade",
     "f.routing.d":
       "Uma chamada de classificação barata avalia cada conversa nova. Perguntas simples descem sozinhas para um modelo mais leve; a força toda fica reservada para o que precisa mesmo dela.",
     "f.goal.t": "Objetivos, não apenas prompts",
     "f.goal.d":
-      "Dê um objetivo e o que conta como concluído. Um revisor independente decide se foi cumprido, e o agente tenta de novo com esse retorno até passar ou atingir o seu limite de tentativas.",
+      "Define um objetivo e o que conta como concluído. Um revisor independente decide se foi cumprido, e o agente tenta de novo com esse retorno até passar ou atingir o teu limite de tentativas.",
     "f.tools.t": "Ciclo real de ferramentas",
     "f.tools.d":
       "Ferramentas nativas para shell, ficheiros, web, scripts e envio de ficheiros. Adiciona as tuas em minutos.",
@@ -598,15 +598,15 @@ export const ui = {
       "Instala um plugin, preenche a configuração e dá aos agentes novas ferramentas ou canais de imediato.",
     "f.learn.t": "Aprendizagem e memória",
     "f.learn.d":
-      "O agente lembra o que aprende (factos, preferências, as pessoas com quem fala) e reaproveita nas conversas seguintes. Leia e edite qualquer memória pelo painel.",
+      "O agente lembra-se do que aprende (factos, preferências, as pessoas com quem fala) e reaproveita nas conversas seguintes. Lê e edita qualquer memória pelo painel.",
     "f.usage.t": "Limites de gasto e mensagens",
     "f.usage.d":
-      "Limite cada empresa por gasto e por mensagens: um orçamento mensal em dólar e um limite mensal de mensagens. Ambos medidos ao vivo, ficando vermelhos no painel à medida que se esgotam.",
+      "Limita cada empresa por gasto e por mensagens: um orçamento mensal em dólares e um limite mensal de mensagens. Ambos medidos ao vivo, ficando vermelhos no painel à medida que se esgotam.",
     "f.sandbox.t": "Controlo e segurança",
-    "f.sandbox.d": "Ferramentas arriscadas pedem aprovação antes. Toda execução fica rastreada, com proteções de comando sempre ligadas.",
+    "f.sandbox.d": "Ferramentas arriscadas pedem aprovação primeiro. Todas as execuções ficam registadas, com as proteções de comandos sempre ativas.",
     "f.tenant.t": "Multiempresa",
     "f.tenant.d":
-      "Empresas opcionais isolam agentes, modelos, canais e automações, com um limite de despesa e um limite de mensagens por empresa que pode repor quando quiser.",
+      "Empresas opcionais isolam agentes, modelos, canais e automações, com um limite de despesa e um limite de mensagens por empresa que podes repor quando quiseres.",
     "f.traces.t": "Traces e utilização",
     "f.traces.d":
       "Cada execução regista o gatilho, ferramentas, tokens e custo. Abre um trace para rever passo a passo.",
@@ -624,17 +624,17 @@ export const ui = {
     "security.1.t": "O que o utilizador envia",
     "security.1.d": "A mensagem tal como a escreveu.",
     "security.2.t": "O que chega ao modelo",
-    "security.2.d": "O Pepe troca o dado sensível por um token antes de o pedido sair do seu servidor.",
+    "security.2.d": "O Pepe troca o dado sensível por um token antes de o pedido sair do teu servidor.",
     "security.3.t": "O que o modelo responde",
     "security.3.d": "Raciocina sobre o token. Nunca viu o valor real, nem o guardou.",
     "security.4.t": "O que o utilizador recebe",
-    "security.4.d": "O Pepe repõe o valor real, apenas do seu lado.",
+    "security.4.d": "O Pepe repõe o valor real, apenas do teu lado.",
     "security.chip.1": "O meu NIF é 123 456 789, pode ver a minha encomenda?",
     "security.chip.2": "O meu NIF é [NIF_1], pode ver a minha encomenda?",
     "security.chip.3": "Encontrei a encomenda do [NIF_1]: sai para entrega amanhã.",
     "security.chip.4": "Encontrei a encomenda do 123 456 789: sai para entrega amanhã.",
 
-    "widget.title": "Ou coloca-o direto no teu site",
+    "widget.title": "Ou coloca-o diretamente no teu site",
     "widget.body":
       "Cola uma única tag script na tua página e esta mesma bolha fica logo ativa, sem backend para escrever, sem passo de build. Alguns atributos opcionais definem a cor, a saudação e o idioma, para que cada visitante seja respondido no idioma do próprio site já na primeira mensagem.",
     "widget.cta": "Ver a documentação do widget →",
@@ -648,13 +648,13 @@ export const ui = {
     "uc.ads.t": "Campanhas de anúncios",
     "uc.ads.d": "Acompanha o gasto e o desempenho no Meta, Google e LinkedIn Ads, com relatório diário.",
     "uc.support.t": "Apoio ao cliente",
-    "uc.support.d": "Responde no WhatsApp, Slack ou Telegram, com transferência humana quando importa.",
+    "uc.support.d": "Responde no WhatsApp, Slack ou Telegram, com transferência humana quando for preciso.",
     "uc.sched.t": "Agendamento e lembretes",
     "uc.sched.d": "Tarefas recorrentes e avisos pontuais quando algo muda.",
     "uc.reports.t": "Relatórios e análises",
     "uc.reports.d": "Extrai números das tuas próprias ferramentas e envia um resumo periodicamente.",
     "uc.monitor.t": "Monitorização de erros",
-    "uc.monitor.d": "Acompanha o Sentry, o AppSignal e outras ferramentas de observabilidade, e aponta o que precisa mesmo de atenção humana.",
+    "uc.monitor.d": "Acompanha o Sentry, o AppSignal e outras ferramentas de monitorização, e aponta o que precisa de atenção humana.",
     "uc.insights.t": "Insights de dados",
     "uc.insights.d": "Consulta a tua base de dados e transforma números em próximos passos.",
     "uc.notes.t": "Notas e resumos de reuniões",
@@ -673,11 +673,11 @@ export const ui = {
     "how.4.d": "Devolve a resposta final onde ela foi pedida e regista a execução como trace.",
 
     "cta.title": "Executa os teus próprios agentes em minutos",
-    "cta.sub": "Código aberto. Traz o teu modelo. Mantém runtime, chaves e dados sob teu controlo.",
+    "cta.sub": "Código aberto. Traz o teu modelo. Mantém o runtime, as chaves e os dados sob o teu controlo.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
     "why.title": "Porquê \"Pepe\"?",
-    "why.body": "O nome pisca o olho ao universo de Chespirito, querido na América Latina. A piada do Pepe era simples: fazia exatamente o que lhe mandavam. Sem discutir nem inventar. Um bom resumo para um runtime de agentes.",
+    "why.body": "O nome é uma referência ao universo de Chespirito, adorado em toda a América Latina. A piada do Pepe era simples: fazia exatamente o que lhe mandavam. Sem discutir, sem improvisar. Um bom resumo para um runtime de agentes.",
 
     "foot.tagline":
       "Um runtime de agentes de IA em Elixir/OTP. Auto-alojado, agnóstico de modelo, sem base de dados. Sem afiliação a qualquer fornecedor de modelos.",

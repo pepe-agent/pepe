@@ -105,7 +105,7 @@ defmodule PepeWeb.OverviewLive do
             </div>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <.mini label={gettext("Memory")} value={"#{@footprint.memory_mb} MB"} />
-              <.mini label={gettext("CPU")} value={if @cpu, do: "#{@cpu}%", else: "—"} />
+              <.mini label={gettext("CPU")} value={if @cpu, do: "#{@cpu}%", else: "-"} />
               <.mini label={gettext("Conversations")} value={@footprint.sessions} />
               <.mini label={gettext("Processes")} value={@footprint.processes} />
             </div>

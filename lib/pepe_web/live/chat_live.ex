@@ -97,7 +97,7 @@ defmodule PepeWeb.ChatLive do
               </p>
             </div>
 
-            <form :if={@sessions != []} phx-change="filter_chats" class="space-y-2 border-b border-zinc-800 p-3">
+            <form id="chat-filter" :if={@sessions != []} phx-change="filter_chats" class="space-y-2 border-b border-zinc-800 p-3">
               <input
                 name="q"
                 value={@f_q}
@@ -187,7 +187,7 @@ defmodule PepeWeb.ChatLive do
                 </button>
               </div>
 
-              <form phx-submit="send" phx-change="type" class="flex gap-2">
+              <form id="chat-compose" phx-submit="send" phx-change="type" class="flex gap-2">
                 <input name="text" value={@input} autocomplete="off" placeholder={gettext("Message...  (type / for commands)")}
                   class="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
                 <button type="submit" class="rounded-lg bg-orange-600 px-5 py-2 font-medium transition hover:bg-orange-500">{gettext("Send")}</button>
@@ -472,12 +472,6 @@ defmodule PepeWeb.ChatLive do
   def handle_info(:refresh_sessions, socket),
     do: {:noreply, assign(socket, sessions: list_sessions(socket.assigns.scope), focus: load_focus(socket.assigns.selected))}
 
-  def handle_info(:sync_messages, %{assigns: %{selected: key}} = socket) when is_binary(key) do
-    {:noreply, assign(socket, messages: history(key))}
-  end
-
-  def handle_info(:sync_messages, socket), do: {:noreply, socket}
-
   def handle_info(:clear_activity, socket) do
     # Only clear once the run is really over (a new run may have started meanwhile).
     if socket.assigns.running,
@@ -494,17 +488,14 @@ defmodule PepeWeb.ChatLive do
   defp apply_event({:permission_request, id, name, requester}, socket),
     do: assign(socket, pending_perm: %{id: id, tool: name, pid: requester})
 
+  # `:done` fires from inside the run task, before the session has absorbed the turn, so
+  # the history read here can still be one turn behind. Show the answer right away
+  # anyway, because waiting would leave the reader staring at a blank; `:committed`
+  # below then reconciles against the session, which is the source of truth.
   defp apply_event({:done, content}, socket) do
     # Keep the activity strip briefly, then drop it - so the answer is already there to
     # read and only the machine chatter disappears (never a blank gap).
     Process.send_after(self(), :clear_activity, 2000)
-
-    # The runtime emits :done *before* the session commits the turn, so the history we
-    # read here can still be one turn behind. Optimistically show the answer now, then
-    # re-sync from the session, which is the source of truth. Without this a goal loop's
-    # retry turns never appear until the page is reloaded: their answers land while the
-    # last message is still an assistant one, and `ensure_reply` leaves the list alone.
-    Process.send_after(self(), :sync_messages, 250)
 
     assign(socket,
       messages: ensure_reply(history(socket.assigns.selected), content),
@@ -514,6 +505,12 @@ defmodule PepeWeb.ChatLive do
       sessions: list_sessions(socket.assigns.scope)
     )
   end
+
+  # The turn is now in the session's state. Re-read it. This is what makes a goal loop's
+  # retry turns appear: their answers land while the last message is already an assistant
+  # one, so `ensure_reply` leaves the list alone and only this re-read picks them up.
+  defp apply_event(:committed, %{assigns: %{selected: key}} = socket) when is_binary(key),
+    do: assign(socket, messages: history(key))
 
   defp apply_event({:error, _reason}, socket) do
     socket

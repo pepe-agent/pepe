@@ -33,7 +33,7 @@ the **Usage & billing** section shows tokens, cost and amount-to-bill by cycle
 (hour / day / week / month / year) with breakdowns by company, model and agent; set
 per-model prices under **Models -> Edit** and a company's markup under
 **Companies -> Edit**. Currency is a label only (default `USD`, set `"currency"` in
-config); there's no FX conversion. Full walkthrough: `mix pepe` doc **billing**.
+config); there's no FX conversion. Full walkthrough: `mix pepe usage help`.
 
 ---
 

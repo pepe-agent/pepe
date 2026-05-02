@@ -115,6 +115,72 @@ defmodule PepeWeb.OpenAIControllerTest do
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
 
+  test "the X-Session-Id header keys the session when no session_id param is sent" do
+    sid = "hdr-#{System.unique_integer([:positive])}"
+
+    post_msg = fn text ->
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("x-session-id", sid)
+      |> post("/v1/chat/completions", %{
+        "model" => "assistant",
+        "messages" => [%{"role" => "user", "content" => text}]
+      })
+    end
+
+    assert json_response(post_msg.("oi"), 200)["session_id"] == sid
+    json_response(post_msg.("e agora?"), 200)
+
+    history = Pepe.Agent.Session.history("api:root:" <> sid)
+    roles = Enum.map(history, & &1["role"])
+    assert roles == ["system", "user", "assistant", "user", "assistant"]
+  end
+
+  test "the same value in `user` and `session_id` is one session, not `u:u`" do
+    uid = "same-#{System.unique_integer([:positive])}"
+
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "assistant",
+        "user" => uid,
+        "session_id" => uid,
+        "messages" => [%{"role" => "user", "content" => "oi"}]
+      })
+
+    assert json_response(conn, 200)["session_id"] == uid
+
+    # Deduped: the two dimensions carry the same value, so they name one conversation.
+    assert Pepe.Agent.Session.history("api:root:" <> uid) != []
+    assert Registry.lookup(Pepe.Agent.Registry, "api:root:#{uid}:#{uid}") == []
+  end
+
+  test "with neither `user` nor `session_id` the call is stateless: no session is kept" do
+    before = api_session_keys()
+
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "assistant",
+        "messages" => [%{"role" => "user", "content" => "oi"}]
+      })
+
+    body = json_response(conn, 200)
+    assert hd(body["choices"])["message"]["content"] == "Hello from the mock!"
+
+    # Nothing to correlate the call with, so nothing is retained server-side.
+    refute Map.has_key?(body, "session_id")
+    assert api_session_keys() == before
+  end
+
+  defp api_session_keys do
+    Pepe.Agent.SessionSupervisor.list()
+    |> Enum.filter(&String.starts_with?(&1, "api:"))
+    |> Enum.sort()
+  end
+
   test "user + session_id combine into a `user:session_id` key (independent threads per user)" do
     uid = "u-#{System.unique_integer([:positive])}"
 

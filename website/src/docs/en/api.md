@@ -109,7 +109,7 @@ The response is a standard OpenAI chat completion object:
 }
 ```
 
-`pepe serve` runs in the foreground - for a real deployment, see [Dashboard](../dashboard/#keeping-it-running) for installing it as a persistent background service.
+`pepe serve` runs in the foreground. For a real deployment, see [Dashboard](../dashboard/#keeping-it-running) for installing it as a persistent background service.
 
 ## Endpoints
 

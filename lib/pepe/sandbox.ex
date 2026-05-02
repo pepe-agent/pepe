@@ -2,7 +2,7 @@ defmodule Pepe.Sandbox do
   @moduledoc """
   Two layers of protection for the shell/script tools (`bash`, `run_script`).
 
-  ## 1. Guardrails — on by default, zero config, cross-platform
+  ## 1. Guardrails: on by default, zero config, cross-platform
 
   `guard/1` inspects a shell command and refuses a small set of **catastrophic,
   never-legitimate** operations (wiping the disk, formatting a filesystem, fork
@@ -11,11 +11,11 @@ defmodule Pepe.Sandbox do
   command can slip past static inspection. It costs nothing and needs no setup, so
   it runs always.
 
-  ## 2. Isolation — opt-in, strong
+  ## 2. Isolation: opt-in, strong
 
   For a real boundary, configure a **sandbox wrapper** (`Pepe.Config.set_sandbox/1`,
   or `mix pepe setup`): a path to an executable that receives the real command and
-  runs it isolated however the host allows — Docker/Podman (portable, Linux/macOS/
+  runs it isolated however the host allows: Docker/Podman (portable, Linux/macOS/
   Windows), `firejail`/`bwrap` (Linux), `sandbox-exec` (macOS). Pepe passes the
   agent's working directory in `PEPE_SANDBOX_CWD`. Example wrappers ship in
   `examples/sandbox/`. Unset (the default) = the command runs directly on the host,

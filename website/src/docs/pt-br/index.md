@@ -60,7 +60,7 @@ consentimento.
 
 <div class="note"><strong>Ferramentas embutidas.</strong> Cada agente pode receber ferramentas como <code>bash</code>, <code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>list_dir</code>, <code>fetch_url</code> e <code>web_search</code>. Você escolhe quais cada agente recebe ao criá-lo, então um bot de suporte e um agente de programação podem ter poderes bem diferentes.</div>
 
-## As quatro superfícies
+## As cinco superfícies
 
 Você constrói um agente uma vez. O Pepe então o expõe pela superfície que melhor
 serve à tarefa. A configuração e o gerenciamento, por sua vez, acontecem de três
