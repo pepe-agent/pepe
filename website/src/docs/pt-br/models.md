@@ -54,17 +54,17 @@ linha de comando.
 pepe model rename openrouter OR-trabalho
 ```
 
-Todo agente, cron e padrão que aponta pra conexão continua funcionando:
+Todo agente, cron e padrão que aponta para a conexão continua funcionando:
 renomear só muda o nome de exibição, não o id estável que cada referência
-guarda de verdade, então não tem nada pra consertar depois.
+guarda de verdade, então não tem nada para consertar depois.
 
 ### Trocar de modelo no meio da conversa
 
 `/model` e `/models` funcionam do mesmo jeito no Telegram, no console
-(`pepe chat`) e no próprio chat do painel; veja [Telegram](../telegram/) pra
+(`pepe chat`) e no próprio chat do painel; veja [Telegram](../telegram/) para
 a referência completa de comandos. Qualquer um numa conversa permitida pode
-trocar o modelo só pra sua sessão; um treinador (a mesma lista que controla
-`/learn`) também pode trocar pra todo mundo.
+trocar o modelo só para sua sessão; um treinador (a mesma lista que controla
+`/learn`) também pode trocar para todo mundo.
 
 ## A conexão de modelo
 
@@ -73,7 +73,7 @@ definir significa que o agente usa o modelo padrão do seu escopo, então você 
 apontar um conjunto inteiro de agentes para um provedor e trocar todos mudando um
 único padrão.
 
-Uma conexão de modelo pode carregar uma cadeia de reserva. Quando o modelo primário
+Uma conexão de modelo pode carregar uma cadeia de fallback. Quando o modelo primário
 do agente falha com um erro transitório (um limite de taxa, um tempo esgotado, uma
 queda de rede ou um 5xx), o runtime desce pela cadeia e tenta de novo no próximo
 modelo, emitindo um evento `failover` enquanto o faz. Um erro grave como uma chave de
@@ -83,7 +83,7 @@ resolveria.
 O Pepe fala com os provedores pelo protocolo Chat Completions da OpenAI, então
 qualquer endpoint compatível com OpenAI funciona sem mudança de código.
 
-Uma sessão também pode descer sozinha pra um modelo mais barato automaticamente,
+Uma sessão também pode descer sozinha para um modelo mais barato automaticamente,
 no seu próprio primeiro turno, quando uma chamada rápida de triagem julga a
 conversa simples o bastante. Veja [Roteamento de modelo por complexidade](../agents/#roteamento-de-modelo-por-complexidade).
 

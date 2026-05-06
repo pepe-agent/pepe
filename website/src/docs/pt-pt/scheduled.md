@@ -15,7 +15,7 @@ pepe cron add \
   --agent assistant \
   --prompt "Resume as linhas de log de erro das últimas 24 horas e lista os 3 principais problemas." \
   --schedule "0 9 * * 1-5" \
-  --timezone "America/Sao_Paulo" \
+  --timezone "Europe/Lisbon" \
   --deliver "telegram:123456789"
 ```
 
@@ -57,9 +57,9 @@ O horário é uma expressão cron padrão de 5 campos: `minuto hora dia-do-mês 
 30 8 * * *      # 08:30 todos os dias
 ```
 
-Uma tarefa carrega o seu próprio **fuso horário nomeado**, não um desvio fixo em relação ao UTC. Isto importa porque "9h local" desloca-se em relação ao UTC duas vezes por ano por causa da hora de verão. O Pepe guarda a expressão mais um nome de fuso como `America/Sao_Paulo` ou `Europe/Berlin` e avalia o horário nesse fuso. Perto de uma mudança de hora de verão faz o mais sensato: salta para a frente na lacuna da primavera e escolhe o lado mais tardio da sobreposição do outono, de modo que um trabalho nunca dispara duas vezes nem desaparece em silêncio.
+Uma tarefa carrega o seu próprio **fuso horário nomeado**, não um desvio fixo em relação ao UTC. Isto importa porque "9h local" desloca-se em relação ao UTC duas vezes por ano por causa da hora de verão. O Pepe guarda a expressão mais um nome de fuso como `Europe/Lisbon` ou `Europe/Berlin` e avalia o horário nesse fuso. Perto de uma mudança de hora de verão faz o mais sensato: salta para a frente na lacuna da primavera e escolhe o lado mais tardio da sobreposição do outono, de modo que um trabalho nunca dispara duas vezes nem desaparece em silêncio.
 
-Define o teu fuso predefinido uma vez durante o `pepe setup`. As tarefas que não nomeiam o seu próprio fuso usam esse. Se nada estiver configurado, o valor de recurso é UTC.
+Define o teu fuso predefinido uma vez durante o `pepe setup`. As tarefas que não nomeiam o seu próprio fuso usam esse. Se nada estiver configurado, o fallback é UTC.
 
 <div class="note"><strong>Descreve o horário por palavras.</strong> Uma expressão cron é fácil de errar à mão. Tanto o formulário do painel como um agente por conversa conseguem transformar uma frase como "todos os dias úteis às 9:30" na expressão correspondente por ti. Cada expressão gerada é validada antes de ser guardada, portanto uma inválida nunca é armazenada.</div>
 

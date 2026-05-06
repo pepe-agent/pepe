@@ -40,18 +40,18 @@ Os dois caminhos escrevem a mesma configuração.
 ## Docker
 
 Prefere container? `docker pull ghcr.io/pepe-agent/pepe` (amd64 e arm64). Ele precisa de um
-volume e de uma senha do dashboard - os dois estão explicados, junto de como dar ferramentas
+volume e de uma senha do painel. Os dois estão explicados, junto de como dar ferramentas
 extras ao agente dentro do container, na [página de Docker](/pt-br/docs/docker/).
 
 ## Desinstalar
 
-Remova o binário; apague também a pasta de configuração pra descartar todo
+Remova o binário; apague também a pasta de configuração para descartar todo
 modelo, agente e credencial que você configurou.
 
 ```bash
 rm ~/.local/bin/pepe
-rm -rf ~/.pepe   # opcional - também descarta sua configuração
+rm -rf ~/.pepe   # opcional: também descarta sua configuração
 ```
 
 (`~/.local/bin` é a pasta padrão de instalação; se você sobrescreveu com
-`$PEPE_BIN_DIR`, é onde ele apontar.)
+`$PEPE_BIN_DIR`, é para onde essa variável apontar.)

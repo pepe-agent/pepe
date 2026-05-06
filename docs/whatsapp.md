@@ -5,17 +5,17 @@ Pepe polls), WhatsApp **pushes** inbound messages to a webhook, so each connecti
 gets its own URL:
 
 ```
-/webhooks/:company/:provider/:slug        e.g.  /webhooks/acme/whatsapp/suporte
+/webhooks/:company/:provider/:slug        e.g.  /webhooks/acme/whatsapp/support
 ```
 
-This is one generic webhook surface (a provider registry - WhatsApp today, others
+This is one generic webhook surface (a provider registry: WhatsApp today, others
 later), not WhatsApp-specific plumbing. The `:company` segment is `root` for the
 no-company scope. `GET` answers Meta's verification handshake; `POST` is an inbound
-message - its `X-Hub-Signature-256` is verified against the app secret, then the
+message: its `X-Hub-Signature-256` is verified against the app secret, then the
 bound agent runs and the reply is sent back over the Graph API. Served by
 `mix pepe serve` (no extra process).
 
-You can run **as many connections as you like**, each bound to an agent - the
+You can run **as many connections as you like**, each bound to an agent, the
 webhook analogue of Telegram's multi-bot. A connection has a **mode**:
 
 | | **admin** (yours) | **support** (customer-facing) |
@@ -23,17 +23,17 @@ webhook analogue of Telegram's multi-bot. A connection has a **mode**:
 | Slash commands | on (`/new` resets) | off (treated as text) |
 | Who may message | `allowed_numbers` (your number) | anyone |
 | Learns? (`trainers`) | you're a trainer | `[]` - never learns from a customer |
-| Agent tools | full | keep it locked (safe tools only - no human to approve) |
+| Agent tools | full | keep it locked (safe tools only, no human to approve) |
 | Session | kept | ephemeral + idle TTL |
 
 ```bash
 # add a support number (tokens default to ${WA_TOKEN_<SLUG>} / ${WA_APP_SECRET_<SLUG>})
-mix pepe gateway whatsapp add suporte \
-  --agent acme/atendimento --company acme --mode support \
+mix pepe gateway whatsapp add support \
+  --agent acme/support --company acme --mode support \
   --phone-number-id 123456789 --ttl-min 30
 mix pepe gateway whatsapp list                 # connections + their Callback URLs
-mix pepe gateway whatsapp set-agent suporte acme/vendas
-mix pepe gateway whatsapp remove suporte
+mix pepe gateway whatsapp set-agent support acme/sales
+mix pepe gateway whatsapp remove support
 ```
 
 ...or add one from the **Channels** tab in the dashboard. Then register the printed
@@ -43,7 +43,7 @@ Callback URL and verify token in your Meta app (subscribe the `messages` field).
 `phone_number_id`, generate a permanent access token (`${WA_TOKEN_<SLUG>}`), copy the
 App Secret (`${WA_APP_SECRET_<SLUG>}`), and point the Callback URL at your slug.
 
-**The session** is keyed `whatsapp:<agent>:<phone>` - the agent's thread with that
+**The session** is keyed `whatsapp:<agent>:<phone>`, the agent's thread with that
 customer, isolated per company via the agent handle. Two things end it: the agent
 calls the **`end_session`** tool when the exchange is done (clears the context for
 the next message), or the **idle TTL** (`--ttl-min`, unset = never) evicts a quiet

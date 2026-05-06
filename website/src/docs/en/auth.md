@@ -29,9 +29,9 @@ A token is a random string prefixed `pepe_`. Only its SHA-256 hash is stored in 
 
 An agent granted the guarded `manage_token` tool can mint, list, and revoke tokens from a conversation. Because a token grants API access, the tool is not read-only: it goes through the permission gate, so you confirm before a token is created, and the raw secret is returned once for you to copy.
 
-> You: Create a token for the buskaza company, labeled chatwoot.
+> You: Create a token for the acme company, labeled chatwoot.
 >
-> Agent: (asks you to confirm, then mints it) API token created, scope company buskaza. Copy it now, it will not be shown again: `pepe_9f2a...`
+> Agent: (asks you to confirm, then mints it) API token created, scope company acme. Copy it now, it will not be shown again: `pepe_9f2a...`
 
 ### Presenting a token
 

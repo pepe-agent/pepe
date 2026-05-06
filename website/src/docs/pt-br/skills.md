@@ -15,7 +15,7 @@ de uma linha aparecem no contexto do agente. Quando o assunto surge, o agente
 chama a ferramenta `skill` com esse nome, lê o documento completo e o segue.
 
 É justamente essa indireção que importa. O agente carrega dezenas de
-procedimentos pagando apenas uma linha de contexto por cada um, e abre a versão
+procedimentos pagando apenas uma linha de contexto para cada um, e abre a versão
 longa exatamente quando o trabalho pede. O resumo é a primeira linha não vazia
 do arquivo, então essa linha de abertura deve dizer quando a skill se aplica.
 

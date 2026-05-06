@@ -5,9 +5,9 @@ description: Rode um agente rumo a um resultado, verificado por um revisor indep
 
 ## Dar um prompt vs. perseguir um objetivo
 
-Um prompt te compra **um turno**. O agente responde, e aí *você* decide se ficou bom, pede um ajuste, e repete. Isso te coloca dentro do loop como aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só anda enquanto você está na frente do teclado.
+Um prompt te dá **um turno**. O agente responde, e aí *você* decide se ficou bom, pede um ajuste, e repete. Isso te coloca dentro do loop como aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só anda enquanto você está na frente do teclado.
 
-Um **objetivo** te compra um **resultado**. Você diz o que significa "pronto", e o Pepe continua trabalhando até um revisor independente concordar que chegou lá, ou até acabarem as tentativas.
+Um **objetivo** te dá um **resultado**. Você diz o que significa "pronto", e o Pepe continua trabalhando até um revisor independente concordar que chegou lá, ou até acabarem as tentativas.
 
 A diferença está em **quem verifica**. Num turno normal é o próprio agente que decide que terminou, que é justamente a avaliação em que você não pode confiar. Num objetivo, uma **chamada separada ao modelo** julga o resultado contra o seu critério.
 
@@ -42,13 +42,13 @@ O Pepe vai imprimindo cada tentativa e o veredito do revisor:
 ✅ Goal met after 2 attempt(s).
 ```
 
-No dashboard, dispare de qualquer chat:
+No painel, dispare de qualquer chat:
 
 ```
 /goal limpar a lista de clientes | sem e-mails duplicados, toda linha com telefone válido
 ```
 
-O painel acima da conversa passa a mostrar o critério, a contagem de tentativas e o último veredito do revisor enquanto ele trabalha.
+O quadro acima da conversa passa a mostrar o critério, a contagem de tentativas e o último veredito do revisor enquanto ele trabalha.
 
 ## Como o revisor se mantém independente
 

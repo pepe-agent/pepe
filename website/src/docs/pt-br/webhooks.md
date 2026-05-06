@@ -19,7 +19,7 @@ https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
   `msteams` ou `googlechat`.
 - `<slug>` é o nome único que você deu à conexão.
 
-Um `GET` para essa URL responde ao aperto de mão de verificação do provedor (o
+Um `GET` para essa URL responde ao handshake de verificação do provedor (o
 Pepe devolve o desafio que a plataforma envia quando você registra a URL pela
 primeira vez). Um `POST` é um evento de entrada. Em um `POST`, o Pepe resolve a
 conexão, verifica a assinatura da requisição contra o segredo que você
@@ -29,7 +29,7 @@ que a plataforma receba o retorno na hora (provedores como a Meta repetem um
 webhook lento).
 
 Há uma única rota genérica. Adicionar um novo provedor nunca adiciona um novo
-ponto de acesso.
+endpoint.
 
 <div class="note"><strong>Host público.</strong> Canais por webhook precisam de
 uma URL que a plataforma consiga alcançar. Exponha sua instância do Pepe atrás
@@ -59,21 +59,21 @@ todos eles (e pelo WhatsApp).
 Slack, Microsoft Teams e Google Chat suportam conversas em grupo/canal, onde
 por padrão a conexão só responde quando é @mencionada (uma mensagem direta
 sempre chega ao agente, independente da configuração). Coloque
-`require_mention: false` na conexão pra ela responder a toda mensagem em todo
-canal em que estiver - ou, sem mexer nessa configuração da conexão inteira,
-dispense isso pra um único canal de dentro desse canal:
+`require_mention: false` na conexão para ela responder a toda mensagem em todo
+canal em que estiver. Ou, sem mexer nessa configuração da conexão inteira,
+dispense isso para um único canal de dentro desse canal:
 
 ```text
-/mention off   # só nesse canal, até o /new - não precisa @mencionar pra ele responder
+/mention off   # só nesse canal, até o /new: não precisa @mencionar para ele responder
 /mention on    # volta a exigir @menção
 /mention       # mostra a configuração atual
 ```
 
-Como um comando de canal ainda precisa estar endereçado ao bot pra rodar, o
+Como um comando de canal ainda precisa estar endereçado ao bot para rodar, o
 *primeiro* `/mention off` precisa de uma @menção de verdade
 (`@bot /mention off`); depois disso, o canal não precisa mais até o `/new`.
 A dispensa vive na conversa daquele canal, não na conexão, então nunca vaza
-pra nenhum outro canal. WhatsApp e Discord não filtram por menção hoje
+para nenhum outro canal. WhatsApp e Discord não filtram por menção hoje
 (sempre respondem), então `/mention` não faz nada neles.
 
 ## Trocando de modelo
@@ -100,14 +100,14 @@ comandos digitados.
 
 Cada canal por webhook é um pequeno módulo que implementa o mesmo contrato, então
 todos se comportam de forma coerente e uma nova plataforma é um novo módulo em
-vez de uma nova rota. As funções de retorno são:
+vez de uma nova rota. Os callbacks são:
 
-- `name` e `label`: o segmento de URL do provedor e seu nome para pessoas.
+- `name` e `label`: o segmento de URL do provedor e o nome legível para humanos.
 - `config_schema`: os campos que o painel mostra para configurar uma conexão.
-- `verify`: responder ao aperto de mão de verificação do `GET`.
+- `verify`: responder ao handshake de verificação do `GET`.
 - `authenticate`: verificar a assinatura em um `POST` de entrada contra o segredo
   da conexão e o corpo cru da requisição. Uma requisição que falha é descartada.
-- `parse`: normalizar a carga da plataforma em zero ou mais mensagens simples.
+- `parse`: normalizar o payload da plataforma em zero ou mais mensagens simples.
   Atualizações de estado e recibos de entrega são ignorados.
 - `respond` (opcional): produzir uma resposta síncrona quando o protocolo exige
   uma antes de qualquer trabalho do agente, como o desafio `url_verification` do

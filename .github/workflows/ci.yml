@@ -1,0 +1,143 @@
+name: ci
+
+# Runs on every push and every pull request. Until now nothing did: the repo is public,
+# it has 800+ tests, and none of them ran unless somebody remembered to type `mix test`.
+# `mix precommit` is a good habit, but a habit is not a gate.
+#
+# Deliberately NOT the `precommit` alias: that one runs `mix format`, which *rewrites*
+# files. In CI a formatting problem must fail the build, not be quietly fixed inside a
+# container nobody will ever look at again.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A second push to the same branch cancels the first: the older run's answer is about
+# code nobody has anymore.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# These three (here, release.yml, and the Dockerfile's ARGs) must say the same thing. They
+# had drifted: the release binaries were compiled with Elixir 1.18 while the container image
+# used 1.20.2, so one tag shipped two artifacts out of two compilers. Nobody noticed, and
+# nobody would have, until dialyzer failed here on a warning that only 1.18 emits.
+#
+# Elixir 1.20.2 is the latest. OTP is deliberately NOT: 29 is out, and Burrito 1.5.0 (the
+# latest, and what packages the binaries users download) cannot build against it. The whole
+# release fails in Zig's link step. Verified by building all five targets in a Linux
+# container on both: 28 produces them, 29 produces none.
+#
+# So do not "modernize" this to 29. The container image would happily take it, and then the
+# image and the binaries would be back to disagreeing, for a version bump nobody asked for.
+# Revisit when Burrito ships OTP 29 support.
+env:
+  MIX_ENV: test
+  ELIXIR_VERSION: "1.20.2"
+  OTP_VERSION: "28.5.0.3"
+
+jobs:
+  test:
+    name: test + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      # Keyed on the lock file: a dependency change rebuilds, anything else reuses.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      - run: mix deps.get
+
+      # An unused entry in mix.lock is a dependency somebody removed and left behind.
+      - name: Check the lock file has nothing stale in it
+        run: mix deps.unlock --check-unused
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      # The suite stands up a real OpenAI-compatible mock server over TCP, so it exercises
+      # the whole stack. No database is involved.
+      - name: Test, with coverage
+        run: mix coveralls.json
+
+      - name: Publish coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./cover/excoveralls.json
+          format: coveralls
+
+  credo:
+    name: credo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      - run: mix deps.get
+      - run: mix credo
+
+  dialyzer:
+    name: dialyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-
+
+      # The PLT is the expensive part by an order of magnitude: building it from scratch
+      # takes minutes, checking against it takes seconds. It only changes when the
+      # toolchain or the dependencies do, so it gets a cache of its own with no
+      # restore-keys: a PLT built against different deps is worse than no PLT.
+      - uses: actions/cache@v4
+        with:
+          path: priv/plts
+          key: ${{ runner.os }}-plt-${{ env.OTP_VERSION }}-${{ env.ELIXIR_VERSION }}-${{ hashFiles('mix.lock') }}
+
+      - run: mix deps.get
+
+      - name: Build the PLT if it wasn't cached
+        run: mix dialyzer --plt
+
+      - run: mix dialyzer --format github

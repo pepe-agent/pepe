@@ -77,7 +77,7 @@ defmodule Pepe.DoctorTest do
     checks = Doctor.checks()
 
     plaintext = Enum.filter(checks, &match?({"security", "plaintext secret at" <> _, {:warn, _}}, &1))
-    assert length(plaintext) == 1
+    assert [_] = plaintext
     assert Enum.any?(checks, &match?({"security", "dashboard password", {:warn, _}}, &1))
   end
 

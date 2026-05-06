@@ -206,7 +206,7 @@ The regex and HTTP hooks fail open by design: if a redactor errors or a model is
 
 ## Dashboard access
 
-The web dashboard is open on localhost by default, which is convenient for local development. The moment you expose it beyond your machine, put it behind a password:
+The dashboard is open on localhost by default, which is convenient for local development. The moment you expose it beyond your machine, put it behind a password:
 
 ```bash
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
@@ -226,4 +226,4 @@ The raw token is shown once and only its SHA-256 hash is stored, never the token
 
 ## Multi-tenant scoping
 
-Work can be walled off per company (a handle-based tenant scope). The default no-company scope is called Principal. A company's agents, models, and provider keys stay invisible to other companies, and an API token scoped to a company reaches only that company's agents. This keeps one tenant's credentials and conversations from ever leaking into another's, which matters when you host agents on behalf of several customers from one Pepe instance.
+Work can be walled off per company (a handle-based tenant scope). The default no-company scope is root (shown as "Principal" in the dashboard). A company's agents, models, and provider keys stay invisible to other companies, and an API token scoped to a company reaches only that company's agents. This keeps one tenant's credentials and conversations from ever leaking into another's, which matters when you host agents on behalf of several customers from one Pepe instance.

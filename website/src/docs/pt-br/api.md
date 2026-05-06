@@ -109,7 +109,7 @@ A resposta é um objeto padrão de chat completion da OpenAI:
 }
 ```
 
-O `pepe serve` roda em primeiro plano - pra um deploy de verdade, veja [Painel](../dashboard/#mantendo-ele-no-ar) pra instalá-lo como serviço persistente em segundo plano.
+O `pepe serve` roda em primeiro plano. Para um deploy de verdade, veja [Painel](../dashboard/#mantendo-o-painel-no-ar) e instale-o como serviço persistente em segundo plano.
 
 ## Endpoints
 
@@ -124,12 +124,12 @@ Os dois ficam sob `/v1`, então um cliente configurado com `base_url = http://HO
 
 ## O campo "model" seleciona um agente
 
-Essa é a ideia que faz todo o resto se encaixar. O campo `model` de uma requisição de chat não nomeia um modelo de linguagem puro. Ele nomeia um **agente** do Pepe. Quando você envia `"model": "assistant"`, o Pepe executa o agente chamado `assistant`, com o prompt de sistema desse agente e o conjunto próprio de ferramentas dele. O agente executa o laço completo de chamadas de ferramenta internamente (chama o modelo, executa as chamadas de ferramenta, devolve os resultados, repete) e retorna uma única resposta final no formato usual de uma completion.
+Essa é a ideia que faz todo o resto se encaixar. O campo `model` de uma requisição de chat não nomeia um modelo de linguagem puro. Ele nomeia um **agente** do Pepe. Quando você envia `"model": "assistant"`, o Pepe executa o agente chamado `assistant`, com o prompt de sistema desse agente e o conjunto próprio de ferramentas dele. O agente executa o loop completo de chamadas de ferramenta internamente (chama o modelo, executa as chamadas de ferramenta, devolve os resultados, repete) e retorna uma única resposta final no formato usual de uma completion.
 
 A resolução do campo `model` acontece nesta ordem:
 
 1. Se o nome corresponder a um agente, esse agente é executado.
-2. Se nenhum agente corresponder mas o nome corresponder a uma conexão de modelo pura, o Pepe a embrulha em um agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Essa alternativa só está disponível no escopo aberto ou raiz (veja [Escopos de token](../auth/#escopos-de-token)).
+2. Se nenhum agente corresponder mas o nome corresponder a uma conexão de modelo pura, o Pepe a encapsula em um agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Essa alternativa só está disponível no escopo aberto ou raiz (veja [Escopos de token](../auth/#escopos-de-token)).
 3. Se nenhum corresponder, o agente padrão é executado.
 
 <div class="note"><strong>Conclusão prática.</strong> O conjunto de "modelos" que um cliente pode escolher é o seu conjunto de agentes. Dê a um agente um nome descritivo, conecte as ferramentas dele uma vez e todo cliente compatível com OpenAI o enxerga como um modelo selecionável.</div>
@@ -153,7 +153,7 @@ curl http://localhost:4000/v1/chat/completions \
 
 ### Streaming (Server-Sent Events)
 
-Defina `"stream": true` para receber a resposta conforme ela é gerada. O formato no fio é idêntico ao streaming da OpenAI: uma sequência de linhas `data:`, cada uma carregando um objeto `chat.completion.chunk`, terminada por `data: [DONE]`.
+Defina `"stream": true` para receber a resposta conforme ela é gerada. O formato transmitido é idêntico ao streaming da OpenAI: uma sequência de linhas `data:`, cada uma carregando um objeto `chat.completion.chunk`, terminada por `data: [DONE]`.
 
 ```bash
 curl -N http://localhost:4000/v1/chat/completions \

@@ -1,6 +1,6 @@
 ---
 title: Modelos
-description: Liga fornecedores compatíveis com OpenAI e define modelos predefinidos e de recurso.
+description: Liga fornecedores compatíveis com OpenAI e define modelos predefinidos e de fallback.
 ---
 
 ## 3. Ligar um modelo
@@ -74,7 +74,7 @@ significa que o agente usa o modelo predefinido do seu âmbito, por isso podes a
 um conjunto inteiro de agentes para um fornecedor e trocá-los todos ao mudar uma
 única predefinição.
 
-Uma ligação de modelo pode transportar uma cadeia de reserva. Quando o modelo
+Uma ligação de modelo pode transportar uma cadeia de fallback. Quando o modelo
 primário do agente falha com um erro transitório (um limite de taxa, um tempo
 esgotado, uma quebra de rede ou um 5xx), o runtime desce pela cadeia e volta a tentar
 no modelo seguinte, emitindo um evento `failover` enquanto o faz. Um erro grave como

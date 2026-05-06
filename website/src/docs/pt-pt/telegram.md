@@ -48,7 +48,7 @@ pepe gateway telegram list
 pepe gateway telegram remove support
 ```
 
-Executa o consultador em primeiro plano (um consultador por bot):
+Executa o poller em primeiro plano (um poller por bot):
 
 ```bash
 pepe gateway telegram
@@ -66,7 +66,7 @@ linha de comandos.</div>
 ### Em grupos
 
 Num chat 1:1 o bot responde sempre. Adicionado a um grupo, por padrão só
-responde quando é @mencionado ou recebe um `/comando` - caso contrário,
+responde quando é @mencionado ou recebe um `/comando`; caso contrário,
 responderia a todas as mensagens num grupo movimentado. Desliga essa
 exigência por completo para um bot (em todos os grupos em que está) com
 `require_mention: false` durante o `pepe gateway telegram setup`.
@@ -84,7 +84,7 @@ propaga para nenhum outro grupo em que o mesmo bot esteja, e uma conversa
 nova (`/new`) esquece-a.
 
 Uma conversa de grupo é uma única sessão partilhada entre todos os que estão
-nela, sem identificar quem disse o quê - se o teu agente precisar de
+nela, sem identificar quem disse o quê. Se o teu agente precisar de
 distinguir as pessoas, indica isso no prompt dele. O bot também é cego ao que
 não lhe é dirigido: uma mensagem que não o @menciona (e não está dispensada
 com `/mention off`) nunca chega ao agente, nem como contexto silencioso, por
@@ -117,7 +117,7 @@ disser.
 
 Um agente que tenha a ferramenta `manage_channel` consegue criar e reassociar
 bots do Telegram a partir de uma conversa. Como edita a configuração, cada
-chamada passa pela cancela de permissão: o agente propõe a alteração e tu
+chamada passa pela barreira de permissão: o agente propõe a alteração e tu
 confirmas antes de ela ser aplicada.
 
 Dirias:
@@ -139,7 +139,7 @@ salvaguardas:
 
 Outras ações do `manage_channel` são `list`, `set_agent` (reassociar um bot a
 outro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`,
-`disable` e `remove`. Após qualquer alteração, reconcilia os consultadores em
+`disable` e `remove`. Após qualquer alteração, reconcilia os pollers em
 execução, por isso um bot arranca ou pára ao vivo, sem reinício.
 
 <div class="note"><strong>Apenas Telegram.</strong> A ferramenta de conversa

@@ -18,11 +18,11 @@ Como checagens de agente custam tokens, o intervalo mínimo delas é maior: 300 
 
 ### O que ela envia quando dispara
 
-Quando o gatilho enfim passa, uma vigia entrega uma mensagem. Essa mensagem é ou um **modelo** fixo (um texto que você define de antemão, sem chamada ao modelo) ou é **composta pelo agente** na hora do disparo (uma chamada ao modelo, uma vez), para que possa incluir detalhe fresco, como um resumo do que de fato aconteceu.
+Quando o gatilho enfim passa, uma vigia entrega uma mensagem. Essa mensagem é ou um **texto fixo** (que você define de antemão, sem chamada ao modelo), ou é **composta pelo agente** na hora do disparo (uma chamada ao modelo, uma vez), para que possa incluir detalhe fresco, como um resumo do que de fato aconteceu.
 
 ### Criar uma vigia pela CLI
 
-A CLI cria vigias por sonda. Vigias julgadas por agente são criadas pela conversa, onde o modelo já está no laço.
+A CLI cria vigias por sonda. Vigias julgadas por agente são criadas pela conversa, onde o modelo já está no loop.
 
 ```bash
 pepe watch add "api-up" \
@@ -58,7 +58,7 @@ Peça em linguagem natural e o agente cria a vigia pela ferramenta `watch` dele.
 
 > Me avise quando o deploy terminar. Cheque a cada poucos minutos.
 
-Para uma checagem scriptável o agente configura uma sonda. Para algo que precisa de julgamento ele configura um gatilho de agente, formulando uma pergunta de sim/não que responde a cada intervalo. Ele também pode escolher compor a mensagem de disparo com o modelo em vez de um modelo fixo, para que a notificação carregue um resumo real em vez de uma linha enlatada. As ações da ferramenta `watch` são `create`, `list`, `pause`, `resume` e `cancel`.
+Para uma checagem scriptável o agente configura uma sonda. Para algo que precisa de julgamento ele configura um gatilho de agente, formulando uma pergunta de sim/não que responde a cada intervalo. Ele também pode escolher compor a mensagem de disparo com o modelo em vez de usar um texto fixo, para que a notificação carregue um resumo real em vez de uma linha enlatada. As ações da ferramenta `watch` são `create`, `list`, `pause`, `resume` e `cancel`.
 
 Para manter as coisas limitadas, pode haver no máximo 50 vigias ativas ao mesmo tempo, e o Pepe recusa uma vigia nova cuja condição seja idêntica a uma já em execução, então você não empilha duplicatas sem querer. Uma vigia também tem um número máximo de checagens; se a condição nunca se tornar verdadeira dentro desse orçamento, a vigia expira em silêncio em vez de sondar para sempre.
 

@@ -158,7 +158,7 @@ defmodule Pepe.Agent.SessionStopTest do
 
     {:ok, _reply} = Session.chat(key, "hello", authorize: allow)
     original = Session.history(key)
-    assert length(original) > 0
+    assert [_ | _] = original
 
     new_key = key <> "-fork"
     assert {:ok, ^new_key} = Session.fork(key, new_key)

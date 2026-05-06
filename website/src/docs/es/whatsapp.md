@@ -6,7 +6,7 @@ description: Conecta webhooks de WhatsApp Cloud API a agentes de Pepe.
 ## WhatsApp
 
 WhatsApp usa la Cloud API de Meta. Tiene una línea de comandos dedicada porque es
-el canal por webhook más común. Agrega una conexión:
+el canal por webhook más común. Añade una conexión:
 
 ```bash
 pepe gateway whatsapp add support \
@@ -24,8 +24,8 @@ Las credenciales de la conexión (guardadas bajo su `config`):
 - `access_token`: el token bearer de la Graph API. Guárdalo como `${ENV_VAR}`.
 - `app_secret`: verifica el `X-Hub-Signature-256` entrante. Guárdalo como
   `${ENV_VAR}`.
-- `verify_token`: cualquier cadena que elijas. Meta la devuelve durante el saludo
-  de suscripción. Si omites la opción, se usa el slug.
+- `verify_token`: cualquier cadena que elijas. Meta la devuelve durante el
+  handshake de suscripción. Si omites la opción, se usa el slug.
 
 Si dejas fuera `--access-token` o `--app-secret`, la línea de comandos escribe
 una referencia de marcador derivada del slug (por ejemplo `${WA_TOKEN_SUPPORT}`),
@@ -47,7 +47,7 @@ pepe gateway whatsapp remove support
 
 Las demás opciones de `whatsapp add` son `--company`, `--trainers`, `--ttl-min`,
 `--ephemeral` y `--commands`, que corresponden a los campos por conexión
-descritos arriba. El panel agrega y edita conexiones de WhatsApp a través de la
+descritos arriba. El panel añade y edita conexiones de WhatsApp a través de la
 misma sección Channels.
 
 <div class="note"><strong>Regla de las 24 horas.</strong> Meta solo permite

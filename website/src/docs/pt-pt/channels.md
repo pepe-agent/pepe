@@ -31,7 +31,7 @@ página mostra cada uma onde se aplica:
 Os canais distinguem-se apenas na forma como uma mensagem chega ao Pepe:
 
 - **Telegram** é um bot que o Pepe consulta. Nada precisa de estar acessível
-  publicamente. Adiciona um token, associa-o a um agente, executa a comporta.
+  publicamente. Adiciona um token, associa-o a um agente, executa o gateway.
 - **Canais por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google Chat
   e uma rota de entrada genérica) recebem mensagens que a plataforma envia para
   um URL de retorno. O Pepe expõe um URL por ligação. Regista-o uma única vez
@@ -124,7 +124,7 @@ com a ferramenta `send_file` fá-lo no momento em que pedes. Dirias:
 > Vai buscar os registos da semana passada e envia-me a folha de cálculo.
 
 O agente executa o passo que constrói o ficheiro, e depois invoca `send_file` com
-o caminho resultante. Não há uma cancela de confirmação separada no `send_file`;
+o caminho resultante. Não há uma barreira de confirmação separada no `send_file`;
 ele só entrega ao próprio canal da conversa atual, resolvido a partir da sessão,
 por isso não consegue divulgar um ficheiro a mais ninguém.
 
@@ -145,11 +145,11 @@ ser independente.
 
 Para além de associar um canal a um agente, um agente que dispõe da ferramenta
 `set_route` pode alterar quais agentes podem escrever a quais, pela conversa. O
-encaminhamento é direccionado, por isso permitir que o agente A escreva ao agente B
-não permite que B escreva a A. Como edita a configuração, passa pela cancela de
+encaminhamento é dirigido, por isso permitir que o agente A escreva ao agente B
+não permite que B escreva a A. Como edita a configuração, passa pela barreira de
 permissão: confirma a alteração antes de ela ter efeito. Dirias:
 
-> Deixa o agente de triagem passar para o agente de facturação.
+> Deixa o agente de triagem passar para o agente de faturação.
 
 O agente invoca `set_route` com `to: "billing"` (e `from` assume por predefinição
 aquele com quem está a falar), ou `action: "deny"` para remover uma rota. Na linha

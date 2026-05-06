@@ -23,7 +23,7 @@ credenciais (uma referência `${ENV_VAR}` é aceite para qualquer segredo). O
 
 Na aplicação do Slack, define o URL de pedido de Event Subscriptions com o URL
 da ligação e subscreve `message.channels` e `app_mention`. A primeira gravação
-dispara um aperto de mão `url_verification`, que o Pepe responde de imediato.
+dispara um handshake `url_verification`, que o Pepe responde de imediato.
 As respostas são publicadas com `chat.postMessage`. Formato do URL de retorno:
 
 ```

@@ -1,11 +1,11 @@
 ---
 title: Docker
-description: Execute o Pepe em contentor e instale, dentro dele, as ferramentas de que o agente precisa.
+description: Corre o Pepe em contentor e instala, lá dentro, as ferramentas de que o agente precisa.
 ---
 
-Cada release publica uma imagem de contentor a par dos binários, em `amd64` e `arm64`. O
-`docker pull` seleciona a arquitetura correta automaticamente, quer esteja num Mac
-M-series, quer num servidor.
+Cada versão publica uma imagem de contentor a par dos binários, para `amd64` e `arm64`. O
+`docker pull` escolhe a arquitetura certa sozinho, quer estejas num Mac M-series, quer num
+servidor.
 
 ```bash
 docker run -d --name pepe \
@@ -16,30 +16,28 @@ docker run -d --name pepe \
   ghcr.io/pepe-agent/pepe
 ```
 
-Abra <http://localhost:4000>, autentique-se e conclua a configuração no painel.
+Abre <http://localhost:4000>, inicia sessão e termina a configuração a partir do painel.
 
 ## Requisitos
 
-Duas definições são obrigatórias. Omitir qualquer uma delas falha em silêncio.
+Há duas definições obrigatórias, e deixar qualquer uma delas de fora falha em silêncio.
 
 ### Volumes
 
 São dois, e guardam coisas de natureza diferente.
 
-O `/data` (o `PEPE_HOME`) é **estado**: configuração, agentes, conversas, workspaces e
-Mnesia. É este o volume de que faz cópia de segurança. Sem ele, o `docker rm` apaga a
+O `/data` (o `PEPE_HOME`) guarda **estado**: configuração, agentes, conversas, workspaces e
+Mnesia. É deste volume que fazes cópia de segurança. Sem ele, o `docker rm` apaga a
 instalação inteira.
 
-O `/tools` é **cache**: tudo aquilo que o agente instala para si próprio. Está no `PATH` e
-é também onde fica a diretoria home do agente, em `/tools/home`. É este segundo pormenor
-que faz com que "instalar uma vez" seja mesmo uma vez só, e tem uma secção própria mais
-abaixo.
+O `/tools` é **cache**: tudo aquilo que o agente instala para si próprio. Está no `PATH` e é
+também onde fica a pasta pessoal do agente, em `/tools/home`. É este segundo pormenor que
+faz com que "instalar uma vez" seja mesmo uma vez só, e tem uma secção própria mais abaixo.
 
-O `/tools` fica fora do `/data` de propósito. Uma cópia de segurança deve levar estado, não
-dezenas de megabytes de binários e ficheiros de modelo que podem voltar a ser
-descarregados, e esses ficheiros são específicos de arquitetura: um `/data` guardado numa
-máquina arm64 e restaurado numa amd64 colocaria no `PATH` executáveis que ali não
-funcionam.
+O `/tools` fica de propósito fora do `/data`. Uma cópia de segurança deve levar estado, e
+não dezenas de megabytes de binários e ficheiros de modelo que se voltam a descarregar.
+Além disso, esses ficheiros dependem da arquitetura: um `/data` guardado numa máquina arm64
+e reposto numa amd64 iria colocar no `PATH` executáveis que ali não correm.
 
 ```bash
 -v pepe-data:/data -v pepe-tools:/tools
@@ -48,55 +46,53 @@ funcionam.
 ### Palavra-passe do painel
 
 Um contentor não é loopback. O Pepe classifica-o como rede pública e, sem palavra-passe,
-responde 403 a todos os pedidos. O painel não arranca.
+devolve 403 a todos os pedidos: o painel não chega a servir.
 
 ```bash
 -e PEPE_DASHBOARD_PASSWORD=...
 ```
 
-Esta é uma política deliberada, não uma limitação do Docker. O Pepe recusa-se a expor um
-painel sem autenticação numa rede pela qual não pode responder. A regra veio de um
-incidente real: um serviço exposto, sem autenticação, foi varrido e abusado.
+Isto é uma política deliberada, não uma limitação do Docker. O Pepe recusa-se a expor um
+painel sem autenticação numa rede pela qual não pode responder. A regra nasceu de um
+incidente real, em que um serviço exposto e sem autenticação foi varrido e abusado.
 
 ## Segredos
 
-Não coloque chaves de API na imagem nem no ficheiro de configuração. Guarde apenas a
-referência na configuração e forneça o valor real na execução. O Pepe resolve a referência
-no momento da leitura e nunca grava o valor expandido.
+Não metas chaves de API na imagem nem no ficheiro de configuração. Guarda só a referência
+na configuração e fornece o valor verdadeiro no momento da execução. O Pepe resolve a
+referência quando lê e nunca grava o valor expandido.
 
 ```bash
 # a configuração guarda apenas:  "api_key": "${OPENROUTER_API_KEY}"
 docker run -d ... -e OPENROUTER_API_KEY=sk-... ghcr.io/pepe-agent/pepe
 ```
 
-## Ferramentas para o agente
+## Instalar ferramentas para o agente
 
-O agente é executado como utilizador sem privilégios e não pode executar `apt install`.
-Isto é intencional: os comandos que executa são escolhidos por um modelo de linguagem, e
-conceder root a esse processo não é uma decisão que nos caiba tomar por si.
+O agente corre como utilizador sem privilégios e não consegue executar `apt install`. Isto é
+intencional: os comandos que ele executa são escolhidos por um modelo de linguagem, e dar
+root a esse processo não é uma decisão a tomar em teu nome.
 
-A restrição custa menos do que parece, porque o root não é a chave que falta:
+A restrição custa menos do que parece, porque o root não é a peça que falta:
 
 > Tudo o que o `apt` instala morre com o contentor. O apt escreve em `/usr` e `/etc`, que
-> pertencem à camada gravável do contentor, não a um volume. O root dá permissão, não
-> persistência: o que foi instalado desaparece no `docker rm` mesmo quando está a executar
-> como root.
+> pertencem à camada gravável do contentor e não a um volume. O root dá permissão, não
+> persistência: o que for instalado desaparece no `docker rm` mesmo que corras como root.
 
-A pergunta nunca é como obter root. É onde a ferramenta tem de morar para sobreviver. Há
-duas respostas, e hoje a primeira já resolve a maior parte dos casos sozinha.
+A pergunta nunca é como chegar a root. É onde a ferramenta tem de morar para sobreviver. Há
+duas respostas, e hoje a primeira já cobre a maior parte dos casos sozinha.
 
 ### Tudo o que o agente instala para si próprio persiste
 
-O `HOME` do agente é `/tools/home`, ou seja, fica dentro do volume `/tools`. É aqui que
-está o truque todo. Os instaladores não perguntam onde está o seu volume: escrevem em
-`~/.local/bin` e em `~/.cache`, e mais nada. Com o `HOME` na camada do contentor, tudo o
-que o agente instala para si é descarregado de novo no contentor seguinte. Com o `HOME` no
+O `HOME` do agente é `/tools/home`, ou seja, fica dentro do volume `/tools`. É aqui que está
+o truque todo. Os instaladores não perguntam onde está o teu volume: escrevem em
+`~/.local/bin` e em `~/.cache`, e mais nada. Com o `HOME` na camada do contentor, tudo o que
+o agente prepara para si volta a ser descarregado no contentor seguinte. Com o `HOME` no
 volume, instala uma única vez.
 
-A diferença é fácil de medir. O agente que transcreve uma mensagem de voz instala o `uv` e
-descarrega um modelo Whisper, cerca de 75 MB. À primeira vez, demora 27 segundos. Num
-contentor acabado de criar, a mesma transcrição demora 1,2 segundos, porque a cache
-sobreviveu.
+A diferença é fácil de medir. Um agente que transcreve uma mensagem de voz instala o `uv` e
+puxa um modelo Whisper, cerca de 75 MB. À primeira, demora 27 segundos. Num contentor
+acabado de criar, a mesma transcrição demora 1,2 segundos, porque a cache sobreviveu.
 
 Assim, o `uv`, um `pip install --user`, um modelo Whisper, um toolchain de linguagem ou um
 simples descarregamento:
@@ -105,24 +101,25 @@ simples descarregamento:
 curl -sL <url> -o /tools/op && chmod +x /tools/op
 ```
 
-sobrevivem ao `docker rm` e a uma atualização do Pepe, sem root e sem reconstruir imagem
-nenhuma. O `/tools` está no `PATH`, pelo que um executável ali colocado fica logo
-disponível na shell do agente. O CLI do 1Password (`op`), o `gh`, o `kubectl` e o
-`terraform` são todos um único ficheiro e não precisam de mais do que isto.
+sobrevivem todos ao `docker rm` e a uma atualização do Pepe, sem root e sem reconstruir nada.
+O `/tools` está no `PATH`, pelo que um binário ali deixado fica logo ao alcance da shell do
+agente. O CLI do 1Password (`op`), o `gh`, o `kubectl` e o `terraform` são todos ficheiros
+únicos e não precisam de mais do que isto.
 
 ### Os pacotes de sistema ficam na imagem
 
-Algumas ferramentas são pacotes de sistema a sério. O `psql`, o `imagemagick` e afins
-espalham ficheiros e bibliotecas partilhadas por todo o sistema de ficheiros, e um volume
-não comporta isso. Têm de fazer parte de uma imagem.
+Algumas ferramentas são mesmo pacotes de sistema. O `psql`, o `imagemagick` e afins espalham
+ficheiros e bibliotecas partilhadas por todo o sistema de ficheiros, e um volume não dá conta
+disso. Têm de fazer parte de uma imagem.
 
-Um build arg instala pacotes adicionais sem que tenha de escrever um Dockerfile:
+Um build argument instala pacotes adicionais sem que precises sequer de escrever um
+Dockerfile:
 
 ```bash
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="postgresql-client imagemagick" .
 ```
 
-Se prefere manter um Dockerfile seu, derivar da nossa imagem funciona igualmente bem e
+Se preferires manter um Dockerfile teu, derivar da nossa imagem funciona igualmente bem e
 continua a ser uma opção perfeitamente válida:
 
 ```dockerfile
@@ -140,42 +137,42 @@ docker run -d -p 4000:4000 -v pepe-data:/data -v pepe-tools:/tools \
   -e PEPE_DASHBOARD_PASSWORD=... o-meu-pepe
 ```
 
-Os dois caminhos têm o mesmo custo: a cada nova release do Pepe, reconstrói a imagem.
+Os dois caminhos têm o mesmo custo: a cada nova versão do Pepe, reconstróis a imagem.
 
 #### Porque é que o `ffmpeg` não está na imagem
 
-O `ffmpeg` parece o pacote de sistema óbvio para esta imagem, já que o Telegram envia voz
-em OGG/Opus e o transcript tem de vir de algum lado. Nenhuma das duas rotas que de facto
-transcrevem precisa dele. A API de transcrição aceita o ficheiro `.ogg` tal como ele chega,
-sem conversão nenhuma, e o `faster-whisper` descodifica através do PyAV, que transporta os
-próprios codecs dentro do wheel. Isto foi medido, não suposto: um ficheiro OGG/Opus foi
-transcrito num Debian limpo, sem qualquer `ffmpeg` instalado. Só o CLI do `whisper.cpp`
-invoca o `ffmpeg` por fora, e essa rota é opt-in.
+O `ffmpeg` parece o pacote de sistema óbvio para esta imagem, já que o Telegram envia voz em
+OGG/Opus e a transcrição tem de vir de algum lado. Nenhuma das duas vias que de facto
+transcrevem precisa dele. Uma API de transcrição aceita o `.ogg` tal como ele chega, sem
+conversão nenhuma, e o `faster-whisper` descodifica através do PyAV, que traz os próprios
+codecs dentro do wheel. Isto foi medido, não suposto: um ficheiro OGG/Opus transcrito num
+Debian limpo, sem `ffmpeg` instalado em lado nenhum. Só o CLI do `whisper.cpp` chama o
+`ffmpeg` por fora, e essa via é opt-in.
 
-Incluí-lo mesmo assim saía caro demais. O `ffmpeg` do Debian arrasta 204 pacotes e 121 MB
-de ficheiros (LLVM, Mesa, um sintetizador de fala, um provador de teoremas), tudo para
-servir uma pilha de aceleração de vídeo por GPU em que um contentor headless nunca toca.
-Removê-lo baixou a imagem de 945 MB para 408 MB, cerca de 84 MB comprimidos, que é o que
-descarrega de facto por arquitetura.
+Incluí-lo mesmo assim custava muito mais do que valia. O pacote `ffmpeg` do Debian arrasta
+204 pacotes e 121 MB de ficheiros (LLVM, Mesa, um sintetizador de fala, um provador de
+teoremas), tudo para servir uma pilha de aceleração de vídeo por GPU em que um contentor
+headless nunca toca. Deixá-lo cair baixou a imagem de 945 MB para 408 MB, cerca de 84 MB
+comprimidos, que é o que descarregas de facto por arquitetura.
 
-Se quiser mesmo o `ffmpeg`, seja para o CLI do `whisper.cpp` ou para outra coisa qualquer,
-instale-o com o build arg acima ou coloque um build estático de ficheiro único em `/tools`,
-que está no `PATH` e vive num volume.
+Se quiseres mesmo o `ffmpeg`, seja para o CLI do `whisper.cpp` seja para outra coisa
+qualquer, instala-o com o build argument acima, ou deixa em `/tools` um build estático de
+ficheiro único, que está no `PATH` e vive num volume.
 
-### Testar uma ferramenta
+### Experimentar uma ferramenta
 
 ```bash
 docker exec -u root pepe apt-get update
 docker exec -u root pepe apt-get install -y jq
 ```
 
-Funciona, e é descartado no `docker rm` seguinte. Use para confirmar que a ferramenta
-resolve o seu problema e só depois decida onde ela mora: no home do próprio agente, se ele
-a consegue instalar sozinho, ou na imagem, se for pacote de sistema.
+Isto funciona, e é descartado no `docker rm` seguinte. Usa-o para confirmar que a ferramenta
+resolve o teu problema e só depois decide onde ela mora: na pasta pessoal do próprio agente,
+se ele a conseguir instalar sozinho, ou na imagem, se for pacote de sistema.
 
-Arrancar o contentor como root (`docker run --user root`) é opt-in e nunca o comportamento
-por omissão. Vale a pena repetir que não compra nada durável: o que o `apt` escreve
-continua a morrer com o contentor, pelo que volta às duas respostas acima.
+Arrancar o contentor como root (`docker run --user root`) é opt-in e nunca a predefinição.
+Vale a pena repetir que não compra nada durável: o que o `apt` escreve continua a morrer com
+o contentor, pelo que acabas de volta às duas respostas acima.
 
 ## Compose
 
@@ -202,7 +199,7 @@ volumes:
 docker compose up -d
 ```
 
-## Atualização
+## Atualizar
 
 ```bash
 docker pull ghcr.io/pepe-agent/pepe
@@ -210,15 +207,15 @@ docker rm -f pepe
 docker run -d ... ghcr.io/pepe-agent/pepe   # mesmos volumes, mesmas flags
 ```
 
-Configuração, agentes e conversas voltam com o `/data`. As ferramentas do agente, o home
-dele e todas as caches que lá estão voltam com o `/tools`, pelo que não reinstala nada na
-primeira mensagem. Os pacotes instalados com `apt` não voltam, e é para esses que a imagem
-existe.
+Configuração, agentes e conversas voltam com o `/data`. As ferramentas do agente, a pasta
+pessoal dele e todas as caches que lá estão voltam com o `/tools`, pelo que não reinstala
+nada na primeira mensagem. Os pacotes instalados com `apt` não voltam, e é para esses que a
+imagem existe.
 
-## Acesso ao nó
+## Uma shell no nó
 
 ```bash
 docker exec -it pepe bin/pepe remote
 ```
 
-Abre uma shell IEx ligada à release em execução, para inspecionar o sistema por dentro.
+Abre uma shell IEx ligada à versão em execução, para inspecionares o sistema por dentro.

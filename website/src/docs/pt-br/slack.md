@@ -23,7 +23,7 @@ uma conexão contém:
 
 No app do Slack, defina a URL de requisição de Event Subscriptions com a URL da
 conexão e assine `message.channels` e `app_mention`. O primeiro salvamento
-dispara um aperto de mão `url_verification`, que o Pepe responde na hora. As
+dispara um handshake `url_verification`, que o Pepe responde na hora. As
 respostas são publicadas com `chat.postMessage`. Formato da URL de retorno:
 
 ```

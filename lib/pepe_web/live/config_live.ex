@@ -94,15 +94,7 @@ defmodule PepeWeb.ConfigLive do
   def handle_event("check_update", _p, socket) do
     parent = self()
 
-    Task.start(fn ->
-      result =
-        case Pepe.Update.latest() do
-          {:ok, v} -> if Pepe.Update.newer?(v), do: {:newer, v}, else: :up_to_date
-          _ -> :error
-        end
-
-      send(parent, {:update_result, result})
-    end)
+    Task.start(fn -> send(parent, {:update_result, update_status()}) end)
 
     {:noreply, assign(socket, update: :checking)}
   end
@@ -156,6 +148,13 @@ defmodule PepeWeb.ConfigLive do
     case Config.add_company(name) do
       :ok -> {:noreply, push_navigate(socket, to: "/agents?scope=#{name}")}
       _ -> {:noreply, put_flash(socket, :error, gettext("Invalid or duplicate company name."))}
+    end
+  end
+
+  defp update_status do
+    case Pepe.Update.latest() do
+      {:ok, v} -> if Pepe.Update.newer?(v), do: {:newer, v}, else: :up_to_date
+      _ -> :error
     end
   end
 

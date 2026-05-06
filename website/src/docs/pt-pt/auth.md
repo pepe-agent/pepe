@@ -27,11 +27,11 @@ Um token é uma cadeia aleatória com o prefixo `pepe_`. No ficheiro de configur
 
 #### Fá-lo pela conversa
 
-Um agente ao qual seja concedida a ferramenta protegida `manage_token` pode gerar, listar e revogar tokens a partir de uma conversa. Como um token concede acesso à API, a ferramenta não é apenas de leitura: passa pela barreira de permissões, pelo que confirma antes de um token ser criado, e o segredo em bruto é devolvido uma vez para o copiar.
+Um agente ao qual seja concedida a ferramenta protegida `manage_token` pode gerar, listar e revogar tokens a partir de uma conversa. Como um token concede acesso à API, a ferramenta não é apenas de leitura: passa pela barreira de permissão, pelo que confirma antes de um token ser criado, e o segredo em bruto é devolvido uma vez para o copiar.
 
-> Tu: Cria um token para a empresa buskaza, com o rótulo chatwoot.
+> Tu: Cria um token para a empresa acme, com o rótulo chatwoot.
 >
-> Agente: (pede-te para confirmar e depois gera-o) Token de API criado, âmbito empresa buskaza. Copia-o agora, não voltará a ser mostrado: `pepe_9f2a...`
+> Agente: (pede-te para confirmar e depois gera-o) Token de API criado, âmbito empresa acme. Copia-o agora, não voltará a ser mostrado: `pepe_9f2a...`
 
 ### Apresentar um token
 

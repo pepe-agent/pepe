@@ -13,7 +13,7 @@ Nem sempre foi assim. O gateway gravava o ficheiro na área de trabalho do agent
 entregava-lhe o caminho, deixando-o descobrir sozinho como escutar: encontrar um
 transcritor, instalá-lo, executá-lo, ler o resultado. Cada mensagem de voz tornava-se um
 pequeno projeto de investigação. Era lento, saía diferente de cada vez, e gastava uma
-cancela de permissão só para ler a mensagem que acabara de chegar.
+barreira de permissão só para ler a mensagem que acabara de chegar.
 
 ### Nada para configurar
 
@@ -46,9 +46,9 @@ dentro do turno do agente:
 - **Um comando barra falado funciona.** Diz `/help` ou `/stop` numa mensagem de voz e o
   comando é executado, tal como se o tivesses escrito, em vez de se tornar um turno do
   agente sobre um ficheiro largado numa pasta.
-- **Um bot num grupo pode ser interpelado por voz.** Num grupo que exige menção, a cancela
+- **Um bot num grupo pode ser interpelado por voz.** Num grupo que exige menção, a barreira
   passa a ler as **palavras** em vez da legenda. Uma mensagem de voz não tem legenda, por
-  isso antes disto não havia nada para a cancela ler, e era impossível dirigir-se ao bot a
+  isso antes disto não havia nada para a barreira ler, e era impossível dirigir-se ao bot a
   falar.
 
 <div class="note"><strong>Só fala.</strong> É o áudio que se torna texto logo à porta. Uma

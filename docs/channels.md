@@ -2,7 +2,7 @@
 
 Beyond Telegram (a poller) and the WebSocket / HTTP API, Pepe serves several messaging
 channels through one inbound-webhook endpoint, `/webhooks/:company/:provider/:slug`.
-Configure a connection on the dashboard **Integrations** tab (or import one with
+Configure a connection on the dashboard **Channels** tab (or import one with
 [migrate](migrating.md)); it shows the webhook URL to paste into the platform.
 
 The built-in webhook channels:
@@ -16,7 +16,8 @@ The built-in webhook channels:
 | **Google Chat** | Chat API webhook | `access_token` (OAuth for the Chat API) |
 
 Plus **Chatwoot** as a channel plugin (see [Plugins](plugins.md)), which fronts WhatsApp,
-the web widget and more, with native human handoff.
+the web widget and more, with native human handoff. Channel plugins are configured on the
+dashboard **Integrations** tab rather than **Channels**.
 
 ## Setup notes per channel
 

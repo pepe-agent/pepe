@@ -34,23 +34,23 @@ its `SOUL.md` (persona) and any files it creates (`MEMORY.md`, `people.md`, ...)
 
 An agent with **no identity yet** (no `SOUL.md`, default seed) presents itself as
 Pepe, tells you it has no name or characteristics defined, and offers to set one
-up - then saves your choices to `SOUL.md` and renames itself with `rename_agent`.
+up, then saves your choices to `SOUL.md` and renames itself with `rename_agent`.
 `auto_approve` lists tools the agent may run without asking (see **Permissions**).
 
-### Storage & backup - it's all files, no database
+### Storage & backup: it's all files, no database
 
-Everything lives under `~/.pepe/` (or `PEPE_HOME`) - there is **no database
+Everything lives under `~/.pepe/` (or `PEPE_HOME`). There is **no database
 server**. `config.json` is the single source of truth (companies, agents, models,
 watches, crons, bots, MCP, hashed API tokens). Agent knowledge lives as files in
 `agents/<name>/` and `companies/<co>/agents/<name>/`; conversation history in
 `data/sessions/`; `data/mnesia/` is a disposable cache (rebuilds itself). `Pepe.Repo`
-+ Postgres exist in the code but are **off** (`ecto_repos: []`) - the door for a future
++ Postgres exist in the code but are **off** (`ecto_repos: []`), the door for a future
 DB backend, unused today.
 
-Secrets are never stored raw - they're `${ENV_VAR}` references resolved at read time,
+Secrets are never stored raw: they're `${ENV_VAR}` references resolved at read time,
 so they live in your environment, not the files.
 
-Back up with one command - it archives the durable parts, skips the disposable cache,
+Back up with one command: it archives the durable parts, skips the disposable cache,
 and lists the secret env vars you must save separately (they're not in the archive):
 
 ```bash

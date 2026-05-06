@@ -25,7 +25,7 @@ As credenciais da conexão (guardadas dentro do `config` dela):
 - `app_secret`: verifica o `X-Hub-Signature-256` de entrada. Guarde como
   `${ENV_VAR}`.
 - `verify_token`: qualquer texto que você escolher. A Meta o devolve durante o
-  aperto de mão de assinatura. Se você omitir a opção, o slug é usado.
+  handshake de assinatura. Se você omitir a opção, o slug é usado.
 
 Se você deixar de fora `--access-token` ou `--app-secret`, a linha de comando
 grava uma referência de espaço reservado derivada do slug (por exemplo
@@ -52,7 +52,8 @@ acima. O painel adiciona e edita conexões do WhatsApp pela mesma seção Channe
 <div class="note"><strong>Regra das 24 horas.</strong> A Meta só permite
 respostas em formato livre dentro de 24 horas da última mensagem do usuário. O
 suporte reativo se encaixa nisso de forma natural. Mensagens proativas fora da
-janela precisam de modelos pré-aprovados, que este canal não envia.</div>
+janela precisam de templates de mensagem pré-aprovados, que este canal não
+envia.</div>
 
 ### Trocando de modelo
 

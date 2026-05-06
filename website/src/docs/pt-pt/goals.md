@@ -1,15 +1,15 @@
 ---
 title: Objetivos
-description: Execute um agente rumo a um resultado, verificado por um revisor independente, até estar mesmo concluído.
+description: Executa um agente rumo a um resultado, verificado por um revisor independente, até estar mesmo concluído.
 ---
 
 ## Dar um prompt vs. perseguir um objetivo
 
-Um prompt compra-lhe **um turno**. O agente responde, e depois é *você* que decide se está bom, pede um acerto, e repete. Isso coloca-o dentro do ciclo como aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só avança enquanto está à frente do teclado.
+Um prompt dá-te **um turno**. O agente responde, e depois és *tu* que decides se está bom, pedes um acerto, e repetes. Isso coloca-te dentro do ciclo como aprovador e inspetor de qualidade ao mesmo tempo, e o trabalho só avança enquanto estás à frente do teclado.
 
-Um **objetivo** compra-lhe um **resultado**. Diz o que significa "concluído", e o Pepe continua a trabalhar até um revisor independente concordar que lá chegou, ou até esgotar as tentativas.
+Um **objetivo** dá-te um **resultado**. Dizes o que significa "concluído", e o Pepe continua a trabalhar até um revisor independente concordar que lá chegou, ou até esgotar as tentativas.
 
-A diferença está em **quem verifica**. Num turno normal é o próprio agente que decide que terminou, que é exatamente a avaliação em que não pode confiar. Num objetivo, uma **chamada separada ao modelo** avalia o resultado face ao seu critério.
+A diferença está em **quem verifica**. Num turno normal é o próprio agente que decide que terminou, que é exatamente a avaliação em que não podes confiar. Num objetivo, uma **chamada separada ao modelo** avalia o resultado face ao teu critério.
 
 ## Executar um
 
@@ -42,7 +42,7 @@ O Pepe vai imprimindo cada tentativa e o veredito do revisor:
 ✅ Goal met after 2 attempt(s).
 ```
 
-No painel, dispare a partir de qualquer conversa:
+No painel, dispara-o a partir de qualquer conversa:
 
 ```
 /goal limpar a lista de clientes | sem e-mails duplicados, todas as linhas com telefone válido
@@ -52,9 +52,9 @@ O painel acima da conversa passa a mostrar o critério, a contagem de tentativas
 
 ## Como o revisor se mantém independente
 
-O revisor é uma chamada nova, com **contexto limpo**. Nunca vê a conversa de trabalho, apenas duas coisas: o seu critério e o resultado final. Assim avalia o artefacto, não o raciocínio que o produziu, e não pode ser convencido a aprovar por um agente que está confiante e errado.
+O revisor é uma chamada nova, com **contexto limpo**. Nunca vê a conversa de trabalho, apenas duas coisas: o teu critério e o resultado final. Assim avalia o artefacto, não o raciocínio que o produziu, e não pode ser convencido a aprovar por um agente que está confiante e errado.
 
-Por omissão o revisor usa a ligação de modelo do próprio agente. Passe `--judge` para lhe dar um modelo **diferente**, que é a configuração mais forte: um revisor independente é mais independente quando não é o mesmo modelo a corrigir o seu próprio teste.
+Por omissão o revisor usa a ligação de modelo do próprio agente. Passa `--judge` para lhe dar um modelo **diferente**, que é a configuração mais forte: um revisor independente é mais independente quando não é o mesmo modelo a corrigir o seu próprio teste.
 
 ```bash
 pepe goal "..." --criteria "..." --judge gpt-5-review
@@ -70,7 +70,7 @@ O limite é **obrigatório** (3 por omissão, no máximo 10). Um critério que o
 🛑 Gave up at the attempt cap. Still missing: 3 linhas continuam com a coluna de telefone vazia
 ```
 
-Essa mensagem já vale por si: normalmente é ou um critério impossível, ou um obstáculo real que merece o seu olhar.
+Essa mensagem já vale por si: normalmente é ou um critério impossível, ou um obstáculo real que merece o teu olhar.
 
 ## Escrever um critério que funciona
 
@@ -79,7 +79,7 @@ O critério é a funcionalidade inteira. Um critério vago transforma o revisor 
 - **Bom:** "sem e-mails duplicados, e todas as linhas com um telefone no formato `+NN NNN NNN NNN`"
 - **Mau:** "a lista está limpa"
 
-Pergunte a si próprio: *um estranho, vendo apenas o meu critério e o resultado, conseguiria decidir sim ou não sem me perguntar nada?* Se não, o revisor também não consegue. Prefira critérios que nomeiem uma propriedade verificável (uma contagem, um formato, um ficheiro que tem de existir, um teste que tem de passar) a critérios que descrevem uma sensação de qualidade.
+Pergunta a ti próprio: *um estranho, vendo apenas o meu critério e o resultado, conseguiria decidir sim ou não sem me perguntar nada?* Se não, o revisor também não consegue. Prefere critérios que nomeiem uma propriedade verificável (uma contagem, um formato, um ficheiro que tem de existir, um teste que tem de passar) a critérios que descrevem uma sensação de qualidade.
 
 ## Objetivos e ferramentas
 
@@ -87,7 +87,7 @@ Um objetivo não é um modo especial: envolve um turno normal. O agente continua
 
 ## O que o ciclo de objetivo não é
 
-- **Não** é um agendador. Para correr algo de forma recorrente, veja [Tarefas agendadas](/pt-pt/docs/scheduled/).
-- **Não** é um vigia. Para ser avisado quando uma condição se tornar verdadeira, veja [Watches](/pt-pt/docs/watches/).
+- **Não** é um agendador. Para correr algo de forma recorrente, vê [Tarefas agendadas](/pt-pt/docs/scheduled/).
+- **Não** é um vigia. Para seres avisado quando uma condição se tornar verdadeira, vê [Watches](/pt-pt/docs/watches/).
 
 Um objetivo termina. Ou lá chega, ou desiste, e acabou.

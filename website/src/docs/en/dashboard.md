@@ -19,7 +19,7 @@ Only works from the installed `pepe` binary, not `mix pepe serve install`. If yo
 
 ## Dashboard access
 
-The web dashboard is open on localhost by default, which is convenient for local development. The moment you expose it beyond your machine, put it behind a password:
+The dashboard is open on localhost by default, which is convenient for local development. The moment you expose it beyond your machine, put it behind a password:
 
 ```bash
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'

@@ -41,4 +41,4 @@ O agente chama `manage_agent` com `action: "add_tool"` e depois com
 `action: "remember"`. Cada uma dessas ações tem barreira: o agente propõe a mudança,
 você a autoriza e só então ela é aplicada. Um agente também pode se renomear com a
 ferramenta separada `rename_agent` ("De agora em diante, se chame scout"), que move o
-diretório do seu espaço de trabalho e entra em vigor na próxima mensagem.
+diretório do seu workspace e entra em vigor na próxima mensagem.

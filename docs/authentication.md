@@ -1,7 +1,7 @@
 # Dashboard authentication
 
 The dashboard is **open by default** so a local install has zero friction: on your
-own machine, `mix pepe serve` and browse to it. Authentication is **opt-in** - the
+own machine, `mix pepe serve` and browse to it. Authentication is **opt-in**: the
 moment you set a dashboard password, every page requires signing in. There is no
 database and no user table: the password is checked in constant time and a signed
 flag rides in the Phoenix session cookie.
@@ -22,8 +22,8 @@ mix pepe dashboard
 mix pepe dashboard password --clear
 ```
 
-The value is `${ENV}`-interpolated at read time, so - like every other secret in
-Pepe - it is never written to `~/.pepe/config.json` in the clear.
+The value is `${ENV}`-interpolated at read time, so (like every other secret in
+Pepe) it is never written to `~/.pepe/config.json` in the clear.
 
 With a password set:
 
@@ -40,7 +40,7 @@ again.
 Being "open by default" is safe only because that default is **loopback-only**. A
 per-request guard (`PepeWeb.NetworkGuard`) enforces it: with **no password set**, the
 dashboard answers only genuine `localhost` clients. Any request from somewhere else -
-a LAN address, a VM, or through a reverse proxy - gets a **403** telling you to set a
+a LAN address, a VM, or through a reverse proxy) gets a **403** telling you to set a
 password. There is no "allow open anyway" switch: reaching the dashboard from off-box
 means either a password or a tunnel. (This mirrors what mature agent runtimes settled
 on after a real incident where an unauthenticated public bind was scanned and abused.)
@@ -54,7 +54,7 @@ The rule, precisely:
 | through a proxy (`X-Forwarded-For` present) | **403** | login required |
 
 LAN and private ranges (`192.168.x`, `10.x`, `172.16.x`) count as **public**, not
-trusted. The `/v1` API and `/webhooks` are unaffected - they carry their own auth.
+trusted. The `/v1` API and `/webhooks` are unaffected; they carry their own auth.
 
 ### Reaching it from another machine
 
@@ -62,9 +62,9 @@ Two safe options:
 
 1. **Set a password** and expose it behind TLS (a reverse proxy or tunnel), so the
    password and session cookie are never sent in the clear. When you put a proxy in
-   front, keep a password on too - a proxied request is treated as public.
+   front, keep a password on too, since a proxied request is treated as public.
 
-2. **Keep it loopback and tunnel in** - nothing is opened to the network:
+2. **Keep it loopback and tunnel in**, so nothing is opened to the network:
 
    ```bash
    mix pepe serve --tunnel                       # built-in Cloudflare quick tunnel (needs cloudflared)
@@ -120,7 +120,7 @@ mix pepe dashboard            # show the current posture (auth, hosts, proxies)
   list it here (with a password on). An empty allowlist plus a password accepts any
   host (the password is the gate).
 - **Trusted proxies** decide when `X-Forwarded-For` is believed. By default it is
-  ignored - a proxied request is treated as remote (fail-closed). List your proxy here
+  ignored, and a proxied request is treated as remote (fail-closed). List your proxy here
   and Pepe takes the real client IP from the forwarded chain, so the loopback-vs-remote
   rule and the login rate-limit see the true peer, not the proxy.
 
@@ -134,8 +134,8 @@ on each failure. Over the limit returns **429** with a `Retry-After` header.
 
 The gate is intentionally small and composable: one on_mount hook (`PepeWeb.Auth`), one
 plug (`PepeWeb.NetworkGuard`, backed by `Pepe.Net` + `PepeWeb.RemoteClient`), and the
-login throttle. Richer schemes - OAuth, trusted-proxy identity headers, per-operator
-accounts - can slot in without touching each LiveView.
+login throttle. Richer schemes (OAuth, trusted-proxy identity headers, per-operator
+accounts) can slot in without touching each LiveView.
 
 ---
 

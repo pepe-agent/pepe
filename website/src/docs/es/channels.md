@@ -6,7 +6,7 @@ description: Entiende tipos de canal, vinculación, sesiones, envío de archivos
 Un canal conecta uno de tus agentes con un lugar donde la gente ya conversa.
 Alguien envía un mensaje, Pepe ejecuta el agente vinculado (llamando a
 herramientas y leyendo la respuesta), y la respuesta se entrega por ese mismo
-canal. No escribes nada de código de conexión. Agregas una conexión, la apuntas
+canal. No escribes nada de código de conexión. Añades una conexión, la apuntas
 a un agente y funciona.
 
 Todo en esta página da por sentado que ya tienes al menos un agente definido. Si
@@ -19,7 +19,7 @@ muestra cada una donde corresponde:
 
 1. La línea de comandos `pepe`.
 2. El panel web (su sección "Channels" lista tus bots y conexiones, y te guía
-   para agregar uno).
+   para añadir uno).
 3. Por chat. Un agente que dispone de la herramienta de gestión adecuada puede
    crear y revincular bots de Telegram, entregar archivos y cerrar una
    conversación, todo en lenguaje corriente. Esas acciones están protegidas, así
@@ -31,7 +31,7 @@ muestra cada una donde corresponde:
 Los canales solo se diferencian en cómo llega un mensaje hasta Pepe:
 
 - **Telegram** es un bot que Pepe consulta. Nada tiene que ser accesible
-  públicamente. Agrega un token, vincúlalo a un agente y ejecuta la pasarela.
+  públicamente. Añade un token, vincúlalo a un agente y ejecuta la pasarela.
 - **Canales por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google
   Chat y una ruta entrante genérica) reciben mensajes que la plataforma envía a
   una URL de retorno. Pepe expone una URL por conexión. La registras una sola
@@ -55,7 +55,7 @@ motor:
 
 Soporte es el valor predeterminado seguro para cualquier cosa a la que el
 público pueda llegar. Combínalo con un agente restringido (solo herramientas
-seguras, ya que no hay una persona de tu lado para aprobar una acción riesgosa)
+seguras, ya que no hay una persona de tu lado para aprobar una acción arriesgada)
 y, si quieres, un tiempo de espera por sesión inactiva. Admin es para un canal
 que solo usas tú, donde los comandos de barra y la memoria son útiles.
 
@@ -148,7 +148,7 @@ Más allá de vincular un canal a un agente, un agente que dispone de la
 herramienta `set_route` puede cambiar qué agentes pueden escribir a cuáles, desde
 el chat. El enrutamiento es dirigido, así que permitir que el agente A escriba al
 agente B no permite que B escriba a A. Como edita la configuración, pasa por la
-verja de permisos: confirmas el cambio antes de que surta efecto. Dirías:
+barrera de permisos: confirmas el cambio antes de que surta efecto. Dirías:
 
 > Deja que el agente de triaje derive al agente de facturación.
 
@@ -165,7 +165,7 @@ la ruta de webhook y cada bot de Telegram configurado:
 pepe serve --port 4000
 ```
 
-El puerto también se lee de la variable de entorno `PORT`. Agrega `--tunnel`
+El puerto también se lee de la variable de entorno `PORT`. Añade `--tunnel`
 para abrir un túnel público y probar canales por webhook sin tu propio proxy
 inverso. Define `PEPE_PUBLIC_URL` para que las URL de retorno que registras con
 cada proveedor apunten a tu host real.

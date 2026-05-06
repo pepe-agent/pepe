@@ -14,9 +14,9 @@ Uma skill nunca é colada por inteiro no prompt do sistema. Só o nome e um resu
 de uma linha aparecem no contexto do agente. Quando o assunto surge, o agente
 chama a ferramenta `skill` com esse nome, lê o documento completo e segue-o.
 
-É precisamente essa indirecção que importa. O agente transporta dezenas de
+É precisamente essa indireção que importa. O agente transporta dezenas de
 procedimentos pagando apenas uma linha de contexto por cada um, e abre a versão
-longa exactamente quando o trabalho o exige. O resumo é a primeira linha não
+longa exatamente quando o trabalho o exige. O resumo é a primeira linha não
 vazia do ficheiro, por isso essa linha de abertura deve dizer quando a skill se
 aplica.
 
@@ -27,7 +27,7 @@ aplica.
 Estas vêm com o Pepe, em `priv/skills/`:
 
 - **`skill-creator`** - como criar, editar, auditar e melhorar skills (a meta-skill).
-- **`install-tool`** - escrever uma ferramenta em plugin e activá-la pela conversa.
+- **`install-tool`** - escrever uma ferramenta em plugin e ativá-la pela conversa.
 - **`write-a-script`** - resolver tarefas complexas escrevendo e guardando um programa para correr.
 - **`manage-routing`** - alterar rotas entre agentes com `set_route`.
 - **`handle-media`** - perceber uma entrada de voz, áudio, imagem ou ficheiro (transcrever, ler), instalando o que for preciso.
@@ -79,7 +79,7 @@ agente, em linguagem natural, algo que ele ainda não sabe fazer.
 
 Combinado com [plugins](../plugins/) e o `enable_tool`, podes pedir pela conversa
 que o agente instale uma ferramenta que faça X. Ele lê a skill `install-tool`,
-escreve o plugin em `plugins/<nome>.exs`, activa a ferramenta em si mesmo e
+escreve o plugin em `plugins/<nome>.exs`, ativa a ferramenta em si mesmo e
 começa a usá-la, sem reiniciar.
 
 Para trabalho complexo ou de vários passos, o agente não faz tudo à mão. A

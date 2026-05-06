@@ -43,7 +43,7 @@ O socket fala um protocolo simples de frames JSON. Cada mensagem, nas duas dire�
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. Um tópico no qual você não tem permissão de entrar é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado. Passe também `{"lang": "pt-BR"}` e isso empurra a primeira resposta do agente para esse idioma (uma dica de sistema única, no primeiro turno da sessão). É assim que o atributo `data-lang` do [widget incorporável](../widget/) chega ao agente.
+Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. Um tópico no qual você não tem permissão de entrar é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado. Passe também `{"lang": "pt-BR"}` e isso inclina a primeira resposta do agente para esse idioma (uma dica de sistema única, no primeiro turno da sessão). É assim que o atributo `data-lang` do [widget incorporável](../widget/) chega ao agente.
 
 ### Eventos
 
@@ -95,7 +95,7 @@ channel.push("prompt", { text: "Quais arquivos existem no diretório atual?" });
 
 ### Frames crus (qualquer linguagem)
 
-Sem o pacote `phoenix`, fale o protocolo de frames diretamente sobre qualquer cliente WebSocket. Este exemplo em Python entra, envia um prompt, imprime os deltas em streaming e para quando `done` chega. Repare no heartbeat que você deve enviar periódicamente em uma conexão de longa duração.
+Sem o pacote `phoenix`, fale o protocolo de frames diretamente sobre qualquer cliente WebSocket. Este exemplo em Python entra, envia um prompt, imprime os deltas em streaming e para quando `done` chega. Repare no heartbeat que você deve enviar periodicamente em uma conexão de longa duração.
 
 ```python
 import json

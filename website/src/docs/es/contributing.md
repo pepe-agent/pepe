@@ -89,7 +89,7 @@ todo.
 
 ## Ayuda con modelos
 
-Los reportes de proveedores son muy útiles. El reporte ideal incluye:
+Los informes de proveedores son muy útiles. El informe ideal incluye:
 
 - proveedor y modelo probado;
 - comando usado para configurarlo;

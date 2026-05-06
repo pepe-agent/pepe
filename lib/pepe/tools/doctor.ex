@@ -30,25 +30,20 @@ defmodule Pepe.Tools.Doctor do
 
   @impl true
   def run(args, _ctx) do
+    # `checks/1` always returns at least the checks that need no config, so there is no
+    # empty case to handle: a clause for one would be dead code, and Dialyzer says so.
     checks = Pepe.Doctor.checks(live: args["live"] == true)
+    problems = Enum.reject(checks, &match?({_, _, :ok}, &1))
 
-    case checks do
-      [] ->
-        {:ok, "Nothing configured to check yet."}
+    summary =
+      if problems == [] do
+        "✅ All #{length(checks)} checks passed."
+      else
+        "#{length(problems)} issue(s) out of #{length(checks)} checks:\n" <>
+          Enum.map_join(problems, "\n", &format/1)
+      end
 
-      _ ->
-        problems = Enum.reject(checks, &match?({_, _, :ok}, &1))
-
-        summary =
-          if problems == [] do
-            "✅ All #{length(checks)} checks passed."
-          else
-            "#{length(problems)} issue(s) out of #{length(checks)} checks:\n" <>
-              Enum.map_join(problems, "\n", &format/1)
-          end
-
-        {:ok, summary}
-    end
+    {:ok, summary}
   end
 
   defp format({area, subject, {:error, msg}}), do: "❌ [#{area}] #{subject} - #{msg}"

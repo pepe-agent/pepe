@@ -30,7 +30,7 @@ mix pepe hooks generate "cpf, cnpj and our policy numbers APOL-12345678" --model
 ```
 
 **A hard guarantee.** Mark a model connection **require_redaction** and the runtime
-refuses to send to it unless the agent runs a redaction hook - so a forgotten agent
+refuses to send to it unless the agent runs a redaction hook, so a forgotten agent
 config can never leak raw PII to that provider. Redaction runs off-process, so an
 LLM-backed hook never blocks the session; the reversible map lives only in memory and
 is cleared on reset / `end_session` / TTL eviction.

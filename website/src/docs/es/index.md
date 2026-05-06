@@ -243,7 +243,7 @@ vuelta en disco en texto plano.
 ### Conversaciones aisladas
 
 Cada conversación se ejecuta como su propio proceso ligero y supervisado,
-identificado por un id de sesión. Muchas corren en paralelo, y una caída en una
+identificado por un id de sesión. Muchas se ejecutan en paralelo, y una caída en una
 nunca toca a otra, así que un solo turno defectuoso no puede tumbar al resto de
 tus agentes.
 

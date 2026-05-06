@@ -34,14 +34,14 @@ A seção Channels tem um botão **+ Widget** que abre um formulário ali mesmo:
 rótulo, agente, origem permitida e aparência, sem precisar ir até a página
 de tokens. Depois de criar um, o painel mostra a tag `<script>` completa já
 preenchida com o token real, o agente e o endereço do seu próprio servidor,
-pronta pra copiar e colar. Widgets existentes também mantêm um trecho
+pronta para copiar e colar. Widgets existentes também mantêm um trecho
 recolhível, e o token bruto deles fica visível a qualquer momento. Diferente
 de um token de API normal, o valor de um token de widget não é um segredo
 que vale a pena esconder (veja [Segurança](#segurança) mais abaixo), então
 não tem aquele "copie agora, você não vai ver de novo". Trocar qual agente
 ou origem um widget usa ainda significa criar um novo e revogar o antigo
-(isso continua só por rotação), mas a aparência pode ser editada no lugar a
-qualquer momento.
+(esses dois continuam sendo apenas rotacionáveis), mas a aparência pode ser
+editada no lugar a qualquer momento.
 
 ### Defina a aparência pelo painel
 
@@ -49,8 +49,8 @@ Título, logo, cor, tema, saudação e posição não precisam morar na tag
 `<script>` de jeito nenhum: defina no token do widget em vez disso (na
 criação, ou depois pelo botão **Edit appearance** num widget existente) e o
 script busca isso ao carregar. A prioridade é por campo, não tudo-ou-nada:
-**o valor do token vence sempre que estiver definido**; um campo não
-definido no token cai pro próprio atributo `data-*` da tag, e depois pro
+**o valor do token prevalece sempre que estiver definido**; um campo não
+definido no token recorre ao atributo `data-*` da tag, e depois ao
 padrão embutido. Então isso é totalmente opcional (uma incorporação simples
 só com `data-token` continua funcionando exatamente como antes), e os dois
 podem se misturar livremente: cor vindo do painel, saudação fixa na tag,
@@ -69,7 +69,7 @@ Cole a tag script na página, apontando para o seu servidor Pepe:
         data-logo="https://example.com/logo.png"
         data-color="#ea580c"
         data-theme="dark"
-        data-greeting="Hi! How can I help?"
+        data-greeting="Olá! Como posso ajudar?"
         data-position="right"
         data-lang="pt-BR"></script>
 ```
@@ -80,12 +80,12 @@ Cole a tag script na página, apontando para o seu servidor Pepe:
 | `data-token` | O token de widget de `token add --widget`. | nenhum |
 | `data-server` | O host para conectar. | o próprio host do script |
 | `data-title` | O texto do cabeçalho do painel. | "Chat" |
-| `data-logo` | Uma imagem quadrada pequena, usada como ícone da bolha e ao lado do título no cabeçalho. Omita pra manter o ícone de chat simples. | nenhum |
+| `data-logo` | Uma imagem quadrada pequena, usada como ícone da bolha e ao lado do título no cabeçalho. Omita para manter o ícone de chat simples. | nenhum |
 | `data-color` | Cor de destaque da bolha, do cabeçalho e dos botões. | `#ea580c` |
 | `data-theme` | `light` ou `dark`: as cores base do painel abaixo do cabeçalho. | `light` |
 | `data-greeting` | A primeira mensagem mostrada antes de o visitante enviar algo. | escolhida a partir de `data-lang`, inglês se nenhum for definido |
 | `data-position` | `left` ou `right`. | `right` |
-| `data-lang` | O idioma **do site**, não o do navegador do visitante (ex.: `pt-BR`). Um site sabe em que idioma ele foi escrito, um locale de navegador é só um chute sobre quem está lendo. Escolhe a saudação embutida quando `data-greeting` não é definido, e é enviado uma vez ao entrar na conversa pra que o agente já se incline a responder nesse idioma desde a primeira resposta. | nenhum |
+| `data-lang` | O idioma **do site**, não o do navegador do visitante (ex.: `pt-BR`). Um site sabe em que idioma ele foi escrito, um locale de navegador é só um chute sobre quem está lendo. Escolhe a saudação embutida quando `data-greeting` não é definido, e é enviado uma vez ao entrar na conversa para que o agente já se incline a responder nesse idioma desde a primeira resposta. | nenhum |
 
 Sem passo de build, sem instalar npm: `widget.js` e sua folha de estilo são
 servidos diretamente pelo seu servidor Pepe em `/plugin-assets/pepe-widget/`,
@@ -105,7 +105,7 @@ O botão de nova conversa no cabeçalho (um simples "+") começa uma conversa
 nova na hora: fecha a conexão atual, limpa o painel e reconecta com um id de
 sessão novo. Esse id já fica salvo na hora, então mesmo um reload completo da
 página continua falando com a conversa nova, não com a antiga. Se o próprio
-agente encerrar a conversa (a tool `end_session` dele), o painel mostra uma
+agente encerrar a conversa (a ferramenta `end_session` dele), o painel mostra uma
 pequena nota do sistema no lugar, e a próxima mensagem que você mandar já
 começa do zero, sem precisar clicar em nada.
 
@@ -131,27 +131,27 @@ separadas do chat próprio do painel.
   pode ser reutilizado a partir de outro site, mesmo um para o qual esse
   mesmo servidor sirva outro widget.
 - **Travado em um agente.** Um token de widget sempre roda exatamente o
-  agente pro qual foi criado; o widget não tem como pedir outro diferente.
+  agente para o qual foi criado; o widget não tem como pedir outro diferente.
 - **Com limite de taxa.** As mensagens por uma conexão de widget são
   limitadas (20 por minuto por padrão, ajustável com `config :pepe,
   widget_rate_limit:` / `widget_rate_window_s:` se você se auto-hospeda e
-  precisa ajustar), pra que um token público que vive no código-fonte da
+  precisa ajustar), para que um token público que vive no código-fonte da
   página não possa ser bombardeado. Nenhuma outra superfície é afetada.
 - **Não é tratado como segredo.** O valor bruto de um token de widget já
   mora em HTML público, legível com "exibir código-fonte" no site que o
   incorpora. Então, diferente de um token de API normal, ele é guardado
   recuperável e continua visível no painel/`manage_token list`. O que
-  realmente protege ele são os três pontos acima, não esconder a string.
+  realmente o protege são os três pontos acima, não esconder a string.
 
 <div class="note"><strong>Dê um agente restrito.</strong> Um widget fica de
-cara pra internet pública, sem nenhum humano aprovando chamadas de
+exposto à internet pública, sem nenhum humano aprovando chamadas de
 ferramenta. Vincule-o a um agente limitado a ferramentas seguras, somente
 leitura ou voltadas ao cliente, a mesma orientação de qualquer canal voltado
 ao cliente em <a href="./security/">Segurança e ambiente isolado</a>.</div>
 
 ### Faça por chat
 
-Um agente com a tool `manage_token` pode criar um token de widget numa
+Um agente com a ferramenta `manage_token` pode criar um token de widget numa
 conversa:
 
 > Crie um token de widget para o agente support, permitido a partir de https://example.com.
@@ -159,7 +159,7 @@ conversa:
 O agente chama `manage_token` com `action: "create"`, `agent: "support"`,
 `widget: true`, e `allowed_origin: "https://example.com"`. Criar um token não
 é somente leitura, então a chamada passa pela barreira de permissão; o token
-bruto volta na resposta pra você copiar na tag script, e continua disponível
+bruto volta na resposta para você copiar na tag script, e continua disponível
 a qualquer momento com `action: "list"`, já que um token de widget não é um
 segredo que vale a pena esconder.
 
@@ -167,7 +167,7 @@ A aparência funciona do mesmo jeito, em qualquer uma das duas ações: passe
 qualquer um de `title`, `logo`, `color`, `theme`, `greeting`, `position` no
 `create`, ou depois com `action: "update"` e o `id` do token:
 
-> Muda a saudação do widget do support pra "Oi! Precisa de ajuda?" e a cor pra #2563eb.
+> Muda a saudação do widget do support para "Oi! Precisa de ajuda?" e a cor para #2563eb.
 
 O agente chama `manage_token` com `action: "update"`, `id: "<o id do
 token>"`, `greeting: "Oi! Precisa de ajuda?"`, e `color: "#2563eb"`; um

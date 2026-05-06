@@ -173,11 +173,11 @@ pepe agent add support \
   --hooks pii_redact
 ```
 
-Três pontos do fluxo são censurados: a mensagem de entrada do humano, **o resultado bruto de qualquer tool** (uma consulta à base de dados, a leitura de um ficheiro, uma pesquisa na web - qualquer coisa que uma tool traga, não só o que um humano escreveu), e a resposta de saída do agente. O resultado da tool é censurado antes de entrar na conversa e antes de ser gravado em disco - por isso um resultado grande que acabe guardado num ficheiro do workspace (ver Agentes) já sai gravado censurado, nunca em bruto. Pede "lista os 10 doentes mais recentes com diagnóstico cardíaco" contra a tua própria base de dados e, com `pii_redact` ativado, o modelo raciocina sobre `[PERSON_1]`, `[PERSON_2]`, ...; só a resposta final para ti recebe os nomes reais de volta.
+Três pontos do fluxo são censurados: a mensagem de entrada do humano, **o resultado bruto de qualquer tool** (uma consulta à base de dados, a leitura de um ficheiro, uma pesquisa na web, qualquer coisa que uma tool traga, não só o que um humano escreveu), e a resposta de saída do agente. O resultado da tool é censurado antes de entrar na conversa e antes de ser gravado em disco, por isso um resultado grande que acabe guardado num ficheiro do workspace (ver Agentes) já sai gravado censurado, nunca em bruto. Pede "lista os 10 doentes mais recentes com diagnóstico cardíaco" contra a tua própria base de dados e, com `pii_redact` ativado, o modelo raciocina sobre `[PERSON_1]`, `[PERSON_2]`, ...; só a resposta final para ti recebe os nomes reais de volta.
 
 Vem quatro hooks de fábrica:
 
-- `pii_redact`: um censor de expressões regulares, offline e sem dependências. Substitui dados pessoais estruturados (correio eletrónico, número de cartão e documentos nacionais como o CPF ou o CNPJ) por um token estável como `[CPF_1]`. Por predefinição é reversível: regista `token -> real` para que o fluxo consiga restaurar o valor real na resposta à saída.
+- `pii_redact`: um censor de expressões regulares, offline e sem dependências. Substitui dados pessoais estruturados (correio eletrónico, número de cartão e documentos nacionais como o NIF) por um token estável como `[NIF_1]`. Por predefinição é reversível: regista `token -> real` para que o fluxo consiga restaurar o valor real na resposta à saída.
 - `llm_redact`: usa um modelo local ou configurado para substituir nomes, moradas e texto livre por pseudónimos realistas, e depois restaura-os à saída. Combina melhor com o `pii_redact`, que trata os documentos estruturados de forma determinística enquanto o modelo trata das partes desordenadas em qualquer idioma.
 - `presidio`: envia o texto através dos teus próprios contentores auto-alojados de análise e anonimização do Microsoft Presidio, para que os dados permaneçam sob o teu controlo.
 - `http_redact`: a válvula de escape genérica. O Pepe publica a mensagem no teu próprio endpoint, que devolve o texto transformado, para que qualquer serviço de censura se ligue sem um adaptador dedicado.
@@ -186,7 +186,7 @@ As definições globais de cada hook (que pacotes de reconhecedores, padrões pe
 
 ```bash
 pepe hooks list
-pepe hooks generate "redact Brazilian CPF, emails, and phone numbers" --save
+pepe hooks generate "redact Portuguese NIF, emails, and phone numbers" --save
 ```
 
 Os hooks de expressões regulares e de HTTP falham de forma aberta por conceito: se um censor der erro ou um modelo estiver indisponível, o texto original passa em vez de bloquear o trabalho. Quando precisas de uma garantia firme, marca a ligação de modelo com `require_redaction` em `config.json`. Um modelo assim marcado recusa-se a correr, a não ser que o agente tenha pelo menos um hook de censura habilitado, transformando uma limpeza de melhor esforço numa obrigatória.
@@ -212,7 +212,7 @@ O painel web fica aberto em localhost por predefinição, o que é cómodo para 
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Vinculado a uma interface pública sem palavra-passe, o painel fecha por predefinição e bloqueia os clientes remotos até definires uma. Detalhes completos - a lista de permissões de `Host` e as definições de trusted-proxies para servir atrás de um domínio, e como o correr como serviço persistente - estão na página [Painel](../dashboard/).
+Vinculado a uma interface pública sem palavra-passe, o painel fecha por predefinição e bloqueia os clientes remotos até definires uma. Os detalhes completos (a lista de permissões de `Host` e as definições de trusted-proxies para servir atrás de um domínio, e como o correr como serviço persistente) estão na página [Painel](../dashboard/).
 
 ## Tokens da API
 

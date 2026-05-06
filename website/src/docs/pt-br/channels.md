@@ -7,7 +7,7 @@ Um canal conecta um dos seus agentes a um lugar onde as pessoas já conversam.
 Alguém envia uma mensagem, o Pepe executa o agente vinculado (chamando
 ferramentas e lendo a resposta de volta), e a resposta é entregue no mesmo
 canal. Você não escreve nenhum código de ligação. Você adiciona uma conexão,
-aponta ela para um agente e pronto, funciona.
+aponte-a para um agente e pronto, funciona.
 
 Tudo nesta página pressupõe que você já tem pelo menos um agente definido. Se
 ainda não tem, veja primeiro o guia de agentes.
@@ -29,7 +29,7 @@ página mostra cada uma onde ela se aplica:
 
 Os canais diferem apenas em como uma mensagem chega até o Pepe:
 
-- **Telegram** é um bot que o Pepe consulta. Nada precisa ser acessível
+- **Telegram** é um bot que o Pepe consulta por polling. Nada precisa ser acessível
   publicamente. Adicione um token, vincule a um agente, execute o gateway.
 - **Canais por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google Chat
   e uma rota de entrada genérica) recebem mensagens que a plataforma envia para
@@ -42,7 +42,7 @@ Cada conexão (e cada bot do Telegram) nomeia um `agent`. Essa é a vinculação
 Cada remetente distinto ganha a própria conversa, então o contexto é mantido por
 pessoa sem que você gerencie nada.
 
-Uma conexão por webhook também tem um `mode` que muda como o motor se comporta:
+Uma conexão por webhook também tem um `mode` que muda como o runtime se comporta:
 
 | | Suporte | Admin |
 |--|---------|-------|
@@ -123,7 +123,7 @@ a ferramenta `send_file` faz isso no momento em que você pede. Você diria:
 > Puxe os cadastros da semana passada e me mande a planilha.
 
 O agente roda o passo que monta o arquivo, e então chama `send_file` com o
-caminho resultante. Não há uma trava de confirmação separada no `send_file`; ele
+caminho resultante. Não há uma barreira de confirmação separada no `send_file`; ele
 só entrega no próprio canal da conversa atual, resolvido a partir da sessão,
 então ele não consegue vazar um arquivo para mais ninguém.
 
@@ -136,7 +136,7 @@ ferramenta `end_session` faz isso pela conversa:
 > Obrigado, era só isso.
 
 O agente envia primeiro a resposta final, e então chama `end_session`, que limpa
-o contexto do fio ao vivo. O conhecimento aprendido dele fica intacto. Só a
+o contexto da conversa em andamento. O conhecimento aprendido dele fica intacto. Só a
 conversa atual é reiniciada. Isso é útil em um canal em modo `support` onde cada
 troca deveria ser independente.
 

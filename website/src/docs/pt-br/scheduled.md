@@ -57,7 +57,7 @@ O horário é uma expressão cron padrão de 5 campos: `minuto hora dia-do-mês 
 30 8 * * *      # 08:30 todos os dias
 ```
 
-Uma tarefa carrega o próprio **fuso horário nomeado**, não um deslocamento fixo em relação ao UTC. Isso importa porque "9h local" desliza em relação ao UTC duas vezes por ano por causa do horário de verão. O Pepe guarda a expressão mais um nome de fuso como `America/Sao_Paulo` ou `Europe/Berlin` e avalia o horário nesse fuso. Perto de uma virada de horário de verão ele faz o mais sensato: pula para a frente no vão da primavera e escolhe o lado mais tarde da sobreposição do outono, de modo que um trabalho nunca dispara duas vezes nem some em silêncio.
+Uma tarefa carrega o próprio **fuso horário nomeado**, não um deslocamento fixo em relação ao UTC. Isso importa porque "9h local" desliza em relação ao UTC duas vezes por ano por causa do horário de verão. O Pepe guarda a expressão mais um nome de fuso como `America/Sao_Paulo` ou `Europe/Berlin` e avalia o horário nesse fuso. Perto de uma virada de horário de verão ele faz o mais sensato: no salto do horário de verão, avança junto; na hora que se repete, escolhe a segunda ocorrência. Assim um trabalho nunca dispara duas vezes nem some em silêncio.
 
 Defina seu fuso padrão uma vez durante o `pepe setup`. Tarefas que não nomeiam o próprio fuso usam esse. Se nada estiver configurado, o valor de reserva é UTC.
 
@@ -107,13 +107,13 @@ Um agente pode criar e gerenciar as próprias tarefas agendadas durante uma conv
 
 O agente sabe a hora local atual (o system prompt dele é ancorado com ela), então "amanhã às 8:30" resolve para a janela certa em vez de derivar para UTC. Ele escreve o prompt completo e autossuficiente para você, escolhe a expressão cron e, por padrão, entrega o resultado de volta no mesmo chat de onde você perguntou.
 
-A ferramenta `schedule_task` suporta as mesmas ações da CLI: `create`, `list`, `run` (forçar agora para prever), `enable`, `disable`, `remove` e `history`.
+A ferramenta `schedule_task` suporta as mesmas ações da CLI: `create`, `list`, `run` (forçar uma execução agora, para pré-visualizar o resultado), `enable`, `disable`, `remove` e `history`.
 
 #### O duplo aceite
 
 Criar trabalho agendado pela conversa é deliberadamente protegido duas vezes, porque uma tarefa roda sozinha depois:
 
 1. **A ferramenta precisa estar concedida ao agente.** Um agente só pode agendar algo se `schedule_task` estiver na lista de permissões dele. Agentes sem ela simplesmente não conseguem.
-2. **Cada criação ainda pergunta a você.** `schedule_task` é uma ferramenta com trava, então, a menos que tenha sido pré-aprovada, o runtime pede que você autorize a chamada específica antes de ela valer. Cada superfície mostra esse pedido do seu jeito nativo (botões embutidos no Telegram, um menu com as setas do teclado no terminal). Você pode responder só desta vez, pelo resto da sessão, sempre (lembrado no agente) ou negar.
+2. **Cada criação ainda pergunta a você.** `schedule_task` passa pela barreira de permissão, então, a menos que tenha sido pré-aprovada, o runtime pede que você autorize a chamada específica antes de ela valer. Cada superfície mostra esse pedido do seu jeito nativo (botões embutidos no Telegram, um menu com as setas do teclado no terminal). Você pode responder só desta vez, pelo resto da sessão, sempre (lembrado no agente) ou negar.
 
 Assim uma tarefa nunca aparece pelas suas costas: o recurso é opcional, e cada tarefa concreta também é.

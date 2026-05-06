@@ -1,6 +1,6 @@
 # Learning (self-improvement + TimeLearn)
 
-An agent can **turn conversations into lasting knowledge on its own** - the
+An agent can **turn conversations into lasting knowledge on its own** through the
 "reflect" loop. It learns only from **trusted conversations** so a client's chat
 never becomes memory. Who counts as trusted is a per-bot `trainers` allowlist:
 
@@ -8,7 +8,7 @@ never becomes memory. Who counts as trusted is a per-bot `trainers` allowlist:
 
 - **`[]`** -> learns from no one (a client-facing bot)
 
-- **`[id1, id2]`** -> learns only from those user ids (your ids - the trainers)
+- **`[id1, id2]`** -> learns only from those user ids (your ids, the trainers)
 
 - **omitted / `null`** -> the default (everyone)
 
@@ -34,14 +34,14 @@ shell/network), so it can update the workspace but nothing else; the live sessio
 is untouched. It fires on `/compact`, on idle (~90s after the last turn), and on
 demand with **`/learn`** (Telegram + console).
 
-**TimeLearn** shows what an agent has learned, on a timeline - skills (🧠) and
+**TimeLearn** shows what an agent has learned, on a timeline: skills (🧠) and
 memory entries (📝), newest first, with source and date:
 
 ```bash
-mix pepe timelearn zak               # in the terminal
+mix pepe timelearn assistant         # in the terminal
 ```
 
-...or the **Learn** tab in the web dashboard (with an agent picker). The generator
+...or the **Learning** tab in the dashboard (with an agent picker). The generator
 (reflect) produces; TimeLearn displays.
 
 ## Consolidation
@@ -54,14 +54,14 @@ dropping stale or contradicted lines, and combining overlapping skills, without 
 any durable fact. It uses the same restricted, file-only reviewer.
 
 ```bash
-mix pepe learn consolidate zak            # run a pass now
-mix pepe learn auto zak                    # schedule it nightly (default 0 3 * * *)
-mix pepe learn auto zak --at "0 */12 * * *"   # or a custom schedule
-mix pepe learn auto zak --off              # stop the schedule
-mix pepe learn status                      # which agents consolidate on a schedule
+mix pepe learn consolidate assistant              # run a pass now
+mix pepe learn auto assistant                     # schedule it nightly (default 0 3 * * *)
+mix pepe learn auto assistant --at "0 */12 * * *" # or a custom schedule
+mix pepe learn auto assistant --off               # stop the schedule
+mix pepe learn status                             # which agents consolidate on a schedule
 ```
 
-In the dashboard, the **Learn** tab has **Consolidate now** and a **Nightly** toggle.
+In the dashboard, the **Learning** tab has **Consolidate now** and a **Nightly** toggle.
 The nightly schedule is a managed entry on the [Scheduled tasks](scheduled-tasks.md)
 page (a `consolidate` job), and each run is recorded like any other run, visible in
 [Traces](traces.md).

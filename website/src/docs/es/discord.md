@@ -20,7 +20,7 @@ El `config` de una conexión contiene:
 - `application_id`: se usa para publicar la respuesta de seguimiento.
 
 En la app de Discord, apunta "Interactions Endpoint URL" a la URL de la conexión
-y agrega un comando de barra con una opción de texto (por ejemplo
+y añade un comando de barra con una opción de texto (por ejemplo
 `/ask prompt:...`). Discord exige un acuse en tres segundos, así que Pepe
 responde con una respuesta diferida y publica la respuesta real como seguimiento
 una vez que el agente termina. Forma de la URL de retorno:

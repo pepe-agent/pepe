@@ -33,6 +33,10 @@ defmodule Pepe.Agent.Runtime do
                         "reply now with your best summary of what you found or accomplished " <>
                         "so far, and what (if anything) is left unfinished."
 
+  # Every option the loop reads. It has to be every one: a caller passing an option that
+  # is missing here is a call Dialyzer says can never succeed, which is how `:review` and
+  # `:agent_chain` were found sitting outside a type that had quietly stopped keeping up
+  # with the code.
   @type opts :: [
           model: Model.t(),
           on_event: (term() -> any()),
@@ -40,6 +44,8 @@ defmodule Pepe.Agent.Runtime do
           cwd: String.t(),
           session_key: String.t() | nil,
           source: String.t() | nil,
+          review: boolean(),
+          agent_chain: [String.t()] | nil,
           authorize: (String.t(), term(), map() -> Pepe.Permissions.decision()) | nil
         ]
 
@@ -285,23 +291,21 @@ defmodule Pepe.Agent.Runtime do
     emit(opts, {:tool_call, name, raw})
 
     output =
-      cond do
-        ctx[:review] and stageable?(name) ->
-          stage_for_review(name, call, ctx)
+      if ctx[:review] and stageable?(name) do
+        stage_for_review(name, call, ctx)
+      else
+        case Pepe.Permissions.gate(name, raw, ctx) do
+          :allow ->
+            Tools.execute(call, ctx)
 
-        true ->
-          case Pepe.Permissions.gate(name, raw, ctx) do
-            :allow ->
-              Tools.execute(call, ctx)
+          :deny ->
+            emit(opts, {:tool_denied, name, nil})
+            Pepe.Permissions.denied_message(name)
 
-            :deny ->
-              emit(opts, {:tool_denied, name, nil})
-              Pepe.Permissions.denied_message(name)
-
-            {:deny, reason} ->
-              emit(opts, {:tool_denied, name, reason})
-              Pepe.Permissions.denied_message(name, reason)
-          end
+          {:deny, reason} ->
+            emit(opts, {:tool_denied, name, reason})
+            Pepe.Permissions.denied_message(name, reason)
+        end
       end
 
     emit(opts, {:tool_result, name, output})

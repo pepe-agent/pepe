@@ -18,7 +18,7 @@ acabara de chegar.
 ### Nada para configurar
 
 Se você já tem uma conexão de modelo com a OpenAI ou com a Groq, a transcrição já
-funciona. O Pepe reaproveita essa credencial e pede ao provider o modelo de transcrição
+funciona. O Pepe reaproveita essa credencial e pede ao provedor o modelo de transcrição
 dele (`whisper-1` na OpenAI, `whisper-large-v3-turbo` na Groq) em vez do modelo de chat com
 que a conexão foi configurada. Mande um áudio e ele é respondido. Não há nada a ajustar.
 
@@ -31,7 +31,7 @@ O Pepe tenta estas rotas nesta ordem, e qualquer uma delas pode estar ausente:
 2. **`media.audio.command`**: um comando local, por exemplo `whisper-cli -f {file}`. O
    `{file}` é substituído pelo caminho do áudio. Isso vem *antes* da detecção automática, e
    é de propósito: quem configurou um transcritor local fez isso para o áudio não sair da
-   máquina, e passar por cima disso para chamar um provider derrotaria o objetivo.
+   máquina, e passar por cima disso para chamar um provedor anularia o propósito.
 3. **Detecção automática**: a rota sem configuração descrita acima.
 4. **Nada disponível**: o arquivo vai para o agente, que se vira com as ferramentas que
    tem. Esse caminho continua existindo como rede de segurança; ele não é a porta de
@@ -43,14 +43,14 @@ Como as palavras existem antes de o roteamento rodar, o roteamento consegue lê-
 saem duas consequências, nenhuma delas possível enquanto a transcrição só aparecia dentro
 do turno do agente:
 
-- **Um comando barra falado funciona.** Fale `/help` ou `/stop` num áudio e o comando é
+- **Um comando de barra falado funciona.** Fale `/help` ou `/stop` num áudio e o comando é
   executado, exatamente como se você tivesse digitado, em vez de virar um turno do agente
   sobre um arquivo largado num diretório.
 - **Um bot em grupo pode ser chamado por voz.** Num grupo que exige menção, a barreira lê
   as **palavras** em vez da legenda. Um áudio não tem legenda, então antes disso não havia
   nada para a barreira ler, e era impossível endereçar o bot falando.
 
-<div class="note"><strong>Só fala.</strong> É o áudio que vira texto na porta de entrada.
+<div class="note"><strong>Somente voz.</strong> É o áudio que vira texto na porta de entrada.
 Uma foto ou um documento continuam indo para o agente, que tem olhos para uma e ferramentas
 para o outro.</div>
 

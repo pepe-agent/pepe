@@ -69,7 +69,7 @@ Cola a tag script na página, apontando para o teu servidor Pepe:
         data-logo="https://example.com/logo.png"
         data-color="#ea580c"
         data-theme="dark"
-        data-greeting="Hi! How can I help?"
+        data-greeting="Olá! Em que posso ajudar?"
         data-position="right"
         data-lang="pt-PT"></script>
 ```

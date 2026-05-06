@@ -105,6 +105,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
+      mix pepe version                         # what's running, and which build
       mix pepe update                          # self-update the binary to the latest release
       mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
@@ -178,6 +179,11 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
   def dispatch(["review" | rest]), do: with_app([], fn -> review_cmd(rest) end)
   def dispatch(["update" | _]), do: with_app([], fn -> update_cmd() end)
+
+  # Answering "what am I running?" needs no config, no app, and no network: it is the one
+  # question a broken install still has to be able to answer, and the first one support
+  # will ask.
+  def dispatch([v | _]) when v in ["version", "--version", "-v"], do: version_cmd()
 
   # `mcp tools` launches the server (needs the app); the rest just edit config.
   def dispatch(["mcp", "tools" | rest]), do: with_app([], fn -> mcp_cmd(["tools" | rest]) end)
@@ -3930,6 +3936,19 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # `pepe version` - what is running, and on what. The build target is printed alongside
+  # the number because it is the other half of a useful bug report: an "it won't start" is
+  # a different problem on pepe_linux_arm than on pepe_macos_x86.
+  defp version_cmd do
+    info("pepe #{Pepe.Update.current()}")
+
+    if Pepe.Update.running_from_source?() do
+      info(dim("running from a source checkout"))
+    else
+      info(dim(Pepe.Update.target() || "unknown build target"))
+    end
+  end
+
   # `mix pepe update` - self-update the packaged binary to the latest release.
   defp update_cmd do
     info(dim("checking for a newer release..."))
@@ -3957,22 +3976,20 @@ defmodule Mix.Tasks.Pepe do
     live? = "--offline" not in rest
     info(bold("✦ Pepe doctor") <> dim(if live?, do: " (live probes)", else: " (offline)"))
 
+    # `checks/1` always returns at least the ones that need no config, so there is no
+    # empty case to write a branch for: it would be dead code, and Dialyzer says so.
     checks = Pepe.Doctor.checks(live: live?)
 
-    if checks == [] do
-      info(dim("nothing configured to check yet."))
-    else
-      Enum.each(checks, fn
-        {area, subject, :ok} -> info("#{green("✓")} [#{area}] #{subject}")
-        {area, subject, {:warn, msg}} -> info("#{dim("⚠")} [#{area}] #{subject} - #{msg}")
-        {area, subject, {:error, msg}} -> error("[#{area}] #{subject} - #{msg}")
-      end)
+    Enum.each(checks, fn
+      {area, subject, :ok} -> info("#{green("✓")} [#{area}] #{subject}")
+      {area, subject, {:warn, msg}} -> info("#{dim("⚠")} [#{area}] #{subject} - #{msg}")
+      {area, subject, {:error, msg}} -> error("[#{area}] #{subject} - #{msg}")
+    end)
 
-      if Pepe.Doctor.healthy?(checks) do
-        ok("healthy")
-      else
-        error("issues found - fix the ✗ items above")
-      end
+    if Pepe.Doctor.healthy?(checks) do
+      ok("healthy")
+    else
+      error("issues found - fix the ✗ items above")
     end
   end
 

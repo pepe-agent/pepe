@@ -19,7 +19,7 @@ https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
   ou `googlechat`.
 - `<slug>` é o nome único que deste à ligação.
 
-Um `GET` a esse URL responde ao aperto de mão de verificação do fornecedor (o
+Um `GET` a esse URL responde ao handshake de verificação do fornecedor (o
 Pepe devolve o desafio que a plataforma envia quando regista o URL pela primeira
 vez). Um `POST` é um evento de entrada. Num `POST`, o Pepe resolve a ligação,
 verifica a assinatura do pedido contra o segredo que configuraste, extrai a
@@ -60,7 +60,7 @@ Slack, Microsoft Teams e Google Chat suportam conversas em grupo/canal, onde
 por padrão a ligação só responde quando é @mencionada (uma mensagem direta
 chega sempre ao agente, independentemente da configuração). Define
 `require_mention: false` na ligação para que responda a todas as mensagens
-em todos os canais em que está - ou, sem mexer nessa configuração de toda a
+em todos os canais em que está. Ou então, sem mexer nessa configuração de toda a
 ligação, dispensa isso para um único canal a partir desse canal:
 
 ```text

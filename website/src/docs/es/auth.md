@@ -29,9 +29,9 @@ Un token es una cadena aleatoria con el prefijo `pepe_`. En el archivo de config
 
 Un agente al que se le otorga la herramienta protegida `manage_token` puede generar, listar y revocar tokens desde una conversación. Como un token concede acceso a la API, la herramienta no es de solo lectura: pasa por la barrera de permisos, así que confirmas antes de que se cree un token, y el secreto en bruto se devuelve una sola vez para que lo copies.
 
-> Tú: Crea un token para la empresa buskaza, con la etiqueta chatwoot.
+> Tú: Crea un token para la empresa acme, con la etiqueta chatwoot.
 >
-> Agente: (te pide confirmación y luego lo genera) Token de API creado, alcance empresa buskaza. Cópialo ahora, no se volverá a mostrar: `pepe_9f2a...`
+> Agente: (te pide confirmación y luego lo genera) Token de API creado, alcance empresa acme. Cópialo ahora, no se volverá a mostrar: `pepe_9f2a...`
 
 ### Presentar un token
 
@@ -61,7 +61,7 @@ Un token lleva un ámbito que decide a qué agentes puede llegar. De lo más est
 
 * **Fijado a un agente** (`--agent HANDLE`): siempre ejecuta exactamente ese agente. El campo `model` de la petición se ignora. Entrega esto a quien solo deba alcanzar un agente específico.
 * **Empresa** (`--company CO`): cualquier agente dentro de esa empresa. Un nombre de `model` puro se cualifica dentro de esa empresa automáticamente, y una petición por un agente que pertenece a otra empresa se rechaza con `403`.
-* **Ninguno**: el ámbito raíz (sin empresa). Es sobre lo que opera cada comando cuando no le pones ámbito. Puede alcanzar los agentes raíz (los que tienen un nombre puro, sin espacio de nombres) y, de forma única, recurrir a conexiones de modelo puras por nombre.
+* **Ninguno**: el ámbito raíz (sin empresa). Es el ámbito en el que opera cada comando cuando no especificas ninguno. Puede alcanzar los agentes raíz (los que tienen un nombre puro, sin espacio de nombres) y, de forma única, recurrir a conexiones de modelo puras por nombre.
 
 `GET /v1/models` respeta el ámbito: un token de empresa o de agente ve solo sus propios agentes, nunca los de otra empresa, y nunca las conexiones de modelo puras.
 
@@ -95,7 +95,7 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{ "model": "some-other-company-agent", "messages": [{"role":"user","content":"hola"}] }'
 ```
 
-Para fijar un token a exactamente un agente (el campo `model` se ignora entonces por completo), agrega `--agent`:
+Para fijar un token a exactamente un agente (el campo `model` se ignora entonces por completo), añade `--agent`:
 
 ```bash
 pepe token add --company acme --agent acme/support --label "widget de soporte de Acme"

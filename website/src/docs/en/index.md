@@ -26,7 +26,7 @@ pepe run "read package.json and tell me which dependencies are outdated"
 
 You define the behavior once, and the same agent is reachable four ways: from the
 terminal, over an OpenAI-compatible HTTP API, over a streaming WebSocket, and
-from messaging channels like Telegram and WhatsApp. There is also a web dashboard
+from messaging channels like Telegram and WhatsApp. There is also a dashboard
 for browsing and chatting from the browser. Meet each use case where it already
 lives, without creating a separate agent for each channel.
 
@@ -130,7 +130,7 @@ pepe agent add assistant \
   --default
 ```
 
-You can also do this in the web dashboard on the **Agents** page, which includes
+You can also do this in the dashboard on the **Agents** page, which includes
 a form for the persona, model, and tool selection.
 
 ### Do it by chat
@@ -235,8 +235,9 @@ single bad turn cannot take down the rest of your agents.
 ### Multi-tenant when you need it
 
 Work can be scoped to a **company**, isolating agents, channels, models, and
-usage per tenant. If you never opt in, everything lives in the default scope,
-called **Principal**, and you can ignore companies entirely.
+usage per tenant. If you never opt in, everything lives in the default **root**
+scope (shown as "Principal" in the dashboard), and you can ignore companies
+entirely.
 
 ## Where to go next
 

@@ -51,6 +51,6 @@ Un agente al que se le otorgan las herramientas de solo lectura `config_get` y `
 >
 > Agente: (ejecuta `doctor`) Encontré un problema: la conexión de modelo "openrouter" referencia `${OPENROUTER_API_KEY}`, pero esa variable no está definida en el entorno. Expórtala antes de servir.
 
-La herramienta `doctor` hace un chequeo de salud de toda la configuración y marca secretos `${ENV}` sin definir, agentes que apuntan a modelos ausentes, programaciones inválidas y conexiones inalcanzables. Pasa `live: true` para también sondear la red.
+La herramienta `doctor` hace un comprobación de salud de toda la configuración y marca secretos `${ENV}` sin definir, agentes que apuntan a modelos ausentes, programaciones inválidas y conexiones inalcanzables. Pasa `live: true` para también sondear la red.
 
 <div class="note"><strong>Los ajustes sensibles a la seguridad no se pueden editar por chat.</strong> La herramienta protegida `config_set` está cerrada por defecto: solo toca una lista blanca corta (el modelo y el agente por defecto, el idioma, la zona horaria y un par de opciones de Telegram). Los secretos, las listas de herramientas permitidas, los tokens de bot, el envoltorio del entorno aislado y la contraseña del panel quedan a propósito fuera de esa lista, así que `config_set` no puede cambiarlos. Esos los defines tú con la CLI o el panel. Los tokens de la API son lo único que un agente puede generar por chat, pero solo a través de la herramienta separada y protegida por la barrera de permisos `manage_token`, nunca mediante `config_set`.</div>

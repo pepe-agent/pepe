@@ -186,32 +186,32 @@ defmodule Pepe.Doctor do
   defp webhook_checks do
     Enum.flat_map(Config.webhooks(), fn {slug, entry} ->
       case entry["provider"] && Pepe.Webhooks.provider(entry["provider"]) do
-        nil ->
-          [{"channel", slug, {:error, "unknown provider #{inspect(entry["provider"])}"}}]
-
-        mod ->
-          agent_check =
-            if entry["agent"] && Config.get_agent(entry["agent"]) do
-              {"channel", slug, :ok}
-            else
-              {"channel", slug, {:error, "agent #{inspect(entry["agent"])} doesn't exist"}}
-            end
-
-          missing =
-            mod.config_schema()
-            |> Enum.filter(&required_config_field?/1)
-            |> Enum.filter(fn f -> (entry["config"] || %{})[f["key"]] in [nil, ""] end)
-            |> Enum.map(& &1["key"])
-
-          creds =
-            case missing do
-              [] -> []
-              keys -> [{"channel", "#{slug} config", {:warn, "missing required fields: #{Enum.join(keys, ", ")}"}}]
-            end
-
-          [agent_check | creds]
+        nil -> [{"channel", slug, {:error, "unknown provider #{inspect(entry["provider"])}"}}]
+        mod -> [webhook_agent_check(slug, entry) | webhook_creds_check(slug, entry, mod)]
       end
     end)
+  end
+
+  defp webhook_agent_check(slug, entry) do
+    if entry["agent"] && Config.get_agent(entry["agent"]) do
+      {"channel", slug, :ok}
+    else
+      {"channel", slug, {:error, "agent #{inspect(entry["agent"])} doesn't exist"}}
+    end
+  end
+
+  defp webhook_creds_check(slug, entry, mod) do
+    config = entry["config"] || %{}
+
+    missing =
+      mod.config_schema()
+      |> Enum.filter(&(required_config_field?(&1) and config[&1["key"]] in [nil, ""]))
+      |> Enum.map(& &1["key"])
+
+    case missing do
+      [] -> []
+      keys -> [{"channel", "#{slug} config", {:warn, "missing required fields: #{Enum.join(keys, ", ")}"}}]
+    end
   end
 
   defp required_config_field?(field), do: field["type"] != "select" and field["required"] != false
@@ -240,14 +240,16 @@ defmodule Pepe.Doctor do
         entries
         |> Enum.filter(&File.dir?(Path.join(dir, &1)))
         |> Enum.reject(&MapSet.member?(known, &1))
-        |> Enum.map(fn e ->
-          label = if company, do: "#{company}/#{e}", else: e
-          {"state", "orphan agent dir #{label}", {:warn, "on disk but not in config; remove it or re-add the agent"}}
-        end)
+        |> Enum.map(&orphan_agent_dir_check(&1, company))
 
       _ ->
         []
     end
+  end
+
+  defp orphan_agent_dir_check(entry, company) do
+    label = if company, do: "#{company}/#{entry}", else: entry
+    {"state", "orphan agent dir #{label}", {:warn, "on disk but not in config; remove it or re-add the agent"}}
   end
 
   # Plugins: packages with a broken/missing manifest, and any `.exs` that won't parse.
@@ -285,12 +287,17 @@ defmodule Pepe.Doctor do
       {:ok, entries} ->
         entries
         |> Enum.filter(&String.ends_with?(&1, ".md"))
-        |> Enum.flat_map(fn f ->
-          case File.read(Path.join(dir, f)) do
-            {:ok, body} -> if String.trim(body) == "", do: [{"skill", Path.rootname(f), {:warn, "skill file is empty"}}], else: []
-            _ -> []
-          end
-        end)
+        |> Enum.flat_map(&empty_skill_check(dir, &1))
+
+      _ ->
+        []
+    end
+  end
+
+  defp empty_skill_check(dir, file) do
+    case File.read(Path.join(dir, file)) do
+      {:ok, body} ->
+        if String.trim(body) == "", do: [{"skill", Path.rootname(file), {:warn, "skill file is empty"}}], else: []
 
       _ ->
         []

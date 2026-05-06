@@ -39,7 +39,7 @@ los reembolsos superiores a 200 necesitan una persona.
 ```
 
 El agente llama a `manage_agent` con `action: "add_tool"` y luego con
-`action: "remember"`. Cada una de estas acciones tiene puerta de permisos: el
+`action: "remember"`. Cada una de estas acciones pasa por la barrera de permisos: el
 agente propone el cambio, tú lo autorizas y solo entonces se aplica. Un agente
 también puede renombrarse a sí mismo con la herramienta aparte `rename_agent` ("De
 ahora en adelante, llámate scout"), que mueve su directorio de espacio de trabajo y

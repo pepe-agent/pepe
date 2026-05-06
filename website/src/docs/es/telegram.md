@@ -47,7 +47,7 @@ pepe gateway telegram list
 pepe gateway telegram remove support
 ```
 
-Ejecuta el consultador en primer plano (un consultador por bot):
+Ejecuta el poller en primer plano (un poller por bot):
 
 ```bash
 pepe gateway telegram
@@ -58,14 +58,14 @@ bots de Telegram configurados junto con la API HTTP, así que un único servidor
 en ejecución cubre todos los canales a la vez.
 
 <div class="note"><strong>Panel.</strong> La sección Channels del panel lista
-tus bots con una insignia en vivo de activo/inactivo, te permite agregar un bot,
+tus bots con una insignia en vivo de activo/inactivo, te permite añadir un bot,
 editar con qué agente habla y eliminarlo. Escribe la misma configuración que la
 línea de comandos.</div>
 
 ### En grupos
 
 En un chat 1:1 el bot siempre responde. Añadido a un grupo, por defecto solo
-responde cuando lo @mencionan o le das un `/comando` - si no, respondería a
+responde cuando lo @mencionan o le das un `/comando`; si no, respondería a
 cada mensaje en un grupo activo. Desactiva ese requisito por completo para un
 bot (en todos los grupos en los que está) con `require_mention: false` durante
 `pepe gateway telegram setup`.
@@ -83,7 +83,7 @@ se filtra a ningún otro grupo en el que esté el mismo bot, y una conversación
 nueva (`/new`) la olvida.
 
 Una conversación de grupo es una sola sesión compartida entre todos los que
-están en ella, sin etiquetar quién dijo qué - si tu agente necesita
+están en ella, sin etiquetar quién dijo qué. Si tu agente necesita
 distinguir a las personas, indícaselo en su prompt. El bot también es ciego a
 lo que no se le dirige: un mensaje que no lo @menciona (y no está dispensado
 con `/mention off`) nunca llega al agente, ni siquiera como contexto
@@ -115,12 +115,12 @@ agente.
 
 Un agente que tenga la herramienta `manage_channel` puede crear y revincular
 bots de Telegram desde una conversación. Como edita la configuración, cada
-llamada pasa por la verja de permisos: el agente propone el cambio y tú
+llamada pasa por la barrera de permisos: el agente propone el cambio y tú
 confirmas antes de que se aplique.
 
 Dirías:
 
-> Agrega un bot de Telegram llamado sales que hable con el agente de ventas. El
+> Añade un bot de Telegram llamado sales que hable con el agente de ventas. El
 > token está en la variable de entorno SALES_BOT_TOKEN.
 
 El agente llama a `manage_channel` con `action: "add"`, `name: "sales"`,
@@ -137,7 +137,7 @@ salvaguardas:
 
 Otras acciones de `manage_channel` son `list`, `set_agent` (revincular un bot a
 otro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`,
-`disable` y `remove`. Tras cualquier cambio reconcilia los consultadores en
+`disable` y `remove`. Tras cualquier cambio reconcilia los pollers en
 ejecución, así que un bot arranca o se detiene en vivo sin reiniciar.
 
 <div class="note"><strong>Solo Telegram.</strong> La herramienta de chat

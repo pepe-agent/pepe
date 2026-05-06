@@ -5,7 +5,7 @@ description: Ligue o endpoint de Interactions de um app do Discord a um agente d
 
 ## Discord
 
-O Discord é ligado pelo ponto de acesso de Interactions (comandos de barra),
+O Discord é ligado pelo endpoint de Interactions (comandos de barra),
 então ele se encaixa no gateway de webhook em vez de uma conexão persistente.
 Configure pela configuração guiada (ou pelo painel):
 

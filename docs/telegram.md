@@ -25,7 +25,7 @@ Installed **skills are also surfaced as their own slash commands** (e.g. a
 `weather` skill shows up as `/weather`), so they're discoverable from the "/" menu.
 
 `/models` opens an inline-button picker scoped to your company, with a checkmark on
-the current model - tap one to switch. A **trainer** (the bot's `trainers`
+the current model; tap one to switch. A **trainer** (the bot's `trainers`
 allowlist, same one that gates `/learn`) is then asked *this conversation only* or
 *everyone*; anyone else in an allowed chat just switches their own conversation, no
 asking. Set `model_switch_locked: true` on the bot to keep non-trainers from
@@ -39,8 +39,8 @@ messages follow the configured `locale`; the agent's own replies follow the user
 language, and raw internal errors are never leaked into the chat.
 
 A **dead chat is self-healing**: if a send comes back permanently failed (bot
-blocked, chat/user gone), that chat is skipped on every further send - no wasted API
-calls or log noise - and automatically un-marked the moment a send to it succeeds
+blocked, chat/user gone), that chat is skipped on every further send (no wasted API
+calls or log noise) and automatically un-marked the moment a send to it succeeds
 again (e.g. the user un-blocked the bot). No manual reset needed.
 
 **"Working" activity while the agent runs** is deliberately ambient, not a status
@@ -59,10 +59,10 @@ report you're meant to read. Tune it per bot with `tool_progress`:
 The native "typing..." indicator stays alive across all modes. Set it from chat
 (`manage_channel` -> `set_progress`) or the CLI (`--progress`).
 
-### Heartbeat - proactive check-ins (opt-in)
+### Heartbeat: proactive check-ins (opt-in)
 
 A bot can periodically give its agent the floor to say something **on its own
-initiative** ("the deploy finished", "you asked me to watch for X") - and, just as
+initiative** ("the deploy finished", "you asked me to watch for X"), and, just as
 importantly, the right to say **nothing** most of the time. Off by default:
 
 ```bash
@@ -71,7 +71,7 @@ manage_channel set_heartbeat name: "sales" heartbeat_minutes: 30 heartbeat_hours
 ```
 
 Each pulse runs the agent on its session's live context with a prompt that says
-"this is an automatic check - reply with exactly `HEARTBEAT_OK` if there's nothing
+"this is an automatic check, reply with exactly `HEARTBEAT_OK` if there's nothing
 worth saying." That's the common case; only a genuine message gets sent. Feed it:
 
 - an optional `HEARTBEAT.md` in the agent's workspace ("what to watch for"),
@@ -85,7 +85,7 @@ local waking hours.
 
 ### Multiple bots, one per agent
 
-You can run **several bots at once, each bound directly to its own agent** - one
+You can run **several bots at once, each bound directly to its own agent**: one
 Telegram bot *is* agent X, another *is* agent Y. Pepe starts one poller per bot;
 each has its own token, bound agent, allowlists and session namespace.
 
@@ -111,8 +111,8 @@ Within a single bot you can still switch agent per chat with `/agent X` (see
 
 #### Let an agent add a bot from chat
 
-An agent can create and manage bots itself with the `manage_channel` tool - *"add
-a bot for the sales agent, token in `$SALES_BOT_TOKEN`"* - as long as the tool is in
+An agent can create and manage bots itself with the `manage_channel` tool (*"add
+a bot for the sales agent, token in `$SALES_BOT_TOKEN`"*), as long as the tool is in
 its allowlist. It's guarded two ways:
 
 - **Permission gate** - `manage_channel` is a risky tool, so each call is authorized

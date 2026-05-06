@@ -3,7 +3,7 @@
 A tool is any module implementing the `Pepe.Tools.Tool` behaviour
 (`name/0`, `spec/0`, `run/2`). Two ways to ship one:
 
-**Built-in** (compiled in) - add the module under `lib/pepe/tools/` and list it
+**Built-in** (compiled in): add the module under `lib/pepe/tools/` and list it
 in `@builtin` in `Pepe.Tools`:
 
 ```elixir
@@ -17,7 +17,7 @@ defmodule Pepe.Tools.MyTool do
 end
 ```
 
-**Plugin** (drop-in, no recompile) - put the same module in a `.exs` under
+**Plugin** (drop-in, no recompile): put the same module in a `.exs` under
 `~/.pepe/plugins/`. It's compiled at runtime, hot-reloaded on change (by mtime),
 and appears in `mix pepe tools`. Add its `name` to an agent's `tools` to enable
 it:

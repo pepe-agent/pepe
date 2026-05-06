@@ -20,7 +20,7 @@ curl http://localhost:4000/v1/models
 curl http://localhost:4000/health
 ```
 
-Works with the official OpenAI SDKs - just set the base URL to
+Works with the official OpenAI SDKs; just set the base URL to
 `http://localhost:4000/v1` and the model to your agent's name.
 
 ### Access tokens (per company or per agent)
@@ -40,7 +40,7 @@ value is shown once), and its scope decides what it can reach:
 
 ```bash
 mix pepe token add --company acme --label "acme mobile app"   # prints pepe_... once
-mix pepe token add --agent acme/vendas --label "single integration"
+mix pepe token add --agent acme/sales --label "single integration"
 mix pepe token list       # id · fingerprint · scope · label
 mix pepe token revoke <id>
 
@@ -48,7 +48,7 @@ mix pepe token revoke <id>
 curl http://localhost:4000/v1/chat/completions \
   -H 'authorization: Bearer pepe_...' \
   -H 'content-type: application/json' \
-  -d '{"model":"vendas","messages":[{"role":"user","content":"oi"}]}'   # "vendas" -> acme/vendas
+  -d '{"model":"sales","messages":[{"role":"user","content":"hello"}]}'   # "sales" -> acme/sales
 ```
 
 The token is read from `Authorization: Bearer ...` (the OpenAI standard, what the
@@ -62,7 +62,7 @@ real over the network: a remote caller reaches exactly the agents its token allo
 
 By default the endpoint is stateless (you send the full `messages` array each
 time, like OpenAI). Pass a **session id** and the server keeps the whole
-conversation for you - then you only need to send the latest user message.
+conversation for you, so you only need to send the latest user message.
 
 Two dimensions, combined into the session key:
 

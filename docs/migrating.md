@@ -27,7 +27,7 @@ skipped, without touching your config.
 - **Skills** (each source's `SKILL.md` folders) are copied into Pepe's skills.
 - **Channels**: a **Telegram** bot token (and allowed chats) is set as the default bot;
   **WhatsApp**, **Slack** and **Microsoft Teams** connections are created from the source's
-  credentials as webhook connections (finish any missing field on the Integrations page).
+  credentials as webhook connections (finish any missing field on the Channels page).
 
 ## What is reported, not mapped
 

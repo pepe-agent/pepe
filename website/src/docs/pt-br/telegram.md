@@ -47,7 +47,7 @@ pepe gateway telegram list
 pepe gateway telegram remove support
 ```
 
-Rode o consultador em primeiro plano (um consultador por bot):
+Rode o poller em primeiro plano (um poller por bot):
 
 ```bash
 pepe gateway telegram
@@ -65,26 +65,26 @@ de comando.</div>
 ### Em grupos
 
 Num chat 1:1 o bot sempre responde. Adicionado a um grupo, por padrão só
-responde quando é @mencionado ou recebe um `/comando` - senão, responderia a
-toda mensagem num grupo movimentado. Desligue essa exigência por completo pro
-bot (em todo grupo em que ele estiver) com `require_mention: false` durante o
+responde quando é @mencionado ou recebe um `/comando`, porque senão responderia
+a toda mensagem num grupo movimentado. Desligue essa exigência por completo para
+o bot (em todo grupo em que ele estiver) com `require_mention: false` durante o
 `pepe gateway telegram setup`.
 
-Pra um único grupo, sem mexer na configuração do bot inteiro, rode:
+Para um único grupo, sem mexer na configuração do bot inteiro, rode:
 
 ```text
-/mention off   # só nesse grupo, até o /new - não precisa @mencionar pra ele responder
+/mention off   # só nesse grupo, até o /new: não precisa @mencionar para ele responder
 /mention on    # volta a exigir @menção
 /mention       # mostra a configuração atual
 ```
 
-A dispensa vive na conversa daquele grupo, não no bot, então nunca vaza pra
+A dispensa vive na conversa daquele grupo, não no bot, então nunca vaza para
 nenhum outro grupo em que o mesmo bot esteja, e uma conversa nova (`/new`)
 esquece ela.
 
 Uma conversa de grupo é uma única sessão compartilhada entre todo mundo que
-está nela, sem marcar quem disse o quê - se seu agente precisa diferenciar as
-pessoas, avise isso no prompt dele. O bot também é cego pro que não é
+está nela, sem marcar quem disse o quê. Se seu agente precisa diferenciar as
+pessoas, avise isso no prompt dele. O bot também é cego para o que não é
 endereçado a ele: uma mensagem que não o @menciona (e não está dispensada
 via `/mention off`) nunca chega ao agente, nem como contexto silencioso,
 então ele não consegue "se atualizar" sobre o que rolou antes dele entrar na
@@ -114,8 +114,8 @@ reinício do servidor, voltando ao que a configuração do próprio agente diz.
 
 Um agente que tem a ferramenta `manage_channel` pode criar e revincular bots do
 Telegram a partir de uma conversa. Como ela edita a configuração, cada chamada
-passa pela trava de permissão: o agente propõe a mudança e você confirma antes
-de ela ser aplicada.
+passa pela barreira de permissão: o agente propõe a mudança e você confirma
+antes de ela ser aplicada.
 
 Você diria:
 
@@ -135,8 +135,8 @@ O agente chama `manage_channel` com `action: "add"`, `name: "sales"`,
 
 Outras ações do `manage_channel` são `list`, `set_agent` (revincular um bot a
 outro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`,
-`disable` e `remove`. Depois de qualquer mudança ela reconcilia os consultadores
-em execução, então um bot inicia ou para ao vivo, sem reinício.
+`disable` e `remove`. Depois de qualquer mudança ela reconcilia os pollers em
+execução, então um bot inicia ou para ao vivo, sem reinício.
 
 <div class="note"><strong>Só Telegram.</strong> A ferramenta de chat gerencia
 bots do Telegram. As conexões por webhook (WhatsApp, Slack e as demais) são

@@ -7,7 +7,7 @@ description: Usa memoria de conversación del lado del servidor por HTTP y WebSo
 
 Por defecto la API es **sin estado**: cada petición debe llevar el historial completo de mensajes, exactamente como en OpenAI. Envías todo, Pepe responde, no se recuerda nada.
 
-Pepe también ofrece un modo **con estado** que la mayoría de los servidores de OpenAI no tienen. Adjunta un id de sesión y el servidor mantiene la conversación por ti. En cada llamada posterior envías solo el mensaje más nuevo del usuario; Pepe lo agrega al historial almacenado, ejecuta el agente y recuerda el resultado. Esto es cómodo para interfaces de chat y bots de mensajería donde no quieres enviar toda la transcripción cada vez.
+Pepe también ofrece un modo **con estado** que la mayoría de los servidores de OpenAI no tienen. Adjunta un id de sesión y el servidor mantiene la conversación por ti. En cada llamada posterior envías solo el mensaje más nuevo del usuario; Pepe lo añade al historial almacenado, ejecuta el agente y recuerda el resultado. Esto es cómodo para interfaces de chat y bots de mensajería donde no quieres enviar toda la transcripción cada vez.
 
 ## CLI vs API
 
@@ -55,7 +55,7 @@ curl http://localhost:4000/v1/chat/completions \
   }'
 ```
 
-En el modo con estado la respuesta incluye el `session_id` que usaste, para que puedas devolverlo en la siguiente llamada. Las sesiones con estado también funcionan con streaming; solo agrega `"stream": true`.
+En el modo con estado la respuesta incluye el `session_id` que usaste, para que puedas devolverlo en la siguiente llamada. Las sesiones con estado también funcionan con streaming; solo añade `"stream": true`.
 
 ### Recuperarse de un reinicio
 

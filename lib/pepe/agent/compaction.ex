@@ -121,7 +121,6 @@ defmodule Pepe.Agent.Compaction do
       {:ok, %{content: c}} when is_binary(c) and c != "" -> {:ok, c}
       {:ok, _} -> {:error, :empty_summary}
       {:error, reason} -> {:error, reason}
-      other -> {:error, other}
     end
   end
 

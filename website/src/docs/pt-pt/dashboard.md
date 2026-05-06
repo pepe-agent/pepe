@@ -7,7 +7,7 @@ O painel é a interface web local iniciada por `pepe serve`. Usa-o para conversa
 
 ## Manter em execução
 
-O `pepe serve` corre em primeiro plano - fechar o terminal ou terminar sessão pára o processo, e o painel com ele. Para um deploy a sério, instala-o como serviço persistente em segundo plano: launchd no macOS, systemd `--user` no Linux. Sobrevive a logout/reboot e reinicia-se sozinho se cair.
+O `pepe serve` corre em primeiro plano: fechar o terminal ou terminar sessão pára o processo, e o painel com ele. Para um deploy a sério, instala-o como serviço persistente em segundo plano: launchd no macOS, systemd `--user` no Linux. Sobrevive a logout/reboot e reinicia-se sozinho se cair.
 
 ```bash
 pepe serve install [--port 4000]
@@ -15,7 +15,7 @@ pepe serve status
 pepe serve uninstall
 ```
 
-Só funciona a partir do binário `pepe` instalado, não em `mix pepe serve install`. Se as tuas ligações de modelo referenciam segredos `${ENV_VAR}`, o `install` lista-os - o serviço arranca com um ambiente mínimo, por isso precisam de ser adicionados à mão no ficheiro gerado.
+Só funciona a partir do binário `pepe` instalado, não em `mix pepe serve install`. Se as tuas ligações de modelo referenciam segredos `${ENV_VAR}`, o `install` lista-os: o serviço arranca com um ambiente mínimo, por isso precisam de ser adicionados à mão no ficheiro gerado.
 
 ## Acesso ao painel
 
@@ -29,7 +29,7 @@ Podes passar uma palavra-passe literal ou uma referência `${ENV_VAR}` para que 
 
 A palavra-passe é lida de `dashboard.password` na configuração (interpolada), com recurso a variável de ambiente `PEPE_DASHBOARD_PASSWORD`. Duas definições relacionadas reforçam um painel servido atrás de um domínio:
 
-- `pepe dashboard hosts app.example.com,dash.example.com` define os valores adicionais do cabeçalho `Host` que o painel aceita. Isto serve também de lista de permissões contra o reataque de DNS (DNS rebinding).
+- `pepe dashboard hosts app.example.com,dash.example.com` define os valores adicionais do cabeçalho `Host` que o painel aceita. Isto serve também de lista de permissões contra DNS rebinding.
 - `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista os proxies inversos cujo cabeçalho `X-Forwarded-For` pode ser considerado fidedigno. Vazio por predefinição, o que significa que nenhum cabeçalho de encaminhamento é considerado fidedigno.
 
 Vinculado a uma interface pública sem palavra-passe, o painel fecha por predefinição e bloqueia os clientes remotos até definires uma.

@@ -135,7 +135,7 @@ defmodule Pepe.Agent.CompactionTest do
   test "compact_now replaces the middle with the model's summary, keeping head and tail" do
     msgs = long_history()
     {head, middle, tail} = Compaction.split(msgs, 30)
-    assert length(middle) == 4
+    assert [_, _, _, _] = middle
 
     assert {:ok, compacted, "SUMMARY: they agreed to ship on Friday."} =
              Compaction.compact_now(msgs, mock_model(:summary))

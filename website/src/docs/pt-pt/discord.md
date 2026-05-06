@@ -6,7 +6,7 @@ description: Liga o endpoint de Interactions de uma aplicação do Discord a um 
 ## Discord
 
 O Discord é ligado pelo ponto de acesso de Interactions (comandos de barra),
-por isso encaixa-se na comporta de webhook em vez de uma ligação persistente.
+por isso encaixa-se no gateway de webhook em vez de uma ligação persistente.
 Configura pela configuração guiada (ou pelo painel):
 
 ```bash

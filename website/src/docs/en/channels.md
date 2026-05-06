@@ -17,7 +17,7 @@ Like the rest of Pepe, channels can be managed three ways, and this page shows
 each where it applies:
 
 1. The `pepe` command line.
-2. The web dashboard (its "Channels" section lists your bots and connections,
+2. The dashboard (its "Channels" section lists your bots and connections,
    and walks you through adding one).
 3. By chat. An agent that holds the right management tool can create and rebind
    Telegram bots, deliver files, and close a conversation, all in plain

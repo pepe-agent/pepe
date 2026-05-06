@@ -68,7 +68,7 @@ Define tu zona por defecto una vez durante `pepe setup`. Las tareas que no nombr
 El destino de `deliver` decide qué pasa con la salida de una ejecución:
 
 - `telegram:<chat_id>` lo envía a ese chat de Telegram. El mensaje lleva como prefijo el nombre de la tarea, para que un chat que recibe varias tareas pueda distinguirlas.
-- `none` no lo envía a ningún lado. La ejecución igual corre y queda registrada en el historial. Bueno para tareas cuyo único fin es un efecto secundario (escribir un archivo, llamar a una herramienta).
+- `none` no lo envía a ningún lado. La ejecución se realiza igualmente y queda registrada en el historial. Bueno para tareas cuyo único fin es un efecto secundario (escribir un archivo, llamar a una herramienta).
 - Cualquier otra cosa (incluido `log`) escribe la salida en el log de la aplicación.
 
 Sea cual sea el destino, cada ejecución se añade al archivo de historial propio de esa tarea, así que siempre puedes releer lo que pasó.
@@ -111,7 +111,7 @@ La herramienta `schedule_task` admite las mismas acciones que la CLI: `create`, 
 
 #### La doble aprobación
 
-Crear trabajo programado desde el chat está deliberadamente protegido dos veces, porque una tarea corre sola más tarde:
+Crear trabajo programado desde el chat está deliberadamente protegido dos veces, porque una tarea se ejecuta sola más tarde:
 
 1. **La herramienta tiene que estar concedida al agente.** Un agente solo puede programar algo si `schedule_task` está en su lista de permitidos. Los agentes sin ella simplemente no pueden.
 2. **Cada creación igual te pregunta.** `schedule_task` es una herramienta con control, así que a menos que se haya preaprobado, el runtime te pide autorizar la llamada concreta antes de que surta efecto. Cada superficie muestra ese aviso a su manera nativa (botones en línea en Telegram, un menú con las flechas del teclado en la terminal). Puedes responder solo por esta vez, por el resto de la sesión, siempre (recordado en el agente) o denegar.

@@ -1,6 +1,6 @@
 # MCP servers (external tools)
 
-Connect **MCP (Model Context Protocol)** servers - Sentry, GitHub, ... - and their
+Connect **MCP (Model Context Protocol)** servers (Sentry, GitHub, ...) and their
 tools become callable by agents as if built in. Servers launch over stdio on demand
 (via `npx`, so **nothing to install manually**); tokens go in as `${ENV_VAR}` refs.
 
@@ -12,7 +12,7 @@ mix pepe mcp list
 ```
 
 Each MCP tool is exposed as `mcp__<server>__<tool>`. **Scoping is just the tool
-allowlist** - to make an agent *read-only* against a server, give it only the read
+allowlist**: to make an agent *read-only* against a server, give it only the read
 tools and leave the mutating ones out:
 
 ```bash

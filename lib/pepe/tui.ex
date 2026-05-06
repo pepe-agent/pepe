@@ -123,13 +123,16 @@ defmodule Pepe.TUI do
     |> Enum.slice(page * @page_size, @page_size)
     |> Enum.with_index(page * @page_size + 1)
     |> Enum.each(fn {item, i} ->
-      prefix = if chosen, do: "[#{if MapSet.member?(chosen, i), do: "x", else: " "}] ", else: ""
-      Owl.IO.puts("#{prefix}#{i}. #{item |> render.() |> IO.iodata_to_binary()}")
+      Owl.IO.puts("#{checkbox(chosen, i)}#{i}. #{item |> render.() |> IO.iodata_to_binary()}")
     end)
 
     if pages > 1, do: Owl.IO.puts([dim(gettext("page %{page}/%{pages}", page: page + 1, pages: pages))])
     Owl.IO.puts([])
   end
+
+  # Only multi-select passes a `chosen` set; single-select lines carry no checkbox.
+  defp checkbox(nil, _i), do: ""
+  defp checkbox(chosen, i), do: if(MapSet.member?(chosen, i), do: "[x] ", else: "[ ] ")
 
   # Single-select: number picks; n/p page. Enter is NOT a pagination command.
   # Spell out "type the number and press Enter" - a first-timer won't assume it.

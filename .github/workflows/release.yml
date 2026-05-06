@@ -40,15 +40,23 @@ jobs:
       - name: Install Erlang/Elixir
         uses: erlef/setup-beam@v1
         with:
-          # 28+: Pepe.TUI's arrow-key select/multiselect needs OTP 28's raw
-          # terminal mode (:shell.start_interactive({:noshell, :raw})) to
-          # actually suppress echo - on 27 the call still returns :ok, so the
-          # fancy menu draws, but keystrokes (arrow-key escape sequences) leak
-          # onto the screen instead of being captured. Burrito bundles this
-          # exact OTP series' ERTS into every target, so the version here is
-          # what end users actually run, not just what builds it.
-          otp-version: "28"
-          elixir-version: "1.18"
+          # OTP 28 exactly, and it is pinned from both sides.
+          #
+          # Not lower: Pepe.TUI's arrow-key select/multiselect needs OTP 28's raw terminal
+          # mode (:shell.start_interactive({:noshell, :raw})) to actually suppress echo. On
+          # 27 the call still returns :ok, so the menu draws and then the arrow keys leak
+          # their escape sequences onto the screen instead of being captured.
+          #
+          # Not higher: OTP 29 is out, and Burrito 1.5.0 (the latest) cannot build against
+          # it. The Zig link step fails and no binary is produced at all. Checked by
+          # building all five targets in a Linux container on both: 28 gives five, 29 gives
+          # none. Bump this when Burrito supports 29, not before, and keep ci.yml and the
+          # Dockerfile in step when you do.
+          #
+          # Burrito bundles this exact OTP series' ERTS into every target, so the version
+          # here is what end users actually run, not merely what builds it.
+          otp-version: "28.5.0.3"
+          elixir-version: "1.20.2"
 
       # The one action here still on Node 20. Upstream has no Node 24 release (v2.2.1 is
       # the latest, and it still declares node20), so the runner forces it onto Node 24

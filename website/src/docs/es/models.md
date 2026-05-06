@@ -97,5 +97,5 @@ Point the researcher agent at the groq-fast model.
 ```
 
 El agente llama a `manage_agent` con `action: "set_model"`. El modelo destino debe
-ser una conexión configurada, y el cambio pasa por la puerta de permisos como
+ser una conexión configurada, y el cambio pasa por la barrera de permisos como
 cualquier otra edición de configuración.

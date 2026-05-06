@@ -7,7 +7,7 @@ description: Proteja o acesso remoto à API com tokens com escopo.
 
 Com **zero tokens configurados, a API responde apenas a chamadas da mesma máquina (loopback)**. Um `curl` local ou o painel funcionam sem token, mas qualquer chamada remota é recusada com `401`, então um servidor que você expõe numa rede nunca fica anônimo.
 
-Criar o primeiro token vira uma chave para todo mundo. Assim que qualquer token existe, cada requisição, local ou remota, precisa apresentar um válido, ou é recusada com `401`. Criar o primeiro token é o que libera o acesso remoto.
+Criar o primeiro token muda o jogo para todo mundo. Assim que qualquer token existe, cada requisição, local ou remota, precisa apresentar um válido, ou é recusada com `401`. Criar o primeiro token é o que libera o acesso remoto.
 
 ### Gerar e gerenciar tokens
 
@@ -29,9 +29,9 @@ Um token é uma string aleatória com o prefixo `pepe_`. No arquivo de configura
 
 Um agente que recebe a ferramenta protegida `manage_token` consegue gerar, listar e revogar tokens a partir de uma conversa. Como um token concede acesso à API, a ferramenta não é somente leitura: ela passa pela barreira de permissão, então você confirma antes de um token ser criado, e o segredo bruto é retornado uma vez para você copiar.
 
-> Você: Crie um token para a empresa buskaza, com o rótulo chatwoot.
+> Você: Crie um token para a empresa acme, com o rótulo chatwoot.
 >
-> Agente: (pede para você confirmar e então o gera) Token da API criado, escopo empresa buskaza. Copie agora, ele não será mostrado de novo: `pepe_9f2a...`
+> Agente: (pede para você confirmar e então o gera) Token da API criado, escopo empresa acme. Copie agora, ele não será mostrado de novo: `pepe_9f2a...`
 
 ### Apresentar um token
 
@@ -61,7 +61,7 @@ Um token carrega um escopo que decide quais agentes ele pode alcançar. Do mais 
 
 * **Fixado em um agente** (`--agent HANDLE`): sempre executa exatamente aquele agente. O campo `model` da requisição é ignorado. Entregue isso a quem só deve alcançar um agente específico.
 * **Empresa** (`--company CO`): qualquer agente dentro daquela empresa. Um nome de `model` puro se qualifica dentro daquela empresa automaticamente, e uma requisição por um agente que pertence a outra empresa é recusada com `403`.
-* **Nenhum**: o escopo raiz (sem empresa). É sobre o que todo comando opera quando você não lhe dá escopo. Ele consegue alcançar os agentes raiz (aqueles com nome puro, sem espaço de nomes) e, de forma única, recorrer a conexões de modelo puras pelo nome.
+* **Nenhum**: o escopo raiz (sem empresa). É o escopo em que todo comando opera quando você não especifica nenhum. Ele consegue alcançar os agentes raiz (aqueles com nome puro, sem espaço de nomes) e, de forma única, recorrer a conexões de modelo puras pelo nome.
 
 `GET /v1/models` respeita o escopo: um token de empresa ou de agente vê apenas os próprios agentes, nunca os de outra empresa, e nunca as conexões de modelo puras.
 
@@ -95,7 +95,7 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{ "model": "some-other-company-agent", "messages": [{"role":"user","content":"olá"}] }'
 ```
 
-Para prender um token a exatamente um agente (o campo `model` e então ignorado por completo), adicione `--agent`:
+Para prender um token a exatamente um agente (o campo `model` é então ignorado por completo), adicione `--agent`:
 
 ```bash
 pepe token add --company acme --agent acme/support --label "widget de suporte da Acme"

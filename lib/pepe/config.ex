@@ -67,12 +67,7 @@ defmodule Pepe.Config do
     end
   end
 
-  defp user_home do
-    case System.user_home() do
-      nil -> nil
-      h -> h
-    end
-  end
+  defp user_home, do: System.user_home()
 
   @backups_kept 5
 

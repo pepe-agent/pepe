@@ -62,6 +62,11 @@
 # fails at boot with `version GLIBC_2.xx not found` - the image builds fine and then
 # won't start. Bump these three together, never one alone.
 #
+# And keep them equal to what .github/workflows/{ci,release}.yml use. This image would run
+# perfectly well on OTP 29, but the binaries cannot: Burrito 1.5.0 fails to build against
+# it. Taking 29 here alone would put the image and the binaries of the same tag back on
+# different runtimes, which is exactly the drift that hid a bug once already.
+#
 #   https://hub.docker.com/r/hexpm/elixir/tags
 
 ARG ELIXIR_VERSION=1.20.2

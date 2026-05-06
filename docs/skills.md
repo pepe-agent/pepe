@@ -19,16 +19,16 @@ its topic comes up, so they don't bloat every prompt.
   same name. The first non-empty line is the summary; the rest is the procedure.
 
 An agent can **author its own skills**: ask it to "remember how to do X as a skill"
-and (guided by `skill-creator`) it writes a new `skills/<name>.md` - which then
+and (guided by `skill-creator`) it writes a new `skills/<name>.md`, which then
 appears in its skills list, no restart.
 
 Combined with plugins + `enable_tool`, an agent can be asked in chat to "install a
 tool that does X": it reads the `install-tool` skill, writes the plugin to
-`plugins/<name>.exs`, enables it on itself, and uses it - no restart.
+`plugins/<name>.exs`, enables it on itself, and uses it, with no restart.
 
-For complex/multi-step work the agent doesn't grind it out by hand - the
+For complex/multi-step work the agent doesn't grind it out by hand. The
 `run_script` tool lets it write a short program (Python, Node, Ruby, Bash, or
-Elixir - Elixir is always available) and run it, getting back stdout/stderr/exit
+Elixir, which is always available) and run it, getting back stdout/stderr/exit
 code and iterating on errors. Worthwhile scripts are **saved** under `scripts/` and
 re-run later (`run_script` with `file:`), and when the agent works out *how* to do
 a recurring task (read a PDF, crunch a spreadsheet) it **writes itself a skill** to

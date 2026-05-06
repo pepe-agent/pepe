@@ -18,7 +18,7 @@ There is no database. You can create and edit agents three ways, and they all wr
 to the same file:
 
 1. The `pepe` command-line tool.
-2. The web dashboard.
+2. The dashboard.
 3. Plain conversation, by talking to an agent that has the relevant management tool.
 
 Here is a complete agent as it appears on disk:
@@ -368,12 +368,12 @@ which moves its workspace directory and takes effect on the next message.
 
 ## Multi-tenant agents with companies
 
-Companies are optional. Without one, everything lives in the default scope, called
-Principal, exactly as a single-tenant install always has. Add a company to wall a
-tenant off: its agents, workspaces, shared space, model connections, and routing are
-isolated from every other company.
+Companies are optional. Without one, everything lives in the default **root** scope
+(shown as "Principal" in the dashboard), exactly as a single-tenant install always
+has. Add a company to wall a tenant off: its agents, workspaces, shared space, model
+connections, and routing are isolated from every other company.
 
-An agent's real identity is its handle. In the Principal scope the handle is just the
+An agent's real identity is its handle. In the root scope the handle is just the
 bare name (`assistant`). Inside a company it is qualified as `company/name`
 (`acme/assistant`), so the same bare name can be reused across companies without
 collision.
@@ -394,7 +394,7 @@ Add `--company acme` to any agent command to act inside that scope. Bare peer na
 in `--can-message` and `--can-manage` resolve into the agent's own company, so routes
 never accidentally cross a tenant boundary. Each company can pin its own default
 model and default agent, or share the operator's global provider. A company agent is
-never promoted to the global (Principal) default just by being the first one created
+never promoted to the global (root) default just by being the first one created
 inside its company.
 
 ## Managing agents from the CLI
@@ -449,7 +449,7 @@ pepe run assistant "your prompt here"
 Resume or separate console sessions with `--session KEY`.
 
 ```bash
-pepe tui assistant
+pepe chat assistant
 ```
 
 **Over HTTP and WebSocket.** Start the server, then call the OpenAI-compatible API or

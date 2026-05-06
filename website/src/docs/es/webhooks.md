@@ -19,16 +19,16 @@ https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
   `msteams` o `googlechat`.
 - `<slug>` es el nombre único que le diste a la conexión.
 
-Un `GET` a esa URL responde al saludo de verificación del proveedor (Pepe
+Un `GET` a esa URL responde al handshake de verificación del proveedor (Pepe
 devuelve el desafío que la plataforma envía cuando registras la URL por primera
 vez). Un `POST` es un evento entrante. En un `POST`, Pepe resuelve la conexión,
 verifica la firma de la petición contra el secreto que configuraste, extrae el
 mensaje, ejecuta el agente vinculado y entrega la respuesta a través de la
-propia API del proveedor. El trabajo del agente corre en segundo plano para que
+propia API del proveedor. El trabajo del agente se ejecuta en segundo plano para que
 la plataforma reciba su acuse de inmediato (proveedores como Meta reintentan un
 webhook lento).
 
-Hay una única ruta genérica. Agregar un nuevo proveedor nunca agrega un nuevo
+Hay una única ruta genérica. Añadir un nuevo proveedor nunca añade un nuevo
 punto de acceso.
 
 <div class="note"><strong>Host público.</strong> Los canales por webhook
@@ -60,7 +60,7 @@ Slack, Microsoft Teams y Google Chat admiten conversaciones en grupo/canal,
 donde por defecto la conexión solo responde cuando la @mencionan (un mensaje
 directo siempre llega al agente, sin importar el ajuste). Pon
 `require_mention: false` en la conexión para que responda a todos los
-mensajes en todos los canales en los que está - o, sin tocar ese ajuste de
+mensajes en todos los canales en los que está, o, sin tocar ese ajuste de
 toda la conexión, dispénsalo para un solo canal desde dentro de ese canal:
 
 ```text
@@ -104,7 +104,7 @@ módulo en lugar de una nueva ruta. Las funciones de retorno son:
 
 - `name` y `label`: el segmento de URL del proveedor y su nombre para personas.
 - `config_schema`: los campos que el panel muestra para configurar una conexión.
-- `verify`: responder al saludo de verificación del `GET`.
+- `verify`: responder al handshake de verificación del `GET`.
 - `authenticate`: verificar la firma en un `POST` entrante contra el secreto de
   la conexión y el cuerpo crudo de la petición. Una petición que falla se
   descarta.

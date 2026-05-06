@@ -5,9 +5,9 @@ description: Ejecuta un agente hacia un resultado, verificado por un revisor ind
 
 ## Dar un prompt vs. perseguir un objetivo
 
-Un prompt te compra **un turno**. El agente responde y luego *tú* decides si está bien, pides un ajuste y repites. Eso te mete dentro del bucle como aprobador e inspector de calidad a la vez, y el trabajo solo avanza mientras estás frente al teclado.
+Un prompt te da **un turno**. El agente responde y luego *tú* decides si está bien, pides un ajuste y repites. Eso te mete dentro del bucle como aprobador e inspector de calidad a la vez, y el trabajo solo avanza mientras estás frente al teclado.
 
-Un **objetivo** te compra un **resultado**. Dices qué significa "terminado", y Pepe sigue trabajando hasta que un revisor independiente confirme que se llegó, o hasta que se agoten los intentos.
+Un **objetivo** te da un **resultado**. Dices qué significa "terminado", y Pepe sigue trabajando hasta que un revisor independiente confirme que se ha alcanzado, o hasta que se agoten los intentos.
 
 La diferencia está en **quién verifica**. En un turno normal es el propio agente quien decide que terminó, que es justamente la evaluación en la que no puedes confiar. En un objetivo, una **llamada separada al modelo** califica el resultado frente a tu criterio.
 
@@ -64,7 +64,7 @@ Si la respuesta del revisor llega ilegible, Pepe la cuenta como **no cumplida**.
 
 ## El límite de intentos
 
-El límite es **obligatorio** (3 por defecto, 10 como máximo). Un criterio que el agente nunca podrá satisfacer debe costar un número acotado de intentos, no correr para siempre. Al alcanzar el límite, Pepe se detiene, marca el objetivo como `blocked` y te dice qué faltaba:
+El límite es **obligatorio** (3 por defecto, 10 como máximo). Un criterio que el agente nunca podrá satisfacer debe costar un número acotado de intentos, no prolongarse indefinidamente. Al alcanzar el límite, Pepe se detiene, marca el objetivo como `blocked` y te dice qué faltaba:
 
 ```
 🛑 Gave up at the attempt cap. Still missing: 3 filas siguen con la columna de teléfono vacía
@@ -74,7 +74,7 @@ Ese mensaje ya vale por sí solo: normalmente es o un criterio imposible, o un o
 
 ## Escribir un criterio que funcione
 
-El criterio es la funcionalidad entera. Uno vago convierte al revisor en un cara o cruz, y el bucle nunca converge.
+El criterio lo es todo. Uno vago convierte al revisor en un cara o cruz, y el bucle nunca converge.
 
 - **Bueno:** "sin correos duplicados, y cada fila con un teléfono con formato `+NN NNN NNN NNN`"
 - **Malo:** "la lista está limpia"
@@ -88,6 +88,6 @@ Un objetivo no es un modo especial: envuelve un turno normal. El agente conserva
 ## Lo que el bucle de objetivo no es
 
 - **No** es un planificador. Para ejecutar algo de forma recurrente, mira [Tareas programadas](/es/docs/scheduled/).
-- **No** es un vigía. Para que te avise cuando una condición se cumpla, mira [Watches](/es/docs/watches/).
+- **No** es una vigilancia. Para que te avise cuando una condición se cumpla, mira [Watches](/es/docs/watches/).
 
 Un objetivo termina. O llega, o se rinde, y ya está.

@@ -24,7 +24,7 @@ Toda chamada de ferramenta passa por uma barreira antes de rodar. Ferramentas so
 
 As ferramentas que nunca perguntam são as de somente leitura: `read_file`, `list_dir`, `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` e `send_to_agent`. Qualquer coisa fora dessa lista, incluindo qualquer ferramenta de plugin adicionada, é tratada como arriscada e exige aprovação. Esse é um padrão deliberadamente seguro: presume-se que uma ferramenta desconhecida seja perigosa.
 
-Quando uma ferramenta arriscada não foi aprovada de antemão, o runtime pergunta à pessoa do outro lado. Cada superfície mostra esse aviso do seu jeito nativo (botões embutidos num canal de chat, um menu com as setas do teclado na CLI), mas a decisão é sempre uma de quatro:
+Quando uma ferramenta arriscada não foi aprovada de antemão, o runtime pergunta à pessoa do outro lado. Cada superfície mostra esse pedido de autorização do seu jeito nativo (botões embutidos num canal de chat, um menu com as setas do teclado na CLI), mas a decisão é sempre uma de quatro:
 
 - `once`: permite só esta chamada, pergunta de novo na próxima vez.
 - `session`: permite pelo resto desta conversa. Fica na memória e é esquecido quando você inicia uma nova sessão ou reinicia. As outras sessões continuam perguntando.
@@ -35,7 +35,7 @@ Uma chamada negada não derruba a execução. O modelo é informado de que a pes
 
 ### Aprovação automática e o agente dono
 
-Escolher `always` no aviso registra essa ferramenta na lista `auto_approve` do agente, então ela nunca mais pergunta para aquele agente. Não há uma opção separada para configurar isso de antemão pelo `pepe agent add`. Você concede confiança respondendo `always` uma vez quando o aviso aparece, ou editando o agente em `config.json`:
+Escolher `always` no pedido registra essa ferramenta na lista `auto_approve` do agente, então ela nunca mais pergunta para aquele agente. Não há uma opção separada para configurar isso de antemão pelo `pepe agent add`. Você concede confiança respondendo `always` uma vez quando o pedido aparece, ou editando o agente em `config.json`:
 
 ```json
 {
@@ -85,9 +85,9 @@ As ferramentas de shell (`bash` e `run_script`) passam cada comando por uma guar
 - Bombas de bifurcação (fork bombs).
 - Desligar ou reiniciar a máquina (`shutdown`, `reboot`, `halt`, `poweroff`, `init 0`).
 
-Ela é pura, multiplataforma, sem configuração e sempre ligada. Não custa nada, então nunca precisa ser habilitada.
+Ela não depende de nada externo, funciona em qualquer sistema, não exige configuração e está sempre ligada. Não custa nada, então nunca precisa ser habilitada.
 
-Deixe claro o que ela é: uma rede fina contra acidentes e contra injeção de prompt óbvia, não um limite de segurança. Um comando decidido ou ofuscado pode escapar da inspeção estática, e a guarda permite de propósito trabalho poderoso porém legítimo, como instalar dependências ou consultar um banco de dados. Para um limite de verdade, adicione o ambiente isolado.
+Deixe claro o que ela é: uma proteção rasa contra acidentes e contra injeção de prompt óbvia, não um limite de segurança. Um comando decidido ou ofuscado pode escapar da inspeção estática, e a guarda permite de propósito trabalho poderoso porém legítimo, como instalar dependências ou consultar um banco de dados. Para um limite de verdade, adicione o ambiente isolado.
 
 ## O ambiente isolado (isolamento opcional)
 
@@ -109,7 +109,7 @@ Escolha o passo Sandbox e o seu isolamento. O Pepe oferece o que a sua máquina 
 | macOS | sandbox-exec (já vem com o macOS) ou Docker Desktop |
 | Windows | Docker ou WSL |
 
-O Docker é o denominador comum portátil: ele monta apenas a área de trabalho, então o resto do sistema de arquivos da máquina anfitriã fica invisível, e você pode manter a rede ligada quando o agente precisa de um banco de dados ou de uma API. O invólucro do Docker é ajustável por variáveis de ambiente, incluindo `PEPE_SANDBOX_IMAGE`, `PEPE_SANDBOX_NET` (`bridge` ou `none`), `PEPE_SANDBOX_MEM`, `PEPE_SANDBOX_CPUS` e `PEPE_SANDBOX_RUNTIME` (`docker` ou `podman`).
+O Docker é o denominador comum portátil: ele monta apenas o workspace, então o resto do sistema de arquivos da máquina anfitriã fica invisível, e você pode manter a rede ligada quando o agente precisa de um banco de dados ou de uma API. O invólucro do Docker é ajustável por variáveis de ambiente, incluindo `PEPE_SANDBOX_IMAGE`, `PEPE_SANDBOX_NET` (`bridge` ou `none`), `PEPE_SANDBOX_MEM`, `PEPE_SANDBOX_CPUS` e `PEPE_SANDBOX_RUNTIME` (`docker` ou `podman`).
 
 Se você preferir apontar para o seu próprio invólucro, defina o caminho direto em `config.json`:
 
@@ -125,7 +125,7 @@ Qualquer executável serve desde que rode seus argumentos (`program arg1 arg2 ..
 
 ## Os segredos ficam como referências
 
-A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não há banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe as interpola contra o ambiente no momento da leitura e nunca persiste o valor expandido.
+A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não há banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe as interpola com os valores do ambiente no momento da leitura e nunca persiste o valor expandido.
 
 ```json
 {
@@ -148,7 +148,7 @@ export TELEGRAM_BOT_TOKEN=123456:AA...
 pepe serve --port 4000
 ```
 
-Um marcador de string inteira que resolve para nada (a variável não está definida) é tratado como "não definido" em vez de uma string vazia, então um segredo ausente aparece como um claro "não configurado" em vez de um branco silencioso.
+Um marcador de string inteira que resolve para nada (a variável não está definida) é tratado como "não definido" em vez de uma string vazia, então um segredo ausente aparece como um claro "não configurado" em vez de um vazio silencioso.
 
 ### Faça pela conversa
 
@@ -160,7 +160,7 @@ Um agente que recebe as ferramentas somente leitura `config_get` e `doctor` cons
 
 A ferramenta `doctor` faz uma verificação de saúde de toda a configuração e sinaliza segredos `${ENV}` não definidos, agentes apontando para modelos ausentes, agendamentos inválidos e conexões inalcançáveis. Passe `live: true` para também sondar a rede.
 
-<div class="note"><strong>Ajustes sensíveis à segurança não são editáveis pela ferramenta geral de configuração.</strong> A ferramenta protegida `config_set` é fechada por padrão: ela só mexe numa lista de permissão curta (o modelo e o agente padrão, o idioma, o fuso horário e algumas poucas opções do Telegram). Segredos, listas de ferramentas permitidas, tokens de bot, o invólucro do ambiente isolado e a senha do painel ficam de propósito fora dessa lista, então o `config_set` não consegue mudá-los. Você define esses por conta própria com a CLI ou o painel. Os tokens da API são a única coisa que um agente consegue gerar pela conversa, mas apenas pela ferramenta separada e protegida por barreira de permissão `manage_token`, nunca pelo `config_set`.</div>
+<div class="note"><strong>Ajustes sensíveis à segurança não são editáveis pela ferramenta geral de configuração.</strong> A ferramenta protegida `config_set` recusa por padrão (fail-closed): ela só mexe numa lista de permissão curta (o modelo e o agente padrão, o idioma, o fuso horário e algumas poucas opções do Telegram). Segredos, listas de ferramentas permitidas, tokens de bot, o invólucro do ambiente isolado e a senha do painel ficam de propósito fora dessa lista, então o `config_set` não consegue mudá-los. Você define esses por conta própria com a CLI ou o painel. Os tokens da API são a única coisa que um agente consegue gerar pela conversa, mas apenas pela ferramenta separada e protegida por barreira de permissão `manage_token`, nunca pelo `config_set`.</div>
 
 ## Hooks de censura (limpeza opcional de dados pessoais)
 
@@ -173,12 +173,12 @@ pepe agent add support \
   --hooks pii_redact
 ```
 
-Três pontos do fluxo são censurados: a mensagem de entrada do humano, **o resultado bruto de qualquer tool** (uma consulta ao banco, a leitura de um arquivo, uma busca na web - qualquer coisa que uma tool traga, não só o que um humano digitou), e a resposta de saída do agente. O resultado da tool é censurado antes de entrar na conversa e antes de ser gravado em disco - então um resultado grande que acabe salvo num arquivo do workspace (veja Agentes) já sai gravado censurado, nunca cru. Peça "liste os 10 pacientes mais recentes com diagnóstico cardíaco" contra o seu próprio banco e, com `pii_redact` habilitado, o modelo raciocina sobre `[PERSON_1]`, `[PERSON_2]`, ...; só a resposta final pra você recebe os nomes reais de volta.
+Três pontos do fluxo são censurados: a mensagem de entrada do humano, **o resultado bruto de qualquer ferramenta** (uma consulta ao banco, a leitura de um arquivo, uma busca na web, qualquer coisa que uma ferramenta traga, não só o que um humano digitou), e a resposta de saída do agente. O resultado da ferramenta é censurado antes de entrar na conversa e antes de ser gravado em disco, então um resultado grande que acabe salvo num arquivo do workspace (veja Agentes) já sai gravado censurado, nunca em texto bruto. Peça "liste os 10 pacientes mais recentes com diagnóstico cardíaco" contra o seu próprio banco e, com `pii_redact` habilitado, o modelo raciocina sobre `[PERSON_1]`, `[PERSON_2]`, ...; só a resposta final para você recebe os nomes reais de volta.
 
 Quatro hooks vêm de fábrica:
 
 - `pii_redact`: um censor de expressões regulares, offline e sem dependências. Ele substitui dados pessoais estruturados (email, número de cartão e documentos nacionais como CPF ou CNPJ) por um token estável como `[CPF_1]`. Por padrão é reversível: registra `token -> real` para que o pipeline consiga restaurar o valor real na resposta de saída.
-- `llm_redact`: usa um modelo local ou configurado para substituir nomes, endereços e texto livre por pseudônimos realistas, e depois os restaura na saída. Vai melhor junto com o `pii_redact`, que lida com os documentos estruturados de forma determinística enquanto o modelo cuida das partes bagunçadas em qualquer idioma.
+- `llm_redact`: usa um modelo local ou configurado para substituir nomes, endereços e texto livre por pseudônimos realistas, e depois os restaura na saída. Combina melhor com o `pii_redact`, que lida com os documentos estruturados de forma determinística enquanto o modelo cuida das partes bagunçadas em qualquer idioma.
 - `presidio`: envia o texto pelos seus próprios contêineres auto-hospedados de análise e anonimização do Microsoft Presidio, assim os dados ficam sob o seu controle.
 - `http_redact`: a válvula de escape genérica. O Pepe publica a mensagem no seu próprio endpoint, que devolve o texto transformado, assim qualquer serviço de censura se conecta sem um adaptador dedicado.
 
@@ -189,7 +189,7 @@ pepe hooks list
 pepe hooks generate "redact Brazilian CPF, emails, and phone numbers" --save
 ```
 
-Os hooks de expressões regulares e de HTTP falham de forma aberta por design: se um censor der erro ou um modelo estiver indisponível, o texto original passa em vez de bloquear o trabalho. Quando você precisa de uma garantia firme, marque a conexão de modelo com `require_redaction` em `config.json`. Um modelo marcado assim se recusa a rodar a menos que o agente tenha pelo menos um hook de censura habilitado, transformando uma limpeza de melhor esforço em uma obrigatória.
+Os hooks de expressões regulares e de HTTP são fail-open por design: se um censor der erro ou um modelo estiver indisponível, o texto original passa em vez de bloquear o trabalho. Quando você precisa de uma garantia firme, marque a conexão de modelo com `require_redaction` em `config.json`. Um modelo marcado assim se recusa a rodar a menos que o agente tenha pelo menos um hook de censura habilitado, transformando uma limpeza de melhor esforço em uma obrigatória.
 
 ```json
 {
@@ -212,7 +212,7 @@ O painel web fica aberto em localhost por padrão, o que é conveniente para o d
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Vinculado a uma interface pública sem senha, o painel se fecha por padrão e bloqueia clientes remotos até que você defina uma. Detalhes completos - a lista de permissão de `Host` e os ajustes de trusted-proxies pra servir atrás de um domínio, e como rodar como serviço persistente - estão na página [Painel](../dashboard/).
+Vinculado a uma interface pública sem senha, o painel se recusa a servir (fail-closed) e bloqueia clientes remotos até que você defina uma. Os detalhes completos (a lista de permissão de `Host`, os ajustes de trusted-proxies para servir atrás de um domínio e como rodar como serviço persistente) estão na página [Painel](../dashboard/).
 
 ## Tokens da API
 

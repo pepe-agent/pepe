@@ -62,7 +62,7 @@ pepe agent add assistant \
   --tools bash,read_file,write_file,web_search
 ```
 
-Rode um prompt de uma vez só contra ele. A resposta é transmitida para o seu
+Rode um prompt avulso nele. A resposta é transmitida para o seu
 terminal à medida que é produzida:
 
 ```bash
@@ -113,7 +113,7 @@ fora desse escopo é recusado com educação.
 | `auto_approve` | Ferramentas que este agente pode executar sem pedir permissão. `["*"]` significa todas. | `[]` |
 | `can_message` | Outros agentes para os quais este pode enviar mensagens (uma rota direcionada). | `[]` |
 | `can_manage` | Quais agentes este pode administrar. Veja [Administrar agentes](#administrar-agentes). | `null` (só ele mesmo) |
-| `hooks` | Transformações do fluxo de mensagens a aplicar, como a redação de dados pessoais. | `[]` |
+| `hooks` | Transformações do fluxo de mensagens a aplicar, como a censura de dados pessoais. | `[]` |
 | `max_iterations` | O teto rígido de quantas rodadas de modelo mais ferramenta um turno pode ter. | `12` |
 | `temperature` | Temperatura de amostragem passada ao modelo. Sem definir usa o padrão do próprio provedor. | padrão do provedor |
 | `triage_model` | Uma conexão de modelo que julga a complexidade antes do primeiro turno de uma sessão. Veja [Roteamento de modelo por complexidade](#roteamento-de-modelo-por-complexidade). | nenhum (desligado) |
@@ -139,18 +139,18 @@ tudo dentro de um mesmo turno. O limite de iterações é a proteção que imped
 agente confuso fique em loop para sempre.
 
 Outras duas barreiras ficam na frente da chamada ao modelo. Um agente cujo modelo
-exige redação se recusa a rodar a menos que o agente tenha um hook de redação
-ativado, e uma empresa que atingiu seu teto de gasto mensal - ou seu teto de
-mensagens de clientes por mês, um limite separado - para aqui sem novas chamadas ao
-modelo nem respostas. Ambas falham o turno de forma limpa em vez de seguir em
-silêncio; veja Cobrança e limites pra saber como configurar esses tetos.
+exige censura de dados se recusa a rodar a menos que o agente tenha um hook de
+censura ativado, e uma empresa que atingiu seu teto de gasto mensal (ou seu teto de
+mensagens de clientes por mês, que é um limite separado) para aqui, sem novas
+chamadas ao modelo nem respostas. Ambas encerram o turno com um erro claro em vez de seguir em
+silêncio; veja Cobrança e limites para saber como configurar esses tetos.
 
 <div class="note"><strong>Transmissão e eventos.</strong> Conforme o ciclo roda, ele
 emite eventos de ciclo de vida: um fragmento de texto transmitido
 (<code>assistant_delta</code>), uma mensagem completa do assistente
 (<code>assistant</code>), uma chamada de ferramenta (<code>tool_call</code>), uma
 ferramenta recusada (<code>tool_denied</code>), um resultado de ferramenta
-(<code>tool_result</code>), uma troca para um modelo reserva (<code>failover</code>),
+(<code>tool_result</code>), uma troca para um modelo de fallback (<code>failover</code>),
 um registro de uso de tokens (<code>usage</code>), uma resposta final
 (<code>done</code>) ou um erro (<code>error</code>). A CLI, o WebSocket e os canais
 de mensagens exibem tudo ao vivo, e por isso você vê a digitação e a atividade das
@@ -174,14 +174,14 @@ O conjunto embutido cobre o essencial:
 |------|--------------|
 | `bash` | Executa um comando de shell. |
 | `run_script` | Escreve e executa um programa curto em Python, Node, Ruby ou Elixir. |
-| `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabalha com arquivos no espaço de trabalho do agente. |
+| `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabalha com arquivos no workspace do agente. |
 | `fetch_url`, `web_search` | Lê uma página web ou busca na web. |
 | `send_file` | Entrega um arquivo que o agente produziu no canal atual. |
 | `send_to_agent` | Envia mensagem a outro agente (sujeito a `can_message`). |
 | `schedule_task`, `watch` | Cria tarefas recorrentes e vigias de uma vez só do tipo "me avise quando X". |
-| `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gere agentes, ferramentas e roteamento pelo chat. |
+| `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gerencia agentes, ferramentas e roteamento pelo chat. |
 | `manage_channel`, `end_session` | Conecta e fecha canais de mensagens pelo chat. |
-| `manage_mcp`, `scan_skill`, `skill` | Adiciona servidores de ferramentas externas e habilidades. |
+| `manage_mcp`, `scan_skill`, `skill` | Adiciona servidores de ferramentas externas e skills. |
 | `manage_plugin` | Instala, varre, lista e remove plugins da comunidade (ferramentas, canais) pelo chat. |
 | `config_get`, `config_set`, `doctor` | Inspeciona e altera a configuração sob proteções, roda diagnósticos. |
 
@@ -201,7 +201,7 @@ chamada. Você pode responder:
   `auto_approve`.
 - Negar. Nunca lembrado, então é perguntado de novo.
 
-Coloque você mesmo uma ferramenta em `auto_approve` para pular o aviso desde o
+Coloque você mesmo uma ferramenta em `auto_approve` para pular o pedido desde o
 início. Em superfícies sem pessoa a quem perguntar (por exemplo a API HTTP), as
 ferramentas com barreira são autorizadas a rodar para que a requisição não trave.
 
@@ -226,7 +226,7 @@ definir significa que o agente usa o modelo padrão do seu escopo, então você 
 apontar um conjunto inteiro de agentes para um provedor e trocar todos mudando um
 único padrão.
 
-Uma conexão de modelo pode carregar uma cadeia de reserva. Quando o modelo primário
+Uma conexão de modelo pode carregar uma cadeia de fallback. Quando o modelo primário
 do agente falha com um erro transitório (um limite de taxa, um tempo esgotado, uma
 queda de rede ou um 5xx), o runtime desce pela cadeia e tenta de novo no próximo
 modelo, emitindo um evento `failover` enquanto o faz. Um erro grave como uma chave de
@@ -252,8 +252,8 @@ qualquer outra edição de configuração.
 
 O próprio `model` de um agente é tratado como a boa opção padrão.
 Opcionalmente, uma chamada de classificação barata e direta pode julgar se uma
-conversa é simples o bastante pra *descer* pra algo mais barato, antes mesmo do
-turno de verdade começar. Sem agente extra pra configurar, só dois campos:
+conversa é simples o bastante para *descer* para algo mais barato, antes mesmo do
+turno de verdade começar. Sem agente extra para configurar, só dois campos:
 
 - `triage_model`: uma conexão de modelo que classifica a mensagem recebida com
   um prompt fixo e embutido (não uma persona que você escreve); o Pepe só
@@ -273,7 +273,7 @@ pepe agent add assistant \
 A triagem roda uma única vez, no primeiro turno de uma sessão, nunca de novo
 naquela mesma sessão; assim que uma conversa é julgada simples, ela fica no
 modelo mais barato pelo resto da conversa (o mesmo mecanismo que o comando
-`/model` usa pra trocar o modelo de uma sessão, só que acionado automaticamente
+`/model` usa para trocar o modelo de uma sessão, só que acionado automaticamente
 em vez de na mão). Um veredito complexo não muda nada: a sessão roda no
 próprio modelo do agente exatamente como rodaria sem `triage_model` definido.
 
@@ -281,8 +281,8 @@ A triagem é uma otimização de melhor esforço, nunca uma dependência. Se o
 modelo de triagem não existe, está inacessível, ou simplesmente demora demais
 (com um teto de poucos segundos), o turno segue no próprio modelo do agente,
 em silêncio; uma queda na triagem nunca bloqueia nem quebra uma conversa.
-`simple_model` também precisa estar definido pra triagem rodar; senão não
-haveria pra onde descer.
+`simple_model` também precisa estar definido para a triagem rodar; senão não
+haveria para onde descer.
 
 Cada veredito aparece como um passo próprio no Trace daquele turno (o replay
 de cada execução no painel), junto de qualquer hook de privacidade que rodou
@@ -352,7 +352,7 @@ significado é preciso:
 
 - Sem definir (`null`): o agente pode administrar apenas a si mesmo.
 - Vazio (`[]`, definido com `--can-manage none`): ele não pode administrar ninguém,
-  nem a si mesmo. Um filho travado, por exemplo um agente voltado ao cliente que não
+  nem a si mesmo. Um filho bloqueado, por exemplo um agente voltado ao cliente que não
   pode se alterar.
 - Uma lista de nomes: exatamente esses agentes, e nenhum outro. Inclua o próprio nome
   para deixar que ele também administre a si mesmo.
@@ -380,13 +380,13 @@ O agente chama `manage_agent` com `action: "add_tool"` e depois com
 `action: "remember"`. Cada uma dessas ações tem barreira: o agente propõe a mudança,
 você a autoriza e só então ela é aplicada. Um agente também pode se renomear com a
 ferramenta separada `rename_agent` ("De agora em diante, se chame scout"), que move o
-diretório do seu espaço de trabalho e entra em vigor na próxima mensagem.
+diretório do seu workspace e entra em vigor na próxima mensagem.
 
 ## Agentes multiempresa com empresas
 
 Empresas são opcionais. Sem uma, tudo vive no escopo padrão, chamado Principal,
 exatamente como uma instalação de empresa única sempre funcionou. Adicione uma
-empresa para isolar uma empresa: seus agentes, espaços de trabalho, espaço
+empresa para isolar um cliente: seus agentes, workspaces, espaço
 compartilhado, conexões de modelo e roteamento ficam isolados de qualquer outra
 empresa.
 

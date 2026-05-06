@@ -633,90 +633,91 @@ defmodule PepeWeb.ChatLive do
     end
   end
 
-  defp run_slash_command(socket, cmd) do
-    key = socket.assigns.selected
+  defp run_slash_command(socket, cmd), do: dispatch_slash(slash_name(cmd), socket, socket.assigns.selected, cmd)
 
-    case slash_name(cmd) do
-      c when c in ["/new", "/reset"] ->
-        Session.reset(key)
+  defp dispatch_slash(name, socket, key, _cmd) when name in ["/new", "/reset"], do: new_conversation(socket, key)
+  defp dispatch_slash("/stop", socket, key, _cmd), do: stop_turn(socket, key)
+  defp dispatch_slash("/inline", socket, key, cmd), do: inline_into_turn(socket, key, cmd)
+  defp dispatch_slash("/goal", socket, key, cmd), do: start_goal(socket, key, cmd)
+  defp dispatch_slash("/retry", socket, key, _cmd), do: retry_last(socket, key)
+  defp dispatch_slash("/fork", socket, key, _cmd), do: fork_session(socket, key)
+  defp dispatch_slash("/name", socket, key, cmd), do: label_session(socket, key, cmd)
+  defp dispatch_slash("/compact", socket, key, _cmd), do: compact_session(socket, key)
+  defp dispatch_slash("/models", socket, _key, _cmd), do: list_models(socket)
+  defp dispatch_slash("/model", socket, key, cmd), do: change_model(socket, key, slash_args(cmd))
 
-        socket
-        |> assign(
-          messages: history(key),
-          streaming: "",
-          running: false,
-          activity: [],
-          pending_perm: nil,
-          input: ""
-        )
-        |> put_flash(:info, gettext("🧠 New conversation started."))
+  defp dispatch_slash("/usage", socket, key, _cmd),
+    do: socket |> assign(input: "") |> put_flash(:info, usage_line(key))
 
-      "/stop" ->
-        Session.stop(key)
-        assign(socket, running: false, streaming: "", activity: [], input: "")
+  defp dispatch_slash(_name, socket, _key, cmd),
+    do: put_flash(socket, :error, gettext("Unknown command %{cmd}", cmd: cmd))
 
-      "/inline" ->
-        text = cmd |> String.replace_prefix("/inline", "") |> String.trim()
+  defp new_conversation(socket, key) do
+    Session.reset(key)
 
-        flash =
-          cond do
-            text == "" -> {:error, gettext("Usage: /inline TEXT")}
-            match?(:ok, Session.inline(key, text)) -> {:info, gettext("Fed into the running turn.")}
-            true -> {:error, gettext("Nothing is running - send it as a normal message.")}
-          end
+    socket
+    |> assign(
+      messages: history(key),
+      streaming: "",
+      running: false,
+      activity: [],
+      pending_perm: nil,
+      input: ""
+    )
+    |> put_flash(:info, gettext("🧠 New conversation started."))
+  end
 
-        socket |> assign(input: "") |> put_flash(elem(flash, 0), elem(flash, 1))
+  defp stop_turn(socket, key) do
+    Session.stop(key)
+    assign(socket, running: false, streaming: "", activity: [], input: "")
+  end
 
-      "/goal" ->
-        start_goal(socket, key, cmd)
+  defp inline_into_turn(socket, key, cmd) do
+    text = cmd |> String.replace_prefix("/inline", "") |> String.trim()
 
-      "/retry" ->
-        retry_last(socket, key)
+    flash =
+      cond do
+        text == "" -> {:error, gettext("Usage: /inline TEXT")}
+        match?(:ok, Session.inline(key, text)) -> {:info, gettext("Fed into the running turn.")}
+        true -> {:error, gettext("Nothing is running - send it as a normal message.")}
+      end
 
-      "/fork" ->
-        fork_session(socket, key)
+    socket |> assign(input: "") |> put_flash(elem(flash, 0), elem(flash, 1))
+  end
 
-      "/name" ->
-        title = cmd |> String.replace_prefix("/name", "") |> String.trim()
-        Pepe.Agent.SessionTitles.set(key, title)
+  defp label_session(socket, key, cmd) do
+    title = cmd |> String.replace_prefix("/name", "") |> String.trim()
+    Pepe.Agent.SessionTitles.set(key, title)
 
-        flash =
-          if title == "",
-            do: gettext("Label cleared."),
-            else: gettext("Labeled “%{title}”.", title: title)
+    flash =
+      if title == "",
+        do: gettext("Label cleared."),
+        else: gettext("Labeled “%{title}”.", title: title)
 
-        socket
-        |> assign(input: "", sessions: list_sessions(socket.assigns.scope))
-        |> put_flash(:info, flash)
+    socket
+    |> assign(input: "", sessions: list_sessions(socket.assigns.scope))
+    |> put_flash(:info, flash)
+  end
 
-      "/usage" ->
-        socket |> assign(input: "") |> put_flash(:info, usage_line(key))
+  defp compact_session(socket, key) do
+    parent = self()
 
-      "/compact" ->
-        parent = self()
+    Task.start(fn ->
+      Session.compact(key)
+      send(parent, {:compacted, key})
+    end)
 
-        Task.start(fn ->
-          Session.compact(key)
-          send(parent, {:compacted, key})
-        end)
+    socket |> assign(input: "") |> put_flash(:info, gettext("Compacting history..."))
+  end
 
-        socket |> assign(input: "") |> put_flash(:info, gettext("Compacting history..."))
+  defp list_models(socket) do
+    text =
+      case ModelSwitch.list_for(scope_company(socket.assigns.scope)) do
+        [] -> gettext("No models are configured for this company.")
+        models -> gettext("Available models:") <> " " <> Enum.map_join(models, ", ", & &1.name)
+      end
 
-      "/models" ->
-        text =
-          case ModelSwitch.list_for(scope_company(socket.assigns.scope)) do
-            [] -> gettext("No models are configured for this company.")
-            models -> gettext("Available models:") <> " " <> Enum.map_join(models, ", ", & &1.name)
-          end
-
-        socket |> assign(input: "") |> put_flash(:info, text)
-
-      "/model" ->
-        change_model(socket, key, slash_args(cmd))
-
-      _ ->
-        put_flash(socket, :error, gettext("Unknown command %{cmd}", cmd: cmd))
-    end
+    socket |> assign(input: "") |> put_flash(:info, text)
   end
 
   # Branch the current conversation into a fresh session seeded with its history, then

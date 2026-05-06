@@ -1,6 +1,6 @@
 ---
 title: Vigilancias
-description: Crea monitores duraderos que avisan una sola vez cuando una condición se cumple.
+description: Crea vigilancias duraderas que avisan una sola vez cuando una condición se cumple.
 ---
 
 ## Vigilancias
@@ -9,7 +9,7 @@ Una vigilancia responde a una pregunta distinta: no "haz esto según el reloj" s
 
 ### Disparadores por sonda y por agente
 
-La parte barata de una vigilancia es el **disparador**, que corre en cada intervalo. Solo cuando el disparador se activa corre la notificación (posiblemente costosa), una vez. Hay dos tipos de disparador:
+La parte barata de una vigilancia es el **disparador**, que se ejecuta en cada intervalo. Solo cuando el disparador se activa se ejecuta la notificación (posiblemente costosa), una vez. Hay dos tipos de disparador:
 
 - Una **sonda** ejecuta un comando de shell y no cuesta tokens por comprobación. El éxito es el código de salida 0 por defecto, o puedes exigir que aparezca una cadena en la salida del comando. Usa una sonda siempre que la condición sea scriptable (una URL está accesible, un trabajo escribió un archivo, un log contiene una línea).
 - Un disparador de **agente** le vuelve a preguntar al agente una pregunta de sí/no en cada intervalo, una llamada al modelo por comprobación. Úsalo solo cuando decidir si la condición se cumple requiere verdadero criterio.
@@ -60,7 +60,7 @@ Pídelo en lenguaje natural y el agente crea la vigilancia a través de su herra
 
 Para una comprobación scriptable el agente configura una sonda. Para algo que necesita criterio configura un disparador de agente, formulando una pregunta de sí/no que responde en cada intervalo. También puede optar por componer el mensaje de disparo con el modelo en lugar de una plantilla fija, para que la notificación lleve un resumen real en vez de una línea enlatada. Las acciones de la herramienta `watch` son `create`, `list`, `pause`, `resume` y `cancel`.
 
-Para mantener las cosas acotadas, puede haber como mucho 50 vigilancias activas a la vez, y Pepe rechaza una vigilancia nueva cuya condición sea idéntica a una que ya está corriendo, así que no puedes apilar duplicados por accidente. Una vigilancia también tiene un número máximo de comprobaciones; si la condición nunca se vuelve verdadera dentro de ese presupuesto, la vigilancia caduca en silencio en vez de sondear para siempre.
+Para mantener las cosas acotadas, puede haber como mucho 50 vigilancias activas a la vez, y Pepe rechaza una vigilancia nueva cuya condición sea idéntica a una que ya está activa, así que no puedes apilar duplicados por accidente. Una vigilancia también tiene un número máximo de comprobaciones; si la condición nunca se vuelve verdadera dentro de ese presupuesto, la vigilancia caduca en silencio en vez de sondear para siempre.
 
 ### Entrega al canal de origen
 
@@ -73,4 +73,4 @@ Dos garantías lo hacen fiable:
 
 Una vigilancia pasa por un pequeño conjunto de estados a lo largo de su vida: `pending` (aún vigilando), `paused`, `done` (disparada y entregada), `expired` (agotó su presupuesto de comprobaciones) o `cancelled`.
 
-<div class="note"><strong>Sin base de datos, sin crontab.</strong> Las tareas y las vigilancias son registros simples en <code>~/.pepe/config.json</code>, y el historial de ejecuciones de las tareas es un archivo JSONL por tarea bajo <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. No hay nada más que instalar ni mantener corriendo. Todo el programador es un temporizador dentro del proceso que arranca cuando ejecutas <code>pepe serve</code> o un gateway, y se detiene cuando los detienes.</div>
+<div class="note"><strong>Sin base de datos, sin crontab.</strong> Las tareas y las vigilancias son registros simples en <code>~/.pepe/config.json</code>, y el historial de ejecuciones de las tareas es un archivo JSONL por tarea bajo <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. No hay nada más que instalar ni mantener en marcha. Todo el programador es un temporizador dentro del proceso que arranca cuando ejecutas <code>pepe serve</code> o un gateway, y se detiene cuando los detienes.</div>

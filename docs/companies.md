@@ -2,13 +2,13 @@
 
 Optional. A **company** is an isolated tenant scope, so one deployment can serve
 many clients whose data never crosses. It is entirely opt-in: with no company,
-everything lives in the **root** scope - identical to a single-tenant install - and
+everything lives in the **root** scope (identical to a single-tenant install) and
 that's what every command uses without `--company`. Most deployments never need a
 company; add one only when you must wall tenants off.
 
-An agent's identity is a **handle**: a bare name in root (`vendas`) or
-`company/name` inside a company (`acme/vendas`). The same bare name can be reused
-per company - `acme/vendas` and `globex/vendas` are different agents. Because the
+An agent's identity is a **handle**: a bare name in root (`sales`) or
+`company/name` inside a company (`acme/sales`). The same bare name can be reused
+per company, so `acme/sales` and `globex/sales` are different agents. Because the
 handle is what keys everything (config, workspace, sessions, routes), isolation
 follows automatically:
 
@@ -22,7 +22,7 @@ follows automatically:
   even if an allowlist asks for it.
 
 - **Models/keys** - a company agent resolves its own models first, then root, so a
-  company can pin private provider keys other companies can't see - or inherit one
+  company can pin private provider keys other companies can't see, or inherit one
   shared global provider. A company agent/model never becomes the global default.
 
 ```bash
@@ -32,14 +32,14 @@ mix pepe company list
 
 # agents, models, routes all take --company
 mix pepe model add llm  --company acme --base-url ... --api-key '${ACME_KEY}' --model ...
-mix pepe agent add vendas  --company acme --prompt "..." --can-message suporte
-mix pepe agent add suporte --company acme --prompt "..."
-mix pepe agent route vendas suporte --company acme   # both resolve inside acme
+mix pepe agent add sales   --company acme --prompt "..." --can-message support
+mix pepe agent add support --company acme --prompt "..."
+mix pepe agent route sales support --company acme   # both resolve inside acme
 
 mix pepe agent list --company acme    # only Acme's
 mix pepe agent list                   # only root
 mix pepe agent list --all             # every scope
-mix pepe tui --company acme vendas    # or: mix pepe run acme/vendas "..."
+mix pepe chat --company acme sales    # or: mix pepe run acme/sales "..."
 
 mix pepe company rename acme umbrella # re-keys its agents, models, routes,
                                       # crons, watches, bots, tokens and files
@@ -51,8 +51,8 @@ mix pepe company remove acme --force  # ...unless forced (drops its agents too)
 "companies": { "acme": { "description": "Acme Inc", "default_model": "llm" } },
 "agents": {
   "assistant":    { "can_message": [] },          // root scope
-  "acme/vendas":  { "can_message": ["acme/suporte"] },
-  "acme/suporte": { "can_message": [] }
+  "acme/sales":   { "can_message": ["acme/support"] },
+  "acme/support": { "can_message": [] }
 }
 ```
 

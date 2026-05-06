@@ -9,7 +9,7 @@ Elixir compilado em tempo de execução a partir de `~/.pepe/plugins/`, sem rebu
 Esses são os únicos dois formatos que um plugin pode ter hoje; um módulo é
 comparado com o formato que ele implementa.
 
-## O comportamento Tool
+## O behaviour Tool
 
 ```elixir
 @callback name() :: String.t()
@@ -20,7 +20,7 @@ comparado com o formato que ele implementa.
 
 | Callback | Finalidade |
 |---|---|
-| `name/0` | O nome de função que o modelo chama, por exemplo `"read_file"`. Precisa ser único entre todas as ferramentas; um plugin nunca ganha uma colisão de nome contra uma ferramenta embutida. |
+| `name/0` | O nome de função que o modelo chama, por exemplo `"read_file"`. Precisa ser único entre todas as ferramentas; em caso de conflito de nome com uma ferramenta embutida, a embutida sempre prevalece. |
 | `spec/0` | A especificação de função no estilo OpenAI: nome, descrição em linguagem simples e um JSON Schema para os parâmetros. É isso que o modelo lê para decidir quando e como chamar a ferramenta. |
 | `run/2` | Executa a chamada. `args` são os argumentos decodificados (um mapa com chaves em string); `ctx` carrega o contexto da execução atual (abaixo). Devolva `{:ok, text}` ou `{:error, message}`; de qualquer forma vira uma string e volta ao modelo, então escreva para que o modelo leia. |
 
@@ -73,7 +73,7 @@ Ferramentas que leem/escrevem arquivos resolvem caminhos via
 ignorar `ctx` por completo e usar direto o cliente HTTP `Req` já incluso, sem
 dependência extra.
 
-## O comportamento Channel provider
+## O behaviour Channel provider
 
 Um provedor de canal ensina o Pepe a falar uma nova plataforma de mensagens
 sobre o webhook de entrada genérico já existente: nenhuma rota nova, só um
@@ -92,7 +92,7 @@ módulo novo no registro.
 | `name/0` | sim | Chave de registro e o segmento `:provider` da URL do webhook, ex. `"whatsapp"`. |
 | `verify/2` | sim | Responde o handshake `GET` da plataforma quando você registra a URL do webhook. `{:ok, challenge}` ou `:error` se o provedor não tiver um. |
 | `authenticate/3` | sim | Confere a assinatura de um `POST` de entrada contra o segredo da conexão. `:ok` para aceitar, `:error` para descartar. |
-| `parse/1` | sim | Normaliza um payload decodificado em zero ou mais mensagens `%{from, text, id}`, ou `:ignore` para o que não tem nada a fazer (recibos, atualizações de status). |
+| `parse/1` | sim | Normaliza um payload decodificado em zero ou mais mensagens `%{from, text, id}`, ou `:ignore` para o que não exige nenhuma ação (recibos, atualizações de status). |
 | `deliver/3` | sim | Envia uma resposta em texto para `to` (um endereço do provedor: número de telefone, id de canal, ...). |
 | `label/0` | não | Rótulo humano para o painel (usa `name/0` por padrão). |
 | `config_schema/0` | não | Campos que o painel renderiza para configurar uma conexão, mesmo formato do array `config` de um manifesto de plugin (abaixo). |
@@ -104,9 +104,9 @@ módulo novo no registro.
 
 `Pepe.Tools.all/0` devolve as ferramentas embutidas seguidas de cada
 ferramenta de plugin carregada; `Pepe.Webhooks` faz o mesmo para provedores de
-canal. Uma regra para lembrar: uma embutida sempre ganha uma colisão de nome,
-então escolha um nome de ferramenta diferente de `read_file`, `web_search` e
-do resto de `pepe tools`.
+canal. Uma regra para lembrar: em caso de conflito de nome, a embutida sempre
+prevalece, então escolha um nome de ferramenta diferente de `read_file`,
+`web_search` e do resto de `pepe tools`.
 
 ### Conceder uma ferramenta a um agente
 
@@ -149,7 +149,7 @@ um diretório com um `manifest.json` e um ou mais arquivos `.exs`.
 
 A fonte é um arquivo local, um diretório local, um `.tar.gz`, ou uma URL para
 qualquer um desses. Uma URL de repositório do GitHub é baixada como seu
-arquivo de código-fonte (`main`, depois `master`, quando nenhuma branch é
+pacote de código-fonte (`main`, depois `master`, quando nenhuma branch é
 indicada).
 
 **CLI:**
@@ -169,7 +169,7 @@ o plugin declara configurações, um botão Configurar.
 **Pela conversa, com `manage_plugin`:** um agente com essa ferramenta pode
 instalar em seu nome: faça `scan` de uma fonte primeiro para ver o que ela
 faz, depois `install`, `list`, `remove`. Passa pela mesma varredura de
-segurança da CLI, mas sem a saída de emergência `--force`: um veredito
+segurança da CLI, mas sem a válvula de escape `--force`: um veredito
 perigoso é sempre recusado pela conversa, e o agente vai te dizer para
 revisar o código e rodar `--force` você mesmo em um terminal se ainda assim
 quiser.
@@ -338,7 +338,7 @@ Instagram, ...).
 pepe plugin install ./examples/plugins/chatwoot
 ```
 
-**Transferência nativa para humano, sem cola extra.** O Chatwoot carrega o
+**Transferência nativa para humano, sem nenhuma integração extra.** O Chatwoot carrega o
 sinal de transferência em todo webhook: o `status` da conversa. O plugin
 implementa `parse/1` para responder só conversas marcadas como `pending`
 (controladas pelo bot); no momento em que um atendente humano assume

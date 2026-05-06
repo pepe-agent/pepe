@@ -52,8 +52,8 @@ cada chamada de ferramenta (`tool_call`), cada resultado de ferramenta
 com streaming mostram os tokens conforme eles chegam.
 
 Ferramentas arriscadas (qualquer uma que rode um comando ou escreva um arquivo)
-podem passar por um portão de permissão que pede ao usuário para aprovar antes de
-a ferramenta rodar. Se o usuário recusar, o runtime emite um evento `tool_denied`
+podem passar por uma barreira de permissão que pede ao usuário para aprovar
+antes de a ferramenta rodar. Se o usuário recusar, o runtime emite um evento `tool_denied`
 e entrega ao modelo uma breve mensagem de "negado" em vez de rodar a ferramenta,
 de modo que um agente nunca age silenciosamente na sua máquina sem o seu
 consentimento.
@@ -153,7 +153,7 @@ O agente usa `manage_agent` para `create` o novo agente, definir sua persona e
 adicionar cada ferramenta. `manage_agent` é uma capacidade protegida: o agente só
 pode mexer nos agentes da própria lista de permitidos, é instruído a confirmar as
 mudanças com você primeiro, e por ser uma ferramenta arriscada, cada chamada
-ainda passa pelo portão de permissão antes de qualquer coisa ser escrita. Assim
+ainda passa pela barreira de permissão antes de qualquer coisa ser escrita. Assim
 você vê a mudança proposta e a aprova antes que ela tenha efeito.
 
 ## Conectando um modelo
@@ -191,8 +191,8 @@ a partir de uma conversa:
 O agente usa `manage_channel` para adicionar o bot e vinculá-lo ao agente
 indicado. Essa capacidade é deliberadamente protegida: ela só mexe em bots com
 nome (nunca o padrão protegido), é instruída a confirmar os detalhes com você
-primeiro, e é uma ferramenta arriscada, então a chamada passa pelo portão de
-permissão. E o mais importante: você dá o **nome** de uma variável de ambiente que
+primeiro, e é uma ferramenta arriscada, então a chamada passa pela barreira
+de permissão. E o mais importante: você dá o **nome** de uma variável de ambiente que
 contém o token, nunca o token em si, de modo que o segredo nunca passa pelo chat
 nem pelo modelo. Depois da mudança, o bot em execução entra no ar ao vivo, sem
 reiniciar.
@@ -212,8 +212,8 @@ Como cada provedor é alcançado pelo mesmo protocolo Chat Completions da OpenAI
 trocar de modelo é uma mudança de configuração, não de código. OpenAI, OpenRouter,
 Together, Groq, DeepSeek, Mistral e servidores locais como Ollama, LM Studio e
 vLLM funcionam todos do mesmo jeito. Uma conexão de modelo pode até listar modelos
-de reserva, então uma falha transitória (um limite de taxa, um erro de servidor,
-uma oscilação de rede) em um provedor rola discretamente para o próximo, enquanto
+de fallback, então uma falha transitória (um limite de taxa, um erro de servidor,
+uma oscilação de rede) em um provedor passa discretamente para o próximo, enquanto
 uma chave inválida ou uma requisição malformada falha na hora, em vez de tentar de
 novo sem propósito.
 
@@ -240,7 +240,7 @@ puro.
 ### Conversas isoladas
 
 Cada conversa roda como seu próprio processo leve e supervisionado, identificado
-por um id de sessão. Muitas correm lado a lado, e uma queda em uma nunca toca a
+por um id de sessão. Muitas correm lado a lado, e uma queda em uma nunca afeta a
 outra, então um único turno ruim não pode derrubar o resto dos seus agentes.
 
 ### Multiempresa quando você precisa
@@ -259,5 +259,5 @@ e uso por cliente. Se você nunca ativar, tudo vive no escopo padrão, chamado
   OpenAI, tanto pela via de requisição/resposta quanto pela de streaming.
 - [Canais](../channels/). Coloque um agente no Telegram, WhatsApp, Slack e mais.
 - [Tarefas agendadas](../scheduled/). Rode agentes em um agendamento recorrente.
-- [Segurança e permissões](../security/). O portão de permissão, o sandbox e como
+- [Segurança e permissões](../security/). A barreira de permissão, o sandbox e como
   manter um agente dentro de limites seguros.

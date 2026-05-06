@@ -16,7 +16,7 @@ docker run -d --name pepe \
   ghcr.io/pepe-agent/pepe
 ```
 
-Abra <http://localhost:4000>, entre com a senha e conclua a configuração pelo dashboard.
+Abra <http://localhost:4000>, entre com a senha e conclua a configuração pelo painel.
 
 ## Requisitos
 
@@ -44,17 +44,17 @@ numa amd64 colocaria no `PATH` executáveis que não rodam ali.
 -v pepe-data:/data -v pepe-tools:/tools
 ```
 
-### Senha do dashboard
+### Senha do painel
 
 Um container não é loopback. O Pepe o classifica como rede pública e, sem senha, responde
-403 a todas as requisições. O dashboard não sobe.
+403 a todas as requisições. O painel não sobe.
 
 ```bash
 -e PEPE_DASHBOARD_PASSWORD=...
 ```
 
 Essa é uma política deliberada, não uma limitação do Docker. O Pepe se recusa a expor um
-dashboard sem autenticação numa rede pela qual não pode responder. A regra veio de um
+painel sem autenticação numa rede pela qual não pode responder. A regra veio de um
 incidente real: um serviço exposto, sem autenticação, foi varrido e abusado.
 
 ## Segredos
@@ -142,7 +142,7 @@ Os dois caminhos têm o mesmo custo: a cada nova release do Pepe, você reconstr
 #### Por que o `ffmpeg` não está na imagem
 
 O `ffmpeg` parece o pacote de sistema óbvio para esta imagem, já que o Telegram manda voz
-em OGG/Opus e o transcript precisa sair de algum lugar. Nenhuma das duas rotas que de fato
+em OGG/Opus e a transcrição precisa sair de algum lugar. Nenhuma das duas rotas que de fato
 transcrevem precisa dele. A API de transcrição aceita o arquivo `.ogg` exatamente como ele
 chega, sem conversão nenhuma, e o `faster-whisper` decodifica através do PyAV, que carrega
 os próprios codecs dentro do wheel. Isso foi medido, não suposto: um arquivo OGG/Opus foi
@@ -171,7 +171,7 @@ resolve o seu problema e, aí sim, decida onde ela mora: no home do próprio age
 consegue instalar sozinho, ou na imagem, se for pacote de sistema.
 
 Subir o container como root (`docker run --user root`) é opt-in e nunca o padrão. Vale
-repetir que isso não compra nada durável: o que o `apt` grava continua morrendo com o
+repetir que isso não traz nenhum ganho duradouro: o que o `apt` grava continua morrendo com o
 container, e você volta às duas respostas acima.
 
 ## Compose

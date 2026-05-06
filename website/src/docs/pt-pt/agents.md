@@ -140,8 +140,8 @@ um agente confuso ande em ciclo para sempre.
 
 Outras duas barreiras ficam à frente da chamada ao modelo. Um agente cujo modelo
 exige redação recusa-se a correr a menos que o agente tenha um hook de redação
-ativado, e uma empresa que atingiu o seu limite de gasto mensal - ou o seu limite de
-mensagens de clientes por mês, um limite separado - para aqui sem novas chamadas ao
+ativado, e uma empresa que atingiu o seu limite de gasto mensal (ou o seu limite de
+mensagens de clientes por mês, um limite separado) para aqui sem novas chamadas ao
 modelo nem respostas. Ambas falham o turno de forma limpa em vez de prosseguir em
 silêncio; ver Faturação e limites para saber como configurar esses limites.
 
@@ -150,7 +150,7 @@ emite eventos de ciclo de vida: um fragmento de texto transmitido
 (<code>assistant_delta</code>), uma mensagem completa do assistente
 (<code>assistant</code>), uma chamada de ferramenta (<code>tool_call</code>), uma
 ferramenta recusada (<code>tool_denied</code>), um resultado de ferramenta
-(<code>tool_result</code>), uma troca para um modelo de reserva
+(<code>tool_result</code>), uma troca para um modelo de fallback
 (<code>failover</code>), um registo de uso de tokens (<code>usage</code>), uma
 resposta final (<code>done</code>) ou um erro (<code>error</code>). A CLI, o WebSocket
 e os canais de mensagens mostram tudo ao vivo, e é por isso que vês a escrita e a
@@ -174,7 +174,7 @@ O conjunto integrado cobre o essencial:
 |------|--------------|
 | `bash` | Executa um comando de shell. |
 | `run_script` | Escreve e executa um programa curto em Python, Node, Ruby ou Elixir. |
-| `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabalha com ficheiros no espaço de trabalho do agente. |
+| `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabalha com ficheiros no workspace do agente. |
 | `fetch_url`, `web_search` | Lê uma página web ou pesquisa na web. |
 | `send_file` | Entrega um ficheiro que o agente produziu no canal atual. |
 | `send_to_agent` | Envia mensagem a outro agente (sujeito a `can_message`). |
@@ -227,7 +227,7 @@ significa que o agente usa o modelo predefinido do seu âmbito, por isso podes a
 um conjunto inteiro de agentes para um fornecedor e trocá-los todos ao mudar uma
 única predefinição.
 
-Uma ligação de modelo pode transportar uma cadeia de reserva. Quando o modelo
+Uma ligação de modelo pode transportar uma cadeia de fallback. Quando o modelo
 primário do agente falha com um erro transitório (um limite de taxa, um tempo
 esgotado, uma quebra de rede ou um 5xx), o runtime desce pela cadeia e volta a tentar
 no modelo seguinte, emitindo um evento `failover` enquanto o faz. Um erro grave como
@@ -383,7 +383,7 @@ O agente chama `manage_agent` com `action: "add_tool"` e depois com
 `action: "remember"`. Cada uma destas ações tem barreira: o agente propõe a
 alteração, tu autoriza-la e só então é aplicada. Um agente também se pode renomear
 com a ferramenta separada `rename_agent` ("De agora em diante, chama-te scout"), que
-move o diretório do seu espaço de trabalho e entra em vigor na próxima mensagem.
+move o diretório do seu workspace e entra em vigor na próxima mensagem.
 
 ## Agentes multiempresa com empresas
 

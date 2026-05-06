@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-06
+
+### Added
+- CLI: `pepe version` (also `--version`, `-v`) prints the running version and which build it is (`pepe_linux_arm`, `pepe_macos_x86`, ...), or says it is a source checkout. There was no way to ask, which made "what are you running?" an awkward first question in any bug report. It needs no config and no network, so a broken install can still answer it.
+
+### Fixed
+- Release: the binaries and the container image of a tag are now built by the same compiler. In 0.3.0 they were not: the binaries came out of Elixir 1.18 and the image out of 1.20.2, from one commit, and nothing compared them. Both worked, but a bug appearing in only one of them would have been hunted in the wrong place. The toolchain is now declared once, in `.tool-versions`, and CI, the release workflow and the Dockerfile all name the same Elixir and the same OTP patch release.
+- Docs: the translated documentation was swept against the English source, one calque at a time. Several passages did not merely read badly, they said the wrong thing: "a prompt buys you one turn" is an idiom and means nothing translated literally; "poller" had become a word for someone who consults another person; on a page about API keys, "flips the switch" had become "turns into a key", so the reader inferred the opposite. `channels.md` also sent readers to the wrong dashboard tab.
+
 ## [0.3.0] - 2026-05-01
 
 ### Security
@@ -144,7 +153,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/pepe-agent/pepe/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/pepe-agent/pepe/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/pepe-agent/pepe/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pepe-agent/pepe/releases/tag/v0.1.0

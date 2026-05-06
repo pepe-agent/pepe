@@ -17,7 +17,7 @@ All three are optional and independent: set any of them, all of them, or none. R
 
 The message cap counts **one customer-originated message, once**, not every model call it takes to answer it. If an agent calls three tools before replying, that is still one message against the cap, the same way it is one message in the chat. Tool-calling iterations, cron runs, sub-agent-to-sub-agent messages, and heartbeats never count.
 
-It only counts messages from customer-facing surfaces: Telegram, WhatsApp and other webhook channels, the embeddable widget. It deliberately excludes the TUI console, the dashboard's own test chat, and the HTTP API, since those are the operator using their own runtime, not a customer messaging it.
+It only counts messages from customer-facing surfaces: Telegram, WhatsApp and other webhook channels, the embeddable widget. It deliberately excludes the `pepe chat` console, the dashboard's own test chat, and the HTTP API, since those are the operator using their own runtime, not a customer messaging it.
 
 An individual agent can be exempted from the message cap entirely, which is useful for something like an always-on escalation agent that must never go quiet because the rest of the company hit its cap:
 

@@ -30,4 +30,23 @@ defmodule Pepe.UpdateTest do
   test "binary_path returns an absolute path" do
     assert Update.binary_path() |> Path.type() == :absolute
   end
+
+  describe "pepe version" do
+    test "answers under each of its three names, with no config and no network" do
+      for argv <- [["version"], ["--version"], ["-v"]] do
+        out = ExUnit.CaptureIO.capture_io(fn -> Mix.Tasks.Pepe.dispatch(argv) end)
+
+        assert out =~ "pepe #{Update.current()}"
+      end
+    end
+
+    test "says which build it is, so a bug report carries it" do
+      out = ExUnit.CaptureIO.capture_io(fn -> Mix.Tasks.Pepe.dispatch(["version"]) end)
+
+      # A source checkout is what the suite runs as; the packaged binary prints its target
+      # instead. Either way the line has to be there: "0.3.0" alone does not tell you
+      # whether "it won't start" means the arm build or the x86 one.
+      assert out =~ "source checkout" or out =~ Update.target()
+    end
+  end
 end

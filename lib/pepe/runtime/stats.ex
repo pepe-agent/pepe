@@ -99,14 +99,15 @@ defmodule Pepe.Runtime.Stats do
     Enum.reduce(SessionSupervisor.list(), %{}, fn key, acc ->
       with agent when is_binary(agent) <- agent_of(key),
            kb when is_integer(kb) <- memory_kb_of(key) do
-        Map.update(acc, agent, %{sessions: 1, memory_kb: kb}, fn m ->
-          %{sessions: m.sessions + 1, memory_kb: m.memory_kb + kb}
-        end)
+        Map.update(acc, agent, %{sessions: 1, memory_kb: kb}, &add_session(&1, kb))
       else
         _ -> acc
       end
     end)
   end
+
+  defp add_session(%{sessions: sessions, memory_kb: memory_kb}, kb),
+    do: %{sessions: sessions + 1, memory_kb: memory_kb + kb}
 
   # A session that dies while we're walking the list must not take the panel with it.
   defp agent_of(key) do

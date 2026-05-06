@@ -52,7 +52,7 @@ cada chamada de ferramenta (`tool_call`), cada resultado de ferramenta
 com streaming mostram os tokens à medida que chegam.
 
 Ferramentas arriscadas (qualquer uma que corra um comando ou escreva um ficheiro)
-podem passar por um portão de permissão que pede ao utilizador para aprovar antes
+podem passar por uma barreira de permissão que pede ao utilizador para aprovar antes
 de a ferramenta correr. Se o utilizador recusar, o runtime emite um evento
 `tool_denied` e entrega ao modelo uma breve mensagem de "negado" em vez de correr
 a ferramenta, de modo que um agente nunca atua em silêncio na tua máquina sem o
@@ -154,7 +154,7 @@ O agente usa `manage_agent` para `create` o novo agente, definir a sua persona e
 adicionar cada ferramenta. `manage_agent` é uma capacidade protegida: o agente só
 pode mexer nos agentes da sua própria lista de permitidos, é instruído a confirmar
 as alterações contigo primeiro, e por ser uma ferramenta arriscada, cada chamada
-passa ainda pelo portão de permissão antes de algo ser escrito. Assim vês a
+passa ainda pela barreira de permissão antes de algo ser escrito. Assim vês a
 alteração proposta e podes aprová-la antes de ela ter efeito.
 
 ## Ligar um modelo
@@ -192,7 +192,7 @@ Telegram a partir de uma conversa:
 O agente usa `manage_channel` para adicionar o bot e ligá-lo ao agente indicado.
 Esta capacidade é deliberadamente protegida: só mexe em bots com nome (nunca o
 predefinido protegido), é instruída a confirmar os detalhes contigo primeiro, e é
-uma ferramenta arriscada, por isso a chamada passa pelo portão de permissão. E o
+uma ferramenta arriscada, por isso a chamada passa pela barreira de permissão. E o
 mais importante: dás o **nome** de uma variável de ambiente que contém o token,
 nunca o token em si, de modo que o segredo nunca passa pelo chat nem pelo modelo.
 Depois da alteração, o bot em execução entra no ar ao vivo, sem reiniciar.
@@ -212,7 +212,7 @@ Como cada fornecedor é alcançado pelo mesmo protocolo Chat Completions da Open
 trocar de modelo é uma alteração de configuração, não de código. OpenAI,
 OpenRouter, Together, Groq, DeepSeek, Mistral e servidores locais como Ollama, LM
 Studio e vLLM funcionam todos da mesma forma. Uma ligação de modelo pode até listar
-modelos de reserva, por isso uma falha transitória (um limite de taxa, um erro de
+modelos de fallback, por isso uma falha transitória (um limite de taxa, um erro de
 servidor, uma oscilação de rede) num fornecedor passa discretamente para o
 seguinte, enquanto uma chave inválida ou um pedido malformado falha de imediato,
 em vez de tentar de novo sem propósito.
@@ -260,5 +260,5 @@ chamado **Principal**, e podes ignorar as empresas por completo.
   OpenAI, tanto pela via de pedido/resposta como pela de streaming.
 - [Canais](../channels/). Coloca um agente no Telegram, WhatsApp, Slack e mais.
 - [Tarefas agendadas](../scheduled/). Corre agentes num agendamento recorrente.
-- [Segurança e permissões](../security/). O portão de permissão, o sandbox e como
+- [Segurança e permissões](../security/). A barreira de permissão, o sandbox e como
   manter um agente dentro de limites seguros.

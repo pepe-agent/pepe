@@ -70,7 +70,7 @@ Pega la etiqueta script en la página, apuntando a tu servidor Pepe:
         data-logo="https://example.com/logo.png"
         data-color="#ea580c"
         data-theme="dark"
-        data-greeting="Hi! How can I help?"
+        data-greeting="¡Hola! ¿En qué puedo ayudarte?"
         data-position="right"
         data-lang="es"></script>
 ```
@@ -160,7 +160,7 @@ una conversación:
 
 El agente llama a `manage_token` con `action: "create"`, `agent: "support"`,
 `widget: true`, y `allowed_origin: "https://example.com"`. Crear un token no es
-de solo lectura, así que la llamada pasa por la puerta de permisos; el token
+de solo lectura, así que la llamada pasa por la barrera de permisos; el token
 en crudo vuelve en la respuesta para que lo copies en la etiqueta script, y
 sigue disponible en cualquier momento con `action: "list"`, ya que un token de
 widget no es un secreto que valga la pena esconder.

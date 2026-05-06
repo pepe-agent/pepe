@@ -40,7 +40,7 @@ Los dos caminos escriben la misma configuración.
 ## Docker
 
 ¿Prefieres un contenedor? `docker pull ghcr.io/pepe-agent/pepe` (amd64 y arm64). Necesita un
-volumen y una contraseña del panel - ambos están explicados, junto con cómo darle
+volumen y una contraseña del panel: ambos están explicados, junto con cómo darle
 herramientas extra al agente dentro del contenedor, en la [página de Docker](/es/docs/docker/).
 
 ## Desinstalar

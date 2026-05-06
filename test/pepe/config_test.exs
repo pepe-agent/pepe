@@ -55,7 +55,7 @@ defmodule Pepe.ConfigTest do
       Config.backup()
 
       baks = File.ls!(home) |> Enum.filter(&String.starts_with?(&1, "#{base}.bak."))
-      assert length(baks) == 5
+      assert [_, _, _, _, _] = baks
       refute Enum.any?(baks, &String.ends_with?(&1, ".bak.1000"))
     end
   end

@@ -55,7 +55,7 @@ responde 403 a todas las peticiones. El panel no arranca.
 
 Es una política deliberada, no una limitación de Docker. Pepe se niega a exponer un panel
 sin autenticación en una red por la que no puede responder. La regla surgió de un incidente
-real: un servicio expuesto, sin autenticación, fue escaneado y abusado.
+real: un servicio expuesto, sin autenticación, fue escaneado y alguien abusó de él.
 
 ## Secretos
 

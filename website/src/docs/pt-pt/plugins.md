@@ -9,7 +9,7 @@ compilado em tempo de execução a partir de `~/.pepe/plugins/`, sem rebuild.
 São os únicos dois formatos que um plugin pode ter hoje; um módulo é
 comparado com o formato que implementa.
 
-## O comportamento Tool
+## O behaviour Tool
 
 ```elixir
 @callback name() :: String.t()
@@ -20,7 +20,7 @@ comparado com o formato que implementa.
 
 | Callback | Finalidade |
 |---|---|
-| `name/0` | O nome de função que o modelo invoca, por exemplo `"read_file"`. Tem de ser único entre todas as ferramentas: um plugin nunca ganha uma colisão de nome contra uma ferramenta incorporada. |
+| `name/0` | O nome de função que o modelo invoca, por exemplo `"read_file"`. Tem de ser único entre todas as ferramentas: em caso de conflito de nome, a ferramenta incorporada prevalece sempre. |
 | `spec/0` | A especificação de função ao estilo OpenAI: nome, descrição em linguagem simples e um JSON Schema para os parâmetros. É isto que o modelo lê para decidir quando e como invocar a ferramenta. |
 | `run/2` | Executa a chamada. `args` são os argumentos descodificados (um mapa com chaves em texto); `ctx` transporta o contexto da execução atual (abaixo). Devolve `{:ok, text}` ou `{:error, message}`; em qualquer caso é convertido em texto e volta ao modelo, por isso escreve para que o modelo leia. |
 
@@ -73,7 +73,7 @@ de `Pepe.Agent.Workspace`; as que chamam uma API externa costumam ignorar o
 `ctx` por completo e usar diretamente o cliente HTTP `Req` já incluído, sem
 dependência extra.
 
-## O comportamento Channel provider
+## O behaviour Channel provider
 
 Um fornecedor de canal ensina o Pepe a falar com uma nova plataforma de
 mensagens através do webhook de entrada genérico já existente: nenhuma rota
@@ -104,8 +104,8 @@ nova, apenas um módulo novo no registo.
 
 `Pepe.Tools.all/0` devolve as ferramentas incorporadas seguidas de cada
 ferramenta de plugin carregada; `Pepe.Webhooks` faz o mesmo para fornecedores
-de canal. Uma regra a reter: uma incorporada ganha sempre uma colisão de
-nome, por isso escolhe um nome de ferramenta diferente de `read_file`,
+de canal. Uma regra a reter: em caso de conflito de nome, a incorporada prevalece
+sempre, por isso escolhe um nome de ferramenta diferente de `read_file`,
 `web_search` e do resto de `pepe tools`.
 
 ### Conceder uma ferramenta a um agente

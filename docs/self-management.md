@@ -1,7 +1,7 @@
 # Self-knowledge & self-management (how an agent operates Pepe)
 
-Pepe is designed so an agent can **resolve requests about Pepe itself** - "add a
-bot", "schedule this", "connect Sentry", "switch the timezone" - without bespoke
+Pepe is designed so an agent can **resolve requests about Pepe itself** ("add a
+bot", "schedule this", "connect Sentry", "switch the timezone") without bespoke
 hand-holding, and without ever being dangerous:
 
 - **It reads its own docs.** How-to guides ship under `priv/docs/` (agents, channels,
@@ -11,7 +11,7 @@ hand-holding, and without ever being dangerous:
   (Drop extra guides in `~/.pepe/docs/` to extend or override.)
 
 - **It discovers what's editable.** `config_set` called with no arguments returns the
-  schema - the editable settings, their current values and accepted values. The
+  schema: the editable settings, their current values and accepted values. The
   editable set is a **fail-closed allowlist** (`default_model`, `default_agent`,
   `language`, `timezone`, `telegram.require_mention/enabled`); anything else is
   refused with a pointer to the right guarded tool (`manage_agent`, `manage_channel`,
@@ -22,7 +22,7 @@ hand-holding, and without ever being dangerous:
   installs, scans, lists, and removes drop-in `.exs` tools/channels from chat (a
   local path, a `.tar.gz`, or a GitHub URL), through the same `Pepe.Skills.Sentinel`
   static scan the CLI uses. Unlike the CLI's `--force`, this tool has no override: a
-  `danger` verdict is always refused from chat - overriding it is an operator
+  `danger` verdict is always refused from chat; overriding it is an operator
   decision made deliberately at the terminal, never one an agent is talked into
   mid-conversation.
 

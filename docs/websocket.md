@@ -13,7 +13,7 @@ tokens exist, then pass one as a **connect param** (a WebSocket can't set header
 `ws://localhost:4000/socket/websocket?token=pepe_...`. The token's scope is enforced on
 `join`: a client can only join `agent:` topics its token allows (`agent:default`
 resolves to the scope's default), and a company token joining another company's agent
-is refused. Bare names qualify into the token's company (`agent:vendas` -> `acme/vendas`).
+is refused. Bare names qualify into the token's company (`agent:sales` -> `acme/sales`).
 
 ---
 
