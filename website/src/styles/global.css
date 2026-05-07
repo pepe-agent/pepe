@@ -337,6 +337,11 @@ footer { border-top: 1px solid var(--border); padding: 46px 0; color: var(--dim)
 /* ---- docs layout ---- */
 .docs { display: grid; grid-template-columns: 240px 1fr; gap: 48px; align-items: start; padding: 40px 0 80px; }
 .docs-nav { position: sticky; top: 72px; align-self: start; height: calc(100vh - 84px); min-height: 0; display: flex; flex-direction: column; gap: 18px; }
+/* The link list sits inside a <details> so it can fold away on a phone. On a wide screen
+   that element is invisible plumbing: it has to pass the sidebar's height straight
+   through to the scroller inside it, or the sticky column stops scrolling. */
+.docs-nav-menu { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.docs-nav-menu > summary { display: none; }
 .docs-nav-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; padding-right: 8px; padding-bottom: 18px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
 .docs-nav-scroll::-webkit-scrollbar { width: 8px; }
 .docs-nav-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -431,8 +436,22 @@ footer { border-top: 1px solid var(--border); padding: 46px 0; color: var(--dim)
   .surfaces, .grid, .steps { grid-template-columns: 1fr 1fr; }
   .docs { grid-template-columns: 1fr; gap: 20px; }
   .docs-nav { position: static; height: auto; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
-  .docs-nav-scroll { height: auto; overflow: visible; padding-right: 0; padding-bottom: 0; }
   .doc-search-results { max-height: 360px; }
+
+  /* The 32 links fold behind this. Left open they push the first paragraph of every page
+     a full screen down, which is a scroll the reader did not ask for and cannot skip. */
+  .docs-nav-menu { display: block; flex: none; }
+  .docs-nav-menu > summary {
+    display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-size: 14.5px; font-weight: 600; user-select: none;
+  }
+  .docs-nav-menu > summary::-webkit-details-marker { display: none; }
+  .docs-nav-menu > summary:hover { background: var(--panel); }
+  .docs-nav-menu > summary svg { width: 18px; height: 18px; color: var(--muted); }
+  .docs-nav-menu[open] > summary { margin-bottom: 10px; }
+  /* Capped, so opening it scrolls the menu rather than the page. */
+  .docs-nav-scroll { max-height: 60vh; overflow-y: auto; padding-right: 0; padding-bottom: 0; }
 }
 @media (max-width: 640px) {
   .nav-links { display: none; }

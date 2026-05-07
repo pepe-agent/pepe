@@ -1,0 +1,15 @@
+# The toolchain this project is built and shipped with. `mise` reads this on entering the
+# directory, so you are on it without having to think about it.
+#
+# It is deliberately NOT .tool-versions. Cloudflare's build system looks for that file in
+# the repository root, and finding one it tries to install every tool named in it: it saw
+# Erlang and Elixir, failed, and never reached the website build at all. Cloudflare does
+# not read mise.toml, so the pin lives here and stays out of its way.
+#
+# OTP is held at 28 on purpose. 29 is out, but Burrito (which packages the binaries people
+# download) cannot build against it: the release fails in Zig's link step and produces
+# nothing. Raise it when Burrito supports 29, together with .github/workflows/{ci,release}
+# .yml and the Dockerfile's ARGs, which name the same versions.
+[tools]
+erlang = "28.5.0.3"
+elixir = "1.20.2-otp-28"

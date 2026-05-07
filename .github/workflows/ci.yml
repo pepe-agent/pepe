@@ -106,6 +106,32 @@ jobs:
       - run: mix deps.get
       - run: mix credo
 
+  # Cloudflare builds and deploys the site on its own, and when that build breaks it keeps
+  # serving the last good one without saying anything. Upgrading Astro to a major that
+  # needs a newer Node than Cloudflare was giving it broke the deploy for a whole day, and
+  # the only reason anyone found out was someone going to look. This job builds the site on
+  # every push, from the Node version .nvmrc names, so the same mistake fails here in
+  # thirty seconds instead of failing there in silence.
+  website:
+    name: website builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: website/.nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install exactly what the lock file says
+        working-directory: website
+        run: npm ci
+
+      - name: Build
+        working-directory: website
+        run: npm run build
+
   dialyzer:
     name: dialyzer
     runs-on: ubuntu-latest

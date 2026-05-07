@@ -68,10 +68,19 @@ const searchCopy: Record<Locale, { label: string; placeholder: string; empty: st
   },
 };
 
+// Only shown on narrow screens, where the 32 links are folded away behind it.
+const menuCopy: Record<Locale, string> = {
+  en: "All pages",
+  es: "Todas las páginas",
+  "pt-br": "Todas as páginas",
+  "pt-pt": "Todas as páginas",
+};
+
 const idx = allSlugs.indexOf(slug);
 const prev = idx > 0 ? allSlugs[idx - 1] : null;
 const next = idx < allSlugs.length - 1 ? allSlugs[idx + 1] : null;
 const search = searchCopy[lang];
+const menuLabel = menuCopy[lang];
 
 // Home > Docs > this page - the three levels that always have a real,
 // navigable URL. Not attempting a 4th "section" level: a nav group's label
@@ -118,16 +127,37 @@ const breadcrumbJsonLd = { "@context": "https://schema.org", "@type": "Breadcrum
         />
         <div class="doc-search-results" data-doc-search-results hidden></div>
       </div>
-      <div class="docs-nav-scroll">
-        {sidebar.map((g) => (
-          <div>
-            <h4>{g.label}</h4>
-            {g.items.map((it) => (
-              <a href={it.href} class={it.slug === slug ? "active" : ""}>{it.title}</a>
-            ))}
-          </div>
-        ))}
-      </div>
+      <!--
+        Open by default, so the sidebar renders as it always has: on a wide screen CSS
+        hides the summary and this is just the list. The script below folds it shut on a
+        narrow one, where 32 links between the header and the first paragraph is a scroll
+        nobody asked for. Doing it that way round means a reader with no JavaScript gets
+        the long list rather than a menu that cannot be opened.
+      -->
+      <details class="docs-nav-menu" open>
+        <summary>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+          {menuLabel}
+        </summary>
+        <div class="docs-nav-scroll">
+          {sidebar.map((g) => (
+            <div>
+              <h4>{g.label}</h4>
+              {g.items.map((it) => (
+                <a href={it.href} class={it.slug === slug ? "active" : ""}>{it.title}</a>
+              ))}
+            </div>
+          ))}
+        </div>
+      </details>
+      <script is:inline>
+        // Before paint, so it never flashes the open list and then collapses.
+        if (window.matchMedia("(max-width: 900px)").matches) {
+          document.currentScript.previousElementSibling.open = false;
+        }
+      </script>
     </aside>
 
     <article class="doc-content">

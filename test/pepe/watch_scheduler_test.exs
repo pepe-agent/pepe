@@ -50,7 +50,10 @@ defmodule Pepe.Watch.SchedulerTest do
       )
 
     tick()
-    wait_until(fn -> Config.get_watch(id).state == "done" end)
+    # match?/2 rather than `.state ==`: the watch can be absent for a tick, and reading a
+    # field off nil raises inside the predicate, which kills the retry that exists to
+    # tolerate exactly that.
+    wait_until(fn -> match?(%{state: "done"}, Config.get_watch(id)) end)
     assert Config.get_watch(id).pending_delivery == nil
   end
 
@@ -76,7 +79,10 @@ defmodule Pepe.Watch.SchedulerTest do
 
     tick()
     assert_receive {:watch_message, ^origin, "deploy done"}, 2_000
-    wait_until(fn -> Config.get_watch(id).state == "done" end)
+    # match?/2 rather than `.state ==`: the watch can be absent for a tick, and reading a
+    # field off nil raises inside the predicate, which kills the retry that exists to
+    # tolerate exactly that.
+    wait_until(fn -> match?(%{state: "done"}, Config.get_watch(id)) end)
     assert Config.get_watch(id).pending_delivery == nil
   end
 
@@ -91,7 +97,10 @@ defmodule Pepe.Watch.SchedulerTest do
       )
 
     tick()
-    wait_until(fn -> Config.get_watch(id).state == "done" end)
+    # match?/2 rather than `.state ==`: the watch can be absent for a tick, and reading a
+    # field off nil raises inside the predicate, which kills the retry that exists to
+    # tolerate exactly that.
+    wait_until(fn -> match?(%{state: "done"}, Config.get_watch(id)) end)
     assert Config.get_watch(id).pending_delivery == "held"
   end
 end
