@@ -402,8 +402,12 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp model_cmd(["remove", name | _]) do
-    Config.delete_model(name)
-    ok("removed model connection #{name}")
+    if Config.get_model(name) do
+      Config.delete_model(name)
+      ok("removed model connection #{name}")
+    else
+      error("unknown model connection: #{name}")
+    end
   end
 
   defp model_cmd(["rename", old, new | _]) do
@@ -423,8 +427,14 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp model_cmd(["default", name | _]) do
-    Config.set_default_model(name)
-    ok("default model -> #{name}")
+    # Validate first. Pointing the default at a name that does not exist leaves an install
+    # that looks configured and answers nothing, and only `doctor` ever says why.
+    if Config.get_model(name) do
+      Config.set_default_model(name)
+      ok("default model -> #{name}")
+    else
+      error("unknown model connection: #{name}")
+    end
   end
 
   # Redo the OAuth sign-in in place - same name, same base_url/model/pricing/
@@ -1919,8 +1929,13 @@ defmodule Mix.Tasks.Pepe do
   defp agent_cmd(["remove", name | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: [company: :string])
     handle = Company.handle(opts[:company], name)
-    Config.delete_agent(handle)
-    ok("removed agent #{handle}")
+
+    if Config.get_agent(handle) do
+      Config.delete_agent(handle)
+      ok("removed agent #{handle}")
+    else
+      error("unknown agent: #{handle}")
+    end
   end
 
   defp agent_cmd(["rename", old, new | _]) do
@@ -1990,9 +2005,15 @@ defmodule Mix.Tasks.Pepe do
 
   defp agent_cmd(["default", name | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: [company: :string])
-    Config.set_default_agent_for(opts[:company], name)
-    scope = if opts[:company], do: " for #{opts[:company]}", else: ""
-    ok("default agent#{scope} -> #{name}")
+    handle = Company.handle(opts[:company], name)
+
+    if Config.get_agent(handle) do
+      Config.set_default_agent_for(opts[:company], name)
+      scope = if opts[:company], do: " for #{opts[:company]}", else: ""
+      ok("default agent#{scope} -> #{name}")
+    else
+      error("unknown agent: #{handle}")
+    end
   end
 
   defp agent_cmd(cmd) when cmd in [[], ["help"]] do

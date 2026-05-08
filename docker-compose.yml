@@ -28,9 +28,13 @@ services:
       # dashboard refuses to serve.
       PEPE_DASHBOARD_PASSWORD: ${PEPE_DASHBOARD_PASSWORD:?set this in a .env file}
 
-      # Secrets stay out of the image: the config file refers to them as ${VAR_NAME}
-      # and Pepe interpolates them at read time, so put the real values here (or in a
-      # .env file next to this one).
+      # Secrets stay out of the image: Pepe's config refers to them as ${VAR_NAME} and
+      # resolves them when reading, so the real value only ever lives in the environment.
+      #
+      # Each one needs BOTH halves: the value in a .env file beside this one, AND a line
+      # here naming it. Compose reads .env to fill in the ${...} in *this file*, not to
+      # populate the container, so a key that is only in .env never reaches Pepe and you
+      # get a "no model configured" with nothing to explain it. Uncomment what you use.
       # OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       # TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TZ: UTC

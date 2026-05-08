@@ -92,7 +92,7 @@ defmodule PepeWeb.ScheduledLive do
 
         <div :if={@creating} class="min-h-0 flex-1 overflow-y-auto p-6">
           <div class="max-w-2xl">
-            <.form for={@form} phx-submit="cron_create" phx-change="cron_validate" class="space-y-4">
+            <.form id="cron-form" for={@form} phx-submit="cron_create" phx-change="cron_validate" class="space-y-4">
               <div class="text-lg font-semibold">
                 {if @edit_cron, do: gettext("Edit %{name}", name: @edit_cron.name), else: gettext("+ New task")}
               </div>

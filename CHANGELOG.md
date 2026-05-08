@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-05-08
+
+### Added
+- Docs: the Docker page covers Compose properly. Pepe ships a `docker-compose.yml` and the page never said so; it now points at it and covers the whole life of an install: the `.env`, `up`, `logs`, a shell into the node, and the upgrade. That last one is `docker compose pull` **then** `up -d`: without the pull, Compose starts the image already cached on disk, which is how you upgrade to yesterday.
+- Docs: on a phone, the sidebar's 32 links folded behind a menu. They had been putting 1734px between the header and the first line of text, on every page.
+
+### Fixed
+- Docker: **a secret in `.env` alone never reaches Pepe.** Compose reads `.env` to fill in the `${...}` in the compose file itself, not to populate the container, so a key that is only in `.env` leaves you with a "no model configured" and nothing to explain it. Each secret needs both halves: the value in `.env` **and** a line under `environment:` naming it. The compose file said "put the real values here (or in a .env file next to this one)", which reads as though either would do. It, and all four translations of the Docker page, now say what actually works.
+- CLI: `pepe model default NAME` and `pepe agent default NAME` accepted a name that does not exist and wrote it anyway. The install then looked configured and answered nothing, and only `pepe doctor` ever said why. They now refuse, as every sibling command already did.
+- CLI: `pepe model remove NAME` and `pepe agent remove NAME` printed `✓ removed ...` for a name that was never there, having removed nothing.
+- Dashboard: saving a model connection whose name is taken auto-suffixes it (`openrouter-2`), and the page builds a message telling you so, then discarded it: a second flash of the same kind replaced the first, leaving only "Model openrouter-2 saved." with no hint where the `-2` came from.
+- Dashboard: a fresh install showed a Telegram bot nobody had created, and it could not be dismissed. It comes from the config seed that makes exporting `TELEGRAM_BOT_TOKEN` enough to get a bot, and its remove button was hidden because removing it would not have worked: the delete never touched the key the seed lives under.
+- OAuth: signing in to a subscription died instead of falling back when its callback port was already in use (a second sign-in, a remote box with no loopback). `Bandit.start_link/1` is a supervisor start and fires an exit down the link on failure, killing the caller before it can read the error, so the paste-the-code route that exists for exactly this case was unreachable.
+- Dashboard: three forms (cron, MCP servers, channels) could not be recovered after a reconnect, so a dropped connection lost whatever had been typed into them. They had no `id`, which is what LiveView needs to restore a form.
+- Docs site: on a phone the text ran flush into both edges of the screen, and on a wide screen the sidebar's link list spilled over the footer instead of scrolling.
+
 ## [0.3.1] - 2026-05-06
 
 ### Added
@@ -153,7 +169,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/pepe-agent/pepe/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/pepe-agent/pepe/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/pepe-agent/pepe/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/pepe-agent/pepe/compare/v0.1.0...v0.2.0

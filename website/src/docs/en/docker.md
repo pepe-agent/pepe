@@ -176,6 +176,14 @@ container, so you end up back at the two answers above.
 
 ## Compose
 
+Pepe ships a `docker-compose.yml`, so there is nothing to write:
+
+```bash
+curl -O https://raw.githubusercontent.com/pepe-agent/pepe/master/docker-compose.yml
+```
+
+It is the `docker run` above, with the two volumes and the password already in place:
+
 ```yaml
 services:
   pepe:
@@ -184,22 +192,54 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - pepe-data:/data
-      - pepe-tools:/tools
+      - pepe-data:/data # state: config, agents, conversations. Back this up.
+      - pepe-tools:/tools # the agent's home and anything it installs for itself.
     environment:
-      PEPE_DASHBOARD_PASSWORD: ${PEPE_DASHBOARD_PASSWORD}
+      # The `:?` is deliberate: with no password the dashboard would 403 every request
+      # (a container is not loopback), so compose refuses to start rather than hand you
+      # a container that runs and serves nothing.
+      PEPE_DASHBOARD_PASSWORD: ${PEPE_DASHBOARD_PASSWORD:?set this in a .env file}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      TZ: UTC
 
 volumes:
   pepe-data:
   pepe-tools:
 ```
 
+Secrets go in a `.env` file next to it, never in the compose file and never in the image.
+Pepe's configuration refers to them by name (`"api_key": "${OPENROUTER_API_KEY}"`) and
+resolves them when reading, so the real value only ever exists in the environment:
+
+```bash
+# .env
+PEPE_DASHBOARD_PASSWORD=a-strong-password
+OPENROUTER_API_KEY=sk-...
+```
+
+Every secret needs both halves: the value in `.env`, **and** a line under `environment:`
+naming it. Compose reads `.env` to fill in the `${...}` in the compose file itself, not to
+populate the container, so a key that is only in `.env` never reaches Pepe, and you get a
+"no model configured" with no clue as to why. Add a line for each one you use.
+
+Then, from that directory:
+
 ```bash
 docker compose up -d
+docker compose logs -f          # follow the log
+docker compose exec pepe bin/pepe remote   # an IEx shell into the running node
 ```
 
 ## Upgrading
+
+With Compose:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Without it:
 
 ```bash
 docker pull ghcr.io/pepe-agent/pepe
@@ -212,10 +252,14 @@ home directory and every cache in it come back with `/tools`, so it does not rei
 anything on the first message. Packages installed with `apt` do not come back, which is
 why the image exists for those.
 
+One thing to know: `docker compose down` stops the containers and leaves the volumes
+alone, which is what you want. `docker compose down -v` also deletes them, and with them
+the entire installation.
+
 ## A shell into the node
 
 ```bash
-docker exec -it pepe bin/pepe remote
+docker exec -it pepe bin/pepe remote            # or: docker compose exec pepe bin/pepe remote
 ```
 
 Opens an IEx shell attached to the running release, for inspecting the system from the

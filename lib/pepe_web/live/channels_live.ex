@@ -203,7 +203,7 @@ defmodule PepeWeb.ChannelsLive do
                   </div>
                   <div class="flex shrink-0 gap-1 text-sm">
                     <button phx-click="bot_edit" phx-value-name={b["name"]} class={btn_ghost()}>{gettext("Edit")}</button>
-                    <button :if={b["name"] != "default"} phx-click="bot_remove" phx-value-name={b["name"]}
+                    <button phx-click="bot_remove" phx-value-name={b["name"]}
                       data-confirm={gettext("Remove bot %{name}?", name: b["name"])} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
                   </div>
                 </div>

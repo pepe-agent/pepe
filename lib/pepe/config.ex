@@ -1193,7 +1193,22 @@ defmodule Pepe.Config do
     |> save()
   end
 
-  @doc "Delete a named Telegram bot."
+  @doc """
+  Delete a named Telegram bot.
+
+  `"default"` is the odd one out: it is not in `telegrams` at all, it is the legacy
+  singular `telegram` map that a fresh config is seeded with (so that exporting
+  `TELEGRAM_BOT_TOKEN` is enough to get a bot, with nothing else to set up). Deleting it
+  therefore means clearing that map, not removing a key from `telegrams`, which is why it
+  used to be undeletable: the dashboard's remove button was hidden for it, and had it been
+  shown it would have done nothing.
+  """
+  def delete_telegram_bot("default") do
+    load()
+    |> Map.put("telegram", %{})
+    |> save()
+  end
+
   def delete_telegram_bot(name) do
     load()
     |> update_in(["telegrams"], &Map.delete(&1 || %{}, name))

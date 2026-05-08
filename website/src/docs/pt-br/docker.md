@@ -176,6 +176,14 @@ container, e você volta às duas respostas acima.
 
 ## Compose
 
+O Pepe já vem com um `docker-compose.yml` pronto, então não há nada para escrever:
+
+```bash
+curl -O https://raw.githubusercontent.com/pepe-agent/pepe/master/docker-compose.yml
+```
+
+É o mesmo `docker run` lá de cima, com os dois volumes e a senha já no lugar:
+
 ```yaml
 services:
   pepe:
@@ -184,22 +192,56 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - pepe-data:/data
-      - pepe-tools:/tools
+      - pepe-data:/data # estado: configuração, agentes, conversas. É deste que você faz backup.
+      - pepe-tools:/tools # o home do agente e tudo que ele instala para si mesmo.
     environment:
-      PEPE_DASHBOARD_PASSWORD: ${PEPE_DASHBOARD_PASSWORD}
+      # O `:?` é proposital: sem senha, o painel responderia 403 a todas as requisições
+      # (um container não é loopback), então o compose se recusa a subir em vez de te
+      # entregar um container que roda e não serve nada.
+      PEPE_DASHBOARD_PASSWORD: ${PEPE_DASHBOARD_PASSWORD:?set this in a .env file}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      TZ: UTC
 
 volumes:
   pepe-data:
   pepe-tools:
 ```
 
+Os segredos ficam num arquivo `.env` ao lado, nunca no arquivo do compose e nunca na
+imagem. A configuração do Pepe se refere a eles pelo nome
+(`"api_key": "${OPENROUTER_API_KEY}"`) e os resolve no momento da leitura, então o valor
+real só existe no ambiente:
+
+```bash
+# .env
+PEPE_DASHBOARD_PASSWORD=uma-senha-forte
+OPENROUTER_API_KEY=sk-...
+```
+
+Todo segredo precisa das **duas metades**: o valor no `.env` **e** uma linha em
+`environment:` nomeando ele. O Compose lê o `.env` para preencher os `${...}` do próprio
+arquivo compose, não para popular o container. Uma chave que só existe no `.env` nunca
+chega no Pepe, e você recebe um "no model configured" sem nenhuma pista do motivo.
+Acrescente uma linha para cada segredo que usar.
+
+A partir desse diretório:
+
 ```bash
 docker compose up -d
+docker compose logs -f          # acompanha o log
+docker compose exec pepe bin/pepe remote   # um shell IEx no nó em execução
 ```
 
 ## Atualização
+
+Com o Compose:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Sem ele:
 
 ```bash
 docker pull ghcr.io/pepe-agent/pepe
@@ -212,10 +254,14 @@ dele e todos os caches que estão lá dentro voltam com o `/tools`, então ele n
 nada na primeira mensagem. Pacotes instalados com `apt` não voltam, e é para eles que a
 imagem existe.
 
+Um detalhe importante: o `docker compose down` para os containers e deixa os volumes
+intactos, que é o que você quer. O `docker compose down -v` também apaga os volumes e, com
+eles, a instalação inteira.
+
 ## Acesso ao nó
 
 ```bash
-docker exec -it pepe bin/pepe remote
+docker exec -it pepe bin/pepe remote            # ou: docker compose exec pepe bin/pepe remote
 ```
 
 Abre um shell IEx conectado ao release em execução, para inspecionar o sistema por dentro.

@@ -545,21 +545,21 @@ defmodule PepeWeb.ModelsLive do
     final_raw = unique_suggestion(raw_name, scope)
     name = scope_name(final_raw, scope)
 
-    socket =
-      if final_raw != raw_name do
-        put_flash(
-          socket,
-          :info,
-          gettext("A model connection named %{name} already exists - saved this one as %{final} instead.",
-            name: scope_name(raw_name, scope),
-            final: name
-          )
-        )
+    # One flash, not two. `write_model/4` ends with an `:info` flash of its own, and a
+    # second `:info` on the same socket replaces the first: the collision notice was being
+    # built and then thrown away, so the operator only ever saw "Model openrouter-2 saved."
+    # and had to work out for themselves where the -2 came from.
+    message =
+      if final_raw == raw_name do
+        gettext("Model %{name} saved.", name: name)
       else
-        socket
+        gettext("A model connection named %{name} already exists - saved this one as %{final} instead.",
+          name: scope_name(raw_name, scope),
+          final: name
+        )
       end
 
-    write_model(socket, name, params, gettext("Model %{name} saved.", name: name))
+    write_model(socket, name, params, message)
   end
 
   defp save_edited_model(socket, raw_name, params) do

@@ -335,14 +335,19 @@ footer { border-top: 1px solid var(--border); padding: 46px 0; color: var(--dim)
 .foot .small { font-size: 13px; max-width: 300px; }
 
 /* ---- docs layout ---- */
-.docs { display: grid; grid-template-columns: 240px 1fr; gap: 48px; align-items: start; padding: 40px 0 80px; }
-.docs-nav { position: sticky; top: 72px; align-self: start; height: calc(100vh - 84px); min-height: 0; display: flex; flex-direction: column; gap: 18px; }
+/* Vertical padding only. A shorthand here would also set the horizontal to 0, and since
+   this rule outranks `.container` by coming later, that quietly cancelled the 24px gutter
+   every other page has: on a phone, where the container is not centred, the text ran flush
+   into both edges of the screen. */
+.docs { display: grid; grid-template-columns: 240px 1fr; gap: 48px; align-items: start; padding-top: 40px; padding-bottom: 80px; }
+.docs-nav { position: sticky; top: 72px; align-self: start; display: flex; flex-direction: column; gap: 18px; }
 /* The link list sits inside a <details> so it can fold away on a phone. On a wide screen
-   that element is invisible plumbing: it has to pass the sidebar's height straight
-   through to the scroller inside it, or the sticky column stops scrolling. */
-.docs-nav-menu { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+   the summary is hidden and it is meant to be invisible plumbing, but it is not free:
+   a browser puts the open content in a shadow slot, so `flex: 1` on the scroller inside
+   never reaches it, the list grows to its full height, and the sidebar spills over the
+   footer. Hence an explicit max-height here rather than a flex chain through it. */
 .docs-nav-menu > summary { display: none; }
-.docs-nav-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; padding-right: 8px; padding-bottom: 18px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+.docs-nav-scroll { max-height: calc(100vh - 190px); overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; padding-right: 8px; padding-bottom: 18px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
 .docs-nav-scroll::-webkit-scrollbar { width: 8px; }
 .docs-nav-scroll::-webkit-scrollbar-track { background: transparent; }
 .docs-nav-scroll::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }

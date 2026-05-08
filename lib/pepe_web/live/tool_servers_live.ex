@@ -77,7 +77,7 @@ defmodule PepeWeb.ToolServersLive do
           </div>
 
           <div :if={@edit_mcp} class="max-w-2xl">
-          <.form for={@form} phx-submit="mcp_save" phx-change="mcp_change" class="space-y-4">
+          <.form id="mcp-form" for={@form} phx-submit="mcp_save" phx-change="mcp_change" class="space-y-4">
             <div class="text-lg font-semibold">{gettext("+ New MCP server")}</div>
             <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
               {gettext("Please fix the errors below.")}

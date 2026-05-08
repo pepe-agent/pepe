@@ -76,7 +76,11 @@ jobs:
       - name: Test, with coverage
         run: mix coveralls.json
 
-      - name: Publish coverage
+      # Not a gate, and it must not behave like one. Coveralls answering 504 says nothing
+      # about the code, and a build that goes red for somebody else's outage is a build
+      # people learn to ignore. The tests above are the gate; this is a report.
+      - name: Publish coverage to Coveralls
+        continue-on-error: true
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

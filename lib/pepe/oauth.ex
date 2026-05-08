@@ -267,10 +267,22 @@ defmodule Pepe.OAuth do
 
     opts = [plug: plug, scheme: :http, ip: {127, 0, 0, 1}, port: port, startup_log: false]
 
-    case Bandit.start_link(opts) do
-      {:ok, pid} -> pid
-      {:error, _} -> nil
-    end
+    # `Bandit.start_link/1` is a *supervisor* start: when the port can't be bound (in
+    # use by another sign-in, privileged, no loopback on a remote box) it doesn't
+    # merely hand back `{:error, _}` - it also fires an exit signal down the link,
+    # which kills the caller outright before it can read that error. Trap it for the
+    # duration of the start, so an unbindable port degrades to the paste-the-code
+    # route (`pid: nil`) - which is the entire reason that route exists.
+    trapping? = Process.flag(:trap_exit, true)
+
+    pid =
+      case Bandit.start_link(opts) do
+        {:ok, pid} -> pid
+        {:error, _reason} -> nil
+      end
+
+    Process.flag(:trap_exit, trapping?)
+    pid
   end
 
   defp stop_callback(nil), do: :ok
