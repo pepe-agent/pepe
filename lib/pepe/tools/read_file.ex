@@ -22,6 +22,10 @@ defmodule Pepe.Tools.ReadFile do
     })
   end
 
+  # Reads a file and changes nothing, so it cannot race with the tool beside it.
+  @impl true
+  def concurrent?, do: true
+
   @impl true
   def run(%{"path" => path}, ctx) do
     full = resolve(path, ctx)

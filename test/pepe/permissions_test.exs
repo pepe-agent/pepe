@@ -109,7 +109,11 @@ defmodule Pepe.PermissionsTest do
     ctx = %{agent: agent, session_key: "s3", authorize: fn _, _, _ -> :always end}
 
     assert Permissions.gate("write_file", "{}", ctx) == :allow
-    assert "write_file" in Config.get_agent("zak").auto_approve
+
+    # The grant records what it was given for, not just which tool it was given on: writing a
+    # file is what the human was looking at, and writing a file is what they signed for.
+    # See Pepe.Permissions.Grant.
+    assert Config.get_agent("zak").auto_approve == ["write_file:writes_file"]
 
     # A fresh ctx carrying the reloaded agent is pre-approved, no asking.
     reloaded = Config.get_agent("zak")

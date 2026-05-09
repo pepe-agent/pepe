@@ -677,10 +677,15 @@ defmodule Pepe.Config do
   defp resolve_agent_model(%Agent{model: id} = agent), do: %{agent | model: model_name_for(id)}
 
   @doc "Persistently approve `tool` for `agent_name` (the `:always` permission grant)."
-  def allow_tool(agent_name, tool) do
+  def allow_tool(agent_name, grant) do
     case get_agent(agent_name) do
-      nil -> {:error, :unknown_agent}
-      agent -> put_agent(%{agent | auto_approve: Enum.uniq([tool | agent.auto_approve])})
+      nil ->
+        {:error, :unknown_agent}
+
+      agent ->
+        # Widen the grant this agent already has for that tool rather than piling a second
+        # entry beside it, so the list stays something a human can audit at a glance.
+        put_agent(%{agent | auto_approve: Pepe.Permissions.Grant.merge(agent.auto_approve, grant)})
     end
   end
 

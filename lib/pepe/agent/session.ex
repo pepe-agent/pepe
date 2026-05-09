@@ -12,6 +12,7 @@ defmodule Pepe.Agent.Session do
   use GenServer, restart: :temporary
 
   alias Pepe.Agent.Runtime
+  alias Pepe.Agent.SessionTitles
   alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.LLM
@@ -622,6 +623,7 @@ defmodule Pepe.Agent.Session do
           # (which can itself call a model), so a listener that re-reads history on
           # `:done` reads it one turn stale. `:committed` is the event to reconcile on.
           emit(running[:on_event], :committed)
+          maybe_title(state)
           state
 
         {:error, reason} ->
@@ -748,6 +750,34 @@ defmodule Pepe.Agent.Session do
 
   # A run's `:on_event` is optional, and a listener that crashes on an event it doesn't
   # know must not take the session down with it.
+  # Name the conversation once, from its opening message, on the agent's utility model.
+  #
+  # After the first exchange and not before: a session named from the first message alone
+  # would be named from "hi". After the first *answer* the conversation has a subject.
+  #
+  # In a task, because this process has queued turns waiting on it and a title is worth
+  # nothing next to the next reply. Fire and forget: nothing reads a title but a human, so a
+  # title that never arrives costs nothing. With a `utility_model` a cheap model writes the
+  # name; with none, the opening message is trimmed into one, for free (Pepe.Agent.Utility).
+  defp maybe_title(%{key: key, agent_name: agent_name, messages: messages}) do
+    with 1 <- Enum.count(messages, &(&1["role"] == "user")),
+         nil <- SessionTitles.get(key),
+         %{} = agent <- Config.get_agent(agent_name),
+         %{"content" => first} when is_binary(first) <-
+           Enum.find(messages, &(&1["role"] == "user")) do
+      Task.start(fn -> title_now(key, agent, first) end)
+    end
+
+    :ok
+  end
+
+  defp title_now(key, agent, first) do
+    case SessionTitles.generate(key, agent, first) do
+      {:ok, title} -> Phoenix.PubSub.broadcast(Pepe.PubSub, "session:" <> key, {:titled, key, title})
+      :skip -> :ok
+    end
+  end
+
   defp emit(fun, event) when is_function(fun, 1) do
     fun.(event)
     :ok

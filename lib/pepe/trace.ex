@@ -235,6 +235,13 @@ defmodule Pepe.Trace do
     do: %{"t" => "tool_denied", "name" => name, "reason" => reason}
 
   defp encode_event({:failover, from, to}), do: %{"t" => "failover", "from" => from, "to" => to}
+
+  # The provider had no room left for an answer that big and we asked again for a smaller
+  # one (see Pepe.LLM.OutputCap). Worth seeing: a turn that keeps landing here is a turn
+  # whose conversation has grown until the answer barely fits.
+  defp encode_event({:output_cap, model, cap}),
+    do: %{"t" => "output_cap", "model" => model, "cap" => cap}
+
   # Complexity-routing verdict, recorded before Runtime.run even starts - see
   # Pepe.Agent.Session's spawn_run/7. `chosen_model` is only set on a :simple
   # verdict (the session downgraded); :complex and :failed leave the agent on

@@ -30,6 +30,7 @@ defmodule Pepe.Doctor do
     offline =
       env_checks() ++
         security_checks() ++
+        billing_checks() ++
         agent_checks() ++
         cron_checks() ++
         webhook_checks() ++
@@ -79,6 +80,22 @@ defmodule Pepe.Doctor do
 
   defp collect_env_refs(_), do: []
 
+  # A subscription connection whose monthly fee we were never told still bills the client
+  # correctly (that is priced off the API list, not off what we pay), but it makes the
+  # reported margin an upper bound: the fee never appears against it. Worth saying out loud,
+  # because the number looks right and isn't.
+  defp billing_checks do
+    Config.models()
+    |> Enum.filter(&Pepe.Config.Model.subscription?/1)
+    |> Enum.map(fn model ->
+      if is_number(model.monthly_cost) do
+        {"billing", model.name, :ok}
+      else
+        {"billing", model.name, {:warn, "subscription with no monthly_cost - its fee is missing from your margin"}}
+      end
+    end)
+  end
+
   # Agents: model exists, tools known (builtin/plugin/mcp).
   defp agent_checks do
     known = MapSet.new(Pepe.Tools.names())
@@ -106,9 +123,25 @@ defmodule Pepe.Doctor do
           list -> [{"agent", agent.name, {:warn, "unknown tools: #{Enum.join(list, ", ")}"}}]
         end
 
-      [model_check | tools_check]
+      [model_check | tools_check] ++ utility_check(agent)
     end)
   end
+
+  # A `utility_model` pointing nowhere is treated as unset (Pepe.Agent.Utility deliberately
+  # refuses to fall back to the agent's own model, so that a typo cannot be the thing that
+  # starts spending). Silently, though - the chores still get done, just the cheap way - and
+  # a setting that looks applied and isn't is exactly what a diagnostic is for.
+  defp utility_check(%{utility_model: name} = agent) when is_binary(name) and name != "" do
+    if Config.get_model(name) do
+      []
+    else
+      [
+        {"agent", agent.name, {:warn, "utility_model #{name} doesn't exist - chores fall back to the no-model path"}}
+      ]
+    end
+  end
+
+  defp utility_check(_agent), do: []
 
   # Crons: schedule parses, timezone valid, agent exists.
   defp cron_checks do

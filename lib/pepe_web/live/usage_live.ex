@@ -78,8 +78,19 @@ defmodule PepeWeb.UsageLive do
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <.stat label={gettext("Total tokens")} value={tokens(@summary.totals.total)} />
             <.stat label={gettext("Calls")} value={Integer.to_string(@summary.totals.count)} />
-            <.stat label={gettext("Provider cost")} value={money(@summary.totals.cost, @summary.currency)} />
+            <%!-- What we paid. Tokens served by a subscription cost nothing here; the month's
+                  flat fee is added on top, once, rather than pretending each token was bought. --%>
+            <.stat label={gettext("Provider cost")}
+              value={money(@summary.totals.cost + @summary.subscriptions, @summary.currency)}
+              sub={
+                @summary.subscriptions > 0 &&
+                  gettext("incl. %{fee} of subscriptions", fee: money(@summary.subscriptions, @summary.currency))
+              } />
             <.stat label={gettext("To bill")} value={money(@summary.totals.billable, @summary.currency)}
+              sub={
+                @summary.totals.list != @summary.totals.cost &&
+                  gettext("at API prices: %{list}", list: money(@summary.totals.list, @summary.currency))
+              }
               accent={@summary.totals.billable > @summary.totals.cost} />
           </div>
 
@@ -131,12 +142,15 @@ defmodule PepeWeb.UsageLive do
   attr :label, :string, required: true
   attr :value, :string, required: true
   attr :accent, :boolean, default: false
+  # A second line under the figure, or `false`/`nil` for none.
+  attr :sub, :any, default: nil
 
   defp stat(assigns) do
     ~H"""
     <div class={card()}>
       <div class="text-sm text-zinc-500">{@label}</div>
       <div class={["mt-1 text-xl font-semibold", @accent && "text-green-400"]}>{@value}</div>
+      <div :if={@sub} class="mt-0.5 text-xs text-zinc-500">{@sub}</div>
     </div>
     """
   end

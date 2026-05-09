@@ -18,8 +18,8 @@ defmodule Pepe.Tools.ManageAgent do
   memory live in the target's workspace (`SOUL.md`, `MEMORY.md`); tools/model live in
   its config.
 
-  Actions: `list`, `get`, `create`, `set_persona`, `set_model`, `add_tool`,
-  `remove_tool`, `remember`.
+  Actions: `list`, `get`, `create`, `set_persona`, `set_model`, `set_utility_model`,
+  `add_tool`, `remove_tool`, `remember`.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -48,6 +48,10 @@ defmodule Pepe.Tools.ManageAgent do
         starting persona/system prompt).
       - set_persona: set the target's persona (its SOUL.md) - needs `target`, `value`.
       - set_model: point the target at a configured model - needs `target`, `value`.
+      - set_utility_model: point the target's chores (naming a conversation) at a
+        cheap configured model - needs `target`, `value`; an empty `value` turns it
+        off, and conversations are then named from the first words of the message,
+        for free.
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -58,7 +62,7 @@ defmodule Pepe.Tools.ManageAgent do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(list get create set_persona set_model add_tool remove_tool remember),
+            "enum" => ~w(list get create set_persona set_model set_utility_model add_tool remove_tool remember),
             "description" => "What to do."
           },
           "target" => %{"type" => "string", "description" => "The agent to act on."},
@@ -128,6 +132,15 @@ defmodule Pepe.Tools.ManageAgent do
     end
   end
 
+  # An empty value is a real answer here, not a missing one: it is how you turn the cheap
+  # model back off. So this reads `value` directly rather than through fetch/2, which exists
+  # to refuse a blank.
+  defp dispatch("set_utility_model", target, args) do
+    with {:ok, agent} <- get(target) do
+      set_utility(agent, target, String.trim(to_string(args["value"] || "")))
+    end
+  end
+
   defp dispatch("set_model", target, args) do
     with {:ok, model} <- fetch(args, "value"),
          {:ok, agent} <- get(target) do
@@ -172,6 +185,21 @@ defmodule Pepe.Tools.ManageAgent do
 
   defp dispatch(other, _target, _args), do: {:error, "unknown or incomplete action: #{other}"}
 
+  defp set_utility(agent, target, "") do
+    Config.put_agent(%{agent | utility_model: nil})
+
+    {:ok, "#{target} does its chores without a model now: conversations are named from the first words of the message."}
+  end
+
+  defp set_utility(agent, target, model) do
+    if Config.get_model(model) do
+      Config.put_agent(%{agent | utility_model: model})
+      {:ok, "#{target} now does its chores (naming conversations) on #{model}."}
+    else
+      {:error, "no model connection named #{model}"}
+    end
+  end
+
   ###
   ### helpers
   ###
@@ -193,6 +221,7 @@ defmodule Pepe.Tools.ManageAgent do
     """
     agent: #{a.name}
     model: #{a.model || "(default)"}
+    utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
     persona: #{persona_preview(a.name)}

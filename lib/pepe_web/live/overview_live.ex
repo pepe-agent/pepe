@@ -94,7 +94,10 @@ defmodule PepeWeb.OverviewLive do
             <.stat label={gettext("Live sessions")} value={Integer.to_string(@live_sessions)} sub={gettext("Open right now")} />
             <.stat label={gettext("Messages this month")} value={tokens(@month.totals.count)} sub={gettext("model calls")} />
             <.stat label={gettext("Tokens this month")} value={tokens(@month.totals.total)} sub={gettext("in + out")} />
-            <.stat label={gettext("To bill this month")} value={money(@month.totals.billable, @month.currency)} sub={gettext("cost %{c}", c: money(@month.totals.cost, @month.currency))} accent />
+            <%!-- Cost is what we actually paid: token prices for API connections, plus the flat
+                  monthly fee of each subscription that served a call. Not the tokens a
+                  subscription served priced as if they had been bought. --%>
+            <.stat label={gettext("To bill this month")} value={money(@month.totals.billable, @month.currency)} sub={gettext("cost %{c}", c: money(@month.totals.cost + @month.subscriptions, @month.currency))} accent />
           </div>
 
           <%!-- What the runtime costs to run, measured live rather than asserted. --%>

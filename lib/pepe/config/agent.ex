@@ -48,6 +48,13 @@ defmodule Pepe.Config.Agent do
             # `triage_model` is set - triage is skipped entirely if this is unset,
             # since there would be nowhere to switch to on a SIMPLE verdict.
             simple_model: nil,
+            # The cheap model connection for the small talk the agent has with itself
+            # rather than with the user: naming a conversation, and whatever chrome comes
+            # after it. Not for anything whose output the agent then has to *reason from* -
+            # a summary written badly poisons every turn that reads it, so compaction
+            # deliberately stays on the agent's own model. nil = use the agent's own model.
+            # See Pepe.Agent.Utility.
+            utility_model: nil,
             # Skip the company's monthly customer-message cap for this agent (see
             # Pepe.Config.company_message_limit/1) - an always-on agent (e.g. an
             # escalation/on-call agent) that must never be throttled by it. Doesn't
@@ -79,6 +86,7 @@ defmodule Pepe.Config.Agent do
       fallbacks: map["fallbacks"],
       triage_model: map["triage_model"],
       simple_model: map["simple_model"],
+      utility_model: map["utility_model"],
       exempt_message_limit: map["exempt_message_limit"] || false
     }
   end

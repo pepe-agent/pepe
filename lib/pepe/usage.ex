@@ -1,18 +1,39 @@
 defmodule Pepe.Usage do
   @moduledoc """
-  Token metering for billing. Every model call the runtime makes is recorded to a
-  durable per-company ledger (`Pepe.Usage.Log`); this module records those
-  entries and aggregates them into time buckets - hour, day, week, month, year -
-  with the money math on top.
+  Token metering for billing. Every model call the runtime makes is recorded to a durable
+  per-company ledger (`Pepe.Usage.Log`); this module records those entries and aggregates
+  them into time buckets - hour, day, week, month, year - with the money math on top.
 
-  Cost is `tokens × the model's price` (per 1M tokens; see `Pepe.Pricing`). The
-  amount to bill a client is `cost × the company's markup` - a company with no
-  markup bills exactly the provider cost. Both figures are kept side by side so the
-  operator always sees the real cost, never just the marked-up number.
+  ## Three numbers, not two
+
+  A conversation that runs on a ChatGPT Plus or Claude Max login costs nothing per token:
+  the month was paid for in advance, whether you send one message or ten thousand. It is
+  worth exactly the same to the client either way. So the ledger keeps the two apart.
+
+    * **`list`** - `tokens × the model's price` (per 1M; see `Pepe.Pricing`). What these
+      tokens would have cost on the API, whether or not they did.
+    * **`billable`** - `list × the company's markup`. What the client pays, and it is
+      deliberately computed from `list` rather than from what we spent. The subscription
+      will run out one day and the same work will fall through to the paid API, and on that
+      day the client's price must not move. A price that tracks our supply arrangements is a
+      price we have to explain.
+    * **`cost`** - what we actually paid *these tokens*. Zero on a subscription connection,
+      because at the margin it is. The month's flat fee is counted once, as
+      `subscriptions`, from each subscription connection's `monthly_cost`.
+
+  Margin is therefore `billable - cost - subscriptions`, and the point of the split is that
+  it comes out right. Charging the subscription's tokens to ourselves at API prices, which
+  is what a single number forces you to do, understates the margin: it books forty dollars
+  of cost in a month where twenty dollars left the bank.
+
+  Whether a call ran on a subscription is decided **when it is recorded**, not when it is
+  read. A connection can be switched from an API key to a login, or the other way, and last
+  month's entries must not silently change meaning when it happens.
   """
 
   alias Pepe.Company
   alias Pepe.Config
+  alias Pepe.Config.Model
   alias Pepe.Pricing
   alias Pepe.Usage.Log
 
@@ -22,12 +43,24 @@ defmodule Pepe.Usage do
   def granularities, do: @granularities
 
   @doc """
-  Record one model call's token usage against the agent's company. `usage` is the
-  provider's usage map (`\"prompt_tokens\"`, `\"completion_tokens\"`,
-  `\"total_tokens\"`). No-ops when nothing meaningful was reported.
+  Record one model call's token usage against the agent's company. `usage` is the provider's
+  usage map (`\"prompt_tokens\"`, `\"completion_tokens\"`, `\"total_tokens\"`). No-ops when
+  nothing meaningful was reported.
+
+  Pass the `Pepe.Config.Model` rather than its name where you have it: the entry then
+  remembers whether it ran on a subscription, which is the one fact that cannot be recovered
+  later (the connection may since have been switched to an API key, or away from one).
   """
-  @spec record(String.t(), String.t(), map() | nil) :: :ok
-  def record(agent_handle, model_name, usage) when is_map(usage) do
+  @spec record(String.t(), Model.t() | String.t(), map() | nil) :: :ok
+  def record(agent_handle, %Model{} = model, usage) when is_map(usage),
+    do: append(agent_handle, model.name, usage, Model.subscription?(model))
+
+  def record(agent_handle, model_name, usage) when is_map(usage),
+    do: append(agent_handle, model_name, usage, false)
+
+  def record(_agent, _model, _usage), do: :ok
+
+  defp append(agent_handle, model_name, usage, subscription?) do
     in_tok = int(usage["prompt_tokens"])
     out_tok = int(usage["completion_tokens"])
     total = int(usage["total_tokens"])
@@ -41,19 +74,23 @@ defmodule Pepe.Usage do
       end
 
     if in_tok + out_tok > 0 do
-      Log.append(Company.of(to_string(agent_handle)), %{
+      entry = %{
         "at" => System.system_time(:second),
         "agent" => to_string(agent_handle),
         "model" => to_string(model_name),
         "in" => in_tok,
         "out" => out_tok
-      })
+      }
+
+      # Only written when true, so the ledger's shape does not change for anybody paying by
+      # the token, and an entry from an older Pepe reads exactly as it always did.
+      entry = if subscription?, do: Map.put(entry, "sub", true), else: entry
+
+      Log.append(Company.of(to_string(agent_handle)), entry)
     end
 
     :ok
   end
-
-  def record(_agent, _model, _usage), do: :ok
 
   @currency_symbols %{"USD" => "$", "BRL" => "R$", "EUR" => "€", "GBP" => "£"}
 
@@ -157,9 +194,10 @@ defmodule Pepe.Usage do
   Options: `:tz` (billing-day timezone, default the configured one), `:limit`
   (most-recent buckets to return, default 60).
 
-  Returns a map with `:buckets` (each `%{key, in, out, total, cost, billable}`,
-  oldest->newest), `:totals`, and `:by_model` / `:by_agent` / `:by_company`
-  breakdowns, plus the `:currency` label.
+  Returns a map with `:buckets` (each `%{key, in, out, total, list, cost, billable}`,
+  oldest->newest), `:totals`, and `:by_model` / `:by_agent` / `:by_company` breakdowns, plus
+  the `:currency` label, the month's `:subscriptions` (the flat fees behind any subscription
+  connection that was actually used) and the `:margin` those make honest.
   """
   def summary(scope, granularity, opts \\ []) when granularity in @granularities do
     tz = opts[:tz] || Config.default_timezone()
@@ -183,15 +221,42 @@ defmodule Pepe.Usage do
       |> Enum.sort_by(& &1.key)
       |> Enum.take(-limit)
 
+    totals = sum(priced)
+    subs = subscriptions(priced, models)
+
     %{
       granularity: granularity,
       currency: Config.currency(),
       buckets: buckets,
-      totals: sum(priced),
+      totals: totals,
+      subscriptions: subs,
+      margin: totals.billable - totals.cost - subs,
       by_model: group_sum(priced, "model"),
       by_agent: group_sum(priced, "agent"),
       by_company: by_company(priced)
     }
+  end
+
+  # The flat monthly fee behind every subscription connection that actually served a call in
+  # this period, counted once each however many calls it served. Charged in full and not
+  # pro-rated: a month of Claude Max costs a month of Claude Max whether it was used on the
+  # first day or the last.
+  #
+  # A connection whose `monthly_cost` we were never told contributes zero, which makes the
+  # reported margin an optimistic bound rather than a lie - and `pepe doctor` is where that
+  # gets pointed out.
+  defp subscriptions(priced, models) do
+    priced
+    |> Enum.filter(& &1["sub"])
+    |> Enum.map(& &1["model"])
+    |> Enum.uniq()
+    |> Enum.map(fn name ->
+      case models[name] do
+        %Model{monthly_cost: fee} when is_number(fee) -> fee / 1
+        _ -> 0.0
+      end
+    end)
+    |> Enum.sum()
   end
 
   @doc """
@@ -295,12 +360,18 @@ defmodule Pepe.Usage do
   # from the lookup tables built by price_lookup/3 and markup_lookup/1.
   defp price(e, prices, markups) do
     {ip, op} = Map.fetch!(prices, e["model"])
-    cost = Pricing.cost(e["in"], e["out"], ip, op)
+    list = Pricing.cost(e["in"], e["out"], ip, op)
     markup = Map.fetch!(markups, e["company"])
 
     e
-    |> Map.put("cost", cost)
-    |> Map.put("billable", cost * markup)
+    |> Map.put("list", list)
+    # What the client pays, always from the list price. A subscription is our supply
+    # arrangement, not theirs: when it runs out and the work falls through to the paid API,
+    # their invoice must read the same as it did the month before.
+    |> Map.put("billable", list * markup)
+    # What we actually paid for these tokens. Nothing, on a subscription: the month was
+    # bought in advance and is counted once, as `subscriptions`.
+    |> Map.put("cost", if(e["sub"], do: 0.0, else: list))
   end
 
   @doc """
@@ -326,12 +397,13 @@ defmodule Pepe.Usage do
   defp sum(entries) do
     Enum.reduce(
       entries,
-      %{in: 0, out: 0, total: 0, cost: 0.0, billable: 0.0, count: 0},
+      %{in: 0, out: 0, total: 0, list: 0.0, cost: 0.0, billable: 0.0, count: 0},
       fn e, a ->
         %{
           in: a.in + e["in"],
           out: a.out + e["out"],
           total: a.total + e["in"] + e["out"],
+          list: a.list + e["list"],
           cost: a.cost + e["cost"],
           billable: a.billable + e["billable"],
           count: a.count + 1

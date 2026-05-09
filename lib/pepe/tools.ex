@@ -123,17 +123,53 @@ defmodule Pepe.Tools do
   def specs(_), do: nil
 
   @doc """
+  May this tool run alongside the others the model asked for in the same turn?
+
+  False unless the tool says otherwise, which is the safe way round: the failure it
+  prevents is silent (two edits to one file racing, one overwriting the other), while the
+  cost of being wrong the other way is only that something took longer than it had to. A
+  tool nobody has thought about yet, an MCP tool from a server we know nothing about, and
+  a plugin written against the older behaviour all land here and run in series.
+  """
+  @spec concurrent?(String.t()) :: boolean()
+  def concurrent?(name) do
+    case by_name()[name] do
+      nil -> false
+      mod -> function_exported?(mod, :concurrent?, 0) and mod.concurrent?()
+    end
+  end
+
+  @doc """
   Execute a tool call. `tool_call` is the OpenAI tool_call map. Returns the
   string result (always - errors are turned into a readable string for the model).
   """
-  def execute(%{"function" => %{"name" => name, "arguments" => raw_args}}, ctx \\ %{}) do
-    result =
-      if Pepe.MCP.mcp_tool?(name) do
-        execute_mcp(name, raw_args)
-      else
-        execute_builtin(name, raw_args, ctx)
-      end
+  def execute(%{"function" => %{"name" => name}} = call, ctx \\ %{}) do
+    call |> run_only(ctx) |> finalize(name, ctx)
+  end
 
+  @doc """
+  Run the tool body and nothing else. No redaction, no spilling.
+
+  Split out from `execute/2` so the runtime can run concurrent tools in tasks while keeping
+  everything that depends on the *calling* process here at home. Both redaction and
+  spilling do: redaction's reversible map lives in the process dictionary, so a tool that
+  redacted inside its own task would throw its map away, and the same email seen by two
+  tools would come back as two different tokens.
+  """
+  @spec run_only(map(), map()) :: String.t()
+  def run_only(%{"function" => %{"name" => name, "arguments" => raw_args}}, ctx \\ %{}) do
+    if Pepe.MCP.mcp_tool?(name) do
+      execute_mcp(name, raw_args)
+    else
+      execute_builtin(name, raw_args, ctx)
+    end
+  end
+
+  @doc """
+  Redact and spill a raw tool result. Must run in the process that owns the turn.
+  """
+  @spec finalize(String.t(), String.t(), map()) :: String.t()
+  def finalize(result, name, ctx) do
     result
     |> redact(ctx)
     |> spill_large(name, ctx)

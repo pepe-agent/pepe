@@ -18,6 +18,10 @@ defmodule Pepe.Tools.FetchUrl do
     })
   end
 
+  # Waits on a network, which is exactly what makes running these together worth it.
+  @impl true
+  def concurrent?, do: true
+
   @impl true
   def run(%{"url" => url}, _ctx) do
     with {:ok, host} <- parse_host(url),

@@ -33,9 +33,28 @@ defmodule Pepe.Config.Model do
             # OAuth/subscription metadata when signed in via `Pepe.OAuth`
             # (%{"provider", "refresh", "expires_at", "token_url", "client_id"}).
             # `api_key` still holds the current access token (Bearer).
-            oauth: nil
+            oauth: nil,
+            # What this subscription costs per month, if it is one (ChatGPT Plus, Claude
+            # Max). Only meaningful alongside `oauth`. Tokens spent on a subscription cost
+            # nothing at the margin - the month was paid for in advance, whether you send
+            # one message or ten thousand - so the ledger records them at zero and counts
+            # this fixed figure once instead. Unset means "I have not told Pepe what I pay",
+            # and the margin is then reported as the optimistic bound it really is.
+            # See Pepe.Usage.
+            monthly_cost: nil
 
   @type t :: %__MODULE__{}
+
+  @doc """
+  Whether this connection is a subscription (signed in with an account) rather than an API
+  key billed by the token.
+
+  It is the distinction the whole cost side of billing turns on: the same conversation costs
+  real money on one and nothing at the margin on the other, while being worth exactly the
+  same to the client either way.
+  """
+  @spec subscription?(t()) :: boolean()
+  def subscription?(%__MODULE__{oauth: oauth}), do: is_map(oauth) and oauth != %{}
 
   @doc "Build a Model struct from a string-keyed map (as loaded from JSON)."
   def from_map(map) when is_map(map) do
@@ -54,7 +73,8 @@ defmodule Pepe.Config.Model do
       require_redaction: map["require_redaction"],
       headers: map["headers"] || %{},
       fallbacks: map["fallbacks"] || [],
-      oauth: map["oauth"]
+      oauth: map["oauth"],
+      monthly_cost: map["monthly_cost"]
     }
   end
 

@@ -128,9 +128,16 @@ defmodule Pepe.Gateways.TUI do
   @doc "The console `authorize` callback - an arrow-key menu over the shared options."
   @spec authorizer() :: (String.t(), term(), map() -> Pepe.Permissions.decision())
   def authorizer do
-    fn name, args, _ctx ->
+    fn name, args, ctx ->
       Config.put_locale()
-      label = bold(Prompt.question(name)) <> risk_lines(name, args) <> "\n" <> dim(one_line(args))
+
+      label =
+        bold(Prompt.question(name)) <>
+          risk_lines(name, args) <>
+          "\n" <>
+          dim(one_line(args)) <>
+          "\n" <>
+          dim(Prompt.scope_note(ctx[:risks] || []))
 
       case Pepe.TUI.select(Prompt.options(), label: label, render_as: &Prompt.label/1) do
         :deny -> maybe_deny_reason()

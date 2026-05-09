@@ -202,6 +202,20 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
+            <.form_section title={gettext("Chores")}>
+              <p class={hlp()}>
+                {gettext("Some calls are not the agent thinking, they are the agent tidying up: naming a conversation so this sidebar reads like something. Point them at a cheap connection you already have. Left off, a conversation is still named, from the first few words of what was asked - free, offline, and nobody's opening message is sent anywhere to be read.")}
+              </p>
+
+              <div>
+                <label class={lbl()}>{gettext("Utility model")}</label>
+                <select name="utility_model" class={fld()}>
+                  <option value="">{gettext("(off: name conversations without a model)")}</option>
+                  <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:utility_model]}>{m}</option>
+                </select>
+              </div>
+            </.form_section>
+
             <.form_section title={gettext("Capabilities")}>
               <div>
                 <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span></label>
@@ -301,6 +315,7 @@ defmodule PepeWeb.AgentsLive do
       fallbacks: nil,
       triage_model: nil,
       simple_model: nil,
+      utility_model: nil,
       exempt_message_limit: false
     }
 
@@ -346,6 +361,7 @@ defmodule PepeWeb.AgentsLive do
           fallbacks: socket.assigns.edit_agent[:fallbacks],
           triage_model: blank(params["triage_model"]),
           simple_model: blank(params["simple_model"]),
+          utility_model: blank(params["utility_model"]),
           exempt_message_limit: params["exempt_message_limit"] == "true"
       }
 
@@ -373,6 +389,7 @@ defmodule PepeWeb.AgentsLive do
           hooks: params["hooks"] || [],
           triage_model: blank(params["triage_model"]),
           simple_model: blank(params["simple_model"]),
+          utility_model: blank(params["utility_model"]),
           exempt_message_limit: params["exempt_message_limit"] == "true"
       }
 

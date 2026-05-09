@@ -28,6 +28,10 @@ defmodule Pepe.Tools.Docs do
     )
   end
 
+  # Reads the shipped documentation.
+  @impl true
+  def concurrent?, do: true
+
   @impl true
   def run(%{"name" => name}, _ctx) when is_binary(name) and name != "" do
     case Pepe.Docs.read(name) do

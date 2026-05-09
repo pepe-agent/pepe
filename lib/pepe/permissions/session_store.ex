@@ -14,17 +14,28 @@ defmodule Pepe.Permissions.SessionStore do
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
 
-  @doc "Grant `tool` for `session_key` for the rest of this session."
-  def allow(session_key, tool) do
+  @doc """
+  Remember a grant for `session_key` for the rest of this session.
+
+  `grant` is a `Pepe.Permissions.Grant` string (`"bash:deletes"`), not a bare tool name: a
+  session grant remembers what it was given for, exactly as a persisted one does.
+  """
+  def allow(session_key, grant) do
     ensure_table()
-    :ets.insert(@table, {{session_key, tool}})
+    :ets.insert(@table, {{session_key, grant}})
     :ok
   end
 
-  @doc "Whether `tool` is approved for `session_key`."
+  @doc "Every grant remembered for `session_key`."
+  def grants(session_key) do
+    ensure_table()
+    :ets.select(@table, [{{{session_key, :"$1"}}, [], [:"$1"]}])
+  end
+
+  @doc "Whether `tool` is approved for `session_key`, whatever the risk (used by tests/tools)."
   def member?(session_key, tool) do
     ensure_table()
-    :ets.member(@table, {session_key, tool})
+    Enum.any?(grants(session_key), &(Pepe.Permissions.Grant.parse(&1) |> elem(0) == tool))
   end
 
   @doc "Forget every grant for `session_key` (called on `/new`)."

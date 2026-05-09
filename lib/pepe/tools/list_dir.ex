@@ -21,6 +21,10 @@ defmodule Pepe.Tools.ListDir do
     })
   end
 
+  # Reads a directory and changes nothing.
+  @impl true
+  def concurrent?, do: true
+
   @impl true
   def run(args, ctx) do
     path = resolve(args["path"] || ".", ctx)

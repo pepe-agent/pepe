@@ -7,12 +7,94 @@ matters because agents are non-deterministic, so an exact-string test is useless
 asserts the things that actually matter (did it call the right tool? did it mention the
 answer? did it avoid claiming it has no access?).
 
+## Your traces are the test data you already have
+
+The hard part of an eval suite is not running it, it is *writing* it, and nobody ever
+finds the afternoon. So don't write one. When an agent handles something well, keep that
+run:
+
+```bash
+mix pepe eval add a1b2c3                                   # a trace id
+mix pepe eval add a1b2c3 --suite support --contains "refund,5 business days"
+```
+
+In the dashboard it is a button on the trace: **✓ This went right**.
+
+The case keeps the prompt and the agent verbatim, and asserts **the tools the agent
+used**. That is the assertion worth having. It survives model updates and rewording, and
+it is exactly what changes when an edit goes wrong: the agent stops looking things up and
+starts inventing them, or reaches for a shell where it used to read a file. A model that
+answers the same question with the same tools is a model that still works the way you
+decided it should.
+
+It deliberately does **not** demand the same sentence back. Two runs of one prompt never
+produce one, and a test that insists gets muted within a week, and from then on protects
+nothing. The reply that was right is kept in the case under `recorded`, for whoever reads
+a failure. If some words in it *were* the point, say so with `--contains` and they get
+asserted too.
+
+Failed runs are refused: promoting one would freeze the failure as the expectation, and
+hand you a green suite for it.
+
+### How this actually goes, start to finish
+
+You have never written an eval and you are not going to start today. Fine. Do this instead.
+
+**1. Use Pepe normally.** Talk to your agent, let clients talk to it. Every run is already
+being recorded; you do not have to do anything to make that happen.
+
+**2. When something goes well, say so.** Open the dashboard, go to **Traces**, click the
+run, press **✓ This went right**. That is the whole ceremony. From the terminal it is the
+same thing:
+
+```bash
+mix pepe traces                       # the recent runs, with their ids
+mix pepe eval add a1b2c3              # keep that one
+# ✓ added to recorded: What is the price of the annual plan?
+#   agent: support
+#   asserts it still calls: read_file, web_search
+#   run it with: mix pepe eval recorded
+```
+
+Do that four or five times over a week, whenever you notice the agent doing the right
+thing. You now have a suite that describes your agent, written by your agent, about the
+things your clients actually ask.
+
+**3. Before you change anything, run it.**
+
+```bash
+mix pepe eval recorded
+```
+
+```
+▸ recorded
+  ✓ What is the price of the annual plan?
+  ✓ Cancel my subscription
+  ✗ Where is my order?
+      tool read_file was not called
+  2/3 passed
+```
+
+That cross is the whole point of the feature. The agent still answered. The answer still
+read fine. It just stopped opening the file and started reciting from memory, and next
+month, when the price changes, it would have gone on confidently quoting the old one. No
+exception was raised, no log line was written, and without this suite you would have found
+out from a client.
+
+**4. Put it in CI.** A non-passing run exits non-zero, so it drops straight in next to your
+tests. Now a persona edit that breaks something cannot reach production quietly.
+
+**When a case is wrong, delete it.** These are JSON files under `~/.pepe/evals/`; a case
+that no longer reflects what you want is a case to remove, not to argue with. The suite is
+a record of decisions, and decisions change.
+
 ## Running
 
 ```bash
 mix pepe eval               # run every suite (bundled + your own)
 mix pepe eval arithmetic    # run one suite
 mix pepe eval list          # list suites and their case counts
+mix pepe eval add TRACE_ID  # keep a run that went right (see above)
 mix pepe eval --seed        # copy the bundled suites into ~/.pepe/evals to edit
 mix pepe eval help
 ```

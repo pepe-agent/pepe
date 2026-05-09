@@ -51,4 +51,25 @@ defmodule Pepe.Permissions.Prompt do
   @doc "The question text for a tool, e.g. for a prompt header (translated)."
   @spec question(String.t()) :: String.t()
   def question(tool), do: gettext("🔐 Allow me to run the %{tool} tool?", tool: "`#{tool}`")
+
+  @doc """
+  What a "session" or "always" answer will actually cover, given the risks of the call being
+  asked about.
+
+  The point of saying it out loud: a permission is only meaningful if the person granting it
+  knows its width. "Always allow bash" sounds like one thing while you are looking at `ls`
+  and turns out to be another the day the agent reaches for `rm`. It no longer is, and this
+  is the sentence that tells you so.
+  """
+  @spec scope_note([Pepe.Permissions.Risk.kind()]) :: String.t()
+  def scope_note([]) do
+    gettext("Allowing for the session or always covers calls like this one, which flag no risk. Anything riskier will ask again.")
+  end
+
+  def scope_note(risks) do
+    gettext("Allowing for the session or always covers %{tool} calls that %{risks}. Anything else it does will ask again.",
+      tool: gettext("this tool's"),
+      risks: Enum.map_join(risks, ", ", &Pepe.Permissions.Risk.label/1)
+    )
+  end
 end

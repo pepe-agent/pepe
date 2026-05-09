@@ -35,6 +35,28 @@ defmodule PepePlugins.Weather do
 end
 ```
 
+## Running alongside the others
+
+A model often asks for several tools in one turn. Pepe runs the ones that say they
+can be run together at the same time, so three URL fetches cost one round trip
+instead of three. A tool opts in with `concurrent?/0`:
+
+```elixir
+def concurrent?, do: true
+```
+
+It is `false` unless you say otherwise, and that is deliberate: the failure it
+prevents is a silent one. Two edits to the same file, run at once, both read the
+original and one of them quietly overwrites the other, with no error anywhere.
+Sequential edits compose. So a tool waits its turn until somebody has actually
+thought about whether it can race with the ones beside it.
+
+Say `true` if your tool only reads, or only reaches out over the network. Leave it
+alone if it writes, executes, or otherwise changes the machine. A serial tool is
+also a barrier: everything the model asked for before it finishes first, and
+everything after it starts only once it is done, so a read the model placed after
+a write really does read what the write left behind.
+
 ---
 
 [Back to the docs index](../README.md#documentation)

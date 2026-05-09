@@ -1335,9 +1335,42 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # Promote a conversation that already happened into a case that has to keep happening.
+  defp eval_cmd(["add" | rest]) do
+    {opts, args, _} =
+      OptionParser.parse(rest,
+        strict: [suite: :string, name: :string, contains: :string, scope: :string]
+      )
+
+    case args do
+      [id] -> eval_add(id, opts)
+      _ -> error("usage: mix pepe eval add TRACE_ID [--suite NAME] [--name NAME] [--contains \"a,b\"] [--scope COMPANY]")
+    end
+  end
+
   defp eval_cmd(["help"]), do: eval_help()
   defp eval_cmd([suite]), do: eval_report(run_and_print_suite(suite))
   defp eval_cmd(_), do: error("usage: mix pepe eval [SUITE | list | --seed]")
+
+  defp eval_add(id, opts) do
+    suite = opts[:suite] || "recorded"
+    contains = opts[:contains] |> to_string() |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+
+    case Pepe.Eval.FromTrace.promote(opts[:scope], id, suite, name: opts[:name], contains: contains) do
+      {:ok, kase} -> print_added_case(kase, suite, contains)
+      {:error, why} -> error(why)
+    end
+  end
+
+  defp print_added_case(kase, suite, contains) do
+    tools = kase["expect"]["tool_called"] || []
+
+    ok("added to #{green(suite)}: #{kase["name"]}")
+    info(dim("  agent: #{kase["agent"]}"))
+    info(dim("  asserts it still calls: #{(tools == [] && "(no tools ran)") || Enum.join(tools, ", ")}"))
+    unless contains == [], do: info(dim("  and that the reply still says: #{Enum.join(contains, ", ")}"))
+    info(dim("  run it with: mix pepe eval #{suite}"))
+  end
 
   defp eval_help do
     puts("""
@@ -1347,10 +1380,23 @@ defmodule Mix.Tasks.Pepe do
       eval SUITE           run one suite by name
       eval list            list available suites and their case counts
       eval --seed          copy the bundled suites into #{Pepe.Eval.dir()} to edit
+      eval add TRACE_ID    turn a conversation that already happened into a case
 
     Suites are JSON under #{Pepe.Eval.dir()} (yours) or shipped with Pepe; a case asserts
     the reply (contains / not_contains / matches) and the tools it used (tool_called /
     tool_not_called). Omit a case's "agent" to run it against your default agent.
+
+    #{bold("eval add")} is the one to reach for. Your traces are the test data you already
+    have: when an agent handles something well, promote that run and it becomes a case. It
+    keeps the prompt, the agent, and the tools the agent used - the tools being the assertion
+    worth having, since they are what changes when a persona edit goes wrong (the agent stops
+    looking things up and starts inventing them). It does not demand the same sentence back,
+    because two runs never produce one, and a test that insists on it gets muted and then
+    protects nothing. Name the words that were the point and they get asserted too:
+
+      mix pepe eval add a1b2c3 --suite support --contains "refund,5 business days"
+
+    Options: --suite (default "recorded"), --name, --contains "a,b", --scope COMPANY.
     """)
   end
 
@@ -1870,6 +1916,7 @@ defmodule Mix.Tasks.Pepe do
           temperature: :float,
           triage_model: :string,
           simple_model: :string,
+          utility_model: :string,
           default: :boolean,
           exempt_message_limit: :boolean,
           admin: :boolean
@@ -1892,6 +1939,7 @@ defmodule Mix.Tasks.Pepe do
         temperature: opts[:temperature],
         triage_model: opts[:triage_model],
         simple_model: opts[:simple_model],
+        utility_model: opts[:utility_model],
         exempt_message_limit: opts[:exempt_message_limit] || false
       }
 

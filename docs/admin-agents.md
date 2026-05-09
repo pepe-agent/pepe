@@ -19,6 +19,8 @@ mix pepe agent add child --can-manage none   # a locked agent that can't alter i
 ```
 
 `manage_agent` actions: `list`, `get`, `create`, `set_persona`, `set_model`,
+`set_utility_model` (the cheap connection its chores run on, e.g. naming a
+conversation; an empty value turns it off and the chores are done without a model),
 `add_tool`, `remove_tool`, `remember` (append a fact to the target's memory). It's a
 risky tool, so each use is authorized through the permission gate; persona and memory
 live in the target's workspace, tools/model in its config.

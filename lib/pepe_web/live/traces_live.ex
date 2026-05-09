@@ -31,6 +31,7 @@ defmodule PepeWeb.TracesLive do
        companies: Config.companies(),
        new_company: false,
        selected: nil,
+       selected_scope: nil,
        f_agent: "",
        f_source: "",
        f_outcome: "",
@@ -143,6 +144,12 @@ defmodule PepeWeb.TracesLive do
               gettext("The last runs across every surface: the tools each called, how it ended and how long it took. Open one to replay it.")
           }
         >
+          <%!-- Your traces are the test data you already have. When a run went right, this is
+                where you say so, and it becomes a case that has to keep going right. --%>
+          <button :if={@selected} phx-click="promote" class={btn()}
+            data-confirm={gettext("Keep this run as an eval case? It will assert that the agent still calls the same tools for this prompt.")}>
+            {gettext("✓ This went right")}
+          </button>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>
           <button :if={!@selected} phx-click="refresh" class={btn_ghost()}>{gettext("Refresh")}</button>
         </.view_header>
@@ -474,7 +481,26 @@ defmodule PepeWeb.TracesLive do
 
   @impl true
   def handle_event("open", %{"scope" => scope, "id" => id}, socket) do
-    {:noreply, assign(socket, selected: Trace.get(scope, id))}
+    {:noreply, assign(socket, selected: Trace.get(scope, id), selected_scope: scope)}
+  end
+
+  # Promote the open trace into an eval case. The suite is "recorded" so everything captured
+  # this way lands in one place and `mix pepe eval recorded` is the whole regression run.
+  def handle_event("promote", _p, socket) do
+    case Pepe.Eval.FromTrace.promote(socket.assigns.selected_scope, socket.assigns.selected["id"], "recorded") do
+      {:ok, kase} ->
+        tools = kase["expect"]["tool_called"] || []
+
+        message =
+          if tools == [],
+            do: gettext("Kept. No tools ran, so the case asserts the agent still answers this without reaching for one."),
+            else: gettext("Kept. The case asserts the agent still calls %{tools} for this.", tools: Enum.join(tools, ", "))
+
+        {:noreply, put_flash(socket, :info, message)}
+
+      {:error, why} ->
+        {:noreply, put_flash(socket, :error, why)}
+    end
   end
 
   def handle_event("close", _p, socket), do: {:noreply, assign(socket, selected: nil)}

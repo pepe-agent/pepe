@@ -456,6 +456,11 @@ defmodule PepeWeb.ChatLive do
       else: {:noreply, socket}
   end
 
+  # The session named itself after its first exchange (Pepe.Agent.SessionTitles). It arrives
+  # after the reply, on its own, so the sidebar has to be told rather than asked.
+  def handle_info({:titled, _key, _title}, socket),
+    do: {:noreply, assign(socket, sessions: list_sessions(socket.assigns.scope))}
+
   def handle_info({:compacted, key}, socket) do
     if key == socket.assigns.selected do
       # Replace the lingering "Compacting..." notice with a done one (which auto-dismisses).

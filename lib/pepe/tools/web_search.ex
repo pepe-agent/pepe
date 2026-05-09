@@ -22,6 +22,10 @@ defmodule Pepe.Tools.WebSearch do
     })
   end
 
+  # Waits on a network.
+  @impl true
+  def concurrent?, do: true
+
   @impl true
   def run(%{"query" => query}, _ctx) do
     params = [q: query, format: "json", no_html: 1, skip_disambig: 1]
