@@ -24,6 +24,14 @@ defmodule Pepe.Config.Cron do
             # where to send the result: "telegram:<chat_id>" | "log"
             deliver: "log",
             enabled: true,
+            # Run this job again even when the previous run of it is still going. False, and
+            # deliberately: a cron here is an agent turn, not an idempotent script. It costs a
+            # model call, it has side effects, and every run of it shares one agent workspace,
+            # so a job that outgrows its own schedule would pile up, be billed twice, deliver
+            # twice, and have two runs writing over each other. It is skipped instead, and the
+            # skip is recorded, which is how you find out the job is too slow for its schedule.
+            # Set this only where concurrency is genuinely what you want.
+            overlap: false,
             last_run: nil,
             last_result: nil
 
@@ -42,6 +50,7 @@ defmodule Pepe.Config.Cron do
       model: map["model"],
       deliver: map["deliver"] || "log",
       enabled: Map.get(map, "enabled", true),
+      overlap: Map.get(map, "overlap", false),
       last_run: map["last_run"],
       last_result: map["last_result"]
     }

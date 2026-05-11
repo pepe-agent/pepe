@@ -125,7 +125,32 @@ defmodule Pepe.Cron do
     result
   end
 
-  @doc "PubSub topic that carries `{:cron_run, :started | :finished, id}` for every run."
+  @doc """
+  Record that a due run did not happen, because the previous one was still going.
+
+  It goes in the same run log as a real run, and counts as a failure, because that is what it
+  is: the job did not do the thing it was scheduled to do. A skip that only whispered into a
+  log file nobody opens would let a job quietly stop happening on schedule, and the first sign
+  of it would be that whatever it was supposed to do had stopped being done.
+  """
+  @spec skipped(Cron.t()) :: :ok
+  def skipped(%Cron{} = cron) do
+    # Written down before it is announced, and in that order on purpose: a listener told the
+    # skip happened will go and read the log, and it should find it there.
+    record(
+      cron,
+      :scheduler,
+      false,
+      "⏭️ skipped: the previous run was still going. This job takes longer than its own " <>
+        "schedule allows. Give it a longer interval, make it do less, or set `overlap: true` " <>
+        "if running it on top of itself is genuinely what you want."
+    )
+
+    notify({:cron_run, :skipped, cron.id})
+    :ok
+  end
+
+  @doc "PubSub topic that carries `{:cron_run, :started | :finished | :skipped, id}` for every run."
   def runs_topic, do: "crons:runs"
 
   # Announce a run's lifecycle so any live surface can show it as running, from any source

@@ -45,9 +45,12 @@ agente de cliente consiga reconfigurar o administrador nem a si próprio.
 | `set_persona` | Reescreve o prompt de sistema do agente alvo. |
 | `set_model` | Aponta o agente alvo para outra ligação de modelo. |
 | `set_utility_model` | Define a ligação barata onde correm as tarefas menores do agente alvo, como dar nome a uma conversa. Um valor vazio desliga isto, e as tarefas passam a ser feitas sem modelo. |
+| `set_flag` | Liga ou desliga um interruptor do agente alvo (`on`/`off`): `trust_untrusted_content` (deixar que ele atue sobre o que estranhos enviam) ou `exempt_message_limit`. Ligar o `trust_untrusted_content` não pode ser feito a partir de uma execução que ela própria ingeriu conteúdo de fora, por isso um documento injetado não o consegue virar. |
 | `add_tool` | Concede mais uma ferramenta ao agente alvo. |
 | `remove_tool` | Revoga uma ferramenta do agente alvo. |
 | `remember` | Acrescenta um facto à memória do agente alvo. |
+
+Não precisa dos nomes técnicos das flags. O `set_flag` é conduzido pelo modelo, por isso pede com as suas palavras ("deixa o agente de atendimento atuar nos ficheiros que os clientes enviam", "para de limitar as mensagens deste agente") e ele escolhe o interruptor certo.
 
 A persona e a memória vivem no workspace do agente alvo. As ferramentas e o modelo vivem
 na entrada dele no ficheiro de configuração.

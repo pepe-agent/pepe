@@ -81,6 +81,24 @@ El temporizador vive dentro del proceso de la aplicación, así que solo corre m
 
 Si el proceso estaba caído en el momento en que una tarea debía dispararse, Pepe hace una **recuperación** acotada al reiniciar. Cuando vuelve y nota que pasó una ranura programada sin ejecución, dispara ese trabajo una vez, siempre que aún esté dentro de una ventana de gracia (la mitad del periodo del trabajo, acotada entre 2 minutos y 2 horas). La recuperación está anclada a la ranura perdida, así que un solo reinicio nunca dispara dos veces. Un trabajo que estuvo caído mucho más tiempo que su ventana de gracia simplemente se retoma en su próxima ranura normal, en lugar de repetir una vieja.
 
+### Una tarea no se ejecuta encima de sí misma
+
+Una tarea cuya ejecución anterior **sigue en marcha** cuando llega su siguiente turno se **omite**, y la omisión se escribe en su historial.
+
+Se omite en lugar de acumularse porque una tarea aquí no es un script idempotente, es **un turno de agente**. Cuesta una llamada al modelo, tiene efectos secundarios (un mensaje entregado, un archivo escrito), y cada ejecución de la misma tarea comparte un único espacio de trabajo del agente. Un trabajo que tarda siete minutos con una programación de cinco se acumularía: dos ejecuciones, luego tres, luego cuatro, cada una facturada, el informe entregado dos veces, y dos ejecuciones escribiendo una encima de la otra. Te enterarías por la factura.
+
+Y nunca se omite en silencio. La omisión queda como una entrada fallida en el historial, y dice qué va mal:
+
+> ⏭️ skipped: the previous run was still going. This job takes longer than its own schedule allows.
+
+Esa entrada es el objetivo. Sin ella, el trabajo simplemente dejaría de ocurrir, puntualmente, y la primera señal sería que aquello que hacía había dejado de hacerse.
+
+```bash
+pepe cron add --name "digest" --prompt "..." --schedule "*/5 * * * *" --overlap
+```
+
+`--overlap` (o `"overlap": true` en la configuración) la ejecuta igualmente, para la tarea en la que la concurrencia es realmente lo que quieres.
+
 ### Historial de ejecuciones
 
 Cada disparo, ya sea del temporizador, de un `pepe cron run` forzado, de un botón del panel o de un chat, añade una línea al archivo de historial de esa tarea (`<PEPE_HOME>/data/cron_logs/<id>.jsonl`). Cada línea registra la marca de tiempo, la fuente, si tuvo éxito y la salida (recortada).

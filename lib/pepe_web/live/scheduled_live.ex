@@ -51,6 +51,12 @@ defmodule PepeWeb.ScheduledLive do
   def handle_info({:cron_run, :finished, id}, socket),
     do: {:noreply, assign(socket, running: MapSet.delete(socket.assigns.running, id), crons: Config.crons())}
 
+  # A slot came round while the previous run was still going, so it was not run. The one still
+  # running keeps its badge; what changes is the history, which now carries the skip, and the
+  # skip is the thing worth seeing: it says this job takes longer than its own schedule allows.
+  def handle_info({:cron_run, :skipped, _id}, socket),
+    do: {:noreply, assign(socket, crons: Config.crons())}
+
   defp cron_changeset(attrs) do
     types = %{name: :string, prompt: :string, schedule: :string}
 

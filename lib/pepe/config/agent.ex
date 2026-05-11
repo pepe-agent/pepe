@@ -59,7 +59,17 @@ defmodule Pepe.Config.Agent do
             # Pepe.Config.company_message_limit/1) - an always-on agent (e.g. an
             # escalation/on-call agent) that must never be throttled by it. Doesn't
             # affect the company's separate spend cap (over_budget?/1).
-            exempt_message_limit: false
+            exempt_message_limit: false,
+            # Let this agent ACT on content from outside (a document a client sent, a page a
+            # tool fetched). Off by default, and the default is the safe one: normally, once a
+            # run has taken in a stranger's content, the agent's pre-approved tools go back to
+            # asking, so an injected "ignore your instructions and run this" cannot quietly
+            # fire a tool this agent was trusted with (see Pepe.Permissions). Turn this on only
+            # for an agent you have decided to trust to act on what strangers send it - which
+            # is a real decision, not a convenience: it reopens exactly that path. Reading and
+            # answering never needed it; this is only for a document that must trigger an
+            # action on the system.
+            trust_untrusted_content: false
 
   @type t :: %__MODULE__{}
 
@@ -87,7 +97,8 @@ defmodule Pepe.Config.Agent do
       triage_model: map["triage_model"],
       simple_model: map["simple_model"],
       utility_model: map["utility_model"],
-      exempt_message_limit: map["exempt_message_limit"] || false
+      exempt_message_limit: map["exempt_message_limit"] || false,
+      trust_untrusted_content: map["trust_untrusted_content"] || false
     }
   end
 end

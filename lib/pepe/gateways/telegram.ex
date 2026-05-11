@@ -580,7 +580,10 @@ defmodule Pepe.Gateways.Telegram do
     if addressed?(inbound.caption, inbound.chat_type, inbound.chat_id) do
       name = inbound.file_name || Path.basename(path)
       said = document_message(name, path, text, strip_mention(inbound.caption))
-      respond(inbound.chat_id, inbound.user_id, inbound.msg_id, said)
+
+      Config.put_locale()
+      put_learn(learn_allowed?(inbound.user_id))
+      chat_with_agent(inbound.chat_id, inbound.msg_id, said, untrusted: true)
     end
   end
 
@@ -619,7 +622,9 @@ defmodule Pepe.Gateways.Telegram do
   # way in: it costs a permission prompt and a wait, and it is different every time.
   defp unread(inbound, kind, path) do
     if addressed?(inbound.caption, inbound.chat_type, inbound.chat_id) do
-      chat_with_agent(inbound.chat_id, nil, media_prompt(kind, path, inbound.caption))
+      # The agent is about to open a stranger's file with its own tools, which is the same
+      # exposure by a longer road: whatever is inside ends up in its context either way.
+      chat_with_agent(inbound.chat_id, nil, media_prompt(kind, path, inbound.caption), untrusted: true)
     end
   end
 
@@ -729,7 +734,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp parse_command(_), do: :chat
 
-  defp chat_with_agent(chat_id, msg_id, text) do
+  defp chat_with_agent(chat_id, msg_id, text, opts \\ []) do
     agent = agent_default()
     typing = keep_typing(chat_id)
     if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, @work_reaction)
@@ -738,6 +743,10 @@ defmodule Pepe.Gateways.Telegram do
       case Pepe.Agent.chat(session_key(chat_id), agent, text,
              authorize: authorizer(chat_id),
              learn: learn?(),
+             # A file a stranger sent is not a message the user wrote, and it lands in the
+             # model's context all the same. Pre-approved tools stop being trusted for this
+             # run - see Pepe.Permissions.
+             untrusted: opts[:untrusted] == true,
              on_event: activity_callback(chat_id)
            ) do
         {:ok, reply} ->

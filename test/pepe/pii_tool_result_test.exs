@@ -60,7 +60,15 @@ defmodule Pepe.PiiToolResultTest do
 
     Config.put_hook_settings("pii_redact", %{"packs" => ["br", "intl"]})
     Config.put_model(%Model{name: "mock", base_url: "http://127.0.0.1:#{port}", api_key: "x", model: "m"})
-    Config.put_agent(%Agent{name: "dbagent", hooks: ["pii_redact"], model: "mock", tools: ["bash"]})
+    # No human on this surface, so what may run unattended has to be said out loud. It used
+    # to run anyway, which is the hole this now closes.
+    Config.put_agent(%Agent{
+      name: "dbagent",
+      hooks: ["pii_redact"],
+      model: "mock",
+      tools: ["bash"],
+      auto_approve: ["*"]
+    })
 
     on_exit(fn ->
       Process.exit(server, :normal)

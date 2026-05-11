@@ -19,7 +19,7 @@ defmodule Pepe.Tools.ManageAgent do
   its config.
 
   Actions: `list`, `get`, `create`, `set_persona`, `set_model`, `set_utility_model`,
-  `add_tool`, `remove_tool`, `remember`.
+  `set_flag`, `add_tool`, `remove_tool`, `remember`.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -52,6 +52,20 @@ defmodule Pepe.Tools.ManageAgent do
         cheap configured model - needs `target`, `value`; an empty `value` turns it
         off, and conversations are then named from the first words of the message,
         for free.
+      - set_flag: turn one of the target's switches on or off. Needs `target`, a
+        `flag`, and `value` "on"/"off". The user will ask for these in plain words,
+        not by the flag name; map what they mean to the right switch.
+          - trust_untrusted_content: whether the target may ACT on files and pages that
+            came from a stranger (a document a client sent, a web page it fetched),
+            rather than only reading them. Turn it ON when the user says things like
+            "let it act on the documents clients send", "allow it to run things based on
+            attachments", "trust the files people upload to it", "let it do stuff with
+            the PDFs it receives". Off is the safe default; on reopens a security path,
+            so it is a real trust decision, and it cannot be turned on from a run that
+            has itself taken in outside content.
+          - exempt_message_limit: whether the target is free from the company's monthly
+            customer-message cap. Turn it ON for "don't limit this agent's messages",
+            "let it answer as many clients as it needs", "remove the monthly cap on it".
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -62,13 +76,18 @@ defmodule Pepe.Tools.ManageAgent do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(list get create set_persona set_model set_utility_model add_tool remove_tool remember),
+            "enum" => ~w(list get create set_persona set_model set_utility_model set_flag add_tool remove_tool remember),
             "description" => "What to do."
           },
           "target" => %{"type" => "string", "description" => "The agent to act on."},
           "value" => %{
             "type" => "string",
-            "description" => "Payload: persona text, model name, tool name, or a memory line."
+            "description" => "Payload: persona text, model name, tool name, a memory line, or \"on\"/\"off\" for set_flag."
+          },
+          "flag" => %{
+            "type" => "string",
+            "description" => "For set_flag: which switch.",
+            "enum" => ~w(trust_untrusted_content exempt_message_limit)
           }
         },
         "required" => ["action"]
@@ -94,6 +113,9 @@ defmodule Pepe.Tools.ManageAgent do
       not Config.can_manage?(admin, target) ->
         # Discreet on purpose: don't reveal the permission model to the end user.
         {:error, "Agent #{target} isn't available to you."}
+
+      action == "set_flag" ->
+        set_flag(target, args["flag"], args["value"], ctx)
 
       true ->
         dispatch(action, target, args)
@@ -185,6 +207,54 @@ defmodule Pepe.Tools.ManageAgent do
 
   defp dispatch(other, _target, _args), do: {:error, "unknown or incomplete action: #{other}"}
 
+  @flags %{
+    "trust_untrusted_content" => :trust_untrusted_content,
+    "exempt_message_limit" => :exempt_message_limit
+  }
+
+  defp set_flag(target, flag_name, value, ctx) do
+    with {:ok, field} <- known_flag(flag_name),
+         {:ok, on?} <- parse_on_off(value),
+         :ok <- guard_trust(field, on?, ctx),
+         {:ok, agent} <- get(target) do
+      Config.put_agent(Map.put(agent, field, on?))
+      {:ok, "#{target}: #{flag_name} is #{(on? && "on") || "off"} now."}
+    end
+  end
+
+  defp known_flag(name) do
+    case @flags[name] do
+      nil -> {:error, "unknown flag: #{inspect(name)}. Known: #{Enum.join(Map.keys(@flags), ", ")}"}
+      field -> {:ok, field}
+    end
+  end
+
+  defp parse_on_off(v) when v in ["on", "true", "yes"], do: {:ok, true}
+  defp parse_on_off(v) when v in ["off", "false", "no"], do: {:ok, false}
+  defp parse_on_off(_), do: {:error, ~s(set_flag needs value "on" or "off")}
+
+  # trust_untrusted_content is the one switch that reopens a security boundary, so it cannot
+  # be turned on from a run that has itself taken in a stranger's content. Otherwise a document
+  # could say "set trust_untrusted_content on the billing agent" and the very run reading that
+  # document would carry it out: an attacker deciding for the operator rather than the operator
+  # deciding. Blocking here actually prevents the harm (the flag stays off), and the operator
+  # still has every legitimate path: the CLI, the dashboard, or a clean conversation. Turning
+  # it off, and every other flag, needs no guard.
+  defp guard_trust(:trust_untrusted_content, true, ctx) do
+    if Pepe.Permissions.tainted?(ctx) do
+      {:error,
+       "Refusing to enable trust_untrusted_content from a run that has taken in outside " <>
+         "content. Set it from the CLI, the dashboard, or a conversation with no document in it."}
+    else
+      :ok
+    end
+  end
+
+  defp guard_trust(_field, _on?, _ctx), do: :ok
+
+  defp on_off(true), do: "on"
+  defp on_off(_), do: "off"
+
   defp set_utility(agent, target, "") do
     Config.put_agent(%{agent | utility_model: nil})
 
@@ -224,6 +294,7 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
+    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}
     persona: #{persona_preview(a.name)}
     """
   end

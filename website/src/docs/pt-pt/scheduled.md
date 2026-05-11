@@ -81,6 +81,24 @@ O cronómetro vive dentro do processo da aplicação, por isso só corre enquant
 
 Se o processo estava em baixo no momento em que uma tarefa deveria disparar, o Pepe faz uma **recuperação** limitada ao regressar. Quando volta e repara que uma janela agendada passou sem execução, dispara esse trabalho uma vez, desde que ainda esteja dentro de uma janela de tolerância (metade do período do trabalho, limitada entre 2 minutos e 2 horas). A recuperação está ancorada na janela perdida, por isso um único regresso nunca dispara duas vezes. Um trabalho que esteve em baixo muito mais tempo do que a sua janela de tolerância é simplesmente retomado na próxima janela normal, em vez de repetir uma antiga.
 
+### Uma tarefa não corre por cima de si mesma
+
+Uma tarefa cuja execução anterior **ainda está a correr** quando chega a hora seguinte é **saltada**, e o salto é escrito no histórico dela.
+
+É saltada em vez de acumulada porque uma tarefa aqui não é um script idempotente, é **um turno de agente**. Custa uma chamada ao modelo, tem efeitos colaterais (uma mensagem entregue, um ficheiro escrito), e cada execução da mesma tarefa partilha um único espaço de trabalho do agente. Um trabalho que demora sete minutos num agendamento de cinco acumularia: duas execuções, depois três, depois quatro, cada uma faturada, o relatório entregue duas vezes, e duas execuções a escrever uma por cima da outra. Descobria-o pela fatura.
+
+E nunca é saltada em silêncio. O salto fica como uma entrada de falha no histórico, e diz o que está errado:
+
+> ⏭️ skipped: the previous run was still going. This job takes longer than its own schedule allows.
+
+Essa entrada é o ponto. Sem ela, o trabalho deixaria simplesmente de acontecer, à hora certa, e o primeiro sinal seria que aquilo que fazia tinha deixado de ser feito.
+
+```bash
+pepe cron add --name "digest" --prompt "..." --schedule "*/5 * * * *" --overlap
+```
+
+O `--overlap` (ou `"overlap": true` na configuração) corre-a à mesma, para a tarefa em que a concorrência é mesmo o que quer.
+
 ### Histórico de execuções
 
 Cada disparo, seja do cronómetro, de um `pepe cron run` forçado, de um botão do painel ou de uma conversa, acrescenta uma linha ao ficheiro de histórico da tarefa (`<PEPE_HOME>/data/cron_logs/<id>.jsonl`). Cada linha regista a data e hora, a origem, se teve sucesso e a saída (cortada).

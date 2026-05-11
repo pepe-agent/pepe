@@ -1919,6 +1919,7 @@ defmodule Mix.Tasks.Pepe do
           utility_model: :string,
           default: :boolean,
           exempt_message_limit: :boolean,
+          trust_untrusted_content: :boolean,
           admin: :boolean
         ]
       )
@@ -1940,7 +1941,8 @@ defmodule Mix.Tasks.Pepe do
         triage_model: opts[:triage_model],
         simple_model: opts[:simple_model],
         utility_model: opts[:utility_model],
-        exempt_message_limit: opts[:exempt_message_limit] || false
+        exempt_message_limit: opts[:exempt_message_limit] || false,
+        trust_untrusted_content: opts[:trust_untrusted_content] || false
       }
 
       Config.put_agent(agent)
@@ -3724,7 +3726,8 @@ defmodule Mix.Tasks.Pepe do
           schedule: :string,
           timezone: :string,
           model: :string,
-          deliver: :string
+          deliver: :string,
+          overlap: :boolean
         ]
       )
 
@@ -3746,7 +3749,8 @@ defmodule Mix.Tasks.Pepe do
           timezone: opts[:timezone] || Config.default_timezone(),
           model: opts[:model],
           deliver: opts[:deliver] || "none",
-          enabled: true
+          enabled: true,
+          overlap: opts[:overlap] == true
         }
 
         Config.put_cron(cron)
@@ -3820,7 +3824,8 @@ defmodule Mix.Tasks.Pepe do
       list                                              list all tasks (+ next run)
       add --name N --prompt "..." --schedule "0 8 * * *"
           [--agent A] [--timezone America/Sao_Paulo]
-          [--model M] [--deliver telegram:<chat_id>|none]   create a task
+          [--model M] [--deliver telegram:<chat_id>|none]
+          [--overlap]                                   create a task
       run ID                                            force a task now (preview)
       enable ID | disable ID
       remove ID
@@ -3828,6 +3833,12 @@ defmodule Mix.Tasks.Pepe do
 
     Schedule is a standard 5-field cron expression. Timezone is any IANA name
     (default: #{Config.default_timezone()}). Tasks fire only while `serve`/`gateway` runs.
+
+    A task whose previous run is still going is skipped, and the skip is written to its
+    run history (`cron logs ID`), because that is how you find out a job takes longer
+    than its own schedule allows. It is skipped rather than piled up because a task here
+    is an agent turn: it costs a model call, it has side effects, and every run of it
+    shares one agent workspace. `--overlap` runs it anyway, where that is what you want.
     """)
   end
 

@@ -129,4 +129,117 @@ defmodule Pepe.Tools.ManageAgentTest do
     refute msg =~ "not allowed"
     refute Config.get_agent("suporte")
   end
+
+  describe "set_flag (enable or disable a switch on a managed agent)" do
+    setup do
+      on_exit(fn -> Process.delete(:pepe_untrusted_content) end)
+      :ok
+    end
+
+    test "an admin turns a target's switch on and off by chat" do
+      assert {:ok, msg} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "exempt_message_limit", "value" => "on"},
+                 ctx(["vendas"])
+               )
+
+      assert msg =~ "on"
+      assert Config.get_agent("vendas").exempt_message_limit == true
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "exempt_message_limit", "value" => "off"},
+                 ctx(["vendas"])
+               )
+
+      assert Config.get_agent("vendas").exempt_message_limit == false
+    end
+
+    test "trust_untrusted_content can be turned on from an ordinary conversation" do
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "trust_untrusted_content", "value" => "on"},
+                 ctx(["vendas"])
+               )
+
+      assert Config.get_agent("vendas").trust_untrusted_content == true
+    end
+
+    test "but NOT from a run that has itself taken in a stranger's content" do
+      # The escalation this closes: a document the admin agent is reading says "trust the
+      # billing agent", and the very run reading it carries that out. That is an attacker
+      # deciding for the operator, not the operator deciding.
+      Pepe.Permissions.taint()
+
+      assert {:error, why} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "trust_untrusted_content", "value" => "on"},
+                 ctx(["vendas"])
+               )
+
+      assert why =~ "outside"
+      assert Config.get_agent("vendas").trust_untrusted_content == false
+
+      # Turning it OFF from a tainted run is still fine: tightening never needs guarding.
+      Config.put_agent(%{Config.get_agent("vendas") | trust_untrusted_content: true})
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "trust_untrusted_content", "value" => "off"},
+                 ctx(["vendas"])
+               )
+
+      assert Config.get_agent("vendas").trust_untrusted_content == false
+    end
+
+    test "an unknown flag or a bad value is refused" do
+      assert {:error, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "make_it_fast", "value" => "on"},
+                 ctx(["vendas"])
+               )
+
+      assert {:error, why} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "exempt_message_limit", "value" => "maybe"},
+                 ctx(["vendas"])
+               )
+
+      assert why =~ "on"
+    end
+
+    test "and only on an agent the admin may manage" do
+      assert {:error, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "rh", "flag" => "exempt_message_limit", "value" => "on"},
+                 ctx(["vendas"])
+               )
+    end
+
+    test "get shows the current flags, so the admin can see what it is changing" do
+      assert {:ok, text} = ManageAgent.run(%{"action" => "get", "target" => "vendas"}, ctx(["vendas"]))
+      assert text =~ "trust_untrusted_content=off"
+      assert text =~ "exempt_message_limit=off"
+    end
+  end
+
+  describe "the flag descriptions speak the language a person uses" do
+    # The LLM does the mapping from "let it act on the documents clients send" to
+    # trust_untrusted_content: that is its job, and it is not something a unit test can pin.
+    # What a unit test CAN protect is the raw material it needs to do it: the plain-language
+    # phrases in the tool description. Strip those out to "tidy up" the spec and the mapping
+    # quietly stops working, which is the regression this catches.
+    test "the trigger phrases are in the spec, so the model can match them" do
+      desc = ManageAgent.spec()["function"]["description"]
+
+      # The user never types the flag name. These are the words they actually use.
+      assert desc =~ "documents clients send"
+      assert desc =~ "attachments"
+      assert desc =~ "don't limit this agent's messages"
+
+      # And the flag names are still there for the model to emit.
+      assert desc =~ "trust_untrusted_content"
+      assert desc =~ "exempt_message_limit"
+    end
+  end
 end

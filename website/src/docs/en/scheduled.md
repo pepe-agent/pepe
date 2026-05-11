@@ -81,6 +81,24 @@ The ticker lives inside the application process, so it only runs while `pepe ser
 
 If the process was down at the moment a task was supposed to fire, Pepe does a bounded **catch-up** on recovery. When it comes back and notices a scheduled slot passed without a run, it fires that job once, as long as it is still within a grace window (half the job's period, clamped between 2 minutes and 2 hours). The catch-up is anchored to the missed slot, so one recovery never double-fires. A job that has been down far longer than its grace window is simply picked up at its next normal slot instead of replaying a stale one.
 
+### A task does not run on top of itself
+
+A task whose previous run is **still going** when its next slot comes round is **skipped**, and the skip is written to its run history.
+
+It is skipped rather than piled up because a task here is not an idempotent shell script, it is **an agent turn**. It costs a model call, it has side effects (a message delivered, a file written), and every run of the same task shares one agent workspace. A job that takes seven minutes on a five-minute schedule would otherwise accumulate: two runs, then three, then four, each one billed, the report delivered twice, and two runs writing over each other. You would find out from the invoice.
+
+And it is never skipped in silence. The skip is a failed entry in the run history, and it says what is wrong:
+
+> ⏭️ skipped: the previous run was still going. This job takes longer than its own schedule allows.
+
+That entry is the point. Without it the job would simply stop happening, on schedule, and the first sign would be that whatever it did had stopped being done.
+
+```bash
+pepe cron add --name "digest" --prompt "..." --schedule "*/5 * * * *" --overlap
+```
+
+`--overlap` (or `"overlap": true` in the config) runs it anyway, for a task where concurrency is genuinely what you want.
+
 ### Run history
 
 Every fire, whether from the timer, a forced `pepe cron run`, a dashboard button, or a chat, appends one line to a per-task history file (`<PEPE_HOME>/data/cron_logs/<id>.jsonl`). Each line records the timestamp, the source, whether it succeeded, and the (clipped) output.

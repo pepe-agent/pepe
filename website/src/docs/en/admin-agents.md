@@ -44,9 +44,12 @@ able to reconfigure the admin, or itself.
 | `set_persona` | Rewrite the target's system prompt. |
 | `set_model` | Point the target at a different model connection. |
 | `set_utility_model` | Set the cheap connection the target's chores run on, such as naming a conversation. An empty value turns it off, and the chores are then done without a model. |
+| `set_flag` | Turn one of the target's switches on or off (`on`/`off`): `trust_untrusted_content` (let it act on content strangers send it) or `exempt_message_limit`. Turning `trust_untrusted_content` on cannot be done from a run that has itself taken in outside content, so an injected document cannot flip it. |
 | `add_tool` | Grant the target one more tool. |
 | `remove_tool` | Revoke a tool from the target. |
 | `remember` | Append a fact to the target's memory. |
+
+You do not need the flag names. `set_flag` is driven by the model, so you ask in plain words ("let the support agent act on the files clients send it", "stop limiting this agent's messages") and it picks the right switch.
 
 Persona and memory live in the target's workspace. Tools and model live in its entry in
 the configuration file.

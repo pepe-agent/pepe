@@ -32,3 +32,16 @@ When created from a chat, `deliver` defaults to that same chat. Confirm the deta
   hard-code it; use what the user asked (e.g. "6am German time" -> `Europe/Berlin`).
 - Tasks only fire while a long-running surface is up (`mix pepe serve` / `gateway`).
 - Each due task runs in its own process, so many can fire at once without blocking.
+
+## A task does not run on top of itself
+
+If a task's previous run is still going when its next slot comes round, that slot is
+**skipped**, and the skip is written to its run history. A task here is an agent turn:
+it costs a model call, it has side effects, and every run of it shares one agent
+workspace, so piling up would bill twice, deliver twice, and let two runs write over
+each other.
+
+If the user asks why a task seems to have stopped running, look at its history
+(`logs`): a run of skips means the job takes longer than its own schedule allows. Tell
+them so, and offer the three real fixes: a longer interval, less work per run, or
+`overlap: true` if running it on top of itself is genuinely what they want.
