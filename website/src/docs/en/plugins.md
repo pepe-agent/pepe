@@ -99,9 +99,12 @@ registry.
 ## The registry
 
 `Pepe.Tools.all/0` returns the built-in tools followed by every loaded plugin
-tool; `Pepe.Webhooks` does the same for channel providers. One rule to know: a
-built-in always wins a name collision, so pick a tool name distinct from
-`read_file`, `web_search`, and the rest of `pepe tools`.
+tool; `Pepe.Webhooks` does the same for channel providers. Built-ins and
+plugins are merged into a single registry, and the two shapes settle a name
+collision in opposite ways. For tools, a built-in always wins, so pick a tool
+name distinct from `read_file`, `web_search`, and the rest of `pepe tools`. For
+channel providers, a plugin of the same name wins, which is how you replace a
+bundled provider with your own version of it.
 
 ### Granting a tool to an agent
 
@@ -138,11 +141,25 @@ the change lands on the next tool call. One file can define several modules
 A plugin is one of two shapes: a bare `.exs` file, or a **package** (a
 directory with a `manifest.json` and one or more `.exs` files).
 
+Runtime compilation carries one honest limit: **a plugin cannot bring a new
+external dependency with it.** Elixir resolves and compiles dependencies at
+build time, so a plugin can only use the libraries Pepe already ships (`Req`,
+`Jason`, the standard library, and the rest of its deps). A plugin that needs a
+brand-new library is not a drop-in; it would mean rebuilding Pepe. In practice
+this is rarely a constraint, since a tool that calls an HTTP API and a channel
+provider like Chatwoot need nothing beyond what is already bundled, which is
+why they install cleanly.
+
 ## Installing a plugin
 
 The source is a local file, a local directory, a `.tar.gz`, or a URL to any of
-those. A GitHub repo URL is fetched as its source archive (`main`, then
-`master`, when no branch is given).
+those, and `install` unrolls whatever you give it into the plugins directory. A
+GitHub repo URL is fetched as its source archive and extracted, taking the
+default branch (`main`, then `master`) when no branch is given; add
+`/tree/<branch>` to the URL to take a different one. A `.tar.gz`, local or
+remote, is extracted and the package placed under the `name` from its manifest.
+A directory is copied in as it is, and a bare `.exs` file is copied straight
+across.
 
 **CLI:**
 
@@ -168,11 +185,25 @@ terminal if you still want it.
 ## The security scan
 
 A plugin is ordinary Elixir with full access to the running app; installing
-one is a trust decision, like adding any dependency. Before it's placed on
-disk, `Pepe.Skills.Sentinel` statically scans it, reading the syntax tree for
-dangerous patterns (spawning shells, dynamic eval, destructive filesystem
-calls, reading secrets, network access). It never executes the code, and
-returns one of three verdicts:
+one is a trust decision, like adding any dependency. Install only from a source
+you trust, and prefer pinning a specific version or commit.
+
+Before it's placed on disk, `Pepe.Skills.Sentinel` statically scans it. It
+walks the **parse tree** rather than the raw text, so it flags dangerous calls
+precisely:
+
+- shelling out (`System.cmd`, `:os.cmd`),
+- dynamic eval (`Code.eval_string`),
+- unsafe deserialization (`:erlang.binary_to_term`),
+- destructive filesystem calls (`File.rm_rf`),
+- atom exhaustion (`String.to_atom`),
+- reading the environment or secret paths (`~/.ssh`, the Pepe config),
+- network access.
+
+Because it reads the AST, it catches the aliased and Erlang forms of those
+calls too, and it does not trip over the same words when they appear in a
+comment or a string. It never executes the code, and returns one of three
+verdicts:
 
 - **clean**: no findings.
 - **caution**: flagged but often legitimate (a channel plugin *should* make

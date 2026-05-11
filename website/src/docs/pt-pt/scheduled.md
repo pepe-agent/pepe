@@ -44,7 +44,7 @@ Cada tarefa recebe um id legível derivado do nome (`morning-brief`). Se esse id
 
 ### Faz pelo painel
 
-Corre `pepe serve` e abre a página **Scheduled**. Lista cada tarefa com a próxima hora de execução e dá-te as mesmas ações em botões: criar uma tarefa nova com um formulário, forçar uma execução agora, ativar ou desativar, editar, remover e abrir o histórico de uma tarefa no próprio sítio. Quando escreves o horário de uma tarefa, o painel consegue transformar uma frase simples como "todos os dias úteis às 9:30" na expressão cron correspondente por ti, usando um modelo configurado, e valida o resultado antes de guardar.
+Corre `pepe serve` e abre a página **Scheduled**. Lista cada tarefa com a próxima hora de execução e dá-te as mesmas ações em botões: criar uma tarefa nova com um formulário, forçar uma execução agora, ativar ou desativar, editar, remover e abrir o histórico de uma tarefa no próprio sítio. O formulário de criação cobre tudo o que a linha de comandos faz: o agente, o prompt, o horário, o fuso horário, o modelo e para onde entregar o resultado, incluindo a opção "Não enviar para lado nenhum". Quando escreves o horário de uma tarefa, o painel consegue transformar uma frase simples como "todos os dias úteis às 9:30" na expressão cron correspondente por ti, usando um modelo configurado, e valida o resultado antes de guardar.
 
 ### Expressões de horário e fusos horários
 
@@ -76,6 +76,8 @@ Independentemente do destino, cada execução é acrescentada ao ficheiro de his
 ### O cronómetro por minuto e a recuperação
 
 O agendador dispara a cada 30 segundos (abaixo do minuto de propósito, para que um pequeno desvio de relógio nunca o faça perder um minuto). Em cada disparo olha para todas as tarefas ativas e aciona as que coincidem com o minuto atual no fuso dessa tarefa. Uma salvaguarda por tarefa garante que um trabalho dispara **no máximo uma vez por minuto**, mesmo com o disparo a ser mais rápido do que isso.
+
+O cronómetro vive dentro do processo da aplicação, por isso só corre enquanto o `pepe serve` ou o `pepe gateway` estiver de pé, e nunca durante um comando de execução única. Cada tarefa cuja hora chegou corre no seu próprio processo, por isso várias tarefas que caiam no mesmo minuto disparam em simultâneo, e uma tarefa lenta nunca bloqueia outra. As definições das tarefas ficam guardadas em `~/.pepe/config.json`, sob `"crons"`.
 
 Se o processo estava em baixo no momento em que uma tarefa deveria disparar, o Pepe faz uma **recuperação** limitada ao regressar. Quando volta e repara que uma janela agendada passou sem execução, dispara esse trabalho uma vez, desde que ainda esteja dentro de uma janela de tolerância (metade do período do trabalho, limitada entre 2 minutos e 2 horas). A recuperação está ancorada na janela perdida, por isso um único regresso nunca dispara duas vezes. Um trabalho que esteve em baixo muito mais tempo do que a sua janela de tolerância é simplesmente retomado na próxima janela normal, em vez de repetir uma antiga.
 

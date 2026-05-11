@@ -165,8 +165,6 @@ defmodule Pepe.Doctor do
   end
 
   # Security: secrets stored in the clear, and a server with no dashboard password.
-  @secret_keys ~w(api_key password token bot_token secret app_secret client_secret verify_token access_token refresh_token signing_secret)
-
   defp security_checks do
     secret_checks =
       case plaintext_secrets(Config.load(), []) do
@@ -175,7 +173,9 @@ defmodule Pepe.Doctor do
 
         paths ->
           Enum.map(paths, fn path ->
-            {"security", "plaintext secret at #{path}", {:warn, "stored in the clear; use a ${ENV_VAR} reference instead"}}
+            {"security", "plaintext secret at #{path}",
+             {:warn,
+              "in the clear - revoke and reissue it (it is in the file, and if it was typed into a chat it also reached a model provider), then refer to it as ${ENV_VAR}"}}
           end)
       end
 
@@ -189,15 +189,23 @@ defmodule Pepe.Doctor do
     secret_checks ++ [password_check]
   end
 
-  # Walk the config, flagging any secret-named key whose value is a plaintext (non-${ENV})
-  # non-empty string. Returns dotted paths like "models.m1.api_key".
+  # Walk the config, flagging a credential written in the clear. Returns dotted paths like
+  # "models.m1.api_key" or "mcp.github.env.GITHUB_TOKEN".
+  #
+  # Two ways to be a finding, because a secret hides in two ways. A key whose *name* says so
+  # (`api_key`, and now `GITHUB_TOKEN` and `BRAVE_API_KEY`, matched on word parts rather than
+  # by exact name - which is why they used to sail straight past this check). Or a *value*
+  # that is unmistakably a credential (`sk-...`, `ghp_...`) whatever it was filed under, which
+  # is how a token passed positionally in an argument list gets caught: there, it has no key
+  # name to give it away.
   defp plaintext_secrets(map, path) when is_map(map) do
     Enum.flat_map(map, fn {k, v} ->
       here = path ++ [to_string(k)]
 
       cond do
-        is_binary(v) and to_string(k) in @secret_keys and plaintext_secret?(v) -> [Enum.join(here, ".")]
         is_map(v) or is_list(v) -> plaintext_secrets(v, here)
+        Pepe.Secrets.secret_key?(k) and plaintext_value?(v) -> [Enum.join(here, ".")]
+        Pepe.Secrets.plaintext?(v) -> [Enum.join(here, ".")]
         true -> []
       end
     end)
@@ -211,7 +219,10 @@ defmodule Pepe.Doctor do
 
   defp plaintext_secrets(_v, _path), do: []
 
-  defp plaintext_secret?(v), do: v != "" and not Regex.match?(~r/\$\{[A-Z0-9_]+\}/, v)
+  # For a key that already announces itself as a secret, any non-empty value that is not an
+  # ${ENV_VAR} reference is a finding - it does not also have to look like a credential.
+  defp plaintext_value?(v) when is_binary(v), do: v != "" and not Pepe.Secrets.reference?(v)
+  defp plaintext_value?(_v), do: false
 
   # Channels (inbound webhook providers): provider known, agent exists, required creds
   # present. These are inbound, so unlike Telegram they have no getMe-style live probe -

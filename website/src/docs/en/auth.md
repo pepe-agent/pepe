@@ -1,7 +1,97 @@
 ---
 title: Authentication
-description: Protect remote API access with scoped tokens.
+description: Sign in to the dashboard, and protect remote API access with scoped tokens.
 ---
+
+Pepe has two front doors and each has its own lock. The dashboard is for people, and it is guarded by an optional password plus a network rule that fails closed. The `/v1` HTTP API is for programs, and it is guarded by bearer tokens that carry a scope. On your own machine neither lock is in your way, and neither door opens to the network until you turn its lock on.
+
+## Dashboard authentication
+
+The dashboard is **open by default** so a local install has zero friction: run `pepe serve` on your own machine and browse to it. Authentication is **opt-in**: the moment you set a dashboard password, every page requires signing in. There is no database and no user table. The password is checked in constant time and a signed flag rides in the Phoenix session cookie.
+
+### Enabling it
+
+Set a password either way. If both are present, the config value wins:
+
+```bash
+# Option A: an environment variable, so nothing lands in the config file.
+export PEPE_DASHBOARD_PASSWORD='a long passphrase'
+
+# Option B: store a reference, so the secret still comes from the environment.
+pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
+
+# Check the current state, or turn it off again.
+pepe dashboard
+pepe dashboard password --clear
+```
+
+The value is `${ENV}`-interpolated at read time, so, like every other secret in Pepe, it is never written to `~/.pepe/config.json` in the clear.
+
+With a password set:
+
+* every dashboard route redirects to **`/login`** until you sign in;
+* `POST /login` checks the password with a constant-time compare and stores a signed `dashboard_authed` flag in the session cookie;
+* a **Sign out** link appears in the sidebar footer, and `DELETE /logout` clears the flag.
+
+Unset the password, by removing the environment variable or the config key, and the dashboard is open again.
+
+### Fail closed: the dashboard is never open to the network without a password
+
+Being "open by default" is safe only because that default is **loopback-only**. A per-request guard enforces it: with **no password set**, the dashboard answers only genuine `localhost` clients. Any request from somewhere else, whether a LAN address, a virtual machine, or a reverse proxy, gets a **403** telling you to set a password. There is no "allow open anyway" switch: reaching the dashboard from off the box means either a password or a tunnel.
+
+The rule, precisely:
+
+| Request comes from | No password | Password set |
+|---|---|---|
+| `localhost` (loopback, no proxy headers) | allowed | login required |
+| LAN, a VM, or another machine | **403** | login required |
+| through a proxy (`X-Forwarded-For` present) | **403** | login required |
+
+LAN and private ranges (`192.168.x`, `10.x`, `172.16.x`) count as **public**, not as trusted. The `/v1` API and the `/webhooks` endpoints are unaffected by this rule; they carry their own authentication, described below.
+
+### Reaching it from another machine
+
+Two options are safe:
+
+1. **Set a password** and expose the dashboard behind TLS, using a reverse proxy or a tunnel, so the password and the session cookie are never sent in the clear. When you put a proxy in front, keep the password on, because a proxied request is treated as public.
+
+2. **Keep it on loopback and tunnel in**, so nothing is opened to the network at all:
+
+```bash
+pepe serve --tunnel                     # built-in Cloudflare quick tunnel (needs cloudflared)
+ssh -L 4000:localhost:4000 you@server   # then browse http://localhost:4000
+tailscale serve 4000                    # a private tailnet, no public port
+```
+
+`pepe serve --tunnel` runs `cloudflared` and prints a public `https://<...>.trycloudflare.com` URL for the life of the process. Because the tunnel is a proxy, a tunneled request counts as public, so set a dashboard password before using it. The full walkthrough, including named tunnels with a stable URL you choose, is on the [Dashboard](../dashboard/#reaching-it-remotely) page.
+
+`ssh -L` and a Multipass port-forward instead arrive on loopback, so they just work with no password. A VM reached across its virtual network looks remote and is blocked, so forward its port to `localhost`.
+
+### Serving behind a domain or a reverse proxy
+
+Two optional settings make a real deployment behave correctly:
+
+```bash
+# The Host header values the dashboard should answer to (loopback names always work).
+pepe dashboard hosts dash.example.com
+
+# The reverse proxies whose X-Forwarded-For may be trusted (CIDRs or bare IPs).
+pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8
+
+# Show the current posture: authentication, hosts, proxies.
+pepe dashboard
+```
+
+* **Allowed hosts** are a DNS-rebinding defense. With no password, the dashboard accepts only a **loopback** `Host` (`localhost`, `127.0.0.1`, `::1`) and rejects any other name with **400**, which stops a malicious page from rebinding a domain to your machine and driving the local dashboard. When you serve under a real domain, list it here, with a password on. An empty allowlist plus a password accepts any host, because the password is then the gate.
+* **Trusted proxies** decide when `X-Forwarded-For` is believed. By default it is ignored and a proxied request is treated as remote, which is the fail-closed choice. List your proxy here and Pepe takes the real client IP from the forwarded chain, so the loopback-versus-remote rule and the login rate limit both see the true peer instead of the proxy.
+
+### Brute-force protection
+
+`POST /login` is rate-limited per client IP, by default 10 attempts every 60 seconds, and a successful login resets the counter. That sits on top of the constant-time password compare and a small delay on each failure. Going over the limit returns **429** with a `Retry-After` header.
+
+### Extending it
+
+The gate is deliberately small and composable: one `on_mount` hook (`PepeWeb.Auth`), one plug (`PepeWeb.NetworkGuard`, backed by `Pepe.Net` and `PepeWeb.RemoteClient`), and the login throttle. Richer schemes, such as OAuth, trusted-proxy identity headers, or per-operator accounts, can slot in without touching each LiveView.
 
 ## Authentication and tokens
 

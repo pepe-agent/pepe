@@ -20,6 +20,8 @@ Because agent checks cost tokens, their minimum interval is higher: 300 seconds 
 
 When the trigger finally passes, a watch delivers a message. That message is either a fixed **template** (a piece of text you set up front, no model call), or **composed by the agent** at fire time (one model call, once) so it can include fresh detail like a summary of what actually happened.
 
+The combination worth knowing is a free probe gating an agent-composed message. The `curl` polling costs nothing, and the model is only asked to write the summary at the moment the condition passes.
+
 ### Create a watch from the CLI
 
 The CLI creates probe watches. Agent-judged watches are created from chat, where the model is already in the loop.
@@ -64,7 +66,7 @@ To keep things bounded, at most 50 watches can be active at once, and Pepe refus
 
 ### Delivery to the origin channel
 
-A watch records its **origin**, the channel and conversation it was created from, at creation time. When it fires it delivers back there, even after a restart, whether that is a Telegram chat, a connected terminal or WebSocket session, or the application log. If the watch was created over the stateless HTTP API (which has no conversation to message back), it falls back to the log.
+A watch records its **origin**, the channel and conversation it was created from, at creation time. When it fires it delivers back there, even after a restart, whether that is a Telegram chat (a direct push), a connected terminal or WebSocket session, or the application log. On a WebSocket the notification arrives as a `"watch"` event on the channel; pass a stable `session` when you join and you will receive it across reconnects, instead of only on the socket that happened to create the watch. In `pepe chat` it is printed inline in the console. If the watch was created over the stateless HTTP API (which has no conversation to message back), it falls back to the log.
 
 Two guarantees make this reliable:
 
@@ -73,4 +75,4 @@ Two guarantees make this reliable:
 
 A watch moves through a small set of states over its life: `pending` (still watching), `paused`, `done` (fired and delivered), `expired` (ran out of its check budget), or `cancelled`.
 
-<div class="note"><strong>No database, no crontab.</strong> Tasks and watches are plain records in <code>~/.pepe/config.json</code>, and task run history is one JSONL file per task under <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. There is nothing else to install or keep running. The whole scheduler is an in-process timer that starts when you run <code>pepe serve</code> or a gateway, and stops when you stop them.</div>
+<div class="note"><strong>No database, no crontab.</strong> Tasks and watches are plain records in <code>~/.pepe/config.json</code> (under <code>"crons"</code> and <code>"watches"</code>), and task run history is one JSONL file per task under <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. There is nothing else to install or keep running. The whole scheduler is an in-process timer that runs on whichever long-lived surface is up, <code>pepe serve</code>, a gateway, or an interactive <code>pepe chat</code>, and stops when you stop it. Run only one of them at a time against the same config: two would both tick, and a watch would fire twice.</div>

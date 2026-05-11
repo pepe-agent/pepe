@@ -44,7 +44,7 @@ Each task gets a readable id derived from its name (`morning-brief`). If that id
 
 ### Do it in the dashboard
 
-Run `pepe serve` and open the **Scheduled** page. It lists every task with its next run time, and gives you the same actions as buttons: create a new task with a form, force a run now, enable or disable, edit, remove, and open a task's run history in place. When you type a task's schedule, the dashboard can turn a plain phrase like "every weekday at 9:30" into the matching cron expression for you, using a configured model, and it validates the result before saving.
+Run `pepe serve` and open the **Scheduled** page. It lists every task with its next run time, and gives you the same actions as buttons: create a new task with a form, force a run now, enable or disable, edit, remove, and open a task's run history in place. The create form covers everything the CLI does: the agent, the prompt, the schedule, the timezone, the model, and where to deliver the result, including a "Don't send anywhere" option. When you type a task's schedule, the dashboard can turn a plain phrase like "every weekday at 9:30" into the matching cron expression for you, using a configured model, and it validates the result before saving.
 
 ### Schedule expressions and timezones
 
@@ -76,6 +76,8 @@ Regardless of the target, every run is appended to that task's own history file,
 ### The minute ticker and catch-up
 
 The scheduler ticks every 30 seconds (sub-minute on purpose, so a little clock drift never makes it miss a minute). On each tick it looks at every enabled task and fires the ones whose schedule matches the current minute in that task's timezone. A per-task guard makes sure a job fires **at most once per minute** even though the tick is faster than that.
+
+The ticker lives inside the application process, so it only runs while `pepe serve` or `pepe gateway` is up, and never during a one-shot command. Each due task runs in its own process, so several tasks falling on the same minute fire concurrently and one slow task never blocks another. The task definitions themselves are stored in `~/.pepe/config.json`, under `"crons"`.
 
 If the process was down at the moment a task was supposed to fire, Pepe does a bounded **catch-up** on recovery. When it comes back and notices a scheduled slot passed without a run, it fires that job once, as long as it is still within a grace window (half the job's period, clamped between 2 minutes and 2 hours). The catch-up is anchored to the missed slot, so one recovery never double-fires. A job that has been down far longer than its grace window is simply picked up at its next normal slot instead of replaying a stale one.
 

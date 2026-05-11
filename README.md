@@ -189,17 +189,26 @@ mix pepe run "list the files here and summarize the project"
 
 ## Documentation
 
-One topic per page. Open just what you need.
+**The docs live at [pepe-agent.com/docs](https://pepe-agent.com/en/docs/)**, in English,
+Portuguese and Spanish. One topic per page; open just what you need.
 
-**Get going** &nbsp; [Architecture](docs/architecture.md) · [CLI reference](docs/cli-reference.md) · [Configuration](docs/configuration.md) · [Migrating from another runtime](docs/migrating.md)
+**Start** &nbsp; [Install](https://pepe-agent.com/en/docs/install/) · [Docker](https://pepe-agent.com/en/docs/docker/) · [Quickstart](https://pepe-agent.com/en/docs/quickstart/)
 
-**Talk to it** &nbsp; [Web dashboard](docs/dashboard.md) · [Dashboard auth](docs/authentication.md) · [HTTP API](docs/http-api.md) · [WebSocket](docs/websocket.md) · [Telegram](docs/telegram.md) · [WhatsApp](docs/whatsapp.md) · [Channels (Slack/Discord/Teams/Chat)](docs/channels.md)
+**Configure** &nbsp; [Models](https://pepe-agent.com/en/docs/models/) · [Agents](https://pepe-agent.com/en/docs/agents/) · [Configuration](https://pepe-agent.com/en/docs/config/) · [Secrets & vaults](https://pepe-agent.com/en/docs/secrets/) · [Usage & billing](https://pepe-agent.com/en/docs/billing/) · [Companies](https://pepe-agent.com/en/docs/companies/)
 
-**Agents** &nbsp; [Admin agents](docs/admin-agents.md) · [Permissions](docs/permissions.md) · [Agent-to-agent routing](docs/routing.md) · [Companies](docs/companies.md) · [Skills](docs/skills.md) · [Learning](docs/learning.md) · [Goals & plans](docs/goals-and-plans.md) · [Adding a tool](docs/adding-a-tool.md) · [Plugins](docs/plugins.md) · [Self-management](docs/self-management.md)
+**What an agent can do** &nbsp; [Skills](https://pepe-agent.com/en/docs/skills/) · [Learning](https://pepe-agent.com/en/docs/learning/) · [Agent-to-agent routing](https://pepe-agent.com/en/docs/routing/) · [Delegation](https://pepe-agent.com/en/docs/delegation/) · [Admin agents](https://pepe-agent.com/en/docs/admin-agents/)
 
-**Automation & ops** &nbsp; [MCP servers](docs/mcp.md) · [Scheduled tasks](docs/scheduled-tasks.md) · [Watches](docs/watches.md) · [Usage & billing](docs/billing.md) · [Traces](docs/traces.md) · [Evals](docs/evals.md) · [Privacy hooks](docs/privacy-hooks.md)
+**Talk to it** &nbsp; [Dashboard](https://pepe-agent.com/en/docs/dashboard/) · [HTTP API](https://pepe-agent.com/en/docs/api/) · [WebSocket](https://pepe-agent.com/en/docs/websocket/) · [Telegram](https://pepe-agent.com/en/docs/telegram/) · [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/) · [Slack, Discord, Teams, Chat](https://pepe-agent.com/en/docs/channels/) · [Widget](https://pepe-agent.com/en/docs/widget/)
 
-**Contribute** &nbsp; [Contributing & help wanted](docs/contributing.md) · [Tests](docs/tests.md)
+**Automate & operate** &nbsp; [Goals](https://pepe-agent.com/en/docs/goals/) · [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/) · [Watches](https://pepe-agent.com/en/docs/watches/) · [MCP servers](https://pepe-agent.com/en/docs/mcp/) · [Plugins](https://pepe-agent.com/en/docs/plugins/) · [Security](https://pepe-agent.com/en/docs/security/) · [Privacy hooks](https://pepe-agent.com/en/docs/privacy/) · [Traces](https://pepe-agent.com/en/docs/traces/) · [Evals](https://pepe-agent.com/en/docs/evals/)
+
+### In this repository
+
+Only what you read when you are working *on* Pepe rather than *with* it. Everything a
+user reads lives on the site, once, so the two cannot drift apart, which is precisely
+what they did while there were two copies.
+
+[Architecture](docs/architecture.md) · [CLI reference](docs/cli-reference.md) · [Adding a tool](docs/adding-a-tool.md) · [Tests](docs/tests.md) · [Migrating from another runtime](docs/migrating.md) · [Contributing & help wanted](docs/contributing.md)
 
 
 ---
@@ -208,10 +217,10 @@ One topic per page. Open just what you need.
 
 Pepe is meant to be embedded. A few common paths:
 
-- **Behind your web app / SaaS** - point any OpenAI SDK at the [HTTP API](docs/http-api.md), scope access with per-company [tokens](docs/http-api.md), and keep tenants isolated with [Companies](docs/companies.md).
-- **Customer support on WhatsApp** - connect a number and bind it to a support agent; see [WhatsApp](docs/whatsapp.md). Redact PII before it reaches any model with [Privacy hooks](docs/privacy-hooks.md).
-- **Bill your clients** - every model call is metered per company; export invoices from [Usage & billing](docs/billing.md).
-- **Automate** - recurring jobs with [Scheduled tasks](docs/scheduled-tasks.md), one-shot "notify me when X" with [Watches](docs/watches.md).
+- **Behind your web app / SaaS** - point any OpenAI SDK at the [HTTP API](https://pepe-agent.com/en/docs/api/), scope access with per-company [tokens](https://pepe-agent.com/en/docs/auth/), and keep tenants isolated with [Companies](https://pepe-agent.com/en/docs/companies/).
+- **Customer support on WhatsApp** - connect a number and bind it to a support agent; see [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/). Redact PII before it reaches any model with [Privacy hooks](https://pepe-agent.com/en/docs/privacy/).
+- **Bill your clients** - every model call is metered per company; export invoices from [Usage & billing](https://pepe-agent.com/en/docs/billing/).
+- **Automate** - recurring jobs with [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/), one-shot "notify me when X" with [Watches](https://pepe-agent.com/en/docs/watches/).
 
 ---
 

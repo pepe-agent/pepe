@@ -104,9 +104,12 @@ nueva, solo un módulo nuevo en el registro.
 
 `Pepe.Tools.all/0` devuelve las herramientas integradas seguidas de cada
 herramienta de plugin cargada; `Pepe.Webhooks` hace lo mismo con los
-proveedores de canal. Una regla para recordar: en caso de conflicto de nombre, la
-integrada siempre prevalece, así que elige un nombre de herramienta distinto de
-`read_file`, `web_search` y el resto de `pepe tools`.
+proveedores de canal. Las integradas y los plugins se unen en un único
+registro, y las dos formas resuelven un conflicto de nombre de maneras
+opuestas. En las herramientas, la integrada siempre prevalece, así que elige un
+nombre de herramienta distinto de `read_file`, `web_search` y el resto de `pepe
+tools`. En los proveedores de canal, prevalece el plugin con el mismo nombre, y
+así es como reemplazas un proveedor ya incluido por tu propia versión de él.
 
 ### Conceder una herramienta a un agente
 
@@ -147,11 +150,26 @@ Un plugin tiene una de dos formas: un archivo `.exs` suelto, o un
 **paquete**: un directorio con un `manifest.json` y uno o más archivos
 `.exs`.
 
+Compilar en tiempo de ejecución trae un límite honesto: **un plugin no puede
+traer consigo una dependencia externa nueva.** Elixir resuelve y compila las
+dependencias en tiempo de build, así que un plugin solo puede usar las
+bibliotecas que Pepe ya incluye (`Req`, `Jason`, la biblioteca estándar y el
+resto de sus dependencias). Un plugin que necesita una biblioteca inédita no es
+un drop-in; exigiría recompilar Pepe. En la práctica rara vez estorba, porque
+una herramienta que llama a una API HTTP y un proveedor de canal como Chatwoot
+no necesitan nada más allá de lo que ya viene incluido, y por eso se instalan
+sin problema.
+
 ## Instalar un plugin
 
 La fuente es un archivo local, un directorio local, un `.tar.gz`, o una URL a
-cualquiera de esos. Una URL de repositorio de GitHub se descarga como su
-archivo fuente (`main`, luego `master`, cuando no se indica ninguna rama).
+cualquiera de esos, y `install` desempaqueta lo que le des en la carpeta de
+plugins. Una URL de repositorio de GitHub se descarga como su archivo fuente y
+se extrae, tomando la rama por defecto (`main`, luego `master`) cuando no se
+indica ninguna; añade `/tree/<branch>` a la URL para tomar otra. Un `.tar.gz`,
+local o remoto, se extrae y el paquete se coloca bajo el `name` de su
+manifiesto. Un directorio se copia tal cual, y un `.exs` suelto se copia
+directamente.
 
 **CLI:**
 
@@ -178,11 +196,26 @@ ejecutes `--force` tú mismo en una terminal si aun así lo quieres.
 
 Un plugin es Elixir corriente con acceso total a la aplicación en ejecución:
 instalar uno es una decisión de confianza, igual que añadir cualquier
-dependencia. Antes de colocarlo en disco, `Pepe.Skills.Sentinel` lo escanea
-de forma estática, leyendo el árbol de sintaxis en busca de patrones
-peligrosos (lanzar shells, eval dinámico, llamadas destructivas al sistema de
-archivos, lectura de secretos, acceso a red). Nunca ejecuta el código, y
-devuelve uno de tres veredictos:
+dependencia. Instala solo desde una fuente en la que confíes, y prefiere fijar
+una versión o un commit concreto.
+
+Antes de colocarlo en disco, `Pepe.Skills.Sentinel` lo escanea de forma
+estática. Recorre el **árbol sintáctico** en vez del texto en bruto, así que
+señala las llamadas peligrosas con precisión:
+
+- lanzar shells (`System.cmd`, `:os.cmd`),
+- eval dinámico (`Code.eval_string`),
+- deserialización insegura (`:erlang.binary_to_term`),
+- llamadas destructivas al sistema de archivos (`File.rm_rf`),
+- agotamiento de átomos (`String.to_atom`),
+- lectura del entorno o de rutas con secretos (`~/.ssh`, la configuración de
+  Pepe),
+- acceso a red.
+
+Como lee el AST, también atrapa las formas con alias y las formas Erlang de esas
+llamadas, y no tropieza con esas mismas palabras cuando aparecen en un
+comentario o en una cadena. Nunca ejecuta el código, y devuelve uno de tres
+veredictos:
 
 - **limpio**: sin hallazgos.
 - **precaución**: señalado pero a menudo legítimo (un plugin de canal
@@ -258,8 +291,8 @@ pepe plugin install ./examples/plugins/google
 pepe agent add assistant --tools gcal_upcoming,gcal_create_event,gmail_search,gmail_send
 ```
 
-Se autentica con un token bearer OAuth2 resuelto en el momento de la llamada
-- nada sensible embebido en el código. Exporta un token de acceso listo (más
+Se autentica con un token bearer OAuth2 resuelto en el momento de la llamada:
+nada sensible embebido en el código. Exporta un token de acceso listo (más
 rápido, expira en ~1h):
 
 ```bash

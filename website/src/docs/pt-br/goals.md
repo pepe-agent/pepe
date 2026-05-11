@@ -85,6 +85,48 @@ Pergunte a si mesmo: *um estranho, vendo só o meu critério e o resultado, cons
 
 Um objetivo não é um modo especial: ele envolve um turno normal. O agente continua com todas as suas ferramentas, então pode ler arquivos, consultar um banco ou chamar uma API enquanto trabalha rumo ao objetivo. Só a **resposta final** de cada tentativa vai para o revisor.
 
+## Estado de trabalho dentro da conversa
+
+O `pepe goal` conduz uma execução inteira de fora. Duas ferramentas separadas dão ao agente um estado de trabalho **por dentro**, para que ele se mantenha coerente ao longo de muitos turnos, em vez de reagir uma mensagem por vez. As duas são por conversa: vivem com a sessão, no armazenamento descartável, e cada chamada e seu resultado aparecem no chat e nos [Traces](/pt-br/docs/traces/). As duas são opcionais, então você adiciona `goal` e `update_plan` à lista de ferramentas de um agente.
+
+### `goal`: a estrela-guia
+
+Um objetivo aqui é uma meta persistente mais um status. O agente define um no início de uma tarefa não trivial, relê para se manter orientado, e o marca como concluído (ou bloqueado) no fim. A ferramenta aceita quatro ações:
+
+- `set`: um `objective` (o que ele está tentando alcançar), mais um alvo opcional e consultivo de `budget_tokens` para manter o esforço proporcional.
+- `status`: marca o objetivo como `active`, `paused`, `blocked` ou `complete`, com uma `note` opcional. O `blocked` é como o agente avisa que travou e precisa de você; o `complete` significa que a meta foi atingida.
+- `show`: devolve o objetivo atual.
+- `clear`: descarta o objetivo.
+
+A meta e o status sobrevivem entre turnos e a um reinício, então uma execução longa ou autônoma não se desvia daquilo que se propôs a fazer.
+
+<div class="note"><strong>O <code>budget_tokens</code> é um alvo consultivo, não um teto rígido.</strong> O agente é informado dele para manter o esforço proporcional, e nada o obriga a respeitá-lo. Os limites rígidos de gasto são o teto mensal por empresa descrito em <a href="/pt-br/docs/billing/">Uso e cobrança</a>.</div>
+
+### `update_plan`: a lista de tarefas viva
+
+O `update_plan` mantém uma lista ordenada de passos, cada um `pending`, `in_progress` ou `done`. Cada chamada passa a lista **inteira** e substitui a anterior, então existe sempre exatamente um plano coerente. A lista renderizada volta a cada atualização:
+
+```
+Plan (1/3 done):
+[x] read the failing test
+[~] find the root cause
+[ ] write the fix
+```
+
+O agente mantém um passo `in_progress` por vez e revisa a lista conforme o trabalho evolui. Uma lista `steps` vazia limpa o plano. Use para trabalho de várias etapas, em que o progresso precisa ficar visível, e dispense em um pedido trivial de um passo só.
+
+### Como habilitar
+
+```bash
+pepe agent add worker --prompt "..." --tools bash,read_file,edit_file,goal,update_plan
+```
+
+Você também pode adicioná-las à lista de ferramentas de um agente existente pelo painel, na aba Agents. Uma vez habilitadas, as duas aparecem em `pepe tools`.
+
+### Vendo o objetivo e o plano atuais
+
+No painel, a aba Chat mostra um **quadro de foco** estreito logo abaixo do cabeçalho da conversa selecionada: o objetivo, com a meta e um selo de status, e a lista do plano, os dois atualizados enquanto o agente trabalha. Eles também ficam visíveis no próprio fluxo, porque cada chamada de `goal` e `update_plan` e o resultado dela aparecem na conversa e nos [Traces](/pt-br/docs/traces/).
+
 ## O que o loop de objetivo não é
 
 - **Não** é um agendador. Para rodar algo de forma recorrente, veja [Tarefas agendadas](/pt-br/docs/scheduled/).

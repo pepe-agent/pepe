@@ -61,8 +61,24 @@ tool you install (e.g. an OCR/vision lib via `uv run --with ...`). Same loop.
 
 ## Documents (PDF, spreadsheet, ...)
 
-Handle with [[write-a-script]] - read/parse with the right library (`pypdf`,
-`openpyxl`, ...), installing it on the fly, and answer about the content.
+**Most of the time you will never get here.** A document sent in a chat is read at
+the door and arrives as text in the message, together with whatever the sender said
+about it. Text files, `.docx`, `.xlsx` and `.pptx` always are, and a `.pdf` is too
+wherever `pdftotext` exists.
+
+You are reading this because one of them could not be read: a PDF on a machine with
+no `pdftotext`, an old binary `.xls`, an archive, or a file that is not what its
+name claims. So do it yourself with [[write-a-script]]: read or parse it with the
+right library (`pypdf`, `openpyxl`, ...), installing it on the fly, and answer about
+the content.
+
+An archive (`.zip`, `.tar.gz`) is never opened for you, on purpose: there is no "the
+text" of a box, and unpacking whatever a stranger sends is how you accept a
+decompression bomb. Open it yourself, deliberately, and look at what is inside
+before acting on it.
+
+You were also handed only the first part of a long document. The whole file is in
+your workspace at the path you were given, so read it there when you need more.
 
 ## Notes
 - Files the gateway saved live under `media/` in your workspace; scripts run there,

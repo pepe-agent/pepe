@@ -5,6 +5,37 @@ description: Usa la interfaz web local para inspeccionar y gestionar agentes, mo
 
 El panel es la interfaz web local que arranca con `pepe serve`. Úsalo para conversar con agentes, inspeccionar trazas, gestionar conexiones de modelo, configurar canales, revisar tareas programadas y generar tokens de API sin editar JSON a mano.
 
+```bash
+pepe serve          # API, panel y pasarelas, todo en un solo proceso
+# luego abre http://localhost:4000
+```
+
+Desde un clon del código fuente, compila los assets una vez con `mix assets.build` antes de ejecutar `mix pepe serve`.
+
+## Sesiones y conversación
+
+El panel abre con una lista viva de sesiones a la izquierda y un panel de conversación con streaming a la derecha. Elige una sesión para leer su historial y hablar con su agente, y la respuesta llega token a token. `New chat` inicia una sesión nueva, y cada sesión muestra su agente, su modelo y su número de turnos.
+
+Las sesiones viven dentro del proceso en marcha, así que ejecuta todo desde el único proceso `pepe serve`. Así el panel ve todas las sesiones, incluidas las que llegaron por Telegram.
+
+Las herramientas arriesgadas también se autorizan ahí mismo. La ejecución se detiene y muestra un aviso de permitir/denegar, que es la versión web de los botones que recibe un usuario de Telegram, salvo que el agente ya tenga esa herramienta preaprobada. El agente propietario omnipotente nunca pregunta. Mira [Seguridad y entorno aislado](../security/) para ver cómo decide la barrera.
+
+## Qué hay en la barra lateral
+
+La barra lateral refleja la CLI, así que casi todo lo que haces con el comando `pepe` también lo puedes hacer aquí:
+
+- **Chat**: conversar con una sesión.
+- **Companies**: crear, editar y eliminar ámbitos de empresa y su margen de facturación. Mira [Empresas](../companies/).
+- **Agents**: crear, editar y eliminar agentes, con su persona, modelo, herramientas, rutas, ámbito de administración y cuál es el agente por defecto.
+- **Models**: añadir, quitar y editar conexiones de modelo, fijar un precio por modelo y elegir el predeterminado.
+- **Usage and billing**: uso de tokens y coste por ciclo, por empresa. Mira [Uso y facturación](../billing/).
+- **Learning**: la línea de tiempo de TimeLearn. Mira [Aprendizaje](../learning/).
+- **Scheduled**: crear, ejecutar y gestionar tareas programadas. Mira [Tareas programadas](../scheduled/).
+- **Watches**: el "avísame cuando X" de una sola vez. Mira [Watches](../watches/).
+- **Channels**: añadir, quitar y editar bots de Telegram, aplicado en vivo. Mira [Telegram](../telegram/).
+- **MCP**: servidores de herramientas externas. Mira [Servidores MCP](../mcp/).
+- **Config file**: editar `~/.pepe/config.json` ahí mismo, validado al guardar.
+
 ## Mantenerlo en marcha
 
 `pepe serve` se ejecuta en primer plano: cerrar la terminal o salir de la sesión detiene el proceso, y el panel con él. Para un despliegue de verdad, instálalo como servicio persistente en segundo plano: launchd en macOS, systemd `--user` en Linux. Sobrevive a cierre de sesión/reinicio y se reinicia solo si falla.

@@ -15,6 +15,8 @@ Start the server, then send a chat completion. This works out of the box with no
 pepe serve --port 4000
 ```
 
+Running Pepe from a source checkout instead of the installed binary? `PHX_SERVER=true mix phx.server` serves exactly the same endpoint.
+
 **curl**
 
 ```bash
@@ -178,6 +180,37 @@ Each chunk looks like this, with the incremental text in `choices[0].delta.conte
 ```
 
 The final chunk carries an empty delta and `"finish_reason": "stop"`, followed by the sentinel line `data: [DONE]`. Because this matches OpenAI byte for byte, any OpenAI streaming client parses it without changes.
+
+## Stateful sessions
+
+By default the endpoint is stateless: you send the full `messages` array on every call, exactly as you would to OpenAI. Pass a session id instead and the server keeps the whole conversation for you, so each later call only has to carry the newest user message.
+
+Two fields feed the session key, and they compose:
+
+* `"user": "abc"` says **who** is talking. It is the standard OpenAI field, so a plain OpenAI SDK keeps a conversation without any Pepe-specific field.
+* `"session_id": "xyz"`, in the JSON body or as an `X-Session-Id` header, says **which** conversation of theirs.
+
+| Sent | Session key |
+| --- | --- |
+| `user` only | `abc` |
+| `session_id` only | `xyz` |
+| both | `abc:xyz` (independent threads per person) |
+| both, same value | deduped to one |
+| neither, or blank | stateless |
+
+So on WhatsApp you can pass `user` as the phone number and `session_id` as a thread id, and each thread of each contact becomes its own conversation. An empty string (`""`) in either field is treated as stateless.
+
+```bash
+# Turn 1.
+curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"my name is John Doe"}]}'
+
+# Turn 2, same "user". The server remembers turn 1.
+curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"what is my name?"}]}'
+```
+
+Each session is its own supervised process, keyed by `api:<id>`. Streaming works with sessions too. The WebSocket and Telegram are stateful by design, per connection and per chat id respectively, so they need none of this. See [Sessions](../sessions/) for the full picture, including what happens to an unfinished turn when Pepe restarts.
 
 ## Errors
 

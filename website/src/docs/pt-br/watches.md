@@ -20,6 +20,8 @@ Como checagens de agente custam tokens, o intervalo mínimo delas é maior: 300 
 
 Quando o gatilho enfim passa, uma vigia entrega uma mensagem. Essa mensagem é ou um **texto fixo** (que você define de antemão, sem chamada ao modelo), ou é **composta pelo agente** na hora do disparo (uma chamada ao modelo, uma vez), para que possa incluir detalhe fresco, como um resumo do que de fato aconteceu.
 
+A combinação que vale a pena conhecer é uma sonda gratuita controlando uma mensagem composta pelo agente. A sondagem com `curl` não custa nada, e o modelo só é chamado para escrever o resumo no momento em que a condição passa.
+
 ### Criar uma vigia pela CLI
 
 A CLI cria vigias por sonda. Vigias julgadas por agente são criadas pela conversa, onde o modelo já está no loop.
@@ -64,7 +66,7 @@ Para manter as coisas limitadas, pode haver no máximo 50 vigias ativas ao mesmo
 
 ### Entrega no canal de origem
 
-Uma vigia registra a **origem**, o canal e a conversa em que foi criada, no momento da criação. Quando dispara, ela entrega de volta ali, mesmo após um reinício, seja um chat do Telegram, uma sessão de terminal ou WebSocket conectada, ou o log da aplicação. Se a vigia foi criada pela API HTTP sem estado (que não tem conversa para responder), ela recorre ao log.
+Uma vigia registra a **origem**, o canal e a conversa em que foi criada, no momento da criação. Quando dispara, ela entrega de volta ali, mesmo após um reinício, seja um chat do Telegram (um envio direto), uma sessão de terminal ou WebSocket conectada, ou o log da aplicação. No WebSocket a notificação chega como um evento `"watch"` no canal; passe um `session` estável ao entrar e você a recebe mesmo depois de reconectar, em vez de só no socket que por acaso criou a vigia. No `pepe chat` ela é impressa direto no console. Se a vigia foi criada pela API HTTP sem estado (que não tem conversa para responder), ela recorre ao log.
 
 Duas garantias tornam isso confiável:
 
@@ -73,4 +75,4 @@ Duas garantias tornam isso confiável:
 
 Uma vigia passa por um pequeno conjunto de estados ao longo da vida: `pending` (ainda vigiando), `paused`, `done` (disparada e entregue), `expired` (esgotou o orçamento de checagens) ou `cancelled`.
 
-<div class="note"><strong>Sem banco de dados, sem crontab.</strong> Tarefas e vigias são registros simples no <code>~/.pepe/config.json</code>, e o histórico de execuções das tarefas é um arquivo JSONL por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. Não há mais nada para instalar ou manter rodando. Todo o agendador é um cronômetro dentro do processo que inicia quando você roda <code>pepe serve</code> ou um gateway, e para quando você os para.</div>
+<div class="note"><strong>Sem banco de dados, sem crontab.</strong> Tarefas e vigias são registros simples no <code>~/.pepe/config.json</code> (sob <code>"crons"</code> e <code>"watches"</code>), e o histórico de execuções das tarefas é um arquivo JSONL por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. Não há mais nada para instalar ou manter rodando. Todo o agendador é um cronômetro dentro do processo, que roda em qualquer superfície de vida longa que estiver de pé: <code>pepe serve</code>, um gateway ou um <code>pepe chat</code> interativo. Ele para quando você para a superfície. Rode só uma delas por vez sobre a mesma configuração: duas iriam disparar as duas, e uma vigia avisaria duas vezes.</div>

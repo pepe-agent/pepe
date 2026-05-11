@@ -69,7 +69,7 @@ Host isolated tenants in one deployment. Without `--company`, everything uses th
 **root** scope (shown as Principal in the dashboard), exactly as a single-tenant
 install always has, so this is entirely opt-in. Add `--company NAME` to scope a command
 to a company; its agents, workspaces, `shared/` space and models are walled off from
-every other company (see **[Companies](companies.md)**).
+every other company (see **[Companies](https://pepe-agent.com/en/docs/companies/)**).
 
 ```bash
 mix pepe company add acme --description "Acme Inc"     # create a tenant scope
@@ -129,7 +129,7 @@ mix pepe gateway telegram            # run the gateway in the foreground (long-p
 Bearer tokens for the `/v1` HTTP API and the WebSocket. With no tokens, only same-machine
 (loopback) callers reach either; creating the first one locks both, so every call then
 needs a valid token. Scope a token to a company (`--company`) or a single agent
-(`--agent HANDLE`). See **[HTTP API](http-api.md)**.
+(`--agent HANDLE`). See **[HTTP API](https://pepe-agent.com/en/docs/api/)**.
 
 ```bash
 mix pepe token add --company acme --label "acme mobile app"   # prints pepe_... once
@@ -144,7 +144,7 @@ mix pepe token revoke <id>
 ### Watches (one-shot "notify me when X")
 
 A watch polls a cheap probe and notifies **once** when it passes, then stops. See
-**[Watches](watches.md)**.
+**[Watches](https://pepe-agent.com/en/docs/watches/)**.
 
 ```bash
 mix pepe watch add "site up" --probe "curl -sf https://x" --every 120
@@ -201,7 +201,7 @@ mix pepe update                      # self-update the binary to the latest rele
 ### Dashboard
 
 Auth is opt-in. Without a password the dashboard is open to localhost only and remote
-clients are blocked. See **[Dashboard](dashboard.md)**.
+clients are blocked. See **[Dashboard](https://pepe-agent.com/en/docs/dashboard/)**.
 
 ```bash
 mix pepe dashboard                            # show the current auth/host settings

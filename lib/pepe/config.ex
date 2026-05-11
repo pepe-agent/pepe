@@ -1520,14 +1520,28 @@ defmodule Pepe.Config do
   ###
 
   @doc """
-  Interpolate `${ENV_VAR}` references in a string against the environment.
-  Non-strings pass through untouched. A bare `${VAR}` resolving to nothing
-  returns nil so callers can treat it as "unset".
+  Resolve a config value that points at a secret rather than holding one.
+
+  Three forms, and the first is the one that has always been here:
+
+    * `${ENV_VAR}` - an environment variable.
+    * `exec:COMMAND` - whatever the command prints (`exec:op read op://Work/openai/key`).
+    * `file:/path` - the contents of a file (a Docker or Kubernetes secret mount).
+
+  Non-strings pass through untouched, and anything that resolves to nothing returns `nil` so
+  callers treat it exactly as they already treat an unset variable.
+
+  The last two are fetched at the point of use, by the runtime, and cached briefly
+  (`Pepe.Secrets.Vault`). Which is the whole point of them: the secret is never in the config
+  file, never in the environment, and never in anything the agent can read.
   """
   def interpolate(nil), do: nil
 
   def interpolate(value) when is_binary(value) do
     cond do
+      Pepe.Secrets.Vault.ref?(value) ->
+        Pepe.Secrets.Vault.resolve(value)
+
       # whole-string single placeholder -> nil when env missing
       Regex.match?(~r/^\$\{[A-Z0-9_]+\}$/, value) ->
         var = String.slice(value, 2..-2//1)
@@ -1544,6 +1558,22 @@ defmodule Pepe.Config do
   end
 
   def interpolate(value), do: value
+
+  @doc """
+  Environment variables a vault resolver is allowed to see (`secrets.vault_env` in the
+  config), on top of the bare minimum it needs to run at all.
+
+  A 1Password service account needs `OP_SERVICE_ACCOUNT_TOKEN`; Vault needs `VAULT_ADDR` and
+  `VAULT_TOKEN`. Naming them is the point: the resolver gets what it needs to open the vault,
+  and not the rest of Pepe's environment on the way past.
+  """
+  @spec vault_env() :: [String.t()]
+  def vault_env do
+    case get_in(load(), ["secrets", "vault_env"]) do
+      list when is_list(list) -> Enum.map(list, &to_string/1)
+      _ -> []
+    end
+  end
 
   defp encode(struct) do
     struct |> Map.from_struct() |> Map.delete(:name) |> stringify()

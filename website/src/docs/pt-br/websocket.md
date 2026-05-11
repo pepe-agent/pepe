@@ -43,7 +43,7 @@ O socket fala um protocolo simples de frames JSON. Cada mensagem, nas duas dire�
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. Um tópico no qual você não tem permissão de entrar é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado. Passe também `{"lang": "pt-BR"}` e isso inclina a primeira resposta do agente para esse idioma (uma dica de sistema única, no primeiro turno da sessão). É assim que o atributo `data-lang` do [widget incorporável](../widget/) chega ao agente.
+Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. O escopo é aplicado no `join`, então um tópico que o seu token não permite é recusado ali mesmo. `agent:default` resolve para o agente padrão do escopo do seu token. Um nome simples é qualificado dentro da empresa do seu token, então um token com escopo `acme` que entra em `agent:sales` chega em `acme/sales`, e um token de empresa que tenta entrar no agente de outra empresa é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado. Passe também `{"lang": "pt-BR"}` e isso inclina a primeira resposta do agente para esse idioma (uma dica de sistema única, no primeiro turno da sessão). É assim que o atributo `data-lang` do [widget incorporável](../widget/) chega ao agente.
 
 ### Eventos
 

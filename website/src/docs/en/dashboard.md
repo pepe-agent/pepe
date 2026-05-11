@@ -5,6 +5,37 @@ description: Use the local web UI to inspect and manage agents, models, channels
 
 The dashboard is the local web UI started by `pepe serve`. Use it to chat with agents, inspect traces, manage model connections, configure channels, review scheduled work, and generate API tokens without editing JSON by hand.
 
+```bash
+pepe serve          # API, dashboard and gateways, all in one process
+# then open http://localhost:4000
+```
+
+From a source checkout, build the assets once with `mix assets.build` before running `mix pepe serve`.
+
+## Sessions and chat
+
+The dashboard opens on a live list of sessions on the left and a streaming chat panel on the right. Pick a session to read its history and talk to its agent, and the reply streams in token by token. `New chat` starts a fresh session, and each session shows its agent, its model, and its turn count.
+
+Sessions live inside the running process, so run everything from the one `pepe serve` process. The dashboard then sees every session, including the ones that arrived over Telegram.
+
+Risky tools are authorized inline here too. The run pauses and shows an allow/deny prompt, which is the web version of the buttons a Telegram user gets, unless the agent has already pre-approved that tool. The omnipotent owner agent never prompts. See [Security and sandbox](../security/) for how the gate decides.
+
+## What the sidebar holds
+
+The left sidebar mirrors the CLI, so almost everything you can do with the `pepe` command you can also do here:
+
+- **Chat**: talk to a session.
+- **Companies**: create, edit and delete tenant scopes and their billing markup. See [Companies](../companies/).
+- **Agents**: create, edit and delete agents, with their persona, model, tools, routes, admin scope, and which one is the default.
+- **Models**: add, remove and edit model connections, set a per-model price, and pick the default.
+- **Usage and billing**: token usage and cost by cycle, per company. See [Usage and billing](../billing/).
+- **Learning**: the TimeLearn timeline. See [Learning](../learning/).
+- **Scheduled**: create, run and manage scheduled tasks. See [Scheduled tasks](../scheduled/).
+- **Watches**: one-shot "notify me when X". See [Watches](../watches/).
+- **Channels**: add, remove and edit Telegram bots, applied live. See [Telegram](../telegram/).
+- **MCP**: external tool servers. See [MCP servers](../mcp/).
+- **Config file**: edit `~/.pepe/config.json` inline, validated on save.
+
 ## Keeping it running
 
 `pepe serve` runs in the foreground: closing the terminal or logging out stops it, and the dashboard with it. For a real deployment, install it as a persistent background service instead: launchd on macOS, systemd `--user` on Linux. It survives logout/reboot and restarts itself if it crashes.

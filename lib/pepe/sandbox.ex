@@ -133,17 +133,82 @@ defmodule Pepe.Sandbox do
   @doc """
   Run `program` with `argv` (like `System.cmd/3`), through the configured sandbox
   wrapper when one is set, else directly. Returns `{output, exit_status}`.
+
+  The child does **not** inherit Pepe's secrets. See `scrubbed_env/1`.
   """
   @spec cmd(String.t(), [String.t()], keyword()) :: {String.t(), non_neg_integer()}
   def cmd(program, argv, opts \\ []) do
+    opts = Keyword.put(opts, :env, scrubbed_env(opts[:env] || []))
+
     case Config.sandbox() do
       nil ->
         System.cmd(program, argv, opts)
 
       wrapper ->
         cwd = opts[:cd] || File.cwd!()
-        env = [{"PEPE_SANDBOX_CWD", cwd} | opts[:env] || []]
+        env = [{"PEPE_SANDBOX_CWD", cwd} | opts[:env]]
         System.cmd(wrapper, [program | argv], Keyword.put(opts, :env, env))
     end
   end
+
+  @doc """
+  The environment to hand a command the agent chose: everything Pepe has, minus its secrets.
+
+  `System.cmd/3` gives a child the parent's whole environment, which meant the agent's shell
+  inherited Pepe's - and Pepe's environment is where the API keys are. `echo $OPENAI_API_KEY`
+  returned the key. So did `env`. The `${ENV_VAR}` scheme kept secrets out of the *config
+  file*, which is a real protection against a leaked backup or a careless commit, and did
+  nothing at all about the agent, because the secret still had to exist somewhere for Pepe to
+  use it, and that somewhere was the process the agent's shell is a child of.
+
+  A variable is dropped when the config refers to it as a secret (every `${VAR}` Pepe reads
+  is, by definition, a secret it holds) or when its name says it is one (`GITHUB_TOKEN`,
+  `AWS_SECRET_ACCESS_KEY`). What is left is the ordinary environment a command needs to work:
+  `PATH`, `HOME`, `LANG`.
+
+  This is not a sandbox, and it does not pretend to be. An agent that can run arbitrary shell
+  can still read any file the user can read. What it closes is the cheapest and most likely
+  leak by a wide margin - the one a prompt injection reaches with a single word, `env` - and
+  it removes the thing that made "the config has no secrets in it" a comfortable half-truth.
+  """
+  @spec scrubbed_env(keyword() | [{String.t(), String.t()}]) :: [{String.t(), String.t() | nil}]
+  def scrubbed_env(extra \\ []) do
+    referenced = MapSet.new(secret_env_names())
+
+    # `System.cmd/3` *merges* `:env` into the parent's environment, it does not replace it, so
+    # listing what to keep would keep everything. A variable is removed by naming it with a
+    # nil value. Getting this backwards is exactly the kind of mistake that leaves a security
+    # control looking like it works, which is why the tests run a real `env`.
+    dropped =
+      System.get_env()
+      |> Map.keys()
+      |> Enum.filter(fn name -> MapSet.member?(referenced, name) or Pepe.Secrets.secret_key?(name) end)
+      |> Enum.map(&{&1, nil})
+
+    dropped ++ Enum.map(extra, fn {k, v} -> {to_string(k), to_string(v)} end)
+  end
+
+  # Every ${VAR} the config points at. Pepe reads these to authenticate; that is what makes
+  # them secrets, whatever they happen to be called.
+  defp secret_env_names do
+    Config.load()
+    |> collect_refs()
+    |> Enum.uniq()
+  rescue
+    # A broken or missing config must not hand the agent the environment by default.
+    _ -> []
+  end
+
+  defp collect_refs(value) when is_map(value),
+    do: value |> Map.values() |> Enum.flat_map(&collect_refs/1)
+
+  defp collect_refs(value) when is_list(value), do: Enum.flat_map(value, &collect_refs/1)
+
+  defp collect_refs(value) when is_binary(value) do
+    ~r/\$\{([A-Z0-9_]+)\}/
+    |> Regex.scan(value, capture: :all_but_first)
+    |> List.flatten()
+  end
+
+  defp collect_refs(_value), do: []
 end

@@ -44,7 +44,7 @@ Cada tarea recibe un id legible derivado de su nombre (`morning-brief`). Si ese 
 
 ### Hazlo en el panel
 
-Ejecuta `pepe serve` y abre la página **Scheduled**. Lista cada tarea con su próxima hora de ejecución, y te da las mismas acciones como botones: crear una tarea nueva con un formulario, forzar una ejecución ahora, activar o desactivar, editar, eliminar y abrir el historial de una tarea en el mismo lugar. Cuando escribes el horario de una tarea, el panel puede convertir una frase sencilla como "cada día laborable a las 9:30" en la expresión cron correspondiente por ti, usando un modelo configurado, y valida el resultado antes de guardarlo.
+Ejecuta `pepe serve` y abre la página **Scheduled**. Lista cada tarea con su próxima hora de ejecución, y te da las mismas acciones como botones: crear una tarea nueva con un formulario, forzar una ejecución ahora, activar o desactivar, editar, eliminar y abrir el historial de una tarea en el mismo lugar. El formulario de creación cubre todo lo que hace la CLI: el agente, el prompt, el horario, la zona horaria, el modelo y a dónde entregar el resultado, incluida la opción "No enviar a ningún lado". Cuando escribes el horario de una tarea, el panel puede convertir una frase sencilla como "cada día laborable a las 9:30" en la expresión cron correspondiente por ti, usando un modelo configurado, y valida el resultado antes de guardarlo.
 
 ### Expresiones de horario y zonas horarias
 
@@ -76,6 +76,8 @@ Sea cual sea el destino, cada ejecución se añade al archivo de historial propi
 ### El temporizador por minuto y la recuperación
 
 El programador hace un tick cada 30 segundos (a propósito por debajo del minuto, para que una pequeña deriva del reloj nunca le haga perder un minuto). En cada tick mira todas las tareas activas y dispara las que coinciden con el minuto actual en la zona horaria de esa tarea. Un guardián por tarea asegura que un trabajo se dispare **como mucho una vez por minuto** aunque el tick sea más rápido que eso.
+
+El temporizador vive dentro del proceso de la aplicación, así que solo corre mientras `pepe serve` o `pepe gateway` está en pie, y nunca durante un comando de una sola ejecución. Cada tarea que toca se ejecuta en su propio proceso, así que varias tareas que caen en el mismo minuto se disparan a la vez, y una tarea lenta nunca bloquea a otra. Las definiciones de las tareas se guardan en `~/.pepe/config.json`, bajo `"crons"`.
 
 Si el proceso estaba caído en el momento en que una tarea debía dispararse, Pepe hace una **recuperación** acotada al reiniciar. Cuando vuelve y nota que pasó una ranura programada sin ejecución, dispara ese trabajo una vez, siempre que aún esté dentro de una ventana de gracia (la mitad del periodo del trabajo, acotada entre 2 minutos y 2 horas). La recuperación está anclada a la ranura perdida, así que un solo reinicio nunca dispara dos veces. Un trabajo que estuvo caído mucho más tiempo que su ventana de gracia simplemente se retoma en su próxima ranura normal, en lugar de repetir una vieja.
 

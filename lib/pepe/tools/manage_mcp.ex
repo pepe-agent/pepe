@@ -13,8 +13,15 @@ defmodule Pepe.Tools.ManageMcp do
        (e.g. `mcp__sentry__find_organizations`) to that agent's tools with
        `manage_agent` - leaving the mutating ones (`mcp__sentry__update_issue`) out.
 
-  It's a risky tool (in the allowlist + through the permission gate). Secrets are
-  expected as env-var references; a raw-looking token in the args is refused.
+  It's a risky tool (in the allowlist + through the permission gate).
+
+  Secrets are expected as `${ENV_VAR}` references. A token pasted in raw is **not refused**,
+  it is saved and reported: by the time we see it, it has already been typed into a chat, so
+  it has been through a model provider and is in the transcript and the trace. Refusing the
+  write would not un-leak it; it would only leave the person confused and the token no less
+  compromised. So the server gets added, and the answer says what has to happen now - revoke
+  it, reissue it, put the new one in the environment. `pepe doctor` says so too, for the ones
+  nobody read. See `Pepe.Secrets`.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -79,17 +86,32 @@ defmodule Pepe.Tools.ManageMcp do
 
   defp add(args) do
     with {:ok, name} <- fetch(args, "name"),
-         {:ok, command} <- fetch(args, "command"),
-         args_list <- args["args"] || [],
-         :ok <- no_raw_secret(args_list) do
-      Config.put_mcp_server(name, %{
-        "command" => command,
-        "args" => args_list,
-        "env" => args["env"] || %{}
-      })
+         {:ok, command} <- fetch(args, "command") do
+      args_list = args["args"] || []
+      env = args["env"] || %{}
 
-      {:ok, "MCP server #{name} saved. Run `tools` on it to validate, then grant an agent its read tools."}
+      Config.put_mcp_server(name, %{"command" => command, "args" => args_list, "env" => env})
+
+      saved = "MCP server #{name} saved. Run `tools` on it to validate, then grant an agent its read tools."
+
+      # The env map is where a token actually goes, and it used to be the one place nobody
+      # looked: the old guard read the args array only, so `env: {"GITHUB_TOKEN": "ghp_..."}`
+      # sailed through into config.json in the clear, unmentioned.
+      {:ok, saved <> Pepe.Secrets.warning(raw_secrets(args_list, env), "the MCP server #{name}")}
     end
+  end
+
+  # A credential in the clear, wherever it was put: named in `env`, or sitting positionally in
+  # `args` (`--token ghp_...`), where it has no key name to be recognised by.
+  defp raw_secrets(args_list, env) do
+    in_env = Pepe.Secrets.plaintext_in(env)
+
+    in_args =
+      args_list
+      |> Enum.filter(&Pepe.Secrets.plaintext?/1)
+      |> Enum.map(&{"args", &1})
+
+    in_env ++ in_args
   end
 
   defp list_tools(name) do
@@ -139,23 +161,6 @@ defmodule Pepe.Tools.ManageMcp do
     Enum.map_join(tools, "\n", fn t ->
       "• mcp__#{server}__#{t["name"]} - #{String.slice(to_string(t["description"]), 0, 100)}"
     end)
-  end
-
-  # Refuse a token that looks pasted raw (long, no ${...}) so secrets stay as refs.
-  defp no_raw_secret(args) do
-    raw =
-      Enum.find(args, fn a ->
-        is_binary(a) and String.length(a) > 24 and not String.contains?(a, "${") and
-          String.match?(a, ~r/[A-Za-z0-9_\-]{24,}/)
-      end)
-
-    if raw do
-      {:error,
-       "That looks like a raw secret in the args. Pass it as a ${ENV_VAR} reference " <>
-         "(set the env var yourself); the token must not go through the chat."}
-    else
-      :ok
-    end
   end
 
   defp fetch(args, key) do

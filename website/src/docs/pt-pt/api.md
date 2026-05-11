@@ -15,6 +15,8 @@ Inicia o servidor e depois envia uma chat completion. Isto funciona de imediato,
 pepe serve --port 4000
 ```
 
+Estás a correr o Pepe a partir do código-fonte em vez do binário instalado? O `PHX_SERVER=true mix phx.server` serve exatamente o mesmo endpoint.
+
 **curl**
 
 ```bash
@@ -178,6 +180,37 @@ Cada fragmento tem este aspeto, com o texto incremental em `choices[0].delta.con
 ```
 
 O fragmento final transporta um delta vazio e `"finish_reason": "stop"`, seguido da linha sentinela `data: [DONE]`. Como isto coincide com a OpenAI byte a byte, qualquer cliente de streaming da OpenAI o interpreta sem alterações.
+
+## Sessões com estado
+
+Por predefinição o endpoint é sem estado: envias o array `messages` completo em cada chamada, exatamente como farias à OpenAI. Em alternativa, passa um id de sessão e o servidor guarda a conversa inteira por ti, para que cada chamada seguinte só tenha de transportar a nova mensagem do utilizador.
+
+Dois campos alimentam a chave da sessão, e compõem-se entre si:
+
+* `"user": "abc"` diz **quem** está a falar. É o campo padrão da OpenAI, por isso um SDK comum da OpenAI mantém uma conversa sem qualquer campo específico do Pepe.
+* `"session_id": "xyz"`, no corpo JSON ou como cabeçalho `X-Session-Id`, diz **qual** conversa dessa pessoa.
+
+| Enviado | Chave da sessão |
+| --- | --- |
+| só `user` | `abc` |
+| só `session_id` | `xyz` |
+| ambos | `abc:xyz` (threads independentes por pessoa) |
+| ambos, com o mesmo valor | reduzido a um só |
+| nenhum, ou em branco | sem estado |
+
+Assim, no WhatsApp podes passar o `user` como o número de telefone e o `session_id` como um id de thread, e cada thread de cada contacto torna-se a sua própria conversa. Uma cadeia vazia (`""`) em qualquer um dos campos é tratada como sem estado.
+
+```bash
+# Turno 1.
+curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"o meu nome é John Doe"}]}'
+
+# Turno 2, mesmo "user". O servidor lembra-se do turno 1.
+curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"qual é o meu nome?"}]}'
+```
+
+Cada sessão é o seu próprio processo supervisionado, com a chave `api:<id>`. O streaming também funciona com sessões. O WebSocket e o Telegram têm estado por natureza, por ligação e por id de conversa respetivamente, por isso não precisam de nada disto. Vê [Sessões](../sessions/) para o quadro completo, incluindo o que acontece a um turno inacabado quando o Pepe reinicia.
 
 ## Erros
 

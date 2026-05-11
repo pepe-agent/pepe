@@ -104,9 +104,12 @@ módulo novo no registro.
 
 `Pepe.Tools.all/0` devolve as ferramentas embutidas seguidas de cada
 ferramenta de plugin carregada; `Pepe.Webhooks` faz o mesmo para provedores de
-canal. Uma regra para lembrar: em caso de conflito de nome, a embutida sempre
-prevalece, então escolha um nome de ferramenta diferente de `read_file`,
-`web_search` e do resto de `pepe tools`.
+canal. Embutidos e plugins são unidos em um único registro, e os dois formatos
+resolvem um conflito de nome de maneiras opostas. Em ferramentas, a embutida
+sempre prevalece, então escolha um nome de ferramenta diferente de `read_file`,
+`web_search` e do resto de `pepe tools`. Em provedores de canal, um plugin de
+mesmo nome é que prevalece, e é assim que você substitui um provedor que já vem
+junto pela sua própria versão dele.
 
 ### Conceder uma ferramenta a um agente
 
@@ -145,12 +148,25 @@ pode definir vários módulos (o exemplo do Google abaixo traz quatro).
 Um plugin tem um de dois formatos: um arquivo `.exs` solto, ou um **pacote**,
 um diretório com um `manifest.json` e um ou mais arquivos `.exs`.
 
+Compilar em tempo de execução traz um limite honesto: **um plugin não pode
+trazer uma dependência externa nova junto com ele.** O Elixir resolve e compila
+dependências em tempo de build, então um plugin só pode usar as bibliotecas que
+o Pepe já traz (`Req`, `Jason`, a biblioteca padrão e o resto das dependências
+dele). Um plugin que precisa de uma biblioteca inédita não é um drop-in; isso
+exigiria recompilar o Pepe. Na prática isso raramente atrapalha, porque uma
+ferramenta que chama uma API HTTP e um provedor de canal como o Chatwoot não
+precisam de nada além do que já vem junto, e por isso instalam sem problema.
+
 ## Instalar um plugin
 
 A fonte é um arquivo local, um diretório local, um `.tar.gz`, ou uma URL para
-qualquer um desses. Uma URL de repositório do GitHub é baixada como seu
-pacote de código-fonte (`main`, depois `master`, quando nenhuma branch é
-indicada).
+qualquer um desses, e o `install` desempacota o que você der na pasta de
+plugins. Uma URL de repositório do GitHub é baixada como seu pacote de
+código-fonte e extraída, pegando a branch padrão (`main`, depois `master`)
+quando nenhuma branch é indicada; acrescente `/tree/<branch>` à URL para pegar
+outra. Um `.tar.gz`, local ou remoto, é extraído e o pacote é colocado sob o
+`name` do manifesto dele. Um diretório é copiado como está, e um `.exs` solto é
+copiado direto.
 
 **CLI:**
 
@@ -178,11 +194,26 @@ quiser.
 
 Um plugin é Elixir comum com acesso total ao aplicativo em execução:
 instalar um é uma decisão de confiança, igual a adicionar qualquer
-dependência. Antes de ser colocado em disco, o `Pepe.Skills.Sentinel` varre o
-código de forma estática, lendo a árvore de sintaxe atrás de padrões
-perigosos (lançar shells, eval dinâmico, chamadas destrutivas no sistema de
-arquivos, leitura de segredos, acesso à rede). Ele nunca executa o código, e
-devolve um de três vereditos:
+dependência. Instale só a partir de uma fonte em que você confia, e prefira
+fixar uma versão ou um commit específico.
+
+Antes de ser colocado em disco, o `Pepe.Skills.Sentinel` varre o código de
+forma estática. Ele percorre a **árvore sintática** em vez do texto cru, então
+sinaliza chamadas perigosas com precisão:
+
+- lançar shells (`System.cmd`, `:os.cmd`),
+- eval dinâmico (`Code.eval_string`),
+- desserialização insegura (`:erlang.binary_to_term`),
+- chamadas destrutivas no sistema de arquivos (`File.rm_rf`),
+- exaustão de átomos (`String.to_atom`),
+- leitura do ambiente ou de caminhos com segredos (`~/.ssh`, a configuração do
+  Pepe),
+- acesso à rede.
+
+Como ele lê a AST, também pega as formas com alias e as formas Erlang dessas
+chamadas, e não tropeça nas mesmas palavras quando elas aparecem em um
+comentário ou em uma string. Ele nunca executa o código, e devolve um de três
+vereditos:
 
 - **limpo**: nenhum achado.
 - **cautela**: sinalizado mas muitas vezes legítimo (um plugin de canal

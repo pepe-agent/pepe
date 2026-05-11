@@ -12,6 +12,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Bash
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
+  alias Pepe.Tools.Delegate
   alias Pepe.Tools.Docs
   alias Pepe.Tools.Doctor
   alias Pepe.Tools.EditFile
@@ -62,6 +63,7 @@ defmodule Pepe.Tools do
     Docs,
     Doctor,
     SendToAgent,
+    Delegate,
     ScheduleTask,
     ManageChannel,
     ManageAgent,

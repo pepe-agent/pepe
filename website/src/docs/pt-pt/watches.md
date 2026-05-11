@@ -20,6 +20,8 @@ Como as verificações de agente custam tokens, o intervalo mínimo delas é mai
 
 Quando o gatilho finalmente passa, uma vigilância entrega uma mensagem. Essa mensagem é ou um **modelo** fixo (um texto que defines à partida, sem chamada ao modelo) ou é **composta pelo agente** no momento do disparo (uma chamada ao modelo, uma vez), para poder incluir detalhe fresco, como um resumo do que de facto aconteceu.
 
+A combinação que vale a pena conhecer é uma sonda gratuita a controlar uma mensagem composta pelo agente. A sondagem com `curl` não custa nada, e o modelo só é chamado para escrever o resumo no momento em que a condição passa.
+
 ### Cria uma vigilância pela CLI
 
 A CLI cria vigilâncias por sonda. Vigilâncias julgadas por agente são criadas pela conversa, onde o modelo já está no ciclo.
@@ -64,7 +66,7 @@ Para manter as coisas limitadas, podem estar ativas no máximo 50 vigilâncias a
 
 ### Entrega no canal de origem
 
-Uma vigilância regista a sua **origem**, o canal e a conversa a partir dos quais foi criada, no momento da criação. Quando dispara, entrega ali de volta, mesmo depois de um reinício, seja uma conversa do Telegram, uma sessão de terminal ou WebSocket ligada, ou o log da aplicação. Se a vigilância foi criada através da API HTTP sem estado (que não tem conversa para responder), recorre ao log.
+Uma vigilância regista a sua **origem**, o canal e a conversa a partir dos quais foi criada, no momento da criação. Quando dispara, entrega ali de volta, mesmo depois de um reinício, seja uma conversa do Telegram (um envio direto), uma sessão de terminal ou WebSocket ligada, ou o log da aplicação. No WebSocket a notificação chega como um evento `"watch"` no canal; passa um `session` estável quando entras e recebe-la mesmo depois de reconectares, em vez de apenas no socket que por acaso criou a vigilância. No `pepe chat` é impressa diretamente na consola. Se a vigilância foi criada através da API HTTP sem estado (que não tem conversa para responder), recorre ao log.
 
 Duas garantias tornam isto fiável:
 
@@ -73,4 +75,4 @@ Duas garantias tornam isto fiável:
 
 Uma vigilância passa por um pequeno conjunto de estados ao longo da sua vida: `pending` (ainda a vigiar), `paused`, `done` (disparada e entregue), `expired` (esgotou o seu orçamento de verificações) ou `cancelled`.
 
-<div class="note"><strong>Sem base de dados, sem crontab.</strong> Tarefas e vigilâncias são registos simples em <code>~/.pepe/config.json</code>, e o histórico de execuções das tarefas é um ficheiro JSONL por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. Não há mais nada para instalar ou manter em execução. Todo o agendador é um temporizador dentro do processo que arranca quando corres <code>pepe serve</code> ou uma gateway, e pára quando os paras.</div>
+<div class="note"><strong>Sem base de dados, sem crontab.</strong> Tarefas e vigilâncias são registos simples em <code>~/.pepe/config.json</code> (sob <code>"crons"</code> e <code>"watches"</code>), e o histórico de execuções das tarefas é um ficheiro JSONL por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. Não há mais nada para instalar ou manter em execução. Todo o agendador é um temporizador dentro do processo, que corre em qualquer superfície de vida longa que esteja de pé: <code>pepe serve</code>, uma gateway ou um <code>pepe chat</code> interativo. Pára quando páras a superfície. Corre só uma delas de cada vez sobre a mesma configuração: duas iriam disparar ambas, e uma vigilância avisaria duas vezes.</div>

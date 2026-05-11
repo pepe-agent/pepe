@@ -78,6 +78,8 @@ defmodule Pepe.Application do
         Pepe.Agent.SessionSupervisor,
         # In-memory session-scoped tool approvals (the `:session` permission grant)
         Pepe.Permissions.SessionStore,
+        # Owns the short-lived cache of secrets fetched from a vault (exec:/file: refs).
+        Pepe.Secrets.Vault,
         # MCP tool servers: a registry + dynamic supervisor; clients start on demand.
         {Registry, keys: :unique, name: Pepe.MCP.Registry},
         {DynamicSupervisor, name: Pepe.MCP.DynSup, strategy: :one_for_one},

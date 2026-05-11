@@ -12,7 +12,7 @@ Las capas, de la más débil pero siempre activa a la más fuerte pero opcional:
 1. La barrera de permisos. Una persona aprueba cualquier herramienta que actúe.
 2. Protecciones de comandos. Un filtro incorporado que rechaza unos pocos comandos catastróficos.
 3. El entorno aislado. Un envoltorio opcional que ejecuta comandos de shell en aislamiento real.
-4. Referencias a secretos. Las credenciales viven como `${ENV_VAR}`, nunca expandidas en disco.
+4. Secretos. Las credenciales viven como `${ENV_VAR}` o en una bóveda, nunca en el archivo de configuración, y la shell del agente no las hereda.
 5. Hooks de censura. Limpieza opcional de datos personales antes de que el texto llegue a un modelo.
 6. Control de acceso. La contraseña del panel y los tokens de portador de la API.
 
@@ -33,6 +33,36 @@ Cuando una herramienta arriesgada no ha sido aprobada de antemano, el runtime pr
 
 Una llamada denegada no hace fallar la ejecución. Se le informa al modelo que la persona no autorizó la herramienta y se le pide que pruebe otro enfoque o que te consulte, de modo que la conversación continúa.
 
+### Una concesión recuerda para qué se dio
+
+"Permitir siempre bash" era un cheque en blanco. Veías al agente a punto de ejecutar un `ls build/`, lo aprobabas, y ese mismo permiso pasaba a cubrir `rm -rf`, `sudo` y `curl | sh` para siempre. Quien lo firmó estaba mirando un listado de directorio.
+
+Cada llamada se clasifica primero (borra archivos, accede a la red, se ejecuta con privilegios elevados, ejecuta código incrustado), y **la concesión registra los riesgos que estabas mirando de verdad**. Es decir, una lista `auto_approve` real se ve así:
+
+```jsonc
+"auto_approve": [
+  "bash:none",                  // aprobado para llamadas de bash que no señalan ningún riesgo
+  "write_file:writes_file",     // ...y para escribir archivos
+  "bash:deletes+network"        // ampliada después, cuando dijiste que sí a un rm y a un curl
+]
+```
+
+Una llamada se permite cuando todos los riesgos que lleva ya fueron aprobados. Aprobar un `ls` deja pasar `cat` y `grep` sin volver a preguntar, y ese es justamente el objetivo: una barrera que da la lata es una barrera que la gente apaga. Pero el primer `rm` señala `deletes`, no está cubierto, se detiene a preguntar, y la pregunta nombra exactamente aquello a lo que nunca dijiste que sí. Di que sí y la concesión se amplía ahí mismo, así que la lista sigue siendo lo bastante corta para auditarla.
+
+Las formas antiguas, más gruesas, siguen funcionando sin cambios:
+
+| Concesión | Significa |
+|---|---|
+| `"*"` | toda herramienta, todo riesgo (el agente del propio propietario) |
+| `"bash"` | un cheque en blanco sobre bash, tal como lo escribía un Pepe anterior a esto |
+| `"bash:any"` | el mismo cheque en blanco, escrito a sabiendas |
+
+<div class="note"><strong>Esto no es un sandbox, y no debe leerse como tal.</strong> La clasificación lee el comando como texto, y el texto miente: un comando puede montarse en tiempo de ejecución, descodificarse desde base64 o esconderse dentro de un script que el propio agente escribió un instante antes. Falla cerrado, en el sentido de que un riesgo no reconocido nunca queda cubierto por una concesión más estrecha. Lo que cierra es la distancia entre lo que una persona miró y lo que de verdad firmó. No convierte en un lugar seguro un contenedor que ejecuta shell elegida por un LLM, y ese contenedor sigue teniendo que ser uno que estarías dispuesto a perder.</div>
+
+### Gestionar las concesiones guardadas
+
+Las concesiones persistentes siguen siendo tuyas, para inspeccionarlas y revocarlas. Desde un canal de chat como Telegram, `/approve` lista lo que el agente puede ejecutar sin preguntar, `/approve clear` borra todas las concesiones guardadas y `/approve clear <tool>` borra solo una. Son comandos de operador, así que únicamente un usuario de confianza puede ejecutarlos.
+
 ### Aprobación automática y el agente propietario
 
 Elegir `always` en el aviso registra esa herramienta en la lista `auto_approve` del agente, así que nunca vuelve a preguntar para ese agente. No hay una opción aparte para configurar esto por adelantado desde `pepe agent add`. Otorgas confianza respondiendo `always` una vez cuando aparece el aviso, o editando el agente en `config.json`:
@@ -49,7 +79,7 @@ Elegir `always` en el aviso registra esa herramienta en la lista `auto_approve` 
 }
 ```
 
-Un único comodín `"*"` en `auto_approve` significa que el agente ejecuta cualquier herramienta sin preguntar jamás. Ese es el agente propietario omnipotente que se crea para ti en `pepe setup`: con confianza sobre todas las herramientas para que puedas manejar tu propia máquina sin fricción. Otorga esa confianza de forma deliberada, y nunca a un agente expuesto a entradas no confiables.
+Un único comodín `"*"` en `auto_approve` significa que el agente ejecuta cualquier herramienta sin preguntar jamás. Ese es el agente propietario omnipotente que se crea para ti en `pepe setup`: con confianza sobre todas las herramientas para que puedas manejar tu propia máquina sin fricción. Nace también como superadministrador de todos los demás agentes (`can_manage: ["*"]`), así que puede crearlos y reconfigurarlos por chat desde el primer día. Los agentes que añades después tienen un alcance normal. Otorga esa confianza de forma deliberada, y nunca a un agente expuesto a entradas no confiables.
 
 ```json
 {
@@ -149,6 +179,36 @@ pepe serve --port 4000
 ```
 
 Un marcador de cadena completa que se resuelve en nada (la variable no está definida) se trata como "sin definir" en lugar de una cadena vacía, así que un secreto ausente aparece como un claro "no configurado" en vez de un blanco silencioso.
+
+### O guárdalos en una bóveda
+
+Un valor de la configuración puede decir **dónde vive el secreto** en lugar de contenerlo. Pepe lo busca en el momento en que lo necesita:
+
+```json
+{ "api_key": "exec:op read op://Trabajo/openai/key" }
+{ "api_key": "exec:vault kv get -field=key secret/openai" }
+{ "api_key": "exec:aws secretsmanager get-secret-value --secret-id openai --query SecretString --output text" }
+```
+
+Son tres ejemplos, no tres integraciones. **El contrato entero es: un comando que imprime el secreto en la salida estándar.** Pepe no sabe qué es 1Password, y no hay una lista de bóvedas soportadas a la que añadirse. El llavero de macOS, `gcloud secrets`, `pass`, la CLI de Bitwarden y un script que escribiste esta mañana ya funcionan, porque todos imprimen un secreto cuando los ejecutas. `file:/run/secrets/key` cubre un montaje de secreto de Docker o Kubernetes.
+
+Luego **revocas una clave en la bóveda** y deja de funcionar en un minuto, sin ssh, sin editar nada, sin reiniciar. Si tu bóveda necesita una credencial propia (un token de cuenta de servicio, una dirección), nómbrala y solo a ella: `"secrets": { "vault_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }`.
+
+El valor resuelto se cachea en memoria durante 60 segundos, porque abrir una bóveda cuesta unos cientos de milisegundos y un Pepe con tráfico lo pagaría en cada llamada al modelo. Así que el secreto sí vive en el proceso hasta un minuto: esto estrecha la ventana, no la elimina. Una bóveda bloqueada o inalcanzable se lee como un secreto **no configurado**, nunca como uno equivocado.
+
+### Y el agente no ve nada de esto
+
+Uses lo que uses, **la shell del agente no hereda los secretos de Pepe**.
+
+Vale la pena decirlo con todas las letras, porque `${ENV_VAR}` invita a una media verdad cómoda. Mantiene los secretos fuera del **archivo** de configuración, lo cual es real. Y no hacía nada por el **agente**, porque el secreto seguía teniendo que existir en algún sitio para que Pepe lo usara, y ese sitio era el proceso del que la shell del agente es hija. `echo $OPENAI_API_KEY` devolvía la clave. `env` también, que es una sola palabra al alcance de una inyección de prompt.
+
+Un comando que el agente ejecuta recibe ahora el entorno de Pepe menos sus credenciales: cada `${VAR}` a la que apunta la configuración, y cada variable cuyo nombre dice que lo es. `PATH` y `HOME` se quedan, porque un agente que no encuentra `git` es un agente roto, y a un agente roto un humano irritado le arranca las protecciones.
+
+<div class="note"><strong>Esto no es un sandbox.</strong> Un agente que puede ejecutar shell puede leer cualquier archivo que tú puedas leer. Lo que cierra es la fuga más barata y más probable, por mucho, y hace que "la configuración no tiene secretos" deje de ser una frase que significa menos de lo que suena.</div>
+
+### Si un token se pega en el chat
+
+Está comprometido. No por dónde ha acabado, sino por dónde ya ha estado: escrito en un chat significa enviado al proveedor del modelo, escrito en la conversación y escrito en el trace en disco. Pepe **lo guarda y te avisa** en lugar de rechazar la escritura, porque rechazar no deshace la fuga, solo te deja atascado. Revócalo, reemítelo, y pon el nuevo en una variable de entorno o en una bóveda. `pepe doctor` sigue diciéndolo hasta que lo hagas.
 
 ### Hazlo por chat
 

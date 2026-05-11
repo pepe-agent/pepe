@@ -26,6 +26,9 @@ página mostra cada uma onde se aplica:
    lê as notas "Fá-lo pela conversa" mais abaixo para saber o passo exato de
    confirmação.
 
+Se vens de outro motor de agentes, o `pepe migrate` importa os canais que já lá
+existem, em vez de teres de adicionar cada um à mão.
+
 ## Duas formas de canal
 
 Os canais distinguem-se apenas na forma como uma mensagem chega ao Pepe:
@@ -36,6 +39,54 @@ Os canais distinguem-se apenas na forma como uma mensagem chega ao Pepe:
   e uma rota de entrada genérica) recebem mensagens que a plataforma envia para
   um URL de retorno. O Pepe expõe um URL por ligação. Regista-o uma única vez
   junto do fornecedor.
+
+Todos os canais por webhook, qualquer que seja a plataforma, são servidos pelo
+mesmo endpoint de entrada:
+
+```
+/webhooks/:company/:provider/:slug
+```
+
+`:company` é o âmbito do inquilino, e é `root` quando não usas empresas.
+`:provider` é o nome da plataforma, e `:slug` é o nome que deste à ligação.
+Acrescentar um fornecedor nunca acrescenta um endpoint novo.
+
+Estes são os canais por webhook que vêm com o Pepe, e o que cada um precisa:
+
+| Canal | Como se liga | Configuração que precisa |
+|---|---|---|
+| **WhatsApp** | Webhook da Meta Cloud API | `phone_number_id`, `access_token`, `app_secret`, `verify_token` |
+| **Slack** | Webhook da Events API | `bot_token` (`xoxb-`), `signing_secret` |
+| **Discord** | Endpoint de Interactions (comandos de barra) | `public_key`, `application_id` |
+| **Microsoft Teams** | Webhook do Bot Framework | `app_id`, `app_password`, `tenant_id` |
+| **Google Chat** | Webhook da Chat API | `access_token` (OAuth para a Chat API) |
+
+O Chatwoot também está disponível, como um [plugin](../plugins/) de canal em vez
+de uma ligação nativa. Serve de frente ao WhatsApp, ao widget web e a outros, e
+traz passagem nativa para um humano. Os plugins de canal são configurados no
+separador **Integrations** do painel, e não em **Channels**.
+
+## Notas de configuração por canal
+
+- **Slack.** Cria uma aplicação, adiciona um scope de bot token, ativa as Event
+  Subscriptions e aponta o request URL para o URL da ligação. O Pepe responde
+  sozinho ao desafio `url_verification`. Adiciona os eventos `message.channels` e
+  `app_mention`. O signing secret verifica cada pedido. Vê [Slack](../slack/).
+- **Discord.** Isto usa o endpoint de Interactions, e não um bot de gateway, por
+  isso responde a **comandos de barra**. Adiciona um comando com uma opção de
+  texto e depois aponta o "Interactions Endpoint URL" da aplicação para o URL da
+  ligação. A public key da aplicação verifica a assinatura Ed25519. O comando é
+  confirmado de imediato e a resposta chega como follow-up. Vê
+  [Discord](../discord/).
+- **Microsoft Teams.** Regista um bot no Azure e aponta o respetivo messaging
+  endpoint para o URL da ligação. O Pepe responde ao `serviceUrl` da activity com
+  um token gerado a partir das credenciais da aplicação. Mantém o endpoint atrás
+  de um proxy ou de um segredo: o JWT de entrada não é validado aqui. Vê
+  [Microsoft Teams](../msteams/).
+- **Google Chat.** Configura o endpoint de webhook (HTTP) da aplicação para o URL
+  da ligação e fornece um `access_token` OAuth da Chat API. As respostas são
+  publicadas de volta no espaço. Mantém o endpoint atrás de um proxy. Vê
+  [Google Chat](../googlechat/).
 
 ## Associação, sessões e os dois modos
 
@@ -154,6 +205,13 @@ permissão: confirma a alteração antes de ela ter efeito. Dirias:
 O agente invoca `set_route` com `to: "billing"` (e `from` assume por predefinição
 aquele com quem está a falar), ou `action: "deny"` para remover uma rota. Na linha
 de comandos, o mesmo é `pepe agent route triage billing`.
+
+## O que não vem incluído
+
+O Signal, o IRC e o iMessage precisam de uma ligação persistente ou de uma ponte
+específica da plataforma, que não encaixa no modelo de webhook, por isso estão
+fora de âmbito por agora. Um canal novo pode sempre ser acrescentado como um
+[plugin](../plugins/) de canal.
 
 ## Servir tudo
 

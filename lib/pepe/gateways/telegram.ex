@@ -498,15 +498,15 @@ defmodule Pepe.Gateways.Telegram do
   defp handle_update(%{"message" => %{"video_note" => %{"file_id" => id}} = m}),
     do: media(m, id, "voice")
 
-  defp handle_update(%{"message" => %{"document" => %{"file_id" => id}} = m}),
-    do: media(m, id, "document")
+  defp handle_update(%{"message" => %{"document" => %{"file_id" => id} = doc} = m}),
+    do: media(m, id, "document", doc["file_name"])
 
   defp handle_update(%{"message" => %{"photo" => [_ | _] = sizes} = m}),
     do: media(m, List.last(sizes)["file_id"], "photo")
 
   defp handle_update(_), do: :ok
 
-  defp media(message, file_id, kind) do
+  defp media(message, file_id, kind, file_name \\ nil) do
     chat = message["chat"] || %{}
     chat_id = chat["id"]
     user_id = get_in(message, ["from", "id"])
@@ -524,7 +524,10 @@ defmodule Pepe.Gateways.Telegram do
         user_id: user_id,
         msg_id: message["message_id"],
         chat_type: chat["type"],
-        caption: message["caption"] || ""
+        caption: message["caption"] || "",
+        # What the sender called it. `report-q3.pdf` tells the agent (and the user reading
+        # the reply) what was actually looked at; `document_17.pdf` tells nobody anything.
+        file_name: file_name
       }
 
       Task.start(fn ->
@@ -541,8 +544,8 @@ defmodule Pepe.Gateways.Telegram do
 
     case download_file(file_id, kind) do
       {:ok, path} ->
-        case speech(kind, path) do
-          {:ok, text} -> spoken(inbound, text)
+        case to_text(kind, path) do
+          {:ok, text} -> understood(inbound, kind, path, text)
           :unavailable -> unread(inbound, kind, path)
         end
 
@@ -552,12 +555,45 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # Only speech becomes text at the door. A photo or a document still goes to the agent,
-  # which has eyes for one and tools for the other.
-  defp speech(kind, path) when kind in ["voice", "audio"],
-    do: Pepe.Media.transcribe(Path.join(Pepe.Agent.Workspace.dir(agent_default()), path))
+  # Speech and documents become text at the door. A photo still goes to the agent, which has
+  # eyes for it. Anything we cannot read falls through to the agent too, which is the safety
+  # net rather than the way in (see `unread/3`).
+  defp to_text(kind, path) when kind in ["voice", "audio"], do: Pepe.Media.transcribe(abs_media(path))
+  defp to_text("document", path), do: Pepe.Media.Document.extract(abs_media(path))
+  defp to_text(_kind, _path), do: :unavailable
 
-  defp speech(_kind, _path), do: :unavailable
+  defp abs_media(path), do: Path.join(Pepe.Agent.Workspace.dir(agent_default()), path)
+
+  defp understood(inbound, kind, _path, text) when kind in ["voice", "audio"],
+    do: spoken(inbound, text)
+
+  defp understood(inbound, "document", path, text), do: attached(inbound, path, text)
+
+  # A document is not the message, it is what came *with* the message. The caption is the
+  # instruction ("summarise this"), and the file is the material, so they arrive as one thing
+  # and the agent answers about the content instead of first having to go and find it.
+  #
+  # In a group, being addressed is still judged on the caption, exactly as it was when the
+  # agent had to open the file itself: a file dropped in a group with nothing said is not a
+  # question, and answering it uninvited would be worse than useless.
+  defp attached(inbound, path, text) do
+    if addressed?(inbound.caption, inbound.chat_type, inbound.chat_id) do
+      name = inbound.file_name || Path.basename(path)
+      said = document_message(name, path, text, strip_mention(inbound.caption))
+      respond(inbound.chat_id, inbound.user_id, inbound.msg_id, said)
+    end
+  end
+
+  defp document_message(name, path, text, caption) do
+    lead = if caption == "", do: "", else: caption <> "\n\n"
+
+    lead <>
+      "--- Attached file: #{name} ---\n" <>
+      text <>
+      "\n--- end of #{name} ---\n" <>
+      "(The file itself is in your workspace at `#{path}`. Long documents are handed over " <>
+      "only in part, so read it there if you need more of it.)"
+  end
 
   # Silence, or audio with nothing said in it. The file was read; there was just nothing
   # in it, and answering an empty message would only produce a confused reply.
@@ -1597,7 +1633,8 @@ defmodule Pepe.Gateways.Telegram do
   #   * "ambient"  - a single vague "what kind of work is happening" line, edited in
   #     place; no tool names, args or per-step ledger.
   #   * "off"      - nothing but the native typing indicator.
-  #   * "verbose"  - the detailed per-tool breadcrumb list (for power users).
+  #   * "verbose"  - the detailed ledger: each tool call, and the sentence the model said
+  #     before reaching for it, so you can see not just what it did but why (power users).
   # The message-based modes use one message, edited in place, deleted when done.
   defp progress_mode, do: bot()["tool_progress"] || "reaction"
 
@@ -1614,11 +1651,30 @@ defmodule Pepe.Gateways.Telegram do
     if progress_mode() == "verbose", do: verbose_result(chat_id), else: :ok
   end
 
+  # The model saying, in its own words, what it is about to do. It is worth showing: the
+  # ledger of tool calls tells you *what* happened and this tells you *why*, which is the
+  # difference between watching a machine work and being able to tell it is going wrong.
+  #
+  # Held rather than drawn, and that is the whole trick. The runtime emits `:assistant` for
+  # both the sentence before a batch of tool calls and the final answer, and there is nothing
+  # in the event to tell them apart. So it is stashed, and the tool call that follows draws
+  # it. When nothing follows, it was the final answer, and it arrives as the answer instead
+  # of flashing in a progress note that is about to be deleted.
+  defp tg_activity(_chat_id, {:assistant, text}) when is_binary(text) do
+    if progress_mode() == "verbose" and String.trim(text) != "" do
+      Process.put(:tg_act_saying, clip_reasoning(text))
+    end
+
+    :ok
+  end
+
   defp tg_activity(chat_id, event) when elem(event, 0) in [:done, :error] do
     if id = Process.get(:tg_act_id), do: delete_status(chat_id, id)
     Process.delete(:tg_act_id)
     Process.delete(:tg_act_lines)
     Process.delete(:tg_act_phrase)
+    Process.delete(:tg_act_saying)
+    Process.delete(:tg_act_drawn)
     :ok
   end
 
@@ -1664,9 +1720,36 @@ defmodule Pepe.Gateways.Telegram do
   # Verbose: the per-tool breadcrumb ledger, edited in place; a result marks the last
   # line done.
   defp verbose_tool(chat_id, name, raw) do
-    lines = (Process.get(:tg_act_lines, []) ++ [activity_line(name, raw)]) |> Enum.take(-6)
+    # The sentence the model said before reaching for this tool, if it said one. Consumed,
+    # so a batch of parallel calls credits it to the first of them rather than repeating it.
+    saying = Process.get(:tg_act_saying)
+    Process.delete(:tg_act_saying)
+
+    lines =
+      (Process.get(:tg_act_lines, []) ++ saying_lines(saying) ++ [activity_line(name, raw)])
+      |> Enum.take(-8)
+
     Process.put(:tg_act_lines, lines)
     render_activity(chat_id, Enum.join(lines, "\n"))
+  end
+
+  defp saying_lines(nil), do: []
+  defp saying_lines(text), do: ["💭 " <> text]
+
+  # One line, and short. This is a progress note, not the answer: the answer is coming, in
+  # full, right after. A paragraph here would make the note taller than the reply it precedes.
+  @reasoning_len 140
+
+  defp clip_reasoning(text) do
+    text =
+      text
+      |> String.split("\n", trim: true)
+      |> List.first("")
+      |> String.trim()
+
+    if String.length(text) > @reasoning_len,
+      do: String.slice(text, 0, @reasoning_len) <> "...",
+      else: text
   end
 
   defp verbose_result(chat_id) do
@@ -1675,16 +1758,42 @@ defmodule Pepe.Gateways.Telegram do
     render_activity(chat_id, Enum.join(lines, "\n"))
   end
 
+  # Telegram rate-limits how often one message may be edited, and a turn now fires those
+  # edits in bursts: the tool calls a model asks for run together where they safely can, so
+  # five of them arrive as five `:tool_call` events and five `:tool_result` events within a
+  # fraction of a second, each wanting to redraw the same note. Ten edits in that window is a
+  # 429, and then the note stops updating at all, which is worse than a note that updates a
+  # little less often.
+  #
+  # So the ledger is kept in the run task's dictionary and drawn at most this often. A burst
+  # collapses into one edit that shows all of it, rather than ten that show none of it. The
+  # note stays live: any event arriving after the window redraws it with whatever the state is
+  # by then, so it self-corrects rather than going stale.
+  @edit_every_ms 700
+
   # One status message per turn: send it the first time (with the real text, no
   # placeholder flash), then edit it in place. Id stored in the run task's dict.
   defp render_activity(chat_id, text) do
     case Process.get(:tg_act_id) do
-      nil -> if id = send_status(chat_id, text), do: Process.put(:tg_act_id, id)
-      id -> edit_status(chat_id, id, text)
+      nil ->
+        # The first note is drawn at once. Its whole job is to say that something is
+        # happening, and a note that arrives late has already failed at it.
+        if id = send_status(chat_id, text) do
+          Process.put(:tg_act_id, id)
+          Process.put(:tg_act_drawn, now_ms())
+        end
+
+      id ->
+        if now_ms() - Process.get(:tg_act_drawn, 0) >= @edit_every_ms do
+          edit_status(chat_id, id, text)
+          Process.put(:tg_act_drawn, now_ms())
+        end
     end
 
     :ok
   end
+
+  defp now_ms, do: System.monotonic_time(:millisecond)
 
   defp mark_last_done([]), do: []
 

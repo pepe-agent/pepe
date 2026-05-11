@@ -6,7 +6,9 @@ description: Cria e gere bots do Telegram ligados a agentes do Pepe.
 ## Telegram
 
 O Telegram é o canal mais rápido de pôr de pé porque não precisa de qualquer URL
-público. Cria um bot com o @BotFather, copia o respetivo token e regista-o.
+público. Cria um bot com o @BotFather, copia o respetivo token e regista-o. O Pepe
+consulta o Telegram à procura de mensagens novas, por isso não há webhook nenhum
+a expor.
 
 Configura o bot predefinido de forma interativa:
 
@@ -30,16 +32,15 @@ As opções do `telegram add`:
 - `--token` (obrigatória): o token do bot, literal ou `${ENV_VAR}`.
 - `--agent`: qual o agente que responde. Omite para usar o teu agente
   predefinido.
-- `--trainers`: de quem este bot pode aprender para a memória. Omite para todos,
-  `none` para ninguém, ou uma lista separada por vírgulas de ids de utilizador
-  para apenas esses.
+- `--trainers`: de quem este bot pode aprender para a memória, e quem pode
+  executar os comandos de operador dele. Omite para todos, `none` para ninguém, ou
+  uma lista separada por vírgulas de ids de utilizador para apenas esses.
 - `--heartbeat-minutes` e `--heartbeat-hours`: uma janela periódica opcional de
   ativação (para agentes que verificam coisas segundo um horário). As horas são
-  uma janela local como `8-22`.
+  uma janela local como `8-22`. Vê "Heartbeat" mais abaixo.
 - `--progress`: como o bot sinaliza que está a trabalhar enquanto uma execução
-  decorre. Uma entre `reaction` (uma reação na tua mensagem), `ambient` (uma
-  linha de atividade), `off` (apenas o indicador de escrita) ou `verbose` (um
-  detalhe por ferramenta).
+  decorre. Uma entre `reaction`, `ambient`, `off` ou `verbose`. Vê "Mostrar que
+  está a trabalhar" mais abaixo.
 
 Listar e remover bots:
 
@@ -54,14 +55,108 @@ Executa o poller em primeiro plano (um poller por bot):
 pepe gateway telegram
 ```
 
+Cada bot tem o seu próprio poller, o seu token, o seu agente associado, as suas
+listas de autorizados e o seu espaço de nomes de sessão. Dois bots que resolvem
+para o mesmo token são desduplicados, porque dois pollers num só token entrariam
+em conflito um com o outro.
+
 Normalmente não precisas de executar isto em separado. O `pepe serve` arranca com
 os bots do Telegram configurados a par da API HTTP, por isso um único servidor em
 execução cobre todos os canais de uma vez.
 
+Dentro de um único bot podes na mesma mudar de agente por conversa com
+`/agent <nome>` (vê [Encaminhamento](../routing/)). Um bot dedicado é para quando
+um canal inteiro deve *ser* um agente.
+
 <div class="note"><strong>Painel.</strong> A secção Channels do painel lista os
 teus bots com um distintivo ao vivo de ativo/inativo, permite-te adicionar um
 bot, editar com que agente ele fala e removê-lo. Grava a mesma configuração que a
-linha de comandos.</div>
+linha de comandos, e os pollers em execução reconciliam-se sem reinício.</div>
+
+### Onde vive a configuração
+
+O bot predefinido vive sob `"telegram"` no `~/.pepe/config.json`. Os bots com nome
+adicionais vivem sob `"telegrams"`, um mapa de nome para configuração, e cada um
+deles aceita as mesmas chaves do bot predefinido:
+
+- `bot_token`: o token, literal ou `${ENV_VAR}`.
+- `enabled`: se o poller deste bot arranca.
+- `agent`: qual o agente que responde.
+- `allowed_chats` e `allowed_users`: as listas de ids autorizados. Deixa-as de
+  fora e o bot fala com qualquer um.
+- `require_mention`: num grupo, só responder quando o bot é @mencionado.
+- `trainers`: com quem o bot aprende, e quem pode executar os comandos de operador
+  dele.
+
+O `/whoami` numa conversa é a forma fácil de descobrir os ids para essas listas.
+Imprime o teu id de utilizador e o id da conversa.
+
+As sessões têm espaço de nomes por bot. O bot predefinido indexa as conversas como
+`telegram:<chat_id>`, enquanto um bot com nome usa `telegram:<name>:<chat_id>`.
+Dois bots nunca colidem, portanto, nem nas conversas nem na entrega de tarefas
+agendadas.
+
+### Comandos de barra
+
+Cada conversa é uma sessão persistente, conduzida por comandos de barra. Também
+aparecem no menu "/" do Telegram, no idioma que configuraste.
+
+| Comando | O que faz |
+|---|---|
+| `/new` | Começa uma conversa nova |
+| `/undo` | Anula a tua última mensagem |
+| `/retry` | Refaz a última resposta |
+| `/compact` | Resume o histórico para libertar contexto |
+| `/stop` | Para a execução atual |
+| `/inline <texto>` | Injeta uma mensagem na execução já a decorrer |
+| `/btw <pergunta>` | Faz uma pergunta paralela que não fica guardada na conversa |
+| `/mention on\|off` | Num grupo, exigir ou não uma @menção |
+| `/model [nome] [session\|global]` | Mostra o modelo atual, ou define-o |
+| `/learn` | Guarda o que o agente aprendeu na memória e nas skills |
+| `/whoami` | Mostra os teus ids de utilizador e de conversa do Telegram |
+| `/help` | Lista os comandos que podes executar |
+
+E os comandos de operador, que só os formadores do bot podem executar:
+
+| Comando | O que faz |
+|---|---|
+| `/agent <nome>` | Muda o agente que responde nesta conversa |
+| `/status` | Mostra informação da sessão |
+| `/models` | Escolhe um modelo numa lista de botões |
+| `/tools` | Lista as ferramentas de runtime disponíveis |
+| `/skill [nome]` | Lista as skills, ou executa uma pelo nome |
+| `/approve` | Gere as permissões de ferramenta guardadas |
+| `/usage` | Mostra o gasto e a contagem de mensagens do mês |
+
+As skills instaladas tornam-se também comandos de barra próprios, por isso uma
+skill chamada `weather` responde a `/weather` além de `/skill weather`, e fica
+descoberta a partir do menu "/". Um comando de skill conta como comando de
+operador, porque uma skill executa instruções arbitrárias através do agente.
+
+#### Os comandos de operador são só para formadores
+
+Os comandos da segunda tabela expõem a superfície de operador: a tua configuração,
+as tuas permissões, o teu gasto e o inventário interno de modelos, ferramentas e
+skills. Estão restritos à lista `trainers` do bot, e a barreira fica no ponto
+único onde todos os comandos são despachados, por isso um comando que pode ser
+alcançado por dois nomes não consegue contorná-la.
+
+- Um bot **sem lista `trainers`** confia em toda a gente com quem fala. É o bot
+  pessoal, e para ele nada muda: tens todos os comandos, skills incluídas.
+- Um bot **com lista `trainers`** é virado para o cliente. Um cliente que fale com
+  ele não consegue alcançar `/approve`, `/agent`, `/status`, `/models`, `/tools`,
+  `/skill` nem `/usage`, nem qualquer comando de skill. Também não lhe são
+  anunciados: o `/help` lista apenas os comandos que quem chamou pode de facto
+  executar, e o menu "/" do bot é construído para a pessoa menos fiável que o
+  consegue ver, por isso os comandos de operador ficam de fora do popup por
+  completo. Quem não é formador e escreve um mesmo assim ouve que o comando não
+  está disponível ali, e nunca vê os interiores de operador.
+
+O `/model` é, de propósito, metade de cada. Lê-lo (`/model` sem argumentos) revela
+qual o modelo por trás do bot, o que é infraestrutura, por isso esse caminho é só
+para formadores. Mudá-lo não é: um cliente pode escolher um modelo para a sua
+própria conversa, a não ser que tranques isso. Vê "Muda de modelo a meio de uma
+conversa" abaixo.
 
 ### Em grupos
 
@@ -94,8 +189,10 @@ para a conversa.
 ### Muda de modelo a meio de uma conversa
 
 `/model` mostra o modelo ativo nesse chat, com um botão **Browse models**
-para escolher outro; `/models` vai direto a esse seletor. Utilização
-escrita:
+para escolher outro; `/models` vai direto a esse seletor. O seletor está limitado
+à tua empresa e põe um visto no modelo em uso, por isso tocas num para mudar.
+Ambas estas leituras são só para formadores, já que revelam que modelos estão por
+trás do bot. Utilização escrita:
 
 ```text
 /model openrouter               # pergunta se muda só este chat ou todos
@@ -107,11 +204,87 @@ Qualquer pessoa numa conversa permitida pode mudar a sua própria sessão;
 mudá-lo **globalmente** (para todas as conversas que este bot atende) está
 reservado a **formadores** (a mesma lista que rege o `/learn` e a memória),
 por isso um membro qualquer do chat não consegue reapontar todo o bot para
-outro modelo em silêncio. Define `model_switch_locked: true` no bot para
-desativar por completo a mudança de modelo para quem não é formador. Uma
-alteração de sessão vive só em memória; repõe-se com `/new` ou com um
-reinício do servidor, voltando ao que a configuração própria do agente
-disser.
+outro modelo em silêncio. É ao formador que é perguntado qual das duas opções
+quis dizer; qualquer outra pessoa muda apenas a sua própria conversa, sem nada a
+responder. Define `model_switch_locked: true` no bot para desativar por completo a
+mudança de modelo para quem não é formador. Uma alteração de sessão vive só em
+memória; repõe-se com `/new` ou com um reinício do servidor, voltando ao que a
+configuração própria do agente disser.
+
+### Mostrar que está a trabalhar
+
+Enquanto uma execução decorre, o bot mostra que está ocupado. Isto é de propósito
+um sinal ambiente, e não um relatório de estado que devas ler. O indicador nativo
+de "a escrever..." do Telegram mantém-se vivo em todos os modos. Por cima dele, o
+`tool_progress` (a opção `--progress`) escolhe um de quatro:
+
+- `reaction`, a predefinição: uma reação 👀 na tua própria mensagem enquanto o
+  agente trabalha, retirada quando a resposta chega. Não acrescenta qualquer
+  mensagem à conversa, e é o mais silencioso dos quatro.
+- `ambient`: uma única linha vaga ("a procurar coisas...", "a executar algo...")
+  editada no sítio e apagada quando a resposta chega. Sem nomes de ferramenta, sem
+  argumentos, sem registo.
+- `off`: nada além do indicador nativo de escrita.
+- `verbose`: o registo completo, para quem quer acompanhar a execução. Cada
+  chamada de ferramenta assim que acontece e, por cima dela, a frase que o modelo
+  disse antes de recorrer àquela ferramenta. O registo diz *o que* fez; a frase
+  diz *porquê*, que é o que permite ver o agente a ir para o sítio errado antes
+  de lá chegar. Continua a ser uma única mensagem, editada no lugar, apagada
+  quando a resposta chega.
+
+Define-o pela linha de comandos com `--progress`, ou de dentro de uma conversa com
+a ferramenta `manage_channel` (`set_progress`).
+
+### Heartbeat: contactos proativos
+
+Um bot pode periodicamente dar a palavra ao seu agente para dizer alguma coisa
+**por iniciativa própria** ("o deploy terminou", "pediste-me para ficar atento a
+X") e, igualmente importante, o direito de **não dizer nada** na maior parte do
+tempo. Vem desligado, e ativa-lo por bot:
+
+```bash
+pepe gateway telegram add ops --token "${OPS_BOT_TOKEN}" --agent operator --heartbeat-minutes 30 --heartbeat-hours 8-22
+```
+
+Um agente que tenha a ferramenta `manage_channel` também consegue configurar isto
+sozinho, de dentro de uma conversa:
+
+```text
+manage_channel set_heartbeat name: "sales" heartbeat_minutes: 30 heartbeat_hours: "8-22"
+```
+
+Cada pulsação executa o agente sobre o contexto vivo da sua sessão, com um prompt
+que diz que esta é uma verificação automática e que deve responder exatamente
+`HEARTBEAT_OK` se não houver nada que valha a pena dizer. Esse é o caso comum, e
+só uma mensagem genuína chega a ser enviada para a conversa. Alimenta-lo com duas
+coisas:
+
+- Um `HEARTBEAT.md` opcional no workspace do agente, que é onde escreves o que deve
+  ser vigiado.
+- **Eventos de sistema**, que qualquer parte do Pepe pode colocar em fila para uma
+  sessão (`Pepe.Heartbeat.Events.push/2`), e que a pulsação seguinte recolhe
+  sozinha.
+
+Um ciclo proativo descontrolado é impossível por construção. Uma barreira de
+arrefecimento impõe um mínimo de 30 segundos entre pulsações, e um disjuntor de
+cheia dispara com 5 disparos em 60 segundos. O `heartbeat_hours` (uma janela local
+como `8-22`) mantém o bot calado fora das horas em que estás acordado.
+
+### As conversas mortas curam-se sozinhas
+
+Se um envio volta com falha permanente, porque o bot foi bloqueado ou porque a
+conversa ou o utilizador desapareceu, essa conversa passa a ser ignorada em todos
+os envios seguintes. Não há chamadas de API desperdiçadas nem ruído no registo. No
+momento em que um envio para ela volta a resultar, por exemplo porque a pessoa
+desbloqueou o bot, a marca é retirada automaticamente. Não há nada para repor à
+mão.
+
+### Idioma e erros
+
+As mensagens fixas do próprio Pepe (respostas de comando, botões, recusas) seguem
+o `locale` que configuraste. As respostas do agente seguem o idioma em que a
+pessoa escreve, seja ele qual for. Os erros internos em bruto nunca são
+derramados na conversa.
 
 ### Fá-lo pela conversa
 
@@ -133,9 +306,9 @@ salvaguardas:
   ambiente que guarda o token, nunca o token em si. É armazenado como
   `${SALES_BOT_TOKEN}` e resolvido no momento da leitura, por isso o segredo em
   bruto nunca chega ao modelo nem aos registos. Um token em bruto (que contém
-  dois pontos) é rejeitado.
+  dois pontos) é rejeitado. És tu que defines essa variável de ambiente.
 - **O bot predefinido protegido é intocável.** A ferramenta só mexe em bots com
-  nome, nunca no `default`.
+  nome, nunca no `default`, e não toca em mais nada da tua configuração.
 
 Outras ações do `manage_channel` são `list`, `set_agent` (reassociar um bot a
 outro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`,

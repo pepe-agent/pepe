@@ -93,6 +93,17 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
         :tool ->
           if last["role"] == "tool", do: model_reply(conn, "ran it", nil), else: model_reply(conn, nil, bash_call())
 
+        # Five tools at once: the shape that turns one progress note into ten edits.
+        :burst ->
+          if last["role"] == "tool", do: model_reply(conn, "all done", nil), else: model_reply(conn, nil, many_calls())
+
+        # A model that says what it is about to do before doing it, which is what a real one
+        # does and what the verbose progress note exists to show.
+        :thinking_tool ->
+          if last["role"] == "tool",
+            do: model_reply(conn, "the disk is fine, 12% used", nil),
+            else: model_reply(conn, "Let me check how full the disk is.", bash_call())
+
         _ ->
           model_reply(conn, "here is my answer", nil)
       end
@@ -117,6 +128,18 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
     defp bash_call do
       [%{"id" => "c1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"true"})}}]
+    end
+
+    # What a model actually does when the work splits: several reads at once. They run
+    # together now, so their events arrive as a burst.
+    defp many_calls do
+      for n <- 1..5 do
+        %{
+          "id" => "c#{n}",
+          "type" => "function",
+          "function" => %{"name" => "read_file", "arguments" => ~s({"path":"f#{n}.txt"})}
+        }
+      end
     end
 
     defp model_reply(conn, content, tool_calls) do
@@ -198,6 +221,20 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
   end
 
   defp model_answers(mode), do: Agent.update(:tg_cmd_llm, fn _ -> mode end)
+
+  # Everything the bot sent or edited in this chat, in whatever order it arrived, until the
+  # turn goes quiet. The progress note and the reply are two HTTP calls racing each other
+  # over the same pool: under load the note can land second, and a test that assumes the
+  # first message is the note fails for a reason that has nothing to do with what it checks.
+  # It also drains the turn, so no straggler outlives the test.
+  defp everything_said(chat, acc \\ []) do
+    receive do
+      {:sent, ^chat, text, _buttons} -> everything_said(chat, [text | acc])
+      {:edited, ^chat, text} -> everything_said(chat, [text | acc])
+    after
+      2_000 -> Enum.reverse(acc)
+    end
+  end
 
   # Enough back-and-forth that there is a middle worth condensing.
   defp chatter(chat, turns) do
@@ -664,9 +701,63 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
       say(chat, "do the thing")
 
-      assert_receive {:sent, ^chat, status, _buttons}, 5_000
-      assert status =~ "bash"
-      assert status =~ "true"
+      said = everything_said(chat)
+      assert Enum.any?(said, &(&1 =~ "bash" and &1 =~ "true"))
+    end
+
+    test "verbose mode also shows why: what the model said before reaching for the tool",
+         %{chat: chat} do
+      start_bot!(%{"tool_progress" => "verbose", "agent" => "assistant"})
+      Config.put_agent(%{Config.get_agent("assistant") | auto_approve: ["bash"]})
+      model_answers(:thinking_tool)
+
+      say(chat, "is the disk full?")
+
+      said = everything_said(chat)
+
+      # The ledger of tool calls says what happened. The sentence says why, which is what
+      # lets you tell it is about to do the wrong thing before it does it. Both in one note.
+      assert Enum.any?(said, &(&1 =~ "Let me check how full the disk is" and &1 =~ "bash"))
+    end
+
+    test "a burst of parallel tools does not become a burst of edits", %{chat: chat} do
+      start_bot!(%{"tool_progress" => "verbose", "agent" => "assistant"})
+      Config.put_agent(%{Config.get_agent("assistant") | tools: ["read_file"], auto_approve: ["*"]})
+      model_answers(:burst)
+
+      say(chat, "read all five")
+
+      # Telegram rate-limits edits to one message. Five tools now run together, so without
+      # coalescing this turn would fire ten edits (five calls, five results) inside a fraction
+      # of a second, earn a 429, and the note would stop updating at all.
+      said = everything_said(chat)
+
+      redraws = Enum.count(said, &(&1 =~ "read_file"))
+      assert redraws <= 3, "the note was redrawn #{redraws} times for one burst of five tools"
+
+      # And it is still alive: the note was drawn at all, and the answer still arrived.
+      assert Enum.any?(said, &(&1 =~ "read_file"))
+      assert Enum.any?(said, &(&1 =~ "all done"))
+    end
+
+    test "the final answer never shows up as progress", %{chat: chat} do
+      start_bot!(%{"tool_progress" => "verbose", "agent" => "assistant"})
+      Config.put_agent(%{Config.get_agent("assistant") | auto_approve: ["bash"]})
+      model_answers(:thinking_tool)
+
+      say(chat, "is the disk full?")
+
+      said = everything_said(chat)
+
+      # The answer arrives, as the answer.
+      assert Enum.any?(said, &(&1 =~ "the disk is fine"))
+
+      # The runtime emits the same `:assistant` event for the sentence before a tool call and
+      # for the answer itself, and nothing in the event tells them apart. A naive reader would
+      # flash the answer into the progress note a moment before deleting it. It is held
+      # instead, and drawn only by the tool call that follows it. Nothing follows the answer,
+      # so the answer is never drawn as progress.
+      refute Enum.any?(said, &(&1 =~ "💭 the disk is fine"))
     end
   end
 

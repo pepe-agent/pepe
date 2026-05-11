@@ -12,7 +12,7 @@ The layers, from weakest-but-always-on to strongest-but-opt-in:
 1. The permission gate. A human approves any tool that acts.
 2. Command guardrails. A built-in filter that refuses a few catastrophic commands.
 3. The sandbox. An opt-in wrapper that runs shell commands in real isolation.
-4. Secret references. Credentials live as `${ENV_VAR}`, never expanded on disk.
+4. Secrets. Credentials live as `${ENV_VAR}` or in a vault, never in the config file, and the agent's shell does not inherit them.
 5. Redaction hooks. Optional PII scrubbing before text reaches a model.
 6. Access control. The dashboard password and API bearer tokens.
 
@@ -33,6 +33,36 @@ When a risky tool has not been pre-approved, the runtime asks the person on the 
 
 A denied call does not crash the run. The model is told the user did not authorize the tool and is asked to try another approach or check in with you, so the conversation keeps going.
 
+### A grant remembers what it was given for
+
+"Always allow bash" used to be a blank cheque. You would see the agent about to run `ls build/`, wave it through, and that same permission then covered `rm -rf`, `sudo`, and `curl | sh` forever. The person who signed it had been looking at a directory listing.
+
+Every call is classified first (deletes files, reaches the network, runs with elevated privileges, runs embedded code), and **the grant records the risks you were actually looking at**. So a real `auto_approve` list reads like this:
+
+```jsonc
+"auto_approve": [
+  "bash:none",                  // approved for bash calls that flag no risk
+  "write_file:writes_file",     // ...and for writing files
+  "bash:deletes+network"        // widened later, when you said yes to an rm and a curl
+]
+```
+
+A call is allowed when every risk it carries was already approved. Approving `ls` lets `cat` and `grep` through without asking again, which is the point: a gate that nags is a gate people switch off. But the first `rm` flags `deletes`, is not covered, and stops to ask, and the question names the thing you never said yes to. Say yes and the grant widens in place, so the list stays short enough to audit.
+
+The coarser, older forms still work, unchanged:
+
+| Grant | Means |
+|---|---|
+| `"*"` | every tool, every risk (the owner's own agent) |
+| `"bash"` | a blank cheque on bash, as written by a Pepe from before this existed |
+| `"bash:any"` | the same blank cheque, written knowingly |
+
+<div class="note"><strong>This is not a sandbox, and must not be read as one.</strong> The classification reads the command as text, and text lies: a command can be assembled at runtime, base64-decoded, or hidden inside a script the agent wrote a moment earlier. It fails closed, in the sense that an unrecognised risk is never covered by a narrower grant. What it closes is the gap between what a human looked at and what they actually signed. It does not turn a container that runs LLM-chosen shell into a safe place, and that container still needs to be one you would be willing to lose.</div>
+
+### Managing the saved grants
+
+The persistent grants stay yours to inspect and revoke. From a chat channel such as Telegram, `/approve` lists what the agent may currently run without asking, `/approve clear` drops every saved grant, and `/approve clear <tool>` drops a single one. They are operator commands, so only a trusted user can run them.
+
 ### Auto-approval and the owner agent
 
 Choosing `always` at the prompt records that tool in the agent's `auto_approve` list, so it never asks again for that agent. There is no separate flag to set this up front from `pepe agent add`. You grant trust either by answering `always` once when the prompt appears, or by editing the agent in `config.json`:
@@ -49,7 +79,7 @@ Choosing `always` at the prompt records that tool in the agent's `auto_approve` 
 }
 ```
 
-A single wildcard `"*"` in `auto_approve` means the agent runs every tool without ever asking. That is the omnipotent owner agent created for you at `pepe setup`: trusted with all tools so you can drive your own machine without friction. Grant that trust deliberately, and never to an agent exposed to untrusted input.
+A single wildcard `"*"` in `auto_approve` means the agent runs every tool without ever asking. That is the omnipotent owner agent created for you at `pepe setup`: trusted with all tools so you can drive your own machine without friction. It is also born a super-admin over every other agent (`can_manage: ["*"]`), so it can create and reconfigure them by chat from the start. Agents you add later are scoped normally. Grant that trust deliberately, and never to an agent exposed to untrusted input.
 
 ```json
 {
@@ -149,6 +179,36 @@ pepe serve --port 4000
 ```
 
 A whole-string placeholder that resolves to nothing (the variable is unset) is treated as "unset" rather than an empty string, so a missing secret surfaces as a clear "not configured" rather than a silent blank.
+
+### Or keep them in a vault
+
+A config value may say **where the secret lives** instead of holding it. Pepe fetches it at the moment it is needed:
+
+```json
+{ "api_key": "exec:op read op://Work/openai/key" }
+{ "api_key": "exec:vault kv get -field=key secret/openai" }
+{ "api_key": "exec:aws secretsmanager get-secret-value --secret-id openai --query SecretString --output text" }
+```
+
+Those are three examples, not three integrations. **The whole contract is: a command that prints the secret on stdout.** Pepe does not know what 1Password is, and there is no list of supported vaults to be added to. The macOS keychain, `gcloud secrets`, `pass`, a Bitwarden CLI and a script you wrote this morning all work today, because they all print a secret when you run them. `file:/run/secrets/key` covers a Docker or Kubernetes secret mount.
+
+You then **revoke a key in the vault** and it stops working within a minute, with no ssh, no edit, no restart. If your vault needs a credential of its own (a service-account token, an address), name it and only it: `"secrets": { "vault_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }`.
+
+The resolved value is cached in memory for 60 seconds, because opening a vault costs a few hundred milliseconds and a busy Pepe would otherwise pay that on every model call. So a secret does live in the process for up to a minute: this narrows the window, it does not abolish it. A vault that is locked or unreachable reads as an **unset** secret, never a wrong one.
+
+### And the agent never sees any of it
+
+Whichever you use, **the agent's shell does not inherit Pepe's secrets**.
+
+This is worth spelling out, because `${ENV_VAR}` invites a comfortable half-truth. It keeps secrets out of the config *file*, which is real. It used to do nothing at all about the *agent*, because the secret still had to exist somewhere for Pepe to use it, and that somewhere was the process whose child the agent's shell is. `echo $OPENAI_API_KEY` returned the key. So did `env`, which is a single word for a prompt injection to reach.
+
+A command the agent runs now gets Pepe's environment minus its credentials: every `${VAR}` the config points at, and every variable whose name says it is one. `PATH` and `HOME` stay, because an agent that cannot find `git` is a broken agent, and a broken agent gets its guard rails torn off by an irritated human.
+
+<div class="note"><strong>This is not a sandbox.</strong> An agent that can run shell can read any file you can read. What it closes is the cheapest and most likely leak by a wide margin, and it stops "the config has no secrets in it" from being a sentence that means less than it sounds like.</div>
+
+### If a token gets pasted into the chat
+
+It is compromised. Not because of where it landed, but because of where it has already been: typed into a chat means sent to the model provider, written into the conversation, and written into the trace on disk. Pepe **saves it and tells you** rather than refusing the write, because refusing does not un-leak anything, it only leaves you stuck. Revoke it, reissue it, and put the new one in an environment variable or a vault. `pepe doctor` keeps saying so until you do.
 
 ### Do it by chat
 

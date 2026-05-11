@@ -43,7 +43,7 @@ El socket habla un protocolo de tramas JSON simple. Cada mensaje, en ambas direc
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Unirse a `agent:<name>` selecciona y autoriza ese agente contra el ámbito de tu token, exactamente como el campo `model` por HTTP. Un tópico al que no tienes permiso de unirte se rechaza. Pasa `{"session": "some-stable-id"}` en el payload de unión para mantener el mismo canal de vigilancia/notificación entre reconexiones; de lo contrario se usa un id nuevo por conexión. Pasa también `{"lang": "pt-BR"}` y eso empuja la primera respuesta del agente hacia ese idioma (un aviso de sistema único en el primer turno de la sesión), así es como el atributo `data-lang` del [widget incrustable](../widget/) llega al agente.
+Unirse a `agent:<name>` selecciona y autoriza ese agente contra el ámbito de tu token, exactamente como el campo `model` por HTTP. El ámbito se aplica en el `join`, así que un tópico que tu token no permite se rechaza ahí mismo. `agent:default` resuelve al agente predeterminado del ámbito de tu token. Un nombre simple se cualifica dentro de la empresa de tu token, así que un token con ámbito `acme` que se une a `agent:sales` llega a `acme/sales`, y un token de empresa que intente unirse al agente de otra empresa se rechaza. Pasa `{"session": "some-stable-id"}` en el payload de unión para mantener el mismo canal de vigilancia/notificación entre reconexiones; de lo contrario se usa un id nuevo por conexión. Pasa también `{"lang": "pt-BR"}` y eso empuja la primera respuesta del agente hacia ese idioma (un aviso de sistema único en el primer turno de la sesión), así es como el atributo `data-lang` del [widget incrustable](../widget/) llega al agente.
 
 ### Eventos
 

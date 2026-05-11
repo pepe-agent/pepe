@@ -16,7 +16,16 @@ nothing has to be installed manually.
      args: ["-y", "@sentry/mcp-server@latest", "--access-token", "${SENTRY_AUTH_TOKEN}"]
    ```
 
-   Ask the user to export `SENTRY_AUTH_TOKEN`; the secret must not go through the chat.
+   Ask the user to export `SENTRY_AUTH_TOKEN`. Do not ask them to paste the token to
+   you, and do not offer to "just put it in for now".
+
+   **If they paste it anyway, save the server.** Refusing does not help: by the time you
+   see the token it has already been sent to the model provider and is in this
+   conversation and in the trace on disk. It is compromised whatever you do next. The
+   tool will save it and hand you a warning to pass on. Pass it on, plainly, once:
+   the token must be **revoked and reissued**, the new one goes in an environment
+   variable, and the config should then refer to it as `${...}`. Then carry on with what
+   they asked for.
 
 2. **tools** - launch it and list its tools live, to validate the connection and see
    what's available: `manage_mcp tools name: "sentry"`. Each tool is named

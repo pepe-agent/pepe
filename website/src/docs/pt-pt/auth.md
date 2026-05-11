@@ -1,7 +1,97 @@
 ---
 title: Autenticação
-description: Protege o acesso remoto à API com tokens com âmbito.
+description: Entra no painel e protege o acesso remoto à API com tokens com âmbito.
 ---
+
+O Pepe tem duas portas de entrada e cada uma tem a sua própria fechadura. O painel é para pessoas, e é guardado por uma palavra-passe opcional mais uma regra de rede que fecha por predefinição. A API HTTP `/v1` é para programas, e é guardada por tokens bearer que transportam um âmbito. Na tua própria máquina nenhuma das fechaduras te estorva, e nenhuma das portas se abre para a rede antes de ligares a fechadura dela.
+
+## Autenticação do painel
+
+O painel é **aberto por predefinição**, para que uma instalação local não tenha atrito nenhum: corre `pepe serve` na tua máquina e abre-o no navegador. A autenticação é **opcional, ligas tu**: no momento em que defines uma palavra-passe do painel, todas as páginas passam a exigir autenticação. Não há base de dados nem tabela de utilizadores. A palavra-passe é verificada em tempo constante e uma flag assinada viaja no cookie de sessão do Phoenix.
+
+### Ligar a autenticação
+
+Define uma palavra-passe de uma de duas formas. Se ambas estiverem presentes, vence o valor da configuração:
+
+```bash
+# Opção A: uma variável de ambiente, para que nada caia no ficheiro de configuração.
+export PEPE_DASHBOARD_PASSWORD='uma frase secreta bem longa'
+
+# Opção B: guarda uma referência, para que o segredo continue a vir do ambiente.
+pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
+
+# Vê o estado atual, ou desliga outra vez.
+pepe dashboard
+pepe dashboard password --clear
+```
+
+O valor é interpolado como `${ENV}` no momento da leitura, por isso, tal como todos os outros segredos no Pepe, nunca é escrito em texto simples no `~/.pepe/config.json`.
+
+Com uma palavra-passe definida:
+
+* todas as rotas do painel redirecionam para **`/login`** até entrares;
+* o `POST /login` verifica a palavra-passe com uma comparação em tempo constante e guarda uma flag assinada `dashboard_authed` no cookie de sessão;
+* aparece um link **Sign out** no rodapé da barra lateral, e o `DELETE /logout` limpa a flag.
+
+Retira a palavra-passe, removendo a variável de ambiente ou a chave da configuração, e o painel volta a ficar aberto.
+
+### Fecha por predefinição: o painel nunca fica aberto na rede sem palavra-passe
+
+Ser "aberto por predefinição" só é seguro porque essa predefinição é **apenas loopback**. Uma barreira por pedido garante isso: **sem palavra-passe definida**, o painel responde apenas a clientes `localhost` genuínos. Qualquer pedido vindo de outro sítio, seja um endereço da LAN, uma máquina virtual ou um proxy inverso, recebe um **403** a dizer-te para definires uma palavra-passe. Não existe interruptor de "deixa aberto na mesma": chegar ao painel a partir de fora da máquina significa ou uma palavra-passe ou um túnel.
+
+A regra, com precisão:
+
+| O pedido vem de | Sem palavra-passe | Com palavra-passe |
+|---|---|---|
+| `localhost` (loopback, sem cabeçalhos de proxy) | permitido | exige autenticação |
+| LAN, uma VM ou outra máquina | **403** | exige autenticação |
+| por um proxy (com `X-Forwarded-For`) | **403** | exige autenticação |
+
+A LAN e as gamas privadas (`192.168.x`, `10.x`, `172.16.x`) contam como **públicas**, não como de confiança. A API `/v1` e os endpoints `/webhooks` não são afetados por esta regra; têm a sua própria autenticação, descrita mais abaixo.
+
+### Chegar ao painel a partir de outra máquina
+
+Duas opções são seguras:
+
+1. **Define uma palavra-passe** e expõe o painel atrás de TLS, com um proxy inverso ou um túnel, para que a palavra-passe e o cookie de sessão nunca sigam em texto simples. Quando pões um proxy à frente, mantém a palavra-passe ligada, porque um pedido vindo de proxy é tratado como público.
+
+2. **Mantém tudo em loopback e entra por um túnel**, para que nada seja aberto na rede:
+
+```bash
+pepe serve --tunnel                        # túnel rápido da Cloudflare, embutido (precisa do cloudflared)
+ssh -L 4000:localhost:4000 tu@servidor     # depois abre http://localhost:4000
+tailscale serve 4000                       # uma tailnet privada, sem porta pública
+```
+
+O `pepe serve --tunnel` corre o `cloudflared` e imprime um URL público `https://<...>.trycloudflare.com` que dura enquanto o processo viver. Como o túnel é um proxy, um pedido vindo por ele conta como público, por isso define uma palavra-passe do painel antes de o usares. O percurso completo, incluindo túneis nomeados com um URL estável escolhido por ti, está na página do [Painel](../dashboard/#acesso-remoto).
+
+Já o `ssh -L` e um reencaminhamento de porta do Multipass chegam pelo loopback, por isso funcionam sem palavra-passe nenhuma. Uma VM alcançada através da sua rede virtual parece remota e é bloqueada, por isso reencaminha a porta dela para o `localhost`.
+
+### Servir atrás de um domínio ou de um proxy inverso
+
+Duas definições opcionais fazem um deploy a sério comportar-se corretamente:
+
+```bash
+# Os valores do cabeçalho Host aos quais o painel deve responder (nomes de loopback funcionam sempre).
+pepe dashboard hosts dash.example.com
+
+# Os proxies inversos cujo X-Forwarded-For pode ser de confiança (CIDRs ou IPs simples).
+pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8
+
+# Mostra a postura atual: autenticação, hosts, proxies.
+pepe dashboard
+```
+
+* Os **hosts permitidos** são uma defesa contra DNS rebinding. Sem palavra-passe, o painel aceita apenas um `Host` de **loopback** (`localhost`, `127.0.0.1`, `::1`) e recusa qualquer outro nome com **400**, o que impede uma página maliciosa de reapontar um domínio para a tua máquina e conduzir o painel local. Quando serves sob um domínio a sério, lista-o aqui, com uma palavra-passe ligada. Uma lista vazia mais uma palavra-passe aceita qualquer host, porque aí a palavra-passe é a barreira.
+* Os **proxies de confiança** decidem quando o `X-Forwarded-For` é acreditado. Por predefinição é ignorado e um pedido vindo de proxy é tratado como remoto, que é a escolha que fecha por omissão. Lista aqui o teu proxy e o Pepe passa a tirar o IP real do cliente da cadeia reencaminhada, para que tanto a regra de loopback contra remoto como o limite de tentativas de autenticação vejam o par verdadeiro em vez do proxy.
+
+### Proteção contra força bruta
+
+O `POST /login` tem limite de taxa por IP de cliente, por predefinição 10 tentativas a cada 60 segundos, e uma autenticação bem-sucedida repõe o contador. Isso assenta em cima da comparação de palavra-passe em tempo constante e de um pequeno atraso a cada falha. Passar do limite devolve **429** com um cabeçalho `Retry-After`.
+
+### Estender a autenticação
+
+A barreira é deliberadamente pequena e componível: um hook `on_mount` (`PepeWeb.Auth`), um plug (`PepeWeb.NetworkGuard`, apoiado em `Pepe.Net` e `PepeWeb.RemoteClient`) e o limitador de autenticação. Esquemas mais ricos, como OAuth, cabeçalhos de identidade vindos de um proxy de confiança ou contas por operador, encaixam sem mexer em cada LiveView.
 
 ## Autenticação e tokens
 

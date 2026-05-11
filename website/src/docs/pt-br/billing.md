@@ -1,7 +1,56 @@
 ---
 title: Cobrança e limites
-description: Limite o gasto ou o volume de mensagens mensal de uma empresa, aplique uma margem no que você cobra, e resete um teto antes da hora.
+description: Meça cada chamada de modelo por empresa, precifique, aplique uma margem no que você cobra, limite o gasto ou o volume de mensagens mensal, e exporte a fatura do cliente.
 ---
+
+## Quanto custa uma chamada
+
+Toda chamada de modelo é medida e atribuída à empresa do agente, então você consegue cobrar um cliente por token. A medição acontece no único ponto por onde passam todas as superfícies (o console, a API HTTP `/v1`, o WebSocket, o Telegram e todo canal via webhook), e ela vai sendo anexada a um ledger durável, só de acréscimo, em `~/.pepe/data/usage/<company>/YYYY-MM.jsonl`. Esse arquivo é a trilha de auditoria do que é cobrado.
+
+O **custo** é `tokens × o preço do modelo`, cotado por 1M de tokens. Um preço é resolvido em camadas, e a primeira camada que responde vence:
+
+1. O **preço manual** definido na conexão do modelo.
+2. Um **cache ao vivo** em `~/.pepe/data/price_book.json`, atualizado a partir do OpenRouter e do mapa de preços do LiteLLM.
+3. Uma **semente embutida** de preços conhecidos, que é a saída offline.
+
+Assim um modelo conhecido já é precificado sozinho, e você só digita um preço para sobrescrever algum ou para preencher uma lacuna. Defina preços por modelo em Models, depois Edit, no painel, ou atualize o cache ao vivo você mesmo:
+
+```bash
+pepe usage prices --refresh
+```
+
+Os preços também se atualizam sozinhos uma vez por semana enquanto o `serve` ou um gateway estiver de pé.
+
+O **valor a cobrar** é `preço de tabela × a margem da empresa`, o multiplicador opcional por empresa descrito abaixo. O que você pagou e o que você cobra são sempre mostrados lado a lado, então uma margem nunca esconde o custo real do seu próprio time.
+
+## Assinaturas (ChatGPT Plus, Claude Max)
+
+Uma conversa que roda num login de assinatura não custa nada por token: o mês foi pago adiantado, quer você mande uma mensagem ou dez mil. Mesmo assim ela vale exatamente o mesmo para o cliente que uma que rodou na API paga, então o Pepe mantém três números em vez de dois.
+
+| Número | O que significa |
+|---|---|
+| **Tabela** | `tokens × o preço do modelo`. O que esses tokens teriam custado na API, tendo custado ou não. |
+| **A cobrar** | `tabela × margem`. O que o cliente paga, calculado a partir do preço de tabela e **não** a partir do que você gastou. |
+| **Custo** | O que você pagou de verdade. Zero para os tokens que uma assinatura serviu, mais a mensalidade fixa daquela assinatura, contada uma única vez. |
+
+Cobrar a partir do preço de tabela é a razão de tudo isso. Um dia a assinatura vai acabar e o mesmo trabalho vai cair na API paga, e nesse dia a fatura do cliente não pode se mexer. Um preço que acompanha os seus arranjos de fornecimento é um preço que você tem que explicar.
+
+Diga ao Pepe quanto uma assinatura custa para você e a margem sai certa:
+
+```json
+{
+  "models": {
+    "claude-max": {
+      "oauth": { "provider": "anthropic" },
+      "monthly_cost": 100
+    }
+  }
+}
+```
+
+O bloco `oauth` é escrito para você pelo `pepe model login`. O `monthly_cost` é quanto aquela assinatura custa por mês. Deixe o `monthly_cost` sem definir e a mensalidade simplesmente nunca aparece contra a margem, o que torna a margem informada um limite superior otimista em vez de um número errado. O `pepe doctor` avisa isso.
+
+Se uma chamada rodou numa assinatura é decidido **quando ela é registrada**, não quando o ledger é lido. Troque uma conexão de um login para uma chave de API e os registros do mês passado continuam significando o que significavam.
 
 ## Cobrança e limites
 
@@ -55,3 +104,19 @@ pepe company reset-messages acme
 A página Companies do painel tem os mesmos dois botões ao lado do badge de cada teto, com uma confirmação mostrando a contagem atual antes de resetar.
 
 Um reset não apaga nada; ele só marca um ponto de corte. Gasto ou mensagens registrados antes do reset continuam no ledger; eles simplesmente param de contar para o teto daí em diante. Isso importa por um motivo específico: **o badge do teto de gasto e o botão de reset só afetam a contagem operacional usada para bloquear novas chamadas de modelo.** O registro de faturamento real do mês (o que você cobraria de um cliente) vive em Usage e sempre reflete o total real, resetado ou não. Se você resetar o teto de gasto de uma empresa no meio do mês, o badge da página Companies vai mostrar um número menor que a página Usage para o mesmo mês; isso é esperado, não uma inconsistência, já que respondem perguntas diferentes ("essa empresa foi limitada desde o último reset?" contra "quanto essa empresa custou de verdade esse mês?").
+
+## Ler o consumo e exportar faturas
+
+```bash
+pepe usage                                   # todos os escopos, por mês, por empresa
+pepe usage --company acme --granularity day  # uma empresa, por dia
+pepe usage export --company acme             # uma fatura de cliente (Markdown, ou --format csv)
+pepe usage prices --refresh                  # atualiza o cache ao vivo de preços
+pepe usage help                              # o passo a passo completo
+```
+
+O `usage export` transforma o mês de uma empresa numa fatura de cliente, em Markdown ou CSV. Um agente consegue fazer isso sozinho com a ferramenta `export_invoice`, então uma tarefa agendada mensal pode exportar a fatura de cada cliente e enviá-la, usando o Pepe para cobrar pelo próprio uso do Pepe.
+
+No painel, a seção Usage & billing mostra tokens, custo e valor a cobrar por ciclo (hora, dia, semana, mês, ano), com quebras por empresa, modelo e agente. Os preços por modelo são definidos em Models, depois Edit; a margem de uma empresa em Companies, depois Edit.
+
+A moeda é apenas um rótulo. O padrão é `USD` e você muda definindo `"currency"` no `config.json`. Não há conversão de câmbio, então o número está na moeda em que o seu provedor cota os preços dele.
