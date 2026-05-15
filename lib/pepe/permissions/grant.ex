@@ -78,8 +78,15 @@ defmodule Pepe.Permissions.Grant do
   def for(tool, []), do: tool <> ":" <> @none
 
   def for(tool, risks) do
-    tool <> ":" <> (risks |> Enum.map(&to_string/1) |> Enum.sort() |> Enum.join("+"))
+    tool <> ":" <> (risks |> Enum.map(&risk_string/1) |> Enum.sort() |> Enum.join("+"))
   end
+
+  # A known risk stringifies by its atom name; an unrecognised one round-trips through the exact
+  # text it came in as. `widen` folds already-parsed risks back through here, and a grant that
+  # carried an `{:unknown, _}` (an older Pepe wrote it, or a human typed it) would otherwise hit
+  # `to_string/1` on a tuple and crash the turn instead of failing closed as it is meant to.
+  defp risk_string({:unknown, text}), do: text
+  defp risk_string(kind), do: to_string(kind)
 
   @doc """
   Fold a new grant into an existing list, widening the one for that tool rather than piling

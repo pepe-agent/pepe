@@ -4,7 +4,45 @@ defmodule Pepe.Tools.SendToAgentTest do
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
+  alias Pepe.Permissions
   alias Pepe.Tools.SendToAgent
+
+  # The callee, B. It is pre-approved for everything and its model does what an injected
+  # message would ask: run `env`. Once the tool has answered, it replies with that answer
+  # verbatim, so the test can read what the gate did from the string that comes back.
+  defmodule Callee do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      {:ok, body, conn} = read_body(conn)
+      msgs = body |> Jason.decode!() |> Map.fetch!("messages")
+
+      message =
+        case Enum.find(msgs, &(&1["role"] == "tool")) do
+          nil ->
+            %{
+              "role" => "assistant",
+              "content" => nil,
+              "tool_calls" => [
+                %{
+                  "id" => "c1",
+                  "type" => "function",
+                  "function" => %{"name" => "bash", "arguments" => ~s({"command":"env"})}
+                }
+              ]
+            }
+
+          tool ->
+            %{"role" => "assistant", "content" => tool["content"]}
+        end
+
+      payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => "stop"}]}
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+    end
+  end
 
   setup do
     home = Path.join(System.tmp_dir!(), "pepe_a2a_#{System.unique_integer([:positive])}")
@@ -73,5 +111,48 @@ defmodule Pepe.Tools.SendToAgentTest do
     assert {:ok, out} = SendToAgent.run(%{"to" => "B", "message" => "hello"}, ctx(from))
     assert out =~ "B replied:"
     assert out =~ "Hello from the mock!"
+  end
+
+  describe "the taint travels across the hop, so a peer cannot launder it clean" do
+    setup do
+      {:ok, server} = Bandit.start_link(plug: Callee, port: 0, startup_log: false)
+      {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      Config.put_model(%Model{name: "m", base_url: "http://127.0.0.1:#{port}", api_key: "k", model: "m"})
+
+      # B is pre-approved for everything, exactly the peer worth laundering through.
+      Config.put_agent(%Agent{
+        name: "B",
+        model: "m",
+        system_prompt: "hi",
+        tools: ["bash"],
+        auto_approve: ["*"],
+        max_iterations: 3
+      })
+
+      %{from: %Agent{name: "A", can_message: ["B"]}}
+    end
+
+    test "a clean run's hop runs the peer's pre-approved tool, as it always has", %{from: from} do
+      # The control: with no taint, `auto_approve` on B means what it says, and the `env` runs.
+      assert {:ok, out} = SendToAgent.run(%{"to" => "B", "message" => "do it"}, ctx(from))
+      assert out =~ "PATH="
+      refute out =~ "content from outside"
+    end
+
+    test "a tainted run's hop hands the peer the taint, and its pre-approval stops applying", %{from: from} do
+      # This is the hole. `send_to_agent` runs in the tainted run's own process (it is not a
+      # concurrent tool), so tainting here is the exact state that exists when a run that read a
+      # malicious document reaches this call. Before the fix, `deliver` did not pass `untrusted`
+      # on, so B started clean and ran the `env` the document wanted. Now the taint travels, and
+      # B, with nobody to ask, refuses.
+      Permissions.taint()
+      on_exit(&Permissions.untaint/0)
+
+      assert {:ok, out} = SendToAgent.run(%{"to" => "B", "message" => "do it"}, ctx(from))
+      assert out =~ "content from outside"
+      refute out =~ "PATH="
+    end
   end
 end

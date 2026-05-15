@@ -138,4 +138,21 @@ defmodule Pepe.Permissions.GrantTest do
       refute Grant.covers?(["bash:any"], "write_file", [])
     end
   end
+
+  describe "merging over a grant that carries an unrecognised risk" do
+    test "widens it instead of crashing the turn" do
+      # The stored grant holds a risk this Pepe has no meaning for (an older version wrote it,
+      # or a human typed it). Folding a real, recognised risk into it used to hit `to_string/1`
+      # on the `{:unknown, _}` tuple and raise, taking the turn down. It must widen cleanly and
+      # keep the unknown risk verbatim, so the grant still fails closed against it.
+      merged = Grant.merge(["bash:something_we_removed"], Grant.for("bash", [:network]))
+
+      assert merged == ["bash:network+something_we_removed"]
+
+      # The recognised risk is now granted; the unknown one is preserved and still matches
+      # nothing real, so it neither widens the grant nor silently disappears.
+      assert Grant.covers?(merged, "bash", [:network])
+      refute Grant.covers?(merged, "bash", [:deletes])
+    end
+  end
 end

@@ -246,6 +246,75 @@ defmodule Pepe.Agent.ParallelToolsTest do
     end
   end
 
+  describe "a concurrent tool that dies" do
+    test "does not take the turn down or orphan the calls beside it", %{cwd: cwd, home: home} do
+      # A plugin is risky and may declare itself concurrent, and it may `exit`/`throw` past the
+      # tools' own rescue (which only catches `raise`). In a batch, that goes through
+      # `Task.async_stream`, which reports it as `{:exit, _}` rather than `{:ok, _}`. If the
+      # runtime only matched `{:ok, _}`, the whole turn would crash and every tool_call id in
+      # the batch would be left unanswered, making the model's next request malformed. Instead
+      # the dead call becomes an error result under its own id, and its neighbour still answers.
+      boom = """
+      defmodule PepeParallelTest.Boom do
+        @behaviour Pepe.Tools.Tool
+        import Pepe.Tools.Tool, only: [function: 3]
+
+        def name, do: "boom"
+        def concurrent?, do: true
+
+        def spec do
+          function("boom", "Explodes.", %{"type" => "object", "properties" => %{}})
+        end
+
+        def run(_args, _ctx), do: exit(:kaboom)
+      end
+      """
+
+      fine = """
+      defmodule PepeParallelTest.Fine do
+        @behaviour Pepe.Tools.Tool
+        import Pepe.Tools.Tool, only: [function: 3]
+
+        def name, do: "fine"
+        def concurrent?, do: true
+
+        def spec do
+          function("fine", "Works.", %{"type" => "object", "properties" => %{}})
+        end
+
+        def run(_args, _ctx), do: {:ok, "i am fine"}
+      end
+      """
+
+      File.mkdir_p!(Path.join(home, "plugins"))
+      File.write!(Path.join([home, "plugins", "boom.exs"]), boom)
+      File.write!(Path.join([home, "plugins", "fine.exs"]), fine)
+
+      agent = %Agent{
+        name: "riskt",
+        model: "mock",
+        system_prompt: "hi",
+        tools: ["boom", "fine"],
+        auto_approve: ["*"],
+        max_iterations: 3
+      }
+
+      Config.put_agent(agent)
+
+      asks([
+        call("a", "boom", %{}),
+        call("b", "fine", %{})
+      ])
+
+      {:ok, _reply, messages} = converse(agent, cwd)
+
+      # Both ids came back: the turn survived, and neither call was orphaned.
+      assert [{"a", died}, {"b", ok}] = tool_results(messages)
+      assert died =~ "boom" and died =~ "crashed"
+      assert ok =~ "i am fine"
+    end
+  end
+
   describe "speed" do
     test "tools that wait on a network wait at the same time", %{cwd: cwd} do
       # A server that takes 300ms to answer anything. Serially, three calls are 900ms;

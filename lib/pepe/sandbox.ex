@@ -173,7 +173,11 @@ defmodule Pepe.Sandbox do
   """
   @spec scrubbed_env(keyword() | [{String.t(), String.t()}]) :: [{String.t(), String.t() | nil}]
   def scrubbed_env(extra \\ []) do
-    referenced = MapSet.new(secret_env_names())
+    # `${VAR}` refs plus the vault-opening credentials. The latter are named to be handed to a
+    # resolver so it can open the vault (`OP_SERVICE_ACCOUNT_TOKEN`, `VAULT_TOKEN`, a custom
+    # one); they unlock every secret Pepe holds, so the agent's own shell must never inherit
+    # them, and a name like `MY_VAULT_CRED` would slip past the by-the-name check on its own.
+    referenced = MapSet.new(secret_env_names() ++ vault_env())
 
     # `System.cmd/3` *merges* `:env` into the parent's environment, it does not replace it, so
     # listing what to keep would keep everything. A variable is removed by naming it with a
@@ -196,6 +200,15 @@ defmodule Pepe.Sandbox do
     |> Enum.uniq()
   rescue
     # A broken or missing config must not hand the agent the environment by default.
+    _ -> []
+  end
+
+  # The vault-resolver credentials the config names. Read separately from the `${VAR}` refs
+  # because a vault entry is `exec:…` or `file:…`, not an interpolation, so `collect_refs`
+  # never sees these.
+  defp vault_env do
+    Config.vault_env()
+  rescue
     _ -> []
   end
 

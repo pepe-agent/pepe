@@ -145,10 +145,16 @@ defmodule Pepe.Tools.Delegate do
   end
 
   # Only what needs no permission - and never `delegate` itself, or one task becomes sixty-four.
+  # A worker researches: it reads files and the web and reports back. It does not act, and it
+  # does not speak for the parent to anyone else. So the approval-gated tools go (it holds no
+  # `authorize` to answer them), `delegate` goes (no nesting), and `send_to_agent` goes too —
+  # that one is always-safe, so the approval filter would leave it in, and a worker that read a
+  # malicious document could then route that instruction to a peer that *does* act, laundering
+  # the whole read-only guarantee in one hop.
   defp readable(tools) do
     tools
     |> List.wrap()
-    |> Enum.reject(&(Permissions.requires_approval?(&1) or &1 == "delegate"))
+    |> Enum.reject(&(Permissions.requires_approval?(&1) or &1 in ~w(delegate send_to_agent)))
   end
 
   defp fan_out(tasks, worker, ctx) do
@@ -167,7 +173,16 @@ defmodule Pepe.Tools.Delegate do
   defp answer(worker, task, ctx) do
     # No `authorize`: a worker holds no tool that could ask for it. Its cwd is the parent's,
     # so relative paths mean the same thing they meant in the conversation that spawned it.
-    case Runtime.converse(worker, task, cwd: ctx[:cwd], source: "delegate", session_key: nil) do
+    # The taint travels with the task: if the parent has read a stranger's content, the task it
+    # is handing down is that content, and the worker must start locked down too.
+    opts = [
+      cwd: ctx[:cwd],
+      source: "delegate",
+      session_key: nil,
+      untrusted: Pepe.Permissions.tainted?(ctx)
+    ]
+
+    case Runtime.converse(worker, task, opts) do
       {:ok, reply, _messages} -> reply
       {:error, reason} -> "(failed: #{inspect(reason)})"
     end

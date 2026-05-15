@@ -244,6 +244,13 @@ defmodule Pepe.Tools do
         end
       rescue
         e -> "Error: tool #{name} crashed: #{Exception.message(e)}"
+      catch
+        # A tool that `exit`s or `throw`s (a plugin, mostly) must not escape as a linked task
+        # crash. When it runs inside a concurrent batch it is a `Task.async_stream` child linked
+        # to the turn, and a bare `exit` there kills the turn before the stream can turn it into
+        # a result. Caught here, at the source, it is just another failed tool call.
+        :exit, reason -> "Error: tool #{name} crashed: #{inspect(reason)}"
+        :throw, value -> "Error: tool #{name} threw: #{inspect(value)}"
       end
     else
       nil -> "Error: unknown tool #{name}"

@@ -167,4 +167,44 @@ defmodule Pepe.Media.DocumentTest do
       assert String.length(text) == Document.max_chars()
     end
   end
+
+  describe "a decompression bomb is refused before it is inflated" do
+    test "an office file that declares gigabytes of output does not get inflated", %{dir: dir} do
+      # A real deflate bomb: one entry, highly compressible, whose *declared* uncompressed
+      # size is far past the cap. `:zip.create` stores the true (large) size in the central
+      # directory, so the size check sees it without inflating anything. Sending this to a
+      # customer-facing bot must not be able to OOM the node.
+      huge = String.duplicate("A", 40_000_000)
+      path = Path.join(dir, "bomb.xlsx")
+
+      {:ok, _} =
+        :zip.create(
+          String.to_charlist(path),
+          [{~c"xl/worksheets/sheet1.xml", huge}]
+        )
+
+      # The zipped file on disk is tiny (A repeats compress to almost nothing)...
+      assert File.stat!(path).size < 1_000_000
+
+      # ...but it is refused, on the strength of its declared size, without allocating 40 MB.
+      assert Document.extract(path) == :unavailable
+    end
+
+    test "a .docx bomb in the single named entry is refused too", %{dir: dir} do
+      huge = String.duplicate("B", 40_000_000)
+      path = Path.join(dir, "bomb.docx")
+      {:ok, _} = :zip.create(String.to_charlist(path), [{~c"word/document.xml", huge}])
+
+      assert Document.extract(path) == :unavailable
+    end
+
+    test "a normal office file, well under the cap, still reads", %{dir: dir} do
+      xml = "<w:document><w:body><w:p><w:r><w:t>fine</w:t></w:r></w:p></w:body></w:document>"
+      path = Path.join(dir, "ok.docx")
+      {:ok, _} = :zip.create(String.to_charlist(path), [{~c"word/document.xml", xml}])
+
+      assert {:ok, text} = Document.extract(path)
+      assert text =~ "fine"
+    end
+  end
 end

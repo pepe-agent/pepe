@@ -26,6 +26,7 @@ defmodule Pepe.Agent.Runtime do
   """
 
   alias Pepe.Agent.Compaction
+  alias Pepe.Agent.LoopGuard
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
@@ -188,11 +189,11 @@ defmodule Pepe.Agent.Runtime do
 
         new_messages = messages ++ [assistant_msg] ++ tool_msgs
 
-        # Stuck-loop guard: if the model keeps issuing the exact same tool call, it's
-        # spinning with no progress (a failing command it won't stop retrying). Drop to
-        # the terminal branch, which strips tools and makes it summarize instead of
-        # looping to max_iterations.
-        if stuck?(tool_calls, messages) do
+        # Stuck-loop guard: the model is spinning with no progress - repeating one call, or
+        # flip-flopping between two and never converging (see Pepe.Agent.LoopGuard). Drop to
+        # the terminal branch, which strips tools and makes it summarize instead of looping to
+        # max_iterations.
+        if LoopGuard.stuck?(tool_calls, messages) do
           loop(agent, chain, new_messages, specs, ctx, opts, 0)
         else
           loop(agent, chain, new_messages, specs, ctx, opts, iterations_left - 1)
@@ -222,30 +223,6 @@ defmodule Pepe.Agent.Runtime do
       0 -> messages
     end
   end
-
-  # The same tool call (name + arguments) issued this many times means the agent is
-  # stuck repeating it with no progress.
-  @stuck_repeats 3
-
-  @doc false
-  # True when any of `tool_calls` has already been issued identically enough times in
-  # `prior` that this one tips it over the repeat threshold.
-  def stuck?(tool_calls, prior) do
-    counts = tool_call_signatures(prior)
-    Enum.any?(tool_calls, fn c -> Map.get(counts, signature(c), 0) >= @stuck_repeats - 1 end)
-  end
-
-  defp tool_call_signatures(messages) do
-    for %{"role" => "assistant", "tool_calls" => calls} <- messages,
-        is_list(calls),
-        c <- calls,
-        reduce: %{} do
-      acc -> Map.update(acc, signature(c), 1, &(&1 + 1))
-    end
-  end
-
-  defp signature(%{"function" => %{"name" => name, "arguments" => args}}), do: {name, args}
-  defp signature(_), do: :unknown
 
   # Try each model in the chain; advance ONLY on transient failures (rate limit,
   # server error, network) - auth/request errors fail fast (a bad key on model B
@@ -421,11 +398,22 @@ defmodule Pepe.Agent.Runtime do
     if Enum.all?(steps, &concurrent_step?/1) do
       steps
       |> Task.async_stream(&execute_step(&1, ctx), ordered: true, timeout: :infinity)
-      |> Enum.map(fn {:ok, done} -> done end)
+      |> Enum.zip(steps)
+      |> Enum.map(fn
+        {{:ok, done}, _step} -> done
+        # A concurrent tool that `exit`s or `throw`s (past the tools' own rescue) must not take
+        # the whole turn down with it: that would orphan every tool_call id in this batch and
+        # the model's next request would be malformed. The dead step becomes an error result
+        # under its own id, exactly as a returned `{:error, _}` would, and the turn goes on.
+        {{:exit, reason}, step} -> died(step, reason)
+      end)
     else
       Enum.map(steps, &execute_step(&1, ctx))
     end
   end
+
+  defp died({_kind, id, name, _}, reason),
+    do: {id, name, "Error: tool #{name} crashed (#{inspect(reason)})"}
 
   defp execute_step({:answered, id, name, out}, _ctx), do: {id, name, out}
   defp execute_step({:run, id, name, call}, ctx), do: {id, name, Tools.run_only(call, ctx)}

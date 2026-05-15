@@ -220,16 +220,27 @@ defmodule Pepe.Media.Document do
 
   # One named entry, into memory. Never `:zip.unzip` to disk: the names inside an archive are
   # whatever the sender wrote, including `../../etc/anything`.
+  #
+  # The size is checked against the central directory *before* anything is inflated, because
+  # `:zip.extract(:memory)` does not stream - it hands back the fully inflated binary, so a
+  # cap on the *result* is a cap applied after the damage. A 20 MB archive whose entries
+  # declare gigabytes of output is refused here rather than allocated and then trimmed. That
+  # is the whole difference between a size cap and a decompression-bomb defence.
   defp entry(path, name) do
-    case :zip.extract(String.to_charlist(path), [{:file_list, [name]}, :memory]) do
-      {:ok, [{^name, body}]} -> {:ok, sanitize(body)}
+    with :ok <- within_budget?(path, &(&1 == name)),
+         {:ok, [{^name, body}]} <-
+           :zip.extract(String.to_charlist(path), [{:file_list, [name]}, :memory]) do
+      {:ok, body}
+    else
       _ -> :unavailable
     end
   end
 
   defp entries(path, pattern) do
-    case :zip.extract(String.to_charlist(path), [:memory]) do
-      {:ok, list} -> matching(list, pattern)
+    with :ok <- within_budget?(path, &(to_string(&1) =~ pattern)),
+         {:ok, list} <- :zip.extract(String.to_charlist(path), [:memory]) do
+      matching(list, pattern)
+    else
       _ -> :unavailable
     end
   end
@@ -237,15 +248,38 @@ defmodule Pepe.Media.Document do
   defp matching(list, pattern) do
     case Enum.filter(list, fn {name, _} -> to_string(name) =~ pattern end) do
       [] -> :unavailable
-      found -> {:ok, Enum.map(found, fn {name, body} -> {name, sanitize(body)} end)}
+      found -> {:ok, found}
     end
   end
 
-  # A document that expands to twenty megabytes of XML is not a document.
-  defp sanitize(body) when byte_size(body) > @max_unzipped,
-    do: binary_part(body, 0, @max_unzipped)
+  # Sum the *declared* uncompressed sizes of the entries we are about to read (from the zip's
+  # central directory, which `:zip.list_dir` reads without inflating a single byte) and refuse
+  # if they exceed the cap. This is what stops a deflate bomb: the archive says up front how
+  # big it claims to be, and we never inflate an entry we would have to throw most of away.
+  defp within_budget?(path, keep?) do
+    with {:ok, list} <- :zip.list_dir(String.to_charlist(path)) do
+      total =
+        list
+        |> Enum.flat_map(fn
+          {:zip_file, name, info, _, _, _} -> [{name, info}]
+          _ -> []
+        end)
+        |> Enum.filter(fn {name, _} -> keep?.(name) end)
+        |> Enum.map(fn {_, info} -> declared_size(info) end)
+        |> Enum.sum()
 
-  defp sanitize(body), do: body
+      if total <= @max_unzipped, do: :ok, else: :unavailable
+    else
+      _ -> :unavailable
+    end
+  end
+
+  # The uncompressed size is the first field of the file_info record the central directory
+  # carries. A missing or bogus value is treated as over-budget rather than trusted as zero.
+  defp declared_size({:file_info, size, _, _, _, _, _, _, _, _, _, _, _, _}) when is_integer(size) and size >= 0,
+    do: size
+
+  defp declared_size(_), do: @max_unzipped + 1
 
   ###
   ### text out

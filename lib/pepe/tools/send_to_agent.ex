@@ -104,7 +104,12 @@ defmodule Pepe.Tools.SendToAgent do
         opts = [
           agent_chain: chain ++ [to],
           authorize: ctx[:authorize],
-          session_key: ctx[:session_key]
+          session_key: ctx[:session_key],
+          # If this run has taken in a stranger's content, the message it is now handing to
+          # another agent is that content (or shaped by it). The taint has to travel with it,
+          # or a run reads a malicious document, is itself locked down, and then launders the
+          # instruction through a peer that starts clean. See Pepe.Permissions.
+          untrusted: Pepe.Permissions.tainted?(ctx)
         ]
 
         case Runtime.converse(agent, prompt, opts) do

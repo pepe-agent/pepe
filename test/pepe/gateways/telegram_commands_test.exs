@@ -30,7 +30,12 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     plug(:dispatch)
 
     get "/bot:token/getUpdates" do
-      updates = Agent.get_and_update(:tg_cmd_updates, &{&1, []})
+      # A dead Agent means the test ended and its state was torn down while a poll or a
+      # background chat task was in flight (the gateway polls in a tight loop and spawns tasks
+      # that outlive a test). Treat it as absent so a late hit on a slow machine does not crash
+      # a background process and bleed a failure into the next test. See safe_get/2 below.
+      updates = safe_take(:tg_cmd_updates, [])
+
       # Nothing pending: idle briefly instead of spinning the poller hot.
       if updates == [], do: Process.sleep(20)
       json(conn, %{"ok" => true, "result" => updates})
@@ -67,7 +72,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     end
 
     get "/bot:token/getFile" do
-      case Agent.get(:tg_cmd_files, & &1) do
+      case safe_get(:tg_cmd_files, :default) do
         # 404 rather than 5xx: it fails the lookup just the same, and Req does not spend
         # three retries and seconds of backoff on it, which the suite would feel.
         :fail -> Plug.Conn.send_resp(conn, 404, "gone")
@@ -86,7 +91,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       last = List.last(messages)
       send(test_pid(), {:llm, chat_of(messages), to_string(last["content"])})
 
-      case Agent.get(:tg_cmd_llm, & &1) do
+      case safe_get(:tg_cmd_llm, :default) do
         :fail ->
           conn |> Plug.Conn.put_resp_content_type("application/json") |> Plug.Conn.send_resp(400, ~s({"error":"no"}))
 
@@ -156,7 +161,16 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       json(conn, payload)
     end
 
-    defp test_pid, do: Agent.get(:tg_cmd_test_pid, & &1)
+    defp test_pid, do: safe_get(:tg_cmd_test_pid, self())
+
+    defp safe_get(name, default), do: safe(fn -> Agent.get(name, & &1) end, default)
+    defp safe_take(name, default), do: safe(fn -> Agent.get_and_update(name, &{&1, []}) end, default)
+
+    defp safe(fun, default) do
+      fun.()
+    catch
+      :exit, _ -> default
+    end
 
     defp json(conn, body) do
       conn

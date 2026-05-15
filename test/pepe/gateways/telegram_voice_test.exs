@@ -27,7 +27,9 @@ defmodule Pepe.Gateways.TelegramVoiceTest do
     plug(:dispatch)
 
     get "/bot:token/getUpdates" do
-      updates = Agent.get_and_update(:tg_voice_updates, &{&1, []})
+      # See the note in the commands test: tolerate a torn-down Agent from a poll or a
+      # background task that outlived the test.
+      updates = safe_take(:tg_voice_updates, [])
       if updates == [], do: Process.sleep(20)
       json(conn, %{"ok" => true, "result" => updates})
     end
@@ -43,7 +45,7 @@ defmodule Pepe.Gateways.TelegramVoiceTest do
     # `:tg_voice_getme` can be flipped to :fail to make this look like a network blip, so
     # a test can check the gateway recovers instead of forgetting its own name for good.
     get "/bot:token/getMe" do
-      case Agent.get(:tg_voice_getme, & &1) do
+      case safe_get(:tg_voice_getme, :ok) do
         # 404 rather than 5xx: it fails the lookup just the same, and Req does not spend
         # three retries and seven seconds of backoff on it, which the suite would feel.
         :fail -> Plug.Conn.send_resp(conn, 404, "nope")
@@ -69,14 +71,23 @@ defmodule Pepe.Gateways.TelegramVoiceTest do
 
       conn
       |> Plug.Conn.put_resp_content_type("text/plain")
-      |> Plug.Conn.send_resp(200, Agent.get(:tg_voice_said, & &1))
+      |> Plug.Conn.send_resp(200, safe_get(:tg_voice_said, ""))
     end
 
     match _ do
       json(conn, %{"ok" => true, "result" => true})
     end
 
-    defp test_pid, do: Agent.get(:tg_voice_test_pid, & &1)
+    defp test_pid, do: safe_get(:tg_voice_test_pid, self())
+
+    defp safe_get(name, default), do: safe(fn -> Agent.get(name, & &1) end, default)
+    defp safe_take(name, default), do: safe(fn -> Agent.get_and_update(name, &{&1, []}) end, default)
+
+    defp safe(fun, default) do
+      fun.()
+    catch
+      :exit, _ -> default
+    end
 
     defp json(conn, body) do
       conn

@@ -65,6 +65,41 @@ defmodule Pepe.SandboxTest do
     assert {:error, _} = Sandbox.install_wrapper("nope")
   end
 
+  describe "the agent's shell does not inherit Pepe's secrets" do
+    test "a real `env` shows neither the referenced, the secret-named, nor the vault credentials" do
+      # Three ways a secret is known to Pepe, all of which must be gone from the child:
+      #   - a `${VAR}` the config interpolates,
+      #   - a variable whose name says it is one,
+      #   - a vault-opening credential named in `secrets.vault_env`, whose name gives nothing
+      #     away (this is the one a by-the-name check misses on its own).
+      Config.save(%{
+        "models" => %{
+          "m" => %{"base_url" => "https://x/v1", "model" => "g", "api_key" => "${REFERENCED_KEY}"}
+        },
+        "secrets" => %{"vault_env" => ["MY_VAULT_CRED"]}
+      })
+
+      System.put_env("REFERENCED_KEY", "referenced-secret")
+      System.put_env("GITHUB_TOKEN", "name-says-secret")
+      System.put_env("MY_VAULT_CRED", "opens-the-vault")
+      System.put_env("ORDINARY_VAR", "harmless")
+
+      on_exit(fn ->
+        for v <- ~w(REFERENCED_KEY GITHUB_TOKEN MY_VAULT_CRED ORDINARY_VAR),
+            do: System.delete_env(v)
+      end)
+
+      {out, 0} = Sandbox.cmd("sh", ["-c", "env"], stderr_to_stdout: true)
+
+      refute out =~ "referenced-secret"
+      refute out =~ "name-says-secret"
+      refute out =~ "opens-the-vault"
+
+      # The child still gets the ordinary environment a command needs to work.
+      assert out =~ "ORDINARY_VAR=harmless"
+    end
+  end
+
   test "a configured wrapper receives the program and the cwd" do
     wrapper = Path.join(System.tmp_dir!(), "pepe_wrap_#{System.unique_integer([:positive])}.sh")
 

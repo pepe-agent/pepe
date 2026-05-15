@@ -28,12 +28,11 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
     plug(:dispatch)
 
     get "/bot:token/getUpdates" do
-      updates = Elixir.Agent.get_and_update(:tg_doc_updates, &{&1, []})
-      json(conn, %{"ok" => true, "result" => updates})
+      json(conn, %{"ok" => true, "result" => take(:tg_doc_updates, [])})
     end
 
     get "/bot:token/getFile" do
-      name = Elixir.Agent.get(:tg_doc_name, & &1)
+      name = read(:tg_doc_name, "file.txt")
       json(conn, %{"ok" => true, "result" => %{"file_path" => "documents/#{name}"}})
     end
 
@@ -44,7 +43,7 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
     get "/file/bot:token/documents/*rest" do
       conn
       |> Plug.Conn.put_resp_content_type("application/octet-stream")
-      |> Plug.Conn.send_resp(200, Elixir.Agent.get(:tg_doc_body, & &1))
+      |> Plug.Conn.send_resp(200, read(:tg_doc_body, ""))
     end
 
     post "/bot:token/sendMessage" do
@@ -73,7 +72,20 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
       json(conn, %{"ok" => true, "result" => true})
     end
 
-    defp test_pid, do: Elixir.Agent.get(:tg_doc_test_pid, & &1)
+    # The gateway polls in a tight loop and spawns background tasks that outlive a test, so any
+    # of these can be hit after ExUnit has torn the state Agents down. A dead Agent is treated
+    # as absent rather than crashing a background process and bleeding a failure into the next
+    # test. `send/2` to a dead pid is already a harmless no-op.
+    defp test_pid, do: read(:tg_doc_test_pid, self())
+    defp read(name, default), do: safe(fn -> Elixir.Agent.get(name, & &1) end, default)
+    defp take(name, default), do: safe(fn -> Elixir.Agent.get_and_update(name, &{&1, []}) end, default)
+
+    defp safe(fun, default) do
+      fun.()
+    catch
+      :exit, _ -> default
+    end
+
     defp json(conn, body), do: conn |> Plug.Conn.put_resp_content_type("application/json") |> Plug.Conn.send_resp(200, Jason.encode!(body))
   end
 

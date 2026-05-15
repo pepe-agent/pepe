@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-05-15
+
+### Security
+- Documents: an office file (`.docx`, `.xlsx`, `.pptx`) is now refused **before it is inflated** if its central directory declares more than 20 MB of output. These are ZIP archives, and `:zip.extract(:memory)` does not stream: it hands back the fully inflated binary, so a cap on the result was a cap applied after a deflate bomb had already been allocated. A tiny archive that expands to gigabytes, attached to a client-facing bot, could have taken the node down; now the declared sizes are summed from the archive's own listing, which costs nothing, and an over-budget file is turned away without a byte inflated.
+- Permissions: the withdrawal of pre-approval on tainted content now **travels across an agent hop**. A run that read a malicious document was itself locked down, but `send_to_agent` handed the message to a peer that started clean, so the injected instruction could be laundered through one hop and run with the peer's pre-approval. The taint now propagates with the message, and a delegated worker no longer keeps `send_to_agent` at all (it is read-only, and routing to an acting agent was the same laundering path by another name).
+- Secrets: the scrub of the agent's shell environment now also drops the **vault-opening credentials** named in `secrets.vault_env`. Those unlock every secret Pepe holds, and one with a name that does not read as a credential (`MY_VAULT_CRED`) slipped past the by-the-name check and survived into the agent's shell. They are removed by name now, on top of the `${VAR}` references and the credential-shaped names.
+
+### Fixed
+- Runtime: a concurrent tool that `exit`s or `throw`s (a plugin, past the rescue that only catches `raise`) no longer takes the whole turn down with it. In a batch it runs as a linked task, and a bare exit there killed the turn and left every tool call in the batch unanswered, which makes the model's next request malformed. It is now caught at the source and becomes an ordinary failed-tool-call result under its own id, so its neighbours still answer.
+- Permissions: folding a new grant into a stored one that carried an **unrecognised risk** (an older Pepe wrote it, or a human typed it) no longer crashes the turn. Widening the grant ran the unknown risk back through `to_string/1` on a tuple and raised; it now round-trips through its original text and the grant still fails closed against it.
+- Runtime: the stuck-loop guard now also catches **oscillation**, not only repetition. It already stopped an agent that issued the same tool call over and over; it now also stops one that flip-flops between exactly two actions and never converges (write the file to A, test, write it to B, test, back to A), which plain repetition never caught because each call looks like progress on its own. Three or more distinct actions is left alone: that is the model exploring, not looping. It is pure and deterministic, hashing the tool name and arguments, no model call and nothing to configure. The repetition half also got more precise: it now needs the same call three times *in a row*, so a tool used three times across a long task with real work between is no longer flagged.
+
 ## [0.4.0] - 2026-05-11
 
 ### Security
