@@ -132,4 +132,4 @@ pepe backup                       # writes pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /path/x.tgz
 ```
 
-To restore, extract the archive back into `~/` (or into the parent of `PEPE_HOME`) and export those variables again. That is the whole disaster recovery story.
+To restore, `pepe restore that-archive.tgz` and export those variables again. You can also lift a single company out to run on its own server with `pepe extract`. See [Backup & extract](/en/docs/backup/) for the whole story.

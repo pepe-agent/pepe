@@ -257,20 +257,22 @@ defmodule Pepe.Media.Document do
   # if they exceed the cap. This is what stops a deflate bomb: the archive says up front how
   # big it claims to be, and we never inflate an entry we would have to throw most of away.
   defp within_budget?(path, keep?) do
-    with {:ok, list} <- :zip.list_dir(String.to_charlist(path)) do
-      total =
-        list
-        |> Enum.flat_map(fn
-          {:zip_file, name, info, _, _, _} -> [{name, info}]
-          _ -> []
-        end)
-        |> Enum.filter(fn {name, _} -> keep?.(name) end)
-        |> Enum.map(fn {_, info} -> declared_size(info) end)
-        |> Enum.sum()
+    case :zip.list_dir(String.to_charlist(path)) do
+      {:ok, list} ->
+        total =
+          list
+          |> Enum.flat_map(fn
+            {:zip_file, name, info, _, _, _} -> [{name, info}]
+            _ -> []
+          end)
+          |> Enum.filter(fn {name, _} -> keep?.(name) end)
+          |> Enum.map(fn {_, info} -> declared_size(info) end)
+          |> Enum.sum()
 
-      if total <= @max_unzipped, do: :ok, else: :unavailable
-    else
-      _ -> :unavailable
+        if total <= @max_unzipped, do: :ok, else: :unavailable
+
+      _ ->
+        :unavailable
     end
   end
 

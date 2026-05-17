@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-05-17
+
+### Added
+- CLI: `mix pepe extract COMPANY` lifts one company out of a shared install as a **standalone, root-scoped** archive. A tenant that grew up inside a multi-company install can now leave to run on its own server: the company's `company/agent` handles are rewritten to bare root names, so the `.tgz` is a fresh single-tenant install that is only that company. You could not get there by copying a folder, because the company's rows are threaded through the shared `config.json`. **Only that company's** agents, models, crons, watches, bots, tokens, webhooks, workspaces, usage history and billing/limits travel; nothing of another tenant does, and a model, token or webhook that belongs to a different company is never carried even when a misconfigured reference points at it (it fails closed rather than leak a stranger's credentials). Every model a kept reference depends on — by `.model`, a cron/bot override, a `default_model`, a `triage_model`/`simple_model`/`utility_model` hook, or a `fallbacks` entry — is pulled in if it is a shared/root model, so the bundle works on an empty box, and the command names which ones.
+- CLI: `mix pepe restore FILE.tgz` unpacks a backup **or** an extract (they are the same shape) into `~/.pepe`. It refuses to write over a non-empty home unless you pass `--force`, and the write is **non-destructive on failure**: the new install is staged beside the old one and only swapped in once the copy fully succeeds, so a broken archive or a full disk leaves the existing install intact rather than half-wiped. Both `extract` and `restore` print the env vars the archive references (`${ENV_VAR}` plus vault-opening credentials, which are never in the archive) so you can provision them on the destination — and, honestly, **warn when the archive does carry a live credential in the clear** (an OAuth login's tokens, an inline `api_key`, a literal webhook secret), so you can rotate or re-authenticate it. Replaces the old manual "untar it back into place" recovery step.
+
 ## [0.4.1] - 2026-05-15
 
 ### Security

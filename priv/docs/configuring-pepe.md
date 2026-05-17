@@ -102,7 +102,7 @@ A few filenames are **conventions** you may create and maintain yourself:
 This is autonomy by convention, not hardcoded code: ordinary file tools plus a place
 where files persist. Rename yourself with `rename_agent` (it moves this directory too).
 
-## Backup and restore
+## Backup, extract, and restore
 
 `mix pepe backup` tars the durable parts of `~/.pepe` - `config.json`, every agent and
 company workspace, `shared`, and sessions - into a `.tgz`, skipping the disposable
@@ -113,10 +113,29 @@ mix pepe backup                          # writes pepe-backup-YYYY-MM-DD.tgz
 mix pepe backup --output ~/pepe-safe.tgz
 ```
 
-Because every secret is a `${ENV_VAR}` reference, **no secret is in the archive** - the
-command prints the env-var names it found (and whether each is currently set) so you
-save them separately. There is no `restore` subcommand: recover by extracting the tar
-back into the parent of `~/.pepe` and re-exporting those env vars.
+`mix pepe extract COMPANY` lifts one company out as a **standalone, root-scoped**
+archive: its `company/agent` handles are rewritten to bare names, so the `.tgz` is a
+fresh single-tenant install that is only that company - drop it on a new server and run.
+Only that company's agents, models, workspaces and usage travel, plus any shared model
+its agents depend on (the command names them). Nothing of the other tenants goes with it.
+
+```bash
+mix pepe extract acme                    # writes acme-extract-YYYY-MM-DD.tgz
+mix pepe extract acme --output ~/acme.tgz
+```
+
+`mix pepe restore FILE.tgz` unpacks either archive (a backup or an extract - same shape)
+into `~/.pepe`. It **replaces** what is there, so it refuses a non-empty home unless you
+pass `--force`.
+
+```bash
+mix pepe restore ~/acme.tgz              # into a fresh ~/.pepe
+mix pepe restore ~/pepe-safe.tgz --force # over an existing one
+```
+
+Because every secret is a `${ENV_VAR}` reference, **no secret is in any of these
+archives** - each command prints the env-var names it found (and whether each is
+currently set) so you re-provision them on the destination.
 
 ## The safe pattern
 

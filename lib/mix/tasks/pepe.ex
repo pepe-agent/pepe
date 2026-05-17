@@ -109,7 +109,9 @@ defmodule Mix.Tasks.Pepe do
       mix pepe update                          # self-update the binary to the latest release
       mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
-      mix pepe backup [--output FILE.tgz]      # archive ~/.pepe + list the secret env vars to save
+      mix pepe backup [--output FILE.tgz]      # archive the whole ~/.pepe + list the secret env vars to save
+      mix pepe extract COMPANY [--output FILE.tgz]  # lift ONE company out as a standalone (root) install
+      mix pepe restore FILE.tgz [--force]      # restore a backup or an extract into ~/.pepe
   """
   use Mix.Task
   use Gettext, backend: Pepe.Gettext
@@ -154,12 +156,18 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "serve" | _]), do: serve_help()
   def dispatch(["help", "run" | _]), do: run_help()
   def dispatch(["help", "backup" | _]), do: backup_help()
+  def dispatch(["help", "extract" | _]), do: extract_help()
+  def dispatch(["help", "restore" | _]), do: restore_help()
 
   def dispatch(["setup" | _]), do: with_config(&setup/0)
   def dispatch(["config" | rest]), do: with_config(fn -> config_cmd(rest) end)
   def dispatch(["dashboard" | rest]), do: with_config(fn -> dashboard_cmd(rest) end)
   def dispatch(["backup", "help" | _]), do: backup_help()
   def dispatch(["backup" | rest]), do: with_config(fn -> backup_cmd(rest) end)
+  def dispatch(["extract", "help" | _]), do: extract_help()
+  def dispatch(["extract" | rest]), do: with_config(fn -> extract_cmd(rest) end)
+  def dispatch(["restore", "help" | _]), do: restore_help()
+  def dispatch(["restore" | rest]), do: with_config(fn -> restore_cmd(rest) end)
   def dispatch(["tools" | _]), do: with_config(&tools/0)
   def dispatch(["timelearn" | rest]), do: with_config(fn -> timelearn_cmd(rest) end)
 
@@ -3584,6 +3592,138 @@ defmodule Mix.Tasks.Pepe do
   defp print_secret_var_line(v) do
     status = if System.get_env(v), do: green("set"), else: red("UNSET")
     puts("  #{v}  (#{status})")
+  end
+
+  ###
+  ### extract (one company -> a standalone install) & restore
+  ###
+
+  defp extract_help do
+    info("""
+    mix pepe extract COMPANY - lift one company out as a standalone, single-tenant install
+
+      extract COMPANY [--output FILE.tgz]    # defaults to COMPANY-extract-YYYY-MM-DD.tgz
+
+    Backup archives the WHOLE install (every company); extract takes ONE company and
+    de-scopes it to root, so its `company/agent` handles become bare names and the archive
+    is a fresh install that happens to be that company - drop it on a new server and run.
+    Only that company's agents, models, workspaces and usage travel (plus any shared model
+    they depend on); nothing of the other tenants goes with it.
+
+    Restore either archive with `mix pepe restore FILE.tgz`.
+    """)
+  end
+
+  defp restore_help do
+    info("""
+    mix pepe restore FILE.tgz - unpack a backup or an extract into ~/.pepe
+
+      restore FILE.tgz [--force]    # --force is required to replace a non-empty ~/.pepe
+
+    Works for both a full backup and a company extract - they are the same shape. Refuses to
+    write over an existing, non-empty ~/.pepe unless you pass --force. Re-export the
+    ${ENV_VAR} secrets it lists afterwards; they live outside the archive.
+    """)
+  end
+
+  defp extract_cmd([]), do: error("which company? usage: mix pepe extract COMPANY [--output FILE.tgz]")
+
+  defp extract_cmd(rest) do
+    {opts, args} = OptionParser.parse!(rest, strict: [output: :string])
+
+    case args do
+      [company | _] -> run_extract(company, opts[:output])
+      [] -> error("which company? usage: mix pepe extract COMPANY [--output FILE.tgz]")
+    end
+  end
+
+  defp run_extract(company, output) do
+    case Pepe.Bundle.extract(company, output: output) do
+      {:ok, %{output: out} = report} ->
+        ok("extracted #{green(company)} to #{green(out)}#{backup_size(out)}")
+        info("  a standalone, root-scoped install - restore with `mix pepe restore #{Path.basename(out)}`")
+        announce_shared_models(report.shared_models)
+        report_bundle_secrets(report.secrets)
+        warn_literal_secrets(report.literal_secrets)
+
+      {:error, :not_found} ->
+        error("no such company: #{company}  (see `mix pepe company list`)")
+
+      {:error, {:tar_failed, msg}} ->
+        error("extract failed while archiving: #{msg}")
+    end
+  end
+
+  # Shared/root models a kept agent depends on came along so the bundle works alone; name them
+  # so the operator knows the archive carries a copy that will now live at root.
+  defp announce_shared_models([]), do: :ok
+
+  defp announce_shared_models(names) do
+    info("  pulled in #{length(names)} shared model(s) the company's agents depend on: #{Enum.join(names, ", ")}")
+  end
+
+  defp restore_cmd([]), do: error("which archive? usage: mix pepe restore FILE.tgz [--force]")
+
+  defp restore_cmd(rest) do
+    {opts, args} = OptionParser.parse!(rest, strict: [force: :boolean, home: :string])
+
+    case args do
+      [archive | _] -> run_restore(archive, opts)
+      [] -> error("which archive? usage: mix pepe restore FILE.tgz [--force]")
+    end
+  end
+
+  defp run_restore(archive, opts) do
+    case Pepe.Bundle.restore(archive, home: opts[:home], force: opts[:force] || false) do
+      {:ok, %{home: home, secrets: secrets} = report} ->
+        ok("restored into #{green(Config.short_path(home))}")
+        info("  the Mnesia cache (disposable) rebuilds itself on first use")
+        report_bundle_secrets(secrets)
+        warn_literal_secrets(report.literal_secrets)
+
+      {:error, reason} ->
+        error(restore_error(reason, archive, opts))
+    end
+  end
+
+  defp restore_error(:no_archive, archive, _opts), do: "no such archive: #{archive}"
+
+  defp restore_error(:home_not_empty, _archive, opts) do
+    "#{Config.short_path(opts[:home] || Config.home())} already has files in it - " <>
+      "restore replaces them. Re-run with --force if that is what you want."
+  end
+
+  defp restore_error(:not_a_pepe_archive, _archive, _opts),
+    do: "that doesn't look like a Pepe backup or extract (no config.json inside)"
+
+  defp restore_error(:ambiguous_archive, _archive, _opts),
+    do: "that archive has more than one install inside it - refusing to guess which to restore"
+
+  defp restore_error({:untar_failed, msg}, _archive, _opts),
+    do: "restore failed while unpacking: #{msg}"
+
+  defp restore_error({:restore_failed, msg}, _archive, _opts),
+    do: "restore failed while writing - your existing install was left untouched: #{msg}"
+
+  # Same shape as the backup secrets report: the ${ENV_VAR}s the archive references live
+  # outside it and must be present on the destination.
+  defp report_bundle_secrets([]), do: info("\nNo ${ENV_VAR} secrets referenced - nothing extra to provision.")
+
+  defp report_bundle_secrets(vars) do
+    puts("\n" <> bold("⚠ Secrets are NOT in the archive - set these env vars on the destination:"))
+    Enum.each(vars, &print_secret_var_line/1)
+  end
+
+  # The honest counter-warning: some credentials are NOT references and DID travel in the
+  # archive in the clear (an OAuth login's tokens, an inline api_key, a literal webhook secret).
+  # Say so plainly, and say what to do about it, rather than let "secrets are not in the archive"
+  # read as the whole truth.
+  defp warn_literal_secrets([]), do: :ok
+
+  defp warn_literal_secrets(labels) do
+    puts("\n" <> bold(red("⚠ This archive DOES contain live credentials, in the clear:")))
+    Enum.each(labels, fn l -> puts("  #{l}") end)
+    info("  Treat the archive as a secret. On the destination, rotate these or re-authenticate.")
   end
 
   defp tools do

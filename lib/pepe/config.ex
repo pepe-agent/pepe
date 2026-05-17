@@ -631,6 +631,304 @@ defmodule Pepe.Config do
   end
 
   @doc """
+  Build a self-contained, **root-scoped** config holding only `company`, with its
+  `company/thing` handles de-scoped to bare root names - the config a fresh, single-tenant
+  install would have if this company were the only thing on it. Nothing is saved; the map is
+  returned for a caller (`Pepe.Bundle`) to write into a bundle.
+
+  De-scoping is the same handle rewrite a rename does, aimed at the empty scope: `remap_handle`
+  with `new == ""` turns `acme/sales` into `sales` (see `Company.handle/2`). Only the company's
+  own agents, models, crons, watches, bots and tokens travel, plus any **shared/root model** a
+  kept agent points at (agents reference models by id, so a shared dependency is pulled in whole
+  rather than left dangling). The `companies` map and the root bot binding are dropped; every
+  other top-level key (server, sandbox, secrets, pricing, timezone) is an install-wide setting
+  and rides along unchanged.
+
+  Returns `{:ok, config, %{secrets: [String.t()], shared_models: [String.t()]}}`, or
+  `{:error, :not_found}` for an unknown company. `secrets` are the `${ENV_VAR}` names the
+  extracted config still references (they live outside the files and must be provisioned on the
+  destination); `shared_models` are the names of the root/shared models pulled in as
+  dependencies, so the caller can point them out.
+  """
+  @spec extract_config(String.t()) ::
+          {:ok, map(), %{secrets: [String.t()], shared_models: [String.t()], literal_secrets: [String.t()]}}
+          | {:error, :not_found}
+  def extract_config(company) do
+    if company_exists?(company) do
+      config = load()
+      {new, shared} = build_extracted(config, company)
+
+      {:ok, new,
+       %{
+         secrets: provisioning_env(new),
+         shared_models: shared,
+         literal_secrets: literal_secrets(new)
+       }}
+    else
+      {:error, :not_found}
+    end
+  end
+
+  # Sections keyed or bound to a scope, which are filtered to the company and de-scoped. `root`
+  # (the operator's own billing/limits) and the legacy single `telegram` bot are dropped
+  # outright; `companies` collapses into the bundle's root scope.
+  @scoped_sections ~w(agents models crons watches telegrams api_tokens webhooks)
+  @dropped_sections ~w(companies telegram root)
+
+  # A scope's billing/limits fields (per-company under `companies.<co>`, root's under `root`).
+  @billing_keys ~w(markup budget message_limit budget_reset_at)
+
+  defp build_extracted(config, co) do
+    agents = keep_owned_handles(config["agents"], co)
+    crons = keep_agent_bound(config["crons"], co)
+    watches = keep_agent_bound(config["watches"], co)
+    telegrams = keep_agent_bound(config["telegrams"], co)
+    tokens = keep_tokens(config["api_tokens"], co)
+    webhooks = keep_webhooks(config["webhooks"], co)
+    meta = get_in(config, ["companies", co]) || %{}
+
+    deps = model_deps(agents, [crons, watches, telegrams], meta)
+    {models, shared} = keep_models(config["models"], deps, co)
+
+    rebuilt = %{
+      "agents" => descope_agents(agents, co),
+      "models" => descope_model_names(models, co),
+      "crons" => descope_agent_bound(crons, co),
+      "watches" => descope_agent_bound(watches, co),
+      "telegrams" => descope_agent_bound(telegrams, co),
+      "api_tokens" => descope_tokens(tokens, co),
+      "webhooks" => descope_webhooks(webhooks, co)
+    }
+
+    new =
+      config
+      |> Map.drop(@scoped_sections ++ @dropped_sections)
+      |> Map.merge(rebuilt)
+      |> Map.put("default_agent", descope_name(meta["default_agent"], co))
+      |> Map.put("default_model", descope_name(meta["default_model"], co))
+      |> put_root_billing(meta)
+
+    {new, shared}
+  end
+
+  # The company's own billing/limits become the bundle's root scope. The source install's `root`
+  # billing (a different tenant's markup and spend caps) is dropped above and never carried; and
+  # the company's cap must survive the move, or the standalone install starts with no ceiling.
+  defp put_root_billing(config, meta) do
+    case Map.take(meta, @billing_keys) do
+      billing when map_size(billing) == 0 -> config
+      billing -> Map.put(config, "root", billing)
+    end
+  end
+
+  # Handle-keyed section (agents) filtered to the company's own entries.
+  defp keep_owned_handles(section, co) when is_map(section),
+    do: Map.filter(section, fn {handle, _} -> Company.of(handle) == co end)
+
+  defp keep_owned_handles(_section, _co), do: %{}
+
+  # Id-keyed section whose entries carry an `"agent"` handle (crons/watches/telegrams), filtered
+  # to entries bound to one of the company's agents.
+  defp keep_agent_bound(section, co) when is_map(section),
+    do: Map.filter(section, fn {_id, e} -> Company.of(e["agent"] || "") == co end)
+
+  defp keep_agent_bound(_section, _co), do: %{}
+
+  # A token may be scoped to a company by its `"company"` field (a bare name, e.g. from
+  # `token add --company acme` with no agent) OR bound to one of its agents. Filtering by the
+  # agent alone drops the whole-tenant token, which is the commonest shape when standing an
+  # install up on its own. Webhooks are the same: an inbound connection is scoped by its own
+  # `"company"` and routes to an `"agent"`.
+  defp keep_tokens(section, co) when is_map(section),
+    do: Map.filter(section, fn {_id, e} -> scoped_to?(e, co) end)
+
+  defp keep_tokens(_section, _co), do: %{}
+
+  defp keep_webhooks(section, co) when is_map(section),
+    do: Map.filter(section, fn {_slug, e} -> scoped_to?(e, co) end)
+
+  defp keep_webhooks(_section, _co), do: %{}
+
+  # An entry belongs to `co` if its bare `"company"` names it, or its `"agent"` handle is in it.
+  defp scoped_to?(entry, co),
+    do: entry["company"] == co or Company.of(entry["agent"] || "") == co
+
+  # Every model the bundle needs, by every way a model is pointed at. `.model`, a cron/watch/bot
+  # `.model` override, and a scope `default_model` are stored as model **ids**; an agent's
+  # `triage_model`/`simple_model`/`utility_model` and its `fallbacks` are stored as model
+  # **names**. Missing any of these routes leaves a root/shared dependency out of the bundle and
+  # the reference dangling on the restored install (a silent loss of the default model, the
+  # triage hook, or a fallback), so all of them are collected.
+  defp model_deps(agents, id_sections, meta) do
+    agent_vals = Map.values(agents)
+
+    ids =
+      (Enum.map(agent_vals, & &1["model"]) ++
+         Enum.flat_map(id_sections, fn sec -> sec |> Map.values() |> Enum.map(& &1["model"]) end) ++
+         [meta["default_model"]])
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new()
+
+    names =
+      agent_vals
+      |> Enum.flat_map(fn a ->
+        [a["triage_model"], a["simple_model"], a["utility_model"]] ++ List.wrap(a["fallbacks"])
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new()
+
+    %{ids: ids, names: names}
+  end
+
+  # Models the bundle needs: the company's own (by name scope), plus any **root/shared** model a
+  # kept reference points at (by id or by name), so a shared dependency travels whole. A model
+  # that belongs to *another* company is deliberately NEVER pulled in, even when referenced -
+  # carrying it would leak that tenant's connection (base_url, headers, the name of its secret)
+  # into this bundle. Such a cross-company reference is a misconfiguration, and dropping it fails
+  # closed: the restored agent has a dangling ref rather than a stranger's credentials. Returns
+  # the kept id->model map and the names of the pulled-in shared ones (for the caller to report).
+  defp keep_models(models, deps, co) when is_map(models) do
+    kept =
+      Map.filter(models, fn {id, m} ->
+        name = m["name"] || ""
+
+        case Company.of(name) do
+          ^co -> true
+          nil -> MapSet.member?(deps.ids, id) or MapSet.member?(deps.names, name)
+          _other_company -> false
+        end
+      end)
+
+    shared =
+      kept
+      |> Enum.filter(fn {_id, m} -> Company.of(m["name"] || "") != co end)
+      |> Enum.map(fn {_id, m} -> m["name"] end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.sort()
+
+    {kept, shared}
+  end
+
+  defp keep_models(_models, _deps, _co), do: {%{}, []}
+
+  defp descope_agents(agents, co) do
+    Map.new(agents, fn {handle, v} ->
+      {remap_handle(handle, co, ""), v |> rewrite_agent_refs(co, "") |> descope_model_hooks(co)}
+    end)
+  end
+
+  # An agent's model-hook fields (`triage_model`/`simple_model`/`utility_model`) and its
+  # `fallbacks` list hold model NAMES, so a company one (`acme/triage`) must lose its prefix the
+  # same way the model's own name does, or it matches nothing on the restored install.
+  defp descope_model_hooks(agent, co) do
+    agent
+    |> remap_field("triage_model", co, "")
+    |> remap_field("simple_model", co, "")
+    |> remap_field("utility_model", co, "")
+    |> remap_list("fallbacks", co, "")
+  end
+
+  defp descope_model_names(models, co),
+    do: Map.new(models, fn {id, v} -> {id, remap_field(v, "name", co, "")} end)
+
+  defp descope_agent_bound(section, co),
+    do: Map.new(section, fn {id, v} -> {id, remap_field(v, "agent", co, "")} end)
+
+  defp descope_tokens(section, co) do
+    Map.new(section, fn {id, e} ->
+      {id, e |> descope_scope_company(co) |> remap_field("agent", co, "")}
+    end)
+  end
+
+  defp descope_webhooks(section, co) do
+    Map.new(section, fn {slug, e} ->
+      {slug, e |> descope_scope_company(co) |> remap_field("agent", co, "")}
+    end)
+  end
+
+  # A token's/webhook's `company` is a bare name, not a handle, and the root scope is `nil`
+  # everywhere it is read (token_in_scope?, verify_api_token, webhook `norm`, the usage/agent
+  # scoping). De-scoping it to root must land on `nil`, not the `""` a handle remap would give -
+  # otherwise the restored entry is scoped to a company that does not exist and matches nothing.
+  defp descope_scope_company(entry, co) do
+    case Map.get(entry, "company") do
+      ^co -> Map.put(entry, "company", nil)
+      _ -> entry
+    end
+  end
+
+  # A stored default handle (`acme/sales`) becomes its bare name; nil stays nil.
+  defp descope_name(nil, _co), do: nil
+  defp descope_name(handle, co), do: remap_handle(handle, co, "")
+
+  @doc """
+  The environment variables a destination must have for `config` to resolve its secrets: every
+  `${ENV_VAR}` it references, plus the vault-opening credentials named in `secrets.vault_env`
+  (which a vault resolver reads to open the vault, and which are *not* written as `${VAR}`, so
+  a plain `${VAR}` scan would miss them). Sorted and unique. Used by `extract`/`restore` and
+  `backup` to tell the operator what to provision, since none of these ever live in the archive.
+  """
+  @spec provisioning_env(map()) :: [String.t()]
+  def provisioning_env(config) when is_map(config) do
+    (env_refs(config) ++ vault_env_names(config)) |> Enum.uniq() |> Enum.sort()
+  end
+
+  # Every `${ENV_VAR}` the given config still points at, sorted and unique.
+  defp env_refs(config) do
+    ~r/\$\{([A-Z0-9_]+)\}/
+    |> Regex.scan(Jason.encode!(config), capture: :all_but_first)
+    |> List.flatten()
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp vault_env_names(config) do
+    case get_in(config, ["secrets", "vault_env"]) do
+      list when is_list(list) -> Enum.map(list, &to_string/1)
+      _ -> []
+    end
+  end
+
+  # Config field names that hold a credential across models and webhook providers.
+  @secret_config_keys ~w(access_token app_secret app_password signing_secret bot_token client_secret token secret api_key password)
+
+  @doc """
+  Labels for every place in `config` that holds a **raw** credential (not a `${ENV_VAR}`,
+  `exec:` or `file:` reference) - an OAuth login's stored tokens, a model's inline `api_key`, a
+  webhook provider secret typed literally. These *are* written into a backup/extract archive, so
+  "no secret is in the archive" is only true when this list is empty; when it is not, the caller
+  warns that the archive carries live credentials to rotate or re-authenticate on the
+  destination. Sorted and unique.
+  """
+  @spec literal_secrets(map()) :: [String.t()]
+  def literal_secrets(config) when is_map(config) do
+    models = for {_id, m} <- config["models"] || %{}, label = model_literal(m), not is_nil(label), do: label
+    hooks = for {slug, e} <- config["webhooks"] || %{}, webhook_literal?(e), do: "webhook:#{slug}"
+
+    (models ++ hooks) |> Enum.uniq() |> Enum.sort()
+  end
+
+  defp model_literal(m) do
+    cond do
+      is_map(m["oauth"]) -> "model:#{m["name"]} (OAuth login - re-authenticate on the destination)"
+      raw_secret?(m["api_key"]) -> "model:#{m["name"]} (inline api_key)"
+      true -> nil
+    end
+  end
+
+  defp webhook_literal?(entry) do
+    cfg = entry["config"] || %{}
+    Enum.any?(@secret_config_keys, fn key -> raw_secret?(cfg[key]) end)
+  end
+
+  # A non-empty string that is not one of the three reference forms is a credential sitting in
+  # the file in the clear.
+  defp raw_secret?(v) when is_binary(v) and v != "",
+    do: not (String.starts_with?(v, "${") or String.starts_with?(v, "exec:") or String.starts_with?(v, "file:"))
+
+  defp raw_secret?(_), do: false
+
+  @doc """
   Agents in a scope: `nil` for the root scope, or a company name. Root returns only
   bare-name agents; a company returns only its own - never another's.
   """

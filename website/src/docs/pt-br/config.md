@@ -132,4 +132,4 @@ pepe backup                       # gera pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /path/x.tgz
 ```
 
-Para restaurar, extraia o arquivo de volta em `~/` (ou dentro do diretório pai de `PEPE_HOME`) e exporte essas variáveis de novo. Essa é toda a história de recuperação de desastre.
+Para restaurar, `pepe restore esse-arquivo.tgz` e exporte essas variáveis de novo. Você também pode retirar uma única empresa para rodar no próprio servidor com `pepe extract`. Veja [Backup e extração](/pt-br/docs/backup/) para a história completa.
