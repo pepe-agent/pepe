@@ -23,7 +23,7 @@ defmodule Pepe.Tools.WriteFile do
   end
 
   @impl true
-  def run(%{"path" => path, "content" => content}, ctx) do
+  def run(%{"path" => path, "content" => content}, ctx) when is_binary(path) do
     full = resolve(path, ctx)
     File.mkdir_p!(Path.dirname(full))
 
@@ -33,6 +33,7 @@ defmodule Pepe.Tools.WriteFile do
     end
   end
 
+  def run(%{"path" => _, "content" => _}, _ctx), do: {:error, "'path' must be a string"}
   def run(_, _), do: {:error, "missing 'path' or 'content'"}
 
   defp resolve(path, ctx), do: Pepe.Agent.Workspace.resolve_in_ctx(path, ctx)

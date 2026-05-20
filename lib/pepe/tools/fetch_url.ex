@@ -22,21 +22,50 @@ defmodule Pepe.Tools.FetchUrl do
   @impl true
   def concurrent?, do: true
 
+  # How many redirects to follow before giving up.
+  @max_redirects 5
+
   @impl true
-  def run(%{"url" => url}, _ctx) do
+  def run(%{"url" => url}, _ctx), do: fetch(url, 0)
+
+  def run(_, _), do: {:error, "missing 'url'"}
+
+  # Redirects are followed by hand, not by Req, because Req's automatic redirect would jump to a
+  # `Location` no one validated - the classic SSRF: a public URL that 302s to
+  # `http://169.254.169.254/…` (cloud metadata). Every hop, including the redirect targets, is
+  # re-checked against `Pepe.Net.internal?` here, so an internal address is refused wherever in
+  # the chain it appears.
+  defp fetch(_url, hops) when hops > @max_redirects, do: {:error, "too many redirects"}
+
+  defp fetch(url, hops) do
     with {:ok, host} <- parse_host(url),
          :ok <- check_host(host) do
-      case Req.get(url, receive_timeout: 30_000, retry: :transient) do
-        {:ok, %{status: status, body: body}} ->
-          {:ok, "status=#{status}\n#{truncate(stringify(body))}"}
-
-        {:error, reason} ->
-          {:error, "request failed: #{inspect(reason)}"}
+      case Req.get(url, receive_timeout: 30_000, retry: :transient, redirect: false) do
+        {:ok, resp} -> handle_response(resp, url, hops)
+        {:error, reason} -> {:error, "request failed: #{inspect(reason)}"}
       end
     end
   end
 
-  def run(_, _), do: {:error, "missing 'url'"}
+  # A 3xx is followed by re-entering `fetch/2` on the (validated) target; anything else is the
+  # body. Splitting this out of `fetch/2` keeps each function's nesting shallow.
+  defp handle_response(%{status: status} = resp, url, hops) when status in 300..399 do
+    case redirect_target(resp, url) do
+      {:ok, next} -> fetch(next, hops + 1)
+      :none -> {:ok, format(resp)}
+    end
+  end
+
+  defp handle_response(resp, _url, _hops), do: {:ok, format(resp)}
+
+  defp redirect_target(%{headers: headers}, base) do
+    case headers["location"] do
+      [loc | _] when is_binary(loc) and loc != "" -> {:ok, base |> URI.merge(loc) |> URI.to_string()}
+      _ -> :none
+    end
+  end
+
+  defp format(%{status: status, body: body}), do: "status=#{status}\n#{truncate(stringify(body))}"
 
   defp parse_host(url) do
     case URI.new(url) do

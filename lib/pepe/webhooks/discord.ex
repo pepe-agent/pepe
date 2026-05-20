@@ -15,8 +15,6 @@ defmodule Pepe.Webhooks.Discord do
   """
   @behaviour Pepe.Webhooks.Provider
 
-  require Logger
-
   @api "https://discord.com/api/v10"
   @ping 1
   @application_command 2
@@ -59,8 +57,7 @@ defmodule Pepe.Webhooks.Discord do
       :ok
     else
       false when key in [nil, ""] ->
-        Logger.warning("[discord] no public_key set; inbound signature unverified")
-        :ok
+        Pepe.Webhooks.Provider.unsigned_inbound("discord")
 
       _ ->
         :error

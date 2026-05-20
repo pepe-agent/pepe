@@ -28,7 +28,8 @@ defmodule Pepe.WebhookChannelsTest do
     test "verifies the request signature" do
       secret = "shhh"
       body = ~s({"type":"event_callback"})
-      ts = "1700000000"
+      # A fresh timestamp: Slack signs it, and stale ones are now rejected as replays.
+      ts = Integer.to_string(System.system_time(:second))
       sig = "v0=" <> (:crypto.mac(:hmac, :sha256, secret, "v0:#{ts}:#{body}") |> Base.encode16(case: :lower))
       config = %{"config" => %{"signing_secret" => secret}}
       headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
@@ -147,7 +148,9 @@ defmodule Pepe.WebhookChannelsTest do
         end
       end)
 
-      config = %{"config" => %{"app_id" => "id", "app_password" => "sec", "tenant_id" => "ten"}}
+      # `sf.example` isn't a public Bot Framework host, so the connection allows it explicitly
+      # (as a regional/self-hosted deployment would for its own service host).
+      config = %{"config" => %{"app_id" => "id", "app_password" => "sec", "tenant_id" => "ten", "service_hosts" => ["sf.example"]}}
       assert :ok = MsTeams.deliver(config, "https://sf.example/|conv1", "reply")
 
       assert_received {:token_req, form}
@@ -255,10 +258,17 @@ defmodule Pepe.WebhookChannelsTest do
       File.rm_rf(home)
     end)
 
-    Pepe.Config.put_webhook("s1", %{"provider" => "slack", "company" => nil, "agent" => "x", "config" => %{}})
+    # Slack signs the url_verification handshake too, so the connection carries a secret and the
+    # request is signed - the same fail-closed authentication as any other inbound.
+    secret = "shhh"
+    Pepe.Config.put_webhook("s1", %{"provider" => "slack", "company" => nil, "agent" => "x", "config" => %{"signing_secret" => secret}})
     payload = %{"type" => "url_verification", "challenge" => "ok!"}
+    raw = ~s({"type":"url_verification","challenge":"ok!"})
+    ts = Integer.to_string(System.system_time(:second))
+    sig = "v0=" <> (:crypto.mac(:hmac, :sha256, secret, "v0:#{ts}:#{raw}") |> Base.encode16(case: :lower))
+    headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
 
     assert {:respond, 200, "text/plain", "ok!"} =
-             Pepe.Webhooks.handle_inbound("root", "slack", "s1", "raw", payload, %{})
+             Pepe.Webhooks.handle_inbound("root", "slack", "s1", raw, payload, headers)
   end
 end

@@ -16,8 +16,6 @@ defmodule Pepe.Webhooks.MsTeams do
   """
   @behaviour Pepe.Webhooks.Provider
 
-  require Logger
-
   alias Pepe.Config
 
   @impl true
@@ -46,10 +44,17 @@ defmodule Pepe.Webhooks.MsTeams do
   def verify(_config, _params), do: :error
 
   @impl true
-  def authenticate(_config, _raw_body, _headers) do
-    # The inbound Authorization bearer is a Bot Framework JWT; full validation is delegated.
-    Logger.warning("[msteams] inbound JWT not verified here; keep this endpoint behind a proxy/secret")
-    :ok
+  def authenticate(config, _raw_body, _headers) do
+    # The inbound Authorization bearer is a Bot Framework JWT. This provider does not validate it
+    # itself, so accepting inbound is only safe behind a proxy that does. That deployment is opt-in
+    # (`trust_proxy: true` in the connection config); by DEFAULT the endpoint is fail-closed, or a
+    # predictable URL (`/webhooks/root/msteams/msteams`) would let anyone anonymously drive the
+    # bound agent (arbitrary command execution if it holds `bash`).
+    if provider_config(config)["trust_proxy"] == true do
+      :ok
+    else
+      Pepe.Webhooks.Provider.unsigned_inbound("msteams")
+    end
   end
 
   # A message activity: strip the bot @mention, address the reply by serviceUrl + convo id.
@@ -96,12 +101,21 @@ defmodule Pepe.Webhooks.MsTeams do
 
   defp strip_mention(text), do: text |> String.replace(~r{<at>.*?</at>}, "") |> String.trim()
 
+  # The hosts the reply (and its bearer token) may be sent to. The `serviceUrl` arrives in the
+  # inbound payload, so without this an attacker who reaches `parse/1` could point it at their own
+  # server and receive the connector bearer token in the Authorization header. These are the
+  # public-cloud Bot Framework hosts; regional/gov/self-hosted deployments add theirs via the
+  # connection's `service_hosts` (an entry starting with `.` is a domain suffix, else an exact
+  # host).
+  @default_service_hosts ~w(smba.trafficmanager.net .botframework.com .botframework.us)
+
   @impl true
   def deliver(config, addr, text) do
     [service_url, conv] = String.split(addr, "|", parts: 2)
     pc = provider_config(config)
 
-    with {:ok, token} <- access_token(pc) do
+    with :ok <- allowed_service_url(service_url, pc),
+         {:ok, token} <- access_token(pc) do
       url = "#{String.trim_trailing(service_url, "/")}/v3/conversations/#{conv}/activities"
       body = %{"type" => "message", "text" => text, "textFormat" => "markdown"}
 
@@ -112,6 +126,20 @@ defmodule Pepe.Webhooks.MsTeams do
       end
     end
   end
+
+  defp allowed_service_url(url, pc) do
+    hosts = @default_service_hosts ++ List.wrap(pc["service_hosts"])
+
+    with {:ok, %URI{scheme: "https", host: host}} when is_binary(host) <- URI.new(url),
+         true <- Enum.any?(hosts, &host_match?(host, &1)) do
+      :ok
+    else
+      _ -> {:error, :untrusted_service_url}
+    end
+  end
+
+  defp host_match?(host, "." <> _ = suffix), do: String.ends_with?(host, suffix)
+  defp host_match?(host, exact), do: host == exact
 
   # Client-credentials token for the Bot Framework connector.
   defp access_token(pc) do

@@ -142,13 +142,14 @@ defmodule PepeWeb.AgentChannel do
     end
   end
 
-  # A widget-scoped connection's token sits in public page source, so its prompts
-  # are rate-limited; every other scope (a plain API token, a same-host tool) is
-  # unaffected. Keyed by this connection's own session, so one visitor can't exhaust
-  # another's budget.
+  # A widget-scoped connection's token sits in public page source, so its prompts are
+  # rate-limited; every other scope (a plain API token, a same-host tool) is unaffected. Keyed by
+  # the token + the real client IP (`:widget_throttle_key`, set at connect), NOT the client's own
+  # session id - a visitor could rotate the session id on every connect to mint a fresh bucket and
+  # get unlimited prompts, exhausting the site owner's model credits.
   defp widget_rate_limit(socket) do
     case socket.assigns[:api_scope] do
-      %{kind: "widget"} -> PepeWeb.WidgetThrottle.check(socket.assigns.watch_key)
+      %{kind: "widget"} -> PepeWeb.WidgetThrottle.check(socket.assigns[:widget_throttle_key] || socket.assigns.watch_key)
       _ -> :ok
     end
   end

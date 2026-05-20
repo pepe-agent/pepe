@@ -52,21 +52,42 @@ defmodule PepeWeb.AgentChannelRateLimitTest do
   end
 
   defp join_as(token, session) do
+    # A widget connect now requires an Origin matching the token; a browser always sends it.
+    Process.put(:pepe_ws_request_origin, "https://example.com")
     {:ok, socket} = connect(PepeWeb.AgentSocket, %{"token" => token})
     {:ok, _reply, socket} = subscribe_and_join(socket, "agent:assistant", %{"session" => session})
     socket
   end
 
+  # A distinct client IP per test, stashed where the socket reads it, so the token+IP buckets
+  # (which are now stable across connects) don't collide across tests.
+  defp with_client_ip do
+    ip = {10, 0, 0, rem(System.unique_integer([:positive]), 250) + 2}
+    Process.put(:pepe_ws_client_ip, ip)
+    ApiToken.hash("ctx_widget") <> ":" <> (ip |> :inet.ntoa() |> to_string())
+  end
+
   test "a widget-scoped connection is rate-limited once its budget is spent" do
-    session = "widget-#{System.unique_integer([:positive])}"
-    socket = join_as("ctx_widget", session)
+    bucket = with_client_ip()
+    socket = join_as("ctx_widget", "widget-#{System.unique_integer([:positive])}")
 
-    # Exhaust the (budget of 1) directly, keyed exactly as the channel keys a widget
-    # connection ("widget:<site>:" <> session, site from the token's allowed_origin),
-    # so this assertion never races the first prompt's own (async, model-call-failure)
-    # error push.
-    assert :ok = PepeWeb.WidgetThrottle.check("widget:example.com:" <> session)
+    # Exhaust the budget of 1 directly on the connection's real key, so this assertion never races
+    # the first prompt's own (async, model-call-failure) error push.
+    assert :ok = PepeWeb.WidgetThrottle.check(bucket)
 
+    push(socket, "prompt", %{"text" => "hi"})
+    assert_push "error", %{reason: reason}, 2_000
+    assert reason =~ "rate limited"
+  end
+
+  test "rotating the session id does NOT mint a fresh budget (the bypass is closed)" do
+    # The whole point of keying by token+IP: a visitor that changes the session on every connect
+    # must NOT get a new bucket, or the limit means nothing. Exhaust the budget, then connect with
+    # a brand-new session - it is still refused.
+    bucket = with_client_ip()
+    assert :ok = PepeWeb.WidgetThrottle.check(bucket)
+
+    socket = join_as("ctx_widget", "rotated-session-#{System.unique_integer([:positive])}")
     push(socket, "prompt", %{"text" => "hi"})
     assert_push "error", %{reason: reason}, 2_000
     assert reason =~ "rate limited"

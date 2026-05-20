@@ -82,13 +82,21 @@ defmodule Pepe.Store do
 
   @doc "Create the schema/table and start Mnesia (idempotent, runs once)."
   def ensure_started do
-    if :persistent_term.get(@ready, false) do
-      :ok
-    else
-      do_start()
-      :persistent_term.put(@ready, true)
-      :ok
-    end
+    if :persistent_term.get(@ready, false), do: :ok, else: bootstrap()
+  end
+
+  # Serialize the bootstrap: two processes hitting the store for the first time at once would both
+  # see the flag unset and both enter `do_start/0`, and one's `:mnesia.stop()` would land on the
+  # other mid-write. A lock (with a second check inside it) makes exactly one process run it.
+  defp bootstrap do
+    :global.trans({{__MODULE__, :bootstrap}, self()}, fn ->
+      unless :persistent_term.get(@ready, false) do
+        do_start()
+        :persistent_term.put(@ready, true)
+      end
+    end)
+
+    :ok
   end
 
   defp do_start do

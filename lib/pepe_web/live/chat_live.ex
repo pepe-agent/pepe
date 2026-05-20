@@ -418,15 +418,14 @@ defmodule PepeWeb.ChatLive do
   end
 
   def handle_event("perm", %{"id" => id, "decision" => token}, socket) do
-    id = String.to_integer(id)
-
-    case socket.assigns.pending_perm do
-      %{id: ^id, pid: pid} ->
-        send(pid, {:perm_reply, id, Prompt.from_token(token)})
-        {:noreply, assign(socket, pending_perm: nil)}
-
-      _ ->
-        {:noreply, socket}
+    # `id` comes over the socket and a client can send any string; `String.to_integer` would
+    # raise and crash the LiveView, so parse leniently and ignore a malformed or stale one.
+    with {id, ""} <- Integer.parse(to_string(id)),
+         %{id: ^id, pid: pid} <- socket.assigns.pending_perm do
+      send(pid, {:perm_reply, id, Prompt.from_token(token)})
+      {:noreply, assign(socket, pending_perm: nil)}
+    else
+      _ -> {:noreply, socket}
     end
   end
 

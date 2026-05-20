@@ -269,8 +269,15 @@ defmodule Pepe.WebhooksTest do
         {:ok, %{status: 200, body: %{"ok" => true}}}
       end)
 
-      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      secret = "sign-me"
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
       Pepe.Config.put_webhook("acme-slack", slack_entry)
+
+      # Every inbound is signed (the raw body is "{}" for all three calls here), so one valid,
+      # fresh header set authenticates them all.
+      ts = Integer.to_string(System.system_time(:second))
+      sig = "v0=" <> (:crypto.mac(:hmac, :sha256, secret, "v0:#{ts}:{}") |> Base.encode16(case: :lower))
+      headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
 
       channel_message = %{
         "type" => "event_callback",
@@ -279,7 +286,7 @@ defmodule Pepe.WebhooksTest do
 
       # Without the waiver: a plain channel message (no app_mention, not a DM) never
       # reaches the agent.
-      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, %{})
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, headers)
       refute_receive {:delivered, _url, _opts}, 200
 
       # A slash command in a channel still needs to be addressed like any other
@@ -291,13 +298,13 @@ defmodule Pepe.WebhooksTest do
         "event" => %{"type" => "app_mention", "text" => "<@U0BOT123> /mention off", "channel" => "C1", "ts" => "2.0"}
       }
 
-      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", mention_off, %{})
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", mention_off, headers)
       assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts}, 1000
       assert opts[:json]["text"] =~ "without being @mentioned"
 
       # With the waiver now set for channel C1, the earlier plain (unaddressed)
       # message shape reaches the agent and gets a real reply delivered back.
-      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, %{})
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, headers)
       assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts2}, 1000
       assert opts2[:json]["text"] == "hello!"
     end

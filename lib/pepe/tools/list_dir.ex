@@ -26,6 +26,10 @@ defmodule Pepe.Tools.ListDir do
   def concurrent?, do: true
 
   @impl true
+  # A non-string path is never a legitimate call (a charlist would sidestep the string-based
+  # workspace checks), so reject it before resolving.
+  def run(%{"path" => p}, _ctx) when not is_binary(p), do: {:error, "'path' must be a string"}
+
   def run(args, ctx) do
     path = resolve(args["path"] || ".", ctx)
 

@@ -55,10 +55,13 @@ defmodule PepeWeb.AgentSocketWidgetOriginTest do
     assert :error = conn_from(token_a, "https://evil.example.com")
   end
 
-  test "a widget token connects when no Origin header was captured (non-browser client, unchanged behavior)", %{
+  test "a widget token is refused when NO Origin was captured (a scripted caller, not a browser page)", %{
     token_a: token_a
   } do
-    assert {:ok, _socket} = conn_from(token_a, nil)
+    # A widget lives in a browser page and a browser always sends Origin on the upgrade. No Origin
+    # means a script replaying the public token, so it is refused - the origin binding is the only
+    # thing tying this public token to the intended site.
+    assert :error = conn_from(token_a, nil)
   end
 
   test "a non-widget token is unaffected by any Origin mismatch" do

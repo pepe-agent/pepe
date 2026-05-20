@@ -529,7 +529,12 @@ defmodule PepeWeb.TracesLive do
   end
 
   def handle_event("page", %{"page" => page}, socket) do
-    {:noreply, socket |> assign(page: String.to_integer(page)) |> apply_view()}
+    # Client-sent; parse leniently so a bad value can't crash the LiveView. `apply_view` clamps
+    # the page into range.
+    case Integer.parse(to_string(page)) do
+      {page, ""} -> {:noreply, socket |> assign(page: page) |> apply_view()}
+      _ -> {:noreply, socket}
+    end
   end
 
   def handle_event("set_scope", params, socket),

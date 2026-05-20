@@ -21,6 +21,40 @@ defmodule Pepe.Permissions.RiskTest do
     assert Risk.hints("set_route", %{}) == [:changes_config]
   end
 
+  test "reading inside the workspace carries no risk; reaching outside it does" do
+    # A relative path (and shared/) stays in the agent's own space - the free, always-safe read.
+    assert Risk.hints("read_file", %{"path" => "notes.md"}) == []
+    assert Risk.hints("read_file", %{"path" => "shared/team.md"}) == []
+    assert Risk.hints("list_dir", %{"path" => "."}) == []
+
+    # An absolute path, or one that climbs out with `..`, can reach another tenant's files,
+    # ~/.pepe/config.json, or /etc - so it is flagged and stops being always-safe.
+    assert :reads_outside in Risk.hints("read_file", %{"path" => "/etc/passwd"})
+    assert :reads_outside in Risk.hints("read_file", %{"path" => "../../../etc/passwd"})
+    assert :reads_outside in Risk.hints("read_file", %{"path" => "shared/../../secrets"})
+    assert :reads_outside in Risk.hints("list_dir", %{"path" => "/root"})
+  end
+
+  test "a non-string path (a charlist from a JSON int array) is treated as outside, not skipped" do
+    # The model controls the tool args; `{"path":[47,101,...]}` decodes to a charlist that is a
+    # valid path for File.read but is not a binary. It must NOT slip past with no risk hint.
+    assert :reads_outside in Risk.hints("read_file", %{"path" => ~c"/etc/hosts"})
+    assert :reads_outside in Risk.hints("list_dir", %{"path" => ~c"/root"})
+    assert :writes_outside in Risk.hints("write_file", %{"path" => ~c"/etc/x"})
+    assert :writes_outside in Risk.hints("move_file", %{"from" => "a", "to" => ~c"/etc/x"})
+  end
+
+  test "writing outside the workspace, or into the code dirs, is flagged beyond writes_file" do
+    assert Risk.hints("write_file", %{"path" => "out.txt"}) == [:writes_file]
+
+    # plugins/ and skills/ are loaded as code/procedures - a write there is injection, not data.
+    assert :writes_outside in Risk.hints("write_file", %{"path" => "plugins/evil.exs"})
+    assert :writes_outside in Risk.hints("write_file", %{"path" => "skills/x.md"})
+    assert :writes_outside in Risk.hints("write_file", %{"path" => "/etc/cron.d/x"})
+    assert :writes_outside in Risk.hints("edit_file", %{"path" => "../outside.txt"})
+    assert :writes_outside in Risk.hints("move_file", %{"from" => "a.txt", "to" => "plugins/x.exs"})
+  end
+
   test "a harmless command yields no hints" do
     assert Risk.hints("bash", %{"command" => "echo hello"}) == []
   end
@@ -40,7 +74,9 @@ defmodule Pepe.Permissions.RiskTest do
           :elevated,
           :network,
           :writes_file,
-          :changes_config
+          :changes_config,
+          :reads_outside,
+          :writes_outside
         ] do
       assert is_binary(Risk.label(k))
     end

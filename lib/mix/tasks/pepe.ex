@@ -2813,11 +2813,11 @@ defmodule Mix.Tasks.Pepe do
   defp setup do
     if configured?() do
       announce_backup(Config.backup())
-      Config.load() |> Config.save()
+      Config.update(& &1)
       config_menu()
     else
       maybe_choose_home()
-      Config.load() |> Config.save()
+      Config.update(& &1)
       first_run_setup()
     end
   end
@@ -3426,9 +3426,10 @@ defmodule Mix.Tasks.Pepe do
   ###
 
   defp dashboard_cmd(["password", "--clear"]) do
-    cfg = Config.load()
-    dash = cfg |> Map.get("dashboard", %{}) |> Map.delete("password")
-    Config.save(Map.put(cfg, "dashboard", dash))
+    Config.update(fn cfg ->
+      dash = cfg |> Map.get("dashboard", %{}) |> Map.delete("password")
+      Map.put(cfg, "dashboard", dash)
+    end)
 
     if System.get_env("PEPE_DASHBOARD_PASSWORD") do
       ok("cleared the config password (but PEPE_DASHBOARD_PASSWORD is still set in the environment)")
@@ -3438,9 +3439,11 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp dashboard_cmd(["password", value]) when is_binary(value) do
-    cfg = Config.load()
-    dash = cfg |> Map.get("dashboard", %{}) |> Map.put("password", value)
-    Config.save(Map.put(cfg, "dashboard", dash))
+    Config.update(fn cfg ->
+      dash = cfg |> Map.get("dashboard", %{}) |> Map.put("password", value)
+      Map.put(cfg, "dashboard", dash)
+    end)
+
     ok("dashboard password set - the dashboard now requires signing in at /login")
 
     if value =~ ~r/^\$\{.+\}$/ do
@@ -3497,16 +3500,19 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp clear_dashboard_key(key, label) do
-    cfg = Config.load()
-    dash = cfg |> Map.get("dashboard", %{}) |> Map.delete(key)
-    Config.save(Map.put(cfg, "dashboard", dash))
+    Config.update(fn cfg ->
+      dash = cfg |> Map.get("dashboard", %{}) |> Map.delete(key)
+      Map.put(cfg, "dashboard", dash)
+    end)
+
     ok("#{label} cleared")
   end
 
   defp put_dashboard(key, value) do
-    cfg = Config.load()
-    dash = cfg |> Map.get("dashboard", %{}) |> Map.put(key, value)
-    Config.save(Map.put(cfg, "dashboard", dash))
+    Config.update(fn cfg ->
+      dash = cfg |> Map.get("dashboard", %{}) |> Map.put(key, value)
+      Map.put(cfg, "dashboard", dash)
+    end)
   end
 
   ###

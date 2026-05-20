@@ -19,11 +19,13 @@ defmodule Pepe.Permissions.Risk do
           | :network
           | :writes_file
           | :changes_config
+          | :reads_outside
+          | :writes_outside
 
   @doc "Risk hint kinds for a tool call, from its decoded args map."
   @spec hints(String.t(), map()) :: [kind()]
   def hints(name, args) when is_map(args) do
-    Enum.uniq(tool_hints(name) ++ command_hints(command_text(name, args)))
+    Enum.uniq(tool_hints(name) ++ path_hints(name, args) ++ command_hints(command_text(name, args)))
   end
 
   def hints(_name, _args), do: []
@@ -37,6 +39,51 @@ defmodule Pepe.Permissions.Risk do
   def label(:network), do: gettext("accesses the network")
   def label(:writes_file), do: gettext("writes to a file")
   def label(:changes_config), do: gettext("changes Pepe configuration")
+  def label(:reads_outside), do: gettext("reads a file outside its workspace")
+  def label(:writes_outside), do: gettext("writes outside its workspace")
+
+  # Risks that depend on WHERE a file tool points, not just which tool it is. A relative path
+  # stays inside the agent's own workspace (and `shared/`) and is the free, always-safe read the
+  # tools are meant to be. An absolute path, or one that climbs out with `..`, can reach another
+  # tenant's files, `~/.pepe/config.json`, `~/.ssh`, `/etc` - so it carries a risk and stops
+  # being always-safe, which routes it through the gate (refused where there is nobody to ask)
+  # and the taint. Writing additionally treats `plugins/` and `skills/` as outside, because
+  # those directories are loaded as code and procedures: a write there is injection, not data.
+  defp path_hints("read_file", %{"path" => p}), do: reads_outside(p)
+  defp path_hints("list_dir", %{"path" => p}), do: reads_outside(p)
+
+  defp path_hints(name, %{"path" => p}) when name in ["write_file", "edit_file"],
+    do: writes_outside(p)
+
+  defp path_hints("move_file", %{"from" => from, "to" => to}),
+    do: Enum.uniq(writes_outside(from) ++ writes_outside(to))
+
+  defp path_hints(_name, _args), do: []
+
+  defp reads_outside(p) when is_binary(p), do: if(climbs_out?(p), do: [:reads_outside], else: [])
+  # A non-string path is never a legitimate in-workspace read. The model controls the tool
+  # arguments, and a JSON array of char codes (`[47,101,...]`) decodes to a charlist that is a
+  # valid path for `File.read/1` but skips the `is_binary` checks above - so treat any non-string
+  # path as outside, forcing it through the gate instead of the always-safe short-circuit.
+  defp reads_outside(_), do: [:reads_outside]
+
+  defp writes_outside(p) when is_binary(p),
+    do: if(climbs_out?(p) or into_code_dir?(p), do: [:writes_outside], else: [])
+
+  defp writes_outside(_), do: [:writes_outside]
+
+  # Absolute, or escaping the workspace with a `..` segment (checked on the split path so
+  # `shared/../../etc` is caught regardless of its prefix).
+  defp climbs_out?(p), do: Path.type(p) == :absolute or ".." in Path.split(p)
+
+  # The plugins/ and skills/ dirs are compiled/loaded, so a write there is code, not data.
+  defp into_code_dir?(p) do
+    case Path.split(p) do
+      ["plugins" | _] -> true
+      ["skills" | _] -> true
+      _ -> false
+    end
+  end
 
   # The command/code string to scan, per tool.
   defp command_text("bash", %{"command" => c}) when is_binary(c), do: c

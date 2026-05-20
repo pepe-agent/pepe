@@ -234,7 +234,7 @@ defmodule PepeWeb.ModelsLive do
               </div>
               <div>
                 <label class={lbl()}>{gettext("API key")}</label>
-                <input name="api_key" value={@edit_model.api_key} class={fld()} />
+                <input type="password" name="api_key" value={@edit_model.api_key} class={fld()} />
               </div>
             </.form_section>
 
@@ -308,7 +308,7 @@ defmodule PepeWeb.ModelsLive do
 
                 <div :if={@edit_model.env}>
                   <label class={lbl()}>{gettext("API key")}</label>
-                  <input name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
+                  <input type="password" name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
                   <p class={hlp()}>
                     {gettext("Defaults to the %{env} env var (%{status}). Paste a key here to load its models now.",
                       env: @edit_model.env, status: key_status(@edit_model.env))}

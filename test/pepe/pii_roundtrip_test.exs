@@ -84,6 +84,24 @@ defmodule Pepe.PiiRoundtripTest do
     refute reply =~ "[EMAIL_1]"
   end
 
+  test "an aside (/btw) redacts PII in and restores it out, the same as a normal turn" do
+    # The side-question path must not be the one that skips redaction: an aside sends the same
+    # kind of user text to the provider, so the model must see tokens and the reply come back
+    # restored, exactly as the main chat does above.
+    prompt = "Side question: is #{@cpf} / #{@email} on file?"
+    {:ok, reply} = Pepe.Agent.aside("pii:aside", "support", prompt)
+
+    assert_received {:model_saw, saw}
+    refute saw =~ @cpf
+    refute saw =~ @email
+    assert saw =~ "[CPF_1]"
+    assert saw =~ "[EMAIL_1]"
+
+    assert reply =~ @cpf
+    assert reply =~ @email
+    refute reply =~ "[CPF_1]"
+  end
+
   test "with reversible off, the model still never sees raw PII and nothing is restored" do
     Config.put_hook_settings("pii_redact", %{"packs" => ["br", "intl"], "reversible" => false})
 

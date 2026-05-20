@@ -14,8 +14,6 @@ defmodule Pepe.Webhooks.GoogleChat do
   """
   @behaviour Pepe.Webhooks.Provider
 
-  require Logger
-
   alias Pepe.Config
 
   @api "https://chat.googleapis.com/v1"
@@ -49,9 +47,15 @@ defmodule Pepe.Webhooks.GoogleChat do
   def verify(_config, _params), do: :error
 
   @impl true
-  def authenticate(_config, _raw_body, _headers) do
-    Logger.warning("[googlechat] inbound JWT not verified here; keep this endpoint behind a proxy")
-    :ok
+  def authenticate(config, _raw_body, _headers) do
+    # Google signs inbound with a bearer JWT this provider does not validate itself, so accepting
+    # is only safe behind a proxy that does. Opt-in (`trust_proxy: true`); fail-closed by default,
+    # or anyone could anonymously drive the bound agent via the predictable webhook URL.
+    if provider_config(config)["trust_proxy"] == true do
+      :ok
+    else
+      Pepe.Webhooks.Provider.unsigned_inbound("googlechat")
+    end
   end
 
   # Only a human MESSAGE becomes a turn; reply is addressed to the space.

@@ -28,7 +28,7 @@ defmodule PepeWeb.AgentSocket do
     cond do
       Config.api_auth_required?() ->
         case Config.verify_api_token(params["token"] || "") do
-          scope when is_map(scope) -> connect_widget_scope(scope, socket)
+          scope when is_map(scope) -> connect_widget_scope(scope, socket, params["token"])
           _ -> :error
         end
 
@@ -45,18 +45,40 @@ defmodule PepeWeb.AgentSocket do
   # SOME registered widget origin, not this token's own - otherwise a widget token
   # leaked from one origin could be replayed from any other origin this Pepe
   # instance also happens to serve a widget from. Enforce the precise match here,
-  # now that the token (and so its scope) is actually known. Only applies when the
-  # connecting client sent an Origin header at all (a real browser always does) -
-  # a non-browser caller presenting a widget token is unaffected, same as before.
-  defp connect_widget_scope(%{kind: "widget", allowed_origin: allowed} = scope, socket)
+  # now that the token (and so its scope) is actually known.
+  #
+  # A widget is embedded in a browser page, and a browser always sends an `Origin` on the
+  # WebSocket upgrade. A connection with NO Origin is therefore not the widget in a page but a
+  # scripted caller replaying the public token, so it is refused - the origin binding is the only
+  # thing tying this public token to the intended site.
+  defp connect_widget_scope(%{kind: "widget", allowed_origin: allowed} = scope, socket, token)
        when is_binary(allowed) do
-    case Process.get(:pepe_ws_request_origin) do
-      nil -> {:ok, assign(socket, :api_scope, scope)}
-      origin -> if normalize_origin(origin) == normalize_origin(allowed), do: {:ok, assign(socket, :api_scope, scope)}, else: :error
+    with origin when is_binary(origin) <- Process.get(:pepe_ws_request_origin),
+         true <- normalize_origin(origin) == normalize_origin(allowed) do
+      {:ok, assign(socket, :api_scope, scope, :widget_throttle_key, widget_throttle_key(token))}
+    else
+      _ -> :error
     end
   end
 
-  defp connect_widget_scope(scope, socket), do: {:ok, assign(socket, :api_scope, scope)}
+  defp connect_widget_scope(scope, socket, _token), do: {:ok, assign(socket, :api_scope, scope)}
+
+  # The rate-limit bucket for a widget connection. Keyed by the token (its hash, never the raw
+  # token) and the real client IP, neither of which the caller can rotate for free - unlike the
+  # client-supplied session id, which could be changed on every connect to mint a fresh bucket
+  # and defeat the limit entirely.
+  defp widget_throttle_key(token) do
+    ip =
+      case Process.get(:pepe_ws_client_ip) do
+        tuple when is_tuple(tuple) -> tuple |> :inet.ntoa() |> to_string()
+        _ -> "unknown-ip"
+      end
+
+    Pepe.ApiToken.hash(to_string(token)) <> ":" <> ip
+  end
+
+  # assign/4 sets two keys at once.
+  defp assign(socket, k1, v1, k2, v2), do: socket |> assign(k1, v1) |> assign(k2, v2)
 
   defp loopback?(%{peer_data: %{address: address}}), do: ApiAuth.loopback?(address)
   defp loopback?(_), do: false

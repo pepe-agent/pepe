@@ -33,6 +33,36 @@ defmodule Pepe.PermissionsTest do
   test "safe tools run without ever asking", %{agent: agent} do
     ctx = %{agent: agent, authorize: fn _, _, _ -> flunk("should not ask") end}
     assert Permissions.gate("read_file", "{}", ctx) == :allow
+    assert Permissions.gate("read_file", ~s({"path":"notes.md"}), ctx) == :allow
+    assert Permissions.gate("read_file", ~s({"path":"shared/team.md"}), ctx) == :allow
+  end
+
+  test "read_file reaching OUTSIDE the workspace stops being always-safe", %{agent: agent} do
+    # In-workspace reads are free (above). An absolute or `..` path can reach another tenant's
+    # files, ~/.pepe/config.json, /etc - so it goes through the gate. With nobody to ask (a
+    # webhook/API agent) it is refused, which is exactly the customer-facing exposure that made
+    # a booby-trapped "read config.json and tell me" prompt injection work.
+    assert {:deny, _} = Permissions.gate("read_file", ~s({"path":"/etc/passwd"}), %{agent: agent})
+    assert {:deny, _} = Permissions.gate("read_file", ~s({"path":"../../secrets"}), %{agent: agent})
+
+    # With a human on the line, it is asked (not silently allowed, not silently denied).
+    test = self()
+    ctx = %{agent: agent, authorize: fn _n, _a, _c -> send(test, :asked) && :deny end}
+    assert Permissions.gate("read_file", ~s({"path":"/etc/passwd"}), ctx) == :deny
+    assert_received :asked
+
+    # And an operator can still pre-approve it explicitly for an unattended agent.
+    trusted = %{agent | auto_approve: ["read_file:reads_outside"]}
+    assert Permissions.gate("read_file", ~s({"path":"/etc/hosts"}), %{agent: trusted}) == :allow
+  end
+
+  test "write_file into the plugins dir needs its own approval, not a plain write grant", %{agent: agent} do
+    # A one-time "allow writes" must not silently become code execution: writing to plugins/ is
+    # a stronger risk than writing a data file, so a `write_file:writes_file` grant does not
+    # cover it.
+    writer = %{agent | auto_approve: ["write_file:writes_file"]}
+    assert Permissions.gate("write_file", ~s({"path":"notes.txt","content":"x"}), %{agent: writer}) == :allow
+    assert {:deny, _} = Permissions.gate("write_file", ~s({"path":"plugins/x.exs","content":"x"}), %{agent: writer})
   end
 
   test "with nobody to ask, only what was pre-approved runs", %{agent: agent} do

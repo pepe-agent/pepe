@@ -109,8 +109,17 @@ defmodule Pepe.Config do
     case File.read(path()) do
       {:ok, body} ->
         case Jason.decode(body) do
-          {:ok, map} when is_map(map) -> map |> migrate()
-          _ -> default()
+          {:ok, map} when is_map(map) ->
+            migrate(map)
+
+          _ ->
+            # The file is present but unparseable (a truncated/half-written save, disk corruption).
+            # Falling back to `default()` here would be catastrophic: the next mutation would
+            # `load()` an empty config and `save()` it over the real one, wiping every model,
+            # agent, company and token. A present-but-corrupt file is an error to raise, NOT a
+            # missing file to default. (An absent file still defaults, below.)
+            raise "#{short_path(path())} is present but not valid JSON - refusing to overwrite it " <>
+                    "with defaults. Restore it from a backup (see `#{Path.rootname(path())}.bak`)."
         end
 
       {:error, _} ->
@@ -132,9 +141,27 @@ defmodule Pepe.Config do
   @doc "Persist the raw config map, creating the directory if needed."
   def save(map) when is_map(map) do
     File.mkdir_p!(home())
-    File.write!(path(), Jason.encode!(map, pretty: true))
+    # Write to a temp file and rename into place. `File.rename` is atomic on the same filesystem,
+    # so a reader never sees a half-written config and a crash mid-write leaves the old file
+    # intact rather than a truncated one (which `load/0` would now refuse anyway).
+    tmp = path() <> ".tmp"
+    File.write!(tmp, Jason.encode!(map, pretty: true))
+    File.rename!(tmp, path())
     map
   end
+
+  @doc """
+  Atomically read-modify-write the config: `fun` receives the current config map and returns the
+  new one. The whole load→modify→save runs under a lock, so two concurrent mutations can't each
+  load the same state, change different slices, and have the last save silently drop the other's
+  change (a lost update). Every mutator in this module goes through here; a bare `load |> ... |>
+  save` from anywhere else re-opens that race, so don't.
+
+  Not reentrant: `fun` must not call another mutator that itself calls `update/1`, or the inner
+  save would be clobbered by the outer. Compose the changes into one `fun` instead.
+  """
+  @spec update((map() -> map())) :: map()
+  def update(fun) when is_function(fun, 1), do: Pepe.Config.Writer.update(fun)
 
   ###
   ### Models
@@ -180,19 +207,21 @@ defmodule Pepe.Config do
   def put_model(%Model{name: name} = model) do
     id = model.id || model_id_for(name) || generate_model_id()
 
-    load()
-    |> update_in(["models"], fn m -> Map.put(m || %{}, id, encode_model(%{model | id: id})) end)
-    |> maybe_default_root("default_model", id)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["models"], fn m -> Map.put(m || %{}, id, encode_model(%{model | id: id})) end)
+      |> maybe_default_root("default_model", id)
+    end)
   end
 
   def delete_model(id_or_name) do
     id = model_id_for(id_or_name) || id_or_name
 
-    load()
-    |> update_in(["models"], &Map.delete(&1 || %{}, id))
-    |> clear_default_if("default_model", id)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["models"], &Map.delete(&1 || %{}, id))
+      |> clear_default_if("default_model", id)
+    end)
   end
 
   @doc """
@@ -216,10 +245,11 @@ defmodule Pepe.Config do
   defp do_rename_model(old, new) do
     put_model(%{get_model(old) | name: new})
 
-    load()
-    |> remap_fallbacks_everywhere(old, new)
-    |> model_rename_in_hook("llm_redact", "model", old, new)
-    |> save()
+    update(fn config ->
+      config
+      |> remap_fallbacks_everywhere(old, new)
+      |> model_rename_in_hook("llm_redact", "model", old, new)
+    end)
 
     :ok
   end
@@ -358,7 +388,8 @@ defmodule Pepe.Config do
   end
 
   def set_default_model(name_or_id) do
-    load() |> Map.put("default_model", model_id_for(name_or_id) || name_or_id) |> save()
+    id = model_id_for(name_or_id) || name_or_id
+    update(fn config -> Map.put(config, "default_model", id) end)
   end
 
   @doc "Set the default model for a scope: global for root, or the company's own."
@@ -367,9 +398,9 @@ defmodule Pepe.Config do
   def set_default_model_for(company, name_or_id) do
     id = model_id_for(name_or_id) || name_or_id
 
-    load()
-    |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_model", id) end)
-    |> save()
+    update(fn config ->
+      update_in(config, ["companies", company], fn m -> Map.put(m || %{}, "default_model", id) end)
+    end)
   end
 
   ###
@@ -404,14 +435,13 @@ defmodule Pepe.Config do
         {:error, :already_exists}
 
       true ->
-        load()
-        |> update_in(["companies"], fn c ->
-          Map.put(c || %{}, name, Map.put_new(meta, "created", true))
-        end)
-        |> save()
-
+        update(&insert_company(&1, name, meta))
         :ok
     end
+  end
+
+  defp insert_company(config, name, meta) do
+    update_in(config, ["companies"], fn c -> Map.put(c || %{}, name, Map.put_new(meta, "created", true)) end)
   end
 
   @doc """
@@ -432,9 +462,10 @@ defmodule Pepe.Config do
           |> Map.new()
           |> Map.put("created", true)
 
-        load()
-        |> update_in(["companies"], &Map.put(&1 || %{}, name, merged))
-        |> save()
+        update(fn config ->
+          config
+          |> update_in(["companies"], &Map.put(&1 || %{}, name, merged))
+        end)
 
         :ok
     end
@@ -455,17 +486,18 @@ defmodule Pepe.Config do
         {:error, {:not_empty, length(owned)}}
 
       true ->
-        config = load()
-        agents = Map.get(config, "agents", %{})
-        kept = Map.reject(agents, fn {handle, _} -> Company.of(handle) == name end)
-
-        config
-        |> Map.put("agents", kept)
-        |> update_in(["companies"], &Map.delete(&1 || %{}, name))
-        |> save()
-
+        update(&drop_company(&1, name))
         :ok
     end
+  end
+
+  defp drop_company(config, name) do
+    agents = Map.get(config, "agents", %{})
+    kept = Map.reject(agents, fn {handle, _} -> Company.of(handle) == name end)
+
+    config
+    |> Map.put("agents", kept)
+    |> update_in(["companies"], &Map.delete(&1 || %{}, name))
   end
 
   @doc """
@@ -490,17 +522,18 @@ defmodule Pepe.Config do
   end
 
   defp do_rename_company(old, new) do
-    load()
-    |> rename_company_entry(old, new)
-    |> rekey_section("agents", old, new, &rewrite_agent_refs(&1, old, new))
-    |> remap_model_names(old, new)
-    |> rewrite_agent_binding("crons", old, new)
-    |> rewrite_agent_binding("watches", old, new)
-    |> rewrite_bot_bindings(old, new)
-    |> rewrite_token_scopes(old, new)
-    |> remap_field("default_agent", old, new)
-    |> remap_field("default_model", old, new)
-    |> save()
+    update(fn config ->
+      config
+      |> rename_company_entry(old, new)
+      |> rekey_section("agents", old, new, &rewrite_agent_refs(&1, old, new))
+      |> remap_model_names(old, new)
+      |> rewrite_agent_binding("crons", old, new)
+      |> rewrite_agent_binding("watches", old, new)
+      |> rewrite_bot_bindings(old, new)
+      |> rewrite_token_scopes(old, new)
+      |> remap_field("default_agent", old, new)
+      |> remap_field("default_model", old, new)
+    end)
 
     move_company_dirs(old, new)
     :ok
@@ -961,10 +994,11 @@ defmodule Pepe.Config do
   def put_agent(%Agent{name: name} = agent) do
     stored = %{agent | model: model_id_for(agent.model) || agent.model}
 
-    load()
-    |> update_in(["agents"], fn a -> Map.put(a || %{}, name, encode(stored)) end)
-    |> maybe_default_root("default_agent", name)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["agents"], fn a -> Map.put(a || %{}, name, encode(stored)) end)
+      |> maybe_default_root("default_agent", name)
+    end)
   end
 
   # An agent's stored `model` is a model id (rename-safe); resolve it back to
@@ -974,33 +1008,50 @@ defmodule Pepe.Config do
   defp resolve_agent_model(%Agent{model: nil} = agent), do: agent
   defp resolve_agent_model(%Agent{model: id} = agent), do: %{agent | model: model_name_for(id)}
 
+  # Atomically read-modify-write one agent: `fun` gets the current Agent struct and returns the
+  # modified one, with the read and the write under a single lock. A `get_agent` + `put_agent`
+  # pair (the old shape) could lose a concurrent grant/route change to the SAME agent - both read
+  # the old agent, and the second `put_agent` writes back the whole entry, dropping the first's
+  # change. Returns `:ok`, or `{:error, :unknown_agent}`. (Callers ignore the success value.)
+  defp update_agent(name, fun) do
+    if is_map(get_in(load(), ["agents", name])) do
+      update(&apply_to_agent(&1, name, fun))
+      :ok
+    else
+      {:error, :unknown_agent}
+    end
+  end
+
+  defp apply_to_agent(config, name, fun) do
+    case config["agents"][name] do
+      raw when is_map(raw) ->
+        agent = Agent.from_map(Map.put(raw, "name", name)) |> resolve_agent_model()
+        updated = fun.(agent)
+        stored = %{updated | model: model_id_for(updated.model) || updated.model}
+        update_in(config, ["agents"], &Map.put(&1 || %{}, name, encode(stored)))
+
+      _ ->
+        config
+    end
+  end
+
   @doc "Persistently approve `tool` for `agent_name` (the `:always` permission grant)."
   def allow_tool(agent_name, grant) do
-    case get_agent(agent_name) do
-      nil ->
-        {:error, :unknown_agent}
-
-      agent ->
-        # Widen the grant this agent already has for that tool rather than piling a second
-        # entry beside it, so the list stays something a human can audit at a glance.
-        put_agent(%{agent | auto_approve: Pepe.Permissions.Grant.merge(agent.auto_approve, grant)})
-    end
+    # Widen the grant this agent already has for that tool rather than piling a second entry
+    # beside it, so the list stays something a human can audit at a glance.
+    update_agent(agent_name, fn agent ->
+      %{agent | auto_approve: Pepe.Permissions.Grant.merge(agent.auto_approve, grant)}
+    end)
   end
 
   @doc "Allow `from` to message `to` (a directed route; `to -> from` is unaffected)."
   def allow_message(from, to) do
-    case get_agent(from) do
-      nil -> {:error, :unknown_agent}
-      agent -> put_agent(%{agent | can_message: Enum.uniq(agent.can_message ++ [to])})
-    end
+    update_agent(from, fn agent -> %{agent | can_message: Enum.uniq(agent.can_message ++ [to])} end)
   end
 
   @doc "Remove the `from -> to` route."
   def disallow_message(from, to) do
-    case get_agent(from) do
-      nil -> {:error, :unknown_agent}
-      agent -> put_agent(%{agent | can_message: List.delete(agent.can_message, to)})
-    end
+    update_agent(from, fn agent -> %{agent | can_message: List.delete(agent.can_message, to)} end)
   end
 
   @doc """
@@ -1022,46 +1073,40 @@ defmodule Pepe.Config do
 
   @doc "Grant `from` management authority over `to` (directed; list is exhaustive)."
   def allow_manage(from, to) do
-    case get_agent(from) do
-      nil -> {:error, :unknown_agent}
-      agent -> put_agent(%{agent | can_manage: Enum.uniq((agent.can_manage || []) ++ [to])})
-    end
+    update_agent(from, fn agent -> %{agent | can_manage: Enum.uniq((agent.can_manage || []) ++ [to])} end)
   end
 
   @doc "Revoke `from`'s authority over `to`."
   def disallow_manage(from, to) do
-    case get_agent(from) do
-      nil -> {:error, :unknown_agent}
-      agent -> put_agent(%{agent | can_manage: List.delete(agent.can_manage || [], to)})
-    end
+    update_agent(from, fn agent -> %{agent | can_manage: List.delete(agent.can_manage || [], to)} end)
   end
 
   def delete_agent(name) do
-    load()
-    |> update_in(["agents"], &Map.delete(&1 || %{}, name))
-    |> clear_default_if("default_agent", name)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["agents"], &Map.delete(&1 || %{}, name))
+      |> clear_default_if("default_agent", name)
+    end)
   end
 
   @doc "Rename an agent (config key + name + default pointer). Does not move files."
   def rename_agent(old, new) do
-    config = load()
-    agents = config["agents"] || %{}
+    if is_map(get_in(load(), ["agents", old])) do
+      update(fn config ->
+        agents = config["agents"] || %{}
+        agent_map = agents[old] || %{}
 
-    case Map.fetch(agents, old) do
-      {:ok, agent_map} ->
-        agents =
+        new_agents =
           agents
           |> Map.delete(old)
           |> Map.put(new, Map.put(agent_map, "name", new))
 
         config
-        |> Map.put("agents", agents)
+        |> Map.put("agents", new_agents)
         |> rename_default_agent(old, new)
-        |> save()
-
-      :error ->
-        {:error, :not_found}
+      end)
+    else
+      {:error, :not_found}
     end
   end
 
@@ -1080,7 +1125,7 @@ defmodule Pepe.Config do
   end
 
   def set_default_agent(name) do
-    load() |> Map.put("default_agent", name) |> save()
+    update(fn config -> config |> Map.put("default_agent", name) end)
   end
 
   @doc """
@@ -1090,9 +1135,10 @@ defmodule Pepe.Config do
   def set_default_agent_for(nil, name), do: set_default_agent(name)
 
   def set_default_agent_for(company, name) do
-    load()
-    |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_agent", name) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_agent", name) end)
+    end)
   end
 
   @doc """
@@ -1181,9 +1227,10 @@ defmodule Pepe.Config do
     stored = %{cron | model: model_id_for(cron.model) || cron.model}
     map = stored |> Map.from_struct() |> Map.delete(:id) |> stringify()
 
-    load()
-    |> update_in(["crons"], fn c -> Map.put(c || %{}, id, map) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["crons"], fn c -> Map.put(c || %{}, id, map) end)
+    end)
   end
 
   # Same rename-safety trick as resolve_agent_model/1: a cron's stored `model`
@@ -1193,9 +1240,10 @@ defmodule Pepe.Config do
 
   @doc "Delete a cron by id."
   def delete_cron(id) do
-    load()
-    |> update_in(["crons"], &Map.delete(&1 || %{}, id))
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["crons"], &Map.delete(&1 || %{}, id))
+    end)
   end
 
   ###
@@ -1224,16 +1272,18 @@ defmodule Pepe.Config do
   def put_watch(%Watch{id: id} = watch) when is_binary(id) do
     map = watch |> Map.from_struct() |> Map.delete(:id) |> stringify()
 
-    load()
-    |> update_in(["watches"], fn w -> Map.put(w || %{}, id, map) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["watches"], fn w -> Map.put(w || %{}, id, map) end)
+    end)
   end
 
   @doc "Delete a watch by id."
   def delete_watch(id) do
-    load()
-    |> update_in(["watches"], &Map.delete(&1 || %{}, id))
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["watches"], &Map.delete(&1 || %{}, id))
+    end)
   end
 
   ###
@@ -1329,9 +1379,10 @@ defmodule Pepe.Config do
       |> maybe_put("token", widget? && raw)
       |> put_appearance(widget?, opts)
 
-    load()
-    |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["api_tokens"], fn t -> Map.put(t || %{}, id, entry) end)
+    end)
 
     {:ok, raw, id}
   end
@@ -1365,7 +1416,7 @@ defmodule Pepe.Config do
           |> Enum.reduce(entry, fn field, acc -> Map.put(acc, to_string(field), blank_to_nil(opts[field])) end)
           |> maybe_put_label(opts)
 
-        load() |> put_in(["api_tokens", id], updated) |> save()
+        update(fn config -> config |> put_in(["api_tokens", id], updated) end)
         :ok
 
       _ ->
@@ -1386,7 +1437,7 @@ defmodule Pepe.Config do
   @doc "Revoke a token by id."
   def revoke_api_token(id) do
     if get_in(load(), ["api_tokens", id]) do
-      load() |> update_in(["api_tokens"], &Map.delete(&1 || %{}, id)) |> save()
+      update(fn config -> config |> update_in(["api_tokens"], &Map.delete(&1 || %{}, id)) end)
       :ok
     else
       {:error, :not_found}
@@ -1418,7 +1469,7 @@ defmodule Pepe.Config do
   def widget_config(raw) when is_binary(raw) do
     hash = Pepe.ApiToken.hash(raw)
 
-    case Enum.find(api_tokens(), &(&1["kind"] == "widget" and &1["hash"] == hash)) do
+    case Enum.find(api_tokens(), &(&1["kind"] == "widget" and token_hash_match?(&1, hash))) do
       nil ->
         nil
 
@@ -1440,13 +1491,18 @@ defmodule Pepe.Config do
   def verify_api_token(raw) when is_binary(raw) do
     hash = Pepe.ApiToken.hash(raw)
 
-    case Enum.find(api_tokens(), &(&1["hash"] == hash)) do
+    case Enum.find(api_tokens(), &token_hash_match?(&1, hash)) do
       nil -> nil
       t -> %{company: t["company"], agent: t["agent"], kind: t["kind"], allowed_origin: t["allowed_origin"]}
     end
   end
 
   def verify_api_token(_), do: nil
+
+  # Constant-time compare of the stored token hash. The hashes are SHA-256 of the token, so a
+  # timing side channel is not practically exploitable (the attacker can't steer the hash bits
+  # without a preimage), but the secure compare is the correct default and costs nothing.
+  defp token_hash_match?(entry, hash), do: Plug.Crypto.secure_compare(to_string(entry["hash"]), hash)
 
   ###
   ### Gateways
@@ -1457,7 +1513,7 @@ defmodule Pepe.Config do
   end
 
   def put_telegram(map) when is_map(map) do
-    load() |> Map.put("telegram", map) |> save()
+    update(fn config -> config |> Map.put("telegram", map) end)
   end
 
   @doc """
@@ -1491,9 +1547,10 @@ defmodule Pepe.Config do
   def put_telegram_bot(name, map) when is_binary(name) and is_map(map) do
     clean = Map.delete(map, "name")
 
-    load()
-    |> update_in(["telegrams"], fn t -> Map.put(t || %{}, name, clean) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["telegrams"], fn t -> Map.put(t || %{}, name, clean) end)
+    end)
   end
 
   @doc """
@@ -1507,15 +1564,17 @@ defmodule Pepe.Config do
   shown it would have done nothing.
   """
   def delete_telegram_bot("default") do
-    load()
-    |> Map.put("telegram", %{})
-    |> save()
+    update(fn config ->
+      config
+      |> Map.put("telegram", %{})
+    end)
   end
 
   def delete_telegram_bot(name) do
-    load()
-    |> update_in(["telegrams"], &Map.delete(&1 || %{}, name))
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["telegrams"], &Map.delete(&1 || %{}, name))
+    end)
   end
 
   ###
@@ -1538,16 +1597,18 @@ defmodule Pepe.Config do
   def put_webhook(slug, map) when is_binary(slug) and is_map(map) do
     clean = Map.delete(map, "slug")
 
-    load()
-    |> update_in(["webhooks"], fn w -> Map.put(w || %{}, slug, clean) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["webhooks"], fn w -> Map.put(w || %{}, slug, clean) end)
+    end)
   end
 
   @doc "Delete a webhook connection."
   def delete_webhook(slug) do
-    load()
-    |> update_in(["webhooks"], &Map.delete(&1 || %{}, slug))
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["webhooks"], &Map.delete(&1 || %{}, slug))
+    end)
   end
 
   ###
@@ -1566,9 +1627,10 @@ defmodule Pepe.Config do
 
   @doc "Replace the settings for one media kind (`\"audio\"`)."
   def put_media(kind, settings) when is_binary(kind) and is_map(settings) do
-    load()
-    |> update_in(["media"], fn m -> Map.put(m || %{}, kind, settings) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["media"], fn m -> Map.put(m || %{}, kind, settings) end)
+    end)
   end
 
   @doc "Global per-hook settings (`name => settings`), e.g. `pii_redact`'s packs/custom."
@@ -1579,9 +1641,10 @@ defmodule Pepe.Config do
 
   @doc "Replace one hook's global settings map."
   def put_hook_settings(name, settings) when is_binary(name) and is_map(settings) do
-    load()
-    |> update_in(["hooks"], fn h -> Map.put(h || %{}, name, settings) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["hooks"], fn h -> Map.put(h || %{}, name, settings) end)
+    end)
   end
 
   ###
@@ -1612,16 +1675,18 @@ defmodule Pepe.Config do
 
   @doc "Create or replace an MCP server definition."
   def put_mcp_server(name, map) when is_binary(name) and is_map(map) do
-    load()
-    |> update_in(["mcp"], fn m -> Map.put(m || %{}, name, map) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["mcp"], fn m -> Map.put(m || %{}, name, map) end)
+    end)
   end
 
   @doc "Delete an MCP server definition."
   def delete_mcp_server(name) do
-    load()
-    |> update_in(["mcp"], &Map.delete(&1 || %{}, name))
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["mcp"], &Map.delete(&1 || %{}, name))
+    end)
   end
 
   @doc "Saved settings for a plugin (by name) as a `%{key => value}` map. Secrets may be `${ENV_VAR}` refs."
@@ -1629,9 +1694,10 @@ defmodule Pepe.Config do
 
   @doc "Create or replace a plugin's settings map."
   def put_plugin_config(name, map) when is_binary(name) and is_map(map) do
-    load()
-    |> update_in(["plugins"], fn m -> Map.put(m || %{}, name, map) end)
-    |> save()
+    update(fn config ->
+      config
+      |> update_in(["plugins"], fn m -> Map.put(m || %{}, name, map) end)
+    end)
   end
 
   def server do
@@ -1645,7 +1711,7 @@ defmodule Pepe.Config do
   def default_timezone, do: load()["timezone"] || "Etc/UTC"
 
   @doc "Set the default timezone for scheduled tasks."
-  def set_default_timezone(tz), do: load() |> Map.put("timezone", tz) |> save()
+  def set_default_timezone(tz), do: update(fn config -> config |> Map.put("timezone", tz) end)
 
   @doc """
   Path to the sandbox wrapper program that `bash`/`run_script` run commands through
@@ -1660,8 +1726,8 @@ defmodule Pepe.Config do
   end
 
   @doc "Set (or clear, with nil) the sandbox wrapper program."
-  def set_sandbox(nil), do: load() |> Map.delete("sandbox") |> save()
-  def set_sandbox(path) when is_binary(path), do: load() |> Map.put("sandbox", path) |> save()
+  def set_sandbox(nil), do: update(fn config -> config |> Map.delete("sandbox") end)
+  def set_sandbox(path) when is_binary(path), do: update(fn config -> config |> Map.put("sandbox", path) end)
 
   @doc """
   The billing currency symbol/code used to label costs (default `\"USD\"`). Prices
@@ -1670,7 +1736,7 @@ defmodule Pepe.Config do
   def currency, do: load()["currency"] || "USD"
 
   @doc "Set the billing currency label."
-  def set_currency(code), do: load() |> Map.put("currency", code) |> save()
+  def set_currency(code), do: update(fn config -> config |> Map.put("currency", code) end)
 
   @doc """
   The dashboard password, or nil when unset. Read from config `dashboard.password`
@@ -1694,7 +1760,7 @@ defmodule Pepe.Config do
   def review_writes?, do: load()["review_writes"] == true
 
   @doc "Turn the autonomous-write review queue on or off."
-  def set_review_writes(on?), do: load() |> Map.put("review_writes", on? == true) |> save()
+  def set_review_writes(on?), do: update(fn config -> config |> Map.put("review_writes", on? == true) end)
 
   @doc """
   Extra `Host` header values the dashboard accepts besides loopback names (for
@@ -1736,10 +1802,16 @@ defmodule Pepe.Config do
   """
   @spec update_scope(String.t() | nil, map()) :: :ok | {:error, :not_found}
   def update_scope(nil, meta) do
-    merged =
-      scope_config(nil) |> Map.merge(meta) |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
+    update(fn config ->
+      merged =
+        (config["root"] || %{})
+        |> Map.merge(meta)
+        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+        |> Map.new()
 
-    load() |> Map.put("root", merged) |> save()
+      Map.put(config, "root", merged)
+    end)
+
     :ok
   end
 
@@ -1807,7 +1879,7 @@ defmodule Pepe.Config do
 
   @doc "Set the locale and apply it to Gettext for this process."
   def set_locale(locale) do
-    load() |> Map.put("locale", locale) |> save()
+    update(fn config -> config |> Map.put("locale", locale) end)
   end
 
   @doc "Apply the configured locale to `Pepe.Gettext` (call per process)."

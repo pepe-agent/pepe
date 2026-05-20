@@ -14,8 +14,6 @@ defmodule Pepe.Webhooks.WhatsApp do
   """
   @behaviour Pepe.Webhooks.Provider
 
-  require Logger
-
   alias Pepe.Config
 
   @graph "https://graph.facebook.com/v21.0"
@@ -66,9 +64,7 @@ defmodule Pepe.Webhooks.WhatsApp do
         if Plug.Crypto.secure_compare(expected, given), do: :ok, else: :error
 
       _ ->
-        # No app secret configured - accept but flag it (fine for local dev only).
-        Logger.warning("[whatsapp] no app_secret set; inbound signature unverified")
-        :ok
+        Pepe.Webhooks.Provider.unsigned_inbound("whatsapp")
     end
   end
 

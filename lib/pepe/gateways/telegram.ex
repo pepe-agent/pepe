@@ -447,7 +447,8 @@ defmodule Pepe.Gateways.Telegram do
     chat_id = chat["id"]
     user_id = get_in(message, ["from", "id"])
 
-    if active?() and allowed?(chat_id, user_id) and addressed?(text, chat["type"], chat_id) do
+    if active?() and allowed?(chat_id, user_id) and addressed?(text, chat["type"], chat_id) and
+         Pepe.Gateways.Telegram.Throttle.allow?(chat_id) do
       b = bot()
 
       Task.start(fn ->
@@ -464,7 +465,7 @@ defmodule Pepe.Gateways.Telegram do
     chat_id = get_in(cq, ["message", "chat", "id"])
     user_id = get_in(cq, ["from", "id"])
 
-    if active?() and allowed?(chat_id, user_id) do
+    if active?() and may_approve?(chat_id, user_id) do
       deliver_permission(data, cq)
     end
   end
@@ -515,7 +516,7 @@ defmodule Pepe.Gateways.Telegram do
     # group it would run against the caption, and a voice note usually has none, so a
     # spoken "@bot, deploy it" could never reach the bot. It is checked below instead,
     # against the words, once there are any. The allowlist still gates who gets this far.
-    if active?() and allowed?(chat_id, user_id) do
+    if active?() and allowed?(chat_id, user_id) and Pepe.Gateways.Telegram.Throttle.allow?(chat_id) do
       b = bot()
       learn = learn_allowed?(user_id)
 
@@ -828,6 +829,18 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
+  # Who may press a risky-tool permission button. When the bot distinguishes trainers from
+  # ordinary allowed users, only a trainer may approve - otherwise, in a group, any allowed user
+  # could approve another user's risky action (e.g. a `bash` prompt). A personal bot with no
+  # trainers configured makes no such distinction, so the allowlist alone stands, unchanged.
+  defp may_approve?(chat_id, user_id) do
+    allowed?(chat_id, user_id) and
+      case bot()["trainers"] do
+        list when is_list(list) and list != [] -> learns_from?(bot(), user_id)
+        _ -> true
+      end
+  end
+
   defp request_authorization(chat_id, name, args) do
     id = System.unique_integer([:positive])
     :ets.insert(@pending, {id, self()})
@@ -961,13 +974,27 @@ defmodule Pepe.Gateways.Telegram do
   # place. Do not gate inside a `run_command/3` clause: a command can be reached by
   # more than one name (a skill answers both to `/skill <name>` and to `/<name>`),
   # and a gate on one clause leaves the other open.
+  # Commands that reach into the shared session's in-flight turn (stop/undo/inline). In a group
+  # the session is shared by chat id, so without a gate any allowed member could interrupt another
+  # member's running turn. They are trainer-gated in groups (like the risky-tool approval button);
+  # in a DM it's your own session, and a bot with no trainers makes no distinction, both unchanged.
+  @turn_control ~w(stop undo inline)
+
   defp dispatch(chat_id, cmd, args) do
-    if operator_command?(cmd) do
-      operator_only(chat_id, fn -> run_command(chat_id, cmd, args) end)
-    else
-      run_command(chat_id, cmd, args)
+    cond do
+      operator_command?(cmd) ->
+        operator_only(chat_id, fn -> run_command(chat_id, cmd, args) end)
+
+      cmd in @turn_control and group_chat?(chat_id) ->
+        operator_only(chat_id, fn -> run_command(chat_id, cmd, args) end)
+
+      true ->
+        run_command(chat_id, cmd, args)
     end
   end
+
+  # Telegram group/supergroup chat ids are negative; a private chat's is the positive user id.
+  defp group_chat?(chat_id), do: is_integer(chat_id) and chat_id < 0
 
   defp run_command(chat_id, cmd, _args) when cmd in ["new", "reset"] do
     ensure_session(chat_id)

@@ -451,13 +451,26 @@ defmodule Pepe.Agent.Session do
         {:reply, {:error, :no_agent}, state}
 
       agent ->
-        messages = ensure_system(state.messages, agent) ++ [Message.user(text)]
+        # An aside is real user text on its way to the provider, so it gets the same
+        # inbound/outbound redaction a normal turn does (spawn_run/resume) - it must not be the
+        # one path that leaks PII a configured hook would have caught, or leaves tool-result
+        # hook entries stranded in the process dictionary. It stays ephemeral: `state` (its
+        # `pii_map` included) is left untouched, so the aside changes nothing about the session.
+        {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => state.pii_map})
+        messages = ensure_system(state.messages, agent) ++ [Message.user(redacted)]
         opts = Keyword.put(opts, :session_key, state.key)
 
-        # Reply from the run but keep `state` untouched, so the aside is ephemeral.
+        Pepe.Hooks.start_map(state.pii_map ++ entries)
+
         case Runtime.run(agent, messages, opts) do
-          {:ok, reply, _all} -> {:reply, {:ok, reply}, state}
-          {:error, reason} -> {:reply, {:error, reason}, state}
+          {:ok, reply, _all} ->
+            map = Pepe.Hooks.take_map()
+            {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
+            {:reply, {:ok, Pepe.Hooks.restore(shown, map)}, state}
+
+          {:error, reason} ->
+            Pepe.Hooks.take_map()
+            {:reply, {:error, reason}, state}
         end
     end
   end

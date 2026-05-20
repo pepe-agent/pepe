@@ -12,6 +12,8 @@ defmodule PepeWeb.OpenAIController do
   """
   use PepeWeb, :controller
 
+  require Logger
+
   alias Pepe.Agent.Runtime
   alias Pepe.ApiScope
   alias Pepe.Company
@@ -180,7 +182,7 @@ defmodule PepeWeb.OpenAIController do
 
     case Pepe.Agent.chat(key, agent.name, text) do
       {:ok, reply} -> json(conn, completion_object(agent.name, reply, session_id))
-      {:error, reason} -> error(conn, 502, "session error: #{inspect(reason)}")
+      {:error, reason} -> upstream_error(conn, "session error", reason)
     end
   end
 
@@ -209,7 +211,10 @@ defmodule PepeWeb.OpenAIController do
       end)
 
     conn = stream_loop(conn, id, agent.name)
-    Task.await(task, :infinity)
+    # The stream loop already bounds itself (its `after 180_000`). Wait for the task with a finite
+    # ceiling and kill it if it overruns, so a hung provider never leaves the request process and
+    # its connection pinned forever (a slow resource-exhaustion vector under load).
+    Task.shutdown(task, 5_000)
 
     {:ok, conn} = chunk(conn, "data: [DONE]\n\n")
     conn
@@ -228,8 +233,16 @@ defmodule PepeWeb.OpenAIController do
         json(conn, completion_object(agent.name, content))
 
       {:error, reason} ->
-        error(conn, 502, "agent error: #{inspect(reason)}")
+        upstream_error(conn, "agent error", reason)
     end
+  end
+
+  # Never serialize the raw `reason` into the response: it can carry the provider's base_url,
+  # internal hostnames, and upstream error internals, handed to any caller (including another
+  # tenant's token or the public widget). Log it server-side, return a generic message.
+  defp upstream_error(conn, label, reason) do
+    Logger.error("[/v1] #{label}: #{inspect(reason)}")
+    error(conn, 502, label)
   end
 
   defp completion_object(model_name, content, session_id \\ nil) do
@@ -277,7 +290,10 @@ defmodule PepeWeb.OpenAIController do
     task = Task.async(fn -> Runtime.run(agent, messages, opts) end)
 
     conn = stream_loop(conn, id, agent.name)
-    Task.await(task, :infinity)
+    # The stream loop already bounds itself (its `after 180_000`). Wait for the task with a finite
+    # ceiling and kill it if it overruns, so a hung provider never leaves the request process and
+    # its connection pinned forever (a slow resource-exhaustion vector under load).
+    Task.shutdown(task, 5_000)
 
     {:ok, conn} = chunk(conn, "data: [DONE]\n\n")
     conn
@@ -296,9 +312,8 @@ defmodule PepeWeb.OpenAIController do
         conn
 
       {:stream_error, reason} ->
-        payload =
-          chunk_object(id, model_name, %{"content" => "\n[error: #{inspect(reason)}]"}, "stop")
-
+        Logger.error("[/v1] stream error: #{inspect(reason)}")
+        payload = chunk_object(id, model_name, %{"content" => "\n[error: upstream request failed]"}, "stop")
         {:ok, conn} = chunk(conn, "data: #{Jason.encode!(payload)}\n\n")
         conn
     after

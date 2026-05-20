@@ -28,7 +28,7 @@ defmodule Pepe.Tools.EditFile do
   end
 
   @impl true
-  def run(%{"path" => path, "old_string" => old, "new_string" => new}, ctx) do
+  def run(%{"path" => path, "old_string" => old, "new_string" => new}, ctx) when is_binary(path) do
     full = resolve(path, ctx)
 
     with {:ok, content} <- File.read(full),
@@ -43,6 +43,7 @@ defmodule Pepe.Tools.EditFile do
     end
   end
 
+  def run(%{"path" => _, "old_string" => _, "new_string" => _}, _ctx), do: {:error, "'path' must be a string"}
   def run(_, _), do: {:error, "missing 'path', 'old_string' or 'new_string'"}
 
   defp count(content, sub) do

@@ -27,7 +27,7 @@ defmodule Pepe.Tools.ReadFile do
   def concurrent?, do: true
 
   @impl true
-  def run(%{"path" => path}, ctx) do
+  def run(%{"path" => path}, ctx) when is_binary(path) do
     full = resolve(path, ctx)
 
     case File.read(full) do
@@ -36,6 +36,10 @@ defmodule Pepe.Tools.ReadFile do
     end
   end
 
+  # A non-string path (e.g. a JSON array of char codes decoding to a charlist) is rejected: it is
+  # never a legitimate call, and a charlist is a valid path for File.read that would otherwise
+  # sidestep the string-based workspace checks.
+  def run(%{"path" => _}, _ctx), do: {:error, "'path' must be a string"}
   def run(_, _), do: {:error, "missing 'path'"}
 
   defp resolve(path, ctx), do: Pepe.Agent.Workspace.resolve_in_ctx(path, ctx)

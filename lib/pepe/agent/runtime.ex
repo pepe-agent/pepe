@@ -199,6 +199,13 @@ defmodule Pepe.Agent.Runtime do
           loop(agent, chain, new_messages, specs, ctx, opts, iterations_left - 1)
         end
 
+      # The provider signalled failure (an SSE `response.failed`/`error`, a mapped `finish_reason`)
+      # and produced nothing. Without this it would fall through as a successful *empty* reply -
+      # a provider outage read as the agent having calmly said nothing.
+      {:ok, %{finish_reason: "error", content: content}} when content in [nil, ""] ->
+        emit(opts, {:error, :provider_error})
+        {:error, :provider_error}
+
       {:ok, %{content: content}} ->
         content = content || ""
         emit(opts, {:assistant, content})
@@ -348,6 +355,13 @@ defmodule Pepe.Agent.Runtime do
   # the write, then the last read. Never all three reads first, which would silently turn a
   # read-after-write into a read-before-write.
   defp run_tools(tool_calls, ctx, opts) do
+    # Capture the taint now, in the run-owning process, so it survives the fan-out into child
+    # Tasks (whose process dictionary is empty). A concurrent `delegate`/`send_to_agent` then reads
+    # the real taint from `ctx` instead of a blank one, and can't launder outside content by
+    # spawning a worker that starts clean. Fixed for the whole batch: the taint only changes when a
+    # tool result comes back (finalize_tool, below), i.e. after this batch.
+    ctx = Map.put(ctx, :tainted, Pepe.Permissions.tainted?(ctx))
+
     tool_calls
     |> Enum.map(&prepare_tool(&1, ctx, opts))
     |> Enum.chunk_by(&concurrent_step?/1)

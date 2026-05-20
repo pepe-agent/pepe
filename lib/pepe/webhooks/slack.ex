@@ -14,8 +14,6 @@ defmodule Pepe.Webhooks.Slack do
   """
   @behaviour Pepe.Webhooks.Provider
 
-  require Logger
-
   alias Pepe.Config
 
   @api "https://slack.com/api"
@@ -65,11 +63,23 @@ defmodule Pepe.Webhooks.Slack do
         ts = headers["x-slack-request-timestamp"] || ""
         given = headers["x-slack-signature"] || ""
         expected = "v0=" <> hmac_hex(secret, "v0:#{ts}:#{raw_body}")
-        if Plug.Crypto.secure_compare(expected, given), do: :ok, else: :error
+        if Plug.Crypto.secure_compare(expected, given) and fresh?(ts), do: :ok, else: :error
 
       _ ->
-        Logger.warning("[slack] no signing_secret set; inbound signature unverified")
-        :ok
+        Pepe.Webhooks.Provider.unsigned_inbound("slack")
+    end
+  end
+
+  # Slack signs the request timestamp into the HMAC and recommends rejecting anything older than
+  # five minutes. The signature alone does not stop replay - a captured, still-valid request can
+  # be re-sent verbatim - but the timestamp window does: an attacker cannot move `ts` forward
+  # without the signing secret, so a stale one is refused.
+  @max_age_seconds 300
+
+  defp fresh?(ts) do
+    case Integer.parse(to_string(ts)) do
+      {t, _} -> abs(System.system_time(:second) - t) <= @max_age_seconds
+      :error -> false
     end
   end
 

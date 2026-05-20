@@ -24,7 +24,7 @@ defmodule Pepe.Tools.MoveFile do
   end
 
   @impl true
-  def run(%{"from" => from, "to" => to}, ctx) do
+  def run(%{"from" => from, "to" => to}, ctx) when is_binary(from) and is_binary(to) do
     src = resolve(from, ctx)
     dst = resolve(to, ctx)
     File.mkdir_p!(Path.dirname(dst))
@@ -35,6 +35,7 @@ defmodule Pepe.Tools.MoveFile do
     end
   end
 
+  def run(%{"from" => _, "to" => _}, _ctx), do: {:error, "'from' and 'to' must be strings"}
   def run(_, _), do: {:error, "missing 'from' or 'to'"}
 
   defp resolve(path, ctx), do: Pepe.Agent.Workspace.resolve_in_ctx(path, ctx)

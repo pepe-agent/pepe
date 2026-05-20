@@ -66,10 +66,16 @@ defmodule PepeWeb.ChannelsLive do
         {"data-position", t["position"]}
       ]
       |> Enum.reject(fn {_, v} -> is_nil(v) end)
-      |> Enum.map_join("\n        ", fn {k, v} -> ~s(#{k}="#{v}") end)
+      |> Enum.map_join("\n        ", fn {k, v} -> ~s(#{k}="#{attr(v)}") end)
 
-    ~s(<script src="#{host || "https://your-pepe-host"}/plugin-assets/pepe-widget/widget.js"\n        #{attrs}></script>)
+    ~s(<script src="#{attr(host || "https://your-pepe-host")}/plugin-assets/pepe-widget/widget.js"\n        #{attrs}></script>)
   end
+
+  # The appearance fields are free text the operator types, and this snippet is copied verbatim
+  # into their own public site's HTML - so a value with a `"` or `<` would break out of the
+  # attribute (or inject a tag) there, even though it renders as inert text inside the dashboard.
+  # Escape each value for double-quoted-attribute context.
+  defp attr(v), do: v |> to_string() |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
   # `values` is a widget token entry (or `%{}` for a fresh one) - reused by both the
   # create form and the edit form below, keyed by `prefix` so both can post-back

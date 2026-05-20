@@ -129,7 +129,9 @@ defmodule Pepe.LLM.Messages do
 
     base = %{
       "model" => model.model,
-      "max_tokens" => model.max_tokens || @default_max_tokens,
+      # `opts[:max_tokens]` first so the runtime's output-cap retry (which lowers the reservation
+      # after a provider rejects an over-large one) actually reaches the request.
+      "max_tokens" => opts[:max_tokens] || model.max_tokens || @default_max_tokens,
       "messages" => to_messages(messages),
       "stream" => true
     }

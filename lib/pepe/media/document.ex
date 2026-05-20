@@ -236,21 +236,35 @@ defmodule Pepe.Media.Document do
     end
   end
 
+  # Only the entries matching `pattern` are extracted, by name. `:zip.extract(:memory)` with no
+  # `:file_list` inflates EVERY entry, so a `.xlsx`/`.pptx` carrying one tiny legit sheet (which
+  # passes the budget) plus a huge non-matching entry (`xl/media/bomb.bin`) would still be fully
+  # inflated and OOM the node. Extracting only the matching names, after budgeting those same
+  # names, means a non-matching bomb is never inflated at all.
   defp entries(path, pattern) do
-    with :ok <- within_budget?(path, &(to_string(&1) =~ pattern)),
-         {:ok, list} <- :zip.extract(String.to_charlist(path), [:memory]) do
-      matching(list, pattern)
+    with {:ok, names} <- matching_names(path, pattern),
+         :ok <- within_budget?(path, &(to_string(&1) =~ pattern)),
+         {:ok, list} <- :zip.extract(String.to_charlist(path), [{:file_list, names}, :memory]) do
+      matching(list)
     else
       _ -> :unavailable
     end
   end
 
-  defp matching(list, pattern) do
-    case Enum.filter(list, fn {name, _} -> to_string(name) =~ pattern end) do
-      [] -> :unavailable
-      found -> {:ok, found}
+  # The names (charlists, as `:file_list` wants) of the entries matching `pattern`, read from the
+  # central directory without inflating anything.
+  defp matching_names(path, pattern) do
+    with {:ok, list} <- :zip.list_dir(String.to_charlist(path)),
+         [_ | _] = names <-
+           for({:zip_file, name, _info, _, _, _} <- list, to_string(name) =~ pattern, do: name) do
+      {:ok, names}
+    else
+      _ -> :unavailable
     end
   end
+
+  defp matching([]), do: :unavailable
+  defp matching(found), do: {:ok, found}
 
   # Sum the *declared* uncompressed sizes of the entries we are about to read (from the zip's
   # central directory, which `:zip.list_dir` reads without inflating a single byte) and refuse

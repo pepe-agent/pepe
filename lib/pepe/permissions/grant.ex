@@ -140,7 +140,17 @@ defmodule Pepe.Permissions.Grant do
   end
 
   defp known,
-    do: [:inline_eval, :download_exec, :deletes, :elevated, :network, :writes_file, :changes_config]
+    do: [
+      :inline_eval,
+      :download_exec,
+      :deletes,
+      :elevated,
+      :network,
+      :writes_file,
+      :changes_config,
+      :reads_outside,
+      :writes_outside
+    ]
 
   @doc "Human-readable: what a grant actually lets through."
   @spec describe(String.t()) :: String.t()

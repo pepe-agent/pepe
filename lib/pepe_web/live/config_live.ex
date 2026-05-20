@@ -113,7 +113,9 @@ defmodule PepeWeb.ConfigLive do
   def handle_event("config_save", %{"json" => json}, socket) do
     case Jason.decode(json) do
       {:ok, map} when is_map(map) ->
-        Config.save(map)
+        # The operator edited the whole config as raw JSON; write it through the serialized path
+        # so it doesn't race (and lose) a concurrent write from a running agent turn.
+        Config.update(fn _ -> map end)
         Pepe.Gateways.Supervisor.reload_telegram()
 
         {:noreply,

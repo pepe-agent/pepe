@@ -385,12 +385,45 @@ defmodule Pepe.Plugins do
   end
 
   defp compile(path) do
-    path |> Code.compile_file() |> Enum.map(&elem(&1, 0))
+    case guard(path) do
+      :ok ->
+        path |> Code.compile_file() |> Enum.map(&elem(&1, 0))
+
+      {:danger, scan} ->
+        Logger.error(
+          "[plugins] refusing to load #{Path.basename(path)}: Sentinel flagged it dangerous " <>
+            "(#{scan_summary(scan)}). Remove it, or re-install with a reviewed version."
+        )
+
+        []
+    end
   rescue
     error ->
       Logger.warning("[plugins] failed to load #{path}: #{Exception.message(error)}")
       []
   end
+
+  # Scan every plugin at load, not only at `install/1`. A `.exs` can reach the plugins dir
+  # without going through install (a `write_file`, a restored bundle, a hand-edit), and it is
+  # compiled and run in-process with full access. The same `:danger` bar that blocks an install
+  # blocks a load, so a plugin that got there some other way cannot execute code the operator
+  # never reviewed.
+  defp guard(path) do
+    case File.read(path) do
+      {:ok, src} ->
+        scan = Pepe.Skills.Sentinel.scan_code(src, Path.basename(path))
+        if scan.verdict == :danger, do: {:danger, scan}, else: :ok
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp scan_summary(%{findings: [_ | _] = findings}) do
+    findings |> Enum.take(3) |> Enum.map_join("; ", fn f -> "#{f[:category]}: #{f[:match]}" end)
+  end
+
+  defp scan_summary(_), do: "no detail"
 
   defp download(url) do
     case Req.get(url, receive_timeout: 30_000, redirect: true) do

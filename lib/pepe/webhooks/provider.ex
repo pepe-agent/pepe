@@ -39,10 +39,31 @@ defmodule Pepe.Webhooks.Provider do
   @doc """
   Authenticate an inbound `POST`: verify its signature against the connection's
   secret using the raw request body and headers. `:ok` to accept, `:error` to
-  reject (the request is dropped). Providers may return `:ok` when no secret is
-  configured, but should log that it's unverified.
+  reject (the request is dropped). When no secret is configured, fall back to
+  `unsigned_inbound/1` rather than returning `:ok` outright - it accepts only in
+  development and refuses everywhere else.
   """
   @callback authenticate(config :: map(), raw_body :: binary(), headers :: map()) :: :ok | :error
+
+  require Logger
+
+  @doc """
+  The fallback for an inbound `POST` when the connection has no secret to verify against.
+  Accepting an unsigned request is a convenience for local development only; anywhere else it is
+  refused, so a tenant that forgot to configure its signing secret cannot be impersonated by
+  forged, unsigned events. Returns `:ok` in the `:dev` environment (with a warning), `:error`
+  otherwise.
+  """
+  @spec unsigned_inbound(String.t()) :: :ok | :error
+  def unsigned_inbound(provider) do
+    if Application.get_env(:pepe, :env) == :dev do
+      Logger.warning("[#{provider}] no secret set; accepting UNVERIFIED inbound (dev only)")
+      :ok
+    else
+      Logger.error("[#{provider}] no secret configured; refusing unsigned inbound")
+      :error
+    end
+  end
 
   @doc """
   Normalize a decoded payload into zero or more inbound messages. `:ignore` for

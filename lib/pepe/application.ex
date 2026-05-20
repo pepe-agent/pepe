@@ -73,6 +73,9 @@ defmodule Pepe.Application do
         PepeWeb.Telemetry,
         {DNSCluster, query: Application.get_env(:pepe, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Pepe.PubSub},
+        # Serializes all config writes so concurrent read-modify-write mutations can't lose each
+        # other's changes. Started early: everything below may write config.
+        Pepe.Config.Writer,
         # Registry + dynamic supervisor for live agent conversation sessions
         {Registry, keys: :unique, name: Pepe.Agent.Registry},
         Pepe.Agent.SessionSupervisor,
@@ -95,7 +98,9 @@ defmodule Pepe.Application do
         # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).
         PepeWeb.LoginThrottle,
         # Per-session rate limiter for the embeddable chat widget (in-memory ETS, no DB).
-        PepeWeb.WidgetThrottle
+        PepeWeb.WidgetThrottle,
+        # Per-chat rate limiter for inbound Telegram messages (in-memory ETS, no DB).
+        Pepe.Gateways.Telegram.Throttle
       ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Pepe.Supervisor]

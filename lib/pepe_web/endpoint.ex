@@ -82,6 +82,11 @@ defmodule PepeWeb.Endpoint do
   # reads it back via the process dictionary to enforce it per-token.
   def call(conn, opts) do
     Process.put(:pepe_ws_request_origin, conn |> Plug.Conn.get_req_header("origin") |> List.first())
+    # Same reason as the origin above: the socket's own `:connect_info` can't give the real client
+    # IP behind a trusted proxy, and the widget rate-limit must key on something the caller can't
+    # rotate for free (unlike the client-supplied session id). Stash the resolved client IP here,
+    # where the full conn (and the trusted-proxy chain) is available.
+    Process.put(:pepe_ws_client_ip, PepeWeb.RemoteClient.ip(conn))
     super(conn, opts)
   end
 

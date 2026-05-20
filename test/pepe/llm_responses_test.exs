@@ -109,4 +109,68 @@ defmodule Pepe.LLM.ResponsesTest do
     assert res.content == "I can't help with that."
     assert res.tool_calls == []
   end
+
+  defmodule CaptureBody do
+    @behaviour Plug
+    import Plug.Conn
+
+    @impl true
+    def init(pid), do: pid
+
+    @impl true
+    def call(conn, pid) do
+      {:ok, raw, conn} = read_body(conn)
+      send(pid, {:req, raw})
+      done = ~s({"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":1,"output_tokens":1}}})
+
+      conn
+      |> put_resp_content_type("text/event-stream")
+      |> send_resp(200, "data: " <> done <> "\n\n")
+    end
+  end
+
+  defmodule FailedPlug do
+    @behaviour Plug
+    import Plug.Conn
+
+    @impl true
+    def init(opts), do: opts
+
+    @impl true
+    def call(conn, _opts) do
+      failed = ~s({"type":"response.failed","response":{"status":"failed"}})
+      conn |> put_resp_content_type("text/event-stream") |> send_resp(200, "data: " <> failed <> "\n\n")
+    end
+  end
+
+  test "a response.failed event finalizes as an error with no content (the runtime turns this into an error)" do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {:ok, server} = Bandit.start_link(plug: FailedPlug, scheme: :http, ip: {127, 0, 0, 1}, port: 0)
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    model = %Model{name: "codex", base_url: "http://127.0.0.1:#{port}/codex", api: "openai-responses", api_key: "x", model: "gpt-5"}
+
+    {:ok, res} = Responses.stream_chat(model, [%{"role" => "user", "content" => "hi"}], fn _ -> :ok end)
+
+    # This is the shape the runtime must not read as a successful empty reply.
+    assert res.finish_reason == "error"
+    assert res.content == nil
+  end
+
+  test "opts[:max_tokens] becomes max_output_tokens on the Responses request" do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {:ok, server} = Bandit.start_link(plug: {CaptureBody, self()}, scheme: :http, ip: {127, 0, 0, 1}, port: 0)
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    model = %Model{name: "codex", base_url: "http://127.0.0.1:#{port}/codex", api: "openai-responses", api_key: "x", model: "gpt-5"}
+
+    # The output-cap retry lowers opts[:max_tokens]; the Responses adapter must translate it to
+    # this endpoint's own `max_output_tokens`, or the retry silently changes nothing.
+    {:ok, _} = Responses.chat(model, [%{"role" => "user", "content" => "hi"}], max_tokens: 256)
+
+    assert_received {:req, raw}
+    assert Jason.decode!(raw)["max_output_tokens"] == 256
+  end
 end

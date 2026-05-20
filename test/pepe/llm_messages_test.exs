@@ -124,6 +124,14 @@ defmodule Pepe.LLM.MessagesTest do
     assert body["max_tokens"] == 4096
   end
 
+  test "opts[:max_tokens] reaches the request, so the output-cap retry can lower it", %{port: port} do
+    {:ok, _} =
+      Messages.chat(oauth_model(port), [%{"role" => "user", "content" => "hi"}], max_tokens: 128)
+
+    assert_received {:req, raw, _headers}
+    assert Jason.decode!(raw)["max_tokens"] == 128
+  end
+
   test "an API key connection uses x-api-key and no client block", %{port: port} do
     model = %{oauth_model(port) | oauth: nil, api_key: "sk-ant-123"}
     {:ok, _} = Messages.chat(model, [%{"role" => "system", "content" => "S"}, %{"role" => "user", "content" => "hi"}], [])
@@ -135,5 +143,36 @@ defmodule Pepe.LLM.MessagesTest do
     refute Map.has_key?(headers, "authorization")
     # plain string system, no Claude Code spoof
     assert body["system"] == "S"
+  end
+
+  defmodule ErrorPlug do
+    @behaviour Plug
+    import Plug.Conn
+
+    @impl true
+    def init(opts), do: opts
+
+    @impl true
+    def call(conn, _opts) do
+      # A streamed request that fails: the "why" is in the body, which `into:` feeds to the
+      # collector, not to `resp.body`.
+      body = ~s({"type":"error","error":{"message":"max_tokens: 5000 > 4096 available"}})
+      conn |> put_resp_content_type("application/json") |> send_resp(400, body)
+    end
+  end
+
+  test "a non-2xx streamed response carries its error body (for the output-cap retry)" do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {:ok, server} = Bandit.start_link(plug: ErrorPlug, scheme: :http, ip: {127, 0, 0, 1}, port: 0)
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    model = %Model{name: "claude", base_url: "http://127.0.0.1:#{port}/v1", api: "anthropic-messages", api_key: "k", model: "claude-x"}
+
+    assert {:error, {:http_error, 400, raw}} =
+             Messages.stream_chat(model, [%{"role" => "user", "content" => "hi"}], fn _ -> :ok end)
+
+    # The body reached the caller (not the empty `resp.body`), so a caller can read the cap.
+    assert raw =~ "available"
   end
 end

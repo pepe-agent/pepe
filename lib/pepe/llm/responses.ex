@@ -178,6 +178,14 @@ defmodule Pepe.LLM.Responses do
       "include" => ["reasoning.encrypted_content"]
     }
 
+    # The Responses API's output limit is `max_output_tokens`. Take it from `opts[:max_tokens]`
+    # (what the output-cap retry lowers) first, then the model's own; omit it when neither is set.
+    base =
+      case opts[:max_tokens] || model.max_tokens do
+        nil -> base
+        cap -> Map.put(base, "max_output_tokens", cap)
+      end
+
     base =
       if tools == [] do
         base

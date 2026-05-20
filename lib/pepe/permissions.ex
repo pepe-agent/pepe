@@ -82,7 +82,10 @@ defmodule Pepe.Permissions do
     risks = Risk.hints(name, decode(args))
 
     cond do
-      not requires_approval?(name) -> :allow
+      # Always-safe, but only while it carries no risk. `read_file`/`list_dir` are free inside
+      # the workspace; the moment one reaches an absolute or `..` path it picks up a risk hint
+      # and stops short-circuiting here, falling through to the taint check and the gate.
+      not requires_approval?(name) and risks == [] -> :allow
       tainted?(ctx) -> ask(name, args, risks, ctx)
       preapproved?(name, risks, ctx) -> :allow
       true -> ask(name, args, risks, ctx)
@@ -121,6 +124,11 @@ defmodule Pepe.Permissions do
   """
   @spec tainted?(map()) :: boolean()
   def tainted?(%{agent: %{trust_untrusted_content: true}}), do: false
+  # The taint lives in the run-owning process's dictionary, but tools can fan out into child
+  # Tasks whose dictionary is empty (`delegate` when batched with another concurrent tool). So the
+  # runtime captures the taint into `ctx` before fanning out, and a captured flag wins over a
+  # process-dictionary read - otherwise a delegated worker would start untainted and launder it.
+  def tainted?(%{tainted: tainted}) when is_boolean(tainted), do: tainted
   def tainted?(_ctx), do: Process.get(@taint) == true
 
   defp decode(args) when is_map(args), do: args

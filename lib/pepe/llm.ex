@@ -85,11 +85,16 @@ defmodule Pepe.LLM do
       when is_function(on_delta, 1) do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts, true)
-    init = %{buffer: "", content: "", tool_calls: %{}, finish: nil, usage: nil}
+    init = %{buffer: "", content: "", tool_calls: %{}, finish: nil, usage: nil, raw: ""}
 
     collector = fn {:data, data}, {req, resp} ->
       state = resp.private[:pepe] || init
       state = consume(state.buffer <> data, %{state | buffer: ""}, on_delta)
+      # Keep a bounded copy of the raw stream. `into:` hands the body to the collector for a
+      # non-2xx status too, and there the parsed SSE state is empty - the error body is the only
+      # place a provider says *why* (an over-`max_tokens` reservation, say), which the runtime's
+      # output-cap retry reads. Capped so a large successful stream is not doubled in memory.
+      state = %{state | raw: cap_raw(state.raw <> data)}
       {:cont, {req, %{resp | private: Map.put(resp.private, :pepe, state)}}}
     end
 
@@ -113,8 +118,10 @@ defmodule Pepe.LLM do
         # stream produced no data frames
         {:ok, finalize(resp.private[:pepe] || init)}
 
-      {:ok, %{status: status, body: resp}} ->
-        {:error, {:http_error, status, resp}}
+      {:ok, %{status: status} = resp} ->
+        # The error body was streamed into the collector (not `resp.body`, which `into:` leaves
+        # empty), so read it back from there.
+        {:error, {:http_error, status, (resp.private[:pepe] || init).raw}}
 
       {:error, reason} ->
         {:error, reason}
@@ -221,6 +228,12 @@ defmodule Pepe.LLM do
   ###
 
   # Split into complete lines, keep the trailing partial in the buffer.
+  # Enough of the raw stream to carry an error body (a provider's "why"); a success body is much
+  # larger and never needed here, so cap it rather than double the stream in memory.
+  @max_raw 8192
+  defp cap_raw(raw) when byte_size(raw) > @max_raw, do: binary_part(raw, 0, @max_raw)
+  defp cap_raw(raw), do: raw
+
   defp consume(data, state, on_delta) do
     case String.split(data, "\n") do
       [single] ->
@@ -281,7 +294,7 @@ defmodule Pepe.LLM do
   end
 
   defp merge_tool_call(d, acc) do
-    idx = d["index"] || 0
+    idx = bucket_index(d, acc)
     existing = Map.get(acc, idx, empty_tool_call())
 
     merged = %{
@@ -292,6 +305,27 @@ defmodule Pepe.LLM do
 
     Map.put(acc, idx, merged)
   end
+
+  # Which accumulator bucket a streamed tool-call delta belongs to. OpenAI sends an `index` on
+  # every fragment (the common path, unchanged). A non-conforming provider may omit it and stream
+  # parallel calls; keying them all to `0` (the old `d["index"] || 0`) concatenated distinct calls
+  # into one garbled call. Without an index: a delta carrying an `id` opens/reuses that call's own
+  # bucket, and an id-less, index-less argument fragment continues the most recently opened one.
+  defp bucket_index(%{"index" => idx}, _acc) when is_integer(idx), do: idx
+
+  defp bucket_index(%{"id" => id}, acc) when is_binary(id) and id != "" do
+    case Enum.find(acc, fn {_i, tc} -> tc["id"] == id end) do
+      {i, _} -> i
+      nil -> next_index(acc)
+    end
+  end
+
+  defp bucket_index(_d, acc), do: max_index(acc) || 0
+
+  defp next_index(acc), do: (max_index(acc) || -1) + 1
+
+  defp max_index(acc) when map_size(acc) == 0, do: nil
+  defp max_index(acc), do: acc |> Map.keys() |> Enum.max()
 
   defp empty_tool_call,
     do: %{"id" => nil, "type" => "function", "function" => %{"name" => "", "arguments" => ""}}
