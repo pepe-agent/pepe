@@ -74,7 +74,7 @@ defmodule PepeWeb.LearningLiveTest do
     assert html =~ "assistant remembers the XML load"
     refute html =~ "sales remembers the pricing table"
 
-    html = render_change(view, "pick_learn_agent", %{"agent" => "sales"})
+    html = render_change(view, "pick_learn_agent", %{"agent" => "default/sales"})
     assert html =~ "sales remembers the pricing table"
     refute html =~ "assistant remembers the XML load"
   end
@@ -166,11 +166,11 @@ defmodule PepeWeb.LearningLiveTest do
 
     html = render_click(view, "toggle_auto")
     assert html =~ "Nightly: on"
-    assert Reflect.auto?("assistant")
+    assert Reflect.auto?("default/assistant")
 
     html = render_click(view, "toggle_auto")
     assert html =~ "Nightly: off"
-    refute Reflect.auto?("assistant")
+    refute Reflect.auto?("default/assistant")
   end
 
   test "a finished consolidation reports its summary and refreshes the timeline" do

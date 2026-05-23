@@ -34,7 +34,7 @@ defmodule PepeWeb.ChatLive do
       {"/name", gettext("Label this conversation in the sidebar - TEXT")},
       {"/usage", gettext("Show this month's spend and message count")},
       {"/compact", gettext("Summarize history to free up context")},
-      {"/models", gettext("List models available to this company")},
+      {"/models", gettext("List models available to this project")},
       {"/model", gettext("Show or change the model - NAME [session|global]")}
     ]
   end
@@ -49,8 +49,8 @@ defmodule PepeWeb.ChatLive do
      assign(socket,
        page_title: "Pepe · Chat",
        scope: scope,
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        f_agent: "",
        f_channel: "",
        f_q: "",
@@ -84,7 +84,7 @@ defmodule PepeWeb.ChatLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="chat" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="chat" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <div class="flex h-full min-w-0">
           <div class="flex w-80 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30">
@@ -441,10 +441,10 @@ defmodule PepeWeb.ChatLive do
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/chat")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   ## async run events
 
@@ -716,8 +716,8 @@ defmodule PepeWeb.ChatLive do
 
   defp list_models(socket) do
     text =
-      case ModelSwitch.list_for(scope_company(socket.assigns.scope)) do
-        [] -> gettext("No models are configured for this company.")
+      case ModelSwitch.list_for(scope_project(socket.assigns.scope)) do
+        [] -> gettext("No models are configured for this project.")
         models -> gettext("Available models:") <> " " <> Enum.map_join(models, ", ", & &1.name)
       end
 
@@ -776,11 +776,11 @@ defmodule PepeWeb.ChatLive do
     messages |> Enum.reverse() |> Enum.find_value(fn m -> m.role == "user" && m.content end)
   end
 
-  # This month's spend and message count for the company that owns this session's agent.
+  # This month's spend and message count for the project that owns this session's agent.
   defp usage_line(key) do
-    company = key |> status() |> Map.get(:agent) |> Pepe.Company.of()
-    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
-    count = Pepe.Usage.message_count_month_to_date(company)
+    project = key |> status() |> Map.get(:agent) |> Pepe.Project.of()
+    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(project))
+    count = Pepe.Usage.message_count_month_to_date(project)
     gettext("This month: %{cost} · %{count} messages", cost: cost, count: count)
   end
 
@@ -845,8 +845,8 @@ defmodule PepeWeb.ChatLive do
   defp scope_label("session"), do: gettext("this conversation only")
   defp scope_label("global"), do: gettext("everyone")
 
-  defp scope_company(scope) when scope in [nil, "all", "root"], do: nil
-  defp scope_company(scope), do: scope
+  defp scope_project(scope) when scope in [nil, "all", "root"], do: nil
+  defp scope_project(scope), do: scope
 
   defp slash_matches(input) do
     if slash?(input),
@@ -854,9 +854,9 @@ defmodule PepeWeb.ChatLive do
       else: []
   end
 
-  # A default agent for the current scope: the company's own, else the global default.
+  # A default agent for the current scope: the project's own, else the global default.
   defp default_agent_for(scope) when scope in [nil, "all", "root"], do: Config.default_agent_name()
-  defp default_agent_for(company), do: Config.default_agent_for(company) || Config.default_agent_name()
+  defp default_agent_for(project), do: Config.default_agent_for(project) || Config.default_agent_name()
 
   defp list_sessions(scope) do
     live = MapSet.new(SessionSupervisor.list())

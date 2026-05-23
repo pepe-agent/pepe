@@ -2,7 +2,7 @@ defmodule Pepe.Tools.ManageToken do
   @moduledoc """
   Let an agent mint, list, and revoke **API tokens** from a conversation, so a human
   can hand out `/v1` access ("give the Chatwoot integration a token for the buskaza
-  company") without dropping to a terminal.
+  project") without dropping to a terminal.
 
   Deliberately guarded, because a token grants API access:
 
@@ -45,10 +45,10 @@ defmodule Pepe.Tools.ManageToken do
       source anyway) and its appearance stays editable.
 
       actions:
-      - create: mint a token. Optional `company` (omit for the root/Principal scope), \
+      - create: mint a token. Optional `project` (omit for the root/Principal scope), \
         optional `agent` (a full handle like "buskaza/default" to lock the token to one \
-        agent; must be inside `company`), optional `label` (a human note). A company \
-        token reaches only that company's agents; an agent token always runs that agent \
+        agent; must be inside `project`), optional `label` (a human note). A project \
+        token reaches only that project's agents; an agent token always runs that agent \
         and ignores the request's model field. Pass `widget: true` for a token meant to \
         sit in public page source (an embedded chat widget's script tag) - it then \
         REQUIRES `agent` (a public credential always pins to one agent) and should \
@@ -76,9 +76,9 @@ defmodule Pepe.Tools.ManageToken do
             "enum" => ~w(create list revoke update),
             "description" => "What to do."
           },
-          "company" => %{
+          "project" => %{
             "type" => "string",
-            "description" => "For create: the company handle to scope to. Omit for the root/Principal scope."
+            "description" => "For create: the project handle to scope to. Omit for the root/Principal scope."
           },
           "agent" => %{
             "type" => "string",
@@ -138,7 +138,7 @@ defmodule Pepe.Tools.ManageToken do
   defp create(args) do
     opts =
       [
-        company: blank_to_nil(args["company"]),
+        project: blank_to_nil(args["project"]),
         agent: blank_to_nil(args["agent"]),
         label: blank_to_nil(args["label"]),
         widget: args["widget"] == true,
@@ -148,9 +148,9 @@ defmodule Pepe.Tools.ManageToken do
     case Config.add_api_token(opts) do
       {:ok, raw, id} -> {:ok, created_message(raw, id, opts)}
       {:error, :widget_needs_agent} -> {:error, "a widget token must be agent-locked; pass `agent`"}
-      {:error, :unknown_company} -> {:error, "no company named #{inspect(opts[:company])}"}
+      {:error, :unknown_project} -> {:error, "no project named #{inspect(opts[:project])}"}
       {:error, :unknown_agent} -> {:error, "no agent named #{inspect(opts[:agent])}"}
-      {:error, :agent_out_of_scope} -> {:error, "agent #{opts[:agent]} is not in company #{opts[:company]}"}
+      {:error, :agent_out_of_scope} -> {:error, "agent #{opts[:agent]} is not in project #{opts[:project]}"}
     end
   end
 
@@ -196,7 +196,7 @@ defmodule Pepe.Tools.ManageToken do
       if opts[:widget], do: " list shows it again any time, since it's a widget token.", else: " Copy it now - it will not be shown again."
 
     """
-    API token created (id #{id}, scope: #{scope_text(opts[:company], opts[:agent])}#{kind}).#{retrievable}
+    API token created (id #{id}, scope: #{scope_text(opts[:project], opts[:agent])}#{kind}).#{retrievable}
 
         #{raw}
 
@@ -216,13 +216,13 @@ defmodule Pepe.Tools.ManageToken do
         # anyway - see Config.add_api_token/1); a regular token only ever shows its
         # safe fingerprint prefix, since its raw value was never stored.
         shown = if t["kind"] == "widget", do: t["token"], else: t["prefix"]
-        "• #{t["id"]} [#{scope_text(t["company"], t["agent"])}]#{kind} #{shown}#{note}"
+        "• #{t["id"]} [#{scope_text(t["project"], t["agent"])}]#{kind} #{shown}#{note}"
       end)
   end
 
   defp scope_text(nil, nil), do: "Principal (root)"
-  defp scope_text(company, nil), do: "company #{company}"
-  defp scope_text(_company, agent), do: "agent #{agent}"
+  defp scope_text(project, nil), do: "project #{project}"
+  defp scope_text(_project, agent), do: "agent #{agent}"
 
   defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: String.trim(v))
   defp blank_to_nil(v), do: v

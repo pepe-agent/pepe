@@ -15,8 +15,8 @@ defmodule PepeWeb.ChannelsLive do
      assign(socket,
        page_title: "Pepe · Channels",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        bots: Config.telegram_bots(),
        widget_tokens: Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget")),
        widget_raw: nil,
@@ -137,7 +137,7 @@ defmodule PepeWeb.ChannelsLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="bots" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="bots" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="📡"
@@ -265,7 +265,7 @@ defmodule PepeWeb.ChannelsLive do
               id="native-channels"
               providers={@native_channels}
               scope={@scope}
-              companies={@companies}
+              projects={@projects}
               show_picker={false}
             />
 
@@ -511,10 +511,10 @@ defmodule PepeWeb.ChannelsLive do
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/bots")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   @impl true
   def handle_info({:flash, kind, msg}, socket), do: {:noreply, put_flash(socket, kind, msg)}
@@ -534,8 +534,8 @@ defmodule PepeWeb.ChannelsLive do
     |> Enum.any?(fn b -> (Config.interpolate(b["bot_token"]) || b["bot_token"]) == want end)
   end
 
-  defp widget_error(:unknown_company), do: gettext("That company does not exist.")
-  defp widget_error(:agent_out_of_scope), do: gettext("That agent is not in the chosen company.")
+  defp widget_error(:unknown_project), do: gettext("That project does not exist.")
+  defp widget_error(:agent_out_of_scope), do: gettext("That agent is not in the chosen project.")
   defp widget_error(:unknown_agent), do: gettext("That agent does not exist.")
   defp widget_error(:widget_needs_agent), do: gettext("Pick an agent for this widget.")
 end

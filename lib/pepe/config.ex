@@ -29,10 +29,14 @@ defmodule Pepe.Config do
   interpolated against the environment at read time, never persisted expanded.
   """
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config.Agent
   alias Pepe.Config.Cron
   alias Pepe.Config.Model
+
+  # The slug of the project a fresh install is born with, and the one every command falls back to
+  # when no project is given. It is a normal, renameable project; this is only its initial slug.
+  @default_project_slug "default"
 
   @doc "Absolute path to the config directory (created on demand)."
   def home do
@@ -116,7 +120,7 @@ defmodule Pepe.Config do
             # The file is present but unparseable (a truncated/half-written save, disk corruption).
             # Falling back to `default()` here would be catastrophic: the next mutation would
             # `load()` an empty config and `save()` it over the real one, wiping every model,
-            # agent, company and token. A present-but-corrupt file is an error to raise, NOT a
+            # agent, project and token. A present-but-corrupt file is an error to raise, NOT a
             # missing file to default. (An absent file still defaults, below.)
             raise "#{short_path(path())} is present but not valid JSON - refusing to overwrite it " <>
                     "with defaults. Restore it from a backup (see `#{Path.rootname(path())}.bak`)."
@@ -128,11 +132,20 @@ defmodule Pepe.Config do
   end
 
   defp default do
+    default_id = generate_project_id()
+
     %{
       "default_model" => nil,
       "models" => %{},
       "default_agent" => nil,
       "agents" => %{},
+      # Every install has at least one project (a tenant scope). A fresh one is born with a
+      # single "default" project, and that project is the one every command uses when no
+      # `--project` is given. It's a normal project - renameable, shown in `project list` - that
+      # simply happens to be the omission target, pointed at by id so a rename never moves the
+      # binding.
+      "projects" => %{default_id => %{"slug" => @default_project_slug, "name" => "Default"}},
+      "default_project" => default_id,
       "telegram" => %{"bot_token" => "${TELEGRAM_BOT_TOKEN}", "allowed_chats" => []},
       "server" => %{"port" => 4000}
     }
@@ -229,14 +242,14 @@ defmodule Pepe.Config do
   just a field update - the default_model/agent.model/cron.model pointers
   aiming at its id are entirely unaffected. Only the two fields that are still
   name-based (other models' `fallbacks`, the llm_redact hook's model) get
-  rewritten. A rename can't cross company scope (a model's `acme/` prefix, if
+  rewritten. A rename can't cross project scope (a model's `acme/` prefix, if
   any, must stay put - that's how a model's tenant is determined).
   """
   def rename_model(old, new) do
     cond do
       get_model(old) == nil -> {:error, :not_found}
       old == new -> :ok
-      Company.of(old) != Company.of(new) -> {:error, :scope_mismatch}
+      Project.of(old) != Project.of(new) -> {:error, :scope_mismatch}
       not is_nil(model = get_model(new)) and model.id != model_id_for(old) -> {:error, :already_exists}
       true -> do_rename_model(old, new)
     end
@@ -271,8 +284,8 @@ defmodule Pepe.Config do
     end
   end
 
-  # Strict equality only - unlike remap_handle/remap_field (used for company
-  # renames), a model name isn't a hierarchical "company/thing" handle, so no
+  # Strict equality only - unlike remap_handle/remap_field (used for project
+  # renames), a model name isn't a hierarchical "project/thing" handle, so no
   # prefix-matching is appropriate here.
   defp model_rename_exact(map, field, old, new) do
     case Map.get(map, field) do
@@ -290,14 +303,119 @@ defmodule Pepe.Config do
 
   defp generate_model_id, do: :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
 
+  defp generate_project_id, do: "p_" <> (:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower))
+
   # One-time, idempotent upgrade from the old models-keyed-by-name shape to the
   # current id-keyed shape. Runs on every load/0; a no-op after the first
   # (successful) run, since the shape check below then reads false.
+  #
+  # Order matters and is a dependency chain, not a preference: projects must exist
+  # (migrate_to_projects) before agents can be re-keyed onto project ids
+  # (migrate_agents_to_ids maps each agent's slug -> project id). Keep this sequence.
   defp migrate(config) do
-    if needs_model_id_migration?(config) do
-      config |> migrate_model_ids() |> save()
-    else
+    config
+    |> maybe_migrate(&needs_model_id_migration?/1, &migrate_model_ids/1)
+    |> maybe_migrate(&needs_project_migration?/1, &migrate_to_projects/1)
+    |> maybe_migrate(&needs_agent_id_migration?/1, &migrate_agents_to_ids/1)
+  end
+
+  # Upgrade agents from handle-keyed (`slug/name`) to id-keyed: each gets a stable id and stores
+  # its bare label + owning project id, so renaming a project or an agent never re-keys it.
+  # Handle-shaped references (default_agent, cron/bot/token bindings, can_message) stay as handles
+  # and resolve at read time. Runs once, after the projects migration (which it depends on).
+  defp needs_agent_id_migration?(config) do
+    config
+    |> Map.get("agents", %{})
+    |> Enum.any?(fn {_k, m} -> is_map(m) and not Map.has_key?(m, "project") end)
+  end
+
+  defp migrate_agents_to_ids(config) do
+    agents =
       config
+      |> Map.get("agents", %{})
+      |> Map.new(fn
+        # Already id-keyed (has "project") - leave it alone. Re-keying an already-migrated entry
+        # would treat its id as a bare name and mangle it; only touch old handle-keyed entries.
+        {id, %{"project" => _} = m} ->
+          {id, m}
+
+        {handle, m} ->
+          {slug, bare} = handle_parts(config, handle)
+          pid = project_id_for(config, slug)
+          {generate_agent_id(), m |> Map.drop(["name"]) |> Map.put("bare", bare) |> Map.put("project", pid)}
+      end)
+
+    config = Map.put(config, "agents", agents)
+
+    # Second pass, now that every agent has an id: convert each agent's `can_message`/`can_manage`
+    # handles to agent ids, so those routing/authority lists are rename-safe too. (Single bindings
+    # - default_agent, cron/bot/token `agent` - need no migration pass: a stored handle reads back
+    # transparently and every new write stores an id.)
+    update_in(config, ["agents"], fn ags ->
+      Map.new(ags, fn {id, m} ->
+        {id,
+         m
+         |> Map.update("can_message", [], &store_agent_refs(config, &1))
+         |> Map.update("can_manage", nil, &store_agent_refs(config, &1))}
+      end)
+    end)
+  end
+
+  # Run a one-time, idempotent upgrade and persist it, or pass the config through untouched. Each
+  # migration's `needs?` check reads false once its shape is in place, so it fires at most once.
+  defp maybe_migrate(config, needs?, migrate) do
+    if needs?.(config), do: config |> migrate.() |> save(), else: config
+  end
+
+  # Upgrade the old "root scope + companies" shape to the uniform "projects" shape: the implicit
+  # root becomes a real `default` project, each project becomes a project keyed by a stable id
+  # (slug = old name), every bare (root) handle is qualified into the default project - agents and
+  # every reference to them (default_agent, cron/watch/bot/token bindings, can_message/can_manage)
+  # - and root's own billing (the old top-level "root" key) folds into the default project. Reuses
+  # the same remap helpers a project rename uses, with `old = nil` (the bare/root scope).
+  defp needs_project_migration?(config), do: not Map.has_key?(config, "projects")
+
+  defp migrate_to_projects(config) do
+    default_id = generate_project_id()
+    default_slug = @default_project_slug
+
+    project_projects =
+      config
+      |> Map.get("companies", %{})
+      |> Map.new(fn {slug, meta} ->
+        {generate_project_id(), Map.merge(%{"slug" => slug, "name" => slug}, meta)}
+      end)
+
+    default_meta = Map.merge(config["root"] || %{}, %{"slug" => default_slug, "name" => "Default"})
+    projects = Map.put(project_projects, default_id, default_meta)
+
+    config
+    |> Map.put("projects", projects)
+    |> Map.put("default_project", default_id)
+    |> Map.delete("companies")
+    |> Map.delete("root")
+    # Re-key bare (root) agent handles into the default project, but leave each agent body alone:
+    # bare `can_message`/`can_manage` entries are resolved against the sender's scope at runtime
+    # (`Project.qualify/2`), so qualifying them here would wrongly pin same-project peers.
+    |> rekey_section("agents", nil, default_slug, & &1)
+    |> rewrite_agent_binding("crons", nil, default_slug)
+    |> rewrite_agent_binding("watches", nil, default_slug)
+    |> rewrite_bot_bindings(nil, default_slug)
+    |> migrate_token_agents(default_slug)
+    |> remap_field("default_agent", nil, default_slug)
+  end
+
+  # Qualify only a token's bare `agent` handle into the default project. The token's `project`
+  # field is a project slug, not a handle, and is left untouched: a project token keeps its slug,
+  # and a root token keeps `project: nil` (the open scope), resolved to the default at use time
+  # (`resolve_scope/1`) rather than rewritten here.
+  defp migrate_token_agents(config, default_slug) do
+    case Map.get(config, "api_tokens") do
+      m when is_map(m) ->
+        Map.put(config, "api_tokens", Map.new(m, fn {id, e} -> {id, remap_field(e, "agent", nil, default_slug)} end))
+
+      _ ->
+        config
     end
   end
 
@@ -320,7 +438,7 @@ defmodule Pepe.Config do
     config
     |> Map.put("models", new_models)
     |> migrate_ref("default_model", id_map)
-    |> migrate_company_defaults(id_map)
+    |> migrate_project_defaults(id_map)
     |> migrate_owned_refs("agents", "model", id_map)
     |> migrate_owned_refs("crons", "model", id_map)
   end
@@ -332,23 +450,23 @@ defmodule Pepe.Config do
     end
   end
 
-  defp migrate_company_defaults(config, id_map) do
+  defp migrate_project_defaults(config, id_map) do
     case Map.get(config, "companies") do
       m when is_map(m) ->
-        Map.put(config, "companies", Map.new(m, fn {co, v} -> {co, migrate_company_default(v, co, id_map)} end))
+        Map.put(config, "companies", Map.new(m, fn {co, v} -> {co, migrate_project_default(v, co, id_map)} end))
 
       _ ->
         config
     end
   end
 
-  defp migrate_company_default(v, co, id_map) do
+  defp migrate_project_default(v, co, id_map) do
     case Map.get(v, "default_model") do
       nil ->
         v
 
       ref ->
-        id = Map.get(id_map, Company.handle(co, ref)) || Map.get(id_map, ref)
+        id = Map.get(id_map, Project.handle(co, ref)) || Map.get(id_map, ref)
         Map.put(v, "default_model", id || ref)
     end
   end
@@ -369,8 +487,8 @@ defmodule Pepe.Config do
         v
 
       ref when is_binary(ref) ->
-        scope = Company.of(Map.get(v, "agent") || owner_key)
-        id = Map.get(id_map, Company.handle(scope, ref)) || Map.get(id_map, ref)
+        scope = Project.of(Map.get(v, "agent") || owner_key)
+        id = Map.get(id_map, Project.handle(scope, ref)) || Map.get(id_map, ref)
         Map.put(v, field, id || ref)
 
       _ ->
@@ -392,140 +510,284 @@ defmodule Pepe.Config do
     update(fn config -> Map.put(config, "default_model", id) end)
   end
 
-  @doc "Set the default model for a scope: global for root, or the company's own."
+  @doc "Set the default model for a scope: the global default for `nil`, or a project's own."
   def set_default_model_for(nil, name), do: set_default_model(name)
 
-  def set_default_model_for(company, name_or_id) do
+  def set_default_model_for(scope, name_or_id) do
     id = model_id_for(name_or_id) || name_or_id
-
-    update(fn config ->
-      update_in(config, ["companies", company], fn m -> Map.put(m || %{}, "default_model", id) end)
-    end)
+    update_project(scope, %{"default_model" => id})
   end
 
   ###
-  ### Companies (multi-tenant scopes)
+  ### Projects (multi-tenant scopes)
   ###
+  #
+  # The "projects" map is id-keyed. Each entry carries a stable `slug` (the path-safe handle used
+  # in `slug/agent`, workspace dirs and URLs - renameable) and a free `name` (display label).
+  # `default_project` points at one id: the scope every command falls back to when none is given.
+  # Keying by id means renaming a slug never moves the default binding. See `Pepe.Project` for the
+  # handle math.
 
-  @doc """
-  Names of all configured companies (the tenant scopes), sorted. The **root** scope
-  is not a company - it's the implicit default every command uses without
-  `--company`, so it never appears here.
-  """
-  def companies do
-    load() |> Map.get("companies", %{}) |> Map.keys() |> Enum.sort()
+  @doc "All projects, each as `%{\"id\" => ..., \"slug\" => ..., \"name\" => ..., ...meta}`, sorted by slug."
+  def projects do
+    load()
+    |> projects_of()
+    |> Enum.map(fn {id, m} -> Map.put(m, "id", id) end)
+    |> Enum.sort_by(& &1["slug"])
   end
 
-  @doc "Fetch one company's metadata map by name, or nil."
-  def get_company(name), do: load() |> get_in(["companies", name])
+  @doc """
+  The id of the default project - the scope every command falls back to when no project is given.
+  Falls back to the first project if the pointer is missing or dangles (a hand-edited config),
+  so resolution never crashes.
+  """
+  def default_project_id, do: resolve_default_id(load())
 
-  @doc "Does this company exist?"
-  def company_exists?(name), do: not is_nil(get_company(name))
+  # The projects map from a config snapshot (empty if absent). Threaded rather than re-read so it
+  # works both outside a lock (from `load()`) and inside `update/1` (on the locked snapshot).
+  defp projects_of(config), do: Map.get(config, "projects", %{})
+
+  defp resolve_default_id(config) do
+    projects = projects_of(config)
+    pointer = config["default_project"]
+
+    if is_binary(pointer) and Map.has_key?(projects, pointer),
+      do: pointer,
+      else: projects |> Map.keys() |> Enum.sort() |> List.first()
+  end
+
+  @doc "The slug of the default project - what an omitted scope resolves to."
+  def default_project_slug, do: default_project_slug(load())
+
+  defp default_project_slug(config) do
+    case resolve_default_id(config) do
+      nil -> @default_project_slug
+      id -> get_in(config, ["projects", id, "slug"]) || @default_project_slug
+    end
+  end
+
+  @doc "Resolve an optional scope to a concrete slug: `nil` becomes the default project's slug."
+  def resolve_scope(nil), do: default_project_slug()
+  def resolve_scope(slug) when is_binary(slug), do: slug
 
   @doc """
-  Create a company (a tenant scope). Fails on an invalid name or a duplicate. Meta
-  is a free-form map (e.g. `%{\"description\" => ...}`); a `\"created\"` marker is kept.
+  Qualify a bare handle into the default project (`assistant` -> `default/assistant`); an
+  already-qualified handle (`acme/vendas`) is returned unchanged. This is the "bare by omission"
+  rule at the storage boundary: a handle with no project part belongs to the default project, so
+  every agent is stored and looked up under a fully-qualified `project/name` key.
   """
-  def add_company(name, meta \\ %{}) do
+  def resolve_handle(handle), do: resolve_handle(load(), handle)
+
+  defp resolve_handle(config, handle) when is_binary(handle) do
+    case Project.of(handle) do
+      nil -> Project.handle(default_project_slug(config), handle)
+      _ -> handle
+    end
+  end
+
+  defp resolve_handle(_config, handle), do: handle
+
+  # The project id for an id (passed straight through) or a slug; nil if neither matches.
+  defp project_id_for(config, id_or_slug) do
+    projects = projects_of(config)
+
+    if is_binary(id_or_slug) and Map.has_key?(projects, id_or_slug) do
+      id_or_slug
+    else
+      Enum.find_value(projects, &slug_match(&1, id_or_slug))
+    end
+  end
+
+  defp slug_match({id, %{"slug" => slug}}, slug), do: id
+  defp slug_match(_entry, _slug), do: nil
+
+  @doc "Fetch a project's metadata (with its `id`) by id or slug, or nil."
+  def get_project(id_or_slug) do
+    config = load()
+
+    case project_id_for(config, id_or_slug) do
+      nil -> nil
+      id -> config |> get_in(["projects", id]) |> Map.put("id", id)
+    end
+  end
+
+  @doc "Does a project with this id or slug exist?"
+  def project_exists?(id_or_slug), do: not is_nil(get_project(id_or_slug))
+
+  @doc """
+  The **additional** projects' slugs, sorted - every project except the default one. The default
+  project is the home scope every command falls back to, surfaced on its own (as "Principal" in
+  the dashboard, explained by `pepe project` when the list is empty), so it isn't listed here.
+  """
+  def project_slugs do
+    default = default_project_slug()
+    projects() |> Enum.map(& &1["slug"]) |> Enum.reject(&(&1 == default)) |> Enum.sort()
+  end
+
+  @doc """
+  Create a project (a tenant scope) with a path-safe `slug`. `meta` is free-form
+  (e.g. `%{\"name\" => ..., \"description\" => ...}`); `slug` and a `\"created\"` marker are kept,
+  and `name` defaults to the slug. Returns `:ok`, `{:error, :invalid_slug}` or
+  `{:error, :already_exists}`.
+  """
+  def add_project(slug, meta \\ %{}) do
     cond do
-      not Company.valid_name?(name) ->
-        {:error, :invalid_name}
+      not Project.valid_name?(slug) ->
+        {:error, :invalid_slug}
 
-      company_exists?(name) ->
+      project_exists?(slug) ->
         {:error, :already_exists}
 
       true ->
-        update(&insert_company(&1, name, meta))
+        update(&insert_project(&1, generate_project_id(), slug, meta))
         :ok
     end
   end
 
-  defp insert_company(config, name, meta) do
-    update_in(config, ["companies"], fn c -> Map.put(c || %{}, name, Map.put_new(meta, "created", true)) end)
+  defp insert_project(config, id, slug, meta) do
+    entry =
+      meta
+      |> Map.put("slug", slug)
+      |> Map.put_new("name", slug)
+      |> Map.put_new("created", true)
+
+    update_in(config, ["projects"], fn p -> Map.put(p || %{}, id, entry) end)
   end
 
   @doc """
-  Update a company's metadata (e.g. its `"description"`). Merges `meta` over the
-  existing map, dropping keys whose value is nil, and always keeps the `"created"`
-  marker. The name is the identity key and never changes here. Fails if unknown.
+  Update a project's metadata (e.g. its `"description"` or billing fields) by id or slug. Merges
+  `meta` over the existing entry, dropping keys whose value is nil, always keeping the `"slug"`
+  identity and the `"created"` marker. The slug never changes here - use `rename_project/2`. Fails
+  with `{:error, :not_found}` if unknown.
   """
-  def update_company(name, meta) do
-    case get_company(name) do
+  def update_project(id_or_slug, meta) do
+    case project_id_for(load(), id_or_slug) do
       nil ->
         {:error, :not_found}
 
-      existing ->
+      _ ->
+        update(fn config -> apply_to_project(config, id_or_slug, meta) end)
+        :ok
+    end
+  end
+
+  defp apply_to_project(config, id_or_slug, meta) do
+    case project_id_for(config, id_or_slug) do
+      nil ->
+        config
+
+      id ->
+        existing = get_in(config, ["projects", id]) || %{}
+
         merged =
           existing
           |> Map.merge(meta)
           |> Enum.reject(fn {_k, v} -> is_nil(v) end)
           |> Map.new()
+          |> Map.put("slug", existing["slug"])
           |> Map.put("created", true)
 
-        update(fn config ->
-          config
-          |> update_in(["companies"], &Map.put(&1 || %{}, name, merged))
-        end)
+        put_in(config, ["projects", id], merged)
+    end
+  end
 
+  @doc "Set a project's display `name`. Never re-keys anything. `{:error, :not_found}` if unknown."
+  def set_project_name(id_or_slug, name), do: update_project(id_or_slug, %{"name" => name})
+
+  @doc """
+  Make `id_or_slug` the default project - the scope every command falls back to when none is
+  given. `{:error, :not_found}` if unknown.
+  """
+  def set_default_project(id_or_slug) do
+    case get_project(id_or_slug) do
+      nil ->
+        {:error, :not_found}
+
+      %{"id" => id} ->
+        update(fn config -> Map.put(config, "default_project", id) end)
         :ok
     end
   end
 
   @doc """
-  Delete a company. Refuses while it still owns agents unless `force: true`, which
-  also drops those agents from the config (their workspace files are left on disk).
+  Delete a project by id or slug. Refuses to delete the **last** project (there is always at
+  least one), or the **current default** (`{:error, :is_default}` - set another default first, so
+  the omission target never moves out from under you by surprise), or a project that still owns
+  agents unless `force: true` (which also drops those agents; their workspace files stay on disk).
   """
-  def delete_company(name, opts \\ []) do
-    owned = agents_in(name)
+  def delete_project(id_or_slug, opts \\ []) do
+    config = load()
 
-    cond do
-      not company_exists?(name) ->
+    case project_id_for(config, id_or_slug) do
+      nil ->
         {:error, :not_found}
 
-      owned != [] and not Keyword.get(opts, :force, false) ->
-        {:error, {:not_empty, length(owned)}}
+      id ->
+        slug = get_in(config, ["projects", id, "slug"])
 
-      true ->
-        update(&drop_company(&1, name))
-        :ok
+        cond do
+          map_size(projects_of(config)) <= 1 ->
+            {:error, :last_project}
+
+          id == resolve_default_id(config) ->
+            {:error, :is_default}
+
+          agents_in(slug) != [] and not Keyword.get(opts, :force, false) ->
+            {:error, {:not_empty, length(agents_in(slug))}}
+
+          true ->
+            update(&drop_project(&1, id, slug))
+            :ok
+        end
     end
   end
 
-  defp drop_company(config, name) do
+  defp drop_project(config, id, _slug) do
     agents = Map.get(config, "agents", %{})
-    kept = Map.reject(agents, fn {handle, _} -> Company.of(handle) == name end)
+    # Agents are id-keyed and carry their owning project id; filter on that, not on the handle
+    # (which is the opaque agent id here, never a `slug/name`), or the project's agents survive as
+    # orphans and resurface under the default project.
+    kept = Map.reject(agents, fn {_id, m} -> m["project"] == id end)
 
     config
     |> Map.put("agents", kept)
-    |> update_in(["companies"], &Map.delete(&1 || %{}, name))
+    |> update_in(["projects"], &Map.delete(&1 || %{}, id))
   end
 
   @doc """
-  Rename a company, re-keying everything that carries its handle: the company entry
-  itself, its agents and models (and any `company/...` references in `can_message` /
-  `can_manage`), and the `agent` binding of every cron, watch, bot and API token
-  that points at one of its agents. Also moves the company's workspace and usage
-  directories on disk. Free text (prompts, descriptions) is never touched.
+  Rename a project's **slug** (by id or current slug), re-keying everything that carries it: the
+  project's own `slug` field, its agents and models (and any `slug/...` references in `can_message`
+  / `can_manage`), and the `agent` binding of every cron, watch, bot and API token that points at
+  one of its agents. The project's stable id never changes, so the `default_project` binding is
+  untouched. Also moves its workspace and usage directories on disk. Free text (prompts,
+  descriptions) is never touched.
 
-  Fails on an invalid or already-taken new name, or an unknown old one. Best done
-  while idle: any in-flight session keyed by an old handle simply finishes; new
-  requests use the new handle.
+  Fails on an invalid or already-taken new slug, or an unknown project. Best done while idle: any
+  in-flight session keyed by an old handle simply finishes; new requests use the new handle.
   """
-  def rename_company(old, new) do
+  def rename_project(id_or_slug, new_slug) do
+    old =
+      case get_project(id_or_slug) do
+        %{"slug" => s} -> s
+        nil -> nil
+      end
+
     cond do
-      not Company.valid_name?(new) -> {:error, :invalid_name}
-      not company_exists?(old) -> {:error, :not_found}
-      old == new -> :ok
-      company_exists?(new) -> {:error, :already_exists}
-      true -> do_rename_company(old, new)
+      not Project.valid_name?(new_slug) -> {:error, :invalid_slug}
+      is_nil(old) -> {:error, :not_found}
+      old == new_slug -> :ok
+      project_exists?(new_slug) -> {:error, :already_exists}
+      true -> do_rename_project(old, new_slug)
     end
   end
 
-  defp do_rename_company(old, new) do
+  defp do_rename_project(old, new) do
     update(fn config ->
       config
-      |> rename_company_entry(old, new)
-      |> rekey_section("agents", old, new, &rewrite_agent_refs(&1, old, new))
+      |> rename_project_slug(old, new)
+      # Agents are id-keyed, so the project rename doesn't re-key them - only their handle-shaped
+      # references (can_message/can_manage) that embed the old slug are re-pointed.
+      |> remap_agents_refs(old, new)
       |> remap_model_names(old, new)
       |> rewrite_agent_binding("crons", old, new)
       |> rewrite_agent_binding("watches", old, new)
@@ -535,26 +797,29 @@ defmodule Pepe.Config do
       |> remap_field("default_model", old, new)
     end)
 
-    move_company_dirs(old, new)
+    move_project_dirs(old, new)
     :ok
   end
 
-  # A handle in `old`'s scope becomes the same name in `new`; the bare company name
-  # (e.g. a token's `"company"`) is remapped too. Anything else is left alone.
+  # A handle in `old`'s scope becomes the same name in `new`; the bare project slug
+  # (e.g. a token's `"project"`) is remapped too. Anything else is left alone.
   defp remap_handle(h, old, new) when is_binary(h) do
     cond do
       h == old -> new
-      Company.of(h) == old -> Company.handle(new, Company.name_of(h))
+      Project.of(h) == old -> Project.handle(new, Project.name_of(h))
       true -> h
     end
   end
 
   defp remap_handle(h, _old, _new), do: h
 
-  defp rename_company_entry(config, old, new) do
-    update_in(config, ["companies"], fn cs ->
-      {meta, rest} = Map.pop(cs || %{}, old)
-      Map.put(rest, new, meta || %{})
+  # Rename a project's slug in place. The projects map is id-keyed, so the entry's key (its id)
+  # never changes - only its "slug" field is rewritten.
+  defp rename_project_slug(config, old, new) do
+    update_in(config, ["projects"], fn projects ->
+      Map.new(projects || %{}, fn {id, m} ->
+        {id, if(m["slug"] == old, do: Map.put(m, "slug", new), else: m)}
+      end)
     end)
   end
 
@@ -570,7 +835,7 @@ defmodule Pepe.Config do
     end
   end
 
-  # Models are id-keyed (their map key never changes), so a company rename
+  # Models are id-keyed (their map key never changes), so a project rename
   # rewrites each affected model's `name` field in place instead of re-keying
   # the section the way rekey_section/5 does for agents.
   defp remap_model_names(config, old, new) do
@@ -626,7 +891,7 @@ defmodule Pepe.Config do
           config,
           "api_tokens",
           Map.new(m, fn {id, e} ->
-            {id, e |> remap_field("company", old, new) |> remap_field("agent", old, new)}
+            {id, e |> remap_field("project", old, new) |> remap_field("agent", old, new)}
           end)
         )
 
@@ -653,8 +918,15 @@ defmodule Pepe.Config do
     end
   end
 
-  defp move_company_dirs(old, new) do
-    for base <- [Path.join(home(), "companies"), Path.join([home(), "data", "usage"])] do
+  # Move every per-scope directory keyed by a project's slug when the slug is renamed: the agents'
+  # workspaces/shared under `projects/<slug>/`, and the usage, traces and messages ledgers.
+  defp move_project_dirs(old, new) do
+    for base <- [
+          Path.join(home(), "projects"),
+          Path.join([home(), "data", "usage"]),
+          Path.join([home(), "data", "traces"]),
+          Path.join([home(), "data", "messages"])
+        ] do
       src = Path.join(base, old)
       dst = Path.join(base, new)
       if File.dir?(src) and not File.exists?(dst), do: File.rename(src, dst)
@@ -664,21 +936,22 @@ defmodule Pepe.Config do
   end
 
   @doc """
-  Build a self-contained, **root-scoped** config holding only `company`, with its
-  `company/thing` handles de-scoped to bare root names - the config a fresh, single-tenant
-  install would have if this company were the only thing on it. Nothing is saved; the map is
+  Build a self-contained, **root-scoped** config holding only `project`, with its
+  `project/thing` handles de-scoped to bare root names - the config a fresh, single-tenant
+  install would have if this project were the only thing on it. Nothing is saved; the map is
   returned for a caller (`Pepe.Bundle`) to write into a bundle.
 
   De-scoping is the same handle rewrite a rename does, aimed at the empty scope: `remap_handle`
-  with `new == ""` turns `acme/sales` into `sales` (see `Company.handle/2`). Only the company's
+  with `new == ""` turns `acme/sales` into `sales` (see `Project.handle/2`). Only the project's
   own agents, models, crons, watches, bots and tokens travel, plus any **shared/root model** a
   kept agent points at (agents reference models by id, so a shared dependency is pulled in whole
-  rather than left dangling). The `companies` map and the root bot binding are dropped; every
+  rather than left dangling). The `projects` map, the `default_project` pointer and the root bot
+  binding are dropped; every
   other top-level key (server, sandbox, secrets, pricing, timezone) is an install-wide setting
   and rides along unchanged.
 
   Returns `{:ok, config, %{secrets: [String.t()], shared_models: [String.t()]}}`, or
-  `{:error, :not_found}` for an unknown company. `secrets` are the `${ENV_VAR}` names the
+  `{:error, :not_found}` for an unknown project. `secrets` are the `${ENV_VAR}` names the
   extracted config still references (they live outside the files and must be provisioned on the
   destination); `shared_models` are the names of the root/shared models pulled in as
   dependencies, so the caller can point them out.
@@ -686,10 +959,10 @@ defmodule Pepe.Config do
   @spec extract_config(String.t()) ::
           {:ok, map(), %{secrets: [String.t()], shared_models: [String.t()], literal_secrets: [String.t()]}}
           | {:error, :not_found}
-  def extract_config(company) do
-    if company_exists?(company) do
+  def extract_config(project) do
+    if project_exists?(project) do
       config = load()
-      {new, shared} = build_extracted(config, company)
+      {new, shared} = build_extracted(config, project)
 
       {:ok, new,
        %{
@@ -702,23 +975,32 @@ defmodule Pepe.Config do
     end
   end
 
-  # Sections keyed or bound to a scope, which are filtered to the company and de-scoped. `root`
-  # (the operator's own billing/limits) and the legacy single `telegram` bot are dropped
-  # outright; `companies` collapses into the bundle's root scope.
+  # Sections keyed or bound to a scope, which are filtered to the project and de-scoped. The whole
+  # `projects` map and the `default_project` pointer are dropped: the bundle is bare single-tenant,
+  # and load-time migration re-expands it into a fresh default project. The legacy single
+  # `telegram` bot is dropped outright too.
   @scoped_sections ~w(agents models crons watches telegrams api_tokens webhooks)
-  @dropped_sections ~w(companies telegram root)
+  @dropped_sections ~w(projects default_project telegram)
 
-  # A scope's billing/limits fields (per-company under `companies.<co>`, root's under `root`).
+  # A scope's billing/limits fields (kept in the project's own entry under `projects.<id>`).
   @billing_keys ~w(markup budget message_limit budget_reset_at)
 
+  # A project's meta (billing, defaults) by slug, from a config snapshot (empty if unknown).
+  defp project_meta_in(config, slug) do
+    case project_id_for(config, slug) do
+      nil -> %{}
+      id -> get_in(config, ["projects", id]) || %{}
+    end
+  end
+
   defp build_extracted(config, co) do
-    agents = keep_owned_handles(config["agents"], co)
-    crons = keep_agent_bound(config["crons"], co)
-    watches = keep_agent_bound(config["watches"], co)
-    telegrams = keep_agent_bound(config["telegrams"], co)
-    tokens = keep_tokens(config["api_tokens"], co)
-    webhooks = keep_webhooks(config["webhooks"], co)
-    meta = get_in(config, ["companies", co]) || %{}
+    agents = keep_owned_agents(config["agents"], project_id_for(config, co))
+    crons = config["crons"] |> resolve_section_agents(config) |> keep_agent_bound(co)
+    watches = config["watches"] |> resolve_section_agents(config) |> keep_agent_bound(co)
+    telegrams = config["telegrams"] |> resolve_section_agents(config) |> keep_agent_bound(co)
+    tokens = config["api_tokens"] |> resolve_section_agents(config) |> keep_tokens(co)
+    webhooks = config["webhooks"] |> resolve_section_agents(config) |> keep_webhooks(co)
+    meta = project_meta_in(config, co)
 
     deps = model_deps(agents, [crons, watches, telegrams], meta)
     {models, shared} = keep_models(config["models"], deps, co)
@@ -744,9 +1026,9 @@ defmodule Pepe.Config do
     {new, shared}
   end
 
-  # The company's own billing/limits become the bundle's root scope. The source install's `root`
+  # The project's own billing/limits become the bundle's root scope. The source install's `root`
   # billing (a different tenant's markup and spend caps) is dropped above and never carried; and
-  # the company's cap must survive the move, or the standalone install starts with no ceiling.
+  # the project's cap must survive the move, or the standalone install starts with no ceiling.
   defp put_root_billing(config, meta) do
     case Map.take(meta, @billing_keys) do
       billing when map_size(billing) == 0 -> config
@@ -754,24 +1036,36 @@ defmodule Pepe.Config do
     end
   end
 
-  # Handle-keyed section (agents) filtered to the company's own entries.
-  defp keep_owned_handles(section, co) when is_map(section),
-    do: Map.filter(section, fn {handle, _} -> Company.of(handle) == co end)
+  # Resolve every entry's `"agent"` field (an agent id) back to a handle, so the extract's
+  # scope-filtering and de-scoping (which work on handles) see handles regardless of storage.
+  defp resolve_section_agents(section, config) when is_map(section),
+    do: Map.new(section, fn {k, e} -> {k, resolve_entry_agent(e, config)} end)
 
-  defp keep_owned_handles(_section, _co), do: %{}
+  defp resolve_section_agents(other, _config), do: other
+
+  defp resolve_entry_agent(%{"agent" => a} = e, config) when is_binary(a),
+    do: Map.put(e, "agent", ref_to_handle(config, a))
+
+  defp resolve_entry_agent(e, _config), do: e
+
+  # Id-keyed agents belonging to project `pid`.
+  defp keep_owned_agents(section, pid) when is_map(section),
+    do: Map.filter(section, fn {_id, m} -> m["project"] == pid end)
+
+  defp keep_owned_agents(_section, _pid), do: %{}
 
   # Id-keyed section whose entries carry an `"agent"` handle (crons/watches/telegrams), filtered
-  # to entries bound to one of the company's agents.
+  # to entries bound to one of the project's agents.
   defp keep_agent_bound(section, co) when is_map(section),
-    do: Map.filter(section, fn {_id, e} -> Company.of(e["agent"] || "") == co end)
+    do: Map.filter(section, fn {_id, e} -> Project.of(e["agent"] || "") == co end)
 
   defp keep_agent_bound(_section, _co), do: %{}
 
-  # A token may be scoped to a company by its `"company"` field (a bare name, e.g. from
-  # `token add --company acme` with no agent) OR bound to one of its agents. Filtering by the
+  # A token may be scoped to a project by its `"project"` field (a bare name, e.g. from
+  # `token add --project acme` with no agent) OR bound to one of its agents. Filtering by the
   # agent alone drops the whole-tenant token, which is the commonest shape when standing an
   # install up on its own. Webhooks are the same: an inbound connection is scoped by its own
-  # `"company"` and routes to an `"agent"`.
+  # `"project"` and routes to an `"agent"`.
   defp keep_tokens(section, co) when is_map(section),
     do: Map.filter(section, fn {_id, e} -> scoped_to?(e, co) end)
 
@@ -782,9 +1076,9 @@ defmodule Pepe.Config do
 
   defp keep_webhooks(_section, _co), do: %{}
 
-  # An entry belongs to `co` if its bare `"company"` names it, or its `"agent"` handle is in it.
+  # An entry belongs to `co` if its bare `"project"` names it, or its `"agent"` handle is in it.
   defp scoped_to?(entry, co),
-    do: entry["company"] == co or Company.of(entry["agent"] || "") == co
+    do: entry["project"] == co or Project.of(entry["agent"] || "") == co
 
   # Every model the bundle needs, by every way a model is pointed at. `.model`, a cron/watch/bot
   # `.model` override, and a scope `default_model` are stored as model **ids**; an agent's
@@ -813,11 +1107,11 @@ defmodule Pepe.Config do
     %{ids: ids, names: names}
   end
 
-  # Models the bundle needs: the company's own (by name scope), plus any **root/shared** model a
+  # Models the bundle needs: the project's own (by name scope), plus any **root/shared** model a
   # kept reference points at (by id or by name), so a shared dependency travels whole. A model
-  # that belongs to *another* company is deliberately NEVER pulled in, even when referenced -
+  # that belongs to *another* project is deliberately NEVER pulled in, even when referenced -
   # carrying it would leak that tenant's connection (base_url, headers, the name of its secret)
-  # into this bundle. Such a cross-company reference is a misconfiguration, and dropping it fails
+  # into this bundle. Such a cross-project reference is a misconfiguration, and dropping it fails
   # closed: the restored agent has a dangling ref rather than a stranger's credentials. Returns
   # the kept id->model map and the names of the pulled-in shared ones (for the caller to report).
   defp keep_models(models, deps, co) when is_map(models) do
@@ -825,16 +1119,16 @@ defmodule Pepe.Config do
       Map.filter(models, fn {id, m} ->
         name = m["name"] || ""
 
-        case Company.of(name) do
+        case Project.of(name) do
           ^co -> true
           nil -> MapSet.member?(deps.ids, id) or MapSet.member?(deps.names, name)
-          _other_company -> false
+          _other_project -> false
         end
       end)
 
     shared =
       kept
-      |> Enum.filter(fn {_id, m} -> Company.of(m["name"] || "") != co end)
+      |> Enum.filter(fn {_id, m} -> Project.of(m["name"] || "") != co end)
       |> Enum.map(fn {_id, m} -> m["name"] end)
       |> Enum.reject(&is_nil/1)
       |> Enum.sort()
@@ -844,14 +1138,17 @@ defmodule Pepe.Config do
 
   defp keep_models(_models, _deps, _co), do: {%{}, []}
 
+  # Produce the extracted bare-root (old-shape) agents map: keyed by bare name, with the id-keyed
+  # `bare`/`project` fields stripped and scope references de-scoped. Restore's migration re-expands
+  # it into the default project.
   defp descope_agents(agents, co) do
-    Map.new(agents, fn {handle, v} ->
-      {remap_handle(handle, co, ""), v |> rewrite_agent_refs(co, "") |> descope_model_hooks(co)}
+    Map.new(agents, fn {_id, m} ->
+      {m["bare"], m |> Map.drop(["bare", "project"]) |> rewrite_agent_refs(co, "") |> descope_model_hooks(co)}
     end)
   end
 
   # An agent's model-hook fields (`triage_model`/`simple_model`/`utility_model`) and its
-  # `fallbacks` list hold model NAMES, so a company one (`acme/triage`) must lose its prefix the
+  # `fallbacks` list hold model NAMES, so a project one (`acme/triage`) must lose its prefix the
   # same way the model's own name does, or it matches nothing on the restored install.
   defp descope_model_hooks(agent, co) do
     agent
@@ -869,23 +1166,23 @@ defmodule Pepe.Config do
 
   defp descope_tokens(section, co) do
     Map.new(section, fn {id, e} ->
-      {id, e |> descope_scope_company(co) |> remap_field("agent", co, "")}
+      {id, e |> descope_scope_project(co) |> remap_field("agent", co, "")}
     end)
   end
 
   defp descope_webhooks(section, co) do
     Map.new(section, fn {slug, e} ->
-      {slug, e |> descope_scope_company(co) |> remap_field("agent", co, "")}
+      {slug, e |> descope_scope_project(co) |> remap_field("agent", co, "")}
     end)
   end
 
-  # A token's/webhook's `company` is a bare name, not a handle, and the root scope is `nil`
+  # A token's/webhook's `project` is a bare name, not a handle, and the root scope is `nil`
   # everywhere it is read (token_in_scope?, verify_api_token, webhook `norm`, the usage/agent
   # scoping). De-scoping it to root must land on `nil`, not the `""` a handle remap would give -
-  # otherwise the restored entry is scoped to a company that does not exist and matches nothing.
-  defp descope_scope_company(entry, co) do
-    case Map.get(entry, "company") do
-      ^co -> Map.put(entry, "company", nil)
+  # otherwise the restored entry is scoped to a project that does not exist and matches nothing.
+  defp descope_scope_project(entry, co) do
+    case Map.get(entry, "project") do
+      ^co -> Map.put(entry, "project", nil)
       _ -> entry
     end
   end
@@ -962,11 +1259,12 @@ defmodule Pepe.Config do
   defp raw_secret?(_), do: false
 
   @doc """
-  Agents in a scope: `nil` for the root scope, or a company name. Root returns only
-  bare-name agents; a company returns only its own - never another's.
+  Agents in a scope: `nil` resolves to the default project, or pass a project slug. Returns only
+  that project's agents - never another's.
   """
   def agents_in(scope) do
-    agents() |> Enum.filter(fn a -> Company.of(a.name) == scope end)
+    slug = resolve_scope(scope)
+    agents() |> Enum.filter(fn a -> Project.of(a.name) == slug end)
   end
 
   ###
@@ -974,31 +1272,190 @@ defmodule Pepe.Config do
   ###
 
   def agents do
-    load()
+    config = load()
+
+    config
     |> Map.get("agents", %{})
-    |> Enum.map(fn {name, a} -> Agent.from_map(Map.put(a, "name", name)) |> resolve_agent_model() end)
+    |> Enum.map(fn {id, m} -> build_agent(config, id, m) end)
   end
 
-  @spec get_agent(String.t()) :: Agent.t() | nil
-  def get_agent(name) do
-    case load() |> get_in(["agents", name]) do
-      nil -> nil
-      a -> Agent.from_map(Map.put(a, "name", name)) |> resolve_agent_model()
+  # Build the Agent struct from a stored (id-keyed) map: fill the stable `id`, owning `project`
+  # id and bare label, and the derived display handle in `name` (`<project-slug>/<bare>`), so
+  # callers keep seeing a handle in `.name`.
+  defp build_agent(config, id, m) do
+    agent =
+      m
+      |> Map.put("id", id)
+      |> Map.put("name", agent_handle(config, m))
+      |> Agent.from_map()
+      |> resolve_agent_model()
+
+    # Routing/authority lists are STORED as agent ids (rename-safe); resolve them back to handles
+    # on read so every caller sees handles exactly as before. A non-agent entry (`"*"`, or a stale
+    # id) passes through untouched. `can_manage: nil` (the "itself only" default) is preserved.
+    %{
+      agent
+      | can_message: resolve_agent_refs(config, agent.can_message),
+        can_manage: resolve_agent_refs(config, agent.can_manage)
+    }
+  end
+
+  defp resolve_agent_refs(config, refs) when is_list(refs), do: Enum.map(refs, &ref_to_handle(config, &1))
+  defp resolve_agent_refs(_config, other), do: other
+
+  # An agent id -> its display handle; anything else (a bare name, `"*"`, an unresolvable id) as-is.
+  defp ref_to_handle(config, ref) do
+    case get_in(config, ["agents", ref]) do
+      m when is_map(m) -> agent_handle(config, m)
+      _ -> ref
     end
   end
 
-  def get_agent!(name) do
-    get_agent(name) || raise "unknown agent: #{inspect(name)}"
+  # A handle -> the agent's stable id for storage; a non-resolving entry (`"*"`, a bare peer name
+  # that has no agent yet) is kept verbatim so nothing is silently dropped.
+  defp handle_to_ref(config, handle), do: agent_id_for(config, handle) || handle
+
+  defp store_agent_refs(config, refs) when is_list(refs), do: Enum.map(refs, &handle_to_ref(config, &1))
+  defp store_agent_refs(_config, other), do: other
+
+  # A single agent binding (a cron/bot/token `agent`, or `default_agent`): store the handle as its
+  # stable id, and resolve a stored id back to its handle on read. A nil or non-resolving value
+  # (e.g. a token with no agent) passes through untouched, so nothing is lost.
+  defp store_agent_ref(nil), do: nil
+  defp store_agent_ref(handle), do: handle_to_ref(load(), handle)
+
+  defp read_agent_ref(nil), do: nil
+  defp read_agent_ref(ref), do: ref_to_handle(load(), ref)
+
+  # Transform a raw map's `"agent"` field (a bot/token map) in place, only if the key is present -
+  # so an empty telegram map never gains a stray `"agent" => nil` key.
+  defp read_map_agent(m) when is_map(m),
+    do: if(Map.has_key?(m, "agent"), do: Map.update!(m, "agent", &read_agent_ref/1), else: m)
+
+  defp store_map_agent(m) when is_map(m),
+    do: if(Map.has_key?(m, "agent"), do: Map.update!(m, "agent", &store_agent_ref/1), else: m)
+
+  # Prepare an agent for id-keyed storage: pin its bare label + owning project, store the model by
+  # id, and store its routing/authority lists as agent ids (so a rename never rewrites them).
+  defp store_agent(config, %Agent{} = agent, bare, pid) do
+    %{
+      agent
+      | model: model_id_for(agent.model) || agent.model,
+        bare: bare,
+        project: pid,
+        can_message: store_agent_refs(config, agent.can_message),
+        can_manage: store_agent_refs(config, agent.can_manage)
+    }
+  end
+
+  # The display handle `<project-slug>/<bare>` for a stored agent map.
+  defp agent_handle(config, m) do
+    slug = get_in(config, ["projects", m["project"], "slug"]) || default_project_slug(config)
+    Project.handle(slug, m["bare"])
+  end
+
+  # Resolve an agent reference - an agent id, or a handle (`slug/name`, or a bare name that
+  # resolves into the default project) - to the agent's stable id, or nil.
+  defp agent_id_for(config, ref) when is_binary(ref) do
+    agents = Map.get(config, "agents", %{})
+
+    if Map.has_key?(agents, ref) do
+      ref
+    else
+      {slug, bare} = handle_parts(config, ref)
+      pid = project_id_for(config, slug)
+      Enum.find_value(agents, &agent_match(&1, pid, bare))
+    end
+  end
+
+  defp agent_id_for(_config, _ref), do: nil
+
+  defp agent_match({id, %{"project" => pid, "bare" => bare}}, pid, bare), do: id
+  defp agent_match(_entry, _pid, _bare), do: nil
+
+  # Re-point every agent's handle-shaped refs (can_message/can_manage) from `old` to `new`, without
+  # re-keying the id-keyed agents map. Used by a project rename.
+  defp remap_agents_refs(config, old, new) do
+    update_in(config, ["agents"], &remap_each_agent_refs(&1, old, new))
+  end
+
+  defp remap_each_agent_refs(agents, old, new) do
+    Map.new(agents || %{}, fn {id, m} -> {id, rewrite_agent_refs(m, old, new)} end)
+  end
+
+  # {project-slug, bare-name} for a handle, filling an omitted project with the default.
+  defp handle_parts(config, handle) do
+    case Project.of(handle) do
+      nil -> {default_project_slug(config), Project.name_of(handle)}
+      slug -> {slug, Project.name_of(handle)}
+    end
+  end
+
+  defp generate_agent_id, do: "a_" <> (:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower))
+
+  @spec get_agent(String.t()) :: Agent.t() | nil
+  def get_agent(ref) do
+    config = load()
+
+    case agent_id_for(config, ref) do
+      nil -> nil
+      id -> build_agent(config, id, config["agents"][id])
+    end
+  end
+
+  def get_agent!(ref) do
+    get_agent(ref) || raise "unknown agent: #{inspect(ref)}"
   end
 
   def put_agent(%Agent{name: name} = agent) do
-    stored = %{agent | model: model_id_for(agent.model) || agent.model}
+    if valid_handle?(name) do
+      do_put_agent(agent)
+    else
+      {:error, :invalid_name}
+    end
+  end
 
+  # A handle is `slug/name` or a bare name; every segment must be a plain `[A-Za-z0-9_-]+` label
+  # (the rule projects already enforce). This is the choke point every agent write flows through -
+  # the CLI validated, but the manage_agent tool and the dashboard did not, which let a crafted
+  # name (`acme/../../x`) reach the filesystem-path builder. Reject it here, and Workspace.dir
+  # refuses it again as a backstop.
+  defp valid_handle?(handle) do
+    slug = Project.of(handle)
+    (is_nil(slug) or Project.valid_name?(slug)) and Project.valid_name?(Project.name_of(handle))
+  end
+
+  defp do_put_agent(%Agent{name: name} = agent) do
     update(fn config ->
+      {slug, bare} = handle_parts(config, name)
+      {config, pid} = ensure_project(config, slug)
+      id = agent.id || agent_id_for(config, name) || generate_agent_id()
+      stored = store_agent(config, agent, bare, pid)
+
       config
-      |> update_in(["agents"], fn a -> Map.put(a || %{}, name, encode(stored)) end)
-      |> maybe_default_root("default_agent", name)
+      |> update_in(["agents"], fn a -> Map.put(a || %{}, id, encode_agent(stored)) end)
+      |> maybe_default_root_agent(id, pid)
     end)
+  end
+
+  # {config, project-id} for a slug, creating the project (with that slug) if it doesn't exist -
+  # so putting an agent into a not-yet-declared project just works, as it did when agents were
+  # handle-keyed. (The CLI still validates and rejects an unknown `--project` before this.)
+  defp ensure_project(config, slug) do
+    case project_id_for(config, slug) do
+      nil ->
+        id = generate_project_id()
+        {update_in(config, ["projects"], &Map.put(&1 || %{}, id, %{"slug" => slug, "name" => slug})), id}
+
+      pid ->
+        {config, pid}
+    end
+  end
+
+  # Store an agent id-keyed: drop the derived `name` and the `id` (which is the map key); keep the
+  # stable `bare` label and owning `project` id.
+  defp encode_agent(%Agent{} = agent) do
+    agent |> Map.from_struct() |> Map.drop([:id, :name]) |> stringify()
   end
 
   # An agent's stored `model` is a model id (rename-safe); resolve it back to
@@ -1013,22 +1470,23 @@ defmodule Pepe.Config do
   # pair (the old shape) could lose a concurrent grant/route change to the SAME agent - both read
   # the old agent, and the second `put_agent` writes back the whole entry, dropping the first's
   # change. Returns `:ok`, or `{:error, :unknown_agent}`. (Callers ignore the success value.)
-  defp update_agent(name, fun) do
-    if is_map(get_in(load(), ["agents", name])) do
-      update(&apply_to_agent(&1, name, fun))
-      :ok
-    else
-      {:error, :unknown_agent}
+  defp update_agent(ref, fun) do
+    case agent_id_for(load(), ref) do
+      nil ->
+        {:error, :unknown_agent}
+
+      id ->
+        update(&apply_to_agent(&1, id, fun))
+        :ok
     end
   end
 
-  defp apply_to_agent(config, name, fun) do
-    case config["agents"][name] do
+  defp apply_to_agent(config, id, fun) do
+    case config["agents"][id] do
       raw when is_map(raw) ->
-        agent = Agent.from_map(Map.put(raw, "name", name)) |> resolve_agent_model()
-        updated = fun.(agent)
-        stored = %{updated | model: model_id_for(updated.model) || updated.model}
-        update_in(config, ["agents"], &Map.put(&1 || %{}, name, encode(stored)))
+        updated = fun.(build_agent(config, id, raw))
+        stored = store_agent(config, updated, raw["bare"], raw["project"])
+        update_in(config, ["agents"], &Map.put(&1 || %{}, id, encode_agent(stored)))
 
       _ ->
         config
@@ -1044,14 +1502,34 @@ defmodule Pepe.Config do
     end)
   end
 
+  # Canonicalize a route/authority target relative to `from`'s scope: a bare `to` qualifies into
+  # `from`'s project, then resolves to the target agent's canonical handle - so add/remove match
+  # the resolved `can_message`/`can_manage` lists and the id-based storage lines up. `"*"` (the
+  # can_manage wildcard) and an unresolved name pass through untouched.
+  defp canon_target(_from, "*"), do: "*"
+
+  defp canon_target(from, to) do
+    from_handle = agent_display_handle(from)
+    agent_display_handle(Project.qualify(to, from_handle))
+  end
+
+  defp agent_display_handle(ref) do
+    case get_agent(ref) do
+      %Agent{name: name} -> name
+      _ -> to_string(ref)
+    end
+  end
+
   @doc "Allow `from` to message `to` (a directed route; `to -> from` is unaffected)."
   def allow_message(from, to) do
-    update_agent(from, fn agent -> %{agent | can_message: Enum.uniq(agent.can_message ++ [to])} end)
+    target = canon_target(from, to)
+    update_agent(from, fn agent -> %{agent | can_message: Enum.uniq(agent.can_message ++ [target])} end)
   end
 
   @doc "Remove the `from -> to` route."
   def disallow_message(from, to) do
-    update_agent(from, fn agent -> %{agent | can_message: List.delete(agent.can_message, to)} end)
+    target = canon_target(from, to)
+    update_agent(from, fn agent -> %{agent | can_message: List.delete(agent.can_message, target)} end)
   end
 
   @doc """
@@ -1073,83 +1551,138 @@ defmodule Pepe.Config do
 
   @doc "Grant `from` management authority over `to` (directed; list is exhaustive)."
   def allow_manage(from, to) do
-    update_agent(from, fn agent -> %{agent | can_manage: Enum.uniq((agent.can_manage || []) ++ [to])} end)
+    target = canon_target(from, to)
+    update_agent(from, fn agent -> %{agent | can_manage: Enum.uniq((agent.can_manage || []) ++ [target])} end)
   end
 
   @doc "Revoke `from`'s authority over `to`."
   def disallow_manage(from, to) do
-    update_agent(from, fn agent -> %{agent | can_manage: List.delete(agent.can_manage || [], to)} end)
+    target = canon_target(from, to)
+    update_agent(from, fn agent -> %{agent | can_manage: List.delete(agent.can_manage || [], target)} end)
   end
 
-  def delete_agent(name) do
+  def delete_agent(ref) do
     update(fn config ->
-      config
-      |> update_in(["agents"], &Map.delete(&1 || %{}, name))
-      |> clear_default_if("default_agent", name)
+      case agent_id_for(config, ref) do
+        nil ->
+          config
+
+        id ->
+          config
+          |> update_in(["agents"], &Map.delete(&1 || %{}, id))
+          |> clear_default_if("default_agent", id)
+      end
     end)
   end
 
-  @doc "Rename an agent (config key + name + default pointer). Does not move files."
+  # Set the global default_agent (an agent id) to this project's agent, if the agent belongs to
+  # the default project and no default is set yet. An agent in another project must never become
+  # the global default just by being the first one created.
+  defp maybe_default_root_agent(config, id, pid) do
+    if pid == resolve_default_id(config),
+      do: maybe_default(config, "default_agent", id),
+      else: config
+  end
+
+  defp project_slug_of(config, pid),
+    do: get_in(config, ["projects", pid, "slug"]) || default_project_slug(config)
+
+  @doc """
+  Rename an agent - change its bare label and move its workspace directory. The agent's stable id
+  never changes, so id-based references don't move; the handle references that still embed the
+  bare name (`default_agent`, `can_message`/`can_manage`, cron/bot/token bindings) are re-pointed.
+  """
   def rename_agent(old, new) do
-    if is_map(get_in(load(), ["agents", old])) do
-      update(fn config ->
-        agents = config["agents"] || %{}
-        agent_map = agents[old] || %{}
+    config = load()
+    new_bare = Project.name_of(new)
 
-        new_agents =
-          agents
-          |> Map.delete(old)
-          |> Map.put(new, Map.put(agent_map, "name", new))
+    case agent_id_for(config, old) do
+      nil ->
+        {:error, :not_found}
 
-        config
-        |> Map.put("agents", new_agents)
-        |> rename_default_agent(old, new)
-      end)
-    else
-      {:error, :not_found}
+      id ->
+        m = config["agents"][id]
+        old_handle = agent_handle(config, m)
+        new_handle = Project.handle(project_slug_of(config, m["project"]), new_bare)
+
+        cond do
+          not Project.valid_name?(new_bare) ->
+            {:error, :invalid_name}
+
+          # Another agent in the same project already has this bare name: renaming onto it would
+          # give two distinct ids the same derived handle and the same workspace dir.
+          agent_name_taken?(config, id, m["project"], new_bare) ->
+            {:error, :already_exists}
+
+          true ->
+            do_rename_agent(id, old_handle, new_handle, new_bare)
+        end
     end
   end
 
-  defp rename_default_agent(%{"default_agent" => old} = config, old, new),
-    do: Map.put(config, "default_agent", new)
+  defp do_rename_agent(id, old_handle, new_handle, new_bare) do
+    update(fn c ->
+      c
+      |> update_in(["agents", id], &Map.put(&1, "bare", new_bare))
+      |> rekey_agent_refs(old_handle, new_handle)
+    end)
 
-  defp rename_default_agent(config, _old, _new), do: config
+    Pepe.Agent.Workspace.rename(old_handle, new_handle)
+    :ok
+  end
 
-  def default_agent_name, do: load()["default_agent"]
+  defp agent_name_taken?(config, id, pid, bare) do
+    config
+    |> Map.get("agents", %{})
+    |> Enum.any?(fn {other_id, m} -> other_id != id and m["project"] == pid and m["bare"] == bare end)
+  end
+
+  # Re-point every handle-shaped reference to an agent from `old` to `new` (used by rename_agent).
+  # Does NOT re-key the id-keyed agents map - only the references that still carry a handle.
+  defp rekey_agent_refs(config, old, new) do
+    config
+    |> update_in(["agents"], fn agents ->
+      Map.new(agents || %{}, fn {id, m} -> {id, rewrite_agent_refs(m, old, new)} end)
+    end)
+    |> rewrite_agent_binding("crons", old, new)
+    |> rewrite_agent_binding("watches", old, new)
+    |> rewrite_bot_bindings(old, new)
+    |> rewrite_token_scopes(old, new)
+    |> remap_field("default_agent", old, new)
+  end
+
+  # The global default_agent is stored as an agent id; resolve it back to a handle for callers.
+  def default_agent_name, do: read_agent_ref(load()["default_agent"])
 
   def default_agent do
-    case default_agent_name() do
+    case load()["default_agent"] do
       nil -> nil
-      name -> get_agent(name)
+      ref -> get_agent(ref)
     end
   end
 
   def set_default_agent(name) do
-    update(fn config -> config |> Map.put("default_agent", name) end)
+    update(fn config -> Map.put(config, "default_agent", handle_to_ref(config, name)) end)
   end
 
   @doc """
-  Set the default agent for a scope: the global default for root, or the company's
-  own default (stored as a bare name in the company meta) for a company.
+  Set the default agent for a scope: the global default for `nil`, or a project's own default
+  (stored as an agent id in the project meta) for a project slug.
   """
   def set_default_agent_for(nil, name), do: set_default_agent(name)
 
-  def set_default_agent_for(company, name) do
-    update(fn config ->
-      config
-      |> update_in(["companies", company], fn m -> Map.put(m || %{}, "default_agent", name) end)
-    end)
-  end
+  def set_default_agent_for(scope, name),
+    do: update_project(scope, %{"default_agent" => handle_to_ref(load(), Project.handle(scope, name))})
 
   @doc """
-  The default model for a scope: a company's own default if it pins one (resolved in
-  the company then the root scope), otherwise the root default. So companies can
+  The default model for a scope: a project's own default if it pins one (resolved in
+  the project then the root scope), otherwise the root default. So projects can
   share the operator's global provider or pin their own isolated keys.
   """
   def default_model_for(nil), do: default_model()
 
-  def default_model_for(company) do
-    case (get_company(company) || %{})["default_model"] do
+  def default_model_for(project) do
+    case (get_project(project) || %{})["default_model"] do
       nil -> default_model()
       id -> get_model(id) || default_model()
     end
@@ -1158,24 +1691,24 @@ defmodule Pepe.Config do
   @doc "The default agent handle for a scope, or nil. Root uses the global default."
   def default_agent_for(nil), do: default_agent_name()
 
-  def default_agent_for(company) do
-    case (get_company(company) || %{})["default_agent"] do
+  def default_agent_for(project) do
+    case (get_project(project) || %{})["default_agent"] do
       nil -> nil
-      name -> Company.handle(company, name)
+      ref -> read_agent_ref(ref)
     end
   end
 
   @doc """
-  Resolve the model connection an agent should use. A company agent's model
-  reference resolves within its own company first, then the root scope; an unset
-  reference falls back to the scope's default model. Company keys stay invisible to
-  other companies.
+  Resolve the model connection an agent should use. A project agent's model
+  reference resolves within its own project first, then the root scope; an unset
+  reference falls back to the scope's default model. Project keys stay invisible to
+  other projects.
   """
-  def model_for_agent(%Agent{name: handle, model: nil}), do: default_model_for(Company.of(handle))
+  def model_for_agent(%Agent{name: handle, model: nil}), do: default_model_for(Project.of(handle))
 
   def model_for_agent(%Agent{name: handle, model: ref}) do
-    scope = Company.of(handle)
-    get_model(Company.handle(scope, ref)) || get_model(ref) || default_model_for(scope)
+    scope = Project.of(handle)
+    get_model(Project.handle(scope, ref)) || get_model(ref) || default_model_for(scope)
   end
 
   @doc """
@@ -1210,7 +1743,7 @@ defmodule Pepe.Config do
   def crons do
     load()
     |> Map.get("crons", %{})
-    |> Enum.map(fn {id, map} -> Cron.from_map(Map.put(map, "id", id)) |> resolve_cron_model() end)
+    |> Enum.map(fn {id, map} -> Cron.from_map(Map.put(map, "id", id)) |> resolve_cron_model() |> resolve_cron_agent() end)
     |> Enum.sort_by(& &1.id)
   end
 
@@ -1218,13 +1751,15 @@ defmodule Pepe.Config do
   def get_cron(id) do
     case load() |> get_in(["crons", id]) do
       nil -> nil
-      map -> Cron.from_map(Map.put(map, "id", id)) |> resolve_cron_model()
+      map -> Cron.from_map(Map.put(map, "id", id)) |> resolve_cron_model() |> resolve_cron_agent()
     end
   end
 
+  defp resolve_cron_agent(%Cron{agent: agent} = cron), do: %{cron | agent: read_agent_ref(agent)}
+
   @doc "Create or replace a cron (keyed by its `id`)."
   def put_cron(%Cron{id: id} = cron) when is_binary(id) do
-    stored = %{cron | model: model_id_for(cron.model) || cron.model}
+    stored = %{cron | model: model_id_for(cron.model) || cron.model, agent: store_agent_ref(cron.agent)}
     map = stored |> Map.from_struct() |> Map.delete(:id) |> stringify()
 
     update(fn config ->
@@ -1256,7 +1791,7 @@ defmodule Pepe.Config do
   def watches do
     load()
     |> Map.get("watches", %{})
-    |> Enum.map(fn {id, map} -> Watch.from_map(Map.put(map, "id", id)) end)
+    |> Enum.map(fn {id, map} -> Watch.from_map(Map.put(map, "id", id)) |> resolve_watch_agent() end)
     |> Enum.sort_by(& &1.id)
   end
 
@@ -1264,13 +1799,15 @@ defmodule Pepe.Config do
   def get_watch(id) do
     case load() |> get_in(["watches", id]) do
       nil -> nil
-      map -> Watch.from_map(Map.put(map, "id", id))
+      map -> Watch.from_map(Map.put(map, "id", id)) |> resolve_watch_agent()
     end
   end
 
+  defp resolve_watch_agent(%Watch{agent: agent} = watch), do: %{watch | agent: read_agent_ref(agent)}
+
   @doc "Create or replace a watch (keyed by its `id`)."
   def put_watch(%Watch{id: id} = watch) when is_binary(id) do
-    map = watch |> Map.from_struct() |> Map.delete(:id) |> stringify()
+    map = %{watch | agent: store_agent_ref(watch.agent)} |> Map.from_struct() |> Map.delete(:id) |> stringify()
 
     update(fn config ->
       config
@@ -1297,7 +1834,7 @@ defmodule Pepe.Config do
   def api_tokens do
     load()
     |> Map.get("api_tokens", %{})
-    |> Enum.map(fn {id, m} -> Map.put(m, "id", id) end)
+    |> Enum.map(fn {id, m} -> m |> Map.put("id", id) |> Map.update("agent", nil, &read_agent_ref/1) end)
     |> Enum.sort_by(& &1["id"])
   end
 
@@ -1308,14 +1845,14 @@ defmodule Pepe.Config do
   def api_auth_required?, do: api_tokens() != []
 
   @doc """
-  Mint an API token scoped to `company` (nil = root) and optionally `agent` (a full
+  Mint an API token scoped to `project` (nil = root) and optionally `agent` (a full
   handle). Returns `{raw_token, id}`; for a regular token, the raw value is shown once
   and only its hash is stored - a leaked config can't be replayed. `agent` must be
-  within `company`.
+  within `project`.
 
   Pass `widget: true` to mint a **widget token**: meant to sit in public page source
   (an embedded chat bubble's script tag), so it must be `agent`-locked (never
-  company-wide or root - a public credential always pins to one known-safe agent).
+  project-wide or root - a public credential always pins to one known-safe agent).
   Give it `allowed_origin` (a scheme+host, e.g. `"https://example.com"`); the
   WebSocket only accepts connections whose browser `Origin` matches some registered
   widget token's origin (see `PepeWeb.AgentSocket.check_origin?/1`) - a coarse gate in
@@ -1338,39 +1875,42 @@ defmodule Pepe.Config do
   @widget_appearance_fields ~w(title logo color theme greeting position)a
 
   def add_api_token(opts \\ []) do
-    company = opts[:company]
+    project = opts[:project]
     agent = opts[:agent]
     widget? = opts[:widget] == true
 
-    case validate_api_token(company, agent, widget?) do
-      :ok -> create_api_token(company, agent, widget?, opts)
+    case validate_api_token(project, agent, widget?) do
+      :ok -> create_api_token(project, agent, widget?, opts)
       error -> error
     end
   end
 
-  defp validate_api_token(company, agent, widget?) do
+  defp validate_api_token(project, agent, widget?) do
     cond do
       widget? and is_nil(agent) -> {:error, :widget_needs_agent}
-      unknown_company?(company) -> {:error, :unknown_company}
-      agent_out_of_scope?(agent, company) -> {:error, :agent_out_of_scope}
+      unknown_project?(project) -> {:error, :unknown_project}
+      agent_out_of_scope?(agent, project) -> {:error, :agent_out_of_scope}
       unknown_agent?(agent) -> {:error, :unknown_agent}
       true -> :ok
     end
   end
 
-  defp unknown_company?(company), do: company && not company_exists?(company)
-  defp agent_out_of_scope?(agent, company), do: agent && Company.of(agent) != company
+  defp unknown_project?(project), do: project && not project_exists?(project)
+
+  defp agent_out_of_scope?(agent, project),
+    do: agent && resolve_scope(Project.of(agent)) != resolve_scope(project)
+
   defp unknown_agent?(agent), do: agent && is_nil(get_agent(agent))
 
-  defp create_api_token(company, agent, widget?, opts) do
+  defp create_api_token(project, agent, widget?, opts) do
     raw = Pepe.ApiToken.generate()
     id = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
 
     entry =
       %{
         "hash" => Pepe.ApiToken.hash(raw),
-        "company" => company,
-        "agent" => agent,
+        "project" => project,
+        "agent" => store_agent_ref(agent),
         "label" => opts[:label],
         "prefix" => Pepe.ApiToken.fingerprint(raw)
       }
@@ -1483,8 +2023,8 @@ defmodule Pepe.Config do
   def widget_config(_raw), do: nil
 
   @doc """
-  Verify a raw bearer token. Returns its scope `%{company: c, agent: a, kind: k,
-  allowed_origin: o}` (`company`/`agent`/`allowed_origin` may be nil; `kind` is
+  Verify a raw bearer token. Returns its scope `%{project: c, agent: a, kind: k,
+  allowed_origin: o}` (`project`/`agent`/`allowed_origin` may be nil; `kind` is
   `"widget"` for a widget token, else nil) when it matches a stored hash, or `nil`
   when it doesn't.
   """
@@ -1493,7 +2033,7 @@ defmodule Pepe.Config do
 
     case Enum.find(api_tokens(), &token_hash_match?(&1, hash)) do
       nil -> nil
-      t -> %{company: t["company"], agent: t["agent"], kind: t["kind"], allowed_origin: t["allowed_origin"]}
+      t -> %{project: t["project"], agent: t["agent"], kind: t["kind"], allowed_origin: t["allowed_origin"]}
     end
   end
 
@@ -1509,11 +2049,11 @@ defmodule Pepe.Config do
   ###
 
   def telegram do
-    load() |> Map.get("telegram", %{})
+    load() |> Map.get("telegram", %{}) |> read_map_agent()
   end
 
   def put_telegram(map) when is_map(map) do
-    update(fn config -> config |> Map.put("telegram", map) end)
+    update(fn config -> config |> Map.put("telegram", store_map_agent(map)) end)
   end
 
   @doc """
@@ -1526,14 +2066,14 @@ defmodule Pepe.Config do
   def telegram_bots do
     base =
       case load()["telegram"] do
-        m when is_map(m) and map_size(m) > 0 -> [Map.put(m, "name", m["name"] || "default")]
+        m when is_map(m) and map_size(m) > 0 -> [Map.put(m, "name", m["name"] || "default") |> read_map_agent()]
         _ -> []
       end
 
     extra =
       load()
       |> Map.get("telegrams", %{})
-      |> Enum.map(fn {name, m} -> Map.put(m, "name", name) end)
+      |> Enum.map(fn {name, m} -> m |> Map.put("name", name) |> read_map_agent() end)
       |> Enum.sort_by(& &1["name"])
 
     (base ++ extra)
@@ -1545,7 +2085,7 @@ defmodule Pepe.Config do
 
   @doc "Create or replace a named (non-default) Telegram bot."
   def put_telegram_bot(name, map) when is_binary(name) and is_map(map) do
-    clean = Map.delete(map, "name")
+    clean = map |> Map.delete("name") |> store_map_agent()
 
     update(fn config ->
       config
@@ -1583,7 +2123,7 @@ defmodule Pepe.Config do
 
   @doc """
   All webhook connections as a `slug => entry` map. Each entry binds a provider
-  (`\"whatsapp\"`, ...) and an agent to a URL `/webhooks/:company/:provider/:slug`.
+  (`\"whatsapp\"`, ...) and an agent to a URL `/webhooks/:project/:provider/:slug`.
   """
   def webhooks, do: load() |> Map.get("webhooks", %{})
 
@@ -1788,42 +2328,25 @@ defmodule Pepe.Config do
     end
   end
 
-  # The metadata map for a billing/limits scope: root's own top-level "root" key,
-  # or a company's entry under "companies". Root always "exists" (it's the implicit
-  # default every command uses without --company), so root reads/writes here never
-  # hit the {:error, :not_found} a company update can.
-  defp scope_config(nil), do: load()["root"] || %{}
-  defp scope_config(company), do: get_company(company) || %{}
+  # The metadata map for a billing/limits scope. Uniform now: `nil` resolves to the default
+  # project, any slug to its own project. Billing fields live in the project entry like any other
+  # meta - there is no separate top-level "root" key, and no nil special case.
+  defp scope_config(scope), do: get_project(resolve_scope(scope)) || %{}
 
   @doc """
-  Update a billing/limits scope's metadata: root's own top-level config, or a
-  company's (same as `update_company/2`, `{:error, :not_found}` if unknown). Root
-  always succeeds - it always "exists", there's nothing to look up.
+  Update a billing/limits scope's metadata: `nil` resolves to the default project, a slug to its
+  own. Same as `update_project/2`; `{:error, :not_found}` if unknown (the default always exists).
   """
   @spec update_scope(String.t() | nil, map()) :: :ok | {:error, :not_found}
-  def update_scope(nil, meta) do
-    update(fn config ->
-      merged =
-        (config["root"] || %{})
-        |> Map.merge(meta)
-        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-        |> Map.new()
-
-      Map.put(config, "root", merged)
-    end)
-
-    :ok
-  end
-
-  def update_scope(company, meta), do: update_company(company, meta)
+  def update_scope(scope, meta), do: update_project(resolve_scope(scope), meta)
 
   @doc """
   A scope's billing markup: the multiplier applied to provider cost to get the
   amount to charge. Unset means `1.0` - bill exactly the provider cost.
   """
-  @spec company_markup(String.t() | nil) :: float()
-  def company_markup(company) do
-    case scope_config(company)["markup"] do
+  @spec project_markup(String.t() | nil) :: float()
+  def project_markup(project) do
+    case scope_config(project)["markup"] do
       n when is_number(n) and n > 0 -> n / 1
       _ -> 1.0
     end
@@ -1833,11 +2356,11 @@ defmodule Pepe.Config do
   A scope's monthly spend cap in the billing currency, or `nil` for no cap. When
   set, the runtime refuses new model calls for that scope once the month-to-date
   billable total reaches it. Root has its own cap (stored outside "companies",
-  since it isn't one), independent of every company's.
+  since it isn't one), independent of every project's.
   """
-  @spec company_budget(String.t() | nil) :: float() | nil
-  def company_budget(company) do
-    case scope_config(company)["budget"] do
+  @spec project_budget(String.t() | nil) :: float() | nil
+  def project_budget(project) do
+    case scope_config(project)["budget"] do
       n when is_number(n) and n > 0 -> n / 1
       _ -> nil
     end
@@ -1845,12 +2368,12 @@ defmodule Pepe.Config do
 
   @doc """
   A scope's monthly cap on customer-originated messages, or `nil` for no cap.
-  Independent of `company_budget/1` (the spend cap) - a scope can have either,
+  Independent of `project_budget/1` (the spend cap) - a scope can have either,
   both, or neither. See `Pepe.Usage.over_message_limit?/1`.
   """
-  @spec company_message_limit(String.t() | nil) :: pos_integer() | nil
-  def company_message_limit(company) do
-    case scope_config(company)["message_limit"] do
+  @spec project_message_limit(String.t() | nil) :: pos_integer() | nil
+  def project_message_limit(project) do
+    case scope_config(project)["message_limit"] do
       n when is_integer(n) and n > 0 -> n
       _ -> nil
     end
@@ -1862,17 +2385,17 @@ defmodule Pepe.Config do
   billing month starts, this naturally stops mattering - `Pepe.Usage.month_to_date/1`
   only ever looks at the current month's entries in the first place.
   """
-  @spec company_budget_reset_at(String.t() | nil) :: integer() | nil
-  def company_budget_reset_at(company) do
-    case scope_config(company)["budget_reset_at"] do
+  @spec project_budget_reset_at(String.t() | nil) :: integer() | nil
+  def project_budget_reset_at(project) do
+    case scope_config(project)["budget_reset_at"] do
       n when is_integer(n) -> n
       _ -> nil
     end
   end
 
-  @doc "Stamp `scope`'s budget as reset right now. `{:error, :not_found}` if an unknown company."
-  @spec reset_company_budget(String.t() | nil) :: :ok | {:error, :not_found}
-  def reset_company_budget(scope), do: update_scope(scope, %{"budget_reset_at" => System.system_time(:second)})
+  @doc "Stamp `scope`'s budget as reset right now. `{:error, :not_found}` if an unknown project."
+  @spec reset_project_budget(String.t() | nil) :: :ok | {:error, :not_found}
+  def reset_project_budget(scope), do: update_scope(scope, %{"budget_reset_at" => System.system_time(:second)})
 
   @doc "Locale for fixed system messages (default \"en\")."
   def locale, do: load()["locale"] || "en"
@@ -1945,11 +2468,7 @@ defmodule Pepe.Config do
     end
   end
 
-  defp encode(struct) do
-    struct |> Map.from_struct() |> Map.delete(:name) |> stringify()
-  end
-
-  # Models are id-keyed (unlike agents/companies, which are still name-keyed),
+  # Models are id-keyed (unlike agents/projects, which are still name-keyed),
   # so it's :id that's redundant with the map key here, not :name.
   defp encode_model(%Model{} = model) do
     model |> Map.from_struct() |> Map.delete(:id) |> stringify()
@@ -1963,10 +2482,13 @@ defmodule Pepe.Config do
     if is_nil(config[key]), do: Map.put(config, key, name), else: config
   end
 
-  # Like maybe_default/3 but only for root-scope handles: a company agent/model must
-  # never become the global (root) default just by being the first one created.
+  # Like maybe_default/3 but only for the DEFAULT project's items: an agent/model in another
+  # project must never become the global default just by being the first one created. A nil-scope
+  # name (a bare handle, or a model id, which carries no project prefix) belongs to the default
+  # project, so it counts.
   defp maybe_default_root(config, key, name) do
-    if is_nil(Company.of(name)), do: maybe_default(config, key, name), else: config
+    slug = default_project_slug(config)
+    if (Project.of(name) || slug) == slug, do: maybe_default(config, key, name), else: config
   end
 
   defp clear_default_if(config, key, name) do

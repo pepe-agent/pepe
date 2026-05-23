@@ -263,36 +263,34 @@ defmodule Pepe.Doctor do
   # State integrity: agent directories on disk with no matching config entry. They keep
   # sessions/memory but config-driven routing ignores them, so flag them.
   defp state_checks do
-    root = orphan_agent_dirs(Path.join(Config.home(), "agents"), Config.agents_in(nil), nil)
-
-    company =
-      Enum.flat_map(Config.companies(), fn co ->
-        orphan_agent_dirs(Path.join([Config.home(), "companies", co, "agents"]), Config.agents_in(co), co)
+    orphans =
+      Enum.flat_map(Config.projects(), fn %{"slug" => slug} ->
+        orphan_agent_dirs(Path.join([Config.home(), "projects", slug, "agents"]), Config.agents_in(slug), slug)
       end)
 
-    case root ++ company do
+    case orphans do
       [] -> [{"state", "agent directories", :ok}]
       orphans -> orphans
     end
   end
 
-  defp orphan_agent_dirs(dir, agents, company) do
-    known = MapSet.new(agents, &Pepe.Company.name_of(&1.name))
+  defp orphan_agent_dirs(dir, agents, project) do
+    known = MapSet.new(agents, &Pepe.Project.name_of(&1.name))
 
     case File.ls(dir) do
       {:ok, entries} ->
         entries
         |> Enum.filter(&File.dir?(Path.join(dir, &1)))
         |> Enum.reject(&MapSet.member?(known, &1))
-        |> Enum.map(&orphan_agent_dir_check(&1, company))
+        |> Enum.map(&orphan_agent_dir_check(&1, project))
 
       _ ->
         []
     end
   end
 
-  defp orphan_agent_dir_check(entry, company) do
-    label = if company, do: "#{company}/#{entry}", else: entry
+  defp orphan_agent_dir_check(entry, project) do
+    label = if project, do: "#{project}/#{entry}", else: entry
     {"state", "orphan agent dir #{label}", {:warn, "on disk but not in config; remove it or re-add the agent"}}
   end
 

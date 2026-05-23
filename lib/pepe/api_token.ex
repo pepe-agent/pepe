@@ -1,6 +1,6 @@
 defmodule Pepe.ApiToken do
   @moduledoc """
-  Bearer tokens for the OpenAI-compatible HTTP API, each scoped to a company (or
+  Bearer tokens for the OpenAI-compatible HTTP API, each scoped to a project (or
   root) and optionally a single agent.
 
   A token is a random string prefixed `pepe_`. Only its **SHA-256 hash** is stored in
@@ -12,8 +12,8 @@ defmodule Pepe.ApiToken do
 
     * `agent`   - locked to exactly that agent handle; the request's `model` field is
       ignored, so the token always runs that one agent.
-    * `company` - any agent inside that company; a bare `model` name qualifies into it,
-      and another company's agent is refused.
+    * `project` - any agent inside that project; a bare `model` name qualifies into it,
+      and another project's agent is refused.
     * neither   - the root scope (root agents + bare model connections).
   """
 

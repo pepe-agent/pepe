@@ -22,8 +22,8 @@ defmodule PepeWeb.LearningLive do
      assign(socket,
        page_title: "Pepe · Learning",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        learn_agent: agent,
        learn_nodes: Pepe.Learning.timeline(agent),
        auto?: agent && Reflect.auto?(agent),
@@ -38,7 +38,7 @@ defmodule PepeWeb.LearningLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="learn" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="learn" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="✦"
@@ -158,7 +158,7 @@ defmodule PepeWeb.LearningLive do
 
   def handle_event("learn_save", %{"content" => content}, socket) do
     case socket.assigns.editing do
-      %{path: path} ->
+      %{path: path} when is_binary(path) ->
         File.mkdir_p!(Path.dirname(path))
         File.write!(path, content)
 
@@ -196,10 +196,10 @@ defmodule PepeWeb.LearningLive do
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/learn")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   @impl true
   def handle_info({:consolidated, name, result}, socket) do
@@ -234,8 +234,23 @@ defmodule PepeWeb.LearningLive do
   end
 
   defp load_node("memory", title, agent) do
-    path = Path.join(Workspace.dir(agent), title)
-    %{title: title, path: path, content: read(path), note: nil}
+    base = Workspace.dir(agent)
+    path = Path.join(base, title)
+
+    # `title` arrives from a client event param; a value like `../../etc/cron.d/x` would escape the
+    # workspace and turn the editor's File.write! into an arbitrary write. Only open a path that
+    # stays inside the agent's workspace; otherwise hand back a non-writable node.
+    if contained?(base, path) do
+      %{title: title, path: path, content: read(path), note: nil}
+    else
+      %{title: title, path: nil, content: "", note: gettext("Invalid path.")}
+    end
+  end
+
+  defp contained?(base, path) do
+    base = Path.expand(base)
+    full = Path.expand(path)
+    full == base or String.starts_with?(full, base <> "/")
   end
 
   defp read(path) do

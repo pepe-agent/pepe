@@ -58,7 +58,7 @@ defmodule Pepe.TraceTest do
     assert Trace.start("bot", nil) == :started
     Trace.finish({:error, :budget_exceeded})
 
-    [summary] = Trace.recent("root")
+    [summary] = Trace.recent("default")
     assert summary["outcome"]["kind"] == "error"
     assert summary["outcome"]["reason"] =~ "budget_exceeded"
   end
@@ -69,7 +69,7 @@ defmodule Pepe.TraceTest do
     Trace.event({:usage, "gpt", %{prompt_tokens: 10, completion_tokens: 5}})
     Trace.finish({:ok, "done", []})
 
-    [summary] = Trace.recent("root")
+    [summary] = Trace.recent("default")
     assert summary["usage"] == [%{"model" => "gpt", "in" => 100, "out" => 40}, %{"model" => "gpt", "in" => 10, "out" => 5}]
     refute Map.has_key?(summary, "events")
   end
@@ -79,7 +79,7 @@ defmodule Pepe.TraceTest do
     Trace.event({:usage, "gpt", %{"input_tokens" => 80, "output_tokens" => 20}})
     Trace.finish({:ok, "x", []})
 
-    [s] = Trace.recent("root")
+    [s] = Trace.recent("default")
     assert s["usage"] == [%{"model" => "gpt", "in" => 80, "out" => 20}]
   end
 
@@ -87,7 +87,7 @@ defmodule Pepe.TraceTest do
     assert Trace.start("bot", nil, "housekeeping", "cron") == :started
     Trace.finish({:ok, "done", []})
 
-    [summary] = Trace.recent("root")
+    [summary] = Trace.recent("default")
     assert summary["source"] == "cron"
   end
 
@@ -120,7 +120,7 @@ defmodule Pepe.TraceTest do
     Trace.event({:assistant, "hello"})
     id = Trace.finish({:ok, "hello", []})
 
-    kinds = Trace.get("root", id)["events"] |> Enum.map(& &1["t"])
+    kinds = Trace.get("default", id)["events"] |> Enum.map(& &1["t"])
     assert kinds == ["assistant"]
   end
 end

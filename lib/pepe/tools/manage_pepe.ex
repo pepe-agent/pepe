@@ -2,7 +2,7 @@ defmodule Pepe.Tools.ManagePepe do
   @moduledoc """
   Run the non-interactive `pepe` CLI from a conversation, so a trusted agent can drive
   the whole runtime by chat: add models and agents, manage channels, cron tasks,
-  watches, tokens, companies, plugins, hooks, config, usage, and more.
+  watches, tokens, projects, plugins, hooks, config, usage, and more.
 
   This is the most powerful tool in the box. Give it **only to an owner-style agent you
   fully trust**, never to a client-facing bot. It is not read-only, so every call goes
@@ -42,14 +42,14 @@ defmodule Pepe.Tools.ManagePepe do
       """
       Run a pepe CLI command and return its output, exactly as if typed in a terminal. \
       Pass `command` as everything after "pepe" (e.g. "agent list", "model add openai \
-      --base-url URL --model gpt-5", "token add --company acme --label ci"). This is a \
+      --base-url URL --model gpt-5", "token add --project acme --label ci"). This is a \
       privileged tool, so confirm the exact command with the user before running \
       anything that changes state.
 
       Refused (they can't run as a one-shot): setup, chat, tui, serve, eval, and the \
       foreground gateway forms (gateway with no subcommand, "gateway telegram", and \
       "gateway telegram setup"). Use `manage_channel` to wire up channels instead. \
-      Everything else works: config, dashboard, backup, company, model, agent, token, \
+      Everything else works: config, dashboard, backup, project, model, agent, token, \
       cron, watch, hooks, plugin, mcp, usage, traces, learn, migrate, doctor, and the \
       non-interactive gateway subcommands. Run "help" to see the full command list.
       """,
@@ -58,7 +58,7 @@ defmodule Pepe.Tools.ManagePepe do
         "properties" => %{
           "command" => %{
             "type" => "string",
-            "description" => "The pepe command line without the leading \"pepe\", e.g. \"agent list\" or \"token add --company acme\"."
+            "description" => "The pepe command line without the leading \"pepe\", e.g. \"agent list\" or \"token add --project acme\"."
           }
         },
         "required" => ["command"]

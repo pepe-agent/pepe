@@ -123,13 +123,13 @@ defmodule PepeWeb.DashUI do
 
   attr :active, :string, required: true
   attr :scope, :string, default: "all"
-  attr :companies, :list, default: []
-  attr :new_company, :boolean, default: false
+  attr :projects, :list, default: []
+  attr :new_project, :boolean, default: false
 
   @doc """
   The left navigation sidebar, shared by every section. `active` is the current
   section's path key (e.g. "agents") for highlighting. The workspace scope selector
-  drives `set_scope`/`company_add`/`toggle_new_company`, which each LiveView handles.
+  drives `set_scope`/`project_add`/`toggle_new_project`, which each LiveView handles.
   """
   def sidebar(assigns) do
     ~H"""
@@ -152,24 +152,24 @@ defmodule PepeWeb.DashUI do
 
       <div class="border-b border-zinc-800 px-3 py-3">
         <label class="mb-1 block px-1 text-xs font-semibold uppercase tracking-wider text-zinc-600">
-          {gettext("Company")}
+          {gettext("Project")}
         </label>
         <form id="scope-form" phx-change="set_scope">
           <select name="scope" class={fld()}>
-            <option value="all" selected={@scope == "all"}>{gettext("All companies")}</option>
+            <option value="all" selected={@scope == "all"}>{gettext("All projects")}</option>
             <option value="root" selected={@scope == "root"}>{gettext("Principal")}</option>
-            <option :for={c <- @companies} value={c} selected={@scope == c}>{c}</option>
+            <option :for={c <- @projects} value={c} selected={@scope == c}>{c}</option>
           </select>
         </form>
         <p class="mt-1.5 px-1 text-xs leading-relaxed text-zinc-500">
-          {gettext("Pick a company to see and configure only its agents, models and automations.")}
+          {gettext("Pick a project to see and configure only its agents, models and automations.")}
         </p>
-        <form :if={@new_company} phx-submit="company_add" class="mt-2 flex gap-1">
-          <input name="name" placeholder={gettext("company name")} required class={fld()} />
+        <form :if={@new_project} phx-submit="project_add" class="mt-2 flex gap-1">
+          <input name="name" placeholder={gettext("project name")} required class={fld()} />
           <button class="rounded-lg bg-orange-600 px-3 text-[15px] font-medium hover:bg-orange-500">{gettext("Add")}</button>
         </form>
-        <button phx-click="toggle_new_company" class="mt-1.5 px-1 text-xs text-zinc-500 transition hover:text-zinc-300">
-          {(@new_company && gettext("Cancel")) || gettext("+ New company")}
+        <button phx-click="toggle_new_project" class="mt-1.5 px-1 text-xs text-zinc-500 transition hover:text-zinc-300">
+          {(@new_project && gettext("Cancel")) || gettext("+ New project")}
         </button>
       </div>
 
@@ -180,7 +180,7 @@ defmodule PepeWeb.DashUI do
         </div>
         <div class="space-y-1">
           <div class={nav_group_cls()}>{gettext("Build")}</div>
-          <.nav_item active={@active} scope={@scope} to="companies" icon="🏢" label={gettext("Companies")} />
+          <.nav_item active={@active} scope={@scope} to="projects" icon="🏢" label={gettext("Projects")} />
           <.nav_item active={@active} scope={@scope} to="agents" icon="🧩" label={gettext("Agents")} />
           <.nav_item active={@active} scope={@scope} to="models" icon="🔌" label={gettext("Models")} />
           <.nav_item active={@active} scope={@scope} to="mcp" icon="🧰" label="MCP" />
@@ -238,7 +238,7 @@ defmodule PepeWeb.DashUI do
     """
   end
 
-  # Keep the selected company (scope) across navigation by carrying it in the URL.
+  # Keep the selected project (scope) across navigation by carrying it in the URL.
   defp nav_href(to, scope) when scope in [nil, "", "all"], do: "/#{to}"
   defp nav_href(to, scope), do: "/#{to}?scope=#{scope}"
 end

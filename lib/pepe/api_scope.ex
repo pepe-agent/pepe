@@ -4,10 +4,10 @@ defmodule Pepe.ApiScope do
   controller and the WebSocket channel so both enforce tenancy identically.
 
   A scope is `:unrestricted` (the API is open because no tokens are configured) or
-  `%{company: c, agent: a}` (either may be nil). See `Pepe.ApiToken`.
+  `%{project: c, agent: a}` (either may be nil). See `Pepe.ApiToken`.
   """
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
 
   @doc """
@@ -16,7 +16,7 @@ defmodule Pepe.ApiScope do
 
   The open scope is lenient - an unknown name falls back to the default agent (legacy
   behaviour) - while a token scope is strict: an agent-locked token always returns its
-  agent, and a company token returns only agents inside it (bare names qualify in),
+  agent, and a project token returns only agents inside it (bare names qualify in),
   `nil` otherwise. A name that is a bare model connection (not an agent) returns `nil`
   so callers that support model pass-through can handle it.
   """
@@ -31,26 +31,26 @@ defmodule Pepe.ApiScope do
 
   def authorize_agent(_name, %{agent: agent}) when is_binary(agent), do: Config.get_agent(agent)
 
-  def authorize_agent(name, %{company: company}) do
+  def authorize_agent(name, %{project: project}) do
     if present?(name),
-      do: scoped_agent(name, company),
-      else: agent_by_handle(Config.default_agent_for(company))
+      do: scoped_agent(name, Config.resolve_scope(project)),
+      else: agent_by_handle(Config.default_agent_for(project))
   end
 
   @doc "The agents a scope may see and list."
   def visible_agents(:unrestricted), do: Config.agents()
   def visible_agents(%{agent: a}) when is_binary(a), do: List.wrap(Config.get_agent(a))
-  def visible_agents(%{company: c}), do: Config.agents_in(c)
+  def visible_agents(%{project: c}), do: Config.agents_in(c)
 
   @doc "May this scope also use a bare model connection (open or root scope only)?"
   def root_or_open?(:unrestricted), do: true
-  def root_or_open?(%{company: nil, agent: nil}), do: true
+  def root_or_open?(%{project: nil, agent: nil}), do: true
   def root_or_open?(_), do: false
 
-  # Resolve a name to an agent only if it lives in `company` (bare names qualify in).
-  defp scoped_agent(name, company) do
-    handle = if Company.of(name) == company, do: name, else: Company.handle(company, name)
-    if Company.of(handle) == company, do: Config.get_agent(handle), else: nil
+  # Resolve a name to an agent only if it lives in `project` (bare names qualify in).
+  defp scoped_agent(name, project) do
+    handle = if Project.of(name) == project, do: name, else: Project.handle(project, name)
+    if Project.of(handle) == project, do: Config.get_agent(handle), else: nil
   end
 
   defp agent_by_handle(nil), do: nil

@@ -60,6 +60,7 @@ defmodule Pepe.ConfigWriterTest do
     |> Task.await_many(10_000)
 
     can_message = Config.get_agent("shared").can_message
-    for peer <- routes, do: assert(peer in can_message, "route to #{peer} was lost")
+    # A bare peer qualifies into the sender's (default) project, so the stored route is `default/peerN`.
+    for peer <- routes, do: assert("default/#{peer}" in can_message, "route to #{peer} was lost")
   end
 end

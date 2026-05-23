@@ -1,7 +1,7 @@
 defmodule Pepe.Webhooks do
   @moduledoc """
   Inbound-webhook gateway - the WhatsApp-and-friends counterpart to the Telegram
-  poller. A single route `/webhooks/:company/:provider/:slug` (see
+  poller. A single route `/webhooks/:project/:provider/:slug` (see
   `PepeWeb.WebhookController`) dispatches here; each connection binds to an agent
   and runs it on a session keyed `provider:agent:from`.
 
@@ -24,7 +24,7 @@ defmodule Pepe.Webhooks do
 
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionSupervisor
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.ModelSwitch
 
@@ -56,15 +56,15 @@ defmodule Pepe.Webhooks do
   end
 
   @doc """
-  Resolve a connection by its `(company, provider, slug)` path. The `slug` is the
-  unique key; `company` and `provider` from the path are validated against the
+  Resolve a connection by its `(project, provider, slug)` path. The `slug` is the
+  unique key; `project` and `provider` from the path are validated against the
   stored entry so a mismatched URL can't reach it. `\"root\"` in the path means the
-  no-company scope. Returns the entry (with its slug) or `nil`.
+  no-project scope. Returns the entry (with its slug) or `nil`.
   """
-  def resolve(company, provider, slug) do
+  def resolve(project, provider, slug) do
     with entry when is_map(entry) <- Config.get_webhook(slug),
          true <- entry["provider"] == provider,
-         true <- norm(entry["company"]) == norm(company) do
+         true <- norm(entry["project"]) == norm(project) do
       Map.put(entry, "slug", slug)
     else
       _ -> nil
@@ -72,8 +72,8 @@ defmodule Pepe.Webhooks do
   end
 
   @doc "Answer a provider's verification handshake for this connection."
-  def verify(company, provider, slug, params) do
-    with entry when is_map(entry) <- resolve(company, provider, slug),
+  def verify(project, provider, slug, params) do
+    with entry when is_map(entry) <- resolve(project, provider, slug),
          mod when not is_nil(mod) <- provider(provider) do
       mod.verify(entry, params)
     else
@@ -87,8 +87,8 @@ defmodule Pepe.Webhooks do
   provider gets its `200` immediately (Meta retries slow webhooks). Returns `:ok`
   once accepted, or `{:error, reason}` when the connection/signature is bad.
   """
-  def handle_inbound(company, provider, slug, raw_body, payload, headers) do
-    with entry when is_map(entry) <- resolve(company, provider, slug),
+  def handle_inbound(project, provider, slug, raw_body, payload, headers) do
+    with entry when is_map(entry) <- resolve(project, provider, slug),
          mod when not is_nil(mod) <- provider(provider),
          :ok <- mod.authenticate(entry, raw_body, headers) do
       case sync_respond(mod, entry, payload, headers) do
@@ -234,7 +234,7 @@ defmodule Pepe.Webhooks do
   defp dispatch_command(_entry, "new", _args, _from), do: {:reset, "🧹 New conversation."}
 
   defp dispatch_command(entry, "models", _args, _from) do
-    {:reply, render_models(ModelSwitch.list_for(Company.of(entry["agent"])))}
+    {:reply, render_models(ModelSwitch.list_for(Project.of(entry["agent"])))}
   end
 
   defp dispatch_command(entry, "model", args, from) do
@@ -271,7 +271,7 @@ defmodule Pepe.Webhooks do
 
   defp mention_status_reply(false), do: "Mention requirement is currently: on (I need an @mention).\nUse /mention on or /mention off."
 
-  defp render_models([]), do: "No models are configured for this company."
+  defp render_models([]), do: "No models are configured for this project."
 
   defp render_models(models),
     do: "Available models:\n" <> Enum.map_join(models, "\n", &"- #{&1.name} (#{&1.model})")

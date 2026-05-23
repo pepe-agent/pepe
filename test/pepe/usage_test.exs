@@ -42,7 +42,7 @@ defmodule Pepe.UsageTest do
 
   describe "record + summary" do
     setup do
-      Config.add_company("acme", %{"markup" => 1.5})
+      Config.add_project("acme", %{"markup" => 1.5})
 
       Config.put_model(%Config.Model{
         name: "acme/gpt",
@@ -72,7 +72,7 @@ defmodule Pepe.UsageTest do
       assert s.totals.count == 2
     end
 
-    test "cost uses the model's manual price; billable applies the company markup" do
+    test "cost uses the model's manual price; billable applies the project markup" do
       Usage.record("acme/sales", "acme/gpt", %{
         "prompt_tokens" => 1_000_000,
         "completion_tokens" => 500_000
@@ -89,7 +89,7 @@ defmodule Pepe.UsageTest do
       Config.put_model(%Config.Model{name: "mini", model: "gpt-4o-mini"})
       Usage.record("assistant", "mini", %{"prompt_tokens" => 1_000_000, "completion_tokens" => 0})
 
-      s = Usage.summary("root", :day)
+      s = Usage.summary("default", :day)
       # gpt-4o-mini seed input price 0.15/1M
       assert_in_delta s.totals.cost, 0.15, 0.0001
     end
@@ -98,12 +98,12 @@ defmodule Pepe.UsageTest do
       Config.put_model(%Config.Model{name: "mini", model: "gpt-4o-mini"})
       Usage.record("assistant", "mini", %{"total_tokens" => 400_000})
 
-      s = Usage.summary("root", :day)
+      s = Usage.summary("default", :day)
       assert s.totals.in == 400_000
       assert s.totals.out == 0
     end
 
-    test "scopes are isolated; :all merges them and breaks down per company" do
+    test "scopes are isolated; :all merges them and breaks down per project" do
       Config.put_model(%Config.Model{name: "mini", model: "gpt-4o-mini"})
 
       Usage.record("acme/sales", "acme/gpt", %{
@@ -114,11 +114,11 @@ defmodule Pepe.UsageTest do
       Usage.record("assistant", "mini", %{"prompt_tokens" => 500_000, "completion_tokens" => 0})
 
       assert Usage.summary("acme", :day).totals.total == 1_000_000
-      assert Usage.summary("root", :day).totals.total == 500_000
+      assert Usage.summary("default", :day).totals.total == 500_000
 
       all = Usage.summary(:all, :day)
       assert all.totals.total == 1_500_000
-      assert Enum.map(all.by_company, & &1.key) |> Enum.sort() == ["acme", "root"]
+      assert Enum.map(all.by_project, & &1.key) |> Enum.sort() == ["acme", "default"]
     end
 
     test "zero/empty usage is not recorded" do
@@ -131,7 +131,7 @@ defmodule Pepe.UsageTest do
 
   describe "invoice" do
     setup do
-      Config.add_company("acme", %{"markup" => 1.5})
+      Config.add_project("acme", %{"markup" => 1.5})
 
       Config.put_model(%Config.Model{
         name: "acme/gpt",
@@ -152,7 +152,7 @@ defmodule Pepe.UsageTest do
     test "builds a per-model invoice with cost, markup and billable", %{month: month} do
       inv = Usage.invoice("acme", month: month, tz: "Etc/UTC")
 
-      assert inv.company == "acme"
+      assert inv.project == "acme"
       assert inv.markup == 1.5
       assert inv.period.label == month
       assert [%{key: "acme/gpt", total: 1_500_000}] = inv.line_items
@@ -182,22 +182,22 @@ defmodule Pepe.UsageTest do
     end
 
     test "the export_invoice tool saves a file and returns it" do
-      assert {:ok, out} = Pepe.Tools.Invoice.run(%{"company" => "acme"}, %{})
+      assert {:ok, out} = Pepe.Tools.Invoice.run(%{"project" => "acme"}, %{})
       assert out =~ "Saved invoice to"
       assert out =~ "# Invoice - acme"
 
-      assert {:error, msg} = Pepe.Tools.Invoice.run(%{"company" => "ghost"}, %{})
-      assert msg =~ "unknown company"
+      assert {:error, msg} = Pepe.Tools.Invoice.run(%{"project" => "ghost"}, %{})
+      assert msg =~ "unknown project"
     end
   end
 
-  describe "company markup" do
+  describe "project markup" do
     test "defaults to 1.0 and reads a configured multiplier" do
-      assert Config.company_markup(nil) == 1.0
-      assert Config.company_markup("nope") == 1.0
+      assert Config.project_markup(nil) == 1.0
+      assert Config.project_markup("nope") == 1.0
 
-      Config.add_company("acme", %{"markup" => 1.3})
-      assert Config.company_markup("acme") == 1.3
+      Config.add_project("acme", %{"markup" => 1.3})
+      assert Config.project_markup("acme") == 1.3
     end
   end
 end

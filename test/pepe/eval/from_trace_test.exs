@@ -96,14 +96,14 @@ defmodule Pepe.Eval.FromTraceTest do
   # Run a turn for real, so a real trace lands on disk, and hand back its id.
   defp recorded_run(agent, prompt) do
     {:ok, _reply, _msgs} = Runtime.converse(agent, prompt, cwd: File.cwd!(), session_key: "s1")
-    [trace | _] = Trace.recent("root", 5)
+    [trace | _] = Trace.recent("default", 5)
     trace["id"]
   end
 
   test "the tools the agent used become the assertion", %{agent: agent} do
     id = recorded_run(agent, "what is the price?")
 
-    assert {:ok, kase} = FromTrace.build("root", id)
+    assert {:ok, kase} = FromTrace.build("default", id)
 
     assert kase["agent"] == "clerk"
     assert kase["prompt"] == "what is the price?"
@@ -119,14 +119,14 @@ defmodule Pepe.Eval.FromTraceTest do
   test "words a human says were the point do get asserted", %{agent: agent} do
     id = recorded_run(agent, "what is the price?")
 
-    assert {:ok, kase} = FromTrace.build("root", id, contains: ["42 euros"])
+    assert {:ok, kase} = FromTrace.build("default", id, contains: ["42 euros"])
     assert kase["expect"]["contains"] == ["42 euros"]
   end
 
   test "promoting writes a runnable case into a suite", %{agent: agent} do
     id = recorded_run(agent, "what is the price?")
 
-    assert {:ok, _} = FromTrace.promote("root", id, "recorded")
+    assert {:ok, _} = FromTrace.promote("default", id, "recorded")
 
     assert [kase] = Eval.load("recorded")
     assert kase["from_trace"] == id
@@ -138,8 +138,8 @@ defmodule Pepe.Eval.FromTraceTest do
   test "the same conversation is not promoted twice", %{agent: agent} do
     id = recorded_run(agent, "what is the price?")
 
-    assert {:ok, _} = FromTrace.promote("root", id, "recorded")
-    assert {:error, why} = FromTrace.promote("root", id, "recorded")
+    assert {:ok, _} = FromTrace.promote("default", id, "recorded")
+    assert {:error, why} = FromTrace.promote("default", id, "recorded")
     assert why =~ "already a case"
 
     assert [_only_one] = Eval.load("recorded")
@@ -148,7 +148,7 @@ defmodule Pepe.Eval.FromTraceTest do
   test "a run that failed is not something to keep doing" do
     # A trace of a turn that died. Promoting it would freeze the failure as the expectation
     # and, worse, hand you a green suite for it.
-    dir = Path.join([Trace.dir(), "root"])
+    dir = Path.join([Trace.dir(), "default"])
     File.mkdir_p!(dir)
 
     File.write!(
@@ -162,13 +162,13 @@ defmodule Pepe.Eval.FromTraceTest do
       })
     )
 
-    assert {:error, why} = FromTrace.build("root", "dead")
+    assert {:error, why} = FromTrace.build("default", "dead")
     assert why =~ "failed"
   end
 
   test "it catches the regression it exists for: the agent stops looking things up", %{agent: agent} do
     id = recorded_run(agent, "what is the price?")
-    assert {:ok, _} = FromTrace.promote("root", id, "recorded", contains: ["42"])
+    assert {:ok, _} = FromTrace.promote("default", id, "recorded", contains: ["42"])
     [kase] = Eval.load("recorded")
 
     # Green today.

@@ -261,7 +261,7 @@ defmodule Pepe.WebhookChannelsTest do
     # Slack signs the url_verification handshake too, so the connection carries a secret and the
     # request is signed - the same fail-closed authentication as any other inbound.
     secret = "shhh"
-    Pepe.Config.put_webhook("s1", %{"provider" => "slack", "company" => nil, "agent" => "x", "config" => %{"signing_secret" => secret}})
+    Pepe.Config.put_webhook("s1", %{"provider" => "slack", "project" => nil, "agent" => "x", "config" => %{"signing_secret" => secret}})
     payload = %{"type" => "url_verification", "challenge" => "ok!"}
     raw = ~s({"type":"url_verification","challenge":"ok!"})
     ts = Integer.to_string(System.system_time(:second))

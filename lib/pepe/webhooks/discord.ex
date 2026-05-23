@@ -2,7 +2,7 @@ defmodule Pepe.Webhooks.Discord do
   @moduledoc """
   Discord provider over the **Interactions** endpoint (slash commands), so it fits the
   inbound-webhook gateway rather than a persistent gateway connection. Point the app's
-  "Interactions Endpoint URL" at `/webhooks/:company/discord/:slug` and add a slash
+  "Interactions Endpoint URL" at `/webhooks/:project/discord/:slug` and add a slash
   command with a text option (e.g. `/ask prompt:...`).
 
   A connection's `"config"` holds:

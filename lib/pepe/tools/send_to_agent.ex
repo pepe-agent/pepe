@@ -20,7 +20,7 @@ defmodule Pepe.Tools.SendToAgent do
   import Pepe.Tools.Tool, only: [function: 3]
 
   alias Pepe.Agent.Runtime
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
 
   @max_hops 5
@@ -50,8 +50,8 @@ defmodule Pepe.Tools.SendToAgent do
     from = ctx[:agent]
     from_name = from && from.name
     chain = ctx[:agent_chain] || List.wrap(from_name)
-    # A bare target resolves to a peer in the sender's own company.
-    to = from_name && Company.qualify(to, from_name)
+    # A bare target resolves to a peer in the sender's own project.
+    to = from_name && Project.qualify(to, from_name)
 
     case authorize(from, from_name, to, chain) do
       :ok -> deliver(to, from_name, message, chain, ctx)
@@ -66,10 +66,10 @@ defmodule Pepe.Tools.SendToAgent do
       is_nil(from) ->
         {:error, "no calling agent in context"}
 
-      # Hard tenant boundary: never route across companies, even if an allowlist or a
+      # Hard tenant boundary: never route across projects, even if an allowlist or a
       # qualified handle asks for it. The route allowlist is scoped, this backs it up.
-      not Company.same_scope?(to, from_name) ->
-        {:error, "Refusing to message #{to}: it belongs to a different company."}
+      not Project.same_scope?(to, from_name) ->
+        {:error, "Refusing to message #{to}: it belongs to a different project."}
 
       to not in (from.can_message || []) ->
         # Discreet on purpose: don't reveal the permission model to the end user.

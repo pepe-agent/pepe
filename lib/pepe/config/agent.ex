@@ -9,7 +9,14 @@ defmodule Pepe.Config.Agent do
   @default_prompt "You are Pepe, a helpful AI agent."
 
   @derive Jason.Encoder
-  defstruct name: nil,
+  defstruct id: nil,
+            # The agent's stable identity is its `id`; `name` is a mutable label and `project` is
+            # the owning project's id. `.name` as read back from Pepe.Config is the derived display
+            # **handle** (`<project-slug>/<name>`), so existing callers keep seeing a handle; the
+            # bare label lives in `bare` and the owning project in `project`.
+            name: nil,
+            bare: nil,
+            project: nil,
             description: nil,
             model: nil,
             system_prompt: @default_prompt,
@@ -55,10 +62,10 @@ defmodule Pepe.Config.Agent do
             # deliberately stays on the agent's own model. nil = use the agent's own model.
             # See Pepe.Agent.Utility.
             utility_model: nil,
-            # Skip the company's monthly customer-message cap for this agent (see
-            # Pepe.Config.company_message_limit/1) - an always-on agent (e.g. an
+            # Skip the project's monthly customer-message cap for this agent (see
+            # Pepe.Config.project_message_limit/1) - an always-on agent (e.g. an
             # escalation/on-call agent) that must never be throttled by it. Doesn't
-            # affect the company's separate spend cap (over_budget?/1).
+            # affect the project's separate spend cap (over_budget?/1).
             exempt_message_limit: false,
             # Let this agent ACT on content from outside (a document a client sent, a page a
             # tool fetched). Off by default, and the default is the safe one: normally, once a
@@ -80,7 +87,10 @@ defmodule Pepe.Config.Agent do
   @spec from_map(map()) :: t()
   def from_map(map) when is_map(map) do
     %__MODULE__{
+      id: map["id"],
       name: map["name"],
+      bare: map["bare"],
+      project: map["project"],
       description: map["description"],
       model: map["model"],
       system_prompt: map["system_prompt"] || @default_prompt,

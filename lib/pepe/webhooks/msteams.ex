@@ -1,7 +1,7 @@
 defmodule Pepe.Webhooks.MsTeams do
   @moduledoc """
   Microsoft Teams provider (Bot Framework). Inbound activities arrive as webhook `POST`s
-  to `/webhooks/:company/msteams/:slug`; replies go back to the activity's `serviceUrl`
+  to `/webhooks/:project/msteams/:slug`; replies go back to the activity's `serviceUrl`
   with an app access token minted via client credentials.
 
   A connection's `"config"` holds:

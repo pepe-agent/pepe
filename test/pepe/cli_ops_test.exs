@@ -21,7 +21,7 @@ defmodule Pepe.CLIOpsTest do
       {out, _err} = run(["token", "add", "--label", "ci"])
 
       assert out =~ "API token created"
-      assert out =~ "scope: root"
+      assert out =~ "scope: default"
       assert out =~ "shown only once"
       assert out =~ "pepe_"
 
@@ -38,7 +38,7 @@ defmodule Pepe.CLIOpsTest do
       {out, _err} = run(["token", "add", "--agent", "support"])
 
       assert out =~ "scope: agent support"
-      assert [%{"agent" => "support"}] = Config.api_tokens()
+      assert [%{"agent" => "default/support"}] = Config.api_tokens()
     end
 
     test "refuses an agent that does not exist, and mints nothing" do
@@ -48,10 +48,10 @@ defmodule Pepe.CLIOpsTest do
       assert Config.api_tokens() == []
     end
 
-    test "refuses a company that does not exist" do
-      {_out, err} = run(["token", "add", "--company", "ghost"])
+    test "refuses a project that does not exist" do
+      {_out, err} = run(["token", "add", "--project", "ghost"])
 
-      assert err =~ "unknown company: ghost"
+      assert err =~ "unknown project: ghost"
       assert Config.api_tokens() == []
     end
 
@@ -88,7 +88,7 @@ defmodule Pepe.CLIOpsTest do
       assert [%{"id" => id, "prefix" => prefix}] = Config.api_tokens()
       assert out =~ id
       assert out =~ prefix
-      assert out =~ "[support]"
+      assert out =~ "[default/support]"
       assert out =~ "widget site"
     end
 
@@ -148,7 +148,7 @@ defmodule Pepe.CLIOpsTest do
 
       cron = Config.get_cron("daily-report")
       assert cron.name == "daily report"
-      assert cron.agent == "support"
+      assert cron.agent == "default/support"
       assert cron.prompt == "summarise yesterday"
       assert cron.enabled
       assert cron.timezone == Config.default_timezone()
@@ -199,7 +199,7 @@ defmodule Pepe.CLIOpsTest do
       assert out =~ "daily-report - daily report"
       assert out =~ "[enabled]"
       assert out =~ "0 8 * * *"
-      assert out =~ "agent:   support"
+      assert out =~ "agent:   default/support"
     end
 
     test "disable stops it firing without deleting it" do
@@ -244,7 +244,7 @@ defmodule Pepe.CLIOpsTest do
 
       watch = Config.get_watch("site-up")
       assert watch.description == "site up"
-      assert watch.agent == "support"
+      assert watch.agent == "default/support"
       assert watch.state == "pending"
       assert watch.trigger == %{"type" => "probe", "command" => "curl -sf https://example.com", "success" => "exit_zero"}
       assert watch.on_fire == %{"type" => "template", "text" => "it is back"}

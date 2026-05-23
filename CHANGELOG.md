@@ -5,7 +5,21 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+- Agents now have a stable **id** of their own (like models and projects): the config's `agents`
+  map is keyed by that id, with the bare name and owning project id as mutable fields, and the
+  `project/name` handle is derived for display. Renaming a project no longer re-keys its agents.
+  Every reference to an agent - routing/authority (`can_message`/`can_manage`), the global and
+  per-project `default_agent`, and the `agent` binding of each cron, bot and API token - is stored
+  by agent id and resolved back to a handle on read, so a project or agent rename never rewrites a
+  reference and can't leave one dangling. Old handle-keyed configs upgrade automatically on load.
+- Multi-tenancy is now a uniform **project** model. The old special "root" scope is gone: every tenant, including the one every command falls back to, is a real, renameable **project** (the default one has the slug `default`). Omitting `--project` resolves to the default project, so single-tenant use is unchanged - you still type bare agent names. The former `company` concept is renamed **project** throughout: `mix pepe project …`, the `--project` flag, the dashboard's Projects page, the config's `projects` map keyed by a stable id with a `default_project` pointer, and token scopes. Old `company`-shaped configs upgrade automatically on load.
+
 ### Security
+- Workspace paths: an agent handle and the dashboard learning-editor's file title are now validated as plain labels (and every path segment is contained within the agent's workspace), so a crafted name or a `../…` title can't build a path that escapes the workspace to read or overwrite arbitrary files. Reachable by the agent itself through `manage_agent`/`rename_agent` (prompt injection) and by the dashboard editor. `Pepe.Project.valid_name?` also anchors on the whole string (`\A…\z`), so a trailing newline no longer slips past the guard.
+- Agent rename: renaming onto a name already taken in the same project is refused - and the workspace directory is no longer moved on a refused rename. Previously the config rejected the collision but the `rename_agent` tool still moved the renaming agent's files onto the target agent's directory, leaking its persona/memory (`SOUL.md`, `MEMORY.md`) into another agent on the next session.
+- Dashboard: a scoped Projects/Models action forces its target into the selected project, so a client-supplied `other-project/thing` can no longer cross the scope boundary and write to another project's agent or model.
+- Delete project (`--force`): now actually removes the deleted project's agents. A stale filter left them orphaned, to resurface reparented under the default project on the next listing; agents of other projects are untouched.
 - Tools: `read_file`/`list_dir` are free only **inside the agent's workspace**. Reaching an absolute path, or climbing out with `..`, now carries a risk and goes through the permission gate (and the taint), instead of being unconditionally always-safe. On a surface with nobody to ask (a webhook/API agent), that read is refused. This closes the worst customer-facing exposure: a prompt injection telling a support bot to `read_file ~/.pepe/config.json` and report it back, which would have leaked every tenant's token hashes, OAuth tokens, and other companies' data - all without a human ever approving it.
 - Tools: `fetch_url` no longer follows HTTP redirects blindly. Each hop, including redirect targets, is re-checked against the internal/private-address guard, closing the SSRF where a public URL 302-redirects to `http://169.254.169.254/…` (cloud instance metadata) and the guard only ever saw the first host.
 - Tools/plugins: writing to `plugins/` or `skills/` (loaded as code and procedures), or to any absolute/`..` path, is now a distinct, stronger risk than writing a data file - a one-time "allow writes" grant no longer silently becomes code execution. Plugins are also **Sentinel-scanned at load**, not only at install, so a `.exs` that reached the plugins dir some other way (a restored bundle, a hand-edit) cannot run code the operator never reviewed if it scans as dangerous.

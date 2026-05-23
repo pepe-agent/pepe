@@ -16,8 +16,8 @@ defmodule PepeWeb.ConfigLive do
      assign(socket,
        page_title: "Pepe · Config",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        config_text: read_config(),
        # nil = not checked yet · :checking · :up_to_date · a version string when newer.
        update: nil,
@@ -30,7 +30,7 @@ defmodule PepeWeb.ConfigLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="config" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="config" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="⚙️"
@@ -120,7 +120,7 @@ defmodule PepeWeb.ConfigLive do
 
         {:noreply,
          socket
-         |> assign(config_text: pretty(map), companies: Config.companies())
+         |> assign(config_text: pretty(map), projects: Config.project_slugs())
          |> put_flash(:info, gettext("Config saved."))}
 
       {:ok, _} ->
@@ -135,21 +135,21 @@ defmodule PepeWeb.ConfigLive do
     {:noreply, assign(socket, config_text: read_config())}
   end
 
-  # Changing the company stays on this page; creating one jumps to its Agents.
+  # Changing the project stays on this page; creating one jumps to its Agents.
   def handle_event("set_scope", %{"scope" => scope}, socket) do
     {:noreply, push_navigate(socket, to: "/config?scope=#{scope}")}
   end
 
-  def handle_event("toggle_new_company", _p, socket) do
-    {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket) do
+    {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
   end
 
-  def handle_event("company_add", %{"name" => name}, socket) do
+  def handle_event("project_add", %{"name" => name}, socket) do
     name = String.trim(name)
 
-    case Config.add_company(name) do
+    case Config.add_project(name) do
       :ok -> {:noreply, push_navigate(socket, to: "/agents?scope=#{name}")}
-      _ -> {:noreply, put_flash(socket, :error, gettext("Invalid or duplicate company name."))}
+      _ -> {:noreply, put_flash(socket, :error, gettext("Invalid or duplicate project name."))}
     end
   end
 

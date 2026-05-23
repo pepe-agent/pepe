@@ -70,7 +70,7 @@ defmodule PepeWeb.ChannelsLiveTest do
     {:ok, view, _html} = live(conn(), "/bots")
 
     html =
-      add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_BOT_TOKEN}", "agent" => "sales"})
+      add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_BOT_TOKEN}", "agent" => "default/sales"})
 
     assert html =~ "Bot sales-bot added."
     assert html =~ "sales-bot"
@@ -78,7 +78,7 @@ defmodule PepeWeb.ChannelsLiveTest do
 
     bot = Config.telegram_bot("sales-bot")
     assert bot["bot_token"] == "${SALES_BOT_TOKEN}"
-    assert bot["agent"] == "sales"
+    assert bot["agent"] == "default/sales"
   end
 
   test "a bot with no name or token is refused" do
@@ -103,10 +103,10 @@ defmodule PepeWeb.ChannelsLiveTest do
   test "a second bot may not reuse another bot's token" do
     {:ok, view, _html} = live(conn(), "/bots")
 
-    add_bot(view, %{"name" => "sales-bot", "token" => "${SHARED_TOKEN}", "agent" => "sales"})
+    add_bot(view, %{"name" => "sales-bot", "token" => "${SHARED_TOKEN}", "agent" => "default/sales"})
 
     html =
-      add_bot(view, %{"name" => "support-bot", "token" => "${SHARED_TOKEN}", "agent" => "assistant"})
+      add_bot(view, %{"name" => "support-bot", "token" => "${SHARED_TOKEN}", "agent" => "default/assistant"})
 
     assert html =~ "this token is already used by another bot"
     assert Config.telegram_bot("support-bot") == nil
@@ -116,32 +116,32 @@ defmodule PepeWeb.ChannelsLiveTest do
   test "editing a bot rebinds its agent and keeps the token when left blank" do
     {:ok, view, _html} = live(conn(), "/bots")
 
-    add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_BOT_TOKEN}", "agent" => "sales"})
+    add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_BOT_TOKEN}", "agent" => "default/sales"})
 
     render_click(view, "bot_edit", %{"name" => "sales-bot"})
 
     html =
       view
-      |> form("form[phx-submit=bot_save]", %{"agent" => "assistant", "token" => ""})
+      |> form("form[phx-submit=bot_save]", %{"agent" => "default/assistant", "token" => ""})
       |> render_submit()
 
     assert html =~ "Bot sales-bot saved."
     bot = Config.telegram_bot("sales-bot")
-    assert bot["agent"] == "assistant"
+    assert bot["agent"] == "default/assistant"
     assert bot["bot_token"] == "${SALES_BOT_TOKEN}"
   end
 
   test "a bot edit may not steal another bot's token" do
     {:ok, view, _html} = live(conn(), "/bots")
 
-    add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_TOKEN}", "agent" => "sales"})
-    add_bot(view, %{"name" => "support-bot", "token" => "${SUPPORT_TOKEN}", "agent" => "assistant"})
+    add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_TOKEN}", "agent" => "default/sales"})
+    add_bot(view, %{"name" => "support-bot", "token" => "${SUPPORT_TOKEN}", "agent" => "default/assistant"})
 
     render_click(view, "bot_edit", %{"name" => "support-bot"})
 
     html =
       view
-      |> form("form[phx-submit=bot_save]", %{"agent" => "assistant", "token" => "${SALES_TOKEN}"})
+      |> form("form[phx-submit=bot_save]", %{"agent" => "default/assistant", "token" => "${SALES_TOKEN}"})
       |> render_submit()
 
     assert html =~ "That token is already used by another bot."
@@ -151,7 +151,7 @@ defmodule PepeWeb.ChannelsLiveTest do
   test "removing a bot drops it from the config and from the page" do
     {:ok, view, _html} = live(conn(), "/bots")
 
-    add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_BOT_TOKEN}", "agent" => "sales"})
+    add_bot(view, %{"name" => "sales-bot", "token" => "${SALES_BOT_TOKEN}", "agent" => "default/sales"})
     assert has_element?(view, "button[phx-click=bot_edit][phx-value-name=sales-bot]")
 
     render_click(view, "bot_remove", %{"name" => "sales-bot"})
@@ -160,19 +160,19 @@ defmodule PepeWeb.ChannelsLiveTest do
     refute has_element?(view, "button[phx-click=bot_edit][phx-value-name=sales-bot]")
   end
 
-  test "the bot list only shows the selected company's bots" do
-    :ok = Config.add_company("acme")
+  test "the bot list only shows the selected project's bots" do
+    :ok = Config.add_project("acme")
     Config.put_agent(%Agent{name: "acme/support"})
 
     {:ok, view, _html} = live(conn(), "/bots")
-    add_bot(view, %{"name" => "root-bot", "token" => "${ROOT_TOKEN}", "agent" => "assistant"})
+    add_bot(view, %{"name" => "root-bot", "token" => "${ROOT_TOKEN}", "agent" => "default/assistant"})
     add_bot(view, %{"name" => "acme-bot", "token" => "${ACME_TOKEN}", "agent" => "acme/support"})
 
     {:ok, _view, html} = live(conn(), "/bots?scope=acme")
     assert html =~ "acme-bot"
     refute html =~ "root-bot"
 
-    {:ok, _view, html} = live(conn(), "/bots?scope=root")
+    {:ok, _view, html} = live(conn(), "/bots?scope=default")
     assert html =~ "root-bot"
     refute html =~ "acme-bot"
   end
@@ -183,13 +183,13 @@ defmodule PepeWeb.ChannelsLiveTest do
     html =
       add_widget(view, %{
         "label" => "example.com widget",
-        "agent" => "sales",
+        "agent" => "default/sales",
         "allowed_origin" => "https://example.com",
         "title" => "Chat with us"
       })
 
     assert [token] = Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget"))
-    assert token["agent"] == "sales"
+    assert token["agent"] == "default/sales"
     assert token["allowed_origin"] == "https://example.com"
     assert token["title"] == "Chat with us"
 
@@ -214,7 +214,7 @@ defmodule PepeWeb.ChannelsLiveTest do
   test "a widget's appearance can be changed after it is minted" do
     {:ok, view, _html} = live(conn(), "/bots")
 
-    add_widget(view, %{"agent" => "sales", "title" => "Chat"})
+    add_widget(view, %{"agent" => "default/sales", "title" => "Chat"})
     [token] = Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget"))
 
     render_click(view, "widget_dismiss")
@@ -232,7 +232,7 @@ defmodule PepeWeb.ChannelsLiveTest do
     assert updated["title"] == "Support"
     assert updated["theme"] == "dark"
     # The token itself is untouched: appearance is the only thing this form edits.
-    assert updated["agent"] == "sales"
+    assert updated["agent"] == "default/sales"
     assert snippet_text(html) =~ ~s(data-title="Support")
   end
 
@@ -260,7 +260,7 @@ defmodule PepeWeb.ChannelsLiveTest do
 
     test "removing it does not disturb a bot the operator did create" do
       {:ok, view, _} = live(conn(), "/bots")
-      add_bot(view, %{"name" => "support", "token" => "t", "agent" => "assistant"})
+      add_bot(view, %{"name" => "support", "token" => "t", "agent" => "default/assistant"})
 
       render_click(view, "bot_remove", %{"name" => "default"})
 

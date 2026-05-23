@@ -1,7 +1,7 @@
 defmodule Pepe.Webhooks.GoogleChat do
   @moduledoc """
   Google Chat provider. Space events arrive as webhook `POST`s to
-  `/webhooks/:company/googlechat/:slug`; replies are posted asynchronously to the Chat
+  `/webhooks/:project/googlechat/:slug`; replies are posted asynchronously to the Chat
   REST API so a slow agent turn does not block the request.
 
   A connection's `"config"` holds:

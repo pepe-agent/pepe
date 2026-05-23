@@ -23,7 +23,7 @@ defmodule PepeWeb.AgentSocketTest do
         "globex/vendas" => %{"system_prompt" => "g"}
       },
       "api_tokens" => %{
-        "tacme" => %{"hash" => ApiToken.hash("ctx_acme"), "company" => "acme", "agent" => nil}
+        "tacme" => %{"hash" => ApiToken.hash("ctx_acme"), "project" => "acme", "agent" => nil}
       }
     }
 
@@ -44,7 +44,7 @@ defmodule PepeWeb.AgentSocketTest do
     assert :error = conn(%{"token" => "ctx_nope"})
   end
 
-  test "a company token connects and can join its own agents (bare name qualifies)" do
+  test "a project token connects and can join its own agents (bare name qualifies)" do
     {:ok, socket} = conn(%{"token" => "ctx_acme"})
     assert {:ok, _reply, _s} = subscribe_and_join(socket, "agent:acme/vendas", %{})
 
@@ -52,7 +52,7 @@ defmodule PepeWeb.AgentSocketTest do
     assert {:ok, _reply, _s} = subscribe_and_join(socket, "agent:vendas", %{})
   end
 
-  test "a company token cannot join another company's or a root agent" do
+  test "a project token cannot join another project's or a root agent" do
     {:ok, socket} = conn(%{"token" => "ctx_acme"})
     assert {:error, %{reason: _}} = subscribe_and_join(socket, "agent:globex/vendas", %{})
 

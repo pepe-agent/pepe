@@ -1,11 +1,11 @@
 defmodule Pepe.BundleTest do
   @moduledoc """
-  Lifting one company out of a shared install and standing it up on its own.
+  Lifting one project out of a shared install and standing it up on its own.
 
-  The thing worth pinning is the de-scoping. A company's rows are threaded through the shared
-  `config.json` as `company/agent` handles, so you cannot get a working single-tenant install by
+  The thing worth pinning is the de-scoping. A project's rows are threaded through the shared
+  `config.json` as `project/agent` handles, so you cannot get a working single-tenant install by
   copying a folder. Extract rewrites those handles to bare root names, carries only that
-  company's agents/models/workspaces/usage (never another tenant's), and pulls in any shared
+  project's agents/models/workspaces/usage (never another tenant's), and pulls in any shared
   model a kept agent leans on so the bundle works on an empty box.
   """
   use ExUnit.Case, async: false
@@ -30,11 +30,11 @@ defmodule Pepe.BundleTest do
     %{home: home}
   end
 
-  # Two companies plus a shared root model, so isolation and the shared-dependency pull-in both
+  # Two projects plus a shared root model, so isolation and the shared-dependency pull-in both
   # have something to prove.
-  defp seed_two_companies do
-    Config.add_company("acme")
-    Config.add_company("globex")
+  defp seed_two_projects do
+    Config.add_project("acme")
+    Config.add_project("globex")
 
     # A root/shared model (bare name = root scope) that an acme agent will depend on.
     Config.put_model(%Model{name: "shared-gpt", base_url: "https://x/v1", api_key: "${SHARED_KEY}", model: "g"})
@@ -47,18 +47,18 @@ defmodule Pepe.BundleTest do
     Config.put_agent(%Agent{name: "globex/bot", model: "globex/gpt", system_prompt: "hi"})
 
     Config.put_cron(%Cron{id: "c1", agent: "acme/sales", prompt: "morning", schedule: "0 8 * * *"})
-    Config.add_api_token(company: "acme", agent: "acme/sales", label: "acme key")
+    Config.add_api_token(project: "acme", agent: "acme/sales", label: "acme key")
     Config.set_default_model_for("acme", "acme/gpt")
 
-    # On-disk state that must travel: agent workspaces, the company shared space, the ledger.
+    # On-disk state that must travel: agent workspaces, the project shared space, the ledger.
     for name <- ~w(sales support) do
-      dir = Path.join([Config.home(), "companies", "acme", "agents", name])
+      dir = Path.join([Config.home(), "projects", "acme", "agents", name])
       File.mkdir_p!(dir)
       File.write!(Path.join(dir, "SOUL.md"), "I am #{name}")
     end
 
-    File.mkdir_p!(Path.join([Config.home(), "companies", "acme", "shared"]))
-    File.write!(Path.join([Config.home(), "companies", "acme", "shared", "notes.md"]), "shared acme note")
+    File.mkdir_p!(Path.join([Config.home(), "projects", "acme", "shared"]))
+    File.write!(Path.join([Config.home(), "projects", "acme", "shared", "notes.md"]), "shared acme note")
 
     usage = Path.join([Config.home(), "data", "usage", "acme"])
     File.mkdir_p!(usage)
@@ -66,8 +66,8 @@ defmodule Pepe.BundleTest do
   end
 
   describe "Config.extract_config/1" do
-    test "de-scopes only the named company, pulling in its shared model dependency" do
-      seed_two_companies()
+    test "de-scopes only the named project, pulling in its shared model dependency" do
+      seed_two_projects()
 
       assert {:ok, config, report} = Config.extract_config("acme")
 
@@ -88,20 +88,20 @@ defmodule Pepe.BundleTest do
 
       # The API token de-scopes to the ROOT scope, which is `nil` (not `""`), and its agent
       # binding goes bare - otherwise the restored token would match no agent.
-      assert [%{"company" => tcompany, "agent" => "sales"}] = Map.values(config["api_tokens"])
-      assert tcompany == nil
+      assert [%{"project" => tproject, "agent" => "sales"}] = Map.values(config["api_tokens"])
+      assert tproject == nil
 
       # Only acme's secrets are referenced; globex's key is gone with globex.
       assert report.secrets == ["ACME_KEY", "SHARED_KEY"]
       refute "GLOBEX_KEY" in report.secrets
     end
 
-    test "an unknown company is refused" do
+    test "an unknown project is refused" do
       assert Config.extract_config("nope") == {:error, :not_found}
     end
 
     test "the secrets report includes vault-opening credentials, not only ${VAR} refs" do
-      seed_two_companies()
+      seed_two_projects()
       # A vault-based setup: the model's key is fetched by a command, and the resolver needs
       # OP_TOKEN to run it. That name never appears as ${VAR}, so a plain scan would miss it and
       # the operator would stand up a new server whose vaults cannot open.
@@ -113,8 +113,8 @@ defmodule Pepe.BundleTest do
       assert "ACME_KEY" in report.secrets
     end
 
-    test "a cross-company model reference is not leaked into the bundle" do
-      seed_two_companies()
+    test "a cross-project model reference is not leaked into the bundle" do
+      seed_two_projects()
 
       # A misconfiguration: an acme agent points at globex's model (by id, the way agents store
       # models). Extracting acme must NOT pull globex's connection - base_url, headers, the name
@@ -132,20 +132,20 @@ defmodule Pepe.BundleTest do
     end
   end
 
-  describe "extract carries the whole company, and only that company" do
-    test "a webhook of another company is not leaked; the company's own travels de-scoped" do
-      seed_two_companies()
+  describe "extract carries the whole project, and only that project" do
+    test "a webhook of another project is not leaked; the project's own travels de-scoped" do
+      seed_two_projects()
 
       Config.put_webhook("acme-wa", %{
         "provider" => "whatsapp",
-        "company" => "acme",
+        "project" => "acme",
         "agent" => "acme/sales",
         "config" => %{"access_token" => "${ACME_WA_TOKEN}"}
       })
 
       Config.put_webhook("globex-wa", %{
         "provider" => "whatsapp",
-        "company" => "globex",
+        "project" => "globex",
         "agent" => "globex/bot",
         "config" => %{"access_token" => "globex-secret-literal"}
       })
@@ -156,34 +156,31 @@ defmodule Pepe.BundleTest do
       assert Map.keys(config["webhooks"]) == ["acme-wa"]
       refute Jason.encode!(config) =~ "globex-secret-literal"
 
-      # acme's own webhook travels, de-scoped to the root scope (company nil, agent bare).
-      assert %{"company" => nil, "agent" => "sales"} = config["webhooks"]["acme-wa"]
+      # acme's own webhook travels, de-scoped to the root scope (project nil, agent bare).
+      assert %{"project" => nil, "agent" => "sales"} = config["webhooks"]["acme-wa"]
       assert "ACME_WA_TOKEN" in report.secrets
     end
 
-    test "a company-scoped API token (no agent) is kept, not dropped" do
-      seed_two_companies()
-      # `token add --company acme` with no agent: scoped by the company field alone. This is the
+    test "a project-scoped API token (no agent) is kept, not dropped" do
+      seed_two_projects()
+      # `token add --project acme` with no agent: scoped by the project field alone. This is the
       # commonest token shape for a whole tenant, and filtering by agent would silently drop it.
-      Config.add_api_token(company: "acme", label: "tenant key")
+      Config.add_api_token(project: "acme", label: "tenant key")
 
       assert {:ok, config, _report} = Config.extract_config("acme")
 
-      companies = config["api_tokens"] |> Map.values() |> Enum.map(& &1["company"]) |> Enum.uniq()
-      assert companies == [nil]
-      # Both the agent-bound token (from the seed) and the company-only one survived.
+      projects = config["api_tokens"] |> Map.values() |> Enum.map(& &1["project"]) |> Enum.uniq()
+      assert projects == [nil]
+      # Both the agent-bound token (from the seed) and the project-only one survived.
       assert map_size(config["api_tokens"]) == 2
     end
 
-    test "the company's billing becomes root; the source install's root billing is not carried" do
-      seed_two_companies()
+    test "the project's billing becomes root; the source install's root billing is not carried" do
+      seed_two_projects()
 
-      config = Config.load()
-
-      config
-      |> put_in(["companies", "acme"], Map.merge(config["companies"]["acme"], %{"markup" => 1.5, "budget" => 200}))
-      |> Map.put("root", %{"markup" => 9.9, "budget" => 9999})
-      |> Config.save()
+      # acme's own caps, and the operator's own (default-project) caps that must NOT leak.
+      Config.update_scope("acme", %{"markup" => 1.5, "budget" => 200})
+      Config.update_scope(nil, %{"markup" => 9.9, "budget" => 9999})
 
       assert {:ok, extracted, _report} = Config.extract_config("acme")
 
@@ -195,7 +192,7 @@ defmodule Pepe.BundleTest do
     end
 
     test "a root model referenced only by a cron override or a triage hook is still pulled in" do
-      seed_two_companies()
+      seed_two_projects()
 
       # Two shared models that NO agent's `.model` points at - reached only through a cron's model
       # override and an agent's triage hook. A dependency scan that only looked at `.model` would
@@ -213,7 +210,7 @@ defmodule Pepe.BundleTest do
     end
 
     test "an agent's triage_model and fallbacks are de-scoped like its model" do
-      seed_two_companies()
+      seed_two_projects()
 
       Config.put_model(%Model{name: "acme/triage", base_url: "https://x/v1", api_key: "k", model: "g"})
       Config.put_model(%Model{name: "acme/backup", base_url: "https://x/v1", api_key: "k", model: "g"})
@@ -227,13 +224,13 @@ defmodule Pepe.BundleTest do
 
       assert {:ok, config, _report} = Config.extract_config("acme")
 
-      # The company prefix is stripped from the hook fields, matching the now-bare model names.
+      # The project prefix is stripped from the hook fields, matching the now-bare model names.
       assert config["agents"]["sales"]["triage_model"] == "triage"
       assert config["agents"]["sales"]["fallbacks"] == ["backup"]
     end
 
     test "the report is honest about a raw credential that DID travel in the archive" do
-      seed_two_companies()
+      seed_two_projects()
 
       # An OAuth-login model stores its live tokens inline, not as ${VAR}; a model with an inline
       # api_key does the same. These are in the archive, so the report must say so rather than let
@@ -248,8 +245,8 @@ defmodule Pepe.BundleTest do
   end
 
   describe "extract then restore, end to end" do
-    test "the company stands up on a fresh home as a root install", %{home: _home} do
-      seed_two_companies()
+    test "the project stands up on a fresh home as a root install", %{home: _home} do
+      seed_two_projects()
 
       out = Path.join(System.tmp_dir!(), "acme_#{System.unique_integer([:positive])}.tgz")
       on_exit(fn -> File.rm_rf(out) end)
@@ -269,22 +266,22 @@ defmodule Pepe.BundleTest do
 
       config = fresh |> Path.join("config.json") |> File.read!() |> Jason.decode!()
 
-      # Root install: bare agents, no company scoping, globex nowhere in sight.
+      # Root install: bare agents, no project scoping, globex nowhere in sight.
       assert Map.keys(config["agents"]) |> Enum.sort() == ["sales", "support"]
       refute Map.has_key?(config, "companies")
 
-      # The workspace travelled and now lives at the root layout.
-      assert File.read!(Path.join([fresh, "agents", "sales", "SOUL.md"])) == "I am sales"
-      assert File.read!(Path.join([fresh, "shared", "notes.md"])) == "shared acme note"
+      # The workspace travelled and now lives in the fresh install's default project.
+      assert File.read!(Path.join([fresh, "projects", "default", "agents", "sales", "SOUL.md"])) == "I am sales"
+      assert File.read!(Path.join([fresh, "projects", "default", "shared", "notes.md"])) == "shared acme note"
 
       # The ledger travelled and its per-line handle was de-scoped in step.
-      ledger = Path.join([fresh, "data", "usage", "root", "2026-07.jsonl"]) |> File.read!()
+      ledger = Path.join([fresh, "data", "usage", "default", "2026-07.jsonl"]) |> File.read!()
       assert ledger =~ ~s("agent":"sales")
       refute ledger =~ "acme/sales"
     end
 
     test "restore refuses to write over a non-empty home unless forced" do
-      seed_two_companies()
+      seed_two_projects()
       out = Path.join(System.tmp_dir!(), "acme_#{System.unique_integer([:positive])}.tgz")
       on_exit(fn -> File.rm_rf(out) end)
       {:ok, _} = Bundle.extract("acme", output: out, today: ~D[2026-07-14])

@@ -42,8 +42,8 @@ defmodule PepeWeb.TracesLiveTest do
 
   test "replays a run step by step" do
     {:ok, view, _html} = live(conn(), "/traces")
-    id = Trace.recent("root") |> hd() |> Map.fetch!("id")
-    html = render_click(view, "open", %{"scope" => "root", "id" => id})
+    id = Trace.recent("default") |> hd() |> Map.fetch!("id")
+    html = render_click(view, "open", %{"scope" => "default", "id" => id})
 
     assert html =~ "read the readme"
     assert html =~ "read_file"

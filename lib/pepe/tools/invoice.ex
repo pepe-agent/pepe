@@ -1,6 +1,6 @@
 defmodule Pepe.Tools.Invoice do
   @moduledoc """
-  Generate a billing invoice for a company from metered token usage, saved as a
+  Generate a billing invoice for a project from metered token usage, saved as a
   file and returned inline. Lets an agent produce (and then send) an invoice on its
   own - e.g. a monthly scheduled task that exports each client's invoice and emails
   it.
@@ -20,15 +20,15 @@ defmodule Pepe.Tools.Invoice do
   def spec do
     function(
       "export_invoice",
-      "Generate a billing invoice for a company over a calendar month, from metered " <>
+      "Generate a billing invoice for a project over a calendar month, from metered " <>
         "token usage. Saves it as a file and returns the rendered invoice plus the file " <>
         "path (attach it or paste it when sending to the client).",
       %{
         "type" => "object",
         "properties" => %{
-          "company" => %{
+          "project" => %{
             "type" => "string",
-            "description" => "Company (tenant) to bill, e.g. \"acme\"."
+            "description" => "Project (tenant) to bill, e.g. \"acme\"."
           },
           "month" => %{
             "type" => "string",
@@ -40,15 +40,15 @@ defmodule Pepe.Tools.Invoice do
             "description" => "markdown (a readable statement) or csv (for spreadsheets). Default markdown."
           }
         },
-        "required" => ["company"]
+        "required" => ["project"]
       }
     )
   end
 
   @impl true
-  def run(%{"company" => company} = args, _ctx) do
-    if Config.company_exists?(company) do
-      inv = Usage.invoice(company, month: args["month"])
+  def run(%{"project" => project} = args, _ctx) do
+    if Config.project_exists?(project) do
+      inv = Usage.invoice(project, month: args["month"])
       format = if args["format"] == "csv", do: :csv, else: :markdown
 
       {body, ext} =
@@ -64,7 +64,7 @@ defmodule Pepe.Tools.Invoice do
 
       {:ok, "Saved invoice to #{path}\n\n#{body}"}
     else
-      {:error, "unknown company: #{company}"}
+      {:error, "unknown project: #{project}"}
     end
   end
 end

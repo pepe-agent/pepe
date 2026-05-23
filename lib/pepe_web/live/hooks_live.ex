@@ -31,8 +31,8 @@ defmodule PepeWeb.HooksLive do
      |> assign(
        page_title: "Pepe · Privacy",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        editing: nil,
        edit: %{},
        ai: AiFill.init()
@@ -48,7 +48,7 @@ defmodule PepeWeb.HooksLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="hooks" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="hooks" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="🛡️"
@@ -294,13 +294,13 @@ defmodule PepeWeb.HooksLive do
   def handle_event("set_scope", %{"scope" => scope}, socket),
     do: {:noreply, push_navigate(socket, to: "/hooks?scope=#{scope}")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", %{"name" => name}, socket) do
-    case Config.add_company(String.trim(name)) do
+  def handle_event("project_add", %{"name" => name}, socket) do
+    case Config.add_project(String.trim(name)) do
       :ok -> {:noreply, push_navigate(socket, to: "/agents?scope=#{name}")}
-      _ -> {:noreply, put_flash(socket, :error, gettext("Invalid or duplicate company name."))}
+      _ -> {:noreply, put_flash(socket, :error, gettext("Invalid or duplicate project name."))}
     end
   end
 

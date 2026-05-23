@@ -2,7 +2,7 @@ defmodule Pepe.Hooks do
   @moduledoc """
   The message-flow hook pipeline - the single place surfaces run redaction (and
   other transforms) through. A hook is opt-in: an agent with no `hooks` (and no
-  company `default_hooks`) runs raw, exactly as before.
+  project `default_hooks`) runs raw, exactly as before.
 
   `transform/4` runs an agent's hooks for a stage, threading the text and collecting
   the reversible map (pseudonym -> real). `restore/2` puts the real values back on the
@@ -23,7 +23,7 @@ defmodule Pepe.Hooks do
 
   require Logger
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
 
   @map_key :pepe_hooks_map
@@ -118,7 +118,7 @@ defmodule Pepe.Hooks do
   @doc "Does this agent run any hooks at all? (fast path: skip the pipeline if not.)"
   def any?(agent), do: hooks_for(agent) != []
 
-  @doc "The `{name, module, settings}` list of hooks an agent runs - its own + company defaults."
+  @doc "The `{name, module, settings}` list of hooks an agent runs - its own + project defaults."
   def hooks_for(nil), do: []
 
   def hooks_for(agent) do
@@ -130,15 +130,15 @@ defmodule Pepe.Hooks do
     |> Enum.reject(fn {_name, mod, _settings} -> is_nil(mod) end)
   end
 
-  # An agent's own hooks plus any inherited from its company's `default_hooks`.
+  # An agent's own hooks plus any inherited from its project's `default_hooks`.
   defp hook_names(agent) do
-    company_defaults =
-      case Company.of(agent.name) do
+    project_defaults =
+      case Project.of(agent.name) do
         nil -> []
-        co -> (Config.get_company(co) || %{})["default_hooks"] || []
+        co -> (Config.get_project(co) || %{})["default_hooks"] || []
       end
 
-    (company_defaults ++ (agent.hooks || [])) |> Enum.uniq()
+    (project_defaults ++ (agent.hooks || [])) |> Enum.uniq()
   end
 
   defp safe_run(mod, stage, text, settings, ctx) do

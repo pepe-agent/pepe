@@ -25,7 +25,7 @@ defmodule Pepe.Tools.ConfigToolsTest do
   test "config_get reports models, agents, language and telegram" do
     {:ok, text} = ConfigGet.run(%{}, %{})
     assert text =~ "Models: Codex"
-    assert text =~ "Agents: ZakAI"
+    assert text =~ "Agents: default/ZakAI"
     assert text =~ "Language: en"
   end
 

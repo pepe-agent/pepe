@@ -1,7 +1,7 @@
 defmodule Pepe.Webhooks.Slack do
   @moduledoc """
   Slack provider (Events API). Inbound arrives as webhook `POST`s to
-  `/webhooks/:company/slack/:slug`; replies go to the Web API `chat.postMessage`.
+  `/webhooks/:project/slack/:slug`; replies go to the Web API `chat.postMessage`.
 
   A connection's `"config"` holds:
 

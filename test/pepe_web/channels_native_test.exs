@@ -44,9 +44,9 @@ defmodule PepeWeb.ChannelsNativeTest do
     view
     |> form("form[phx-submit=save]", %{
       "slug" => "support",
-      "agent" => "assistant",
+      "agent" => "default/assistant",
       "mode" => "support",
-      "company" => "root",
+      "project" => "default",
       "cfg" => %{"phone_number_id" => "123", "access_token" => "${WA_TOKEN}"}
     })
     |> render_submit()
@@ -67,16 +67,16 @@ defmodule PepeWeb.ChannelsNativeTest do
     view
     |> form("form[phx-submit=save]", %{
       "slug" => "team",
-      "agent" => "assistant",
+      "agent" => "default/assistant",
       "mode" => "support",
-      "company" => "root",
+      "project" => "default",
       "cfg" => %{"bot_token" => "xoxb-1", "signing_secret" => "${SLACK_SECRET}"}
     })
     |> render_submit()
 
     entry = Config.get_webhook("team")
     assert entry["provider"] == "slack"
-    assert entry["agent"] == "assistant"
+    assert entry["agent"] == "default/assistant"
     assert entry["config"]["bot_token"] == "xoxb-1"
     assert entry["config"]["signing_secret"] == "${SLACK_SECRET}"
   end

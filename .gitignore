@@ -78,3 +78,5 @@ arquivo_teste_aprovacao_*.txt
 
 # Local agent tooling state, not part of the project.
 /.claude/agent-memory/
+
+/undefined

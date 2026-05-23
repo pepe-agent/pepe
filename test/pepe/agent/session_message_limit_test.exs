@@ -30,7 +30,7 @@ defmodule Pepe.Agent.SessionMessageLimitTest do
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
 
     Config.put_model(%Model{name: "mock", base_url: "http://localhost:#{port}", api_key: "test", model: "mock-model"})
-    Config.add_company("acme", %{"message_limit" => 2})
+    Config.add_project("acme", %{"message_limit" => 2})
     Config.put_agent(%Pepe.Config.Agent{name: "acme/bot", model: "mock", tools: [], max_iterations: 5})
 
     Config.put_agent(%Pepe.Config.Agent{
@@ -50,7 +50,7 @@ defmodule Pepe.Agent.SessionMessageLimitTest do
     :ok
   end
 
-  test "an external-facing session is counted and blocked once the company cap is reached" do
+  test "an external-facing session is counted and blocked once the project cap is reached" do
     key = "telegram:#{System.unique_integer([:positive])}"
     {:ok, _pid} = SessionSupervisor.ensure(key, "acme/bot")
 
@@ -81,7 +81,7 @@ defmodule Pepe.Agent.SessionMessageLimitTest do
 
     assert Usage.message_count_month_to_date("acme") == 0
 
-    # Company is still under cap (0/2), but even past the cap these must go through -
+    # Project is still under cap (0/2), but even past the cap these must go through -
     # exhaust it via an external session first, then confirm tui still isn't blocked.
     Usage.record_message("acme")
     Usage.record_message("acme")
@@ -105,8 +105,8 @@ defmodule Pepe.Agent.SessionMessageLimitTest do
     assert Usage.message_count_month_to_date("acme") == 2
   end
 
-  test "a company with no message_limit set is never blocked" do
-    Config.add_company("free", %{})
+  test "a project with no message_limit set is never blocked" do
+    Config.add_project("free", %{})
     Config.put_agent(%Pepe.Config.Agent{name: "free/bot", model: "mock", tools: [], max_iterations: 5})
 
     key = "telegram:#{System.unique_integer([:positive])}"

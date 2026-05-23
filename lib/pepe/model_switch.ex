@@ -7,7 +7,7 @@ defmodule Pepe.ModelSwitch do
 
   Three pieces:
 
-    * `list_for/1` - the models a caller may see, scoped to their company.
+    * `list_for/1` - the models a caller may see, scoped to their project.
     * `permission/2` - what a caller may do: change the model for everyone
       (`:global`), just their own conversation (`:session`), or nothing (`:none`).
     * `apply/4` - actually make the change at the given scope.
@@ -19,14 +19,16 @@ defmodule Pepe.ModelSwitch do
   """
 
   alias Pepe.Agent.Session
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
 
-  @doc "Models visible to `company` (`nil` = the root scope), sorted by name."
+  @doc "Models visible to a scope (`nil` = the default project), sorted by name."
   @spec list_for(String.t() | nil) :: [Config.Model.t()]
-  def list_for(company) do
+  def list_for(scope) do
+    slug = Config.resolve_scope(scope)
+
     Config.models()
-    |> Enum.filter(&(Company.of(&1.name) == company))
+    |> Enum.filter(&(Config.resolve_scope(Project.of(&1.name)) == slug))
     |> Enum.sort_by(& &1.name)
   end
 

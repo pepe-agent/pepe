@@ -26,28 +26,37 @@ defmodule Pepe.Agent.Workspace do
   alias Pepe.Config.Agent
 
   @doc """
-  An agent's private workspace directory. Root agents live under `agents/<name>`;
-  a company agent lives under `companies/<company>/agents/<name>`, so identically
-  named agents in different companies never collide and never see each other's files.
+  An agent's private workspace directory, `projects/<project>/agents/<name>`. Every agent belongs
+  to a project (a bare handle resolves to the default project), so identically named agents in
+  different projects never collide and never see each other's files.
   """
   def dir(agent_handle) do
-    case Pepe.Company.split(to_string(agent_handle)) do
-      {nil, name} -> Path.join([Config.home(), "agents", name])
-      {company, name} -> Path.join([Config.home(), "companies", company, "agents", name])
-    end
+    handle = to_string(agent_handle)
+    project = safe_segment(Config.resolve_scope(Pepe.Project.of(handle)))
+    Path.join([Config.home(), "projects", project, "agents", safe_segment(Pepe.Project.name_of(handle))])
   end
 
-  @doc "The shared, cross-agent directory for the root scope."
+  @doc "The shared, cross-agent directory for the default project."
   def shared_dir, do: shared_dir(nil)
 
   @doc """
-  The shared directory for an agent's scope. Root shares `shared/`; a company shares
-  its own `companies/<company>/shared/` - so `shared/...` paths isolate per company.
+  The shared directory for an agent's project, `projects/<project>/shared/` - so `shared/...`
+  paths isolate per project. A bare handle (or `nil`) resolves to the default project.
   """
   def shared_dir(agent_handle) do
-    case Pepe.Company.of(to_string(agent_handle)) do
-      nil -> Path.join(Config.home(), "shared")
-      company -> Path.join([Config.home(), "companies", company, "shared"])
+    project = safe_segment(Config.resolve_scope(Pepe.Project.of(to_string(agent_handle))))
+    Path.join([Config.home(), "projects", project, "shared"])
+  end
+
+  # A project slug or bare agent name is a single path segment. Refuse anything that isn't a plain
+  # `[A-Za-z0-9_-]+` label (the same rule projects are validated with), so a crafted handle like
+  # `acme/../../etc` can never build a path that escapes the workspace root - `Path.join` does not
+  # normalize `..`. This is the last-line backstop; callers should validate at the entry too.
+  defp safe_segment(seg) do
+    if Pepe.Project.valid_name?(seg) do
+      seg
+    else
+      raise ArgumentError, "unsafe agent/project path segment: #{inspect(seg)}"
     end
   end
 

@@ -1,7 +1,7 @@
 defmodule PepeWeb.OverviewLive do
   @moduledoc """
   The dashboard home: an at-a-glance overview for whoever runs Pepe - live sessions,
-  messages and token spend this month, which company spends the most, and how many
+  messages and token spend this month, which project spends the most, and how many
   agents/models/channels/automations are configured. Scope-aware via the sidebar.
   """
   use PepeWeb, :live_view
@@ -28,8 +28,8 @@ defmodule PepeWeb.OverviewLive do
      |> assign(
        page_title: "Pepe · Overview",
        scope: scope,
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        footprint: Stats.footprint(),
        cpu: nil,
        sched: Stats.sample()
@@ -68,7 +68,7 @@ defmodule PepeWeb.OverviewLive do
       live_sessions: scoped_live_sessions(scope),
       counts: %{
         agents: length(scoped_agents(Config.agents(), scope)),
-        companies: length(Config.companies()),
+        projects: length(Config.project_slugs()),
         models: length(scoped_models(Config.models(), scope)),
         channels: scoped_channels(scope),
         automations: scoped_automations(scope)
@@ -81,7 +81,7 @@ defmodule PepeWeb.OverviewLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="overview" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="overview" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="🏠"
@@ -116,7 +116,7 @@ defmodule PepeWeb.OverviewLive do
 
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <.mini label={gettext("Agents")} value={@counts.agents} />
-            <.mini label={gettext("Companies")} value={@counts.companies} />
+            <.mini label={gettext("Projects")} value={@counts.projects} />
             <.mini label={gettext("Models")} value={@counts.models} />
             <.mini label={gettext("Channels")} value={@counts.channels} />
             <.mini label={gettext("Automations")} value={@counts.automations} />
@@ -134,16 +134,16 @@ defmodule PepeWeb.OverviewLive do
             </div>
 
             <div>
-              <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Top companies by spend")}</div>
+              <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Top projects by spend")}</div>
               <div class="space-y-1 rounded-xl border border-zinc-800 p-2">
-                <div :for={c <- Enum.take(@month.by_company, 6)} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-[15px] hover:bg-zinc-800/50">
+                <div :for={c <- Enum.take(@month.by_project, 6)} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-[15px] hover:bg-zinc-800/50">
                   <span class="truncate text-zinc-300">{c.key}</span>
                   <span class="flex shrink-0 items-center gap-3 text-sm">
                     <span class="text-zinc-500">{tokens(c.total)}</span>
                     <span class="w-20 text-right font-medium">{money(c.billable, @month.currency)}</span>
                   </span>
                 </div>
-                <p :if={@month.by_company == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("No usage yet")}</p>
+                <p :if={@month.by_project == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("No usage yet")}</p>
               </div>
             </div>
           </div>
@@ -215,8 +215,8 @@ defmodule PepeWeb.OverviewLive do
     if max > 0, do: max(round(total / max * 100), 2), else: 0
   end
 
-  # Everything below is counted within the selected company scope (a bare count
-  # ignores which company is showing). `in_scope?` treats "all" as everything.
+  # Everything below is counted within the selected project scope (a bare count
+  # ignores which project is showing). `in_scope?` treats "all" as everything.
   defp scoped_live_sessions(scope) do
     Enum.count(SessionSupervisor.list(), fn key ->
       agent = session_agent(key)
@@ -246,14 +246,14 @@ defmodule PepeWeb.OverviewLive do
 
   defp scope_label("all"), do: gettext("all scopes")
   defp scope_label("root"), do: gettext("the Principal scope")
-  defp scope_label(company), do: company
+  defp scope_label(project), do: project
 
   @impl true
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/overview")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 end

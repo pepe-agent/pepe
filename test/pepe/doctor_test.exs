@@ -41,8 +41,8 @@ defmodule Pepe.DoctorTest do
     Config.put_agent(%Config.Agent{name: "a", tools: ["bash", "made_up_tool"], model: "ghost"})
 
     checks = Doctor.checks()
-    assert Enum.any?(checks, &match?({"agent", "a", {:error, _}}, &1))
-    assert Enum.any?(checks, &match?({"agent", "a", {:warn, "unknown tools:" <> _}}, &1))
+    assert Enum.any?(checks, &match?({"agent", "default/a", {:error, _}}, &1))
+    assert Enum.any?(checks, &match?({"agent", "default/a", {:warn, "unknown tools:" <> _}}, &1))
   end
 
   test "mcp__ tool names are considered known" do
@@ -51,7 +51,7 @@ defmodule Pepe.DoctorTest do
     Config.put_agent(%Config.Agent{name: "a", tools: ["mcp__sentry__find_organizations"]})
 
     checks = Doctor.checks()
-    refute Enum.any?(checks, &match?({"agent", "a", {:warn, _}}, &1))
+    refute Enum.any?(checks, &match?({"agent", "default/a", {:warn, _}}, &1))
   end
 
   test "flags a cron with a bad schedule, timezone or agent" do
@@ -92,10 +92,10 @@ defmodule Pepe.DoctorTest do
 
   test "state: flags an orphan agent directory on disk" do
     home = System.get_env("PEPE_HOME")
-    File.mkdir_p!(Path.join([home, "agents", "ghostdir"]))
+    File.mkdir_p!(Path.join([home, "projects", "default", "agents", "ghostdir"]))
 
     checks = Doctor.checks()
-    assert Enum.any?(checks, &match?({"state", "orphan agent dir ghostdir", {:warn, _}}, &1))
+    assert Enum.any?(checks, &match?({"state", "orphan agent dir default/ghostdir", {:warn, _}}, &1))
   end
 
   test "plugin: flags an .exs that doesn't parse" do
@@ -121,6 +121,6 @@ defmodule Pepe.DoctorTest do
 
     assert {:ok, out} = Pepe.Tools.Doctor.run(%{}, %{})
     assert out =~ "issue"
-    assert out =~ "[agent] a"
+    assert out =~ "[agent] default/a"
   end
 end

@@ -163,7 +163,7 @@ defmodule Pepe.Agent.SessionCommandsTest do
       start!(key)
 
       {:ok, _} = Session.chat(key, "hello", authorize: allow())
-      assert Session.status(key).agent == "helper"
+      assert Session.status(key).agent == "default/helper"
 
       assert Session.set_agent(key, "sales") == :ok
 

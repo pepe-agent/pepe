@@ -7,7 +7,7 @@ defmodule PepeWeb.DashData do
   """
   use Gettext, backend: Pepe.Gettext
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.Webhooks
 
@@ -50,8 +50,8 @@ defmodule PepeWeb.DashData do
 
   @doc "Is an item (by its agent/model handle) inside the selected scope?"
   def in_scope?(_handle, "all"), do: true
-  def in_scope?(handle, "root"), do: Company.of(to_string(handle)) == nil
-  def in_scope?(handle, company), do: Company.of(to_string(handle)) == company
+  def in_scope?(handle, "root"), do: Project.of(to_string(handle)) == nil
+  def in_scope?(handle, project), do: Project.of(to_string(handle)) == project
 
   def scoped_agents(agents, scope), do: Enum.filter(agents, &in_scope?(&1.name, scope))
   def scoped_models(models, scope), do: Enum.filter(models, &in_scope?(&1.name, scope))
@@ -68,14 +68,17 @@ defmodule PepeWeb.DashData do
 
   def agents_title("all"), do: gettext("Agents")
   def agents_title("root"), do: gettext("Agents · Principal")
-  def agents_title(company), do: gettext("Agents · %{c}", c: company)
+  def agents_title(project), do: gettext("Agents · %{c}", c: project)
   def model_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
 
-  @doc "Qualify a bare name into the selected company scope (leave root/all/qualified as-is)."
+  @doc "Qualify a bare name into the selected project scope (leave root/all/qualified as-is)."
   def scope_name("", _scope), do: ""
 
   def scope_name(name, scope) when scope not in [nil, "all", "root"] do
-    if Company.of(name), do: name, else: Company.handle(scope, name)
+    # Force the name into the SELECTED scope: take only its bare part and re-qualify. A
+    # client-supplied `other-project/thing` must not slip through and target another project's
+    # agent/model - that would let a scoped dashboard action cross the tenancy boundary.
+    Project.handle(scope, Project.name_of(name))
   end
 
   def scope_name(name, _scope), do: name
@@ -250,21 +253,21 @@ defmodule PepeWeb.DashData do
   end
 
   ## shared sidebar events - the workspace scope drives agents/models, so changing it
-  ## (or creating a company) jumps to that scope's Agents page.
+  ## (or creating a project) jumps to that scope's Agents page.
 
   def set_scope(socket, %{"scope" => scope}, base) do
     Phoenix.LiveView.push_navigate(socket, to: "#{base}?scope=#{scope}")
   end
 
-  def add_company(socket, %{"name" => name}) do
+  def add_project(socket, %{"name" => name}) do
     name = String.trim(name)
 
-    case Config.add_company(name) do
+    case Config.add_project(name) do
       :ok ->
         Phoenix.LiveView.push_navigate(socket, to: "/agents?scope=#{name}")
 
       _ ->
-        Phoenix.LiveView.put_flash(socket, :error, gettext("Invalid or duplicate company name."))
+        Phoenix.LiveView.put_flash(socket, :error, gettext("Invalid or duplicate project name."))
     end
   end
 

@@ -1,7 +1,7 @@
 defmodule Pepe.CLITest do
   @moduledoc """
   The `mix pepe` CLI: the commands that define the setup (models, agents,
-  companies) plus the ones that only report on it (config, tools, doctor, help).
+  projects) plus the ones that only report on it (config, tools, doctor, help).
 
   Every test asserts on both halves of what the command promises: the output the
   user reads, and the effect it left behind in `Pepe.Config`.
@@ -55,8 +55,8 @@ defmodule Pepe.CLITest do
 
       assert out =~ Config.path()
       assert out =~ "default model: openai"
-      assert out =~ "default agent: support"
-      assert out =~ "agents: support"
+      assert out =~ "default agent: default/support"
+      assert out =~ "agents: default/support"
     end
 
     test "on a fresh install it says nothing is set instead of crashing" do
@@ -163,11 +163,11 @@ defmodule Pepe.CLITest do
       assert Config.models() == []
     end
 
-    test "refuses a company that does not exist" do
+    test "refuses a project that does not exist" do
       {_out, err} =
-        run(["model", "add", "openai", "--company", "ghost", "--base-url", "https://api.example.com/v1", "--model", "gpt-4o"])
+        run(["model", "add", "openai", "--project", "ghost", "--base-url", "https://api.example.com/v1", "--model", "gpt-4o"])
 
-      assert err =~ "unknown company: ghost"
+      assert err =~ "unknown project: ghost"
       assert Config.models() == []
     end
   end
@@ -264,27 +264,27 @@ defmodule Pepe.CLITest do
     test "--default makes it the agent every surface answers with" do
       run(["agent", "add", "support", "--prompt", "you help", "--default"])
 
-      assert Config.default_agent_name() == "support"
+      assert Config.default_agent_name() == "default/support"
     end
 
-    test "--company scopes the handle into that company" do
-      run(["company", "add", "acme"])
+    test "--project scopes the handle into that project" do
+      run(["project", "add", "acme"])
 
-      {out, _err} = run(["agent", "add", "support", "--company", "acme", "--prompt", "you help"])
+      {out, _err} = run(["agent", "add", "support", "--project", "acme", "--prompt", "you help"])
 
       assert out =~ "agent acme/support saved"
       assert Config.get_agent("acme/support")
       assert Config.get_agent("support") == nil
     end
 
-    test "refuses a company that does not exist, and saves nothing" do
-      {_out, err} = run(["agent", "add", "support", "--company", "ghost", "--prompt", "you help"])
+    test "refuses a project that does not exist, and saves nothing" do
+      {_out, err} = run(["agent", "add", "support", "--project", "ghost", "--prompt", "you help"])
 
-      assert err =~ "unknown company: ghost"
+      assert err =~ "unknown project: ghost"
       assert Config.agents() == []
     end
 
-    test "refuses a name carrying a company separator" do
+    test "refuses a name carrying a project separator" do
       {_out, err} = run(["agent", "add", "acme/support", "--prompt", "you help"])
 
       assert err =~ "invalid name"
@@ -302,7 +302,7 @@ defmodule Pepe.CLITest do
 
       assert out =~ ~r/support \(default\)/
       assert out =~ "tools: read_file"
-      assert out =~ "-> sales"
+      assert out =~ "-> default/sales"
     end
 
     test "with no agents it tells you how to add one" do
@@ -312,13 +312,13 @@ defmodule Pepe.CLITest do
       assert out =~ "mix pepe agent add"
     end
 
-    test "a company's agents are hidden from the root listing and shown by --company" do
-      run(["company", "add", "acme"])
-      run(["agent", "add", "support", "--company", "acme", "--prompt", "a"])
+    test "a project's agents are hidden from the root listing and shown by --project" do
+      run(["project", "add", "acme"])
+      run(["agent", "add", "support", "--project", "acme", "--prompt", "a"])
       run(["agent", "add", "root-bot", "--prompt", "b"])
 
       {root, _} = run(["agent", "list"])
-      {scoped, _} = run(["agent", "list", "--company", "acme"])
+      {scoped, _} = run(["agent", "list", "--project", "acme"])
       {all, _} = run(["agent", "list", "--all"])
 
       assert root =~ "root-bot"
@@ -345,7 +345,7 @@ defmodule Pepe.CLITest do
       {out, _err} = run(["agent", "default", "sales"])
 
       assert out =~ "default agent -> sales"
-      assert Config.default_agent_name() == "sales"
+      assert Config.default_agent_name() == "default/sales"
     end
 
     test "rename moves the agent and its workspace" do
@@ -384,7 +384,7 @@ defmodule Pepe.CLITest do
 
       {out, _err} = run(["agent", "route", "support", "sales"])
       assert out =~ "support -> sales (can message)"
-      assert Config.get_agent("support").can_message == ["sales"]
+      assert Config.get_agent("support").can_message == ["default/sales"]
 
       {out, _err} = run(["agent", "route", "support", "sales", "--remove"])
       assert out =~ "removed route support -> sales"
@@ -400,14 +400,14 @@ defmodule Pepe.CLITest do
       assert Config.get_agent("support").can_message == []
     end
 
-    test "route refuses to cross a company boundary" do
-      run(["company", "add", "acme"])
+    test "route refuses to cross a project boundary" do
+      run(["project", "add", "acme"])
       run(["agent", "add", "support", "--prompt", "a"])
-      run(["agent", "add", "inside", "--company", "acme", "--prompt", "b"])
+      run(["agent", "add", "inside", "--project", "acme", "--prompt", "b"])
 
       {_out, err} = run(["agent", "route", "support", "acme/inside"])
 
-      assert err =~ "refusing route across companies"
+      assert err =~ "refusing route across projects"
       assert Config.get_agent("support").can_message == []
     end
 
@@ -423,7 +423,7 @@ defmodule Pepe.CLITest do
 
       {out, _err} = run(["agent", "manage", "boss", "support"])
       assert out =~ "boss can now manage support"
-      assert Config.get_agent("boss").can_manage == ["support"]
+      assert Config.get_agent("boss").can_manage == ["default/support"]
 
       run(["agent", "manage", "boss", "*"])
       assert "*" in Config.get_agent("boss").can_manage
@@ -439,76 +439,76 @@ defmodule Pepe.CLITest do
     end
   end
 
-  describe "company" do
+  describe "project" do
     test "add creates an isolated tenant" do
-      {out, _err} = run(["company", "add", "acme", "--description", "the acme corp"])
+      {out, _err} = run(["project", "add", "acme", "--description", "the acme corp"])
 
-      assert out =~ "company acme created"
-      assert Config.company_exists?("acme")
-      assert Config.get_company("acme")["description"] == "the acme corp"
+      assert out =~ "project acme created"
+      assert Config.project_exists?("acme")
+      assert Config.get_project("acme")["description"] == "the acme corp"
     end
 
     test "add refuses a duplicate" do
-      run(["company", "add", "acme"])
+      run(["project", "add", "acme"])
 
-      {_out, err} = run(["company", "add", "acme"])
+      {_out, err} = run(["project", "add", "acme"])
 
-      assert err =~ "company acme already exists"
+      assert err =~ "project acme already exists"
     end
 
     test "add refuses an illegal name" do
-      {_out, err} = run(["company", "add", "acme corp!"])
+      {_out, err} = run(["project", "add", "acme corp!"])
 
-      assert err =~ "invalid company name"
-      assert Config.companies() == []
+      assert err =~ "invalid project name"
+      assert Config.project_slugs() == []
     end
 
-    test "list shows each company and how many agents it holds" do
-      run(["company", "add", "acme"])
-      run(["agent", "add", "support", "--company", "acme", "--prompt", "a"])
+    test "list shows each project and how many agents it holds" do
+      run(["project", "add", "acme"])
+      run(["agent", "add", "support", "--project", "acme", "--prompt", "a"])
 
-      {out, _err} = run(["company", "list"])
+      {out, _err} = run(["project", "list"])
 
       assert out =~ "acme (1 agent)"
     end
 
-    test "with no companies it explains the root scope" do
-      {out, _err} = run(["company", "list"])
+    test "with no projects it explains the root scope" do
+      {out, _err} = run(["project", "list"])
 
-      assert out =~ "no companies"
+      assert out =~ "no projects"
       assert out =~ "root scope"
     end
 
     test "remove refuses to orphan agents unless --force is given" do
-      run(["company", "add", "acme"])
-      run(["agent", "add", "support", "--company", "acme", "--prompt", "a"])
+      run(["project", "add", "acme"])
+      run(["agent", "add", "support", "--project", "acme", "--prompt", "a"])
 
-      {_out, err} = run(["company", "remove", "acme"])
+      {_out, err} = run(["project", "remove", "acme"])
       assert err =~ "still has 1 agent"
-      assert Config.company_exists?("acme")
+      assert Config.project_exists?("acme")
 
-      {out, _err} = run(["company", "remove", "acme", "--force"])
-      assert out =~ "removed company acme"
-      refute Config.company_exists?("acme")
+      {out, _err} = run(["project", "remove", "acme", "--force"])
+      assert out =~ "removed project acme"
+      refute Config.project_exists?("acme")
       assert Config.get_agent("acme/support") == nil
     end
 
-    test "remove says so when the company does not exist" do
-      {_out, err} = run(["company", "remove", "ghost"])
+    test "remove says so when the project does not exist" do
+      {_out, err} = run(["project", "remove", "ghost"])
 
-      assert err =~ "unknown company: ghost"
+      assert err =~ "unknown project: ghost"
     end
 
     test "an unknown subcommand points at the help" do
-      {_out, err} = run(["company", "frobnicate"])
+      {_out, err} = run(["project", "frobnicate"])
 
-      assert err =~ "unknown company command: frobnicate"
+      assert err =~ "unknown project command: frobnicate"
     end
   end
 
   # These four reported success for a name that was never there, and `default` went further
   # and wrote it: the install then looked configured and answered nothing, and only
-  # `doctor` ever said why. Every sibling command (company remove, cron remove, watch
+  # `doctor` ever said why. Every sibling command (project remove, cron remove, watch
   # cancel, token revoke) validates. These now do too.
   describe "a name that does not exist" do
     test "model remove says so instead of claiming success" do

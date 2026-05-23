@@ -16,7 +16,7 @@ defmodule PepeWeb.OpenAIController do
 
   alias Pepe.Agent.Runtime
   alias Pepe.ApiScope
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.LLM.Message
@@ -24,7 +24,7 @@ defmodule PepeWeb.OpenAIController do
   def models(conn, _params) do
     scope = conn.assigns[:api_scope] || :unrestricted
     agents = Enum.map(ApiScope.visible_agents(scope), &model_object(&1.name, "agent"))
-    # Raw model connections are only listed for open/root scope; company/agent tokens
+    # Raw model connections are only listed for open/root scope; project/agent tokens
     # see only their agents.
     models =
       if ApiScope.root_or_open?(scope),
@@ -172,9 +172,9 @@ defmodule PepeWeb.OpenAIController do
   ###
 
   # The conversation lives in a supervised GenServer keyed per scope so a session id
-  # can't be reused across companies to reach another tenant's conversation.
+  # can't be reused across projects to reach another tenant's conversation.
   defp session_key(agent, session_id) do
-    "api:" <> (Company.of(agent.name) || "root") <> ":" <> session_id
+    "api:" <> Pepe.Config.resolve_scope(Project.of(agent.name)) <> ":" <> session_id
   end
 
   defp session_response(conn, agent, session_id, text, false) do

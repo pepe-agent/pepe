@@ -1,8 +1,8 @@
 defmodule PepeWeb.UsageLive do
   @moduledoc """
-  Usage (billing) section: token consumption metered per company, agent and model,
+  Usage (billing) section: token consumption metered per project, agent and model,
   aggregated into billing cycles (hour / day / week / month / year). Shows provider
-  cost and - when a company has a markup - the amount to bill, side by side. Prices
+  cost and - when a project has a markup - the amount to bill, side by side. Prices
   come from the layered price book; a button refreshes the live cache.
   """
   use PepeWeb, :live_view
@@ -29,8 +29,8 @@ defmodule PepeWeb.UsageLive do
      |> assign(
        page_title: "Pepe · Usage",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        granularity: "day",
        refreshing: false,
        cache_info: Pricing.cache_info()
@@ -49,12 +49,12 @@ defmodule PepeWeb.UsageLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="usage" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="usage" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="📊"
           title={gettext("Usage & billing")}
-          desc={gettext("Tokens metered per company, agent and model, by cycle. Cost uses each model's price; the amount to bill adds the company's markup. Prices are editable per model.")}
+          desc={gettext("Tokens metered per project, agent and model, by cycle. Cost uses each model's price; the amount to bill adds the project's markup. Prices are editable per model.")}
         >
           <div class="flex items-center gap-2">
             <span class="hidden text-xs text-zinc-500 sm:inline">{price_cache_label(@cache_info)}</span>
@@ -126,8 +126,8 @@ defmodule PepeWeb.UsageLive do
           </div>
 
           <div class="grid gap-5 lg:grid-cols-3">
-            <.breakdown :if={@scope == "all"} title={gettext("By company")} currency={@summary.currency}
-              rows={Enum.map(@summary.by_company, &{&1.key, &1.total, &1.cost, &1.billable})} bill?={true} />
+            <.breakdown :if={@scope == "all"} title={gettext("By project")} currency={@summary.currency}
+              rows={Enum.map(@summary.by_project, &{&1.key, &1.total, &1.cost, &1.billable})} bill?={true} />
             <.breakdown title={gettext("By model")} currency={@summary.currency}
               rows={Enum.map(@summary.by_model, &{&1.key, &1.total, &1.cost, &1.billable})} bill?={false} />
             <.breakdown title={gettext("By agent")} currency={@summary.currency}
@@ -192,10 +192,10 @@ defmodule PepeWeb.UsageLive do
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/usage")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   @impl true
   def handle_info({:prices_refreshed, result}, socket) do

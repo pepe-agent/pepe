@@ -37,7 +37,7 @@ defmodule Pepe.Tools.ManageChannelTest do
 
     bot = Config.telegram_bot("sales")
     assert bot["bot_token"] == "${SALES_TOKEN}"
-    assert bot["agent"] == "sales-bot"
+    assert bot["agent"] == "default/sales-bot"
   end
 
   test "rejects a raw token - must be an env var NAME" do
@@ -79,7 +79,7 @@ defmodule Pepe.Tools.ManageChannelTest do
                ctx()
              )
 
-    assert Config.telegram_bot("sales")["agent"] == "other"
+    assert Config.telegram_bot("sales")["agent"] == "default/other"
 
     assert {:ok, _} = ManageChannel.run(%{"action" => "disable", "name" => "sales"}, ctx())
     assert Config.telegram_bot("sales")["enabled"] == false

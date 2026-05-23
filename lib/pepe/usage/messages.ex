@@ -1,9 +1,9 @@
 defmodule Pepe.Usage.Messages do
   @moduledoc """
-  Append-only counter of customer-originated messages per company per month - the
-  source of truth for `Pepe.Config.company_message_limit/1`'s monthly cap.
+  Append-only counter of customer-originated messages per project per month - the
+  source of truth for `Pepe.Config.project_message_limit/1`'s monthly cap.
 
-  Kept as its own ledger under `<PEPE_HOME>/data/messages/<company>/YYYY-MM.jsonl`,
+  Kept as its own ledger under `<PEPE_HOME>/data/messages/<project>/YYYY-MM.jsonl`,
   separate from `Pepe.Usage.Log` (the token/cost ledger): one customer message can
   trigger several model calls, so counting `Log` entries would overcount, and
   mixing entry shapes into that ledger would break its billing summary/invoice math.
@@ -11,16 +11,16 @@ defmodule Pepe.Usage.Messages do
 
   alias Pepe.Config
 
-  @doc "Root directory holding the per-company message counters."
+  @doc "Root directory holding the per-project message counters."
   def dir, do: Path.join([Config.home(), "data", "messages"])
 
   @doc "The directory for one scope (`nil`/`\"root\"` -> `root/`)."
   def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
 
-  @doc "Record one customer-originated message for `company` (`nil` counts against root)."
+  @doc "Record one customer-originated message for `project` (`nil` counts against root)."
   @spec record(String.t() | nil) :: :ok
-  def record(company) do
-    d = scope_dir(company)
+  def record(project) do
+    d = scope_dir(project)
     File.mkdir_p!(d)
     at = System.system_time(:second)
     File.write!(Path.join(d, month_file(at)), Jason.encode!(%{"at" => at}) <> "\n", [:append])
@@ -28,13 +28,13 @@ defmodule Pepe.Usage.Messages do
   end
 
   @doc """
-  Reset `company`'s counter early, before the natural month boundary - appends a
+  Reset `project`'s counter early, before the natural month boundary - appends a
   reset marker rather than deleting anything, so the ledger stays a full audit
   trail; messages recorded before the marker just stop counting toward the cap.
   """
   @spec reset(String.t() | nil) :: :ok
-  def reset(company) do
-    d = scope_dir(company)
+  def reset(project) do
+    d = scope_dir(project)
     File.mkdir_p!(d)
     at = System.system_time(:second)
     File.write!(Path.join(d, month_file(at)), Jason.encode!(%{"at" => at, "reset" => true}) <> "\n", [:append])
@@ -42,16 +42,16 @@ defmodule Pepe.Usage.Messages do
   end
 
   @doc """
-  How many messages `company` has been recorded for since the later of: the start
+  How many messages `project` has been recorded for since the later of: the start
   of the current billing month, or its last `reset/1` (if any fell within it).
   """
   @spec month_to_date(String.t() | nil) :: non_neg_integer()
-  def month_to_date(company) do
+  def month_to_date(project) do
     tz = Config.default_timezone()
     key = bucket_key(System.os_time(:second), tz)
 
     this_month =
-      company |> entries() |> Enum.filter(&(bucket_key(&1["at"], tz) == key)) |> Enum.with_index()
+      project |> entries() |> Enum.filter(&(bucket_key(&1["at"], tz) == key)) |> Enum.with_index()
 
     # Break ties on append order (list position), not the raw second-resolution
     # timestamp - a record and a reset in the same wall-clock second are common
@@ -68,13 +68,13 @@ defmodule Pepe.Usage.Messages do
     Enum.count(this_month, fn {e, i} -> !e["reset"] and i > last_reset_index end)
   end
 
-  @doc "Unix timestamp of `company`'s last reset within the current billing month, or `nil`."
+  @doc "Unix timestamp of `project`'s last reset within the current billing month, or `nil`."
   @spec last_reset_at(String.t() | nil) :: integer() | nil
-  def last_reset_at(company) do
+  def last_reset_at(project) do
     tz = Config.default_timezone()
     key = bucket_key(System.os_time(:second), tz)
 
-    company
+    project
     |> entries()
     |> Enum.filter(&(bucket_key(&1["at"], tz) == key and &1["reset"]))
     |> Enum.map(& &1["at"])
@@ -84,8 +84,8 @@ defmodule Pepe.Usage.Messages do
     end
   end
 
-  defp entries(company) do
-    d = scope_dir(company)
+  defp entries(project) do
+    d = scope_dir(project)
 
     case File.ls(d) do
       {:ok, files} ->
@@ -116,7 +116,7 @@ defmodule Pepe.Usage.Messages do
     end
   end
 
-  defp scope_name(scope) when scope in [nil, "", "root"], do: "root"
+  defp scope_name(scope) when scope in [nil, ""], do: Config.default_project_slug()
   defp scope_name(scope), do: to_string(scope)
 
   # Storage partition (raw UTC month) - just keeps files bounded; the actual

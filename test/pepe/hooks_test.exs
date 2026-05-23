@@ -105,8 +105,8 @@ defmodule Pepe.HooksTest do
       refute Hooks.any?(agent)
     end
 
-    test "a company default_hook applies to its agents" do
-      Config.add_company("acme", %{"default_hooks" => ["pii_redact"]})
+    test "a project default_hook applies to its agents" do
+      Config.add_project("acme", %{"default_hooks" => ["pii_redact"]})
       agent = %Agent{name: "acme/sales", hooks: []}
 
       {redacted, _} = Hooks.transform(:inbound, "CPF #{@cpf}", agent)

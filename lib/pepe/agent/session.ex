@@ -19,7 +19,7 @@ defmodule Pepe.Agent.Session do
   alias Pepe.LLM.Message
 
   # Sources that are the owner/operator using their own runtime, not a customer
-  # messaging it - never counted or blocked by Pepe.Config.company_message_limit/1.
+  # messaging it - never counted or blocked by Pepe.Config.project_message_limit/1.
   # Everything else (telegram, a webhook provider, widget:...) counts by default,
   # so a newly added channel is covered without having to list it here.
   @internal_sources ~w(tui web api)
@@ -552,8 +552,8 @@ defmodule Pepe.Agent.Session do
     end
   end
 
-  defp start_chat_run(state, agent, company, counts?, text, opts, from) do
-    if counts?, do: Pepe.Usage.record_message(company)
+  defp start_chat_run(state, agent, project, counts?, text, opts, from) do
+    if counts?, do: Pepe.Usage.record_message(project)
 
     # Tag the run with this session's key so `:session` approvals are scoped to it.
     opts = Keyword.put(opts, :session_key, state.key)
@@ -749,14 +749,14 @@ defmodule Pepe.Agent.Session do
         {:noreply, state}
 
       agent ->
-        company = Pepe.Company.of(agent.name)
+        project = Pepe.Project.of(agent.name)
         counts? = customer_message?(state.key, agent)
 
-        if counts? and Pepe.Usage.over_message_limit?(company) do
+        if counts? and Pepe.Usage.over_message_limit?(project) do
           GenServer.reply(from, {:error, :message_limit_exceeded})
           {:noreply, state}
         else
-          start_chat_run(state, agent, company, counts?, text, opts, from)
+          start_chat_run(state, agent, project, counts?, text, opts, from)
         end
     end
   end
@@ -954,7 +954,7 @@ defmodule Pepe.Agent.Session do
     {pid, Process.monitor(pid)}
   end
 
-  # Whether this turn is a real customer message against the company's monthly
+  # Whether this turn is a real customer message against the project's monthly
   # message cap - not the owner's own TUI console, dashboard test chat, or direct
   # API use, and not an agent explicitly exempted from the cap.
   defp customer_message?(key, agent) do

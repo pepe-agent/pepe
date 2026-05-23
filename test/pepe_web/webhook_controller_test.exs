@@ -18,7 +18,7 @@ defmodule PepeWeb.WebhookControllerTest do
 
     Config.put_webhook("support", %{
       "provider" => "whatsapp",
-      "company" => "acme",
+      "project" => "acme",
       "agent" => "acme/support",
       "config" => %{"verify_token" => "vt", "app_secret" => "s3cr3t"}
     })

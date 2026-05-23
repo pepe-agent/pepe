@@ -1,7 +1,7 @@
 defmodule Pepe.Usage do
   @moduledoc """
   Token metering for billing. Every model call the runtime makes is recorded to a durable
-  per-company ledger (`Pepe.Usage.Log`); this module records those entries and aggregates
+  per-project ledger (`Pepe.Usage.Log`); this module records those entries and aggregates
   them into time buckets - hour, day, week, month, year - with the money math on top.
 
   ## Three numbers, not two
@@ -12,7 +12,7 @@ defmodule Pepe.Usage do
 
     * **`list`** - `tokens × the model's price` (per 1M; see `Pepe.Pricing`). What these
       tokens would have cost on the API, whether or not they did.
-    * **`billable`** - `list × the company's markup`. What the client pays, and it is
+    * **`billable`** - `list × the project's markup`. What the client pays, and it is
       deliberately computed from `list` rather than from what we spent. The subscription
       will run out one day and the same work will fall through to the paid API, and on that
       day the client's price must not move. A price that tracks our supply arrangements is a
@@ -31,7 +31,7 @@ defmodule Pepe.Usage do
   month's entries must not silently change meaning when it happens.
   """
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.Config.Model
   alias Pepe.Pricing
@@ -43,7 +43,7 @@ defmodule Pepe.Usage do
   def granularities, do: @granularities
 
   @doc """
-  Record one model call's token usage against the agent's company. `usage` is the provider's
+  Record one model call's token usage against the agent's project. `usage` is the provider's
   usage map (`\"prompt_tokens\"`, `\"completion_tokens\"`, `\"total_tokens\"`). No-ops when
   nothing meaningful was reported.
 
@@ -86,7 +86,7 @@ defmodule Pepe.Usage do
       # the token, and an entry from an older Pepe reads exactly as it always did.
       entry = if subscription?, do: Map.put(entry, "sub", true), else: entry
 
-      Log.append(Company.of(to_string(agent_handle)), entry)
+      Log.append(Project.of(to_string(agent_handle)), entry)
     end
 
     :ok
@@ -107,27 +107,27 @@ defmodule Pepe.Usage do
   end
 
   @doc """
-  Billable spend (in the billing currency) for `company` in the current month, since
+  Billable spend (in the billing currency) for `project` in the current month, since
   the later of: the month's start, or its last `reset_budget/1` call (if any fell
   within it). This is what the pre-flight budget gate and the dashboard badge use -
   `Pepe.Usage.Invoice`/`summary/3` read the ledger directly and are never affected
   by a reset, so the real accounting record stays intact.
   """
   @spec month_to_date(String.t() | nil) :: float()
-  def month_to_date(company) do
+  def month_to_date(project) do
     tz = Config.default_timezone()
     key = bucket_key(System.os_time(:second), :month, tz)
-    reset_at = Config.company_budget_reset_at(company)
+    reset_at = Config.project_budget_reset_at(project)
     cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
 
     # Strictly-after (not >=): entries only have second resolution, and
     # reset_budget/1 can't record its own position in the ledger (it's stored on
-    # the company, not appended as a marker) - a usage record and a reset landing
+    # the project, not appended as a marker) - a usage record and a reset landing
     # in the same wall-clock second must resolve as "recorded before the reset",
     # never the reverse, or the reset would look like it silently did nothing.
     entries =
-      company
+      project
       |> Log.entries()
       |> Enum.filter(fn e ->
         bucket_key(e["at"], :month, tz) == key and (is_nil(reset_at) or e["at"] > reset_at)
@@ -139,63 +139,63 @@ defmodule Pepe.Usage do
   end
 
   @doc """
-  Is `company` at or over its monthly spend cap? Always `false` when no cap is set
-  (see `Pepe.Config.company_budget/1`). This is the runtime's pre-flight budget gate.
+  Is `project` at or over its monthly spend cap? Always `false` when no cap is set
+  (see `Pepe.Config.project_budget/1`). This is the runtime's pre-flight budget gate.
   """
   @spec over_budget?(String.t() | nil) :: boolean()
-  def over_budget?(company) do
-    case Config.company_budget(company) do
+  def over_budget?(project) do
+    case Config.project_budget(project) do
       nil -> false
-      budget -> month_to_date(company) >= budget
+      budget -> month_to_date(project) >= budget
     end
   end
 
-  @doc "Reset `company`'s budget counter early, before the natural month boundary."
+  @doc "Reset `project`'s budget counter early, before the natural month boundary."
   @spec reset_budget(String.t() | nil) :: :ok | {:error, :not_found}
-  def reset_budget(company), do: Config.reset_company_budget(company)
+  def reset_budget(project), do: Config.reset_project_budget(project)
 
-  @doc "Unix timestamp of `company`'s last budget reset, or `nil` if it's never been reset."
+  @doc "Unix timestamp of `project`'s last budget reset, or `nil` if it's never been reset."
   @spec budget_reset_at(String.t() | nil) :: integer() | nil
-  def budget_reset_at(company), do: Config.company_budget_reset_at(company)
+  def budget_reset_at(project), do: Config.project_budget_reset_at(project)
 
-  @doc "Unix timestamp of `company`'s last message-count reset this month, or `nil`."
+  @doc "Unix timestamp of `project`'s last message-count reset this month, or `nil`."
   @spec messages_reset_at(String.t() | nil) :: integer() | nil
-  def messages_reset_at(company), do: Pepe.Usage.Messages.last_reset_at(company)
+  def messages_reset_at(project), do: Pepe.Usage.Messages.last_reset_at(project)
 
-  @doc "Record one customer-originated message against `company`'s monthly counter."
+  @doc "Record one customer-originated message against `project`'s monthly counter."
   @spec record_message(String.t() | nil) :: :ok
-  def record_message(company), do: Pepe.Usage.Messages.record(company)
+  def record_message(project), do: Pepe.Usage.Messages.record(project)
 
-  @doc "How many customer messages `company` has been recorded for this month."
+  @doc "How many customer messages `project` has been recorded for this month."
   @spec message_count_month_to_date(String.t() | nil) :: non_neg_integer()
-  def message_count_month_to_date(company), do: Pepe.Usage.Messages.month_to_date(company)
+  def message_count_month_to_date(project), do: Pepe.Usage.Messages.month_to_date(project)
 
-  @doc "Reset `company`'s message counter early, before the natural month boundary."
+  @doc "Reset `project`'s message counter early, before the natural month boundary."
   @spec reset_messages(String.t() | nil) :: :ok
-  def reset_messages(company), do: Pepe.Usage.Messages.reset(company)
+  def reset_messages(project), do: Pepe.Usage.Messages.reset(project)
 
   @doc """
-  Is `company` at or over its monthly customer-message cap? Always `false` when no
-  cap is set (see `Pepe.Config.company_message_limit/1`). Independent of
-  `over_budget?/1` - a company can have either, both, or neither cap.
+  Is `project` at or over its monthly customer-message cap? Always `false` when no
+  cap is set (see `Pepe.Config.project_message_limit/1`). Independent of
+  `over_budget?/1` - a project can have either, both, or neither cap.
   """
   @spec over_message_limit?(String.t() | nil) :: boolean()
-  def over_message_limit?(company) do
-    case Config.company_message_limit(company) do
+  def over_message_limit?(project) do
+    case Config.project_message_limit(project) do
       nil -> false
-      limit -> message_count_month_to_date(company) >= limit
+      limit -> message_count_month_to_date(project) >= limit
     end
   end
 
   @doc """
   Aggregate a scope's usage into buckets at `granularity`.
 
-  `scope` is `nil`/`\"root\"` (root only), a company name, or `:all`/`\"all\"`.
+  `scope` is `nil`/`\"root\"` (root only), a project name, or `:all`/`\"all\"`.
   Options: `:tz` (billing-day timezone, default the configured one), `:limit`
   (most-recent buckets to return, default 60).
 
   Returns a map with `:buckets` (each `%{key, in, out, total, list, cost, billable}`,
-  oldest->newest), `:totals`, and `:by_model` / `:by_agent` / `:by_company` breakdowns, plus
+  oldest->newest), `:totals`, and `:by_model` / `:by_agent` / `:by_project` breakdowns, plus
   the `:currency` label, the month's `:subscriptions` (the flat fees behind any subscription
   connection that was actually used) and the `:margin` those make honest.
   """
@@ -204,7 +204,7 @@ defmodule Pepe.Usage do
     limit = opts[:limit] || 60
 
     # Load the live price cache and every model's manual price once, up front, and
-    # resolve price/markup per distinct model/company (not per row - see
+    # resolve price/markup per distinct model/project (not per row - see
     # price_lookup/3), so pricing thousands of ledger entries never touches disk or
     # rescans the price book per row.
     cache = Pricing.load_cache()
@@ -233,7 +233,7 @@ defmodule Pepe.Usage do
       margin: totals.billable - totals.cost - subs,
       by_model: group_sum(priced, "model"),
       by_agent: group_sum(priced, "agent"),
-      by_company: by_company(priced)
+      by_project: by_project(priced)
     }
   end
 
@@ -260,13 +260,13 @@ defmodule Pepe.Usage do
   end
 
   @doc """
-  Build a billing invoice for one company over a calendar month.
+  Build a billing invoice for one project over a calendar month.
 
   `opts`: `:month` (`\"YYYY-MM\"`, default the current month in the billing tz),
   `:tz`. Returns a map with the `:period`, per-model `:line_items`, `:totals`, the
   `:markup` and `:currency` - ready to render (`Pepe.Usage.Invoice`).
   """
-  def invoice(company, opts \\ []) do
+  def invoice(project, opts \\ []) do
     tz = opts[:tz] || Config.default_timezone()
     {from, to, label} = month_range(opts[:month], tz)
 
@@ -274,7 +274,7 @@ defmodule Pepe.Usage do
     models = Map.new(Config.models(), &{&1.name, &1})
 
     raw_entries =
-      company
+      project
       |> Log.entries()
       |> Enum.filter(fn e -> is_integer(e["at"]) and e["at"] >= from and e["at"] < to end)
 
@@ -289,9 +289,9 @@ defmodule Pepe.Usage do
       |> Enum.sort_by(& &1.billable, :desc)
 
     %{
-      company: company,
+      project: project,
       currency: Config.currency(),
-      markup: Config.company_markup(company),
+      markup: Config.project_markup(project),
       period: %{label: label, from: from, to: to},
       line_items: line_items,
       totals: sum(entries),
@@ -349,19 +349,19 @@ defmodule Pepe.Usage do
     entries |> Enum.map(& &1["model"]) |> Enum.uniq() |> Map.new(&{&1, price_for(&1, models, cache)})
   end
 
-  # {company => markup} for just the distinct companies present in `entries`, same
-  # reasoning as price_lookup/3 (a handful of distinct companies, not one lookup
+  # {project => markup} for just the distinct projects present in `entries`, same
+  # reasoning as price_lookup/3 (a handful of distinct projects, not one lookup
   # per row).
   defp markup_lookup(entries) do
-    entries |> Enum.map(& &1["company"]) |> Enum.uniq() |> Map.new(&{&1, Config.company_markup(nil_scope(&1))})
+    entries |> Enum.map(& &1["project"]) |> Enum.uniq() |> Map.new(&{&1, Config.project_markup(nil_scope(&1))})
   end
 
-  # Decorate an entry with cost (provider) and billable (cost × company markup),
+  # Decorate an entry with cost (provider) and billable (cost × project markup),
   # from the lookup tables built by price_lookup/3 and markup_lookup/1.
   defp price(e, prices, markups) do
     {ip, op} = Map.fetch!(prices, e["model"])
     list = Pricing.cost(e["in"], e["out"], ip, op)
-    markup = Map.fetch!(markups, e["company"])
+    markup = Map.fetch!(markups, e["project"])
 
     e
     |> Map.put("list", list)
@@ -419,11 +419,11 @@ defmodule Pepe.Usage do
     |> Enum.sort_by(& &1.total, :desc)
   end
 
-  defp by_company(entries) do
+  defp by_project(entries) do
     entries
-    |> Enum.group_by(& &1["company"])
+    |> Enum.group_by(& &1["project"])
     |> Enum.map(fn {c, es} ->
-      sum(es) |> Map.merge(%{key: c, markup: Config.company_markup(nil_scope(c))})
+      sum(es) |> Map.merge(%{key: c, markup: Config.project_markup(nil_scope(c))})
     end)
     |> Enum.sort_by(& &1.billable, :desc)
   end

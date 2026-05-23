@@ -23,25 +23,25 @@ defmodule Mix.Tasks.Pepe do
       mix pepe model remove NAME
       mix pepe model default NAME
 
-  ## Companies (multi-tenant)
+  ## Projects (multi-tenant)
 
-  Optional. Without `--company`, everything operates on the **root** scope, exactly
-  as a single-tenant install always has. Add a company to isolate a tenant: its
+  Optional. Without `--project`, everything operates on the **root** scope, exactly
+  as a single-tenant install always has. Add a project to isolate a tenant: its
   agents, workspaces, `shared/` space, models and routing are walled off from every
-  other company. Add `--company NAME` to any agent/model command to act inside it.
+  other project. Add `--project NAME` to any agent/model command to act inside it.
 
-      mix pepe company add NAME [--description "..."]
-      mix pepe company list
-      mix pepe company remove NAME [--force]   # --force also drops its agents
+      mix pepe project add NAME [--description "..."]
+      mix pepe project list
+      mix pepe project remove NAME [--force]   # --force also drops its agents
 
   ## API access tokens
 
   Bearer tokens for the `/v1` HTTP API and the WebSocket. With no tokens, only
   same-machine (loopback) callers reach either; creating the first one locks both -
-  every call, local or remote, then needs a valid token. Scope a token to a company
-  (`--company`) or a single agent (`--agent HANDLE`).
+  every call, local or remote, then needs a valid token. Scope a token to a project
+  (`--project`) or a single agent (`--agent HANDLE`).
 
-      mix pepe token add [--company CO] [--agent HANDLE] [--label "..."]
+      mix pepe token add [--project CO] [--agent HANDLE] [--label "..."]
       mix pepe token add --agent HANDLE --widget --allowed-origin https://example.com
       mix pepe token list
       mix pepe token update ID [--title ...] [--greeting ...] ...
@@ -66,9 +66,9 @@ defmodule Mix.Tasks.Pepe do
 
   ## Agents
 
-      mix pepe agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--company CO]
-      mix pepe agent list [--company CO | --all]
-      mix pepe agent route FROM TO [--remove] [--company CO]   # let FROM message TO (directed)
+      mix pepe agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--project CO]
+      mix pepe agent list [--project CO | --all]
+      mix pepe agent route FROM TO [--remove] [--project CO]   # let FROM message TO (directed)
       mix pepe agent manage ADMIN TARGET [--remove]  # let ADMIN administer TARGET ("*" = all)
       mix pepe agent rename OLD NEW          # rename + move its workspace dir
       mix pepe agent remove NAME
@@ -95,10 +95,10 @@ defmodule Mix.Tasks.Pepe do
       mix pepe timelearn [AGENT]               # what the agent has learned, on a timeline
       mix pepe learn consolidate|auto [AGENT]    # tidy memory now, or schedule nightly consolidation
       mix pepe cron list|add|run|logs ...        # scheduled tasks (recurring agent jobs)
-      mix pepe usage [--company CO] ...          # token usage & cost by cycle (billing)
-      mix pepe usage export --company CO ...     # generate a client invoice (md/csv)
+      mix pepe usage [--project CO] ...          # token usage & cost by cycle (billing)
+      mix pepe usage export --project CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
-      mix pepe traces [--company CO] [ID]        # inspect/replay recent agent runs
+      mix pepe traces [--project CO] [ID]        # inspect/replay recent agent runs
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
@@ -110,13 +110,13 @@ defmodule Mix.Tasks.Pepe do
       mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
       mix pepe backup [--output FILE.tgz]      # archive the whole ~/.pepe + list the secret env vars to save
-      mix pepe extract COMPANY [--output FILE.tgz]  # lift ONE company out as a standalone (root) install
+      mix pepe extract PROJECT [--output FILE.tgz]  # lift ONE project out as a standalone (root) install
       mix pepe restore FILE.tgz [--force]      # restore a backup or an extract into ~/.pepe
   """
   use Mix.Task
   use Gettext, backend: Pepe.Gettext
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
@@ -152,7 +152,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "agent" | _]), do: agent_cmd(["help"])
   def dispatch(["help", "model" | _]), do: model_cmd(["help"])
   def dispatch(["help", "gateway" | _]), do: gateway_cmd(["help"])
-  def dispatch(["help", "company" | _]), do: company_cmd(["help"])
+  def dispatch(["help", "project" | _]), do: project_cmd(["help"])
   def dispatch(["help", "serve" | _]), do: serve_help()
   def dispatch(["help", "run" | _]), do: run_help()
   def dispatch(["help", "backup" | _]), do: backup_help()
@@ -211,7 +211,7 @@ defmodule Mix.Tasks.Pepe do
 
   def dispatch(["plugin" | rest]), do: with_config(fn -> plugin_cmd(rest) end)
   def dispatch(["migrate" | rest]), do: with_config(fn -> migrate_cmd(rest) end)
-  def dispatch(["company" | rest]), do: with_config(fn -> company_cmd(rest) end)
+  def dispatch(["project" | rest]), do: with_config(fn -> project_cmd(rest) end)
 
   # `hooks generate` calls a model (needs the app); `list` just reads.
   def dispatch(["hooks", "generate" | rest]),
@@ -392,13 +392,17 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp model_cmd(["list" | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [company: :string, all: :boolean])
+    {opts, _} = OptionParser.parse!(rest, strict: [project: :string, all: :boolean])
     default = Config.default_model_name()
 
     models =
       if opts[:all],
         do: Config.models(),
-        else: Enum.filter(Config.models(), &(Company.of(&1.name) == opts[:company]))
+        else:
+          Enum.filter(
+            Config.models(),
+            &(Config.resolve_scope(Project.of(&1.name)) == Config.resolve_scope(opts[:project]))
+          )
 
     case models do
       [] ->
@@ -430,7 +434,7 @@ defmodule Mix.Tasks.Pepe do
         error("a model connection named #{new} already exists")
 
       {:error, :scope_mismatch} ->
-        error("can't rename across a company boundary")
+        error("can't rename across a project boundary")
     end
   end
 
@@ -528,22 +532,22 @@ defmodule Mix.Tasks.Pepe do
   # once taken becomes "openrouter-2", "openrouter-3", ... The bare `name` is
   # kept around for provider auto-detection (matching e.g. the "openrouter"
   # catalog entry); only the stored handle gets suffixed.
-  defp unique_handle(name, company) do
+  defp unique_handle(name, project) do
     taken = model_names()
-    handle = Company.handle(company, name)
+    handle = Project.handle(project, name)
 
     if handle in taken do
       2
       |> Stream.iterate(&(&1 + 1))
-      |> Enum.find_value(&candidate_handle(&1, name, company, taken))
+      |> Enum.find_value(&candidate_handle(&1, name, project, taken))
     else
       {name, handle}
     end
   end
 
-  defp candidate_handle(n, name, company, taken) do
+  defp candidate_handle(n, name, project, taken) do
     candidate = "#{name}-#{n}"
-    h = Company.handle(company, candidate)
+    h = Project.handle(project, candidate)
     if h not in taken, do: {candidate, h}
   end
 
@@ -553,7 +557,7 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} =
       OptionParser.parse!(rest,
         strict: [
-          company: :string,
+          project: :string,
           base_url: :string,
           api_key: :string,
           model: :string,
@@ -564,9 +568,9 @@ defmodule Mix.Tasks.Pepe do
         ]
       )
 
-    with :ok <- validate_scope(name, opts[:company]) do
-      {store_name, handle} = resolve_handle(name, opts[:company], dedupe?)
-      warn_if_renamed(name, store_name, handle, opts[:company])
+    with :ok <- validate_scope(name, opts[:project]) do
+      {store_name, handle} = resolve_handle(name, opts[:project], dedupe?)
+      warn_if_renamed(name, store_name, handle, opts[:project])
 
       # Guided flow: no --base-url ⇒ use a matching known provider name, or let
       # the user pick one from the catalog. --base-url ⇒ use it directly.
@@ -575,13 +579,13 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  defp resolve_handle(name, company, true), do: unique_handle(name, company)
-  defp resolve_handle(name, company, false), do: {name, Company.handle(company, name)}
+  defp resolve_handle(name, project, true), do: unique_handle(name, project)
+  defp resolve_handle(name, project, false), do: {name, Project.handle(project, name)}
 
-  defp warn_if_renamed(name, store_name, _handle, _company) when store_name == name, do: :ok
+  defp warn_if_renamed(name, store_name, _handle, _project) when store_name == name, do: :ok
 
-  defp warn_if_renamed(name, _store_name, handle, company) do
-    info(dim("a connection named \"#{Company.handle(company, name)}\" already exists - saving this one as \"#{handle}\" instead."))
+  defp warn_if_renamed(name, _store_name, handle, project) do
+    info(dim("a connection named \"#{Project.handle(project, name)}\" already exists - saving this one as \"#{handle}\" instead."))
   end
 
   defp resolve_connection(name, opts) do
@@ -619,7 +623,7 @@ defmodule Mix.Tasks.Pepe do
         }
 
         Config.put_model(model)
-        if opts[:default], do: Config.set_default_model_for(opts[:company], store_name)
+        if opts[:default], do: Config.set_default_model_for(opts[:project], store_name)
         ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
     end
   end
@@ -901,18 +905,18 @@ defmodule Mix.Tasks.Pepe do
   defp usage_cmd(["export" | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
-        strict: [company: :string, month: :string, format: :string, output: :string]
+        strict: [project: :string, month: :string, format: :string, output: :string]
       )
 
     cond do
-      is_nil(opts[:company]) ->
-        error("--company is required, e.g. mix pepe usage export --company acme")
+      is_nil(opts[:project]) ->
+        error("--project is required, e.g. mix pepe usage export --project acme")
 
-      not Config.company_exists?(opts[:company]) ->
-        error("unknown company: #{opts[:company]}")
+      not Config.project_exists?(opts[:project]) ->
+        error("unknown project: #{opts[:project]}")
 
       true ->
-        inv = Pepe.Usage.invoice(opts[:company], month: opts[:month])
+        inv = Pepe.Usage.invoice(opts[:project], month: opts[:month])
 
         {body, ext} =
           if opts[:format] == "csv",
@@ -925,7 +929,7 @@ defmodule Mix.Tasks.Pepe do
 
           path ->
             File.write!(path, body)
-            ok("wrote #{ext} invoice for #{opts[:company]} #{inv.period.label} -> #{path}")
+            ok("wrote #{ext} invoice for #{opts[:project]} #{inv.period.label} -> #{path}")
         end
     end
   end
@@ -935,7 +939,7 @@ defmodule Mix.Tasks.Pepe do
   defp usage_cmd(rest) do
     {opts, _} =
       OptionParser.parse!(rest,
-        strict: [company: :string, granularity: :string, limit: :integer]
+        strict: [project: :string, granularity: :string, limit: :integer]
       )
 
     case @granularity_atoms[opts[:granularity] || "month"] do
@@ -943,7 +947,7 @@ defmodule Mix.Tasks.Pepe do
         error("unknown cycle: #{opts[:granularity]} (use hour|day|week|month|year)")
 
       gran ->
-        scope = opts[:company] || :all
+        scope = opts[:project] || :all
         s = Pepe.Usage.summary(scope, gran, limit: opts[:limit] || 24)
         print_usage(s, scope)
     end
@@ -975,13 +979,13 @@ defmodule Mix.Tasks.Pepe do
       )
     end
 
-    if scope == :all and s.by_company != [] do
-      puts("\n#{bold("by company")}")
-      Enum.each(s.by_company, &print_company_line(&1, s.currency))
+    if scope == :all and s.by_project != [] do
+      puts("\n#{bold("by project")}")
+      Enum.each(s.by_project, &print_project_line(&1, s.currency))
     end
   end
 
-  defp print_company_line(c, currency) do
+  defp print_project_line(c, currency) do
     markup = if c.markup != 1.0, do: " (×#{c.markup})", else: ""
 
     puts(
@@ -1002,13 +1006,13 @@ defmodule Mix.Tasks.Pepe do
   defp traces_cmd(["help"]), do: traces_help()
 
   defp traces_cmd(rest) do
-    {opts, args} = OptionParser.parse!(rest, strict: [company: :string, limit: :integer])
-    scope = opts[:company] || :all
+    {opts, args} = OptionParser.parse!(rest, strict: [project: :string, limit: :integer])
+    scope = opts[:project] || :all
 
     case args do
       [id] -> print_trace(find_trace(scope, id))
       [] -> print_trace_list(scope, opts[:limit] || 30)
-      _ -> error("usage: mix pepe traces [--company NAME] [--limit N] [ID]")
+      _ -> error("usage: mix pepe traces [--project NAME] [--limit N] [ID]")
     end
   end
 
@@ -1094,7 +1098,7 @@ defmodule Mix.Tasks.Pepe do
     puts("""
     #{bold("mix pepe traces")} - inspect and replay recent agent runs
 
-      traces [--company NAME] [--limit N]   list recent runs (any surface)
+      traces [--project NAME] [--limit N]   list recent runs (any surface)
       traces ID                             replay one run step by step
 
     Every run is recorded under <PEPE_HOME>/data/traces; the dashboard has the same
@@ -1243,18 +1247,18 @@ defmodule Mix.Tasks.Pepe do
     puts("""
     #{bold("mix pepe usage")} - token metering & billing
 
-      usage [--company NAME] [--granularity CYCLE] [--limit N]
+      usage [--project NAME] [--granularity CYCLE] [--limit N]
                                     report token usage & cost by cycle
                                     CYCLE = hour|day|week|month|year (default month)
-                                    no --company = all scopes, broken down per company
+                                    no --project = all scopes, broken down per project
       usage prices [--refresh]      show (or refresh) the live price cache
-      usage export --company NAME [--month YYYY-MM] [--format markdown|csv] [--output FILE]
+      usage export --project NAME [--month YYYY-MM] [--format markdown|csv] [--output FILE]
                                     generate a client invoice (an agent can do this
                                     too, via the export_invoice tool, then email it)
 
     Cost = tokens × the model's price (set per model, or auto from the price book).
-    The amount to bill = cost × the company's markup (set per company; blank = 1.0).
-    Every model call is metered automatically and attributed to the agent's company.
+    The amount to bill = cost × the project's markup (set per project; blank = 1.0).
+    Every model call is metered automatically and attributed to the agent's project.
     """)
   end
 
@@ -1352,7 +1356,7 @@ defmodule Mix.Tasks.Pepe do
 
     case args do
       [id] -> eval_add(id, opts)
-      _ -> error("usage: mix pepe eval add TRACE_ID [--suite NAME] [--name NAME] [--contains \"a,b\"] [--scope COMPANY]")
+      _ -> error("usage: mix pepe eval add TRACE_ID [--suite NAME] [--name NAME] [--contains \"a,b\"] [--scope PROJECT]")
     end
   end
 
@@ -1404,7 +1408,7 @@ defmodule Mix.Tasks.Pepe do
 
       mix pepe eval add a1b2c3 --suite support --contains "refund,5 business days"
 
-    Options: --suite (default "recorded"), --name, --contains "a,b", --scope COMPANY.
+    Options: --suite (default "recorded"), --name, --contains "a,b", --scope PROJECT.
     """)
   end
 
@@ -1433,29 +1437,29 @@ defmodule Mix.Tasks.Pepe do
   end
 
   ###
-  ### company commands
+  ### project commands
   ###
 
-  defp company_cmd(["add", name | rest]) do
+  defp project_cmd(["add", name | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: [description: :string])
     meta = if opts[:description], do: %{"description" => opts[:description]}, else: %{}
 
-    case Config.add_company(name, meta) do
+    case Config.add_project(name, meta) do
       :ok ->
         ok(
-          "company #{green(name)} created - add agents with " <>
-            "#{bold("mix pepe agent add NAME --company #{name}")}"
+          "project #{green(name)} created - add agents with " <>
+            "#{bold("mix pepe agent add NAME --project #{name}")}"
         )
 
-      {:error, :invalid_name} ->
-        error("invalid company name #{inspect(name)} - use letters, digits, - and _ only")
+      {:error, :invalid_slug} ->
+        error("invalid project name #{inspect(name)} - use letters, digits, - and _ only")
 
       {:error, :already_exists} ->
-        error("company #{name} already exists")
+        error("project #{name} already exists")
     end
   end
 
-  defp company_cmd(["set", name | rest]) do
+  defp project_cmd(["set", name | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
         strict: [budget: :string, message_limit: :string, markup: :string, description: :string]
@@ -1463,146 +1467,146 @@ defmodule Mix.Tasks.Pepe do
 
     if opts == [] do
       error(
-        "usage: mix pepe company set NAME [--budget N|none] [--message-limit N|none] " <>
+        "usage: mix pepe project set NAME [--budget N|none] [--message-limit N|none] " <>
           "[--markup N|none] [--description \"...\"|none]"
       )
     else
       meta =
         %{}
-        |> put_company_opt(opts, :budget, "budget", &parse_money_opt/1)
-        |> put_company_opt(opts, :message_limit, "message_limit", &parse_count_opt/1)
-        |> put_company_opt(opts, :markup, "markup", &parse_money_opt/1)
-        |> put_company_opt(opts, :description, "description", &parse_description_opt/1)
+        |> put_project_opt(opts, :budget, "budget", &parse_money_opt/1)
+        |> put_project_opt(opts, :message_limit, "message_limit", &parse_count_opt/1)
+        |> put_project_opt(opts, :markup, "markup", &parse_money_opt/1)
+        |> put_project_opt(opts, :description, "description", &parse_description_opt/1)
 
       case Config.update_scope(scope_arg(name), meta) do
         :ok -> ok("updated #{green(name)}")
-        {:error, :not_found} -> error("unknown company: #{name}")
+        {:error, :not_found} -> error("unknown project: #{name}")
       end
     end
   end
 
-  defp company_cmd(["set" | _]),
+  defp project_cmd(["set" | _]),
     do:
       error(
-        "usage: mix pepe company set NAME|root [--budget N|none] [--message-limit N|none] " <>
+        "usage: mix pepe project set NAME|root [--budget N|none] [--message-limit N|none] " <>
           "[--markup N|none] [--description \"...\"|none]"
       )
 
-  defp company_cmd(["reset-messages", name | _]) do
-    if name == "root" or Config.company_exists?(name) do
+  defp project_cmd(["reset-messages", name | _]) do
+    if name == "root" or Config.project_exists?(name) do
       scope = scope_arg(name)
       before = Pepe.Usage.message_count_month_to_date(scope)
       Pepe.Usage.reset_messages(scope)
       ok("reset #{green(name)}'s message count (was #{before}) for the rest of this month")
     else
-      error("unknown company: #{name}")
+      error("unknown project: #{name}")
     end
   end
 
-  defp company_cmd(["reset-messages" | _]),
-    do: error("usage: mix pepe company reset-messages NAME|root")
+  defp project_cmd(["reset-messages" | _]),
+    do: error("usage: mix pepe project reset-messages NAME|root")
 
-  defp company_cmd(["reset-budget", name | _]) do
-    if name == "root" or Config.company_exists?(name) do
+  defp project_cmd(["reset-budget", name | _]) do
+    if name == "root" or Config.project_exists?(name) do
       scope = scope_arg(name)
       before = :erlang.float_to_binary(Pepe.Usage.month_to_date(scope) / 1, decimals: 2)
       Pepe.Usage.reset_budget(scope)
       ok("reset #{green(name)}'s spend count (was #{Config.currency()} #{before}) for the rest of this month")
     else
-      error("unknown company: #{name}")
+      error("unknown project: #{name}")
     end
   end
 
-  defp company_cmd(["reset-budget" | _]),
-    do: error("usage: mix pepe company reset-budget NAME|root")
+  defp project_cmd(["reset-budget" | _]),
+    do: error("usage: mix pepe project reset-budget NAME|root")
 
-  defp company_cmd(["list" | _]) do
-    case Config.companies() do
+  defp project_cmd(["list" | _]) do
+    case Config.project_slugs() do
       [] ->
-        info("no companies. everything runs in the root scope. add one:\n  mix pepe company add acme")
+        info("no projects. everything runs in the root scope. add one:\n  mix pepe project add acme")
 
-      companies ->
-        Enum.each(companies, &print_company_summary/1)
+      projects ->
+        Enum.each(projects, &print_project_summary/1)
     end
   end
 
-  defp company_cmd(["remove", name | rest]) do
+  defp project_cmd(["remove", name | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: [force: :boolean])
 
-    case Config.delete_company(name, force: opts[:force] || false) do
+    case Config.delete_project(name, force: opts[:force] || false) do
       :ok ->
-        ok("removed company #{name}")
+        ok("removed project #{name}")
 
       {:error, :not_found} ->
-        error("unknown company: #{name}")
+        error("unknown project: #{name}")
 
       {:error, {:not_empty, n}} ->
         error(
-          "company #{name} still has #{n} agent#{if n == 1, do: "", else: "s"} - " <>
+          "project #{name} still has #{n} agent#{if n == 1, do: "", else: "s"} - " <>
             "move them out first, or pass --force to drop them too"
         )
     end
   end
 
-  defp company_cmd(["rename", old, new | _]) do
-    case Config.rename_company(old, new) do
+  defp project_cmd(["rename", old, new | _]) do
+    case Config.rename_project(old, new) do
       :ok ->
         ok(
-          "renamed company #{green(old)} -> #{green(new)} - agents, models, routes, " <>
+          "renamed project #{green(old)} -> #{green(new)} - agents, models, routes, " <>
             "crons, watches, bots, tokens and files all re-keyed"
         )
 
       {:error, :not_found} ->
-        error("unknown company: #{old}")
+        error("unknown project: #{old}")
 
       {:error, :already_exists} ->
-        error("company #{new} already exists")
+        error("project #{new} already exists")
 
-      {:error, :invalid_name} ->
+      {:error, :invalid_slug} ->
         error("invalid name #{inspect(new)} - use letters, digits, - and _ only")
     end
   end
 
-  defp company_cmd(["rename" | _]),
-    do: error("usage: mix pepe company rename OLD NEW")
+  defp project_cmd(["rename" | _]),
+    do: error("usage: mix pepe project rename OLD NEW")
 
-  defp company_cmd(cmd) when cmd in [[], ["help"]] do
+  defp project_cmd(cmd) when cmd in [[], ["help"]] do
     puts("""
-    #{bold("mix pepe company")} - multi-tenant scopes
+    #{bold("mix pepe project")} - multi-tenant scopes
 
-      add NAME [--description "..."]   create a company (an isolated tenant)
+      add NAME [--description "..."]   create a project (an isolated tenant)
       set NAME|root [--budget N|none] [--message-limit N|none] [--markup N|none] [--description "..."|none]
                                        update caps/markup/description (only the flags given change)
       reset-messages NAME|root        zero the message count early, before the month rolls over
       reset-budget NAME|root          zero the spend count early, before the month rolls over
-      list                            list companies + how many agents each has
-      rename OLD NEW                  rename a company (re-keys all its agents & bindings)
-      remove NAME [--force]           delete a company (--force also drops its agents)
+      list                            list projects + how many agents each has
+      rename OLD NEW                  rename a project (re-keys all its agents & bindings)
+      remove NAME [--force]           delete a project (--force also drops its agents)
 
     --budget is a monthly spend cap (in the billing currency); --message-limit is a
     monthly cap on customer-originated messages. Either blocks that scope's agents
     once reached, until next month - independent caps, set either, both, or neither.
-    "root" is the single-tenant default (every command without --company) - it isn't
-    a real company (it never shows in `list`, can't be renamed/removed) but it can
-    have its own budget/message-limit/markup just like a company can, via
-    `company set root ...`. An agent can be exempted from --message-limit
+    "root" is the single-tenant default (every command without --project) - it isn't
+    a real project (it never shows in `list`, can't be renamed/removed) but it can
+    have its own budget/message-limit/markup just like a project can, via
+    `project set root ...`. An agent can be exempted from --message-limit
     individually: pass --exempt-message-limit when creating it with `agent add`, or
     toggle it later on the dashboard's agent edit page (there's no CLI way to flip
     it on an existing agent without touching its other settings - `agent add` on an
     existing name replaces the whole agent, it doesn't patch one field).
 
-    Without --company, every command uses the root scope. Add --company NAME to an
-    agent/model command to act inside that company; its agents, workspaces,
-    shared/ space and models are isolated from other companies.
+    Without --project, every command uses the root scope. Add --project NAME to an
+    agent/model command to act inside that project; its agents, workspaces,
+    shared/ space and models are isolated from other projects.
     """)
   end
 
-  defp company_cmd(other),
-    do: error("unknown company command: #{Enum.join(other, " ")} (try: mix pepe company help)")
+  defp project_cmd(other),
+    do: error("unknown project command: #{Enum.join(other, " ")} (try: mix pepe project help)")
 
-  defp print_company_summary(name) do
+  defp print_project_summary(name) do
     count = length(Config.agents_in(name))
-    desc = (Config.get_company(name) || %{})["description"]
+    desc = (Config.get_project(name) || %{})["description"]
     suffix = if desc, do: " - #{desc}", else: ""
     puts("#{bold(name)} (#{count} agent#{if count == 1, do: "", else: "s"})#{suffix}")
   end
@@ -1611,7 +1615,7 @@ defmodule Mix.Tasks.Pepe do
   defp scope_arg("root"), do: nil
   defp scope_arg(name), do: name
 
-  defp put_company_opt(meta, opts, key, field, parse) do
+  defp put_project_opt(meta, opts, key, field, parse) do
     case Keyword.fetch(opts, key) do
       :error -> meta
       {:ok, raw} -> Map.put(meta, field, parse.(raw))
@@ -1662,13 +1666,13 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} =
       OptionParser.parse!(rest,
         strict:
-          [company: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string] ++
+          [project: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string] ++
             @token_appearance_switches
       )
 
     attrs =
       [
-        company: opts[:company],
+        project: opts[:project],
         agent: opts[:agent],
         label: opts[:label],
         widget: opts[:widget] == true,
@@ -1712,7 +1716,7 @@ defmodule Mix.Tasks.Pepe do
     puts("""
     #{bold("mix pepe token")} - API access tokens for /v1
 
-      add [--company CO] [--agent HANDLE] [--label "..."]   mint a token (shown once
+      add [--project CO] [--agent HANDLE] [--label "..."]   mint a token (shown once
                                                               for a regular token;
                                                               retrievable via `list`
                                                               for --widget)
@@ -1724,7 +1728,7 @@ defmodule Mix.Tasks.Pepe do
              [--position left|right]                         never its secret/scope
 
     No tokens ⇒ the /v1 API is open. The first token locks it: every call then needs
-    `Authorization: Bearer pepe_...`. A token scoped to a company reaches only its
+    `Authorization: Bearer pepe_...`. A token scoped to a project reaches only its
     agents; scoped to an agent, only that one.
 
     --widget mints a public, embeddable-chat-widget token (see `mix pepe token add
@@ -1751,22 +1755,22 @@ defmodule Mix.Tasks.Pepe do
   defp token_scope_label(opts) do
     cond do
       opts[:agent] -> "agent #{opts[:agent]}"
-      opts[:company] -> "company #{opts[:company]}"
-      true -> "root"
+      opts[:project] -> "project #{opts[:project]}"
+      true -> "default"
     end
   end
 
   defp print_token_add_error(:widget_needs_agent, _opts),
     do: error("a --widget token must be --agent-locked (a public embed always pins to one agent)")
 
-  defp print_token_add_error(:unknown_company, opts), do: error("unknown company: #{opts[:company]}")
+  defp print_token_add_error(:unknown_project, opts), do: error("unknown project: #{opts[:project]}")
   defp print_token_add_error(:unknown_agent, opts), do: error("unknown agent: #{opts[:agent]}")
 
   defp print_token_add_error(:agent_out_of_scope, opts),
-    do: error("agent #{opts[:agent]} is not in company #{opts[:company] || "(root)"}")
+    do: error("agent #{opts[:agent]} is not in project #{opts[:project] || "(root)"}")
 
   defp print_token_line(t) do
-    scope = t["agent"] || t["company"] || "root"
+    scope = t["agent"] || t["project"] || "default"
     label = if t["label"], do: " - #{t["label"]}", else: ""
     kind = if t["kind"] == "widget", do: " (widget, #{t["allowed_origin"] || "no origin set"})", else: ""
     # A widget token's raw value is retrievable (public page source anyway);
@@ -1912,7 +1916,7 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} =
       OptionParser.parse!(rest,
         strict: [
-          company: :string,
+          project: :string,
           model: :string,
           prompt: :string,
           description: :string,
@@ -1932,8 +1936,8 @@ defmodule Mix.Tasks.Pepe do
         ]
       )
 
-    with :ok <- validate_scope(name, opts[:company]) do
-      handle = Company.handle(opts[:company], name)
+    with :ok <- validate_scope(name, opts[:project]) do
+      handle = Project.handle(opts[:project], name)
 
       agent = %Agent{
         name: handle,
@@ -1954,29 +1958,29 @@ defmodule Mix.Tasks.Pepe do
       }
 
       Config.put_agent(agent)
-      if opts[:default], do: Config.set_default_agent_for(opts[:company], name)
+      if opts[:default], do: Config.set_default_agent_for(opts[:project], name)
       admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
       ok("agent #{green(handle)} saved (tools: #{Enum.join(agent.tools, ", ")})#{admin_note}")
     end
   end
 
   defp agent_cmd(["list" | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [company: :string, all: :boolean])
+    {opts, _} = OptionParser.parse!(rest, strict: [project: :string, all: :boolean])
     default = Config.default_agent_name()
 
-    agents = if opts[:all], do: Config.agents(), else: Config.agents_in(opts[:company])
+    agents = if opts[:all], do: Config.agents(), else: Config.agents_in(opts[:project])
 
     scope_note =
       cond do
         opts[:all] -> " (all scopes)"
-        opts[:company] -> " in company #{opts[:company]}"
+        opts[:project] -> " in project #{opts[:project]}"
         true -> ""
       end
 
     case agents do
       [] ->
         info(
-          "no agents#{scope_note}. add one:\n  mix pepe agent add assistant --model <model> --prompt \"You are helpful.\"#{if opts[:company], do: " --company #{opts[:company]}", else: ""}"
+          "no agents#{scope_note}. add one:\n  mix pepe agent add assistant --model <model> --prompt \"You are helpful.\"#{if opts[:project], do: " --project #{opts[:project]}", else: ""}"
         )
 
       agents ->
@@ -1985,8 +1989,8 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp agent_cmd(["remove", name | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [company: :string])
-    handle = Company.handle(opts[:company], name)
+    {opts, _} = OptionParser.parse!(rest, strict: [project: :string])
+    handle = Project.handle(opts[:project], name)
 
     if Config.get_agent(handle) do
       Config.delete_agent(handle)
@@ -1998,19 +2002,24 @@ defmodule Mix.Tasks.Pepe do
 
   defp agent_cmd(["rename", old, new | _]) do
     case Config.rename_agent(old, new) do
+      :ok ->
+        ok("agent #{green(old)} -> #{green(new)} (workspace moved)")
+
       {:error, :not_found} ->
         error("unknown agent: #{old}")
 
-      _ ->
-        Pepe.Agent.Workspace.rename(old, new)
-        ok("agent #{green(old)} -> #{green(new)} (workspace moved)")
+      {:error, :already_exists} ->
+        error("an agent named #{new} already exists in that project")
+
+      {:error, :invalid_name} ->
+        error("invalid agent name #{inspect(new)} - use letters, digits, - and _ only")
     end
   end
 
   defp agent_cmd(["route", from, to | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean, company: :string])
-    from = Company.handle(opts[:company], from)
-    to = Company.handle(opts[:company], to)
+    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean, project: :string])
+    from = Project.handle(opts[:project], from)
+    to = Project.handle(opts[:project], to)
 
     cond do
       is_nil(Config.get_agent(from)) ->
@@ -2019,8 +2028,8 @@ defmodule Mix.Tasks.Pepe do
       is_nil(Config.get_agent(to)) ->
         error("unknown agent: #{to}")
 
-      not Company.same_scope?(from, to) ->
-        error("refusing route across companies: #{from} -> #{to}")
+      not Project.same_scope?(from, to) ->
+        error("refusing route across projects: #{from} -> #{to}")
 
       opts[:remove] ->
         Config.disallow_message(from, to)
@@ -2036,9 +2045,9 @@ defmodule Mix.Tasks.Pepe do
     do: error("usage: mix pepe agent route FROM TO [--remove]")
 
   defp agent_cmd(["manage", from, to | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean, company: :string])
-    from = Company.handle(opts[:company], from)
-    to = if to == "*", do: "*", else: Company.handle(opts[:company], to)
+    {opts, _} = OptionParser.parse!(rest, strict: [remove: :boolean, project: :string])
+    from = Project.handle(opts[:project], from)
+    to = if to == "*", do: "*", else: Project.handle(opts[:project], to)
 
     cond do
       is_nil(Config.get_agent(from)) ->
@@ -2062,12 +2071,12 @@ defmodule Mix.Tasks.Pepe do
     do: error("usage: mix pepe agent manage ADMIN TARGET [--remove]   (TARGET may be \"*\")")
 
   defp agent_cmd(["default", name | rest]) do
-    {opts, _} = OptionParser.parse!(rest, strict: [company: :string])
-    handle = Company.handle(opts[:company], name)
+    {opts, _} = OptionParser.parse!(rest, strict: [project: :string])
+    handle = Project.handle(opts[:project], name)
 
     if Config.get_agent(handle) do
-      Config.set_default_agent_for(opts[:company], name)
-      scope = if opts[:company], do: " for #{opts[:company]}", else: ""
+      Config.set_default_agent_for(opts[:project], name)
+      scope = if opts[:project], do: " for #{opts[:project]}", else: ""
       ok("default agent#{scope} -> #{name}")
     else
       error("unknown agent: #{handle}")
@@ -2079,13 +2088,13 @@ defmodule Mix.Tasks.Pepe do
     mix pepe agent - manage agents
 
       add NAME [--model M] [--prompt "..."] [--tools t1,t2]
-               [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--company CO]
-      list [--company CO | --all]                          list agents (+ routes)
-      route FROM TO [--remove] [--company CO]              directed A->B messaging
-      manage ADMIN TARGET [--remove] [--company CO]        let ADMIN administer TARGET (or "*")
+               [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--project CO]
+      list [--project CO | --all]                          list agents (+ routes)
+      route FROM TO [--remove] [--project CO]              directed A->B messaging
+      manage ADMIN TARGET [--remove] [--project CO]        let ADMIN administer TARGET (or "*")
       rename OLD NEW                                        rename + move its dir
-      remove NAME [--company CO]
-      default NAME [--company CO]                           set the (scope) default agent
+      remove NAME [--project CO]
+      default NAME [--project CO]                           set the (scope) default agent
 
     Capabilities are controlled by an agent's --tools (a capability = having its
     tool - omit --tools to grant every tool); learning is controlled per-conversation
@@ -2093,7 +2102,7 @@ defmodule Mix.Tasks.Pepe do
     can administer/train every other agent, e.g. the one bootstrap "boss" agent you
     train the rest through) - it does NOT skip the human-approval gate on risky tool
     calls, only widens which agents it's allowed to reach with manage_agent.
-    Add --company CO to scope any of these to a company; without it, the root scope.
+    Add --project CO to scope any of these to a project; without it, the root scope.
     """)
   end
 
@@ -2112,7 +2121,7 @@ defmodule Mix.Tasks.Pepe do
   defp parse_tools_opt(""), do: []
   defp parse_tools_opt(str), do: str |> String.split(",") |> Enum.map(&String.trim/1)
 
-  # Routes are scoped: a bare peer name resolves into this agent's own company.
+  # Routes are scoped: a bare peer name resolves into this agent's own project.
   defp parse_can_message_opt(v, _handle) when v in [nil, ""], do: []
 
   defp parse_can_message_opt(str, handle),
@@ -2253,10 +2262,10 @@ defmodule Mix.Tasks.Pepe do
     # Accept the agent as a positional (`tui NAME`) or a flag (`tui --agent NAME`),
     # and an optional `--session KEY` to resume/separate console sessions.
     {opts, rest} =
-      OptionParser.parse!(args, strict: [agent: :string, session: :string, company: :string])
+      OptionParser.parse!(args, strict: [agent: :string, session: :string, project: :string])
 
     raw = opts[:agent] || List.first(rest)
-    agent_name = resolve_tui_agent_name(raw, opts[:company])
+    agent_name = resolve_tui_agent_name(raw, opts[:project])
 
     case agent_name && Config.get_agent(agent_name) do
       nil ->
@@ -2267,11 +2276,11 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  defp resolve_tui_agent_name(raw, company) do
+  defp resolve_tui_agent_name(raw, project) do
     cond do
-      raw && company -> Company.handle(company, raw)
+      raw && project -> Project.handle(project, raw)
       raw -> raw
-      company -> Config.default_agent_for(company)
+      project -> Config.default_agent_for(project)
       true -> Config.default_agent_name()
     end
   end
@@ -2465,7 +2474,7 @@ defmodule Mix.Tasks.Pepe do
       OptionParser.parse(rest,
         strict: [
           agent: :string,
-          company: :string,
+          project: :string,
           mode: :string,
           phone_number_id: :string,
           access_token: :string,
@@ -2520,7 +2529,7 @@ defmodule Mix.Tasks.Pepe do
     info("""
     mix pepe gateway whatsapp - WhatsApp Cloud API connections (webhook-based)
 
-      add SLUG --agent HANDLE --phone-number-id ID [--company CO] [--mode support|admin]
+      add SLUG --agent HANDLE --phone-number-id ID [--project CO] [--mode support|admin]
                [--access-token ${ENV}] [--app-secret ${ENV}] [--verify-token X]
                [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
       list                     list connections + their Callback URLs
@@ -2628,7 +2637,7 @@ defmodule Mix.Tasks.Pepe do
     do: error("usage: mix pepe gateway telegram [setup|add|list|remove]  (or: help)")
 
   defp print_whatsapp_conn_line({slug, e}) do
-    co = e["company"] || "root"
+    co = e["project"] || "default"
     puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}")
     puts(dim("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
   end
@@ -2639,7 +2648,7 @@ defmodule Mix.Tasks.Pepe do
     entry =
       %{
         "provider" => "whatsapp",
-        "company" => blank_default(opts[:company], nil),
+        "project" => blank_default(opts[:project], nil),
         "agent" => opts[:agent],
         "mode" => mode,
         "commands" => Keyword.get(opts, :commands, mode == "admin"),
@@ -2658,7 +2667,7 @@ defmodule Mix.Tasks.Pepe do
       |> reject_nil_values()
 
     Config.put_webhook(slug, entry)
-    co = entry["company"] || "root"
+    co = entry["project"] || "default"
     ok("whatsapp #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
     info("register this Callback URL in the Meta app:")
     info(bold("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
@@ -3368,22 +3377,22 @@ defmodule Mix.Tasks.Pepe do
   defp model_names, do: Enum.map(Config.models(), & &1.name)
   defp agent_names, do: Enum.map(Config.agents(), & &1.name)
 
-  # CLI: qualify a bare peer/target into the same company as `handle`; leave the "*"
+  # CLI: qualify a bare peer/target into the same project as `handle`; leave the "*"
   # wildcard and already-qualified handles untouched.
   defp qualify("*", _handle), do: "*"
-  defp qualify(name, handle), do: Company.qualify(name, handle)
+  defp qualify(name, handle), do: Project.qualify(name, handle)
 
-  # Validate a name (and optional --company target) before creating something in it:
-  # the bare name must be a legal segment and, when given, the company must exist.
-  # Prints and returns :error on failure, :ok otherwise. `nil` company = root scope.
-  defp validate_scope(name, company) do
+  # Validate a name (and optional --project target) before creating something in it:
+  # the bare name must be a legal segment and, when given, the project must exist.
+  # Prints and returns :error on failure, :ok otherwise. `nil` project = root scope.
+  defp validate_scope(name, project) do
     cond do
-      not Company.valid_name?(name) ->
+      not Project.valid_name?(name) ->
         error("invalid name #{inspect(name)} - use letters, digits, - and _ only (no \"/\")")
         :error
 
-      company && not Config.company_exists?(company) ->
-        error("unknown company: #{company} - create it with: mix pepe company add #{company}")
+      project && not Config.project_exists?(project) ->
+        error("unknown project: #{project} - create it with: mix pepe project add #{project}")
         :error
 
       true ->
@@ -3521,7 +3530,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp backup_help do
     info("""
-    mix pepe backup - archive ~/.pepe (config + agent/company workspaces + sessions)
+    mix pepe backup - archive ~/.pepe (config + agent/project workspaces + sessions)
 
       backup [--output FILE.tgz]    # defaults to pepe-backup-YYYY-MM-DD.tgz
 
@@ -3530,7 +3539,7 @@ defmodule Mix.Tasks.Pepe do
     """)
   end
 
-  # Tar up the durable parts of PEPE_HOME (config + agent/company workspaces +
+  # Tar up the durable parts of PEPE_HOME (config + agent/project workspaces +
   # sessions), skip the disposable Mnesia cache, then list the ${ENV_VAR} secrets that
   # live outside the files and must be saved separately.
   defp backup_cmd(rest) do
@@ -3552,7 +3561,7 @@ defmodule Mix.Tasks.Pepe do
     case System.cmd("tar", args, stderr_to_stdout: true) do
       {_, 0} ->
         ok("backup written to #{green(out)}#{backup_size(out)}")
-        info("  included: config.json · agent & company workspaces · shared · sessions")
+        info("  included: config.json · agent & project workspaces · shared · sessions")
         info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
         report_backup_secrets(home)
 
@@ -3601,19 +3610,19 @@ defmodule Mix.Tasks.Pepe do
   end
 
   ###
-  ### extract (one company -> a standalone install) & restore
+  ### extract (one project -> a standalone install) & restore
   ###
 
   defp extract_help do
     info("""
-    mix pepe extract COMPANY - lift one company out as a standalone, single-tenant install
+    mix pepe extract PROJECT - lift one project out as a standalone, single-tenant install
 
-      extract COMPANY [--output FILE.tgz]    # defaults to COMPANY-extract-YYYY-MM-DD.tgz
+      extract PROJECT [--output FILE.tgz]    # defaults to PROJECT-extract-YYYY-MM-DD.tgz
 
-    Backup archives the WHOLE install (every company); extract takes ONE company and
-    de-scopes it to root, so its `company/agent` handles become bare names and the archive
-    is a fresh install that happens to be that company - drop it on a new server and run.
-    Only that company's agents, models, workspaces and usage travel (plus any shared model
+    Backup archives the WHOLE install (every project); extract takes ONE project and
+    de-scopes it to root, so its `project/agent` handles become bare names and the archive
+    is a fresh install that happens to be that project - drop it on a new server and run.
+    Only that project's agents, models, workspaces and usage travel (plus any shared model
     they depend on); nothing of the other tenants goes with it.
 
     Restore either archive with `mix pepe restore FILE.tgz`.
@@ -3626,34 +3635,34 @@ defmodule Mix.Tasks.Pepe do
 
       restore FILE.tgz [--force]    # --force is required to replace a non-empty ~/.pepe
 
-    Works for both a full backup and a company extract - they are the same shape. Refuses to
+    Works for both a full backup and a project extract - they are the same shape. Refuses to
     write over an existing, non-empty ~/.pepe unless you pass --force. Re-export the
     ${ENV_VAR} secrets it lists afterwards; they live outside the archive.
     """)
   end
 
-  defp extract_cmd([]), do: error("which company? usage: mix pepe extract COMPANY [--output FILE.tgz]")
+  defp extract_cmd([]), do: error("which project? usage: mix pepe extract PROJECT [--output FILE.tgz]")
 
   defp extract_cmd(rest) do
     {opts, args} = OptionParser.parse!(rest, strict: [output: :string])
 
     case args do
-      [company | _] -> run_extract(company, opts[:output])
-      [] -> error("which company? usage: mix pepe extract COMPANY [--output FILE.tgz]")
+      [project | _] -> run_extract(project, opts[:output])
+      [] -> error("which project? usage: mix pepe extract PROJECT [--output FILE.tgz]")
     end
   end
 
-  defp run_extract(company, output) do
-    case Pepe.Bundle.extract(company, output: output) do
+  defp run_extract(project, output) do
+    case Pepe.Bundle.extract(project, output: output) do
       {:ok, %{output: out} = report} ->
-        ok("extracted #{green(company)} to #{green(out)}#{backup_size(out)}")
+        ok("extracted #{green(project)} to #{green(out)}#{backup_size(out)}")
         info("  a standalone, root-scoped install - restore with `mix pepe restore #{Path.basename(out)}`")
         announce_shared_models(report.shared_models)
         report_bundle_secrets(report.secrets)
         warn_literal_secrets(report.literal_secrets)
 
       {:error, :not_found} ->
-        error("no such company: #{company}  (see `mix pepe company list`)")
+        error("no such project: #{project}  (see `mix pepe project list`)")
 
       {:error, {:tar_failed, msg}} ->
         error("extract failed while archiving: #{msg}")
@@ -3665,7 +3674,7 @@ defmodule Mix.Tasks.Pepe do
   defp announce_shared_models([]), do: :ok
 
   defp announce_shared_models(names) do
-    info("  pulled in #{length(names)} shared model(s) the company's agents depend on: #{Enum.join(names, ", ")}")
+    info("  pulled in #{length(names)} shared model(s) the project's agents depend on: #{Enum.join(names, ", ")}")
   end
 
   defp restore_cmd([]), do: error("which archive? usage: mix pepe restore FILE.tgz [--force]")

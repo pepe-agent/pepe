@@ -45,7 +45,7 @@ defmodule PepeWeb.OpenAIControllerTest do
     conn = get(build_conn(), "/v1/models")
     body = json_response(conn, 200)
     ids = Enum.map(body["data"], & &1["id"])
-    assert "assistant" in ids
+    assert "default/assistant" in ids
     assert "mock" in ids
   end
 
@@ -88,8 +88,8 @@ defmodule PepeWeb.OpenAIControllerTest do
     _body2 = json_response(post_msg.("e agora?"), 200)
 
     # system + (user + assistant) * 2 = 5 messages retained server-side.
-    # The key is scoped by the agent's scope ("root" here) to isolate tenants.
-    history = Pepe.Agent.Session.history("api:root:" <> sid)
+    # The key is scoped by the agent's scope ("default" here) to isolate tenants.
+    history = Pepe.Agent.Session.history("api:default:" <> sid)
     roles = Enum.map(history, & &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
@@ -110,7 +110,7 @@ defmodule PepeWeb.OpenAIControllerTest do
     json_response(post_msg.("oi"), 200)
     json_response(post_msg.("e agora?"), 200)
 
-    history = Pepe.Agent.Session.history("api:root:" <> uid)
+    history = Pepe.Agent.Session.history("api:default:" <> uid)
     roles = Enum.map(history, & &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
@@ -131,7 +131,7 @@ defmodule PepeWeb.OpenAIControllerTest do
     assert json_response(post_msg.("oi"), 200)["session_id"] == sid
     json_response(post_msg.("e agora?"), 200)
 
-    history = Pepe.Agent.Session.history("api:root:" <> sid)
+    history = Pepe.Agent.Session.history("api:default:" <> sid)
     roles = Enum.map(history, & &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
@@ -152,8 +152,8 @@ defmodule PepeWeb.OpenAIControllerTest do
     assert json_response(conn, 200)["session_id"] == uid
 
     # Deduped: the two dimensions carry the same value, so they name one conversation.
-    assert Pepe.Agent.Session.history("api:root:" <> uid) != []
-    assert Registry.lookup(Pepe.Agent.Registry, "api:root:#{uid}:#{uid}") == []
+    assert Pepe.Agent.Session.history("api:default:" <> uid) != []
+    assert Registry.lookup(Pepe.Agent.Registry, "api:default:#{uid}:#{uid}") == []
   end
 
   test "with neither `user` nor `session_id` the call is stateless: no session is kept" do
@@ -199,7 +199,7 @@ defmodule PepeWeb.OpenAIControllerTest do
     json_response(post_msg.("t2", "oi thread 2"), 200)
 
     # The two threads of the same user are kept apart under composite keys.
-    assert Pepe.Agent.Session.history("api:root:#{uid}:t1") |> Enum.count(&(&1["role"] == "user")) == 1
-    assert Pepe.Agent.Session.history("api:root:#{uid}:t2") |> Enum.count(&(&1["role"] == "user")) == 1
+    assert Pepe.Agent.Session.history("api:default:#{uid}:t1") |> Enum.count(&(&1["role"] == "user")) == 1
+    assert Pepe.Agent.Session.history("api:default:#{uid}:t2") |> Enum.count(&(&1["role"] == "user")) == 1
   end
 end

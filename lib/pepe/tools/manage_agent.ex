@@ -63,7 +63,7 @@ defmodule Pepe.Tools.ManageAgent do
             the PDFs it receives". Off is the safe default; on reopens a security path,
             so it is a real trust decision, and it cannot be turned on from a run that
             has itself taken in outside content.
-          - exempt_message_limit: whether the target is free from the company's monthly
+          - exempt_message_limit: whether the target is free from the project's monthly
             customer-message cap. Turn it ON for "don't limit this agent's messages",
             "let it answer as many clients as it needs", "remove the monthly cap on it".
       - add_tool / remove_tool: grant or revoke one tool on the target - needs

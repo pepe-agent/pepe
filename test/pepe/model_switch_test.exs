@@ -25,7 +25,7 @@ defmodule Pepe.ModelSwitchTest do
   end
 
   describe "list_for/1" do
-    test "filters models by company, root scope is unprefixed handles" do
+    test "filters models by project, root scope is unprefixed handles" do
       Config.put_model(%Model{name: "root-model", base_url: "https://x", model: "gpt"})
       Config.put_model(%Model{name: "acme/model-a", base_url: "https://x", model: "gpt"})
       Config.put_model(%Model{name: "acme/model-b", base_url: "https://x", model: "gpt"})
@@ -34,7 +34,7 @@ defmodule Pepe.ModelSwitchTest do
       assert Enum.map(ModelSwitch.list_for(nil), & &1.name) == ["root-model"]
       assert Enum.map(ModelSwitch.list_for("acme"), & &1.name) == ["acme/model-a", "acme/model-b"]
       assert Enum.map(ModelSwitch.list_for("globex"), & &1.name) == ["globex/model-c"]
-      assert ModelSwitch.list_for("no-such-company") == []
+      assert ModelSwitch.list_for("no-such-project") == []
     end
   end
 

@@ -40,7 +40,7 @@ defmodule Pepe.ReflectConsolidateTest do
     assert Reflect.auto?("assistant")
 
     # persisted and round-trips through config
-    assert %Cron{kind: "consolidate", agent: "assistant"} = Config.get_cron("learn:assistant")
+    assert %Cron{kind: "consolidate", agent: "default/assistant"} = Config.get_cron("learn:assistant")
 
     :ok = Reflect.unschedule_auto("assistant")
     refute Reflect.auto?("assistant")

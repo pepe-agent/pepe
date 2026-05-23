@@ -33,7 +33,7 @@ defmodule Pepe.RenameModelTest do
     Config.put_model(%Model{name: "openrouter", model: "gpt-4o", fallbacks: []})
     Config.put_model(%Model{name: "backup", model: "gpt-4o", fallbacks: ["openrouter"]})
     Config.set_default_model("openrouter")
-    Config.add_company("acme", %{})
+    Config.add_project("acme", %{})
     Config.set_default_model_for("acme", "openrouter")
 
     Config.put_agent(%Agent{name: "assistant", model: "openrouter"})
@@ -52,7 +52,7 @@ defmodule Pepe.RenameModelTest do
     # id-based references need no rewriting - the on-disk pointer is unchanged,
     # only what it resolves to now displays the new name
     assert Config.default_model_name() == "OR-chave2"
-    assert Config.get_company("acme")["default_model"] == id_before
+    assert Config.get_project("acme")["default_model"] == id_before
     assert Config.default_model_for("acme").name == "OR-chave2"
     assert Config.get_agent("assistant").model == "OR-chave2"
     assert Config.get_cron("c1").model == "OR-chave2"
@@ -62,8 +62,8 @@ defmodule Pepe.RenameModelTest do
     assert Config.get_model("backup").fallbacks == ["OR-chave2"]
   end
 
-  test "rejects renaming across a company boundary" do
-    Config.add_company("acme", %{})
+  test "rejects renaming across a project boundary" do
+    Config.add_project("acme", %{})
     Config.put_model(%Model{name: "acme/openrouter", model: "gpt-4o"})
 
     assert Config.rename_model("acme/openrouter", "openrouter") == {:error, :scope_mismatch}
@@ -76,7 +76,7 @@ defmodule Pepe.RenameModelTest do
 
     assert Config.rename_model("openrouter", "OR-chave2") == :ok
 
-    keys = Pepe.Usage.summary("root", :day).by_model |> Enum.map(& &1.key)
+    keys = Pepe.Usage.summary("default", :day).by_model |> Enum.map(& &1.key)
     assert "openrouter" in keys
     refute "OR-chave2" in keys
   end

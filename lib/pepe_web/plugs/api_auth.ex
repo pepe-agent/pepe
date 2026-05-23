@@ -6,7 +6,7 @@ defmodule PepeWeb.ApiAuth do
   network-exposed server open:
 
     * Tokens configured: a valid token is required from every caller, local or remote.
-      The request is tagged with the token's scope (`%{company, agent}`), which the
+      The request is tagged with the token's scope (`%{project, agent}`), which the
       controller enforces. A missing or unknown token gets a 401 in the OpenAI error
       shape.
     * No tokens configured: only same-machine (loopback) callers are let in, tagged

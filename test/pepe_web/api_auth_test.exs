@@ -31,11 +31,11 @@ defmodule PepeWeb.ApiAuthTest do
         "globex/vendas" => agent.()
       },
       "api_tokens" => %{
-        "troot" => %{"hash" => ApiToken.hash("ctx_root"), "company" => nil, "agent" => nil},
-        "tacme" => %{"hash" => ApiToken.hash("ctx_acme"), "company" => "acme", "agent" => nil},
+        "troot" => %{"hash" => ApiToken.hash("ctx_root"), "project" => nil, "agent" => nil},
+        "tacme" => %{"hash" => ApiToken.hash("ctx_acme"), "project" => "acme", "agent" => nil},
         "tagent" => %{
           "hash" => ApiToken.hash("ctx_agent"),
-          "company" => "acme",
+          "project" => "acme",
           "agent" => "acme/vendas"
         }
       }
@@ -85,13 +85,13 @@ defmodule PepeWeb.ApiAuthTest do
     assert conn.status == 200
   end
 
-  test "a company token reaches its own agent but not another company's" do
+  test "a project token reaches its own agent but not another project's" do
     assert post_chat("ctx_acme", "acme/vendas").status == 200
-    # bare name qualifies into the token's company
+    # bare name qualifies into the token's project
     assert post_chat("ctx_acme", "vendas").status == 200
-    # another company's agent is forbidden
+    # another project's agent is forbidden
     assert post_chat("ctx_acme", "globex/vendas").status == 403
-    # a root agent is out of scope for a company token
+    # a root agent is out of scope for a project token
     assert post_chat("ctx_acme", "assistant").status == 403
   end
 
@@ -101,7 +101,7 @@ defmodule PepeWeb.ApiAuthTest do
     assert post_chat("ctx_agent", "globex/vendas").status == 200
   end
 
-  test "a root token reaches root agents but not company agents" do
+  test "a root token reaches root agents but not project agents" do
     assert post_chat("ctx_root", "assistant").status == 200
     assert post_chat("ctx_root", "acme/vendas").status == 403
   end
@@ -116,7 +116,7 @@ defmodule PepeWeb.ApiAuthTest do
     assert "acme/vendas" in ids
     refute "globex/vendas" in ids
     refute "assistant" in ids
-    # company tokens don't see raw model connections
+    # project tokens don't see raw model connections
     refute "mock" in ids
   end
 end

@@ -5,8 +5,8 @@ defmodule Pepe.Usage.Invoice do
   """
 
   @doc "A stable filename stem for an invoice, e.g. `acme-2026-07`."
-  def basename(%{company: company, period: %{label: label}}),
-    do: "#{safe(company)}-#{label}"
+  def basename(%{project: project, period: %{label: label}}),
+    do: "#{safe(project)}-#{label}"
 
   @doc "Render the invoice as CSV: one row per model plus a TOTAL row."
   def to_csv(inv) do
@@ -48,7 +48,7 @@ defmodule Pepe.Usage.Invoice do
       end
 
     """
-    # Invoice - #{inv.company}
+    # Invoice - #{inv.project}
 
     **Period:** #{inv.period.label}
     **Currency:** #{cur}

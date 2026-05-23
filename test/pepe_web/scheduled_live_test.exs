@@ -96,7 +96,7 @@ defmodule PepeWeb.ScheduledLiveTest do
     assert [cron] = Config.crons()
     assert cron.name == "Daily XML check"
     assert cron.schedule == "0 8 * * *"
-    assert cron.agent == "assistant"
+    assert cron.agent == "default/assistant"
     assert cron.deliver == "log"
     assert cron.enabled
   end
@@ -151,8 +151,8 @@ defmodule PepeWeb.ScheduledLiveTest do
     assert Config.crons() == []
   end
 
-  test "the agent dropdown only offers agents from the selected company" do
-    :ok = Config.add_company("acme")
+  test "the agent dropdown only offers agents from the selected project" do
+    :ok = Config.add_project("acme")
     Config.put_agent(%Agent{name: "acme/support"})
 
     {:ok, view, _html} = live(conn(), "/cron?scope=acme")

@@ -85,7 +85,7 @@ defmodule PepeWeb.ConnectionsComponent do
           <div class="mt-1 text-sm text-zinc-400">{gettext("Agent:")} {e["agent"] || gettext("(default)")}</div>
           <div class="mt-2 text-sm text-zinc-500">
             {gettext("Webhook URL")}:
-            <code class="break-all text-zinc-300">{webhook_url(e["company"], p.name, slug)}</code>
+            <code class="break-all text-zinc-300">{webhook_url(e["project"], p.name, slug)}</code>
           </div>
           <p class="mt-1 text-xs text-zinc-600">{gettext("Paste this into the provider as its outgoing webhook URL.")}</p>
         </div>
@@ -131,10 +131,10 @@ defmodule PepeWeb.ConnectionsComponent do
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class={lbl()}>{gettext("Company")}</label>
-              <select name="company" class={fld()}>
-                <option value="root" selected={fval(@form_values, "company") in ["", "root"]}>{gettext("Principal")}</option>
-                <option :for={c <- @companies} value={c} selected={fval(@form_values, "company") == c}>{c}</option>
+              <label class={lbl()}>{gettext("Project")}</label>
+              <select name="project" class={fld()}>
+                <option value="default" selected={fval(@form_values, "project") in ["", "default"]}>{gettext("Principal")}</option>
+                <option :for={c <- @projects} value={c} selected={fval(@form_values, "project") == c}>{c}</option>
               </select>
             </div>
             <div>
@@ -155,7 +155,7 @@ defmodule PepeWeb.ConnectionsComponent do
             <label class={lbl()}>{gettext("This connection talks to")}</label>
             <select name="agent" class={fld()}>
               <option value="">{gettext("Choose an agent")}</option>
-              <option :for={a <- scoped_agent_names(form_company(@form_values))} value={a} selected={fval(@form_values, "agent") == a}>{a}</option>
+              <option :for={a <- scoped_agent_names(form_project(@form_values))} value={a} selected={fval(@form_values, "agent") == a}>{a}</option>
             </select>
             <p :if={@form_errors["agent"]} class="mt-1.5 text-sm text-red-400">{@form_errors["agent"]}</p>
           </div>
@@ -203,7 +203,7 @@ defmodule PepeWeb.ConnectionsComponent do
       p ->
         values = %{
           "slug" => slug,
-          "company" => entry["company"] || "root",
+          "project" => entry["project"] || "default",
           "agent" => entry["agent"] || "",
           "mode" => entry["mode"] || "support",
           "cfg" => entry["config"] || %{}
@@ -232,10 +232,10 @@ defmodule PepeWeb.ConnectionsComponent do
     {:noreply, assign(socket, adding: nil, editing_slug: nil, form_values: %{}, form_errors: %{})}
   end
 
-  # Keep the form live as fields change so the agent list follows the chosen company.
-  # Clear the picked agent when the company changes and it no longer belongs there.
+  # Keep the form live as fields change so the agent list follows the chosen project.
+  # Clear the picked agent when the project changes and it no longer belongs there.
   def handle_event("form_change", params, socket) do
-    agents = scoped_agent_names(form_company(params))
+    agents = scoped_agent_names(form_project(params))
     params = if params["agent"] in ["" | agents], do: params, else: Map.put(params, "agent", "")
     {:noreply, assign(socket, form_values: params)}
   end
@@ -280,7 +280,7 @@ defmodule PepeWeb.ConnectionsComponent do
     entry =
       reject_nil(%{
         "provider" => name,
-        "company" => company_value(params["company"]),
+        "project" => project_value(params["project"]),
         "agent" => agent,
         "mode" => mode,
         # A support channel is customer-facing: history is ephemeral and it never
@@ -314,15 +314,15 @@ defmodule PepeWeb.ConnectionsComponent do
         socket
 
       p ->
-        default_company =
-          if socket.assigns.scope in [nil, "all", "root"], do: "root", else: socket.assigns.scope
+        default_project =
+          if socket.assigns.scope in [nil, "all", "default"], do: "default", else: socket.assigns.scope
 
         assign(socket,
           adding: name,
           editing_slug: nil,
           form_label: p.label,
           form_schema: p.schema,
-          form_values: %{"company" => default_company, "mode" => "support"},
+          form_values: %{"project" => default_project, "mode" => "support"},
           form_errors: %{}
         )
     end
@@ -336,13 +336,13 @@ defmodule PepeWeb.ConnectionsComponent do
     |> Enum.sort_by(&elem(&1, 0))
   end
 
-  defp company_value(c) when c in [nil, "", "root"], do: nil
-  defp company_value(c), do: c
+  defp project_value(c) when c in [nil, "", "default"], do: nil
+  defp project_value(c), do: c
 
-  # The company selected in the form drives which agents are offered ("root" == no company).
-  defp form_company(values) do
-    case Map.get(values, "company") do
-      c when c in [nil, ""] -> "root"
+  # The project selected in the form drives which agents are offered ("default" == the default project).
+  defp form_project(values) do
+    case Map.get(values, "project") do
+      c when c in [nil, ""] -> "default"
       c -> c
     end
   end
@@ -362,8 +362,8 @@ defmodule PepeWeb.ConnectionsComponent do
   defp fval(values, key), do: to_string(Map.get(values, key, ""))
   defp cfgval(values, key), do: to_string(get_in(values, ["cfg", key]) || "")
 
-  defp webhook_url(company, provider, slug),
-    do: "#{webhook_host()}/webhooks/#{company || "root"}/#{provider}/#{slug}"
+  defp webhook_url(project, provider, slug),
+    do: "#{webhook_host()}/webhooks/#{project || "root"}/#{provider}/#{slug}"
 
   defp webhook_host, do: System.get_env("PEPE_PUBLIC_URL") || "https://YOUR_HOST"
 end

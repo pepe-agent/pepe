@@ -45,7 +45,7 @@ defmodule Pepe.WebhooksTest do
     Map.merge(
       %{
         "provider" => "whatsapp",
-        "company" => "acme",
+        "project" => "acme",
         "agent" => "acme/support",
         "mode" => "support",
         "config" => %{
@@ -125,18 +125,18 @@ defmodule Pepe.WebhooksTest do
       refute Config.webhook_exists?("support")
     end
 
-    test "resolve validates company + provider against the stored entry" do
+    test "resolve validates project + provider against the stored entry" do
       Config.put_webhook("support", entry())
 
       assert %{"slug" => "support"} = Webhooks.resolve("acme", "whatsapp", "support")
-      # wrong company or provider in the path must not resolve
+      # wrong project or provider in the path must not resolve
       assert Webhooks.resolve("globex", "whatsapp", "support") == nil
       assert Webhooks.resolve("acme", "stripe", "support") == nil
       assert Webhooks.resolve("acme", "whatsapp", "nope") == nil
     end
 
     test "root scope resolves via the 'root' path segment" do
-      Config.put_webhook("geral", entry(%{"company" => nil}))
+      Config.put_webhook("geral", entry(%{"project" => nil}))
       assert %{"slug" => "geral"} = Webhooks.resolve("root", "whatsapp", "geral")
     end
 
@@ -204,7 +204,7 @@ defmodule Pepe.WebhooksTest do
     defp admin(overrides \\ %{}),
       do: entry(Map.merge(%{"mode" => "admin", "commands" => true, "trainers" => ["boss"]}, overrides))
 
-    test "/models is scoped to the connection's company" do
+    test "/models is scoped to the connection's project" do
       assert {:reply, text} = Webhooks.command(admin(), "/models", "boss")
       assert text =~ "model-a"
       refute text =~ "model-b"

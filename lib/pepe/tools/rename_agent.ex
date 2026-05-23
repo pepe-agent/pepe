@@ -4,7 +4,6 @@ defmodule Pepe.Tools.RenameAgent do
 
   import Pepe.Tools.Tool, only: [function: 3]
 
-  alias Pepe.Agent.Workspace
   alias Pepe.Config
 
   @impl true
@@ -29,14 +28,23 @@ defmodule Pepe.Tools.RenameAgent do
   def run(%{"new_name" => new_name}, ctx) when is_binary(new_name) and new_name != "" do
     case ctx[:agent] do
       %{name: old} when is_binary(old) and old != new_name ->
+        # Config.rename_agent moves the workspace directory itself (with canonical handles) on
+        # success. Only retarget Telegram after a real :ok - never touch the filesystem when the
+        # rename was refused, or a rejected collision would still move this agent's files onto the
+        # colliding agent's path.
         case Config.rename_agent(old, new_name) do
+          :ok ->
+            retarget_telegram(old, new_name)
+            {:ok, "Renamed to #{new_name}; workspace moved. Takes effect on the next message."}
+
           {:error, :not_found} ->
             {:error, "this agent (#{old}) isn't in the config"}
 
-          _ ->
-            Workspace.rename(old, new_name)
-            retarget_telegram(old, new_name)
-            {:ok, "Renamed to #{new_name}; workspace moved. Takes effect on the next message."}
+          {:error, :already_exists} ->
+            {:error, "the name #{new_name} is already taken in this project"}
+
+          {:error, :invalid_name} ->
+            {:error, "#{new_name} isn't a valid agent name (letters, digits, - and _ only)"}
         end
 
       %{name: ^new_name} ->

@@ -1,7 +1,7 @@
 defmodule Pepe.Providers do
   @moduledoc """
   Catalog of well-known, OpenAI-compatible providers, used by the CLI for a
-  guided "pick a company -> pick an auth method -> pick a model" flow.
+  guided "pick a project -> pick an auth method -> pick a model" flow.
 
   Each provider has one or more **auth methods**. Selecting a provider opens its
   submenu of methods:

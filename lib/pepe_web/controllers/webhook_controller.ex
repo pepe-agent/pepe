@@ -1,6 +1,6 @@
 defmodule PepeWeb.WebhookController do
   @moduledoc """
-  The single inbound-webhook endpoint: `/webhooks/:company/:provider/:slug`.
+  The single inbound-webhook endpoint: `/webhooks/:project/:provider/:slug`.
 
   `GET` answers a provider's verification handshake (echoes the challenge). `POST`
   is an inbound event - the raw body is verified, then `Pepe.Webhooks` runs the
@@ -11,15 +11,15 @@ defmodule PepeWeb.WebhookController do
 
   alias Pepe.Webhooks
 
-  def verify(conn, %{"company" => c, "provider" => p, "slug" => s} = params) do
+  def verify(conn, %{"project" => c, "provider" => p, "slug" => s} = params) do
     case Webhooks.verify(c, p, s, params) do
       {:ok, challenge} -> send_resp(conn, 200, challenge)
       :error -> send_resp(conn, 403, "forbidden")
     end
   end
 
-  def receive(conn, %{"company" => c, "provider" => p, "slug" => s} = params) do
-    payload = Map.drop(params, ["company", "provider", "slug"])
+  def receive(conn, %{"project" => c, "provider" => p, "slug" => s} = params) do
+    payload = Map.drop(params, ["project", "provider", "slug"])
     headers = Map.new(conn.req_headers)
 
     case Webhooks.handle_inbound(c, p, s, raw_body(conn), payload, headers) do

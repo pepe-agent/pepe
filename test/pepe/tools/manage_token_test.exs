@@ -42,17 +42,17 @@ defmodule Pepe.Tools.ManageTokenTest do
     refute Map.has_key?(token, "raw")
   end
 
-  test "a company-scoped token records its company" do
-    assert {:ok, out} = ManageToken.run(%{"action" => "create", "company" => "buskaza"}, ctx())
-    assert out =~ "company buskaza"
+  test "a project-scoped token records its project" do
+    assert {:ok, out} = ManageToken.run(%{"action" => "create", "project" => "buskaza"}, ctx())
+    assert out =~ "project buskaza"
     assert [token] = Config.api_tokens()
-    assert token["company"] == "buskaza"
+    assert token["project"] == "buskaza"
   end
 
-  test "an agent outside the company is refused" do
-    args = %{"action" => "create", "company" => "buskaza", "agent" => "assistant"}
+  test "an agent outside the project is refused" do
+    args = %{"action" => "create", "project" => "buskaza", "agent" => "assistant"}
     assert {:error, msg} = ManageToken.run(args, ctx())
-    assert msg =~ "not in company"
+    assert msg =~ "not in project"
     assert Config.api_tokens() == []
   end
 
@@ -105,7 +105,7 @@ defmodule Pepe.Tools.ManageTokenTest do
       assert [token] = Config.api_tokens()
       assert token["kind"] == "widget"
       assert token["allowed_origin"] == "https://example.com"
-      assert token["agent"] == "assistant"
+      assert token["agent"] == "default/assistant"
     end
 
     test "list shows the widget badge and origin" do

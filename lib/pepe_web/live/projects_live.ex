@@ -1,8 +1,8 @@
-defmodule PepeWeb.CompaniesLive do
+defmodule PepeWeb.ProjectsLive do
   @moduledoc """
-  Companies section: create, edit, rename and delete tenant scopes. Each company
+  Projects section: create, edit, rename and delete tenant scopes. Each project
   walls off its own agents, workspaces, models and automations from every other.
-  Root is the default, non-company workspace. A company's name is its identity key
+  Root is the default, non-project workspace. A project's name is its identity key
   (it prefixes every agent handle); renaming re-keys everything that references it.
   """
   use PepeWeb, :live_view
@@ -18,37 +18,37 @@ defmodule PepeWeb.CompaniesLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Companies",
+       page_title: "Pepe · Projects",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        editing: nil,
-       form: company_form("")
+       form: project_form("")
      )}
   end
 
-  defp company_changeset(name) do
+  defp project_changeset(name) do
     {%{}, %{name: :string}}
     |> Changeset.cast(%{"name" => name}, [:name])
     |> Changeset.validate_required([:name])
   end
 
-  defp company_form(name), do: to_form(company_changeset(name), as: :company)
+  defp project_form(name), do: to_form(project_changeset(name), as: :project)
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="companies" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="projects" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="🏢"
-          title={gettext("Companies")}
-          desc={gettext("A company is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Principal is the default, non-company workspace.")}
+          title={gettext("Projects")}
+          desc={gettext("A project is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Principal is the default, non-project workspace.")}
         >
-          <button :if={!@editing} phx-click="company_new" class={btn()}>{gettext("+ New company")}</button>
-          <button :if={@editing} phx-click="company_cancel" class={btn_ghost()}>&larr; {gettext("Back to companies")}</button>
+          <button :if={!@editing} phx-click="project_new" class={btn()}>{gettext("+ New project")}</button>
+          <button :if={@editing} phx-click="project_cancel" class={btn_ghost()}>&larr; {gettext("Back to projects")}</button>
         </.view_header>
 
         <div class="flex-1 overflow-y-auto p-6">
@@ -61,15 +61,15 @@ defmodule PepeWeb.CompaniesLive do
               </div>
               <div class="flex shrink-0 gap-1 text-sm">
                 <.link navigate={~p"/overview?scope=root"} class={btn_ghost()}>{gettext("Open")}</.link>
-                <button phx-click="company_edit" phx-value-name="root" class={btn_ghost()}>{gettext("Edit")}</button>
+                <button phx-click="project_edit" phx-value-name="root" class={btn_ghost()}>{gettext("Edit")}</button>
               </div>
             </div>
             <div class="mt-1 flex items-center gap-2 text-sm">
-              <span :if={Config.company_markup(nil) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
-                {gettext("markup ×%{m}", m: Config.company_markup(nil))}
+              <span :if={Config.project_markup(nil) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
+                {gettext("markup ×%{m}", m: Config.project_markup(nil))}
               </span>
               <span
-                :if={Config.company_budget(nil)}
+                :if={Config.project_budget(nil)}
                 title={gettext("Operational count toward the cap, not the billable total - see Usage for the real month total, unaffected by resets.")}
                 class={[
                   "rounded px-1.5",
@@ -77,14 +77,14 @@ defmodule PepeWeb.CompaniesLive do
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {money(Pepe.Usage.month_to_date(nil), Config.currency())} / {money(Config.company_budget(nil), Config.currency())}
+                {money(Pepe.Usage.month_to_date(nil), Config.currency())} / {money(Config.project_budget(nil), Config.currency())}
                 <span :if={Pepe.Usage.budget_reset_at(nil)} class="text-zinc-500">
                   · {gettext("since %{date}", date: local_datetime(Pepe.Usage.budget_reset_at(nil), "%m/%d"))}
                 </span>
               </span>
               <button
-                :if={Config.company_budget(nil)}
-                phx-click="company_reset_budget"
+                :if={Config.project_budget(nil)}
+                phx-click="project_reset_budget"
                 phx-value-name="root"
                 data-confirm={gettext("Reset the principal scope's spend count (currently %{n}) for the rest of this month?", n: money(Pepe.Usage.month_to_date(nil), Config.currency()))}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
@@ -92,7 +92,7 @@ defmodule PepeWeb.CompaniesLive do
                 {gettext("reset")}
               </button>
               <span
-                :if={Config.company_message_limit(nil)}
+                :if={Config.project_message_limit(nil)}
                 title={gettext("Operational count toward the cap, not necessarily every message this month if it's been reset.")}
                 class={[
                   "rounded px-1.5",
@@ -100,14 +100,14 @@ defmodule PepeWeb.CompaniesLive do
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {gettext("%{used}/%{limit} msgs/mo", used: Pepe.Usage.message_count_month_to_date(nil), limit: Config.company_message_limit(nil))}
+                {gettext("%{used}/%{limit} msgs/mo", used: Pepe.Usage.message_count_month_to_date(nil), limit: Config.project_message_limit(nil))}
                 <span :if={Pepe.Usage.messages_reset_at(nil)} class="text-zinc-500">
                   · {gettext("since %{date}", date: local_datetime(Pepe.Usage.messages_reset_at(nil), "%m/%d"))}
                 </span>
               </span>
               <button
-                :if={Config.company_message_limit(nil)}
-                phx-click="company_reset_messages"
+                :if={Config.project_message_limit(nil)}
+                phx-click="project_reset_messages"
                 phx-value-name="root"
                 data-confirm={gettext("Reset the principal scope's message count (currently %{n}) for the rest of this month?", n: Pepe.Usage.message_count_month_to_date(nil))}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
@@ -116,7 +116,7 @@ defmodule PepeWeb.CompaniesLive do
               </button>
             </div>
           </div>
-          <div :for={name <- @companies} class={card()}>
+          <div :for={name <- @projects} class={card()}>
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span class="font-medium">{name}</span>
@@ -124,11 +124,11 @@ defmodule PepeWeb.CompaniesLive do
               </div>
               <div class="flex shrink-0 gap-1 text-sm">
                 <.link navigate={~p"/overview?scope=#{name}"} class={btn_ghost()}>{gettext("Open")}</.link>
-                <button phx-click="company_edit" phx-value-name={name} class={btn_ghost()}>{gettext("Edit")}</button>
+                <button phx-click="project_edit" phx-value-name={name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button
-                  phx-click="company_delete"
+                  phx-click="project_delete"
                   phx-value-name={name}
-                  data-confirm={gettext("Delete company %{name} and its %{count} agents? Their workspaces stay on disk.", name: name, count: length(Config.agents_in(name)))}
+                  data-confirm={gettext("Delete project %{name} and its %{count} agents? Their workspaces stay on disk.", name: name, count: length(Config.agents_in(name)))}
                   class={[btn_ghost(), "text-red-400 hover:text-red-300"]}
                 >
                   {gettext("Delete")}
@@ -137,11 +137,11 @@ defmodule PepeWeb.CompaniesLive do
             </div>
             <div class="mt-1 flex items-center gap-2 text-sm">
               <span :if={desc_of(name)} class="text-zinc-400">{desc_of(name)}</span>
-              <span :if={Config.company_markup(name) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
-                {gettext("markup ×%{m}", m: Config.company_markup(name))}
+              <span :if={Config.project_markup(name) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
+                {gettext("markup ×%{m}", m: Config.project_markup(name))}
               </span>
               <span
-                :if={Config.company_budget(name)}
+                :if={Config.project_budget(name)}
                 title={gettext("Operational count toward the cap, not the billable total - see Usage for the real month total, unaffected by resets.")}
                 class={[
                   "rounded px-1.5",
@@ -149,14 +149,14 @@ defmodule PepeWeb.CompaniesLive do
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {money(Pepe.Usage.month_to_date(name), Config.currency())} / {money(Config.company_budget(name), Config.currency())}
+                {money(Pepe.Usage.month_to_date(name), Config.currency())} / {money(Config.project_budget(name), Config.currency())}
                 <span :if={Pepe.Usage.budget_reset_at(name)} class="text-zinc-500">
                   · {gettext("since %{date}", date: local_datetime(Pepe.Usage.budget_reset_at(name), "%m/%d"))}
                 </span>
               </span>
               <button
-                :if={Config.company_budget(name)}
-                phx-click="company_reset_budget"
+                :if={Config.project_budget(name)}
+                phx-click="project_reset_budget"
                 phx-value-name={name}
                 data-confirm={gettext("Reset %{name}'s spend count (currently %{n}) for the rest of this month?", name: name, n: money(Pepe.Usage.month_to_date(name), Config.currency()))}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
@@ -164,7 +164,7 @@ defmodule PepeWeb.CompaniesLive do
                 {gettext("reset")}
               </button>
               <span
-                :if={Config.company_message_limit(name)}
+                :if={Config.project_message_limit(name)}
                 title={gettext("Operational count toward the cap, not necessarily every message this month if it's been reset.")}
                 class={[
                   "rounded px-1.5",
@@ -172,14 +172,14 @@ defmodule PepeWeb.CompaniesLive do
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {gettext("%{used}/%{limit} msgs/mo", used: Pepe.Usage.message_count_month_to_date(name), limit: Config.company_message_limit(name))}
+                {gettext("%{used}/%{limit} msgs/mo", used: Pepe.Usage.message_count_month_to_date(name), limit: Config.project_message_limit(name))}
                 <span :if={Pepe.Usage.messages_reset_at(name)} class="text-zinc-500">
                   · {gettext("since %{date}", date: local_datetime(Pepe.Usage.messages_reset_at(name), "%m/%d"))}
                 </span>
               </span>
               <button
-                :if={Config.company_message_limit(name)}
-                phx-click="company_reset_messages"
+                :if={Config.project_message_limit(name)}
+                phx-click="project_reset_messages"
                 phx-value-name={name}
                 data-confirm={gettext("Reset %{name}'s message count (currently %{n}) for the rest of this month?", name: name, n: Pepe.Usage.message_count_month_to_date(name))}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
@@ -188,17 +188,17 @@ defmodule PepeWeb.CompaniesLive do
               </button>
             </div>
           </div>
-          <p :if={@companies == []} class="text-[15px] text-zinc-500">
-            {gettext("No companies yet. Everything lives in the root workspace. Create one to isolate a client or team.")}
+          <p :if={@projects == []} class="text-[15px] text-zinc-500">
+            {gettext("No projects yet. Everything lives in the root workspace. Create one to isolate a client or team.")}
           </p>
           </div>
 
           <div :if={@editing} class="max-w-2xl">
-            <.form for={@form} phx-submit="company_save" class="space-y-4">
+            <.form for={@form} phx-submit="project_save" class="space-y-4">
               <div class="text-lg font-semibold">
                 {cond do
                   @editing.name == "root" -> gettext("Edit Principal")
-                  @editing.new? -> gettext("+ New company")
+                  @editing.new? -> gettext("+ New project")
                   true -> gettext("Edit %{name}", name: @editing.name)
                 end}
               </div>
@@ -219,13 +219,13 @@ defmodule PepeWeb.CompaniesLive do
                 <label class={lbl()}>
                   {gettext("Description")} <span class="text-zinc-600">{gettext("(optional)")}</span>
                 </label>
-                <input name="company[description]" value={@editing.description} placeholder={gettext("Acme Inc, sales team")} class={fld()} />
+                <input name="project[description]" value={@editing.description} placeholder={gettext("Acme Inc, sales team")} class={fld()} />
               </div>
               <div>
                 <label class={lbl()}>
                   {gettext("Billing markup")} <span class="text-zinc-600">{gettext("(optional)")}</span>
                 </label>
-                <input name="company[markup]" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
+                <input name="project[markup]" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
                   {gettext("Multiplier applied to provider cost to get the amount to bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
                 </p>
@@ -234,23 +234,23 @@ defmodule PepeWeb.CompaniesLive do
                 <label class={lbl()}>
                   {gettext("Monthly budget")} <span class="text-zinc-600">{gettext("(optional)")}</span>
                 </label>
-                <input name="company[budget]" value={@editing.budget} placeholder="100" inputmode="decimal" class={fld()} />
+                <input name="project[budget]" value={@editing.budget} placeholder="100" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Spend cap for the month in %{currency}. When reached, this company's agents stop making model calls until next month. Blank = no cap.", currency: Config.currency())}
+                  {gettext("Spend cap for the month in %{currency}. When reached, this project's agents stop making model calls until next month. Blank = no cap.", currency: Config.currency())}
                 </p>
               </div>
               <div>
                 <label class={lbl()}>
                   {gettext("Monthly message limit")} <span class="text-zinc-600">{gettext("(optional)")}</span>
                 </label>
-                <input name="company[message_limit]" value={@editing.message_limit} placeholder="5000" inputmode="numeric" class={fld()} />
+                <input name="project[message_limit]" value={@editing.message_limit} placeholder="5000" inputmode="numeric" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Cap on customer messages for the month. When reached, this company's agents stop replying until next month (an agent can be exempted individually). Blank = no cap.")}
+                  {gettext("Cap on customer messages for the month. When reached, this project's agents stop replying until next month (an agent can be exempted individually). Blank = no cap.")}
                 </p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
-                <button type="button" phx-click="company_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
+                <button type="button" phx-click="project_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
             </.form>
           </div>
@@ -261,15 +261,15 @@ defmodule PepeWeb.CompaniesLive do
   end
 
   @impl true
-  def handle_event("company_new", _p, socket),
+  def handle_event("project_new", _p, socket),
     do:
       {:noreply,
        assign(socket,
          editing: %{new?: true, name: "", description: "", markup: "", budget: "", message_limit: ""},
-         form: company_form("")
+         form: project_form("")
        )}
 
-  def handle_event("company_edit", %{"name" => name}, socket) do
+  def handle_event("project_edit", %{"name" => name}, socket) do
     scope = event_scope(name)
 
     {:noreply,
@@ -282,55 +282,55 @@ defmodule PepeWeb.CompaniesLive do
          budget: budget_field(scope),
          message_limit: message_limit_field(scope)
        },
-       form: company_form(name)
+       form: project_form(name)
      )}
   end
 
-  def handle_event("company_cancel", _p, socket), do: {:noreply, assign(socket, editing: nil)}
+  def handle_event("project_cancel", _p, socket), do: {:noreply, assign(socket, editing: nil)}
 
-  def handle_event("company_save", %{"company" => p}, socket) do
+  def handle_event("project_save", %{"project" => p}, socket) do
     cond do
       socket.assigns.editing.name == "root" ->
         save_root(p, socket)
 
-      not company_changeset(p["name"] || "").valid? ->
-        cs = company_changeset(p["name"] || "")
-        {:noreply, assign(socket, form: to_form(%{cs | action: :validate}, as: :company))}
+      not project_changeset(p["name"] || "").valid? ->
+        cs = project_changeset(p["name"] || "")
+        {:noreply, assign(socket, form: to_form(%{cs | action: :validate}, as: :project))}
 
       socket.assigns.editing.new? ->
-        create_company(p, socket)
+        create_project(p, socket)
 
       true ->
-        edit_company(p, socket)
+        edit_project(p, socket)
     end
   end
 
-  def handle_event("company_delete", %{"name" => name}, socket) do
-    Config.delete_company(name, force: true)
+  def handle_event("project_delete", %{"name" => name}, socket) do
+    Config.delete_project(name, force: true)
 
     {:noreply,
      socket
-     |> assign(companies: Config.companies(), editing: nil)
-     |> put_flash(:info, gettext("Company %{name} removed.", name: name))}
+     |> assign(projects: Config.project_slugs(), editing: nil)
+     |> put_flash(:info, gettext("Project %{name} removed.", name: name))}
   end
 
-  def handle_event("company_reset_messages", %{"name" => name}, socket) do
+  def handle_event("project_reset_messages", %{"name" => name}, socket) do
     Pepe.Usage.reset_messages(event_scope(name))
     {:noreply, put_flash(socket, :info, gettext("%{name}'s message count reset for the rest of this month.", name: name))}
   end
 
-  def handle_event("company_reset_budget", %{"name" => name}, socket) do
+  def handle_event("project_reset_budget", %{"name" => name}, socket) do
     Pepe.Usage.reset_budget(event_scope(name))
     {:noreply, put_flash(socket, :info, gettext("%{name}'s spend count reset for the rest of this month.", name: name))}
   end
 
   def handle_event("set_scope", params, socket),
-    do: {:noreply, set_scope(socket, params, "/companies")}
+    do: {:noreply, set_scope(socket, params, "/projects")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   # The "root" sentinel used throughout this page's markup/events -> the nil scope
   # every Config/Usage function expects (same convention as chat_live/connections_component).
@@ -349,7 +349,7 @@ defmodule PepeWeb.CompaniesLive do
     {:noreply, socket |> assign(editing: nil) |> put_flash(:info, gettext("Principal scope updated."))}
   end
 
-  defp create_company(p, socket) do
+  defp create_project(p, socket) do
     name = String.trim(p["name"] || "")
 
     meta =
@@ -359,15 +359,15 @@ defmodule PepeWeb.CompaniesLive do
       |> put_if(parse_budget(p["budget"]), "budget")
       |> put_if(parse_message_limit(p["message_limit"]), "message_limit")
 
-    case Config.add_company(name, meta) do
+    case Config.add_project(name, meta) do
       :ok ->
         {:noreply,
          socket
-         |> assign(companies: Config.companies(), editing: nil)
-         |> put_flash(:info, gettext("Company %{name} created.", name: name))}
+         |> assign(projects: Config.project_slugs(), editing: nil)
+         |> put_flash(:info, gettext("Project %{name} created.", name: name))}
 
       {:error, :already_exists} ->
-        {:noreply, put_flash(socket, :error, gettext("That company already exists."))}
+        {:noreply, put_flash(socket, :error, gettext("That project already exists."))}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Invalid name. Use letters, digits, - and _."))}
@@ -375,7 +375,7 @@ defmodule PepeWeb.CompaniesLive do
   end
 
   # Save an edit: if the name changed, re-key everything (rename), then update the meta.
-  defp edit_company(p, socket) do
+  defp edit_project(p, socket) do
     old = socket.assigns.editing.name
     new = String.trim(p["name"] || "")
 
@@ -388,15 +388,15 @@ defmodule PepeWeb.CompaniesLive do
 
     case maybe_rename(old, new) do
       :ok ->
-        Config.update_company(new, meta)
+        Config.update_project(new, meta)
 
         {:noreply,
          socket
-         |> assign(companies: Config.companies(), editing: nil)
+         |> assign(projects: Config.project_slugs(), editing: nil)
          |> put_flash(:info, save_flash(old, new))}
 
       {:error, :already_exists} ->
-        {:noreply, put_flash(socket, :error, gettext("That company already exists."))}
+        {:noreply, put_flash(socket, :error, gettext("That project already exists."))}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Invalid name. Use letters, digits, - and _."))}
@@ -404,16 +404,16 @@ defmodule PepeWeb.CompaniesLive do
   end
 
   defp maybe_rename(old, old), do: :ok
-  defp maybe_rename(old, new), do: Config.rename_company(old, new)
+  defp maybe_rename(old, new), do: Config.rename_project(old, new)
 
-  defp save_flash(old, old), do: gettext("Company %{name} updated.", name: old)
-  defp save_flash(old, new), do: gettext("Company %{old} renamed to %{new}.", old: old, new: new)
+  defp save_flash(old, old), do: gettext("Project %{name} updated.", name: old)
+  defp save_flash(old, new), do: gettext("Project %{old} renamed to %{new}.", old: old, new: new)
 
-  defp desc_of(name), do: (Config.get_company(name) || %{})["description"]
+  defp desc_of(name), do: (Config.get_project(name) || %{})["description"]
 
   # The markup as a form value: blank when unset or the default 1.0.
   defp markup_field(name) do
-    case Config.company_markup(name) do
+    case Config.project_markup(name) do
       1.0 -> ""
       m -> to_string(m)
     end
@@ -421,7 +421,7 @@ defmodule PepeWeb.CompaniesLive do
 
   # The monthly budget as a form value: blank when unset.
   defp budget_field(name) do
-    case Config.company_budget(name) do
+    case Config.project_budget(name) do
       nil -> ""
       b -> to_string(b)
     end
@@ -429,7 +429,7 @@ defmodule PepeWeb.CompaniesLive do
 
   # The monthly message limit as a form value: blank when unset.
   defp message_limit_field(name) do
-    case Config.company_message_limit(name) do
+    case Config.project_message_limit(name) do
       nil -> ""
       n -> to_string(n)
     end

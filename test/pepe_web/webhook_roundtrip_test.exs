@@ -40,7 +40,7 @@ defmodule PepeWeb.WebhookRoundtripTest do
       "webhooks" => %{
         "support" => %{
           "provider" => "whatsapp",
-          "company" => "acme",
+          "project" => "acme",
           "agent" => "acme/support",
           "mode" => "support",
           "config" => %{"verify_token" => "vt", "app_secret" => "s3cr3t"}

@@ -1,30 +1,30 @@
 defmodule Pepe.Bundle do
   @moduledoc """
-  Move a Pepe install, or one company out of it, as a single `.tgz`.
+  Move a Pepe install, or one project out of it, as a single `.tgz`.
 
   Two archives, one shape, one restore. Both are a `~/.pepe` laid out inside a tarball, so
   `restore/2` unpacks either without needing to know which it is.
 
-    * **Backup** (`mix pepe backup`) is the whole install: every company, every workspace, every
+    * **Backup** (`mix pepe backup`) is the whole install: every project, every workspace, every
       session. It is the "don't lose this machine" archive, and it restores onto an empty box as
       the same machine.
 
-    * **Extract** (`extract/2`) is one company, lifted out and **de-scoped to root**: its
-      `company/agent` handles become bare names, so the archive is a fresh single-tenant install
-      that happens to be that company. This is how a tenant that grew up inside a shared install
+    * **Extract** (`extract/2`) is one project, lifted out and **de-scoped to root**: its
+      `project/agent` handles become bare names, so the archive is a fresh single-tenant install
+      that happens to be that project. This is how a tenant that grew up inside a shared install
       leaves to run on its own server. You cannot get there by copying a folder, because the
-      company's rows are threaded through the shared `config.json`; the de-scoping
+      project's rows are threaded through the shared `config.json`; the de-scoping
       (`Pepe.Config.extract_config/1`) is the whole point.
 
   ## What travels, and what does not
 
-  The config carries only the company's own agents, models, crons, watches, bots and tokens,
-  plus any shared model a kept agent depends on. On disk, the company's agent workspaces
-  (`companies/<co>/agents/*`), its `shared/`, and its usage ledger travel; the ledger's per-line
+  The config carries only the project's own agents, models, crons, watches, bots and tokens,
+  plus any shared model a kept agent depends on. On disk, the project's agent workspaces
+  (`projects/<co>/agents/*`), its `shared/`, and its usage ledger travel; the ledger's per-line
   `agent` handle is de-scoped in step with the config. Install-wide capability (`plugins/`,
   `skills/`) travels too, so an agent that leaned on a skill still works. Disposable state does
   **not**: the Mnesia cache rebuilds itself, and other tenants' traces and sessions are not this
-  company's to carry.
+  project's to carry.
 
   ## Secrets
 
@@ -37,9 +37,13 @@ defmodule Pepe.Bundle do
   alias Pepe.Config
   alias Pepe.Usage.Log
 
+  # The slug of the default project a fresh, extracted single-tenant install is born with. The
+  # bundle stages every de-scoped agent/shared/usage dir under it so load-time migration finds them.
+  @extracted_slug "default"
+
   @doc """
-  Write a de-scoped, root-scoped archive of one `company` to `output` (a `.tgz` path; defaults
-  to `./<company>-extract-YYYY-MM-DD.tgz` when nil - the date is the caller's to pass in via
+  Write a de-scoped, root-scoped archive of one `project` to `output` (a `.tgz` path; defaults
+  to `./<project>-extract-YYYY-MM-DD.tgz` when nil - the date is the caller's to pass in via
   `opts[:today]` so this stays pure of the clock).
 
   Returns `{:ok, %{output: path, secrets: [...], shared_models: [...]}}` or `{:error, reason}`.
@@ -53,10 +57,10 @@ defmodule Pepe.Bundle do
              literal_secrets: [String.t()]
            }}
           | {:error, term()}
-  def extract(company, opts \\ []) do
-    with {:ok, config, report} <- Config.extract_config(company) do
+  def extract(project, opts \\ []) do
+    with {:ok, config, report} <- Config.extract_config(project) do
       today = opts[:today] || Date.utc_today()
-      output = Path.expand(opts[:output] || "#{company}-extract-#{today}.tgz")
+      output = Path.expand(opts[:output] || "#{project}-extract-#{today}.tgz")
       stage = Path.join(System.tmp_dir!(), "pepe_extract_#{System.unique_integer([:positive])}")
       home_base = Path.basename(Config.home())
 
@@ -69,9 +73,9 @@ defmodule Pepe.Bundle do
         File.chmod!(stage, 0o700)
         File.write!(Path.join(root, "config.json"), Jason.encode!(config, pretty: true))
 
-        copy_company_agents(root, company, config)
-        copy_company_shared(root, company)
-        copy_usage(root, company)
+        copy_project_agents(root, project, config)
+        copy_project_shared(root, project)
+        copy_usage(root, project)
         copy_global_capability(root)
 
         case tar(output, stage, home_base) do
@@ -174,14 +178,15 @@ defmodule Pepe.Bundle do
   ### staging an extract
   ###
 
-  # Each kept agent's private workspace: companies/<co>/agents/<name> -> agents/<name>.
-  defp copy_company_agents(root, company, config) do
-    dst_base = Path.join(root, "agents")
+  # Each kept agent's private workspace, moved to the extracted install's default project:
+  # projects/<co>/agents/<name> -> projects/default/agents/<name>.
+  defp copy_project_agents(root, project, config) do
+    dst_base = Path.join([root, "projects", @extracted_slug, "agents"])
 
     for {handle, _} <- Map.get(config, "agents", %{}) do
       # Handles in the extracted config are already bare (de-scoped), and the source lives under
-      # the company on the original install.
-      src = Path.join([Config.home(), "companies", company, "agents", handle])
+      # the project's project on the original install.
+      src = Path.join([Config.home(), "projects", project, "agents", handle])
 
       if File.dir?(src) do
         File.mkdir_p!(dst_base)
@@ -190,18 +195,19 @@ defmodule Pepe.Bundle do
     end
   end
 
-  defp copy_company_shared(root, company) do
-    src = Path.join([Config.home(), "companies", company, "shared"])
-    if File.dir?(src), do: File.cp_r!(src, Path.join(root, "shared"))
+  defp copy_project_shared(root, project) do
+    src = Path.join([Config.home(), "projects", project, "shared"])
+    if File.dir?(src), do: File.cp_r!(src, Path.join([root, "projects", @extracted_slug, "shared"]))
   end
 
-  # The company's usage ledger becomes the root ledger, with each line's `agent` handle
-  # de-scoped so the archive's billing history matches its now-bare agents.
-  defp copy_usage(root, company) do
-    src = Log.scope_dir(company)
+  # The project's usage ledger becomes the extracted install's **default project** ledger, with
+  # each line's `agent` handle de-scoped and its `project` field repointed to the default slug so
+  # the archive's billing history matches its now-default-project agents.
+  defp copy_usage(root, project) do
+    src = Log.scope_dir(project)
 
     if File.dir?(src) do
-      dst = Path.join([root, "data", "usage", "root"])
+      dst = Path.join([root, "data", "usage", @extracted_slug])
       File.mkdir_p!(dst)
 
       for file <- File.ls!(src), String.ends_with?(file, ".jsonl") do
@@ -218,7 +224,8 @@ defmodule Pepe.Bundle do
   defp descope_usage_line(line) do
     case Jason.decode(line) do
       {:ok, %{"agent" => agent} = entry} when is_binary(agent) ->
-        Jason.encode!(%{entry | "agent" => Pepe.Company.name_of(agent)}) <> "\n"
+        rescoped = Map.put(entry, "project", @extracted_slug)
+        Jason.encode!(%{rescoped | "agent" => Pepe.Project.name_of(agent)}) <> "\n"
 
       _ ->
         line

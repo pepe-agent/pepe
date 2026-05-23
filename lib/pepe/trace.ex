@@ -16,7 +16,7 @@ defmodule Pepe.Trace do
   They are diagnostic, not a billing record - that is `Pepe.Usage.Log`.
   """
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
 
   @key :pepe_trace
@@ -43,7 +43,7 @@ defmodule Pepe.Trace do
           id: new_id(),
           at: System.os_time(:second),
           agent: agent_name,
-          scope: Company.of(agent_name),
+          scope: Project.of(agent_name),
           session: session,
           source: source || source_from_session(session),
           prompt: clip(prompt),
@@ -125,7 +125,7 @@ defmodule Pepe.Trace do
 
   # --- reading (dashboard / CLI) -----------------------------------------------------
 
-  @doc "Scopes (companies + root) that have any recorded trace."
+  @doc "Scopes (projects + root) that have any recorded trace."
   def scopes do
     case File.ls(dir()) do
       {:ok, names} -> Enum.sort(names)
@@ -280,7 +280,6 @@ defmodule Pepe.Trace do
 
   defp clip(other), do: clip(inspect(other))
 
-  defp scope_name(nil), do: "root"
-  defp scope_name("root"), do: "root"
+  defp scope_name(scope) when scope in [nil, ""], do: Config.default_project_slug()
   defp scope_name(scope) when is_binary(scope), do: scope
 end

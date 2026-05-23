@@ -25,7 +25,7 @@ defmodule Pepe.Tools.SetRouteTest do
   test "allow adds a directed route" do
     assert {:ok, msg} = SetRoute.run(%{"from" => "A", "to" => "B", "action" => "allow"}, %{})
     assert msg =~ "A can now message B"
-    assert Config.get_agent("A").can_message == ["B"]
+    assert Config.get_agent("A").can_message == ["default/B"]
     # Directed: B -> A was not created.
     assert Config.get_agent("B").can_message == []
   end
@@ -33,7 +33,7 @@ defmodule Pepe.Tools.SetRouteTest do
   test "from defaults to the calling agent" do
     ctx = %{agent: %Agent{name: "A"}}
     assert {:ok, _} = SetRoute.run(%{"to" => "B"}, ctx)
-    assert Config.get_agent("A").can_message == ["B"]
+    assert Config.get_agent("A").can_message == ["default/B"]
   end
 
   test "deny removes the route" do

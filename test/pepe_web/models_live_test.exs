@@ -199,8 +199,8 @@ defmodule PepeWeb.ModelsLiveTest do
     assert html =~ "backup"
   end
 
-  test "the list only shows the selected company's connections" do
-    :ok = Config.add_company("acme")
+  test "the list only shows the selected project's connections" do
+    :ok = Config.add_project("acme")
     model_fixture("shared-openai")
     model_fixture("acme/private-openai")
 

@@ -18,7 +18,7 @@ defmodule Pepe.Agent.Utility do
 
   What it must never do is quietly fall back to the agent's own model. That would add
   spending nobody asked for to every install that upgraded, and Pepe bills those tokens to a
-  company. A feature that costs money turns itself on when you say so, not when you upgrade.
+  project. A feature that costs money turns itself on when you say so, not when you upgrade.
   A name pointing at a connection that does not exist counts as unset for the same reason: a
   typo must not be the thing that starts spending. `pepe doctor` says so when it sees one.
 

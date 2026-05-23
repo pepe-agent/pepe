@@ -36,8 +36,8 @@ defmodule PepeWeb.Router do
   scope "/webhooks", PepeWeb do
     pipe_through :api
 
-    get "/:company/:provider/:slug", WebhookController, :verify
-    post "/:company/:provider/:slug", WebhookController, :receive
+    get "/:project/:provider/:slug", WebhookController, :verify
+    post "/:project/:provider/:slug", WebhookController, :receive
   end
 
   # The chat widget's dashboard-managed appearance - must come before the generic
@@ -74,7 +74,7 @@ defmodule PepeWeb.Router do
       live "/", OverviewLive
       live "/overview", OverviewLive
       live "/chat", ChatLive
-      live "/companies", CompaniesLive
+      live "/projects", ProjectsLive
       live "/agents", AgentsLive
       live "/models", ModelsLive
       live "/bots", ChannelsLive

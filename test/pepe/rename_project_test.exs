@@ -1,4 +1,4 @@
-defmodule Pepe.RenameCompanyTest do
+defmodule Pepe.RenameProjectTest do
   use ExUnit.Case, async: false
 
   alias Pepe.Agent.Workspace
@@ -20,7 +20,7 @@ defmodule Pepe.RenameCompanyTest do
   end
 
   defp seed do
-    Config.add_company("acme", %{"description" => "Acme Inc", "markup" => 1.5})
+    Config.add_project("acme", %{"description" => "Acme Inc", "markup" => 1.5})
 
     Config.put_agent(%Agent{
       name: "acme/sales",
@@ -34,23 +34,23 @@ defmodule Pepe.RenameCompanyTest do
 
   test "rejects bad, unknown or duplicate names" do
     seed()
-    Config.add_company("globex")
+    Config.add_project("globex")
 
-    assert Config.rename_company("acme", "bad name") == {:error, :invalid_name}
-    assert Config.rename_company("nope", "x") == {:error, :not_found}
-    assert Config.rename_company("acme", "globex") == {:error, :already_exists}
-    assert Config.rename_company("acme", "acme") == :ok
+    assert Config.rename_project("acme", "bad name") == {:error, :invalid_slug}
+    assert Config.rename_project("nope", "x") == {:error, :not_found}
+    assert Config.rename_project("acme", "globex") == {:error, :already_exists}
+    assert Config.rename_project("acme", "acme") == :ok
   end
 
-  test "re-keys the company, its agents, models and routes" do
+  test "re-keys the project, its agents, models and routes" do
     seed()
-    assert Config.rename_company("acme", "umbrella") == :ok
+    assert Config.rename_project("acme", "umbrella") == :ok
 
-    # company entry moved, meta preserved
-    assert "acme" not in Config.companies()
-    assert "umbrella" in Config.companies()
-    assert Config.get_company("umbrella")["description"] == "Acme Inc"
-    assert Config.company_markup("umbrella") == 1.5
+    # project entry moved, meta preserved
+    assert "acme" not in Config.project_slugs()
+    assert "umbrella" in Config.project_slugs()
+    assert Config.get_project("umbrella")["description"] == "Acme Inc"
+    assert Config.project_markup("umbrella") == 1.5
 
     # agents re-keyed, and cross-refs inside them rewritten
     names = Enum.map(Config.agents(), & &1.name) |> Enum.sort()
@@ -89,18 +89,18 @@ defmodule Pepe.RenameCompanyTest do
     })
 
     assert {:ok, raw, _id} =
-             Config.add_api_token(company: "acme", agent: "acme/sales", label: "x")
+             Config.add_api_token(project: "acme", agent: "acme/sales", label: "x")
 
     assert is_binary(raw)
 
-    assert Config.rename_company("acme", "umbrella") == :ok
+    assert Config.rename_project("acme", "umbrella") == :ok
 
     assert Config.get_cron("c1").agent == "umbrella/sales"
     assert Config.get_watch("w1").agent == "umbrella/support"
     assert Config.telegram_bot("sales")["agent"] == "umbrella/sales"
 
     [tok] = Config.api_tokens()
-    assert tok["company"] == "umbrella"
+    assert tok["project"] == "umbrella"
     assert tok["agent"] == "umbrella/sales"
     # the cron prompt (free text) is untouched
     assert Config.get_cron("c1").prompt == "hi"
@@ -117,10 +117,10 @@ defmodule Pepe.RenameCompanyTest do
       "completion_tokens" => 0
     })
 
-    assert Config.rename_company("acme", "umbrella") == :ok
+    assert Config.rename_project("acme", "umbrella") == :ok
 
     # old dirs gone, new dirs carry the content
-    refute File.dir?(Path.join([Config.home(), "companies", "acme"]))
+    refute File.dir?(Path.join([Config.home(), "projects", "acme"]))
     assert File.read!(Path.join(Workspace.dir("umbrella/sales"), "MEMORY.md")) == "remember me"
     assert Pepe.Usage.summary("umbrella", :month).totals.total == 1000
     assert Pepe.Usage.summary("acme", :month).totals.total == 0

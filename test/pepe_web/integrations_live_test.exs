@@ -46,9 +46,9 @@ defmodule PepeWeb.IntegrationsLiveTest do
       view
       |> form("form[phx-submit=save]", %{
         "slug" => "acme",
-        "agent" => "assistant",
+        "agent" => "default/assistant",
         "mode" => "support",
-        "company" => "root",
+        "project" => "default",
         "cfg" => %{
           "base_url" => "https://app.chatwoot.com",
           "account_id" => "42",
@@ -59,7 +59,7 @@ defmodule PepeWeb.IntegrationsLiveTest do
 
     entry = Config.get_webhook("acme")
     assert entry["provider"] == "chatwoot"
-    assert entry["agent"] == "assistant"
+    assert entry["agent"] == "default/assistant"
     assert entry["config"]["base_url"] == "https://app.chatwoot.com"
     assert entry["config"]["account_id"] == "42"
     assert entry["config"]["api_token"] == "${CHATWOOT_TOKEN}"

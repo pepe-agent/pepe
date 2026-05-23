@@ -2,13 +2,13 @@ defmodule Pepe.Usage.Log do
   @moduledoc """
   Append-only token-usage ledger - the durable record billing is built on.
 
-  One JSONL file per company per month under
-  `<PEPE_HOME>/data/usage/<company>/YYYY-MM.jsonl` (the root scope lives under
+  One JSONL file per project per month under
+  `<PEPE_HOME>/data/usage/<project>/YYYY-MM.jsonl` (the root scope lives under
   `root/`). Every model call the runtime makes appends one line:
 
       {"at": 1720000000, "agent": "acme/sales", "model": "gpt-4o", "in": 812, "out": 143}
 
-  The company is the directory, so it isn't repeated per line. Partitioning by
+  The project is the directory, so it isn't repeated per line. Partitioning by
   month keeps files bounded and lets a period read touch only the months it needs.
   Append-only + never-expiring (unlike `Pepe.Store`) because it is the audit
   trail for what a client is charged.
@@ -16,25 +16,25 @@ defmodule Pepe.Usage.Log do
 
   alias Pepe.Config
 
-  @doc "Root directory holding the per-company usage ledgers."
+  @doc "Root directory holding the per-project usage ledgers."
   def dir, do: Path.join([Config.home(), "data", "usage"])
 
   @doc "The directory for one scope (`nil`/`\"root\"` -> `root/`)."
   def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
 
   @doc """
-  Append one usage entry to `company`'s ledger for the month of `entry["at"]`.
+  Append one usage entry to `project`'s ledger for the month of `entry["at"]`.
   `entry` carries `at`, `agent`, `model`, `in`, `out`.
   """
   @spec append(String.t() | nil, map()) :: :ok
-  def append(company, entry) do
-    d = scope_dir(company)
+  def append(project, entry) do
+    d = scope_dir(project)
     File.mkdir_p!(d)
     File.write!(Path.join(d, month_file(entry["at"])), Jason.encode!(entry) <> "\n", [:append])
     :ok
   end
 
-  @doc "Scopes (companies + root) that have any recorded usage."
+  @doc "Scopes (projects + root) that have any recorded usage."
   def scopes do
     case File.ls(dir()) do
       {:ok, names} -> Enum.sort(names)
@@ -43,7 +43,7 @@ defmodule Pepe.Usage.Log do
   end
 
   @doc """
-  All entries for a scope across every month, each decorated with its `company`
+  All entries for a scope across every month, each decorated with its `project`
   (the scope name). Newest last (file/append order).
   """
   @spec entries(String.t() | nil) :: [map()]
@@ -57,7 +57,7 @@ defmodule Pepe.Usage.Log do
         |> Enum.filter(&String.ends_with?(&1, ".jsonl"))
         |> Enum.sort()
         |> Enum.flat_map(fn f -> read_file(Path.join(d, f)) end)
-        |> Enum.map(&Map.put(&1, "company", name))
+        |> Enum.map(&Map.put(&1, "project", name))
 
       _ ->
         []
@@ -89,7 +89,7 @@ defmodule Pepe.Usage.Log do
     end
   end
 
-  defp scope_name(scope) when scope in [nil, "", "root"], do: "root"
+  defp scope_name(scope) when scope in [nil, ""], do: Config.default_project_slug()
   defp scope_name(scope), do: to_string(scope)
 
   # Partition file by the entry's UTC month - a storage bucket, independent of the

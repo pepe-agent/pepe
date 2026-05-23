@@ -80,7 +80,7 @@ defmodule Pepe.Agent.SessionTitles do
              receive_timeout: 20_000
            ),
          title when title != "" <- clean(content) do
-      # These tokens are spent on the company's behalf like any other. Metering them here
+      # These tokens are spent on the project's behalf like any other. Metering them here
       # keeps the ledger honest: the alternative is spending that no invoice ever sees.
       meter(agent, model, result[:usage])
       title

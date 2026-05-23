@@ -20,7 +20,7 @@ defmodule Pepe.Gateways.TUI do
 
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionSupervisor
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
@@ -257,9 +257,9 @@ defmodule Pepe.Gateways.TUI do
   end
 
   defp run_command(key, "usage", _rest) do
-    company = key |> Session.status() |> Map.get(:agent) |> Company.of()
-    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
-    count = Pepe.Usage.message_count_month_to_date(company)
+    project = key |> Session.status() |> Map.get(:agent) |> Project.of()
+    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(project))
+    count = Pepe.Usage.message_count_month_to_date(project)
     info(gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
   end
 
@@ -301,11 +301,11 @@ defmodule Pepe.Gateways.TUI do
   end
 
   defp run_command(key, "models", _rest) do
-    company = key |> Session.status() |> Map.get(:agent) |> Company.of()
+    project = key |> Session.status() |> Map.get(:agent) |> Project.of()
 
-    case ModelSwitch.list_for(company) do
+    case ModelSwitch.list_for(project) do
       [] ->
-        info(gettext("No models are configured for this company."))
+        info(gettext("No models are configured for this project."))
 
       models ->
         info(

@@ -106,8 +106,8 @@ defmodule Pepe.Agent.Runtime do
       Enum.any?(chain, & &1.require_redaction) and not Pepe.Hooks.any?(agent) ->
         {:error, :redaction_required}
 
-      # A company at its monthly spend cap stops here (no new model calls).
-      Pepe.Usage.over_budget?(Pepe.Company.of(agent.name)) ->
+      # A project at its monthly spend cap stops here (no new model calls).
+      Pepe.Usage.over_budget?(Pepe.Project.of(agent.name)) ->
         {:error, :budget_exceeded}
 
       true ->
@@ -312,7 +312,7 @@ defmodule Pepe.Agent.Runtime do
 
   defp lower_cap(_reason, _model, _messages, _capped), do: :none
 
-  # Meter tokens for billing, attributed to the agent's company (the model call is
+  # Meter tokens for billing, attributed to the agent's project (the model call is
   # the single choke point every surface flows through). Best-effort: a metering
   # failure must never break the conversation.
   defp record_usage(%{agent: %{name: name}}, model, usage, opts) when is_map(usage) do

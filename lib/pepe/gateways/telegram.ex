@@ -42,7 +42,7 @@ defmodule Pepe.Gateways.Telegram do
 
   require Logger
 
-  alias Pepe.Company
+  alias Pepe.Project
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
@@ -1131,9 +1131,9 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "usage", _args) do
-    company = Company.of(agent_default())
-    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(company))
-    count = Pepe.Usage.message_count_month_to_date(company)
+    project = Project.of(agent_default())
+    cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(project))
+    count = Pepe.Usage.message_count_month_to_date(project)
     send_message(chat_id, gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
   end
 
@@ -1302,9 +1302,9 @@ defmodule Pepe.Gateways.Telegram do
   defp send_model_picker(chat_id) do
     ensure_session(chat_id)
 
-    case ModelSwitch.list_for(Company.of(agent_default())) do
+    case ModelSwitch.list_for(Project.of(agent_default())) do
       [] ->
-        send_message(chat_id, gettext("No models are configured for this company."))
+        send_message(chat_id, gettext("No models are configured for this project."))
 
       models ->
         current = Pepe.Agent.Session.status(session_key(chat_id)).model
@@ -1322,9 +1322,9 @@ defmodule Pepe.Gateways.Telegram do
   defp edit_model_picker(chat_id, message_id) do
     ensure_session(chat_id)
 
-    case ModelSwitch.list_for(Company.of(agent_default())) do
+    case ModelSwitch.list_for(Project.of(agent_default())) do
       [] ->
-        edit_message(chat_id, message_id, gettext("No models are configured for this company."))
+        edit_message(chat_id, message_id, gettext("No models are configured for this project."))
 
       models ->
         current = Pepe.Agent.Session.status(session_key(chat_id)).model

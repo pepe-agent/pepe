@@ -22,10 +22,10 @@ defmodule PepeWeb.TokensLive do
      assign(socket,
        page_title: "Pepe · API tokens",
        scope: params["scope"] || "all",
-       companies: Config.companies(),
-       new_company: false,
+       projects: Config.project_slugs(),
+       new_project: false,
        tokens: Config.api_tokens(),
-       token_company: nil,
+       token_project: nil,
        token_widget: false,
        raw: nil
      )}
@@ -36,7 +36,7 @@ defmodule PepeWeb.TokensLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <div class="flex h-screen bg-zinc-950 text-zinc-100">
-      <.sidebar active="tokens" scope={@scope} companies={@companies} new_company={@new_company} />
+      <.sidebar active="tokens" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="🔑"
@@ -69,12 +69,12 @@ defmodule PepeWeb.TokensLive do
                 <input name="label" placeholder={gettext("CI pipeline, teammate laptop...")} class={fld()} />
               </div>
               <div>
-                <label class={lbl()}>{gettext("Company")}</label>
-                <select name="company" phx-change="token_pick_company" class={fld()}>
-                  <option value="" selected={@token_company == nil}>{gettext("Principal")}</option>
-                  <option :for={c <- @companies} value={c} selected={@token_company == c}>{c}</option>
+                <label class={lbl()}>{gettext("Project")}</label>
+                <select name="project" phx-change="token_pick_project" class={fld()}>
+                  <option value="" selected={@token_project == nil}>{gettext("Principal")}</option>
+                  <option :for={c <- @projects} value={c} selected={@token_project == c}>{c}</option>
                 </select>
-                <p class={hlp()}>{gettext("Scopes the token to a single workspace. Principal is the default, non-company workspace.")}</p>
+                <p class={hlp()}>{gettext("Scopes the token to a single workspace. Principal is the default, non-project workspace.")}</p>
               </div>
               <div>
                 <label class={lbl()}>
@@ -82,7 +82,7 @@ defmodule PepeWeb.TokensLive do
                 </label>
                 <select name="agent" class={fld()}>
                   <option value="">{gettext("Any agent in scope")}</option>
-                  <option :for={a <- agent_options(@token_company)} value={a}>{a}</option>
+                  <option :for={a <- agent_options(@token_project)} value={a}>{a}</option>
                 </select>
                 <p class={hlp()}>{gettext("Lock the token to one agent, or leave it open to any agent in the scope above.")}</p>
               </div>
@@ -145,8 +145,8 @@ defmodule PepeWeb.TokensLive do
   end
 
   @impl true
-  def handle_event("token_pick_company", %{"company" => company}, socket) do
-    {:noreply, assign(socket, token_company: blank(company))}
+  def handle_event("token_pick_project", %{"project" => project}, socket) do
+    {:noreply, assign(socket, token_project: blank(project))}
   end
 
   def handle_event("token_toggle_widget", _params, socket) do
@@ -156,7 +156,7 @@ defmodule PepeWeb.TokensLive do
   def handle_event("token_create", params, socket) do
     opts = [
       label: blank(params["label"]),
-      company: blank(params["company"]),
+      project: blank(params["project"]),
       agent: blank(params["agent"]),
       widget: params["widget"] == "true",
       allowed_origin: blank(params["allowed_origin"])
@@ -184,28 +184,28 @@ defmodule PepeWeb.TokensLive do
   def handle_event("set_scope", params, socket),
     do: {:noreply, set_scope(socket, params, "/tokens")}
 
-  def handle_event("toggle_new_company", _p, socket),
-    do: {:noreply, assign(socket, new_company: !socket.assigns.new_company)}
+  def handle_event("toggle_new_project", _p, socket),
+    do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
-  def handle_event("company_add", params, socket), do: {:noreply, add_company(socket, params)}
+  def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
-  # Agents available for the chosen scope: nil = root/Principal, else the company's agents.
-  # A token carries its own company (nil = root), so scope by that directly - the
-  # dashboard must only show the selected workspace's tokens, never another company's.
+  # Agents available for the chosen scope: nil = root/Principal, else the project's agents.
+  # A token carries its own project (nil = root), so scope by that directly - the
+  # dashboard must only show the selected workspace's tokens, never another project's.
   defp scoped_tokens(tokens, scope), do: Enum.filter(tokens, &token_in_scope?(&1, scope))
 
   defp token_in_scope?(_t, "all"), do: true
-  defp token_in_scope?(t, "root"), do: t["company"] in [nil, ""]
-  defp token_in_scope?(t, company), do: t["company"] == company
+  defp token_in_scope?(t, "root"), do: t["project"] in [nil, ""]
+  defp token_in_scope?(t, project), do: t["project"] == project
 
-  defp agent_options(company) do
-    Config.agents_in(company) |> Enum.map(& &1.name) |> Enum.sort()
+  defp agent_options(project) do
+    Config.agents_in(project) |> Enum.map(& &1.name) |> Enum.sort()
   end
 
-  # A readable scope for a stored token: "Principal" or the company, plus the agent when
+  # A readable scope for a stored token: "Principal" or the project, plus the agent when
   # locked, plus a widget/origin badge when it's a public embeddable token.
-  defp token_scope(%{"company" => company, "agent" => agent} = t) do
-    base = company || gettext("Principal")
+  defp token_scope(%{"project" => project, "agent" => agent} = t) do
+    base = project || gettext("Principal")
     scope = if agent, do: "#{base} / #{agent}", else: base
 
     if t["kind"] == "widget" do
@@ -215,8 +215,8 @@ defmodule PepeWeb.TokensLive do
     end
   end
 
-  defp token_error(:unknown_company), do: gettext("That company does not exist.")
-  defp token_error(:agent_out_of_scope), do: gettext("That agent is not in the chosen company.")
+  defp token_error(:unknown_project), do: gettext("That project does not exist.")
+  defp token_error(:agent_out_of_scope), do: gettext("That agent is not in the chosen project.")
   defp token_error(:unknown_agent), do: gettext("That agent does not exist.")
 
   defp token_error(:widget_needs_agent),
