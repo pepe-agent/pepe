@@ -57,29 +57,32 @@ mix pepe agent add assistant \
 mix pepe agent list
 mix pepe agent route assistant helper    # let assistant message another agent (see Routing)
 mix pepe agent manage boss assistant     # let boss administer assistant ("*" = all)
-mix pepe agent rename assistant helper   # rename + move its workspace dir (~/.pepe/agents/<name>/)
+mix pepe agent rename assistant helper   # relabel + move its workspace dir (~/.pepe/projects/default/agents/<name>/)
 mix pepe agent remove helper
 mix pepe agent default assistant
 mix pepe agent help                      # (or `mix pepe help agent`)
 ```
 
-### Companies (multi-tenant, optional)
+### Projects (multi-tenant, optional)
 
-Host isolated tenants in one deployment. Without `--company`, everything uses the
-**root** scope (shown as Principal in the dashboard), exactly as a single-tenant
-install always has, so this is entirely opt-in. Add `--company NAME` to scope a command
-to a company; its agents, workspaces, `shared/` space and models are walled off from
-every other company (see **[Companies](https://pepe-agent.com/en/docs/companies/)**).
+Host isolated tenants in one deployment. Every tenant is a **project**; without
+`--project`, everything falls back to the **default project** (slug `default`, shown as
+Principal in the dashboard), exactly as a single-tenant install always has, so this is
+entirely opt-in. Add `--project NAME` to scope a command to a project; its agents,
+workspaces, `shared/` space and models are walled off from every other project (see
+**[Projects](https://pepe-agent.com/en/docs/projects/)**). Projects and agents carry a
+stable internal id, so a rename only relabels and moves the directory - every binding
+(routes, defaults, cron/bot/token) follows.
 
 ```bash
-mix pepe company add acme --description "Acme Inc"     # create a tenant scope
-mix pepe company list
-mix pepe company rename acme umbrella                  # re-key everything to a new name
-mix pepe agent add sales --company acme --prompt "..."  # agent "acme/sales"
-mix pepe agent list --company acme                     # only Acme's agents
-mix pepe agent list --all                              # every scope
+mix pepe project add acme --description "Acme Inc"     # create a tenant scope
+mix pepe project list
+mix pepe project rename acme umbrella                  # relabel it; id-based bindings follow
+mix pepe agent add sales --project acme --prompt "..."  # agent "acme/sales"
+mix pepe agent list --project acme                     # only Acme's agents
+mix pepe agent list --all                              # every project
 mix pepe run acme/sales "hello"                       # run it by its handle
-mix pepe company remove acme --force                   # drop the company + its agents
+mix pepe project remove acme --force                   # drop the project + its agents
 ```
 
 ### Running
@@ -128,11 +131,11 @@ mix pepe gateway telegram            # run the gateway in the foreground (long-p
 
 Bearer tokens for the `/v1` HTTP API and the WebSocket. With no tokens, only same-machine
 (loopback) callers reach either; creating the first one locks both, so every call then
-needs a valid token. Scope a token to a company (`--company`) or a single agent
+needs a valid token. Scope a token to a project (`--project`) or a single agent
 (`--agent HANDLE`). See **[HTTP API](https://pepe-agent.com/en/docs/api/)**.
 
 ```bash
-mix pepe token add --company acme --label "acme mobile app"   # prints pepe_... once
+mix pepe token add --project acme --label "acme mobile app"   # prints pepe_... once
 mix pepe token add --agent acme/sales --label "one integration"
 mix pepe token add --agent acme/sales --widget \
   --allowed-origin https://example.com     # a token safe to embed in public page source
@@ -170,11 +173,11 @@ mix pepe learn status                      # which agents consolidate on a sched
 ### Usage, billing and traces
 
 ```bash
-mix pepe usage                                  # tokens & cost by cycle, per company
-mix pepe usage --company acme --granularity day
-mix pepe usage export --company acme            # a client invoice (Markdown, or --format csv)
+mix pepe usage                                  # tokens & cost by cycle, per project
+mix pepe usage --project acme --granularity day
+mix pepe usage export --project acme            # a client invoice (Markdown, or --format csv)
 mix pepe usage prices [--refresh]               # show/refresh the live model price cache
-mix pepe traces [--company NAME] [--limit N]    # list recent agent runs (any surface)
+mix pepe traces [--project NAME] [--limit N]    # list recent agent runs (any surface)
 mix pepe traces <id>                            # replay one run step by step
 ```
 

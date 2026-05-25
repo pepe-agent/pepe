@@ -61,4 +61,16 @@ defmodule Pepe.HeartbeatSessionTest do
     {:ok, _reply} = Session.chat(key, "hello")
     assert Session.heartbeat(key) == :silent
   end
+
+  test "end_session cast while idle resets the context now, not on the next unrelated turn", %{key: key} do
+    {:ok, _reply} = Session.chat(key, "hello")
+    assert Enum.any?(Session.history(key), &(&1["role"] == "user"))
+
+    # `end_session` is a cast. Fired from an inline heartbeat/aside (or any time no normal turn is
+    # running), it used to only set `reset_pending`, which then wiped the NEXT normal turn's context.
+    # It must apply the reset immediately instead. The next synchronous call is processed after the
+    # cast, so a cleared history here proves it did not linger.
+    Session.end_session(key)
+    refute Enum.any?(Session.history(key), &(&1["role"] == "user"))
+  end
 end

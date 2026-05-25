@@ -23,7 +23,7 @@ todo el árbol de trabajo.
 ## En el panel
 
 Abre **Traces** en la barra lateral. La lista muestra las ejecuciones más
-recientes del alcance del workspace actual, con su desenlace, su duración y las
+recientes del proyecto del workspace actual, con su desenlace, su duración y las
 herramientas que usó cada una. Pulsa **Replay** en cualquier ejecución para
 recorrerla paso a paso: el prompt arriba y, después, una línea de tiempo con cada
 llamada a herramienta, resultado, failover, recuento de tokens y la respuesta
@@ -32,8 +32,8 @@ final.
 ## Desde la CLI
 
 ```bash
-pepe traces                       # ejecuciones recientes de todos los alcances
-pepe traces --company acme        # solo las ejecuciones de una empresa
+pepe traces                       # ejecuciones recientes de todos los proyectos
+pepe traces --project acme        # solo las ejecuciones de un proyecto
 pepe traces --limit 10            # limita el tamaño de la lista
 pepe traces 1720000000123456      # reproduce una ejecución por id, paso a paso
 ```
@@ -41,9 +41,9 @@ pepe traces 1720000000123456      # reproduce una ejecución por id, paso a paso
 ## Dónde viven los traces
 
 Los traces se escriben como un archivo JSON por ejecución, en
-`<PEPE_HOME>/data/traces/<alcance>/<id>.json`, y el alcance raíz vive bajo
-`root/`. El directorio tiene un tope por alcance, así que los traces más antiguos
-se van recortando y se mantiene acotado. Los argumentos y los resultados de
+`<PEPE_HOME>/data/traces/<slug>/<id>.json`, donde `<slug>` es el slug del proyecto
+(el proyecto por defecto vive bajo `default/`). El directorio tiene un tope por
+proyecto, así que los traces más antiguos se van recortando y se mantiene acotado. Los argumentos y los resultados de
 herramienta muy largos se recortan en el registro guardado.
 
 <div class="note"><strong>Diagnóstico, no registro de facturación.</strong> Los traces existen para explicar una ejecución, y se recortan para mantenerse acotados. La contabilidad de tokens para facturar vive en el <a href="../billing/">libro de uso</a>, separado y de solo adición.</div>

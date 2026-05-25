@@ -100,7 +100,7 @@ Um objetivo aqui é uma meta persistente mais um status. O agente define um no i
 
 A meta e o status sobrevivem entre turnos e a um reinício, então uma execução longa ou autônoma não se desvia daquilo que se propôs a fazer.
 
-<div class="note"><strong>O <code>budget_tokens</code> é um alvo consultivo, não um teto rígido.</strong> O agente é informado dele para manter o esforço proporcional, e nada o obriga a respeitá-lo. Os limites rígidos de gasto são o teto mensal por empresa descrito em <a href="/pt-br/docs/billing/">Uso e cobrança</a>.</div>
+<div class="note"><strong>O <code>budget_tokens</code> é um alvo consultivo, não um teto rígido.</strong> O agente é informado dele para manter o esforço proporcional, e nada o obriga a respeitá-lo. Os limites rígidos de gasto são o teto mensal por projeto descrito em <a href="/pt-br/docs/billing/">Uso e cobrança</a>.</div>
 
 ### `update_plan`: a lista de tarefas viva
 

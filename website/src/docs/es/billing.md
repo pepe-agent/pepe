@@ -1,11 +1,11 @@
 ---
 title: Facturación y límites
-description: Mide cada llamada al modelo por empresa, ponle precio, aplica un margen a lo que facturas, limita el gasto o el volumen de mensajes mensual, y exporta la factura del cliente.
+description: Mide cada llamada al modelo por proyecto, ponle precio, aplica un margen a lo que facturas, limita el gasto o el volumen de mensajes mensual, y exporta la factura del cliente.
 ---
 
 ## Cuánto cuesta una llamada
 
-Cada llamada al modelo se mide y se atribuye a la empresa del agente, así puedes facturarle a un cliente por token. La medición ocurre en el único punto por el que pasan todas las superficies (la consola, la API HTTP `/v1`, el WebSocket, Telegram y todos los canales por webhook), y se va anexando a un ledger duradero, de solo adición, en `~/.pepe/data/usage/<company>/YYYY-MM.jsonl`. Ese archivo es el rastro de auditoría de lo que se cobra.
+Cada llamada al modelo se mide y se atribuye al proyecto del agente, así puedes facturarle a un cliente por token. La medición ocurre en el único punto por el que pasan todas las superficies (la consola, la API HTTP `/v1`, el WebSocket, Telegram y todos los canales por webhook), y se va anexando a un ledger duradero, de solo adición, en `~/.pepe/data/usage/<slug>/YYYY-MM.jsonl` (donde `<slug>` es el slug del proyecto, p. ej. `default`). Ese archivo es el rastro de auditoría de lo que se cobra.
 
 El **coste** es `tokens × el precio del modelo`, cotizado por cada 1M de tokens. Un precio se resuelve por capas, y gana la primera capa que responde:
 
@@ -21,7 +21,7 @@ pepe usage prices --refresh
 
 Los precios también se actualizan solos una vez por semana mientras `serve` o una pasarela estén en marcha.
 
-El **importe a facturar** es `precio de lista × el margen de la empresa`, el multiplicador opcional por empresa que se describe más abajo. Lo que pagaste y lo que facturas se muestran siempre uno al lado del otro, así que un margen nunca le esconde el coste real a tu propio equipo.
+El **importe a facturar** es `precio de lista × el margen del proyecto`, el multiplicador opcional por proyecto que se describe más abajo. Lo que pagaste y lo que facturas se muestran siempre uno al lado del otro, así que un margen nunca le esconde el coste real a tu propio equipo.
 
 ## Suscripciones (ChatGPT Plus, Claude Max)
 
@@ -54,13 +54,13 @@ Si una llamada corrió sobre una suscripción se decide **cuando se registra**, 
 
 ## Facturación y límites
 
-Cada llamada al modelo se mide por empresa (consulta Agentes para entender qué es una empresa y cómo crear una). Además de esa medición, una empresa puede llevar opcionalmente dos topes mensuales independientes, más un margen de facturación:
+Cada llamada al modelo se mide por proyecto (consulta Agentes para entender qué es un proyecto y cómo crear uno). Además de esa medición, un proyecto puede llevar opcionalmente dos topes mensuales independientes, más un margen de facturación:
 
-- **Tope de gasto** (`--budget`) - un límite estricto en tu moneda configurada. En cuanto el total facturable del mes lo alcanza, los agentes de esa empresa dejan de hacer nuevas llamadas al modelo hasta que el tope se reinicie.
-- **Tope de mensajes** (`--message-limit`) - un límite estricto en mensajes originados por clientes. En cuanto se alcanza, los agentes de esa empresa dejan de responder a nuevos mensajes hasta que se reinicie.
+- **Tope de gasto** (`--budget`) - un límite estricto en tu moneda configurada. En cuanto el total facturable del mes lo alcanza, los agentes de ese proyecto dejan de hacer nuevas llamadas al modelo hasta que el tope se reinicie.
+- **Tope de mensajes** (`--message-limit`) - un límite estricto en mensajes originados por clientes. En cuanto se alcanza, los agentes de ese proyecto dejan de responder a nuevos mensajes hasta que se reinicie.
 - **Margen** (`--markup`) - un multiplicador aplicado sobre el coste del proveedor para llegar al importe que cobras al cliente (p. ej., `1.3` = coste del proveedor +30%). Sin definir, facturas exactamente el coste del proveedor.
 
-Los tres son opcionales e independientes: define cualquiera de ellos, todos, o ninguno. Root (el ámbito predeterminado, sin empresa) puede llevar los mismos topes, definidos con `pepe company set root ...`. Root no es una empresa real (nunca aparece en `company list`, no se puede renombrar ni eliminar), pero tampoco está excluido de los límites de facturación.
+Los tres son opcionales e independientes: define cualquiera de ellos, todos, o ninguno. El proyecto por defecto lleva los mismos topes que cualquier otro, definidos con `pepe project set default ...` (o como lo hayas renombrado).
 
 ### Qué cuenta para el tope de mensajes
 
@@ -68,7 +68,7 @@ El tope de mensajes cuenta **un mensaje del cliente, una vez**, no cada llamada 
 
 Solo cuenta mensajes provenientes de superficies orientadas al cliente: Telegram, WhatsApp y otros canales por webhook, el widget incrustable. Excluye deliberadamente la consola TUI, el chat de prueba propio del panel, y la API HTTP, ya que esos son el operador usando su propio runtime, no un cliente enviándole mensajes.
 
-Un agente individual puede quedar exento del tope de mensajes por completo, lo que resulta útil para algo como un agente de escalado siempre activo que nunca debe quedarse callado solo porque el resto de la empresa alcanzó el tope:
+Un agente individual puede quedar exento del tope de mensajes por completo, lo que resulta útil para algo como un agente de escalado siempre activo que nunca debe quedarse callado solo porque el resto del proyecto alcanzó el tope:
 
 ```bash
 pepe agent add escalation --exempt-message-limit
@@ -79,44 +79,44 @@ Hoy no hay forma desde la consola de activar esa opción en un agente que ya exi
 ### Configurar los topes
 
 ```bash
-pepe company set acme --budget 100
-pepe company set acme --message-limit 5000
-pepe company set acme --budget 100 --message-limit 5000 --markup 1.3
+pepe project set acme --budget 100
+pepe project set acme --message-limit 5000
+pepe project set acme --budget 100 --message-limit 5000 --markup 1.3
 ```
 
-`company set` solo modifica las opciones que pases; el resto de la configuración de la empresa queda intacta. Pasa `none` para borrar un tope:
+`project set` solo modifica las opciones que pases; el resto de la configuración del proyecto queda intacta. Pasa `none` para borrar un tope:
 
 ```bash
-pepe company set acme --budget none
+pepe project set acme --budget none
 ```
 
-Los mismos campos son editables desde la página Companies del panel.
+Los mismos campos son editables desde la página Projects del panel.
 
 ### Reiniciar un tope antes de tiempo
 
 Un tope se reinicia naturalmente al comienzo de cada mes de facturación, pero no hace falta esperar:
 
 ```bash
-pepe company reset-budget acme
-pepe company reset-messages acme
+pepe project reset-budget acme
+pepe project reset-messages acme
 ```
 
-La página Companies del panel tiene los mismos dos botones junto al indicador de cada tope, con una confirmación que muestra el recuento actual antes de reiniciar.
+La página Projects del panel tiene los mismos dos botones junto al indicador de cada tope, con una confirmación que muestra el recuento actual antes de reiniciar.
 
-Un reinicio no borra nada; solo marca un punto de corte. El gasto o los mensajes registrados antes del reinicio siguen en el ledger; simplemente dejan de contar para el tope de ahí en adelante. Esto importa por un motivo concreto: **el indicador del tope de gasto y el botón de reinicio solo afectan al recuento operativo usado para bloquear nuevas llamadas al modelo.** El registro de facturación real del mes, lo que le facturarías a un cliente, vive en Usage y siempre refleja el total real, reiniciado o no. Si reinicias el tope de gasto de una empresa a mitad de mes, el indicador de la página Companies mostrará un número menor que la página Usage para ese mismo mes; eso es lo esperado, no una inconsistencia, ya que responden a preguntas distintas ("¿se ha limitado esta empresa desde el último reinicio?" frente a "¿cuánto costó realmente esta empresa este mes?").
+Un reinicio no borra nada; solo marca un punto de corte. El gasto o los mensajes registrados antes del reinicio siguen en el ledger; simplemente dejan de contar para el tope de ahí en adelante. Esto importa por un motivo concreto: **el indicador del tope de gasto y el botón de reinicio solo afectan al recuento operativo usado para bloquear nuevas llamadas al modelo.** El registro de facturación real del mes, lo que le facturarías a un cliente, vive en Usage y siempre refleja el total real, reiniciado o no. Si reinicias el tope de gasto de un proyecto a mitad de mes, el indicador de la página Projects mostrará un número menor que la página Usage para ese mismo mes; eso es lo esperado, no una inconsistencia, ya que responden a preguntas distintas ("¿se ha limitado este proyecto desde el último reinicio?" frente a "¿cuánto costó realmente este proyecto este mes?").
 
 ## Leer el consumo y exportar facturas
 
 ```bash
-pepe usage                                   # todos los ámbitos, por mes, por empresa
-pepe usage --company acme --granularity day  # una empresa, por día
-pepe usage export --company acme             # una factura de cliente (Markdown, o --format csv)
+pepe usage                                   # todos los proyectos, por mes, por proyecto
+pepe usage --project acme --granularity day  # un proyecto, por día
+pepe usage export --project acme             # una factura de cliente (Markdown, o --format csv)
 pepe usage prices --refresh                  # actualiza la caché en vivo de precios
 pepe usage help                              # el recorrido completo
 ```
 
-`usage export` convierte el mes de una empresa en una factura de cliente, en Markdown o CSV. Un agente puede hacer lo mismo por su cuenta con la herramienta `export_invoice`, así que una tarea programada mensual puede exportar la factura de cada cliente y enviarla, usando Pepe para facturar el propio uso de Pepe.
+`usage export` convierte el mes de un proyecto en una factura de cliente, en Markdown o CSV. Un agente puede hacer lo mismo por su cuenta con la herramienta `export_invoice`, así que una tarea programada mensual puede exportar la factura de cada cliente y enviarla, usando Pepe para facturar el propio uso de Pepe.
 
-En el panel, la sección Usage & billing muestra tokens, coste e importe a facturar por ciclo (hora, día, semana, mes, año), con desgloses por empresa, modelo y agente. Los precios por modelo se definen en Models, luego Edit; el margen de una empresa en Companies, luego Edit.
+En el panel, la sección Usage & billing muestra tokens, coste e importe a facturar por ciclo (hora, día, semana, mes, año), con desgloses por proyecto, modelo y agente. Los precios por modelo se definen en Models, luego Edit; el margen de un proyecto en Projects, luego Edit.
 
 La moneda es solo una etiqueta. Por defecto es `USD` y la cambias definiendo `"currency"` en `config.json`. No hay conversión de divisas, así que el número está en la moneda en la que tu proveedor cotiza sus precios.

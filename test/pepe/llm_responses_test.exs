@@ -76,6 +76,48 @@ defmodule Pepe.LLM.ResponsesTest do
     assert res.usage["prompt_tokens"] == 5
   end
 
+  defmodule NoCallId do
+    @behaviour Plug
+    import Plug.Conn
+    @impl true
+    def init(opts), do: opts
+
+    @impl true
+    def call(conn, _opts) do
+      # One valid function call, and one malformed one with no `call_id` - which can't be correlated
+      # with a result and must be dropped rather than emitted with a nil id.
+      events = [
+        ~s({"type":"response.output_item.added","item":{"type":"function_call","id":"item_ok","call_id":"call_ok","name":"good","arguments":"{}"}}),
+        ~s({"type":"response.output_item.added","item":{"type":"function_call","id":"item_bad","name":"orphan","arguments":"{}"}}),
+        ~s({"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":1,"output_tokens":1}}})
+      ]
+
+      body = Enum.map_join(events, "", fn e -> "data: " <> e <> "\n\n" end)
+      conn |> put_resp_content_type("text/event-stream") |> send_resp(200, body)
+    end
+  end
+
+  test "a function call with no call_id is dropped, never emitted with a nil id" do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {:ok, server} = Bandit.start_link(plug: NoCallId, scheme: :http, ip: {127, 0, 0, 1}, port: 0)
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    model = %Model{
+      name: "codex",
+      base_url: "http://127.0.0.1:#{port}/codex",
+      api: "openai-responses",
+      api_key: "not-a-jwt",
+      model: "gpt-5-codex"
+    }
+
+    {:ok, res} = Responses.stream_chat(model, [%{"role" => "user", "content" => "go"}], fn _ -> :ok end)
+
+    assert [call] = res.tool_calls
+    assert call["id"] == "call_ok"
+    refute Enum.any?(res.tool_calls, &(&1["id"] in [nil, ""]))
+  end
+
   defmodule FakeRefusal do
     @behaviour Plug
     import Plug.Conn

@@ -26,7 +26,7 @@ o Pepe responde com uma resposta diferida e publica a resposta real como
 seguimento assim que o agente termina. Formato do URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/root/discord/<slug>
+https://YOUR_HOST/webhooks/default/discord/<slug>
 ```
 
 Vê [Webhooks](../webhooks/) para os campos partilhados por toda a ligação
@@ -39,7 +39,7 @@ O comando que registaste (`/ask` acima) transporta o texto que colocares na tua
 opção `prompt:`; por isso `/model` e `/models` chegam ao Pepe da mesma forma
 que qualquer outra mensagem, escritos nesse valor. Só disparam numa ligação em
 modo `admin` com `commands` ativado; no `support`, são texto simples.
-`/models` lista os modelos disponíveis para a empresa desta ligação; `/model`
+`/models` lista os modelos disponíveis para o projeto desta ligação; `/model`
 mostra o atual, ou muda-o:
 
 ```text

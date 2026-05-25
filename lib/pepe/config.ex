@@ -361,8 +361,14 @@ defmodule Pepe.Config do
     end)
   end
 
-  # Run a one-time, idempotent upgrade and persist it, or pass the config through untouched. Each
-  # migration's `needs?` check reads false once its shape is in place, so it fires at most once.
+  # Run a one-time upgrade and persist it, or pass the config through untouched. The persist here is
+  # load-bearing, not just an optimization: the migrations mint fresh random ids (`m_…`, `p_…`,
+  # `a_…`) each run, so they are NOT idempotent across separate `load/0` calls. The first load must
+  # freeze those ids to disk, or a later `load/0` in the same request would re-migrate to different
+  # ids and a model/agent id resolved from an earlier load would no longer exist. `needs?` reads
+  # false once the shape is in place, so it fires at most once. (This is a read-path write; the only
+  # exposure is a concurrent locked `update/1` on the very first boot of a legacy config, a
+  # one-time window whose loser is at worst a re-migration.)
   defp maybe_migrate(config, needs?, migrate) do
     if needs?.(config), do: config |> migrate.() |> save(), else: config
   end
@@ -747,11 +753,71 @@ defmodule Pepe.Config do
     # Agents are id-keyed and carry their owning project id; filter on that, not on the handle
     # (which is the opaque agent id here, never a `slug/name`), or the project's agents survive as
     # orphans and resurface under the default project.
+    dropped = for {aid, m} <- agents, m["project"] == id, into: MapSet.new(), do: aid
     kept = Map.reject(agents, fn {_id, m} -> m["project"] == id end)
 
+    # Clear bindings BEFORE swapping in `kept`, while the dropped agents still resolve, then drop
+    # any global default that pointed at one of them.
     config
+    |> clear_agent_bindings(dropped)
     |> Map.put("agents", kept)
     |> update_in(["projects"], &Map.delete(&1 || %{}, id))
+    |> then(fn c -> Enum.reduce(dropped, c, &clear_default_if(&2, "default_agent", &1)) end)
+  end
+
+  # When agents are deleted - one agent, or a whole project's - drop or blank every stored binding
+  # that pointed at them, so an agent later created with the same handle can't silently inherit a
+  # dead automation through a legacy handle binding (id bindings already resolve to nil once the id
+  # is gone; handle bindings would re-point at the recreated agent). Cron/watch/token/webhook entries
+  # are purpose-built for their agent and are removed; a Telegram bot's binding is only blanked, so
+  # the bot falls back to the default agent instead of vanishing together with its token. Must run
+  # while the agents still exist, so handle-shaped bindings still resolve to an id.
+  defp clear_agent_bindings(config, ids) do
+    bound? = fn ref -> is_binary(ref) and MapSet.member?(ids, agent_id_for(config, ref)) end
+
+    config
+    |> reject_bound_entries("crons", bound?)
+    |> reject_bound_entries("watches", bound?)
+    |> reject_bound_entries("api_tokens", bound?)
+    |> reject_bound_entries("webhooks", bound?)
+    |> blank_bound_agent("telegram", bound?)
+    |> blank_bound_bots("telegrams", bound?)
+  end
+
+  defp reject_bound_entries(config, section, bound?) do
+    case Map.get(config, section) do
+      m when is_map(m) ->
+        Map.put(config, section, Map.reject(m, fn {_k, v} -> is_map(v) and bound?.(v["agent"]) end))
+
+      _ ->
+        config
+    end
+  end
+
+  defp blank_bound_agent(config, section, bound?) do
+    case Map.get(config, section) do
+      m when is_map(m) ->
+        if bound?.(m["agent"]), do: Map.put(config, section, Map.delete(m, "agent")), else: config
+
+      _ ->
+        config
+    end
+  end
+
+  defp blank_bound_bots(config, section, bound?) do
+    case Map.get(config, section) do
+      m when is_map(m) ->
+        Map.put(
+          config,
+          section,
+          Map.new(m, fn {name, v} ->
+            {name, if(is_map(v) and bound?.(v["agent"]), do: Map.delete(v, "agent"), else: v)}
+          end)
+        )
+
+      _ ->
+        config
+    end
   end
 
   @doc """
@@ -1407,9 +1473,11 @@ defmodule Pepe.Config do
     get_agent(ref) || raise "unknown agent: #{inspect(ref)}"
   end
 
+  @doc "Create or replace an agent. Returns `:ok`, or `{:error, :invalid_name}` for a bad handle."
   def put_agent(%Agent{name: name} = agent) do
     if valid_handle?(name) do
       do_put_agent(agent)
+      :ok
     else
       {:error, :invalid_name}
     end
@@ -1569,6 +1637,7 @@ defmodule Pepe.Config do
 
         id ->
           config
+          |> clear_agent_bindings(MapSet.new([id]))
           |> update_in(["agents"], &Map.delete(&1 || %{}, id))
           |> clear_default_if("default_agent", id)
       end
@@ -1602,33 +1671,39 @@ defmodule Pepe.Config do
 
       id ->
         m = config["agents"][id]
+        pid = m["project"]
         old_handle = agent_handle(config, m)
-        new_handle = Project.handle(project_slug_of(config, m["project"]), new_bare)
+        new_handle = Project.handle(project_slug_of(config, pid), new_bare)
 
-        cond do
-          not Project.valid_name?(new_bare) ->
-            {:error, :invalid_name}
-
-          # Another agent in the same project already has this bare name: renaming onto it would
-          # give two distinct ids the same derived handle and the same workspace dir.
-          agent_name_taken?(config, id, m["project"], new_bare) ->
-            {:error, :already_exists}
-
-          true ->
-            do_rename_agent(id, old_handle, new_handle, new_bare)
-        end
+        if Project.valid_name?(new_bare),
+          do: do_rename_agent(id, pid, old_handle, new_handle, new_bare),
+          else: {:error, :invalid_name}
     end
   end
 
-  defp do_rename_agent(id, old_handle, new_handle, new_bare) do
-    update(fn c ->
-      c
-      |> update_in(["agents", id], &Map.put(&1, "bare", new_bare))
-      |> rekey_agent_refs(old_handle, new_handle)
-    end)
+  # The name-collision check runs INSIDE the writer lock, atomically with the write. Checking it
+  # before `update/1` is a TOCTOU: two concurrent renames to the same name would both pass the
+  # pre-lock check and both commit, leaving two ids with the same derived handle and workspace dir.
+  # If the lock sees the name already taken it leaves the config untouched; we then move the
+  # workspace directory only when the rename actually took effect (the stored `bare` changed).
+  defp do_rename_agent(id, pid, old_handle, new_handle, new_bare) do
+    result =
+      update(fn c ->
+        if agent_name_taken?(c, id, pid, new_bare) do
+          c
+        else
+          c
+          |> update_in(["agents", id], &Map.put(&1, "bare", new_bare))
+          |> rekey_agent_refs(old_handle, new_handle)
+        end
+      end)
 
-    Pepe.Agent.Workspace.rename(old_handle, new_handle)
-    :ok
+    if get_in(result, ["agents", id, "bare"]) == new_bare do
+      Pepe.Agent.Workspace.rename(old_handle, new_handle)
+      :ok
+    else
+      {:error, :already_exists}
+    end
   end
 
   defp agent_name_taken?(config, id, pid, bare) do

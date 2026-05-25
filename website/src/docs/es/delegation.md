@@ -47,6 +47,6 @@ Esto ejecuta los workers como un agente distinto, con la persona y las herramien
 
 ## Lo que cuesta
 
-Cada worker es una llamada de modelo real, medida y facturada como cualquier otra, a la misma empresa. Ocho workers son ocho turnos. Ese es el trato: estás recomprando tiempo de reloj y sitio en la ventana de contexto, y lo pagas en tokens. Para una tarea que no habría cabido en una sola ventana, ni siquiera llega a ser un trato.
+Cada worker es una llamada de modelo real, medida y facturada como cualquier otra, al mismo proyecto. Ocho workers son ocho turnos. Ese es el trato: estás recomprando tiempo de reloj y sitio en la ventana de contexto, y lo pagas en tokens. Para una tarea que no habría cabido en una sola ventana, ni siquiera llega a ser un trato.
 
 Cada worker tiene su propio trace, así que **Traces** en el [panel](../dashboard/) muestra lo que hizo realmente cada uno, no solo lo que el padre dijo de ello.

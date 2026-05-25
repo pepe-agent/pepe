@@ -43,10 +43,10 @@ Todo canal por webhook, qualquer que seja a plataforma, é servido pelo mesmo
 endpoint de entrada:
 
 ```
-/webhooks/:company/:provider/:slug
+/webhooks/:project/:provider/:slug
 ```
 
-`:company` é o escopo do inquilino, e é `root` quando você não usa empresas.
+`:project` é o escopo do projeto, e é `default` quando você não cria projetos adicionais.
 `:provider` é o nome da plataforma, e `:slug` é o nome que você deu à conexão.
 Adicionar um provedor nunca adiciona um endpoint novo.
 

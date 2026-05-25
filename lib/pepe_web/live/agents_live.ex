@@ -365,17 +365,26 @@ defmodule PepeWeb.AgentsLive do
           exempt_message_limit: params["exempt_message_limit"] == "true"
       }
 
-      Config.put_agent(agent)
+      case Config.put_agent(agent) do
+        :ok ->
+          {:noreply,
+           socket
+           |> assign(
+             agents: Config.agents(),
+             edit_agent: nil,
+             form: agent_form(""),
+             default_agent: Config.default_agent_name()
+           )
+           |> put_flash(:info, gettext("Agent %{name} saved.", name: name))}
 
-      {:noreply,
-       socket
-       |> assign(
-         agents: Config.agents(),
-         edit_agent: nil,
-         form: agent_form(""),
-         default_agent: Config.default_agent_name()
-       )
-       |> put_flash(:info, gettext("Agent %{name} saved.", name: name))}
+        {:error, _} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             gettext("Couldn't save %{name}: the name must be letters, digits, - or _.", name: name)
+           )}
+      end
     else
       # Keep what the user typed on screen and show the error under the field.
       edit = %{

@@ -244,11 +244,11 @@ identificado por um id de sessão. Muitas correm lado a lado, e uma falha numa
 nunca toca noutra, por isso um único turno defeituoso não consegue deitar abaixo o
 resto dos teus agentes.
 
-### Multiempresa quando precisas
+### Multi-tenant quando precisas
 
-O trabalho pode ser limitado a uma **empresa**, isolando agentes, canais, modelos
-e utilização por empresa. Se nunca ativares, tudo vive no âmbito predefinido,
-chamado **Principal**, e podes ignorar as empresas por completo.
+O trabalho pode ser limitado a um **projeto**, isolando agentes, canais, modelos
+e utilização por projeto. Se nunca criares outro, tudo vive no **projeto default**,
+para o qual cada comando recorre por omissão, e podes ignorar os projetos por completo.
 
 ## Para onde ir a seguir
 

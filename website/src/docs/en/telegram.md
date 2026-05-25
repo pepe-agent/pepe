@@ -186,7 +186,7 @@ that happened before it was brought in.
 
 `/model` shows the model currently active in this chat, with a **Browse
 models** button to pick a different one; `/models` jumps straight to that
-picker. The picker is scoped to your company and puts a checkmark on the model
+picker. The picker is scoped to your project and puts a checkmark on the model
 in use, so you tap one to switch. Both of those readings are trainers-only,
 since they reveal which models sit behind the bot. Typed usage:
 

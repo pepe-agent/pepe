@@ -24,7 +24,7 @@ credenciales de cliente. La mención al bot se quita del texto entrante antes de
 que el agente lo vea. Forma de la URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/root/msteams/<slug>
+https://YOUR_HOST/webhooks/default/msteams/<slug>
 ```
 
 Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
@@ -35,7 +35,7 @@ cómo funciona la ruta genérica por dentro.
 
 `/model` y `/models` solo se activan en una conexión en modo `admin` con
 `commands` habilitado; en `support`, son texto plano. `/models` lista los
-modelos disponibles para la empresa de esta conexión; `/model` muestra el
+modelos disponibles para el proyecto de esta conexión; `/model` muestra el
 actual, o lo cambia:
 
 ```text

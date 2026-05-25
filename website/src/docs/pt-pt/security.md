@@ -107,7 +107,7 @@ Se precisar mesmo que um agente **atue** a partir do que estranhos enviam, e nã
 
 ### O proprietário pode conduzir a CLI pela conversa
 
-A ferramenta `manage_pepe` executa os mesmos comandos `pepe` não interativos que escreverias num terminal (acrescentar um modelo, definir um agente, gerar um token, agendar uma tarefa, gerir empresas), para que um agente proprietário fidedigno consiga operar todo o runtime a partir de uma conversa.
+A ferramenta `manage_pepe` executa os mesmos comandos `pepe` não interativos que escreverias num terminal (acrescentar um modelo, definir um agente, gerar um token, agendar uma tarefa, gerir projetos), para que um agente proprietário fidedigno consiga operar todo o runtime a partir de uma conversa.
 
 > Tu: Acrescenta um agente chamado researcher com as ferramentas web_search e read_file.
 >
@@ -292,8 +292,8 @@ Sem nenhum token, a API HTTP responde apenas a quem chama a partir de loopback (
 pepe token add --label "ci pipeline"
 ```
 
-O token em bruto é mostrado uma única vez e apenas o seu hash SHA-256 é armazenado, nunca o token em si. Um token pode ter âmbito: `--company` limita-o aos agentes de uma empresa, e `--agent` limita-o a um único agente (que tem de residir dentro dessa empresa). Faz a sua gestão com `pepe token list` e `pepe token revoke ID`, a partir da página de tokens de API do painel, ou por conversa com um agente que tenha a ferramenta protegida `manage_token`. Para os formatos dos pedidos e a utilização do SDK, consulta a [página da API HTTP](../api/).
+O token em bruto é mostrado uma única vez e apenas o seu hash SHA-256 é armazenado, nunca o token em si. Um token pode ter âmbito: `--project` limita-o aos agentes de um projeto, e `--agent` limita-o a um único agente (que tem de residir dentro desse projeto). Faz a sua gestão com `pepe token list` e `pepe token revoke ID`, a partir da página de tokens de API do painel, ou por conversa com um agente que tenha a ferramenta protegida `manage_token`. Para os formatos dos pedidos e a utilização do SDK, consulta a [página da API HTTP](../api/).
 
-## Isolamento multiempresa
+## Isolamento multi-tenant
 
-O trabalho pode ser separado por empresa (um âmbito de empresa baseado num identificador). O âmbito predefinido, sem empresa, chama-se Principal. Os agentes, modelos e chaves de fornecedor de uma empresa ficam invisíveis para as outras empresas, e um token de API com âmbito de empresa alcança apenas os agentes dessa empresa. Isto impede que as credenciais e conversas de uma empresa se infiltrem nas de outra, o que importa quando alojas agentes em nome de vários clientes a partir de uma única instância do Pepe.
+O trabalho pode ser separado por projeto (cada tenant é um projeto). O projeto default é um projeto normal para o qual cada comando recorre por omissão. Os agentes, modelos e chaves de fornecedor de um projeto ficam invisíveis para os outros projetos, e um token de API com âmbito de projeto alcança apenas os agentes desse projeto. Isto impede que as credenciais e conversas de um projeto se infiltrem nas de outro, o que importa quando alojas agentes em nome de vários clientes a partir de uma única instância do Pepe.

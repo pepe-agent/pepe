@@ -58,7 +58,7 @@ defmodule Pepe.LLM.Messages do
 
     case Req.post(req) do
       {:ok, %{status: status, private: %{pepe: state}}} when status in 200..299 ->
-        {:ok, finalize(state)}
+        {:ok, finalize(flush(state, on_delta))}
 
       {:ok, %{status: status} = resp} when status in 200..299 ->
         {:ok, finalize(resp.private[:pepe] || init)}
@@ -359,6 +359,16 @@ defmodule Pepe.LLM.Messages do
   defp map_stop("max_tokens"), do: "length"
   defp map_stop("tool_use"), do: "tool_calls"
   defp map_stop(_), do: nil
+
+  # Flush a final SSE line the stream left un-terminated in the buffer (truncated stream or a
+  # provider that doesn't newline-end its last frame), so its content/tool/error is not dropped. An
+  # incomplete, undecodable line is a no-op.
+  defp flush(state, on_delta) do
+    case String.trim(state.buffer) do
+      "" -> state
+      _ -> handle_line(state.buffer, %{state | buffer: ""}, on_delta)
+    end
+  end
 
   defp finalize(state) do
     tool_calls =

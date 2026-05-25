@@ -24,7 +24,7 @@ bot mention is stripped from the incoming text before the agent sees it.
 Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/root/msteams/<slug>
+https://YOUR_HOST/webhooks/default/msteams/<slug>
 ```
 
 See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
@@ -35,7 +35,7 @@ generic route works under the hood.
 
 `/model` and `/models` only fire on an `admin`-mode connection with
 `commands` enabled; on `support`, they are plain text. `/models` lists the
-models available to this connection's company; `/model` shows the current
+models available to this connection's project; `/model` shows the current
 one, or changes it:
 
 ```text

@@ -15,6 +15,8 @@ defmodule Pepe.LLM.Responses do
   Dispatched from `Pepe.LLM` when `model.api == "openai-responses"`.
   """
 
+  require Logger
+
   alias Pepe.Config.Model
 
   @originator "pepe"
@@ -55,7 +57,7 @@ defmodule Pepe.LLM.Responses do
 
     case Req.post(req) do
       {:ok, %{status: status, private: %{pepe: state}}} when status in 200..299 ->
-        {:ok, finalize(state)}
+        {:ok, finalize(flush(state, on_delta))}
 
       {:ok, %{status: status} = resp} when status in 200..299 ->
         {:ok, finalize(resp.private[:pepe] || init)}
@@ -347,19 +349,29 @@ defmodule Pepe.LLM.Responses do
   # a new output item - register function calls so we can stream their arguments
   defp handle_event(
          "response.output_item.added",
-         %{"item" => %{"type" => "function_call"} = item},
+         %{"item" => %{"type" => "function_call", "call_id" => call_id} = item},
          state,
          _on_delta
-       ) do
-    key = item["id"] || item["call_id"]
+       )
+       when is_binary(call_id) and call_id != "" do
+    key = item["id"] || call_id
 
     call = %{
-      "call_id" => item["call_id"],
+      "call_id" => call_id,
       "name" => item["name"],
       "arguments" => item["arguments"] || ""
     }
 
     %{state | calls: Map.put(state.calls, key, call), order: append_once(state.order, key)}
+  end
+
+  # A function call with no `call_id` can't be correlated with its result: the tool-result message we
+  # send back keys on `call_id`, so a nil one would be rejected by the provider (or silently mismatch).
+  # A conforming Responses stream always carries it; skip the malformed item rather than emit a
+  # nil-id tool call downstream.
+  defp handle_event("response.output_item.added", %{"item" => %{"type" => "function_call"}}, state, _on_delta) do
+    Logger.warning("[responses] dropping a function_call with no call_id")
+    state
   end
 
   # streamed tool-call argument fragments
@@ -411,6 +423,16 @@ defmodule Pepe.LLM.Responses do
   defp map_status("failed"), do: "error"
   defp map_status("cancelled"), do: "error"
   defp map_status(_), do: "stop"
+
+  # Flush a final SSE line the stream left un-terminated in the buffer (truncated stream or a
+  # provider that doesn't newline-end its last frame), so its content/tool/error is not dropped. An
+  # incomplete, undecodable line is a no-op.
+  defp flush(state, on_delta) do
+    case String.trim(state.buffer) do
+      "" -> state
+      _ -> handle_line(state.buffer, %{state | buffer: ""}, on_delta)
+    end
+  end
 
   defp finalize(state) do
     tool_calls =

@@ -9,12 +9,11 @@ Todo canal por webhook, seja qual for a plataforma, é acessível em uma única
 rota:
 
 ```
-https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
+https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<company>` é o escopo de empresa. Use `root` para o escopo padrão
-  (mostrado como "Principal" no painel), ou o identificador de uma empresa para
-  isolar uma conexão naquela empresa.
+- `<project>` é o escopo do projeto. Use `default` para o projeto default,
+  ou o slug de outro projeto para isolar uma conexão naquele projeto.
 - `<provider>` é o nome da plataforma: `whatsapp`, `slack`, `discord`,
   `msteams` ou `googlechat`.
 - `<slug>` é o nome único que você deu à conexão.
@@ -81,7 +80,7 @@ para nenhum outro canal. WhatsApp e Discord não filtram por menção hoje
 `/model` e `/models` só disparam numa conexão em modo `admin` com `commands`
 habilitado (veja a comparação de modos em [Channels](../channels/)); no
 `support`, viram texto puro. `/models` lista os modelos disponíveis para a
-empresa da conexão; `/model` mostra o atual, ou troca:
+projeto da conexão; `/model` mostra o atual, ou troca:
 
 ```text
 /model openrouter               # pergunta se troca só esse chat ou todos

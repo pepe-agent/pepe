@@ -42,11 +42,11 @@ Every webhook channel, whatever the platform, is served by the same inbound
 endpoint:
 
 ```
-/webhooks/:company/:provider/:slug
+/webhooks/:project/:provider/:slug
 ```
 
-`:company` is the tenant scope, and it is `root` when you are not using
-companies. `:provider` is the platform name, and `:slug` is the name you gave the
+`:project` is the tenant scope, and it is `default` when you are not using
+extra projects. `:provider` is the platform name, and `:slug` is the name you gave the
 connection. Adding a provider never adds a new endpoint.
 
 These are the webhook channels that ship with Pepe, and what each one needs:

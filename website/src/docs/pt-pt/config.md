@@ -74,7 +74,7 @@ pepe agent add assistant --model openrouter --utility-model groq-fast
 
 Também está no painel, em Agents, depois Edit, depois Chores. E um agente que tenha a ferramenta `manage_agent` consegue fazê-lo pela conversa: "faz as tuas tarefas menores no groq-fast".
 
-**Deixa por definir e as conversas continuam a receber nome**, a partir das primeiras palavras da mensagem de abertura. É gratuito, é offline, e a primeira mensagem de ninguém é enviada seja para onde for para ser lida. Não é muito pior para aquilo que uma barra lateral serve realmente, que é reconheceres a conversa. O que o Pepe nunca fará é recorrer ao modelo do próprio agente, porque isso começaria a gastar em cada instalação que apenas atualizou de versão, e o Pepe imputa esses tokens a uma empresa. Um `utility_model` a nomear uma ligação que não existe conta como por definir, pelo mesmo motivo, e o `pepe doctor` di-lo: um erro de escrita não pode ser aquilo que começa a gastar.
+**Deixa por definir e as conversas continuam a receber nome**, a partir das primeiras palavras da mensagem de abertura. É gratuito, é offline, e a primeira mensagem de ninguém é enviada seja para onde for para ser lida. Não é muito pior para aquilo que uma barra lateral serve realmente, que é reconheceres a conversa. O que o Pepe nunca fará é recorrer ao modelo do próprio agente, porque isso começaria a gastar em cada instalação que apenas atualizou de versão, e o Pepe imputa esses tokens a um projeto. Um `utility_model` a nomear uma ligação que não existe conta como por definir, pelo mesmo motivo, e o `pepe doctor` di-lo: um erro de escrita não pode ser aquilo que começa a gastar.
 
 Um aviso sobre os escalões "gratuitos" de modelos. O texto enviado para dar nome a uma conversa é a **mensagem de abertura** do cliente, que é onde estão o nome, o número de telefone e a reclamação. A maioria dos escalões gratuitos paga-se com os teus dados. Se não colocarias essa mensagem num conjunto de treino, não apontes o `utility_model` para um deles. O caminho sem modelo existe precisamente para não teres de o fazer.
 
@@ -121,7 +121,7 @@ A ferramenta `doctor` faz uma verificação de saúde de toda a configuração e
 
 ## Armazenamento e cópia de segurança: são todos ficheiros, sem base de dados
 
-Tudo vive dentro de `~/.pepe/` (ou de `PEPE_HOME`). Não há servidor de base de dados. O `config.json` é a única fonte de verdade para empresas, agentes, modelos, watches, crons, bots, servidores MCP e tokens de API já com hash. O conhecimento de um agente vive como ficheiros em `agents/<name>/` e em `companies/<co>/agents/<name>/`, o histórico das conversas em `data/sessions/`, e o `data/mnesia/` é uma cache descartável que se reconstrói sozinha. O `Pepe.Repo` e o Postgres existem no código, mas estão desligados (`ecto_repos: []`); são a porta deixada aberta para um futuro backend de base de dados, hoje sem uso.
+Tudo vive dentro de `~/.pepe/` (ou de `PEPE_HOME`). Não há servidor de base de dados. O `config.json` é a única fonte de verdade para projetos, agentes, modelos, watches, crons, bots, servidores MCP e tokens de API já com hash. O conhecimento de um agente vive como ficheiros em `agents/<name>/` e em `projects/<slug>/agents/<name>/`, o histórico das conversas em `data/sessions/`, e o `data/mnesia/` é uma cache descartável que se reconstrói sozinha. O `Pepe.Repo` e o Postgres existem no código, mas estão desligados (`ecto_repos: []`); são a porta deixada aberta para um futuro backend de base de dados, hoje sem uso.
 
 Os segredos nunca são guardados em texto simples. São referências `${ENV_VAR}` resolvidas no momento da leitura, por isso vivem no teu ambiente e não nos ficheiros.
 
@@ -132,4 +132,4 @@ pepe backup                       # gera pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /path/x.tgz
 ```
 
-Para restaurar, `pepe restore esse-arquivo.tgz` e exporta novamente essas variáveis. Também pode retirar uma única empresa para correr no seu próprio servidor com `pepe extract`. Veja [Cópia de segurança e extração](/pt-pt/docs/backup/) para a história completa.
+Para restaurar, `pepe restore esse-arquivo.tgz` e exporta novamente essas variáveis. Também pode retirar um único projeto para correr no seu próprio servidor com `pepe extract`. Veja [Cópia de segurança e extração](/pt-pt/docs/backup/) para a história completa.

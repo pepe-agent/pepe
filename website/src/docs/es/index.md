@@ -247,11 +247,11 @@ identificado por un id de sesión. Muchas se ejecutan en paralelo, y una caída 
 nunca toca a otra, así que un solo turno defectuoso no puede tumbar al resto de
 tus agentes.
 
-### Multiempresa cuando la necesitas
+### Multi-cliente cuando la necesitas
 
-El trabajo puede acotarse a una **empresa**, aislando agentes, canales, modelos y
-uso por empresa. Si nunca lo activas, todo vive en el ámbito predeterminado,
-llamado **Principal**, y puedes ignorar las empresas por completo.
+El trabajo puede acotarse a un **proyecto**, aislando agentes, canales, modelos y
+uso por cliente. Si nunca lo activas, todo vive en el **proyecto por defecto**, al
+que recurre cada comando, y puedes ignorar los proyectos por completo.
 
 ## A dónde ir después
 

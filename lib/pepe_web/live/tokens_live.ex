@@ -204,9 +204,11 @@ defmodule PepeWeb.TokensLive do
 
   # A readable scope for a stored token: "Principal" or the project, plus the agent when
   # locked, plus a widget/origin badge when it's a public embeddable token.
-  defp token_scope(%{"project" => project, "agent" => agent} = t) do
-    base = project || gettext("Principal")
-    scope = if agent, do: "#{base} / #{agent}", else: base
+  # Read fields by key rather than matching a fixed shape: a token from an older config (or a
+  # hand-edit) may be missing `project`/`agent`, and a display helper must degrade, not crash the page.
+  defp token_scope(t) when is_map(t) do
+    base = t["project"] || gettext("Principal")
+    scope = if t["agent"], do: "#{base} / #{t["agent"]}", else: base
 
     if t["kind"] == "widget" do
       scope <> " · " <> gettext("widget (%{origin})", origin: t["allowed_origin"] || gettext("no origin set"))

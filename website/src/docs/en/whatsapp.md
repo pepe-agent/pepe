@@ -10,12 +10,12 @@ WhatsApp uses Meta's Cloud API. Unlike Telegram, which Pepe polls, WhatsApp
 Pepe's generic inbound route:
 
 ```
-/webhooks/:company/:provider/:slug        e.g.  /webhooks/acme/whatsapp/support
+/webhooks/:project/:provider/:slug        e.g.  /webhooks/acme/whatsapp/support
 ```
 
 That route is one generic webhook surface backed by a provider registry, not
-WhatsApp-specific plumbing. The `:company` segment is `root` when you are not
-using companies. A `GET` on the URL answers Meta's verification handshake. A
+WhatsApp-specific plumbing. The `:project` segment is `default` when you are not
+using extra projects. A `GET` on the URL answers Meta's verification handshake. A
 `POST` is an inbound message: its `X-Hub-Signature-256` is verified against the
 app secret, then the bound agent runs and its reply goes back over the Graph API.
 `pepe serve` serves this route, so there is no extra process to run.
@@ -53,7 +53,7 @@ verify token. Paste both into the Meta app's webhook configuration, and subscrib
 the `messages` field so Meta actually delivers inbound messages to you:
 
 ```
-https://YOUR_HOST/webhooks/root/whatsapp/support
+https://YOUR_HOST/webhooks/default/whatsapp/support
 ```
 
 Manage connections:
@@ -65,7 +65,7 @@ pepe gateway whatsapp remove support
 ```
 
 `whatsapp list` prints every connection with its callback URL. The other flags on
-`whatsapp add` are `--company`, `--trainers`, `--ttl-min`, `--ephemeral`, and
+`whatsapp add` are `--project`, `--trainers`, `--ttl-min`, `--ephemeral`, and
 `--commands`, mapping to the per-connection fields described above. The dashboard
 adds and edits WhatsApp connections through the same Channels section.
 
@@ -98,7 +98,7 @@ is in [Channels](../channels/); for a WhatsApp number it comes down to this:
 ### The session
 
 The session is keyed `whatsapp:<agent>:<phone>`. It is the agent's thread with
-that one customer, isolated per company through the agent handle. Two things end
+that one customer, isolated per project through the agent handle. Two things end
 it:
 
 - The agent calls the **`end_session`** tool when the exchange is done, which
@@ -118,7 +118,7 @@ which this channel does not send.</div>
 
 `/model` and `/models` only fire on an `admin`-mode connection (see the mode
 comparison above); on `support`, they are plain text like any other slash
-command. `/models` lists the models available to this connection's company;
+command. `/models` lists the models available to this connection's project;
 `/model` shows the one currently active, or changes it:
 
 ```text

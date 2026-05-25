@@ -61,7 +61,7 @@ Diferente da CLI, essa ferramenta não tem `--force`. Um veredito `danger` da va
 
 ## Liberar acesso à API
 
-A ferramenta protegida `manage_token` gera, lista e revoga tokens de portador do `/v1` pela conversa, com escopo de uma empresa ou de um único agente. Assim um agente consegue dar acesso a uma integração sem que você precise ir até um terminal. Como as outras ferramentas de gestão, ela não é somente leitura, então passa antes pela barreira de permissão.
+A ferramenta protegida `manage_token` gera, lista e revoga tokens de portador do `/v1` pela conversa, com escopo de um projeto ou de um único agente. Assim um agente consegue dar acesso a uma integração sem que você precise ir até um terminal. Como as outras ferramentas de gestão, ela não é somente leitura, então passa antes pela barreira de permissão.
 
 ## O dono pode rodar a CLI inteira
 

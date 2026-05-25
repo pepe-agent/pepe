@@ -8,12 +8,11 @@ description: Configure Slack, Discord, Microsoft Teams, Google Chat, and generic
 Every webhook channel, whatever the platform, is reachable at one route:
 
 ```
-https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
+https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<company>` is the tenant scope. Use `root` for the default scope (shown as
-  "Principal" in the dashboard), or a company handle to wall a connection off
-  to that tenant.
+- `<project>` is the tenant scope. Use `default` for the default project, or
+  another project's slug to wall a connection off to that tenant.
 - `<provider>` is the platform name: `whatsapp`, `slack`, `discord`,
   `msteams`, or `googlechat`.
 - `<slug>` is the unique name you gave the connection.
@@ -79,7 +78,7 @@ answered), so `/mention` is a no-op there.
 `/model` and `/models` fire only on an `admin`-mode connection with `commands`
 enabled (see the mode comparison in [Channels](../channels/)); on `support`,
 they are plain text. `/models` lists the models available to the connection's
-company; `/model` shows the current one, or changes it:
+project; `/model` shows the current one, or changes it:
 
 ```text
 /model openrouter               # ask whether to switch just this chat or everyone

@@ -102,9 +102,9 @@ below); asking it to touch one outside that scope is politely refused.
 
 | Field | What it does | Default |
 |-------|--------------|---------|
-| `name` | The agent's identity, and the key it is stored and addressed under. Inside a company it becomes a handle like `acme/assistant` (see below). | required |
+| `name` | The agent's addressable label. In a project it becomes a handle like `acme/assistant` (see below). The agent also carries a stable internal id, so this name can be changed without breaking any binding. | required |
 | `description` | A short human note. Never sent to the model. | none |
-| `model` | The name of a model connection. Leave it unset to use the scope's default model. | scope default |
+| `model` | The name of a model connection. Leave it unset to use the project's default model. | project default |
 | `system_prompt` | The persona and instructions the agent runs with. | `You are Pepe, a helpful AI agent.` (a seed prompt) |
 | `tools` | The list of tool names this agent may call. Only these are offered to the model. | all tools when `--tools` is omitted at creation |
 | `auto_approve` | Tools this agent may run without asking for permission. `["*"]` means every tool. | `[]` |
@@ -136,7 +136,7 @@ The iteration limit is the guardrail that keeps a confused agent from looping
 forever.
 
 Two other gates sit in front of the model call. An agent whose model requires
-redaction refuses to run unless the agent has a redaction hook enabled, and a company
+redaction refuses to run unless the agent has a redaction hook enabled, and a project
 that has hit its monthly spend cap (or its monthly customer-message cap, a separate
 limit) stops here with no new model calls or replies. Both fail the turn cleanly
 rather than silently proceeding; see Billing & limits for how those caps are set.
@@ -286,7 +286,7 @@ an agent:
 pepe run "summarize this repository"
 ```
 
-The first agent you create in the default (non-company) scope automatically becomes
+The first agent you create in the default project automatically becomes
 the default. Change it at any time:
 
 ```bash
@@ -314,8 +314,8 @@ pepe agent route triage assistant
 ```
 
 Now `triage` can hand work to `assistant`. Remove the route with `--remove`. Routes
-never cross a company boundary; the CLI refuses `A -> B` when the two are in
-different companies.
+never cross a project boundary; the CLI refuses `A -> B` when the two are in
+different projects.
 
 ### Do it by chat
 
@@ -366,36 +366,42 @@ change, you authorize it, and only then is it applied. An agent can also rename
 itself with the separate `rename_agent` tool ("From now on, call yourself scout"),
 which moves its workspace directory and takes effect on the next message.
 
-## Multi-tenant agents with companies
+## Multi-tenant agents with projects
 
-Companies are optional. Without one, everything lives in the default **root** scope
-(shown as "Principal" in the dashboard), exactly as a single-tenant install always
-has. Add a company to wall a tenant off: its agents, workspaces, shared space, model
-connections, and routing are isolated from every other company.
+Every agent lives in a project. On a fresh install that is the single **default
+project**, which every command falls back to when you omit `--project`, exactly as a
+single-tenant install always has. Add a second project to wall a tenant off: its
+agents, workspaces, shared space, model connections, and routing are isolated from
+every other project.
 
-An agent's real identity is its handle. In the root scope the handle is just the
-bare name (`assistant`). Inside a company it is qualified as `company/name`
-(`acme/assistant`), so the same bare name can be reused across companies without
+An agent's real identity is its handle. In the default project the handle is just
+the bare name (`assistant`). In another project it is qualified as `project/name`
+(`acme/assistant`), so the same bare name can be reused across projects without
 collision.
 
-Create a company, then add agents inside it with `--company`:
+Create a project, then add agents inside it with `--project`:
 
 ```bash
-pepe company add acme --description "Acme Corp"
+pepe project add acme --description "Acme Corp"
 
 pepe agent add support \
-  --company acme \
+  --project acme \
   --model openrouter \
   --prompt "You are Acme's support agent." \
   --tools read_file,web_search
 ```
 
-Add `--company acme` to any agent command to act inside that scope. Bare peer names
-in `--can-message` and `--can-manage` resolve into the agent's own company, so routes
-never accidentally cross a tenant boundary. Each company can pin its own default
-model and default agent, or share the operator's global provider. A company agent is
-never promoted to the global (root) default just by being the first one created
-inside its company.
+Add `--project acme` to any agent command to act inside that scope. Bare peer names
+in `--can-message` and `--can-manage` resolve into the agent's own project, so routes
+never accidentally cross a tenant boundary. Each project can pin its own default
+model and default agent, or share the operator's global provider. An agent is never
+promoted to the global default just by being the first one created inside a
+non-default project.
+
+Both projects and agents carry a stable internal id, and every binding (routing,
+permissions, defaults, crons, bots, tokens) is recorded against that id, not the
+name. Renaming a project or an agent relabels it and moves its directory; nothing
+that pointed at it dangles.
 
 ## Managing agents from the CLI
 
@@ -414,25 +420,25 @@ pepe agent add NAME \
   [--triage-model MODEL] \
   [--simple-model MODEL] \
   [--default] \
-  [--company CO]
+  [--project PROJECT]
 
-# List agents in a scope, or every agent everywhere.
-pepe agent list [--company CO | --all]
+# List agents in a project, or every agent everywhere.
+pepe agent list [--project PROJECT | --all]
 
 # Directed messaging: let FROM message TO.
-pepe agent route FROM TO [--remove] [--company CO]
+pepe agent route FROM TO [--remove] [--project PROJECT]
 
 # Management authority: let ADMIN administer TARGET (or "*" for all).
-pepe agent manage ADMIN TARGET [--remove] [--company CO]
+pepe agent manage ADMIN TARGET [--remove] [--project PROJECT]
 
 # Rename an agent and move its workspace directory.
 pepe agent rename OLD NEW
 
 # Delete an agent.
-pepe agent remove NAME [--company CO]
+pepe agent remove NAME [--project PROJECT]
 
-# Set the default agent for a scope.
-pepe agent default NAME [--company CO]
+# Set the default agent for a project.
+pepe agent default NAME [--project PROJECT]
 ```
 
 ## Running an agent

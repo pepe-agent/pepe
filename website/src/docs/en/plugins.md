@@ -359,7 +359,7 @@ agent takes over (`open`), Pepe goes quiet, and resumes when it's back to
 `pending`.
 
 **Setup, in Chatwoot:** create an AgentBot, point its outgoing webhook at
-`https://YOUR_HOST/webhooks/<company>/chatwoot/<slug>`. The connection holds
+`https://YOUR_HOST/webhooks/<project>/chatwoot/<slug>`. The connection holds
 `base_url`, `account_id`, and an `api_token` (as a `${ENV_VAR}`) via
 `config_schema/0`, filled from the dashboard, same Configure pattern as any
 plugin.

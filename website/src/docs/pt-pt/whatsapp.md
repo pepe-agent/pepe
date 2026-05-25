@@ -10,12 +10,12 @@ o WhatsApp **empurra** as mensagens de entrada para um webhook, por isso cada
 ligação recebe o seu próprio URL na rota de entrada genérica do Pepe:
 
 ```
-/webhooks/:company/:provider/:slug        ex.:  /webhooks/acme/whatsapp/support
+/webhooks/:project/:provider/:slug        ex.:  /webhooks/acme/whatsapp/support
 ```
 
 Essa rota é uma superfície de webhook genérica, assente num registo de
 fornecedores, e não uma canalização específica do WhatsApp. O segmento
-`:company` é `root` quando não usas empresas. Um `GET` nesse URL responde ao
+`:project` é `default` quando não crias outros projetos. Um `GET` nesse URL responde ao
 aperto de mão de verificação da Meta. Um `POST` é uma mensagem de entrada: o
 respetivo `X-Hub-Signature-256` é verificado contra o app secret, o agente
 associado corre e a resposta volta pela Graph API. O `pepe serve` serve esta
@@ -54,7 +54,7 @@ configuração de webhook da aplicação da Meta e subscreve o campo `messages`,
 que a Meta entregue de facto as mensagens de entrada:
 
 ```
-https://YOUR_HOST/webhooks/root/whatsapp/support
+https://YOUR_HOST/webhooks/default/whatsapp/support
 ```
 
 Gerir ligações:
@@ -66,7 +66,7 @@ pepe gateway whatsapp remove support
 ```
 
 O `whatsapp list` imprime cada ligação com o respetivo URL de retorno. As outras
-opções do `whatsapp add` são `--company`, `--trainers`, `--ttl-min`,
+opções do `whatsapp add` são `--project`, `--trainers`, `--ttl-min`,
 `--ephemeral` e `--commands`, que correspondem aos campos por ligação descritos
 acima. O painel adiciona e edita ligações do WhatsApp pela mesma secção Channels.
 
@@ -98,7 +98,7 @@ em [Canais](../channels/); para um número de WhatsApp, resume-se a isto:
 ### A sessão
 
 A sessão é indexada como `whatsapp:<agent>:<phone>`. É a conversa do agente com
-aquele cliente em concreto, isolada por empresa através do handle do agente. Duas
+aquele cliente em concreto, isolada por projeto através do handle do agente. Duas
 coisas põem-lhe fim:
 
 - O agente invoca a ferramenta **`end_session`** quando a troca termina, o que
@@ -118,7 +118,7 @@ precisam de modelos pré-aprovados, que este canal não envia.</div>
 
 `/model` e `/models` só disparam numa ligação em modo `admin` (vê a comparação de
 modos acima); no `support`, são texto simples como qualquer outro comando de
-barra. `/models` lista os modelos disponíveis para a empresa dessa ligação;
+barra. `/models` lista os modelos disponíveis para o projeto dessa ligação;
 `/model` mostra o que está ativo, ou muda-o:
 
 ```text

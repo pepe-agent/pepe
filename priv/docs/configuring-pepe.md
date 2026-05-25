@@ -12,6 +12,8 @@ All configuration is a single JSON file at `~/.pepe/config.json` (overridable wi
 - `models` - model connections (name -> base_url, api_key, model).
 - `agents` - agent definitions (name -> prompt, tools, model, routes, admin scope).
 - `default_model`, `default_agent` - the defaults.
+- `projects` - tenant scopes, keyed by stable id (each has a `slug` + `name`).
+- `default_project` - id of the project every bare command falls back to (slug `default`).
 - `telegram` / `telegrams` - the default Telegram bot + named bots.
 - `crons` - scheduled tasks.
 - `mcp` - external MCP tool servers.
@@ -40,7 +42,11 @@ A small, realistic `~/.pepe/config.json` (secrets are `${ENV}` refs, never raw):
       "can_manage": null
     }
   },
-  "companies": { "acme": { "description": "Acme Inc", "default_model": "gpt" } },
+  "default_project": "p_1a2b3c4d",
+  "projects": {
+    "p_1a2b3c4d": { "slug": "default", "name": "Default" },
+    "p_5e6f7a8b": { "slug": "acme", "name": "Acme Inc", "default_model": "gpt" }
+  },
   "telegram": { "bot_token": "${TELEGRAM_BOT_TOKEN}", "allowed_chats": [] },
   "server": { "port": 4000 },
   "timezone": "America/Sao_Paulo"
@@ -49,7 +55,10 @@ A small, realistic `~/.pepe/config.json` (secrets are `${ENV}` refs, never raw):
 
 An agent references a model by name (`"model": "gpt"`); `can_message` is its routing
 allowlist and `can_manage` its admin scope (`null` = itself only - see `permissions`).
-Keys you don't use are simply absent.
+Each entry in `projects` is keyed by a **stable id** (`p_...`); its `slug`/`name` is a
+mutable label, and `default_project` points at the id of the always-present `default`
+project. Renaming a project changes its label, not its id, so bindings never dangle
+(see `projects`). Keys you don't use are simply absent.
 
 ## Secrets - never in plaintext
 
@@ -83,10 +92,10 @@ set that env var - do not paste the secret.
 ## Your workspace on disk
 
 Beyond `config.json`, each agent has a private, persistent **workspace** directory -
-`~/.pepe/agents/<name>/` for a root agent, `~/.pepe/companies/<co>/agents/<name>/` for
-a company one. Relative paths in your file tools land there and survive across
-conversations. A cross-agent `~/.pepe/shared/` (per-company under
-`companies/<co>/shared/`) is reachable via a `shared/...` path.
+`~/.pepe/projects/<slug>/agents/<name>/` (the default project's slug is `default`).
+Relative paths in your file tools land there and survive across conversations. A
+per-project cross-agent `~/.pepe/projects/<slug>/shared/` is reachable via a
+`shared/...` path.
 
 A few filenames are **conventions** you may create and maintain yourself:
 
@@ -104,8 +113,8 @@ where files persist. Rename yourself with `rename_agent` (it moves this director
 
 ## Backup, extract, and restore
 
-`mix pepe backup` tars the durable parts of `~/.pepe` - `config.json`, every agent and
-company workspace, `shared`, and sessions - into a `.tgz`, skipping the disposable
+`mix pepe backup` tars the durable parts of `~/.pepe` - `config.json`, every project's
+agent workspaces, `shared`, and sessions - into a `.tgz`, skipping the disposable
 Mnesia cache (it rebuilds itself). Optional `--output FILE.tgz` picks the path.
 
 ```bash
@@ -113,10 +122,10 @@ mix pepe backup                          # writes pepe-backup-YYYY-MM-DD.tgz
 mix pepe backup --output ~/pepe-safe.tgz
 ```
 
-`mix pepe extract COMPANY` lifts one company out as a **standalone, root-scoped**
-archive: its `company/agent` handles are rewritten to bare names, so the `.tgz` is a
-fresh single-tenant install that is only that company - drop it on a new server and run.
-Only that company's agents, models, workspaces and usage travel, plus any shared model
+`mix pepe extract PROJECT` lifts one project out as a **standalone, default-project**
+archive: its `project/agent` handles are rewritten to bare names, so the `.tgz` is a
+fresh single-tenant install that is only that project - drop it on a new server and run.
+Only that project's agents, models, workspaces and usage travel, plus any shared model
 its agents depend on (the command names them). Nothing of the other tenants goes with it.
 
 ```bash

@@ -14,7 +14,7 @@ import type { Locale } from "../i18n/ui";
 // the architecture, the test suite, how to add a tool, how to migrate, how to help.
 export const docsNav: { group: string; slugs: string[] }[] = [
   { group: "start", slugs: ["index", "install", "docker", "quickstart"] },
-  { group: "configure", slugs: ["models", "agents", "config", "secrets", "billing", "companies"] },
+  { group: "configure", slugs: ["models", "agents", "config", "secrets", "billing", "projects"] },
   { group: "capabilities", slugs: ["skills", "learning", "routing", "delegation", "admin-agents"] },
   {
     group: "channels",

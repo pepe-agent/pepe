@@ -61,6 +61,6 @@ No modo com estado a resposta inclui o `session_id` que você usou, para que voc
 
 Se o Pepe cair no meio de um turno (um deploy, um crash) com a persistência de sessões ativada, a conversa interrompida não é simplesmente perdida. Na próxima subida, o Pepe detecta qualquer sessão cujo último turno não terminou, reexecuta esse turno internamente e entrega a resposta para onde a conversa estava acontecendo (Telegram, o painel, qualquer que seja o canal), então uma mensagem interrompida ainda recebe resposta em vez de simplesmente sumir. Isso só vale para sessões persistidas (`serve`/`gateway`), não para chamadas avulsas de `pepe run`.
 
-<div class="note"><strong>Isolamento entre empresas.</strong> As chaves de sessão são internamente delimitadas por empresa. O mesmo id de sessão usado sob dois tokens diferentes (duas empresas diferentes) nunca chega à mesma conversa, de modo que uma empresa nunca consegue ler a sessão de outra.</div>
+<div class="note"><strong>Isolamento entre projetos.</strong> As chaves de sessão são internamente delimitadas por projeto. O mesmo id de sessão usado sob dois tokens diferentes (dois projetos diferentes) nunca chega à mesma conversa, de modo que um projeto nunca consegue ler a sessão de outro.</div>
 
 Para voltar ao modo sem estado, simplesmente omita as três fontes de id e envie você mesmo o array completo de `messages`. Esse é o comportamento comum da OpenAI.

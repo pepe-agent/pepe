@@ -63,7 +63,7 @@ A diferencia de la CLI, esta herramienta no tiene `--force`. Un veredicto `dange
 
 ## Repartir acceso a la API
 
-La herramienta protegida `manage_token` genera, lista y revoca tokens de portador de `/v1` desde el chat, acotados a una empresa o a un solo agente. Así un agente puede darle acceso a una integración sin que tú tengas que bajar a una terminal. Como las demás herramientas de gestión, no es de solo lectura, así que pasa antes por la barrera de permisos.
+La herramienta protegida `manage_token` genera, lista y revoca tokens de portador de `/v1` desde el chat, acotados a un proyecto o a un solo agente. Así un agente puede darle acceso a una integración sin que tú tengas que bajar a una terminal. Como las demás herramientas de gestión, no es de solo lectura, así que pasa antes por la barrera de permisos.
 
 ## El propietario puede ejecutar la CLI entera
 

@@ -29,8 +29,8 @@ answer.
 ## From the CLI
 
 ```bash
-pepe traces                       # recent runs across all scopes
-pepe traces --company acme        # only one company's runs
+pepe traces                       # recent runs across all projects
+pepe traces --project acme        # only one project's runs
 pepe traces --limit 10            # cap the list
 pepe traces 1720000000123456      # replay one run by id, step by step
 ```
@@ -38,9 +38,9 @@ pepe traces 1720000000123456      # replay one run by id, step by step
 ## Where traces live
 
 Traces are written as one JSON file per run under
-`<PEPE_HOME>/data/traces/<scope>/<id>.json`, and the root scope lives under
-`root/`. The directory is capped per scope, so the oldest traces are trimmed and
-it stays bounded. Long tool arguments and results are clipped in the stored
+`<PEPE_HOME>/data/traces/<slug>/<id>.json`, where `<slug>` is the project's slug
+(the default project lives under `default/`). The directory is capped per project,
+so the oldest traces are trimmed and it stays bounded. Long tool arguments and results are clipped in the stored
 record.
 
 <div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and they are trimmed and clipped to stay bounded. Token accounting for invoices lives in the separate, append-only <a href="../billing/">usage ledger</a>.</div>

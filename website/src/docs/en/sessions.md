@@ -61,6 +61,6 @@ In stateful mode the response includes the `session_id` you used, so you can ech
 
 If Pepe goes down mid-turn (a deploy, a crash) while session persistence is on, the interrupted conversation is not just lost. On the next boot, Pepe notices any session whose last turn never finished, replays it as an internal follow-up, and delivers the reply to wherever the conversation was happening (Telegram, the dashboard, whichever channel it came from), so an interrupted message still gets answered instead of silently vanishing. This only applies to persisted sessions (`serve`/`gateway`), not one-shot `pepe run` calls.
 
-<div class="note"><strong>Tenancy isolation.</strong> Session keys are namespaced by company internally. The same session id used under two different tokens (two different companies) never reaches the same conversation, so one tenant can never read another tenant's session.</div>
+<div class="note"><strong>Tenancy isolation.</strong> Session keys are namespaced by project internally. The same session id used under two different tokens (two different projects) never reaches the same conversation, so one tenant can never read another tenant's session.</div>
 
 To go stateless, simply omit all three id sources and send the full `messages` array yourself. That is the plain OpenAI behavior.

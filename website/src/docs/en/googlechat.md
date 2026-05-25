@@ -21,7 +21,7 @@ Only `MESSAGE` events from a human are acted on. Replies are posted back to
 the space through the Chat REST API. Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/root/googlechat/<slug>
+https://YOUR_HOST/webhooks/default/googlechat/<slug>
 ```
 
 See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
@@ -32,7 +32,7 @@ generic route works under the hood.
 
 `/model` and `/models` only fire on an `admin`-mode connection with
 `commands` enabled; on `support`, they are plain text. `/models` lists the
-models available to this connection's company; `/model` shows the current
+models available to this connection's project; `/model` shows the current
 one, or changes it:
 
 ```text

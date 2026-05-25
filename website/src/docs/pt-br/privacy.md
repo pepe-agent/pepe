@@ -5,7 +5,7 @@ description: Transformações opcionais plugadas no fluxo de mensagens, para o a
 
 Os hooks de privacidade são transformações opcionais plugadas no fluxo de mensagens, para que um agente possa censurar dados pessoais antes que eles cheguem a um modelo externo, e restaurá-los na resposta. Um agente sem hooks roda cru, exatamente como antes.
 
-Você os habilita por agente (com `--hooks`, ou pelo formulário de Agentes no painel), pode herdar um padrão da empresa (`default_hooks`) e configura cada hook uma vez em `"hooks"` na configuração.
+Você os habilita por agente (com `--hooks`, ou pelo formulário de Agentes no painel), pode herdar um padrão do projeto (`default_hooks`) e configura cada hook uma vez em `"hooks"` na configuração.
 
 ## Quatro hooks, um contrato
 
@@ -19,7 +19,7 @@ Eles se compõem, porque cada um alimenta o mesmo mapa reversível:
 ## Usando
 
 ```bash
-pepe agent add support --hooks pii_redact,llm_redact --company acme --prompt "..."
+pepe agent add support --hooks pii_redact,llm_redact --project acme --prompt "..."
 pepe hooks list
 # deixe um modelo montar uma configuração validada de pii_redact a partir de linguagem natural:
 pepe hooks generate "cpf, cnpj e os nossos números de apólice APOL-12345678" --model local --save

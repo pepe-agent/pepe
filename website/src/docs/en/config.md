@@ -74,7 +74,7 @@ pepe agent add assistant --model openrouter --utility-model groq-fast
 
 It is also on the dashboard, under Agents, then Edit, then Chores. An agent that has the `manage_agent` tool can do it by chat: "do your chores on groq-fast".
 
-**Leave it unset and conversations are still named**, from the first few words of the opening message. That is free, it is offline, and nobody's first message is sent anywhere to be read. It is not much worse for what a sidebar is actually for, which is you recognising the conversation. What Pepe will never do is fall back to the agent's own model, because that would start spending on every install that merely upgraded, and Pepe bills those tokens to a company. A `utility_model` naming a connection that does not exist counts as unset for the same reason, and `pepe doctor` says so: a typo must not be the thing that starts spending.
+**Leave it unset and conversations are still named**, from the first few words of the opening message. That is free, it is offline, and nobody's first message is sent anywhere to be read. It is not much worse for what a sidebar is actually for, which is you recognising the conversation. What Pepe will never do is fall back to the agent's own model, because that would start spending on every install that merely upgraded, and Pepe bills those tokens to a project. A `utility_model` naming a connection that does not exist counts as unset for the same reason, and `pepe doctor` says so: a typo must not be the thing that starts spending.
 
 A word of warning about "free" model tiers. The text sent to name a conversation is the client's **opening message**, which is where the name, the phone number, and the complaint live. Most free tiers pay for themselves with your data. If you would not put that message in a training set, do not point `utility_model` at one. The no-model path exists precisely so you do not have to.
 
@@ -121,7 +121,7 @@ The `doctor` tool health-checks the whole setup and flags unset `${ENV}` secrets
 
 ## Storage and backup: it is all files, no database
 
-Everything lives under `~/.pepe/` (or `PEPE_HOME`). There is no database server. `config.json` is the single source of truth for companies, agents, models, watches, crons, bots, MCP servers, and hashed API tokens. An agent's knowledge lives as files in `agents/<name>/` and `companies/<co>/agents/<name>/`, conversation history in `data/sessions/`, and `data/mnesia/` is a disposable cache that rebuilds itself. `Pepe.Repo` and Postgres exist in the code but are switched off (`ecto_repos: []`); they are the door left open for a future database backend, unused today.
+Everything lives under `~/.pepe/` (or `PEPE_HOME`). There is no database server. `config.json` is the single source of truth for projects, agents, models, watches, crons, bots, MCP servers, and hashed API tokens. Projects and agents are keyed by a stable internal id, so renaming one just relabels it and moves its directory while every id-based reference keeps pointing at it. An agent's knowledge lives as files in `projects/<slug>/agents/<name>/` (the default project included, under its own slug), conversation history in `data/sessions/`, and `data/mnesia/` is a disposable cache that rebuilds itself. `Pepe.Repo` and Postgres exist in the code but are switched off (`ecto_repos: []`); they are the door left open for a future database backend, unused today.
 
 Secrets are never stored raw. They are `${ENV_VAR}` references resolved at read time, so they live in your environment rather than in the files.
 
@@ -132,4 +132,4 @@ pepe backup                       # writes pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /path/x.tgz
 ```
 
-To restore, `pepe restore that-archive.tgz` and export those variables again. You can also lift a single company out to run on its own server with `pepe extract`. See [Backup & extract](/en/docs/backup/) for the whole story.
+To restore, `pepe restore that-archive.tgz` and export those variables again. You can also lift a single project out to run on its own server with `pepe extract`. See [Backup & extract](/en/docs/backup/) for the whole story.

@@ -45,10 +45,10 @@ El agente también necesita tener `send_to_agent` en su lista de `tools` para po
 enrutar. La lista de rutas permitidas decide a quién puede llamar, y la herramienta es lo
 que le permite hacer la llamada.
 
-<div class="note"><strong>Fronteras de empresa.</strong> Las rutas nunca cruzan la
-frontera de una empresa. Los nombres simples en <code>--can-message</code> se resuelven
-dentro de la propia empresa del agente, y la CLI rechaza una ruta entre dos agentes que
-viven en empresas distintas.</div>
+<div class="note"><strong>Fronteras de proyecto.</strong> Las rutas nunca cruzan la
+frontera de un proyecto. Los nombres simples en <code>--can-message</code> se resuelven
+dentro del propio proyecto del agente, y la CLI rechaza una ruta entre dos agentes que
+viven en proyectos distintos.</div>
 
 ## El enrutamiento y la barrera de permisos
 

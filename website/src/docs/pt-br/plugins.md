@@ -376,7 +376,7 @@ implementa `parse/1` para responder só conversas marcadas como `pending`
 (`open`), o Pepe fica quieto, e volta quando a conversa retorna a `pending`.
 
 **Configuração, no Chatwoot:** crie um AgentBot, aponte o webhook de saída
-dele para `https://SEU_HOST/webhooks/<company>/chatwoot/<slug>`. A conexão
+dele para `https://SEU_HOST/webhooks/<project>/chatwoot/<slug>`. A conexão
 guarda `base_url`, `account_id` e um `api_token` (como `${ENV_VAR}`) via
 `config_schema/0`, preenchidos pelo painel, o mesmo padrão de Configurar de
 qualquer plugin.

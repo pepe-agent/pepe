@@ -132,13 +132,19 @@ defmodule Pepe.Tools.ManageAgent do
     if Config.get_agent(target) do
       {:error, "agent #{target} already exists"}
     else
-      Config.put_agent(%Agent{
+      agent = %Agent{
         name: target,
         system_prompt: blank(args["value"]) || Agent.default_prompt(),
         tools: []
-      })
+      }
 
-      {:ok, "Created agent #{target}. Set its persona, model and tools next."}
+      case Config.put_agent(agent) do
+        :ok ->
+          {:ok, "Created agent #{target}. Set its persona, model and tools next."}
+
+        {:error, :invalid_name} ->
+          {:error, "#{target} isn't a valid handle - use letters, digits, - or _ (optionally project/name)"}
+      end
     end
   end
 

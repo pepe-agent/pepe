@@ -679,7 +679,19 @@ defmodule Pepe.Agent.Session do
   # An agent ended its own conversation - mark it so `:run_done` clears the context
   # once the current reply is delivered.
   @impl true
-  def handle_cast(:end_session, state), do: {:noreply, %{state | reset_pending: true}}
+  # A normal turn is in flight: let its completion (`:run_done`) clear the context after the reply.
+  def handle_cast(:end_session, %{running: running} = state) when is_map(running) do
+    {:noreply, %{state | reset_pending: true}}
+  end
+
+  # No normal turn to consume the flag - the agent called `end_session` from an inline heartbeat or
+  # aside (both run the turn synchronously, so this cast is only processed once they have returned,
+  # with `running` nil). Clear the context now rather than leaving `reset_pending` set to wipe the
+  # NEXT, unrelated normal turn: an aside is meant to change nothing downstream, and a flag surviving
+  # into a later user turn would silently discard that turn's own history.
+  def handle_cast(:end_session, state) do
+    {:noreply, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], reset_pending: false})}
+  end
 
   # TTL eviction: re-armed on every message; nil ttl_ms = never expire.
   defp arm_ttl(%{ttl_ms: ms} = state) when is_integer(ms) and ms > 0 do

@@ -112,7 +112,7 @@ defmodule Pepe.LLM do
 
     case Req.post(req) do
       {:ok, %{status: status, private: %{pepe: state}}} when status in 200..299 ->
-        {:ok, finalize(state)}
+        {:ok, finalize(flush(state, on_delta))}
 
       {:ok, %{status: status} = resp} when status in 200..299 ->
         # stream produced no data frames
@@ -273,6 +273,11 @@ defmodule Pepe.LLM do
       {:ok, %{"usage" => usage}} ->
         %{state | usage: usage}
 
+      # A 200 stream can still carry a top-level error frame (`data: {"error": {...}}`) instead of
+      # choices. Mark the turn failed so it surfaces as an error, not an empty success.
+      {:ok, %{"error" => _}} ->
+        %{state | finish: "error"}
+
       _ ->
         state
     end
@@ -335,6 +340,18 @@ defmodule Pepe.LLM do
       "name" => (fun["name"] || "") <> (d_fun["name"] || ""),
       "arguments" => (fun["arguments"] || "") <> (d_fun["arguments"] || "")
     }
+  end
+
+  # Process a final SSE line the stream left in the buffer with no trailing newline. `consume/3`
+  # parks the trailing partial in `state.buffer`; if the last frame arrived un-terminated (a
+  # truncated stream, or a provider that doesn't newline-end its final frame), its content/tool/error
+  # would otherwise be silently dropped. A genuinely partial (undecodable) line decodes to nothing
+  # and is a no-op.
+  defp flush(state, on_delta) do
+    case String.trim(state.buffer) do
+      "" -> state
+      _ -> handle_line(state.buffer, %{state | buffer: ""}, on_delta)
+    end
   end
 
   defp finalize(state) do

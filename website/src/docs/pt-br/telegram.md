@@ -189,7 +189,7 @@ conversa.
 
 `/model` mostra o modelo ativo nesse chat, com um botão **Browse models**
 para escolher outro; `/models` vai direto para esse seletor. O seletor é escopado
-à sua empresa e põe um tique no modelo em uso, então você toca em um para trocar.
+ao seu projeto e põe um tique no modelo em uso, então você toca em um para trocar.
 Essas duas leituras são só para treinadores, já que revelam quais modelos estão
 por trás do bot. Uso digitado:
 

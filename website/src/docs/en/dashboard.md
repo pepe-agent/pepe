@@ -25,10 +25,10 @@ Risky tools are authorized inline here too. The run pauses and shows an allow/de
 The left sidebar mirrors the CLI, so almost everything you can do with the `pepe` command you can also do here:
 
 - **Chat**: talk to a session.
-- **Companies**: create, edit and delete tenant scopes and their billing markup. See [Companies](../companies/).
+- **Projects**: create, edit and delete tenant scopes and their billing markup. See [Projects](../projects/).
 - **Agents**: create, edit and delete agents, with their persona, model, tools, routes, admin scope, and which one is the default.
 - **Models**: add, remove and edit model connections, set a per-model price, and pick the default.
-- **Usage and billing**: token usage and cost by cycle, per company. See [Usage and billing](../billing/).
+- **Usage and billing**: token usage and cost by cycle, per project. See [Usage and billing](../billing/).
 - **Learning**: the TimeLearn timeline. See [Learning](../learning/).
 - **Scheduled**: create, run and manage scheduled tasks. See [Scheduled tasks](../scheduled/).
 - **Watches**: one-shot "notify me when X". See [Watches](../watches/).

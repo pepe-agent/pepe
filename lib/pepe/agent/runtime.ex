@@ -199,10 +199,12 @@ defmodule Pepe.Agent.Runtime do
           loop(agent, chain, new_messages, specs, ctx, opts, iterations_left - 1)
         end
 
-      # The provider signalled failure (an SSE `response.failed`/`error`, a mapped `finish_reason`)
-      # and produced nothing. Without this it would fall through as a successful *empty* reply -
-      # a provider outage read as the agent having calmly said nothing.
-      {:ok, %{finish_reason: "error", content: content}} when content in [nil, ""] ->
+      # The provider signalled failure (an SSE `response.failed`/`error`, a mapped `finish_reason`).
+      # Treat it as an error regardless of any partial content. Without this it falls through as a
+      # successful reply: an empty one (a provider outage read as the agent calmly saying nothing),
+      # or worse, one carrying the provider's error text as if it were the agent's answer (the
+      # Anthropic adapter folds an SSE `error` event's message into `content`).
+      {:ok, %{finish_reason: "error"}} ->
         emit(opts, {:error, :provider_error})
         {:error, :provider_error}
 

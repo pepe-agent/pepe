@@ -26,7 +26,7 @@ responde com uma resposta adiada e publica a resposta real como acompanhamento
 assim que o agente termina. Formato da URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/root/discord/<slug>
+https://YOUR_HOST/webhooks/default/discord/<slug>
 ```
 
 Veja [Webhooks](../webhooks/) para os campos compartilhados por toda conexão
@@ -40,7 +40,7 @@ colocar na opção `prompt:` dele, então `/model` e `/models` chegam ao Pepe do
 mesmo jeito que qualquer outra mensagem, digitados nesse valor. Eles só
 disparam numa conexão em modo `admin` com `commands` habilitado; no
 `support`, viram texto puro. `/models` lista os modelos disponíveis para a
-empresa dessa conexão; `/model` mostra o atual, ou troca:
+projeto dessa conexão; `/model` mostra o atual, ou troca:
 
 ```text
 /model openrouter               # pergunta se troca só esse chat ou todos

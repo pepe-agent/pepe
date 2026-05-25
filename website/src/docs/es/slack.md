@@ -27,7 +27,7 @@ guardado dispara un handshake `url_verification`, que Pepe responde de inmediato
 Las respuestas se publican con `chat.postMessage`. Forma de la URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/root/slack/<slug>
+https://YOUR_HOST/webhooks/default/slack/<slug>
 ```
 
 Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
@@ -38,7 +38,7 @@ cómo funciona la ruta genérica por dentro.
 
 `/model` y `/models` solo se activan en una conexión en modo `admin` con
 `commands` habilitado; en `support`, son texto plano. `/models` lista los
-modelos disponibles para la empresa de esta conexión; `/model` muestra el
+modelos disponibles para el proyecto de esta conexión; `/model` muestra el
 actual, o lo cambia:
 
 ```text

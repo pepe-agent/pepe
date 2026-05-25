@@ -57,7 +57,7 @@ break) any of the below, please open an issue with what you tried and what happe
 - **The Claude Pro/Max OAuth sign-in** - only the ChatGPT/Codex flow has been exercised.
 
 - **Surfaces & features** - Telegram (single and multi-bot), the WebSocket API with
-  access tokens, company isolation, usage metering & invoices, cron, watches, and MCP
+  access tokens, project isolation, usage metering & invoices, cron, watches, and MCP
   servers against a real server.
 
 The most useful quick report: your provider, the output of `mix pepe model test`, and

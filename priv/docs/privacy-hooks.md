@@ -49,7 +49,7 @@ touch them). Enable them one of these ways:
 
 - per agent at creation - `mix pepe agent add support --hooks pii_redact,llm_redact`
   (or the dashboard Agents form),
-- a company-wide default - `default_hooks`,
+- a deployment-wide default - `default_hooks`,
 - and configure each hook's settings under `"hooks"` in the config file.
 
 Two CLI helpers:

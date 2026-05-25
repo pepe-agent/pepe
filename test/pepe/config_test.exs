@@ -28,6 +28,31 @@ defmodule Pepe.ConfigTest do
     end
   end
 
+  describe "migration freezes minted ids on first load (id stability)" do
+    test "a legacy config migrates once, persists, and resolves identically across later loads" do
+      legacy =
+        Jason.encode!(%{
+          "default_model" => "mock",
+          "default_agent" => "assistant",
+          "models" => %{"mock" => %{"base_url" => "u", "api_key" => "k", "model" => "m"}},
+          "agents" => %{"assistant" => %{"model" => "mock", "system_prompt" => "hi"}}
+        })
+
+      File.write!(Config.path(), legacy)
+
+      # The migrations mint random ids each run, so they are not idempotent across separate load/0
+      # calls: the first load must freeze them to disk. If it didn't, a second load would re-mint
+      # different ids and the agent's stored model id would resolve to nothing. Both resolutions
+      # (each its own load) must agree.
+      assert Config.model_for_agent(Config.get_agent("assistant")).model == "m"
+      assert Config.model_for_agent(Config.get_agent("assistant")).model == "m"
+
+      migrated = Jason.decode!(File.read!(Config.path()))
+      assert Map.has_key?(migrated, "projects")
+      assert Map.has_key?(migrated, "default_project")
+    end
+  end
+
   describe "backup/0" do
     test "returns nil when there is no config file yet" do
       assert Config.backup() == nil

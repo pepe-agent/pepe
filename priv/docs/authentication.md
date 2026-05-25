@@ -15,10 +15,10 @@ stored), so tell the user to copy it there and then.
 
 A token carries a scope, and the scope decides which agents it runs:
 
-- **Principal (root)** - no `company`, no `agent`. The widest scope: it sees every
-  root agent and may pass a bare model connection through as the model. Mint one for
-  a trusted local integration.
-- **Company** - a `company` handle only. Reaches just that company's agents and
+- **Principal (default project)** - no `project`, no `agent`. The widest scope: it
+  sees every agent in the default project and may pass a bare model connection through
+  as the model. Mint one for a trusted local integration.
+- **Project** - a `project` slug only. Reaches just that project's agents and
   nothing outside it; a bare model connection is refused. Use it to hand one tenant
   API access.
 - **Agent-locked** - a full agent `handle` (like `"acme/support"`). Always runs that
@@ -29,11 +29,11 @@ A token carries a scope, and the scope decides which agents it runs:
 // create: mint a Principal token for a local integration
 { "action": "create", "label": "local chatwoot" }
 
-// create: a company-scoped token - reaches only acme's agents
-{ "action": "create", "company": "acme", "label": "acme prod" }
+// create: a project-scoped token - reaches only acme's agents
+{ "action": "create", "project": "acme", "label": "acme prod" }
 
 // create: an agent-locked token - always runs acme/support
-{ "action": "create", "company": "acme", "agent": "acme/support", "label": "support bot" }
+{ "action": "create", "project": "acme", "agent": "acme/support", "label": "support bot" }
 ```
 
 `list` shows each token's id, scope and label (a regular token only ever shows a safe

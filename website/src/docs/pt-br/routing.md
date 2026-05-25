@@ -46,10 +46,10 @@ O agente também precisa ter `send_to_agent` na sua lista de `tools` para conseg
 rotear. A lista de rotas permitidas decide quem ele pode chamar, e a ferramenta é o que
 lhe permite fazer a chamada.
 
-<div class="note"><strong>Fronteiras de empresa.</strong> As rotas nunca atravessam a
-fronteira de uma empresa. Nomes simples em <code>--can-message</code> são resolvidos
-dentro da própria empresa do agente, e a CLI recusa uma rota entre dois agentes que
-estejam em empresas diferentes.</div>
+<div class="note"><strong>Fronteiras de projeto.</strong> As rotas nunca atravessam a
+fronteira de um projeto. Nomes simples em <code>--can-message</code> são resolvidos
+dentro do próprio projeto do agente, e a CLI recusa uma rota entre dois agentes que
+estejam em projetos diferentes.</div>
 
 ## Roteamento e a barreira de permissão
 

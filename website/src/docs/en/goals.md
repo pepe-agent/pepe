@@ -100,7 +100,7 @@ A goal here is a persistent objective plus a status. The agent sets one at the s
 
 The objective and the status survive across turns and across a restart, so a long or autonomous run does not drift away from what it set out to do.
 
-<div class="note"><strong><code>budget_tokens</code> is an advisory target, not a hard cap.</strong> The agent is told about it so it can keep the effort proportionate, and nothing enforces it. Hard spend limits are the per-company monthly cap described in <a href="/en/docs/billing/">Usage and billing</a>.</div>
+<div class="note"><strong><code>budget_tokens</code> is an advisory target, not a hard cap.</strong> The agent is told about it so it can keep the effort proportionate, and nothing enforces it. Hard spend limits are the per-project monthly cap described in <a href="/en/docs/billing/">Usage and billing</a>.</div>
 
 ### `update_plan`: the live checklist
 

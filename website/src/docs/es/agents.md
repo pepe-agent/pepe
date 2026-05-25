@@ -105,9 +105,9 @@ toque uno fuera de ese alcance se rechaza con cortesía.
 
 | Campo | Qué hace | Predeterminado |
 |-------|--------------|---------|
-| `name` | La identidad del agente, y la clave bajo la que se guarda y se direcciona. Dentro de una empresa se convierte en un identificador como `acme/assistant` (mira más abajo). | obligatorio |
+| `name` | La etiqueta direccionable del agente. Dentro de un proyecto se convierte en un handle como `acme/assistant` (mira más abajo). El agente lleva además un id interno estable, así que este nombre se puede cambiar sin romper ningún vínculo. | obligatorio |
 | `description` | Una nota breve para humanos. Nunca se envía al modelo. | ninguno |
-| `model` | El nombre de una conexión de modelo. Déjalo sin definir para usar el modelo predeterminado del alcance. | predeterminado del alcance |
+| `model` | El nombre de una conexión de modelo. Déjalo sin definir para usar el modelo predeterminado del proyecto. | predeterminado del proyecto |
 | `system_prompt` | La personalidad y las instrucciones con las que se ejecuta el agente. | `Eres Pepe, un agente de IA útil.` (un prompt inicial) |
 | `tools` | La lista de nombres de herramientas que este agente puede llamar. Solo estas se ofrecen al modelo. | todas las herramientas cuando se omite `--tools` al crear |
 | `auto_approve` | Herramientas que este agente puede ejecutar sin pedir permiso. `["*"]` significa todas. | `[]` |
@@ -140,7 +140,7 @@ que un agente confundido dé vueltas para siempre.
 
 Otras dos barreras se sitúan delante de la llamada al modelo. Un agente cuyo modelo
 exige censura se niega a ejecutarse salvo que tenga un hook de censura activado, y
-una empresa que ha alcanzado su tope de gasto mensual (o su tope de mensajes de
+un proyecto que ha alcanzado su tope de gasto mensual (o su tope de mensajes de
 clientes al mes, un límite independiente) se detiene aquí sin nuevas llamadas al
 modelo ni respuestas. Ambas fallan el turno de forma limpia en lugar de seguir en
 silencio; consulta Facturación y límites para ver cómo configurar esos topes.
@@ -303,7 +303,7 @@ ejecuta cuando no nombras a un agente:
 pepe run "resume este repositorio"
 ```
 
-El primer agente que creas en el alcance predeterminado (sin empresa) se convierte
+El primer agente que creas en el proyecto por defecto se convierte
 automáticamente en el predeterminado. Cámbialo cuando quieras:
 
 ```bash
@@ -333,8 +333,8 @@ pepe agent route triage assistant
 ```
 
 Ahora `triage` puede pasar trabajo a `assistant`. Elimina la ruta con `--remove`.
-Las rutas nunca cruzan la frontera de una empresa; la CLI rechaza `A -> B` cuando
-los dos están en empresas distintas.
+Las rutas nunca cruzan la frontera de un proyecto; la CLI rechaza `A -> B` cuando
+los dos están en proyectos distintos.
 
 ### Hazlo por chat
 
@@ -390,38 +390,43 @@ también puede renombrarse a sí mismo con la herramienta aparte `rename_agent` 
 ahora en adelante, llámate scout"), que mueve su directorio de espacio de trabajo y
 surte efecto en el siguiente mensaje.
 
-## Agentes multiempresa con empresas
+## Agentes multi-cliente con proyectos
 
-Las empresas son opcionales. Sin una, todo vive en el alcance predeterminado,
-llamado Principal, exactamente como siempre ha funcionado una instalación de una sola
-empresa. Añade una empresa para aislar a una empresa: sus agentes, espacios de
-trabajo, espacio compartido, conexiones de modelo y enrutamiento quedan aislados de
-cualquier otra empresa.
+Cada agente vive en un proyecto. En una instalación nueva ese es el único **proyecto
+por defecto**, al que recurre cada comando cuando omites `--project`, exactamente como
+siempre ha funcionado una instalación de un solo cliente. Añade un segundo proyecto
+para aislar a un cliente: sus agentes, espacios de trabajo, espacio compartido,
+conexiones de modelo y enrutamiento quedan aislados de cualquier otro proyecto.
 
-La identidad real de un agente es su identificador. En el alcance Principal el
-identificador es solo el nombre a secas (`assistant`). Dentro de una empresa se
-cualifica como `company/name` (`acme/assistant`), así que el mismo nombre a secas se
-puede reutilizar entre empresas sin colisión.
+La identidad real de un agente es su handle. En el proyecto por defecto el handle es
+solo el nombre a secas (`assistant`). Dentro de otro proyecto se cualifica como
+`proyecto/nombre` (`acme/assistant`), así que el mismo nombre a secas se puede
+reutilizar entre proyectos sin colisión.
 
-Crea una empresa y luego añade agentes dentro de ella con `--company`:
+Crea un proyecto y luego añade agentes dentro de él con `--project`:
 
 ```bash
-pepe company add acme --description "Acme Corp"
+pepe project add acme --description "Acme Corp"
 
 pepe agent add support \
-  --company acme \
+  --project acme \
   --model openrouter \
   --prompt "Eres el agente de soporte de Acme." \
   --tools read_file,web_search
 ```
 
-Añade `--company acme` a cualquier comando de agente para actuar dentro de ese
+Añade `--project acme` a cualquier comando de agente para actuar dentro de ese
 alcance. Los nombres de pares a secas en `--can-message` y `--can-manage` se
-resuelven dentro de la propia empresa del agente, así que las rutas nunca cruzan por
-accidente la frontera de una empresa. Cada empresa puede fijar su propio modelo
+resuelven dentro del propio proyecto del agente, así que las rutas nunca cruzan por
+accidente la frontera de un cliente. Cada proyecto puede fijar su propio modelo
 predeterminado y su agente predeterminado, o compartir el proveedor global del
-operador. Un agente de empresa nunca se promueve a predeterminado global (Principal)
-solo por ser el primero creado dentro de su empresa.
+operador. Un agente de un proyecto que no es el por defecto nunca se promueve a
+predeterminado global solo por ser el primero creado dentro de su proyecto.
+
+Tanto los proyectos como los agentes llevan un id interno estable, y cada vínculo
+(enrutamiento, autoridad de gestión, agente predeterminado, cron, bots, tokens) se
+registra contra ese id, no contra el nombre. Renombrar un proyecto o un agente cambia
+su etiqueta y mueve su directorio; nada queda colgando.
 
 ## Gestionar agentes desde la CLI
 
@@ -440,25 +445,25 @@ pepe agent add NAME \
   [--triage-model MODEL] \
   [--simple-model MODEL] \
   [--default] \
-  [--company CO]
+  [--project PROJECT]
 
-# Lista agentes en un alcance, o todos los agentes.
-pepe agent list [--company CO | --all]
+# Lista agentes en un proyecto, o todos los agentes.
+pepe agent list [--project PROJECT | --all]
 
 # Directed messaging: let FROM message TO.
-pepe agent route FROM TO [--remove] [--company CO]
+pepe agent route FROM TO [--remove] [--project PROJECT]
 
 # Management authority: let ADMIN administer TARGET (or "*" for all).
-pepe agent manage ADMIN TARGET [--remove] [--company CO]
+pepe agent manage ADMIN TARGET [--remove] [--project PROJECT]
 
 # Rename an agent and move its workspace directory.
 pepe agent rename OLD NEW
 
 # Delete an agent.
-pepe agent remove NAME [--company CO]
+pepe agent remove NAME [--project PROJECT]
 
-# Set the default agent for a scope.
-pepe agent default NAME [--company CO]
+# Set the default agent for a project.
+pepe agent default NAME [--project PROJECT]
 ```
 
 ## Ejecutar un agente

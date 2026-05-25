@@ -9,12 +9,11 @@ Todo o canal por webhook, seja qual for a plataforma, está acessível numa úni
 rota:
 
 ```
-https://YOUR_HOST/webhooks/<company>/<provider>/<slug>
+https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<company>` é o âmbito de empresa. Usa `root` para o âmbito predefinido
-  (apresentado como "Principal" no painel), ou o identificador de uma empresa
-  para isolar uma ligação nessa empresa.
+- `<project>` é o âmbito do projeto. Usa `default` para o projeto default,
+  ou o slug de outro projeto para isolar uma ligação nesse projeto.
 - `<provider>` é o nome da plataforma: `whatsapp`, `slack`, `discord`, `msteams`
   ou `googlechat`.
 - `<slug>` é o nome único que deste à ligação.
@@ -80,8 +79,8 @@ sempre), por isso `/mention` não tem efeito nenhum aí.
 
 `/model` e `/models` só disparam numa ligação em modo `admin` com `commands`
 ativado (vê a comparação de modos em [Channels](../channels/)); no
-`support`, são texto simples. `/models` lista os modelos disponíveis para a
-empresa da ligação; `/model` mostra o atual, ou muda-o:
+`support`, são texto simples. `/models` lista os modelos disponíveis para o
+projeto da ligação; `/model` mostra o atual, ou muda-o:
 
 ```text
 /model openrouter               # pergunta se muda só este chat ou todos

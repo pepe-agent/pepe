@@ -21,7 +21,7 @@ Apenas os eventos `MESSAGE` de uma pessoa são atendidos. As respostas são
 publicadas de volta no espaço pela Chat REST API. Formato do URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/root/googlechat/<slug>
+https://YOUR_HOST/webhooks/default/googlechat/<slug>
 ```
 
 Vê [Webhooks](../webhooks/) para os campos partilhados por toda a ligação
@@ -32,7 +32,7 @@ como funciona a rota genérica por dentro.
 
 `/model` e `/models` só disparam numa ligação em modo `admin` com `commands`
 ativado; no `support`, são texto simples. `/models` lista os modelos
-disponíveis para a empresa desta ligação; `/model` mostra o atual, ou muda-o:
+disponíveis para o projeto desta ligação; `/model` mostra o atual, ou muda-o:
 
 ```text
 /model openrouter               # pergunta se muda só este chat ou todos

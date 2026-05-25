@@ -10,12 +10,12 @@ consulta, WhatsApp **empuja** los mensajes entrantes hacia un webhook, así que
 cada conexión recibe su propia URL en la ruta de entrada genérica de Pepe:
 
 ```
-/webhooks/:company/:provider/:slug        p. ej.  /webhooks/acme/whatsapp/support
+/webhooks/:project/:provider/:slug        p. ej.  /webhooks/acme/whatsapp/support
 ```
 
 Esa ruta es una superficie de webhook genérica, apoyada en un registro de
-proveedores, y no una tubería específica de WhatsApp. El segmento `:company` es
-`root` cuando no usas empresas. Un `GET` en esa URL responde al handshake de
+proveedores, y no una tubería específica de WhatsApp. El segmento `:project` es
+`default` cuando no usas proyectos adicionales. Un `GET` en esa URL responde al handshake de
 verificación de Meta. Un `POST` es un mensaje entrante: su `X-Hub-Signature-256`
 se verifica contra el app secret, luego se ejecuta el agente vinculado y la
 respuesta vuelve por la Graph API. `pepe serve` sirve esta ruta, así que no hay
@@ -54,7 +54,7 @@ ambos en la configuración de webhook de la app de Meta y suscribe el campo
 `messages`, para que Meta entregue de verdad los mensajes entrantes:
 
 ```
-https://YOUR_HOST/webhooks/root/whatsapp/support
+https://YOUR_HOST/webhooks/default/whatsapp/support
 ```
 
 Gestiona conexiones:
@@ -66,7 +66,7 @@ pepe gateway whatsapp remove support
 ```
 
 `whatsapp list` imprime cada conexión con su URL de retorno. Las demás opciones
-de `whatsapp add` son `--company`, `--trainers`, `--ttl-min`, `--ephemeral` y
+de `whatsapp add` son `--project`, `--trainers`, `--ttl-min`, `--ephemeral` y
 `--commands`, que corresponden a los campos por conexión descritos arriba. El
 panel añade y edita conexiones de WhatsApp a través de la misma sección Channels.
 
@@ -99,7 +99,7 @@ esto:
 ### La sesión
 
 La sesión se indexa como `whatsapp:<agent>:<phone>`. Es el hilo del agente con
-ese cliente concreto, aislado por empresa a través del handle del agente. Dos
+ese cliente concreto, aislado por proyecto a través del handle del agente. Dos
 cosas la terminan:
 
 - El agente llama a la herramienta **`end_session`** cuando el intercambio
@@ -121,7 +121,7 @@ no envía.</div>
 
 `/model` y `/models` solo se activan en una conexión en modo `admin` (ver la
 comparación de modos arriba); en `support`, son texto plano como cualquier otro
-comando de barra. `/models` lista los modelos disponibles para la empresa de esta
+comando de barra. `/models` lista los modelos disponibles para el proyecto de esta
 conexión; `/model` muestra el que está activo, o lo cambia:
 
 ```text

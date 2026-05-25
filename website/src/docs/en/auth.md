@@ -106,12 +106,12 @@ You can mint, list, and revoke tokens three ways: the CLI, the dashboard, or by 
 From the CLI:
 
 ```bash
-pepe token add [--company CO] [--agent HANDLE] [--label "..."]
+pepe token add [--project PROJECT] [--agent HANDLE] [--label "..."]
 pepe token list
 pepe token revoke ID
 ```
 
-In the dashboard, the API tokens page has a form to generate a token (with a company and optional agent scope) and a list to revoke existing ones.
+In the dashboard, the API tokens page has a form to generate a token (with a project and optional agent scope) and a list to revoke existing ones.
 
 A token is a random string prefixed `pepe_`. Only its SHA-256 hash is stored in the config file; the raw token is printed once at creation and never again. Copy it then. If you lose it, revoke it and mint a new one.
 
@@ -119,9 +119,9 @@ A token is a random string prefixed `pepe_`. Only its SHA-256 hash is stored in 
 
 An agent granted the guarded `manage_token` tool can mint, list, and revoke tokens from a conversation. Because a token grants API access, the tool is not read-only: it goes through the permission gate, so you confirm before a token is created, and the raw secret is returned once for you to copy.
 
-> You: Create a token for the acme company, labeled chatwoot.
+> You: Create a token for the acme project, labeled chatwoot.
 >
-> Agent: (asks you to confirm, then mints it) API token created, scope company acme. Copy it now, it will not be shown again: `pepe_9f2a...`
+> Agent: (asks you to confirm, then mints it) API token created, scope project acme. Copy it now, it will not be shown again: `pepe_9f2a...`
 
 ### Presenting a token
 
@@ -150,27 +150,27 @@ Any OpenAI SDK sends the `Authorization: Bearer` form when you set its `api_key`
 A token carries a scope that decides which agents it can reach. From narrowest to widest:
 
 * **Agent-locked** (`--agent HANDLE`): always runs exactly that agent. The request `model` field is ignored. Hand this to a caller who should only ever reach one specific agent.
-* **Company** (`--company CO`): any agent inside that company. A bare `model` name qualifies into that company automatically, and a request for an agent belonging to a different company is refused with `403`.
-* **Neither**: the root scope (no company). This is what every command operates on when you do not scope it. It can reach root agents (those with a bare, un-namespaced name) and, uniquely, fall back to bare model connections by name.
+* **Project** (`--project PROJECT`): any agent inside that project. A bare `model` name qualifies into that project automatically, and a request for an agent belonging to a different project is refused with `403`.
+* **Neither**: the default project. This is what every command operates on when you do not scope it. It can reach the default project's agents (those with a bare, un-namespaced name) and, uniquely, fall back to bare model connections by name.
 
 ### What each scope sees in `GET /v1/models`
 
 | Token | Returns |
 |---|---|
-| `--company acme` | only `acme` agents |
-| `--company globex` | only `globex` agents |
+| `--project acme` | only `acme` agents |
+| `--project globex` | only `globex` agents |
 | `--agent acme/support` | only that one agent |
-| root (no flag) | root agents (no company) plus raw model connections |
-| no token (loopback only) | every agent, all companies, plus raw model connections |
+| default project (no flag) | the default project's agents plus raw model connections |
+| no token (loopback only) | every agent, all projects, plus raw model connections |
 
-A token never crosses the boundary: an `acme` token can never list or reach a `globex` agent. There is no token that names another company to read it. To get another company's agents, mint that company's own token. For a cross-company operator view, use the CLI (`pepe agent list`) or the dashboard, not a tenant token.
+A token never crosses the boundary: an `acme` token can never list or reach a `globex` agent. There is no token that names another project to read it. To get another project's agents, mint that project's own token. For a cross-project operator view, use the CLI (`pepe agent list`) or the dashboard, not a tenant token.
 
-## Multi-tenant routing: give company X its own access
+## Multi-tenant routing: give project X its own access
 
-Scopes are how you hand out API access per tenant. To give a company its own key, mint a company-scoped token:
+Scopes are how you hand out API access per tenant. To give a project its own key, mint a project-scoped token:
 
 ```bash
-pepe token add --company acme --label "Acme production"
+pepe token add --project acme --label "Acme production"
 # prints: pepe_9f2a... (copy it now, shown once)
 ```
 
@@ -178,7 +178,7 @@ A caller holding that token:
 
 * can reach any agent that belongs to `acme`, by name;
 * can send a bare `model` name and have it resolve inside `acme`;
-* is refused with `403` if it names an agent in another company;
+* is refused with `403` if it names an agent in another project;
 * sees only `acme` agents from `GET /v1/models`.
 
 ```bash
@@ -192,11 +192,11 @@ curl http://localhost:4000/v1/chat/completions \
 curl http://localhost:4000/v1/chat/completions \
   -H 'authorization: Bearer pepe_9f2a...' \
   -H 'content-type: application/json' \
-  -d '{ "model": "some-other-company-agent", "messages": [{"role":"user","content":"hi"}] }'
+  -d '{ "model": "some-other-project-agent", "messages": [{"role":"user","content":"hi"}] }'
 ```
 
 To pin a token to exactly one agent (the `model` field is then ignored entirely), add `--agent`:
 
 ```bash
-pepe token add --company acme --agent acme/support --label "Acme support widget"
+pepe token add --project acme --agent acme/support --label "Acme support widget"
 ```

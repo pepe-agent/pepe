@@ -26,7 +26,7 @@ responde con una respuesta diferida y publica la respuesta real como seguimiento
 una vez que el agente termina. Forma de la URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/root/discord/<slug>
+https://YOUR_HOST/webhooks/default/discord/<slug>
 ```
 
 Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
@@ -39,7 +39,7 @@ El comando que registraste (`/ask` arriba) lleva el texto que pongas en su
 opción `prompt:`, así que `/model` y `/models` llegan a Pepe igual que
 cualquier otro mensaje, escritos en ese valor. Solo se activan en una conexión
 en modo `admin` con `commands` habilitado; en `support`, son texto plano.
-`/models` lista los modelos disponibles para la empresa de esta conexión;
+`/models` lista los modelos disponibles para el proyecto de esta conexión;
 `/model` muestra el actual, o lo cambia:
 
 ```text

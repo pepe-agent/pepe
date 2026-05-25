@@ -47,6 +47,6 @@ Isto corre os workers como um agente diferente, com a persona e as ferramentas d
 
 ## Quanto custa
 
-Cada worker é uma chamada de modelo a sério, medida e faturada como qualquer outra, à mesma empresa. Oito workers são oito turnos. É essa a troca: estás a comprar de volta tempo de relógio e espaço na janela de contexto, e a pagá-lo em tokens. Para uma tarefa que nunca teria cabido numa só janela, nem sequer chega a ser uma troca.
+Cada worker é uma chamada de modelo a sério, medida e faturada como qualquer outra, ao mesmo projeto. Oito workers são oito turnos. É essa a troca: estás a comprar de volta tempo de relógio e espaço na janela de contexto, e a pagá-lo em tokens. Para uma tarefa que nunca teria cabido numa só janela, nem sequer chega a ser uma troca.
 
 Cada worker tem o seu próprio trace, por isso **Traces** no [painel](../dashboard/) mostra o que cada um fez de facto, não apenas o que o pai disse sobre isso.

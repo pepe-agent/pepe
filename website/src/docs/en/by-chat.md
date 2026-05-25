@@ -59,7 +59,7 @@ Unlike the CLI, this tool has no `--force`. A `danger` verdict from the scan is 
 
 ## Handing out API access
 
-The guarded `manage_token` tool mints, lists, and revokes `/v1` bearer tokens from chat, scoped to a company or to a single agent. An agent can therefore give an integration access without you dropping to a terminal. Like the other management tools it is not read-only, so it passes the permission gate first.
+The guarded `manage_token` tool mints, lists, and revokes `/v1` bearer tokens from chat, scoped to a project or to a single agent. An agent can therefore give an integration access without you dropping to a terminal. Like the other management tools it is not read-only, so it passes the permission gate first.
 
 ## The owner can run the whole CLI
 

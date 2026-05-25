@@ -190,7 +190,7 @@ para a conversa.
 
 `/model` mostra o modelo ativo nesse chat, com um botão **Browse models**
 para escolher outro; `/models` vai direto a esse seletor. O seletor está limitado
-à tua empresa e põe um visto no modelo em uso, por isso tocas num para mudar.
+ao teu projeto e põe um visto no modelo em uso, por isso tocas num para mudar.
 Ambas estas leituras são só para formadores, já que revelam que modelos estão por
 trás do bot. Utilização escrita:
 

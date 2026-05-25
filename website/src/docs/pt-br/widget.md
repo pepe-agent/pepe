@@ -23,7 +23,7 @@ pepe token add --agent support --widget --allowed-origin https://example.com --l
 ```
 
 `--widget` exige `--agent`: uma credencial pública sempre se fixa em um agente
-conhecido e seguro, nunca em uma empresa inteira ou no escopo raiz.
+conhecido e seguro, nunca em um projeto inteiro.
 `--allowed-origin` é o esquema e o host do site; a conexão do widget é
 recusada de qualquer outro lugar. Veja [Autenticação e tokens](../auth/) para o
 modelo geral de tokens sobre o qual isso se apoia.

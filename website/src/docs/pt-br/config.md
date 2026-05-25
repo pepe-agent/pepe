@@ -74,7 +74,7 @@ pepe agent add assistant --model openrouter --utility-model groq-fast
 
 Também dá para fazer isso no painel, em Agents, depois Edit, depois Chores. E um agente que tem a ferramenta `manage_agent` consegue fazer pela conversa: "faça suas tarefinhas no groq-fast".
 
-**Deixe sem definir e as conversas continuam ganhando nome**, a partir das primeiras palavras da mensagem de abertura. Isso é grátis, é offline, e a primeira mensagem de ninguém é enviada a lugar nenhum para ser lida. Não é muito pior para aquilo que uma barra lateral serve de verdade, que é você reconhecer a conversa. O que o Pepe nunca vai fazer é cair de volta no modelo do próprio agente, porque isso começaria a gastar em toda instalação que apenas atualizou de versão, e o Pepe cobra esses tokens de uma empresa. Um `utility_model` apontando para uma conexão que não existe conta como não definido, pelo mesmo motivo, e o `pepe doctor` avisa: um erro de digitação não pode ser o que começa a gastar.
+**Deixe sem definir e as conversas continuam ganhando nome**, a partir das primeiras palavras da mensagem de abertura. Isso é grátis, é offline, e a primeira mensagem de ninguém é enviada a lugar nenhum para ser lida. Não é muito pior para aquilo que uma barra lateral serve de verdade, que é você reconhecer a conversa. O que o Pepe nunca vai fazer é cair de volta no modelo do próprio agente, porque isso começaria a gastar em toda instalação que apenas atualizou de versão, e o Pepe cobra esses tokens de um projeto. Um `utility_model` apontando para uma conexão que não existe conta como não definido, pelo mesmo motivo, e o `pepe doctor` avisa: um erro de digitação não pode ser o que começa a gastar.
 
 Um aviso sobre as camadas "gratuitas" de modelos. O texto enviado para dar nome a uma conversa é a **mensagem de abertura** do cliente, que é onde moram o nome, o telefone e a reclamação. A maioria das camadas gratuitas se paga com os seus dados. Se você não colocaria essa mensagem num conjunto de treinamento, não aponte o `utility_model` para uma delas. O caminho sem modelo existe justamente para você não precisar.
 
@@ -121,7 +121,7 @@ A ferramenta `doctor` faz uma verificação de saúde de toda a configuração e
 
 ## Armazenamento e backup: é tudo arquivo, sem banco de dados
 
-Tudo vive dentro de `~/.pepe/` (ou de `PEPE_HOME`). Não há servidor de banco de dados. O `config.json` é a única fonte da verdade para empresas, agentes, modelos, watches, crons, bots, servidores MCP e tokens de API já com hash. O conhecimento de um agente vive como arquivos em `agents/<name>/` e em `companies/<co>/agents/<name>/`, o histórico das conversas em `data/sessions/`, e o `data/mnesia/` é um cache descartável que se reconstrói sozinho. O `Pepe.Repo` e o Postgres existem no código, mas estão desligados (`ecto_repos: []`); são a porta deixada aberta para um futuro backend de banco de dados, hoje sem uso.
+Tudo vive dentro de `~/.pepe/` (ou de `PEPE_HOME`). Não há servidor de banco de dados. O `config.json` é a única fonte da verdade para projetos, agentes, modelos, watches, crons, bots, servidores MCP e tokens de API já com hash. Projetos, modelos e agentes carregam um id interno estável, e o nome ou slug é apenas um rótulo mutável: toda referência entre eles (rota, permissão, padrão, binding de cron, bot ou token) é por id, então renomear qualquer um só troca o rótulo e move o diretório, sem deixar nada pendurado. O conhecimento de um agente vive como arquivos em `agents/<name>/` e em `projects/<slug>/agents/<name>/`, o histórico das conversas em `data/sessions/`, e o `data/mnesia/` é um cache descartável que se reconstrói sozinho. O `Pepe.Repo` e o Postgres existem no código, mas estão desligados (`ecto_repos: []`); são a porta deixada aberta para um futuro backend de banco de dados, hoje sem uso.
 
 Os segredos nunca são guardados em texto puro. São referências `${ENV_VAR}` resolvidas no momento da leitura, então eles vivem no seu ambiente, e não nos arquivos.
 
@@ -132,4 +132,4 @@ pepe backup                       # gera pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /path/x.tgz
 ```
 
-Para restaurar, `pepe restore esse-arquivo.tgz` e exporte essas variáveis de novo. Você também pode retirar uma única empresa para rodar no próprio servidor com `pepe extract`. Veja [Backup e extração](/pt-br/docs/backup/) para a história completa.
+Para restaurar, `pepe restore esse-arquivo.tgz` e exporte essas variáveis de novo. Você também pode retirar um único projeto para rodar no próprio servidor com `pepe extract`. Veja [Backup e extração](/pt-br/docs/backup/) para a história completa.

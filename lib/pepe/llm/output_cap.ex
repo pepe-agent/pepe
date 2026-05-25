@@ -25,6 +25,12 @@ defmodule Pepe.LLM.OutputCap do
   # which says nothing about what is left in *this* window. Useful, but only as an upper bound.
   @range ~r/max_tokens\s+should\s+be\s+\[\s*\d+\s*,\s*(\d+)\s*\]/i
 
+  # "max_tokens: 5000 > 4096, which is the maximum allowed number of output tokens" - Anthropic's
+  # wording when the requested output cap exceeds the model's own maximum. The ceiling is the
+  # second number. Guarded so it can't fire on the `@available` phrasing ("... > context_window:
+  # 200000 ..."), where a non-digit follows the `>`.
+  @exceeds ~r/max_tokens:?\s*\d+\s*>\s*(\d+)/i
+
   # "This model's maximum context length is 8192 tokens. However, you requested 8500 tokens
   #  (7500 in the messages, 1000 in the completion)."
   @window ~r/maximum context length is (\d+)/i
@@ -46,6 +52,7 @@ defmodule Pepe.LLM.OutputCap do
       n = capture(@available, text) -> n
       n = from_window(text) -> n
       n = capture(@range, text) -> n
+      n = capture(@exceeds, text) -> n
       true -> nil
     end
   end

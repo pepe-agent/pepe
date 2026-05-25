@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-25
+
 ### Changed
 - Agents now have a stable **id** of their own (like models and projects): the config's `agents`
   map is keyed by that id, with the bare name and owning project id as mutable fields, and the
@@ -20,6 +22,9 @@ All notable changes to this project are documented here. Format follows
 - Agent rename: renaming onto a name already taken in the same project is refused - and the workspace directory is no longer moved on a refused rename. Previously the config rejected the collision but the `rename_agent` tool still moved the renaming agent's files onto the target agent's directory, leaking its persona/memory (`SOUL.md`, `MEMORY.md`) into another agent on the next session.
 - Dashboard: a scoped Projects/Models action forces its target into the selected project, so a client-supplied `other-project/thing` can no longer cross the scope boundary and write to another project's agent or model.
 - Delete project (`--force`): now actually removes the deleted project's agents. A stale filter left them orphaned, to resurface reparented under the default project on the next listing; agents of other projects are untouched.
+- Agent rename is race-safe: the name-collision check now runs **inside** the config write lock. Checking it before the lock was a TOCTOU where two concurrent renames to the same name could both pass and commit, leaving two agents sharing one derived handle and workspace directory.
+- `manage_agent create` and the dashboard agent form now report an invalid handle instead of falsely claiming success: the config already rejected it, but the caller ignored the `{:error, …}` and reported "created"/"saved" while nothing was written.
+- Deleting an agent (or force-deleting a project) now clears the automations bound to it: crons, watches, API tokens and webhooks that targeted the agent are removed, and a Telegram bot bound to it falls back to the default agent. A binding left behind could otherwise re-attach to a different agent later created under the same handle.
 - Tools: `read_file`/`list_dir` are free only **inside the agent's workspace**. Reaching an absolute path, or climbing out with `..`, now carries a risk and goes through the permission gate (and the taint), instead of being unconditionally always-safe. On a surface with nobody to ask (a webhook/API agent), that read is refused. This closes the worst customer-facing exposure: a prompt injection telling a support bot to `read_file ~/.pepe/config.json` and report it back, which would have leaked every tenant's token hashes, OAuth tokens, and other companies' data - all without a human ever approving it.
 - Tools: `fetch_url` no longer follows HTTP redirects blindly. Each hop, including redirect targets, is re-checked against the internal/private-address guard, closing the SSRF where a public URL 302-redirects to `http://169.254.169.254/…` (cloud instance metadata) and the guard only ever saw the first host.
 - Tools/plugins: writing to `plugins/` or `skills/` (loaded as code and procedures), or to any absolute/`..` path, is now a distinct, stronger risk than writing a data file - a one-time "allow writes" grant no longer silently becomes code execution. Plugins are also **Sentinel-scanned at load**, not only at install, so a `.exs` that reached the plugins dir some other way (a restored bundle, a hand-edit) cannot run code the operator never reviewed if it scans as dangerous.
@@ -43,12 +48,16 @@ All notable changes to this project are documented here. Format follows
 ### Fixed
 - HTTP API: a streaming `/v1` request no longer waits on the agent task with an infinite timeout after its own 180s stream loop gives up, so a hung provider can't pin the request process and its connection forever.
 - Dashboard: a couple of LiveView events (`perm`, the traces `page`) parsed a client-sent value with `String.to_integer`, which raises and crashes the LiveView on a malformed value; they parse leniently now.
-
-### Fixed
 - Runtime: the **output-cap retry** (which lowers the token reservation after a provider rejects an over-large one) now actually reaches the request on every provider. The Anthropic Messages and OpenAI Responses adapters were ignoring the retry's `max_tokens` (the Responses one never sent an output limit at all), and a streamed error response dropped its body — the very place the provider says the cap — so the retry either did not fire or repeated the same reservation.
 - Runtime: a provider failure that produces no content (an SSE `response.failed`/`error`) is now surfaced as an error instead of a successful **empty** reply — an outage no longer reads as the agent having calmly said nothing.
 - Store: the lazy Mnesia bootstrap is serialized, so two processes touching the store for the first time at once can no longer stop Mnesia under each other and fail the first read/write.
 - LLM: streamed **parallel tool calls** from a provider that omits the OpenAI `index` field on each fragment are now kept as separate calls, instead of being concatenated into one garbled call. The old code bucketed every index-less fragment to slot 0; it now buckets by the tool-call `id` (and falls back to append order), so "any OpenAI-compatible provider" holds for the streaming multi-tool path, not just the ones that send `index`.
+- Runtime: a provider failure now surfaces as an error even when it arrived *with* text, not only when empty. A 200 stream carrying a top-level `error` frame (OpenAI dialect) used to read as an empty success; the Anthropic adapter folds an SSE `error` event's message into the content, so an outage read as the agent answering with the provider's error string. `finish_reason: "error"` is now treated as a failure regardless of content.
+- LLM: the **output-cap retry** now also recognizes Anthropic's `max_tokens: 5000 > 4096` wording (the requested output cap exceeding the model's own maximum), so that 400 is recovered by lowering the reservation instead of failing the turn.
+- LLM: a final SSE frame the provider (or a truncated connection) left without a trailing newline is now flushed at end-of-stream instead of being dropped in the parser's buffer, so the last content/tool/error frame can't silently vanish.
+- Session: `end_session` called from an inline **heartbeat** or **aside** (rather than a normal turn) now clears the context immediately instead of leaving a pending reset that wiped the *next, unrelated* user turn's history. An aside stays ephemeral.
+- LLM (Responses): a streamed `function_call` with no `call_id` is dropped instead of becoming a nil-id tool call that the provider can't correlate with its result. A conforming stream always carries the id; this only guards a malformed one.
+- Dashboard: the **tokens** page no longer crashes on a stored token that is missing its `project` scope field; `token_scope` reads fields by key and degrades instead of matching a fixed shape.
 
 ## [0.4.2] - 2026-05-17
 

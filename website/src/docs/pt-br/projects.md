@@ -1,30 +1,30 @@
 ---
-title: Empresas
-description: Isole um cliente do outro para que uma única instalação possa atender várias empresas sem que os dados de uma jamais cruzem para a outra.
+title: Projetos
+description: Isole um cliente do outro para que uma única instalação possa atender vários projetos sem que os dados de um jamais cruzem para o outro.
 ---
 
-## O que é uma empresa
+## O que é um projeto
 
-Uma empresa é um escopo de cliente isolado. Uma única instalação pode atender vários
+Um projeto é um escopo de cliente isolado. Uma única instalação pode atender vários
 clientes, e nada cruza de um para o outro: nem arquivos, nem roteamento, nem chaves de
 modelo.
 
-Empresas são totalmente opcionais. Sem nenhuma empresa, tudo vive no escopo **root**,
-que se comporta exatamente como uma instalação de cliente único, e root é o escopo que
-todo comando usa quando você omite `--company`. A maioria das instalações nunca precisa
-de uma empresa. Crie uma só quando você realmente precisar isolar clientes uns dos
-outros.
+Todo tenant é um projeto, inclusive o primeiro. Toda instalação já vem com um **projeto
+default** (slug `default`), e é nele que todo comando cai quando você omite `--project`.
+O default é um projeto normal como qualquer outro: aparece em `project list`, pode ser
+renomeado, e tem billing próprio. Você só cria projetos adicionais quando realmente
+precisa isolar clientes uns dos outros; até lá, tudo vive no default e uma instalação de
+cliente único nunca precisa pensar em projetos.
 
-<div class="note"><strong>No painel.</strong> Root aparece como "Principal", e a página
-Companies lista cada empresa de verdade que você criou. Root não é uma empresa de
-verdade: nunca aparece em <code>company list</code>, e não pode ser renomeado nem
-removido.</div>
+<div class="note"><strong>No painel.</strong> A página Projects lista todos os projetos,
+inclusive o default. O default não é um caso especial: você o vê na lista, edita o nome
+e a margem dele, e mede o billing dele como o de qualquer outro.</div>
 
 ## O handle é a identidade
 
-A identidade real de um agente é o seu **handle**. No root, o handle é apenas o nome
-simples (`sales`). Dentro de uma empresa, ele é qualificado como `empresa/nome`
-(`acme/sales`). O mesmo nome simples pode ser reutilizado em cada empresa, então
+A identidade real de um agente é o seu **handle**. No projeto default, o handle é apenas
+o nome simples (`sales`). Dentro de outro projeto, ele é qualificado como `projeto/nome`
+(`acme/sales`). O mesmo nome simples pode ser reutilizado em cada projeto, então
 `acme/sales` e `globex/sales` são dois agentes diferentes.
 
 O handle é o que indexa tudo: a entrada de configuração, o diretório do workspace, as
@@ -33,75 +33,90 @@ cima. Ele decorre do handle.
 
 ### Arquivos
 
-O workspace de um agente de empresa é `~/.pepe/companies/<empresa>/agents/<nome>/` e o
-espaço compartilhado dele é `~/.pepe/companies/<empresa>/shared/`. Agentes com o mesmo
-nome em empresas diferentes nunca escrevem no mesmo diretório, e um caminho `shared/...`
-nunca vaza entre clientes. Agentes do root mantêm o layout simples, `~/.pepe/agents/<nome>/`
-e `~/.pepe/shared/`.
+O workspace de um agente é `~/.pepe/projects/<slug>/agents/<nome>/` e o espaço
+compartilhado dele é `~/.pepe/projects/<slug>/shared/`. Agentes com o mesmo nome em
+projetos diferentes nunca escrevem no mesmo diretório, e um caminho `shared/...` nunca
+vaza entre clientes. Os agentes do projeto default ficam sob o slug `default`, exatamente
+como os de qualquer outro projeto.
 
 ### Roteamento
 
-`send_to_agent` nunca cruza a fronteira de uma empresa. Um destino informado pelo nome
-simples resolve para um par dentro da própria empresa do remetente, e uma trava rígida
-recusa qualquer rota entre empresas, mesmo que uma lista de permissões peça por ela.
+`send_to_agent` nunca cruza a fronteira de um projeto. Um destino informado pelo nome
+simples resolve para um par dentro do próprio projeto do remetente, e uma trava rígida
+recusa qualquer rota entre projetos, mesmo que uma lista de permissões peça por ela.
 
 ### Modelos e chaves
 
-Um agente de empresa resolve seus modelos primeiro dentro da própria empresa e, só
-depois, cai para o root. Uma empresa pode, assim, fixar chaves de provedor privadas que
-nenhuma outra empresa enxerga, ou herdar um único provedor global compartilhado. O
-agente ou o modelo de uma empresa nunca é promovido a padrão global, nem quando é o
-primeiro a ser criado.
+Um agente resolve seus modelos primeiro dentro do próprio projeto e, só depois, cai para
+o projeto default. Um projeto pode, assim, fixar chaves de provedor privadas que nenhum
+outro projeto enxerga, ou herdar um único provedor global compartilhado. O agente ou o
+modelo de um projeto nunca é promovido a padrão global, nem quando é o primeiro a ser
+criado.
 
-## Criando e usando uma empresa
+## Criando e usando um projeto
 
 ```bash
-pepe company add acme --description "Acme Inc"
-pepe company add globex
-pepe company list
+pepe project add acme --description "Acme Inc"
+pepe project add globex
+pepe project list
 
-# agentes, modelos e rotas aceitam --company
-pepe model add llm  --company acme --base-url ... --api-key '${ACME_KEY}' --model ...
-pepe agent add sales   --company acme --prompt "..." --can-message support
-pepe agent add support --company acme --prompt "..."
-pepe agent route sales support --company acme   # ambos resolvem dentro da acme
+# agentes, modelos e rotas aceitam --project
+pepe model add llm  --project acme --base-url ... --api-key '${ACME_KEY}' --model ...
+pepe agent add sales   --project acme --prompt "..." --can-message support
+pepe agent add support --project acme --prompt "..."
+pepe agent route sales support --project acme   # ambos resolvem dentro da acme
 
-pepe agent list --company acme    # só os da Acme
-pepe agent list                   # só os do root
-pepe agent list --all             # todos os escopos
-pepe chat --company acme sales    # ou: pepe run acme/sales "..."
+pepe agent list --project acme    # só os da Acme
+pepe agent list                   # só os do projeto default
+pepe agent list --all             # todos os projetos
+pepe chat --project acme sales    # ou: pepe run acme/sales "..."
 ```
 
 ## Renomeando e removendo
 
 ```bash
-pepe company rename acme umbrella   # re-indexa os agentes, modelos, rotas,
-                                    # crons, watches, bots, tokens e arquivos dela
-pepe company remove acme            # recusa enquanto ela ainda tiver agentes
-pepe company remove acme --force    # remove a empresa, e os agentes dela junto
+pepe project rename acme umbrella   # troca só o rótulo e move o diretório dela;
+                                    # rotas, permissões, defaults, crons, watches,
+                                    # bots e tokens seguem apontando, por id
+pepe project remove acme            # recusa enquanto ela ainda tiver agentes
+pepe project remove acme --force    # remove o projeto, e os agentes dele junto
 ```
+
+Renomear é seguro porque toda referência é por **id**, não por nome. Cada projeto (assim
+como cada modelo e cada agente) tem um id interno estável; o slug e o nome são apenas
+rótulos mutáveis. Renomear um projeto só troca o rótulo e move o diretório dele, então
+nenhuma rota, permissão, padrão ou binding de cron, bot ou token fica pendurado. O projeto
+default também pode ser renomeado assim.
 
 ## Como fica na configuração
 
+Os projetos são um mapa chaveado por um **id** estável, cada entrada com um `slug` e um
+`name` (ambos rótulos editáveis), mais um ponteiro `default_project` no topo, apontando
+para o id do projeto default:
+
 ```jsonc
-"companies": { "acme": { "description": "Acme Inc", "default_model": "llm" } },
+"default_project": "p_1a2b3c4d",
+"projects": {
+  "p_1a2b3c4d": { "slug": "default", "name": "Default" },
+  "p_5e6f7a8b": { "slug": "acme", "name": "Acme Inc", "default_model": "llm" }
+},
 "agents": {
-  "assistant":    { "can_message": [] },          // escopo root
+  "assistant":    { "can_message": [] },          // projeto default
   "acme/sales":   { "can_message": ["acme/support"] },
   "acme/support": { "can_message": [] }
 }
 ```
 
-## Empresas e canais
+## Projetos e canais
 
-Um bot do Telegram ligado a um agente de empresa mantém a conversa inteira dentro
-daquela empresa. Um bot ligado a um agente do root atende o root, exatamente como fazia
-antes de você ter qualquer empresa.
+Um bot do Telegram ligado a um agente de um projeto mantém a conversa inteira dentro
+daquele projeto. Um bot ligado a um agente do projeto default atende o default,
+exatamente como fazia numa instalação de cliente único.
 
 ## Tetos de gasto e de mensagens
 
-A empresa também é a unidade que o faturamento mede. Toda chamada de modelo é medida por
-empresa, e uma empresa pode carregar um teto mensal de gasto, um teto mensal de mensagens
-de clientes e uma margem de cobrança. Veja [Cobrança e limites](../billing/) para definir,
-limpar e resetar esses tetos, e [Agentes](../agents/) para os campos do agente que a
-empresa delimita.
+O projeto também é a unidade que o faturamento mede. Toda chamada de modelo é medida por
+projeto, e um projeto pode carregar um teto mensal de gasto, um teto mensal de mensagens
+de clientes e uma margem de cobrança. O projeto default tem billing próprio como qualquer
+outro. Veja [Cobrança e limites](../billing/) para definir, limpar e resetar esses tetos,
+e [Agentes](../agents/) para os campos do agente que o projeto delimita.

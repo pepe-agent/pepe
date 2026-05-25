@@ -27,7 +27,7 @@ triggers a `url_verification` handshake, which Pepe answers immediately.
 Replies are posted with `chat.postMessage`. Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/root/slack/<slug>
+https://YOUR_HOST/webhooks/default/slack/<slug>
 ```
 
 See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
@@ -38,7 +38,7 @@ generic route works under the hood.
 
 `/model` and `/models` only fire on an `admin`-mode connection with
 `commands` enabled; on `support`, they are plain text. `/models` lists the
-models available to this connection's company; `/model` shows the current
+models available to this connection's project; `/model` shows the current
 one, or changes it:
 
 ```text

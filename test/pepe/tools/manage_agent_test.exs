@@ -130,6 +130,16 @@ defmodule Pepe.Tools.ManageAgentTest do
     refute Config.get_agent("suporte")
   end
 
+  test "create reports the error (not a false success) when the handle is invalid" do
+    assert {:error, msg} =
+             ManageAgent.run(%{"action" => "create", "target" => "bad/name/extra"}, ctx(["*"]))
+
+    assert msg =~ "valid handle"
+    refute Config.get_agent("bad/name/extra")
+    # No agent was created: only the two the setup put there remain.
+    assert Enum.map(Config.agents(), & &1.name) |> Enum.sort() == ["default/rh", "default/vendas"]
+  end
+
   describe "set_flag (enable or disable a switch on a managed agent)" do
     setup do
       on_exit(fn -> Process.delete(:pepe_untrusted_content) end)

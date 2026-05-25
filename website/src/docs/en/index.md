@@ -234,9 +234,9 @@ single bad turn cannot take down the rest of your agents.
 
 ### Multi-tenant when you need it
 
-Work can be scoped to a **company**, isolating agents, channels, models, and
-usage per tenant. If you never opt in, everything lives in the default **root**
-scope (shown as "Principal" in the dashboard), and you can ignore companies
+Work can be scoped to a **project**, isolating agents, channels, models, and
+usage per tenant. If you never opt in, everything lives in the **default
+project**, which every command falls back to, and you can ignore projects
 entirely.
 
 ## Where to go next

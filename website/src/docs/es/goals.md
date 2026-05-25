@@ -100,7 +100,7 @@ Un objetivo aquí es una meta persistente más un estado. El agente fija uno al 
 
 La meta y el estado sobreviven entre turnos y a un reinicio, así que una ejecución larga o autónoma no se desvía de aquello que se propuso.
 
-<div class="note"><strong><code>budget_tokens</code> es una meta orientativa, no un tope duro.</strong> Se le comunica al agente para que mantenga el esfuerzo proporcionado, y nada lo obliga a respetarla. Los límites duros de gasto son el tope mensual por empresa descrito en <a href="/es/docs/billing/">Uso y facturación</a>.</div>
+<div class="note"><strong><code>budget_tokens</code> es una meta orientativa, no un tope duro.</strong> Se le comunica al agente para que mantenga el esfuerzo proporcionado, y nada lo obliga a respetarla. Los límites duros de gasto son el tope mensual por proyecto descrito en <a href="/es/docs/billing/">Uso y facturación</a>.</div>
 
 ### `update_plan`: la lista de tareas viva
 

@@ -47,10 +47,10 @@ O agente também precisa de ter `send_to_agent` na sua lista de `tools` para con
 encaminhar seja o que for. A lista de rotas permitidas decide a quem ele pode ligar, e a
 ferramenta é o que lhe permite fazer a chamada.
 
-<div class="note"><strong>Fronteiras de empresa.</strong> As rotas nunca atravessam a
-fronteira de uma empresa. Os nomes simples em <code>--can-message</code> são resolvidos
-dentro da própria empresa do agente, e a CLI recusa uma rota entre dois agentes que
-estejam em empresas diferentes.</div>
+<div class="note"><strong>Fronteiras de projeto.</strong> As rotas nunca atravessam a
+fronteira de um projeto. Os nomes simples em <code>--can-message</code> são resolvidos
+dentro do próprio projeto do agente, e a CLI recusa uma rota entre dois agentes que
+estejam em projetos diferentes.</div>
 
 ## Encaminhamento e a barreira de permissão
 

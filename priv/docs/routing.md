@@ -21,8 +21,8 @@ you. Answering isn't itself "messaging", so the callee needs no return route to 
 Routing is a **directed allowlist**: each agent's `can_message` lists exactly who *it*
 may message, so allowing `A -> B` does **not** allow `B -> A`. A message to an agent
 outside your `can_message` is refused, and refused discreetly ("Agent X isn't available
-to you") so the permission model never leaks. Routes never cross a company boundary,
-even if an allowlist somehow names an agent in another company.
+to you") so the permission model never leaks. Routes never cross a project boundary,
+even if an allowlist somehow names an agent in another project.
 
 Because the allowlist *is* the authorization, a `send_to_agent` call doesn't go through
 the human permission prompt - but the callee's own risky tools still do.

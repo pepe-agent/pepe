@@ -25,10 +25,10 @@ As ferramentas arriscadas também são autorizadas ali mesmo. A execução pára
 A barra lateral espelha a CLI, por isso quase tudo o que fazes com o comando `pepe` também podes fazer aqui:
 
 - **Chat**: conversar com uma sessão.
-- **Companies**: criar, editar e eliminar âmbitos de empresa e a margem de faturação de cada um. Vê [Empresas](../companies/).
+- **Projetos**: criar, editar e eliminar projetos e a margem de faturação de cada um. Vê [Projetos](../projects/).
 - **Agents**: criar, editar e eliminar agentes, com persona, modelo, ferramentas, rotas, âmbito de administração e qual deles é o predefinido.
 - **Models**: acrescentar, remover e editar ligações de modelo, definir um preço por modelo e escolher o predefinido.
-- **Usage and billing**: utilização de tokens e custo por ciclo, por empresa. Vê [Utilização e faturação](../billing/).
+- **Usage and billing**: utilização de tokens e custo por ciclo, por projeto. Vê [Utilização e faturação](../billing/).
 - **Learning**: a linha temporal do TimeLearn. Vê [Aprendizagem](../learning/).
 - **Scheduled**: criar, executar e gerir tarefas agendadas. Vê [Tarefas agendadas](../scheduled/).
 - **Watches**: o "avisa-me quando X" de uma só vez. Vê [Watches](../watches/).

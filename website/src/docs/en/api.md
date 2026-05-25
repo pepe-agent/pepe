@@ -119,7 +119,7 @@ There are two:
 
 ```http
 POST /v1/chat/completions   # non-streaming or streaming (Server-Sent Events)
-GET  /v1/models             # lists your agents (and, in the open/root scope, raw model connections)
+GET  /v1/models             # lists your agents (and, in the open/default-project scope, raw model connections)
 ```
 
 Both live under `/v1`, so a client configured with `base_url = http://HOST:PORT/v1` finds them exactly where an OpenAI client expects.
@@ -131,7 +131,7 @@ This is the one idea that makes everything else click. The `model` field in a ch
 Resolution of the `model` field happens in this order:
 
 1. If the name matches an agent, that agent runs.
-2. If no agent matches but the name matches a bare model connection, Pepe wraps it in a minimal pass-through agent (no tools, single turn) and calls that model directly. This fallback is only available in the open or root scope (see [Token scopes](../auth/#token-scopes)).
+2. If no agent matches but the name matches a bare model connection, Pepe wraps it in a minimal pass-through agent (no tools, single turn) and calls that model directly. This fallback is only available in the open or default-project scope (see [Token scopes](../auth/#token-scopes)).
 3. If neither matches, the default agent runs.
 
 <div class="note"><strong>Practical upshot.</strong> The set of "models" a client can pick from is your set of agents. Give an agent a descriptive name, wire up its tools once, and every OpenAI-compatible client sees it as a selectable model.</div>
@@ -260,7 +260,7 @@ curl http://localhost:4000/health
 
 ## Listing models
 
-`GET /v1/models` returns the agents (and, in the open or root scope, raw model connections) the caller can reach, in the OpenAI models shape. This is the scoped, per-company way to discover what is available: with a company token it lists only that company's agents, never another tenant's, and never the raw model connections.
+`GET /v1/models` returns the agents (and, in the open or default-project scope, raw model connections) the caller can reach, in the OpenAI models shape. This is the scoped, per-project way to discover what is available: with a project token it lists only that project's agents, never another tenant's, and never the raw model connections.
 
 ```bash
 curl http://localhost:4000/v1/models \
@@ -277,4 +277,4 @@ curl http://localhost:4000/v1/models \
 }
 ```
 
-Agents are tagged `pepe:agent`. In the open or root scope, raw model connections also appear, tagged `pepe:model`. Because this is a standard models list, OpenAI tooling that offers a model picker populates it with your agents.
+Agents are tagged `pepe:agent`. In the open or default-project scope, raw model connections also appear, tagged `pepe:model`. Because this is a standard models list, OpenAI tooling that offers a model picker populates it with your agents.

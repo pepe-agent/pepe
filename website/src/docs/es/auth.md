@@ -106,12 +106,12 @@ Puedes generar, listar y revocar tokens de tres formas: la CLI, el panel o por c
 Desde la CLI:
 
 ```bash
-pepe token add [--company CO] [--agent HANDLE] [--label "..."]
+pepe token add [--project PROJECT] [--agent HANDLE] [--label "..."]
 pepe token list
 pepe token revoke ID
 ```
 
-En el panel, la página de tokens de la API tiene un formulario para generar un token (con un alcance de empresa y agente opcional) y una lista para revocar los existentes.
+En el panel, la página de tokens de la API tiene un formulario para generar un token (con un alcance de proyecto y agente opcional) y una lista para revocar los existentes.
 
 Un token es una cadena aleatoria con el prefijo `pepe_`. En el archivo de configuración solo se guarda su hash SHA-256; el token en bruto se imprime una vez al crearlo y nunca más. Cópialo en ese momento. Si lo pierdes, revócalo y genera uno nuevo.
 
@@ -119,9 +119,9 @@ Un token es una cadena aleatoria con el prefijo `pepe_`. En el archivo de config
 
 Un agente al que se le otorga la herramienta protegida `manage_token` puede generar, listar y revocar tokens desde una conversación. Como un token concede acceso a la API, la herramienta no es de solo lectura: pasa por la barrera de permisos, así que confirmas antes de que se cree un token, y el secreto en bruto se devuelve una sola vez para que lo copies.
 
-> Tú: Crea un token para la empresa acme, con la etiqueta chatwoot.
+> Tú: Crea un token para el proyecto acme, con la etiqueta chatwoot.
 >
-> Agente: (te pide confirmación y luego lo genera) Token de API creado, alcance empresa acme. Cópialo ahora, no se volverá a mostrar: `pepe_9f2a...`
+> Agente: (te pide confirmación y luego lo genera) Token de API creado, alcance proyecto acme. Cópialo ahora, no se volverá a mostrar: `pepe_9f2a...`
 
 ### Presentar un token
 
@@ -150,17 +150,17 @@ Cualquier SDK de OpenAI envía la forma `Authorization: Bearer` cuando fijas su 
 Un token lleva un ámbito que decide a qué agentes puede llegar. De lo más estrecho a lo más amplio:
 
 * **Fijado a un agente** (`--agent HANDLE`): siempre ejecuta exactamente ese agente. El campo `model` de la petición se ignora. Entrega esto a quien solo deba alcanzar un agente específico.
-* **Empresa** (`--company CO`): cualquier agente dentro de esa empresa. Un nombre de `model` puro se cualifica dentro de esa empresa automáticamente, y una petición por un agente que pertenece a otra empresa se rechaza con `403`.
-* **Ninguno**: el ámbito raíz (sin empresa). Es el ámbito en el que opera cada comando cuando no especificas ninguno. Puede alcanzar los agentes raíz (los que tienen un nombre puro, sin espacio de nombres) y, de forma única, recurrir a conexiones de modelo puras por nombre.
+* **Proyecto** (`--project PROJECT`): cualquier agente dentro de ese proyecto. Un nombre de `model` puro se cualifica dentro de ese proyecto automáticamente, y una petición por un agente que pertenece a otro proyecto se rechaza con `403`.
+* **Ninguno**: el proyecto por defecto. Es el ámbito en el que opera cada comando cuando no especificas ninguno. Puede alcanzar los agentes del proyecto por defecto (los que tienen un nombre puro, sin espacio de nombres) y, de forma única, recurrir a conexiones de modelo puras por nombre.
 
-`GET /v1/models` respeta el ámbito: un token de empresa o de agente ve solo sus propios agentes, nunca los de otra empresa, y nunca las conexiones de modelo puras.
+`GET /v1/models` respeta el ámbito: un token de proyecto o de agente ve solo sus propios agentes, nunca los de otro proyecto, y nunca las conexiones de modelo puras.
 
-## Enrutamiento multiempresa: dale a la empresa X su propio acceso
+## Enrutamiento multi-cliente: dale al proyecto X su propio acceso
 
-Los ámbitos son la forma de repartir acceso a la API por empresa. Para dar a una empresa su propia clave, genera un token con ámbito de empresa:
+Los ámbitos son la forma de repartir acceso a la API por cliente. Para dar a un proyecto su propia clave, genera un token con ámbito de proyecto:
 
 ```bash
-pepe token add --company acme --label "Acme production"
+pepe token add --project acme --label "Acme production"
 # prints: pepe_9f2a... (copy it now, shown once)
 ```
 
@@ -168,7 +168,7 @@ Quien posea ese token:
 
 * puede alcanzar por nombre cualquier agente que pertenezca a `acme`;
 * puede enviar un nombre de `model` puro y que se resuelva dentro de `acme`;
-* se rechaza con `403` si nombra un agente de otra empresa;
+* se rechaza con `403` si nombra un agente de otro proyecto;
 * ve solo los agentes de `acme` desde `GET /v1/models`.
 
 ```bash
@@ -182,11 +182,11 @@ curl http://localhost:4000/v1/chat/completions \
 curl http://localhost:4000/v1/chat/completions \
   -H 'authorization: Bearer pepe_9f2a...' \
   -H 'content-type: application/json' \
-  -d '{ "model": "some-other-company-agent", "messages": [{"role":"user","content":"hola"}] }'
+  -d '{ "model": "some-other-project-agent", "messages": [{"role":"user","content":"hola"}] }'
 ```
 
 Para fijar un token a exactamente un agente (el campo `model` se ignora entonces por completo), añade `--agent`:
 
 ```bash
-pepe token add --company acme --agent acme/support --label "widget de soporte de Acme"
+pepe token add --project acme --agent acme/support --label "widget de soporte de Acme"
 ```

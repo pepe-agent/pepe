@@ -119,7 +119,7 @@ São dois:
 
 ```http
 POST /v1/chat/completions   # non-streaming or streaming (Server-Sent Events)
-GET  /v1/models             # lists your agents (and, in the open/root scope, raw model connections)
+GET  /v1/models             # lists your agents (and, in the open/default-project scope, raw model connections)
 ```
 
 Ambos ficam sob `/v1`, pelo que um cliente configurado com `base_url = http://HOST:PORT/v1` encontra-os exatamente onde um cliente da OpenAI espera.

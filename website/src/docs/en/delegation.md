@@ -47,6 +47,6 @@ This runs the workers as a different agent, with that agent's persona and tools,
 
 ## What it costs
 
-Every worker is a real model call, metered and billed like any other, against the same company. Eight workers is eight turns. That is the trade: you are buying back wall-clock time and context-window room, and you are paying for it in tokens. For a task that would not have fitted in one window at all, it is not really a trade.
+Every worker is a real model call, metered and billed like any other, against the same project. Eight workers is eight turns. That is the trade: you are buying back wall-clock time and context-window room, and you are paying for it in tokens. For a task that would not have fitted in one window at all, it is not really a trade.
 
 Each worker gets its own trace, so **Traces** in the [dashboard](../dashboard/) shows what each one actually did, not just what the parent said about it.

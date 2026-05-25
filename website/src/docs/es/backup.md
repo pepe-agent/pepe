@@ -1,6 +1,6 @@
 ---
 title: Copia de seguridad y extracción
-description: Archiva la instalación completa, o saca una empresa para que funcione en su propio servidor, y restaura cualquiera de las dos con un solo comando.
+description: Archiva la instalación completa, o saca un proyecto para que funcione en su propio servidor, y restaura cualquiera de las dos con un solo comando.
 ---
 
 Todo lo que Pepe sabe vive como archivos bajo `~/.pepe/` (o `PEPE_HOME`), así que moverlo es mover un directorio. Dos comandos crean un archivo comprimido de ello, y uno restaura cualquiera de los dos.
@@ -12,18 +12,18 @@ pepe backup                       # genera pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /ruta/x.tgz
 ```
 
-Este es el archivo del tipo «no pierdas esta máquina». Empaqueta todas las empresas, todos los espacios de trabajo de los agentes, el espacio compartido, las sesiones y los libros de uso, y omite `data/mnesia/` (una caché desechable que se reconstruye sola). Restaurado en una máquina vacía, es la misma máquina otra vez.
+Este es el archivo del tipo «no pierdas esta máquina». Empaqueta todos los proyectos, todos los espacios de trabajo de los agentes, el espacio compartido, las sesiones y los libros de uso, y omite `data/mnesia/` (una caché desechable que se reconstruye sola). Restaurado en una máquina vacía, es la misma máquina otra vez.
 
-## Extracción: una empresa, por su cuenta
+## Extracción: un proyecto, por su cuenta
 
 ```bash
 pepe extract acme                 # genera acme-extract-YYYY-MM-DD.tgz
 pepe extract acme --output /ruta/acme.tgz
 ```
 
-Una empresa que creció dentro de una instalación compartida puede irse para funcionar en su propio servidor. No se llega ahí copiando una carpeta, porque los registros de esa empresa están entretejidos en el `config.json` compartido como identificadores `acme/agente`. La extracción reescribe esos identificadores a nombres de raíz simples, así que el archivo es una **instalación nueva de un solo inquilino que resulta ser esa empresa**: colócalo en un servidor nuevo y ejecútalo.
+Un proyecto que creció dentro de una instalación compartida puede irse para funcionar en su propio servidor. No se llega ahí copiando una carpeta, porque los registros de ese proyecto están entretejidos en el `config.json` compartido como handles `acme/agente`. La extracción reescribe esos handles a los nombres simples de un proyecto por defecto nuevo, así que el archivo es una **instalación nueva de un solo cliente que resulta ser ese proyecto**: colócalo en un servidor nuevo y ejecútalo.
 
-Solo esa empresa viaja: sus agentes, modelos, crons, watches, bots, tokens, espacios de trabajo e historial de uso. Nada de los demás inquilinos va con ella. Si uno de sus agentes depende de un **modelo compartido** (uno que vive en la raíz, no dentro de la empresa), ese modelo también se incorpora al archivo, para que el paquete funcione en una máquina vacía; el comando te dice cuáles.
+Solo ese proyecto viaja: sus agentes, modelos, crons, watches, bots, tokens, espacios de trabajo e historial de uso. Nada de los demás clientes va con él. Si uno de sus agentes depende de un **modelo compartido** (uno que vive en el proyecto por defecto, no dentro de este), ese modelo también se incorpora al archivo, para que el paquete funcione en una máquina vacía; el comando te dice cuáles.
 
 ## Restauración: cualquiera de los archivos
 

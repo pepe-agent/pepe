@@ -5,7 +5,7 @@ description: Opt-in transforms plugged into the message flow, so an agent can re
 
 Privacy hooks are opt-in transforms plugged into the message flow, so an agent can redact PII before it ever reaches an external model, and restore it in the reply. An agent with no hooks runs raw, exactly as before.
 
-You enable them per agent (with `--hooks`, or the Agents form in the dashboard), you can inherit a company default (`default_hooks`), and you configure each hook once under `"hooks"` in the config.
+You enable them per agent (with `--hooks`, or the Agents form in the dashboard), you can inherit a project default (`default_hooks`), and you configure each hook once under `"hooks"` in the config.
 
 ## Four hooks, one contract
 
@@ -19,7 +19,7 @@ They compose, because each one feeds the same reversible map:
 ## Using them
 
 ```bash
-pepe agent add support --hooks pii_redact,llm_redact --company acme --prompt "..."
+pepe agent add support --hooks pii_redact,llm_redact --project acme --prompt "..."
 pepe hooks list
 # let a model build a validated pii_redact config from plain language:
 pepe hooks generate "cpf, cnpj and our policy numbers APOL-12345678" --model local --save

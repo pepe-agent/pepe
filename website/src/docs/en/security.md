@@ -107,7 +107,7 @@ If you genuinely need an agent to **act** on what strangers send it, and not onl
 
 ### The owner can drive the CLI by chat
 
-The `manage_pepe` tool runs the same non-interactive `pepe` commands you would type in a terminal (add a model, define an agent, mint a token, schedule a task, manage companies), so a trusted owner agent can operate the whole runtime from a conversation.
+The `manage_pepe` tool runs the same non-interactive `pepe` commands you would type in a terminal (add a model, define an agent, mint a token, schedule a task, manage projects), so a trusted owner agent can operate the whole runtime from a conversation.
 
 > You: Add an agent called researcher with the web_search and read_file tools.
 >
@@ -292,8 +292,8 @@ With no token, the HTTP API answers only loopback (localhost) callers, so a loca
 pepe token add --label "ci pipeline"
 ```
 
-The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--company` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that company). Manage them with `pepe token list` and `pepe token revoke ID`, from the dashboard's API tokens page, or by chat with an agent that has the guarded `manage_token` tool. For request shapes and SDK usage, see the [HTTP API page](../api/).
+The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--project` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that project). Manage them with `pepe token list` and `pepe token revoke ID`, from the dashboard's API tokens page, or by chat with an agent that has the guarded `manage_token` tool. For request shapes and SDK usage, see the [HTTP API page](../api/).
 
 ## Multi-tenant scoping
 
-Work can be walled off per company (a handle-based tenant scope). The default no-company scope is root (shown as "Principal" in the dashboard). A company's agents, models, and provider keys stay invisible to other companies, and an API token scoped to a company reaches only that company's agents. This keeps one tenant's credentials and conversations from ever leaking into another's, which matters when you host agents on behalf of several customers from one Pepe instance.
+Work can be walled off per project (a handle-based tenant scope). Every install starts with a single default project that every command falls back to; it is a normal project, so it shows in `project list`, can be renamed, and carries its own billing. A project's agents, models, and provider keys stay invisible to other projects, and an API token scoped to a project reaches only that project's agents. This keeps one tenant's credentials and conversations from ever leaking into another's, which matters when you host agents on behalf of several customers from one Pepe instance.

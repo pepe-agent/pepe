@@ -379,7 +379,7 @@ O plugin implementa `parse/1` para responder apenas a conversas marcadas
 assume (`open`), o Pepe fica em silêncio, e retoma quando volta a `pending`.
 
 **Configuração, no Chatwoot:** cria um AgentBot, aponta o teu webhook de
-saída para `https://O_TEU_HOST/webhooks/<company>/chatwoot/<slug>`. A ligação
+saída para `https://O_TEU_HOST/webhooks/<project>/chatwoot/<slug>`. A ligação
 guarda `base_url`, `account_id` e um `api_token` (como `${ENV_VAR}`) via
 `config_schema/0`, preenchidos a partir do painel, o mesmo padrão de
 Configurar de qualquer plugin.

@@ -45,6 +45,20 @@ defmodule Pepe.LLM.OutputCapTest do
     test "qwen states the model's output range, which is a ceiling and not the room left" do
       assert OutputCap.available("Range of max_tokens should be [1, 65536]") == 65_536
     end
+
+    test "anthropic states the exceeded output cap as `max_tokens: X > Y`" do
+      body = %{
+        "error" => %{
+          "message" =>
+            "max_tokens: 5000 > 4096, which is the maximum allowed number of output tokens for " <>
+              "claude-3-5-sonnet-20241022"
+        }
+      }
+
+      # The ceiling is the second number; without this the Anthropic output-cap 400 was never
+      # recognized and the turn failed instead of retrying with a smaller reservation.
+      assert OutputCap.available(body) == 4096
+    end
   end
 
   describe "not our case" do

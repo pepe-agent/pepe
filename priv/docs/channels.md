@@ -97,10 +97,10 @@ tools run and deleted when the turn ends, so only the final answer stays in the 
 ## WhatsApp (Meta Cloud API)
 
 WhatsApp connects over a webhook, not polling. Each connection has its own URL -
-`/webhooks/<company>/whatsapp/<slug>` (company is `root` when there's none) - served
+`/webhooks/<project>/whatsapp/<slug>` (project is `default` when none is named) - served
 by `mix pepe serve`. Add one from chat with the CLI or the dashboard Channels tab:
 
-    mix pepe gateway whatsapp add suporte --agent acme/atendimento --company acme \
+    mix pepe gateway whatsapp add support --agent acme/support --project acme \
       --mode support --phone-number-id 123 --ttl-min 30
 
 A connection binds to an agent (like a Telegram bot) and has a `mode`: `admin`
@@ -120,7 +120,7 @@ rule: free-form replies only within 24h of the customer's last message.
 ## Other webhook channels
 
 Slack, Discord, Microsoft Teams and Google Chat are all inbound-webhook channels
-like WhatsApp - each is a connection at `/webhooks/<company>/<provider>/<slug>`
+like WhatsApp - each is a connection at `/webhooks/<project>/<provider>/<slug>`
 served by `mix pepe serve`, binding an agent to a session keyed
 `<provider>:<agent>:<from>`, with the same `admin` / `support` modes. Unlike Telegram
 (`manage_channel`) and WhatsApp (`mix pepe gateway whatsapp add`), these four have no

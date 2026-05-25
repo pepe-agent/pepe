@@ -105,7 +105,7 @@ fora desse âmbito é recusado com cortesia.
 
 | Campo | O que faz | Predefinição |
 |-------|--------------|---------|
-| `name` | A identidade do agente, e a chave sob a qual é guardado e endereçado. Dentro de uma empresa passa a ser um identificador como `acme/assistant` (vê abaixo). | obrigatório |
+| `name` | A identidade do agente, e a chave sob a qual é guardado e endereçado. Dentro de um projeto passa a ser um identificador como `acme/assistant` (vê abaixo). | obrigatório |
 | `description` | Uma nota curta para humanos. Nunca enviada ao modelo. | nenhum |
 | `model` | O nome de uma ligação de modelo. Deixa por definir para usar o modelo predefinido do âmbito. | predefinição do âmbito |
 | `system_prompt` | A personalidade e as instruções com que o agente corre. | `És o Pepe, um agente de IA prestável.` (um prompt inicial) |
@@ -140,7 +140,7 @@ um agente confuso ande em ciclo para sempre.
 
 Outras duas barreiras ficam à frente da chamada ao modelo. Um agente cujo modelo
 exige redação recusa-se a correr a menos que o agente tenha um hook de redação
-ativado, e uma empresa que atingiu o seu limite de gasto mensal (ou o seu limite de
+ativado, e um projeto que atingiu o seu limite de gasto mensal (ou o seu limite de
 mensagens de clientes por mês, um limite separado) para aqui sem novas chamadas ao
 modelo nem respostas. Ambas falham o turno de forma limpa em vez de prosseguir em
 silêncio; ver Faturação e limites para saber como configurar esses limites.
@@ -300,7 +300,7 @@ nomeias um agente:
 pepe run "resume este repositório"
 ```
 
-O primeiro agente que crias no âmbito predefinido (sem empresa) torna-se
+O primeiro agente que crias no projeto default torna-se
 automaticamente o predefinido. Muda-o quando quiseres:
 
 ```bash
@@ -330,8 +330,8 @@ pepe agent route triage assistant
 ```
 
 Agora `triage` pode passar trabalho a `assistant`. Remove a rota com `--remove`. As
-rotas nunca cruzam a fronteira de uma empresa; a CLI recusa `A -> B` quando os dois
-estão em empresas diferentes.
+rotas nunca cruzam a fronteira de um projeto; a CLI recusa `A -> B` quando os dois
+estão em projetos diferentes.
 
 ### Fá-lo pela conversa
 
@@ -385,38 +385,40 @@ alteração, tu autoriza-la e só então é aplicada. Um agente também se pode 
 com a ferramenta separada `rename_agent` ("De agora em diante, chama-te scout"), que
 move o diretório do seu workspace e entra em vigor na próxima mensagem.
 
-## Agentes multiempresa com empresas
+## Agentes multi-tenant com projetos
 
-As empresas são opcionais. Sem uma, tudo vive no âmbito predefinido, chamado
-Principal, exatamente como uma instalação de empresa única sempre funcionou.
-Adiciona uma empresa para isolar uma empresa: os seus agentes, espaços de trabalho,
-espaço partilhado, ligações de modelo e encaminhamento ficam isolados de qualquer
-outra empresa.
+Todo o tenant é um projeto. Uma instalação single-tenant vive inteira no projeto
+default (slug `default`), aquele para o qual cada comando recorre por omissão, e
+funciona exatamente como sempre funcionou. Adiciona um projeto para isolar um cliente:
+os seus agentes, espaços de trabalho, espaço partilhado, ligações de modelo e
+encaminhamento ficam isolados de qualquer outro projeto.
 
-A identidade real de um agente é o seu identificador. No âmbito Principal o
-identificador é apenas o nome simples (`assistant`). Dentro de uma empresa é
-qualificado como `company/name` (`acme/assistant`), por isso o mesmo nome simples
-pode ser reutilizado entre empresas sem colisão.
+A identidade real de um agente é o seu identificador. No projeto default o
+identificador é apenas o nome simples (`assistant`). Dentro de outro projeto é
+qualificado como `projeto/nome` (`acme/assistant`), por isso o mesmo nome simples
+pode ser reutilizado entre projetos sem colisão. Por baixo desse identificador, cada
+agente guarda um id interno estável: renomeá-lo troca apenas o rótulo e move o
+diretório do workspace, e toda a referência (rotas, gestão, tokens) segue pelo id.
 
-Cria uma empresa e depois adiciona agentes dentro dela com `--company`:
+Cria um projeto e depois adiciona agentes dentro dele com `--project`:
 
 ```bash
-pepe company add acme --description "Acme Corp"
+pepe project add acme --description "Acme Corp"
 
 pepe agent add support \
-  --company acme \
+  --project acme \
   --model openrouter \
   --prompt "És o agente de apoio da Acme." \
   --tools read_file,web_search
 ```
 
-Adiciona `--company acme` a qualquer comando de agente para agir dentro desse âmbito.
-Nomes de pares simples em `--can-message` e `--can-manage` resolvem-se dentro da
-própria empresa do agente, por isso as rotas nunca cruzam por acidente a fronteira de
-uma empresa. Cada empresa pode fixar o seu próprio modelo predefinido e o seu agente
-predefinido, ou partilhar o fornecedor global do operador. Um agente de empresa nunca
-é promovido a predefinido global (Principal) só por ser o primeiro criado dentro da
-sua empresa.
+Adiciona `--project acme` a qualquer comando de agente para agir dentro desse âmbito.
+Nomes de pares simples em `--can-message` e `--can-manage` resolvem-se dentro do
+próprio projeto do agente, por isso as rotas nunca cruzam por acidente a fronteira de
+um projeto. Cada projeto pode fixar o seu próprio modelo predefinido e o seu agente
+predefinido, ou partilhar o fornecedor global do operador. Um agente de um projeto
+nunca é promovido a predefinido global só por ser o primeiro criado dentro do
+seu projeto.
 
 ## Gerir agentes pela CLI
 
@@ -435,25 +437,25 @@ pepe agent add NAME \
   [--triage-model MODEL] \
   [--simple-model MODEL] \
   [--default] \
-  [--company CO]
+  [--project PROJ]
 
 # Lista agentes num âmbito, ou todos os agentes.
-pepe agent list [--company CO | --all]
+pepe agent list [--project PROJ | --all]
 
 # Directed messaging: let FROM message TO.
-pepe agent route FROM TO [--remove] [--company CO]
+pepe agent route FROM TO [--remove] [--project PROJ]
 
 # Management authority: let ADMIN administer TARGET (or "*" for all).
-pepe agent manage ADMIN TARGET [--remove] [--company CO]
+pepe agent manage ADMIN TARGET [--remove] [--project PROJ]
 
 # Rename an agent and move its workspace directory.
 pepe agent rename OLD NEW
 
 # Delete an agent.
-pepe agent remove NAME [--company CO]
+pepe agent remove NAME [--project PROJ]
 
 # Set the default agent for a scope.
-pepe agent default NAME [--company CO]
+pepe agent default NAME [--project PROJ]
 ```
 
 ## Correr um agente

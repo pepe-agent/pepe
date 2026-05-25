@@ -44,10 +44,10 @@ to `refunds` grants nothing in the reverse direction.
 An agent also needs `send_to_agent` in its `tools` list before it can route at all. The
 allowlist decides who it may call, and the tool is what lets it place the call.
 
-<div class="note"><strong>Company boundaries.</strong> Routes never cross a company
+<div class="note"><strong>Project boundaries.</strong> Routes never cross a project
 boundary. Bare peer names in <code>--can-message</code> resolve inside the agent's own
-company, and the CLI refuses a route between two agents that live in different
-companies.</div>
+project, and the CLI refuses a route between two agents that live in different
+projects.</div>
 
 ## Routing and the permission gate
 

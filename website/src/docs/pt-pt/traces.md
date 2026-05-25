@@ -32,7 +32,7 @@ failover, contagem de tokens e a resposta final.
 
 ```bash
 pepe traces                       # execuções recentes de todos os âmbitos
-pepe traces --company acme        # apenas as execuções de uma empresa
+pepe traces --project acme        # apenas as execuções de um projeto
 pepe traces --limit 10            # limita o tamanho da lista
 pepe traces 1720000000123456      # reproduz uma execução por id, passo a passo
 ```
@@ -40,7 +40,7 @@ pepe traces 1720000000123456      # reproduz uma execução por id, passo a pass
 ## Onde ficam os traces
 
 Os traces são escritos como um ficheiro JSON por execução, em
-`<PEPE_HOME>/data/traces/<âmbito>/<id>.json`, e o âmbito raiz fica sob `root/`. O
+`<PEPE_HOME>/data/traces/<slug>/<id>.json`, e o projeto default fica sob `default/`. O
 diretório tem um teto por âmbito, por isso os traces mais antigos vão sendo
 descartados e ele mantém-se limitado. Argumentos e resultados de ferramenta muito
 longos são cortados no registo guardado.

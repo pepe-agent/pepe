@@ -26,7 +26,7 @@ with a deferred response and posts the real answer as a follow-up once the
 agent finishes. Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/root/discord/<slug>
+https://YOUR_HOST/webhooks/default/discord/<slug>
 ```
 
 See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
@@ -39,7 +39,7 @@ Your registered command (`/ask` above) carries whatever text you put in its
 `prompt:` option, so `/model` and `/models` reach Pepe the same way any other
 message would, typed as that value. They only fire on an `admin`-mode
 connection with `commands` enabled; on `support`, they are plain text.
-`/models` lists the models available to this connection's company; `/model`
+`/models` lists the models available to this connection's project; `/model`
 shows the current one, or changes it:
 
 ```text

@@ -1,6 +1,6 @@
 ---
 title: Backup & extract
-description: Archive the whole install, or lift one company out to run on its own server, and restore either with a single command.
+description: Archive the whole install, or lift one project out to run on its own server, and restore either with a single command.
 ---
 
 Everything Pepe knows lives as files under `~/.pepe/` (or `PEPE_HOME`), so moving it is moving a directory. Two commands make an archive of it, and one restores either.
@@ -12,18 +12,18 @@ pepe backup                       # writes pepe-backup-YYYY-MM-DD.tgz
 pepe backup --output /path/x.tgz
 ```
 
-This is the "don't lose this machine" archive. It packs every company, every agent workspace, the shared space, sessions and the usage ledgers, and skips `data/mnesia/` (a disposable cache that rebuilds itself). Restored onto an empty box, it is the same machine again.
+This is the "don't lose this machine" archive. It packs every project, every agent workspace, the shared space, sessions and the usage ledgers, and skips `data/mnesia/` (a disposable cache that rebuilds itself). Restored onto an empty box, it is the same machine again.
 
-## Extract: one company, on its own
+## Extract: one project, on its own
 
 ```bash
 pepe extract acme                 # writes acme-extract-YYYY-MM-DD.tgz
 pepe extract acme --output /path/acme.tgz
 ```
 
-A company that grew up inside a shared install can leave to run on its own server. You cannot get there by copying a folder, because that company's rows are threaded through the shared `config.json` as `acme/agent` handles. Extract rewrites those handles to bare root names, so the archive is a **fresh single-tenant install that happens to be that company** — drop it on a new server and run.
+A project that grew up inside a shared install can leave to run on its own server. You cannot get there by copying a folder, because that project's rows are threaded through the shared `config.json` as `acme/agent` handles. Extract rewrites those handles to the bare names of a fresh default project, so the archive is a **fresh single-tenant install that happens to be that project** — drop it on a new server and run.
 
-Only that company travels: its agents, models, crons, watches, bots, tokens, workspaces and usage history. Nothing of the other tenants goes with it. If one of its agents depends on a **shared model** (one that lives at the root, not inside the company), that model is pulled into the archive too, so the bundle works on an empty box; the command tells you which ones.
+Only that project travels: its agents, models, crons, watches, bots, tokens, workspaces and usage history. Nothing of the other tenants goes with it. If one of its agents depends on a **shared model** (one that lives in the default project, not inside this one), that model is pulled into the archive too, so the bundle works on an empty box; the command tells you which ones.
 
 ## Restore: either archive
 

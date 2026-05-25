@@ -190,7 +190,7 @@ que lo trajeran a la conversación.
 
 `/model` muestra el modelo activo en este chat, con un botón **Browse
 models** para elegir otro; `/models` va directo a ese selector. El selector está
-acotado a tu empresa y pone una marca en el modelo en uso, así que tocas uno para
+acotado a tu proyecto y pone una marca en el modelo en uso, así que tocas uno para
 cambiar. Esas dos lecturas son solo para entrenadores, ya que revelan qué modelos
 hay detrás del bot. Uso escrito:
 

@@ -98,6 +98,34 @@ defmodule Pepe.ProjectTest do
       assert :ok = Config.delete_project("acme", force: true)
       assert Enum.map(Config.agents(), & &1.name) == ["default/keeper"]
     end
+
+    test "force-deleting a project drops crons bound to its agents, sparing others" do
+      Config.add_project("acme")
+      Config.put_agent(%Agent{name: "acme/vendas", system_prompt: "x"})
+      Config.put_agent(%Agent{name: "keeper", system_prompt: "y"})
+      Config.put_cron(%Pepe.Config.Cron{id: "c1", name: "n", agent: "acme/vendas", schedule: "0 8 * * *", prompt: "x"})
+      Config.put_cron(%Pepe.Config.Cron{id: "c2", name: "n2", agent: "keeper", schedule: "0 9 * * *", prompt: "y"})
+
+      assert :ok = Config.delete_project("acme", force: true)
+      # The automation of the deleted project's agent is gone; the unrelated one survives.
+      assert Enum.map(Config.crons(), & &1.id) == ["c2"]
+    end
+  end
+
+  describe "deleting an agent clears its bound automations" do
+    test "a bound cron is removed and a bound Telegram binding is blanked; live ones survive" do
+      Config.put_agent(%Agent{name: "sales", system_prompt: "s"})
+      Config.put_agent(%Agent{name: "keeper", system_prompt: "k"})
+      Config.put_cron(%Pepe.Config.Cron{id: "c1", name: "n", agent: "sales", schedule: "0 8 * * *", prompt: "x"})
+      Config.put_cron(%Pepe.Config.Cron{id: "c2", name: "n2", agent: "keeper", schedule: "0 9 * * *", prompt: "y"})
+      Config.put_telegram(%{"bot_token" => "t", "agent" => "sales"})
+
+      Config.delete_agent("sales")
+
+      # A later agent recreated as "sales" must not inherit the dead cron via a stale binding.
+      assert Enum.map(Config.crons(), & &1.id) == ["c2"]
+      assert Config.telegram()["agent"] == nil
+    end
   end
 
   describe "name validation (path-traversal defense)" do
@@ -110,6 +138,12 @@ defmodule Pepe.ProjectTest do
     test "Workspace.dir refuses a traversal handle as a last-line backstop" do
       assert_raise ArgumentError, fn -> Pepe.Agent.Workspace.dir("acme/../../etc") end
       assert_raise ArgumentError, fn -> Pepe.Agent.Workspace.dir("default/..") end
+    end
+
+    test "put_agent returns :ok on success and {:error, :invalid_name} on a bad handle" do
+      assert :ok = Config.put_agent(%Agent{name: "helper", system_prompt: "x"})
+      assert {:error, :invalid_name} = Config.put_agent(%Agent{name: "bad/name/extra", system_prompt: "x"})
+      assert Enum.map(Config.agents(), & &1.name) == ["default/helper"]
     end
   end
 

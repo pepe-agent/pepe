@@ -243,11 +243,12 @@ Cada conversa roda como seu próprio processo leve e supervisionado, identificad
 por um id de sessão. Muitas correm lado a lado, e uma queda em uma nunca afeta a
 outra, então um único turno ruim não pode derrubar o resto dos seus agentes.
 
-### Multiempresa quando você precisa
+### Multiprojeto quando você precisa
 
-O trabalho pode ser limitado a uma **empresa**, isolando agentes, canais, modelos
-e uso por cliente. Se você nunca ativar, tudo vive no escopo padrão, chamado
-**Principal**, e você pode ignorar as empresas por completo.
+O trabalho pode ser limitado a um **projeto**, isolando agentes, canais, modelos
+e uso por cliente. Todo tenant é um projeto: toda instalação já vem com um projeto
+default (slug `default`), no qual tudo vive quando você não cria nenhum outro, então
+você pode ignorar os projetos por completo até precisar isolar um cliente.
 
 ## Para onde ir depois
 
