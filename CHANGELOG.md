@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-30
+
+### Fixed
+- Deploy: `/health` is now excluded from the `force_ssl` HTTPS redirect. Behind a proxy or tunnel (kamal-proxy, Cloudflare Tunnel) the health check hits `http://…/health` internally with no `X-Forwarded-Proto: https`, so it used to get a 301 and fail; it now answers 200. Every other path still forces HTTPS.
+- Traces: once a run is saved as an eval case, the dashboard shows a "✓ Saved as an eval case" badge instead of leaving the button clickable and then failing on the second click. The duplicate error is now a translated message ("This run is already saved as an eval case.") rather than a raw, broken English string (`already a case in recorded`). Translated in pt-BR, pt-PT and es.
+
 ## [0.5.0] - 2026-05-25
 
 ### Changed

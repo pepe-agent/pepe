@@ -32,6 +32,7 @@ defmodule PepeWeb.TracesLive do
        new_project: false,
        selected: nil,
        selected_scope: nil,
+       selected_recorded: false,
        f_agent: "",
        f_source: "",
        f_outcome: "",
@@ -146,10 +147,15 @@ defmodule PepeWeb.TracesLive do
         >
           <%!-- Your traces are the test data you already have. When a run went right, this is
                 where you say so, and it becomes a case that has to keep going right. --%>
-          <button :if={@selected} phx-click="promote" class={btn()}
+          <button :if={@selected && !@selected_recorded} phx-click="promote" class={btn()}
             data-confirm={gettext("Keep this run as an eval case? It will assert that the agent still calls the same tools for this prompt.")}>
             {gettext("✓ This went right")}
           </button>
+          <span :if={@selected && @selected_recorded}
+            class="inline-flex items-center rounded-md bg-zinc-800 px-3 py-1.5 text-sm text-zinc-400"
+            title={gettext("Saved to the \"recorded\" eval suite. Run it with: mix pepe eval recorded")}>
+            {gettext("✓ Saved as an eval case")}
+          </span>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>
           <button :if={!@selected} phx-click="refresh" class={btn_ghost()}>{gettext("Refresh")}</button>
         </.view_header>
@@ -481,7 +487,12 @@ defmodule PepeWeb.TracesLive do
 
   @impl true
   def handle_event("open", %{"scope" => scope, "id" => id}, socket) do
-    {:noreply, assign(socket, selected: Trace.get(scope, id), selected_scope: scope)}
+    {:noreply,
+     assign(socket,
+       selected: Trace.get(scope, id),
+       selected_scope: scope,
+       selected_recorded: Pepe.Eval.FromTrace.already_case?("recorded", id)
+     )}
   end
 
   # Promote the open trace into an eval case. The suite is "recorded" so everything captured
@@ -496,10 +507,16 @@ defmodule PepeWeb.TracesLive do
             do: gettext("Kept. No tools ran, so the case asserts the agent still answers this without reaching for one."),
             else: gettext("Kept. The case asserts the agent still calls %{tools} for this.", tools: Enum.join(tools, ", "))
 
-        {:noreply, put_flash(socket, :info, message)}
+        {:noreply, socket |> assign(selected_recorded: true) |> put_flash(:info, message)}
+
+      {:error, :already_recorded} ->
+        {:noreply,
+         socket
+         |> assign(selected_recorded: true)
+         |> put_flash(:error, gettext("This run is already saved as an eval case."))}
 
       {:error, why} ->
-        {:noreply, put_flash(socket, :error, why)}
+        {:noreply, put_flash(socket, :error, to_string(why))}
     end
   end
 

@@ -64,7 +64,7 @@ defmodule Pepe.Eval.FromTrace do
   same conversation four times is a suite nobody trusts the count of.
   """
   @spec promote(String.t() | nil, String.t(), String.t(), keyword()) ::
-          {:ok, map()} | {:error, String.t()}
+          {:ok, map()} | {:error, String.t() | :already_recorded}
   def promote(scope, id, suite, opts \\ []) do
     with {:ok, kase} <- build(scope, id, opts),
          :ok <- refuse_duplicate(suite, id) do
@@ -73,10 +73,13 @@ defmodule Pepe.Eval.FromTrace do
     end
   end
 
+  @doc "Whether the trace `id` has already been promoted into `suite` as a case."
+  def already_case?(suite, id) do
+    Enum.any?(Eval.load(suite), &(&1["from_trace"] == id))
+  end
+
   defp refuse_duplicate(suite, id) do
-    if Enum.any?(Eval.load(suite), &(&1["from_trace"] == id)),
-      do: {:error, "trace #{id} is already a case in #{suite}"},
-      else: :ok
+    if already_case?(suite, id), do: {:error, :already_recorded}, else: :ok
   end
 
   defp write(suite, cases) do

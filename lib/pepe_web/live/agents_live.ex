@@ -343,67 +343,9 @@ defmodule PepeWeb.AgentsLive do
     raw_name = get_in(params, ["agent", "name"]) |> to_string()
     cs = agent_changeset(raw_name)
 
-    if cs.valid? do
-      name = raw_name |> String.trim() |> scope_name(socket.assigns.scope)
-      existing = Config.get_agent(name) || %Pepe.Config.Agent{name: name}
-
-      agent = %{
-        existing
-        | name: name,
-          system_prompt: blank(params["system_prompt"]) || Pepe.Config.Agent.default_prompt(),
-          model: blank(params["model"]),
-          tools: params["tools"] || [],
-          can_message: parse_list(params["can_message"]),
-          can_manage: parse_manage(params["can_manage"]),
-          hooks: params["hooks"] || [],
-          # Chip-list state lives in `edit_agent` (LiveView state), not `params` -
-          # read from there so nil (inherit) vs [] (explicit none) survives.
-          fallbacks: socket.assigns.edit_agent[:fallbacks],
-          triage_model: blank(params["triage_model"]),
-          simple_model: blank(params["simple_model"]),
-          utility_model: blank(params["utility_model"]),
-          exempt_message_limit: params["exempt_message_limit"] == "true"
-      }
-
-      case Config.put_agent(agent) do
-        :ok ->
-          {:noreply,
-           socket
-           |> assign(
-             agents: Config.agents(),
-             edit_agent: nil,
-             form: agent_form(""),
-             default_agent: Config.default_agent_name()
-           )
-           |> put_flash(:info, gettext("Agent %{name} saved.", name: name))}
-
-        {:error, _} ->
-          {:noreply,
-           put_flash(
-             socket,
-             :error,
-             gettext("Couldn't save %{name}: the name must be letters, digits, - or _.", name: name)
-           )}
-      end
-    else
-      # Keep what the user typed on screen and show the error under the field.
-      edit = %{
-        socket.assigns.edit_agent
-        | name: raw_name,
-          system_prompt: params["system_prompt"] || "",
-          model: blank(params["model"]),
-          tools: params["tools"] || [],
-          can_message: parse_list(params["can_message"]),
-          can_manage: parse_manage(params["can_manage"]),
-          hooks: params["hooks"] || [],
-          triage_model: blank(params["triage_model"]),
-          simple_model: blank(params["simple_model"]),
-          utility_model: blank(params["utility_model"]),
-          exempt_message_limit: params["exempt_message_limit"] == "true"
-      }
-
-      {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}
-    end
+    if cs.valid?,
+      do: save_valid_agent(params, raw_name, socket),
+      else: reshow_invalid_agent(params, raw_name, cs, socket)
   end
 
   def handle_event("agent_delete", %{"name" => name}, socket) do
@@ -447,4 +389,68 @@ defmodule PepeWeb.AgentsLive do
     do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
   def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
+
+  defp save_valid_agent(params, raw_name, socket) do
+    name = raw_name |> String.trim() |> scope_name(socket.assigns.scope)
+    existing = Config.get_agent(name) || %Pepe.Config.Agent{name: name}
+
+    agent = %{
+      existing
+      | name: name,
+        system_prompt: blank(params["system_prompt"]) || Pepe.Config.Agent.default_prompt(),
+        model: blank(params["model"]),
+        tools: params["tools"] || [],
+        can_message: parse_list(params["can_message"]),
+        can_manage: parse_manage(params["can_manage"]),
+        hooks: params["hooks"] || [],
+        # Chip-list state lives in `edit_agent` (LiveView state), not `params` -
+        # read from there so nil (inherit) vs [] (explicit none) survives.
+        fallbacks: socket.assigns.edit_agent[:fallbacks],
+        triage_model: blank(params["triage_model"]),
+        simple_model: blank(params["simple_model"]),
+        utility_model: blank(params["utility_model"]),
+        exempt_message_limit: params["exempt_message_limit"] == "true"
+    }
+
+    case Config.put_agent(agent) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(
+           agents: Config.agents(),
+           edit_agent: nil,
+           form: agent_form(""),
+           default_agent: Config.default_agent_name()
+         )
+         |> put_flash(:info, gettext("Agent %{name} saved.", name: name))}
+
+      {:error, _} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("Couldn't save %{name}: the name must be letters, digits, - or _.", name: name)
+         )}
+    end
+  end
+
+  # Keep what the user typed on screen and show the validation error under the field.
+  defp reshow_invalid_agent(params, raw_name, cs, socket) do
+    edit = %{
+      socket.assigns.edit_agent
+      | name: raw_name,
+        system_prompt: params["system_prompt"] || "",
+        model: blank(params["model"]),
+        tools: params["tools"] || [],
+        can_message: parse_list(params["can_message"]),
+        can_manage: parse_manage(params["can_manage"]),
+        hooks: params["hooks"] || [],
+        triage_model: blank(params["triage_model"]),
+        simple_model: blank(params["simple_model"]),
+        utility_model: blank(params["utility_model"]),
+        exempt_message_limit: params["exempt_message_limit"] == "true"
+    }
+
+    {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}
+  end
 end

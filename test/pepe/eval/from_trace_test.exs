@@ -139,8 +139,9 @@ defmodule Pepe.Eval.FromTraceTest do
     id = recorded_run(agent, "what is the price?")
 
     assert {:ok, _} = FromTrace.promote("default", id, "recorded")
-    assert {:error, why} = FromTrace.promote("default", id, "recorded")
-    assert why =~ "already a case"
+    # Structured error the UI/CLI can translate, and a helper the dashboard uses to hide the button.
+    assert {:error, :already_recorded} = FromTrace.promote("default", id, "recorded")
+    assert FromTrace.already_case?("recorded", id)
 
     assert [_only_one] = Eval.load("recorded")
   end

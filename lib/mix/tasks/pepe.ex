@@ -1370,6 +1370,7 @@ defmodule Mix.Tasks.Pepe do
 
     case Pepe.Eval.FromTrace.promote(opts[:scope], id, suite, name: opts[:name], contains: contains) do
       {:ok, kase} -> print_added_case(kase, suite, contains)
+      {:error, :already_recorded} -> error("trace #{id} is already a case in #{suite}")
       {:error, why} -> error(why)
     end
   end

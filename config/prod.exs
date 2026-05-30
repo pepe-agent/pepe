@@ -14,7 +14,10 @@ config :pepe, PepeWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     exclude: [
-      # paths: ["/health"],
+      # The health endpoint is hit over plain internal HTTP by a proxy/load balancer (kamal-proxy,
+      # Cloudflare Tunnel), with no `X-Forwarded-Proto: https`. Without this it would answer the SSL
+      # redirect (301) and fail the health check. Everything else still forces HTTPS.
+      paths: ["/health"],
       hosts: ["localhost", "127.0.0.1"]
     ]
   ]
