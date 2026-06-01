@@ -317,6 +317,15 @@ defmodule PepeWeb.ChannelsLive do
                 </select>
               </div>
               <div>
+                <label class={lbl()}>{gettext("While the agent works")}</label>
+                <select name="tool_progress" class={fld()}>
+                  <option value="reaction" selected={(@edit_bot["tool_progress"] || "reaction") == "reaction"}>{gettext("React with 👀 on the message (shows it was seen)")}</option>
+                  <option value="off" selected={@edit_bot["tool_progress"] == "off"}>{gettext("Show nothing")}</option>
+                  <option value="message" selected={@edit_bot["tool_progress"] == "message"}>{gettext("Post a status message")}</option>
+                </select>
+                <p class={hlp()}>{gettext("What the bot does while the agent is thinking or running tools. \"React\" drops a 👀 on your message and clears it when the reply is ready.")}</p>
+              </div>
+              <div>
                 <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("(leave blank to keep the current one)")}</span></label>
                 <input name="token" placeholder={"${TELEGRAM_BOT_TOKEN}  " <> gettext("(or paste a new token)")} class={fld()} />
                 <p class={hlp()}>{gettext("Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file.")}</p>
@@ -496,6 +505,7 @@ defmodule PepeWeb.ChannelsLive do
         (Config.telegram_bot(name) || %{})
         |> Map.delete("name")
         |> put_or_delete("agent", blank(params["agent"]))
+        |> put_or_delete("tool_progress", blank(params["tool_progress"]))
         |> maybe_put_token(new_token)
 
       save_bot(name, bot)

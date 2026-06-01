@@ -41,7 +41,7 @@ defmodule PepeWeb.AgentsLiveFallbackTest do
     {:ok, view, _html} = live(conn(), "/agents")
     html = open_edit(view)
 
-    assert html =~ "Inherits the connection&#39;s own fallback chain."
+    assert html =~ "Using the model connection&#39;s backup list."
     refute html =~ "agent_fallback_candidate"
   end
 
@@ -80,7 +80,7 @@ defmodule PepeWeb.AgentsLiveFallbackTest do
     render_change(view, "agent_fallback_add", %{"agent_fallback_candidate" => "backup-a"})
 
     html = render_click(view, "agent_fallback_inherit", %{})
-    assert html =~ "Inherits the connection&#39;s own fallback chain."
+    assert html =~ "Using the model connection&#39;s backup list."
   end
 
   test "saving with no override leaves the agent's fallbacks nil" do

@@ -57,7 +57,7 @@ defmodule Pepe.Gateways.Telegram do
   # blocking in a Session process.
   @pending :pepe_tg_pending
   # How long to wait for a button press before denying.
-  @perm_timeout 120_000
+  @perm_timeout 300_000
 
   # Tool-approval prompts already answered this turn (chat_id => message_id), so
   # they can be deleted once the turn ends - each has already served its purpose
@@ -844,13 +844,16 @@ defmodule Pepe.Gateways.Telegram do
   defp request_authorization(chat_id, name, args) do
     id = System.unique_integer([:positive])
     :ets.insert(@pending, {id, self()})
-    send_permission_prompt(chat_id, id, name, args)
+    message_id = send_permission_prompt(chat_id, id, name, args)
 
     receive do
       {:perm_reply, ^id, decision} -> decision
     after
       @perm_timeout ->
         :ets.delete(@pending, id)
+        # Tell the user the prompt expired instead of leaving stale, dead-on-click buttons (which is
+        # what happens with two concurrent prompts and a slow answer - a real "I can't click it").
+        edit_expired(chat_id, message_id)
         :deny
     end
   end
@@ -866,14 +869,17 @@ defmodule Pepe.Gateways.Telegram do
         [%{text: Prompt.label(decision), callback_data: "perm:#{id}:#{Prompt.token(decision)}"}]
       end)
 
-    Req.post(api_url(token(), "sendMessage"),
-      json: %{
-        chat_id: chat_id,
-        text: text,
-        parse_mode: "HTML",
-        reply_markup: %{inline_keyboard: buttons}
-      }
-    )
+    case Req.post(api_url(token(), "sendMessage"),
+           json: %{
+             chat_id: chat_id,
+             text: text,
+             parse_mode: "HTML",
+             reply_markup: %{inline_keyboard: buttons}
+           }
+         ) do
+      {:ok, %{body: %{"result" => %{"message_id" => mid}}}} -> mid
+      _ -> nil
+    end
   end
 
   defp decode_args(raw) when is_binary(raw) do
@@ -937,12 +943,30 @@ defmodule Pepe.Gateways.Telegram do
             send(pid, {:perm_reply, id, decision})
 
           _ ->
-            :ok
+            # No waiter: the prompt already timed out or was handled. Give feedback instead of a
+            # silent no-op on a stale button.
+            edit_expired(get_in(cq, ["message", "chat", "id"]), get_in(cq, ["message", "message_id"]))
         end
 
       _ ->
         :ok
     end
+  end
+
+  # Edit an expired/stale prompt so its buttons stop looking clickable and the user knows why.
+  defp edit_expired(nil, _message_id), do: :ok
+  defp edit_expired(_chat_id, nil), do: :ok
+
+  defp edit_expired(chat_id, message_id) do
+    Config.put_locale()
+
+    Req.post(api_url(token(), "editMessageText"),
+      json: %{
+        chat_id: chat_id,
+        message_id: message_id,
+        text: gettext("⌛ This request expired. Ask again if you still need it.")
+      }
+    )
   end
 
   # Replace the prompt's buttons with the shared outcome text so the chat stays tidy.

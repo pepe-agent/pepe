@@ -2483,6 +2483,22 @@ defmodule Pepe.Config do
   @doc "Apply the configured locale to `Pepe.Gettext` (call per process)."
   def put_locale, do: Gettext.put_locale(Pepe.Gettext, locale())
 
+  @doc """
+  The UI locales Pepe ships translations for, as `{code, label}` tuples. Single source of truth for
+  the `setup` wizard, the `config language` CLI command and the dashboard's language selector.
+  """
+  def locales do
+    [
+      {"en", "English"},
+      {"pt_BR", "Português (Brasil)"},
+      {"pt_PT", "Português (Portugal)"},
+      {"es", "Español"}
+    ]
+  end
+
+  @doc "Whether `code` is a locale Pepe ships (used to validate before `set_locale/1`)."
+  def known_locale?(code), do: code in Enum.map(locales(), &elem(&1, 0))
+
   ###
   ### Helpers
   ###

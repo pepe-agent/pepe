@@ -96,7 +96,7 @@ defmodule PepeWeb.AgentsLive do
             <div class="flex items-center justify-between gap-2">
               <div class="min-w-0">
                 <span :if={Pepe.Project.of(a.name)} class="mr-1 rounded bg-indigo-800 px-1.5 text-sm text-indigo-100">{Pepe.Project.of(a.name)}</span>
-                <span class="font-medium">{a.name}</span>
+                <span class="font-medium">{Pepe.Project.name_of(a.name)}</span>
                 <span :if={a.name == @default_agent} class="ml-2 rounded bg-green-700 px-1.5 text-sm">{gettext("default")}</span>
               </div>
               <div class="flex shrink-0 gap-1 text-sm">
@@ -141,14 +141,14 @@ defmodule PepeWeb.AgentsLive do
               </div>
 
               <div>
-                <label class={lbl()}>{gettext("Fallbacks")}</label>
+                <label class={lbl()}>{gettext("Backup models")}</label>
                 <p class={hlp()}>
-                  {gettext("By default this agent uses its model connection's own fallback chain. Override it to give this agent a different one.")}
+                  {gettext("If this agent's model is down or times out, Pepe automatically retries the request on a backup model, in order. By default it uses the backup list already set on the model connection — you rarely need to touch this.")}
                 </p>
 
                 <div :if={@edit_agent.fallbacks == nil} class="mt-2 flex items-center justify-between gap-3 text-sm">
-                  <span class="text-zinc-400">{gettext("Inherits the connection's own fallback chain.")}</span>
-                  <button type="button" phx-click="agent_fallback_override" class="shrink-0 font-medium text-orange-400 hover:text-orange-300">{gettext("Override for this agent")}</button>
+                  <span class="text-zinc-400">{gettext("Using the model connection's backup list.")}</span>
+                  <button type="button" phx-click="agent_fallback_override" class="shrink-0 font-medium text-orange-400 hover:text-orange-300">{gettext("Set a custom list for this agent")}</button>
                 </div>
 
                 <div :if={@edit_agent.fallbacks != nil}>
@@ -226,6 +226,16 @@ defmodule PepeWeb.AgentsLive do
               </div>
 
               <div>
+                <label class={lbl()}>{gettext("Auto-approve")} <span class="text-zinc-600">{gettext("(tools that run without asking)")}</span></label>
+                <input name="auto_approve" value={Enum.join(@edit_agent.auto_approve || [], ",")} placeholder={gettext("blank")} class={fld()} />
+                <p class={hlp()}>
+                  <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("ask before every risky tool (safest)")} ·
+                  <code class="text-zinc-300">*</code> = {gettext("never ask")} · {gettext("or a comma-separated list of tool names.")}
+                  {gettext("It's suspended automatically once the agent reads untrusted content (a fetched page, an incoming message), so prompt injection can't ride it.")}
+                </p>
+              </div>
+
+              <div>
                 <label class={lbl()}>{gettext("Privacy hooks")} <span class="text-zinc-600">{gettext("(redact PII on the message flow)")}</span></label>
                 <div class="grid gap-2 sm:grid-cols-2">
                   <.check_card :for={h <- Pepe.Hooks.names()} name="hooks[]" value={h}
@@ -277,23 +287,7 @@ defmodule PepeWeb.AgentsLive do
   end
 
   # A short, one-line description for a tool, taken from its spec.
-  defp tool_hint(name) do
-    case Pepe.Tools.get(name) do
-      nil -> ""
-      mod -> mod.spec() |> get_in(["function", "description"]) |> short_hint()
-    end
-  end
-
-  defp short_hint(nil), do: ""
-
-  defp short_hint(text) do
-    text
-    |> to_string()
-    |> String.split(~r/(?<=[.!?])\s/, parts: 2)
-    |> List.first()
-    |> String.slice(0, 80)
-    |> String.trim()
-  end
+  defp tool_hint(name), do: Pepe.Tools.summary(name)
 
   defp hook_hint("pii_redact"), do: gettext("Regex: CPF, email, cards, phones")
   defp hook_hint("llm_redact"), do: gettext("A local model masks names/free text (reversible)")
@@ -309,6 +303,7 @@ defmodule PepeWeb.AgentsLive do
       system_prompt: "",
       model: nil,
       tools: [],
+      auto_approve: [],
       can_message: [],
       can_manage: nil,
       hooks: [],
@@ -400,6 +395,7 @@ defmodule PepeWeb.AgentsLive do
         system_prompt: blank(params["system_prompt"]) || Pepe.Config.Agent.default_prompt(),
         model: blank(params["model"]),
         tools: params["tools"] || [],
+        auto_approve: parse_list(params["auto_approve"]),
         can_message: parse_list(params["can_message"]),
         can_manage: parse_manage(params["can_manage"]),
         hooks: params["hooks"] || [],
@@ -442,6 +438,7 @@ defmodule PepeWeb.AgentsLive do
         system_prompt: params["system_prompt"] || "",
         model: blank(params["model"]),
         tools: params["tools"] || [],
+        auto_approve: parse_list(params["auto_approve"]),
         can_message: parse_list(params["can_message"]),
         can_manage: parse_manage(params["can_manage"]),
         hooks: params["hooks"] || [],

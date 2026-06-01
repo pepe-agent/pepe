@@ -48,9 +48,18 @@ defmodule Pepe.Permissions.Prompt do
   def from_token("always"), do: :always
   def from_token(_other), do: :deny
 
-  @doc "The question text for a tool, e.g. for a prompt header (translated)."
+  @doc """
+  The question text for a tool, e.g. for a prompt header (translated). Includes a one-line summary
+  of what the tool does when we have one, so an internal name like `manage_pepe` isn't opaque to
+  whoever is being asked to approve it.
+  """
   @spec question(String.t()) :: String.t()
-  def question(tool), do: gettext("🔐 Allow me to run the %{tool} tool?", tool: "`#{tool}`")
+  def question(tool) do
+    case Pepe.Tools.summary(tool) do
+      "" -> gettext("🔐 Allow me to run the %{tool} tool?", tool: "`#{tool}`")
+      desc -> gettext("🔐 Allow me to run the %{tool} tool — %{desc}?", tool: "`#{tool}`", desc: desc)
+    end
+  end
 
   @doc """
   What a "session" or "always" answer will actually cover, given the risks of the call being

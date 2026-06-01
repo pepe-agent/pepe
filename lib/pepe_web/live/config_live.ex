@@ -19,6 +19,8 @@ defmodule PepeWeb.ConfigLive do
        projects: Config.project_slugs(),
        new_project: false,
        config_text: read_config(),
+       locale: Config.locale(),
+       locales: Config.locales(),
        # nil = not checked yet · :checking · :up_to_date · a version string when newer.
        update: nil,
        can_self_update: not Pepe.Update.running_from_source?()
@@ -37,6 +39,16 @@ defmodule PepeWeb.ConfigLive do
           title={gettext("Configuration file")}
           desc={gettext("The raw config.json the runtime reads. Edit and save; it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
         >
+          <form phx-change="set_locale" class="flex items-center gap-2">
+            <label for="locale" class="text-sm text-zinc-400">{gettext("Language")}</label>
+            <select
+              id="locale"
+              name="locale"
+              class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+            >
+              <option :for={{code, label} <- @locales} value={code} selected={code == @locale}>{label}</option>
+            </select>
+          </form>
           <button :if={@can_self_update and @update in [nil, :up_to_date]} phx-click="check_update" class={btn_ghost()}>
             {gettext("Check for updates")}
           </button>
@@ -91,6 +103,17 @@ defmodule PepeWeb.ConfigLive do
     do: {:noreply, socket |> assign(update: nil) |> put_flash(:error, gettext("Couldn't check for updates."))}
 
   @impl true
+  def handle_event("set_locale", %{"locale" => code}, socket) do
+    if Config.known_locale?(code) do
+      Config.set_locale(code)
+      # Re-navigate so the LiveLocale on_mount re-applies the locale to a fresh process and the whole
+      # page re-renders translated (this process already had the old locale set at mount time).
+      {:noreply, push_navigate(socket, to: "/config?scope=#{socket.assigns.scope}")}
+    else
+      {:noreply, put_flash(socket, :error, gettext("Unknown language."))}
+    end
+  end
+
   def handle_event("check_update", _p, socket) do
     parent = self()
 

@@ -95,6 +95,30 @@ defmodule Pepe.Tools do
   @doc "Look up a tool module by name."
   def get(name), do: Map.get(by_name(), name)
 
+  @doc """
+  A one-line, human summary of what a tool does — the first sentence of its spec description,
+  trimmed. Empty string for an unknown tool. Shown next to the permission prompt and the dashboard
+  tool list so a name like `manage_pepe` isn't opaque.
+  """
+  @spec summary(String.t()) :: String.t()
+  def summary(name) do
+    case get(name) do
+      nil -> ""
+      mod -> mod.spec() |> get_in(["function", "description"]) |> first_sentence()
+    end
+  end
+
+  defp first_sentence(nil), do: ""
+
+  defp first_sentence(text) do
+    text
+    |> to_string()
+    |> String.split(~r/(?<=[.!?])\s/, parts: 2)
+    |> List.first()
+    |> String.slice(0, 100)
+    |> String.trim()
+  end
+
   ###
   ### plugins (drop-in .exs tools, hot-reloaded by mtime)
   ###

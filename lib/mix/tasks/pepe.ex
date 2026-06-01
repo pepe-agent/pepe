@@ -3172,16 +3172,9 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  @locales [
-    {"en", "English"},
-    {"pt_BR", "Português (Brasil)"},
-    {"pt_PT", "Português (Portugal)"},
-    {"es", "Español"}
-  ]
-
   defp setup_language do
     {code, _label} =
-      Pepe.TUI.select(@locales,
+      Pepe.TUI.select(Config.locales(),
         label: bold("Language for system messages") <> dim(" (current: #{Config.locale()})"),
         render_as: fn {_code, label} -> label end
       )
@@ -3423,8 +3416,26 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # Non-interactive locale setter (the wizard's `setup` asks; this one takes the code directly, so it
+  # works over the `manage_pepe` chat tool and in scripts, where `setup` can't run).
+  defp config_cmd(["language", code | _]) do
+    if Config.known_locale?(code) do
+      Config.set_locale(code)
+      ok("language set to #{code}")
+    else
+      codes = Enum.map_join(Config.locales(), ", ", &elem(&1, 0))
+      error("unknown language #{inspect(code)}; choose one of: #{codes}")
+    end
+  end
+
+  defp config_cmd(["language" | _]) do
+    codes = Enum.map_join(Config.locales(), ", ", &elem(&1, 0))
+    error("usage: pepe config language <code>  (one of: #{codes})")
+  end
+
   defp config_cmd(_) do
     info("config file: #{Config.path()}")
+    info("language: #{Config.locale()}  (change with: pepe config language <code>)")
     info("default model: #{Config.default_model_name() || "(none)"}")
     info("default agent: #{Config.default_agent_name() || "(none)"}")
     info("models: #{Config.models() |> Enum.map_join(", ", & &1.name)}")

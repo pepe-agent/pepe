@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-01
+
+### Added
+- Dashboard: a **language selector** on the Config page. Also a non-interactive `pepe config language <code>` CLI command (which an agent can run over chat via `manage_pepe`); the `setup` wizard already offered it. All from one source (`Config.locales/0`).
+- Agent form: an **Auto-approve** field to choose which tools run without asking (the "auto accept") — blank = ask for everything, `*` = never ask, or a list. Noted that it is suspended automatically once the agent reads untrusted content, so prompt injection can't ride it.
+- Telegram bot config: a selector for what the bot does **while the agent works** — react with 👀 on the message (default, shows it was seen), show nothing, or post a status message.
+- The tool **permission prompt** now shows a one-line description of what the tool does (e.g. `manage_pepe` — "Run a pepe CLI command…"), so an internal name isn't opaque to whoever approves it.
+
+### Changed
+- Agents list: each card shows the project badge and the **bare** agent name (`default` · Engenheiro) instead of repeating the project inside the handle (`default/Engenheiro`).
+- Rewrote the agent form's model-backup (fallbacks) copy in plain language: "backup models tried if the main one fails", instead of "fallback chain of its own model connection".
+
+### Fixed
+- Telegram: a tool-permission prompt that timed out left **dead-but-clickable buttons** — pressing them did nothing. This bit hardest with two concurrent prompts (e.g. two `list_dir`/`read_file` calls at once), where the first one sat past the timeout while you answered the second. The prompt now **edits itself to "expired"** on timeout and when you press a stale button, and the timeout was raised from 2 to 5 minutes so there's time to answer several.
+
 ## [0.5.1] - 2026-05-30
 
 ### Fixed
