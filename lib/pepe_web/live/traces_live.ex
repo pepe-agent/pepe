@@ -122,6 +122,14 @@ defmodule PepeWeb.TracesLive do
   defp outcome_matches?(o, kind) when is_map(o), do: o["kind"] == kind
   defp outcome_matches?(_o, _kind), do: false
 
+  # The internal error captured on a failed run (`outcome.reason`), so it can be shown in the trace
+  # instead of just an "error" badge - the operator can diagnose from the dashboard, no server logs.
+  defp error_reason(%{"outcome" => %{"kind" => "error", "reason" => reason}})
+       when is_binary(reason) and reason != "",
+       do: reason
+
+  defp error_reason(_trace), do: nil
+
   defp agent_options(traces) do
     traces |> Enum.map(& &1["agent"]) |> Enum.reject(&(&1 in [nil, ""])) |> Enum.uniq() |> Enum.sort()
   end
@@ -360,6 +368,10 @@ defmodule PepeWeb.TracesLive do
         <div :if={@trace["prompt"]} class="mt-3 rounded-lg bg-zinc-950/60 p-3">
           <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-600">{gettext("Prompt")}</div>
           <div class="whitespace-pre-wrap break-words text-[15px] text-zinc-300">{@trace["prompt"]}</div>
+        </div>
+        <div :if={error_reason(@trace)} class="mt-3 rounded-lg border border-red-900/50 bg-red-950/30 p-3">
+          <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-red-400">{gettext("Error detail")}</div>
+          <pre class="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-red-200">{error_reason(@trace)}</pre>
         </div>
       </div>
 

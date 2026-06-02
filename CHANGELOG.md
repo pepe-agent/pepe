@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-06-02
+
+### Fixed
+- **Mnesia store / redeploys**: the container now pins a stable Erlang node name (`RELEASE_NODE=pepe@127.0.0.1`). The release otherwise defaulted to `pepe@<hostname>`, and a container's hostname changes on every recreation — which **orphaned the disc_copies store** (`Pepe.Store`, bound to the node that created it). After a redeploy every store operation then returned `{:timeout, [:pepe_store]}` and **crashed the agent turn** (the bot only answered with a generic error). Belt-and-suspenders: the store now **self-heals** (wipes and recreates the disposable dir if the table can't load) and its operations **degrade to a miss/no-op instead of crashing the caller** — a disposable cache must never take down a turn.
+- **Traces**: a failed run now shows the **internal error detail** (a code block with the reason) in the dashboard, not just an "error" badge — so a failure is diagnosable from the UI without digging into server logs.
+
 ## [0.5.2] - 2026-06-01
 
 ### Added

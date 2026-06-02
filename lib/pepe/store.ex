@@ -19,6 +19,8 @@ defmodule Pepe.Store do
   on first use, on the local node, under `<PEPE_HOME>/data/mnesia`.
   """
 
+  require Logger
+
   @table :pepe_store
   @ready {__MODULE__, :ready}
 
@@ -26,32 +28,36 @@ defmodule Pepe.Store do
   def put(namespace, key, value, opts \\ []) do
     ensure_started()
     expires_at = ttl_to_expiry(opts[:ttl])
-    :ok = :mnesia.dirty_write({@table, {namespace, key}, value, expires_at})
+    safe(fn -> :mnesia.dirty_write({@table, {namespace, key}, value, expires_at}) end, :ok)
     :ok
   end
 
   @doc "Fetch the value under `{namespace, key}`, or `nil` (also nil once expired)."
   def get(namespace, key) do
     ensure_started()
+    safe(fn -> read(namespace, key) end, nil)
+  end
 
+  defp read(namespace, key) do
     case :mnesia.dirty_read(@table, {namespace, key}) do
-      [{@table, _key, value, expires_at}] ->
-        if expired?(expires_at) do
-          delete(namespace, key)
-          nil
-        else
-          value
-        end
+      [{@table, _key, value, expires_at}] -> fresh_or_nil(namespace, key, value, expires_at)
+      _ -> nil
+    end
+  end
 
-      [] ->
-        nil
+  defp fresh_or_nil(namespace, key, value, expires_at) do
+    if expired?(expires_at) do
+      delete(namespace, key)
+      nil
+    else
+      value
     end
   end
 
   @doc "Remove `{namespace, key}`."
   def delete(namespace, key) do
     ensure_started()
-    :ok = :mnesia.dirty_delete(@table, {namespace, key})
+    safe(fn -> :mnesia.dirty_delete(@table, {namespace, key}) end, :ok)
     :ok
   end
 
@@ -59,21 +65,46 @@ defmodule Pepe.Store do
   def all(namespace) do
     ensure_started()
 
-    @table
-    |> :mnesia.dirty_match_object({@table, {namespace, :_}, :_, :_})
-    |> Enum.reject(fn {@table, _k, _v, exp} -> expired?(exp) end)
-    |> Enum.map(fn {@table, {_ns, key}, value, _exp} -> {key, value} end)
+    safe(
+      fn ->
+        @table
+        |> :mnesia.dirty_match_object({@table, {namespace, :_}, :_, :_})
+        |> Enum.reject(fn {@table, _k, _v, exp} -> expired?(exp) end)
+        |> Enum.map(fn {@table, {_ns, key}, value, _exp} -> {key, value} end)
+      end,
+      []
+    )
   end
 
   @doc "Purge every entry whose TTL has passed. Returns the number removed."
   def expire do
     ensure_started()
 
-    @table
-    |> :mnesia.dirty_match_object({@table, :_, :_, :_})
-    |> Enum.filter(fn {@table, _k, _v, exp} -> expired?(exp) end)
-    |> Enum.map(fn {@table, key, _v, _exp} -> :mnesia.dirty_delete(@table, key) end)
-    |> length()
+    safe(
+      fn ->
+        @table
+        |> :mnesia.dirty_match_object({@table, :_, :_, :_})
+        |> Enum.filter(fn {@table, _k, _v, exp} -> expired?(exp) end)
+        |> Enum.map(fn {@table, key, _v, _exp} -> :mnesia.dirty_delete(@table, key) end)
+        |> length()
+      end,
+      0
+    )
+  end
+
+  # The store is the *disposable* tier: a Mnesia hiccup - a table that won't load, a transient
+  # timeout ({:timeout, [:pepe_store]}) - must degrade to a miss/no-op, never crash the caller's turn.
+  # Before this, a `:ok = :mnesia.dirty_write(...)` match on such a return killed the whole agent turn.
+  defp safe(fun, default) do
+    fun.()
+  rescue
+    e ->
+      Logger.warning("[store] #{Exception.message(e)}")
+      default
+  catch
+    kind, reason ->
+      Logger.warning("[store] #{inspect(kind)} #{inspect(reason)}")
+      default
   end
 
   ###
@@ -101,16 +132,37 @@ defmodule Pepe.Store do
 
   defp do_start do
     dir = Path.join([Pepe.Config.home(), "data", "mnesia"])
-    File.mkdir_p!(dir)
+    start_mnesia(dir)
 
-    # Mnesia may have auto-started with an in-RAM schema, which can't host
-    # disc_copies tables. Stop it, point it at our dir, and create the on-disk
-    # schema while stopped so the restart loads a disc-resident schema.
+    if ensure_table() == :orphaned do
+      # The on-disk schema was created under a different node name - the classic case is a container
+      # whose hostname (and so the Erlang node `pepe@<hostname>`) changed across a redeploy. The
+      # disc_copies table is then bound to a node that isn't us, won't load, and every op returns
+      # `{:timeout, [:pepe_store]}`. The store is disposable, so wipe the dir and recreate fresh under
+      # this node rather than staying wedged. (A stable RELEASE_NODE prevents this in the first place.)
+      Logger.warning("[store] mnesia table won't load (node name changed across a restart?); resetting the disposable store at #{dir}")
+      :mnesia.stop()
+      File.rm_rf!(dir)
+      start_mnesia(dir)
+      ensure_table()
+    end
+
+    :ok
+  end
+
+  # Point Mnesia at `dir` and start it with an on-disk schema (it may have auto-started in RAM, which
+  # can't host disc_copies). Creating the schema while stopped makes the restart load a disc schema.
+  defp start_mnesia(dir) do
+    File.mkdir_p!(dir)
     :mnesia.stop()
     Application.put_env(:mnesia, :dir, String.to_charlist(dir))
     _ = :mnesia.create_schema([node()])
     {:ok, _} = Application.ensure_all_started(:mnesia)
+  end
 
+  # Create the table (idempotent) and wait for it to load. `:ok`, or `:orphaned` when it can't load
+  # within the window - a stale disc_copies from a different node name.
+  defp ensure_table do
     case :mnesia.create_table(@table,
            attributes: [:key, :value, :expires_at],
            disc_copies: [node()],
@@ -120,7 +172,10 @@ defmodule Pepe.Store do
       {:aborted, {:already_exists, @table}} -> :ok
     end
 
-    :ok = :mnesia.wait_for_tables([@table], 10_000)
+    case :mnesia.wait_for_tables([@table], 5_000) do
+      :ok -> :ok
+      _ -> :orphaned
+    end
   end
 
   defp ttl_to_expiry(nil), do: nil

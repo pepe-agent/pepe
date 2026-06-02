@@ -168,10 +168,16 @@ ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 # real ones and have every later shell command - its own, and the operator's - run
 # that instead. Appending still resolves the tools it installs, and cannot shadow a
 # binary that is already on the system.
+# A FIXED Erlang node name. The release otherwise defaults to `pepe@<hostname>`, and a container's
+# hostname changes on every recreation (redeploy) - which orphans the Mnesia disc_copies store
+# (`Pepe.Store`), since its table is bound to the node that created it. Pinning the node keeps the
+# store loadable across restarts and redeploys. 127.0.0.1 stays inside the container (no clustering).
 ENV PEPE_HOME=/data \
     PEPE_SERVE=1 \
     PORT=4000 \
     MIX_ENV=prod \
+    RELEASE_DISTRIBUTION=name \
+    RELEASE_NODE=pepe@127.0.0.1 \
     HOME=/tools/home \
     PATH=$PATH:/tools:/tools/home/.local/bin
 
