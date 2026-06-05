@@ -232,8 +232,9 @@ de "a escrever..." do Telegram mantém-se vivo em todos os modos. Por cima dele,
   de lá chegar. Continua a ser uma única mensagem, editada no lugar, apagada
   quando a resposta chega.
 
-Define-o pela linha de comandos com `--progress`, ou de dentro de uma conversa com
-a ferramenta `manage_channel` (`set_progress`).
+Define-o de três formas: pela linha de comandos com `--progress`; de dentro de uma
+conversa com a ferramenta `manage_channel` (`set_progress`); ou no **painel**, em
+Canais → o seu bot → *Editar* → "Enquanto o agente trabalha", onde cada modo é explicado.
 
 ### Heartbeat: contactos proativos
 

@@ -226,8 +226,9 @@ ambient, not a status report you are meant to read. Telegram's native
   you *why*, which is what lets you see it heading somewhere wrong before it
   gets there. Still one message, edited in place, deleted when the answer lands.
 
-Set it from the command line with `--progress`, or from a chat with the
-`manage_channel` tool (`set_progress`).
+Set it three ways: from the command line with `--progress`; from a chat with the
+`manage_channel` tool (`set_progress`); or in the **dashboard** under Channels →
+your bot → *Edit* → "While the agent works", where each mode is spelled out.
 
 ### Heartbeat: proactive check-ins
 

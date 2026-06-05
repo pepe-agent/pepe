@@ -319,11 +319,26 @@ defmodule PepeWeb.ChannelsLive do
               <div>
                 <label class={lbl()}>{gettext("While the agent works")}</label>
                 <select name="tool_progress" class={fld()}>
-                  <option value="reaction" selected={(@edit_bot["tool_progress"] || "reaction") == "reaction"}>{gettext("React with 👀 on the message (shows it was seen)")}</option>
-                  <option value="off" selected={@edit_bot["tool_progress"] == "off"}>{gettext("Show nothing")}</option>
-                  <option value="message" selected={@edit_bot["tool_progress"] == "message"}>{gettext("Post a status message")}</option>
+                  <option value="reaction" selected={(@edit_bot["tool_progress"] || "reaction") == "reaction"}>👀 {gettext("React")}</option>
+                  <option value="verbose" selected={@edit_bot["tool_progress"] == "verbose"}>🛠️ {gettext("Detailed")}</option>
+                  <option value="ambient" selected={@edit_bot["tool_progress"] == "ambient"}>💬 {gettext("Ambient")}</option>
+                  <option value="off" selected={@edit_bot["tool_progress"] == "off"}>🚫 {gettext("Nothing")}</option>
                 </select>
-                <p class={hlp()}>{gettext("What the bot does while the agent is thinking or running tools. \"React\" drops a 👀 on your message and clears it when the reply is ready.")}</p>
+                <div class="mt-2 space-y-1 text-sm text-zinc-400">
+                  <p>
+                    <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}) — {gettext("just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal.")}
+                  </p>
+                  <p>
+                    <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span> — {gettext("a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing.")}
+                  </p>
+                  <p>
+                    <span class="text-zinc-200">💬 {gettext("Ambient")}</span> — {gettext("a single line describing the kind of work happening, with no tool names or per-step detail.")}
+                  </p>
+                  <p>
+                    <span class="text-zinc-200">🚫 {gettext("Nothing")}</span> — {gettext("no status message at all, just Telegram's native typing indicator.")}
+                  </p>
+                  <p class="pt-0.5 text-zinc-600">{gettext("Whichever you pick, the status message updates in place and is removed when the answer arrives, so only the reply stays in the chat.")}</p>
+                </div>
               </div>
               <div>
                 <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("(leave blank to keep the current one)")}</span></label>

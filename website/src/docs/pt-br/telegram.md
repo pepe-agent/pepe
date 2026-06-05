@@ -231,8 +231,9 @@ Além dele, o `tool_progress` (a opção `--progress`) escolhe um entre quatro:
   errado antes de ele chegar lá. Continua sendo uma mensagem só, editada no
   lugar, apagada quando a resposta chega.
 
-Defina pela linha de comando com `--progress`, ou de dentro de uma conversa com a
-ferramenta `manage_channel` (`set_progress`).
+Defina de três formas: pela linha de comando com `--progress`; de dentro de uma
+conversa com a ferramenta `manage_channel` (`set_progress`); ou no **painel**, em
+Canais → seu bot → *Editar* → "Enquanto o agente trabalha", onde cada modo é explicado.
 
 ### Heartbeat: check-ins proativos
 

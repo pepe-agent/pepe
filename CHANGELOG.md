@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-06-04
+
+### Fixed
+- Telegram bot config: the "While the agent works" selector now offers the real progress modes - **`verbose`** (a live log of each tool the agent uses and the reason it reached for it), **`ambient`** (a single activity line), **`reaction`** (👀) and **`off`**. The 0.5.2 selector offered a non-existent "message" value the gateway ignored, and never exposed `verbose`/`ambient` at all.
+
 ## [0.5.3] - 2026-06-02
 
 ### Fixed

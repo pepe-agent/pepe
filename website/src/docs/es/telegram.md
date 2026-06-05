@@ -232,8 +232,9 @@ Encima de él, `tool_progress` (la opción `--progress`) elige uno de cuatro:
   sitio equivocado antes de que llegue. Sigue siendo un solo mensaje, editado en
   el sitio, borrado cuando llega la respuesta.
 
-Fíjalo desde la línea de comandos con `--progress`, o desde un chat con la
-herramienta `manage_channel` (`set_progress`).
+Fíjalo de tres formas: desde la línea de comandos con `--progress`; desde un chat
+con la herramienta `manage_channel` (`set_progress`); o en el **panel**, en
+Canales → tu bot → *Editar* → "Mientras el agente trabaja", donde se explica cada modo.
 
 ### Heartbeat: avisos proactivos
 
