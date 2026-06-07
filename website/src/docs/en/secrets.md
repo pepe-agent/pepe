@@ -66,6 +66,20 @@ Now a command the agent runs gets Pepe's environment minus its credentials: ever
 
 <div class="note"><strong>This is not a sandbox and does not pretend to be.</strong> An agent that can run shell can read any file you can read. What it closes is the cheapest, most likely leak by a wide margin, and it stops "the config has no secrets in it" from being a sentence that means less than it sounds like.</div>
 
+## When the task *is* the credential
+
+Sometimes the job you give the agent is itself credentialed: *"find the Postgres login in 1Password and run the migration."* You want to ask for that in plain language and have the agent work it out, the way it works everything else out, with no per-secret wiring on your side.
+
+That is the one case where the agent needs a secret in its own shell: the vault's CLI (`op`) and the token that unlocks it. So there is a deliberate opt-in. Name the vault token in `secrets.expose_env` and it survives the scrub for the agent's shell:
+
+```jsonc
+"secrets": { "expose_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }
+```
+
+Now the agent can run `op` on its own: `op vault list`, `op item get "Prod DB"`, and use what it finds. The built-in **`vaults` skill** teaches it the whole flow, including the rule that matters: reach for **`op run`** and **`op inject`**, which hand the secret to a command or a template without the value ever being printed, rather than `op read`-ing it into the open. The agent installs `op` itself if it is missing.
+
+<div class="note"><strong>This trades a boundary for fluency, on purpose.</strong> A 1Password service-account token only opens the vaults you scoped it to, so the blast radius is exactly that scope. Pepe also scrubs the token's own value out of any tool output, so a stray <code>env</code> or a verbose error cannot leak the token itself. What is left is narrower: a secret the agent reads out with <code>op read</code> instead of injecting with <code>op run</code> still reaches the transcript. The skill steers toward injecting, and the token's scope bounds the rest. Use a narrowly-scoped token, or don't turn this on.</div>
+
 ## If a token gets pasted into the chat
 
 It is compromised. Not because of where it landed, but because of where it has already been: typed into a chat means sent to the model provider, written into the conversation, and written into the trace on disk.

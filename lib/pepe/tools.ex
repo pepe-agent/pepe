@@ -198,7 +198,37 @@ defmodule Pepe.Tools do
   def finalize(result, name, ctx) do
     result
     |> redact(ctx)
+    |> scrub_exposed_tokens()
     |> spill_large(name, ctx)
+  end
+
+  @redacted_token "«redacted vault token»"
+
+  # The env vars the operator deliberately let the agent's shell keep (`secrets.expose_env`)
+  # are vault-opening tokens: a leaked one opens everything in its scope. The fluent vault flow
+  # means the agent's shell *can* echo one (a stray `env`, an `op read`, a verbose error), so
+  # strip any that appear in a tool result before it reaches the model or the trace on disk.
+  # This is one-way (never restored, unlike PII redaction): the model never needs the token,
+  # only `op` does, and `op` reads it straight from the environment. A no-op when nothing is
+  # exposed, which is the default.
+  defp scrub_exposed_tokens(result) do
+    case exposed_token_values() do
+      [] -> result
+      values -> Enum.reduce(values, result, &String.replace(&2, &1, @redacted_token))
+    end
+  rescue
+    # A broken config must not stop a tool result from coming back; better an un-scrubbed
+    # result than a crashed turn (the scrub is defence in depth, not the only protection).
+    _ -> result
+  end
+
+  # Values are read fresh from the environment each time (a rotated token changes here at
+  # once). Guarded on length so a short, low-entropy value someone exposed cannot mangle
+  # ordinary output by matching a common substring; real vault tokens are far longer.
+  defp exposed_token_values do
+    Pepe.Config.expose_env()
+    |> Enum.map(&System.get_env/1)
+    |> Enum.filter(&(is_binary(&1) and byte_size(&1) >= 12))
   end
 
   # A tool result can surface PII a human never typed (a DB query, a file read) -

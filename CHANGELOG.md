@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-07
+
+### Added
+- **Let the agent open a vault itself, by chat.** A new built-in **`vaults` skill** teaches the agent to use a secrets vault end to end (1Password, HashiCorp Vault, Bitwarden, Doppler, `pass`, the macOS keychain, AWS/GCP secret managers), including the guardrail to inject a secret (`op run`/`doppler run`/`op inject`) rather than print it, so it never hits disk. Just say "find the Postgres login in my vault and run the migration" with no per-secret setup; the agent installs the CLI itself if missing.
+- **`secrets.expose_env`** (`Config.expose_env/0`): an opt-in allowlist of environment variables the agent's own shell keeps despite the secret scrub. Name a scoped vault-opening token here (e.g. `OP_SERVICE_ACCOUNT_TOKEN`, `VAULT_TOKEN`, `DOPPLER_TOKEN`) so the agent can drive the vault conversationally. Off by default; the blast radius is only what that scoped token can reach. This fixes the agent seeing the vault token as missing (the sandbox scrubs vault-opener tokens by default). As a safety net, an exposed token's own value is scrubbed from any tool output before it reaches the model or the trace, so a stray `env` or a verbose error cannot leak the token itself.
+- **Eleven new built-in skills** for common real-world work, so the agent handles more by conversation without hand-holding: `tmux` (keep a server/REPL/interactive command alive across tool calls), `documents` (PDF text/tables + read/generate xlsx/docx/pptx), `ocr` (text from photos and scanned PDFs), `github` (issues/PRs/repos via `gh`), `jira` (issues/workflow via MCP or the REST API), `trello` (boards/lists/cards via MCP or the REST API), `web-scraping` (structured extraction from JS-heavy pages), `sql-databases` (query Postgres/MySQL/SQLite safely), `http-apis` (authenticated REST/GraphQL from the shell), `coding-agent` (hand a big coding job to `delegate` or an external CLI), and `debugging` (a systematic reproduce → isolate → fix → verify method).
+
 ## [0.5.4] - 2026-06-04
 
 ### Fixed

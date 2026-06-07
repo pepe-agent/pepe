@@ -66,6 +66,20 @@ Agora um comando que o agente roda recebe o ambiente do Pepe menos as credenciai
 
 <div class="note"><strong>Isto não é um sandbox e não finge ser.</strong> Um agente que roda shell consegue ler qualquer arquivo que você lê. O que isto fecha é o vazamento mais barato e mais provável, com folga, e faz "a configuração não tem segredos" deixar de ser uma frase que significa menos do que parece.</div>
 
+## Quando a tarefa *é* a credencial
+
+Às vezes o trabalho que você dá ao agente é, ele próprio, credenciado: *"pega o login do Postgres no 1Password e roda a migração."* Você quer pedir isso em linguagem natural e o agente se virar, como ele se vira com todo o resto, sem nenhuma fiação por segredo do seu lado.
+
+Esse é o único caso em que o agente precisa de um segredo no próprio shell: o CLI do cofre (`op`) e o token que o abre. Por isso existe um opt-in deliberado. Nomeie o token do cofre em `secrets.expose_env` e ele sobrevive à raspagem para o shell do agente:
+
+```jsonc
+"secrets": { "expose_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }
+```
+
+Agora o agente pode rodar `op` sozinho: `op vault list`, `op item get "Prod DB"`, e usar o que encontrar. O **skill `vaults`** embutido ensina o fluxo inteiro, incluindo a regra que importa: preferir **`op run`** e **`op inject`**, que entregam o segredo a um comando ou a um template sem o valor nunca ser impresso, em vez de fazer `op read` dele à mostra. O agente instala o `op` sozinho se ele faltar.
+
+<div class="note"><strong>Isto troca uma fronteira por fluidez, de propósito.</strong> Um token de conta de serviço do 1Password só abre os cofres para os quais você o escopou, então o raio de dano é exatamente esse escopo. O Pepe ainda raspa o valor do próprio token de qualquer saída de ferramenta, então um <code>env</code> à toa ou um erro verboso não vazam o token em si. O que sobra é mais estreito: um segredo que o agente leia com <code>op read</code> em vez de injetar com <code>op run</code> ainda vai pra conversa. O skill empurra pra injeção, e o escopo do token limita o resto. Use um token estreitamente escopado, ou não ligue isto.</div>
+
 ## Se um token for colado no chat
 
 Ele está comprometido. Não por causa de onde foi parar, mas por causa de onde já esteve: digitado num chat significa enviado ao provedor do modelo, escrito na conversa e escrito no trace em disco.

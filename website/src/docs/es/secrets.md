@@ -66,6 +66,20 @@ Ahora un comando que ejecuta el agente recibe el entorno de Pepe menos sus crede
 
 <div class="note"><strong>Esto no es un sandbox ni pretende serlo.</strong> Un agente que puede ejecutar shell puede leer cualquier archivo que tú puedas leer. Lo que cierra es la fuga más barata y más probable, por mucho, y hace que "la configuración no tiene secretos" deje de ser una frase que significa menos de lo que suena.</div>
 
+## Cuando la tarea *es* la credencial
+
+A veces el trabajo que le das al agente está, él mismo, credencializado: *"busca el acceso a Postgres en 1Password y corre la migración."* Quieres pedir eso en lenguaje natural y que el agente se las arregle, igual que se arregla con todo lo demás, sin ningún cableado por secreto de tu parte.
+
+Ese es el único caso en que el agente necesita un secreto en su propia shell: la CLI de la bóveda (`op`) y el token que la abre. Por eso existe una habilitación deliberada. Nombra el token de la bóveda en `secrets.expose_env` y sobrevive al barrido para la shell del agente:
+
+```jsonc
+"secrets": { "expose_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }
+```
+
+Ahora el agente puede correr `op` por su cuenta: `op vault list`, `op item get "Prod DB"`, y usar lo que encuentre. La **skill `vaults`** incorporada le enseña el flujo entero, incluida la regla que importa: preferir **`op run`** e **`op inject`**, que entregan el secreto a un comando o a una plantilla sin que el valor se imprima nunca, en lugar de hacerle `op read` a la vista. El agente instala `op` por su cuenta si falta.
+
+<div class="note"><strong>Esto cambia una frontera por fluidez, a propósito.</strong> Un token de cuenta de servicio de 1Password solo abre las bóvedas a las que lo limitaste, así que el radio de daño es exactamente ese alcance. Pepe además limpia el valor del propio token de cualquier salida de herramienta, así que un <code>env</code> perdido o un error verboso no filtran el token en sí. Lo que queda es más estrecho: un secreto que el agente lea con <code>op read</code> en lugar de inyectar con <code>op run</code> aún llega a la conversación. La skill empuja hacia inyectar, y el alcance del token acota el resto. Usa un token de alcance estrecho, o no actives esto.</div>
+
 ## Si un token se pega en el chat
 
 Está comprometido. No por dónde ha acabado, sino por dónde ya ha estado: escrito en un chat significa enviado al proveedor del modelo, escrito en la conversación y escrito en el trace en disco.

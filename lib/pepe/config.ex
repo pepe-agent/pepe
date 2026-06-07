@@ -2559,6 +2559,24 @@ defmodule Pepe.Config do
     end
   end
 
+  @doc """
+  Environment variables the operator has deliberately allowed the **agent's own shell** to keep,
+  despite the scrub that otherwise strips Pepe's secrets from it (`secrets.expose_env`).
+
+  This is the opt-in for letting the agent use a vault CLI itself: name a scoped vault-opening
+  token here (`OP_SERVICE_ACCOUNT_TOKEN`) and the agent can run `op` to find and use the
+  credentials that token grants, conversationally, with no per-secret setup. Off by default. The
+  blast radius is only what that credential reaches, so the safe pattern is a narrowly-scoped
+  provider token (a 1Password service account opens only the vaults you grant it).
+  """
+  @spec expose_env() :: [String.t()]
+  def expose_env do
+    case get_in(load(), ["secrets", "expose_env"]) do
+      list when is_list(list) -> Enum.map(list, &to_string/1)
+      _ -> []
+    end
+  end
+
   # Models are id-keyed (unlike agents/projects, which are still name-keyed),
   # so it's :id that's redundant with the map key here, not :name.
   defp encode_model(%Model{} = model) do

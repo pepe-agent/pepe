@@ -170,6 +170,15 @@ defmodule Pepe.Sandbox do
   can still read any file the user can read. What it closes is the cheapest and most likely
   leak by a wide margin - the one a prompt injection reaches with a single word, `env` - and
   it removes the thing that made "the config has no secrets in it" a comfortable half-truth.
+
+  ## The deliberate exception: letting the agent open a vault itself
+
+  Sometimes the task *is* the credential - "find the Postgres login in 1Password and use it".
+  For that the agent needs a vault CLI (`op`) and the token that unlocks it, in its own shell.
+  `secrets.expose_env` (`Config.expose_env/0`) is the opt-in: the operator names the vault
+  token there and it survives the scrub, so the agent can run `op` conversationally, with no
+  per-secret wiring. It is off by default, and the safe pattern is a narrowly-scoped provider
+  token whose blast radius is only what it can reach. See the `vaults` skill.
   """
   @spec scrubbed_env(keyword() | [{String.t(), String.t()}]) :: [{String.t(), String.t() | nil}]
   def scrubbed_env(extra \\ []) do
@@ -179,6 +188,10 @@ defmodule Pepe.Sandbox do
     # them, and a name like `MY_VAULT_CRED` would slip past the by-the-name check on its own.
     referenced = MapSet.new(secret_env_names() ++ vault_env())
 
+    # ...except the ones the operator deliberately allowed the agent to keep, so it can open a
+    # vault itself (`secrets.expose_env`). Off by default; see the moduledoc.
+    exposed = MapSet.new(Config.expose_env())
+
     # `System.cmd/3` *merges* `:env` into the parent's environment, it does not replace it, so
     # listing what to keep would keep everything. A variable is removed by naming it with a
     # nil value. Getting this backwards is exactly the kind of mistake that leaves a security
@@ -186,7 +199,10 @@ defmodule Pepe.Sandbox do
     dropped =
       System.get_env()
       |> Map.keys()
-      |> Enum.filter(fn name -> MapSet.member?(referenced, name) or Pepe.Secrets.secret_key?(name) end)
+      |> Enum.filter(fn name ->
+        not MapSet.member?(exposed, name) and
+          (MapSet.member?(referenced, name) or Pepe.Secrets.secret_key?(name))
+      end)
       |> Enum.map(&{&1, nil})
 
     dropped ++ Enum.map(extra, fn {k, v} -> {to_string(k), to_string(v)} end)

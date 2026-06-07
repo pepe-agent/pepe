@@ -98,6 +98,24 @@ defmodule Pepe.SandboxTest do
       # The child still gets the ordinary environment a command needs to work.
       assert out =~ "ORDINARY_VAR=harmless"
     end
+
+    test "a var named in `secrets.expose_env` survives the scrub, so the agent can open a vault itself" do
+      # The opt-in for handing the agent a scoped vault token (OP_SERVICE_ACCOUNT_TOKEN) so it can
+      # run `op` conversationally. Same shape the scrub would normally drop by name, but allowed.
+      Config.save(%{"secrets" => %{"expose_env" => ["OP_SERVICE_ACCOUNT_TOKEN"]}})
+      System.put_env("OP_SERVICE_ACCOUNT_TOKEN", "ops-opted-in")
+      System.put_env("AWS_SECRET_ACCESS_KEY", "still-scrubbed")
+
+      on_exit(fn ->
+        for v <- ~w(OP_SERVICE_ACCOUNT_TOKEN AWS_SECRET_ACCESS_KEY), do: System.delete_env(v)
+      end)
+
+      {out, 0} = Sandbox.cmd("sh", ["-c", "env"], stderr_to_stdout: true)
+
+      # The exposed one reaches the agent's shell; everything else the scrub catches still goes.
+      assert out =~ "OP_SERVICE_ACCOUNT_TOKEN=ops-opted-in"
+      refute out =~ "still-scrubbed"
+    end
   end
 
   test "a configured wrapper receives the program and the cwd" do
