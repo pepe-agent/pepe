@@ -32,7 +32,9 @@ defmodule Pepe.Tools.WebSearch do
 
     case Req.get("https://api.duckduckgo.com/", params: params, receive_timeout: 20_000) do
       {:ok, %{status: 200, body: body}} when is_map(body) ->
-        {:ok, format(body)}
+        # Results are content from outside the conversation: strip model control tokens and
+        # invisible characters before they reach the model (Pepe.Security.ExternalContent).
+        {:ok, Pepe.Security.ExternalContent.sanitize(format(body))}
 
       {:ok, %{status: status}} ->
         {:error, "search returned status #{status}"}

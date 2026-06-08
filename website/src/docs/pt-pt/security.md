@@ -103,6 +103,8 @@ Por isso, assim que uma execução ingere conteúdo de fora, o `auto_approve` de
 
 Isto é uma barreira a sério, não um apelo no prompt. E não é de propósito a resposta inteira, porque o conteúdo ingerido num turno permanece na conversa e um turno seguinte ainda o carrega. O que fecha é o ataque que não precisa de humano nenhum: um cliente a anexar um PDF armadilhado a um bot de atendimento, e o bot a correr em silêncio um comando para o qual estava pré-aprovado.
 
+A par da retirada, o próprio conteúdo é limpo antes de chegar ao modelo. O texto que um `fetch_url` ou `web_search` traz tem removidos os tokens de controlo de modelo (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<start_of_turn>` e afins) e os caracteres invisíveis (espaços de largura zero, um BOM, sobreposições bidi, um hífen suave). Isto não é conteúdo, são as rotas de contrabando: um token de controlo tenta forjar uma troca de papel para o texto citado da web ser lido como instrução de sistema, e um caractere invisível esconde letras entre as que um humano e um filtro por palavra veem. Removê-los é barato e fecha os caminhos fáceis; a retirada acima é a barreira que aguenta quando eles falham.
+
 Se precisar mesmo que um agente **atue** a partir do que estranhos enviam, e não apenas leia e responda, ligue `trust_untrusted_content` nesse agente. Isso levanta a suspensão só para ele. Vem desligado, e esse padrão é o seguro: ligar reabre exatamente o caminho acima, por isso é uma decisão a sério, para um agente cujo trabalho é pegar num documento e fazer algo no sistema com ele. Ler um documento e responder sobre ele nunca precisa disto.
 
 ### O proprietário pode conduzir a CLI pela conversa
@@ -124,6 +126,7 @@ As ferramentas de shell (`bash` e `run_script`) passam cada comando por uma guar
 - Escrever em bruto ou substituir um dispositivo de disco (`dd of=/dev/...`, ou redirecionar para `/dev/sda` e afins).
 - Bombas de bifurcação (fork bombs).
 - Desligar ou reiniciar o computador (`shutdown`, `reboot`, `halt`, `poweroff`, `init 0`).
+- Reconfigurar o Pepe pela shell: correr o CLI `pepe`/`mix pepe`, ou avaliar módulos do Pepe com `elixir -e`. O agente muda a configuração pelas ferramentas com gate (`config_set`, `manage_pepe`, `manage_agent`), que o portão de permissões vê; a mesma mudança pela shell viraria o `auto_approve` ou a palavra-passe do painel sem gate nenhum. Correspondido só na posição de comando, por isso `echo pepe` ou `cat pepe.md` ficam intactos.
 
 É pura, multiplataforma, sem configuração e sempre ativa. Não tem custo, por isso nunca precisa de ser habilitada.
 

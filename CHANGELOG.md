@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-06-08
+
+### Security
+- **Config file is now owner-only.** `~/.pepe/config.json` (which can hold a raw credential) is written `0600` and its directory `0700`, atomically. `pepe doctor` flags a config or home left readable/writable by other users on the machine.
+- **The agent's shell can no longer reconfigure Pepe out-of-band.** The command guard now refuses a shell command that drives the `pepe`/`mix pepe` CLI or evaluates Pepe modules directly (`elixir -e "...Pepe...."`) — paths that would have flipped `auto_approve`, the dashboard password, or a model key without the permission gate seeing it. The agent still configures Pepe through its gated tools (`config_set`, `manage_pepe`, `manage_agent`). Matched only at command position, so `echo pepe` / `cat pepe.md` are untouched.
+- **External content is sanitized before it reaches the model.** Text a `fetch_url` or `web_search` brings back now has model control tokens (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<start_of_turn>`, …) and invisible characters (zero-width, BOM, bidi overrides, soft hyphen) stripped, so a page cannot forge a role switch or smuggle hidden instructions past a human and a naïve filter. Complements the existing taint model (`Pepe.Security.ExternalContent`).
+- **Redaction is ReDoS-safe.** The secret-shape patterns are bounded (`{0,64}` name runs, `{6,4096}` values) so no crafted output can make them backtrack quadratically.
+
+### Added
+- **Secret redaction in tool output** (two layers, on by default). Before a tool result reaches the model or the trace on disk, Pepe now (1) strips the **exact value** of every secret it holds — each `${VAR}` the config references (a model key), the `secrets.vault_env` tokens, and the `secrets.expose_env` tokens — and (2) **masks anything shaped like a credential** it does not know the value of: `PGPASSWORD=…`, `"api_key": "…"`, `Authorization: Bearer …`, a JWT, an `id:token` bot token, keeping a short `abcd…wxyz` hint. This closes the gap where a secret the agent *fetched* (e.g. a database password read with `op read`) could otherwise land in the transcript. The heuristic shape pass is toggleable with `secrets.redact_output: false`; the exact-value pass always runs.
+
 ## [0.5.5] - 2026-06-07
 
 ### Added

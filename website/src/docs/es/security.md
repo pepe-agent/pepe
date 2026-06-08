@@ -103,6 +103,8 @@ Así que en cuanto una ejecución ingiere contenido de fuera, el `auto_approve` 
 
 Esto es una barrera de verdad, no una súplica en el prompt. Y deliberadamente no es la respuesta completa, porque el contenido ingerido en un turno permanece en la conversación y un turno posterior aún lo lleva. Lo que cierra es el ataque que no necesita humano alguno: un cliente que adjunta un PDF trampa a un bot de soporte, y el bot ejecutando en silencio un comando para el que estaba pre-aprobado.
 
+Junto con la retirada, el propio contenido se limpia antes de llegar al modelo. El texto que trae un `fetch_url` o `web_search` tiene quitados los tokens de control de modelo (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<start_of_turn>` y similares) y los caracteres invisibles (espacios de ancho cero, un BOM, anulaciones bidi, un guion suave). Eso no es contenido, son las rutas de contrabando: un token de control intenta forjar un cambio de rol para que el texto citado de la web se lea como instrucción de sistema, y un carácter invisible esconde letras entre las que un humano y un filtro por palabra ven. Quitarlos es barato y cierra los caminos fáciles; la retirada de arriba es la barrera que aguanta cuando fallan.
+
 Si de verdad necesitas que un agente **actúe** a partir de lo que los desconocidos envían, y no solo lea y responda, activa `trust_untrusted_content` en ese agente. Levanta la retirada solo para él. Viene desactivado, y ese valor por defecto es el seguro: activarlo reabre exactamente el camino de arriba, así que es una decisión de verdad, para un agente cuyo trabajo es tomar un documento y hacer algo en el sistema con él. Leer un documento y responder sobre él nunca lo necesita.
 
 ### El propietario puede manejar la CLI por chat
@@ -124,6 +126,7 @@ Las herramientas de shell (`bash` y `run_script`) pasan cada comando por una gua
 - Escribir en crudo o sobrescribir un dispositivo de disco (`dd of=/dev/...`, o redirigir hacia `/dev/sda` y similares).
 - Bombas de bifurcación (fork bombs).
 - Apagar o reiniciar el equipo (`shutdown`, `reboot`, `halt`, `poweroff`, `init 0`).
+- Reconfigurar Pepe desde la shell: ejecutar el CLI `pepe`/`mix pepe`, o evaluar módulos de Pepe con `elixir -e`. El agente cambia la configuración por sus herramientas con control (`config_set`, `manage_pepe`, `manage_agent`), que el portón de permisos ve; el mismo cambio por la shell voltearía `auto_approve` o la contraseña del panel sin control alguno. Coincide solo en posición de comando, así que `echo pepe` o `cat pepe.md` quedan intactos.
 
 Es pura, multiplataforma, sin configuración y siempre activa. No cuesta nada, así que nunca hay que habilitarla.
 

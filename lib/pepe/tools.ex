@@ -198,21 +198,31 @@ defmodule Pepe.Tools do
   def finalize(result, name, ctx) do
     result
     |> redact(ctx)
-    |> scrub_exposed_tokens()
+    |> scrub_known_secret_values()
+    |> scrub_secret_shapes()
     |> spill_large(name, ctx)
   end
 
-  @redacted_token "«redacted vault token»"
+  # After the exact-value scrub above (the tokens Pepe holds), mask anything that merely *looks*
+  # like a credential - a password/api-key/Bearer/JWT the agent fetched and Pepe never knew the
+  # value of. On by default; `secrets.redact_output: false` turns it off. Defence in depth, so a
+  # broken config leaves the result un-masked rather than crashing the turn.
+  defp scrub_secret_shapes(result) do
+    if Pepe.Config.redact_tool_output?(), do: Pepe.Secrets.Redact.scrub(result), else: result
+  rescue
+    _ -> result
+  end
 
-  # The env vars the operator deliberately let the agent's shell keep (`secrets.expose_env`)
-  # are vault-opening tokens: a leaked one opens everything in its scope. The fluent vault flow
-  # means the agent's shell *can* echo one (a stray `env`, an `op read`, a verbose error), so
-  # strip any that appear in a tool result before it reaches the model or the trace on disk.
-  # This is one-way (never restored, unlike PII redaction): the model never needs the token,
-  # only `op` does, and `op` reads it straight from the environment. A no-op when nothing is
-  # exposed, which is the default.
-  defp scrub_exposed_tokens(result) do
-    case exposed_token_values() do
+  @redacted_token "«redacted secret»"
+
+  # Strip the exact value of every secret Pepe *knows* from a tool result before it reaches the
+  # model or the trace on disk: each `${VAR}` the config points at (a model key), the vault
+  # tokens (`secrets.vault_env`), and the ones deliberately left in the agent's shell
+  # (`secrets.expose_env`). The agent can surface one many ways (a stray `env`, an `op read`, a
+  # verbose error), and none is a value the model needs. One-way (never restored, unlike PII
+  # redaction) and precise, so no false positives; the shape pass catches what Pepe cannot know.
+  defp scrub_known_secret_values(result) do
+    case known_secret_values() do
       [] -> result
       values -> Enum.reduce(values, result, &String.replace(&2, &1, @redacted_token))
     end
@@ -222,11 +232,13 @@ defmodule Pepe.Tools do
     _ -> result
   end
 
-  # Values are read fresh from the environment each time (a rotated token changes here at
-  # once). Guarded on length so a short, low-entropy value someone exposed cannot mangle
-  # ordinary output by matching a common substring; real vault tokens are far longer.
-  defp exposed_token_values do
-    Pepe.Config.expose_env()
+  # Read fresh each time (a rotated secret changes here at once). Length-guarded so a short,
+  # low-entropy value cannot mangle ordinary output by matching a common substring.
+  defp known_secret_values do
+    config = Pepe.Config.load()
+
+    (Pepe.Config.provisioning_env(config) ++ Pepe.Config.expose_env())
+    |> Enum.uniq()
     |> Enum.map(&System.get_env/1)
     |> Enum.filter(&(is_binary(&1) and byte_size(&1) >= 12))
   end

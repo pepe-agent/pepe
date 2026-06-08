@@ -154,11 +154,18 @@ defmodule Pepe.Config do
   @doc "Persist the raw config map, creating the directory if needed."
   def save(map) when is_map(map) do
     File.mkdir_p!(home())
+    # The config can hold a raw credential (an OAuth login's stored tokens, a literal api_key),
+    # so it must not be world- or group-readable. Set the home to 0700 and the file to 0600.
+    # Best-effort: chmod is a no-op on Windows and must never turn a save into a crash.
+    _ = File.chmod(home(), 0o700)
+
     # Write to a temp file and rename into place. `File.rename` is atomic on the same filesystem,
     # so a reader never sees a half-written config and a crash mid-write leaves the old file
-    # intact rather than a truncated one (which `load/0` would now refuse anyway).
+    # intact rather than a truncated one (which `load/0` would now refuse anyway). Chmod the temp
+    # to 0600 *before* the rename so the file is never briefly world-readable between the two.
     tmp = path() <> ".tmp"
     File.write!(tmp, Jason.encode!(map, pretty: true))
+    _ = File.chmod(tmp, 0o600)
     File.rename!(tmp, path())
     map
   end
@@ -2576,6 +2583,17 @@ defmodule Pepe.Config do
       _ -> []
     end
   end
+
+  @doc """
+  Whether to mask secret-shaped substrings in tool output before it reaches the model or the
+  trace (`secrets.redact_output`, on by default). See `Pepe.Secrets.Redact`.
+
+  On by default because the failure it prevents (a fetched password landing in the transcript)
+  is silent and costly, and the failure it can cause (over-masking a value that only looks like
+  a secret) is visible and rare. Set it to `false` to turn the heuristic pass off.
+  """
+  @spec redact_tool_output?() :: boolean()
+  def redact_tool_output?, do: get_in(load(), ["secrets", "redact_output"]) != false
 
   # Models are id-keyed (unlike agents/projects, which are still name-keyed),
   # so it's :id that's redundant with the map key here, not :name.

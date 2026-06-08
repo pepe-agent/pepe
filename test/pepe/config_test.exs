@@ -84,4 +84,18 @@ defmodule Pepe.ConfigTest do
       refute Enum.any?(baks, &String.ends_with?(&1, ".bak.1000"))
     end
   end
+
+  describe "file permissions" do
+    test "save restricts the config to owner-only and tightens the home directory" do
+      Config.save(%{"x" => 1})
+
+      # The config can hold a raw credential, so no group/other read or write.
+      assert {:ok, %File.Stat{mode: config_mode}} = File.stat(Config.path())
+      assert Bitwise.band(config_mode, 0o077) == 0, "config is #{Integer.to_string(config_mode, 8)}"
+
+      # The home directory: no group/other write (0700 in practice).
+      assert {:ok, %File.Stat{mode: home_mode}} = File.stat(Config.home())
+      assert Bitwise.band(home_mode, 0o022) == 0
+    end
+  end
 end

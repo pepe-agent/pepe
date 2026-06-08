@@ -33,6 +33,24 @@ defmodule Pepe.SandboxTest do
     end
   end
 
+  test "the guard blocks the agent reconfiguring Pepe through the CLI or by eval" do
+    for cmd <- [
+          "mix pepe config set x y",
+          "pepe agent add evil --admin",
+          "ls; pepe dashboard password s3cret",
+          "sudo pepe manage add",
+          "elixir -e 'Pepe.Config.save(%{})'"
+        ] do
+      assert {:block, _} = Sandbox.guard(cmd), "should block self-management: #{cmd}"
+    end
+  end
+
+  test "the guard allows ordinary commands that merely mention pepe" do
+    for cmd <- ["echo pepe", "cat pepe.md", "grep pepe log.txt", "./bin/pepe-helper run"] do
+      assert :ok = Sandbox.guard(cmd), "should allow: #{cmd}"
+    end
+  end
+
   test "the guard allows normal, legitimate commands" do
     for cmd <- [
           "psql -c 'select count(*) from leads'",

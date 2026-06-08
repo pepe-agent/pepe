@@ -123,4 +123,25 @@ defmodule Pepe.DoctorTest do
     assert out =~ "issue"
     assert out =~ "[agent] default/a"
   end
+
+  test "flags a config file that other users on the machine can read" do
+    Config.save(%{"x" => 1})
+    # Run once so the config is normalized and settled (a first run rewrites a minimal config,
+    # which would reset the mode); then loosen it to simulate a config left world-readable.
+    Doctor.checks()
+    File.chmod!(Config.path(), 0o644)
+
+    checks = Doctor.checks()
+
+    assert {"security", "config file permissions", {:warn, msg}} =
+             List.keyfind(checks, "config file permissions", 1)
+
+    assert msg =~ "chmod 600"
+  end
+
+  test "does not flag a correctly-restricted config" do
+    Config.save(%{"x" => 1})
+    checks = Doctor.checks()
+    assert List.keyfind(checks, "config file permissions", 1) == nil
+  end
 end

@@ -30,14 +30,29 @@ defmodule Pepe.ToolsTest do
       out = Tools.finalize(raw, "bash", %{})
 
       refute out =~ "ops_abcdefghijklmnop1234567890"
-      assert out =~ "«redacted vault token»"
+      assert out =~ "«redacted secret»"
       # Ordinary output is untouched.
       assert out =~ "PATH=/usr/bin"
     end
 
-    test "nothing is exposed by default, so output passes through unchanged" do
-      out = Tools.finalize("plain output, no secrets here", "bash", %{})
-      assert out == "plain output, no secrets here"
+    test "a `${VAR}` model key that Pepe references is redacted too, not just exposed tokens" do
+      # Pepe knows this value (the config points at it), so its exact value is scrubbed from
+      # output even though it was never in expose_env.
+      Config.save(%{
+        "models" => %{"m" => %{"base_url" => "https://x/v1", "model" => "g", "api_key" => "${MODEL_KEY}"}}
+      })
+
+      System.put_env("MODEL_KEY", "sk-referenced-key-abcdef123456")
+      on_exit(fn -> System.delete_env("MODEL_KEY") end)
+
+      out = Tools.finalize("leaked: sk-referenced-key-abcdef123456", "bash", %{})
+      refute out =~ "sk-referenced-key-abcdef123456"
+      assert out =~ "«redacted secret»"
+    end
+
+    test "nothing known and nothing secret-shaped, so output passes through unchanged" do
+      out = Tools.finalize("plain output, all fine here", "bash", %{})
+      assert out == "plain output, all fine here"
     end
 
     test "a short exposed value is left alone, so it cannot mangle ordinary output" do

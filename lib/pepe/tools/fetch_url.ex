@@ -65,7 +65,11 @@ defmodule Pepe.Tools.FetchUrl do
     end
   end
 
-  defp format(%{status: status, body: body}), do: "status=#{status}\n#{truncate(stringify(body))}"
+  # The body is content from outside the conversation: strip model control tokens and invisible
+  # characters before it reaches the model (Pepe.Security.ExternalContent). The `status=` line is
+  # ours and stays as is.
+  defp format(%{status: status, body: body}),
+    do: "status=#{status}\n#{Pepe.Security.ExternalContent.sanitize(truncate(stringify(body)))}"
 
   defp parse_host(url) do
     case URI.new(url) do

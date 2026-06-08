@@ -103,6 +103,8 @@ So once a run has taken in content from outside, `auto_approve` stops applying t
 
 This is a real boundary rather than a plea in the prompt. It is deliberately not the whole answer, because content taken in on one turn stays in the conversation and a later turn still carries it. What it closes is the exploit that needs no human: a client attaching a booby-trapped PDF to a support bot, and the bot quietly running a command it was pre-approved for.
 
+Alongside the withdrawal, the content itself is cleaned before it reaches the model. Text a `fetch_url` or `web_search` brings back has its model control tokens (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<start_of_turn>`, and the like) and its invisible characters (zero-width spaces, a BOM, bidi overrides, a soft hyphen) stripped. Those are not content, they are the smuggling routes: a control token tries to forge a role switch so quoted web text reads as a system instruction, and an invisible character hides letters between the ones a human and a keyword filter see. Removing them is cheap and closes the easy paths; the withdrawal above is the boundary that holds when they fail.
+
 If you genuinely need an agent to **act** on what strangers send it, and not only read and answer, set `trust_untrusted_content` on that agent. It lifts the withdrawal for that agent alone. It is off by default, and that default is the safe one: turning it on reopens exactly the path above, so it is a real decision, for an agent whose job is to take a document and do something on the system with it. Reading a document and answering about it never needs it.
 
 ### The owner can drive the CLI by chat
@@ -124,6 +126,7 @@ The shell tools (`bash` and `run_script`) run every command through a guard firs
 - Writing raw to or overwriting a disk device (`dd of=/dev/...`, or redirecting into `/dev/sda` and friends).
 - Fork bombs.
 - Powering off or rebooting the host (`shutdown`, `reboot`, `halt`, `poweroff`, `init 0`).
+- Reconfiguring Pepe from the shell: driving the `pepe`/`mix pepe` CLI, or evaluating Pepe modules with `elixir -e`. The agent changes config through its gated tools (`config_set`, `manage_pepe`, `manage_agent`), which the permission gate can see; the same change through the shell would flip `auto_approve` or the dashboard password with no gate at all. Matched only at command position, so `echo pepe` or `cat pepe.md` are untouched.
 
 It is pure, cross-platform, zero-config, and always on. It costs nothing, so it never has to be enabled.
 

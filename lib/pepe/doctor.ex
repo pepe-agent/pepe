@@ -22,6 +22,8 @@ defmodule Pepe.Doctor do
 
   alias Pepe.Config
 
+  import Bitwise, only: [&&&: 2]
+
   @type status :: :ok | {:warn, String.t()} | {:error, String.t()}
   @type check :: {String.t(), String.t(), status()}
 
@@ -186,7 +188,30 @@ defmodule Pepe.Doctor do
         {"security", "dashboard password", {:warn, "not set; set one (pepe dashboard password) before exposing the server publicly"}}
       end
 
-    secret_checks ++ [password_check]
+    secret_checks ++ [password_check] ++ file_perms_checks()
+  end
+
+  # The config file can hold a raw credential, so it must not be readable or writable by other
+  # users on the machine. Flags a config or home that any group/other can read or write. POSIX
+  # only: on a filesystem with no Unix mode bits (Windows) `File.stat` gives 0 and this is silent.
+  defp file_perms_checks do
+    [{Config.path(), "config file", 0o077}, {Config.home(), "config directory", 0o022}]
+    |> Enum.flat_map(fn {target, label, mask} -> perm_check(target, label, mask) end)
+  end
+
+  defp perm_check(target, label, mask) do
+    case File.stat(target) do
+      {:ok, %File.Stat{mode: mode}} when (mode &&& mask) != 0 ->
+        [
+          {"security", "#{label} permissions",
+           {:warn,
+            "#{target} is accessible to other users on this machine (mode #{Integer.to_string(mode &&& 0o777, 8)}); " <>
+              "tighten it with `chmod #{if mask == 0o077, do: "600", else: "700"} #{target}`"}}
+        ]
+
+      _ ->
+        []
+    end
   end
 
   # Walk the config, flagging a credential written in the clear. Returns dotted paths like

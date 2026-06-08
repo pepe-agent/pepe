@@ -49,10 +49,29 @@ defmodule Pepe.Sandbox do
     ]
   end
 
-  @doc "Refuse a catastrophic command. Returns `:ok` or `{:block, reason}`."
+  # Ways the agent's shell could reach around the gated tools to reconfigure Pepe itself:
+  # driving the `pepe`/`mix pepe` CLI, or evaluating Pepe modules directly. The agent changes
+  # config through `config_set`/`manage_pepe`/`manage_agent` (which the permission gate sees);
+  # the same change via the shell would flip `auto_approve`, the dashboard password, or a model
+  # key with no gate at all. Matched only at command position, so `echo pepe` or a path like
+  # `./bin/pepe-helper` is untouched. A static check, not a boundary - an obfuscated invocation
+  # can still slip past, exactly like the catastrophic guard.
+  @cmd_start ~S"(?:^|[;&|`(]|\$\()\s*(?:sudo\s+|env\s+\S+=\S+\s+|exec\s+|nohup\s+|command\s+|time\s+)*"
+
+  defp self_management_patterns do
+    [
+      {Regex.compile!(@cmd_start <> ~S"(?:mix\s+pepe|pepe)\b"),
+       "reconfiguring Pepe through the `pepe` CLI is not allowed from the shell - use the " <>
+         "config_set / manage_pepe / manage_agent tools, which the permission gate can see"},
+      {~r/\b(?:elixir|iex)\b[^\n]*\s-e\b[^\n]*Pepe\./,
+       "evaluating Pepe modules directly bypasses the tool gate - use the config/manage tools"}
+    ]
+  end
+
+  @doc "Refuse a catastrophic or self-reconfiguring command. Returns `:ok` or `{:block, reason}`."
   @spec guard(String.t()) :: :ok | {:block, String.t()}
   def guard(command) when is_binary(command) do
-    Enum.find_value(blocked_patterns(), :ok, fn {re, why} ->
+    Enum.find_value(blocked_patterns() ++ self_management_patterns(), :ok, fn {re, why} ->
       if Regex.match?(re, command), do: {:block, why}
     end)
   end
