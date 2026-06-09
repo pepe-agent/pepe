@@ -27,6 +27,20 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     assert Config.telegram_bot("default")["bot_token"] == "abc"
   end
 
+  test "a live config change (require_mention) is picked up by refresh_bot without a restart" do
+    Config.put_telegram(%{"bot_token" => "t", "require_mention" => true})
+    Telegram.refresh_bot()
+    assert Telegram.bot()["require_mention"] == true
+
+    # Operator flips it while the poller runs. The snapshot is stale until the next poll...
+    Config.put_telegram(%{"bot_token" => "t", "require_mention" => false})
+    assert Telegram.bot()["require_mention"] == true
+
+    # ...until the next poll re-reads the config, which is what refresh_bot does.
+    Telegram.refresh_bot()
+    assert Telegram.bot()["require_mention"] == false
+  end
+
   test "named bots live alongside the default, each bound to its own agent" do
     Config.put_telegram(%{"bot_token" => "default-token", "agent" => "assistant"})
     Config.put_telegram_bot("sales", %{"bot_token" => "sales-token", "agent" => "sales-bot"})

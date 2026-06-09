@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-06-09
+
+### Fixed
+- **Telegram per-bot config now takes effect live, without restarting the gateway.** The poller kept the bot's config (`require_mention`, allowlists, bound agent, `trainers`, `heartbeat`, token) in a process-dictionary snapshot taken at startup and never re-read it, so editing one of those did nothing until the process restarted — and `/new` (which only resets the conversation) did not help. Each poll now re-reads the bot's config from the file by name, so a change from any conversation (including one bound to a different bot) lands within a poll cycle.
+
 ## [0.5.6] - 2026-06-08
 
 ### Security

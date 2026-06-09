@@ -187,7 +187,25 @@ defmodule Pepe.Gateways.Telegram do
   def start_link(bot), do: GenServer.start_link(__MODULE__, bot, [])
 
   defp put_bot(bot), do: Process.put(@bot_key, bot || %{})
-  defp bot, do: Process.get(@bot_key) || %{}
+
+  @doc false
+  # The current process's bot snapshot. Public only so the reload behaviour can be tested.
+  def bot, do: Process.get(@bot_key) || %{}
+
+  @doc false
+  # Refresh the process-dictionary snapshot from config by name. Called at the top of every poll
+  # so a change to any of this bot's fields takes effect live. Keeps the current snapshot if the
+  # bot is momentarily absent (a config mid-edit, or the load failing) rather than blanking a live
+  # poller - the name is stable, so this only ever swaps in a newer config for the same bot.
+  def refresh_bot do
+    case Config.telegram_bot(bot_name()) do
+      nil -> :ok
+      fresh -> put_bot(fresh)
+    end
+  rescue
+    _ -> :ok
+  end
+
   defp bot_name, do: bot()["name"] || "default"
 
   defp token, do: resolve_token(bot())
@@ -257,8 +275,11 @@ defmodule Pepe.Gateways.Telegram do
 
   @impl true
   def handle_info(:poll, state) do
-    # Read the token fresh each poll so a token change in the config takes effect
-    # live - no restart needed (most config is hot-reloaded this way).
+    # `bot()` is a process-dictionary snapshot; re-read this bot's config from the file at the
+    # top of every poll so a change to any of its fields (require_mention, allowlists, bound
+    # agent, trainers, heartbeat, the token) takes effect live, without restarting the gateway.
+    refresh_bot()
+
     state =
       case token() && get_updates(token(), state.offset) do
         {:ok, updates} ->
