@@ -5,6 +5,19 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-06-11
+
+### Telegram: much more complete message handling
+- **Forum topics.** In a group with topics, a message in a non-General topic now gets its own conversation and the reply lands **in that topic**, not in General. `message_thread_id` is threaded through every send (reply, typing, progress note, permission prompt, document, menus) and into the session key (`…#t<thread>`). Previously all replies went to General and every topic shared one session.
+- **Stops appearing dead on non-text messages.** A video, GIF/animation, sticker, shared location, venue, contact, poll or dice used to hit a silent catch-all. Now each is handled: files go to the agent, and the others become a short line of text (with a maps link for a location), so the bot actually responds.
+- **Albums (media groups).** Several photos/videos sent together now arrive as **one** turn with the shared caption, instead of firing a separate turn per file.
+- **Edited messages** are now answered — a user fixing a typo gets a reply instead of silence.
+- **Reply context.** When a user replies to a specific message ("this one is broken ☝️"), the quoted message is prepended so the agent knows what "this" refers to; and replying to the bot's own message counts as addressing it in a group.
+- **Replies are tied to the question** in groups (`reply_parameters`), so in a busy chat it's clear what's being answered.
+- **Poll robustness.** `getUpdates` now asks for the update types Telegram omits by default (`message_reaction`, `chat_member`, …) via `allowed_updates`; honors flood-control `retry_after` on **429** (inbound and outbound) instead of dropping messages; and on **409** (a second poller or stale webhook) clears the webhook and backs off instead of wedging invisibly forever.
+- **Received reactions** (a user's 👍/👎) reach the agent as lightweight feedback; a stray inline button now clears its spinner instead of hanging; inline queries and `my_chat_member` (added/removed/promoted) are handled; forum-service messages are no longer mistaken for user input.
+- Progress notes no longer balloon a URL into a link-preview card.
+
 ## [0.5.7] - 2026-06-09
 
 ### Fixed

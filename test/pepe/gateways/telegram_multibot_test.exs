@@ -27,6 +27,72 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     assert Config.telegram_bot("default")["bot_token"] == "abc"
   end
 
+  test "a forum topic gets its own session and its sends are routed back to the topic" do
+    Config.put_telegram(%{"bot_token" => "t"})
+    Telegram.refresh_bot()
+
+    # No topic (General, an ordinary group, or a DM): bare key, no thread field added.
+    Telegram.put_thread(nil)
+    assert Telegram.session_key(12_345) == "telegram:12345"
+    assert Telegram.with_thread(%{chat_id: 12_345}) == %{chat_id: 12_345}
+
+    # In a topic: the session key is suffixed (so the topic is its own conversation) and every
+    # send carries message_thread_id (so the reply lands in that topic, not General).
+    Telegram.put_thread(67)
+    assert Telegram.session_key(12_345) == "telegram:12345#t67"
+    assert Telegram.with_thread(%{chat_id: 12_345}) == %{chat_id: 12_345, message_thread_id: 67}
+  after
+    Telegram.put_thread(nil)
+  end
+
+  test "album parts sharing a media_group_id buffer into one entry; a different group is separate" do
+    Config.put_telegram(%{"bot_token" => "t"})
+    Telegram.refresh_bot()
+    if :ets.whereis(:pepe_tg_albums) == :undefined, do: :ets.new(:pepe_tg_albums, [:set, :public, :named_table])
+    :ets.delete_all_objects(:pepe_tg_albums)
+
+    msg = fn caption ->
+      %{"chat" => %{"id" => 9, "type" => "group"}, "from" => %{"id" => 1}, "message_id" => 1, "caption" => caption}
+    end
+
+    # Three photos of one album (only the first carries the caption) → one entry, three items.
+    Telegram.buffer_album(msg.("look at these"), "f1", "photo", nil, "grp-A")
+    Telegram.buffer_album(msg.(nil), "f2", "photo", nil, "grp-A")
+    Telegram.buffer_album(msg.(nil), "f3", "photo", nil, "grp-A")
+    # A different album is a separate entry.
+    Telegram.buffer_album(msg.(nil), "g1", "photo", nil, "grp-B")
+
+    [{_, a}] = :ets.lookup(:pepe_tg_albums, {9, nil, "grp-A"})
+    [{_, b}] = :ets.lookup(:pepe_tg_albums, {9, nil, "grp-B"})
+
+    assert length(a.items) == 3
+    assert a.caption == "look at these"
+    assert length(b.items) == 1
+  after
+    if :ets.whereis(:pepe_tg_albums) != :undefined, do: :ets.delete_all_objects(:pepe_tg_albums)
+  end
+
+  test "album_prompt lists every file and appends the caption" do
+    out = Telegram.album_prompt(["media/a.jpg", "media/b.jpg"], "what are these?")
+    assert out =~ "2 files"
+    assert out =~ "`media/a.jpg`"
+    assert out =~ "`media/b.jpg`"
+    assert out =~ "what are these?"
+  end
+
+  test "flood-control retry_after is read from the error body, with a sane default" do
+    assert Telegram.retry_after(%{"parameters" => %{"retry_after" => 12}}) == 12
+    assert Telegram.retry_after(%{"ok" => false}) == 5
+    assert Telegram.retry_after(%{"parameters" => %{"retry_after" => 0}}) == 5
+  end
+
+  test "with_reply ties a send to a message id, and is a no-op when there is none" do
+    assert Telegram.with_reply(nil, %{chat_id: 1}) == %{chat_id: 1}
+
+    assert Telegram.with_reply(42, %{chat_id: 1}) ==
+             %{chat_id: 1, reply_parameters: %{message_id: 42, allow_sending_without_reply: true}}
+  end
+
   test "a live config change (require_mention) is picked up by refresh_bot without a restart" do
     Config.put_telegram(%{"bot_token" => "t", "require_mention" => true})
     Telegram.refresh_bot()

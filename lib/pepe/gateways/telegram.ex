@@ -65,6 +65,13 @@ defmodule Pepe.Gateways.Telegram do
   # permission-bookkeeping clutter next to the actual conversation.
   @prompt_log :pepe_tg_prompt_log
 
+  # An album (several photos/videos sent together) arrives as separate updates sharing a
+  # `media_group_id`. We buffer them here, keyed by chat+topic+group, and flush the whole album
+  # as one turn once no new part has arrived for a short while - so "here are 3 screenshots" is
+  # one message to the agent, not three, and the caption (only on the first part) reaches it.
+  @albums :pepe_tg_albums
+  @album_flush_ms 1_500
+
   # The built-in slash commands. Descriptions are built at runtime so they're
   # translated in the active locale. Installed skills are appended dynamically by
   # `full_menu/0`, so they show up in Telegram's "/" popup too.
@@ -188,6 +195,40 @@ defmodule Pepe.Gateways.Telegram do
 
   defp put_bot(bot), do: Process.put(@bot_key, bot || %{})
 
+  # The forum topic the message being handled came from, carried in the process dictionary for
+  # the responding task (like the bot snapshot) so every send can route back into that topic.
+  @thread_key :tg_thread
+  @doc false
+  def put_thread(id), do: Process.put(@thread_key, id)
+  defp thread, do: Process.get(@thread_key)
+
+  # The message to reply to (so the answer is visually tied to the question in a busy group),
+  # consumed once - only the first message of a multi-part reply quotes it.
+  defp put_reply_to(id), do: Process.put(:tg_reply_to, id)
+
+  defp take_reply_to do
+    id = Process.get(:tg_reply_to)
+    Process.delete(:tg_reply_to)
+    id
+  end
+
+  @doc false
+  def with_reply(nil, payload), do: payload
+
+  def with_reply(id, payload),
+    do: Map.put(payload, :reply_parameters, %{message_id: id, allow_sending_without_reply: true})
+
+  @doc false
+  # Route a send into the forum topic the incoming message came from. Telegram rejects
+  # `message_thread_id` in a non-forum chat, so it is added only when the message actually carried
+  # one - the General topic, ordinary groups and DMs carry none and are sent exactly as before.
+  def with_thread(payload) do
+    case thread() do
+      id when is_integer(id) -> Map.put(payload, :message_thread_id, id)
+      _ -> payload
+    end
+  end
+
   @doc false
   # The current process's bot snapshot. Public only so the reload behaviour can be tested.
   def bot, do: Process.get(@bot_key) || %{}
@@ -233,6 +274,7 @@ defmodule Pepe.Gateways.Telegram do
     :persistent_term.erase({__MODULE__, :username, bot_name()})
     if :ets.whereis(@pending) == :undefined, do: :ets.new(@pending, [:set, :public, :named_table])
     if :ets.whereis(@prompt_log) == :undefined, do: :ets.new(@prompt_log, [:bag, :public, :named_table])
+    if :ets.whereis(@albums) == :undefined, do: :ets.new(@albums, [:set, :public, :named_table])
     b = bot()
 
     Task.start(fn ->
@@ -290,6 +332,19 @@ defmodule Pepe.Gateways.Telegram do
           Process.sleep(2_000)
           state
 
+        {:conflict, _body} ->
+          # A second poller or a stale webhook is competing for this bot's updates, so both wedge
+          # invisibly. Clear any webhook and back off, so exactly one consumer wins.
+          Logger.warning("[telegram] getUpdates conflict (409) - clearing webhook and backing off")
+          delete_webhook(token())
+          Process.sleep(5_000)
+          state
+
+        {:retry_after, secs} ->
+          Logger.warning("[telegram] flood control (429): waiting #{secs}s")
+          Process.sleep(min(secs, 60) * 1000)
+          state
+
         {:error, reason} ->
           Logger.warning("[telegram] poll error: #{safe_inspect(reason)}")
           Process.sleep(2_000)
@@ -312,6 +367,18 @@ defmodule Pepe.Gateways.Telegram do
     state = maybe_pulse_heartbeat(state, b, now)
 
     schedule_heartbeat_tick()
+    {:noreply, state}
+  end
+
+  # An album has gone quiet: no new part arrived within the flush window, so process what we
+  # buffered as one turn. `take` removes it atomically, so a late straggler just starts a new one.
+  @impl true
+  def handle_info({:flush_album, key}, state) do
+    case :ets.take(@albums, key) do
+      [{^key, entry}] -> flush_album(entry)
+      _ -> :ok
+    end
+
     {:noreply, state}
   end
 
@@ -375,7 +442,8 @@ defmodule Pepe.Gateways.Telegram do
 
     case Pepe.Heartbeat.pulse(key) do
       {:ok, text} ->
-        chat_id = key |> String.split(":") |> List.last()
+        {chat_id, thread} = chat_and_thread(key)
+        put_thread(thread)
         send_message(chat_id, text)
 
       _silent_or_deferred_or_error ->
@@ -450,34 +518,48 @@ defmodule Pepe.Gateways.Telegram do
 
   defp safe_inspect(term), do: term |> inspect() |> redact()
 
+  # Update types we actually handle. Telegram's default set omits `message_reaction`,
+  # `chat_member` and `my_chat_member`, so they must be named explicitly or they are never
+  # delivered - even with a handler in place.
+  @allowed_updates ~w(message edited_message callback_query inline_query message_reaction my_chat_member chat_member)
+
   defp get_updates(token, offset) do
-    params = [offset: offset, timeout: @poll_timeout]
+    params = [
+      offset: offset,
+      timeout: @poll_timeout,
+      allowed_updates: Jason.encode!(@allowed_updates)
+    ]
 
     case Req.get(api_url(token, "getUpdates"),
            params: params,
            receive_timeout: (@poll_timeout + 10) * 1000
          ) do
       {:ok, %{status: 200, body: %{"ok" => true, "result" => result}}} -> {:ok, result}
+      {:ok, %{status: 409, body: body}} -> {:conflict, body}
+      {:ok, %{status: 429, body: body}} -> {:retry_after, retry_after(body)}
       {:ok, %{body: body}} -> {:error, body}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  defp handle_update(%{"message" => %{"text" => text} = message}) do
-    chat = message["chat"] || %{}
-    chat_id = chat["id"]
-    user_id = get_in(message, ["from", "id"])
+  @doc false
+  # Telegram flood control returns the seconds to wait in `parameters.retry_after`.
+  def retry_after(%{"parameters" => %{"retry_after" => s}}) when is_integer(s) and s > 0, do: s
+  def retry_after(_), do: 5
 
-    if active?() and allowed?(chat_id, user_id) and addressed?(text, chat["type"], chat_id) and
-         Pepe.Gateways.Telegram.Throttle.allow?(chat_id) do
-      b = bot()
-
-      Task.start(fn ->
-        put_bot(b)
-        respond(chat_id, user_id, message["message_id"], strip_mention(text))
-      end)
-    end
+  defp delete_webhook(token) do
+    Req.post(api_url(token, "deleteWebhook"), json: %{drop_pending_updates: false})
+  rescue
+    _ -> :ok
   end
+
+  defp handle_update(%{"message" => %{"text" => text} = message}),
+    do: dispatch_text(message, text)
+
+  # An edited message: the user fixed a typo or reworded. Handle it exactly like a fresh
+  # message so the correction actually gets a reply, instead of being ignored.
+  defp handle_update(%{"edited_message" => %{"text" => text} = message}),
+    do: dispatch_text(message, text)
 
   # A pressed permission button. Dismiss the spinner, then hand the decision to the
   # session that's waiting on it (allowlist still applies).
@@ -526,7 +608,147 @@ defmodule Pepe.Gateways.Telegram do
   defp handle_update(%{"message" => %{"photo" => [_ | _] = sizes} = m}),
     do: media(m, List.last(sizes)["file_id"], "photo")
 
+  defp handle_update(%{"message" => %{"video" => %{"file_id" => id}} = m}),
+    do: media(m, id, "video")
+
+  defp handle_update(%{"message" => %{"animation" => %{"file_id" => id}} = m}),
+    do: media(m, id, "animation")
+
+  # Messages that carry no file to open - a sticker, a shared location, a contact, a poll,
+  # a die - become a short line of text and go through the ordinary text path (so the mention
+  # rule, reply context and topic routing all apply). The caption, if any, rides along, so
+  # "@bot where is this?" attached to a location still reaches the bot.
+  defp handle_update(%{"message" => %{"sticker" => s} = m}),
+    do: dispatch_text(m, described(sticker_text(s), m))
+
+  defp handle_update(%{"message" => %{"location" => loc} = m}),
+    do: dispatch_text(m, described(location_text(loc), m))
+
+  defp handle_update(%{"message" => %{"venue" => v} = m}),
+    do: dispatch_text(m, described(venue_text(v), m))
+
+  defp handle_update(%{"message" => %{"contact" => c} = m}),
+    do: dispatch_text(m, described(contact_text(c), m))
+
+  defp handle_update(%{"message" => %{"poll" => p} = m}),
+    do: dispatch_text(m, described(poll_text(p), m))
+
+  defp handle_update(%{"message" => %{"dice" => d} = m}),
+    do: dispatch_text(m, described(dice_text(d), m))
+
+  # A user's 👍/👎 on a message. Deliver it to the agent as a tiny text turn, so it can be
+  # used as lightweight feedback or a confirmation (delivered only now that `allowed_updates`
+  # asks Telegram for `message_reaction`).
+  defp handle_update(%{"message_reaction" => %{"new_reaction" => [_ | _] = reactions} = r}) do
+    chat = r["chat"] || %{}
+    emojis = reactions |> Enum.map(& &1["emoji"]) |> Enum.reject(&is_nil/1) |> Enum.join(" ")
+    message = %{"chat" => chat, "from" => r["user"], "message_id" => r["message_id"]}
+    if emojis != "", do: dispatch_text(message, "[reacted #{emojis}]")
+  end
+
+  # The bot was added to / removed from / promoted in a chat. Log it; nothing to reply to.
+  defp handle_update(%{"my_chat_member" => %{"new_chat_member" => %{"status" => status}} = u}) do
+    Logger.info("[telegram] my_chat_member: now #{status} in chat #{get_in(u, ["chat", "id"])}")
+    :ok
+  end
+
+  # An inline query (typing "@bot ..." in another chat's input). Not a conversation surface
+  # for a support bot; answer empty so Telegram stops waiting instead of showing a spinner.
+  defp handle_update(%{"inline_query" => %{"id" => id}}) do
+    Req.post(api_url(token(), "answerInlineQuery"), json: %{inline_query_id: id, results: []})
+    :ok
+  end
+
+  # Any other callback button (not the two we own) - clear the client's spinner so it does not
+  # hang, then ignore it.
+  defp handle_update(%{"callback_query" => %{"id" => cq_id}}) do
+    answer_callback(cq_id)
+    :ok
+  end
+
   defp handle_update(_), do: :ok
+
+  # The shared text path for a real text message and for a non-file message turned into text
+  # (a shared location, a contact, a poll). Applies the mention rule, reply-to context and
+  # topic routing uniformly.
+  defp dispatch_text(message, text) do
+    chat = message["chat"] || %{}
+    chat_id = chat["id"]
+    user_id = get_in(message, ["from", "id"])
+    thread_id = message["message_thread_id"]
+    said = with_reply_context(message, text)
+
+    if active?() and allowed?(chat_id, user_id) and
+         addressed?(text, chat["type"], chat_id, message) and
+         Pepe.Gateways.Telegram.Throttle.allow?(chat_id) do
+      b = bot()
+      # In a group, tie the reply to the question so it's clear what's being answered; in a DM
+      # there's only one thread, so a quote would just be clutter (nil = no reply target).
+      reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
+
+      Task.start(fn ->
+        put_bot(b)
+        put_thread(thread_id)
+        put_reply_to(reply_to)
+        respond(chat_id, user_id, message["message_id"], strip_mention(said))
+      end)
+    end
+  end
+
+  # When the user is replying to a specific message, prepend a short quote of it so the agent
+  # sees what "this one" refers to. A reply to the bot's own message is skipped - it is already
+  # in the conversation, so quoting it back is noise.
+  defp with_reply_context(message, text) do
+    case message["reply_to_message"] do
+      %{"text" => quoted} = r when is_binary(quoted) and quoted != "" ->
+        if replying_to_bot?(r), do: text, else: "> #{one_line(quoted, 200)}\n\n#{text}"
+
+      _ ->
+        text
+    end
+  end
+
+  defp replying_to_bot?(%{"from" => %{"is_bot" => true, "username" => u}}),
+    do: u == bot_username()
+
+  defp replying_to_bot?(_), do: false
+
+  defp one_line(text, max) do
+    line = text |> String.split("\n", parts: 2) |> List.first() |> String.trim()
+    if String.length(line) > max, do: String.slice(line, 0, max) <> "…", else: line
+  end
+
+  # Combine a synthesized description with the message's caption (if any), so a mention in the
+  # caption is seen by `addressed?` and the agent gets both the thing and what was said about it.
+  defp described(description, message), do: join_caption(description, message["caption"] || "")
+
+  defp sticker_text(%{"emoji" => e}) when is_binary(e) and e != "", do: "[sticker: #{e}]"
+  defp sticker_text(_), do: "[sticker]"
+
+  defp location_text(%{"latitude" => lat, "longitude" => lon}),
+    do: "[location: #{lat}, #{lon} — https://maps.google.com/?q=#{lat},#{lon}]"
+
+  defp location_text(_), do: "[location]"
+
+  defp venue_text(%{"title" => t} = v),
+    do: "[venue: #{t}#{if v["address"], do: ", " <> v["address"], else: ""}]"
+
+  defp venue_text(_), do: "[venue]"
+
+  defp contact_text(c) do
+    parts = [c["first_name"], c["last_name"], c["phone_number"]] |> Enum.reject(&(&1 in [nil, ""]))
+    "[contact: #{Enum.join(parts, " ")}]"
+  end
+
+  defp poll_text(%{"question" => q, "options" => opts}) when is_list(opts),
+    do: "[poll: #{q} — #{Enum.map_join(opts, " / ", &option_text/1)}]"
+
+  defp poll_text(_), do: "[poll]"
+
+  defp option_text(o), do: o["text"]
+
+  defp dice_text(%{"emoji" => e, "value" => v}), do: "[dice #{e}: #{v}]"
+  defp dice_text(_), do: "[dice]"
 
   defp media(message, file_id, kind, file_name \\ nil) do
     chat = message["chat"] || %{}
@@ -538,26 +760,112 @@ defmodule Pepe.Gateways.Telegram do
     # spoken "@bot, deploy it" could never reach the bot. It is checked below instead,
     # against the words, once there are any. The allowlist still gates who gets this far.
     if active?() and allowed?(chat_id, user_id) and Pepe.Gateways.Telegram.Throttle.allow?(chat_id) do
-      b = bot()
-      learn = learn_allowed?(user_id)
-
-      inbound = %{
-        chat_id: chat_id,
-        user_id: user_id,
-        msg_id: message["message_id"],
-        chat_type: chat["type"],
-        caption: message["caption"] || "",
-        # What the sender called it. `report-q3.pdf` tells the agent (and the user reading
-        # the reply) what was actually looked at; `document_17.pdf` tells nobody anything.
-        file_name: file_name
-      }
-
-      Task.start(fn ->
-        put_bot(b)
-        put_learn(learn)
-        ingest_media(inbound, file_id, kind)
-      end)
+      case message["media_group_id"] do
+        nil -> ingest_single(message, file_id, kind, file_name)
+        group_id -> buffer_album(message, file_id, kind, file_name, group_id)
+      end
     end
+  end
+
+  defp ingest_single(message, file_id, kind, file_name) do
+    b = bot()
+    thread_id = message["message_thread_id"]
+    learn = learn_allowed?(get_in(message, ["from", "id"]))
+    inbound = inbound_of(message, file_name)
+
+    Task.start(fn ->
+      put_bot(b)
+      put_thread(thread_id)
+      put_learn(learn)
+      ingest_media(inbound, file_id, kind)
+    end)
+  end
+
+  defp inbound_of(message, file_name) do
+    chat = message["chat"] || %{}
+
+    %{
+      chat_id: chat["id"],
+      user_id: get_in(message, ["from", "id"]),
+      msg_id: message["message_id"],
+      chat_type: chat["type"],
+      caption: message["caption"] || "",
+      # What the sender called it. `report-q3.pdf` tells the agent (and the user reading the
+      # reply) what was actually looked at; `document_17.pdf` tells nobody anything.
+      file_name: file_name
+    }
+  end
+
+  @doc false
+  # Buffer one part of an album. The first part starts the flush timer and captures the shared
+  # context (the caption is only on the first part); later parts just append their file.
+  def buffer_album(message, file_id, kind, file_name, group_id) do
+    chat = message["chat"] || %{}
+    key = {chat["id"], message["message_thread_id"], group_id}
+    item = %{file_id: file_id, kind: kind, file_name: file_name}
+
+    case :ets.lookup(@albums, key) do
+      [{^key, entry}] ->
+        :ets.insert(@albums, {key, %{entry | items: entry.items ++ [item]}})
+
+      [] ->
+        entry = %{
+          items: [item],
+          caption: message["caption"] || "",
+          chat_id: chat["id"],
+          chat_type: chat["type"],
+          thread: message["message_thread_id"],
+          bot: bot(),
+          learn: learn_allowed?(get_in(message, ["from", "id"]))
+        }
+
+        :ets.insert(@albums, {key, entry})
+        Process.send_after(self(), {:flush_album, key}, @album_flush_ms)
+    end
+  end
+
+  defp flush_album(entry) do
+    Task.start(fn ->
+      put_bot(entry.bot)
+      put_thread(entry.thread)
+      put_learn(entry.learn)
+      process_album(entry)
+    end)
+  end
+
+  # Download every part, then hand the agent the whole album as one turn (a group with nothing
+  # said still needs to be addressed, exactly like a single file).
+  defp process_album(entry) do
+    Config.put_locale()
+    send_chat_action(entry.chat_id, "typing")
+
+    paths =
+      entry.items
+      |> Enum.map(fn i -> download_file(i.file_id, i.kind) end)
+      |> Enum.flat_map(fn
+        {:ok, path} -> [path]
+        _ -> []
+      end)
+
+    cond do
+      paths == [] ->
+        send_message(entry.chat_id, friendly_error(:download))
+
+      addressed?(entry.caption, entry.chat_type, entry.chat_id) ->
+        chat_with_agent(entry.chat_id, nil, album_prompt(paths, entry.caption), untrusted: true)
+
+      true ->
+        :ok
+    end
+  end
+
+  @doc false
+  def album_prompt(paths, caption) do
+    listed = Enum.map_join(paths, ", ", &"`#{&1}`")
+
+    ("The user sent #{length(paths)} files together as one album, saved in your workspace at: " <>
+       "#{listed}. Look at them together and respond to what they want.")
+    |> Kernel.<>(caption_line(caption))
   end
 
   defp ingest_media(inbound, file_id, kind) do
@@ -891,12 +1199,13 @@ defmodule Pepe.Gateways.Telegram do
       end)
 
     case Req.post(api_url(token(), "sendMessage"),
-           json: %{
-             chat_id: chat_id,
-             text: text,
-             parse_mode: "HTML",
-             reply_markup: %{inline_keyboard: buttons}
-           }
+           json:
+             with_thread(%{
+               chat_id: chat_id,
+               text: text,
+               parse_mode: "HTML",
+               reply_markup: %{inline_keyboard: buttons}
+             })
          ) do
       {:ok, %{body: %{"result" => %{"message_id" => mid}}}} -> mid
       _ -> nil
@@ -1274,11 +1583,12 @@ defmodule Pepe.Gateways.Telegram do
         "\n/models - " <> gettext("list them all")
 
     Req.post(api_url(token(), "sendMessage"),
-      json: %{
-        chat_id: chat_id,
-        text: text,
-        reply_markup: %{inline_keyboard: [[%{text: gettext("Browse models"), callback_data: "model:browse"}]]}
-      }
+      json:
+        with_thread(%{
+          chat_id: chat_id,
+          text: text,
+          reply_markup: %{inline_keyboard: [[%{text: gettext("Browse models"), callback_data: "model:browse"}]]}
+        })
     )
   end
 
@@ -1355,11 +1665,12 @@ defmodule Pepe.Gateways.Telegram do
         current = Pepe.Agent.Session.status(session_key(chat_id)).model
 
         Req.post(api_url(token(), "sendMessage"),
-          json: %{
-            chat_id: chat_id,
-            text: models_picker_text(models),
-            reply_markup: %{inline_keyboard: model_buttons(models, current)}
-          }
+          json:
+            with_thread(%{
+              chat_id: chat_id,
+              text: models_picker_text(models),
+              reply_markup: %{inline_keyboard: model_buttons(models, current)}
+            })
         )
     end
   end
@@ -1619,9 +1930,40 @@ defmodule Pepe.Gateways.Telegram do
     :exit, _ -> nil
   end
 
-  defp session_key(chat_id), do: session_key(bot_name(), chat_id)
+  @doc false
+  def session_key(chat_id), do: bot_name() |> session_key(chat_id) |> topic_suffixed()
   defp session_key("default", chat_id), do: "telegram:#{chat_id}"
   defp session_key(name, chat_id), do: "telegram:#{name}:#{chat_id}"
+
+  # A forum topic is its own conversation, so its session key gets a "#t<thread>" suffix. The `#`
+  # keeps it clear of the `:` that separates bot name from chat id (own_key?/3 and the heartbeat
+  # split on `:`). The General topic, ordinary groups and DMs carry no thread and keep the bare
+  # key, so existing sessions are untouched.
+  defp topic_suffixed(base) do
+    case thread() do
+      id when is_integer(id) -> "#{base}#t#{id}"
+      _ -> base
+    end
+  end
+
+  # Inverse of the "#t<thread>" suffix: split a stored session key's chat part back into
+  # {chat_id, thread_id | nil}, for a delivery that starts from a key (the heartbeat) rather than
+  # from an incoming message that still carries its thread.
+  defp chat_and_thread(key) do
+    chat_part = key |> String.split(":") |> List.last()
+
+    case String.split(chat_part, "#t", parts: 2) do
+      [chat, thread] -> {chat, parse_thread(thread)}
+      [chat] -> {chat, nil}
+    end
+  end
+
+  defp parse_thread(str) do
+    case Integer.parse(str) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
 
   defp ensure_session(chat_id) do
     agent = agent_default()
@@ -1662,6 +2004,7 @@ defmodule Pepe.Gateways.Telegram do
   defp send_document(chat_id, path, caption) do
     fields =
       [chat_id: to_string(chat_id)]
+      |> then(fn f -> if id = thread(), do: f ++ [message_thread_id: to_string(id)], else: f end)
       |> then(fn f -> if caption in [nil, ""], do: f, else: f ++ [caption: caption] end)
       |> Kernel.++(document: {File.stream!(path), filename: Path.basename(path)})
 
@@ -1891,7 +2234,10 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp send_status(chat_id, text) do
-    case Req.post(api_url(token(), "sendMessage"), json: %{chat_id: chat_id, text: text}) do
+    # A progress note is throwaway - never let a URL in it balloon into a link preview card.
+    payload = with_thread(%{chat_id: chat_id, text: text, link_preview_options: %{is_disabled: true}})
+
+    case Req.post(api_url(token(), "sendMessage"), json: payload) do
       {:ok, %{status: 200, body: %{"result" => %{"message_id" => id}}}} -> id
       _ -> nil
     end
@@ -1922,14 +2268,31 @@ defmodule Pepe.Gateways.Telegram do
   defp post_part(chat_id, part) do
     url = api_url(token(), "sendMessage")
     html = Pepe.Gateways.Telegram.Markdown.to_html(part)
-    result = Req.post(url, json: %{chat_id: chat_id, text: html, parse_mode: "HTML"})
+    # Consumed once: only this first chunk quotes the question; later chunks of a long reply don't.
+    reply = take_reply_to()
+    result = post_with_retry(url, with_reply(reply, with_thread(%{chat_id: chat_id, text: html, parse_mode: "HTML"})))
 
     case result do
       {:ok, %{status: 200}} ->
         track_delivery(result, chat_id)
 
       _ ->
-        url |> Req.post(json: %{chat_id: chat_id, text: part}) |> track_delivery(chat_id)
+        url
+        |> post_with_retry(with_reply(reply, with_thread(%{chat_id: chat_id, text: part})))
+        |> track_delivery(chat_id)
+    end
+  end
+
+  # A single retry that honours flood control's `retry_after`, so a reply survives a brief 429
+  # rather than being dropped.
+  defp post_with_retry(url, payload) do
+    case Req.post(url, json: payload) do
+      {:ok, %{status: 429, body: body}} ->
+        Process.sleep(min(retry_after(body), 30) * 1000)
+        Req.post(url, json: payload)
+
+      other ->
+        other
     end
   end
 
@@ -1941,7 +2304,7 @@ defmodule Pepe.Gateways.Telegram do
       |> chunk(4000)
       |> Enum.each(fn part ->
         api_url(token(), "sendMessage")
-        |> Req.post(json: %{chat_id: chat_id, text: part, parse_mode: "HTML"})
+        |> Req.post(json: with_thread(%{chat_id: chat_id, text: part, parse_mode: "HTML"}))
         |> track_delivery(chat_id)
       end)
     end
@@ -2014,7 +2377,7 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp send_chat_action(chat_id, action) do
-    Req.post(api_url(token(), "sendChatAction"), json: %{chat_id: chat_id, action: action})
+    Req.post(api_url(token(), "sendChatAction"), json: with_thread(%{chat_id: chat_id, action: action}))
   end
 
   defp chunk(text, size) do
@@ -2041,11 +2404,14 @@ defmodule Pepe.Gateways.Telegram do
   # DMs always reach the agent. In groups, optionally require an @mention (or a
   # /command) so the bot doesn't answer every message - unless this chat waived
   # that for itself with /mention (see mention_waived?/1).
-  defp addressed?(_text, "private", _chat_id), do: true
+  defp addressed?(text, chat_type, chat_id), do: addressed?(text, chat_type, chat_id, %{})
 
-  defp addressed?(text, _group, chat_id) do
+  defp addressed?(_text, "private", _chat_id, _message), do: true
+
+  defp addressed?(text, _group, chat_id, message) do
     if require_mention?() do
-      mentions_bot?(text) or command?(text) or mention_waived?(chat_id)
+      mentions_bot?(text) or command?(text) or mention_waived?(chat_id) or
+        replying_to_bot?(message["reply_to_message"] || %{})
     else
       true
     end
