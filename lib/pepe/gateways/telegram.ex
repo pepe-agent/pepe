@@ -29,8 +29,13 @@ defmodule Pepe.Gateways.Telegram do
         "allowed_chats": [12345],      // optional chat allowlist; empty = any chat
         "allowed_users": [67890],      // optional user allowlist; empty = any user
         "require_mention": true,       // optional; in groups only reply when @mentioned
+        "reactions": "own",            // optional; own (default) | all | off - see below
         "agent": "assistant"           // the agent this bot talks to
       }
+
+  `reactions` decides which 👍/👎 the agent hears: `own` (the default) delivers only a
+  reaction on a message the bot itself sent (feedback on its own answers), `all` delivers
+  every reaction, `off` delivers none.
 
   `require_mention` is bot-wide (every group that bot is in). Any single group can
   waive it for itself with `/mention off` (back on with `/mention on`) - the waiver
@@ -71,6 +76,12 @@ defmodule Pepe.Gateways.Telegram do
   # one message to the agent, not three, and the caption (only on the first part) reaches it.
   @albums :pepe_tg_albums
   @album_flush_ms 1_500
+
+  # Message ids this bot has sent (keyed by {chat_id, message_id}), so a received reaction can be
+  # matched to "a message the bot sent" - the default `own` mode reacts only to feedback on the
+  # bot's own answers, not to every 👍 in the chat. Pruned by TTL on the heartbeat tick.
+  @sent :pepe_tg_sent
+  @sent_ttl 3 * 24 * 60 * 60
 
   # The built-in slash commands. Descriptions are built at runtime so they're
   # translated in the active locale. Installed skills are appended dynamically by
@@ -275,6 +286,7 @@ defmodule Pepe.Gateways.Telegram do
     if :ets.whereis(@pending) == :undefined, do: :ets.new(@pending, [:set, :public, :named_table])
     if :ets.whereis(@prompt_log) == :undefined, do: :ets.new(@prompt_log, [:bag, :public, :named_table])
     if :ets.whereis(@albums) == :undefined, do: :ets.new(@albums, [:set, :public, :named_table])
+    if :ets.whereis(@sent) == :undefined, do: :ets.new(@sent, [:set, :public, :named_table])
     b = bot()
 
     Task.start(fn ->
@@ -366,6 +378,7 @@ defmodule Pepe.Gateways.Telegram do
 
     state = maybe_pulse_heartbeat(state, b, now)
 
+    prune_sent()
     schedule_heartbeat_tick()
     {:noreply, state}
   end
@@ -636,14 +649,11 @@ defmodule Pepe.Gateways.Telegram do
   defp handle_update(%{"message" => %{"dice" => d} = m}),
     do: dispatch_text(m, described(dice_text(d), m))
 
-  # A user's 👍/👎 on a message. Deliver it to the agent as a tiny text turn, so it can be
-  # used as lightweight feedback or a confirmation (delivered only now that `allowed_updates`
-  # asks Telegram for `message_reaction`).
+  # A user's 👍/👎 on a message, delivered to the agent as a tiny text turn (lightweight feedback
+  # or a confirmation). By default only a reaction on the bot's *own* message counts - see
+  # `reaction_wanted?/1`.
   defp handle_update(%{"message_reaction" => %{"new_reaction" => [_ | _] = reactions} = r}) do
-    chat = r["chat"] || %{}
-    emojis = reactions |> Enum.map(& &1["emoji"]) |> Enum.reject(&is_nil/1) |> Enum.join(" ")
-    message = %{"chat" => chat, "from" => r["user"], "message_id" => r["message_id"]}
-    if emojis != "", do: dispatch_text(message, "[reacted #{emojis}]")
+    if reaction_wanted?(r), do: deliver_reaction(r, reactions)
   end
 
   # The bot was added to / removed from / promoted in a chat. Log it; nothing to reply to.
@@ -749,6 +759,41 @@ defmodule Pepe.Gateways.Telegram do
 
   defp dice_text(%{"emoji" => e, "value" => v}), do: "[dice #{e}: #{v}]"
   defp dice_text(_), do: "[dice]"
+
+  @doc false
+  # `own` (the default): only a reaction on a message the bot itself sent - feedback on its own
+  # answers, not every 👍 in the chat. `all`: any reaction. `off`: none. A reaction from another
+  # bot is never delivered.
+  def reaction_wanted?(r) do
+    mode = reaction_mode()
+
+    cond do
+      mode == "off" -> false
+      get_in(r, ["user", "is_bot"]) == true -> false
+      mode == "all" -> true
+      true -> sent_by_bot?(get_in(r, ["chat", "id"]), r["message_id"])
+    end
+  end
+
+  defp reaction_mode do
+    case bot()["reactions"] do
+      m when m in ["off", "own", "all"] -> m
+      _ -> "own"
+    end
+  end
+
+  defp sent_by_bot?(chat_id, message_id) when not is_nil(chat_id) and not is_nil(message_id),
+    do: :ets.whereis(@sent) != :undefined and :ets.member(@sent, {chat_id, message_id})
+
+  defp sent_by_bot?(_chat_id, _message_id), do: false
+
+  defp deliver_reaction(r, reactions) do
+    emojis = reactions |> Enum.map(&reaction_emoji/1) |> Enum.reject(&is_nil/1) |> Enum.join(" ")
+    message = %{"chat" => r["chat"] || %{}, "from" => r["user"], "message_id" => r["message_id"]}
+    if emojis != "", do: dispatch_text(message, "[reacted #{emojis}]")
+  end
+
+  defp reaction_emoji(reaction), do: reaction["emoji"]
 
   defp media(message, file_id, kind, file_name \\ nil) do
     chat = message["chat"] || %{}
@@ -2316,6 +2361,8 @@ defmodule Pepe.Gateways.Telegram do
   defp dead_target?(chat_id), do: Pepe.Gateways.Reachability.dead?(bot_name(), chat_id)
 
   defp track_delivery(response, chat_id) do
+    record_sent(response, chat_id)
+
     if Pepe.Gateways.Reachability.permanent_failure?(response) do
       Logger.info("[telegram] marking chat #{chat_id} dead (permanent delivery failure)")
       Pepe.Gateways.Reachability.mark_dead(bot_name(), chat_id)
@@ -2324,6 +2371,26 @@ defmodule Pepe.Gateways.Telegram do
     end
 
     response
+  end
+
+  # Remember a message the bot just sent, so a later reaction on it can be recognized as
+  # feedback on the bot's own answer (the `own` reaction mode). Best-effort, TTL-pruned.
+  defp record_sent({:ok, %{status: 200, body: %{"result" => %{"message_id" => id}}}}, chat_id)
+       when not is_nil(chat_id) do
+    if :ets.whereis(@sent) != :undefined do
+      :ets.insert(@sent, {{chat_id, id}, System.system_time(:second)})
+    end
+  end
+
+  defp record_sent(_response, _chat_id), do: :ok
+
+  defp prune_sent do
+    if :ets.whereis(@sent) != :undefined do
+      cutoff = System.system_time(:second) - @sent_ttl
+      :ets.select_delete(@sent, [{{:_, :"$1"}, [{:<, :"$1", cutoff}], [true]}])
+    end
+  rescue
+    _ -> :ok
   end
 
   defp htmlb(text), do: "<b>" <> esc(text) <> "</b>"

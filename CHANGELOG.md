@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-06-14
+
+### Changed
+- **Telegram received reactions are quieter by default.** A user's 👍/👎 now reaches the agent only when it is on a message the **bot itself sent** (feedback on its own answers), not on every message in the chat. New per-bot `reactions` setting: `own` (default), `all` (any reaction), `off` (none). Previously every reaction triggered an agent turn, which was noisy and costly.
+
 ## [0.5.8] - 2026-06-11
 
 ### Telegram: much more complete message handling

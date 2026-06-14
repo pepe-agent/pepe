@@ -72,6 +72,36 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     if :ets.whereis(:pepe_tg_albums) != :undefined, do: :ets.delete_all_objects(:pepe_tg_albums)
   end
 
+  test "received reactions default to `own` - only on the bot's own messages, not any 👍" do
+    if :ets.whereis(:pepe_tg_sent) == :undefined, do: :ets.new(:pepe_tg_sent, [:set, :public, :named_table])
+    :ets.delete_all_objects(:pepe_tg_sent)
+    # The bot sent message 100 in chat 9; message 200 is someone else's.
+    :ets.insert(:pepe_tg_sent, {{9, 100}, System.system_time(:second)})
+
+    react = fn msg_id, is_bot ->
+      %{"chat" => %{"id" => 9, "type" => "group"}, "user" => %{"id" => 1, "is_bot" => is_bot}, "message_id" => msg_id}
+    end
+
+    # Default mode (own): a reaction on the bot's message counts; on another message it doesn't.
+    Config.put_telegram(%{"bot_token" => "t"})
+    Telegram.refresh_bot()
+    assert Telegram.reaction_wanted?(react.(100, false))
+    refute Telegram.reaction_wanted?(react.(200, false))
+    refute Telegram.reaction_wanted?(react.(100, true))
+
+    # off: never.
+    Config.put_telegram(%{"bot_token" => "t", "reactions" => "off"})
+    Telegram.refresh_bot()
+    refute Telegram.reaction_wanted?(react.(100, false))
+
+    # all: any non-bot reaction, even on a message the bot didn't send.
+    Config.put_telegram(%{"bot_token" => "t", "reactions" => "all"})
+    Telegram.refresh_bot()
+    assert Telegram.reaction_wanted?(react.(200, false))
+  after
+    if :ets.whereis(:pepe_tg_sent) != :undefined, do: :ets.delete_all_objects(:pepe_tg_sent)
+  end
+
   test "album_prompt lists every file and appends the caption" do
     out = Telegram.album_prompt(["media/a.jpg", "media/b.jpg"], "what are these?")
     assert out =~ "2 files"
