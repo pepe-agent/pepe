@@ -37,6 +37,15 @@ defmodule Pepe.Gateways.Telegram do
   reaction on a message the bot itself sent (feedback on its own answers), `all` delivers
   every reaction, `off` delivers none.
 
+  ## Forum topics
+
+  In a group with topics, each topic is its own conversation (its own session) and replies go
+  back into the topic they came from. A topic can be **bound to its own agent**: run
+  `/agent <name>` inside the topic and it is remembered in `telegram_topics` (keyed by bot,
+  chat and thread), surviving `/new` and restarts. The agent for a message is the topic's bound
+  agent if any, then the bot's `agent`, then the global default. Being bound does not by itself
+  waive `require_mention` - a topic still follows the group's mention rule.
+
   `require_mention` is bot-wide (every group that bot is in). Any single group can
   waive it for itself with `/mention off` (back on with `/mention on`) - the waiver
   lives on that group's own session, so it never affects other groups the same bot
@@ -213,6 +222,11 @@ defmodule Pepe.Gateways.Telegram do
   def put_thread(id), do: Process.put(@thread_key, id)
   defp thread, do: Process.get(@thread_key)
 
+  # The chat id of the message being handled, carried alongside the thread so `agent_default/0`
+  # can look up a per-topic agent binding (keyed by {bot, chat, thread}).
+  defp put_chat(id), do: Process.put(:tg_chat, id)
+  defp chat_dict, do: Process.get(:tg_chat)
+
   # The message to reply to (so the answer is visually tied to the question in a busy group),
   # consumed once - only the first message of a multi-part reply quotes it.
   defp put_reply_to(id), do: Process.put(:tg_reply_to, id)
@@ -267,7 +281,33 @@ defmodule Pepe.Gateways.Telegram do
 
   # The agent this bot is bound to (its whole reason for existing), else the global
   # default. This is how "this channel talks only to agent X" works per bot.
-  defp agent_default, do: bot()["agent"] || Config.default_agent_name()
+  # A forum topic bound to its own agent wins; then the bot's agent; then the global default.
+  defp agent_default, do: topic_agent() || bot()["agent"] || Config.default_agent_name()
+
+  defp topic_agent do
+    with chat_id when not is_nil(chat_id) <- chat_dict(),
+         t when not is_nil(t) <- thread(),
+         name when is_binary(name) <- Config.telegram_topic_agent(bot_name(), chat_id, t),
+         true <- Config.get_agent(name) != nil do
+      name
+    else
+      _ -> nil
+    end
+  end
+
+  # In a forum topic, `/agent` binds the topic to that agent *persistently* (kept in config,
+  # survives `/new` and a restart), so a "support" topic stays the support agent. Anywhere else
+  # it is just this session's switch.
+  defp bind_agent(chat_id, name) do
+    case thread() do
+      nil ->
+        gettext("Switched to agent %{name}.", name: name)
+
+      t ->
+        Config.bind_telegram_topic(bot_name(), chat_id, t, name)
+        gettext("This topic is now bound to agent %{name} (kept across /new and restarts).", name: name)
+    end
+  end
 
   defp presence(nil), do: nil
   defp presence(""), do: nil
@@ -457,6 +497,7 @@ defmodule Pepe.Gateways.Telegram do
       {:ok, text} ->
         {chat_id, thread} = chat_and_thread(key)
         put_thread(thread)
+        put_chat(chat_id)
         send_message(chat_id, text)
 
       _silent_or_deferred_or_error ->
@@ -699,6 +740,7 @@ defmodule Pepe.Gateways.Telegram do
       Task.start(fn ->
         put_bot(b)
         put_thread(thread_id)
+        put_chat(chat_id)
         put_reply_to(reply_to)
         respond(chat_id, user_id, message["message_id"], strip_mention(said))
       end)
@@ -821,6 +863,7 @@ defmodule Pepe.Gateways.Telegram do
     Task.start(fn ->
       put_bot(b)
       put_thread(thread_id)
+      put_chat(inbound.chat_id)
       put_learn(learn)
       ingest_media(inbound, file_id, kind)
     end)
@@ -873,6 +916,7 @@ defmodule Pepe.Gateways.Telegram do
     Task.start(fn ->
       put_bot(entry.bot)
       put_thread(entry.thread)
+      put_chat(entry.chat_id)
       put_learn(entry.learn)
       process_album(entry)
     end)
@@ -1111,6 +1155,15 @@ defmodule Pepe.Gateways.Telegram do
 
   defp chat_with_agent(chat_id, msg_id, text, opts \\ []) do
     agent = agent_default()
+    # A topic bound to an agent is authoritative every turn. `ensure`/`chat` only set the agent
+    # when a session is *created*, so a session that predates the binding (or was created under
+    # the bot's default) would keep the wrong agent. Move it onto the bound one. Outside a bound
+    # topic there is no binding, so a session's own agent (its default, or a /agent switch) stands.
+    if bound = topic_agent() do
+      ensure_session(chat_id)
+      Pepe.Agent.Session.set_agent(session_key(chat_id), bound)
+    end
+
     typing = keep_typing(chat_id)
     if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, @work_reaction)
 
@@ -1194,11 +1247,14 @@ defmodule Pepe.Gateways.Telegram do
   # the poll loop delivers the pressed button (or we time out -> deny).
   defp authorizer(chat_id) do
     # Captured here (in the bot's task) and re-installed when the Session process
-    # invokes the callback, so the prompt is sent via *this* bot's token.
+    # invokes the callback, so the prompt is sent via *this* bot's token and into the
+    # forum topic the request came from (not General).
     b = bot()
+    t = thread()
 
     fn name, args, _ctx ->
       put_bot(b)
+      put_thread(t)
       request_authorization(chat_id, name, args)
     end
   end
@@ -1455,7 +1511,7 @@ defmodule Pepe.Gateways.Telegram do
     if Config.get_agent(name) do
       ensure_session(chat_id)
       Pepe.Agent.Session.set_agent(session_key(chat_id), name)
-      send_message(chat_id, gettext("Switched to agent %{name}.", name: name))
+      send_message(chat_id, bind_agent(chat_id, name))
     else
       send_message(chat_id, gettext("Unknown agent: %{name}", name: name))
     end
@@ -1994,14 +2050,7 @@ defmodule Pepe.Gateways.Telegram do
   # Inverse of the "#t<thread>" suffix: split a stored session key's chat part back into
   # {chat_id, thread_id | nil}, for a delivery that starts from a key (the heartbeat) rather than
   # from an incoming message that still carries its thread.
-  defp chat_and_thread(key) do
-    chat_part = key |> String.split(":") |> List.last()
-
-    case String.split(chat_part, "#t", parts: 2) do
-      [chat, thread] -> {chat, parse_thread(thread)}
-      [chat] -> {chat, nil}
-    end
-  end
+  defp chat_and_thread(key), do: key |> String.split(":") |> List.last() |> split_topic()
 
   defp parse_thread(str) do
     case Integer.parse(str) do
@@ -2023,8 +2072,9 @@ defmodule Pepe.Gateways.Telegram do
   """
   def deliver(target, text) do
     case resolve_delivery(target) do
-      {bot, chat_id} ->
+      {bot, chat_id, thread} ->
         put_bot(bot)
+        put_thread(thread)
         if token(), do: send_message(chat_id, text)
 
       :error ->
@@ -2037,8 +2087,9 @@ defmodule Pepe.Gateways.Telegram do
   @doc "Send a local file as a Telegram document to `target` (a session/delivery key)."
   def deliver_file(target, path, caption \\ nil) do
     case resolve_delivery(target) do
-      {bot, chat_id} ->
+      {bot, chat_id, thread} ->
         put_bot(bot)
+        put_thread(thread)
         if token(), do: send_document(chat_id, path, caption), else: {:error, :no_token}
 
       :error ->
@@ -2060,19 +2111,31 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp resolve_delivery(target) do
-    case String.split(to_string(target), ":", parts: 2) do
-      [name, chat_id] ->
-        case Config.telegram_bot(name) do
-          nil -> :error
-          bot -> {bot, chat_id}
-        end
+  @doc false
+  # Turn a delivery/session key into {bot, chat_id, thread}. The chat part may carry a "#t<thread>"
+  # topic suffix (a forum-topic session), which is split off so the bare chat id goes to Telegram
+  # and the thread routes the message into that topic (not General). Public for tests.
+  def resolve_delivery(target) do
+    {bot, chat_part} =
+      case String.split(to_string(target), ":", parts: 2) do
+        [name, chat] -> {Config.telegram_bot(name), chat}
+        [chat] -> {Config.telegram_bot("default") || List.first(Config.telegram_bots()), chat}
+      end
 
-      [chat_id] ->
-        case Config.telegram_bot("default") || List.first(Config.telegram_bots()) do
-          nil -> :error
-          bot -> {bot, chat_id}
-        end
+    case bot do
+      nil ->
+        :error
+
+      _ ->
+        {chat_id, thread} = split_topic(chat_part)
+        {bot, chat_id, thread}
+    end
+  end
+
+  defp split_topic(chat_part) do
+    case String.split(chat_part, "#t", parts: 2) do
+      [chat, thread] -> {chat, parse_thread(thread)}
+      [chat] -> {chat, nil}
     end
   end
 
@@ -2086,9 +2149,11 @@ defmodule Pepe.Gateways.Telegram do
   # process, so it re-installs this bot and keeps its state in that process dict.
   defp activity_callback(chat_id) do
     b = bot()
+    t = thread()
 
     fn event ->
       put_bot(b)
+      put_thread(t)
       tg_activity(chat_id, event)
     end
   end
@@ -2410,9 +2475,11 @@ defmodule Pepe.Gateways.Telegram do
   # doesn't kill a linked child.
   defp keep_typing(chat_id) do
     b = bot()
+    t = thread()
 
     spawn_link(fn ->
       put_bot(b)
+      put_thread(t)
       typing_loop(chat_id)
     end)
   end

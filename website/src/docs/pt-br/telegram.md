@@ -185,6 +185,18 @@ via `/mention off`) nunca chega ao agente, nem como contexto silencioso,
 então ele não consegue "se atualizar" sobre o que rolou antes dele entrar na
 conversa.
 
+### Tópicos de forum
+
+Num grupo com **tópicos** ligados, cada tópico é uma conversa própria, e a
+resposta cai de volta no tópico de onde veio. Você pode dar a um tópico **seu
+próprio agente**: rode `/agent <nome>` dentro do tópico e ele fica vinculado
+àquele agente, mantido através do `/new` e de reinícios. Assim um grupo pode ter
+um tópico de "suporte" respondido pelo agente de suporte e um de "engenharia"
+pelo engenheiro, lado a lado. O agente de uma mensagem é o agente vinculado ao
+tópico, se houver; senão o `agent` do bot; senão o default global. Um tópico
+vinculado ainda segue a regra de menção do grupo — ponha `require_mention: false`
+(ou `/mention off` naquele tópico) se quiser que responda sem @menção.
+
 ### Troque de modelo no meio de uma conversa
 
 `/model` mostra o modelo ativo nesse chat, com um botão **Browse models**

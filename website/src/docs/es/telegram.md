@@ -186,6 +186,18 @@ con `/mention off`) nunca llega al agente, ni siquiera como contexto
 silencioso, así que no puede "ponerse al día" con lo que se habló antes de
 que lo trajeran a la conversación.
 
+### Temas de foro
+
+En un grupo con **temas** activados, cada tema es su propia conversación, y la
+respuesta vuelve al tema del que vino. Puedes darle a un tema **su propio
+agente**: ejecuta `/agent <nombre>` dentro del tema y queda vinculado a ese
+agente, conservado a través de `/new` y de reinicios. Así un grupo puede tener un
+tema de "soporte" atendido por el agente de soporte y uno de "ingeniería" por el
+ingeniero, lado a lado. El agente de un mensaje es el agente vinculado al tema, si
+lo hay; si no, el `agent` del bot; si no, el predeterminado global. Un tema
+vinculado sigue la regla de mención del grupo — pon `require_mention: false` (o
+`/mention off` en ese tema) si quieres que responda sin @mención.
+
 ### Cambia de modelo en medio de una conversación
 
 `/model` muestra el modelo activo en este chat, con un botón **Browse

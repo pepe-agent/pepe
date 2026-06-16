@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-06-16
+
+### Telegram: DM / group / topic connection layer
+- **Bind a forum topic to its own agent, persistently.** In a group with topics, run `/agent <name>` inside a topic and that topic is bound to that agent, kept in config so it survives `/new` and a restart (precedence: topic binding > the bot's agent > the global default). A "support" topic can be the support agent and an "engineering" topic the engineer, in the same group. The binding takes effect on an existing conversation too, not only a fresh one.
+
+### Fixed
+- **Telegram: files and scheduled reports now reach the right topic.** `send_file` and a cron/watch delivering to a topic session were sending to an invalid chat id (the `#t<thread>` topic suffix leaked into it) — a regression from per-topic sessions. Delivery now splits the topic off and routes into it.
+- **Telegram: the "working…" progress note, the typing indicator, and permission prompts now appear in the topic** the message came from, not in General. They ran in a different process from the reply and lost the topic; the topic is now carried through to them.
+
 ## [0.5.9] - 2026-06-14
 
 ### Changed

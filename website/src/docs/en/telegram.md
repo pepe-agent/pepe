@@ -182,6 +182,18 @@ doesn't @mention it (and isn't waived by `/mention off`) never reaches the
 agent at all, not even as silent context, so it can't "catch up" on chatter
 that happened before it was brought in.
 
+### Forum topics
+
+In a group that has **topics** turned on, each topic is its own conversation,
+and a reply lands back in the topic it came from. You can give a topic **its own
+agent**: run `/agent <name>` inside the topic and it stays bound to that agent,
+kept across `/new` and restarts. So one group can have a "support" topic answered
+by the support agent and an "engineering" topic by the engineer, side by side.
+The agent for a message is the topic's bound agent if it has one, otherwise the
+bot's `agent`, otherwise the global default. A bound topic still follows the
+group's mention rule — set `require_mention: false` (or `/mention off` in that
+topic) if you want it to answer without an @mention.
+
 ### Switch models mid-conversation
 
 `/model` shows the model currently active in this chat, with a **Browse

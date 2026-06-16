@@ -2165,6 +2165,35 @@ defmodule Pepe.Config do
   @doc "Fetch one Telegram bot config by name (`\"default\"` is the legacy one)."
   def telegram_bot(name), do: Enum.find(telegram_bots(), &(&1["name"] == name))
 
+  @doc """
+  The agent a Telegram forum topic is bound to, or `nil`. A group with topics can route each
+  topic to its own agent (a "support" topic to the support agent, "engineering" to the engineer),
+  persistently and across restarts - stored flat under `telegram_topics` keyed by bot, chat and
+  thread.
+  """
+  @spec telegram_topic_agent(String.t(), term(), term()) :: String.t() | nil
+  def telegram_topic_agent(bot_name, chat_id, thread) do
+    get_in(load(), ["telegram_topics", topic_key(bot_name, chat_id, thread)])
+  end
+
+  @doc "Bind a forum topic to an agent (persistent). `nil` agent removes the binding."
+  @spec bind_telegram_topic(String.t(), term(), term(), String.t() | nil) :: map()
+  def bind_telegram_topic(bot_name, chat_id, thread, nil) do
+    update(fn config ->
+      topics = Map.delete(config["telegram_topics"] || %{}, topic_key(bot_name, chat_id, thread))
+      Map.put(config, "telegram_topics", topics)
+    end)
+  end
+
+  def bind_telegram_topic(bot_name, chat_id, thread, agent) do
+    update(fn config ->
+      topics = Map.put(config["telegram_topics"] || %{}, topic_key(bot_name, chat_id, thread), agent)
+      Map.put(config, "telegram_topics", topics)
+    end)
+  end
+
+  defp topic_key(bot_name, chat_id, thread), do: "#{bot_name}:#{chat_id}:#{thread}"
+
   @doc "Create or replace a named (non-default) Telegram bot."
   def put_telegram_bot(name, map) when is_binary(name) and is_map(map) do
     clean = map |> Map.delete("name") |> store_map_agent()

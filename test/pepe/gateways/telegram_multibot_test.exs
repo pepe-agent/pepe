@@ -27,6 +27,29 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     assert Config.telegram_bot("default")["bot_token"] == "abc"
   end
 
+  test "delivery to a topic session key extracts the bare chat id and the thread (send_file/cron)" do
+    Config.put_telegram(%{"bot_token" => "t"})
+
+    # A plain chat: no thread. A topic session key (`<chat>#t<thread>`): bare chat + the thread,
+    # so send_file/cron reach the topic instead of sending an invalid `<chat>#t<thread>` chat id.
+    assert {%{"name" => "default"}, "42", nil} = Telegram.resolve_delivery("42")
+    assert {%{"name" => "default"}, "42", 99} = Telegram.resolve_delivery("42#t99")
+  end
+
+  test "a topic can be bound to an agent persistently, taking precedence over the bot's agent" do
+    Config.put_telegram(%{"bot_token" => "t", "agent" => "assistant"})
+    Config.put_agent(%Config.Agent{name: "engenheiro", tools: []})
+
+    assert Config.telegram_topic_agent("default", -100, 7) == nil
+    Config.bind_telegram_topic("default", -100, 7, "engenheiro")
+    assert Config.telegram_topic_agent("default", -100, 7) == "engenheiro"
+
+    # A different topic is unaffected; unbinding clears it.
+    assert Config.telegram_topic_agent("default", -100, 8) == nil
+    Config.bind_telegram_topic("default", -100, 7, nil)
+    assert Config.telegram_topic_agent("default", -100, 7) == nil
+  end
+
   test "a forum topic gets its own session and its sends are routed back to the topic" do
     Config.put_telegram(%{"bot_token" => "t"})
     Telegram.refresh_bot()
@@ -65,9 +88,9 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     [{_, a}] = :ets.lookup(:pepe_tg_albums, {9, nil, "grp-A"})
     [{_, b}] = :ets.lookup(:pepe_tg_albums, {9, nil, "grp-B"})
 
-    assert length(a.items) == 3
+    assert [_, _, _] = a.items
     assert a.caption == "look at these"
-    assert length(b.items) == 1
+    assert [_] = b.items
   after
     if :ets.whereis(:pepe_tg_albums) != :undefined, do: :ets.delete_all_objects(:pepe_tg_albums)
   end
