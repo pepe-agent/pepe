@@ -161,4 +161,27 @@ defmodule Pepe.Tools.ManageChannelTest do
     assert listing =~ "sales"
     assert listing =~ "sales-bot"
   end
+
+  test "bind_topic connects the current forum topic to an agent, by request; unbind_topic reverts" do
+    Config.put_telegram(%{"bot_token" => "t"})
+    Config.put_agent(%Agent{name: "engenheiro", system_prompt: "x", tools: []})
+
+    # Inside a topic - the session key carries the chat and `#t<thread>`.
+    topic_ctx = %{agent: %Agent{name: "boss"}, session_key: "telegram:-100777#t42"}
+
+    assert {:ok, msg} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, topic_ctx)
+    assert msg =~ "engenheiro"
+    assert Config.telegram_topic_agent("default", "-100777", 42) == "engenheiro"
+
+    assert {:ok, _} = ManageChannel.run(%{"action" => "unbind_topic"}, topic_ctx)
+    assert Config.telegram_topic_agent("default", "-100777", 42) == nil
+
+    # Outside a topic (no `#t`): a clear error, and nothing bound.
+    general_ctx = %{agent: %Agent{name: "boss"}, session_key: "telegram:-100777"}
+    assert {:error, err} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, general_ctx)
+    assert err =~ "topic"
+
+    # An unknown agent is refused.
+    assert {:error, _} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "ghost"}, topic_ctx)
+  end
 end

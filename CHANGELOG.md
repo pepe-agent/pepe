@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-06-18
+
+### Added
+- **Bind a Telegram topic to an agent by asking.** In a forum topic you can now say "connect this topic to the engineer" and the agent does it — no `/agent` slash command to remember. `manage_channel` gained `bind_topic` / `unbind_topic`, which act on the current topic (parsed from the conversation's session key) and go through the permission gate like any other channel change.
+
+### Changed
+- **Agent names resolve case-insensitively.** `/agent engenheiro` now finds an agent named `Engenheiro` (any casing) instead of "unknown agent"; the unknown-agent reply also lists the agents that exist.
+
 ## [0.5.10] - 2026-06-16
 
 ### Telegram: DM / group / topic connection layer

@@ -50,6 +50,11 @@ defmodule Pepe.Tools.ManageChannel do
         with the @BotFather token), `agent` (an existing agent this bot talks to).
       - list: show configured bots (name, agent, whether active).
       - set_agent: rebind a bot to another agent - needs `name`, `agent`.
+      - bind_topic: bind the CURRENT forum topic (the one this conversation is in) to `agent`, \
+        so that topic is answered by it from now on - persistent, survives /new and restarts. \
+        Use this when the user asks to connect/route this topic to a specific agent. Only works \
+        inside a forum topic. Needs `agent`.
+      - unbind_topic: remove the current topic's agent binding (back to the bot's default agent).
       - set_trainers: who the bot LEARNS from - needs `name`, `trainers` ("*" = \
         everyone, "none" = nobody (client-facing bot), or comma-separated user ids).
       - set_heartbeat: enable/tune the bot's proactive heartbeat - needs `name`; \
@@ -66,7 +71,7 @@ defmodule Pepe.Tools.ManageChannel do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(add list set_agent set_trainers set_heartbeat set_progress enable disable remove),
+            "enum" => ~w(add list set_agent set_trainers set_heartbeat set_progress bind_topic unbind_topic enable disable remove),
             "description" => "What to do."
           },
           "mode" => %{
@@ -100,10 +105,43 @@ defmodule Pepe.Tools.ManageChannel do
 
   @impl true
   def run(%{"action" => action} = args, ctx) do
-    if ctx[:agent], do: dispatch(action, args), else: {:error, "no calling agent in context"}
+    cond do
+      is_nil(ctx[:agent]) -> {:error, "no calling agent in context"}
+      # These act on the *current* forum topic, so they need the conversation's session key.
+      action == "bind_topic" -> bind_topic(args, ctx)
+      action == "unbind_topic" -> unbind_topic(ctx)
+      true -> dispatch(action, args)
+    end
   end
 
   def run(_args, _ctx), do: {:error, "manage_channel needs an `action`"}
+
+  # Bind the topic this conversation is in to `agent`, so from now on that topic is answered by it
+  # (persistent - survives /new and restarts). The user asks in plain language ("connect this
+  # topic to the engineer") and the agent does it; no /agent command to remember.
+  defp bind_topic(args, ctx) do
+    with {:ok, agent} <- fetch(args, "agent"),
+         :ok <- ensure_agent(agent),
+         {:ok, {bot, chat, thread}} <- current_topic(ctx) do
+      Config.bind_telegram_topic(bot, chat, thread, agent)
+      {:ok, "This topic is now bound to agent #{agent} - it will answer here from now on, kept across /new and restarts."}
+    end
+  end
+
+  defp unbind_topic(ctx) do
+    with {:ok, {bot, chat, thread}} <- current_topic(ctx) do
+      Config.bind_telegram_topic(bot, chat, thread, nil)
+      {:ok, "This topic is no longer bound to a specific agent - it falls back to the bot's default agent."}
+    end
+  end
+
+  defp current_topic(ctx) do
+    case Pepe.Gateways.Telegram.parse_topic_key(ctx[:session_key]) do
+      {bot, chat, thread} when not is_nil(thread) -> {:ok, {bot, chat, thread}}
+      {_bot, _chat, nil} -> {:error, "this conversation isn't a forum topic, so there's no topic to bind"}
+      :error -> {:error, "this isn't a Telegram conversation"}
+    end
+  end
 
   defp dispatch("list", _args), do: {:ok, render_list(Config.telegram_bots())}
   defp dispatch("add", args), do: add(args)

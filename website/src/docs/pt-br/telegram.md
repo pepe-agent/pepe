@@ -189,8 +189,11 @@ conversa.
 
 Num grupo com **tópicos** ligados, cada tópico é uma conversa própria, e a
 resposta cai de volta no tópico de onde veio. Você pode dar a um tópico **seu
-próprio agente**: rode `/agent <nome>` dentro do tópico e ele fica vinculado
-àquele agente, mantido através do `/new` e de reinícios. Assim um grupo pode ter
+próprio agente**: rode `/agent <nome>` dentro do tópico — ou simplesmente
+**peça** ao agente pra conectar este tópico a outro, que ele faz por você — e ele
+fica vinculado àquele agente, mantido através do `/new` e de reinícios. Os nomes
+são casados sem diferenciar maiúsculas, então `/agent engenheiro` acha um agente
+chamado `Engenheiro`. Assim um grupo pode ter
 um tópico de "suporte" respondido pelo agente de suporte e um de "engenharia"
 pelo engenheiro, lado a lado. O agente de uma mensagem é o agente vinculado ao
 tópico, se houver; senão o `agent` do bot; senão o default global. Um tópico

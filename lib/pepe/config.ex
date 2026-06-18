@@ -1437,7 +1437,10 @@ defmodule Pepe.Config do
     else
       {slug, bare} = handle_parts(config, ref)
       pid = project_id_for(config, slug)
-      Enum.find_value(agents, &agent_match(&1, pid, bare))
+      # Exact handle first; then case-insensitive, so `/agent engenheiro` finds an agent named
+      # "Engenheiro" - a person types a name in whatever case, and it should just resolve.
+      Enum.find_value(agents, &agent_match(&1, pid, bare)) ||
+        Enum.find_value(agents, &agent_match_ci(&1, pid, bare))
     end
   end
 
@@ -1445,6 +1448,12 @@ defmodule Pepe.Config do
 
   defp agent_match({id, %{"project" => pid, "bare" => bare}}, pid, bare), do: id
   defp agent_match(_entry, _pid, _bare), do: nil
+
+  defp agent_match_ci({id, %{"project" => pid, "bare" => stored}}, pid, bare) do
+    if String.downcase(stored) == String.downcase(bare), do: id
+  end
+
+  defp agent_match_ci(_entry, _pid, _bare), do: nil
 
   # Re-point every agent's handle-shaped refs (can_message/can_manage) from `old` to `new`, without
   # re-keying the id-keyed agents map. Used by a project rename.

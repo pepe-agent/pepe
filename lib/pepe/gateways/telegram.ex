@@ -1206,11 +1206,15 @@ defmodule Pepe.Gateways.Telegram do
   # behind - each already served its purpose (confirming the tap), so keeping them
   # around afterward is just permission-bookkeeping clutter, not conversation.
   defp cleanup_prompts(chat_id) do
-    @prompt_log
-    |> :ets.take(chat_id)
-    |> Enum.each(fn {^chat_id, message_id} ->
-      Req.post(api_url(token(), "deleteMessage"), json: %{chat_id: chat_id, message_id: message_id})
-    end)
+    # A turn's tasks can outlive the gateway (during a test teardown, say), by which point the
+    # table may be gone. No table means no prompts to clean up, not a crash.
+    if :ets.whereis(@prompt_log) != :undefined do
+      @prompt_log
+      |> :ets.take(chat_id)
+      |> Enum.each(fn {^chat_id, message_id} ->
+        Req.post(api_url(token(), "deleteMessage"), json: %{chat_id: chat_id, message_id: message_id})
+      end)
+    end
   end
 
   # Map internal errors to a short, user-safe message (no structs/stacktraces).
@@ -1513,7 +1517,8 @@ defmodule Pepe.Gateways.Telegram do
       Pepe.Agent.Session.set_agent(session_key(chat_id), name)
       send_message(chat_id, bind_agent(chat_id, name))
     else
-      send_message(chat_id, gettext("Unknown agent: %{name}", name: name))
+      available = Config.agents() |> Enum.map_join(", ", & &1.name)
+      send_message(chat_id, gettext("Unknown agent: %{name}", name: name) <> " (#{available})")
     end
   end
 
@@ -2138,6 +2143,25 @@ defmodule Pepe.Gateways.Telegram do
       [chat] -> {chat, nil}
     end
   end
+
+  @doc """
+  Parse a Telegram session key into `{bot_name, chat_id, thread_id | nil}`, or `:error` for a
+  non-Telegram key. Lets a tool bind the *current* forum topic to an agent from within a chat
+  (it has the session key, which encodes the chat and topic).
+  """
+  @spec parse_topic_key(term()) :: {String.t(), String.t(), integer() | nil} | :error
+  def parse_topic_key("telegram:" <> rest) do
+    {name, chat_part} =
+      case String.split(rest, ":", parts: 2) do
+        [n, c] -> {n, c}
+        [c] -> {"default", c}
+      end
+
+    {chat, thread} = split_topic(chat_part)
+    {name, chat, thread}
+  end
+
+  def parse_topic_key(_key), do: :error
 
   ###
   ### live activity layer

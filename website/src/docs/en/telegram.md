@@ -186,8 +186,10 @@ that happened before it was brought in.
 
 In a group that has **topics** turned on, each topic is its own conversation,
 and a reply lands back in the topic it came from. You can give a topic **its own
-agent**: run `/agent <name>` inside the topic and it stays bound to that agent,
-kept across `/new` and restarts. So one group can have a "support" topic answered
+agent**: run `/agent <name>` inside the topic — or just **ask** the agent to
+connect this topic to another one, and it does it for you — and it stays bound
+to that agent, kept across `/new` and restarts. Names are matched
+case-insensitively, so `/agent engenheiro` finds an agent called `Engenheiro`. So one group can have a "support" topic answered
 by the support agent and an "engineering" topic by the engineer, side by side.
 The agent for a message is the topic's bound agent if it has one, otherwise the
 bot's `agent`, otherwise the global default. A bound topic still follows the

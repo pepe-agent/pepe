@@ -190,8 +190,11 @@ que lo trajeran a la conversación.
 
 En un grupo con **temas** activados, cada tema es su propia conversación, y la
 respuesta vuelve al tema del que vino. Puedes darle a un tema **su propio
-agente**: ejecuta `/agent <nombre>` dentro del tema y queda vinculado a ese
-agente, conservado a través de `/new` y de reinicios. Así un grupo puede tener un
+agente**: ejecuta `/agent <nombre>` dentro del tema — o simplemente **pídele** al
+agente que conecte este tema a otro, y lo hace por ti — y queda vinculado a ese
+agente, conservado a través de `/new` y de reinicios. Los nombres se emparejan sin
+distinguir mayúsculas, así que `/agent engenheiro` encuentra un agente llamado
+`Engenheiro`. Así un grupo puede tener un
 tema de "soporte" atendido por el agente de soporte y uno de "ingeniería" por el
 ingeniero, lado a lado. El agente de un mensaje es el agente vinculado al tema, si
 lo hay; si no, el `agent` del bot; si no, el predeterminado global. Un tema

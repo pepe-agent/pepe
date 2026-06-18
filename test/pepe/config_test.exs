@@ -85,6 +85,18 @@ defmodule Pepe.ConfigTest do
     end
   end
 
+  describe "get_agent name matching" do
+    test "resolves an agent by name case-insensitively, exact match preferred" do
+      Config.put_agent(%Config.Agent{name: "Engenheiro", tools: []})
+
+      # All three casings resolve to the same agent (its name is the qualified handle).
+      assert Config.get_agent("Engenheiro").name == "default/Engenheiro"
+      assert Config.get_agent("engenheiro").name == "default/Engenheiro"
+      assert Config.get_agent("ENGENHEIRO").name == "default/Engenheiro"
+      assert Config.get_agent("nope") == nil
+    end
+  end
+
   describe "file permissions" do
     test "save restricts the config to owner-only and tightens the home directory" do
       Config.save(%{"x" => 1})
