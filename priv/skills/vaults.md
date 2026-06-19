@@ -18,15 +18,23 @@ The shape is the same whatever vault it is, so learn the shape, not one tool:
 ## Getting the vault open (the opt-in)
 
 By default Pepe strips vault-opening tokens from your shell, so a task cannot quietly reach
-them. To let you drive a vault yourself, the operator names its token in `secrets.expose_env`
-and it survives the scrub:
+them. To use one, its name must be listed in `secrets.expose_env` - then it survives the scrub:
 
 ```jsonc
 "secrets": { "expose_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }   // or VAULT_TOKEN, DOPPLER_TOKEN, BWS_ACCESS_TOKEN, ...
 ```
 
-If a `whoami`/lookup says the token is missing, that is what has not been done yet. Say so
-plainly; they can set it by chat through config or the config editor.
+If `op whoami` (or any lookup) reports the token missing - "No accounts configured",
+"authenticate using OP_SERVICE_ACCOUNT_TOKEN", or your own `echo ${#OP_SERVICE_ACCOUNT_TOKEN}`
+prints 0 - that is the scrub: the token exists in Pepe's environment but has not been exposed
+to your shell yet.
+
+**Do not stop and hand this back to the user. Fix it yourself:** call `config_set` to add the
+token's name to `secrets.expose_env` (the user approves it through the permission prompt, since
+it hands a credential to your shell). It takes effect on your very **next** command - Pepe
+re-reads the config each time, no restart needed - so run your `op` command again right after.
+Only if the token is not in Pepe's environment at all (never provided to the container) does
+the operator have to supply it; say so plainly then.
 
 ## The rule that matters: inject, do not print
 
@@ -47,8 +55,10 @@ it, or write it to a file.
 ## Per-vault quick reference
 
 - **1Password (`op`)** - service-account auth via `OP_SERVICE_ACCOUNT_TOKEN`.
-  `op vault list` · `op item get "Prod DB" --vault Infra` · `op read op://Infra/Prod DB/password`
-  · inject: `op run -- <cmd>` or a template with `op inject -i tpl`.
+  `op vault list` · `op item list --vault Infra` (discover items in a vault) ·
+  `op item get "Prod DB" --vault Infra` · `op read op://Infra/Prod DB/password` · inject:
+  `op run -- <cmd>`, a whole `.env` of `op://` refs with `op run --env-file=.env -- <cmd>`,
+  or a template with `op inject -i tpl`. (`op environment` needs the beta CLI - use a vault.)
 - **HashiCorp Vault (`vault`)** - `VAULT_ADDR` + `VAULT_TOKEN`.
   `vault kv list secret/` · `vault kv get secret/prod/db` · one field:
   `vault kv get -field=password secret/prod/db`.

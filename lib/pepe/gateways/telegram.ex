@@ -1358,7 +1358,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp clip(text) do
     one = text |> to_string() |> String.replace(~r/\s+/, " ") |> String.trim()
-    if String.length(one) > 300, do: String.slice(one, 0, 299) <> "...", else: one
+    if String.length(one) > 140, do: String.slice(one, 0, 139) <> "...", else: one
   end
 
   # "perm:<id>:<token>" -> wake the waiting session and tidy the message.
@@ -2285,10 +2285,32 @@ defmodule Pepe.Gateways.Telegram do
 
     lines =
       (Process.get(:tg_act_lines, []) ++ saying_lines(saying) ++ [activity_line(name, raw)])
-      |> Enum.take(-8)
+      |> tail_ledger()
 
     Process.put(:tg_act_lines, lines)
     render_activity(chat_id, Enum.join(lines, "\n"))
+  end
+
+  # The ledger is a live tail, not a transcript. Rather than a fixed line count (eight
+  # 300-char lines is a wall of text on a phone), it keeps only the most recent lines that
+  # fit a character budget: once the note would grow past it, the oldest lines roll off the
+  # top. A hard line ceiling still caps it when every line is short. The newest line always
+  # survives, even alone over budget - it is the one thing the note exists to show.
+  @ledger_budget 560
+  @ledger_lines 6
+
+  defp tail_ledger(lines) do
+    lines
+    |> Enum.take(-@ledger_lines)
+    |> Enum.reverse()
+    |> Enum.reduce_while({[], 0}, fn line, {kept, size} ->
+      size = size + String.length(line) + 1
+
+      if kept != [] and size > @ledger_budget,
+        do: {:halt, {kept, size}},
+        else: {:cont, {[line | kept], size}}
+    end)
+    |> elem(0)
   end
 
   defp saying_lines(nil), do: []

@@ -49,7 +49,10 @@ defmodule Pepe.Tools.ConfigSet do
       {"language", "system-message language: #{Enum.join(@locales, " | ")}", &set_language/1},
       {"timezone", "default IANA timezone for scheduled tasks (e.g. America/Sao_Paulo)", &set_timezone/1},
       {"telegram.require_mention", "true|false - in groups, reply only when @mentioned", &set_tg_flag("require_mention", &1)},
-      {"telegram.enabled", "true|false - pause/resume the default bot without deleting it", &set_tg_flag("enabled", &1)}
+      {"telegram.enabled", "true|false - pause/resume the default bot without deleting it", &set_tg_flag("enabled", &1)},
+      {"secrets.expose_env",
+       "env var NAME(S) (comma/space separated) to keep in your own shell past the scrub - " <>
+         "e.g. OP_SERVICE_ACCOUNT_TOKEN, so you can run a vault CLI yourself. Additive; never a secret value", &set_expose_env/1}
     ]
   end
 
@@ -119,6 +122,28 @@ defmodule Pepe.Tools.ConfigSet do
 
   defp set_tg_flag(flag, _value), do: {:error, "telegram.#{flag} must be true or false"}
 
+  # Widen (never a secret value, just the NAMES) which env vars survive the scrub into the
+  # agent's shell. The permission gate on config_set is the guard: the operator approves each
+  # call, and tool-output redaction still masks the values, so a name added here lets the agent
+  # *use* a token, not print it.
+  defp set_expose_env(value) do
+    names = value |> String.split(~r/[,\s]+/, trim: true) |> Enum.reject(&(&1 == ""))
+
+    cond do
+      names == [] ->
+        {:error, "give one or more env var names, e.g. OP_SERVICE_ACCOUNT_TOKEN"}
+
+      Enum.any?(names, &(not env_name?(&1))) ->
+        {:error, "not a valid env var name (use UPPER_SNAKE, e.g. OP_SERVICE_ACCOUNT_TOKEN)"}
+
+      true ->
+        merged = Config.add_expose_env(names)
+        {:ok, "secrets.expose_env -> #{Enum.join(merged, ", ")} (takes effect on your next command)"}
+    end
+  end
+
+  defp env_name?(name), do: Regex.match?(~r/\A[A-Z_][A-Z0-9_]*\z/, name)
+
   ###
   ### schema rendering (self-discovery)
   ###
@@ -142,5 +167,13 @@ defmodule Pepe.Tools.ConfigSet do
     do: to_string(Config.telegram()["require_mention"] != false)
 
   defp current("telegram.enabled"), do: to_string(Config.telegram()["enabled"] != false)
+
+  defp current("secrets.expose_env") do
+    case Config.expose_env() do
+      [] -> "(none)"
+      names -> Enum.join(names, ", ")
+    end
+  end
+
   defp current(_), do: "?"
 end

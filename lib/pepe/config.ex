@@ -2623,6 +2623,24 @@ defmodule Pepe.Config do
   end
 
   @doc """
+  Add environment-variable names to `secrets.expose_env`, unioning with what is already there,
+  and return the resulting list. This is additive on purpose: it only ever *widens* what the
+  agent's shell may keep, never silently drops a token another running task depends on. Removal
+  stays a deliberate hand-edit of the config.
+  """
+  @spec add_expose_env([String.t()]) :: [String.t()]
+  def add_expose_env(names) when is_list(names) do
+    merged = Enum.uniq(expose_env() ++ Enum.map(names, &to_string/1))
+
+    update(fn config ->
+      secrets = Map.put(config["secrets"] || %{}, "expose_env", merged)
+      Map.put(config, "secrets", secrets)
+    end)
+
+    merged
+  end
+
+  @doc """
   Whether to mask secret-shaped substrings in tool output before it reaches the model or the
   trace (`secrets.redact_output`, on by default). See `Pepe.Secrets.Redact`.
 

@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.12] - 2026-06-19
+
+### Added
+- **The agent can open a vault by itself, conversationally.** `config_set` now accepts `secrets.expose_env`, so when a vault-opening token (e.g. `OP_SERVICE_ACCOUNT_TOKEN`) is present in Pepe's environment but scrubbed from the agent's shell, the agent adds it to the allowlist itself (through the permission gate) and runs the vault CLI on its next command — instead of getting stuck telling the operator to do it. Additive and name-only: it never sets a secret value, and tool-output redaction still masks the values.
+
+### Changed
+- **Telegram verbose progress note stays compact.** The live tool-activity ledger now rolls the oldest lines off once it passes a character budget (rather than keeping a fixed eight lines), and each line is clipped shorter, so a long `bash` command no longer fills the screen.
+
 ## [0.5.11] - 2026-06-18
 
 ### Added

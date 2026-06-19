@@ -78,4 +78,29 @@ defmodule Pepe.Tools.ConfigToolsTest do
     assert {:error, _} =
              ConfigSet.run(%{"setting" => "telegram.require_mention", "value" => "maybe"}, %{})
   end
+
+  test "config_set adds env var names to secrets.expose_env, additively" do
+    assert {:ok, _} =
+             ConfigSet.run(
+               %{"setting" => "secrets.expose_env", "value" => "OP_SERVICE_ACCOUNT_TOKEN"},
+               %{}
+             )
+
+    assert "OP_SERVICE_ACCOUNT_TOKEN" in Config.expose_env()
+
+    # A second call unions rather than replacing - both survive.
+    assert {:ok, _} =
+             ConfigSet.run(%{"setting" => "secrets.expose_env", "value" => "VAULT_TOKEN"}, %{})
+
+    assert "OP_SERVICE_ACCOUNT_TOKEN" in Config.expose_env()
+    assert "VAULT_TOKEN" in Config.expose_env()
+  end
+
+  test "config_set rejects an invalid env var name for secrets.expose_env" do
+    assert {:error, _} =
+             ConfigSet.run(%{"setting" => "secrets.expose_env", "value" => "not a name"}, %{})
+
+    assert {:error, _} =
+             ConfigSet.run(%{"setting" => "secrets.expose_env", "value" => ""}, %{})
+  end
 end
