@@ -117,7 +117,7 @@ An agent granted the read-only `config_get` and `doctor` tools can report on you
 
 The `doctor` tool health-checks the whole setup and flags unset `${ENV}` secrets, agents pointing at missing models, invalid schedules, and unreachable connections. Pass `live: true` to also probe the network.
 
-<div class="note"><strong>Security-sensitive settings are not editable by the general config tool.</strong> The guarded `config_set` tool is fail-closed: it only touches a short allowlist (the default model and agent, language, timezone, and a couple of Telegram flags). Secrets, tool allowlists, bot tokens, the sandbox wrapper, and the dashboard password are deliberately off that list, so `config_set` cannot change them. You set those yourself with the CLI or the dashboard. API tokens are the one thing an agent can mint by chat, but only through the separate, permission-gated `manage_token` tool, never through `config_set`.</div>
+<div class="note"><strong>Security-sensitive settings are not editable by the general config tool.</strong> The guarded `config_set` tool is fail-closed: it only touches a short allowlist (the default model and agent, language, timezone, a couple of Telegram flags, and `secrets.expose_env` — the list of env-var *names* the agent's shell keeps past the scrub, so it can open a vault it holds a token for). Secret *values*, tool allowlists, bot tokens, the sandbox wrapper, and the dashboard password are deliberately off that list, so `config_set` cannot change them. You set those yourself with the CLI or the dashboard. API tokens are the one thing an agent can mint by chat, but only through the separate, permission-gated `manage_token` tool, never through `config_set`.</div>
 
 ## Storage and backup: it is all files, no database
 

@@ -21,6 +21,26 @@ Do not paste the literal password into the command, where it lands in the trace 
 from the environment. If no password is set up at all, ask the operator to provide one; a plain
 env var is a fine answer, a vault is a better one.
 
+## When the connection fails, adjust and retry - don't give up
+
+The first attempt failing is normal, and the fix is almost always one flag. Do not stop and
+report a blocker on these - just retry:
+
+- **`server does not support SSL, but SSL was required`** - the server doesn't do TLS, common
+  for a database on a private/internal network. Retry with **`sslmode=prefer`**
+  (`PGSSLMODE=prefer` for `psql`, or `?sslmode=prefer` in a URL): it tries SSL and falls back to
+  plaintext, so it works either way. Do not ask the operator before retrying - on a private
+  network this is expected. Only raise it if the connection crosses the public internet, where
+  plaintext would be a real exposure.
+- **`could not translate host name` / `connection refused`** - the host is wrong for where you
+  are running. Inside a container, use the database's service/network name, not `localhost`.
+  Check what the credentials actually say and what names resolve.
+- **`password authentication failed`** - wrong credential or you read the wrong field. Re-check
+  the field labels on the vault item / the env var names.
+
+Whatever you learn about a specific database (its host, the `sslmode` it needs, the read user),
+write it to your knowledge files so the next task connects first try instead of rediscovering it.
+
 ## Reading safely
 
 - **Start with the shape.** `\dt` (psql) or `SHOW TABLES` lists tables; `\d table` describes

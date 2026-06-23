@@ -30,7 +30,16 @@ defmodule Pepe.Config.Agent do
             # Privacy/transform hooks this agent runs on the message flow (redaction,
             # ...), by name - see `Pepe.Hooks`. Empty = none (raw, the default).
             hooks: [],
-            max_iterations: 12,
+            # Tool-call rounds a task may take. `nil` (the default) imposes no task budget: an
+            # agent runs until it is done, with `Pepe.Agent.LoopGuard` stopping a genuine spin
+            # and a high backstop ceiling catching a runaway. Set a number to cap it deliberately.
+            # A low default here was what made agents quit multi-step work halfway and reply with
+            # a "what's left unfinished" summary instead of the answer.
+            max_iterations: nil,
+            # How much of this agent's tool activity a chat surface shows while it works
+            # ("reaction" | "ambient" | "verbose" | "off"). nil = inherit the channel's own
+            # setting. Lets one agent be verbose and another quiet on the same bot.
+            tool_progress: nil,
             temperature: nil,
             # Per-agent override of the model connection's own `fallbacks` chain (see
             # Pepe.Config.Model): nil = inherit the connection's chain (the default),
@@ -100,7 +109,8 @@ defmodule Pepe.Config.Agent do
       # Preserve nil (the "itself only" default) vs [] (nobody) - don't coalesce.
       can_manage: map["can_manage"],
       hooks: map["hooks"] || [],
-      max_iterations: map["max_iterations"] || 12,
+      max_iterations: map["max_iterations"],
+      tool_progress: map["tool_progress"],
       temperature: map["temperature"],
       # Preserve nil (inherit the connection's chain) vs [] (explicitly none).
       fallbacks: map["fallbacks"],

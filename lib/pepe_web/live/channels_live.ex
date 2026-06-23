@@ -319,10 +319,10 @@ defmodule PepeWeb.ChannelsLive do
               <div>
                 <label class={lbl()}>{gettext("While the agent works")}</label>
                 <select name="tool_progress" class={fld()}>
-                  <option value="reaction" selected={(@edit_bot["tool_progress"] || "reaction") == "reaction"}>👀 {gettext("React")}</option>
-                  <option value="verbose" selected={@edit_bot["tool_progress"] == "verbose"}>🛠️ {gettext("Detailed")}</option>
-                  <option value="ambient" selected={@edit_bot["tool_progress"] == "ambient"}>💬 {gettext("Ambient")}</option>
-                  <option value="off" selected={@edit_bot["tool_progress"] == "off"}>🚫 {gettext("Nothing")}</option>
+                  <option value="reaction" selected={(@edit_bot["tool_progress"] || "reaction") == "reaction"}>{gettext("React (default)")}</option>
+                  <option value="verbose" selected={@edit_bot["tool_progress"] == "verbose"}>{gettext("Detailed")}</option>
+                  <option value="ambient" selected={@edit_bot["tool_progress"] == "ambient"}>{gettext("Ambient")}</option>
+                  <option value="off" selected={@edit_bot["tool_progress"] == "off"}>{gettext("Nothing")}</option>
                 </select>
                 <div class="mt-2 space-y-1 text-sm text-zinc-400">
                   <p>

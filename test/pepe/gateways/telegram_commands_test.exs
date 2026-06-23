@@ -771,7 +771,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       # flash the answer into the progress note a moment before deleting it. It is held
       # instead, and drawn only by the tool call that follows it. Nothing follows the answer,
       # so the answer is never drawn as progress.
-      refute Enum.any?(said, &(&1 =~ "💭 the disk is fine"))
+      refute Enum.any?(said, &(&1 =~ "• the disk is fine"))
     end
   end
 

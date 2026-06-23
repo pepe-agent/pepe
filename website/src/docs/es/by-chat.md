@@ -13,7 +13,7 @@ Las guías prácticas vienen con Pepe, en `priv/docs/`, y cubren agentes, canale
 
 ## Descubre qué es editable
 
-Llama a `config_set` sin ningún argumento y devuelve su propio esquema: los ajustes que puede editar, sus valores actuales y los valores que acepta. El conjunto editable es una lista blanca que falla cerrada, en concreto `default_model`, `default_agent`, `language`, `timezone` y `telegram.require_mention` / `telegram.enabled`. Cualquier otra cosa se rechaza, con una indicación de la herramienta protegida adecuada para el trabajo: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task` o `manage_token`. Los secretos nunca son editables por chat.
+Llama a `config_set` sin ningún argumento y devuelve su propio esquema: los ajustes que puede editar, sus valores actuales y los valores que acepta. El conjunto editable es una lista blanca que falla cerrada, en concreto `default_model`, `default_agent`, `language`, `timezone`, `telegram.require_mention` / `telegram.enabled` y `secrets.expose_env` (los *nombres* de variables de entorno que el shell del agente puede conservar tras el borrado, para abrir una bóveda de la que tiene un token — solo nombres, nunca un valor secreto). Cualquier otra cosa se rechaza, con una indicación de la herramienta protegida adecuada para el trabajo: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task` o `manage_token`. Los valores secretos nunca son editables por chat.
 
 ## Administrar agentes
 

@@ -222,6 +222,21 @@ defmodule Pepe.Gateways.Telegram do
   def put_thread(id), do: Process.put(@thread_key, id)
   defp thread, do: Process.get(@thread_key)
 
+  # The responding agent's own `tool_progress` preference (nil = inherit the bot's), carried in
+  # the process dictionary so `progress_mode/0` can prefer it over the channel default.
+  @agent_progress_key :tg_agent_progress
+  defp put_agent_progress(mode), do: Process.put(@agent_progress_key, mode)
+  defp agent_progress, do: Process.get(@agent_progress_key)
+
+  defp agent_tool_progress(nil), do: nil
+
+  defp agent_tool_progress(name) do
+    case Config.get_agent(name) do
+      %{tool_progress: mode} -> mode
+      _ -> nil
+    end
+  end
+
   # The chat id of the message being handled, carried alongside the thread so `agent_default/0`
   # can look up a per-topic agent binding (keyed by {bot, chat, thread}).
   defp put_chat(id), do: Process.put(:tg_chat, id)
@@ -1153,16 +1168,27 @@ defmodule Pepe.Gateways.Telegram do
 
   defp parse_command(_), do: :chat
 
-  defp chat_with_agent(chat_id, msg_id, text, opts \\ []) do
+  # Resolve the agent to run and apply the per-topic binding as a side effect. A topic bound to
+  # an agent is authoritative every turn: `ensure`/`chat` only set the agent when a session is
+  # *created*, so a session that predates the binding (or was created under the bot's default)
+  # would keep the wrong agent - move it onto the bound one. The responding agent may also
+  # override the bot's progress display. Returns the bot's default agent (what `chat/4` receives);
+  # the bound one wins on an existing session via `set_agent`.
+  defp bind_and_resolve_agent(chat_id) do
     agent = agent_default()
-    # A topic bound to an agent is authoritative every turn. `ensure`/`chat` only set the agent
-    # when a session is *created*, so a session that predates the binding (or was created under
-    # the bot's default) would keep the wrong agent. Move it onto the bound one. Outside a bound
-    # topic there is no binding, so a session's own agent (its default, or a /agent switch) stands.
-    if bound = topic_agent() do
+    bound = topic_agent()
+
+    if bound do
       ensure_session(chat_id)
       Pepe.Agent.Session.set_agent(session_key(chat_id), bound)
     end
+
+    put_agent_progress(agent_tool_progress(bound || agent))
+    agent
+  end
+
+  defp chat_with_agent(chat_id, msg_id, text, opts \\ []) do
+    agent = bind_and_resolve_agent(chat_id)
 
     typing = keep_typing(chat_id)
     if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, @work_reaction)
@@ -1345,11 +1371,14 @@ defmodule Pepe.Gateways.Telegram do
   defp arg_block(map) when map_size(map) == 0, do: ""
   defp arg_block(map), do: "\n<code>" <> esc(map_preview(map)) <> "</code>"
 
+  # A short hint, not the raw argument. For files, the basename is enough to know what is being
+  # touched - the full path is noise in a progress note (the reasoning line above carries the
+  # "why"). Commands and URLs keep a clipped preview.
   defp map_preview(%{"command" => c}) when is_binary(c), do: clip(c)
-  defp map_preview(%{"path" => p}) when is_binary(p), do: clip(p)
-  defp map_preview(%{"file" => f}) when is_binary(f), do: clip(f)
+  defp map_preview(%{"path" => p}) when is_binary(p), do: base(p)
+  defp map_preview(%{"file" => f}) when is_binary(f), do: base(f)
   defp map_preview(%{"url" => u}) when is_binary(u), do: clip(u)
-  defp map_preview(%{"to" => t}) when is_binary(t), do: clip(t)
+  defp map_preview(%{"to" => t}) when is_binary(t), do: base(t)
 
   defp map_preview(%{"code" => c} = m) when is_binary(c),
     do: "[" <> to_string(m["language"] || "code") <> "] " <> clip(c)
@@ -1360,6 +1389,9 @@ defmodule Pepe.Gateways.Telegram do
     one = text |> to_string() |> String.replace(~r/\s+/, " ") |> String.trim()
     if String.length(one) > 140, do: String.slice(one, 0, 139) <> "...", else: one
   end
+
+  # Just the filename, for a file-touching tool line. The directory is noise in a progress note.
+  defp base(text), do: text |> to_string() |> String.trim() |> Path.basename() |> clip()
 
   # "perm:<id>:<token>" -> wake the waiting session and tidy the message.
   defp deliver_permission("perm:" <> rest, cq) do
@@ -2174,16 +2206,18 @@ defmodule Pepe.Gateways.Telegram do
   defp activity_callback(chat_id) do
     b = bot()
     t = thread()
+    pg = agent_progress()
 
     fn event ->
       put_bot(b)
       put_thread(t)
+      put_agent_progress(pg)
       tg_activity(chat_id, event)
     end
   end
 
-  @tool_running "🛠️"
-  @tool_done "✅"
+  @tool_running "→"
+  @tool_done "✓"
 
   # How much of the agent's tool activity to surface, per bot (`"tool_progress"`):
   #   * "reaction" - (default) NO message at all; just a 👀 reaction on the user's own
@@ -2194,7 +2228,12 @@ defmodule Pepe.Gateways.Telegram do
   #   * "verbose"  - the detailed ledger: each tool call, and the sentence the model said
   #     before reaching for it, so you can see not just what it did but why (power users).
   # The message-based modes use one message, edited in place, deleted when done.
-  defp progress_mode, do: bot()["tool_progress"] || "reaction"
+  defp progress_mode do
+    case agent_progress() do
+      mode when mode in [nil, ""] -> bot()["tool_progress"] || "reaction"
+      mode -> mode
+    end
+  end
 
   defp tg_activity(chat_id, {:tool_call, name, raw}) do
     case progress_mode() do
@@ -2296,8 +2335,8 @@ defmodule Pepe.Gateways.Telegram do
   # fit a character budget: once the note would grow past it, the oldest lines roll off the
   # top. A hard line ceiling still caps it when every line is short. The newest line always
   # survives, even alone over budget - it is the one thing the note exists to show.
-  @ledger_budget 560
-  @ledger_lines 6
+  @ledger_budget 780
+  @ledger_lines 8
 
   defp tail_ledger(lines) do
     lines
@@ -2314,18 +2353,18 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp saying_lines(nil), do: []
-  defp saying_lines(text), do: ["💭 " <> text]
+  defp saying_lines(text), do: ["• " <> text]
 
   # One line, and short. This is a progress note, not the answer: the answer is coming, in
   # full, right after. A paragraph here would make the note taller than the reply it precedes.
-  @reasoning_len 140
+  @reasoning_len 200
 
+  # The model's own narration of what it is about to do - the part that reads like the agent
+  # talking you through its work, not a terminal log. Keep more of it than one clipped line:
+  # collapse whitespace into a single flowing line and clip generously, so a two-sentence
+  # thought survives instead of being cut at the first newline.
   defp clip_reasoning(text) do
-    text =
-      text
-      |> String.split("\n", trim: true)
-      |> List.first("")
-      |> String.trim()
+    text = text |> String.replace(~r/\s+/, " ") |> String.trim()
 
     if String.length(text) > @reasoning_len,
       do: String.slice(text, 0, @reasoning_len) <> "...",

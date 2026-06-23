@@ -169,7 +169,7 @@ defmodule Pepe.LLM.Responses do
 
   defp build_body(%Model{} = model, messages, opts) do
     {instructions, input} = split_system(messages)
-    tools = to_tools(opts[:tools])
+    tools = to_tools(opts[:tools]) ++ native_tools(model)
 
     base = %{
       "model" => model.model,
@@ -269,6 +269,12 @@ defmodule Pepe.LLM.Responses do
   defp text_part(type, content), do: %{"type" => type, "text" => to_string(content)}
 
   # Chat-Completions tool specs (nested under "function") -> flat Responses tools.
+  # The provider's own built-in tools (server-side), added alongside the agent's function tools.
+  # The model runs these itself; the adapter just ignores their SSE events (the catch-all in
+  # `handle_event/4`), so only the final answer they informed comes through.
+  defp native_tools(%Model{web_search: true}), do: [%{"type" => "web_search"}]
+  defp native_tools(_), do: []
+
   defp to_tools(nil), do: []
 
   defp to_tools(specs) when is_list(specs) do
@@ -402,12 +408,27 @@ defmodule Pepe.LLM.Responses do
 
   defp handle_event(type, %{"response" => response}, state, _on_delta)
        when type in ["response.failed", "error"] do
-    %{state | finish: "error", usage: response["usage"] || state.usage}
+    %{state | finish: "error", content: error_text(response) || state.content, usage: response["usage"] || state.usage}
   end
 
-  defp handle_event("error", _event, state, _on_delta), do: %{state | finish: "error"}
+  defp handle_event("error", event, state, _on_delta),
+    do: %{state | finish: "error", content: error_text(event) || state.content}
 
   defp handle_event(_type, _event, state, _on_delta), do: state
+
+  # A failed response carries the provider's reason - `response.error.{code,message}`, or a
+  # top-level `error` event's `message`. Fold it into content so the runtime surfaces *why* the
+  # call failed (in the log and trace) instead of a bare `:provider_error`.
+  defp error_text(%{"error" => e}) when is_map(e), do: error_text(e)
+
+  defp error_text(%{"message" => m} = e) when is_binary(m) do
+    case e["code"] do
+      code when is_binary(code) -> "#{code}: #{m}"
+      _ -> m
+    end
+  end
+
+  defp error_text(_), do: nil
 
   defp append_once(list, key), do: if(key in list, do: list, else: list ++ [key])
 

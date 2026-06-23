@@ -93,6 +93,14 @@ defmodule PepeWeb.DashData do
   def put_or_delete(map, key, nil), do: Map.delete(map, key)
   def put_or_delete(map, key, value), do: Map.put(map, key, value)
 
+  @doc "Positive integer text -> integer; blank or invalid -> nil (\"no limit\")."
+  def parse_iterations(v) do
+    case v |> to_string() |> String.trim() |> Integer.parse() do
+      {n, _} when n > 0 -> n
+      _ -> nil
+    end
+  end
+
   @doc "Comma text -> trimmed list (\"\" -> [])."
   def parse_list(nil), do: []
 

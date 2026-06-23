@@ -200,6 +200,38 @@ defmodule Pepe.LLM.ResponsesTest do
     assert res.content == nil
   end
 
+  defmodule FailedWithReasonPlug do
+    @behaviour Plug
+    import Plug.Conn
+
+    @impl true
+    def init(opts), do: opts
+
+    @impl true
+    def call(conn, _opts) do
+      failed =
+        ~s({"type":"response.failed","response":{"status":"failed","error":{"code":"server_error","message":"the model is overloaded"}}})
+
+      conn |> put_resp_content_type("text/event-stream") |> send_resp(200, "data: " <> failed <> "\n\n")
+    end
+  end
+
+  test "a response.failed carrying an error surfaces the provider's reason (code + message)" do
+    {:ok, _} = Application.ensure_all_started(:bandit)
+    {:ok, server} = Bandit.start_link(plug: FailedWithReasonPlug, scheme: :http, ip: {127, 0, 0, 1}, port: 0)
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+    on_exit(fn -> Process.exit(server, :normal) end)
+
+    model = %Model{name: "codex", base_url: "http://127.0.0.1:#{port}/codex", api: "openai-responses", api_key: "x", model: "gpt-5"}
+
+    {:ok, res} = Responses.stream_chat(model, [%{"role" => "user", "content" => "hi"}], fn _ -> :ok end)
+
+    # Not a mute failure: the runtime folds this content into `{:provider_error, reason}` so the
+    # log and trace say *why* the Codex call failed, instead of an opaque `:provider_error`.
+    assert res.finish_reason == "error"
+    assert res.content == "server_error: the model is overloaded"
+  end
+
   test "opts[:max_tokens] becomes max_output_tokens on the Responses request" do
     {:ok, _} = Application.ensure_all_started(:bandit)
     {:ok, server} = Bandit.start_link(plug: {CaptureBody, self()}, scheme: :http, ip: {127, 0, 0, 1}, port: 0)

@@ -274,14 +274,25 @@ defmodule Pepe.LLM do
         %{state | usage: usage}
 
       # A 200 stream can still carry a top-level error frame (`data: {"error": {...}}`) instead of
-      # choices. Mark the turn failed so it surfaces as an error, not an empty success.
-      {:ok, %{"error" => _}} ->
-        %{state | finish: "error"}
+      # choices. Mark the turn failed so it surfaces as an error, not an empty success, and fold the
+      # provider's reason into content so it says *why* (see `Pepe.Agent.Runtime`).
+      {:ok, %{"error" => _} = chunk} ->
+        %{state | finish: "error", content: error_text(chunk) || state.content}
 
       _ ->
         state
     end
   end
+
+  # The provider's reason from an error frame - `error.{code|type}` + `error.message`.
+  defp error_text(%{"error" => %{"message" => m} = e}) when is_binary(m) do
+    case e["code"] || e["type"] do
+      code when is_binary(code) -> "#{code}: #{m}"
+      _ -> m
+    end
+  end
+
+  defp error_text(_), do: nil
 
   defp apply_content_delta(nil, state, _on_delta), do: state
   defp apply_content_delta("", state, _on_delta), do: state

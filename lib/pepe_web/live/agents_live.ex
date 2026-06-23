@@ -115,7 +115,7 @@ defmodule PepeWeb.AgentsLive do
           </div>
 
           <div :if={@edit_agent} class="max-w-2xl">
-          <.form for={@form} phx-submit="agent_save" class="space-y-4">
+          <.form for={@form} phx-submit="agent_save" class="space-y-6">
             <div class="text-lg font-semibold">{if @edit_agent.new?, do: gettext("+ New agent"), else: gettext("Edit %{name}", name: @edit_agent.name)}</div>
             <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
               {gettext("Please fix the errors below.")}
@@ -265,11 +265,40 @@ defmodule PepeWeb.AgentsLive do
             </.form_section>
 
             <.form_section title={gettext("Limits")}>
+              <div>
+                <label class={lbl()}>{gettext("Max steps")} <span class="text-zinc-600">{gettext("(tool rounds per task)")}</span></label>
+                <input type="number" min="1" name="max_iterations" value={@edit_agent.max_iterations} placeholder={gettext("no limit")} class={fld()} />
+                <p class={hlp()}>
+                  <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("no limit — the agent runs a task until it's done (safest for real work).")}
+                  {gettext("Set a number only to deliberately cap long tasks. A low cap makes the agent quit multi-step work halfway and reply with what's left unfinished.")}
+                </p>
+              </div>
+
+              <div>
+                <label class={lbl()}>{gettext("Progress display")} <span class="text-zinc-600">{gettext("(while this agent works)")}</span></label>
+                <select name="tool_progress" class={fld()}>
+                  <option value="" selected={@edit_agent.tool_progress in [nil, ""]}>{gettext("Use the channel's setting")}</option>
+                  <option value="reaction" selected={@edit_agent.tool_progress == "reaction"}>{gettext("React")}</option>
+                  <option value="verbose" selected={@edit_agent.tool_progress == "verbose"}>{gettext("Detailed")}</option>
+                  <option value="ambient" selected={@edit_agent.tool_progress == "ambient"}>{gettext("Ambient")}</option>
+                  <option value="off" selected={@edit_agent.tool_progress == "off"}>{gettext("Nothing")}</option>
+                </select>
+                <p class={hlp()}>{gettext("Overrides the channel default for this agent, so one agent can be detailed and another quiet on the same bot.")}</p>
+              </div>
+
               <label class="flex items-start gap-2.5 text-sm">
                 <input type="checkbox" name="exempt_message_limit" value="true" checked={@edit_agent[:exempt_message_limit]} class="mt-0.5" />
                 <span>
                   {gettext("Exempt from the project's monthly message limit")}
                   <p class={hlp()}>{gettext("This agent keeps replying even after the project (see Projects) hits its monthly customer-message cap. Doesn't affect the separate spend cap.")}</p>
+                </span>
+              </label>
+
+              <label class="flex items-start gap-2.5 text-sm">
+                <input type="checkbox" name="trust_untrusted_content" value="true" checked={@edit_agent[:trust_untrusted_content]} class="mt-0.5" />
+                <span>
+                  {gettext("Trust untrusted content (act on files & pages without re-asking)")}
+                  <p class={hlp()}>{gettext("Normally, once the agent takes in a file or a fetched page, its auto-approved tools go back to asking, so a hidden instruction in that content can't run unattended. Turn this on for a trusted owner's agent that must act on documents you send it — it reopens that path, so only for an agent you trust for exactly that.")}</p>
                 </span>
               </label>
             </.form_section>
@@ -399,13 +428,16 @@ defmodule PepeWeb.AgentsLive do
         can_message: parse_list(params["can_message"]),
         can_manage: parse_manage(params["can_manage"]),
         hooks: params["hooks"] || [],
+        max_iterations: parse_iterations(params["max_iterations"]),
+        tool_progress: blank(params["tool_progress"]),
         # Chip-list state lives in `edit_agent` (LiveView state), not `params` -
         # read from there so nil (inherit) vs [] (explicit none) survives.
         fallbacks: socket.assigns.edit_agent[:fallbacks],
         triage_model: blank(params["triage_model"]),
         simple_model: blank(params["simple_model"]),
         utility_model: blank(params["utility_model"]),
-        exempt_message_limit: params["exempt_message_limit"] == "true"
+        exempt_message_limit: params["exempt_message_limit"] == "true",
+        trust_untrusted_content: params["trust_untrusted_content"] == "true"
     }
 
     case Config.put_agent(agent) do
@@ -442,10 +474,13 @@ defmodule PepeWeb.AgentsLive do
         can_message: parse_list(params["can_message"]),
         can_manage: parse_manage(params["can_manage"]),
         hooks: params["hooks"] || [],
+        max_iterations: parse_iterations(params["max_iterations"]),
+        tool_progress: blank(params["tool_progress"]),
         triage_model: blank(params["triage_model"]),
         simple_model: blank(params["simple_model"]),
         utility_model: blank(params["utility_model"]),
-        exempt_message_limit: params["exempt_message_limit"] == "true"
+        exempt_message_limit: params["exempt_message_limit"] == "true",
+        trust_untrusted_content: params["trust_untrusted_content"] == "true"
     }
 
     {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}

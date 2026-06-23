@@ -342,7 +342,13 @@ defmodule Pepe.LLM.Messages do
   defp output_tokens(%{"output_tokens" => n}) when is_integer(n), do: n
   defp output_tokens(_), do: nil
 
-  defp error_text(%{"error" => %{"message" => m}}) when is_binary(m), do: m
+  defp error_text(%{"error" => %{"message" => m} = e}) when is_binary(m) do
+    case e["type"] do
+      t when is_binary(t) -> "#{t}: #{m}"
+      _ -> m
+    end
+  end
+
   defp error_text(_), do: ""
 
   defp append_once(list, key), do: if(key in list, do: list, else: list ++ [key])

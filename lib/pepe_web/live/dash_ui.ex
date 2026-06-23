@@ -75,8 +75,10 @@ defmodule PepeWeb.DashUI do
   """
   def form_section(assigns) do
     ~H"""
-    <div class="space-y-4 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
-      <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
+    <div class="space-y-6 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-6">
+      <div class="border-b border-zinc-800 pb-3 text-sm font-semibold uppercase tracking-wide text-zinc-200">
+        {@title}
+      </div>
       {render_slot(@inner_block)}
     </div>
     """

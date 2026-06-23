@@ -5,6 +5,23 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-06-23
+
+### Added
+- **Agents are competent by default — a base behavioural contract.** Every agent now inherits a short, imperative contract on top of its persona: finish the job (never stop at a plan or a "what's left" checklist when the next step is yours; never fabricate a result when a path is blocked — report it), follow the conversation (resolve "it"/"the bottleneck" from recent turns instead of re-asking), answer without narrating the process, work in parallel (batch independent lookups into one turn), and trust tools over memory. This closes the gap where an operator had to train basic competence into each persona by hand.
+- **Native web search for Responses/Codex models.** A model can enable the provider's own server-side web search (`web_search: true`) — the model searches the web itself, no separate search key or cost. Off by default; ignored by non-Responses adapters.
+- **Per-agent progress display.** An agent can set its own `tool_progress` (react / detailed / ambient / off) that overrides the channel default, so one agent can be verbose and another quiet on the same bot. Editable on the Agents page.
+- **`max_iterations` and the trust-untrusted-content switch are now on the Agents page.** Both were invisible in the dashboard; you can now see and set them where you'd look for them.
+
+### Changed
+- **No task budget by default.** An agent's `max_iterations` now defaults to *no limit* (was 12): it runs a task until it's done, with the loop guard stopping a genuine spin and a high backstop catching a runaway. A low default was what made agents quit multi-step work halfway and reply with a "what's left unfinished" summary. Set a number to cap deliberately.
+- **Dashboard config forms breathe.** More spacing between and within sections, a clearer section heading, and fewer decorative emoji, so settings are easier to scan.
+- **Telegram verbose progress reads like the agent talking, not a terminal log.** The model's own narration (what it's about to do and why) now carries more of the sentence instead of being cut at the first line, and a file-touching tool line shows just the basename (`read_file · knowledge_base.md`) rather than the full path. The live ledger got a little more room for the narration, and dropped its per-line emoji for plain markers (`•` for the narration, `→`/`✓` for a tool running/done) so it reads cleaner.
+- **Skills: connect to a database without learning by failing.** The `sql-databases` skill now covers the connection gotchas — the `sslmode=prefer` retry when a server doesn't do TLS, a wrong host, a bad credential — so the agent adjusts and retries instead of stopping at the first error. And `skill-creator` now names new skills in English (the name is an identifier) even in a non-English conversation.
+
+### Fixed
+- **A failed model call now says *why*, instead of a mute error.** When a provider signals failure mid-stream (an error frame, a `response.failed`, an Anthropic `error` event), all three adapters (OpenAI Chat Completions, Codex/Responses, Anthropic/Messages) now carry the provider's own reason — `code: message` — into the log and trace, and the runtime surfaces it as `{:provider_error, reason}` rather than an opaque `:provider_error`. Previously the reason was discarded, so a trace of a first-call failure showed nothing.
+
 ## [0.5.12] - 2026-06-19
 
 ### Added

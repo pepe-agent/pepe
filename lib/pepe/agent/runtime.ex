@@ -36,6 +36,10 @@ defmodule Pepe.Agent.Runtime do
   alias Pepe.Tools
 
   @stopped_message "(stopped: max iterations reached)"
+  # When an agent sets no `max_iterations`, it runs until done. This is only a runaway backstop
+  # (LoopGuard stops a genuine spin long before), so keep it well above any real multi-step task.
+  @max_iterations_backstop 250
+
   @out_of_turns_nudge "You're out of turns for this task. Do not call any more tools - " <>
                         "reply now with your best summary of what you found or accomplished " <>
                         "so far, and what (if anything) is left unfinished."
@@ -130,7 +134,7 @@ defmodule Pepe.Agent.Runtime do
       agent_chain: opts[:agent_chain]
     }
 
-    loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations)
+    loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations || @max_iterations_backstop)
   end
 
   @doc """
@@ -204,9 +208,10 @@ defmodule Pepe.Agent.Runtime do
       # successful reply: an empty one (a provider outage read as the agent calmly saying nothing),
       # or worse, one carrying the provider's error text as if it were the agent's answer (the
       # Anthropic adapter folds an SSE `error` event's message into `content`).
-      {:ok, %{finish_reason: "error"}} ->
-        emit(opts, {:error, :provider_error})
-        {:error, :provider_error}
+      {:ok, %{finish_reason: "error"} = result} ->
+        reason = {:provider_error, provider_error_detail(result)}
+        emit(opts, {:error, reason})
+        {:error, reason}
 
       {:ok, %{content: content}} ->
         content = content || ""
@@ -219,6 +224,12 @@ defmodule Pepe.Agent.Runtime do
         {:error, reason}
     end
   end
+
+  # A provider-signalled failure carries its own reason: the streaming adapters fold the
+  # provider's error text into `content` (see Pepe.LLM.Responses / Messages). Surface it, so the
+  # log and trace say *why* the model call failed instead of an opaque `:provider_error`.
+  defp provider_error_detail(%{content: c}) when is_binary(c) and c != "", do: c
+  defp provider_error_detail(_), do: "provider signalled an error with no message"
 
   # Pull every pending `{:steer, text}` off the run task's mailbox (non-blocking) and
   # append each as a user message. Emits a lifecycle event so a live surface can show

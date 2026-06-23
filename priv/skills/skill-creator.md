@@ -50,6 +50,10 @@ you don't have*, that's a **tool**, not a skill - write a plugin (see the
 1. **Check what exists.** List your skills; if a near-match exists, edit it instead
    of adding a duplicate. Read related ones to match style and avoid overlap.
 2. **Pick a name.** `kebab-case`, descriptive, matching the trigger (`triage-inbox`).
+   Name it in **English** even when the conversation is in another language - the name is an
+   identifier, like a tool or a filename, and stays consistent with the built-in skills
+   (`test-1password-cli`, not `testar-1password-cli`). The skill's *content* can speak the
+   user's language and domain; the name should not.
 3. **Draft** following the anatomy above. Confirm line 1 is a sharp "Use when ...".
 4. **Write it:** `write_file` to `skills/<name>.md`.
 5. **Validate** (see checklist). Then it shows up in your skills list immediately -

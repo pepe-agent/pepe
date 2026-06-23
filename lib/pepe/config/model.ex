@@ -26,6 +26,10 @@ defmodule Pepe.Config.Model do
             # When true, the runtime refuses to send to this provider unless the agent
             # runs a redaction hook - a hard guarantee that raw PII never reaches it.
             require_redaction: nil,
+            # Enable the provider's own native web search (Responses/Codex models only): the
+            # model searches the web itself, server-side, no separate search key or cost. Off by
+            # default. Ignored by non-Responses adapters.
+            web_search: false,
             headers: %{},
             # Ordered failover chain: names of other model connections to try when
             # this one errors transiently (rate limit, 5xx, network).
@@ -71,6 +75,7 @@ defmodule Pepe.Config.Model do
       input_price: map["input_price"],
       output_price: map["output_price"],
       require_redaction: map["require_redaction"],
+      web_search: map["web_search"] == true,
       headers: map["headers"] || %{},
       fallbacks: map["fallbacks"] || [],
       oauth: map["oauth"],

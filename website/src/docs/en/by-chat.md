@@ -13,7 +13,7 @@ The how-to guides ship with Pepe, under `priv/docs/`, and cover agents, channels
 
 ## It discovers what is editable
 
-Call `config_set` with no arguments and it returns its own schema: the settings it may edit, their current values, and the values they accept. The editable set is a fail-closed allowlist, namely `default_model`, `default_agent`, `language`, `timezone`, and `telegram.require_mention` / `telegram.enabled`. Anything else is refused, with a pointer to the right guarded tool for the job: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task`, or `manage_token`. Secrets are never editable from chat.
+Call `config_set` with no arguments and it returns its own schema: the settings it may edit, their current values, and the values they accept. The editable set is a fail-closed allowlist, namely `default_model`, `default_agent`, `language`, `timezone`, `telegram.require_mention` / `telegram.enabled`, and `secrets.expose_env` (the env-var *names* the agent's shell may keep past the scrub, to open a vault it holds a token for — names only, never a secret value). Anything else is refused, with a pointer to the right guarded tool for the job: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task`, or `manage_token`. Secret values are never editable from chat.
 
 ## Administering agents
 
