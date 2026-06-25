@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-06-25
+
+### Changed
+- **Agents settle facts with tools instead of guessing them.** The base behavioural contract now names, concretely, what to never answer from memory: arithmetic and checksums, the current date/time, the state of the machine (OS, files, processes, ports, git), a file's contents or size, an installed version, anything current in the world — compute or look these up. It also draws the line that saved memory describes the *user*, not the system the agent is running on, so the agent reads the live system for system questions.
+- **Agents verify runnable work before calling it done.** The contract now tells an agent to prove code it wrote or changed — compile, run, or exercise it with the smallest real check — before reporting it finished, closing the "here's a stub, looks right" gap.
+- **Sharper tool descriptions.** `bash`, `web_search`, `fetch_url`, `write_file`, and `edit_file` now tell the model *when* to reach for them (e.g. `bash` for system state/math/inspection; `web_search` to rephrase-and-retry rather than fall back on memory; `edit_file` over rewriting a whole file), so tool use is more decisive and better targeted.
+- **Learned memory is stored as facts, not self-orders.** The background learning review now records user preferences as declarative facts ("prefers terse answers") rather than imperatives ("always answer tersely"), which were being re-read next session as standing instructions that could override the user's actual request.
+
+### Fixed
+- **The agent can finally save what it learns.** The background learning review is given file tools to update its own memory and skills, but its `write_file`/`edit_file` calls were being denied — there is no human to authorize on that unattended surface, and the tools weren't pre-approved — so the review could read but never write. It reviewed, found improvements, and saved nothing, session after session. Its own-workspace writes are now pre-approved (writes to `shared/` or absolute paths stay gated), so the agent actually gets better over time.
+
 ## [0.5.13] - 2026-06-23
 
 ### Added

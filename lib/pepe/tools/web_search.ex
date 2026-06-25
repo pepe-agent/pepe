@@ -13,13 +13,17 @@ defmodule Pepe.Tools.WebSearch do
 
   @impl true
   def spec do
-    function("web_search", "Search the web for current information about a query.", %{
-      "type" => "object",
-      "properties" => %{
-        "query" => %{"type" => "string", "description" => "The search query."}
-      },
-      "required" => ["query"]
-    })
+    function(
+      "web_search",
+      "Search the web for current, real-world information: news, prices, versions, facts that change, anything past what you already know. If the first query comes back thin, rephrase and search again before giving up - don't fall back on memory.",
+      %{
+        "type" => "object",
+        "properties" => %{
+          "query" => %{"type" => "string", "description" => "The search query."}
+        },
+        "required" => ["query"]
+      }
+    )
   end
 
   # Waits on a network.

@@ -11,7 +11,7 @@ defmodule Pepe.Tools.Bash do
   def spec do
     function(
       "bash",
-      "Execute a shell command on the host and return its output (stdout+stderr).",
+      "Run a shell command on the host and return its combined output (stdout+stderr). Reach for this to inspect or change the real system, and to settle anything exactly instead of guessing it: the current date/time, files and their contents, processes and ports, git state, arithmetic, checksums. Chain steps with `&&` and pipes to get more done in one call.",
       %{
         "type" => "object",
         "properties" => %{

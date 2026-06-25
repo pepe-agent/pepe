@@ -35,9 +35,14 @@ defmodule Pepe.Agent.Reflect do
   1) MEMORY - about the user. Did they reveal preferences, persona, personal facts,
      or how they want you to behave/work? If so, record it: append to `USER.md`
      (who they are / how they want you to operate), `MEMORY.md` (durable facts and
-     decisions), or `people.md` (someone they mentioned). Keep these files LEAN - if
-     one is getting long, consolidate or drop stale lines instead of piling on. If
-     there's nothing genuinely new, leave memory alone.
+     decisions), or `people.md` (someone they mentioned). Write each as a declarative
+     FACT about the user, never as an order to yourself: "prefers terse answers", not
+     "always answer tersely" - an imperative gets re-read next session as a standing
+     instruction and can quietly override what the user actually asks for then. Favour
+     what will spare the user from correcting or reminding you again. Keep these files
+     LEAN - if one is getting long, consolidate or drop stale lines instead of piling
+     on. Save durable preferences and facts, not one-off task status. If there's
+     nothing genuinely new, leave memory alone.
 
   2) SKILLS - about technique. Did a reusable technique, fix, workaround, or a
      correction to your style/workflow/format emerge? Capture it. PREFER updating an
@@ -57,10 +62,20 @@ defmodule Pepe.Agent.Reflect do
   """
   @spec review(Pepe.Config.Agent.t(), [map()]) :: {:ok, String.t(), [map()]} | {:error, term()}
   def review(agent, messages) do
-    reviewer = %{agent | tools: @review_tools, max_iterations: 8}
+    reviewer = review_agent(agent)
     transcript = messages ++ [Message.user(@review_prompt)]
-    # No `:authorize` -> the review's restricted, file-only tools run without prompting.
+    # No `:authorize` -> nobody to prompt on this background surface. The review's whole job is to
+    # write to its own memory/skills, so `review_agent/1` pre-approves those file writes; without
+    # it they hit the gate with no human to ask and are denied, and the review could read but never
+    # save what it learned.
     Runtime.run(reviewer, transcript, [])
+  end
+
+  # The reviewer: file/skill tools only, and its own-workspace file writes pre-approved. The bare
+  # `write_file`/`edit_file` grants cover a no-risk write (its own workspace); a write to `shared/`
+  # or an absolute path still carries a risk hint the grant does not cover, so it stays gated.
+  defp review_agent(agent) do
+    %{agent | tools: @review_tools, auto_approve: ~w(write_file edit_file), max_iterations: 8}
   end
 
   @doc "Fire the review in the background - never blocks the caller."
@@ -96,8 +111,7 @@ defmodule Pepe.Agent.Reflect do
   """
   @spec consolidate(Pepe.Config.Agent.t()) :: {:ok, String.t(), [map()]} | {:error, term()}
   def consolidate(agent) do
-    reviewer = %{agent | tools: @review_tools, max_iterations: 8}
-    Runtime.converse(reviewer, @consolidate_prompt, review: Config.review_writes?())
+    Runtime.converse(review_agent(agent), @consolidate_prompt, review: Config.review_writes?())
   end
 
   ###

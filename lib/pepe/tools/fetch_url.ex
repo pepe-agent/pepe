@@ -9,13 +9,17 @@ defmodule Pepe.Tools.FetchUrl do
 
   @impl true
   def spec do
-    function("fetch_url", "Perform an HTTP GET and return the (text) response body.", %{
-      "type" => "object",
-      "properties" => %{
-        "url" => %{"type" => "string", "description" => "The URL to fetch."}
-      },
-      "required" => ["url"]
-    })
+    function(
+      "fetch_url",
+      "Fetch a URL over HTTP(S) with a GET and return its text body. Use it to read a page, an API response, or a raw file when you already have the address; to discover an address, use web_search first.",
+      %{
+        "type" => "object",
+        "properties" => %{
+          "url" => %{"type" => "string", "description" => "The URL to fetch."}
+        },
+        "required" => ["url"]
+      }
+    )
   end
 
   # Waits on a network, which is exactly what makes running these together worth it.

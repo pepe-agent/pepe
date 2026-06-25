@@ -11,7 +11,7 @@ defmodule Pepe.Tools.EditFile do
   def spec do
     function(
       "edit_file",
-      "Replace an exact substring in a file with new text. The old string must appear exactly once.",
+      "Replace an exact substring in a file with new text. `old_string` must match exactly, whitespace included, and appear exactly once - include enough surrounding context to make it unique. Prefer this over rewriting a whole file with write_file for a small, targeted change.",
       %{
         "type" => "object",
         "properties" => %{

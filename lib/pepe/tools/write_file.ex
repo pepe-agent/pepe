@@ -9,17 +9,21 @@ defmodule Pepe.Tools.WriteFile do
 
   @impl true
   def spec do
-    function("write_file", "Create or overwrite a file with the given contents.", %{
-      "type" => "object",
-      "properties" => %{
-        "path" => %{
-          "type" => "string",
-          "description" => "File path (relative = your workspace; shared/... = shared space; or absolute)."
+    function(
+      "write_file",
+      "Create a new file, or overwrite an existing one, with the full contents given. For a small change to a file that already exists, prefer edit_file so you don't have to reproduce the whole thing.",
+      %{
+        "type" => "object",
+        "properties" => %{
+          "path" => %{
+            "type" => "string",
+            "description" => "File path (relative = your workspace; shared/... = shared space; or absolute)."
+          },
+          "content" => %{"type" => "string", "description" => "The full file contents to write."}
         },
-        "content" => %{"type" => "string", "description" => "The full file contents to write."}
-      },
-      "required" => ["path", "content"]
-    })
+        "required" => ["path", "content"]
+      }
+    )
   end
 
   @impl true
