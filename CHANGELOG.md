@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-06-27
+
+### Fixed
+- **A short follow-up no longer gets drowned by a previous turn's tool output.** When a turn read a large file or ran a noisy command, that full output stayed whole in the conversation history and dominated the next turn — so after "how many companies? → 6", a bare "which are they?" bound to the biggest recent blob (a schema doc, the connection details) instead of the companies. Large tool results are now elided (head + tail) in the *retained* history: the turn that ran the tool still saw the full output, but future turns re-read a compact version, keeping the conversation high signal-to-noise. The agent re-runs or re-reads if it needs the omitted part.
+
 ## [0.5.14] - 2026-06-25
 
 ### Changed

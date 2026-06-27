@@ -291,6 +291,38 @@ defmodule Pepe.Agent.Session do
     end
   end
 
+  # Cap tool RESULTS before they enter the *retained* history. The turn that ran a tool already
+  # saw its full output and answered from it; but keeping a 20KB file read or a noisy command whole
+  # in history means a later short follow-up ("which are they?") gets drowned by stale tool bulk,
+  # and the model binds the ambiguous question to the biggest recent blob (the schema doc, the
+  # credentials) instead of the one-line answer. So a retained tool result keeps a head + tail and
+  # elides the middle; if a later turn needs the rest, the agent re-runs or re-reads. This only
+  # shapes what *future* turns re-read - the turn that produced the output was untouched.
+  @retained_tool_head 4_000
+  @retained_tool_tail 1_000
+  @retained_tool_cap @retained_tool_head + @retained_tool_tail + 500
+
+  @doc false
+  def cap_retained_tool_results(messages) do
+    Enum.map(messages, fn
+      %{"role" => "tool", "content" => content} = msg
+      when is_binary(content) and byte_size(content) > @retained_tool_cap ->
+        Map.put(msg, "content", elide_middle(content))
+
+      msg ->
+        msg
+    end)
+  end
+
+  defp elide_middle(content) do
+    head = String.slice(content, 0, @retained_tool_head)
+    tail = String.slice(content, -@retained_tool_tail, @retained_tool_tail)
+
+    head <>
+      "\n\n[... #{byte_size(content)} bytes; middle elided from history to keep the conversation " <>
+      "readable. Re-run or re-read the source if you need the omitted part.]\n\n" <> tail
+  end
+
   # One run at a time per session. While a run is in flight, a new message is
   # rejected with `:busy` (the caller can `/stop` it) rather than interleaving.
   @impl true
@@ -616,7 +648,7 @@ defmodule Pepe.Agent.Session do
           {messages, pii_map} =
             if state.reset_pending,
               do: {init_messages(agent_name), []},
-              else: {all_messages, state.pii_map ++ entries}
+              else: {cap_retained_tool_results(all_messages), state.pii_map ++ entries}
 
           state =
             %{
