@@ -340,6 +340,8 @@ defmodule PepeWeb.AgentsLive do
       triage_model: nil,
       simple_model: nil,
       utility_model: nil,
+      max_iterations: nil,
+      tool_progress: nil,
       exempt_message_limit: false
     }
 

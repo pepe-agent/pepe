@@ -291,6 +291,27 @@ defmodule Pepe.Agent.Session do
     end
   end
 
+  # Two agent references identify the same agent when they resolve to the same stored id. Compared
+  # by id, not raw string: the canonical handle written after a turn ("default/eng") must still match
+  # the raw string a binding stored ("eng"), and a rename can't split them (ids are rename-stable).
+  defp same_agent?(a, b) do
+    if a == b do
+      true
+    else
+      case {resolved_agent_id(a), resolved_agent_id(b)} do
+        {id, id} when is_binary(id) -> true
+        _ -> false
+      end
+    end
+  end
+
+  defp resolved_agent_id(ref) do
+    case Config.get_agent(ref) do
+      %{id: id} -> id
+      _ -> nil
+    end
+  end
+
   # Cap tool RESULTS before they enter the *retained* history. The turn that ran a tool already
   # saw its full output and answered from it; but keeping a 20KB file read or a noisy command whole
   # in history means a later short follow-up ("which are they?") gets drowned by stale tool bulk,
@@ -520,8 +541,20 @@ defmodule Pepe.Agent.Session do
     {:reply, state.messages, state}
   end
 
+  # Re-asserting the agent the session already runs KEEPS the conversation; only a genuine switch
+  # to a different agent starts fresh. A per-topic binding re-asserts its agent on every turn to
+  # stay authoritative - without this, the history was wiped each message, so a follow-up ("which
+  # are they?") arrived with no context and the model answered against the system prompt.
+  #
+  # The two names must be compared by *resolved identity*, not raw string: after a turn,
+  # `agent_name` is the canonical handle ("default/eng"), while a binding stores the raw string the
+  # user typed ("eng" / "Eng"). A bare-string compare would miss the match and wipe every turn.
   def handle_call({:set_agent, agent_name}, _from, state) do
-    {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name)})}
+    if same_agent?(agent_name, state.agent_name) do
+      {:reply, :ok, state}
+    else
+      {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name)})}
+    end
   end
 
   # Not `persist/1`-wrapped: SessionPersistence only saves agent_name/messages, and

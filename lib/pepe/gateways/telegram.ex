@@ -222,6 +222,13 @@ defmodule Pepe.Gateways.Telegram do
   def put_thread(id), do: Process.put(@thread_key, id)
   defp thread, do: Process.get(@thread_key)
 
+  # Telegram sets `message_thread_id` for BOTH forum topics and ordinary reply-chains in a
+  # supergroup; only a real forum topic carries `is_topic_message: true`. We key a session per
+  # topic (the `#t<id>` suffix), so honour the id only for genuine topics - otherwise a plain
+  # reply-to-the-bot in a non-forum group would fork a fresh session and lose the conversation.
+  defp topic_thread_id(%{"is_topic_message" => true, "message_thread_id" => id}), do: id
+  defp topic_thread_id(_message), do: nil
+
   # The responding agent's own `tool_progress` preference (nil = inherit the bot's), carried in
   # the process dictionary so `progress_mode/0` can prefer it over the channel default.
   @agent_progress_key :tg_agent_progress
@@ -741,7 +748,7 @@ defmodule Pepe.Gateways.Telegram do
     chat = message["chat"] || %{}
     chat_id = chat["id"]
     user_id = get_in(message, ["from", "id"])
-    thread_id = message["message_thread_id"]
+    thread_id = topic_thread_id(message)
     said = with_reply_context(message, text)
 
     if active?() and allowed?(chat_id, user_id) and
@@ -871,7 +878,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp ingest_single(message, file_id, kind, file_name) do
     b = bot()
-    thread_id = message["message_thread_id"]
+    thread_id = topic_thread_id(message)
     learn = learn_allowed?(get_in(message, ["from", "id"]))
     inbound = inbound_of(message, file_name)
 
@@ -904,7 +911,8 @@ defmodule Pepe.Gateways.Telegram do
   # context (the caption is only on the first part); later parts just append their file.
   def buffer_album(message, file_id, kind, file_name, group_id) do
     chat = message["chat"] || %{}
-    key = {chat["id"], message["message_thread_id"], group_id}
+    thread_id = topic_thread_id(message)
+    key = {chat["id"], thread_id, group_id}
     item = %{file_id: file_id, kind: kind, file_name: file_name}
 
     case :ets.lookup(@albums, key) do
@@ -917,7 +925,7 @@ defmodule Pepe.Gateways.Telegram do
           caption: message["caption"] || "",
           chat_id: chat["id"],
           chat_type: chat["type"],
-          thread: message["message_thread_id"],
+          thread: thread_id,
           bot: bot(),
           learn: learn_allowed?(get_in(message, ["from", "id"]))
         }

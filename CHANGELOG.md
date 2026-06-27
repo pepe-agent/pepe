@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-06-27
+
+### Fixed
+- **A bound Telegram topic no longer forgets the conversation every message.** A per-topic agent binding re-asserts its agent on every turn to stay authoritative, but that call reset the session's history each time — so in a bound topic a follow-up ("which are they?" after "how many companies? → 6") arrived with no prior turn, and the model answered against the system prompt (its tools, the vault, connection details) instead of the actual subject. Re-asserting the agent a session already runs is now a no-op that keeps the conversation; only a genuine switch to a different agent starts fresh. The two agent names are compared by resolved identity, not raw string, so the canonical handle a finished turn leaves behind (`default/eng`) still matches the raw name the binding re-asserts (`eng`). (DMs and unbound chats were never affected — they don't re-assert an agent.)
+- **A reply to the bot in an ordinary (non-forum) group no longer forks a fresh session.** Telegram stamps `message_thread_id` on reply-chains in any supergroup, not just forum topics; keying a session on it unconditionally meant a plain reply started a new, empty conversation. The thread id is now honoured only for genuine forum topics (`is_topic_message`), so replies in a normal group stay in the one conversation.
+- **The "+ New agent" button on the Agents page no longer crashes the page.** The blank form was missing the `max_iterations` and `tool_progress` keys the template reads, so opening it raised a `KeyError`. Both are now present (unset), and a render test guards the button.
+
+### Security
+- **The unattended learning review can no longer write outside its own workspace.** Its pre-approved `write_file`/`edit_file` grants (added in 0.5.15) were bare tool names, which cover *every* risk — including a write to `shared/`, `skills/`, or an absolute path. Since that review runs with no human to authorize and reads a possibly prompt-injected transcript, that was a path to persistent skill injection. The grants are now scoped to the in-workspace write risk; anything reaching outside stays gated.
+
 ## [0.5.15] - 2026-06-27
 
 ### Fixed

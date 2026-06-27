@@ -102,6 +102,9 @@ defmodule Pepe.Gateways.TelegramTopicTest do
   end
 
   defp queue_text(chat, text, opts) do
+    # A genuine forum-topic message carries BOTH `message_thread_id` and `is_topic_message: true`.
+    # An ordinary reply-chain in a non-forum supergroup carries only the thread id - set
+    # `topic: false` to model that case.
     update = %{
       "update_id" => System.unique_integer([:positive]),
       "message" =>
@@ -112,6 +115,7 @@ defmodule Pepe.Gateways.TelegramTopicTest do
           "text" => text
         }
         |> then(fn m -> if opts[:thread], do: Map.put(m, "message_thread_id", opts[:thread]), else: m end)
+        |> then(fn m -> if opts[:thread] && opts[:topic] != false, do: Map.put(m, "is_topic_message", true), else: m end)
     }
 
     Elixir.Agent.update(:tg_topic_updates, &(&1 ++ [update]))
@@ -128,6 +132,17 @@ defmodule Pepe.Gateways.TelegramTopicTest do
   test "a reply in General (no topic) carries no message_thread_id", %{chat: chat} do
     start_bot!()
     queue_text(chat, "oi", thread: nil)
+
+    assert_receive {:sent, "here you go", thread}, 5_000
+    assert thread == nil
+  end
+
+  test "a reply-chain in a non-forum supergroup is NOT treated as a topic", %{chat: chat} do
+    # Telegram stamps `message_thread_id` on reply-chains in any supergroup, not just forum topics.
+    # Only `is_topic_message: true` marks a real topic; without it the send must carry no thread, so
+    # a plain reply-to-the-bot doesn't fork a fresh per-topic session.
+    start_bot!()
+    queue_text(chat, "oi", thread: 99, topic: false)
 
     assert_receive {:sent, "here you go", thread}, 5_000
     assert thread == nil

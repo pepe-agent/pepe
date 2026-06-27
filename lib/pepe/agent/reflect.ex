@@ -71,11 +71,13 @@ defmodule Pepe.Agent.Reflect do
     Runtime.run(reviewer, transcript, [])
   end
 
-  # The reviewer: file/skill tools only, and its own-workspace file writes pre-approved. The bare
-  # `write_file`/`edit_file` grants cover a no-risk write (its own workspace); a write to `shared/`
-  # or an absolute path still carries a risk hint the grant does not cover, so it stays gated.
+  # The reviewer: file/skill tools only, and its own-workspace file writes pre-approved. The grant
+  # is scoped to the `:writes_file` risk on purpose - a bare `write_file` is a blank cheque
+  # (`{tool, :any}`) that also covers `:writes_outside`, so a write to `shared/`, `skills/`, or an
+  # absolute path would go through unattended. This review runs with no human watching (a
+  # prompt-injected transcript could aim it at persistent skill injection), so those stay gated.
   defp review_agent(agent) do
-    %{agent | tools: @review_tools, auto_approve: ~w(write_file edit_file), max_iterations: 8}
+    %{agent | tools: @review_tools, auto_approve: ~w(write_file:writes_file edit_file:writes_file), max_iterations: 8}
   end
 
   @doc "Fire the review in the background - never blocks the caller."
