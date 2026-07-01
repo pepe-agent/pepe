@@ -153,12 +153,15 @@ defmodule Pepe.Agent.Runtime do
   defp loop(agent, chain, messages, _specs, ctx, opts, 0) do
     nudge = Message.user(@out_of_turns_nudge)
     chat_opts = [temperature: agent.temperature]
+    to_send = Compaction.compact(messages, hd(chain))
 
-    case chat_with_failover(chain, messages ++ [nudge], chat_opts, ctx, opts) do
+    case chat_with_failover(chain, to_send ++ [nudge], chat_opts, ctx, opts) do
       {:ok, %{content: content}} when is_binary(content) and content != "" ->
         emit(opts, {:assistant, content})
         emit(opts, {:done, content})
-        {:ok, content, messages ++ [nudge, Message.assistant(content)]}
+        # The nudge is an internal instruction, never user text - it must not enter the persisted
+        # history, or a later turn would re-read "you're out of turns" as real conversation.
+        {:ok, content, messages ++ [Message.assistant(content)]}
 
       {:error, reason} ->
         emit(opts, {:error, reason})
@@ -166,7 +169,8 @@ defmodule Pepe.Agent.Runtime do
 
       _ ->
         emit(opts, {:done, @stopped_message})
-        {:ok, @stopped_message, messages}
+        # Record the notice the user was just shown, so the persisted history matches what they saw.
+        {:ok, @stopped_message, messages ++ [Message.assistant(@stopped_message)]}
     end
   end
 
@@ -178,11 +182,14 @@ defmodule Pepe.Agent.Runtime do
     # to them right away instead of only after the turn finishes.
     messages = drain_steer(messages, opts)
 
-    # Keep the running history under the model's context window so long conversations
-    # don't fail once they outgrow it (a no-op until it's actually large).
-    messages = Pepe.Agent.Compaction.compact(messages, hd(chain))
+    # Split what the model SEES from what we RETURN. `to_send` is compacted to fit the window; the
+    # returned/persisted history stays the full, uncompacted list. This separation is load-bearing:
+    # the caller (Session.spawn_run) recovers this turn's new messages by dropping the prior history
+    # by length - if compaction shrank the list in place, that drop would eat into the turn and
+    # silently lose it (and re-summarize every turn after). A no-op until the history is large.
+    to_send = Compaction.compact(messages, hd(chain))
 
-    result = chat_with_failover(chain, messages, chat_opts, ctx, opts)
+    result = chat_with_failover(chain, to_send, chat_opts, ctx, opts)
 
     case result do
       {:ok, %{tool_calls: tool_calls} = res} when tool_calls != [] ->

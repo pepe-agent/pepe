@@ -75,22 +75,24 @@ defmodule PepeWeb.OpenAIController do
     end
   end
 
-  # Build the server-side session key from the two dimensions a caller can send:
-  # the standard OpenAI `user` (who) and `session_id` / `X-Session-Id` (which
-  # conversation). Both present -> `user:session_id` (independent threads per user);
-  # one present -> that value alone; the same value in both -> deduped to one; neither
-  # (or blank) -> nil (stateless). So a plain OpenAI SDK, which only sends `user`, still
-  # keeps a conversation with no Pepe-specific field.
+  # Build the conversation id from the two dimensions a caller can send: the standard OpenAI `user`
+  # (who) and `session_id` / `X-Session-Id` (which conversation).
+  #
+  # When a `session_id` is present it IS the conversation id, on its own - `user` does not enter the
+  # key. This is deliberate: a client that sends `session_id` on every call but `user` only on some
+  # (common when different call sites are inconsistent) would otherwise alternate between keys `s`
+  # and `user:s`, splitting ONE conversation into two that each see half the history. Per-caller
+  # isolation is already provided by the token's scope (the tenant boundary); `session_id` is the
+  # client's own conversation handle and is expected to be unique. With no `session_id`, `user`
+  # falls back as the conversation id, so a plain OpenAI SDK still keeps a conversation.
   defp session_from(params, conn) do
     user = present(params["user"])
     sess = present(params["session_id"]) || present(session_header(conn))
 
-    case {user, sess} do
-      {nil, nil} -> nil
-      {u, nil} -> u
-      {nil, s} -> s
-      {u, u} -> u
-      {u, s} -> u <> ":" <> s
+    cond do
+      is_binary(sess) -> sess
+      is_binary(user) -> user
+      true -> nil
     end
   end
 
@@ -171,11 +173,21 @@ defmodule PepeWeb.OpenAIController do
   ### stateful sessions
   ###
 
-  # The conversation lives in a supervised GenServer keyed per scope so a session id
-  # can't be reused across projects to reach another tenant's conversation.
+  # The conversation lives in a supervised GenServer keyed per scope so a session id can't be reused
+  # across projects to reach another tenant's conversation. The **agent** is part of the key too:
+  # `Pepe.Agent.chat` binds an agent only when it first creates the session and never re-binds, so
+  # without this, two `model:` values (two agents) sharing a `session_id` in one scope would have the
+  # second request answered by the FIRST agent, with the first agent's history - a silent crossing.
+  # Keying by agent gives each its own thread instead.
   defp session_key(agent, session_id) do
-    "api:" <> Pepe.Config.resolve_scope(Project.of(agent.name)) <> ":" <> session_id
+    "api:" <> Pepe.Config.resolve_scope(Project.of(agent.name)) <> ":" <> agent_dim(agent) <> ":" <> session_id
   end
+
+  # The passthrough agent wrapping a bare model connection is named "_passthrough" for EVERY model,
+  # so it must carry the model name to stay distinct; a real agent is identified by its handle alone
+  # (and keying it by model too would fork every session the moment its model config changed).
+  defp agent_dim(%{name: "_passthrough", model: model}), do: "_passthrough#" <> to_string(model)
+  defp agent_dim(%{name: name}), do: name
 
   defp session_response(conn, agent, session_id, text, false) do
     key = session_key(agent, session_id)

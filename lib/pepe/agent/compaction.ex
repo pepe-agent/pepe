@@ -124,8 +124,16 @@ defmodule Pepe.Agent.Compaction do
     end
   end
 
+  # A `<system-reminder>` user turn, NOT a second `system` message. The Anthropic and Responses
+  # adapters keep only the FIRST system message and drop the rest - a mid-list `system` summary
+  # would be silently deleted on exactly the two production adapters, so the condensed middle would
+  # vanish instead of being summarized. Framed as a user turn, every adapter keeps it. Same trick as
+  # Pepe.Agent.Session.goal_reminder/1.
   defp summary_message(summary) do
-    Message.system("Summary of the earlier conversation (older turns were condensed to fit the context window):\n" <> summary)
+    Message.user(
+      "<system-reminder>\nSummary of the earlier conversation (older turns were condensed to fit the context window):\n" <>
+        summary <> "\n</system-reminder>"
+    )
   end
 
   defp render(messages) do

@@ -662,7 +662,19 @@ defmodule Pepe.Gateways.Telegram do
 
     if active?() and allowed?(chat_id, user_id) do
       Config.put_locale()
-      handle_model_callback(chat_id, message_id, user_id, data)
+
+      # This runs in the poller process, not a per-message Task, so `thread()` isn't set from the
+      # tap's own message - and `session_key/1` would then resolve the General-topic session instead
+      # of the forum topic the picker was opened in, applying the model change to the wrong
+      # conversation (and reading the ✓ from it). Carry the topic from the picker message the button
+      # is attached to, and clear it after so it never bleeds into the next update this process handles.
+      put_thread(topic_thread_id(cq["message"]))
+
+      try do
+        handle_model_callback(chat_id, message_id, user_id, data)
+      after
+        put_thread(nil)
+      end
     end
   end
 
@@ -1503,8 +1515,12 @@ defmodule Pepe.Gateways.Telegram do
 
   defp run_command(chat_id, "undo", _args) do
     ensure_session(chat_id)
-    Pepe.Agent.Session.undo(session_key(chat_id))
-    send_message(chat_id, gettext("↩️ Undid your last message."))
+
+    # Silent while a turn is in flight (undo is refused mid-run): no confirmation, nothing to say.
+    case Pepe.Agent.Session.undo(session_key(chat_id)) do
+      :ok -> send_message(chat_id, gettext("↩️ Undid your last message."))
+      {:error, :busy} -> :ok
+    end
   end
 
   # A per-chat waiver of the group @mention requirement (see addressed?/3) - lives

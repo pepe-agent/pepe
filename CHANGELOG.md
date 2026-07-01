@@ -5,6 +5,27 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-07-01
+
+A second sweep of the same class of bug 0.5.16 fixed: places where conversation context was
+silently lost or bloated between turns. Found by an independent review of the context pipeline.
+
+### Fixed
+- **A long conversation no longer silently forgets every new turn once it grows past the compaction threshold.** When a session got large enough to condense, the code that extracted "this turn's new messages" measured them by position against the *pre*-condense history, so after compaction shrank that history the measurement fell off the end and the turn was dropped from what got saved. From then on every exchange vanished and a summarize call was burned each turn. The loop now keeps what it sends to the model (condensed to fit the window) separate from what it returns and persists (the full history), so the turn is always retained.
+- **The compaction summary is no longer discarded by the Anthropic and Responses models.** Those two adapters keep only the first system message and drop the rest, and the summary was written as a second system message, so the condensed middle of a long conversation was deleted rather than summarized on exactly the two providers most people run. It's now framed the same way as the goal reminder, which every provider keeps. (The widget's first-turn language hint had the same flaw and the same fix.)
+- **A reply to the bot in an ordinary (non-forum) Telegram group no longer forks a fresh session.** (Shipped in 0.5.16; the sibling below is new.)
+- **The `/models` picker in a Telegram forum topic now changes the model for that topic, not the General one.** A tapped model button runs in the bot's poller, which didn't know which topic the picker was opened in, so it read the checkmark from and applied the change to the wrong conversation. It now carries the topic from the picker message.
+- **A mid-run `/undo`, `/compact`, or agent switch is no longer silently reverted.** These changed the session while a turn was still running, and the turn's completion then overwrote them. `/undo` and `/compact` now say the turn is busy (try again once it's done); re-asserting the current agent stays a harmless no-op, and a genuine switch waits for the turn to finish instead of corrupting it.
+- **A restart no longer degrades a redaction-enabled conversation.** The reversible pseudonym map lived only in memory while the (pseudonymized) history was persisted, so after a restart the agent would quote "PERSON_1" back at the user and mint fresh tokens for names it had already seen. The map is now persisted alongside the history. (It is written to the operator's own disk, same trust tier as the config file; redaction's guarantee that PII never reaches the provider is unchanged. Ephemeral sessions still persist nothing.)
+- **The out-of-turns nudge and the "(stopped)" notice are handled cleanly.** The internal "you're out of turns" instruction no longer leaks into the saved history (a later turn would have re-read it as real conversation), and the rare hard-stop notice the user is shown is now recorded so history matches what they saw.
+
+### Fixed (API)
+- **The OpenAI-compatible endpoint keys a conversation by agent, and stably.** Two `model` values sharing one `session_id` used to land on whichever agent created the session first (answered by the wrong agent, with its history); the agent is now part of the key. And a client that sent `session_id` on every call but `user` on only some would split one conversation into two half-histories; `session_id` now identifies the conversation on its own, so the presence of `user` can't fork it.
+
+### Upgrade notes
+- **Existing `/v1` conversations reset once on deploy of 0.5.17.** The server-side session key format changed (it now includes the agent), so a client reconnecting with the same `session_id` after the upgrade starts a fresh conversation. One-time; clients that carry their own history are unaffected.
+- **`session_id` now identifies a `/v1` conversation on its own.** If you relied on the OpenAI `user` field to separate end-users *while sending a constant `session_id`*, those users now share one conversation within a scope (tenant isolation via the token's scope is unchanged). Send a distinct `session_id` per conversation, as the field intends.
+
 ## [0.5.16] - 2026-06-27
 
 ### Fixed

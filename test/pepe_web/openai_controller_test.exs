@@ -89,12 +89,12 @@ defmodule PepeWeb.OpenAIControllerTest do
 
     # system + (user + assistant) * 2 = 5 messages retained server-side.
     # The key is scoped by the agent's scope ("default" here) to isolate tenants.
-    history = Pepe.Agent.Session.history("api:default:" <> sid)
+    history = Pepe.Agent.Session.history(akey(sid))
     roles = Enum.map(history, & &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
 
-  test "the standard OpenAI `user` field keys the session (preferred over session_id)" do
+  test "the standard OpenAI `user` field keys the session when no session_id is sent" do
     uid = "u-#{System.unique_integer([:positive])}"
 
     post_msg = fn text ->
@@ -110,8 +110,8 @@ defmodule PepeWeb.OpenAIControllerTest do
     json_response(post_msg.("oi"), 200)
     json_response(post_msg.("e agora?"), 200)
 
-    history = Pepe.Agent.Session.history("api:default:" <> uid)
-    roles = Enum.map(history, & &1["role"])
+    # One session, keyed on the conversation id (the `user`) plus the agent, both turns accumulated.
+    roles = Pepe.Agent.Session.history(akey(uid)) |> Enum.map(& &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
 
@@ -131,29 +131,54 @@ defmodule PepeWeb.OpenAIControllerTest do
     assert json_response(post_msg.("oi"), 200)["session_id"] == sid
     json_response(post_msg.("e agora?"), 200)
 
-    history = Pepe.Agent.Session.history("api:default:" <> sid)
-    roles = Enum.map(history, & &1["role"])
+    roles = Pepe.Agent.Session.history(akey(sid)) |> Enum.map(& &1["role"])
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
 
-  test "the same value in `user` and `session_id` is one session, not `u:u`" do
-    uid = "same-#{System.unique_integer([:positive])}"
+  test "session_id identifies the conversation - a sometimes-present `user` never forks it" do
+    # The fork bug: a client that always sends session_id but `user` only sometimes would otherwise
+    # alternate between keys `s` and `user:s`, splitting one conversation in two. session_id now
+    # dominates, so presence or absence of `user` lands both turns in the SAME conversation.
+    sid = "s-#{System.unique_integer([:positive])}"
 
-    conn =
+    post_msg = fn user, text ->
+      params = %{"model" => "assistant", "session_id" => sid, "messages" => [%{"role" => "user", "content" => text}]}
+      params = if user, do: Map.put(params, "user", user), else: params
+
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", params)
+    end
+
+    json_response(post_msg.(nil, "oi"), 200)
+    json_response(post_msg.("alice", "e agora?"), 200)
+
+    # One conversation for this session_id (not two), with both turns in it.
+    assert api_keys_for(sid) == [akey(sid)]
+    assert Pepe.Agent.Session.history(akey(sid)) |> Enum.count(&(&1["role"] == "user")) == 2
+  end
+
+  test "two different models (agents) sharing one session_id do NOT cross conversations" do
+    # `Pepe.Agent.chat` binds an agent only at session creation; without an agent dimension in the
+    # key, the second model's request would be answered by the first agent, with its history.
+    Pepe.Config.put_agent(%Pepe.Config.Agent{name: "other", model: "mock", system_prompt: "Other.", tools: []})
+    sid = "x-#{System.unique_integer([:positive])}"
+
+    post_msg = fn model, text ->
       build_conn()
       |> put_req_header("content-type", "application/json")
       |> post("/v1/chat/completions", %{
-        "model" => "assistant",
-        "user" => uid,
-        "session_id" => uid,
-        "messages" => [%{"role" => "user", "content" => "oi"}]
+        "model" => model,
+        "session_id" => sid,
+        "messages" => [%{"role" => "user", "content" => text}]
       })
+    end
 
-    assert json_response(conn, 200)["session_id"] == uid
+    json_response(post_msg.("assistant", "hi assistant"), 200)
+    json_response(post_msg.("other", "hi other"), 200)
 
-    # Deduped: the two dimensions carry the same value, so they name one conversation.
-    assert Pepe.Agent.Session.history("api:default:" <> uid) != []
-    assert Registry.lookup(Pepe.Agent.Registry, "api:default:#{uid}:#{uid}") == []
+    # Each agent keeps its own thread under the same session_id: two sessions for this id.
+    assert [_, _] = api_keys_for(sid)
   end
 
   test "with neither `user` nor `session_id` the call is stateless: no session is kept" do
@@ -181,8 +206,18 @@ defmodule PepeWeb.OpenAIControllerTest do
     |> Enum.sort()
   end
 
-  test "user + session_id combine into a `user:session_id` key (independent threads per user)" do
+  # The session key for the default `assistant` agent (canonical handle "default/assistant") and a
+  # given conversation id. Tests share the Registry, so match by the exact key rather than listing.
+  defp akey(id), do: "api:default:default/assistant:" <> id
+
+  # Every api session whose conversation id is `id` (any agent) - for the fork/cross tests.
+  defp api_keys_for(id), do: Enum.filter(api_session_keys(), &String.ends_with?(&1, ":" <> id))
+
+  test "different session_ids are independent conversations for the same user" do
     uid = "u-#{System.unique_integer([:positive])}"
+    n = System.unique_integer([:positive])
+    sid1 = "ta-#{n}"
+    sid2 = "tb-#{n}"
 
     post_msg = fn sid, text ->
       build_conn()
@@ -195,11 +230,13 @@ defmodule PepeWeb.OpenAIControllerTest do
       })
     end
 
-    json_response(post_msg.("t1", "oi thread 1"), 200)
-    json_response(post_msg.("t2", "oi thread 2"), 200)
+    json_response(post_msg.(sid1, "oi thread 1"), 200)
+    json_response(post_msg.(sid2, "oi thread 2"), 200)
 
-    # The two threads of the same user are kept apart under composite keys.
-    assert Pepe.Agent.Session.history("api:default:#{uid}:t1") |> Enum.count(&(&1["role"] == "user")) == 1
-    assert Pepe.Agent.Session.history("api:default:#{uid}:t2") |> Enum.count(&(&1["role"] == "user")) == 1
+    # Two distinct session_ids -> two independent conversations, each with its single turn.
+    assert api_keys_for(sid1) == [akey(sid1)]
+    assert api_keys_for(sid2) == [akey(sid2)]
+    assert Pepe.Agent.Session.history(akey(sid1)) |> Enum.count(&(&1["role"] == "user")) == 1
+    assert Pepe.Agent.Session.history(akey(sid2)) |> Enum.count(&(&1["role"] == "user")) == 1
   end
 end

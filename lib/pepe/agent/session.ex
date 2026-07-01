@@ -84,7 +84,7 @@ defmodule Pepe.Agent.Session do
   def set_mention_optional(key, waived?), do: GenServer.call(via(key), {:set_mention_optional, waived?})
 
   @doc "Drop the last user turn (and its responses) from the history."
-  @spec undo(term()) :: :ok
+  @spec undo(term()) :: :ok | {:error, :busy}
   def undo(key), do: GenServer.call(via(key), :undo)
 
   @doc "Cancel the in-flight run for this session, if any."
@@ -181,11 +181,19 @@ defmodule Pepe.Agent.Session do
 
     state =
       case persist?() && SessionPersistence.load(key) do
-        {:ok, name, messages, pending} ->
+        {:ok, name, messages, pii_map, pending} ->
           # A crash mid-tool-call can persist an assistant turn whose tool calls were
           # never answered; replaying it as-is makes the model loop. Repair it first.
           messages = Pepe.LLM.Message.sanitize_replay(messages)
-          %{key: key, agent_name: name || default_agent, messages: messages, running: nil, pending_resume: pending}
+
+          %{
+            key: key,
+            agent_name: name || default_agent,
+            messages: messages,
+            running: nil,
+            pending_resume: pending,
+            pii_map: pii_map
+          }
 
         _ ->
           %{
@@ -223,14 +231,16 @@ defmodule Pepe.Agent.Session do
       # instead of being rejected - each carries its caller's `from` so the reply lands
       # with whoever sent it. See handle_call({:chat...}) below.
       |> Map.put_new(:queue, [])
+      # Reversible redaction map (pseudonym -> real) accumulated by inbound hooks and applied to
+      # outbound replies. `put_new`, not a fixed value in the merge below: a restored session brings
+      # its own map in from disk (see the load branch above), and clobbering it to [] here would
+      # reintroduce the "user sees PERSON_1 after restart" bug. A fresh session has none, so [].
+      |> Map.put_new(:pii_map, [])
       |> Map.merge(%{
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
         reset_pending: false,
-        ttl_ref: nil,
-        # Reversible redaction map (pseudonym -> real) accumulated by inbound hooks and
-        # applied to outbound replies. Lives only in this process; cleared on reset.
-        pii_map: []
+        ttl_ref: nil
       })
 
     {:ok, arm_ttl(state)}
@@ -247,7 +257,7 @@ defmodule Pepe.Agent.Session do
 
   defp persist(state) do
     if persist?() and not Map.get(state, :ephemeral, false),
-      do: SessionPersistence.save(state.key, state.agent_name, state.messages)
+      do: SessionPersistence.save(state.key, state.agent_name, state.messages, Map.get(state, :pii_map, []))
 
     state
   end
@@ -385,6 +395,9 @@ defmodule Pepe.Agent.Session do
     end
   end
 
+  # No running-guard needed (unlike :undo/:compact/:set_agent): seed only ever targets a freshly
+  # minted fork key (`fork` -> SessionSupervisor.ensure(new_key) -> seed), which cannot have a run
+  # in flight, so `run_done` can never race it.
   def handle_call({:seed, snapshot}, _from, state) do
     state = %{state | messages: snapshot.messages, model_override: snapshot.model_override, pii_map: snapshot.pii_map}
     {:reply, :ok, persist(state)}
@@ -498,6 +511,13 @@ defmodule Pepe.Agent.Session do
     end
   end
 
+  # Refuse mid-run. An aside runs `Runtime.run` synchronously inside this handler, which blocks the
+  # GenServer for the whole side-question - delaying the in-flight turn's `run_done` and any `/stop`.
+  # It would also answer against the pre-turn history (stale). Let the caller retry once idle.
+  def handle_call({:aside, _text, _opts}, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
   def handle_call({:aside, text, opts}, _from, state) do
     case resolve_agent(state) do
       nil ->
@@ -549,6 +569,16 @@ defmodule Pepe.Agent.Session do
   # The two names must be compared by *resolved identity*, not raw string: after a turn,
   # `agent_name` is the canonical handle ("default/eng"), while a binding stores the raw string the
   # user typed ("eng" / "Eng"). A bare-string compare would miss the match and wipe every turn.
+  #
+  # While a turn is in flight, never mutate: `run_done` will overwrite agent_name/messages with the
+  # finishing run's values, so a mid-run switch would be silently reverted (and its history wipe
+  # would corrupt the queued turn, which would then execute on the OLD agent). A same-agent
+  # re-assert is a no-op anyway; a genuine switch is deferred - the per-topic binding re-asserts its
+  # agent every turn, so it lands on the next (idle) turn instead of racing this one.
+  def handle_call({:set_agent, _agent_name}, _from, %{running: %{}} = state) do
+    {:reply, :ok, state}
+  end
+
   def handle_call({:set_agent, agent_name}, _from, state) do
     if same_agent?(agent_name, state.agent_name) do
       {:reply, :ok, state}
@@ -587,6 +617,12 @@ defmodule Pepe.Agent.Session do
     {:reply, :ok, %{state | mention_optional: waived?}}
   end
 
+  # Refuse mid-run: `run_done` would restore the pre-undo history anyway, so the undo would silently
+  # do nothing. Better to tell the caller the turn is busy (chat_live already guards on its side).
+  def handle_call(:undo, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
   def handle_call(:undo, _from, state) do
     {:reply, :ok, persist(%{state | messages: drop_last_turn(state.messages)})}
   end
@@ -595,6 +631,12 @@ defmodule Pepe.Agent.Session do
     turns = Enum.count(state.messages, &(&1["role"] == "user"))
 
     {:reply, %{agent: state.agent_name, model: model_id(state.agent_name, state.model_override), turns: turns}, state}
+  end
+
+  # Refuse mid-run: a compaction computed from the pre-turn history would be overwritten by
+  # `run_done` restoring the full history - a wasted (paid) summarize call that changes nothing.
+  def handle_call(:compact, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
   end
 
   def handle_call(:compact, _from, state) do
@@ -1056,19 +1098,21 @@ defmodule Pepe.Agent.Session do
 
   # A `lang` opt (the widget's `data-lang`, threaded from the join payload) nudges the
   # agent to reply in the site's declared language from its very first turn, before
-  # there's enough of the visitor's own text to infer it. Injected as a system message
-  # (invisible in `visible_history`, since system/tool roles are filtered there) and
-  # only on the session's first-ever turn (`prior_messages` holding just the base
-  # system prompt) - later turns already have enough of the visitor's own language to
-  # go on, and re-injecting every turn would fight a conversation that has since
-  # switched languages.
+  # there's enough of the visitor's own text to infer it. Injected only on the session's
+  # first-ever turn (`prior_messages` holding just the base system prompt) - later turns
+  # already have enough of the visitor's own language to go on, and re-injecting every turn
+  # would fight a conversation that has since switched languages.
+  #
+  # Framed as a `<system-reminder>` user turn, not a second `system` message: the Anthropic and
+  # Responses adapters keep only the first system message and drop the rest, so a mid-list system
+  # hint was silently dead on exactly those two production adapters (see Compaction.summary_message).
   defp maybe_add_lang_hint(base, opts, prior_messages) do
     with lang when is_binary(lang) and lang != "" <- Keyword.get(opts, :lang),
          true <- first_turn?(prior_messages) do
       base ++
         [
-          Message.system(
-            "The site embedding this chat declares its language as \"#{lang}\" - reply in that language unless the visitor writes in a different one."
+          Message.user(
+            "<system-reminder>\nThe site embedding this chat declares its language as \"#{lang}\" - reply in that language unless the visitor writes in a different one.\n</system-reminder>"
           )
         ]
     else

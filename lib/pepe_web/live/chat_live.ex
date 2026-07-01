@@ -876,7 +876,7 @@ defmodule PepeWeb.ChatLive do
 
   defp session_card(key, false) do
     case SessionPersistence.load(key) do
-      {:ok, agent, messages, _pending} ->
+      {:ok, agent, messages, _pii_map, _pending} ->
         %{
           key: key,
           title: SessionTitles.get(key),

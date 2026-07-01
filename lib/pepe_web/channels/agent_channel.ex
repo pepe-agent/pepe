@@ -75,10 +75,17 @@ defmodule PepeWeb.AgentChannel do
   defp visible_history(key) do
     key
     |> Session.history()
-    |> Enum.reject(&(&1["role"] in ["system", "tool"]))
+    |> Enum.reject(&(&1["role"] in ["system", "tool"] or system_reminder?(&1)))
     |> Enum.map(&%{role: &1["role"], content: to_string(&1["content"] || "")})
     |> Enum.reject(&(&1.content == "" and &1.role == "assistant"))
   end
+
+  # Internal `<system-reminder>` user turns (a persisted lang hint or compaction summary) drive the
+  # model but are not the visitor's own words - keep them out of the rendered transcript.
+  defp system_reminder?(%{"role" => "user", "content" => c}) when is_binary(c),
+    do: String.starts_with?(c, "<system-reminder>")
+
+  defp system_reminder?(_), do: false
 
   # A widget token's origin becomes part of the key ("widget:example.com:<id>"), so
   # someone running more than one widget (several sites) can tell their conversations

@@ -1,8 +1,10 @@
 defmodule Pepe.Agent.SessionLangHintTest do
   @moduledoc """
   A `lang` chat opt (the widget's `data-lang`, threaded from the WebSocket join
-  payload) injects a system message nudging the reply language - only on a
-  session's first-ever turn, so a later turn's own language isn't fought.
+  payload) injects a `<system-reminder>` user turn nudging the reply language - only
+  on a session's first-ever turn, so a later turn's own language isn't fought. (A user
+  turn, not a system message: the Anthropic/Responses adapters drop all but the first
+  system message, which silently killed the hint on those providers.)
   """
   use ExUnit.Case, async: false
 
@@ -12,8 +14,9 @@ defmodule Pepe.Agent.SessionLangHintTest do
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
 
-  # Echoes every request's system messages back to the test process, then answers
-  # plainly - lets a test assert on exactly what the model was sent.
+  # Echoes every request's message contents back to the test process, then answers
+  # plainly - lets a test assert on exactly what the model was sent (the lang hint is a
+  # user turn now, so we can't filter to just system messages).
   defmodule EchoPlug do
     @moduledoc false
     import Plug.Conn
@@ -23,8 +26,8 @@ defmodule Pepe.Agent.SessionLangHintTest do
     def call(conn, _opts) do
       {:ok, body, conn} = read_body(conn)
       req = Jason.decode!(body)
-      system = req["messages"] |> Enum.filter(&(&1["role"] == "system")) |> Enum.map(& &1["content"])
-      send(:pepe_lang_hint_test, {:seen_system, system})
+      contents = req["messages"] |> Enum.map(& &1["content"])
+      send(:pepe_lang_hint_test, {:seen_messages, contents})
 
       payload = %{
         "choices" => [%{"index" => 0, "message" => %{"role" => "assistant", "content" => "ok"}, "finish_reason" => "stop"}]
@@ -59,27 +62,27 @@ defmodule Pepe.Agent.SessionLangHintTest do
     %{key: key}
   end
 
-  test "the first turn's lang opt is sent as a system message mentioning the language", %{key: key} do
+  test "the first turn's lang opt is sent as a message mentioning the language", %{key: key} do
     assert {:ok, _reply} = Session.chat(key, "oi", lang: "pt-BR")
-    assert_receive {:seen_system, system}, 2_000
-    assert Enum.any?(system, &(&1 =~ "pt-BR"))
+    assert_receive {:seen_messages, messages}, 2_000
+    assert Enum.any?(messages, &(&1 =~ "pt-BR"))
   end
 
   test "a later turn does not inject the hint a second time", %{key: key} do
     assert {:ok, _reply} = Session.chat(key, "oi", lang: "pt-BR")
-    assert_receive {:seen_system, first}, 2_000
+    assert_receive {:seen_messages, first}, 2_000
     assert Enum.count(first, &(&1 =~ "pt-BR")) == 1
 
     # The hint from turn 1 persists in history like any other message (it's not
     # stripped out afterwards) - what matters is it's not injected a SECOND time.
     assert {:ok, _reply} = Session.chat(key, "de novo", lang: "pt-BR")
-    assert_receive {:seen_system, second}, 2_000
+    assert_receive {:seen_messages, second}, 2_000
     assert Enum.count(second, &(&1 =~ "pt-BR")) == 1
   end
 
   test "no lang opt means no hint at all", %{key: key} do
     assert {:ok, _reply} = Session.chat(key, "hi")
-    assert_receive {:seen_system, system}, 2_000
-    refute Enum.any?(system, &(&1 =~ "declares its language"))
+    assert_receive {:seen_messages, messages}, 2_000
+    refute Enum.any?(messages, &(&1 =~ "declares its language"))
   end
 end

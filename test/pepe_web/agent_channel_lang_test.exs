@@ -1,7 +1,7 @@
 defmodule PepeWeb.AgentChannelLangTest do
   @moduledoc """
   A `lang` passed in the channel's join payload (the widget's `data-lang`) reaches
-  the model as a system-message hint on the first turn - see
+  the model as a `<system-reminder>` hint on the first turn - see
   `Pepe.Agent.Session`'s `maybe_add_lang_hint/3`.
   """
   use ExUnit.Case, async: false
@@ -20,8 +20,8 @@ defmodule PepeWeb.AgentChannelLangTest do
     def call(conn, _opts) do
       {:ok, body, conn} = read_body(conn)
       req = Jason.decode!(body)
-      system = req["messages"] |> Enum.filter(&(&1["role"] == "system")) |> Enum.map(& &1["content"])
-      send(:pepe_acl_test, {:seen_system, system})
+      contents = req["messages"] |> Enum.map(& &1["content"])
+      send(:pepe_acl_test, {:seen_messages, contents})
 
       chunks = [
         "data: #{Jason.encode!(%{"choices" => [%{"index" => 0, "delta" => %{"content" => "ok"}, "finish_reason" => nil}]})}\n\n",
@@ -59,15 +59,15 @@ defmodule PepeWeb.AgentChannelLangTest do
     :ok
   end
 
-  test "a lang in the join payload is sent as a system hint on the first turn" do
+  test "a lang in the join payload is sent as a hint on the first turn" do
     {:ok, socket} = connect(PepeWeb.AgentSocket, %{}, connect_info: %{peer_data: %{address: {127, 0, 0, 1}}})
     {:ok, _reply, socket} = subscribe_and_join(socket, "agent:greeter", %{"session" => "al1", "lang" => "es-ES"})
 
     push(socket, "prompt", %{"text" => "hola"})
 
     assert_push "done", %{}, 2_000
-    assert_receive {:seen_system, system}, 2_000
-    assert Enum.any?(system, &(&1 =~ "es-ES"))
+    assert_receive {:seen_messages, messages}, 2_000
+    assert Enum.any?(messages, &(&1 =~ "es-ES"))
   end
 
   test "no lang in the join payload means no hint" do
@@ -77,7 +77,7 @@ defmodule PepeWeb.AgentChannelLangTest do
     push(socket, "prompt", %{"text" => "hi"})
 
     assert_push "done", %{}, 2_000
-    assert_receive {:seen_system, system}, 2_000
-    refute Enum.any?(system, &(&1 =~ "declares its language"))
+    assert_receive {:seen_messages, messages}, 2_000
+    refute Enum.any?(messages, &(&1 =~ "declares its language"))
   end
 end

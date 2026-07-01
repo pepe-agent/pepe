@@ -143,10 +143,16 @@ defmodule Pepe.Agent.CompactionTest do
     [kept_head] = head
     assert [^kept_head, summary | ^tail] = compacted
 
-    # The condensed middle comes back as a single system message that says it is one.
-    assert summary["role"] == "system"
+    # The condensed middle comes back as a `<system-reminder>` USER turn, not a second system
+    # message: the Anthropic and Responses adapters keep only the first system message and drop the
+    # rest, so a system-role summary would be silently deleted on exactly those two adapters.
+    assert summary["role"] == "user"
+    assert summary["content"] =~ "<system-reminder>"
     assert summary["content"] =~ "older turns were condensed"
     assert summary["content"] =~ "ship on Friday"
+
+    # The head stays the ONLY system message, so no adapter drops the summary.
+    assert Enum.count(compacted, &(&1["role"] == "system")) == 1
 
     # And the point of the exercise: it is smaller than what went in.
     assert Compaction.estimate_tokens(compacted) < Compaction.estimate_tokens(msgs)
