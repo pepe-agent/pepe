@@ -168,7 +168,7 @@ defmodule Pepe.LLM.Responses do
   ###
 
   defp build_body(%Model{} = model, messages, opts) do
-    {instructions, input} = split_system(messages)
+    {instructions, input} = split_system(messages, opts[:images])
     tools = to_tools(opts[:tools]) ++ native_tools(model)
 
     base = %{
@@ -206,7 +206,7 @@ defmodule Pepe.LLM.Responses do
   end
 
   # The system prompt becomes `instructions`; the rest becomes `input` items.
-  defp split_system(messages) do
+  defp split_system(messages, images) do
     system =
       messages
       |> Enum.find(&(&1["role"] == "system"))
@@ -217,10 +217,33 @@ defmodule Pepe.LLM.Responses do
 
     input =
       messages
+      # Attach on the ORIGINAL role=="user" turn (tool results are role "tool" here), so the image
+      # lands on the real user message.
+      |> attach_images_to_last_user(images)
       |> Enum.reject(&(&1["role"] == "system"))
       |> Enum.flat_map(&input_items/1)
 
     {system, input}
+  end
+
+  defp attach_images_to_last_user(messages, images) when images in [nil, []], do: messages
+
+  defp attach_images_to_last_user(messages, images) do
+    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> m["role"] == "user" end) |> List.last() do
+      {_m, idx} -> List.update_at(messages, idx, &Map.put(&1, "content", responses_parts(&1["content"], images)))
+      nil -> messages
+    end
+  end
+
+  # A Responses user turn with images: the text (if any) then one `input_image` part each.
+  defp responses_parts(text, images) do
+    text_parts = if is_binary(text) and text != "", do: [text_part("input_text", text)], else: []
+    text_parts ++ Enum.map(images, &%{"type" => "input_image", "image_url" => Pepe.LLM.Image.data_uri(&1)})
+  end
+
+  # Content may already be a Responses content-part list (image attach) or a plain string.
+  defp input_items(%{"role" => "user", "content" => content}) when is_list(content) do
+    [%{"type" => "message", "role" => "user", "content" => content}]
   end
 
   defp input_items(%{"role" => "user", "content" => content}) do
@@ -476,12 +499,19 @@ defmodule Pepe.LLM.Responses do
   end
 
   # The Responses API reports `input_tokens`/`output_tokens`; expose the canonical
-  # `prompt_tokens`/`completion_tokens` shape the rest of Pepe (trace, billing) reads.
+  # `prompt_tokens`/`completion_tokens` shape the rest of Pepe (trace, billing) reads. `input_tokens`
+  # already includes cached input, so `cached_tokens` (from `input_tokens_details`) is a subset of
+  # `prompt_tokens`, exactly as billing expects.
   defp normalize_usage(%{} = usage) do
-    %{
+    base = %{
       "prompt_tokens" => usage["input_tokens"] || usage["prompt_tokens"],
       "completion_tokens" => usage["output_tokens"] || usage["completion_tokens"]
     }
+
+    case get_in(usage, ["input_tokens_details", "cached_tokens"]) do
+      c when is_integer(c) and c > 0 -> Map.put(base, "cached_tokens", c)
+      _ -> base
+    end
   end
 
   defp normalize_usage(other), do: other

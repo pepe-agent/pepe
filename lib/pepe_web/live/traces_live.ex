@@ -73,8 +73,8 @@ defmodule PepeWeb.TracesLive do
   # Provider cost of a run, summing each model call at its price (missing price -> 0).
   defp run_cost(t, models, cache) do
     Enum.reduce(t["usage"] || [], 0.0, fn u, acc ->
-      {ip, op} = Usage.price_for(u["model"], models, cache)
-      acc + Pricing.cost(u["in"] || 0, u["out"] || 0, ip, op)
+      {ip, op, cp} = Usage.price_for(u["model"], models, cache)
+      acc + Pricing.cost(u["in"] || 0, u["out"] || 0, u["cached"] || 0, ip, op, cp)
     end)
   end
 

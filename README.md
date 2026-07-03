@@ -131,6 +131,12 @@ chat so the speaker can see what was understood. With no route available, the ol
 remains as the safety net: the agent gets the file and works it out with its own tools.
 Full detail in the [Voice messages](https://pepe-agent.com/en/docs/voice/) docs.
 
+**Photos, too.** Send a picture and, on a vision-capable model (set `"vision": true` on the
+model connection), the agent sees the actual image rather than just a filename. Telegram's own
+pre-scaled sizes keep it lean (no image library), an album goes as several images at once, and
+`media.image` caps the size (`max_mb`) and count (`max_parts`). A text-only model falls back to
+the file-path prompt.
+
 ### Docker
 
 ```bash

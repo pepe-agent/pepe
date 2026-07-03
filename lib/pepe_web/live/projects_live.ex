@@ -74,6 +74,7 @@ defmodule PepeWeb.ProjectsLive do
                 class={[
                   "rounded px-1.5",
                   (Pepe.Usage.over_budget?(nil) && "bg-red-800/60 text-red-200") ||
+                    (Pepe.Usage.near_budget?(nil) && "bg-amber-800/50 text-amber-100") ||
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >

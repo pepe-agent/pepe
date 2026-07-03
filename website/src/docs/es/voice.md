@@ -52,9 +52,58 @@ del turno del agente:
   que antes de esto no había nada que la verja pudiera leer, y dirigirse al bot hablando era
   imposible.
 
-<div class="note"><strong>Solo el habla.</strong> El audio es lo que se convierte en texto
-en la puerta. Una foto o un documento siguen yendo al agente, que tiene ojos para una y
-herramientas para el otro.</div>
+<div class="note"><strong>El audio se vuelve texto; la foto se vuelve visión.</strong> El habla
+se transcribe en la puerta. Una foto se envía al modelo como una imagen que de verdad puede ver
+(en un modelo con visión, más abajo). Un documento se extrae a texto.</div>
+
+## Fotos
+
+Envía una foto a tu bot de Telegram y, en un **modelo con visión**, el agente ve la imagen de
+verdad, no un nombre de archivo. Antes recibía solo una línea de texto («el usuario envió una
+foto, guardada en `…`») mientras que la imagen en sí nunca llegaba al modelo, así que el agente
+se quedaba adivinando, o inventando, qué había en ella. Ahora la imagen va junto con el mensaje.
+
+Está desactivado a menos que digas que el modelo ve. No todos los endpoints compatibles con
+OpenAI aceptan una imagen, y enviar una a un modelo solo de texto es un error, así que la visión
+es opcional por conexión:
+
+```json
+{
+  "models": {
+    "gpt4o": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "${OPENAI_API_KEY}",
+      "model": "gpt-4o",
+      "vision": true
+    }
+  }
+}
+```
+
+Con `vision` activo, una foto (con o sin pie) llega al modelo como imagen en el turno en que se
+recibe. Funciona igual en conexiones compatibles con OpenAI, Anthropic y Responses/Codex. La
+imagen acompaña solo ese turno: como una transcripción, el registro que queda es la respuesta
+del agente sobre ella, no los bytes, así que nunca infla la sesión ni se reenvía en cada turno.
+Un modelo sin `vision` vuelve al comportamiento anterior (la ruta del archivo en el prompt, para
+que el agente lo abra con sus propias herramientas).
+
+Telegram ya envía cada foto en varios tamaños preescalados, así que Pepe elige el mayor que cabe
+en el tope de bytes, sin ninguna biblioteca de procesamiento de imagen que instalar. Un álbum de
+fotos se envía como varias imágenes juntas. Los límites están en `media.image` y ambos tienen
+valores por defecto:
+
+- `max_mb`: la imagen más grande aceptada, en megabytes. Por defecto `5`. Una foto demasiado
+  grande (o de un tipo no admitido) vuelve al prompt con la ruta del archivo.
+- `max_parts`: cuántas imágenes puede llevar un turno, para álbumes. Por defecto `4`. Lo que
+  pase de ahí se entrega como ruta de archivo.
+
+```json
+{
+  "media": {
+    "image": { "max_mb": 5, "max_parts": 4 }
+  }
+}
+```
 
 ### Configuración
 

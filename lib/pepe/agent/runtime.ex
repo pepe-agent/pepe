@@ -57,6 +57,7 @@ defmodule Pepe.Agent.Runtime do
           source: String.t() | nil,
           review: boolean(),
           untrusted: boolean(),
+          images: [map()] | nil,
           agent_chain: [String.t()] | nil,
           authorize: (String.t(), term(), map() -> Pepe.Permissions.decision()) | nil
         ]

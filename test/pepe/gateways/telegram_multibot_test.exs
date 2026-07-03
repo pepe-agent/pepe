@@ -133,6 +133,20 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     assert out =~ "what are these?"
   end
 
+  test "album_vision_prompt names the images and any non-image files" do
+    # Two images the model can see, plus one leftover file (a video / overflow photo) by path.
+    out = Telegram.album_vision_prompt(["media/clip.mp4"], 2, "what are these?")
+    assert out =~ "2 images"
+    assert out =~ "1 file"
+    assert out =~ "`media/clip.mp4`"
+    assert out =~ "what are these?"
+
+    # Images only: no file line.
+    images_only = Telegram.album_vision_prompt([], 3, "")
+    assert images_only =~ "3 images"
+    refute images_only =~ "saved in your workspace"
+  end
+
   test "flood-control retry_after is read from the error body, with a sane default" do
     assert Telegram.retry_after(%{"parameters" => %{"retry_after" => 12}}) == 12
     assert Telegram.retry_after(%{"ok" => false}) == 5

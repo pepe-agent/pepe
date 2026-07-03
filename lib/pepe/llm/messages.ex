@@ -34,7 +34,7 @@ defmodule Pepe.LLM.Messages do
       when is_function(on_delta, 1) do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts)
-    init = %{buffer: "", content: "", blocks: %{}, order: [], finish: nil, in: 0, out: 0, raw: ""}
+    init = %{buffer: "", content: "", blocks: %{}, order: [], finish: nil, in: 0, out: 0, cached: 0, raw: ""}
 
     collector = fn {:data, data}, {req, resp} ->
       state = resp.private[:pepe] || init
@@ -132,7 +132,7 @@ defmodule Pepe.LLM.Messages do
       # `opts[:max_tokens]` first so the runtime's output-cap retry (which lowers the reservation
       # after a provider rejects an over-large one) actually reaches the request.
       "max_tokens" => opts[:max_tokens] || model.max_tokens || @default_max_tokens,
-      "messages" => to_messages(messages),
+      "messages" => to_messages(messages, opts[:images]),
       "stream" => true
     }
 
@@ -171,11 +171,38 @@ defmodule Pepe.LLM.Messages do
 
   # Chat messages -> Anthropic messages. Consecutive `tool` results merge into one user
   # turn (Anthropic requires tool results as user-role `tool_result` blocks).
-  defp to_messages(messages) do
+  defp to_messages(messages, images) do
     messages
+    # Attach on the ORIGINAL role=="user" turn (never a tool result, which is role "tool" here and
+    # only becomes user-role below), so the image lands on the real user message, not a tool turn.
+    |> attach_images_to_last_user(images)
     |> Enum.reject(&(&1["role"] == "system"))
     |> Enum.reduce([], &add_message/2)
     |> Enum.reverse()
+  end
+
+  defp attach_images_to_last_user(messages, images) when images in [nil, []], do: messages
+
+  defp attach_images_to_last_user(messages, images) do
+    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> m["role"] == "user" end) |> List.last() do
+      {_m, idx} -> List.update_at(messages, idx, &Map.put(&1, "content", image_blocks(&1["content"], images)))
+      nil -> messages
+    end
+  end
+
+  # An Anthropic user turn with images: the text (if any) then one `image` source block each.
+  defp image_blocks(text, images) do
+    text_block = if is_binary(text) and text != "", do: [%{"type" => "text", "text" => text}], else: []
+
+    text_block ++
+      Enum.map(images, fn img ->
+        %{"type" => "image", "source" => %{"type" => "base64", "media_type" => img.media_type, "data" => img.data}}
+      end)
+  end
+
+  # Content may already be an image block list (from attach above) or a plain string.
+  defp add_message(%{"role" => "user", "content" => content}, acc) when is_list(content) do
+    [%{"role" => "user", "content" => content} | acc]
   end
 
   defp add_message(%{"role" => "user"} = m, acc) do
@@ -287,7 +314,7 @@ defmodule Pepe.LLM.Messages do
   end
 
   defp handle_event("message_start", %{"message" => msg}, state, _on_delta) do
-    %{state | in: input_tokens(msg["usage"]) || state.in}
+    %{state | in: input_tokens(msg["usage"]) || state.in, cached: cache_read(msg["usage"]) || state.cached}
   end
 
   # A tool_use block opens: register it so its streamed JSON arguments accumulate.
@@ -338,6 +365,11 @@ defmodule Pepe.LLM.Messages do
 
   defp input_tokens(%{"input_tokens" => n}) when is_integer(n), do: n
   defp input_tokens(_), do: nil
+
+  # Anthropic reports cache-read input separately from `input_tokens` (which excludes it), so total
+  # input = input + cache_read. Billing prices this portion at the cheaper cache rate.
+  defp cache_read(%{"cache_read_input_tokens" => n}) when is_integer(n), do: n
+  defp cache_read(_), do: nil
 
   defp output_tokens(%{"output_tokens" => n}) when is_integer(n), do: n
   defp output_tokens(_), do: nil
@@ -394,11 +426,22 @@ defmodule Pepe.LLM.Messages do
       content: (state.content != "" && state.content) || nil,
       tool_calls: tool_calls,
       finish_reason: if(tool_calls != [], do: "tool_calls", else: state.finish || "stop"),
-      usage: %{
-        "prompt_tokens" => state.in,
-        "completion_tokens" => state.out,
-        "total_tokens" => state.in + state.out
-      }
+      usage: usage_map(state)
     }
+  end
+
+  # `prompt_tokens` is TOTAL input (fresh + cache-read), so `cached_tokens` is a subset of it, as
+  # billing expects. `cached_tokens` is only added when non-zero, keeping the map identical for a
+  # call that hit no cache.
+  defp usage_map(state) do
+    prompt = state.in + state.cached
+
+    base = %{
+      "prompt_tokens" => prompt,
+      "completion_tokens" => state.out,
+      "total_tokens" => prompt + state.out
+    }
+
+    if state.cached > 0, do: Map.put(base, "cached_tokens", state.cached), else: base
   end
 end

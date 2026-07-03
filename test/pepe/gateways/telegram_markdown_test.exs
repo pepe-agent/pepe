@@ -40,4 +40,22 @@ defmodule Pepe.Gateways.Telegram.MarkdownTest do
   test "italic with single * or _" do
     assert Markdown.to_html("isso é *itálico* aqui") == "isso é <i>itálico</i> aqui"
   end
+
+  test "a markdown table flattens to readable rows (Telegram has no tables)" do
+    table = "| Dimensão | Premissa |\n|---|---|\n| Ambição | Crescer |\n| Norte | Entregar mais |"
+    out = Markdown.to_html(table)
+
+    # separator row gone, each row is "label — value", no leftover pipes
+    assert out == "<b>Dimensão</b> — Premissa\n<b>Ambição</b> — Crescer\n<b>Norte</b> — Entregar mais"
+    refute out =~ "|"
+    refute out =~ "---"
+  end
+
+  test "a 3-column row joins the trailing cells" do
+    assert Markdown.to_html("| A | B | C |") == "<b>A</b> — B · C"
+  end
+
+  test "prose with a stray pipe is left alone" do
+    assert Markdown.to_html("rode a | b para juntar") == "rode a | b para juntar"
+  end
 end

@@ -180,7 +180,7 @@ defmodule Pepe.LLM do
   end
 
   defp build_body(%Model{} = model, messages, opts, stream?) do
-    %{"model" => model.model, "messages" => messages}
+    %{"model" => model.model, "messages" => with_images(messages, opts[:images])}
     |> put_some("tools", opts[:tools])
     |> put_some("temperature", opts[:temperature] || model.temperature)
     |> put_some("max_tokens", opts[:max_tokens] || model.max_tokens)
@@ -194,6 +194,24 @@ defmodule Pepe.LLM do
   defp put_some(map, _key, nil), do: map
   defp put_some(map, _key, []), do: map
   defp put_some(map, key, value), do: Map.put(map, key, value)
+
+  # Attach any inbound images to the LAST user message, in OpenAI content-part form. Send-time only:
+  # the images ride in `opts` for this turn and never touch the persisted string history.
+  defp with_images(messages, images) when images in [nil, []], do: messages
+
+  defp with_images(messages, images) do
+    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> m["role"] == "user" end) |> List.last() do
+      {_m, idx} -> List.update_at(messages, idx, &attach_openai_images(&1, images))
+      nil -> messages
+    end
+  end
+
+  defp attach_openai_images(msg, images) do
+    text = to_string(msg["content"] || "")
+    text_part = if text == "", do: [], else: [%{"type" => "text", "text" => text}]
+    image_parts = Enum.map(images, &%{"type" => "image_url", "image_url" => %{"url" => Pepe.LLM.Image.data_uri(&1)}})
+    Map.put(msg, "content", text_part ++ image_parts)
+  end
 
   ###
   ### non-streaming parsing

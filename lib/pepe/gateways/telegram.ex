@@ -694,7 +694,7 @@ defmodule Pepe.Gateways.Telegram do
     do: media(m, id, "document", doc["file_name"])
 
   defp handle_update(%{"message" => %{"photo" => [_ | _] = sizes} = m}),
-    do: media(m, List.last(sizes)["file_id"], "photo")
+    do: media(m, best_photo_size(sizes), "photo")
 
   defp handle_update(%{"message" => %{"video" => %{"file_id" => id}} = m}),
     do: media(m, id, "video")
@@ -963,23 +963,51 @@ defmodule Pepe.Gateways.Telegram do
     Config.put_locale()
     send_chat_action(entry.chat_id, "typing")
 
-    paths =
+    downloaded =
       entry.items
-      |> Enum.map(fn i -> download_file(i.file_id, i.kind) end)
+      |> Enum.map(fn i -> {i.kind, download_file(i.file_id, i.kind)} end)
       |> Enum.flat_map(fn
-        {:ok, path} -> [path]
+        {kind, {:ok, path}} -> [{kind, path}]
         _ -> []
       end)
 
     cond do
-      paths == [] ->
+      downloaded == [] ->
         send_message(entry.chat_id, friendly_error(:download))
 
       addressed?(entry.caption, entry.chat_type, entry.chat_id) ->
-        chat_with_agent(entry.chat_id, nil, album_prompt(paths, entry.caption), untrusted: true)
+        {images, files} = album_media(downloaded)
+        prompt = if images == [], do: album_prompt(files, entry.caption), else: album_vision_prompt(files, length(images), entry.caption)
+        chat_with_agent(entry.chat_id, nil, prompt, untrusted: true, images: images)
 
       true ->
         :ok
+    end
+  end
+
+  # Split album items into vision images (photos, on a vision model, up to the parts cap) and
+  # file-path references (everything else, plus any photo that overflows the cap or won't load).
+  defp album_media(downloaded) do
+    if vision_model?() do
+      {images, files, _n} = Enum.reduce(downloaded, {[], [], 0}, &add_album_item/2)
+      {images, files}
+    else
+      {[], Enum.map(downloaded, fn {_kind, path} -> path end)}
+    end
+  end
+
+  # Fold one album item into `{images, file_paths, image_count}`: a photo becomes an image until the
+  # parts cap, then a path; anything else is a path.
+  defp add_album_item({"photo", path}, {imgs, files, n} = acc) do
+    if n < Pepe.Media.Vision.max_parts(), do: load_album_photo(path, acc), else: {imgs, files ++ [path], n}
+  end
+
+  defp add_album_item({_kind, path}, {imgs, files, n}), do: {imgs, files ++ [path], n}
+
+  defp load_album_photo(path, {imgs, files, n}) do
+    case Pepe.Media.Vision.load(abs_media(path)) do
+      {:ok, image} -> {imgs ++ [image], files, n + 1}
+      :none -> {imgs, files ++ [path], n}
     end
   end
 
@@ -989,6 +1017,27 @@ defmodule Pepe.Gateways.Telegram do
 
     ("The user sent #{length(paths)} files together as one album, saved in your workspace at: " <>
        "#{listed}. Look at them together and respond to what they want.")
+    |> Kernel.<>(caption_line(caption))
+  end
+
+  @doc false
+  # An album that carried at least one image the model can see. Names the attached images, plus any
+  # non-image files (a video, a document, an overflow photo) by workspace path.
+  def album_vision_prompt(files, image_count, caption) do
+    files_line =
+      case files do
+        [] ->
+          ""
+
+        [one] ->
+          " There is also 1 file saved in your workspace at: `#{one}`."
+
+        list ->
+          " There are also #{length(list)} files saved in your workspace at: #{Enum.map_join(list, ", ", &"`#{&1}`")}."
+      end
+
+    ("The user sent an album with #{image_count} #{if image_count == 1, do: "image", else: "images"} to look at." <>
+       files_line <> " Respond to what they want.")
     |> Kernel.<>(caption_line(caption))
   end
 
@@ -1074,6 +1123,21 @@ defmodule Pepe.Gateways.Telegram do
   # No transcription route is configured and none could be worked out, so the agent gets
   # the file and figures it out with the tools it has. This is the safety net, not the
   # way in: it costs a permission prompt and a wait, and it is different every time.
+  # A photo, when the agent's model has vision: send the actual image so the model SEES it, instead
+  # of a "look at the file at this path" prompt it has no organ to act on. Falls back to the path
+  # prompt when the model is text-only or the file can't be read/isn't a supported image type.
+  defp unread(inbound, "photo", path) do
+    if addressed?(inbound.caption, inbound.chat_type, inbound.chat_id) do
+      case vision_image(path) do
+        {:ok, image} ->
+          chat_with_agent(inbound.chat_id, nil, photo_prompt(inbound.caption), untrusted: true, images: [image])
+
+        :none ->
+          chat_with_agent(inbound.chat_id, nil, media_prompt("photo", path, inbound.caption), untrusted: true)
+      end
+    end
+  end
+
   defp unread(inbound, kind, path) do
     if addressed?(inbound.caption, inbound.chat_type, inbound.chat_id) do
       # The agent is about to open a stranger's file with its own tools, which is the same
@@ -1081,6 +1145,39 @@ defmodule Pepe.Gateways.Telegram do
       chat_with_agent(inbound.chat_id, nil, media_prompt(kind, path, inbound.caption), untrusted: true)
     end
   end
+
+  # Load the photo as an image the model can see, but only if the default agent's model declares
+  # vision. `:none` means "fall back to the path prompt" (text-only model, an oversized file, or an
+  # unsupported type - the byte/type policy lives in Pepe.Media.Vision).
+  defp vision_image(path) do
+    if vision_model?(), do: Pepe.Media.Vision.load(abs_media(path)), else: :none
+  end
+
+  defp vision_model? do
+    with %Pepe.Config.Agent{} = agent <- Config.get_agent(agent_default()),
+         %Pepe.Config.Model{vision: true} <- Config.model_for_agent(agent) do
+      true
+    else
+      _ -> false
+    end
+  end
+
+  # Telegram sends every photo in several pre-scaled sizes. Pick the largest that fits the vision
+  # byte cap (no image library needed); if none fit, the smallest, so it still has a chance.
+  defp best_photo_size(sizes) do
+    cap = Pepe.Media.Vision.max_bytes()
+
+    case Enum.filter(sizes, &(&1["file_size"] && &1["file_size"] <= cap)) do
+      [] -> sizes |> Enum.min_by(&(&1["file_size"] || 0)) |> Map.fetch!("file_id")
+      fit -> fit |> Enum.max_by(& &1["file_size"]) |> Map.fetch!("file_id")
+    end
+  end
+
+  defp photo_prompt(""),
+    do: "The user sent you this image. Look at it and respond to what they want."
+
+  defp photo_prompt(caption),
+    do: "The user sent you this image." <> caption_line(caption)
 
   defp join_caption(text, ""), do: text
   defp join_caption(text, caption), do: text <> "\n\n" <> caption
@@ -1221,6 +1318,8 @@ defmodule Pepe.Gateways.Telegram do
              # model's context all the same. Pre-approved tools stop being trusted for this
              # run - see Pepe.Permissions.
              untrusted: opts[:untrusted] == true,
+             # Inbound images (a photo, for a vision model) ride this turn only - never persisted.
+             images: opts[:images],
              on_event: activity_callback(chat_id)
            ) do
         {:ok, reply} ->

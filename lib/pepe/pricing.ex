@@ -168,6 +168,40 @@ defmodule Pepe.Pricing do
   def cost(input_tokens, output_tokens, input_price, output_price),
     do: per_million(input_tokens, input_price) + per_million(output_tokens, output_price)
 
+  @doc """
+  Cost when some input was served from the provider's prompt cache. The `cached_tokens` portion of
+  `input_tokens` is priced at `cached_price` (falling back to `input_price` when the cache rate is
+  unknown, so it is never *more* than the old behaviour), the rest of the input at `input_price`.
+  """
+  @spec cost(number(), number(), number(), number() | nil, number() | nil, number() | nil) :: float()
+  def cost(input_tokens, output_tokens, cached_tokens, input_price, output_price, cached_price) do
+    cached = min(num(cached_tokens), num(input_tokens))
+    fresh = num(input_tokens) - cached
+
+    per_million(fresh, input_price) +
+      per_million(cached, cached_price || input_price) +
+      per_million(output_tokens, output_price)
+  end
+
+  @doc "The per-1M cache-read price for a model id from the live price book, or `nil` if unknown."
+  @spec cached_rate(String.t() | nil, map()) :: number() | nil
+  def cached_rate(nil, _cache), do: nil
+
+  def cached_rate(model_id, cache) when is_binary(model_id) do
+    id = String.downcase(model_id)
+    cached_match(cache, id) || cached_match(@seed, id)
+  end
+
+  defp cached_match(map, id) do
+    map
+    |> Enum.filter(fn {k, _} -> String.contains?(id, k) end)
+    |> Enum.max_by(fn {k, _} -> String.length(k) end, fn -> nil end)
+    |> case do
+      {_k, %{"cached" => c}} when is_number(c) -> c
+      _ -> nil
+    end
+  end
+
   defp per_million(tokens, price) when is_number(tokens) and is_number(price),
     do: tokens / 1_000_000 * price
 
@@ -184,12 +218,17 @@ defmodule Pepe.Pricing do
             o = m["output_cost_per_token"],
             is_number(i) or is_number(o),
             into: %{} do
-          {String.downcase(to_string(id)), %{"in" => per_1m(i), "out" => per_1m(o)}}
+          {String.downcase(to_string(id)), litellm_entry(i, o, m["cache_read_input_token_cost"])}
         end
 
       _ ->
         %{}
     end
+  end
+
+  defp litellm_entry(i, o, cache_read) do
+    base = %{"in" => per_1m(i), "out" => per_1m(o)}
+    if is_number(cache_read), do: Map.put(base, "cached", per_1m(cache_read)), else: base
   end
 
   defp fetch_openrouter do

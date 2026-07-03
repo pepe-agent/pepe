@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.6.0] - unreleased
+
+### Added
+- **Budget soft alerts, before the hard cap slams shut.** When a project crosses its alert threshold (default 80%, configurable per project with `budget_alert_at`), a one-time warning goes out that month instead of the work silently stopping at 100% with no heads-up. It's channel-agnostic: the core decides the alert is due, and it's delivered through the same router watches use, so it reaches whoever is actively using the project on their own channel (a Telegram chat, a live dashboard/widget session, the TUI) — a new surface gets budget alerts for free. The dashboard also shows an amber budget badge as the projects near the cap.
+
+### Fixed
+- **Markdown tables no longer arrive on Telegram as a wall of broken pipes.** Telegram's HTML has no table support, so a table the model emitted showed up as literal `|` characters wrapping across lines. Tables are now flattened at the renderer into readable rows — the first cell bolded as a label, the rest joined (`Label — value`) — and the `|---|` separator row is dropped. Prose with a stray pipe is left alone.
+- **Per-project cost is no longer overstated on cached input.** Providers that serve part of a prompt from their own cache (OpenAI, DeepSeek, Anthropic) bill those tokens far cheaper, but the ledger priced *all* input at the full rate — overstating spend on exactly the long, repetitive conversations where caching helps most. Cache-read tokens are now metered separately (surfaced by all three adapters, recorded in the ledger) and priced at the cache rate, taken automatically from the refreshed price book (LiteLLM's `cache_read_input_token_cost`) or a manual `cached_input_price` on the model. When no cache rate is known, cached input is priced as normal input — never *more* than before.
+
+### Added
+- **The agent can see photos.** Send a picture on Telegram and, on a vision-capable model, the agent receives the actual image instead of just a filename it had no way to look at (it used to be told "a photo is saved at `…`" while the picture never reached the model, so it guessed or made something up). Enable it per model connection with `"vision": true` — off by default, since not every OpenAI-compatible endpoint accepts an image and sending one to a text-only model is an error. Works the same across OpenAI-compatible, Anthropic, and Responses/Codex connections. The image rides the turn it arrives on and is never persisted (like a voice transcript, the lasting record is the agent's reply), so it doesn't bloat sessions or get re-sent every turn.
+- **Photo albums are sent as several images at once**, up to `media.image.max_parts` (default 4); any extra, and any non-image in the album, is handed over as a file path as before.
+
+### Changed
+- **Inbound photos are size-capped without an image library.** Telegram already delivers each photo in several pre-scaled sizes, so Pepe picks the largest that fits `media.image.max_mb` (default 5 MB) — no libvips/imagemagick dependency, no larger container. An oversized or unsupported image falls back to the file-path prompt.
+
 ## [0.5.17] - 2026-07-01
 
 A second sweep of the same class of bug 0.5.16 fixed: places where conversation context was

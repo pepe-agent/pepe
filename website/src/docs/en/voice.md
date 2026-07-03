@@ -50,9 +50,56 @@ neither was possible while the transcript only appeared inside the agent's turn:
   before this there was nothing for the gate to read, and addressing the bot out loud was
   impossible.
 
-<div class="note"><strong>Speech only.</strong> Audio is what becomes text at the door. A
-photo or a document still goes to the agent, which has eyes for one and tools for the
-other.</div>
+<div class="note"><strong>Audio becomes text; a photo becomes sight.</strong> Speech is
+transcribed at the door. A photo is sent to the model as an image it can actually see (on a
+vision model, see below). A document is extracted to text.</div>
+
+## Photos
+
+Send a photo to your Telegram bot and, on a **vision-capable model**, the agent sees the
+actual image, not a filename. It used to receive only a line of text ("the user sent a photo,
+saved at `…`") while the picture itself never reached the model, so the agent was left
+guessing at, or inventing, what was in it. Now the image rides along with the message.
+
+It is off unless you say the model can see. Not every OpenAI-compatible endpoint accepts an
+image, and sending one to a text-only model is an error, so vision is opt-in per connection:
+
+```json
+{
+  "models": {
+    "gpt4o": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "${OPENAI_API_KEY}",
+      "model": "gpt-4o",
+      "vision": true
+    }
+  }
+}
+```
+
+With `vision` set, a photo (with or without a caption) reaches the model as an image on the
+turn it arrives. It works the same on OpenAI-compatible, Anthropic, and Responses/Codex
+connections. The image rides that one turn only: like a transcript, the lasting record is the
+agent's reply about it, not the bytes, so it never bloats the session or gets re-sent every
+turn. A model without `vision` falls back to the old behaviour (the file path in the prompt,
+for the agent to open with its own tools).
+
+Telegram already sends each photo in several pre-scaled sizes, so Pepe picks the largest that
+fits the byte cap, with no image-processing library to install. An album of photos is sent as
+several images together. The limits live under `media.image` and both have defaults:
+
+- `max_mb`: the largest image accepted, in megabytes. Defaults to `5`. An oversized photo (or
+  one of an unsupported type) falls back to the file-path prompt instead.
+- `max_parts`: how many images one turn may carry, for albums. Defaults to `4`. Anything past
+  that is handed over as a file path.
+
+```json
+{
+  "media": {
+    "image": { "max_mb": 5, "max_parts": 4 }
+  }
+}
+```
 
 ### Configuration
 

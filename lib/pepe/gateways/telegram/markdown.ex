@@ -17,6 +17,7 @@ defmodule Pepe.Gateways.Telegram.Markdown do
     |> escape()
     |> fenced_code()
     |> inline_code()
+    |> tables()
     |> bold()
     |> italic()
     |> links()
@@ -63,4 +64,42 @@ defmodule Pepe.Gateways.Telegram.Markdown do
 
   # "- item" / "* item" -> "• item"
   defp bullets(t), do: Regex.replace(~r/^(\s*)[-*]\s+/m, t, "\\1• ")
+
+  # Telegram's HTML has no tables, so a markdown table arrives as a wall of literal pipes that
+  # breaks across lines. Flatten each row to readable text - the first cell bolded as a label, the
+  # rest joined - so a 2-column table reads "<b>Label</b> — value" per line. The `|---|` separator
+  # row is dropped. Only lines that start with `|` are touched, so prose with a stray pipe is safe.
+  defp tables(t) do
+    t
+    |> String.split("\n")
+    |> Enum.reject(&separator_row?/1)
+    |> Enum.map_join("\n", &table_row/1)
+  end
+
+  defp table_line?(line), do: line |> String.trim_leading() |> String.starts_with?("|")
+
+  defp separator_row?(line) do
+    trimmed = String.trim(line)
+    table_line?(line) and String.contains?(trimmed, "-") and Regex.match?(~r/^[\s:|-]+$/, trimmed)
+  end
+
+  defp table_row(line) do
+    if table_line?(line) do
+      cells =
+        line
+        |> String.trim()
+        |> String.trim("|")
+        |> String.split("|")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+
+      case cells do
+        [] -> line
+        [only] -> only
+        [first | rest] -> "<b>#{first}</b> — " <> Enum.join(rest, " · ")
+      end
+    else
+      line
+    end
+  end
 end

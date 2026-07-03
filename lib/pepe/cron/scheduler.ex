@@ -45,7 +45,7 @@ defmodule Pepe.Cron.Scheduler do
   @impl true
   def init(_opts) do
     schedule_tick()
-    {:ok, %{fired: %{}, price_check: 0, running: %{}, refs: %{}}}
+    {:ok, %{fired: %{}, price_check: 0, budget_check: 0, running: %{}, refs: %{}}}
   end
 
   @doc "The crons that have a run in flight right now (used by the dashboard and by tests)."
@@ -58,7 +58,13 @@ defmodule Pepe.Cron.Scheduler do
   def handle_info(:tick, state) do
     state = Enum.reduce(Config.crons(), state, &maybe_fire/2)
     schedule_tick()
-    {:noreply, %{state | price_check: maybe_refresh_prices(state.price_check)}}
+
+    {:noreply,
+     %{
+       state
+       | price_check: maybe_refresh_prices(state.price_check),
+         budget_check: maybe_budget_check(state.budget_check)
+     }}
   end
 
   # The run ended, however it ended. This is the only place the in-flight claim is released,
@@ -81,6 +87,20 @@ defmodule Pepe.Cron.Scheduler do
     if now >= next_at do
       Task.start(&Pepe.Pricing.maybe_auto_refresh/0)
       now + 3600
+    else
+      next_at
+    end
+  end
+
+  # Piggyback the soft budget-alert sweep on the tick, at most once a minute. Channel-agnostic: the
+  # alert reaches each active session on its own channel (see Pepe.Budget.Alert). Off-process so a
+  # slow delivery never stalls the scheduler.
+  defp maybe_budget_check(next_at) do
+    now = System.system_time(:second)
+
+    if now >= next_at do
+      Task.start(&Pepe.Budget.Alert.check/0)
+      now + 60
     else
       next_at
     end

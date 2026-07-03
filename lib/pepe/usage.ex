@@ -64,6 +64,7 @@ defmodule Pepe.Usage do
     in_tok = int(usage["prompt_tokens"])
     out_tok = int(usage["completion_tokens"])
     total = int(usage["total_tokens"])
+    cached = cached_input(usage)
 
     # Some providers report only a total - attribute it to input rather than lose it.
     {in_tok, out_tok} =
@@ -82,14 +83,23 @@ defmodule Pepe.Usage do
         "out" => out_tok
       }
 
-      # Only written when true, so the ledger's shape does not change for anybody paying by
-      # the token, and an entry from an older Pepe reads exactly as it always did.
+      # Only written when true/non-zero, so the ledger's shape does not change for anybody whose
+      # provider reports no cache hits (or an older Pepe), and those entries read exactly as before.
       entry = if subscription?, do: Map.put(entry, "sub", true), else: entry
+      entry = if cached > 0, do: Map.put(entry, "cached", min(cached, in_tok)), else: entry
 
       Log.append(Project.of(to_string(agent_handle)), entry)
     end
 
     :ok
+  end
+
+  # Cache-read input tokens the provider reported, across the shapes they use: a normalized top-level
+  # `cached_tokens` (the Anthropic/Responses adapters set this), or OpenAI's nested
+  # `prompt_tokens_details.cached_tokens`. A subset of `prompt_tokens`.
+  defp cached_input(usage) do
+    top = int(usage["cached_tokens"])
+    if top > 0, do: top, else: int(get_in(usage, ["prompt_tokens_details", "cached_tokens"]))
   end
 
   @currency_symbols %{"USD" => "$", "BRL" => "R$", "EUR" => "€", "GBP" => "£"}
@@ -147,6 +157,29 @@ defmodule Pepe.Usage do
     case Config.project_budget(project) do
       nil -> false
       budget -> month_to_date(project) >= budget
+    end
+  end
+
+  @doc "Fraction of `project`'s monthly budget spent so far (spend / budget), or `nil` if no budget is set."
+  @spec budget_ratio(String.t() | nil) :: float() | nil
+  def budget_ratio(project) do
+    case Config.project_budget(project) do
+      nil -> nil
+      budget when budget > 0 -> month_to_date(project) / budget
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Is `project` at/over its soft alert threshold (default 80%, `Config.project_budget_alert_at/1`)
+  but not yet over the hard cap? This is the "warn before the gate slams" band - `false` with no
+  budget set, and `false` once `over_budget?/1` is true (the gate takes over there).
+  """
+  @spec near_budget?(String.t() | nil) :: boolean()
+  def near_budget?(project) do
+    case budget_ratio(project) do
+      nil -> false
+      ratio -> ratio >= Config.project_budget_alert_at(project) and ratio < 1.0
     end
   end
 
@@ -359,8 +392,8 @@ defmodule Pepe.Usage do
   # Decorate an entry with cost (provider) and billable (cost × project markup),
   # from the lookup tables built by price_lookup/3 and markup_lookup/1.
   defp price(e, prices, markups) do
-    {ip, op} = Map.fetch!(prices, e["model"])
-    list = Pricing.cost(e["in"], e["out"], ip, op)
+    {ip, op, cp} = Map.fetch!(prices, e["model"])
+    list = Pricing.cost(e["in"], e["out"], e["cached"] || 0, ip, op, cp)
     markup = Map.fetch!(markups, e["project"])
 
     e
@@ -375,22 +408,25 @@ defmodule Pepe.Usage do
   end
 
   @doc """
-  The `{input_price, output_price}` per 1M tokens for a model connection: its own
-  manual prices if set, else the layered price book (live cache -> seed) for its
-  upstream id. `models` is a name->Model map and `cache` the loaded price cache, so
-  this stays disk-free when pricing many rows.
+  The `{input_price, output_price, cached_input_price}` per 1M tokens for a model connection: its
+  own manual prices if set, else the layered price book (live cache -> seed) for its upstream id.
+  The cache-read price comes from the model's manual `cached_input_price` or the price book; `nil`
+  means "price cached input as normal input" (no worse than before). `models` is a name->Model map
+  and `cache` the loaded price cache, so this stays disk-free when pricing many rows.
   """
-  @spec price_for(String.t(), map(), map()) :: {number() | nil, number() | nil}
+  @spec price_for(String.t(), map(), map()) :: {number() | nil, number() | nil, number() | nil}
   def price_for(model_name, models \\ %{}, cache \\ %{}) do
     case Map.get(models, model_name) || Config.get_model(model_name) do
-      %{input_price: ip, output_price: op} when is_number(ip) or is_number(op) ->
-        {ip, op}
+      %{input_price: ip, output_price: op, cached_input_price: cp} when is_number(ip) or is_number(op) ->
+        {ip, op, cp}
 
       %{model: upstream} ->
-        Pricing.lookup(upstream, cache) || {nil, nil}
+        {i, o} = Pricing.lookup(upstream, cache) || {nil, nil}
+        {i, o, Pricing.cached_rate(upstream, cache)}
 
       _ ->
-        Pricing.lookup(model_name, cache) || {nil, nil}
+        {i, o} = Pricing.lookup(model_name, cache) || {nil, nil}
+        {i, o, Pricing.cached_rate(model_name, cache)}
     end
   end
 

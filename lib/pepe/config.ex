@@ -1056,7 +1056,7 @@ defmodule Pepe.Config do
   @dropped_sections ~w(projects default_project telegram)
 
   # A scope's billing/limits fields (kept in the project's own entry under `projects.<id>`).
-  @billing_keys ~w(markup budget message_limit budget_reset_at)
+  @billing_keys ~w(markup budget message_limit budget_reset_at budget_alert_at)
 
   # A project's meta (billing, defaults) by slug, from a config snapshot (empty if unknown).
   defp project_meta_in(config, slug) do
@@ -2496,6 +2496,19 @@ defmodule Pepe.Config do
     case scope_config(project)["message_limit"] do
       n when is_integer(n) and n > 0 -> n
       _ -> nil
+    end
+  end
+
+  @doc """
+  The fraction of a scope's budget at which a soft alert fires (before the hard cap of
+  `project_budget/1`). A number in `(0, 1]`; defaults to `0.8` (80%). Only meaningful when a
+  budget is set. See `Pepe.Usage.near_budget?/1`.
+  """
+  @spec project_budget_alert_at(String.t() | nil) :: float()
+  def project_budget_alert_at(project) do
+    case scope_config(project)["budget_alert_at"] do
+      n when is_number(n) and n > 0 and n <= 1 -> n / 1
+      _ -> 0.8
     end
   end
 
