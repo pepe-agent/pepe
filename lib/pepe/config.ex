@@ -2214,6 +2214,73 @@ defmodule Pepe.Config do
   end
 
   @doc """
+  Transform one Telegram bot's config in place, writing it back to wherever it lives (the legacy
+  `telegram` map for `"default"`, the `telegrams` map for a named bot). `fun` receives the bot map
+  (without the injected `"name"`) and returns the updated map. `{:error, :not_found}` if no such bot.
+  """
+  @spec update_telegram_bot(String.t(), (map() -> map())) :: :ok | {:error, :not_found}
+  def update_telegram_bot(name, fun) when is_binary(name) and is_function(fun, 1) do
+    case telegram_bot(name) do
+      nil ->
+        {:error, :not_found}
+
+      bot ->
+        updated = bot |> Map.delete("name") |> fun.()
+        if name == "default", do: put_telegram(updated), else: put_telegram_bot(name, updated)
+        :ok
+    end
+  end
+
+  @doc "Does this bot deny unknown users by default and queue them for approval? (`require_approval`)."
+  @spec telegram_require_approval?(String.t()) :: boolean()
+  def telegram_require_approval?(name) do
+    case telegram_bot(name) do
+      %{"require_approval" => true} -> true
+      _ -> false
+    end
+  end
+
+  @doc "Users who messaged this bot while blocked, awaiting approval (`[%{\"id\", \"name\", ...}]`)."
+  @spec telegram_pending(String.t()) :: [map()]
+  def telegram_pending(name) do
+    case telegram_bot(name) do
+      %{"pending_users" => list} when is_list(list) -> list
+      _ -> []
+    end
+  end
+
+  @doc "Queue a blocked user for approval (no-op if already queued or already allowed)."
+  @spec add_telegram_pending(String.t(), map()) :: :ok | {:error, :not_found}
+  def add_telegram_pending(name, %{"id" => id} = user) do
+    update_telegram_bot(name, fn bot ->
+      pending = bot["pending_users"] || []
+      allowed = bot["allowed_users"] || []
+
+      if id in allowed or Enum.any?(pending, &(&1["id"] == id)),
+        do: bot,
+        else: Map.put(bot, "pending_users", pending ++ [user])
+    end)
+  end
+
+  @doc "Approve a queued user: add to `allowed_users`, drop from the pending queue."
+  @spec approve_telegram_user(String.t(), integer()) :: :ok | {:error, :not_found}
+  def approve_telegram_user(name, user_id) do
+    update_telegram_bot(name, fn bot ->
+      bot
+      |> Map.put("allowed_users", Enum.uniq((bot["allowed_users"] || []) ++ [user_id]))
+      |> Map.put("pending_users", Enum.reject(bot["pending_users"] || [], &(&1["id"] == user_id)))
+    end)
+  end
+
+  @doc "Dismiss a queued user without approving (drop from the pending queue, stays blocked)."
+  @spec dismiss_telegram_pending(String.t(), integer()) :: :ok | {:error, :not_found}
+  def dismiss_telegram_pending(name, user_id) do
+    update_telegram_bot(name, fn bot ->
+      Map.put(bot, "pending_users", Enum.reject(bot["pending_users"] || [], &(&1["id"] == user_id)))
+    end)
+  end
+
+  @doc """
   Delete a named Telegram bot.
 
   `"default"` is the odd one out: it is not in `telegrams` at all, it is the legacy

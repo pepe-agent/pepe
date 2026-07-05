@@ -10,9 +10,12 @@ defmodule Pepe.Webhooks.MsTeams do
     * `app_password` - the client secret (store as `${ENV_VAR}`)
     * `tenant_id`    - the tenant for the token endpoint (or `botframework.com`)
 
-  Inbound JWT validation is delegated (the Bot Framework issues the token); set a real
-  reverse-proxy or keep this behind auth. The reply carries the conversation and its
-  `serviceUrl`, so it is addressed back to the right chat.
+  Inbound requests are authenticated natively: each carries an `Authorization: Bearer`
+  Bot Framework JWT, validated by `Pepe.Webhooks.MsTeamsJwt` (signature, issuer, and an
+  `aud` equal to this bot's `app_id`). So the webhook accepts `POST`s straight from
+  Microsoft, no validating proxy required. An operator who already terminates that check
+  at a proxy can set `trust_proxy: true` to skip it. The reply carries the conversation
+  and its `serviceUrl`, so it is addressed back to the right chat.
   """
   @behaviour Pepe.Webhooks.Provider
 
@@ -44,16 +47,34 @@ defmodule Pepe.Webhooks.MsTeams do
   def verify(_config, _params), do: :error
 
   @impl true
-  def authenticate(config, _raw_body, _headers) do
-    # The inbound Authorization bearer is a Bot Framework JWT. This provider does not validate it
-    # itself, so accepting inbound is only safe behind a proxy that does. That deployment is opt-in
-    # (`trust_proxy: true` in the connection config); by DEFAULT the endpoint is fail-closed, or a
-    # predictable URL (`/webhooks/root/msteams/msteams`) would let anyone anonymously drive the
-    # bound agent (arbitrary command execution if it holds `bash`).
-    if provider_config(config)["trust_proxy"] == true do
+  def authenticate(config, _raw_body, headers) do
+    # The inbound Authorization bearer is a Bot Framework JWT. Validate it against Microsoft's
+    # published keys so a predictable URL (`/webhooks/root/msteams/msteams`) cannot be POSTed by
+    # anyone to drive the bound agent (arbitrary command execution if it holds `bash`). An operator
+    # whose proxy already validates the token opts out with `trust_proxy: true`.
+    pc = provider_config(config)
+
+    if pc["trust_proxy"] == true do
       :ok
     else
-      Pepe.Webhooks.Provider.unsigned_inbound("msteams")
+      authenticate_jwt(pc, headers)
+    end
+  end
+
+  defp authenticate_jwt(pc, headers) do
+    with token when is_binary(token) <- bearer_token(headers),
+         :ok <- Pepe.Webhooks.MsTeamsJwt.verify(token, pc["app_id"] || "") do
+      :ok
+    else
+      _ -> :error
+    end
+  end
+
+  defp bearer_token(headers) do
+    case headers["authorization"] do
+      "Bearer " <> token -> String.trim(token)
+      "bearer " <> token -> String.trim(token)
+      _ -> nil
     end
   end
 

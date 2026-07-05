@@ -341,6 +341,13 @@ defmodule PepeWeb.ChannelsLive do
                 </div>
               </div>
               <div>
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" name="require_approval" value="true" checked={@edit_bot["require_approval"] == true} />
+                  <span class={lbl()}>{gettext("Require approval for new users")}</span>
+                </label>
+                <p class={hlp()}>{gettext("When on, the bot ignores anyone not on its allowlist and lists them below for you to let in with one click. When off, it answers everyone (unless you set an explicit user allowlist).")}</p>
+              </div>
+              <div>
                 <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("(leave blank to keep the current one)")}</span></label>
                 <input name="token" placeholder={"${TELEGRAM_BOT_TOKEN}  " <> gettext("(or paste a new token)")} class={fld()} />
                 <p class={hlp()}>{gettext("Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file.")}</p>
@@ -350,6 +357,31 @@ defmodule PepeWeb.ChannelsLive do
                 <button type="button" phx-click="bot_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
             </form>
+
+            <%!-- USERS WAITING FOR APPROVAL (outside the form, so a button never submits it) --%>
+            <div :if={@edit_bot["require_approval"] == true} class="mt-6 border-t border-zinc-800 pt-4">
+              <div class="text-sm font-semibold">{gettext("Waiting for approval")}</div>
+              <p :if={pending_users(@edit_bot) == []} class={hlp()}>{gettext("No one is waiting.")}</p>
+              <div
+                :for={u <- pending_users(@edit_bot)}
+                class="mt-2 flex items-center justify-between gap-2 rounded bg-zinc-900 px-2 py-1.5"
+              >
+                <div class="min-w-0">
+                  <div class="text-sm text-zinc-200">
+                    {u["name"]} <span class="font-mono text-xs text-zinc-500">id {u["id"]}</span>
+                  </div>
+                  <div class="truncate text-xs text-zinc-500">{u["sample"]}</div>
+                </div>
+                <div class="flex shrink-0 gap-1">
+                  <button phx-click="bot_approve_user" phx-value-name={@edit_bot["name"]} phx-value-id={u["id"]} class={btn()}>
+                    {gettext("Add")}
+                  </button>
+                  <button phx-click="bot_dismiss_user" phx-value-name={@edit_bot["name"]} phx-value-id={u["id"]} class={btn_ghost()}>
+                    {gettext("Ignore")}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <%!-- ADD A TELEGRAM BOT --%>
@@ -510,6 +542,21 @@ defmodule PepeWeb.ChannelsLive do
 
   def handle_event("bot_cancel", _p, socket), do: {:noreply, assign(socket, edit_bot: nil)}
 
+  def handle_event("bot_approve_user", %{"name" => name, "id" => id}, socket) do
+    Config.approve_telegram_user(name, String.to_integer(id))
+    reload_gateways()
+
+    {:noreply,
+     socket
+     |> assign(bots: Config.telegram_bots(), edit_bot: Config.telegram_bot(name))
+     |> put_flash(:info, gettext("User added. They can talk to the bot now."))}
+  end
+
+  def handle_event("bot_dismiss_user", %{"name" => name, "id" => id}, socket) do
+    Config.dismiss_telegram_pending(name, String.to_integer(id))
+    {:noreply, assign(socket, edit_bot: Config.telegram_bot(name))}
+  end
+
   def handle_event("bot_save", %{"name" => name} = params, socket) do
     new_token = blank(params["token"])
 
@@ -521,6 +568,7 @@ defmodule PepeWeb.ChannelsLive do
         |> Map.delete("name")
         |> put_or_delete("agent", blank(params["agent"]))
         |> put_or_delete("tool_progress", blank(params["tool_progress"]))
+        |> Map.put("require_approval", params["require_approval"] == "true")
         |> maybe_put_token(new_token)
 
       save_bot(name, bot)
@@ -550,6 +598,10 @@ defmodule PepeWeb.ChannelsLive do
   # interpolated values so two ${ENV_VAR} refs to the same secret are caught too.
   defp maybe_put_token(bot, nil), do: bot
   defp maybe_put_token(bot, token), do: Map.put(bot, "bot_token", token)
+
+  # Users this bot blocked (deny-by-default under require_approval) that are waiting to be let in.
+  defp pending_users(%{"name" => name}), do: Config.telegram_pending(name)
+  defp pending_users(_), do: []
 
   defp token_taken?(token, exclude_name) do
     want = Config.interpolate(token) || token

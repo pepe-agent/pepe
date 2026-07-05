@@ -154,8 +154,10 @@ as a follow-up once you finish. A `from` here is the interaction token, not a us
 Config: `app_id` (the bot's Microsoft app/client id), `app_password` (the client
 secret) and `tenant_id` (the Azure tenant, or `botframework.com`). Set the bot's
 messaging endpoint to the connection URL. Replies go back to the activity's
-`serviceUrl` with an app access token minted via client credentials. The inbound JWT
-is **not** validated here - keep the endpoint behind a proxy/secret. A 1:1 chat always
+`serviceUrl` with an app access token minted via client credentials. The inbound Bot
+Framework JWT **is** validated here (signature + `aud` == `app_id`), so the endpoint
+accepts POSTs straight from Microsoft; set `trust_proxy: true` only if a proxy already
+does that check. A 1:1 chat always
 replies; in a team channel or group chat the bot replies only when `@mentioned`
 (default; `require_mention: "false"` to answer all). The bot @mention is stripped from
 the text before it reaches you.

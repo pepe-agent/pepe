@@ -78,8 +78,9 @@ native human handoff. Channel plugins are configured on the dashboard's
   answer arrives as a follow-up. See [Discord](../discord/).
 - **Microsoft Teams.** Register a bot in Azure and set its messaging endpoint to
   the connection URL. Pepe replies to the activity's `serviceUrl` with a token
-  minted from the app credentials. Keep the endpoint behind a proxy or a secret:
-  the inbound JWT is not validated here. See [Microsoft Teams](../msteams/).
+  minted from the app credentials. The inbound Bot Framework JWT is validated, so
+  the endpoint accepts POSTs straight from Microsoft. See
+  [Microsoft Teams](../msteams/).
 - **Google Chat.** Configure the app's webhook (HTTP) endpoint to the connection
   URL and provide an OAuth `access_token` for the Chat API. Replies are posted
   back to the space. Keep the endpoint behind a proxy. See

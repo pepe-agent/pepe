@@ -5,9 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
-## [0.6.0] - unreleased
+## [0.6.0] - 2026-07-05
 
 ### Added
+- **Microsoft Teams works with just the three credentials — no proxy needed.** The Teams webhook now validates the inbound Bot Framework token itself (signature against Microsoft's published keys, plus an audience equal to the bot's own `app_id`), so it accepts requests straight from Microsoft. Before, the endpoint fail-closed unless you put a validating reverse-proxy in front of it, which meant filling in the dashboard form correctly still got you nothing. Fill in `app_id`, `app_password` and `tenant_id`, and it works like every other channel. An operator whose proxy already checks the token can skip Pepe's check with `trust_proxy: true`.
+- **Deny-by-default user approval for Telegram bots.** Turn on `require_approval` and the bot stops answering anyone who isn't on its allowlist — instead of silently replying to whoever wanders into the group. Blocked users are queued, and you let them in three ways: a one-click **Add** in the dashboard (with an **Ignore** to drop them), or by chatting with your agent (the operator-only `telegram_access` tool: "who's waiting?" → list, "let Salvador and Ana in" → approved). Off by default, so existing open/customer-facing bots are unchanged.
 - **Budget soft alerts, before the hard cap slams shut.** When a project crosses its alert threshold (default 80%, configurable per project with `budget_alert_at`), a one-time warning goes out that month instead of the work silently stopping at 100% with no heads-up. It's channel-agnostic: the core decides the alert is due, and it's delivered through the same router watches use, so it reaches whoever is actively using the project on their own channel (a Telegram chat, a live dashboard/widget session, the TUI) — a new surface gets budget alerts for free. The dashboard also shows an amber budget badge as the projects near the cap.
 
 ### Fixed
@@ -17,6 +19,7 @@ All notable changes to this project are documented here. Format follows
 ### Added
 - **The agent can see photos.** Send a picture on Telegram and, on a vision-capable model, the agent receives the actual image instead of just a filename it had no way to look at (it used to be told "a photo is saved at `…`" while the picture never reached the model, so it guessed or made something up). Enable it per model connection with `"vision": true` — off by default, since not every OpenAI-compatible endpoint accepts an image and sending one to a text-only model is an error. Works the same across OpenAI-compatible, Anthropic, and Responses/Codex connections. The image rides the turn it arrives on and is never persisted (like a voice transcript, the lasting record is the agent's reply), so it doesn't bloat sessions or get re-sent every turn.
 - **Photo albums are sent as several images at once**, up to `media.image.max_parts` (default 4); any extra, and any non-image in the album, is handed over as a file path as before.
+- **Reply to a voice note with a voice note.** Point `media.tts` at a model connection that serves an OpenAI-compatible `/audio/speech` and a spoken message gets a spoken reply back (in addition to the text, which stays the record). Off by default; the audio is length-capped so a long answer never becomes a five-minute clip, and a TTS failure is silent — the text reply already went out.
 
 ### Changed
 - **Inbound photos are size-capped without an image library.** Telegram already delivers each photo in several pre-scaled sizes, so Pepe picks the largest that fits `media.image.max_mb` (default 5 MB) — no libvips/imagemagick dependency, no larger container. An oversized or unsupported image falls back to the file-path prompt.

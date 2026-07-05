@@ -40,6 +40,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.SendToAgent
   alias Pepe.Tools.SetRoute
   alias Pepe.Tools.Skill
+  alias Pepe.Tools.TelegramAccess
   alias Pepe.Tools.Watch
   alias Pepe.Tools.WebSearch
   alias Pepe.Tools.WriteFile
@@ -78,7 +79,8 @@ defmodule Pepe.Tools do
     EnableTool,
     SetRoute,
     Review,
-    Watch
+    Watch,
+    TelegramAccess
   ]
 
   @doc "All tool modules - built-ins plus loaded plugins."

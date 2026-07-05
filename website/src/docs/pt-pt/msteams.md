@@ -27,6 +27,15 @@ antes de o agente o ver. Formato do URL de retorno:
 https://YOUR_HOST/webhooks/default/msteams/<slug>
 ```
 
+### Autenticação de entrada
+
+Cada pedido de entrada transporta um token do Bot Framework em
+`Authorization: Bearer`, e o Pepe valida-o (assinatura contra as chaves públicas
+da Microsoft, emissor e uma audiência igual ao `app_id` do bot) antes de o agente
+ver seja o que for. Assim o endpoint aceita `POST`s diretamente da Microsoft, sem
+necessidade de um proxy que valide. Se o teu proxy já faz essa verificação, define
+`trust_proxy: true` na ligação para saltar a do Pepe.
+
 Vê [Webhooks](../webhooks/) para os campos partilhados por toda a ligação
 (`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) e
 como funciona a rota genérica por dentro.

@@ -229,6 +229,12 @@ defmodule Pepe.Gateways.Telegram do
   defp topic_thread_id(%{"is_topic_message" => true, "message_thread_id" => id}), do: id
   defp topic_thread_id(_message), do: nil
 
+  # Set on the responding task when the incoming turn was a voice note, so the reply can come back
+  # as a voice note too (when media.tts is configured). Process-dictionary, like the bot snapshot.
+  @voice_reply_key :tg_voice_reply
+  defp put_voice_reply(bool), do: Process.put(@voice_reply_key, bool == true)
+  defp voice_reply?, do: Process.get(@voice_reply_key) == true
+
   # The responding agent's own `tool_progress` preference (nil = inherit the bot's), carried in
   # the process dictionary so `progress_mode/0` can prefer it over the channel default.
   @agent_progress_key :tg_agent_progress
@@ -763,22 +769,62 @@ defmodule Pepe.Gateways.Telegram do
     thread_id = topic_thread_id(message)
     said = with_reply_context(message, text)
 
-    if active?() and allowed?(chat_id, user_id) and
-         addressed?(text, chat["type"], chat_id, message) and
-         Pepe.Gateways.Telegram.Throttle.allow?(chat_id) do
-      b = bot()
-      # In a group, tie the reply to the question so it's clear what's being answered; in a DM
-      # there's only one thread, so a quote would just be clutter (nil = no reply target).
-      reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
+    cond do
+      not active?() ->
+        :ok
 
-      Task.start(fn ->
-        put_bot(b)
-        put_thread(thread_id)
-        put_chat(chat_id)
-        put_reply_to(reply_to)
-        respond(chat_id, user_id, message["message_id"], strip_mention(said))
-      end)
+      # Blocked (deny-by-default under require_approval, or an explicit allowlist miss): queue them
+      # for approval rather than answer. maybe_queue_pending only records under require_approval.
+      not allowed?(chat_id, user_id) ->
+        maybe_queue_pending(message, chat_id, user_id)
+
+      addressed?(text, chat["type"], chat_id, message) and Pepe.Gateways.Telegram.Throttle.allow?(chat_id) ->
+        b = bot()
+        # In a group, tie the reply to the question so it's clear what's being answered; in a DM
+        # there's only one thread, so a quote would just be clutter (nil = no reply target).
+        reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
+
+        Task.start(fn ->
+          put_bot(b)
+          put_thread(thread_id)
+          put_chat(chat_id)
+          put_reply_to(reply_to)
+          respond(chat_id, user_id, message["message_id"], strip_mention(said))
+        end)
+
+      true ->
+        :ok
     end
+  end
+
+  # Record a blocked user for approval, but only when the bot runs `require_approval` and the chat
+  # itself is allowed - there is nothing to approve on a bot that answers everyone, and no point
+  # queuing a stranger from a chat the bot ignores entirely.
+  defp maybe_queue_pending(message, chat_id, user_id) do
+    tg = bot()
+
+    if tg["require_approval"] == true and allowlisted?(tg["allowed_chats"], chat_id) and not is_nil(user_id) do
+      Config.add_telegram_pending(bot_name(), pending_user(message, chat_id, user_id))
+    end
+
+    :ok
+  end
+
+  defp pending_user(message, chat_id, user_id) do
+    from = message["from"] || %{}
+
+    %{
+      "id" => user_id,
+      "name" => sender_display_name(from),
+      "chat_id" => chat_id,
+      "at" => System.system_time(:second),
+      "sample" => message |> Map.get("text", "") |> to_string() |> String.slice(0, 120)
+    }
+  end
+
+  defp sender_display_name(from) do
+    name = [from["first_name"], from["last_name"]] |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(" ")
+    if name == "", do: from["username"] || "unknown", else: name
   end
 
   # When the user is replying to a specific message, prepend a short quote of it so the agent
@@ -1067,8 +1113,11 @@ defmodule Pepe.Gateways.Telegram do
 
   defp abs_media(path), do: Path.join(Pepe.Agent.Workspace.dir(agent_default()), path)
 
-  defp understood(inbound, kind, _path, text) when kind in ["voice", "audio"],
-    do: spoken(inbound, text)
+  defp understood(inbound, kind, _path, text) when kind in ["voice", "audio"] do
+    # A voice NOTE (not an uploaded audio file) may get a spoken reply back, if media.tts is set.
+    if kind == "voice", do: put_voice_reply(true)
+    spoken(inbound, text)
+  end
 
   defp understood(inbound, "document", path, text), do: attached(inbound, path, text)
 
@@ -1323,7 +1372,7 @@ defmodule Pepe.Gateways.Telegram do
              on_event: activity_callback(chat_id)
            ) do
         {:ok, reply} ->
-          send_message(chat_id, reply)
+          deliver_reply(chat_id, reply)
 
         {:error, :stopped} ->
           # The user issued /stop; that command already acknowledged it.
@@ -2257,6 +2306,43 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
+  # Send an Opus .ogg as a native Telegram voice note (the reply-in-voice path). Best-effort: a
+  # failure is logged, never raised, since the text reply already went out.
+  defp send_voice(chat_id, path) do
+    fields =
+      [chat_id: to_string(chat_id)]
+      |> then(fn f -> if id = thread(), do: f ++ [message_thread_id: to_string(id)], else: f end)
+      |> Kernel.++(voice: {File.stream!(path), filename: Path.basename(path)})
+
+    case Req.post(api_url(token(), "sendVoice"), form_multipart: fields, receive_timeout: 120_000) do
+      {:ok, %{status: 200}} -> :ok
+      {:ok, %{status: status, body: body}} -> {:error, {:telegram, status, body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Deliver the agent's reply: always the text (the record), plus a voice note when the turn came in
+  # by voice and TTS is configured. The audio is a bonus - a TTS failure is logged, never surfaced.
+  defp deliver_reply(chat_id, reply) do
+    send_message(chat_id, reply)
+    maybe_send_voice(chat_id, reply)
+  end
+
+  defp maybe_send_voice(chat_id, reply) do
+    if voice_reply?() and Pepe.Media.Speech.enabled?() and is_binary(reply) and reply != "" do
+      case Pepe.Media.Speech.speak(reply) do
+        {:ok, path} ->
+          send_voice(chat_id, path)
+          File.rm(path)
+
+        {:error, reason} ->
+          Logger.warning("[telegram] voice reply (tts) failed: #{safe_inspect(reason)}")
+      end
+    end
+
+    :ok
+  end
+
   defp send_document(chat_id, path, caption) do
     fields =
       [chat_id: to_string(chat_id)]
@@ -2737,8 +2823,16 @@ defmodule Pepe.Gateways.Telegram do
   # or missing list means "no restriction" on that dimension.
   defp allowed?(chat_id, user_id) do
     tg = bot()
-    allowlisted?(tg["allowed_chats"], chat_id) and allowlisted?(tg["allowed_users"], user_id)
+    allowlisted?(tg["allowed_chats"], chat_id) and user_allowed?(tg, user_id)
   end
+
+  # With `require_approval` on, the bot is deny-by-default: an empty `allowed_users` means "nobody
+  # until approved", the opposite of the normal "anyone". A blocked user is queued for approval (see
+  # maybe_queue_pending/3), so the operator can let them in from the dashboard or by chat.
+  defp user_allowed?(%{"require_approval" => true} = tg, user_id),
+    do: user_id in (tg["allowed_users"] || [])
+
+  defp user_allowed?(tg, user_id), do: allowlisted?(tg["allowed_users"], user_id)
 
   defp allowlisted?(list, id) when is_list(list) and list != [], do: id in list
   defp allowlisted?(_no_restriction, _id), do: true

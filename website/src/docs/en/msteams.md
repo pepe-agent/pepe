@@ -27,6 +27,15 @@ Callback URL shape:
 https://YOUR_HOST/webhooks/default/msteams/<slug>
 ```
 
+### Inbound authentication
+
+Each inbound request carries an `Authorization: Bearer` Bot Framework token, and
+Pepe validates it (signature against Microsoft's published keys, issuer, and an
+audience equal to the bot's `app_id`) before the agent sees anything. So the
+endpoint accepts `POST`s straight from Microsoft — no validating proxy required.
+If your proxy already performs that check, set `trust_proxy: true` on the
+connection to skip Pepe's.
+
 See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
 `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) and how the
 generic route works under the hood.
