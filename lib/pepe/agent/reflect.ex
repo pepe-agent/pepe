@@ -65,19 +65,27 @@ defmodule Pepe.Agent.Reflect do
     reviewer = review_agent(agent)
     transcript = messages ++ [Message.user(@review_prompt)]
     # No `:authorize` -> nobody to prompt on this background surface. The review's whole job is to
-    # write to its own memory/skills, so `review_agent/1` pre-approves those file writes; without
-    # it they hit the gate with no human to ask and are denied, and the review could read but never
-    # save what it learned.
-    Runtime.run(reviewer, transcript, [])
+    # write to its own memory/skills, so `review_agent/1` pre-approves those. `review:` threads the
+    # operator's opt-in staging dial (Config.review_writes?/0), same as consolidate/1, so a cautious
+    # operator can route these autonomous writes through Pepe.Approval; the default stays frictionless.
+    Runtime.run(reviewer, transcript, review: Config.review_writes?())
   end
 
-  # The reviewer: file/skill tools only, and its own-workspace file writes pre-approved. The grant
-  # is scoped to the `:writes_file` risk on purpose - a bare `write_file` is a blank cheque
-  # (`{tool, :any}`) that also covers `:writes_outside`, so a write to `shared/`, `skills/`, or an
-  # absolute path would go through unattended. This review runs with no human watching (a
-  # prompt-injected transcript could aim it at persistent skill injection), so those stay gated.
+  # The reviewer: file/skill tools only, with its memory AND skill writes pre-approved so it can
+  # actually save what it learns. The grant is scoped by RISK, not left as a blank cheque:
+  #
+  #   * `:writes_file`  - its own workspace (memory: USER.md, MEMORY.md).
+  #   * `:writes_skill` - the shared skills dir (Pepe.Permissions.Risk splits this out from the
+  #                       generic "writes outside" precisely so a skill can be saved without also
+  #                       granting code-dir or absolute-path writes).
+  #
+  # It does NOT cover `:writes_outside` (absolute paths, `plugins/`, `~/.pepe/config.json` - so no
+  # self-escalation) or `:flagged_skill` (a skill whose content trips the Sentinel injection scanner
+  # - so a poisoned skill is refused even unattended). A clean skill saves silently; the dangerous
+  # ones stop. `config_set`/`manage_*` aren't in @review_tools at all.
   defp review_agent(agent) do
-    %{agent | tools: @review_tools, auto_approve: ~w(write_file:writes_file edit_file:writes_file), max_iterations: 8}
+    grants = ~w(write_file:writes_file+writes_skill edit_file:writes_file+writes_skill)
+    %{agent | tools: @review_tools, auto_approve: grants, max_iterations: 8}
   end
 
   @doc "Fire the review in the background - never blocks the caller."

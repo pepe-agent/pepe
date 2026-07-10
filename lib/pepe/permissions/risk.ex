@@ -21,6 +21,8 @@ defmodule Pepe.Permissions.Risk do
           | :changes_config
           | :reads_outside
           | :writes_outside
+          | :writes_skill
+          | :flagged_skill
 
   @doc "Risk hint kinds for a tool call, from its decoded args map."
   @spec hints(String.t(), map()) :: [kind()]
@@ -41,6 +43,8 @@ defmodule Pepe.Permissions.Risk do
   def label(:changes_config), do: gettext("changes Pepe configuration")
   def label(:reads_outside), do: gettext("reads a file outside its workspace")
   def label(:writes_outside), do: gettext("writes outside its workspace")
+  def label(:writes_skill), do: gettext("adds or changes a skill")
+  def label(:flagged_skill), do: gettext("a skill whose content looks unsafe")
 
   # Risks that depend on WHERE a file tool points, not just which tool it is. A relative path
   # stays inside the agent's own workspace (and `shared/`) and is the free, always-safe read the
@@ -48,12 +52,16 @@ defmodule Pepe.Permissions.Risk do
   # tenant's files, `~/.pepe/config.json`, `~/.ssh`, `/etc` - so it carries a risk and stops
   # being always-safe, which routes it through the gate (refused where there is nobody to ask)
   # and the taint. Writing additionally treats `plugins/` and `skills/` as outside, because
-  # those directories are loaded as code and procedures: a write there is injection, not data.
+  # `plugins/` is loaded as code, so a write there stays `:writes_outside` (injection, gated).
+  # `skills/` is a legitimate learning target (the background review saves skills there), so it gets
+  # its own `:writes_skill` risk - which the review's grant can cover precisely, WITHOUT also
+  # granting code-dir or absolute-path writes. A skills write whose content trips the injection
+  # scanner additionally flags `:flagged_skill` (see flagged_skill/1).
   defp path_hints("read_file", %{"path" => p}), do: reads_outside(p)
   defp path_hints("list_dir", %{"path" => p}), do: reads_outside(p)
 
-  defp path_hints(name, %{"path" => p}) when name in ["write_file", "edit_file"],
-    do: writes_outside(p)
+  defp path_hints(name, %{"path" => p} = args) when name in ["write_file", "edit_file"],
+    do: writes_outside(p, args)
 
   defp path_hints("move_file", %{"from" => from, "to" => to}),
     do: Enum.uniq(writes_outside(from) ++ writes_outside(to))
@@ -67,22 +75,38 @@ defmodule Pepe.Permissions.Risk do
   # path as outside, forcing it through the gate instead of the always-safe short-circuit.
   defp reads_outside(_), do: [:reads_outside]
 
-  defp writes_outside(p) when is_binary(p),
-    do: if(climbs_out?(p) or into_code_dir?(p), do: [:writes_outside], else: [])
+  # move_file carries no content to scan, so it passes an empty args map.
+  defp writes_outside(p) when is_binary(p), do: writes_outside(p, %{})
+  defp writes_outside(_p), do: [:writes_outside]
 
-  defp writes_outside(_), do: [:writes_outside]
+  defp writes_outside(p, args) when is_binary(p) do
+    cond do
+      # Absolute paths and `..` escapes win FIRST, so `skills/../config.json` and the absolute
+      # spelling of the skills dir stay `:writes_outside`, never `:writes_skill`.
+      climbs_out?(p) -> [:writes_outside]
+      skill_path?(p) -> [:writes_skill | flagged_skill(args)]
+      plugin_path?(p) -> [:writes_outside]
+      true -> []
+    end
+  end
+
+  defp writes_outside(_p, _args), do: [:writes_outside]
 
   # Absolute, or escaping the workspace with a `..` segment (checked on the split path so
   # `shared/../../etc` is caught regardless of its prefix).
   defp climbs_out?(p), do: Path.type(p) == :absolute or ".." in Path.split(p)
 
-  # The plugins/ and skills/ dirs are compiled/loaded, so a write there is code, not data.
-  defp into_code_dir?(p) do
-    case Path.split(p) do
-      ["plugins" | _] -> true
-      ["skills" | _] -> true
-      _ -> false
-    end
+  defp skill_path?(p), do: match?(["skills" | _], Path.split(p))
+  defp plugin_path?(p), do: match?(["plugins" | _], Path.split(p))
+
+  # The extra risk a skills-dir write earns when its content trips the Sentinel injection scanner's
+  # `:danger` verdict (prompt injection, credential exfiltration, persistence). The background
+  # review's grant covers `:writes_skill` but NOT `:flagged_skill`, so a poisoned skill is refused
+  # even with no human in the loop, while a clean skill saves silently. On a human surface it just
+  # becomes one more line in the authorize prompt.
+  defp flagged_skill(args) do
+    text = Enum.map_join(["content", "new_string"], "\n", &to_string(args[&1] || ""))
+    if Pepe.Skills.Sentinel.scan(text).verdict == :danger, do: [:flagged_skill], else: []
   end
 
   # The command/code string to scan, per tool.

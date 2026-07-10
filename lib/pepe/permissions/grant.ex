@@ -149,7 +149,9 @@ defmodule Pepe.Permissions.Grant do
       :writes_file,
       :changes_config,
       :reads_outside,
-      :writes_outside
+      :writes_outside,
+      :writes_skill,
+      :flagged_skill
     ]
 
   @doc "Human-readable: what a grant actually lets through."

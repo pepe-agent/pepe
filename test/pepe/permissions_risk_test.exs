@@ -47,9 +47,11 @@ defmodule Pepe.Permissions.RiskTest do
   test "writing outside the workspace, or into the code dirs, is flagged beyond writes_file" do
     assert Risk.hints("write_file", %{"path" => "out.txt"}) == [:writes_file]
 
-    # plugins/ and skills/ are loaded as code/procedures - a write there is injection, not data.
+    # plugins/ is loaded as code - a write there is injection, stays :writes_outside.
     assert :writes_outside in Risk.hints("write_file", %{"path" => "plugins/evil.exs"})
-    assert :writes_outside in Risk.hints("write_file", %{"path" => "skills/x.md"})
+    # skills/ is a legitimate learning target - its own :writes_skill risk, not :writes_outside.
+    assert :writes_skill in Risk.hints("write_file", %{"path" => "skills/x.md"})
+    refute :writes_outside in Risk.hints("write_file", %{"path" => "skills/x.md"})
     assert :writes_outside in Risk.hints("write_file", %{"path" => "/etc/cron.d/x"})
     assert :writes_outside in Risk.hints("edit_file", %{"path" => "../outside.txt"})
     assert :writes_outside in Risk.hints("move_file", %{"from" => "a.txt", "to" => "plugins/x.exs"})

@@ -70,8 +70,12 @@ defmodule Pepe.Webhooks.MsTeamsJwtTest do
 
   test "rejects a tampered signature", %{priv: priv} do
     [header, payload, sig] = sign(priv, claims()) |> String.split(".")
-    # Flip the last character of the signature to a different base64url symbol.
-    flipped = String.slice(sig, 0..-2//1) <> if String.ends_with?(sig, "A"), do: "B", else: "A"
+    # Flip the FIRST base64url character of the signature. Not the last: the last char of a 256-byte
+    # RSA signature carries only a couple of significant bits, and Base.url_decode64 discards the
+    # rest, so flipping it can decode to the same bytes and not actually tamper (a flaky no-op that
+    # depended on the random key). The first char always encodes significant bits.
+    <<first::binary-size(1), rest::binary>> = sig
+    flipped = if(first == "A", do: "B", else: "A") <> rest
     assert MsTeamsJwt.verify("#{header}.#{payload}.#{flipped}", @app_id) == {:error, :bad_signature}
   end
 

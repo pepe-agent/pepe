@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-10
+
+### Fixed
+- **The background learning review can save skills again — without reopening the injection hole.** 0.5.16 scoped the unattended review's write grant to its own workspace to stop a prompt-injected transcript from planting a malicious skill; that also blocked it from saving *legitimate* skills, which live in the shared skills dir. Now a write to `skills/` carries its own `writes_skill` risk (split out from the generic "writes outside"), which the review's grant covers precisely — so a clean skill saves automatically and silently, with no approval click or staging queue. The dangerous cases are stopped by machine, not by friction: a skills write whose content trips the injection scanner (`ignore previous instructions`, credential exfiltration, persistence hooks) additionally flags `flagged_skill`, which the grant does *not* cover, so it's refused even unattended; and `plugins/` (loaded as code), absolute paths, and `..` escapes stay fully gated, so the review still cannot touch the app's code or rewrite its own config to self-escalate. Memory writes were always allowed and still are. Operators who want the strict posture can route all autonomous writes through review-staging (`review_writes`), now honoured on this path too.
+
 ## [0.6.0] - 2026-07-05
 
 ### Added
