@@ -2829,10 +2829,23 @@ defmodule Pepe.Gateways.Telegram do
   # With `require_approval` on, the bot is deny-by-default: an empty `allowed_users` means "nobody
   # until approved", the opposite of the normal "anyone". A blocked user is queued for approval (see
   # maybe_queue_pending/3), so the operator can let them in from the dashboard or by chat.
+  #
+  # An explicit trainer is exempt from the queue - they are already a smaller, deliberately curated
+  # trust tier (see learns_from?/2), at least as trusted as someone hand-approved here. This is the
+  # footgun fix: turning `require_approval` on with an empty `allowed_users` used to lock out the
+  # operator's own DM along with everyone else, with no way back short of editing config.json by
+  # hand. `trainers: nil` does NOT count - that means "learns from everyone" for the (looser)
+  # learning boundary, and reading it as "everyone is exempt here" would silently defeat this gate
+  # for the common case where trainers was simply never set.
   defp user_allowed?(%{"require_approval" => true} = tg, user_id),
-    do: user_id in (tg["allowed_users"] || [])
+    do: user_id in (tg["allowed_users"] || []) or explicit_trainer?(tg, user_id)
 
   defp user_allowed?(tg, user_id), do: allowlisted?(tg["allowed_users"], user_id)
+
+  defp explicit_trainer?(%{"trainers" => list}, user_id) when is_list(list) and list != [],
+    do: "*" in list or user_id in list
+
+  defp explicit_trainer?(_tg, _user_id), do: false
 
   defp allowlisted?(list, id) when is_list(list) and list != [], do: id in list
   defp allowlisted?(_no_restriction, _id), do: true

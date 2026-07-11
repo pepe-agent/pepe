@@ -236,6 +236,95 @@ defmodule PepeWeb.ChannelsLiveTest do
     assert snippet_text(html) =~ ~s(data-title="Support")
   end
 
+  describe "user approval" do
+    # Turning the checkbox on is a form submit (bot_save), same as any other field.
+    defp enable_approval(view) do
+      view
+      |> form("form[phx-submit=bot_save]", %{"require_approval" => "true"})
+      |> render_submit()
+    end
+
+    test "the panel is nested under the checkbox, inside the form, and Add/Ignore never submit it" do
+      {:ok, view, _html} = live(conn(), "/bots")
+      render_click(view, "bot_edit", %{"name" => "default"})
+
+      # bot_save (like any other field's save) closes the edit form, so reopen it to see the panel.
+      enable_approval(view)
+      html = render_click(view, "bot_edit", %{"name" => "default"})
+      assert html =~ "No one is waiting."
+
+      Config.add_telegram_pending("default", %{"id" => 555, "name" => "Salvador", "chat_id" => -1, "at" => 0, "sample" => "oi"})
+      html = render_click(view, "bot_edit", %{"name" => "default"})
+      assert html =~ "Salvador"
+      assert html =~ "id 555"
+
+      # Add is a real button inside <form phx-submit="bot_save">. Without type="button" a plain
+      # <button> defaults to type="submit" and clicking it would also re-run bot_save - asserting
+      # bot_save's own side effect (its flash) never fired proves that didn't happen.
+      html = render_click(view, "bot_approve_user", %{"name" => "default", "id" => "555"})
+      refute html =~ "Bot default saved."
+      assert Config.telegram_bot("default")["allowed_users"] == [555]
+      assert html =~ "No one is waiting."
+      # Salvador moved from "waiting" to "allowed" - still on the page, under the other panel.
+      assert html =~ "Allowed users"
+    end
+
+    test "Ignore drops a pending user without allowing them" do
+      {:ok, view, _html} = live(conn(), "/bots")
+      render_click(view, "bot_edit", %{"name" => "default"})
+      enable_approval(view)
+
+      Config.add_telegram_pending("default", %{"id" => 777, "name" => "Ana", "chat_id" => -1, "at" => 0, "sample" => "oi"})
+      render_click(view, "bot_edit", %{"name" => "default"})
+
+      html = render_click(view, "bot_dismiss_user", %{"name" => "default", "id" => "777"})
+      assert Config.telegram_pending("default") == []
+      refute 777 in (Config.telegram_bot("default")["allowed_users"] || [])
+      assert html =~ "No one is waiting."
+    end
+
+    test "the panel only shows once the checkbox is on" do
+      {:ok, view, _html} = live(conn(), "/bots")
+      html = render_click(view, "bot_edit", %{"name" => "default"})
+
+      refute html =~ "Waiting for approval"
+      refute html =~ "Allowed users"
+    end
+
+    test "an approved user shows up under Allowed users, with the name captured from the queue, and can be revoked" do
+      {:ok, view, _html} = live(conn(), "/bots")
+      render_click(view, "bot_edit", %{"name" => "default"})
+      enable_approval(view)
+      render_click(view, "bot_edit", %{"name" => "default"})
+
+      Config.add_telegram_pending("default", %{"id" => 999, "name" => "Beto", "chat_id" => -1, "at" => 0, "sample" => "oi"})
+      render_click(view, "bot_edit", %{"name" => "default"})
+      render_click(view, "bot_approve_user", %{"name" => "default", "id" => "999"})
+
+      html = render_click(view, "bot_edit", %{"name" => "default"})
+      assert html =~ "Beto"
+      assert html =~ "id 999"
+      refute html =~ "No one has been approved yet."
+
+      html = render_click(view, "bot_revoke_user", %{"name" => "default", "id" => "999"})
+      assert Config.telegram_bot("default")["allowed_users"] == []
+      assert html =~ "No one has been approved yet."
+      refute html =~ "Beto"
+    end
+
+    test "an id added by hand (no queue history) shows with no name, not a crash" do
+      Config.update_telegram_bot("default", &Map.put(&1, "allowed_users", [4242]))
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      render_click(view, "bot_edit", %{"name" => "default"})
+      html = enable_approval(view)
+      html = html <> render_click(view, "bot_edit", %{"name" => "default"})
+
+      assert html =~ "id 4242"
+      assert html =~ "no name on record"
+    end
+  end
+
   test "restarting the gateway reports back to the operator" do
     {:ok, view, _html} = live(conn(), "/bots")
 

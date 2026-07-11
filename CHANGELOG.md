@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **The dashboard can now show and revoke Telegram users it already approved**, not just the ones still waiting. Once someone was let in there was no way to see or undo it short of editing `config.json` by hand. A new "Allowed users" panel sits next to "Waiting for approval", each entry with a **Revoke** button.
+
+### Fixed
+- **Turning on `require_approval` no longer risks locking out the operator too.** It used to be all-or-nothing: an empty `allowed_users` meant *everyone* was queued, including the bot owner's own DM, with no way back short of hand-editing config. A bot's explicit `trainers` list (a smaller, already-curated trust tier) is now exempt from the approval queue on sight. `trainers` left unset is **not** treated as an exemption — that would silently defeat the gate for the common case where it was simply never configured.
+- **MCP tool results now taint the run, same as `fetch_url`/`web_search`.** Content an MCP tool returns (a GitHub issue, a Slack message) is the same class of stranger-authored text, but the taint check only recognized a fixed list of tools — so a read-only MCP tool combined with something risky in `auto_approve` could have that risky tool silently triggered by an instruction hidden in the MCP result.
+- **Approval panel placement fixed.** It used to render *after* the Save/Cancel buttons, outside the form — now it's nested under the "Require approval" checkbox it belongs to.
+
+### Security
+- Patched `mint` (1.9.1 → 1.9.3: fixes a HIGH-severity memory-exhaustion DoS plus two MEDIUM advisories — it's the transport for every LLM provider call), `phoenix_live_view` (1.2.3 → 1.2.7: fixes a MEDIUM XSS via scheme-validation bypass in `<.link>`), and `req` (0.6.2 → 0.6.3, patch). `mix hex.audit` is clean.
+
 ## [0.6.1] - 2026-07-10
 
 ### Fixed

@@ -187,6 +187,69 @@ defmodule Pepe.Agent.UntrustedContentTest do
     assert bash_result["content"] =~ "content from outside"
   end
 
+  test "an MCP tool result taints the rest of the run, same as fetch_url", %{cwd: cwd} do
+    # An MCP tool (mcp__<server>__<tool>) returns the same class of stranger-authored content as
+    # fetch_url/web_search - a GitHub issue, a Slack message - just fetched a different way. It
+    # must taint too. No real MCP server needed: taint_if_outside/1 keys on the NAME alone, so the
+    # call failing (no such server configured) still exercises the exact path that matters here.
+    defmodule McpCaller do
+      @moduledoc false
+      import Plug.Conn
+
+      def init(opts), do: opts
+
+      def call(conn, _opts) do
+        {:ok, body, conn} = read_body(conn)
+        msgs = body |> Jason.decode!() |> Map.fetch!("messages")
+        tools = Enum.count(msgs, &(&1["role"] == "tool"))
+
+        call_for = fn name, args ->
+          %{
+            "role" => "assistant",
+            "content" => nil,
+            "tool_calls" => [
+              %{"id" => "c#{tools}", "type" => "function", "function" => %{"name" => name, "arguments" => args}}
+            ]
+          }
+        end
+
+        message =
+          case tools do
+            0 -> call_for.("mcp__issues__get", ~s({"id":42}))
+            1 -> call_for.("bash", ~s({"command":"env"}))
+            _ -> %{"role" => "assistant", "content" => "done"}
+          end
+
+        payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => "stop"}]}
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+      end
+    end
+
+    {:ok, server} = Bandit.start_link(plug: McpCaller, port: 0, startup_log: false)
+    {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
+
+    Config.put_model(%Model{name: "mc", base_url: "http://127.0.0.1:#{port}", api_key: "k", model: "m"})
+
+    agent = %Agent{
+      name: "mcp-user",
+      model: "mc",
+      system_prompt: "hi",
+      tools: ["bash", "mcp__issues__get"],
+      auto_approve: ["*"],
+      max_iterations: 4
+    }
+
+    Config.put_agent(agent)
+
+    {:ok, _reply, messages} = Runtime.converse(agent, "check issue 42", cwd: cwd)
+
+    # The MCP call itself may fail (no server configured) or succeed - doesn't matter. What
+    # changed is everything after it: bash, pre-approved for everything, was refused instead of
+    # running in silence.
+    assert [_mcp_result, bash_result] = Enum.filter(messages, &(&1["role"] == "tool"))
+    assert bash_result["content"] =~ "content from outside"
+  end
+
   test "an agent trusted to act on outside content is not held back by the taint", %{cwd: cwd} do
     # The escape hatch, for the case a person actually has: a document must trigger an action
     # on the system, and this is an agent you have decided to trust for exactly that. It is a

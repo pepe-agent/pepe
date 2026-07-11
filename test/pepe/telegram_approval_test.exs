@@ -56,6 +56,39 @@ defmodule Pepe.TelegramApprovalTest do
       Config.add_telegram_pending("default", user(5, "known"))
       assert Config.telegram_pending("default") == []
     end
+
+    test "approving captures the name; telegram_allowed/1 lists it; revoke removes it and the name" do
+      Config.add_telegram_pending("default", user(1, "Salvador"))
+      Config.approve_telegram_user("default", 1)
+
+      assert Config.telegram_allowed("default") == [%{"id" => 1, "name" => "Salvador"}]
+
+      assert :ok = Config.revoke_telegram_user("default", 1)
+      assert Config.telegram_bot("default")["allowed_users"] == []
+      assert Config.telegram_allowed("default") == []
+      # the name is dropped too, not left as an orphan entry
+      assert Config.telegram_bot("default")["allowed_users_names"] == %{}
+    end
+
+    test "an id added by hand (no queue history) has no name on record, but still lists and revokes" do
+      Config.update_telegram_bot("default", &Map.put(&1, "allowed_users", [4242]))
+
+      assert Config.telegram_allowed("default") == [%{"id" => 4242, "name" => nil}]
+
+      assert :ok = Config.revoke_telegram_user("default", 4242)
+      assert Config.telegram_allowed("default") == []
+    end
+
+    test "revoking a user does not disturb another approved user" do
+      Config.add_telegram_pending("default", user(1, "Salvador"))
+      Config.add_telegram_pending("default", user(2, "Ana"))
+      Config.approve_telegram_user("default", 1)
+      Config.approve_telegram_user("default", 2)
+
+      Config.revoke_telegram_user("default", 1)
+
+      assert Config.telegram_allowed("default") == [%{"id" => 2, "name" => "Ana"}]
+    end
   end
 
   describe "telegram_access tool" do

@@ -2262,14 +2262,28 @@ defmodule Pepe.Config do
     end)
   end
 
-  @doc "Approve a queued user: add to `allowed_users`, drop from the pending queue."
+  @doc """
+  Approve a queued user: add to `allowed_users`, drop from the pending queue. The name from the
+  pending entry (if any) is kept in `allowed_users_names` (a display-only map, id => name) so the
+  dashboard can show a human, not just a bare id, once the queue entry - the only place the name
+  was ever recorded - is gone.
+  """
   @spec approve_telegram_user(String.t(), integer()) :: :ok | {:error, :not_found}
   def approve_telegram_user(name, user_id) do
     update_telegram_bot(name, fn bot ->
+      pending_entry = Enum.find(bot["pending_users"] || [], &(&1["id"] == user_id))
+
       bot
       |> Map.put("allowed_users", Enum.uniq((bot["allowed_users"] || []) ++ [user_id]))
       |> Map.put("pending_users", Enum.reject(bot["pending_users"] || [], &(&1["id"] == user_id)))
+      |> put_allowed_name(user_id, pending_entry && pending_entry["name"])
     end)
+  end
+
+  defp put_allowed_name(bot, _user_id, nil), do: bot
+
+  defp put_allowed_name(bot, user_id, name) do
+    update_in(bot, ["allowed_users_names"], fn m -> Map.put(m || %{}, to_string(user_id), name) end)
   end
 
   @doc "Dismiss a queued user without approving (drop from the pending queue, stays blocked)."
@@ -2278,6 +2292,40 @@ defmodule Pepe.Config do
     update_telegram_bot(name, fn bot ->
       Map.put(bot, "pending_users", Enum.reject(bot["pending_users"] || [], &(&1["id"] == user_id)))
     end)
+  end
+
+  @doc """
+  Revoke a previously approved user: drop from `allowed_users` (and its display name, if any).
+  They go back to being blocked - a new message from them re-queues into `pending_users`, same as
+  anyone else `require_approval` has never seen before.
+  """
+  @spec revoke_telegram_user(String.t(), integer()) :: :ok | {:error, :not_found}
+  def revoke_telegram_user(name, user_id) do
+    update_telegram_bot(name, fn bot ->
+      bot
+      |> Map.put("allowed_users", Enum.reject(bot["allowed_users"] || [], &(&1 == user_id)))
+      |> update_in(["allowed_users_names"], fn m -> Map.delete(m || %{}, to_string(user_id)) end)
+    end)
+  end
+
+  @doc """
+  This bot's approved users as `[%{"id" => id, "name" => name_or_nil}]`, sorted by name/id - for
+  the dashboard to list (and offer to revoke). `name` is only ever known for someone approved
+  through the pending queue; an id added by hand (config file, CLI) shows with no name.
+  """
+  @spec telegram_allowed(String.t()) :: [%{String.t() => term()}]
+  def telegram_allowed(name) do
+    case telegram_bot(name) do
+      %{"allowed_users" => ids} when is_list(ids) ->
+        names = telegram_bot(name)["allowed_users_names"] || %{}
+
+        ids
+        |> Enum.map(&%{"id" => &1, "name" => names[to_string(&1)]})
+        |> Enum.sort_by(&{&1["name"] || "", &1["id"]})
+
+      _ ->
+        []
+    end
   end
 
   @doc """

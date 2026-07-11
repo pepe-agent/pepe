@@ -524,6 +524,56 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     end
   end
 
+  describe "deny-by-default approval (require_approval)" do
+    test "an unknown user is queued for approval, not answered", %{chat: chat} do
+      start_bot!(%{"require_approval" => true})
+
+      say(chat, "hi", user: @outsider)
+      refute_receive {:sent, ^chat, _text, _buttons}, 500
+
+      assert [%{"id" => @outsider}] = Config.telegram_pending("default")
+    end
+
+    test "an approved user (allowed_users) is answered normally", %{chat: chat} do
+      start_bot!(%{"require_approval" => true, "allowed_users" => [@user]})
+
+      say(chat, "/whoami", user: @user)
+      assert await_reply(chat) =~ to_string(@user)
+      assert Config.telegram_pending("default") == []
+    end
+
+    # The footgun this closes: the operator turns require_approval on with nothing in
+    # allowed_users yet, and used to lock out their own DM too, with no way back short of
+    # editing config.json by hand. An explicit `trainers` list - a smaller, already-curated
+    # trust tier - now exempts its members from the queue on sight.
+    test "an explicit trainer is exempt from the queue, even with an empty allowlist", %{chat: chat} do
+      start_bot!(%{"require_approval" => true, "trainers" => [@user]})
+
+      say(chat, "/whoami", user: @user)
+      assert await_reply(chat) =~ to_string(@user)
+      assert Config.telegram_pending("default") == []
+    end
+
+    # trainers: nil means "everyone" for the LEARNING boundary (learns_from?/2) - a much looser
+    # default that must never be read as "everyone is exempt from require_approval" too, or the
+    # gate would be silently defeated for the common case where trainers was simply never set.
+    test "trainers left unset does NOT exempt anyone - nil is not the same as an explicit list", %{chat: chat} do
+      start_bot!(%{"require_approval" => true})
+
+      say(chat, "/whoami", user: @user)
+      refute_receive {:sent, ^chat, _text, _buttons}, 500
+      assert [%{"id" => @user}] = Config.telegram_pending("default")
+    end
+
+    test "an explicit trainers list with someone NOT on it still queues them", %{chat: chat} do
+      start_bot!(%{"require_approval" => true, "trainers" => [@user]})
+
+      say(chat, "hi", user: @outsider)
+      refute_receive {:sent, ^chat, _text, _buttons}, 500
+      assert [%{"id" => @outsider}] = Config.telegram_pending("default")
+    end
+  end
+
   describe "in a group where the bot must be addressed" do
     setup do: start_bot!(%{"require_mention" => true})
 

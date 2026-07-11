@@ -466,10 +466,15 @@ defmodule Pepe.Agent.Runtime do
   # instruction from the user. From here on, this run's pre-approved tools go back to asking.
   # It runs in the run's own process, which is where the gate reads it (tools may fan out into
   # tasks, the gate never does).
+  #
+  # An MCP tool result is the same class of content - a GitHub issue, a Slack message, a Sentry
+  # error - just fetched over MCP instead of fetch_url/web_search, so it taints too. Every
+  # mcp__<server>__<tool> call counts, not a fixed list: which servers/tools an agent has is
+  # config, not something this module should have to know about ahead of time.
   @outside_content ~w(fetch_url web_search)
 
   defp taint_if_outside(name) when name in @outside_content, do: Pepe.Permissions.taint()
-  defp taint_if_outside(_name), do: :ok
+  defp taint_if_outside(name), do: if(Pepe.MCP.mcp_tool?(name), do: Pepe.Permissions.taint(), else: :ok)
 
   # Mutating file tools whose autonomous use we stage for review rather than apply.
   @stageable ~w(write_file edit_file move_file)

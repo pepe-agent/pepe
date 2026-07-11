@@ -345,7 +345,76 @@ defmodule PepeWeb.ChannelsLive do
                   <input type="checkbox" name="require_approval" value="true" checked={@edit_bot["require_approval"] == true} />
                   <span class={lbl()}>{gettext("Require approval for new users")}</span>
                 </label>
-                <p class={hlp()}>{gettext("When on, the bot ignores anyone not on its allowlist and lists them below for you to let in with one click. When off, it answers everyone (unless you set an explicit user allowlist).")}</p>
+                <p class={hlp()}>{gettext("When on, the bot ignores anyone not on its allowlist. When off, it answers everyone (unless you set an explicit user allowlist).")}</p>
+
+                <%!-- Nested right under the toggle they belong to, not a separate section - and
+                     `type="button"` on every action so a click here never submits the form. --%>
+                <div :if={@edit_bot["require_approval"] == true} class="mt-3 space-y-3">
+                  <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+                    <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500">{gettext("Waiting for approval")}</div>
+                    <p :if={pending_users(@edit_bot) == []} class="mt-1.5 text-sm text-zinc-600">{gettext("No one is waiting.")}</p>
+                    <div :if={pending_users(@edit_bot) != []} class="mt-2 space-y-1.5">
+                      <div
+                        :for={u <- pending_users(@edit_bot)}
+                        class="flex items-center justify-between gap-3 rounded-lg bg-zinc-900 px-3 py-2"
+                      >
+                        <div class="min-w-0">
+                          <div class="text-sm text-zinc-200">
+                            {u["name"]} <span class="font-mono text-xs text-zinc-500">id {u["id"]}</span>
+                          </div>
+                          <div class="truncate text-xs text-zinc-500">{u["sample"]}</div>
+                        </div>
+                        <div class="flex shrink-0 gap-1.5">
+                          <button
+                            type="button"
+                            phx-click="bot_approve_user"
+                            phx-value-name={@edit_bot["name"]}
+                            phx-value-id={u["id"]}
+                            class="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-600"
+                          >
+                            {gettext("Add")}
+                          </button>
+                          <button
+                            type="button"
+                            phx-click="bot_dismiss_user"
+                            phx-value-name={@edit_bot["name"]}
+                            phx-value-id={u["id"]}
+                            class={btn_ghost()}
+                          >
+                            {gettext("Ignore")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+                    <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500">{gettext("Allowed users")}</div>
+                    <p :if={allowed_users(@edit_bot) == []} class="mt-1.5 text-sm text-zinc-600">{gettext("No one has been approved yet.")}</p>
+                    <div :if={allowed_users(@edit_bot) != []} class="mt-2 space-y-1.5">
+                      <div
+                        :for={u <- allowed_users(@edit_bot)}
+                        class="flex items-center justify-between gap-3 rounded-lg bg-zinc-900 px-3 py-2"
+                      >
+                        <div class="text-sm text-zinc-200">
+                          <span :if={u["name"]}>{u["name"]}</span>
+                          <span :if={!u["name"]} class="text-zinc-500">{gettext("(no name on record)")}</span>
+                          <span class="font-mono text-xs text-zinc-500">id {u["id"]}</span>
+                        </div>
+                        <button
+                          type="button"
+                          phx-click="bot_revoke_user"
+                          phx-value-name={@edit_bot["name"]}
+                          phx-value-id={u["id"]}
+                          data-confirm={gettext("Remove this person's access? They'll go back to being blocked.")}
+                          class="rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-1.5 text-sm text-red-300 transition hover:border-red-700 hover:bg-red-900/40"
+                        >
+                          {gettext("Revoke")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("(leave blank to keep the current one)")}</span></label>
@@ -357,31 +426,6 @@ defmodule PepeWeb.ChannelsLive do
                 <button type="button" phx-click="bot_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
             </form>
-
-            <%!-- USERS WAITING FOR APPROVAL (outside the form, so a button never submits it) --%>
-            <div :if={@edit_bot["require_approval"] == true} class="mt-6 border-t border-zinc-800 pt-4">
-              <div class="text-sm font-semibold">{gettext("Waiting for approval")}</div>
-              <p :if={pending_users(@edit_bot) == []} class={hlp()}>{gettext("No one is waiting.")}</p>
-              <div
-                :for={u <- pending_users(@edit_bot)}
-                class="mt-2 flex items-center justify-between gap-2 rounded bg-zinc-900 px-2 py-1.5"
-              >
-                <div class="min-w-0">
-                  <div class="text-sm text-zinc-200">
-                    {u["name"]} <span class="font-mono text-xs text-zinc-500">id {u["id"]}</span>
-                  </div>
-                  <div class="truncate text-xs text-zinc-500">{u["sample"]}</div>
-                </div>
-                <div class="flex shrink-0 gap-1">
-                  <button phx-click="bot_approve_user" phx-value-name={@edit_bot["name"]} phx-value-id={u["id"]} class={btn()}>
-                    {gettext("Add")}
-                  </button>
-                  <button phx-click="bot_dismiss_user" phx-value-name={@edit_bot["name"]} phx-value-id={u["id"]} class={btn_ghost()}>
-                    {gettext("Ignore")}
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
           <%!-- ADD A TELEGRAM BOT --%>
@@ -557,6 +601,16 @@ defmodule PepeWeb.ChannelsLive do
     {:noreply, assign(socket, edit_bot: Config.telegram_bot(name))}
   end
 
+  def handle_event("bot_revoke_user", %{"name" => name, "id" => id}, socket) do
+    Config.revoke_telegram_user(name, String.to_integer(id))
+    reload_gateways()
+
+    {:noreply,
+     socket
+     |> assign(bots: Config.telegram_bots(), edit_bot: Config.telegram_bot(name))
+     |> put_flash(:info, gettext("Access revoked. They're blocked again."))}
+  end
+
   def handle_event("bot_save", %{"name" => name} = params, socket) do
     new_token = blank(params["token"])
 
@@ -602,6 +656,10 @@ defmodule PepeWeb.ChannelsLive do
   # Users this bot blocked (deny-by-default under require_approval) that are waiting to be let in.
   defp pending_users(%{"name" => name}), do: Config.telegram_pending(name)
   defp pending_users(_), do: []
+
+  # Users already approved for this bot, with a name when one was captured at approval time.
+  defp allowed_users(%{"name" => name}), do: Config.telegram_allowed(name)
+  defp allowed_users(_), do: []
 
   defp token_taken?(token, exclude_name) do
     want = Config.interpolate(token) || token

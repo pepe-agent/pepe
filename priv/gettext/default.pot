@@ -619,7 +619,7 @@ msgstr ""
 msgid "(use default model)"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:390
+#: lib/pepe_web/live/channels_live.ex:434
 #, elixir-autogen, elixir-format
 msgid "+ Add a bot"
 msgstr ""
@@ -646,7 +646,7 @@ msgstr ""
 msgid "API key"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:407
+#: lib/pepe_web/live/channels_live.ex:451
 #, elixir-autogen, elixir-format
 msgid "Add bot"
 msgstr ""
@@ -674,13 +674,13 @@ msgstr ""
 msgid "Base URL"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:522
+#: lib/pepe_web/live/channels_live.ex:566
 #, elixir-autogen, elixir-format
 msgid "Bot %{name} added."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:351
-#: lib/pepe_web/live/channels_live.ex:396
+#: lib/pepe_web/live/channels_live.ex:420
+#: lib/pepe_web/live/channels_live.ex:440
 #, elixir-autogen, elixir-format
 msgid "Bot token"
 msgstr ""
@@ -688,8 +688,8 @@ msgstr ""
 #: lib/pepe_web/live/agents_live.ex:308
 #: lib/pepe_web/live/channels_live.ex:235
 #: lib/pepe_web/live/channels_live.ex:302
-#: lib/pepe_web/live/channels_live.ex:357
-#: lib/pepe_web/live/channels_live.ex:408
+#: lib/pepe_web/live/channels_live.ex:426
+#: lib/pepe_web/live/channels_live.ex:452
 #: lib/pepe_web/live/connections_component.ex:185
 #: lib/pepe_web/live/dash_ui.ex:174
 #: lib/pepe_web/live/hooks_live.ex:122
@@ -854,7 +854,7 @@ msgid "Models"
 msgstr ""
 
 #: lib/pepe_web/live/agents_live.ex:125
-#: lib/pepe_web/live/channels_live.ex:394
+#: lib/pepe_web/live/channels_live.ex:438
 #: lib/pepe_web/live/models_live.ex:227
 #: lib/pepe_web/live/models_live.ex:299
 #: lib/pepe_web/live/projects_live.ex:210
@@ -920,7 +920,7 @@ msgid "Run now"
 msgstr ""
 
 #: lib/pepe_web/live/agents_live.ex:307
-#: lib/pepe_web/live/channels_live.ex:356
+#: lib/pepe_web/live/channels_live.ex:425
 #: lib/pepe_web/live/hooks_live.ex:121
 #: lib/pepe_web/live/learning_live.ex:76
 #: lib/pepe_web/live/models_live.ex:279
@@ -982,7 +982,7 @@ msgid "The run failed. Check the model connection."
 msgstr ""
 
 #: lib/pepe_web/live/channels_live.ex:313
-#: lib/pepe_web/live/channels_live.ex:400
+#: lib/pepe_web/live/channels_live.ex:444
 #, elixir-autogen, elixir-format
 msgid "This bot talks to"
 msgstr ""
@@ -1135,7 +1135,7 @@ msgstr ""
 msgid "only those"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:394
+#: lib/pepe_web/live/channels_live.ex:438
 #, elixir-autogen, elixir-format
 msgid "sales"
 msgstr ""
@@ -1222,7 +1222,7 @@ msgstr ""
 msgid "(optional)"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:352
+#: lib/pepe_web/live/channels_live.ex:421
 #, elixir-autogen, elixir-format
 msgid "(or paste a new token)"
 msgstr ""
@@ -1242,7 +1242,7 @@ msgstr ""
 msgid "5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" = 09:30 on weekdays. Invalid expressions are rejected."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:377
+#: lib/pepe_web/live/channels_live.ex:375
 #: lib/pepe_web/live/dash_ui.ex:171
 #, elixir-autogen, elixir-format
 msgid "Add"
@@ -1263,7 +1263,7 @@ msgstr ""
 msgid "Automation"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:580
+#: lib/pepe_web/live/channels_live.ex:634
 #, elixir-autogen, elixir-format
 msgid "Bot %{name} saved."
 msgstr ""
@@ -1418,7 +1418,7 @@ msgstr ""
 msgid "The top level must be a JSON object { ... }."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:353
+#: lib/pepe_web/live/channels_live.ex:422
 #, elixir-autogen, elixir-format
 msgid "Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file."
 msgstr ""
@@ -2092,7 +2092,7 @@ msgid "Invalid: %{msg}"
 msgstr ""
 
 #: lib/pepe_web/live/agents_live.ex:121
-#: lib/pepe_web/live/channels_live.ex:392
+#: lib/pepe_web/live/channels_live.ex:436
 #: lib/pepe_web/live/connections_component.ex:121
 #: lib/pepe_web/live/connections_component.ex:264
 #: lib/pepe_web/live/projects_live.ex:207
@@ -2122,7 +2122,7 @@ msgstr ""
 msgid "A local model masks names/free text (reversible)"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:351
+#: lib/pepe_web/live/channels_live.ex:420
 #, elixir-autogen, elixir-format
 msgid "(leave blank to keep the current one)"
 msgstr ""
@@ -2177,7 +2177,7 @@ msgstr ""
 msgid "Fresh conversation. Send a message to start."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:397
+#: lib/pepe_web/live/channels_live.ex:441
 #, elixir-autogen, elixir-format
 msgid "From @BotFather. Tip: use an env-var reference to keep the token out of the config file."
 msgstr ""
@@ -2313,7 +2313,7 @@ msgstr ""
 msgid "Restart the Telegram gateway now?"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:536
+#: lib/pepe_web/live/channels_live.ex:580
 #, elixir-autogen, elixir-format
 msgid "Telegram gateway restarted."
 msgstr ""
@@ -2919,12 +2919,12 @@ msgstr ""
 msgid "← Previous"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:564
+#: lib/pepe_web/live/channels_live.ex:618
 #, elixir-autogen, elixir-format
 msgid "That token is already used by another bot."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:505
+#: lib/pepe_web/live/channels_live.ex:549
 #, elixir-autogen, elixir-format
 msgid "this token is already used by another bot"
 msgstr ""
@@ -2960,7 +2960,7 @@ msgid "Support (customer-facing)"
 msgstr ""
 
 #: lib/pepe_web/live/channels_live.ex:315
-#: lib/pepe_web/live/channels_live.ex:402
+#: lib/pepe_web/live/channels_live.ex:446
 #, elixir-autogen, elixir-format
 msgid "The default agent"
 msgstr ""
@@ -3115,6 +3115,7 @@ msgstr ""
 msgid "No tokens yet. The /v1 API is open to localhost only. Create one to require a token from every caller."
 msgstr ""
 
+#: lib/pepe_web/live/channels_live.ex:412
 #: lib/pepe_web/live/tokens_live.ex:127
 #, elixir-autogen, elixir-format
 msgid "Revoke"
@@ -3125,7 +3126,7 @@ msgstr ""
 msgid "Revoke this token? Callers using it will be locked out immediately."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:616
+#: lib/pepe_web/live/channels_live.ex:674
 #: lib/pepe_web/live/tokens_live.ex:222
 #, elixir-autogen, elixir-format
 msgid "That agent does not exist."
@@ -3307,7 +3308,7 @@ msgstr ""
 msgid "Paste this on your site:"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:617
+#: lib/pepe_web/live/channels_live.ex:675
 #, elixir-autogen, elixir-format
 msgid "Pick an agent for this widget."
 msgstr ""
@@ -3407,7 +3408,7 @@ msgstr ""
 msgid "Color"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:488
+#: lib/pepe_web/live/channels_live.ex:532
 #, elixir-autogen, elixir-format
 msgid "Couldn't save - the widget may have been removed."
 msgstr ""
@@ -4353,7 +4354,7 @@ msgstr ""
 msgid "Spend cap for the month in %{currency}. When reached, this project's agents stop making model calls until next month. Blank = no cap."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:615
+#: lib/pepe_web/live/channels_live.ex:673
 #: lib/pepe_web/live/tokens_live.ex:221
 #, elixir-autogen, elixir-format
 msgid "That agent is not in the chosen project."
@@ -4365,7 +4366,7 @@ msgstr ""
 msgid "That project already exists."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:614
+#: lib/pepe_web/live/channels_live.ex:672
 #: lib/pepe_web/live/tokens_live.ex:220
 #, elixir-autogen, elixir-format
 msgid "That project does not exist."
@@ -4625,12 +4626,12 @@ msgstr ""
 msgid "no limit — the agent runs a task until it's done (safest for real work)."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:380
+#: lib/pepe_web/live/channels_live.ex:384
 #, elixir-autogen, elixir-format
 msgid "Ignore"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:364
+#: lib/pepe_web/live/channels_live.ex:355
 #, elixir-autogen, elixir-format
 msgid "No one is waiting."
 msgstr ""
@@ -4640,19 +4641,14 @@ msgstr ""
 msgid "Require approval for new users"
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:552
+#: lib/pepe_web/live/channels_live.ex:596
 #, elixir-autogen, elixir-format
 msgid "User added. They can talk to the bot now."
 msgstr ""
 
-#: lib/pepe_web/live/channels_live.ex:363
+#: lib/pepe_web/live/channels_live.ex:354
 #, elixir-autogen, elixir-format
 msgid "Waiting for approval"
-msgstr ""
-
-#: lib/pepe_web/live/channels_live.ex:348
-#, elixir-autogen, elixir-format
-msgid "When on, the bot ignores anyone not on its allowlist and lists them below for you to let in with one click. When off, it answers everyone (unless you set an explicit user allowlist)."
 msgstr ""
 
 #: lib/pepe/permissions/risk.ex:47
@@ -4663,4 +4659,34 @@ msgstr ""
 #: lib/pepe/permissions/risk.ex:46
 #, elixir-autogen, elixir-format
 msgid "adds or changes a skill"
+msgstr ""
+
+#: lib/pepe_web/live/channels_live.ex:348
+#, elixir-autogen, elixir-format
+msgid "When on, the bot ignores anyone not on its allowlist. When off, it answers everyone (unless you set an explicit user allowlist)."
+msgstr ""
+
+#: lib/pepe_web/live/channels_live.ex:401
+#, elixir-autogen, elixir-format
+msgid "(no name on record)"
+msgstr ""
+
+#: lib/pepe_web/live/channels_live.ex:611
+#, elixir-autogen, elixir-format
+msgid "Access revoked. They're blocked again."
+msgstr ""
+
+#: lib/pepe_web/live/channels_live.ex:392
+#, elixir-autogen, elixir-format
+msgid "Allowed users"
+msgstr ""
+
+#: lib/pepe_web/live/channels_live.ex:393
+#, elixir-autogen, elixir-format
+msgid "No one has been approved yet."
+msgstr ""
+
+#: lib/pepe_web/live/channels_live.ex:409
+#, elixir-autogen, elixir-format
+msgid "Remove this person's access? They'll go back to being blocked."
 msgstr ""
