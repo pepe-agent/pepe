@@ -138,7 +138,7 @@ defmodule Pepe.Usage do
     # never the reverse, or the reset would look like it silently did nothing.
     entries =
       project
-      |> Log.entries()
+      |> Log.entries_near()
       |> Enum.filter(fn e ->
         bucket_key(e["at"], :month, tz) == key and (is_nil(reset_at) or e["at"] > reset_at)
       end)

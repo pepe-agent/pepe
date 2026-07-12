@@ -23,6 +23,27 @@ defmodule Pepe.Agent.SessionPersistenceTest do
     assert {:ok, "zak", ^msgs, [], nil} = P.load("telegram:42")
   end
 
+  test "a save is atomic: it writes through a tmp file and leaves no tmp litter behind" do
+    P.save("telegram:42", "zak", [%{"role" => "user", "content" => "hi"}])
+
+    files = P.dir() |> File.ls!()
+    assert Enum.any?(files, &String.ends_with?(&1, ".json"))
+    refute Enum.any?(files, &String.ends_with?(&1, ".tmp"))
+  end
+
+  test "a reader never observes a half-written file: an interrupted write leaves the PRIOR save intact" do
+    original = [%{"role" => "user", "content" => "before the crash"}]
+    P.save("telegram:42", "zak", original)
+
+    # Simulate the exact failure mode the atomic write guards against: something wrote the tmp
+    # file (a truncated JSON, as a kill mid-write would leave) but the rename into place never
+    # happened. load/0 must still see the last GOOD save, not the half-written one.
+    tmp = Path.join(P.dir(), Base.url_encode64("telegram:42", padding: false) <> ".json.tmp")
+    File.write!(tmp, ~s({"key": "telegram:42", "agent_name": "zak", "messages": [{"role":))
+
+    assert {:ok, "zak", ^original, [], nil} = P.load("telegram:42")
+  end
+
   test "save/load round-trips the reversible PII map" do
     msgs = [%{"role" => "user", "content" => "hi PERSON_1"}]
     pii = [%{"fake" => "PERSON_1", "real" => "Alice"}]

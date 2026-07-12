@@ -69,6 +69,37 @@ defmodule Pepe.Usage.Log do
   def entries_for(:all), do: Enum.flat_map(scopes(), &entries/1)
   def entries_for(list) when is_list(list), do: Enum.flat_map(list, &entries/1)
 
+  @doc """
+  Entries for a scope, but only from the ledger files that could contain "now"'s billing month -
+  the file partitioning is by UTC month, while a "current month" query filters by the operator's
+  configured billing timezone, so an entry near a month boundary can sit in the UTC month either
+  side of it (a timezone ahead of UTC can have its month start in UTC's previous month; one behind
+  UTC can have its month end spill into UTC's next). Reading the UTC month either side of `at`
+  covers any real-world offset without having to know the timezone here.
+
+  For `month_to_date/1` (called every turn a project has a budget), this turns an O(every month
+  the scope has ever recorded) read into a bounded 3-file one, and only when it actually helps -
+  once a scope's whole history already fits in 3 months, `entries/1` and this return the same set.
+  """
+  @spec entries_near(String.t() | nil, integer()) :: [map()]
+  def entries_near(scope, at \\ System.os_time(:second)) do
+    d = scope_dir(scope)
+    name = scope_name(scope)
+    {y, m, _d} = at |> DateTime.from_unix!() |> DateTime.to_date() |> Date.to_erl()
+
+    [{y, m - 1}, {y, m}, {y, m + 1}]
+    |> Enum.map(&normalize_month/1)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn {yy, mm} -> read_file(Path.join(d, month_filename(yy, mm))) end)
+    |> Enum.map(&Map.put(&1, "project", name))
+  end
+
+  defp normalize_month({y, 0}), do: {y - 1, 12}
+  defp normalize_month({y, 13}), do: {y + 1, 1}
+  defp normalize_month({y, m}), do: {y, m}
+
+  defp month_filename(y, m), do: :io_lib.format("~4..0B-~2..0B.jsonl", [y, m]) |> to_string()
+
   defp read_file(path) do
     case File.read(path) do
       {:ok, contents} ->
@@ -96,7 +127,7 @@ defmodule Pepe.Usage.Log do
   # timezone used later to draw billing-day boundaries.
   defp month_file(at) when is_integer(at) do
     dt = DateTime.from_unix!(at)
-    :io_lib.format("~4..0B-~2..0B.jsonl", [dt.year, dt.month]) |> to_string()
+    month_filename(dt.year, dt.month)
   end
 
   defp month_file(_), do: "unknown.jsonl"

@@ -17,14 +17,40 @@ defmodule PepeWeb.ProjectsLive do
   @impl true
   def mount(params, _session, socket) do
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
        page_title: "Pepe · Projects",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
        editing: nil,
        form: project_form("")
-     )}
+     )
+     |> refresh_usage()}
+  end
+
+  # The Pepe.Usage.* calls (month_to_date, over_budget?, ...) each read the token ledger - real
+  # I/O, unlike the Config.* budget/markup/limit reads beside them in the template, which are cheap
+  # in-memory map lookups off Config's own cache. Computed once here into `@usage`, keyed by "root"
+  # and each project name, instead of being called straight from the template - which used to mean
+  # every one of them ran again on EVERY re-render (any assign changing, any event), not just when
+  # the numbers could actually have changed. Refreshed after mount and after every event that can
+  # change either which projects exist or their usage numbers.
+  defp refresh_usage(socket) do
+    usage = Map.new(["root" | socket.assigns.projects], &{&1, usage_snapshot(event_scope(&1))})
+    assign(socket, usage: usage)
+  end
+
+  defp usage_snapshot(scope) do
+    %{
+      over_budget: Pepe.Usage.over_budget?(scope),
+      near_budget: Pepe.Usage.near_budget?(scope),
+      month_to_date: Pepe.Usage.month_to_date(scope),
+      budget_reset_at: Pepe.Usage.budget_reset_at(scope),
+      over_message_limit: Pepe.Usage.over_message_limit?(scope),
+      message_count: Pepe.Usage.message_count_month_to_date(scope),
+      messages_reset_at: Pepe.Usage.messages_reset_at(scope)
+    }
   end
 
   defp project_changeset(name) do
@@ -73,21 +99,21 @@ defmodule PepeWeb.ProjectsLive do
                 title={gettext("Operational count toward the cap, not the billable total - see Usage for the real month total, unaffected by resets.")}
                 class={[
                   "rounded px-1.5",
-                  (Pepe.Usage.over_budget?(nil) && "bg-red-800/60 text-red-200") ||
-                    (Pepe.Usage.near_budget?(nil) && "bg-amber-800/50 text-amber-100") ||
+                  (@usage["root"].over_budget && "bg-red-800/60 text-red-200") ||
+                    (@usage["root"].near_budget && "bg-amber-800/50 text-amber-100") ||
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {money(Pepe.Usage.month_to_date(nil), Config.currency())} / {money(Config.project_budget(nil), Config.currency())}
-                <span :if={Pepe.Usage.budget_reset_at(nil)} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(Pepe.Usage.budget_reset_at(nil), "%m/%d"))}
+                {money(@usage["root"].month_to_date, Config.currency())} / {money(Config.project_budget(nil), Config.currency())}
+                <span :if={@usage["root"].budget_reset_at} class="text-zinc-500">
+                  · {gettext("since %{date}", date: local_datetime(@usage["root"].budget_reset_at, "%m/%d"))}
                 </span>
               </span>
               <button
                 :if={Config.project_budget(nil)}
                 phx-click="project_reset_budget"
                 phx-value-name="root"
-                data-confirm={gettext("Reset the principal scope's spend count (currently %{n}) for the rest of this month?", n: money(Pepe.Usage.month_to_date(nil), Config.currency()))}
+                data-confirm={gettext("Reset the principal scope's spend count (currently %{n}) for the rest of this month?", n: money(@usage["root"].month_to_date, Config.currency()))}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
               >
                 {gettext("reset")}
@@ -97,20 +123,20 @@ defmodule PepeWeb.ProjectsLive do
                 title={gettext("Operational count toward the cap, not necessarily every message this month if it's been reset.")}
                 class={[
                   "rounded px-1.5",
-                  (Pepe.Usage.over_message_limit?(nil) && "bg-red-800/60 text-red-200") ||
+                  (@usage["root"].over_message_limit && "bg-red-800/60 text-red-200") ||
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {gettext("%{used}/%{limit} msgs/mo", used: Pepe.Usage.message_count_month_to_date(nil), limit: Config.project_message_limit(nil))}
-                <span :if={Pepe.Usage.messages_reset_at(nil)} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(Pepe.Usage.messages_reset_at(nil), "%m/%d"))}
+                {gettext("%{used}/%{limit} msgs/mo", used: @usage["root"].message_count, limit: Config.project_message_limit(nil))}
+                <span :if={@usage["root"].messages_reset_at} class="text-zinc-500">
+                  · {gettext("since %{date}", date: local_datetime(@usage["root"].messages_reset_at, "%m/%d"))}
                 </span>
               </span>
               <button
                 :if={Config.project_message_limit(nil)}
                 phx-click="project_reset_messages"
                 phx-value-name="root"
-                data-confirm={gettext("Reset the principal scope's message count (currently %{n}) for the rest of this month?", n: Pepe.Usage.message_count_month_to_date(nil))}
+                data-confirm={gettext("Reset the principal scope's message count (currently %{n}) for the rest of this month?", n: @usage["root"].message_count)}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
               >
                 {gettext("reset")}
@@ -146,20 +172,20 @@ defmodule PepeWeb.ProjectsLive do
                 title={gettext("Operational count toward the cap, not the billable total - see Usage for the real month total, unaffected by resets.")}
                 class={[
                   "rounded px-1.5",
-                  (Pepe.Usage.over_budget?(name) && "bg-red-800/60 text-red-200") ||
+                  (@usage[name].over_budget && "bg-red-800/60 text-red-200") ||
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {money(Pepe.Usage.month_to_date(name), Config.currency())} / {money(Config.project_budget(name), Config.currency())}
-                <span :if={Pepe.Usage.budget_reset_at(name)} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(Pepe.Usage.budget_reset_at(name), "%m/%d"))}
+                {money(@usage[name].month_to_date, Config.currency())} / {money(Config.project_budget(name), Config.currency())}
+                <span :if={@usage[name].budget_reset_at} class="text-zinc-500">
+                  · {gettext("since %{date}", date: local_datetime(@usage[name].budget_reset_at, "%m/%d"))}
                 </span>
               </span>
               <button
                 :if={Config.project_budget(name)}
                 phx-click="project_reset_budget"
                 phx-value-name={name}
-                data-confirm={gettext("Reset %{name}'s spend count (currently %{n}) for the rest of this month?", name: name, n: money(Pepe.Usage.month_to_date(name), Config.currency()))}
+                data-confirm={gettext("Reset %{name}'s spend count (currently %{n}) for the rest of this month?", name: name, n: money(@usage[name].month_to_date, Config.currency()))}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
               >
                 {gettext("reset")}
@@ -169,20 +195,20 @@ defmodule PepeWeb.ProjectsLive do
                 title={gettext("Operational count toward the cap, not necessarily every message this month if it's been reset.")}
                 class={[
                   "rounded px-1.5",
-                  (Pepe.Usage.over_message_limit?(name) && "bg-red-800/60 text-red-200") ||
+                  (@usage[name].over_message_limit && "bg-red-800/60 text-red-200") ||
                     "bg-emerald-900/40 text-emerald-200"
                 ]}
               >
-                {gettext("%{used}/%{limit} msgs/mo", used: Pepe.Usage.message_count_month_to_date(name), limit: Config.project_message_limit(name))}
-                <span :if={Pepe.Usage.messages_reset_at(name)} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(Pepe.Usage.messages_reset_at(name), "%m/%d"))}
+                {gettext("%{used}/%{limit} msgs/mo", used: @usage[name].message_count, limit: Config.project_message_limit(name))}
+                <span :if={@usage[name].messages_reset_at} class="text-zinc-500">
+                  · {gettext("since %{date}", date: local_datetime(@usage[name].messages_reset_at, "%m/%d"))}
                 </span>
               </span>
               <button
                 :if={Config.project_message_limit(name)}
                 phx-click="project_reset_messages"
                 phx-value-name={name}
-                data-confirm={gettext("Reset %{name}'s message count (currently %{n}) for the rest of this month?", name: name, n: Pepe.Usage.message_count_month_to_date(name))}
+                data-confirm={gettext("Reset %{name}'s message count (currently %{n}) for the rest of this month?", name: name, n: @usage[name].message_count)}
                 class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
               >
                 {gettext("reset")}
@@ -312,17 +338,26 @@ defmodule PepeWeb.ProjectsLive do
     {:noreply,
      socket
      |> assign(projects: Config.project_slugs(), editing: nil)
+     |> refresh_usage()
      |> put_flash(:info, gettext("Project %{name} removed.", name: name))}
   end
 
   def handle_event("project_reset_messages", %{"name" => name}, socket) do
     Pepe.Usage.reset_messages(event_scope(name))
-    {:noreply, put_flash(socket, :info, gettext("%{name}'s message count reset for the rest of this month.", name: name))}
+
+    {:noreply,
+     socket
+     |> refresh_usage()
+     |> put_flash(:info, gettext("%{name}'s message count reset for the rest of this month.", name: name))}
   end
 
   def handle_event("project_reset_budget", %{"name" => name}, socket) do
     Pepe.Usage.reset_budget(event_scope(name))
-    {:noreply, put_flash(socket, :info, gettext("%{name}'s spend count reset for the rest of this month.", name: name))}
+
+    {:noreply,
+     socket
+     |> refresh_usage()
+     |> put_flash(:info, gettext("%{name}'s spend count reset for the rest of this month.", name: name))}
   end
 
   def handle_event("set_scope", params, socket),
@@ -365,6 +400,7 @@ defmodule PepeWeb.ProjectsLive do
         {:noreply,
          socket
          |> assign(projects: Config.project_slugs(), editing: nil)
+         |> refresh_usage()
          |> put_flash(:info, gettext("Project %{name} created.", name: name))}
 
       {:error, :already_exists} ->
@@ -394,6 +430,7 @@ defmodule PepeWeb.ProjectsLive do
         {:noreply,
          socket
          |> assign(projects: Config.project_slugs(), editing: nil)
+         |> refresh_usage()
          |> put_flash(:info, save_flash(old, new))}
 
       {:error, :already_exists} ->

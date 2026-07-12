@@ -201,6 +201,29 @@ defmodule PepeWeb.ProjectsLiveTest do
     assert Config.project_slugs() == []
   end
 
+  test "a newly created project's budget badge renders with real numbers, not a stale/missing entry" do
+    Config.put_model(%Config.Model{name: "acme/m", model: "gpt-4o", input_price: 1.0, output_price: 0.0})
+    {:ok, view, _html} = live(conn(), "/projects")
+
+    # Created mid-session, after mount already built its usage snapshot for the projects that
+    # existed then. Without a refresh, this card's badge would read a missing entry and crash the
+    # render (KeyError) instead of showing "$0.00 / $50.00".
+    html = new_project(view, %{"name" => "acme", "budget" => "50"})
+    assert html =~ "$0.00"
+    assert html =~ "$50.00"
+
+    Pepe.Usage.record("acme/x", "acme/m", %{"prompt_tokens" => 1_000_000, "completion_tokens" => 0})
+
+    # The record above happened outside the LiveView, so nothing has told this connected view to
+    # look again yet. Triggering an unrelated event on the SAME project (message-limit reset, not
+    # budget) still recomputes ALL of @usage, not just the fields that event is nominally about -
+    # proving refresh_usage/1 is a full recompute. (Resetting BUDGET here would set a new
+    # reset_at boundary and exclude the spend recorded before it - reset semantics working as
+    # intended, just the wrong event to reach for in this test.)
+    html = render_click(view, "project_reset_messages", %{"name" => "acme"})
+    assert html =~ "$1.00"
+  end
+
   test "a project's spend and message counters can be reset from its card" do
     :ok = Config.add_project("acme", %{"budget" => 10.0, "message_limit" => 100})
 

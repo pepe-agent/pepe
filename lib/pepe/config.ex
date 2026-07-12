@@ -108,8 +108,48 @@ defmodule Pepe.Config do
     end
   end
 
+  # Every public read (get_agent, model_for_agent, locale, project_budget, ...) calls load/0, and a
+  # single Telegram message can trigger a dozen of them across one turn - each a fresh disk read +
+  # JSON decode + migration pass, of a file that only changes on an explicit write. Cached in
+  # `:persistent_term` (optimized for exactly this: read-mostly, rarely-written data), invalidated
+  # at the one place every write already funnels through (save/1).
+  #
+  # Deliberately OFF in the test env: tests routinely swap PEPE_HOME per-test (System.put_env) to
+  # get an isolated config, and `:persistent_term.put/2` triggers a global GC sweep on every
+  # write, so a cache that gets rewritten as often as tests write to config would be a needless
+  # speed risk for a win that only matters to a long-lived `mix pepe serve` process, never a short
+  # test run.
+  #
+  # Cached as `{path, map}`, not just `map`: PEPE_HOME can change mid-process even outside tests -
+  # `mix pepe setup`'s first-run wizard lets you relocate the home before anything has been
+  # written there yet (`System.put_env("PEPE_HOME", ...)`) - so the cache checks the path it was
+  # built for and quietly misses (re-reads, re-caches) rather than serving another home's config
+  # after a change like that, present or future, without this having to know every call site that
+  # can move it.
+  @cache_key :pepe_config_cache
+
   @doc "Load the raw config map, returning sane defaults when the file is absent."
   def load do
+    if cacheable?(), do: cached_or_fresh(), else: read_from_disk()
+  end
+
+  defp cached_or_fresh do
+    case :persistent_term.get(@cache_key, :none) do
+      {cached_path, map} -> if cached_path == path(), do: map, else: refresh_cache()
+      :none -> refresh_cache()
+    end
+  end
+
+  defp refresh_cache, do: read_from_disk() |> cache_put()
+
+  defp cacheable?, do: Application.get_env(:pepe, :env) != :test
+
+  defp cache_put(map) do
+    if cacheable?(), do: :persistent_term.put(@cache_key, {path(), map})
+    map
+  end
+
+  defp read_from_disk do
     case File.read(path()) do
       {:ok, body} ->
         case Jason.decode(body) do
@@ -167,7 +207,7 @@ defmodule Pepe.Config do
     File.write!(tmp, Jason.encode!(map, pretty: true))
     _ = File.chmod(tmp, 0o600)
     File.rename!(tmp, path())
-    map
+    cache_put(map)
   end
 
   @doc """

@@ -297,7 +297,10 @@ defmodule Pepe.Gateways.Telegram do
       fresh -> put_bot(fresh)
     end
   rescue
-    _ -> :ok
+    # Never let a bad config read kill the poller - it keeps running on its last-known snapshot,
+    # which is the point of this rescue - but doing so silently meant a persistently broken config
+    # (a hand-edit gone wrong) could go unnoticed indefinitely while the bot quietly ran stale.
+    e -> Logger.warning("[telegram] refresh_bot failed for #{bot_name()}: #{Exception.message(e)}")
   end
 
   defp bot_name, do: bot()["name"] || "default"

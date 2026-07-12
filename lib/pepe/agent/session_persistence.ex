@@ -75,7 +75,18 @@ defmodule Pepe.Agent.SessionPersistence do
       "pending" => pending
     }
 
-    File.write(path(key), Jason.encode!(data))
+    # Write to a temp file and rename into place (same reasoning as Config.save/1): a crash or a
+    # kill mid-write must never leave a half-written session file for load/0 to read back on the
+    # next boot - that would either fail to parse (losing the whole conversation, not just the
+    # latest turn) or, worse, parse as truncated-but-valid JSON and silently drop recent turns.
+    # File.rename/2 is atomic on the same filesystem, so a reader never observes a partial file.
+    # No lock needed: a session's file is only ever written from its own GenServer (one writer
+    # per key), unlike Config's, which genuinely is written from many processes.
+    tmp = path(key) <> ".tmp"
+
+    with :ok <- File.write(tmp, Jason.encode!(data)) do
+      File.rename(tmp, path(key))
+    end
   end
 
   @doc "Load a session's `{agent, messages, pii_map, pending}`, or `:error` if none/unreadable."

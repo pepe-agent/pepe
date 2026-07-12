@@ -25,6 +25,8 @@ defmodule Pepe.Agent.Runtime do
   document sent in), which withdraws pre-approval for the run.
   """
 
+  require Logger
+
   alias Pepe.Agent.Compaction
   alias Pepe.Agent.LoopGuard
   alias Pepe.Config
@@ -343,7 +345,9 @@ defmodule Pepe.Agent.Runtime do
     Pepe.Usage.record(name, model, usage)
     emit(opts, {:usage, model.name, usage})
   rescue
-    _ -> :ok
+    # Metering must never crash the turn the user is waiting on - but a billing bug that
+    # disappears without a trace is worse than one that's merely non-fatal, so it's logged.
+    e -> Logger.warning("[runtime] record_usage failed for #{name}/#{model.name}: #{Exception.message(e)}")
   end
 
   defp record_usage(_ctx, _model, _usage, _opts), do: :ok
