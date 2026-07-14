@@ -5,13 +5,25 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-14
+
+Fixes every item from a full-project security/quality/performance/test-coverage review, plus
+Google Chat's turn at the native-webhook-authentication parity Microsoft Teams got in 0.6.0.
+
 ### Added
 - **The dashboard can now show and revoke Telegram users it already approved**, not just the ones still waiting. Once someone was let in there was no way to see or undo it short of editing `config.json` by hand. A new "Allowed users" panel sits next to "Waiting for approval", each entry with a **Revoke** button.
+- **Google Chat now works with just an access token and a project number — no proxy needed.** The Google Chat webhook now validates the inbound Google-signed token itself (signature against Google's published keys, plus an audience equal to the app's Cloud project number), the same native-verification parity Microsoft Teams already had. Before, the endpoint fail-closed unless you put a validating reverse-proxy in front of it. Set the Chat app's Authentication Audience to **Project Number** and fill in `project_number` on the connection. An operator whose proxy already checks the token can skip Pepe's with `trust_proxy: true`.
+
+### Changed
+- **Fewer disk reads on a busy server.** Config reads are now cached in memory (still validated against the file's mtime/size on every read, so a hand-edit to `config.json` on a live server takes effect immediately — see below) instead of re-reading and re-parsing the file on every single lookup. The monthly spend ledger a budget check reads is now bounded to the current month plus its immediate neighbors instead of a project's entire history.
 
 ### Fixed
-- **Turning on `require_approval` no longer risks locking out the operator too.** It used to be all-or-nothing: an empty `allowed_users` meant *everyone* was queued, including the bot owner's own DM, with no way back short of hand-editing config. A bot's explicit `trainers` list (a smaller, already-curated trust tier) is now exempt from the approval queue on sight. `trainers` left unset is **not** treated as an exemption — that would silently defeat the gate for the common case where it was simply never configured.
+- **Turning on `require_approval` no longer risks locking out the operator too.** It used to be all-or-nothing: an empty `allowed_users` meant *everyone* was queued, including the bot owner's own DM, with no way back short of hand-editing config. A bot's explicit `trainers` list (a smaller, already-curated trust tier) is now exempt from the approval queue on sight. Neither `trainers` left unset nor the `"*"` ("learn from everyone") wildcard are treated as an exemption — either would silently defeat the gate for the common case where a wide-open learning boundary was configured before `require_approval` was ever turned on. Only concrete ids exempt someone.
 - **MCP tool results now taint the run, same as `fetch_url`/`web_search`.** Content an MCP tool returns (a GitHub issue, a Slack message) is the same class of stranger-authored text, but the taint check only recognized a fixed list of tools — so a read-only MCP tool combined with something risky in `auto_approve` could have that risky tool silently triggered by an instruction hidden in the MCP result.
 - **Approval panel placement fixed.** It used to render *after* the Save/Cancel buttons, outside the form — now it's nested under the "Require approval" checkbox it belongs to.
+- **A hand-edit to `config.json` on a running server now takes effect without a restart.** The read cache added for this release was invalidated only by this process's own writes, so the documented way back from a lockout (edit the file directly) silently stopped working on a live `mix pepe serve`. It's now validated against the file's mtime and size on every read.
+- **Session writes are now atomic (tmp file + rename).** A crash or restart mid-write could previously leave a truncated, unloadable session file; a persisted turn is now either fully there or the prior good save is still intact.
+- **Two previously-silent failures now log.** A billing-usage recording error and a Telegram bot config refresh error both failed quietly before; both now leave a trace so an operator debugging "why didn't that update" isn't starting from nothing.
 
 ### Security
 - Patched `mint` (1.9.1 → 1.9.3: fixes a HIGH-severity memory-exhaustion DoS plus two MEDIUM advisories — it's the transport for every LLM provider call), `phoenix_live_view` (1.2.3 → 1.2.7: fixes a MEDIUM XSS via scheme-validation bypass in `<.link>`), and `req` (0.6.2 → 0.6.3, patch). `mix hex.audit` is clean.
@@ -464,7 +476,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/pepe-agent/pepe/compare/v0.6.1...v0.7.0
 [0.4.0]: https://github.com/pepe-agent/pepe/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/pepe-agent/pepe/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/pepe-agent/pepe/compare/v0.3.0...v0.3.1

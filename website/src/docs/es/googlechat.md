@@ -16,6 +16,11 @@ El `config` de una conexión contiene:
 
 - `access_token`: un token OAuth para la Chat API, usado como bearer para las
   respuestas. Guárdalo como `${ENV_VAR}` y renuévalo por fuera.
+- `project_number`: el número del proyecto de Cloud en el que está
+  registrada la app de Chat. En la página de configuración de la app de
+  Chat, pon **Authentication Audience** en **Project Number** — la otra
+  opción (HTTP endpoint URL) envía un token con forma distinta que Pepe no
+  valida, y se rechazaría todo mensaje entrante.
 
 Solo se atienden los eventos `MESSAGE` de una persona. Las respuestas se
 publican de vuelta al espacio a través de la Chat REST API. Forma de la URL de
@@ -24,6 +29,15 @@ retorno:
 ```
 https://YOUR_HOST/webhooks/default/googlechat/<slug>
 ```
+
+### Autenticación de entrada
+
+Cada solicitud entrante trae un token firmado por Google en `Authorization:
+Bearer`, y Pepe lo valida (firma contra las claves publicadas por Google,
+emisor, y un audience igual a `project_number`) antes de que el agente vea
+nada. Así el endpoint acepta `POST`s directo de Google — sin necesitar un
+proxy validador. Si tu proxy ya hace esa comprobación, pon `trust_proxy: true`
+en la conexión para saltarte la de Pepe.
 
 Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
 (`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y

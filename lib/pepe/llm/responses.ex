@@ -18,6 +18,7 @@ defmodule Pepe.LLM.Responses do
   require Logger
 
   alias Pepe.Config.Model
+  alias Pepe.LLM.SSE
 
   @originator "pepe"
   @auth_claim "https://api.openai.com/auth"
@@ -33,15 +34,7 @@ defmodule Pepe.LLM.Responses do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts)
     init = %{buffer: "", content: "", calls: %{}, order: [], finish: nil, usage: nil, raw: ""}
-
-    collector = fn {:data, data}, {req, resp} ->
-      state = resp.private[:pepe] || init
-      # Keep the raw bytes too - on a non-2xx the error body lands here (not in
-      # `resp.body`), and we want to surface what the provider actually said.
-      state = %{state | raw: state.raw <> data}
-      state = consume(state.buffer <> data, %{state | buffer: ""}, on_delta)
-      {:cont, {req, %{resp | private: Map.put(resp.private, :pepe, state)}}}
-    end
+    on_frame = &handle_frame(&1, &2, on_delta)
 
     req =
       Req.new(
@@ -52,26 +45,10 @@ defmodule Pepe.LLM.Responses do
         # Retry transient failures, notably a stale pooled connection the server
         # already closed (`%Req.TransportError{reason: :closed}` on the first call).
         retry: :transient,
-        into: collector
+        into: SSE.collector(init, on_frame)
       )
 
-    case Req.post(req) do
-      {:ok, %{status: status, private: %{pepe: state}}} when status in 200..299 ->
-        {:ok, finalize(flush(state, on_delta))}
-
-      {:ok, %{status: status} = resp} when status in 200..299 ->
-        {:ok, finalize(resp.private[:pepe] || init)}
-
-      # Non-2xx: the body was streamed into the collector, so read it from there.
-      {:ok, %{status: status, private: %{pepe: %{raw: raw}}}} ->
-        {:error, {:http_error, status, raw}}
-
-      {:ok, %{status: status, body: resp}} ->
-        {:error, {:http_error, status, resp}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    Req.post(req) |> SSE.result(init, on_frame, &finalize/1)
   end
 
   @doc """
@@ -319,36 +296,9 @@ defmodule Pepe.LLM.Responses do
   ### SSE parsing
   ###
 
-  defp consume(data, state, on_delta) do
-    case String.split(data, "\n") do
-      [single] ->
-        %{state | buffer: single}
-
-      lines ->
-        {complete, [partial]} = Enum.split(lines, -1)
-        state = Enum.reduce(complete, state, &handle_line(&1, &2, on_delta))
-        %{state | buffer: partial}
-    end
-  end
-
-  defp handle_line(line, state, on_delta) do
-    line = String.trim(line)
-
-    cond do
-      line == "" -> state
-      not String.starts_with?(line, "data:") -> state
-      true -> handle_data(String.trim(String.replace_prefix(line, "data:", "")), state, on_delta)
-    end
-  end
-
-  defp handle_data("[DONE]", state, _on_delta), do: state
-
-  defp handle_data(json, state, on_delta) do
-    case Jason.decode(json) do
-      {:ok, event} -> handle_event(event["type"], event, state, on_delta)
-      _ -> state
-    end
-  end
+  # One decoded frame from `Pepe.LLM.SSE.consume/3`, dispatched on the Responses API's own
+  # `type` field to `handle_event/4` below.
+  defp handle_frame(event, state, on_delta), do: handle_event(event["type"], event, state, on_delta)
 
   # assistant text
   defp handle_event("response.output_text.delta", %{"delta" => delta}, state, on_delta)
@@ -467,16 +417,6 @@ defmodule Pepe.LLM.Responses do
   defp map_status("failed"), do: "error"
   defp map_status("cancelled"), do: "error"
   defp map_status(_), do: "stop"
-
-  # Flush a final SSE line the stream left un-terminated in the buffer (truncated stream or a
-  # provider that doesn't newline-end its last frame), so its content/tool/error is not dropped. An
-  # incomplete, undecodable line is a no-op.
-  defp flush(state, on_delta) do
-    case String.trim(state.buffer) do
-      "" -> state
-      _ -> handle_line(state.buffer, %{state | buffer: ""}, on_delta)
-    end
-  end
 
   defp finalize(state) do
     tool_calls =

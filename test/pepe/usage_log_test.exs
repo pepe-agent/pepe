@@ -47,7 +47,7 @@ defmodule Pepe.Usage.LogTest do
     seed_month("p", 2025, 12, unix(2025, 12, 1))
 
     entries = Log.entries_near("p", now)
-    assert length(entries) == 3
+    assert [_, _, _] = entries
     assert Enum.all?(entries, &(&1["in"] == 1))
   end
 
@@ -68,13 +68,13 @@ defmodule Pepe.Usage.LogTest do
     # outside the window from December's point of view
     seed_month("p", 2025, 10, unix(2025, 10, 1))
 
-    assert length(Log.entries_near("p", dec_now)) == 3
+    assert [_, _, _] = Log.entries_near("p", dec_now)
 
     jan_now = unix(2026, 1, 15)
     # (2026, 1) and (2025, 12) already seeded above; add (2026, 2) to complete January's window
     seed_month("p", 2026, 2, unix(2026, 2, 1))
 
-    assert length(Log.entries_near("p", jan_now)) == 3
+    assert [_, _, _] = Log.entries_near("p", jan_now)
   end
 
   test "an empty scope returns an empty list, not an error" do

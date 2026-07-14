@@ -18,6 +18,7 @@ defmodule Pepe.LLM.Messages do
   """
 
   alias Pepe.Config.Model
+  alias Pepe.LLM.SSE
 
   @version "2023-06-01"
   @oauth_beta "oauth-2025-04-20"
@@ -35,14 +36,7 @@ defmodule Pepe.LLM.Messages do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts)
     init = %{buffer: "", content: "", blocks: %{}, order: [], finish: nil, in: 0, out: 0, cached: 0, raw: ""}
-
-    collector = fn {:data, data}, {req, resp} ->
-      state = resp.private[:pepe] || init
-      # Keep raw bytes: a non-2xx error body is streamed here, not into `resp.body`.
-      state = %{state | raw: state.raw <> data}
-      state = consume(state.buffer <> data, %{state | buffer: ""}, on_delta)
-      {:cont, {req, %{resp | private: Map.put(resp.private, :pepe, state)}}}
-    end
+    on_frame = &handle_frame(&1, &2, on_delta)
 
     req =
       Req.new(
@@ -53,25 +47,10 @@ defmodule Pepe.LLM.Messages do
         # Retry transient failures, notably a stale pooled connection the server
         # already closed (`%Req.TransportError{reason: :closed}` on the first call).
         retry: :transient,
-        into: collector
+        into: SSE.collector(init, on_frame)
       )
 
-    case Req.post(req) do
-      {:ok, %{status: status, private: %{pepe: state}}} when status in 200..299 ->
-        {:ok, finalize(flush(state, on_delta))}
-
-      {:ok, %{status: status} = resp} when status in 200..299 ->
-        {:ok, finalize(resp.private[:pepe] || init)}
-
-      {:ok, %{status: status, private: %{pepe: %{raw: raw}}}} ->
-        {:error, {:http_error, status, raw}}
-
-      {:ok, %{status: status, body: resp}} ->
-        {:error, {:http_error, status, resp}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    Req.post(req) |> SSE.result(init, on_frame, &finalize/1)
   end
 
   @doc "List the Claude model ids via `GET {base}/models`. Returns `{:ok, ids}`."
@@ -284,34 +263,9 @@ defmodule Pepe.LLM.Messages do
   ### SSE parsing
   ###
 
-  defp consume(data, state, on_delta) do
-    case String.split(data, "\n") do
-      [single] ->
-        %{state | buffer: single}
-
-      lines ->
-        {complete, [partial]} = Enum.split(lines, -1)
-        state = Enum.reduce(complete, state, &handle_line(&1, &2, on_delta))
-        %{state | buffer: partial}
-    end
-  end
-
-  defp handle_line(line, state, on_delta) do
-    line = String.trim(line)
-
-    cond do
-      line == "" -> state
-      not String.starts_with?(line, "data:") -> state
-      true -> handle_data(String.trim(String.replace_prefix(line, "data:", "")), state, on_delta)
-    end
-  end
-
-  defp handle_data(json, state, on_delta) do
-    case Jason.decode(json) do
-      {:ok, event} -> handle_event(event["type"], event, state, on_delta)
-      _ -> state
-    end
-  end
+  # One decoded frame from `Pepe.LLM.SSE.consume/3`, dispatched on the Messages API's own
+  # `type` field to `handle_event/4` below.
+  defp handle_frame(event, state, on_delta), do: handle_event(event["type"], event, state, on_delta)
 
   defp handle_event("message_start", %{"message" => msg}, state, _on_delta) do
     %{state | in: input_tokens(msg["usage"]) || state.in, cached: cache_read(msg["usage"]) || state.cached}
@@ -397,16 +351,6 @@ defmodule Pepe.LLM.Messages do
   defp map_stop("max_tokens"), do: "length"
   defp map_stop("tool_use"), do: "tool_calls"
   defp map_stop(_), do: nil
-
-  # Flush a final SSE line the stream left un-terminated in the buffer (truncated stream or a
-  # provider that doesn't newline-end its last frame), so its content/tool/error is not dropped. An
-  # incomplete, undecodable line is a no-op.
-  defp flush(state, on_delta) do
-    case String.trim(state.buffer) do
-      "" -> state
-      _ -> handle_line(state.buffer, %{state | buffer: ""}, on_delta)
-    end
-  end
 
   defp finalize(state) do
     tool_calls =

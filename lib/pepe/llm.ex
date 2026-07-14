@@ -14,6 +14,12 @@ defmodule Pepe.LLM do
   """
 
   alias Pepe.Config.Model
+  alias Pepe.LLM.SSE
+
+  # Enough of the raw stream to carry an error body (a provider's "why"); a success body is much
+  # larger and never needed here, so `stream_chat/4` caps it via `Pepe.LLM.SSE.collector/3`
+  # rather than double the stream in memory.
+  @max_raw 8192
 
   @type result :: %{
           content: String.t() | nil,
@@ -86,17 +92,7 @@ defmodule Pepe.LLM do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts, true)
     init = %{buffer: "", content: "", tool_calls: %{}, finish: nil, usage: nil, raw: ""}
-
-    collector = fn {:data, data}, {req, resp} ->
-      state = resp.private[:pepe] || init
-      state = consume(state.buffer <> data, %{state | buffer: ""}, on_delta)
-      # Keep a bounded copy of the raw stream. `into:` hands the body to the collector for a
-      # non-2xx status too, and there the parsed SSE state is empty - the error body is the only
-      # place a provider says *why* (an over-`max_tokens` reservation, say), which the runtime's
-      # output-cap retry reads. Capped so a large successful stream is not doubled in memory.
-      state = %{state | raw: cap_raw(state.raw <> data)}
-      {:cont, {req, %{resp | private: Map.put(resp.private, :pepe, state)}}}
-    end
+    on_frame = &handle_frame(&1, &2, on_delta)
 
     req =
       Req.new(
@@ -107,25 +103,12 @@ defmodule Pepe.LLM do
         # Retry transient failures, notably a stale pooled connection the server
         # already closed (`%Req.TransportError{reason: :closed}` on the first call).
         retry: :transient,
-        into: collector
+        # `raw` only ever needs to carry an error body (a provider's "why", an over-`max_tokens`
+        # reservation say) - capped so a large successful stream is not doubled in memory.
+        into: SSE.collector(init, on_frame, @max_raw)
       )
 
-    case Req.post(req) do
-      {:ok, %{status: status, private: %{pepe: state}}} when status in 200..299 ->
-        {:ok, finalize(flush(state, on_delta))}
-
-      {:ok, %{status: status} = resp} when status in 200..299 ->
-        # stream produced no data frames
-        {:ok, finalize(resp.private[:pepe] || init)}
-
-      {:ok, %{status: status} = resp} ->
-        # The error body was streamed into the collector (not `resp.body`, which `into:` leaves
-        # empty), so read it back from there.
-        {:error, {:http_error, status, (resp.private[:pepe] || init).raw}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    Req.post(req) |> SSE.result(init, on_frame, &finalize/1)
   end
 
   @doc """
@@ -245,62 +228,29 @@ defmodule Pepe.LLM do
   ### SSE streaming parsing
   ###
 
-  # Split into complete lines, keep the trailing partial in the buffer.
-  # Enough of the raw stream to carry an error body (a provider's "why"); a success body is much
-  # larger and never needed here, so cap it rather than double the stream in memory.
-  @max_raw 8192
-  defp cap_raw(raw) when byte_size(raw) > @max_raw, do: binary_part(raw, 0, @max_raw)
-  defp cap_raw(raw), do: raw
+  # One decoded frame from `Pepe.LLM.SSE.consume/3` - what a `data:` line means for an
+  # OpenAI-compatible stream (Anthropic/Responses adapters have their own vocabulary and their
+  # own version of this function; only the line-splitting/buffering above is shared).
+  defp handle_frame(%{"choices" => [choice | _]} = chunk, state, on_delta) do
+    delta = choice["delta"] || %{}
+    state = apply_content_delta(delta["content"], state, on_delta)
+    state = apply_tool_call_deltas(delta["tool_calls"], state)
 
-  defp consume(data, state, on_delta) do
-    case String.split(data, "\n") do
-      [single] ->
-        %{state | buffer: single}
+    state =
+      if choice["finish_reason"], do: %{state | finish: choice["finish_reason"]}, else: state
 
-      lines ->
-        {complete, [partial]} = Enum.split(lines, -1)
-        state = Enum.reduce(complete, state, &handle_line(&1, &2, on_delta))
-        %{state | buffer: partial}
-    end
+    if chunk["usage"], do: %{state | usage: chunk["usage"]}, else: state
   end
 
-  defp handle_line(line, state, on_delta) do
-    line = String.trim(line)
+  defp handle_frame(%{"usage" => usage}, state, _on_delta), do: %{state | usage: usage}
 
-    cond do
-      line == "" -> state
-      not String.starts_with?(line, "data:") -> state
-      true -> handle_data(String.trim(String.replace_prefix(line, "data:", "")), state, on_delta)
-    end
-  end
+  # A 200 stream can still carry a top-level error frame (`data: {"error": {...}}`) instead of
+  # choices. Mark the turn failed so it surfaces as an error, not an empty success, and fold the
+  # provider's reason into content so it says *why* (see `Pepe.Agent.Runtime`).
+  defp handle_frame(%{"error" => _} = chunk, state, _on_delta),
+    do: %{state | finish: "error", content: error_text(chunk) || state.content}
 
-  defp handle_data("[DONE]", state, _on_delta), do: state
-
-  defp handle_data(json, state, on_delta) do
-    case Jason.decode(json) do
-      {:ok, %{"choices" => [choice | _]} = chunk} ->
-        delta = choice["delta"] || %{}
-        state = apply_content_delta(delta["content"], state, on_delta)
-        state = apply_tool_call_deltas(delta["tool_calls"], state)
-
-        state =
-          if choice["finish_reason"], do: %{state | finish: choice["finish_reason"]}, else: state
-
-        if chunk["usage"], do: %{state | usage: chunk["usage"]}, else: state
-
-      {:ok, %{"usage" => usage}} ->
-        %{state | usage: usage}
-
-      # A 200 stream can still carry a top-level error frame (`data: {"error": {...}}`) instead of
-      # choices. Mark the turn failed so it surfaces as an error, not an empty success, and fold the
-      # provider's reason into content so it says *why* (see `Pepe.Agent.Runtime`).
-      {:ok, %{"error" => _} = chunk} ->
-        %{state | finish: "error", content: error_text(chunk) || state.content}
-
-      _ ->
-        state
-    end
-  end
+  defp handle_frame(_chunk, state, _on_delta), do: state
 
   # The provider's reason from an error frame - `error.{code|type}` + `error.message`.
   defp error_text(%{"error" => %{"message" => m} = e}) when is_binary(m) do
@@ -369,18 +319,6 @@ defmodule Pepe.LLM do
       "name" => (fun["name"] || "") <> (d_fun["name"] || ""),
       "arguments" => (fun["arguments"] || "") <> (d_fun["arguments"] || "")
     }
-  end
-
-  # Process a final SSE line the stream left in the buffer with no trailing newline. `consume/3`
-  # parks the trailing partial in `state.buffer`; if the last frame arrived un-terminated (a
-  # truncated stream, or a provider that doesn't newline-end its final frame), its content/tool/error
-  # would otherwise be silently dropped. A genuinely partial (undecodable) line decodes to nothing
-  # and is a no-op.
-  defp flush(state, on_delta) do
-    case String.trim(state.buffer) do
-      "" -> state
-      _ -> handle_line(state.buffer, %{state | buffer: ""}, on_delta)
-    end
   end
 
   defp finalize(state) do

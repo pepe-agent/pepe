@@ -30,17 +30,17 @@ defmodule Pepe.Webhooks.SignatureTest do
       assert Discord.authenticate(%{"config" => %{}}, "body", %{"x-signature-ed25519" => "", "x-signature-timestamp" => ""}) == :error
     end
 
-    # msteams validates the Bot Framework JWT natively (see msteams_jwt_test), so with no
-    # `Authorization` header at all there is nothing to verify and it fail-closes. googlechat
-    # still leans on a validating proxy, opted into with `trust_proxy`. Either way a bare POST to
-    # the predictable URL is refused, or it would drive the bound agent.
+    # msteams and googlechat both validate their provider's signed JWT natively (see
+    # msteams_jwt_test and googlechat_jwt_test), so with no `Authorization` header at all there
+    # is nothing to verify and they fail-close. A bare POST to the predictable URL is refused
+    # either way, or it would drive the bound agent.
     test "msteams refuses inbound with no bearer token, opt-out via trust_proxy" do
       assert MsTeams.authenticate(%{"config" => %{"app_id" => "a"}}, "body", %{}) == :error
       assert MsTeams.authenticate(%{"config" => %{"trust_proxy" => true}}, "body", %{}) == :ok
     end
 
-    test "googlechat is fail-closed by default, opt-in via trust_proxy" do
-      assert GoogleChat.authenticate(%{"config" => %{}}, "body", %{}) == :error
+    test "googlechat refuses inbound with no bearer token, opt-out via trust_proxy" do
+      assert GoogleChat.authenticate(%{"config" => %{"project_number" => "123"}}, "body", %{}) == :error
       assert GoogleChat.authenticate(%{"config" => %{"trust_proxy" => true}}, "body", %{}) == :ok
     end
   end

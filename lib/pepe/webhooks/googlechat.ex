@@ -6,11 +6,17 @@ defmodule Pepe.Webhooks.GoogleChat do
 
   A connection's `"config"` holds:
 
-    * `access_token` - an OAuth token for the Chat API (Bearer for replies; store as
+    * `access_token`   - an OAuth token for the Chat API (Bearer for replies; store as
       `${ENV_VAR}` and refresh it out of band)
+    * `project_number` - the Cloud project number the Chat app is registered under (the Chat
+      app's "Authentication Audience" setting must be set to **Project Number**, not "HTTP
+      endpoint URL" - a different token shape this provider does not verify)
 
-  Inbound requests carry a Google-issued JWT bearer; validating it against your app's
-  audience is left to a proxy for now. Only `MESSAGE` events from a human are acted on.
+  Inbound requests are authenticated natively: each carries an `Authorization: Bearer` Google-
+  signed JWT, validated by `Pepe.Webhooks.GoogleChatJwt` (signature, issuer, and an `aud` equal
+  to `project_number`). So the webhook accepts `POST`s straight from Google, no validating proxy
+  required. An operator who already terminates that check at a proxy can set `trust_proxy: true`
+  to skip it. Only `MESSAGE` events from a human are acted on.
   """
   @behaviour Pepe.Webhooks.Provider
 
@@ -34,6 +40,13 @@ defmodule Pepe.Webhooks.GoogleChat do
         "hint" => "an OAuth token for the Chat API; store as ${ENV_VAR}"
       },
       %{
+        "key" => "project_number",
+        "label" => "Project number",
+        "type" => "text",
+        "hint" =>
+          "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
+      },
+      %{
         "key" => "require_mention",
         "label" => "Require mention in spaces",
         "type" => "select",
@@ -47,14 +60,34 @@ defmodule Pepe.Webhooks.GoogleChat do
   def verify(_config, _params), do: :error
 
   @impl true
-  def authenticate(config, _raw_body, _headers) do
-    # Google signs inbound with a bearer JWT this provider does not validate itself, so accepting
-    # is only safe behind a proxy that does. Opt-in (`trust_proxy: true`); fail-closed by default,
-    # or anyone could anonymously drive the bound agent via the predictable webhook URL.
-    if provider_config(config)["trust_proxy"] == true do
+  def authenticate(config, _raw_body, headers) do
+    # The inbound Authorization bearer is a Google-signed JWT. Validate it against Google's
+    # published keys so a predictable URL (`/webhooks/root/googlechat/googlechat`) cannot be
+    # POSTed by anyone to drive the bound agent (arbitrary command execution if it holds `bash`).
+    # An operator whose proxy already validates the token opts out with `trust_proxy: true`.
+    pc = provider_config(config)
+
+    if pc["trust_proxy"] == true do
       :ok
     else
-      Pepe.Webhooks.Provider.unsigned_inbound("googlechat")
+      authenticate_jwt(pc, headers)
+    end
+  end
+
+  defp authenticate_jwt(pc, headers) do
+    with token when is_binary(token) <- bearer_token(headers),
+         :ok <- Pepe.Webhooks.GoogleChatJwt.verify(token, to_string(pc["project_number"] || "")) do
+      :ok
+    else
+      _ -> :error
+    end
+  end
+
+  defp bearer_token(headers) do
+    case headers["authorization"] do
+      "Bearer " <> token -> String.trim(token)
+      "bearer " <> token -> String.trim(token)
+      _ -> nil
     end
   end
 

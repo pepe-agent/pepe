@@ -2845,8 +2845,12 @@ defmodule Pepe.Gateways.Telegram do
 
   defp user_allowed?(tg, user_id), do: allowlisted?(tg["allowed_users"], user_id)
 
+  # Deliberately does NOT honor the `"*"` wildcard (documented elsewhere as "learn from
+  # everyone") - that's the same silent-defeat footgun as `nil` above, just reachable through a
+  # value an operator may have set for the (looser) learning boundary before ever turning on
+  # require_approval. Only concrete ids exempt someone from the gate.
   defp explicit_trainer?(%{"trainers" => list}, user_id) when is_list(list) and list != [],
-    do: "*" in list or user_id in list
+    do: user_id in list
 
   defp explicit_trainer?(_tg, _user_id), do: false
 

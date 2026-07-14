@@ -572,6 +572,18 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       refute_receive {:sent, ^chat, _text, _buttons}, 500
       assert [%{"id" => @outsider}] = Config.telegram_pending("default")
     end
+
+    # trainers: ["*"] is the documented "learn from everyone" value for the LEARNING boundary
+    # (learns_from?/2) - the same class of silent-defeat as the nil case above, just reached
+    # through a wildcard someone may have set before ever turning require_approval on. It must
+    # NOT exempt anyone from the queue; only concrete ids do.
+    test "trainers: [\"*\"] does NOT exempt anyone from the queue", %{chat: chat} do
+      start_bot!(%{"require_approval" => true, "trainers" => ["*"]})
+
+      say(chat, "hi", user: @outsider)
+      refute_receive {:sent, ^chat, _text, _buttons}, 500
+      assert [%{"id" => @outsider}] = Config.telegram_pending("default")
+    end
   end
 
   describe "in a group where the bot must be addressed" do

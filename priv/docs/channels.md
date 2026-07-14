@@ -165,8 +165,12 @@ the text before it reaches you.
 ### Google Chat (Chat API)
 
 Config: `access_token` (an OAuth token for the Chat API, the Bearer for replies -
-refresh it out of band). Point the app's webhook (HTTP) endpoint at the connection URL.
-Only human `MESSAGE` events become a turn; replies post back to the space. The inbound
-Google JWT is not validated here - keep it behind a proxy. A DM always replies; in a
-multi-person space the app replies only when `@mentioned` (default;
-`require_mention: "false"` to answer all).
+refresh it out of band) and `project_number` (the Cloud project number the Chat app is
+registered under - its "Authentication Audience" setting must be **Project Number**,
+not "HTTP endpoint URL", which is a differently-shaped token this doesn't verify).
+Point the app's webhook (HTTP) endpoint at the connection URL. Only human `MESSAGE`
+events become a turn; replies post back to the space. The inbound Google JWT **is**
+validated here (signature + `aud` == `project_number`), so the endpoint accepts POSTs
+straight from Google; set `trust_proxy: true` only if a proxy already does that check.
+A DM always replies; in a multi-person space the app replies only when `@mentioned`
+(default; `require_mention: "false"` to answer all).
