@@ -101,6 +101,17 @@ defmodule Pepe.ConfigCacheTest do
     System.put_env("PEPE_HOME", home)
   end
 
+  test "a stale cache entry in the old (pre-stamp) 2-tuple shape is treated as a miss, not a crash", %{home: home} do
+    # Reproduces a real dev-server crash: Phoenix's code_reloader swaps the Config module in
+    # place without clearing persistent_term, so a process that cached under the old 2-tuple
+    # shape ({path, map}, before this cache grew a third stamp element) can still be holding
+    # one after the code updates to expect 3. That must refresh, not CaseClauseError.
+    Config.put_model(%Config.Model{name: "seed", base_url: "http://x", model: "m"})
+    :persistent_term.put(:pepe_config_cache, {Path.join(home, "config.json"), %{"stale" => true}})
+
+    assert Config.get_model("seed")
+  end
+
   test "the cache is a no-op in the test env - the default for every other test in this suite" do
     Application.put_env(:pepe, :env, :test)
     :persistent_term.erase(:pepe_config_cache)

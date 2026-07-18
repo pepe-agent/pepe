@@ -145,7 +145,11 @@ defmodule Pepe.Config do
       {cached_path, cached_stamp, map} ->
         if cached_path == path() and cached_stamp == file_stamp(), do: map, else: refresh_cache()
 
-      :none ->
+      _other ->
+        # :none (never cached yet) or any other shape - notably a stale {path, map} 2-tuple a
+        # process can still be holding from before this cache's format grew a stamp, since
+        # Phoenix's code_reloader swaps the module in place without clearing persistent_term.
+        # Either way, treat it as a miss and refresh rather than crash on an unrecognized shape.
         refresh_cache()
     end
   end
