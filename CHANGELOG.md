@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Voice replies and voice-note transcription are now configurable everywhere, not just by hand-editing `config.json`.** `media.tts` (spoken replies, shipped in 0.6.0) and `media.audio` (transcription) had no dashboard control, no CLI command, and no setup step — the only way to turn either on was editing the config file directly, unlike every other setting in Pepe. Now: `mix pepe media tts --model NAME [--voice alloy]` / `mix pepe media audio --model NAME | --command "..."` (and `... off` for either), a **Media** panel on the dashboard's Config page, a step in `mix pepe setup` (and the reconfigure menu), and `media.tts` / `media.tts.voice` / `media.audio.model` are now editable through the `config_set` chat tool too.
+
 ## [0.7.0] - 2026-07-14
 
 Fixes every item from a full-project security/quality/performance/test-coverage review, plus

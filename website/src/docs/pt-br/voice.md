@@ -37,6 +37,20 @@ O Pepe tenta estas rotas nesta ordem, e qualquer uma delas pode estar ausente:
    tem. Esse caminho continua existindo como rede de segurança; ele não é a porta de
    entrada.
 
+### Configurando isso
+
+Aponte a transcrição para uma conexão de modelo específica, ou um comando local, pela CLI:
+
+```bash
+pepe media audio --model groq --language pt --echo true
+pepe media audio --command "whisper-cli -f {file}"   # mantém o áudio na máquina
+pepe media audio off                                 # volta pra detecção automática
+```
+
+`--echo true` manda a transcrição de volta no chat, pra quem falou ver o que foi
+entendido. As mesmas opções estão na página Config do painel, e no `pepe setup` em
+**Mídia**.
+
 ### Por que transcrever antes muda tudo
 
 Como as palavras existem antes de o roteamento rodar, o roteamento consegue lê-las. Daí
@@ -53,6 +67,22 @@ do turno do agente:
 <div class="note"><strong>Áudio vira texto; foto vira visão.</strong> A fala é transcrita na
 porta de entrada. Uma foto é enviada ao modelo como uma imagem que ele consegue de fato ver
 (num modelo com visão, veja abaixo). Um documento é extraído para texto.</div>
+
+## Respondendo de volta
+
+Responda a um áudio com outro áudio. Desligado por padrão; aponte `media.tts` para uma
+conexão de modelo que sirva um `/audio/speech` compatível com OpenAI e liga:
+
+```bash
+pepe media tts --model openai --voice nova
+pepe media tts off
+```
+
+A resposta em texto continua sendo o registro que fica salvo — o áudio é um extra, e tem
+um limite de tamanho pra uma resposta longa nunca virar um clipe de cinco minutos. Uma
+falha no TTS é silenciosa: a resposta em texto já foi enviada, então nada se perde, só não
+ganha voz naquele turno. As mesmas opções estão na página Config do painel, e no
+`pepe setup` em **Mídia**.
 
 ## Fotos
 

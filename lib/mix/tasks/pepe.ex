@@ -89,6 +89,20 @@ defmodule Mix.Tasks.Pepe do
       mix pepe gateway telegram remove NAME    # delete a named bot
       mix pepe gateway telegram                # run the gateway (one poller per bot)
 
+  ## Media (voice replies & transcription)
+
+  Off by default. `tts` makes a reply to a voice note come back as a voice note too
+  (needs a model connection serving an OpenAI-compatible `/audio/speech`); `audio`
+  controls how an inbound voice note is transcribed to text before the agent sees it
+  (unset, a connection already known to transcribe is used automatically).
+
+      mix pepe media                                        # show current settings
+      mix pepe media tts --model NAME [--voice alloy]        # turn on spoken replies
+      mix pepe media tts off
+      mix pepe media audio --model NAME [--language en] [--max-mb 5] [--timeout 30] [--echo true|false]
+      mix pepe media audio --command "whisper {file}"        # or: a local transcriber instead
+      mix pepe media audio off                               # back to auto-detect
+
   ## Misc
 
       mix pepe tools                           # list built-in tools
@@ -153,6 +167,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "model" | _]), do: model_cmd(["help"])
   def dispatch(["help", "gateway" | _]), do: gateway_cmd(["help"])
   def dispatch(["help", "project" | _]), do: project_cmd(["help"])
+  def dispatch(["help", "media" | _]), do: media_cmd(["help"])
   def dispatch(["help", "serve" | _]), do: serve_help()
   def dispatch(["help", "run" | _]), do: run_help()
   def dispatch(["help", "backup" | _]), do: backup_help()
@@ -218,6 +233,7 @@ defmodule Mix.Tasks.Pepe do
     do: with_app([], fn -> hooks_cmd(["generate" | rest]) end)
 
   def dispatch(["hooks" | rest]), do: with_config(fn -> hooks_cmd(rest) end)
+  def dispatch(["media" | rest]), do: with_config(fn -> media_cmd(rest) end)
   def dispatch(["eval" | rest]), do: with_app([], fn -> eval_cmd(rest) end)
   def dispatch(["token" | rest]), do: with_config(fn -> token_cmd(rest) end)
   def dispatch(["watch" | rest]), do: with_config(fn -> watch_cmd(rest) end)
@@ -1658,6 +1674,121 @@ defmodule Mix.Tasks.Pepe do
   end
 
   ###
+  ### media (voice replies / transcription)
+  ###
+
+  defp media_cmd([]) do
+    tts = Config.media()["tts"] || %{}
+    audio = Config.media()["audio"] || %{}
+
+    puts(bold("tts (spoken replies)") <> "  " <> media_kind_status(tts))
+    if tts["model"], do: puts("  model: #{tts["model"]}  ·  voice: #{tts["voice"] || "alloy"}")
+
+    puts(bold("audio (voice-note transcription)") <> "  " <> media_kind_status(audio))
+
+    if audio != %{} do
+      Enum.each(["model", "command", "language", "max_mb", "timeout", "echo"], &print_audio_field(audio, &1))
+    end
+  end
+
+  defp media_cmd(["tts", "off" | _]) do
+    Config.put_media("tts", %{})
+    ok("voice replies off")
+  end
+
+  defp media_cmd(["tts" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [model: :string, voice: :string])
+
+    case opts[:model] do
+      nil ->
+        error("usage: mix pepe media tts --model NAME [--voice alloy]  (or: mix pepe media tts off)")
+
+      name ->
+        if Config.get_model(name) do
+          Config.put_media("tts", %{"model" => name, "voice" => opts[:voice] || "alloy"})
+          ok("voice replies on, using #{green(name)} (voice: #{opts[:voice] || "alloy"})")
+        else
+          error("unknown model connection: #{name}")
+        end
+    end
+  end
+
+  defp media_cmd(["audio", "off" | _]) do
+    Config.put_media("audio", %{})
+    ok("audio transcription -> auto-detect (a connection already known to transcribe is used, if any)")
+  end
+
+  defp media_cmd(["audio" | rest]) do
+    {opts, _} =
+      OptionParser.parse!(rest,
+        strict: [model: :string, command: :string, language: :string, max_mb: :integer, timeout: :integer, echo: :string]
+      )
+
+    cond do
+      opts[:model] && Config.get_model(opts[:model]) == nil ->
+        error("unknown model connection: #{opts[:model]}")
+
+      opts[:echo] && opts[:echo] not in ["true", "false"] ->
+        error("--echo must be true or false")
+
+      opts == [] ->
+        error(
+          "usage: mix pepe media audio --model NAME | --command \"whisper {file}\" " <>
+            "[--language en] [--max-mb 5] [--timeout 30] [--echo true|false]  (or: mix pepe media audio off)"
+        )
+
+      true ->
+        # Merge onto the current settings (not replace): `media audio --echo true` alone
+        # must not silently wipe a --model set by an earlier call.
+        settings =
+          (Config.media()["audio"] || %{})
+          |> put_media_opt(opts, :model, "model")
+          |> put_media_opt(opts, :command, "command")
+          |> put_media_opt(opts, :language, "language")
+          |> put_media_opt(opts, :max_mb, "max_mb")
+          |> put_media_opt(opts, :timeout, "timeout")
+          |> put_media_echo_opt(opts)
+
+        Config.put_media("audio", settings)
+        ok("audio transcription settings saved")
+    end
+  end
+
+  defp media_cmd(["help"]) do
+    info("""
+    mix pepe media - voice replies (text-to-speech) and voice-note transcription
+
+      (no args)                                     show current settings
+      tts --model NAME [--voice alloy]               turn on spoken replies
+      tts off                                        turn off spoken replies
+      audio --model NAME | --command "cmd {file}"    how a voice note is transcribed
+            [--language en] [--max-mb 5] [--timeout 30] [--echo true|false]
+      audio off                                      back to auto-detect
+    """)
+  end
+
+  defp media_cmd(other),
+    do: error("unknown media command: #{Enum.join(other, " ")} (try: mix pepe media help)")
+
+  defp put_media_opt(settings, opts, key, field) do
+    case Keyword.fetch(opts, key) do
+      :error -> settings
+      {:ok, value} -> Map.put(settings, field, value)
+    end
+  end
+
+  defp put_media_echo_opt(settings, opts) do
+    if opts[:echo], do: Map.put(settings, "echo", opts[:echo] == "true"), else: settings
+  end
+
+  defp print_audio_field(audio, key) do
+    if v = audio[key], do: puts("  #{key}: #{v}")
+  end
+
+  defp media_kind_status(%{} = settings) when map_size(settings) == 0, do: dim("off")
+  defp media_kind_status(_settings), do: green("configured")
+
+  ###
   ### API token commands
   ###
 
@@ -2972,6 +3103,7 @@ defmodule Mix.Tasks.Pepe do
       {:migrate, "Import from another runtime - existing agents and models"},
       {:plugin, "Plugins - install a channel or tool"},
       {:privacy, "Privacy - redact PII before it reaches a model"},
+      {:media, "Media - voice replies (TTS) and voice-note transcription"},
       {:language, "Language for system messages"},
       {:timezone, "Default timezone for scheduled tasks"},
       {:sandbox, "Sandbox - isolate the shell tools (bash / run_script)"},
@@ -2997,6 +3129,7 @@ defmodule Mix.Tasks.Pepe do
   defp handle_config_action(:migrate), do: then_menu(&setup_migrate/0)
   defp handle_config_action(:plugin), do: then_menu(&setup_plugin/0)
   defp handle_config_action(:privacy), do: then_menu(&setup_privacy/0)
+  defp handle_config_action(:media), do: then_menu(&setup_media/0)
   defp handle_config_action(:language), do: then_menu(&setup_language/0)
   defp handle_config_action(:timezone), do: then_menu(&setup_timezone/0)
   defp handle_config_action(:sandbox), do: then_menu(&setup_sandbox/0)
@@ -3125,6 +3258,70 @@ defmodule Mix.Tasks.Pepe do
     info(dim("Configure them in the dashboard (Privacy tab), or with: mix pepe hooks"))
 
     if Owl.IO.confirm(message: "Show the current hooks now?", default: false), do: hooks_cmd(["list"])
+  end
+
+  defp setup_media do
+    info(bold("Media") <> dim(" - voice replies (text-to-speech) and voice-note transcription"))
+    setup_tts()
+    setup_audio()
+  end
+
+  defp setup_tts do
+    tts = Config.media()["tts"] || %{}
+
+    current =
+      if tts["model"],
+        do: " " <> dim("(currently: #{tts["model"]}, voice #{tts["voice"] || "alloy"})"),
+        else: " " <> dim("(currently off)")
+
+    if ask_yes?("Reply to a voice note with a voice note (TTS)?" <> current) do
+      case pick_media_model() do
+        nil ->
+          info(dim("no model connections yet - add one first (mix pepe model add), then come back"))
+
+        name ->
+          voice = Owl.IO.input(label: "Voice:", optional: true) |> blank_default(tts["voice"] || "alloy")
+          Config.put_media("tts", %{"model" => name, "voice" => voice})
+          ok("voice replies on, using #{green(name)} (voice: #{voice})")
+      end
+    else
+      if tts != %{} do
+        Config.put_media("tts", %{})
+        info(dim("voice replies off"))
+      end
+    end
+  end
+
+  defp setup_audio do
+    audio = Config.media()["audio"] || %{}
+
+    info(dim("\nVoice-note transcription: unset, a connection already known to transcribe (OpenAI, Groq) is used automatically."))
+
+    current = if audio["model"], do: " " <> dim("(currently: #{audio["model"]})"), else: ""
+
+    if ask_yes?("Point transcription at a specific model connection?" <> current) do
+      case pick_media_model() do
+        nil ->
+          info(dim("no model connections yet - add one first (mix pepe model add), then come back"))
+
+        name ->
+          Config.put_media("audio", Map.put(audio, "model", name))
+          ok("audio transcription -> #{green(name)}")
+      end
+    end
+  end
+
+  defp pick_media_model do
+    case model_names() do
+      [] ->
+        nil
+
+      names ->
+        {name, _} =
+          Pepe.TUI.select(Enum.map(names, &{&1, &1}), label: "Which model connection?", render_as: fn {_a, l} -> l end)
+
+        name
+    end
   end
 
   defp first_run_setup do

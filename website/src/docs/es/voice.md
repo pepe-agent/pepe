@@ -38,6 +38,19 @@ Pepe prueba estas rutas en este orden, y cualquiera de ellas puede faltar:
 4. **Nada disponible**: el fichero va al agente, que se las arregla con las herramientas que
    tiene. Esa vía queda como red de seguridad; no es la puerta de entrada.
 
+### Configurar esto
+
+Apunta la transcripción a una conexión de modelo concreta, o a un comando local, desde la CLI:
+
+```bash
+pepe media audio --model groq --language es --echo true
+pepe media audio --command "whisper-cli -f {file}"   # mantiene el audio en la máquina
+pepe media audio off                                 # vuelve a la detección automática
+```
+
+`--echo true` devuelve la transcripción al chat, para que quien habló vea qué se entendió.
+Las mismas opciones están en la página Config del panel, y en `pepe setup` bajo **Media**.
+
 ### Por qué importa transcribir primero
 
 Como las palabras existen antes de que se ejecute el enrutado, el enrutado puede leerlas. De
@@ -55,6 +68,22 @@ del turno del agente:
 <div class="note"><strong>El audio se vuelve texto; la foto se vuelve visión.</strong> El habla
 se transcribe en la puerta. Una foto se envía al modelo como una imagen que de verdad puede ver
 (en un modelo con visión, más abajo). Un documento se extrae a texto.</div>
+
+## Responder de vuelta
+
+Responde a una nota de voz con otra nota de voz. Apagado por defecto; apunta `media.tts` a
+una conexión de modelo que sirva un `/audio/speech` compatible con OpenAI y se enciende:
+
+```bash
+pepe media tts --model openai --voice nova
+pepe media tts off
+```
+
+La respuesta en texto sigue siendo el registro que queda guardado — el audio es un extra, y
+tiene un límite de tamaño para que una respuesta larga nunca se convierta en un clip de
+cinco minutos. Un fallo del TTS es silencioso: la respuesta en texto ya se envió, así que no
+se pierde nada, solo no lleva voz ese turno. Las mismas opciones están en la página Config
+del panel, y en `pepe setup` bajo **Media**.
 
 ## Fotos
 

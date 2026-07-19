@@ -21,6 +21,9 @@ defmodule PepeWeb.ConfigLive do
        config_text: read_config(),
        locale: Config.locale(),
        locales: Config.locales(),
+       model_names: Config.models() |> Enum.map(& &1.name),
+       media_tts: Config.media()["tts"] || %{},
+       media_audio: Config.media()["audio"] || %{},
        # nil = not checked yet · :checking · :up_to_date · a version string when newer.
        update: nil,
        can_self_update: not Pepe.Update.running_from_source?()
@@ -73,7 +76,74 @@ defmodule PepeWeb.ConfigLive do
           <button phx-click="config_reload" class={btn_ghost()}>{gettext("Reload from disk")}</button>
         </.view_header>
 
-        <div class="flex min-h-0 flex-1 flex-col gap-3 p-6">
+        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+          <.form_section title={gettext("Media")}>
+            <div class="grid gap-6 md:grid-cols-2">
+              <form phx-submit="media_tts_save" class="space-y-3">
+                <div class="text-sm font-medium text-zinc-200">{gettext("Voice replies (text-to-speech)")}</div>
+                <p class={hlp()}>
+                  {gettext("Reply to a voice note with a voice note. Needs a model connection serving an OpenAI-compatible /audio/speech.")}
+                </p>
+                <div>
+                  <label class={lbl()} for="tts_model">{gettext("Model connection")}</label>
+                  <select id="tts_model" name="model" class={fld()}>
+                    <option value="" selected={@media_tts["model"] in [nil, ""]}>{gettext("Off")}</option>
+                    <option :for={m <- @model_names} value={m} selected={m == @media_tts["model"]}>{m}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class={lbl()} for="tts_voice">{gettext("Voice")}</label>
+                  <input id="tts_voice" name="voice" type="text" value={@media_tts["voice"] || "alloy"} class={fld()} />
+                </div>
+                <button type="submit" class={btn()}>{gettext("Save")}</button>
+              </form>
+
+              <form phx-submit="media_audio_save" class="space-y-3">
+                <div class="text-sm font-medium text-zinc-200">{gettext("Voice-note transcription")}</div>
+                <p class={hlp()}>
+                  {gettext("Unset, a connection already known to transcribe (OpenAI, Groq) is used automatically.")}
+                </p>
+                <div>
+                  <label class={lbl()} for="audio_model">{gettext("Model connection")}</label>
+                  <select id="audio_model" name="model" class={fld()}>
+                    <option value="" selected={@media_audio["model"] in [nil, ""]}>{gettext("Auto-detect")}</option>
+                    <option :for={m <- @model_names} value={m} selected={m == @media_audio["model"]}>{m}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class={lbl()} for="audio_command">{gettext("Or a local command")}</label>
+                  <input
+                    id="audio_command"
+                    name="command"
+                    type="text"
+                    value={@media_audio["command"]}
+                    placeholder="whisper {file}"
+                    class={fld()}
+                  />
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class={lbl()} for="audio_language">{gettext("Language")}</label>
+                    <input id="audio_language" name="language" type="text" value={@media_audio["language"]} class={fld()} />
+                  </div>
+                  <div>
+                    <label class={lbl()} for="audio_max_mb">{gettext("Max MB")}</label>
+                    <input id="audio_max_mb" name="max_mb" type="number" value={@media_audio["max_mb"]} class={fld()} />
+                  </div>
+                  <div>
+                    <label class={lbl()} for="audio_timeout">{gettext("Timeout (s)")}</label>
+                    <input id="audio_timeout" name="timeout" type="number" value={@media_audio["timeout"]} class={fld()} />
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-zinc-300">
+                  <input type="checkbox" name="echo" value="true" checked={@media_audio["echo"] == true} class="h-4 w-4 accent-orange-500" />
+                  {gettext("Echo the transcript back before answering")}
+                </label>
+                <button type="submit" class={btn()}>{gettext("Save")}</button>
+              </form>
+            </div>
+          </.form_section>
+
           <form phx-submit="config_save" class="flex min-h-0 flex-1 flex-col gap-3">
             <textarea
               name="json"
@@ -158,6 +228,36 @@ defmodule PepeWeb.ConfigLive do
     {:noreply, assign(socket, config_text: read_config())}
   end
 
+  def handle_event("media_tts_save", params, socket) do
+    case presence(params["model"]) do
+      nil -> Config.put_media("tts", %{})
+      model -> Config.put_media("tts", %{"model" => model, "voice" => presence(params["voice"]) || "alloy"})
+    end
+
+    {:noreply,
+     socket
+     |> assign(media_tts: Config.media()["tts"] || %{})
+     |> put_flash(:info, gettext("Media settings saved."))}
+  end
+
+  def handle_event("media_audio_save", params, socket) do
+    settings =
+      %{}
+      |> put_present("model", presence(params["model"]))
+      |> put_present("command", presence(params["command"]))
+      |> put_present("language", presence(params["language"]))
+      |> put_present("max_mb", parse_int(params["max_mb"]))
+      |> put_present("timeout", parse_int(params["timeout"]))
+      |> Map.put("echo", params["echo"] == "true")
+
+    Config.put_media("audio", settings)
+
+    {:noreply,
+     socket
+     |> assign(media_audio: Config.media()["audio"] || %{})
+     |> put_flash(:info, gettext("Media settings saved."))}
+  end
+
   # Changing the project stays on this page; creating one jumps to its Agents.
   def handle_event("set_scope", %{"scope" => scope}, socket) do
     {:noreply, push_navigate(socket, to: "/config?scope=#{scope}")}
@@ -180,6 +280,19 @@ defmodule PepeWeb.ConfigLive do
     case Pepe.Update.latest() do
       {:ok, v} -> if Pepe.Update.newer?(v), do: {:newer, v}, else: :up_to_date
       _ -> :error
+    end
+  end
+
+  defp presence(nil), do: nil
+  defp presence(v), do: v |> to_string() |> String.trim() |> then(&if(&1 == "", do: nil, else: &1))
+
+  defp put_present(map, _key, nil), do: map
+  defp put_present(map, key, value), do: Map.put(map, key, value)
+
+  defp parse_int(v) do
+    case v |> to_string() |> String.trim() |> Integer.parse() do
+      {n, ""} when n > 0 -> n
+      _ -> nil
     end
   end
 

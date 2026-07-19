@@ -37,6 +37,20 @@ Pepe tries these in order, and any of them may be missing:
 4. **Nothing available**: the file goes to the agent, which works it out with the tools it
    has. That path stays as a safety net; it is not the way in.
 
+### Configuring it
+
+Point transcription at a specific model connection, or a local command, from the CLI:
+
+```bash
+pepe media audio --model groq --language en --echo true
+pepe media audio --command "whisper-cli -f {file}"   # keep audio on the machine
+pepe media audio off                                 # back to auto-detect
+```
+
+`--echo true` sends the transcript back to the chat so the speaker can see what was
+understood. The same settings are on the dashboard's Config page, and in `pepe setup`
+under **Media**.
+
 ### Why transcribing first matters
 
 Because the words exist before routing runs, routing can read them. Two things follow, and
@@ -53,6 +67,22 @@ neither was possible while the transcript only appeared inside the agent's turn:
 <div class="note"><strong>Audio becomes text; a photo becomes sight.</strong> Speech is
 transcribed at the door. A photo is sent to the model as an image it can actually see (on a
 vision model, see below). A document is extracted to text.</div>
+
+## Talking back
+
+Reply to a voice note with a voice note. Off by default; point `media.tts` at a model
+connection serving an OpenAI-compatible `/audio/speech` and it turns on:
+
+```bash
+pepe media tts --model openai --voice nova
+pepe media tts off
+```
+
+The text reply is still what's saved as the lasting record - the audio is an extra, and
+it's length-capped so a long answer never becomes a five-minute clip. A TTS failure is
+silent: the text reply already went out, so nothing is lost, it just doesn't get a voice
+that turn. Same settings on the dashboard's Config page, and in `pepe setup` under
+**Media**.
 
 ## Photos
 

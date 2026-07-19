@@ -109,27 +109,32 @@ address it with).
 If you already have a model connection to OpenAI or Groq, this needs no configuration at
 all: Pepe reuses that credential and asks the provider for its transcription model
 (`whisper-1`, `whisper-large-v3-turbo`) rather than the chat model. To choose a connection
-yourself, set it under `media.audio` in `~/.pepe/config.json`:
+yourself, or point at a local command instead:
 
-```json
-{
-  "media": {
-    "audio": {
-      "model": "groq",
-      "language": "en",
-      "echo": true
-    }
-  }
-}
+```bash
+mix pepe media audio --model groq --language en --echo true
+mix pepe media audio --command "whisper-cli -f {file}"   # keep audio on the machine
+mix pepe media audio off                                 # back to auto-detect
 ```
 
-`model` names a model connection to transcribe with, and that connection's `fallbacks`
-chain applies here too. Swap it for `command` (`whisper-cli -f {file}`, where `{file}`
-becomes the path) to keep audio on the machine: a configured command beats automatic
-detection, precisely so the audio never leaves. `echo` sends the transcript back to the
-chat so the speaker can see what was understood. With no route available, the old behavior
-remains as the safety net: the agent gets the file and works it out with its own tools.
-Full detail in the [Voice messages](https://pepe-agent.com/en/docs/voice/) docs.
+`--model` names a model connection to transcribe with, and that connection's `fallbacks`
+chain applies here too. `--command` beats automatic detection, precisely so the audio
+never leaves the machine (`{file}` becomes the path). `--echo true` sends the transcript
+back to the chat so the speaker can see what was understood. With no route available, the
+old behavior remains as the safety net: the agent gets the file and works it out with its
+own tools. Same settings from the dashboard (Config page) or `mix pepe setup`. Full detail
+in the [Voice messages](https://pepe-agent.com/en/docs/voice/) docs.
+
+**Talk back, too.** Point `media.tts` at a model connection serving an OpenAI-compatible
+`/audio/speech` and a reply to a voice note comes back as a voice note, alongside the text
+(the lasting record):
+
+```bash
+mix pepe media tts --model openai --voice nova
+mix pepe media tts off
+```
+
+Off by default; same three surfaces (CLI, dashboard, `mix pepe setup`) as transcription.
 
 **Photos, too.** Send a picture and, on a vision-capable model (set `"vision": true` on the
 model connection), the agent sees the actual image rather than just a filename. Telegram's own

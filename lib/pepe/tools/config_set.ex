@@ -50,6 +50,13 @@ defmodule Pepe.Tools.ConfigSet do
       {"timezone", "default IANA timezone for scheduled tasks (e.g. America/Sao_Paulo)", &set_timezone/1},
       {"telegram.require_mention", "true|false - in groups, reply only when @mentioned", &set_tg_flag("require_mention", &1)},
       {"telegram.enabled", "true|false - pause/resume the default bot without deleting it", &set_tg_flag("enabled", &1)},
+      {"media.tts",
+       "an existing model connection serving an OpenAI-compatible /audio/speech, to reply to a voice note with a voice note - or off",
+       &set_media_tts/1},
+      {"media.tts.voice", "the TTS voice name (e.g. alloy, nova) - media.tts must already be on", &set_media_tts_voice/1},
+      {"media.audio.model",
+       "an existing model connection to transcribe inbound voice notes with - or auto (unset: a connection already known to transcribe is used automatically)",
+       &set_media_audio_model/1},
       {"secrets.expose_env",
        "env var NAME(S) (comma/space separated) to keep in your own shell past the scrub - " <>
          "e.g. OP_SERVICE_ACCOUNT_TOKEN, so you can run a vault CLI yourself. Additive; never a secret value", &set_expose_env/1}
@@ -144,6 +151,46 @@ defmodule Pepe.Tools.ConfigSet do
 
   defp env_name?(name), do: Regex.match?(~r/\A[A-Z_][A-Z0-9_]*\z/, name)
 
+  defp set_media_tts(value) when value in ["off", "none"] do
+    Config.put_media("tts", %{})
+    {:ok, "media.tts -> off"}
+  end
+
+  defp set_media_tts(value) do
+    if Config.get_model(value) do
+      voice = (Config.media()["tts"] || %{})["voice"] || "alloy"
+      Config.put_media("tts", %{"model" => value, "voice" => voice})
+      {:ok, "media.tts -> #{value} (voice: #{voice})"}
+    else
+      {:error, "no model connection named #{value}"}
+    end
+  end
+
+  defp set_media_tts_voice(value) do
+    case Config.media()["tts"] do
+      %{"model" => model} when is_binary(model) ->
+        Config.put_media("tts", %{"model" => model, "voice" => value})
+        {:ok, "media.tts.voice -> #{value}"}
+
+      _ ->
+        {:error, "media.tts is off - set media.tts to a model connection first"}
+    end
+  end
+
+  defp set_media_audio_model(value) when value in ["auto", "off", "none"] do
+    Config.put_media("audio", Map.delete(Config.media()["audio"] || %{}, "model"))
+    {:ok, "media.audio.model -> auto (a connection already known to transcribe is used, if any)"}
+  end
+
+  defp set_media_audio_model(value) do
+    if Config.get_model(value) do
+      Config.put_media("audio", Map.put(Config.media()["audio"] || %{}, "model", value))
+      {:ok, "media.audio.model -> #{value}"}
+    else
+      {:error, "no model connection named #{value}"}
+    end
+  end
+
   ###
   ### schema rendering (self-discovery)
   ###
@@ -174,6 +221,16 @@ defmodule Pepe.Tools.ConfigSet do
       names -> Enum.join(names, ", ")
     end
   end
+
+  defp current("media.tts") do
+    case Config.media()["tts"] do
+      %{"model" => model} when is_binary(model) -> model
+      _ -> "off"
+    end
+  end
+
+  defp current("media.tts.voice"), do: (Config.media()["tts"] || %{})["voice"] || "(off)"
+  defp current("media.audio.model"), do: (Config.media()["audio"] || %{})["model"] || "auto"
 
   defp current(_), do: "?"
 end
