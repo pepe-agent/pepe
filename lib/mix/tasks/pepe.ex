@@ -2082,6 +2082,7 @@ defmodule Mix.Tasks.Pepe do
           exempt_message_limit: :boolean,
           trust_untrusted_content: :boolean,
           midrun_fold: :boolean,
+          commitments: :boolean,
           admin: :boolean
         ]
       )
@@ -2271,7 +2272,8 @@ defmodule Mix.Tasks.Pepe do
       utility_model: opts[:utility_model],
       exempt_message_limit: opts[:exempt_message_limit] || false,
       trust_untrusted_content: opts[:trust_untrusted_content] || false,
-      midrun_fold: opts[:midrun_fold] || false
+      midrun_fold: opts[:midrun_fold] || false,
+      commitments: opts[:commitments] || false
     }
   end
 

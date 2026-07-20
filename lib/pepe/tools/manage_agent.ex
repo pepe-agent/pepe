@@ -73,6 +73,11 @@ defmodule Pepe.Tools.ManageAgent do
             target's triage_model if it has one (cheap); otherwise falls back to the
             target's own model for the check - warn the operator this costs an extra call
             on that model for every message that arrives mid-turn if no triage_model is set.
+          - commitments: whether the target notices a stated follow-up after each turn
+            ("me lembra sexta", "I'll check and tell you tomorrow") and tracks it without
+            being asked to. Turn it ON for "have it remember what it promises", "track
+            reminders automatically". Needs a `utility_model` set on the target or this
+            does nothing - warn the operator if they haven't set one.
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -94,7 +99,7 @@ defmodule Pepe.Tools.ManageAgent do
           "flag" => %{
             "type" => "string",
             "description" => "For set_flag: which switch.",
-            "enum" => ~w(trust_untrusted_content exempt_message_limit midrun_fold)
+            "enum" => ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments)
           }
         },
         "required" => ["action"]
@@ -226,7 +231,8 @@ defmodule Pepe.Tools.ManageAgent do
   @flags %{
     "trust_untrusted_content" => :trust_untrusted_content,
     "exempt_message_limit" => :exempt_message_limit,
-    "midrun_fold" => :midrun_fold
+    "midrun_fold" => :midrun_fold,
+    "commitments" => :commitments
   }
 
   defp set_flag(target, flag_name, value, ctx) do
@@ -311,7 +317,7 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
-    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}
+    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}
     persona: #{persona_preview(a.name)}
     """
   end

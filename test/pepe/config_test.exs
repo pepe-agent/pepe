@@ -196,6 +196,76 @@ defmodule Pepe.ConfigTest do
     end
   end
 
+  describe "create_commitment/1" do
+    test "stores a fresh commitment and resolves the agent handle back" do
+      Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+      assert {:ok, c} =
+               Config.create_commitment(%Config.Commitment{
+                 text: "check the deploy and report back",
+                 agent: "assistant",
+                 origin_type: "agent_promise",
+                 state: "scheduled"
+               })
+
+      assert c.agent == "default/assistant"
+      assert c.text == "check the deploy and report back"
+      assert [^c] = Config.commitments()
+    end
+
+    test "skips a near-duplicate for the same agent, punctuation/case-insensitive" do
+      Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+      assert {:ok, _} =
+               Config.create_commitment(%Config.Commitment{
+                 text: "Check the deploy and report back!",
+                 agent: "assistant",
+                 state: "scheduled"
+               })
+
+      assert Config.create_commitment(%Config.Commitment{
+               text: "check the deploy and report back",
+               agent: "assistant",
+               state: "awaiting_confirmation"
+             }) == {:error, :duplicate}
+
+      assert match?([_], Config.commitments())
+    end
+
+    test "does not treat a delivered/cancelled commitment as a duplicate" do
+      Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+      {:ok, first} =
+        Config.create_commitment(%Config.Commitment{text: "ping the user", agent: "assistant", state: "scheduled"})
+
+      Config.put_commitment(%{first | state: "delivered"})
+
+      assert {:ok, _} =
+               Config.create_commitment(%Config.Commitment{text: "ping the user", agent: "assistant", state: "scheduled"})
+
+      assert match?([_, _], Config.commitments())
+    end
+
+    test "only one of two concurrent near-duplicate extractions wins" do
+      Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+      results =
+        1..10
+        |> Enum.map(fn _ ->
+          Task.async(fn ->
+            Config.create_commitment(%Config.Commitment{text: "follow up tomorrow", agent: "assistant", state: "scheduled"})
+          end)
+        end)
+        |> Task.await_many(10_000)
+
+      oks = Enum.count(results, &match?({:ok, _}, &1))
+      dups = Enum.count(results, &(&1 == {:error, :duplicate}))
+      assert oks == 1, "expected exactly one insert to win, got #{oks}"
+      assert dups == 9
+      assert match?([_], Config.commitments())
+    end
+  end
+
   describe "file permissions" do
     test "save restricts the config to owner-only and tightens the home directory" do
       Config.save(%{"x" => 1})

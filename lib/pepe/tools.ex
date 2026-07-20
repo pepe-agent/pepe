@@ -11,6 +11,7 @@ defmodule Pepe.Tools do
 
   alias Pepe.Tools.Bash
   alias Pepe.Tools.Board
+  alias Pepe.Tools.Commitment
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
   alias Pepe.Tools.Delegate
@@ -85,6 +86,7 @@ defmodule Pepe.Tools do
     SetRoute,
     Review,
     Watch,
+    Commitment,
     TelegramAccess,
     TelegramPoll
   ]

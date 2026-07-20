@@ -82,6 +82,7 @@ defmodule PepeWeb.Router do
       live "/cron", ScheduledLive
       live "/board", BoardLive
       live "/watches", WatchesLive
+      live "/commitments", CommitmentsLive
       live "/learn", LearningLive
       live "/usage", UsageLive
       live "/traces", TracesLive

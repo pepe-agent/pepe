@@ -225,11 +225,28 @@ defmodule PepeWeb.AgentsLive do
                   <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:utility_model]}>{m}</option>
                 </select>
               </div>
+
+              <label class="flex items-start gap-2.5 text-sm">
+                <input type="checkbox" name="commitments" value="true" checked={@edit_agent[:commitments]} class="mt-0.5" />
+                <span>
+                  {gettext("Track commitments made in conversation")}
+                  <p class={hlp()}>{gettext("Notices a stated follow-up after each turn (\"remind me Friday\", \"I'll check and tell you tomorrow\") and tracks it without being asked twice. A user's own reminder gets a message back at the right time; this agent's own promise re-runs its session so the work actually happens before anything is said to have been done.")}</p>
+                  <p :if={blank(@edit_agent[:utility_model]) == nil} class={[hlp(), "text-amber-500/80"]}>
+                    {gettext("No utility model set above: this does nothing until one is.")}
+                  </p>
+                </span>
+              </label>
             </.form_section>
 
             <.form_section title={gettext("Capabilities")}>
               <div>
-                <label class={lbl()}>{gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span></label>
+                <label class={lbl()}>
+                  {gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span>
+                  <span
+                    class="ml-1 cursor-help text-zinc-600"
+                    title={gettext("The text under each tool is what it tells the AI model, always in English on purpose - it's an instruction for the model, not a translated interface label.")}
+                  >ⓘ</span>
+                </label>
                 <div class="grid gap-2 sm:grid-cols-2">
                   <.check_card :for={t <- Pepe.Tools.names()} name="tools[]" value={t}
                     checked={t in @edit_agent.tools} hint={tool_hint(t)} />
@@ -354,7 +371,8 @@ defmodule PepeWeb.AgentsLive do
       max_iterations: nil,
       tool_progress: nil,
       exempt_message_limit: false,
-      midrun_fold: false
+      midrun_fold: false,
+      commitments: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -471,7 +489,8 @@ defmodule PepeWeb.AgentsLive do
         utility_model: blank(params["utility_model"]),
         exempt_message_limit: params["exempt_message_limit"] == "true",
         trust_untrusted_content: params["trust_untrusted_content"] == "true",
-        midrun_fold: params["midrun_fold"] == "true"
+        midrun_fold: params["midrun_fold"] == "true",
+        commitments: params["commitments"] == "true"
     }
 
     case Config.put_agent(agent) do
@@ -518,7 +537,8 @@ defmodule PepeWeb.AgentsLive do
         utility_model: blank(params["utility_model"]),
         exempt_message_limit: params["exempt_message_limit"] == "true",
         trust_untrusted_content: params["trust_untrusted_content"] == "true",
-        midrun_fold: params["midrun_fold"] == "true"
+        midrun_fold: params["midrun_fold"] == "true",
+        commitments: params["commitments"] == "true"
     }
 
     {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}

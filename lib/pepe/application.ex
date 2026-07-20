@@ -131,23 +131,20 @@ defmodule Pepe.Application do
     serve? = Application.get_env(:pepe, :serve_endpoint, false)
     gateways? = Application.get_env(:pepe, :start_gateways, false)
     persist? = Application.get_env(:pepe, :persist_sessions, false)
+    server? = serve? or gateways?
 
-    # Cron fires only on the server surfaces; watches also run on an interactive
-    # console (`tui`/`chat`) so a standalone REPL can fire and deliver its own watches.
-    # (Run a single long-lived surface at a time - two schedulers on one config double-fire.)
-    crons =
-      if serve? or gateways?,
-        do: [{Task.Supervisor, name: Pepe.Cron.TaskSupervisor}, Pepe.Cron.Scheduler],
-        else: []
-
-    boards =
-      if serve? or gateways?,
-        do: [{Task.Supervisor, name: Pepe.Board.TaskSupervisor}, Pepe.Board.Scheduler],
-        else: []
-
-    watches = if serve? or gateways? or persist?, do: [Pepe.Watch.Scheduler], else: []
-    crons ++ boards ++ watches
+    # Cron fires only on the server surfaces; watches (and commitments, which fire the
+    # same way) also run on an interactive console (`tui`/`chat`) so a standalone REPL
+    # can fire and deliver its own. (Run a single long-lived surface at a time - two
+    # schedulers on one config double-fire.)
+    maybe_children(server?, [{Task.Supervisor, name: Pepe.Cron.TaskSupervisor}, Pepe.Cron.Scheduler]) ++
+      maybe_children(server?, [{Task.Supervisor, name: Pepe.Board.TaskSupervisor}, Pepe.Board.Scheduler]) ++
+      maybe_children(server? or persist?, [Pepe.Watch.Scheduler]) ++
+      maybe_children(server? or persist?, [Pepe.Commitments.Scheduler])
   end
+
+  defp maybe_children(true, children), do: children
+  defp maybe_children(false, _children), do: []
 
   # The Phoenix endpoint (OpenAI-compatible HTTP API + WebSocket) is only started
   # when serving. CLI one-shot commands set :serve_endpoint to false to boot fast.

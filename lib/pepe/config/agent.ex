@@ -99,7 +99,13 @@ defmodule Pepe.Config.Agent do
             # hard toward queueing on any doubt, timeout, or classifier failure - folding in
             # an unrelated message derails the running turn, which is the worse of the two
             # failure modes. See Pepe.Agent.Session.
-            midrun_fold: false
+            midrun_fold: false,
+            # Off by default. When on, a cheap `utility_model` call after each turn notices a
+            # stated follow-up ("me lembra sexta", "I'll check and tell you tomorrow") and
+            # tracks it - a user's own reminder gets a message back at the right time, an
+            # agent's own promise gets its session re-run so the work actually happens before
+            # anything is said to have been done. See Pepe.Agent.CommitmentExtract.
+            commitments: false
 
   @type t :: %__MODULE__{}
 
@@ -130,10 +136,20 @@ defmodule Pepe.Config.Agent do
       fallbacks: map["fallbacks"],
       triage_model: map["triage_model"],
       simple_model: map["simple_model"],
-      utility_model: map["utility_model"],
-      exempt_message_limit: map["exempt_message_limit"] || false,
-      trust_untrusted_content: map["trust_untrusted_content"] || false,
-      midrun_fold: map["midrun_fold"] || false
+      utility_model: map["utility_model"]
+    }
+    |> put_flags(map)
+  end
+
+  # Split from the rest of from_map/1 to keep its cyclomatic complexity down - each `||`
+  # default counts as a branch, and this is nothing but four of them.
+  defp put_flags(agent, map) do
+    %{
+      agent
+      | exempt_message_limit: map["exempt_message_limit"] || false,
+        trust_untrusted_content: map["trust_untrusted_content"] || false,
+        midrun_fold: map["midrun_fold"] || false,
+        commitments: map["commitments"] || false
     }
   end
 end

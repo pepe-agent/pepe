@@ -910,6 +910,7 @@ defmodule Pepe.Config do
     config
     |> reject_bound_entries("crons", bound?)
     |> reject_bound_entries("watches", bound?)
+    |> reject_bound_entries("commitments", bound?)
     |> reject_bound_entries("api_tokens", bound?)
     |> reject_bound_entries("webhooks", bound?)
     |> blank_bound_agent("telegram", bound?)
@@ -991,6 +992,7 @@ defmodule Pepe.Config do
       |> remap_model_names(old, new)
       |> rewrite_agent_binding("crons", old, new)
       |> rewrite_agent_binding("watches", old, new)
+      |> rewrite_agent_binding("commitments", old, new)
       |> rewrite_bot_bindings(old, new)
       |> rewrite_token_scopes(old, new)
       |> remap_field("default_agent", old, new)
@@ -1179,7 +1181,7 @@ defmodule Pepe.Config do
   # `projects` map and the `default_project` pointer are dropped: the bundle is bare single-tenant,
   # and load-time migration re-expands it into a fresh default project. The legacy single
   # `telegram` bot is dropped outright too.
-  @scoped_sections ~w(agents models crons watches telegrams api_tokens webhooks)
+  @scoped_sections ~w(agents models crons watches commitments telegrams api_tokens webhooks)
   @dropped_sections ~w(projects default_project telegram)
 
   # A scope's billing/limits fields (kept in the project's own entry under `projects.<id>`).
@@ -1197,12 +1199,13 @@ defmodule Pepe.Config do
     agents = keep_owned_agents(config["agents"], project_id_for(config, co))
     crons = config["crons"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     watches = config["watches"] |> resolve_section_agents(config) |> keep_agent_bound(co)
+    commitments = config["commitments"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     telegrams = config["telegrams"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     tokens = config["api_tokens"] |> resolve_section_agents(config) |> keep_tokens(co)
     webhooks = config["webhooks"] |> resolve_section_agents(config) |> keep_webhooks(co)
     meta = project_meta_in(config, co)
 
-    deps = model_deps(agents, [crons, watches, telegrams], meta)
+    deps = model_deps(agents, [crons, watches, commitments, telegrams], meta)
     {models, shared} = keep_models(config["models"], deps, co)
 
     rebuilt = %{
@@ -1210,6 +1213,7 @@ defmodule Pepe.Config do
       "models" => descope_model_names(models, co),
       "crons" => descope_agent_bound(crons, co),
       "watches" => descope_agent_bound(watches, co),
+      "commitments" => descope_agent_bound(commitments, co),
       "telegrams" => descope_agent_bound(telegrams, co),
       "api_tokens" => descope_tokens(tokens, co),
       "webhooks" => descope_webhooks(webhooks, co)
@@ -1903,6 +1907,7 @@ defmodule Pepe.Config do
     end)
     |> rewrite_agent_binding("crons", old, new)
     |> rewrite_agent_binding("watches", old, new)
+    |> rewrite_agent_binding("commitments", old, new)
     |> rewrite_bot_bindings(old, new)
     |> rewrite_token_scopes(old, new)
     |> remap_field("default_agent", old, new)
@@ -2170,6 +2175,99 @@ defmodule Pepe.Config do
   end
 
   ###
+  ### Commitments (agent- or user-made follow-ups, extracted automatically after a turn)
+  ###
+
+  alias Pepe.Config.Commitment
+
+  @doc "All commitments, as `Pepe.Config.Commitment` structs, sorted by id."
+  def commitments do
+    load()
+    |> Map.get("commitments", %{})
+    |> Enum.map(fn {id, map} -> Commitment.from_map(Map.put(map, "id", id)) |> resolve_commitment_agent() end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @doc "Fetch one commitment by id, or nil."
+  def get_commitment(id) do
+    case load() |> get_in(["commitments", id]) do
+      nil -> nil
+      map -> Commitment.from_map(Map.put(map, "id", id)) |> resolve_commitment_agent()
+    end
+  end
+
+  defp resolve_commitment_agent(%Commitment{agent: agent} = c), do: %{c | agent: read_agent_ref(agent)}
+
+  @doc """
+  Create or replace a commitment (keyed by its `id`). For human-driven updates
+  (`confirm`/`cancel`, the scheduler marking it delivered) where the caller already has
+  the id - not for a fresh extraction, see `create_commitment/1`.
+  """
+  def put_commitment(%Commitment{id: id} = commitment) when is_binary(id) do
+    map = %{commitment | agent: store_agent_ref(commitment.agent)} |> Map.from_struct() |> Map.delete(:id) |> stringify()
+
+    update(fn config ->
+      config
+      |> update_in(["commitments"], fn c -> Map.put(c || %{}, id, map) end)
+    end)
+  end
+
+  @doc "Delete a commitment by id."
+  def delete_commitment(id) do
+    update(fn config ->
+      config
+      |> update_in(["commitments"], &Map.delete(&1 || %{}, id))
+    end)
+  end
+
+  @doc """
+  Insert a freshly-extracted commitment, atomically skipping the insert when an active
+  (`awaiting_confirmation`/`scheduled`) commitment already exists for the same agent with
+  near-identical text. Extraction runs automatically after every turn, so this
+  check-then-write must happen inside the same `update_cas/1` callback, not as a separate
+  `commitments/0` read followed by `put_commitment/1` - two turns racing to store the same
+  restated commitment is a real scenario, not a hypothetical one.
+  """
+  @spec create_commitment(Commitment.t()) :: {:ok, Commitment.t()} | {:error, :duplicate} | {:error, term()}
+  def create_commitment(%Commitment{} = commitment) do
+    id = generate_commitment_id()
+    agent_ref = store_agent_ref(commitment.agent)
+    norm = normalize_commitment_text(commitment.text)
+
+    update_cas(fn config ->
+      if duplicate_commitment?(config, agent_ref, norm) do
+        {:error, :duplicate}
+      else
+        map = %{commitment | agent: agent_ref} |> Map.from_struct() |> Map.delete(:id) |> stringify()
+        {:ok, update_in(config, ["commitments"], &Map.put(&1 || %{}, id, map))}
+      end
+    end)
+    |> case do
+      {:ok, new_config} ->
+        {:ok, get_in(new_config, ["commitments", id]) |> Map.put("id", id) |> Commitment.from_map() |> resolve_commitment_agent()}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp duplicate_commitment?(config, agent_ref, norm) do
+    config
+    |> Map.get("commitments", %{})
+    |> Enum.any?(fn {_id, m} ->
+      m["agent"] == agent_ref and m["state"] in ["awaiting_confirmation", "scheduled"] and
+        normalize_commitment_text(m["text"]) == norm
+    end)
+  end
+
+  defp normalize_commitment_text(text) when is_binary(text),
+    do: text |> String.downcase() |> String.replace(~r/[[:punct:]]/u, "") |> String.trim()
+
+  defp normalize_commitment_text(_), do: ""
+
+  defp generate_commitment_id, do: "c_" <> (:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower))
+
+  ###
   ### API access tokens
   ###
 
@@ -2409,15 +2507,17 @@ defmodule Pepe.Config do
   that resolve to the same token are de-duplicated (two pollers on one token would
   409 against each other).
   """
-  def telegram_bots do
+  def telegram_bots, do: telegram_bots_in(load())
+
+  defp telegram_bots_in(config) do
     base =
-      case load()["telegram"] do
+      case config["telegram"] do
         m when is_map(m) and map_size(m) > 0 -> [Map.put(m, "name", m["name"] || "default") |> read_map_agent()]
         _ -> []
       end
 
     extra =
-      load()
+      config
       |> Map.get("telegrams", %{})
       |> Enum.map(fn {name, m} -> m |> Map.put("name", name) |> read_map_agent() end)
       |> Enum.sort_by(& &1["name"])
@@ -2440,7 +2540,10 @@ defmodule Pepe.Config do
     get_in(load(), ["telegram_topics", topic_key(bot_name, chat_id, thread)])
   end
 
-  @doc "Bind a forum topic to an agent (persistent). `nil` agent removes the binding."
+  @doc """
+  Bind a chat (or, with a `thread`, one of its forum topics) to an agent, persistently.
+  `nil` agent removes the binding.
+  """
   @spec bind_telegram_topic(String.t(), term(), term(), String.t() | nil) :: map()
   def bind_telegram_topic(bot_name, chat_id, thread, nil) do
     update(fn config ->
@@ -2456,6 +2559,10 @@ defmodule Pepe.Config do
     end)
   end
 
+  # `thread` is `nil` for a plain chat (no forum topic) - `nil` doesn't implement
+  # `String.Chars`, so it needs its own branch rather than interpolating straight
+  # through; "chat" can never collide with a real thread id (always a positive integer).
+  defp topic_key(bot_name, chat_id, nil), do: "#{bot_name}:#{chat_id}:chat"
   defp topic_key(bot_name, chat_id, thread), do: "#{bot_name}:#{chat_id}:#{thread}"
 
   @doc "Create or replace a named (non-default) Telegram bot."
@@ -2472,19 +2579,34 @@ defmodule Pepe.Config do
   Transform one Telegram bot's config in place, writing it back to wherever it lives (the legacy
   `telegram` map for `"default"`, the `telegrams` map for a named bot). `fun` receives the bot map
   (without the injected `"name"`) and returns the updated map. `{:error, :not_found}` if no such bot.
+
+  Goes through `update_cas/1`, not a separate read followed by a separate write: several blocked
+  messages from the same chat arrive close together, each spawning its own concurrent call into
+  here (`Pepe.Gateways.Telegram.maybe_queue_pending/3`), and a read-then-write-later pair would let
+  one caller's write silently revert whatever another wrote to this bot's config in between - the
+  same race this codebase's other config mutations (`put_agent`, `put_model`, `Pepe.Board`) are all
+  built not to have.
   """
   @spec update_telegram_bot(String.t(), (map() -> map())) :: :ok | {:error, :not_found}
   def update_telegram_bot(name, fun) when is_binary(name) and is_function(fun, 1) do
-    case telegram_bot(name) do
-      nil ->
-        {:error, :not_found}
+    update_cas(fn config ->
+      case Enum.find(telegram_bots_in(config), &(&1["name"] == name)) do
+        nil ->
+          {:error, :not_found}
 
-      bot ->
-        updated = bot |> Map.delete("name") |> fun.()
-        if name == "default", do: put_telegram(updated), else: put_telegram_bot(name, updated)
-        :ok
+        bot ->
+          updated = bot |> Map.delete("name") |> fun.() |> store_map_agent()
+          {:ok, put_bot_in(config, name, updated)}
+      end
+    end)
+    |> case do
+      {:ok, _config} -> :ok
+      {:error, _} = err -> err
     end
   end
+
+  defp put_bot_in(config, "default", updated), do: Map.put(config, "telegram", updated)
+  defp put_bot_in(config, name, updated), do: update_in(config, ["telegrams"], &Map.put(&1 || %{}, name, updated))
 
   @doc "Does this bot deny unknown users by default and queue them for approval? (`require_approval`)."
   @spec telegram_require_approval?(String.t()) :: boolean()

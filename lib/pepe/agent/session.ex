@@ -11,6 +11,7 @@ defmodule Pepe.Agent.Session do
   # Persisted sessions are re-spawned explicitly on boot by `SessionSupervisor.restore`.
   use GenServer, restart: :temporary
 
+  alias Pepe.Agent.CommitmentExtract
   alias Pepe.Agent.Runtime
   alias Pepe.Agent.SessionTitles
   alias Pepe.Agent.Workspace
@@ -802,6 +803,7 @@ defmodule Pepe.Agent.Session do
           # `:done` reads it one turn stale. `:committed` is the event to reconcile on.
           emit(running[:on_event], :committed)
           maybe_title(state)
+          CommitmentExtract.maybe_extract(state)
           state
 
         {:error, reason} ->
