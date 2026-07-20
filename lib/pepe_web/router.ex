@@ -80,6 +80,7 @@ defmodule PepeWeb.Router do
       live "/bots", ChannelsLive
       live "/integrations", IntegrationsLive
       live "/cron", ScheduledLive
+      live "/board", BoardLive
       live "/watches", WatchesLive
       live "/learn", LearningLive
       live "/usage", UsageLive

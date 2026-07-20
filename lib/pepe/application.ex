@@ -16,31 +16,32 @@ defmodule Pepe.Application do
   end
 
   # Runs while the supervision tree is still up, before it's torn down - the
-  # only point where we can still see and wait on in-flight cron jobs. Without
+  # only point where we can still see and wait on in-flight cron/board-card jobs. Without
   # this, a job mid-run (agent call, tool side effects, delivery) is just killed
   # with the VM: no record, no delivery, and any side effect it already started
   # (a message sent, a file written) is left half-done with nothing to show for it.
   @impl true
   def prep_stop(state) do
-    drain_cron_tasks()
+    drain_tasks(Pepe.Cron.TaskSupervisor, "cron job")
+    drain_tasks(Pepe.Board.TaskSupervisor, "board card")
     state
   end
 
-  @cron_drain_timeout_ms 25_000
+  @drain_timeout_ms 25_000
 
-  defp drain_cron_tasks do
-    case Process.whereis(Pepe.Cron.TaskSupervisor) do
+  defp drain_tasks(supervisor, label) do
+    case Process.whereis(supervisor) do
       nil ->
         :ok
 
       _pid ->
-        case Task.Supervisor.children(Pepe.Cron.TaskSupervisor) do
+        case Task.Supervisor.children(supervisor) do
           [] ->
             :ok
 
           pids ->
-            Logger.info("draining #{length(pids)} in-flight cron job(s) before shutdown")
-            deadline = System.monotonic_time(:millisecond) + @cron_drain_timeout_ms
+            Logger.info("draining #{length(pids)} in-flight #{label}(s) before shutdown")
+            deadline = System.monotonic_time(:millisecond) + @drain_timeout_ms
             pids |> Enum.map(&Process.monitor/1) |> await_all_down(deadline)
         end
     end
@@ -139,8 +140,13 @@ defmodule Pepe.Application do
         do: [{Task.Supervisor, name: Pepe.Cron.TaskSupervisor}, Pepe.Cron.Scheduler],
         else: []
 
+    boards =
+      if serve? or gateways?,
+        do: [{Task.Supervisor, name: Pepe.Board.TaskSupervisor}, Pepe.Board.Scheduler],
+        else: []
+
     watches = if serve? or gateways? or persist?, do: [Pepe.Watch.Scheduler], else: []
-    crons ++ watches
+    crons ++ boards ++ watches
   end
 
   # The Phoenix endpoint (OpenAI-compatible HTTP API + WebSocket) is only started

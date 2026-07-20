@@ -31,6 +31,8 @@ defmodule Pepe.Config do
 
   alias Pepe.Project
   alias Pepe.Config.Agent
+  alias Pepe.Config.Board
+  alias Pepe.Config.BoardCard
   alias Pepe.Config.Cron
   alias Pepe.Config.Model
 
@@ -252,6 +254,15 @@ defmodule Pepe.Config do
   """
   @spec update((map() -> map())) :: map()
   def update(fun) when is_function(fun, 1), do: Pepe.Config.Writer.update(fun)
+
+  @doc """
+  Like `update/1`, but `fun` can refuse to write: see `Pepe.Config.Writer.update_cas/1`. Use
+  this instead of `update/1` for any change with a precondition (a claim, a slot that can only
+  be taken once): folding the check into `fun` and reading the config `fun` receives, not one
+  fetched earlier, is what makes two concurrent callers race-free with no separate lock.
+  """
+  @spec update_cas((map() -> {:ok, map()} | {:error, term()})) :: {:ok, map()} | {:error, term()}
+  def update_cas(fun) when is_function(fun, 1), do: Pepe.Config.Writer.update_cas(fun)
 
   ###
   ### Models
@@ -1940,6 +1951,92 @@ defmodule Pepe.Config do
       config
       |> update_in(["crons"], &Map.delete(&1 || %{}, id))
     end)
+  end
+
+  ###
+  ### Boards (durable task/work-item tracking, see Pepe.Board)
+  ###
+
+  @doc "All boards, as `Pepe.Config.Board` structs, sorted by id."
+  def boards do
+    load()
+    |> Map.get("boards", %{})
+    |> Enum.map(fn {id, map} -> Board.from_map(Map.put(map, "id", id)) end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @doc "Fetch one board by id, or nil."
+  def get_board(id) do
+    case load() |> get_in(["boards", id]) do
+      nil -> nil
+      map -> Board.from_map(Map.put(map, "id", id))
+    end
+  end
+
+  @doc """
+  Create or replace a board's own settings (keyed by its `id`): used to edit an existing
+  board (e.g. toggling `auto_dispatch` from the dashboard). Creating a *new* board goes
+  through `Pepe.Board.create_board/1` instead, which guards against a name collision.
+  """
+  def put_board(%Board{id: id} = board) when is_binary(id) do
+    map = board |> Map.from_struct() |> Map.delete(:id) |> stringify()
+    update(fn config -> update_in(config, ["boards"], &Map.put(&1 || %{}, id, map)) end)
+  end
+
+  @doc """
+  Delete a board by id. Refuses unless it has no cards; `force: true` cascades (drops its
+  cards too). Only touches config; deleting a card's `Pepe.Board.Log` file is the caller's
+  job (see `Pepe.Board.delete_board/2`, the entry point that also does that).
+  """
+  def delete_board(id, opts \\ []) do
+    cards = board_cards_for(id)
+
+    if cards != [] and not Keyword.get(opts, :force, false) do
+      {:error, {:not_empty, length(cards)}}
+    else
+      update(fn config ->
+        config
+        |> update_in(["boards"], &Map.delete(&1 || %{}, id))
+        |> update_in(["board_cards"], fn all -> Map.reject(all || %{}, fn {_cid, m} -> m["board"] == id end) end)
+      end)
+
+      :ok
+    end
+  end
+
+  @doc "All board cards, as `Pepe.Config.BoardCard` structs, sorted by id."
+  def board_cards do
+    load()
+    |> Map.get("board_cards", %{})
+    |> Enum.map(fn {id, map} -> BoardCard.from_map(Map.put(map, "id", id)) end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @doc "Cards belonging to one board, sorted by id."
+  def board_cards_for(board_id), do: Enum.filter(board_cards(), &(&1.board == board_id))
+
+  @doc "Fetch one board card by id, or nil."
+  def get_board_card(id) do
+    case load() |> get_in(["board_cards", id]) do
+      nil -> nil
+      map -> BoardCard.from_map(Map.put(map, "id", id))
+    end
+  end
+
+  @doc """
+  Create or replace a board card (keyed by its `id`) with no precondition check: used for
+  a plain field edit (the dashboard changing a title/priority). Anything with a status
+  precondition (a claim, a transition) goes through `Pepe.Board` instead, which uses
+  `update_cas/1` so two concurrent callers can't both win.
+  """
+  def put_board_card(%BoardCard{id: id} = card) when is_binary(id) do
+    map = card |> Map.from_struct() |> Map.delete(:id) |> stringify()
+    update(fn config -> update_in(config, ["board_cards"], &Map.put(&1 || %{}, id, map)) end)
+  end
+
+  @doc "Delete a board card by id."
+  def delete_board_card(id) do
+    update(fn config -> update_in(config, ["board_cards"], &Map.delete(&1 || %{}, id)) end)
   end
 
   ###

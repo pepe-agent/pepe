@@ -10,6 +10,7 @@ defmodule Pepe.Tools do
   """
 
   alias Pepe.Tools.Bash
+  alias Pepe.Tools.Board
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
   alias Pepe.Tools.Delegate
@@ -40,6 +41,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.SendToAgent
   alias Pepe.Tools.SetRoute
   alias Pepe.Tools.Skill
+  alias Pepe.Tools.SwitchAgent
   alias Pepe.Tools.TelegramAccess
   alias Pepe.Tools.Watch
   alias Pepe.Tools.WebSearch
@@ -64,8 +66,10 @@ defmodule Pepe.Tools do
     Docs,
     Doctor,
     SendToAgent,
+    SwitchAgent,
     Delegate,
     ScheduleTask,
+    Board,
     ManageChannel,
     ManageAgent,
     ManageMcp,

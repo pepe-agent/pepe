@@ -63,4 +63,41 @@ defmodule Pepe.ConfigWriterTest do
     # A bare peer qualifies into the sender's (default) project, so the stored route is `default/peerN`.
     for peer <- routes, do: assert("default/#{peer}" in can_message, "route to #{peer} was lost")
   end
+
+  test "update_cas/1 saves and returns {:ok, config} when fun approves the write" do
+    result = Config.update_cas(fn config -> {:ok, Map.put(config, "marker", "set")} end)
+    assert {:ok, %{"marker" => "set"}} = result
+    assert Config.load()["marker"] == "set"
+  end
+
+  test "update_cas/1 leaves the file untouched and returns fun's error when it refuses" do
+    Config.update_cas(fn config -> {:ok, Map.put(config, "marker", "original")} end)
+
+    result = Config.update_cas(fn _config -> {:error, :precondition_failed} end)
+
+    assert result == {:error, :precondition_failed}
+    assert Config.load()["marker"] == "original"
+  end
+
+  test "update_cas/1 is a real compare-and-swap: only one of two concurrent claims on the same slot wins" do
+    Config.update_cas(fn config -> {:ok, Map.put(config, "slot", "open")} end)
+
+    results =
+      1..20
+      |> Enum.map(fn i ->
+        Task.async(fn ->
+          Config.update_cas(fn config ->
+            case config["slot"] do
+              "open" -> {:ok, Map.put(config, "slot", "claimed-by-#{i}")}
+              _ -> {:error, :already_claimed}
+            end
+          end)
+        end)
+      end)
+      |> Task.await_many(10_000)
+
+    oks = Enum.count(results, &match?({:ok, _}, &1))
+    assert oks == 1, "expected exactly one claim to win, got #{oks}"
+    assert String.starts_with?(Config.load()["slot"], "claimed-by-")
+  end
 end

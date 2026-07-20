@@ -211,7 +211,7 @@ Portuguese and Spanish. One topic per page; open just what you need.
 
 **Talk to it** &nbsp; [Dashboard](https://pepe-agent.com/en/docs/dashboard/) · [HTTP API](https://pepe-agent.com/en/docs/api/) · [WebSocket](https://pepe-agent.com/en/docs/websocket/) · [Telegram](https://pepe-agent.com/en/docs/telegram/) · [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/) · [Slack, Discord, Teams, Chat](https://pepe-agent.com/en/docs/channels/) · [Widget](https://pepe-agent.com/en/docs/widget/)
 
-**Automate & operate** &nbsp; [Goals](https://pepe-agent.com/en/docs/goals/) · [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/) · [Watches](https://pepe-agent.com/en/docs/watches/) · [MCP servers](https://pepe-agent.com/en/docs/mcp/) · [Plugins](https://pepe-agent.com/en/docs/plugins/) · [Security](https://pepe-agent.com/en/docs/security/) · [Privacy hooks](https://pepe-agent.com/en/docs/privacy/) · [Traces](https://pepe-agent.com/en/docs/traces/) · [Evals](https://pepe-agent.com/en/docs/evals/)
+**Automate & operate** &nbsp; [Goals](https://pepe-agent.com/en/docs/goals/) · [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/) · [Board](https://pepe-agent.com/en/docs/board/) · [Watches](https://pepe-agent.com/en/docs/watches/) · [MCP servers](https://pepe-agent.com/en/docs/mcp/) · [Plugins](https://pepe-agent.com/en/docs/plugins/) · [Security](https://pepe-agent.com/en/docs/security/) · [Privacy hooks](https://pepe-agent.com/en/docs/privacy/) · [Traces](https://pepe-agent.com/en/docs/traces/) · [Evals](https://pepe-agent.com/en/docs/evals/)
 
 ### In this repository
 
@@ -231,7 +231,7 @@ Pepe is meant to be embedded. A few common paths:
 - **Behind your web app / SaaS** - point any OpenAI SDK at the [HTTP API](https://pepe-agent.com/en/docs/api/), scope access with per-project [tokens](https://pepe-agent.com/en/docs/auth/), and keep tenants isolated with [Projects](https://pepe-agent.com/en/docs/projects/).
 - **Customer support on WhatsApp** - connect a number and bind it to a support agent; see [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/). Redact PII before it reaches any model with [Privacy hooks](https://pepe-agent.com/en/docs/privacy/).
 - **Bill your clients** - every model call is metered per project; export invoices from [Usage & billing](https://pepe-agent.com/en/docs/billing/).
-- **Automate** - recurring jobs with [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/), one-shot "notify me when X" with [Watches](https://pepe-agent.com/en/docs/watches/).
+- **Automate** - recurring jobs with [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/), one-shot "notify me when X" with [Watches](https://pepe-agent.com/en/docs/watches/), durable multi-step handoffs with [Board](https://pepe-agent.com/en/docs/board/).
 
 ---
 

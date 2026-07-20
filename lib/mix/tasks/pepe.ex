@@ -109,6 +109,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe timelearn [AGENT]               # what the agent has learned, on a timeline
       mix pepe learn consolidate|auto [AGENT]    # tidy memory now, or schedule nightly consolidation
       mix pepe cron list|add|run|logs ...        # scheduled tasks (recurring agent jobs)
+      mix pepe board list|add|card ...           # durable task cards, with dependencies
       mix pepe usage [--project CO] ...          # token usage & cost by cycle (billing)
       mix pepe usage export --project CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
@@ -199,6 +200,12 @@ defmodule Mix.Tasks.Pepe do
     do: with_config(fn -> cron_cmd([sub | rest]) end)
 
   def dispatch(["cron" | rest]), do: with_app([], fn -> cron_cmd(rest) end)
+
+  # Every board subcommand only reads/writes config (see Pepe.Board's moduledoc: the CAS
+  # primitive it uses degrades to a plain inline read-modify-write when Config.Writer isn't
+  # running, exactly like Config.update/1 already does for a one-shot command); none of them
+  # call a model, so with_config's fast boot is enough.
+  def dispatch(["board" | rest]), do: with_config(fn -> board_cmd(rest) end)
   def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
   def dispatch(["review" | rest]), do: with_app([], fn -> review_cmd(rest) end)
   def dispatch(["update" | _]), do: with_app([], fn -> update_cmd() end)
@@ -4262,6 +4269,243 @@ defmodule Mix.Tasks.Pepe do
   defp unique_cron_suffix(n, base, taken) do
     candidate = "#{base}-#{n}"
     if candidate not in taken, do: candidate
+  end
+
+  ###
+  ### board (durable task cards, see Pepe.Board)
+  ###
+
+  defp board_cmd(["list" | _]) do
+    case Config.boards() do
+      [] ->
+        info(dim("no boards. add one: mix pepe board add --name N"))
+
+      boards ->
+        info(bold("✦ Boards"))
+        Enum.each(boards, &print_board/1)
+    end
+  end
+
+  defp board_cmd(["add" | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [name: :string, project: :string, auto_dispatch: :boolean, claim_timeout_s: :integer])
+
+    with {:ok, name} <- require_opt(opts, :name) do
+      attrs = %{project: opts[:project], name: name, auto_dispatch: opts[:auto_dispatch] || false, claim_timeout_s: opts[:claim_timeout_s]}
+
+      case Pepe.Board.create_board(attrs) do
+        {:ok, board} ->
+          ok("board #{green(board.id)} created")
+          print_board(board)
+
+        {:error, :already_exists} ->
+          error("a board named #{name} already exists there")
+      end
+    else
+      {:error, :missing, key} -> error("board add needs --#{key}")
+    end
+  end
+
+  defp board_cmd(["remove", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [force: :boolean])
+
+    case Pepe.Board.delete_board(id, force: opts[:force] || false) do
+      :ok -> ok("board #{green(id)} removed")
+      {:error, {:not_empty, n}} -> error("board #{id} has #{n} card(s): pass --force to remove them too")
+      {:error, reason} -> error("could not remove #{id}: #{inspect(reason)}")
+    end
+  end
+
+  defp board_cmd(["card", "list", board_id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [status: :string])
+    cards = Config.board_cards_for(board_id)
+    cards = if opts[:status], do: Enum.filter(cards, &(&1.status == opts[:status])), else: cards
+
+    if cards == [] do
+      info(dim("no cards on #{board_id}"))
+    else
+      info(bold("✦ Cards on ") <> green(board_id))
+      Enum.each(cards, &print_card_line/1)
+    end
+  end
+
+  defp board_cmd(["card", "show", id | _]) do
+    case Config.get_board_card(id) do
+      nil -> error("unknown card: #{id}")
+      card -> print_card(card)
+    end
+  end
+
+  defp board_cmd(["card", "add", board_id | rest]) do
+    {opts, _, _} =
+      OptionParser.parse(rest,
+        strict: [title: :string, body: :string, assignee: :string, priority: :integer, depends_on: :string, auto_dispatch: :boolean]
+      )
+
+    with {:ok, title} <- require_opt(opts, :title) do
+      attrs = %{
+        board: board_id,
+        title: title,
+        body: opts[:body],
+        assignee: opts[:assignee],
+        priority: opts[:priority],
+        depends_on: parse_depends_on(opts[:depends_on]),
+        # opts[:auto_dispatch] is nil (inherit), true (--auto-dispatch), or false
+        # (--no-auto-dispatch): OptionParser auto-generates the negated flag for a
+        # :boolean switch, and Keyword access preserves an explicit false correctly.
+        auto_dispatch: opts[:auto_dispatch]
+      }
+
+      case Pepe.Board.create_card(attrs) do
+        {:ok, card} ->
+          ok("card #{green(card.id)} created on #{board_id}")
+          print_card(card)
+
+        {:error, :board_not_found} ->
+          error("unknown board: #{board_id}")
+
+        {:error, :invalid_dependency} ->
+          error("--depends-on must name existing cards on the same board, with no cycle")
+      end
+    else
+      {:error, :missing, key} -> error("board card add needs --#{key}")
+    end
+  end
+
+  defp board_cmd(["card", "link", id, dep_id | _]) do
+    case Pepe.Board.link(id, dep_id) do
+      {:ok, card} -> ok("#{card.id} now depends on #{dep_id}")
+      {:error, :invalid_dependency} -> error("that dependency doesn't exist, isn't on the same board, or would create a cycle")
+      {:error, reason} -> print_card_error(id, reason)
+    end
+  end
+
+  defp board_cmd(["card", "force-ready", id | _]), do: print_card_transition(Pepe.Board.force_ready(id), id)
+
+  defp board_cmd(["card", "auto-dispatch", id, value | _]) do
+    case value do
+      "on" -> print_card_transition(Pepe.Board.set_auto_dispatch(id, true), id)
+      "off" -> print_card_transition(Pepe.Board.set_auto_dispatch(id, false), id)
+      "inherit" -> print_card_transition(Pepe.Board.set_auto_dispatch(id, nil), id)
+      _ -> error(~s(value must be "on", "off", or "inherit"))
+    end
+  end
+
+  defp board_cmd(["card", "claim", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [as: :string])
+    print_card_transition(Pepe.Board.claim(id, opts[:as] || "cli"), id)
+  end
+
+  defp board_cmd(["card", "complete", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [text: :string])
+    print_card_transition(Pepe.Board.complete(id, opts[:text]), id)
+  end
+
+  defp board_cmd(["card", "block", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [text: :string])
+
+    with {:ok, reason} <- require_opt(opts, :text) do
+      print_card_transition(Pepe.Board.block(id, reason), id)
+    else
+      {:error, :missing, key} -> error("board card block needs --#{key} (the reason)")
+    end
+  end
+
+  defp board_cmd(["card", "unblock", id | _]), do: print_card_transition(Pepe.Board.unblock(id), id)
+
+  defp board_cmd(["card", "comment", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [text: :string])
+
+    with {:ok, text} <- require_opt(opts, :text) do
+      case Pepe.Board.comment(id, "cli", text) do
+        :ok -> ok("comment added to #{id}")
+        {:error, reason} -> print_card_error(id, reason)
+      end
+    else
+      {:error, :missing, key} -> error("board card comment needs --#{key}")
+    end
+  end
+
+  defp board_cmd(["card", "archive", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [force: :boolean])
+    print_card_transition(Pepe.Board.archive(id, force: opts[:force] || false), id)
+  end
+
+  defp board_cmd(["card", "unarchive", id | _]), do: print_card_transition(Pepe.Board.unarchive(id), id)
+
+  defp board_cmd(_) do
+    info("""
+    mix pepe board - durable task cards, with dependencies, for handing off work
+    between agents and humans (not a sales/CRM pipeline)
+
+      list                                    list all boards
+      add --name N [--project P]
+          [--auto-dispatch] [--claim-timeout-s SECS]         create a board
+      remove ID [--force]                     remove a board (--force drops its cards too)
+
+      card list BOARD_ID [--status S]         list a board's cards
+      card show ID                            show one card + recent activity
+      card add BOARD_ID --title T
+          [--body B] [--assignee A] [--priority N]
+          [--depends-on ID,ID,...] [--auto-dispatch|--no-auto-dispatch]  create a card
+      card link ID DEP_ID                     add a dependency
+      card force-ready ID                     todo -> ready, skipping the dependency check
+      card auto-dispatch ID on|off|inherit    override (or clear) this card's own dispatch
+      card claim ID [--as NAME]               ready -> running
+      card complete ID [--text NOTE]          running -> done
+      card block ID --text REASON             running -> blocked
+      card unblock ID                         blocked -> ready
+      card comment ID --text NOTE             leave a note, no status change
+      card archive ID [--force]               archive (--force works on a running card too)
+      card unarchive ID                       archived -> todo
+
+    A card with auto_dispatch on its board fires on its own once ready and assigned;
+    otherwise `card claim` (here, the dashboard, or the agent's own `board` tool) starts it.
+    A card can override its board's own auto_dispatch setting either way (--auto-dispatch
+    / --no-auto-dispatch on `card add`, or `card auto-dispatch ID on|off|inherit` after).
+    Status is a pipeline: todo -> ready -> running -> done|blocked -> archived.
+    """)
+  end
+
+  defp print_card_transition({:ok, card}, _id), do: ok("#{card.id} is now #{card.status}")
+  defp print_card_transition({:error, reason}, id), do: print_card_error(id, reason)
+
+  defp print_card_error(id, {:unexpected_status, status}), do: error("#{id}: can't do that from status #{status}")
+  defp print_card_error(id, :not_found), do: error("unknown card: #{id}")
+  defp print_card_error(id, reason), do: error("#{id}: #{inspect(reason)}")
+
+  defp parse_depends_on(nil), do: []
+  defp parse_depends_on(""), do: []
+  defp parse_depends_on(str), do: str |> String.split(",") |> Enum.map(&String.trim/1)
+
+  defp print_board(%Pepe.Config.Board{} = b) do
+    auto = if b.auto_dispatch, do: green("on"), else: dim("off")
+    n = length(Config.board_cards_for(b.id))
+    info("\n#{bold(b.id)} - #{b.name}  (#{n} card(s))")
+    info(dim("   auto_dispatch: #{auto} · claim_timeout_s: #{b.claim_timeout_s || "off"}"))
+  end
+
+  defp print_card_line(c) do
+    assignee = if c.assignee, do: " -> #{c.assignee}", else: ""
+    info("  #{dim(c.id)} [#{c.status}]#{assignee} #{c.title}")
+  end
+
+  defp print_card(%Pepe.Config.BoardCard{} = c) do
+    info("\n#{bold(c.id)} - #{c.title}  [#{c.status}]")
+    info(dim("   board:        #{c.board}"))
+    info(dim("   assignee:     #{c.assignee || "(unassigned)"}"))
+    info(dim("   priority:     #{c.priority}"))
+    if not is_nil(c.auto_dispatch), do: info(dim("   auto_dispatch: #{c.auto_dispatch} (overridden for this card)"))
+    if c.depends_on != [], do: info(dim("   depends_on:   #{Enum.join(c.depends_on, ", ")}"))
+    if c.claimed_by, do: info(dim("   claimed_by:   #{c.claimed_by}"))
+    if c.block_reason, do: info(dim("   block_reason: #{c.block_reason}"))
+    if c.body, do: info(dim("   body:         #{c.body}"))
+
+    recent = Pepe.Board.Log.tail(c.id, 5)
+
+    if recent != [] do
+      info(dim("   recent activity:"))
+      Enum.each(recent, fn e -> info(dim("     - #{e["event"]}")) end)
+    end
   end
 
   ###
