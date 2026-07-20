@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-07-20
+
 ### Fixed
 - **`send_to_agent` could get paraphrased by the calling agent as "you're now connected to X"**, when it never changes who the user is talking to: it's a one-off consult, not a hand-off. An agent without `switch_agent` in its toolset (the actual hand-off tool) had nothing better to reach for and would sometimes tell the user a connection happened that never did. The tool's own description and its result text now say explicitly, every time, that this is a one-off and the calling agent is still the one answering.
 
@@ -497,7 +499,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/pepe-agent/pepe/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/pepe-agent/pepe/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/pepe-agent/pepe/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/pepe-agent/pepe/compare/v0.6.1...v0.7.0
