@@ -27,6 +27,22 @@ defmodule Pepe.DoctorTest do
     refute Doctor.healthy?(checks)
   end
 
+  test "flags an unrecognized top-level config key - a typo doing nothing silently" do
+    Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+    Config.save(Map.put(Config.load(), "telegran", %{"bot_token" => "x"}))
+
+    checks = Doctor.checks()
+    assert {"config", "telegran", {:warn, msg}} = List.keyfind(checks, "telegran", 1)
+    assert msg =~ "unknown top-level config key"
+  end
+
+  test "a config with only known top-level keys passes cleanly" do
+    Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+    checks = Doctor.checks()
+    assert {"config", "top-level keys", :ok} = List.keyfind(checks, "top-level keys", 1)
+  end
+
   test "passes when the referenced env var is set" do
     var = "PEPE_DOCTOR_SET_#{System.unique_integer([:positive])}"
     System.put_env(var, "value")

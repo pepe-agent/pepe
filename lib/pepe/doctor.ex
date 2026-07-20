@@ -12,7 +12,8 @@ defmodule Pepe.Doctor do
     * `checks/0` - offline checks only (config + on-disk state). Fast, no network.
       Covers: unresolved `${ENV}` secrets, plaintext secrets and a missing dashboard
       password (security), agents/crons/channels pointing at missing pieces, orphan
-      agent directories on disk, and plugins/skills that won't load.
+      agent directories on disk, plugins/skills that won't load, and an unrecognized
+      top-level config key (usually a typo doing nothing silently).
     * `checks/1` with `live: true` - also probes the outside world: a newer release on
       GitHub, Telegram `getMe` per bot, a `/models` ping per model connection, and an
       MCP launch + tools list per server.
@@ -38,7 +39,8 @@ defmodule Pepe.Doctor do
         webhook_checks() ++
         state_checks() ++
         plugin_checks() ++
-        skill_checks()
+        skill_checks() ++
+        unknown_key_checks()
 
     if opts[:live] do
       offline ++ version_checks() ++ telegram_checks() ++ model_checks() ++ mcp_checks()
@@ -81,6 +83,36 @@ defmodule Pepe.Doctor do
   end
 
   defp collect_env_refs(_), do: []
+
+  # Every top-level section this codebase actually reads or writes somewhere, kept by hand
+  # rather than derived - `Config.load/0` on a config that has never set a given section
+  # simply omits it, so there is no way to enumerate this from a live config, only from
+  # reading the code. A key that isn't here is almost always a typo ("telegran" instead of
+  # "telegram") silently doing nothing rather than the error it looks like it should be -
+  # this check exists to turn that silence into a warning. `companies` and the legacy,
+  # pre-project `root` billing shape are both migrated away by `migrate/1` on first load, so
+  # they are listed here only so a config file that hasn't been loaded by this process yet
+  # doesn't warn about its own soon-to-be-migrated shape.
+  @known_top_level_keys ~w(
+    agents api_tokens board_cards boards commitments companies crons currency
+    dashboard default_agent default_model default_project hooks locale mcp media
+    models plugins projects review_writes root sandbox secrets server
+    telegram telegram_topics telegrams timezone watches webhooks
+  )
+
+  defp unknown_key_checks do
+    known = MapSet.new(@known_top_level_keys)
+
+    unknown =
+      Config.load()
+      |> Map.keys()
+      |> Enum.reject(&MapSet.member?(known, &1))
+
+    case unknown do
+      [] -> [{"config", "top-level keys", :ok}]
+      keys -> Enum.map(keys, &{"config", &1, {:warn, "unknown top-level config key - a typo? it's doing nothing"}})
+    end
+  end
 
   # A subscription connection whose monthly fee we were never told still bills the client
   # correctly (that is priced off the API list, not off what we pay), but it makes the
