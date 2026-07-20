@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- Traces can now be grouped by conversation ("Group by conversation" toggle), each session collapsed into one row with its run count and total tokens/cost across every run in it; expand a row to see the individual runs.
+- The dashboard's conversation sidebar now shows a session's raw key (e.g. `telegram:-123456`) in small text under its title, so a Telegram-originated conversation is identifiable even before it has an AI-generated title.
+- Telegram bots can opt into `quick_reactions` (off by default): a message that's only a thank-you or a bare emoji gets a native reaction back instead of a full reply, no model call spent on it. Everything else still goes through the normal reply path unchanged.
+- New `telegram_poll` tool: post a real, tappable Telegram poll (including quiz polls) to the current conversation, instead of listing options as text.
+
 ## [0.9.2] - 2026-07-20
 
 ### Fixed
