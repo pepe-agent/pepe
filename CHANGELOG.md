@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-20
+
 ### Added
 - **`switch_agent`: an agent can hand its whole conversation to another agent, from a plain request instead of the human typing `/agent NAME`.** ("Connect me with billing", "let me talk to support directly".) Same effect as `/agent NAME` (a fresh context, taking effect from the next message, not mid-reply), and gated by the same `can_message` allowlist `send_to_agent` already uses. Unlike `send_to_agent` (a one-off consult, always allowed once routed), `switch_agent` changes who answers every message after this one, so it stays behind the normal permission gate by default.
 - **Board: durable task cards with dependencies, for handing off multi-step or long-running work between agents and humans**, not a sales/CRM pipeline. A card moves through `todo → ready → running → done | blocked → archived`; a stalled or crashed claim always lands in `blocked` rather than silently retrying. Boards are project-scoped, one per project; `auto_dispatch` (off by default) decides whether a `ready`, assigned card fires on its own or waits for an explicit `claim`; a single card can override its board's own setting either way. Available from the dashboard's new **Board** page, `mix pepe board ...` / `mix pepe board card ...`, and the `board` chat tool. An agent dispatched to its own card doesn't need to pass a `card_id` to `complete`/`block`/`comment`: it's inferred from the session; an `auto_dispatch` board's assignee needs `board` in its `auto_approve` since a dispatched run has no human to ask.
@@ -492,7 +494,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/pepe-agent/pepe/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/pepe-agent/pepe/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/pepe-agent/pepe/compare/v0.6.1...v0.7.0
 [0.4.0]: https://github.com/pepe-agent/pepe/compare/v0.3.2...v0.4.0
