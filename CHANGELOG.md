@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **`send_to_agent` could get paraphrased by the calling agent as "you're now connected to X"**, when it never changes who the user is talking to: it's a one-off consult, not a hand-off. An agent without `switch_agent` in its toolset (the actual hand-off tool) had nothing better to reach for and would sometimes tell the user a connection happened that never did. The tool's own description and its result text now say explicitly, every time, that this is a one-off and the calling agent is still the one answering.
+
 ## [0.9.0] - 2026-07-20
 
 ### Added

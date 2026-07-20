@@ -32,7 +32,7 @@ defmodule Pepe.Tools.SendToAgent do
   def spec do
     function(
       "send_to_agent",
-      "Send a message to another agent and get its reply. You may only message agents you're allowed to route to; their answer is returned to you. Use it to delegate work or ask a peer.",
+      "Send a message to another agent and get its reply, to delegate a question or consult a peer. This is a one-off: it never changes who the user is talking to. Never tell the user this connected them to the other agent or that the other agent is now handling the conversation; it isn't. For an actual hand-off (\"talk to X from now on\"), use switch_agent instead.",
       %{
         "type" => "object",
         "properties" => %{
@@ -113,8 +113,12 @@ defmodule Pepe.Tools.SendToAgent do
         ]
 
         case Runtime.converse(agent, prompt, opts) do
-          {:ok, reply, _msgs} -> {:ok, "#{to} replied:\n#{reply}"}
-          {:error, reason} -> {:error, "#{to} could not reply: #{inspect(reason)}"}
+          {:ok, reply, _msgs} ->
+            {:ok,
+             "#{to} replied:\n#{reply}\n\n(One-off consult only: you're still the one talking to the user. Don't say this connected them to #{to} or that #{to} is handling the conversation now.)"}
+
+          {:error, reason} ->
+            {:error, "#{to} could not reply: #{inspect(reason)}"}
         end
     end
   end
