@@ -45,7 +45,7 @@ agente de cliente consiga reconfigurar o administrador nem a si mesmo.
 | `set_persona` | Reescreve o prompt de sistema do agente alvo. |
 | `set_model` | Aponta o agente alvo para outra conexão de modelo. |
 | `set_utility_model` | Define a conexão barata em que rodam as tarefinhas do agente alvo, como dar nome a uma conversa. Um valor vazio desliga isso, e as tarefinhas passam a ser feitas sem modelo. |
-| `set_flag` | Liga ou desliga um interruptor do agente alvo (`on`/`off`): `trust_untrusted_content` (deixar que ele aja sobre o que estranhos mandam) ou `exempt_message_limit`. Ligar o `trust_untrusted_content` não pode ser feito a partir de uma execução que ela mesma ingeriu conteúdo de fora, então um documento injetado não consegue virá-lo. |
+| `set_flag` | Liga ou desliga um interruptor do agente alvo (`on`/`off`): `trust_untrusted_content` (deixar que ele aja sobre o que estranhos mandam), `exempt_message_limit`, ou `midrun_fold` (deixar uma correção no meio do turno direcionar o turno em andamento em vez de sempre esperar; usa o `triage_model` se houver um, senão o próprio modelo do agente — uma chamada a mais por mensagem no meio do turno). Ligar o `trust_untrusted_content` não pode ser feito a partir de uma execução que ela mesma ingeriu conteúdo de fora, então um documento injetado não consegue virá-lo. |
 | `add_tool` | Concede mais uma ferramenta ao agente alvo. |
 | `remove_tool` | Revoga uma ferramenta do agente alvo. |
 | `remember` | Acrescenta um fato à memória do agente alvo. |

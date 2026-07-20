@@ -191,6 +191,17 @@ defmodule PepeWeb.AgentsLive do
                 </select>
               </div>
 
+              <label class="flex items-start gap-2.5 text-sm">
+                <input type="checkbox" name="midrun_fold" value="true" checked={@edit_agent[:midrun_fold]} class="mt-0.5" />
+                <span>
+                  {gettext("Fold a correction into the running turn")}
+                  <p class={hlp()}>{gettext("When a message arrives while this agent is still working, a check decides if it's a correction of that turn ('wait, make it 3pm instead') and steers it in, instead of always waiting for the turn to finish first. Biased toward waiting on any doubt.")}</p>
+                  <p :if={blank(@edit_agent[:triage_model]) == nil} class={[hlp(), "text-amber-500/80"]}>
+                    {gettext("No triage model set above: the check runs on this agent's own model instead, at its cost and speed, on every message that arrives mid-turn.")}
+                  </p>
+                </span>
+              </label>
+
               <%!-- The complex branch isn't a choice - it's the agent's own model. Name it
                     here anyway, so the box explains the whole route without scrolling up. --%>
               <div>
@@ -342,7 +353,8 @@ defmodule PepeWeb.AgentsLive do
       utility_model: nil,
       max_iterations: nil,
       tool_progress: nil,
-      exempt_message_limit: false
+      exempt_message_limit: false,
+      midrun_fold: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -439,7 +451,8 @@ defmodule PepeWeb.AgentsLive do
         simple_model: blank(params["simple_model"]),
         utility_model: blank(params["utility_model"]),
         exempt_message_limit: params["exempt_message_limit"] == "true",
-        trust_untrusted_content: params["trust_untrusted_content"] == "true"
+        trust_untrusted_content: params["trust_untrusted_content"] == "true",
+        midrun_fold: params["midrun_fold"] == "true"
     }
 
     case Config.put_agent(agent) do
@@ -482,7 +495,8 @@ defmodule PepeWeb.AgentsLive do
         simple_model: blank(params["simple_model"]),
         utility_model: blank(params["utility_model"]),
         exempt_message_limit: params["exempt_message_limit"] == "true",
-        trust_untrusted_content: params["trust_untrusted_content"] == "true"
+        trust_untrusted_content: params["trust_untrusted_content"] == "true",
+        midrun_fold: params["midrun_fold"] == "true"
     }
 
     {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}

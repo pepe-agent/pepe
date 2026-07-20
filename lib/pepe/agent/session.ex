@@ -231,6 +231,10 @@ defmodule Pepe.Agent.Session do
       # instead of being rejected - each carries its caller's `from` so the reply lands
       # with whoever sent it. See handle_call({:chat...}) below.
       |> Map.put_new(:queue, [])
+      # A message that arrives mid-turn and is being classified fold-vs-queue (see
+      # `midrun_fold` on Pepe.Config.Agent). At most one in flight at a time - a message
+      # arriving while this is set just queues directly, no second classification race.
+      |> Map.put_new(:classifying, nil)
       # Reversible redaction map (pseudonym -> real) accumulated by inbound hooks and applied to
       # outbound replies. `put_new`, not a fixed value in the merge below: a restored session brings
       # its own map in from disk (see the load branch above), and clobbering it to [] here would
@@ -354,13 +358,30 @@ defmodule Pepe.Agent.Session do
       "readable. Re-run or re-read the source if you need the omitted part.]\n\n" <> tail
   end
 
-  # One run at a time per session. While a run is in flight, a new message is
-  # rejected with `:busy` (the caller can `/stop` it) rather than interleaving.
+  # One run at a time per session. While a run is in flight, a new message either
+  # queues (FIFO, the default) or - when the responding agent has `midrun_fold` on -
+  # gets classified first: a correction/clarification of the turn already running
+  # folds in via the same mechanism `/inline` uses; anything else (including "not
+  # sure") queues exactly like today. Classifying prefers `triage_model` (cheap,
+  # dedicated to this) but falls back to the agent's own model when unset, so the
+  # flag works standalone - at that agent's own cost and speed, which is the
+  # tradeoff the dashboard/CLI/tool text warns about when `triage_model` is empty.
   @impl true
+  def handle_call({:chat, text, opts}, from, %{running: %{}, classifying: nil} = state) do
+    case resolve_agent(state) do
+      %{midrun_fold: true} = agent ->
+        classify_model = agent.triage_model || agent.model || Config.default_model_name()
+        task = classify_midrun(classify_model, state.pending_resume, text)
+        {:noreply, %{state | classifying: %{from: from, text: text, opts: opts, ref: task.ref}}}
+
+      _ ->
+        {:noreply, %{state | queue: state.queue ++ [{from, text, opts}]}}
+    end
+  end
+
+  # A classification is already in flight - don't stack a second one, just queue this
+  # one directly (today's behavior). The one already classifying still gets its shot.
   def handle_call({:chat, text, opts}, from, %{running: %{}} = state) do
-    # A turn is already running: queue this one to run right after (FIFO), holding the
-    # caller's `from` so it gets its reply when its turn runs. `/inline` is the escape
-    # hatch to fold a message into the running turn instead of waiting.
     {:noreply, %{state | queue: state.queue ++ [{from, text, opts}]}}
   end
 
@@ -684,9 +705,13 @@ defmodule Pepe.Agent.Session do
 
     {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
 
-    running = %{task: pid, ref: ref, from: from, on_event: opts[:on_event]}
+    running = %{task: pid, ref: ref, from: from, on_event: opts[:on_event], folded_froms: []}
     {:noreply, %{state | running: running, pending_resume: text}}
   end
+
+  # Reply to every caller whose message was folded into the turn that just finished
+  # (see `midrun_fold`) with the same result the primary caller got.
+  defp reply_folded(froms, reply), do: Enum.each(froms, &GenServer.reply(&1, reply))
 
   # True on a session's first-ever turn: an empty history or just the base system prompt.
   defp first_turn?(messages), do: Enum.count_until(messages, 2) <= 1
@@ -707,16 +732,19 @@ defmodule Pepe.Agent.Session do
     end
   end
 
-  # A finished run reports here. Reply to the waiting caller and absorb the new
-  # history. A stale `:run_done` (the run was stopped meanwhile) is ignored.
+  # A finished run reports here. Reply to the waiting caller (and anyone whose message
+  # got folded into this same turn - see `midrun_fold`) and absorb the new history. A
+  # stale `:run_done` (the run was stopped meanwhile) is ignored.
   @impl true
   def handle_info({:run_done, result, agent_name}, %{running: %{from: from, ref: ref} = running} = state) do
     Process.demonitor(ref, [:flush])
+    folded = Map.get(running, :folded_froms, [])
 
     state =
       case result do
-        {:ok, reply, all_messages, entries} ->
-          GenServer.reply(from, {:ok, reply})
+        {:ok, turn_reply, all_messages, entries} ->
+          reply(from, {:ok, turn_reply})
+          reply_folded(folded, {:ok, turn_reply})
 
           # If the agent called `end_session` this turn, clear the context (and the
           # reversible map) now that the reply is out - the next message starts fresh.
@@ -747,7 +775,8 @@ defmodule Pepe.Agent.Session do
           state
 
         {:error, reason} ->
-          GenServer.reply(from, {:error, reason})
+          reply(from, {:error, reason})
+          reply_folded(folded, {:error, reason})
           clear_pending(%{state | running: nil})
       end
 
@@ -756,14 +785,49 @@ defmodule Pepe.Agent.Session do
 
   def handle_info({:run_done, _result, _agent_name}, state), do: {:noreply, state}
 
+  # A steer arrived too late for the turn it was meant for (see the `receive` at the
+  # end of `spawn_run/7`) - queue it as its own turn, same as any other message. No
+  # caller is waiting on it specifically (`/inline` already replied :ok when it was
+  # sent; a folded caller already got the turn's - stale, pre-correction - reply), so
+  # it queues with `from: nil`; every reply site already tolerates that (see `reply/2`).
+  def handle_info({:queue_leftover, text}, state) do
+    {:noreply, run_next(%{state | queue: state.queue ++ [{nil, text, []}]})}
+  end
+
+  # The midrun classification finished. :fold sends the message into the running turn
+  # the same way `/inline` does and remembers this caller so `run_done` replies to it
+  # too; anything else (:queue, or the run already finished/died while we were
+  # classifying) queues it exactly like the no-classification path always has.
+  def handle_info({ref, verdict}, %{classifying: %{ref: ref} = c} = state) when verdict in [:fold, :queue] do
+    Process.demonitor(ref, [:flush])
+    state = %{state | classifying: nil}
+
+    case {verdict, state.running} do
+      {:fold, %{task: pid} = running} ->
+        send(pid, {:steer, c.text})
+        folded = [c.from | Map.get(running, :folded_froms, [])]
+        {:noreply, %{state | running: %{running | folded_froms: folded}}}
+
+      _ ->
+        {:noreply, run_next(%{state | queue: state.queue ++ [{c.from, c.text, c.opts}]})}
+    end
+  end
+
   # The run task died without reporting (external kill, unexpected exit). Recover the
   # session so it isn't pinned on `:busy`, and unblock the waiting caller.
   def handle_info(
         {:DOWN, ref, :process, _pid, _reason},
-        %{running: %{ref: ref, from: from}} = state
+        %{running: %{ref: ref, from: from} = running} = state
       ) do
-    GenServer.reply(from, {:error, :stopped})
+    reply(from, {:error, :stopped})
+    reply_folded(Map.get(running, :folded_froms, []), {:error, :stopped})
     {:noreply, run_next(clear_pending(%{state | running: nil}))}
+  end
+
+  # The classify task itself died without a result (killed, uncaught crash despite its
+  # own rescue/catch) - fall back to queueing rather than losing the message.
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{classifying: %{ref: ref} = c} = state) do
+    {:noreply, run_next(%{state | classifying: nil, queue: state.queue ++ [{c.from, c.text, c.opts}]})}
   end
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:noreply, state}
@@ -839,21 +903,30 @@ defmodule Pepe.Agent.Session do
 
   defp cancel_idle(state), do: state
 
+  # `from` is `nil` for a turn queued with no real caller waiting on it (a steer that
+  # arrived too late for its own turn to pick up - see `handle_info({:queue_leftover,
+  # ...})`), so every reply site goes through here instead of a raw `GenServer.reply/2`,
+  # which raises on `nil`.
+  defp reply(nil, _msg), do: :ok
+  defp reply(from, msg), do: GenServer.reply(from, msg)
+
   # Cancel the in-flight run (if any): drop the monitor, kill the task, and unblock
-  # the waiting caller with `reply`. Used by `/stop` and `/new`.
-  defp cancel_running(%{running: %{task: pid, ref: ref, from: from}} = state, reply) do
+  # the waiting caller (and anyone folded into this turn) with `reply`. Used by
+  # `/stop` and `/new`.
+  defp cancel_running(%{running: %{task: pid, ref: ref, from: from} = running} = state, msg) do
     Process.demonitor(ref, [:flush])
     Process.exit(pid, :kill)
-    GenServer.reply(from, reply)
+    reply(from, msg)
+    reply_folded(Map.get(running, :folded_froms, []), msg)
     clear_pending(%{state | running: nil})
   end
 
   defp cancel_running(state, _reply), do: state
 
-  # Reply `reply` to every caller waiting in the queue and clear it, so a stop/reset
+  # Reply `msg` to every caller waiting in the queue and clear it, so a stop/reset
   # doesn't leave them blocked until their GenServer.call times out.
-  defp cancel_queue(%{queue: queue} = state, reply) do
-    Enum.each(queue, fn {from, _text, _opts} -> GenServer.reply(from, reply) end)
+  defp cancel_queue(%{queue: queue} = state, msg) do
+    Enum.each(queue, fn {from, _text, _opts} -> reply(from, msg) end)
     %{state | queue: []}
   end
 
@@ -864,7 +937,7 @@ defmodule Pepe.Agent.Session do
   defp start_turn(state, text, opts, from) do
     case resolve_agent(state) do
       nil ->
-        GenServer.reply(from, {:error, :no_agent})
+        reply(from, {:error, :no_agent})
         {:noreply, state}
 
       agent ->
@@ -872,7 +945,7 @@ defmodule Pepe.Agent.Session do
         counts? = customer_message?(state.key, agent)
 
         if counts? and Pepe.Usage.over_message_limit?(project) do
-          GenServer.reply(from, {:error, :message_limit_exceeded})
+          reply(from, {:error, :message_limit_exceeded})
           {:noreply, state}
         else
           start_chat_run(state, agent, project, counts?, text, opts, from)
@@ -982,6 +1055,56 @@ defmodule Pepe.Agent.Session do
     _, _ -> :failed
   end
 
+  # Same bounded-wait shape as `triage_verdict/2`, but never blocks its caller: this
+  # runs from inside `handle_call`, where blocking on an LLM call would freeze the
+  # whole session (including /stop). The outer task always resolves within roughly
+  # @midrun_timeout_ms and its result arrives back here as an ordinary `{ref, verdict}`
+  # message (see the matching handle_info clause) - the caller just stashes the ref
+  # and returns `{:noreply, state}`.
+  @midrun_timeout_ms 15_000
+
+  # Biased hard toward QUEUE: folding in an unrelated message derails the turn already
+  # running, which is the worse of the two ways to get this wrong. Queueing a genuine
+  # correction just means it waits its turn instead - today's behavior, not a new one.
+  @midrun_prompt """
+  An agent is in the middle of working on the request below (CURRENTLY WORKING ON) when \
+  a NEW MESSAGE arrived. Reply with exactly one word and nothing else: FOLD if the new \
+  message is a correction, clarification, or change of instructions for that SAME task \
+  ("wait, make it 3pm instead", "actually use the other file", "stop, that's wrong") - \
+  QUEUE if it is an unrelated new question or task that should wait its turn. If genuinely \
+  unsure, reply QUEUE.
+  """
+
+  defp classify_midrun(triage_model_name, running_text, new_text) do
+    Task.async(fn ->
+      try do
+        inner =
+          Task.async(fn ->
+            case Config.get_model(triage_model_name) do
+              nil ->
+                {:error, :no_such_model}
+
+              model ->
+                prompt = "CURRENTLY WORKING ON: #{running_text}\n\nNEW MESSAGE: #{new_text}"
+                LLM.chat(model, [Message.system(@midrun_prompt), Message.user(prompt)])
+            end
+          end)
+
+        case Task.yield(inner, @midrun_timeout_ms) || Task.shutdown(inner, :brutal_kill) do
+          {:ok, {:ok, %{content: content}}} ->
+            if content |> to_string() |> String.trim() |> String.upcase() =~ "FOLD", do: :fold, else: :queue
+
+          _ ->
+            :queue
+        end
+      rescue
+        _ -> :queue
+      catch
+        _, _ -> :queue
+      end
+    end)
+  end
+
   # Run the loop in an unlinked, monitored process so a crash or a `/stop` kill can't
   # take the session down. It always reports back, turning a raise/exit into `{:error, _}`.
   defp spawn_run(key, agent, base_messages, text, pii_map, opts, should_triage?) do
@@ -1068,6 +1191,19 @@ defmodule Pepe.Agent.Session do
 
         Pepe.Trace.finish(result)
         send(parent, {:run_done, result, agent.name})
+
+        # A steer (`/inline`, or a midrun_fold classification) sent after the loop's
+        # last drain_steer call (top of its final iteration) sits in THIS task's own
+        # mailbox forever - there is no next iteration left to pick it up, and this
+        # task is about to exit. Queue it as an ordinary follow-up turn (fire-and-
+        # forget: whoever sent it already got acked - `/inline` replies :ok immediately,
+        # and a folded caller already got this turn's reply above) rather than silently
+        # losing it.
+        receive do
+          {:steer, leftover} -> send(parent, {:queue_leftover, leftover})
+        after
+          0 -> :ok
+        end
       end)
 
     {pid, Process.monitor(pid)}

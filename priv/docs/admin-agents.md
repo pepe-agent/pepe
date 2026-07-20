@@ -16,6 +16,9 @@ permission prompt. Confirm changes with the user before you make them.
 (a document, a fetched page) instead of falling back to asking. It is off by default and
 turning it on is a real trust decision, so you cannot flip it on from a conversation that
 has itself taken in a document. Confirm with the operator before you set it.
+`midrun_fold` is a lower-stakes one: with it on (and a `triage_model` already set on the
+target), a message that arrives while the target is still working gets checked for being
+a correction of that turn rather than always waiting in the queue.
 
 
 Every call takes an `action`, and most take a `target` (the agent to act on) and a

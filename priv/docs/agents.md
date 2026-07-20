@@ -72,3 +72,19 @@ mix pepe agent add support --model gpt-4o --triage-model gpt-4o-mini --simple-mo
 
 Here a cheap model both judges the message and answers it when the chat is simple,
 while anything needing real reasoning runs on `gpt-4o`.
+
+## Mid-turn folding (`midrun_fold`)
+
+Normally a message that arrives while a turn is already running just waits its turn in
+the queue. With `midrun_fold: true`, a message that arrives mid-turn is classified first:
+is it a correction/clarification of the turn already in flight ("wait, make it 3pm
+instead"), or something unrelated? A correction is steered straight into the running turn
+(same mechanism as `/inline`) instead of waiting; anything else - including any
+classifier failure or timeout - queues exactly as it always has.
+
+The classification call prefers `triage_model` if one is set (cheap, reuses the same
+connection complexity routing uses, so it costs nothing extra to set up if that's already
+on). Without a `triage_model` it falls back to the agent's own `model` instead of doing
+nothing - meaning `midrun_fold` works standalone, but every message that arrives mid-turn
+now costs an extra call on that agent's own model to classify it. Set a `triage_model`
+too if that cost matters.

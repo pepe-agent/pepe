@@ -2064,6 +2064,7 @@ defmodule Mix.Tasks.Pepe do
           default: :boolean,
           exempt_message_limit: :boolean,
           trust_untrusted_content: :boolean,
+          midrun_fold: :boolean,
           admin: :boolean
         ]
       )
@@ -2086,7 +2087,8 @@ defmodule Mix.Tasks.Pepe do
         simple_model: opts[:simple_model],
         utility_model: opts[:utility_model],
         exempt_message_limit: opts[:exempt_message_limit] || false,
-        trust_untrusted_content: opts[:trust_untrusted_content] || false
+        trust_untrusted_content: opts[:trust_untrusted_content] || false,
+        midrun_fold: opts[:midrun_fold] || false
       }
 
       Config.put_agent(agent)

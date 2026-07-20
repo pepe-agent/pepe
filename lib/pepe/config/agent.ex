@@ -85,7 +85,21 @@ defmodule Pepe.Config.Agent do
             # is a real decision, not a convenience: it reopens exactly that path. Reading and
             # answering never needed it; this is only for a document that must trigger an
             # action on the system.
-            trust_untrusted_content: false
+            trust_untrusted_content: false,
+            # A message that arrives while a turn is already running normally waits in the
+            # queue and runs as its own turn after. With this on, a classification call
+            # checks whether the new message is a correction/clarification of the turn
+            # already in progress ("wait, make it 3pm instead") rather than an unrelated new
+            # question - and if so, folds it into the running turn instead of waiting.
+            # Prefers `triage_model` (a cheap connection dedicated to this, same one
+            # complexity-triage uses) but falls back to this agent's own `model` when
+            # `triage_model` isn't set, so the flag works standalone - at that agent's own
+            # cost and speed on every mid-turn message, which is what the dashboard/CLI/
+            # `manage_agent` text warns about when no `triage_model` is configured. Biased
+            # hard toward queueing on any doubt, timeout, or classifier failure - folding in
+            # an unrelated message derails the running turn, which is the worse of the two
+            # failure modes. See Pepe.Agent.Session.
+            midrun_fold: false
 
   @type t :: %__MODULE__{}
 
@@ -118,7 +132,8 @@ defmodule Pepe.Config.Agent do
       simple_model: map["simple_model"],
       utility_model: map["utility_model"],
       exempt_message_limit: map["exempt_message_limit"] || false,
-      trust_untrusted_content: map["trust_untrusted_content"] || false
+      trust_untrusted_content: map["trust_untrusted_content"] || false,
+      midrun_fold: map["midrun_fold"] || false
     }
   end
 end

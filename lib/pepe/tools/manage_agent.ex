@@ -66,6 +66,13 @@ defmodule Pepe.Tools.ManageAgent do
           - exempt_message_limit: whether the target is free from the project's monthly
             customer-message cap. Turn it ON for "don't limit this agent's messages",
             "let it answer as many clients as it needs", "remove the monthly cap on it".
+          - midrun_fold: whether a message that arrives while the target is still working
+            gets checked for being a correction of that turn ("wait, make it 3pm") and
+            steered in, instead of always waiting its turn. Turn it ON for "let it take
+            corrections mid-task", "don't make people wait for a typo fix". Uses the
+            target's triage_model if it has one (cheap); otherwise falls back to the
+            target's own model for the check - warn the operator this costs an extra call
+            on that model for every message that arrives mid-turn if no triage_model is set.
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -87,7 +94,7 @@ defmodule Pepe.Tools.ManageAgent do
           "flag" => %{
             "type" => "string",
             "description" => "For set_flag: which switch.",
-            "enum" => ~w(trust_untrusted_content exempt_message_limit)
+            "enum" => ~w(trust_untrusted_content exempt_message_limit midrun_fold)
           }
         },
         "required" => ["action"]
@@ -215,7 +222,8 @@ defmodule Pepe.Tools.ManageAgent do
 
   @flags %{
     "trust_untrusted_content" => :trust_untrusted_content,
-    "exempt_message_limit" => :exempt_message_limit
+    "exempt_message_limit" => :exempt_message_limit,
+    "midrun_fold" => :midrun_fold
   }
 
   defp set_flag(target, flag_name, value, ctx) do
@@ -300,7 +308,7 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
-    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}
+    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}
     persona: #{persona_preview(a.name)}
     """
   end
