@@ -377,8 +377,8 @@ msgstr "/help para comandos · /exit para sair"
 #: lib/pepe_web/live/channels_live.ex:283
 #: lib/pepe_web/live/scheduled_live.ex:146
 #: lib/pepe_web/live/tokens_live.ex:81
-#: lib/pepe_web/live/traces_live.ex:212
-#: lib/pepe_web/live/traces_live.ex:291
+#: lib/pepe_web/live/traces_live.ex:298
+#: lib/pepe_web/live/traces_live.ex:377
 #, elixir-autogen, elixir-format
 msgid "Agent"
 msgstr "Agente"
@@ -386,8 +386,8 @@ msgstr "Agente"
 #: lib/pepe/gateways/tui.ex:73
 #: lib/pepe_web/live/agents_live.ex:136
 #: lib/pepe_web/live/hooks_live.ex:170
-#: lib/pepe_web/live/models_live.ex:243
-#: lib/pepe_web/live/models_live.ex:319
+#: lib/pepe_web/live/models_live.ex:247
+#: lib/pepe_web/live/models_live.ex:323
 #: lib/pepe_web/live/scheduled_live.ex:152
 #, elixir-autogen, elixir-format
 msgid "Model"
@@ -616,7 +616,7 @@ msgstr "(cron)"
 msgid "(none)"
 msgstr "(nenhum)"
 
-#: lib/pepe_web/live/models_live.ex:299
+#: lib/pepe_web/live/models_live.ex:303
 #, elixir-autogen, elixir-format
 msgid "(this connection)"
 msgstr "(esta conexão)"
@@ -637,7 +637,7 @@ msgstr "+ Adicionar um bot"
 msgid "+ New agent"
 msgstr "+ Novo agente"
 
-#: lib/pepe_web/live/models_live.ex:286
+#: lib/pepe_web/live/models_live.ex:290
 #, elixir-autogen, elixir-format
 msgid "+ New model connection"
 msgstr "+ Nova conexão de modelo"
@@ -647,8 +647,8 @@ msgstr "+ Nova conexão de modelo"
 msgid "API"
 msgstr "API"
 
-#: lib/pepe_web/live/models_live.ex:236
-#: lib/pepe_web/live/models_live.ex:310
+#: lib/pepe_web/live/models_live.ex:240
+#: lib/pepe_web/live/models_live.ex:314
 #, elixir-autogen, elixir-format
 msgid "API key"
 msgstr "Chave de API"
@@ -658,7 +658,7 @@ msgstr "Chave de API"
 msgid "Add bot"
 msgstr "Adicionar bot"
 
-#: lib/pepe_web/live/agents_live.ex:468
+#: lib/pepe_web/live/agents_live.ex:487
 #, elixir-autogen, elixir-format
 msgid "Agent %{name} saved."
 msgstr "Agente %{name} salvo."
@@ -675,8 +675,8 @@ msgstr "Agentes"
 msgid "Allow me to run the"
 msgstr "Posso executar a ferramenta"
 
-#: lib/pepe_web/live/models_live.ex:232
-#: lib/pepe_web/live/models_live.ex:305
+#: lib/pepe_web/live/models_live.ex:236
+#: lib/pepe_web/live/models_live.ex:309
 #, elixir-autogen, elixir-format
 msgid "Base URL"
 msgstr "URL base"
@@ -703,9 +703,9 @@ msgstr "Token do bot"
 #: lib/pepe_web/live/dash_ui.ex:174
 #: lib/pepe_web/live/hooks_live.ex:122
 #: lib/pepe_web/live/learning_live.ex:77
-#: lib/pepe_web/live/models_live.ex:197
-#: lib/pepe_web/live/models_live.ex:280
-#: lib/pepe_web/live/models_live.ex:334
+#: lib/pepe_web/live/models_live.ex:201
+#: lib/pepe_web/live/models_live.ex:284
+#: lib/pepe_web/live/models_live.ex:338
 #: lib/pepe_web/live/plugins_live.ex:129
 #: lib/pepe_web/live/projects_live.ex:280
 #: lib/pepe_web/live/scheduled_live.ex:171
@@ -724,7 +724,7 @@ msgstr "Chat"
 msgid "Check the 06:00 XML load and report anything off."
 msgstr "Verifique a carga de XML das 06:00 e relate qualquer problema."
 
-#: lib/pepe_web/live/models_live.ex:291
+#: lib/pepe_web/live/models_live.ex:295
 #, elixir-autogen, elixir-format
 msgid "Choose a provider..."
 msgstr "Escolha um provedor..."
@@ -755,7 +755,7 @@ msgstr "Criar tarefa"
 msgid "Daily XML check"
 msgstr "Verificação diária de XML"
 
-#: lib/pepe_web/live/models_live.ex:313
+#: lib/pepe_web/live/models_live.ex:317
 #, elixir-autogen, elixir-format
 msgid "Defaults to the %{env} env var (%{status}). Paste a key here to load its models now."
 msgstr ""
@@ -767,7 +767,7 @@ msgstr ""
 msgid "Delete agent %{name}?"
 msgstr "Excluir o agente %{name}?"
 
-#: lib/pepe_web/live/models_live.ex:211
+#: lib/pepe_web/live/models_live.ex:215
 #, elixir-autogen, elixir-format
 msgid "Delete model %{name}?"
 msgstr "Excluir o modelo %{name}?"
@@ -790,7 +790,7 @@ msgstr "Desativar"
 #: lib/pepe_web/live/agents_live.ex:103
 #: lib/pepe_web/live/channels_live.ex:211
 #: lib/pepe_web/live/connections_component.ex:75
-#: lib/pepe_web/live/models_live.ex:209
+#: lib/pepe_web/live/models_live.ex:213
 #: lib/pepe_web/live/projects_live.ex:90
 #: lib/pepe_web/live/projects_live.ex:154
 #: lib/pepe_web/live/scheduled_live.ex:231
@@ -800,7 +800,7 @@ msgstr "Editar"
 
 #: lib/pepe_web/live/agents_live.ex:119
 #: lib/pepe_web/live/channels_live.ex:310
-#: lib/pepe_web/live/models_live.ex:222
+#: lib/pepe_web/live/models_live.ex:226
 #: lib/pepe_web/live/projects_live.ex:229
 #: lib/pepe_web/live/scheduled_live.ex:103
 #, elixir-autogen, elixir-format
@@ -848,13 +848,13 @@ msgstr "O aprendizado está desligado neste chat."
 msgid "Message...  (type / for commands)"
 msgstr "Mensagem...  (digite / para comandos)"
 
-#: lib/pepe_web/live/models_live.ex:554
-#: lib/pepe_web/live/models_live.ex:585
+#: lib/pepe_web/live/models_live.ex:558
+#: lib/pepe_web/live/models_live.ex:595
 #, elixir-autogen, elixir-format
 msgid "Model %{name} saved."
 msgstr "Modelo %{name} salvo."
 
-#: lib/pepe_web/live/models_live.ex:167
+#: lib/pepe_web/live/models_live.ex:171
 #, elixir-autogen, elixir-format
 msgid "Model connections"
 msgstr "Conexões de modelo"
@@ -868,8 +868,8 @@ msgstr "Modelos"
 #: lib/pepe_web/live/agents_live.ex:125
 #: lib/pepe_web/live/board_live.ex:115
 #: lib/pepe_web/live/channels_live.ex:438
-#: lib/pepe_web/live/models_live.ex:227
-#: lib/pepe_web/live/models_live.ex:299
+#: lib/pepe_web/live/models_live.ex:231
+#: lib/pepe_web/live/models_live.ex:303
 #: lib/pepe_web/live/projects_live.ex:236
 #: lib/pepe_web/live/scheduled_live.ex:108
 #: lib/pepe_web/live/tool_servers_live.ex:85
@@ -877,7 +877,7 @@ msgstr "Modelos"
 msgid "Name"
 msgstr "Nome"
 
-#: lib/pepe_web/live/models_live.ex:428
+#: lib/pepe_web/live/models_live.ex:432
 #, elixir-autogen, elixir-format
 msgid "Name, base URL and model id are required."
 msgstr "Nome, URL base e id do modelo são obrigatórios."
@@ -907,7 +907,7 @@ msgstr "Em lugar nenhum (apenas manter o histórico de execução)"
 msgid "Persona (system prompt)"
 msgstr "Persona (prompt de sistema)"
 
-#: lib/pepe_web/live/models_live.ex:289
+#: lib/pepe_web/live/models_live.ex:293
 #, elixir-autogen, elixir-format
 msgid "Provider"
 msgstr "Provedor"
@@ -938,8 +938,8 @@ msgstr "Executar agora"
 #: lib/pepe_web/live/config_live.ex:142
 #: lib/pepe_web/live/hooks_live.ex:121
 #: lib/pepe_web/live/learning_live.ex:76
-#: lib/pepe_web/live/models_live.ex:279
-#: lib/pepe_web/live/models_live.ex:333
+#: lib/pepe_web/live/models_live.ex:283
+#: lib/pepe_web/live/models_live.ex:337
 #: lib/pepe_web/live/plugins_live.ex:128
 #: lib/pepe_web/live/projects_live.ex:279
 #: lib/pepe_web/live/scheduled_live.ex:170
@@ -959,7 +959,7 @@ msgid "Send"
 msgstr "Enviar"
 
 #: lib/pepe_web/live/agents_live.ex:104
-#: lib/pepe_web/live/models_live.ex:210
+#: lib/pepe_web/live/models_live.ex:214
 #, elixir-autogen, elixir-format
 msgid "Set default"
 msgstr "Definir como padrão"
@@ -1008,7 +1008,7 @@ msgid "Timezone"
 msgstr "Fuso horário"
 
 #: lib/pepe_web/live/agents_live.ex:232
-#: lib/pepe_web/live/traces_live.ex:295
+#: lib/pepe_web/live/traces_live.ex:381
 #, elixir-autogen, elixir-format
 msgid "Tools"
 msgstr "Ferramentas"
@@ -1029,8 +1029,8 @@ msgid "What to do"
 msgstr "O que fazer"
 
 #: lib/pepe_web/live/scheduled_live.ex:116
-#: lib/pepe_web/live/traces_live.ex:234
-#: lib/pepe_web/live/traces_live.ex:290
+#: lib/pepe_web/live/traces_live.ex:320
+#: lib/pepe_web/live/traces_live.ex:376
 #, elixir-autogen, elixir-format
 msgid "When"
 msgstr "Quando"
@@ -1074,7 +1074,7 @@ msgstr "em branco"
 
 #: lib/pepe_web/live/agents_live.ex:100
 #: lib/pepe_web/live/channels_live.ex:329
-#: lib/pepe_web/live/models_live.ex:205
+#: lib/pepe_web/live/models_live.ex:209
 #, elixir-autogen, elixir-format
 msgid "default"
 msgstr "padrão"
@@ -1104,7 +1104,7 @@ msgstr "inativo"
 msgid "itself only"
 msgstr "apenas ele mesmo"
 
-#: lib/pepe_web/live/models_live.ex:320
+#: lib/pepe_web/live/models_live.ex:324
 #, elixir-autogen, elixir-format
 msgid "Loading models..."
 msgstr "Carregando modelos..."
@@ -1119,7 +1119,7 @@ msgstr "Gerencia:"
 msgid "Messages:"
 msgstr "Mensagens:"
 
-#: lib/pepe_web/live/models_live.ex:324
+#: lib/pepe_web/live/models_live.ex:328
 #, elixir-autogen, elixir-format
 msgid "model id (e.g. gpt-5)"
 msgstr "id do modelo (ex.: gpt-5)"
@@ -1245,7 +1245,7 @@ msgstr "(opcional)"
 msgid "(or paste a new token)"
 msgstr "(ou cole um novo token)"
 
-#: lib/pepe_web/live/models_live.ex:170
+#: lib/pepe_web/live/models_live.ex:174
 #, elixir-autogen, elixir-format
 msgid "+ New connection"
 msgstr "+ Nova conexão"
@@ -1559,8 +1559,8 @@ msgstr "Por modelo"
 msgid "Calls"
 msgstr "Chamadas"
 
-#: lib/pepe_web/live/traces_live.ex:296
-#: lib/pepe_web/live/traces_live.ex:366
+#: lib/pepe_web/live/traces_live.ex:382
+#: lib/pepe_web/live/traces_live.ex:496
 #: lib/pepe_web/live/usage_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "Cost"
@@ -1582,7 +1582,7 @@ msgstr "Dia"
 msgid "Hour"
 msgstr "Hora"
 
-#: lib/pepe_web/live/traces_live.ex:364
+#: lib/pepe_web/live/traces_live.ex:494
 #: lib/pepe_web/live/usage_live.ex:104
 #, elixir-autogen, elixir-format
 msgid "Input"
@@ -1610,7 +1610,7 @@ msgstr ""
 msgid "No usage recorded yet for this scope."
 msgstr "Ainda não há uso registrado para este escopo."
 
-#: lib/pepe_web/live/traces_live.ex:365
+#: lib/pepe_web/live/traces_live.ex:495
 #: lib/pepe_web/live/usage_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Output"
@@ -1826,7 +1826,7 @@ msgid "Basic auth user"
 msgstr "Usuário (basic auth)"
 
 #: lib/pepe_web/live/hooks_live.ex:91
-#: lib/pepe_web/live/traces_live.ex:247
+#: lib/pepe_web/live/traces_live.ex:333
 #, elixir-autogen, elixir-format
 msgid "Clear"
 msgstr "Limpar"
@@ -2122,7 +2122,7 @@ msgstr "+ Bot do Telegram"
 msgid "Back to channels"
 msgstr "Voltar aos canais"
 
-#: lib/pepe_web/live/models_live.ex:171
+#: lib/pepe_web/live/models_live.ex:175
 #, elixir-autogen, elixir-format
 msgid "Back to models"
 msgstr "Voltar aos modelos"
@@ -2271,7 +2271,7 @@ msgstr ""
 "Coloque o token como ${ENV_VAR}. O segredo fica fora do arquivo de "
 "configuração."
 
-#: lib/pepe_web/live/models_live.ex:274
+#: lib/pepe_web/live/models_live.ex:278
 #, elixir-autogen, elixir-format
 msgid "Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)"
 msgstr ""
@@ -2283,7 +2283,7 @@ msgstr ""
 msgid "Slug (URL id)"
 msgstr "Slug (id da URL)"
 
-#: lib/pepe_web/live/models_live.ex:168
+#: lib/pepe_web/live/models_live.ex:172
 #, elixir-autogen, elixir-format
 msgid "The AI providers your agents run on: any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model...). Pick a provider and we fill in the rest."
 msgstr ""
@@ -2395,116 +2395,116 @@ msgstr "Reiniciar o gateway do Telegram agora?"
 msgid "Telegram gateway restarted."
 msgstr "Gateway do Telegram reiniciado."
 
-#: lib/pepe_web/live/traces_live.ex:414
+#: lib/pepe_web/live/traces_live.ex:544
 #, elixir-autogen, elixir-format
 msgid "Assistant"
 msgstr "Assistente"
 
 #: lib/pepe_web/live/board_live.ex:89
-#: lib/pepe_web/live/traces_live.ex:423
+#: lib/pepe_web/live/traces_live.ex:553
 #, elixir-autogen, elixir-format
 msgid "Blocked"
 msgstr "Bloqueado"
 
-#: lib/pepe_web/live/traces_live.ex:230
-#: lib/pepe_web/live/traces_live.ex:460
+#: lib/pepe_web/live/traces_live.ex:316
+#: lib/pepe_web/live/traces_live.ex:590
 #, elixir-autogen, elixir-format
 msgid "Error"
 msgstr "Erro"
 
-#: lib/pepe_web/live/traces_live.ex:431
+#: lib/pepe_web/live/traces_live.ex:561
 #, elixir-autogen, elixir-format
 msgid "Failover"
 msgstr "Failover"
 
-#: lib/pepe_web/live/traces_live.ex:226
-#: lib/pepe_web/live/traces_live.ex:294
+#: lib/pepe_web/live/traces_live.ex:312
+#: lib/pepe_web/live/traces_live.ex:380
 #, elixir-autogen, elixir-format
 msgid "Outcome"
 msgstr "Resultado"
 
 #: lib/pepe_web/live/scheduled_live.ex:186
-#: lib/pepe_web/live/traces_live.ex:369
+#: lib/pepe_web/live/traces_live.ex:499
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr "Prompt"
 
-#: lib/pepe_web/live/traces_live.ex:168
+#: lib/pepe_web/live/traces_live.ex:246
 #, elixir-autogen, elixir-format
 msgid "Refresh"
 msgstr "Atualizar"
 
-#: lib/pepe_web/live/traces_live.ex:331
+#: lib/pepe_web/live/traces_live.ex:417
 #, elixir-autogen, elixir-format
 msgid "Replay"
 msgstr "Replay"
 
-#: lib/pepe_web/live/traces_live.ex:152
+#: lib/pepe_web/live/traces_live.ex:227
 #, elixir-autogen, elixir-format
 msgid "Replay of one run, step by step."
 msgstr "Replay de uma execução, passo a passo."
 
-#: lib/pepe_web/live/traces_live.ex:405
+#: lib/pepe_web/live/traces_live.ex:535
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "Retorno"
 
-#: lib/pepe_web/live/traces_live.ex:153
+#: lib/pepe_web/live/traces_live.ex:228
 #, elixir-autogen, elixir-format
 msgid "The last runs across every surface: the tools each called, how it ended and how long it took. Open one to replay it."
 msgstr ""
 "As últimas execuções de todos os canais: as ferramentas que cada uma chamou,"
 " como terminou e quanto durou. Abra uma para fazer o replay."
 
-#: lib/pepe_web/live/traces_live.ex:385
+#: lib/pepe_web/live/traces_live.ex:515
 #, elixir-autogen, elixir-format
 msgid "This run ended before any step ran."
 msgstr "Esta execução terminou antes de qualquer passo rodar."
 
-#: lib/pepe_web/live/traces_live.ex:396
+#: lib/pepe_web/live/traces_live.ex:526
 #, elixir-autogen, elixir-format
 msgid "Tool"
 msgstr "Ferramenta"
 
-#: lib/pepe_web/live/traces_live.ex:150
+#: lib/pepe_web/live/traces_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "Trace"
 msgstr "Trace"
 
 #: lib/pepe_web/live/dash_ui.ex:203
-#: lib/pepe_web/live/traces_live.ex:150
+#: lib/pepe_web/live/traces_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "Traces"
 msgstr "Traces"
 
-#: lib/pepe_web/live/traces_live.ex:484
+#: lib/pepe_web/live/traces_live.ex:614
 #, elixir-autogen, elixir-format
 msgid "error"
 msgstr "erro"
 
-#: lib/pepe_web/live/traces_live.ex:453
+#: lib/pepe_web/live/traces_live.ex:583
 #, elixir-autogen, elixir-format
 msgid "in"
 msgstr "entrada"
 
-#: lib/pepe_web/live/traces_live.ex:490
+#: lib/pepe_web/live/traces_live.ex:620
 #, elixir-autogen, elixir-format
 msgid "ok"
 msgstr "ok"
 
-#: lib/pepe_web/live/traces_live.ex:453
+#: lib/pepe_web/live/traces_live.ex:583
 #, elixir-autogen, elixir-format
 msgid "out"
 msgstr "saída"
 
-#: lib/pepe_web/live/traces_live.ex:364
-#: lib/pepe_web/live/traces_live.ex:365
-#: lib/pepe_web/live/traces_live.ex:453
+#: lib/pepe_web/live/traces_live.ex:494
+#: lib/pepe_web/live/traces_live.ex:495
+#: lib/pepe_web/live/traces_live.ex:583
 #, elixir-autogen, elixir-format
 msgid "tokens"
 msgstr "tokens"
 
-#: lib/pepe_web/live/traces_live.ex:167
+#: lib/pepe_web/live/traces_live.ex:242
 #, elixir-autogen, elixir-format
 msgid "← Back"
 msgstr "← Voltar"
@@ -2861,7 +2861,7 @@ msgid "Refused: the security scan flagged this plugin as dangerous."
 msgstr "Recusado: o scan de segurança marcou este plugin como perigoso."
 
 #: lib/pepe_web/live/agents_live.ex:161
-#: lib/pepe_web/live/models_live.ex:257
+#: lib/pepe_web/live/models_live.ex:261
 #: lib/pepe_web/live/plugins_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "Remove"
@@ -2935,12 +2935,12 @@ msgid "Load earlier messages"
 msgstr "Carregar mensagens anteriores"
 
 #: lib/pepe_web/live/chat_live.ex:111
-#: lib/pepe_web/live/traces_live.ex:214
+#: lib/pepe_web/live/traces_live.ex:300
 #, elixir-autogen, elixir-format
 msgid "All agents"
 msgstr "Todos os agentes"
 
-#: lib/pepe_web/live/traces_live.ex:228
+#: lib/pepe_web/live/traces_live.ex:314
 #, elixir-autogen, elixir-format
 msgid "Any outcome"
 msgstr "Qualquer resultado"
@@ -2950,14 +2950,14 @@ msgstr "Qualquer resultado"
 msgid "Built-in channels (Slack, Discord, Teams, Google Chat) live under Channels."
 msgstr "Canais nativos (Slack, Discord, Teams, Google Chat) ficam em Canais."
 
-#: lib/pepe_web/live/traces_live.ex:284
+#: lib/pepe_web/live/traces_live.ex:370
 #, elixir-autogen, elixir-format
 msgid "No runs match these filters. Every agent run, from any surface, shows up here."
 msgstr ""
 "Nenhuma execução corresponde a esses filtros. Toda execução de agente, de "
 "qualquer canal, aparece aqui."
 
-#: lib/pepe_web/live/traces_live.ex:262
+#: lib/pepe_web/live/traces_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "%{from}-%{to} of %{total}"
 msgstr "%{from}-%{to} de %{total}"
@@ -3017,12 +3017,12 @@ msgstr ""
 msgid "Add a channel"
 msgstr "Adicionar canal"
 
-#: lib/pepe_web/live/traces_live.ex:269
+#: lib/pepe_web/live/traces_live.ex:355
 #, elixir-autogen, elixir-format
 msgid "Next →"
 msgstr "Próximo →"
 
-#: lib/pepe_web/live/traces_live.ex:265
+#: lib/pepe_web/live/traces_live.ex:351
 #, elixir-autogen, elixir-format
 msgid "← Previous"
 msgstr "← Anterior"
@@ -3047,7 +3047,7 @@ msgstr "Admin (seu)"
 msgid "Agent's default"
 msgstr "Padrão do agente"
 
-#: lib/pepe_web/live/traces_live.ex:229
+#: lib/pepe_web/live/traces_live.ex:315
 #, elixir-autogen, elixir-format
 msgid "Ok"
 msgstr "Ok"
@@ -3057,7 +3057,7 @@ msgstr "Ok"
 msgid "Pick a configured model"
 msgstr "Escolher um modelo configurado"
 
-#: lib/pepe_web/live/traces_live.ex:293
+#: lib/pepe_web/live/traces_live.ex:379
 #, elixir-autogen, elixir-format
 msgid "Request"
 msgstr "Pedido"
@@ -3073,7 +3073,7 @@ msgstr "Suporte (voltado ao cliente)"
 msgid "The default agent"
 msgstr "O agente padrão"
 
-#: lib/pepe_web/live/traces_live.ex:238
+#: lib/pepe_web/live/traces_live.ex:324
 #, elixir-autogen, elixir-format
 msgid "Until"
 msgstr "Até"
@@ -3094,34 +3094,34 @@ msgid "Secret: write ${ENV_VAR} to keep it out of the config file."
 msgstr ""
 "Segredo: escreva ${ENV_VAR} para mantê-lo fora do arquivo de configuração."
 
-#: lib/pepe_web/live/traces_live.ex:221
+#: lib/pepe_web/live/traces_live.ex:307
 #, elixir-autogen, elixir-format
 msgid "Any source"
 msgstr "Qualquer origem"
 
-#: lib/pepe_web/live/traces_live.ex:580
+#: lib/pepe_web/live/traces_live.ex:722
 #, elixir-autogen, elixir-format
 msgid "Eval"
 msgstr "Avaliação"
 
-#: lib/pepe_web/live/traces_live.ex:581
+#: lib/pepe_web/live/traces_live.ex:723
 #, elixir-autogen, elixir-format
 msgid "Heartbeat"
 msgstr "Heartbeat"
 
-#: lib/pepe_web/live/traces_live.ex:582
-#: lib/pepe_web/live/traces_live.ex:587
+#: lib/pepe_web/live/traces_live.ex:724
+#: lib/pepe_web/live/traces_live.ex:729
 #, elixir-autogen, elixir-format
 msgid "Manual"
 msgstr "Manual"
 
-#: lib/pepe_web/live/traces_live.ex:579
+#: lib/pepe_web/live/traces_live.ex:721
 #, elixir-autogen, elixir-format
 msgid "Schedule"
 msgstr "Agendamento"
 
-#: lib/pepe_web/live/traces_live.ex:219
-#: lib/pepe_web/live/traces_live.ex:292
+#: lib/pepe_web/live/traces_live.ex:305
+#: lib/pepe_web/live/traces_live.ex:378
 #, elixir-autogen, elixir-format
 msgid "Source"
 msgstr "Origem"
@@ -3141,18 +3141,18 @@ msgstr "Nenhuma conversa corresponde a esses filtros."
 msgid "Search conversations"
 msgstr "Buscar conversas"
 
-#: lib/pepe_web/live/traces_live.ex:317
+#: lib/pepe_web/live/traces_live.ex:403
 #, elixir-autogen, elixir-format
 msgid "Estimated provider cost of this run, from its token usage."
 msgstr ""
 "Custo estimado do provedor para esta execução, com base nos tokens usados."
 
-#: lib/pepe_web/live/traces_live.ex:323
+#: lib/pepe_web/live/traces_live.ex:409
 #, elixir-autogen, elixir-format
 msgid "Input tokens → output tokens (%{in} in, %{out} out)."
 msgstr "Tokens de entrada → tokens de saída (%{in} entrada, %{out} saída)."
 
-#: lib/pepe_web/live/traces_live.ex:327
+#: lib/pepe_web/live/traces_live.ex:413
 #, elixir-autogen, elixir-format
 msgid "No token usage was recorded for this run."
 msgstr "Nenhum uso de tokens foi registrado para esta execução."
@@ -3310,29 +3310,29 @@ msgstr "sem origem definida"
 msgid "widget (%{origin})"
 msgstr "widget (%{origin})"
 
-#: lib/pepe_web/live/models_live.ex:573
+#: lib/pepe_web/live/models_live.ex:583
 #, elixir-autogen, elixir-format
 msgid "A model connection named %{name} already exists. Choose a different name."
 msgstr "Já existe uma conexão de modelo chamada %{name}. Escolha outro nome."
 
-#: lib/pepe_web/live/models_live.ex:556
+#: lib/pepe_web/live/models_live.ex:560
 #, elixir-autogen, elixir-format
 msgid "A model connection named %{name} already exists - saved this one as %{final} instead."
 msgstr ""
 "Já existe uma conexão de modelo chamada %{name}. Esta foi salva como "
 "%{final}."
 
-#: lib/pepe_web/live/models_live.ex:581
+#: lib/pepe_web/live/models_live.ex:591
 #, elixir-autogen, elixir-format
 msgid "Couldn't rename %{old}."
 msgstr "Não foi possível renomear %{old}."
 
-#: lib/pepe_web/live/models_live.ex:578
+#: lib/pepe_web/live/models_live.ex:588
 #, elixir-autogen, elixir-format
 msgid "Model %{old} renamed to %{name} and saved."
 msgstr "Modelo %{old} renomeado para %{name} e salvo."
 
-#: lib/pepe_web/live/models_live.ex:229
+#: lib/pepe_web/live/models_live.ex:233
 #, elixir-autogen, elixir-format
 msgid "Renaming updates every agent, cron, hook and default pointing at this connection."
 msgstr ""
@@ -3536,7 +3536,7 @@ msgid "this conversation only"
 msgstr "só esta conversa"
 
 #: lib/pepe_web/live/agents_live.ex:165
-#: lib/pepe_web/live/models_live.ex:261
+#: lib/pepe_web/live/models_live.ex:265
 #, elixir-autogen, elixir-format
 msgid "+ Add a fallback..."
 msgstr "+ Adicionar um fallback..."
@@ -3566,7 +3566,7 @@ msgstr "Escuro"
 msgid "Edit appearance"
 msgstr "Editar aparência"
 
-#: lib/pepe_web/live/models_live.ex:247
+#: lib/pepe_web/live/models_live.ex:251
 #, elixir-autogen, elixir-format
 msgid "Fallbacks"
 msgstr "Fallbacks"
@@ -3592,13 +3592,13 @@ msgid "Logo URL"
 msgstr "URL do logo"
 
 #: lib/pepe_web/live/agents_live.ex:159
-#: lib/pepe_web/live/models_live.ex:255
+#: lib/pepe_web/live/models_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Move earlier"
 msgstr "Mover para cima"
 
 #: lib/pepe_web/live/agents_live.ex:160
-#: lib/pepe_web/live/models_live.ex:256
+#: lib/pepe_web/live/models_live.ex:260
 #, elixir-autogen, elixir-format
 msgid "Move later"
 msgstr "Mover para baixo"
@@ -3644,7 +3644,7 @@ msgstr ""
 " este: agente e origem não mudam depois de gerado, mas a aparência sim, aqui"
 " mesmo."
 
-#: lib/pepe_web/live/models_live.ex:249
+#: lib/pepe_web/live/models_live.ex:253
 #, elixir-autogen, elixir-format
 msgid "Tried in this order when %{name} errors transiently (rate limit, 5xx, network) - the agent never sees the failure."
 msgstr ""
@@ -3676,8 +3676,8 @@ msgstr "(desligado)"
 msgid "Access"
 msgstr "Acesso"
 
-#: lib/pepe_web/live/models_live.ex:267
-#: lib/pepe_web/live/models_live.ex:327
+#: lib/pepe_web/live/models_live.ex:271
+#: lib/pepe_web/live/models_live.ex:331
 #, elixir-autogen, elixir-format
 msgid "Billing"
 msgstr "Cobrança"
@@ -3693,14 +3693,14 @@ msgid "Complexity routing"
 msgstr "Roteamento por complexidade"
 
 #: lib/pepe_web/live/connections_component.ex:124
-#: lib/pepe_web/live/models_live.ex:225
-#: lib/pepe_web/live/models_live.ex:297
+#: lib/pepe_web/live/models_live.ex:229
+#: lib/pepe_web/live/models_live.ex:301
 #, elixir-autogen, elixir-format
 msgid "Connection"
 msgstr "Conexão"
 
 #: lib/pepe_web/live/agents_live.ex:134
-#: lib/pepe_web/live/models_live.ex:241
+#: lib/pepe_web/live/models_live.ex:245
 #, elixir-autogen, elixir-format
 msgid "Model & fallbacks"
 msgstr "Modelo e fallbacks"
@@ -3715,7 +3715,7 @@ msgstr "Persona"
 msgid "Provider credentials"
 msgstr "Credenciais do provedor"
 
-#: lib/pepe_web/live/models_live.ex:271
+#: lib/pepe_web/live/models_live.ex:275
 #, elixir-autogen, elixir-format
 msgid "Security"
 msgstr "Segurança"
@@ -3730,42 +3730,42 @@ msgstr "Modelo simples"
 msgid "Triage model"
 msgstr "Modelo de triagem"
 
-#: lib/pepe_web/live/traces_live.ex:446
+#: lib/pepe_web/live/traces_live.ex:576
 #, elixir-autogen, elixir-format
 msgid "Hook"
 msgstr "Hook"
 
-#: lib/pepe_web/live/traces_live.ex:438
+#: lib/pepe_web/live/traces_live.ex:568
 #, elixir-autogen, elixir-format
 msgid "Triage"
 msgstr "Triagem"
 
-#: lib/pepe_web/live/traces_live.ex:476
+#: lib/pepe_web/live/traces_live.ex:606
 #, elixir-autogen, elixir-format
 msgid "changed"
 msgstr "alterado"
 
-#: lib/pepe_web/live/traces_live.ex:474
+#: lib/pepe_web/live/traces_live.ex:604
 #, elixir-autogen, elixir-format
 msgid "changed, %{n} reversible"
 msgstr "alterado, %{n} reversíveis"
 
-#: lib/pepe_web/live/traces_live.ex:467
+#: lib/pepe_web/live/traces_live.ex:597
 #, elixir-autogen, elixir-format
 msgid "complex"
 msgstr "complexa"
 
-#: lib/pepe_web/live/traces_live.ex:471
+#: lib/pepe_web/live/traces_live.ex:601
 #, elixir-autogen, elixir-format
 msgid "no change"
 msgstr "sem alteração"
 
-#: lib/pepe_web/live/traces_live.ex:466
+#: lib/pepe_web/live/traces_live.ex:596
 #, elixir-autogen, elixir-format
 msgid "simple"
 msgstr "simples"
 
-#: lib/pepe_web/live/traces_live.ex:468
+#: lib/pepe_web/live/traces_live.ex:598
 #, elixir-autogen, elixir-format
 msgid "unreachable, skipped"
 msgstr "inacessível, ignorado"
@@ -3958,7 +3958,7 @@ msgstr "Digite os números que quer marcar (ex: 1 3) e tecle Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:3392
+#: lib/mix/tasks/pepe.ex:3417
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -3978,91 +3978,91 @@ msgstr "n = próxima página  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:3206
+#: lib/mix/tasks/pepe.ex:3231
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (pode usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:3207
+#: lib/mix/tasks/pepe.ex:3232
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:3215
+#: lib/mix/tasks/pepe.ex:3240
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
 "\"%{field}\" é obrigatório. Preencha (pode usar uma referência ${ENV_VAR})."
 
-#: lib/pepe_web/live/models_live.ex:473
+#: lib/pepe_web/live/models_live.ex:477
 #, elixir-autogen, elixir-format
 msgid "%{name} isn't a subscription connection."
 msgstr "%{name} não é uma conexão por assinatura."
 
-#: lib/pepe_web/live/models_live.ex:183
+#: lib/pepe_web/live/models_live.ex:187
 #, elixir-autogen, elixir-format
 msgid "Connect %{label}"
 msgstr "Conectar %{label}"
 
-#: lib/pepe_web/live/models_live.ex:527
+#: lib/pepe_web/live/models_live.ex:531
 #, elixir-autogen, elixir-format
 msgid "Connected %{name}."
 msgstr "%{name} conectado."
 
-#: lib/pepe_web/live/models_live.ex:189
+#: lib/pepe_web/live/models_live.ex:193
 #, elixir-autogen, elixir-format
 msgid "Connecting %{label}"
 msgstr "Conectando %{label}"
 
-#: lib/pepe_web/live/models_live.ex:195
+#: lib/pepe_web/live/models_live.ex:199
 #, elixir-autogen, elixir-format
 msgid "Finish"
 msgstr "Concluir"
 
-#: lib/pepe_web/live/models_live.ex:500
+#: lib/pepe_web/live/models_live.ex:504
 #, elixir-autogen, elixir-format
 msgid "No subscription sign-in for that provider."
 msgstr "Esse provedor não tem login por assinatura."
 
-#: lib/pepe_web/live/models_live.ex:191
+#: lib/pepe_web/live/models_live.ex:195
 #, elixir-autogen, elixir-format
 msgid "Open the sign-in page ↗"
 msgstr "Abrir a página de login ↗"
 
-#: lib/pepe_web/live/models_live.ex:208
+#: lib/pepe_web/live/models_live.ex:212
 #, elixir-autogen, elixir-format
 msgid "Reconnect"
 msgstr "Reconectar"
 
-#: lib/pepe_web/live/models_live.ex:189
+#: lib/pepe_web/live/models_live.ex:193
 #, elixir-autogen, elixir-format
 msgid "Reconnecting %{name}"
 msgstr "Reconectando %{name}"
 
-#: lib/pepe_web/live/models_live.ex:176
+#: lib/pepe_web/live/models_live.ex:180
 #, elixir-autogen, elixir-format
 msgid "Sign in with a subscription"
 msgstr "Entrar com uma assinatura"
 
-#: lib/pepe_web/live/models_live.ex:530
-#: lib/pepe_web/live/models_live.ex:636
+#: lib/pepe_web/live/models_live.ex:534
+#: lib/pepe_web/live/models_live.ex:646
 #, elixir-autogen, elixir-format
 msgid "Sign-in failed: %{reason}"
 msgstr "Falha no login: %{reason}"
 
-#: lib/pepe_web/live/models_live.ex:178
+#: lib/pepe_web/live/models_live.ex:182
 #, elixir-autogen, elixir-format
 msgid "Use your ChatGPT or Claude subscription instead of an API key. Works when this dashboard runs on the same machine as your browser."
 msgstr ""
 "Use sua assinatura do ChatGPT ou Claude em vez de uma chave de API. Funciona"
 " quando este painel roda na mesma máquina que o seu navegador."
 
-#: lib/pepe_web/live/models_live.ex:194
+#: lib/pepe_web/live/models_live.ex:198
 #, elixir-autogen, elixir-format
 msgid "paste the redirect URL or code"
 msgstr "cole a URL de redirecionamento ou o código"
 
-#: lib/pepe_web/live/models_live.ex:192
+#: lib/pepe_web/live/models_live.ex:196
 #, elixir-autogen, elixir-format
 msgid "Authorize in the browser, then come back; this finishes on its own. If it doesn't, paste the redirect URL below."
 msgstr ""
@@ -4409,27 +4409,27 @@ msgstr "a preços de API: %{list}"
 msgid "incl. %{fee} of subscriptions"
 msgstr "inclui %{fee} de assinaturas"
 
-#: lib/pepe_web/live/traces_live.ex:159
+#: lib/pepe_web/live/traces_live.ex:234
 #, elixir-autogen, elixir-format
 msgid "Keep this run as an eval case? It will assert that the agent still calls the same tools for this prompt."
 msgstr ""
 "Guardar esta execução como caso de eval? Ele vai exigir que o agente "
 "continue chamando as mesmas ferramentas para esta pergunta."
 
-#: lib/pepe_web/live/traces_live.ex:519
+#: lib/pepe_web/live/traces_live.ex:649
 #, elixir-autogen, elixir-format
 msgid "Kept. No tools ran, so the case asserts the agent still answers this without reaching for one."
 msgstr ""
 "Guardado. Nenhuma ferramenta rodou, então o caso exige que o agente continue"
 " respondendo sem recorrer a nenhuma."
 
-#: lib/pepe_web/live/traces_live.ex:520
+#: lib/pepe_web/live/traces_live.ex:650
 #, elixir-autogen, elixir-format
 msgid "Kept. The case asserts the agent still calls %{tools} for this."
 msgstr ""
 "Guardado. O caso exige que o agente continue chamando %{tools} para isto."
 
-#: lib/pepe_web/live/traces_live.ex:160
+#: lib/pepe_web/live/traces_live.ex:235
 #, elixir-autogen, elixir-format
 msgid "✓ This went right"
 msgstr "✓ Isto deu certo"
@@ -4640,7 +4640,7 @@ msgstr ""
 "atinge o teto mensal de mensagens de clientes. Não afeta o teto de gastos, "
 "que é separado."
 
-#: lib/pepe_web/live/agents_live.ex:475
+#: lib/pepe_web/live/agents_live.ex:497
 #, elixir-autogen, elixir-format
 msgid "Couldn't save %{name}: the name must be letters, digits, - or _."
 msgstr ""
@@ -4651,18 +4651,18 @@ msgstr ""
 msgid "Invalid path."
 msgstr "Caminho inválido."
 
-#: lib/pepe_web/live/traces_live.ex:164
+#: lib/pepe_web/live/traces_live.ex:239
 #, elixir-autogen, elixir-format
 msgid "Saved to the \"recorded\" eval suite. Run it with: mix pepe eval recorded"
 msgstr ""
 "Salvo na suíte de avaliação \"recorded\". Rode com: mix pepe eval recorded"
 
-#: lib/pepe_web/live/traces_live.ex:528
+#: lib/pepe_web/live/traces_live.ex:658
 #, elixir-autogen, elixir-format
 msgid "This run is already saved as an eval case."
 msgstr "Esta execução já está salva como caso de avaliação."
 
-#: lib/pepe_web/live/traces_live.ex:165
+#: lib/pepe_web/live/traces_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "✓ Saved as an eval case"
 msgstr "✓ Salvo como caso de avaliação"
@@ -4744,7 +4744,7 @@ msgstr "🔐 Posso executar a ferramenta %{tool} — %{desc}?"
 msgid "⌛ This request expired. Ask again if you still need it."
 msgstr "⌛ Este pedido expirou. Peça de novo se ainda precisar."
 
-#: lib/pepe_web/live/traces_live.ex:373
+#: lib/pepe_web/live/traces_live.ex:503
 #, elixir-autogen, elixir-format
 msgid "Error detail"
 msgstr "Detalhe do erro"
@@ -5286,3 +5286,33 @@ msgstr "Este board tem %{n} card(s). Exclua-os primeiro."
 #, elixir-autogen, elixir-format
 msgid "This card is still running. Archive it anyway?"
 msgstr "Este card ainda está em execução. Arquivar mesmo assim?"
+
+#: lib/pepe_web/live/traces_live.ex:449
+#, elixir-autogen, elixir-format
+msgid "%{n} runs"
+msgstr "%{n} execuções"
+
+#: lib/pepe_web/live/agents_live.ex:450
+#, elixir-autogen, elixir-format
+msgid "An agent named %{name} already exists (maybe with different capitalization)."
+msgstr "Já existe um agente chamado %{name} (talvez com capitalização diferente)."
+
+#: lib/pepe_web/live/traces_live.ex:244
+#, elixir-autogen, elixir-format
+msgid "Flat list"
+msgstr "Lista simples"
+
+#: lib/pepe_web/live/traces_live.ex:244
+#, elixir-autogen, elixir-format
+msgid "Group by conversation"
+msgstr "Agrupar por conversa"
+
+#: lib/pepe_web/live/traces_live.ex:436
+#, elixir-autogen, elixir-format
+msgid "No runs match these filters."
+msgstr "Nenhuma execução corresponde a esses filtros."
+
+#: lib/pepe_web/live/traces_live.ex:454
+#, elixir-autogen, elixir-format
+msgid "Total estimated cost across this conversation's runs."
+msgstr "Custo total estimado das execuções desta conversa."

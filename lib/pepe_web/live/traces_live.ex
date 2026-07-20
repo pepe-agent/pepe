@@ -13,6 +13,7 @@ defmodule PepeWeb.TracesLive do
   import PepeWeb.DashUI
   import PepeWeb.DashData
 
+  alias Pepe.Agent.SessionTitles
   alias Pepe.Config
   alias Pepe.Pricing
   alias Pepe.Trace
@@ -38,7 +39,9 @@ defmodule PepeWeb.TracesLive do
        f_outcome: "",
        f_from: "",
        f_to: "",
-       page: 1
+       page: 1,
+       group_by_session: false,
+       expanded_group: nil
      )
      |> load_list()}
   end
@@ -79,10 +82,37 @@ defmodule PepeWeb.TracesLive do
   end
 
   # Recompute the filtered slice and paging metadata from the current filters + page.
+  # Grouped mode paginates over sessions instead of individual runs; either way the paging
+  # assigns (@total/@pages/@page_from/@page_to) mean "how many of what's on screen".
   defp apply_view(socket) do
     a = socket.assigns
     filtered = filter_traces(a.all_traces, a.f_agent, a.f_source, a.f_outcome, a.f_from, a.f_to)
+
+    if a.group_by_session,
+      do: apply_grouped_view(socket, filtered),
+      else: apply_flat_view(socket, filtered)
+  end
+
+  defp apply_flat_view(socket, filtered) do
     total = length(filtered)
+    pages = max(1, ceil(total / @per_page))
+    page = socket.assigns.page |> min(pages) |> max(1)
+
+    assign(socket,
+      total: total,
+      pages: pages,
+      page: page,
+      page_from: (total == 0 && 0) || (page - 1) * @per_page + 1,
+      page_to: min(page * @per_page, total),
+      traces: Enum.slice(filtered, (page - 1) * @per_page, @per_page),
+      session_groups: []
+    )
+  end
+
+  defp apply_grouped_view(socket, filtered) do
+    a = socket.assigns
+    groups = session_groups(filtered, a.models, a.price_cache)
+    total = length(groups)
     pages = max(1, ceil(total / @per_page))
     page = a.page |> min(pages) |> max(1)
 
@@ -92,8 +122,53 @@ defmodule PepeWeb.TracesLive do
       page: page,
       page_from: (total == 0 && 0) || (page - 1) * @per_page + 1,
       page_to: min(page * @per_page, total),
-      traces: Enum.slice(filtered, (page - 1) * @per_page, @per_page)
+      session_groups: Enum.slice(groups, (page - 1) * @per_page, @per_page),
+      traces: []
     )
+  end
+
+  # One conversation's runs, aggregated: total cost/tokens across every call in the session, so
+  # "how much did this conversation cost" doesn't require adding up rows by hand. Runs with no
+  # session (older traces, one-shot calls) aren't conversations, so each stays its own group
+  # rather than getting lumped into a misleading catch-all bucket.
+  defp session_groups(traces, models, cache) do
+    traces
+    |> Enum.group_by(&group_key/1)
+    |> Enum.map(fn {key, ts} -> build_group(key, ts, models, cache) end)
+    |> Enum.sort_by(& &1.last_at, :desc)
+  end
+
+  defp group_key(t) do
+    case t["session"] do
+      s when is_binary(s) and s != "" -> s
+      _ -> "solo:" <> to_string(t["id"])
+    end
+  end
+
+  defp build_group(key, ts, models, cache) do
+    sorted = Enum.sort_by(ts, & &1["at"], :desc)
+    last = List.first(sorted)
+    first = List.last(sorted)
+
+    {tin, tout} =
+      Enum.reduce(ts, {0, 0}, fn t, {i, o} ->
+        {ti, to} = run_tokens(t)
+        {i + ti, o + to}
+      end)
+
+    %{
+      id: key,
+      title: SessionTitles.get(key),
+      count: length(ts),
+      agents: ts |> Enum.map(& &1["agent"]) |> Enum.reject(&(&1 in [nil, ""])) |> Enum.uniq(),
+      source: trace_source(last),
+      last_at: last["at"],
+      first_at: first["at"],
+      tokens_in: tin,
+      tokens_out: tout,
+      cost: Enum.reduce(ts, 0.0, &(run_cost(&1, models, cache) + &2)),
+      traces: sorted
+    }
   end
 
   defp filter_traces(traces, agent, source, outcome, from, to) do
@@ -165,6 +240,9 @@ defmodule PepeWeb.TracesLive do
             {gettext("✓ Saved as an eval case")}
           </span>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>
+          <button :if={!@selected} phx-click="toggle_grouping" class={btn_ghost()}>
+            {(@group_by_session && gettext("Flat list")) || gettext("Group by conversation")}
+          </button>
           <button :if={!@selected} phx-click="refresh" class={btn_ghost()}>{gettext("Refresh")}</button>
         </.view_header>
 
@@ -180,7 +258,15 @@ defmodule PepeWeb.TracesLive do
             f_to={@f_to}
           />
           <div class="flex-1 overflow-y-auto p-6">
-            <.trace_list :if={!@selected} traces={@traces} total={@total} models={@models} cache={@price_cache} />
+            <.trace_list :if={!@selected and !@group_by_session} traces={@traces} total={@total} models={@models} cache={@price_cache} />
+            <.session_list
+              :if={!@selected and @group_by_session}
+              groups={@session_groups}
+              total={@total}
+              expanded={@expanded_group}
+              models={@models}
+              cache={@price_cache}
+            />
             <.detail :if={@selected} trace={@selected} models={@models} cache={@price_cache} />
           </div>
           <.pager
@@ -334,6 +420,50 @@ defmodule PepeWeb.TracesLive do
           </tr>
         </tbody>
       </table>
+    </div>
+    """
+  end
+
+  attr :groups, :list, required: true
+  attr :total, :integer, required: true
+  attr :expanded, :string, default: nil
+  attr :models, :map, required: true
+  attr :cache, :map, required: true
+
+  defp session_list(assigns) do
+    ~H"""
+    <div :if={@total == 0} class="rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
+      {gettext("No runs match these filters.")}
+    </div>
+    <div :if={@groups != []} class="space-y-2">
+      <div :for={g <- @groups} class="overflow-hidden rounded-xl border border-zinc-800">
+        <button
+          type="button"
+          phx-click="toggle_group"
+          phx-value-key={g.id}
+          class="flex w-full flex-wrap items-center justify-between gap-3 bg-zinc-900/40 px-4 py-3 text-left hover:bg-zinc-900/70"
+        >
+          <div class="min-w-0">
+            <div class="truncate text-[15px] font-medium text-zinc-100">{g.title || g.id}</div>
+            <div class="mt-0.5 truncate text-xs text-zinc-500">
+              {g.id} · {gettext("%{n} runs", n: g.count)} · {Enum.join(g.agents, ", ")}
+              <span :if={g.source}>· {source_label(g.source)}</span>
+            </div>
+          </div>
+          <div class="flex shrink-0 items-center gap-4 text-right">
+            <div :if={g.cost > 0} class="text-sm text-zinc-300" title={gettext("Total estimated cost across this conversation's runs.")}>
+              {fmt_cost(g.cost)}
+            </div>
+            <div :if={g.tokens_in + g.tokens_out > 0} class="text-xs text-zinc-600">
+              {fmt_tokens(g.tokens_in)} → {fmt_tokens(g.tokens_out)}
+            </div>
+            <div class="whitespace-nowrap font-mono text-xs text-zinc-500">{fmt_at(g.last_at)}</div>
+          </div>
+        </button>
+        <div :if={@expanded == g.id} class="border-t border-zinc-800 p-3">
+          <.trace_list traces={g.traces} total={length(g.traces)} models={@models} cache={@cache} />
+        </div>
+      </div>
     </div>
     """
   end
@@ -535,6 +665,18 @@ defmodule PepeWeb.TracesLive do
   def handle_event("close", _p, socket), do: {:noreply, assign(socket, selected: nil)}
 
   def handle_event("refresh", _p, socket), do: {:noreply, load_list(socket)}
+
+  def handle_event("toggle_grouping", _p, socket) do
+    {:noreply,
+     socket
+     |> assign(group_by_session: !socket.assigns.group_by_session, expanded_group: nil, page: 1)
+     |> apply_view()}
+  end
+
+  def handle_event("toggle_group", %{"key" => key}, socket) do
+    expanded = if socket.assigns.expanded_group == key, do: nil, else: key
+    {:noreply, assign(socket, expanded_group: expanded)}
+  end
 
   def handle_event("filter", params, socket) do
     {:noreply,

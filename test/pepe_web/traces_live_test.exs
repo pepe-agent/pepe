@@ -49,4 +49,23 @@ defmodule PepeWeb.TracesLiveTest do
     assert html =~ "read_file"
     assert html =~ "Here you go."
   end
+
+  test "groups runs by session and expands to show the underlying runs" do
+    Trace.start("assistant", "api:1", "second question, same session")
+    Trace.event({:assistant, "another answer"})
+    Trace.finish({:ok, "another answer", []})
+
+    {:ok, view, _html} = live(conn(), "/traces")
+    html = render_click(view, "toggle_grouping", %{})
+
+    assert html =~ "api:1"
+    assert html =~ "2 runs"
+    refute html =~ "read the readme"
+
+    key = Trace.recent("default") |> hd() |> Map.fetch!("session")
+    expanded = render_click(view, "toggle_group", %{"key" => key})
+
+    assert expanded =~ "read the readme"
+    assert expanded =~ "second question, same session"
+  end
 end
