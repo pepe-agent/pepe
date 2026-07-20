@@ -127,6 +127,7 @@ defmodule PepeWeb.ChatLive do
                   <button phx-click="select" phx-value-key={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
                     <div class="truncate text-[15px] font-medium">{s.title || session_suffix(s.key)}</div>
                     <div class="truncate text-sm text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
+                    <div class="truncate text-xs text-zinc-600">{s.key}</div>
                   </button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
                     class="px-3 py-2 text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100">✕</button>
