@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-20
+
 ### Added
 - **Voice replies and voice-note transcription are now configurable everywhere, not just by hand-editing `config.json`.** `media.tts` (spoken replies, shipped in 0.6.0) and `media.audio` (transcription) had no dashboard control, no CLI command, and no setup step — the only way to turn either on was editing the config file directly, unlike every other setting in Pepe. Now: `mix pepe media tts --model NAME [--voice alloy]` / `mix pepe media audio --model NAME | --command "..."` (and `... off` for either), a **Media** panel on the dashboard's Config page, a step in `mix pepe setup` (and the reconfigure menu), and `media.tts` / `media.tts.voice` / `media.audio.model` are now editable through the `config_set` chat tool too.
 - **A message that arrives mid-turn can now fold into the turn already running instead of always waiting in the queue.** New per-agent flag `midrun_fold` (dashboard, `mix pepe agent add --midrun_fold`, `manage_agent set_flag`): with it on, a message that arrives while the agent is still working gets a quick classification — a correction of the running turn ("wait, make it 3pm instead") steers straight in, anything else queues as before. Biased hard toward queueing on any doubt or classifier failure. Classifying prefers `triage_model` if one's set (cheap); without one it falls back to the agent's own model rather than doing nothing, at that model's own cost per mid-turn message — the dashboard/CLI/tool text calls this out. Also fixes a related edge case: a correction that arrives just as the turn's very last model call is already in flight no longer gets silently dropped — it now runs as its own follow-up turn.
@@ -483,7 +485,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/pepe-agent/pepe/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/pepe-agent/pepe/compare/v0.6.1...v0.7.0
 [0.4.0]: https://github.com/pepe-agent/pepe/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/pepe-agent/pepe/compare/v0.3.1...v0.3.2
