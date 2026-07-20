@@ -1994,15 +1994,18 @@ defmodule Pepe.Config do
     if cards != [] and not Keyword.get(opts, :force, false) do
       {:error, {:not_empty, length(cards)}}
     else
-      update(fn config ->
-        config
-        |> update_in(["boards"], &Map.delete(&1 || %{}, id))
-        |> update_in(["board_cards"], fn all -> Map.reject(all || %{}, fn {_cid, m} -> m["board"] == id end) end)
-      end)
-
+      update(&do_delete_board(&1, id))
       :ok
     end
   end
+
+  defp do_delete_board(config, id) do
+    config
+    |> update_in(["boards"], &Map.delete(&1 || %{}, id))
+    |> update_in(["board_cards"], &reject_cards_for_board(&1, id))
+  end
+
+  defp reject_cards_for_board(all, board_id), do: Map.reject(all || %{}, fn {_cid, m} -> m["board"] == board_id end)
 
   @doc "All board cards, as `Pepe.Config.BoardCard` structs, sorted by id."
   def board_cards do

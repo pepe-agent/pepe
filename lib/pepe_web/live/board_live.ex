@@ -301,9 +301,6 @@ defmodule PepeWeb.BoardLive do
 
       {:error, {:not_empty, n}} ->
         {:noreply, put_flash(socket, :error, gettext("This board has %{n} card(s). Delete them first.", n: n))}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, gettext("Could not delete the board."))}
     end
   end
 

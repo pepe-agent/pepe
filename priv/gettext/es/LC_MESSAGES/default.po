@@ -5036,7 +5036,7 @@ msgstr "Board"
 msgid "Board created."
 msgstr "Board creado."
 
-#: lib/pepe_web/live/board_live.ex:333
+#: lib/pepe_web/live/board_live.ex:330
 #, elixir-autogen, elixir-format
 msgid "Card created."
 msgstr "Tarjeta creada."
@@ -5056,15 +5056,10 @@ msgstr "Tiempo límite de reclamación (segundos)"
 msgid "Could not create the board."
 msgstr "No se pudo crear el board."
 
-#: lib/pepe_web/live/board_live.ex:336
+#: lib/pepe_web/live/board_live.ex:333
 #, elixir-autogen, elixir-format
 msgid "Could not create the card."
 msgstr "No se pudo crear la tarjeta."
-
-#: lib/pepe_web/live/board_live.ex:306
-#, elixir-autogen, elixir-format
-msgid "Could not delete the board."
-msgstr "No se pudo eliminar el board."
 
 #: lib/pepe_web/live/board_live.ex:136
 #, elixir-autogen, elixir-format

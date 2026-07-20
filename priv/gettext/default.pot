@@ -4777,7 +4777,7 @@ msgstr ""
 msgid "Board created."
 msgstr ""
 
-#: lib/pepe_web/live/board_live.ex:333
+#: lib/pepe_web/live/board_live.ex:330
 #, elixir-autogen, elixir-format
 msgid "Card created."
 msgstr ""
@@ -4797,14 +4797,9 @@ msgstr ""
 msgid "Could not create the board."
 msgstr ""
 
-#: lib/pepe_web/live/board_live.ex:336
+#: lib/pepe_web/live/board_live.ex:333
 #, elixir-autogen, elixir-format
 msgid "Could not create the card."
-msgstr ""
-
-#: lib/pepe_web/live/board_live.ex:306
-#, elixir-autogen, elixir-format
-msgid "Could not delete the board."
 msgstr ""
 
 #: lib/pepe_web/live/board_live.ex:136

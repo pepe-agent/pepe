@@ -240,26 +240,25 @@ defmodule Pepe.Board do
   def reclaim_if_timed_out(_card_id, timeout_s) when timeout_s in [0, nil], do: {:error, :no_timeout}
 
   def reclaim_if_timed_out(card_id, timeout_s) do
-    cas_card(card_id, fn config, m ->
-      case m do
-        %{"status" => "running", "claimed_at" => claimed_at} when is_integer(claimed_at) ->
-          if now() - claimed_at > timeout_s do
-            {:ok,
-             put_in(
-               config,
-               ["board_cards", card_id],
-               Map.merge(m, %{"status" => "blocked", "block_reason" => "claim timed out", "updated_at" => now()})
-             )}
-          else
-            {:error, :not_timed_out}
-          end
-
-        _ ->
-          {:error, :not_applicable}
-      end
-    end)
+    cas_card(card_id, &reclaim_card(&1, card_id, &2, timeout_s))
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => "claim timed out"}) end)
   end
+
+  defp reclaim_card(config, card_id, %{"status" => "running", "claimed_at" => claimed_at} = m, timeout_s)
+       when is_integer(claimed_at) do
+    if now() - claimed_at > timeout_s do
+      {:ok,
+       put_in(
+         config,
+         ["board_cards", card_id],
+         Map.merge(m, %{"status" => "blocked", "block_reason" => "claim timed out", "updated_at" => now()})
+       )}
+    else
+      {:error, :not_timed_out}
+    end
+  end
+
+  defp reclaim_card(_config, _card_id, _m, _timeout_s), do: {:error, :not_applicable}
 
   @doc """
   `ready` cards on `board_id` with an assignee and no current claim, ordered highest-priority
@@ -334,16 +333,16 @@ defmodule Pepe.Board do
     cards = get_in(config, ["board_cards"]) || %{}
 
     Enum.all?(depends_on, &match?(%{"board" => ^board_id}, cards[&1])) and
-      not Enum.any?(depends_on, &reaches?(cards, &1, card_id, MapSet.new()))
+      not Enum.any?(depends_on, &reaches?(cards, &1, card_id, []))
   end
 
   defp reaches?(_cards, current, target, _seen) when current == target, do: true
 
   defp reaches?(cards, current, target, seen) do
-    if MapSet.member?(seen, current) do
+    if current in seen do
       false
     else
-      seen = MapSet.put(seen, current)
+      seen = [current | seen]
       get_in(cards, [current, "depends_on"]) |> List.wrap() |> Enum.any?(&reaches?(cards, &1, target, seen))
     end
   end

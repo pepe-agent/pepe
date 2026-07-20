@@ -4289,19 +4289,26 @@ defmodule Mix.Tasks.Pepe do
   defp board_cmd(["add" | rest]) do
     {opts, _, _} = OptionParser.parse(rest, strict: [name: :string, project: :string, auto_dispatch: :boolean, claim_timeout_s: :integer])
 
-    with {:ok, name} <- require_opt(opts, :name) do
-      attrs = %{project: opts[:project], name: name, auto_dispatch: opts[:auto_dispatch] || false, claim_timeout_s: opts[:claim_timeout_s]}
+    case require_opt(opts, :name) do
+      {:ok, name} ->
+        attrs = %{
+          project: opts[:project],
+          name: name,
+          auto_dispatch: opts[:auto_dispatch] || false,
+          claim_timeout_s: opts[:claim_timeout_s]
+        }
 
-      case Pepe.Board.create_board(attrs) do
-        {:ok, board} ->
-          ok("board #{green(board.id)} created")
-          print_board(board)
+        case Pepe.Board.create_board(attrs) do
+          {:ok, board} ->
+            ok("board #{green(board.id)} created")
+            print_board(board)
 
-        {:error, :already_exists} ->
-          error("a board named #{name} already exists there")
-      end
-    else
-      {:error, :missing, key} -> error("board add needs --#{key}")
+          {:error, :already_exists} ->
+            error("a board named #{name} already exists there")
+        end
+
+      {:error, :missing, key} ->
+        error("board add needs --#{key}")
     end
   end
 
@@ -4311,7 +4318,6 @@ defmodule Mix.Tasks.Pepe do
     case Pepe.Board.delete_board(id, force: opts[:force] || false) do
       :ok -> ok("board #{green(id)} removed")
       {:error, {:not_empty, n}} -> error("board #{id} has #{n} card(s): pass --force to remove them too")
-      {:error, reason} -> error("could not remove #{id}: #{inspect(reason)}")
     end
   end
 
@@ -4341,33 +4347,35 @@ defmodule Mix.Tasks.Pepe do
         strict: [title: :string, body: :string, assignee: :string, priority: :integer, depends_on: :string, auto_dispatch: :boolean]
       )
 
-    with {:ok, title} <- require_opt(opts, :title) do
-      attrs = %{
-        board: board_id,
-        title: title,
-        body: opts[:body],
-        assignee: opts[:assignee],
-        priority: opts[:priority],
-        depends_on: parse_depends_on(opts[:depends_on]),
-        # opts[:auto_dispatch] is nil (inherit), true (--auto-dispatch), or false
-        # (--no-auto-dispatch): OptionParser auto-generates the negated flag for a
-        # :boolean switch, and Keyword access preserves an explicit false correctly.
-        auto_dispatch: opts[:auto_dispatch]
-      }
+    case require_opt(opts, :title) do
+      {:ok, title} ->
+        attrs = %{
+          board: board_id,
+          title: title,
+          body: opts[:body],
+          assignee: opts[:assignee],
+          priority: opts[:priority],
+          depends_on: parse_depends_on(opts[:depends_on]),
+          # opts[:auto_dispatch] is nil (inherit), true (--auto-dispatch), or false
+          # (--no-auto-dispatch): OptionParser auto-generates the negated flag for a
+          # :boolean switch, and Keyword access preserves an explicit false correctly.
+          auto_dispatch: opts[:auto_dispatch]
+        }
 
-      case Pepe.Board.create_card(attrs) do
-        {:ok, card} ->
-          ok("card #{green(card.id)} created on #{board_id}")
-          print_card(card)
+        case Pepe.Board.create_card(attrs) do
+          {:ok, card} ->
+            ok("card #{green(card.id)} created on #{board_id}")
+            print_card(card)
 
-        {:error, :board_not_found} ->
-          error("unknown board: #{board_id}")
+          {:error, :board_not_found} ->
+            error("unknown board: #{board_id}")
 
-        {:error, :invalid_dependency} ->
-          error("--depends-on must name existing cards on the same board, with no cycle")
-      end
-    else
-      {:error, :missing, key} -> error("board card add needs --#{key}")
+          {:error, :invalid_dependency} ->
+            error("--depends-on must name existing cards on the same board, with no cycle")
+        end
+
+      {:error, :missing, key} ->
+        error("board card add needs --#{key}")
     end
   end
 
@@ -4403,9 +4411,8 @@ defmodule Mix.Tasks.Pepe do
   defp board_cmd(["card", "block", id | rest]) do
     {opts, _, _} = OptionParser.parse(rest, strict: [text: :string])
 
-    with {:ok, reason} <- require_opt(opts, :text) do
-      print_card_transition(Pepe.Board.block(id, reason), id)
-    else
+    case require_opt(opts, :text) do
+      {:ok, reason} -> print_card_transition(Pepe.Board.block(id, reason), id)
       {:error, :missing, key} -> error("board card block needs --#{key} (the reason)")
     end
   end
@@ -4415,13 +4422,15 @@ defmodule Mix.Tasks.Pepe do
   defp board_cmd(["card", "comment", id | rest]) do
     {opts, _, _} = OptionParser.parse(rest, strict: [text: :string])
 
-    with {:ok, text} <- require_opt(opts, :text) do
-      case Pepe.Board.comment(id, "cli", text) do
-        :ok -> ok("comment added to #{id}")
-        {:error, reason} -> print_card_error(id, reason)
-      end
-    else
-      {:error, :missing, key} -> error("board card comment needs --#{key}")
+    case require_opt(opts, :text) do
+      {:ok, text} ->
+        case Pepe.Board.comment(id, "cli", text) do
+          :ok -> ok("comment added to #{id}")
+          {:error, reason} -> print_card_error(id, reason)
+        end
+
+      {:error, :missing, key} ->
+        error("board card comment needs --#{key}")
     end
   end
 
