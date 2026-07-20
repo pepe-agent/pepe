@@ -50,10 +50,12 @@ defmodule Pepe.Tools.ManageChannel do
         with the @BotFather token), `agent` (an existing agent this bot talks to).
       - list: show configured bots (name, agent, whether active).
       - set_agent: rebind a bot to another agent - needs `name`, `agent`.
-      - bind_topic: bind the CURRENT forum topic (the one this conversation is in) to `agent`, \
-        so that topic is answered by it from now on - persistent, survives /new and restarts. \
-        Use this when the user asks to connect/route this topic to a specific agent. Only works \
-        inside a forum topic. Needs `agent`.
+      - bind_topic: channel administration, not a conversation hand-off. Permanently routes \
+        every future message in the CURRENT Telegram forum topic to `agent`, persistent, \
+        surviving /new and restarts. Only works inside a forum topic, and only for an operator \
+        configuring routing ahead of time. NOT for a user asking to talk to, be connected with, \
+        or transferred to another agent right now; that's switch_agent (or the /agent command), \
+        never this. Needs `agent`.
       - unbind_topic: remove the current topic's agent binding (back to the bot's default agent).
       - set_trainers: who the bot LEARNS from - needs `name`, `trainers` ("*" = \
         everyone, "none" = nobody (client-facing bot), or comma-separated user ids).

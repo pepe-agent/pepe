@@ -150,7 +150,10 @@ defmodule Pepe.Tools.ManageAgent do
           {:ok, "Created agent #{target}. Set its persona, model and tools next."}
 
         {:error, :invalid_name} ->
-          {:error, "#{target} isn't a valid handle - use letters, digits, - or _ (optionally project/name)"}
+          {:error, "#{target} isn't a valid handle: use letters, digits, - or _ (optionally project/name)"}
+
+        {:error, :name_collision} ->
+          {:error, "an agent named #{target} already exists (different capitalization)"}
       end
     end
   end

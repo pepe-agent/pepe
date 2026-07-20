@@ -430,8 +430,27 @@ defmodule PepeWeb.AgentsLive do
 
   defp save_valid_agent(params, raw_name, socket) do
     name = raw_name |> String.trim() |> scope_name(socket.assigns.scope)
-    existing = Config.get_agent(name) || %Pepe.Config.Agent{name: name}
+    existing = Config.get_agent(name)
+    # `existing` is found case-insensitively, which is right for an edit (the name field is
+    # readonly then, so a match here is always the same agent) but wrong for a genuinely new
+    # agent: reusing a different-case match's id would silently overwrite it with this form's
+    # values. Refuse instead, the same class of bug `Config.put_agent/1` itself now guards
+    # against, but this call always passes an explicit `id` so that guard can't see it coming.
+    creating? = socket.assigns.edit_agent[:new?]
 
+    if creating? and existing do
+      save_agent_name_collision(socket, name)
+    else
+      save_agent(socket, params, name, existing || %Pepe.Config.Agent{name: name})
+    end
+  end
+
+  defp save_agent_name_collision(socket, name) do
+    {:noreply,
+     put_flash(socket, :error, gettext("An agent named %{name} already exists (maybe with different capitalization).", name: name))}
+  end
+
+  defp save_agent(socket, params, name, existing) do
     agent = %{
       existing
       | name: name,
@@ -466,6 +485,9 @@ defmodule PepeWeb.AgentsLive do
            default_agent: Config.default_agent_name()
          )
          |> put_flash(:info, gettext("Agent %{name} saved.", name: name))}
+
+      {:error, :name_collision} ->
+        save_agent_name_collision(socket, name)
 
       {:error, _} ->
         {:noreply,

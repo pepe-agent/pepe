@@ -95,6 +95,105 @@ defmodule Pepe.ConfigTest do
       assert Config.get_agent("ENGENHEIRO").name == "default/Engenheiro"
       assert Config.get_agent("nope") == nil
     end
+
+    test "put_agent refuses a name that only differs in case from an existing agent, rather than silently overwriting it" do
+      :ok = Config.put_agent(%Config.Agent{name: "Engenheiro", system_prompt: "original", tools: ["bash"]})
+
+      assert Config.put_agent(%Config.Agent{name: "engenheiro", system_prompt: "different"}) == {:error, :name_collision}
+
+      # Untouched: the collision was refused, not silently merged into the existing agent.
+      original = Config.get_agent("Engenheiro")
+      assert original.system_prompt == "original"
+      assert original.tools == ["bash"]
+      assert map_size(Config.load()["agents"]) == 1
+    end
+
+    test "put_agent still allows an exact-name update (upsert by name, unrelated to case collisions)" do
+      :ok = Config.put_agent(%Config.Agent{name: "Engenheiro", system_prompt: "v1"})
+      :ok = Config.put_agent(%Config.Agent{name: "Engenheiro", system_prompt: "v2"})
+
+      assert Config.get_agent("Engenheiro").system_prompt == "v2"
+      assert map_size(Config.load()["agents"]) == 1
+    end
+
+    test "rename_agent refuses renaming into a name that only differs in case from a different agent" do
+      Config.put_agent(%Config.Agent{name: "Engenheiro", tools: []})
+      Config.put_agent(%Config.Agent{name: "Suporte", tools: []})
+
+      assert Config.rename_agent("Suporte", "engenheiro") == {:error, :already_exists}
+      # Untouched.
+      assert Config.get_agent("Suporte").name == "default/Suporte"
+    end
+
+    test "rename_agent still allows changing only the casing of an agent's own name" do
+      Config.put_agent(%Config.Agent{name: "Engenheiro", tools: []})
+
+      assert Config.rename_agent("Engenheiro", "engenheiro") == :ok
+      assert Config.get_agent("engenheiro").name == "default/engenheiro"
+    end
+  end
+
+  describe "get_project slug matching" do
+    test "resolves a project by slug case-insensitively, exact match preferred" do
+      :ok = Config.add_project("Acme")
+
+      assert Config.get_project("Acme")["slug"] == "Acme"
+      assert Config.get_project("acme")["slug"] == "Acme"
+      assert Config.get_project("ACME")["slug"] == "Acme"
+      assert Config.get_project("nope") == nil
+    end
+
+    test "add_project refuses a slug that only differs in case from an existing project" do
+      :ok = Config.add_project("Acme")
+      assert Config.add_project("acme") == {:error, :already_exists}
+      assert Config.add_project("ACME") == {:error, :already_exists}
+    end
+
+    test "rename_project refuses renaming into a different project's slug (case-insensitively)" do
+      :ok = Config.add_project("Acme")
+      :ok = Config.add_project("Globex")
+
+      assert Config.rename_project("Globex", "acme") == {:error, :already_exists}
+      assert Config.get_project("Globex")["slug"] == "Globex"
+    end
+
+    test "rename_project still allows changing only the casing of a project's own slug" do
+      :ok = Config.add_project("Acme")
+
+      assert Config.rename_project("Acme", "acme") == :ok
+      assert Config.get_project("acme")["slug"] == "acme"
+    end
+  end
+
+  describe "get_model name matching" do
+    test "resolves a model by name case-insensitively, exact match preferred" do
+      Config.put_model(%Config.Model{name: "OpenAI", base_url: "u", model: "m"})
+
+      assert Config.get_model("OpenAI").name == "OpenAI"
+      assert Config.get_model("openai").name == "OpenAI"
+      assert Config.get_model("OPENAI").name == "OpenAI"
+      assert Config.get_model("nope") == nil
+    end
+
+    test "put_model refuses a name that only differs in case from an existing connection, rather than silently overwriting it" do
+      :ok = Config.put_model(%Config.Model{name: "OpenAI", base_url: "original", api_key: "k1", model: "m"})
+
+      assert Config.put_model(%Config.Model{name: "openai", base_url: "different", model: "m"}) ==
+               {:error, :name_collision}
+
+      original = Config.get_model("OpenAI")
+      assert original.base_url == "original"
+      assert original.api_key == "k1"
+      assert map_size(Config.load()["models"]) == 1
+    end
+
+    test "put_model still allows an exact-name update (upsert by name, unrelated to case collisions)" do
+      :ok = Config.put_model(%Config.Model{name: "OpenAI", base_url: "v1", model: "m"})
+      :ok = Config.put_model(%Config.Model{name: "OpenAI", base_url: "v2", model: "m"})
+
+      assert Config.get_model("OpenAI").base_url == "v2"
+      assert map_size(Config.load()["models"]) == 1
+    end
   end
 
   describe "file permissions" do

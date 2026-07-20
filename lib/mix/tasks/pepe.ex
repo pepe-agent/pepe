@@ -559,7 +559,7 @@ defmodule Mix.Tasks.Pepe do
     taken = model_names()
     handle = Project.handle(project, name)
 
-    if handle in taken do
+    if taken?(handle, taken) do
       2
       |> Stream.iterate(&(&1 + 1))
       |> Enum.find_value(&candidate_handle(&1, name, project, taken))
@@ -571,8 +571,12 @@ defmodule Mix.Tasks.Pepe do
   defp candidate_handle(n, name, project, taken) do
     candidate = "#{name}-#{n}"
     h = Project.handle(project, candidate)
-    if h not in taken, do: {candidate, h}
+    unless taken?(h, taken), do: {candidate, h}
   end
+
+  # Case-insensitive: "openai" must not slip past a taken "OpenAI" and land on
+  # Config.put_model's own case-collision guard with a "saved" message already printed.
+  defp taken?(handle, taken), do: Enum.any?(taken, &(String.downcase(&1) == String.downcase(handle)))
 
   # dedupe?: false when `name` already went through prompt_name/0's own
   # replace-or-rename confirmation - re-checking here would be redundant.
@@ -630,24 +634,30 @@ defmodule Mix.Tasks.Pepe do
 
   defp save_model(base_url, api_key, oauth, handle, store_name, opts) do
     case opts[:model] || pick_model(base_url, api_key) do
-      nil ->
-        error("no model selected; aborting.")
+      nil -> error("no model selected; aborting.")
+      id -> save_model_connection(base_url, api_key, oauth, id, handle, store_name, opts)
+    end
+  end
 
-      id ->
-        model = %Model{
-          name: handle,
-          base_url: base_url,
-          api_key: api_key,
-          oauth: oauth,
-          model: id,
-          api: opts[:api] || api_for(base_url),
-          max_tokens: opts[:max_tokens],
-          temperature: opts[:temperature]
-        }
+  defp save_model_connection(base_url, api_key, oauth, id, handle, store_name, opts) do
+    model = %Model{
+      name: handle,
+      base_url: base_url,
+      api_key: api_key,
+      oauth: oauth,
+      model: id,
+      api: opts[:api] || api_for(base_url),
+      max_tokens: opts[:max_tokens],
+      temperature: opts[:temperature]
+    }
 
-        Config.put_model(model)
+    case Config.put_model(model) do
+      :ok ->
         if opts[:default], do: Config.set_default_model_for(opts[:project], store_name)
         ok("model connection #{green(handle)} saved -> #{model.base_url} (#{green(id)})")
+
+      {:error, :name_collision} ->
+        error("a connection named #{handle} already exists (different capitalization)")
     end
   end
 
@@ -2077,31 +2087,7 @@ defmodule Mix.Tasks.Pepe do
       )
 
     with :ok <- validate_scope(name, opts[:project]) do
-      handle = Project.handle(opts[:project], name)
-
-      agent = %Agent{
-        name: handle,
-        description: opts[:description],
-        model: opts[:model],
-        system_prompt: opts[:prompt] || "You are Pepe, a helpful AI agent.",
-        tools: parse_tools_opt(opts[:tools]),
-        can_message: parse_can_message_opt(opts[:can_message], handle),
-        can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle),
-        hooks: parse_hooks_opt(opts[:hooks]),
-        max_iterations: opts[:max_iterations] || 12,
-        temperature: opts[:temperature],
-        triage_model: opts[:triage_model],
-        simple_model: opts[:simple_model],
-        utility_model: opts[:utility_model],
-        exempt_message_limit: opts[:exempt_message_limit] || false,
-        trust_untrusted_content: opts[:trust_untrusted_content] || false,
-        midrun_fold: opts[:midrun_fold] || false
-      }
-
-      Config.put_agent(agent)
-      if opts[:default], do: Config.set_default_agent_for(opts[:project], name)
-      admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
-      ok("agent #{green(handle)} saved (tools: #{Enum.join(agent.tools, ", ")})#{admin_note}")
+      save_new_agent(name, opts)
     end
   end
 
@@ -2249,6 +2235,45 @@ defmodule Mix.Tasks.Pepe do
 
   defp agent_cmd(other),
     do: error("unknown: mix pepe agent #{Enum.join(other, " ")}  (try: mix pepe agent help)")
+
+  defp save_new_agent(name, opts) do
+    handle = Project.handle(opts[:project], name)
+    agent = new_agent_from_opts(handle, opts)
+
+    case Config.put_agent(agent) do
+      :ok ->
+        if opts[:default], do: Config.set_default_agent_for(opts[:project], name)
+        admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
+        ok("agent #{green(handle)} saved (tools: #{Enum.join(agent.tools, ", ")})#{admin_note}")
+
+      {:error, :name_collision} ->
+        error("an agent named #{handle} already exists (different capitalization)")
+
+      {:error, :invalid_name} ->
+        error("#{handle} isn't a valid handle: use letters, digits, - or _ (optionally project/name)")
+    end
+  end
+
+  defp new_agent_from_opts(handle, opts) do
+    %Agent{
+      name: handle,
+      description: opts[:description],
+      model: opts[:model],
+      system_prompt: opts[:prompt] || "You are Pepe, a helpful AI agent.",
+      tools: parse_tools_opt(opts[:tools]),
+      can_message: parse_can_message_opt(opts[:can_message], handle),
+      can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle),
+      hooks: parse_hooks_opt(opts[:hooks]),
+      max_iterations: opts[:max_iterations] || 12,
+      temperature: opts[:temperature],
+      triage_model: opts[:triage_model],
+      simple_model: opts[:simple_model],
+      utility_model: opts[:utility_model],
+      exempt_message_limit: opts[:exempt_message_limit] || false,
+      trust_untrusted_content: opts[:trust_untrusted_content] || false,
+      midrun_fold: opts[:midrun_fold] || false
+    }
+  end
 
   defp print_agent_line(a, default) do
     mark = if a.name == default, do: " #{green("(default)")}", else: ""
@@ -3560,17 +3585,22 @@ defmodule Mix.Tasks.Pepe do
   # Warn before clobbering an existing entry: offer to replace it or pick another
   # name. `kind` is "model connection" / "agent" for the message.
   defp ensure_unique(name, existing, kind) do
-    if name in existing do
-      info(dim("A #{kind} named #{green(name)}#{dim(" already exists.")}"))
-
-      if Owl.IO.confirm(message: "Replace it?", default: false) do
+    case Enum.find(existing, &(String.downcase(&1) == String.downcase(name))) do
+      nil ->
         name
-      else
-        Owl.IO.input(label: "Pick a different name:")
-        |> ensure_unique(existing, kind)
-      end
-    else
-      name
+
+      match ->
+        info(dim("A #{kind} named #{green(match)}#{dim(" already exists.")}"))
+
+        if Owl.IO.confirm(message: "Replace it?", default: false) do
+          # The exact stored name, not whatever case was typed: so the caller's put_*
+          # ends up updating that same entry in place instead of tripping the case-
+          # collision guard on a name that merely looks the same.
+          match
+        else
+          Owl.IO.input(label: "Pick a different name:")
+          |> ensure_unique(existing, kind)
+        end
     end
   end
 

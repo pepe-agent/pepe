@@ -302,7 +302,7 @@ defmodule Pepe.Tools do
          {:ok, out} <- Pepe.MCP.call(name, args) do
       to_string(out)
     else
-      {:error, reason} -> "Error: #{name} failed: #{inspect(reason)}"
+      {:error, reason} -> annotate_error("Error: #{name} failed: #{inspect(reason)}")
     end
   end
 
@@ -312,23 +312,36 @@ defmodule Pepe.Tools do
       try do
         case mod.run(args, ctx) do
           {:ok, result} -> to_string(result)
-          {:error, reason} -> "Error: #{reason}"
+          {:error, reason} -> annotate_error("Error: #{reason}")
         end
       rescue
-        e -> "Error: tool #{name} crashed: #{Exception.message(e)}"
+        e -> annotate_error("Error: tool #{name} crashed: #{Exception.message(e)}")
       catch
         # A tool that `exit`s or `throw`s (a plugin, mostly) must not escape as a linked task
         # crash. When it runs inside a concurrent batch it is a `Task.async_stream` child linked
         # to the turn, and a bare `exit` there kills the turn before the stream can turn it into
         # a result. Caught here, at the source, it is just another failed tool call.
-        :exit, reason -> "Error: tool #{name} crashed: #{inspect(reason)}"
-        :throw, value -> "Error: tool #{name} threw: #{inspect(value)}"
+        :exit, reason -> annotate_error("Error: tool #{name} crashed: #{inspect(reason)}")
+        :throw, value -> annotate_error("Error: tool #{name} threw: #{inspect(value)}")
       end
     else
-      nil -> "Error: unknown tool #{name}"
-      {:error, reason} -> "Error: invalid arguments for #{name}: #{reason}"
+      nil -> annotate_error("Error: unknown tool #{name}")
+      {:error, reason} -> annotate_error("Error: invalid arguments for #{name}: #{reason}")
     end
   end
+
+  # A genuine tool-execution failure (wrong tool picked, crashed, unknown, bad args) gets
+  # this note right where the model reads it next: far more reliable than a system-prompt
+  # instruction read once, minutes earlier and buried among everything else. See
+  # `Pepe.Agent.Workspace`'s "Discretion about your limits": the instruction lives there
+  # too, but recency wins when the two would otherwise disagree. Deliberately NOT applied
+  # in `finalize/3`: a permission denial (`Pepe.Permissions.denied_message/2`) also flows
+  # through there, and its human-supplied reason is often worth relaying, not suppressing.
+  @error_note "\n\n(For you only: never quote this error, a tool's name, or any internal " <>
+                "mechanism back to the user. If you can't fulfill the request another way, " <>
+                "say plainly you can't do that, then offer what you can.)"
+
+  defp annotate_error(result), do: result <> @error_note
 
   defp decode_args(raw) when is_map(raw), do: {:ok, raw}
   defp decode_args(""), do: {:ok, %{}}

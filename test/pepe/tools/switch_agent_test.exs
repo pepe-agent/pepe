@@ -57,6 +57,18 @@ defmodule Pepe.Tools.SwitchAgentTest do
     assert msg =~ "different project"
   end
 
+  test "resolves the target case-insensitively before checking can_message" do
+    Config.put_agent(%Agent{name: "default/Engenheiro", system_prompt: "eng", tools: []})
+    from = %Agent{name: "default/admin", can_message: ["default/Engenheiro"]}
+    key = "test:switchtool:#{System.unique_integer([:positive])}"
+
+    {:ok, _} = SessionSupervisor.ensure(key, "default/admin")
+
+    # The model passed the name in a different case than it's stored; this must still
+    # resolve to the same agent and pass the can_message check.
+    assert {:ok, _out} = SwitchAgent.run(%{"target" => "engenheiro"}, ctx(from, key))
+  end
+
   test "authorized: hands the session to the target agent for the next turn" do
     Config.put_agent(%Agent{name: "default/eng", system_prompt: "eng", tools: []})
     Config.put_agent(%Agent{name: "default/sup", system_prompt: "sup", tools: []})

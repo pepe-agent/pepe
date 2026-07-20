@@ -99,7 +99,7 @@ defmodule PepeWeb.ModelsLive do
   defp unique_suggestion(key, scope) do
     taken = Config.models() |> Enum.map(& &1.name)
 
-    if scope_name(key, scope) in taken do
+    if taken_ci?(scope_name(key, scope), taken) do
       Stream.iterate(2, &(&1 + 1))
       |> Enum.find_value(&suffixed_suggestion(key, &1, scope, taken))
     else
@@ -109,8 +109,12 @@ defmodule PepeWeb.ModelsLive do
 
   defp suffixed_suggestion(key, n, scope, taken) do
     candidate = "#{key}-#{n}"
-    if scope_name(candidate, scope) not in taken, do: candidate
+    unless taken_ci?(scope_name(candidate, scope), taken), do: candidate
   end
+
+  # Case-insensitive: "openai" must not slip past a taken "OpenAI" and land on
+  # Config.put_model's own case-collision guard after a "saved" flash already fired.
+  defp taken_ci?(name, taken), do: Enum.any?(taken, &(String.downcase(&1) == String.downcase(name)))
 
   defp blank_model,
     do: %{
@@ -567,8 +571,14 @@ defmodule PepeWeb.ModelsLive do
     original = params["original_name"] |> to_string() |> String.trim()
     name = scope_name(raw_name, scope)
 
+    # `Config.get_model/1` is case-insensitive, so a pure case change of the model's own
+    # name ("OpenAI" -> "openai") would otherwise match itself and look like a collision
+    # with a different connection; compare ids to tell the two apart.
+    collision = name != original && Config.get_model(name)
+    self_id = Config.model_id_for(original)
+
     cond do
-      name != original and Config.get_model(name) != nil ->
+      collision && collision.id != self_id ->
         {:noreply,
          put_flash(socket, :error, gettext("A model connection named %{name} already exists. Choose a different name.", name: name))}
 

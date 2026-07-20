@@ -32,7 +32,7 @@ defmodule Pepe.Tools.SendToAgent do
   def spec do
     function(
       "send_to_agent",
-      "Send a message to another agent and get its reply, to delegate a question or consult a peer. This is a one-off: it never changes who the user is talking to. Never tell the user this connected them to the other agent or that the other agent is now handling the conversation; it isn't. For an actual hand-off (\"talk to X from now on\"), use switch_agent instead.",
+      "Send a message to another agent and get its reply, to delegate a question or consult a peer. This is a one-off: it never changes who the user is talking to. Never tell the user this connected them to the other agent or that the other agent is now handling the conversation; it isn't. If the user asked to be connected, transferred, or put in touch with a specific agent (\"connect me with X\", \"conecte com o agente X\"), that's switch_agent, not this tool.",
       %{
         "type" => "object",
         "properties" => %{
@@ -51,10 +51,10 @@ defmodule Pepe.Tools.SendToAgent do
     from_name = from && from.name
     chain = ctx[:agent_chain] || List.wrap(from_name)
     # A bare target resolves to a peer in the sender's own project.
-    to = from_name && Project.qualify(to, from_name)
+    qualified = from_name && Project.qualify(to, from_name)
 
-    case authorize(from, from_name, to, chain) do
-      :ok -> deliver(to, from_name, message, chain, ctx)
+    case authorize(from, from_name, qualified, chain) do
+      {:ok, resolved} -> deliver(resolved, from_name, message, chain, ctx)
       {:error, _} = err -> err
     end
   end
@@ -71,22 +71,38 @@ defmodule Pepe.Tools.SendToAgent do
       not Project.same_scope?(to, from_name) ->
         {:error, "Refusing to message #{to}: it belongs to a different project."}
 
-      to not in (from.can_message || []) ->
-        # Discreet on purpose: don't reveal the permission model to the end user.
-        {:error, "Agent #{to} isn't available to you."}
+      true ->
+        case find_allowed(to, from.can_message || []) do
+          # Discreet on purpose: don't reveal the permission model to the end user.
+          nil -> {:error, "Agent #{to} isn't available to you."}
+          resolved -> check_target(resolved, to, chain)
+        end
+    end
+  end
 
-      is_nil(Config.get_agent(to)) ->
+  defp check_target(resolved, to, chain) do
+    cond do
+      is_nil(Config.get_agent(resolved)) ->
         {:error, "Unknown agent: #{to}"}
 
-      to in chain ->
-        {:error, "Refusing to message #{to}: already in this chain (#{Enum.join(chain, " -> ")}) - would loop."}
+      resolved in chain ->
+        {:error, "Refusing to message #{resolved}: already in this chain (#{Enum.join(chain, " -> ")}); would loop."}
 
       length(chain) >= @max_hops ->
         {:error, "Agent message chain too deep (max #{@max_hops})."}
 
       true ->
-        :ok
+        {:ok, resolved}
     end
+  end
+
+  # A model-typed target ("engenheiro") deserves the same case leeway a human gets from
+  # `/agent engenheiro` finding "Engenheiro": match `can_message` (already in each agent's
+  # exact-case canonical handle) case-insensitively, and use ITS value from here on, rather
+  # than re-deriving a canonical form independently (which can disagree on how the root/
+  # default scope is prefixed; see `Pepe.Config`'s `agent_handle/2` vs `Pepe.Project.qualify/2`).
+  defp find_allowed(target, allowed) do
+    Enum.find(allowed, &(String.downcase(&1) == String.downcase(target)))
   end
 
   @spec deliver(String.t(), String.t() | nil, String.t(), [String.t()], map()) ::

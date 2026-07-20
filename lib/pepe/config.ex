@@ -274,19 +274,33 @@ defmodule Pepe.Config do
   # every existing caller that passes a human-typed name keeps working.
 
   @doc "List all model connections as structs."
-  def models do
-    load()
+  def models, do: models_in(load())
+
+  defp models_in(config) do
+    config
     |> Map.get("models", %{})
     |> Enum.map(fn {id, m} -> Model.from_map(Map.put(m, "id", id)) end)
   end
 
   @doc "Fetch a model connection by id or by its current name."
   def get_model(id_or_name) do
-    case load() |> get_in(["models", id_or_name]) do
-      nil -> Enum.find(models(), &(&1.name == id_or_name))
+    config = load()
+
+    case get_in(config, ["models", id_or_name]) do
+      nil -> find_model_by_name_exact(config, id_or_name) || find_model_by_name_ci(config, id_or_name)
       m -> Model.from_map(Map.put(m, "id", id_or_name))
     end
   end
+
+  # Exact name first; then case-insensitive, so `--model openai` finds one named "OpenAI":
+  # a person types a name in whatever case, same leeway agent lookup already gives.
+  defp find_model_by_name_exact(config, name), do: Enum.find(models_in(config), &(&1.name == name))
+
+  defp find_model_by_name_ci(config, name) when is_binary(name) do
+    Enum.find(models_in(config), &(is_binary(&1.name) and String.downcase(&1.name) == String.downcase(name)))
+  end
+
+  defp find_model_by_name_ci(_config, _name), do: nil
 
   def get_model!(id_or_name) do
     get_model(id_or_name) || raise "unknown model connection: #{inspect(id_or_name)}"
@@ -304,15 +318,36 @@ defmodule Pepe.Config do
   def model_name_for(nil), do: nil
   def model_name_for(id), do: (get_model(id) || %{name: id}).name
 
-  @doc "Insert or update a model connection (matched by id, falling back to its current name)."
-  def put_model(%Model{name: name} = model) do
-    id = model.id || model_id_for(name) || generate_model_id()
+  @doc """
+  Insert or update a model connection (matched by id, falling back to its current name).
+  Refuses (`{:error, :name_collision}`) when `model.id` is nil and `name` matches an
+  existing, differently-cased connection but not exactly; see the matching guard on
+  `put_agent/1` for why: silently reusing that id here would overwrite the existing
+  connection's credentials under a name nobody asked to touch.
+  """
+  def put_model(%Model{} = model) do
+    case update_cas(&do_put_model(&1, model)) do
+      {:ok, _config} -> :ok
+      {:error, _} = err -> err
+    end
+  end
 
-    update(fn config ->
-      config
-      |> update_in(["models"], fn m -> Map.put(m || %{}, id, encode_model(%{model | id: id})) end)
-      |> maybe_default_root("default_model", id)
-    end)
+  # See `do_put_agent/2`'s comment: the collision check and the write must share one
+  # `update_cas/1` call, or two concurrent case-variant creates could both pass a
+  # separately-loaded check and then both write.
+  defp do_put_model(config, %Model{name: name, id: model_id} = model) do
+    if is_nil(model_id) and is_nil(find_model_by_name_exact(config, name)) and find_model_by_name_ci(config, name) do
+      {:error, :name_collision}
+    else
+      id = model_id || (find_model_by_name_exact(config, name) || %{id: nil}).id || generate_model_id()
+
+      new_config =
+        config
+        |> update_in(["models"], &Map.put(&1 || %{}, id, encode_model(%{model | id: id})))
+        |> maybe_default_root("default_model", id)
+
+      {:ok, new_config}
+    end
   end
 
   def delete_model(id_or_name) do
@@ -682,18 +717,27 @@ defmodule Pepe.Config do
   defp resolve_handle(_config, handle), do: handle
 
   # The project id for an id (passed straight through) or a slug; nil if neither matches.
+  # Exact slug first; then case-insensitive, so `--project acme` finds a project slugged
+  # "Acme": a person types a slug in whatever case, same leeway agent lookup already gives.
   defp project_id_for(config, id_or_slug) do
     projects = projects_of(config)
 
     if is_binary(id_or_slug) and Map.has_key?(projects, id_or_slug) do
       id_or_slug
     else
-      Enum.find_value(projects, &slug_match(&1, id_or_slug))
+      Enum.find_value(projects, &slug_match(&1, id_or_slug)) ||
+        Enum.find_value(projects, &slug_match_ci(&1, id_or_slug))
     end
   end
 
   defp slug_match({id, %{"slug" => slug}}, slug), do: id
   defp slug_match(_entry, _slug), do: nil
+
+  defp slug_match_ci({id, %{"slug" => stored}}, slug) when is_binary(stored) and is_binary(slug) do
+    if String.downcase(stored) == String.downcase(slug), do: id
+  end
+
+  defp slug_match_ci(_entry, _slug), do: nil
 
   @doc "Fetch a project's metadata (with its `id`) by id or slug, or nil."
   def get_project(id_or_slug) do
@@ -920,17 +964,19 @@ defmodule Pepe.Config do
   in-flight session keyed by an old handle simply finishes; new requests use the new handle.
   """
   def rename_project(id_or_slug, new_slug) do
-    old =
-      case get_project(id_or_slug) do
-        %{"slug" => s} -> s
-        nil -> nil
-      end
+    project = get_project(id_or_slug)
+    old = project && project["slug"]
+    # A pure case change of the project's own slug ("Acme" -> "acme") is not a collision
+    # with itself: compare against the id `new_slug` resolves to, not the slug string,
+    # since `get_project/1` is case-insensitive and would otherwise see the project's own
+    # current slug as already taken by someone else.
+    other = project && get_project(new_slug)
 
     cond do
       not Project.valid_name?(new_slug) -> {:error, :invalid_slug}
-      is_nil(old) -> {:error, :not_found}
+      is_nil(project) -> {:error, :not_found}
       old == new_slug -> :ok
-      project_exists?(new_slug) -> {:error, :already_exists}
+      not is_nil(other) and other["id"] != project["id"] -> {:error, :already_exists}
       true -> do_rename_project(old, new_slug)
     end
   end
@@ -1511,6 +1557,14 @@ defmodule Pepe.Config do
   # Resolve an agent reference - an agent id, or a handle (`slug/name`, or a bare name that
   # resolves into the default project) - to the agent's stable id, or nil.
   defp agent_id_for(config, ref) when is_binary(ref) do
+    # Exact handle first; then case-insensitive, so `/agent engenheiro` finds an agent named
+    # "Engenheiro": a person types a name in whatever case, and it should just resolve.
+    agent_id_for_exact(config, ref) || agent_id_for_ci(config, ref)
+  end
+
+  defp agent_id_for(_config, _ref), do: nil
+
+  defp agent_id_for_exact(config, ref) do
     agents = Map.get(config, "agents", %{})
 
     if Map.has_key?(agents, ref) do
@@ -1518,14 +1572,16 @@ defmodule Pepe.Config do
     else
       {slug, bare} = handle_parts(config, ref)
       pid = project_id_for(config, slug)
-      # Exact handle first; then case-insensitive, so `/agent engenheiro` finds an agent named
-      # "Engenheiro" - a person types a name in whatever case, and it should just resolve.
-      Enum.find_value(agents, &agent_match(&1, pid, bare)) ||
-        Enum.find_value(agents, &agent_match_ci(&1, pid, bare))
+      Enum.find_value(agents, &agent_match(&1, pid, bare))
     end
   end
 
-  defp agent_id_for(_config, _ref), do: nil
+  defp agent_id_for_ci(config, ref) do
+    agents = Map.get(config, "agents", %{})
+    {slug, bare} = handle_parts(config, ref)
+    pid = project_id_for(config, slug)
+    Enum.find_value(agents, &agent_match_ci(&1, pid, bare))
+  end
 
   defp agent_match({id, %{"project" => pid, "bare" => bare}}, pid, bare), do: id
   defp agent_match(_entry, _pid, _bare), do: nil
@@ -1570,11 +1626,17 @@ defmodule Pepe.Config do
     get_agent(ref) || raise "unknown agent: #{inspect(ref)}"
   end
 
-  @doc "Create or replace an agent. Returns `:ok`, or `{:error, :invalid_name}` for a bad handle."
+  @doc """
+  Create or replace an agent. Returns `:ok`, `{:error, :invalid_name}` for a bad handle, or
+  `{:error, :name_collision}` when creating/renaming by name (no `id` given) to something
+  that matches an existing, differently-cased agent but not exactly.
+  """
   def put_agent(%Agent{name: name} = agent) do
     if valid_handle?(name) do
-      do_put_agent(agent)
-      :ok
+      case update_cas(&do_put_agent(&1, agent)) do
+        {:ok, _config} -> :ok
+        {:error, _} = err -> err
+      end
     else
       {:error, :invalid_name}
     end
@@ -1590,17 +1652,37 @@ defmodule Pepe.Config do
     (is_nil(slug) or Project.valid_name?(slug)) and Project.valid_name?(Project.name_of(handle))
   end
 
-  defp do_put_agent(%Agent{name: name} = agent) do
-    update(fn config ->
+  # Runs inside `update_cas/1`: the collision check and the write share the same freshly
+  # loaded config, so two concurrent creates of case-variant names can't both pass the
+  # check and then both write: one wins the CAS, the other sees the loser's write reflected
+  # in ITS OWN freshly loaded config and refuses. Checking this before a separate `update/1`
+  # call (as an earlier version of this function did) is exactly the TOCTOU `update_cas/1`'s
+  # own docs warn about, and the two entities this guards against silently colliding
+  # (do_put_agent resolving `id` through the same case-insensitive fallback, and quietly
+  # overwriting the differently-cased agent already there) is the bug this whole guard exists
+  # to close; reintroducing it via a check-then-write race would defeat the point.
+  defp do_put_agent(config, %Agent{name: name, id: agent_id} = agent) do
+    if is_nil(agent_id) and agent_case_collision?(config, name) do
+      {:error, :name_collision}
+    else
       {slug, bare} = handle_parts(config, name)
       {config, pid} = ensure_project(config, slug)
-      id = agent.id || agent_id_for(config, name) || generate_agent_id()
+      id = agent_id || agent_id_for(config, name) || generate_agent_id()
       stored = store_agent(config, agent, bare, pid)
 
-      config
-      |> update_in(["agents"], fn a -> Map.put(a || %{}, id, encode_agent(stored)) end)
-      |> maybe_default_root_agent(id, pid)
-    end)
+      new_config =
+        config
+        |> update_in(["agents"], fn a -> Map.put(a || %{}, id, encode_agent(stored)) end)
+        |> maybe_default_root_agent(id, pid)
+
+      {:ok, new_config}
+    end
+  end
+
+  # True when `name` doesn't exactly match any existing agent (in its own scope), but does
+  # match one case-insensitively.
+  defp agent_case_collision?(config, name) do
+    is_nil(agent_id_for_exact(config, name)) and not is_nil(agent_id_for_ci(config, name))
   end
 
   # {config, project-id} for a slug, creating the project (with that slug) if it doesn't exist -
@@ -1806,7 +1888,10 @@ defmodule Pepe.Config do
   defp agent_name_taken?(config, id, pid, bare) do
     config
     |> Map.get("agents", %{})
-    |> Enum.any?(fn {other_id, m} -> other_id != id and m["project"] == pid and m["bare"] == bare end)
+    |> Enum.any?(fn {other_id, m} ->
+      other_id != id and m["project"] == pid and is_binary(m["bare"]) and
+        String.downcase(m["bare"]) == String.downcase(bare)
+    end)
   end
 
   # Re-point every handle-shaped reference to an agent from `old` to `new` (used by rename_agent).

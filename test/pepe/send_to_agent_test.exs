@@ -74,6 +74,19 @@ defmodule Pepe.Tools.SendToAgentTest do
     assert msg =~ "Unknown agent"
   end
 
+  test "resolves the target case-insensitively before checking can_message" do
+    Config.put_agent(%Agent{name: "default/Engenheiro", system_prompt: "eng", tools: []})
+    from = %Agent{name: "default/admin", can_message: ["default/Engenheiro"]}
+
+    # The model passed the name in a different case than it's stored; authorization must
+    # still pass instead of refusing on a case mismatch (it may still fail later trying to
+    # reach a model, since there's no mock server here - that's not what this checks).
+    case SendToAgent.run(%{"to" => "engenheiro", "message" => "hi"}, ctx(from)) do
+      {:error, msg} -> refute msg =~ "isn't available" or msg =~ "Unknown agent"
+      {:ok, _} -> :ok
+    end
+  end
+
   test "refuses a cycle (target already in the chain)" do
     Config.put_agent(%Agent{name: "B", system_prompt: "x"})
     from = %Agent{name: "X", can_message: ["B"]}
