@@ -116,6 +116,8 @@ defmodule Pepe.MixProject do
       {:tz, "~> 0.28"},
       # Rate limiting (the widget's public, unauthenticated-by-design endpoint).
       {:hammer, "~> 7.0"},
+      # Renders chat message markdown on the dashboard (tables, lists, headers, ...).
+      {:mdex, "~> 0.7"},
       {:mimic, "~> 1.11", only: :test},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:excoveralls, "~> 0.18", only: :test},

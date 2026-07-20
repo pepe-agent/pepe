@@ -107,6 +107,24 @@
 
 /* This file is for your main application CSS */
 
+/* Minimal styling for MDEx-rendered chat markdown (tables, lists, headings, code blocks) -
+   Tailwind's preflight strips their default browser styling, so give back just enough to
+   read a table or a list without pulling in the full typography plugin. */
+.chat-md :is(h1, h2, h3) { font-weight: 600; margin: 0.5em 0 0.25em; }
+.chat-md :is(ul, ol) { margin: 0.25em 0 0.25em 1.25em; }
+.chat-md ul { list-style: disc; }
+.chat-md ol { list-style: decimal; }
+.chat-md blockquote { border-left: 2px solid rgb(255 255 255 / 20%); padding-left: 0.75em; opacity: 0.85; }
+/* overflow-x on the container, not on <table> itself - `display: block` on a table
+   element breaks its row/column layout instead of just scrolling it. */
+.chat-md { overflow-x: auto; }
+.chat-md table { border-collapse: collapse; margin: 0.5em 0; }
+.chat-md :is(th, td) { border: 1px solid rgb(255 255 255 / 15%); padding: 0.25em 0.6em; }
+.chat-md th { font-weight: 600; background: rgb(255 255 255 / 4%); }
+.chat-md pre { background: rgb(0 0 0 / 30%); padding: 0.5em 0.75em; border-radius: 0.375rem; overflow-x: auto; margin: 0.4em 0; }
+.chat-md code { border-radius: 0.25rem; background: rgb(0 0 0 / 30%); padding: 0.1em 0.35em; }
+.chat-md pre code { background: none; padding: 0; }
+
 /* Native <select> chevrons look ugly on the dark dashboard - replace with a clean one. */
 select {
   appearance: none;

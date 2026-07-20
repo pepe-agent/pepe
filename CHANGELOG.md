@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **A message with a markdown table showed raw `| pipes | and | dashes |` in the dashboard chat instead of a table.** The chat's markdown rendering was a hand-rolled bold/code-only formatter with no table (or list, or heading) support. Swapped it for a real CommonMark/GFM renderer (MDEx), with raw HTML in a message still shown as escaped text rather than executed.
+
 ## [0.8.0] - 2026-07-20
 
 ### Added

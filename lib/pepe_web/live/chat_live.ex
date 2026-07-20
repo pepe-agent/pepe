@@ -277,22 +277,20 @@ defmodule PepeWeb.ChatLive do
 
   defp bubble(assigns) do
     ~H"""
-    <div class={["max-w-2xl whitespace-pre-wrap rounded-lg px-3 py-2 text-[15px] leading-relaxed", bubble_class(@role)]}>
-      <span :if={@role == "tool_call"} class="text-amber-400">⚙ {@content}</span>
-      <span :if={@role != "tool_call"}>{Phoenix.HTML.raw(format_md(@content))}</span>
+    <div class={["max-w-2xl rounded-lg px-3 py-2 text-[15px] leading-relaxed", bubble_class(@role)]}>
+      <span :if={@role == "tool_call"} class="whitespace-pre-wrap text-amber-400">⚙ {@content}</span>
+      <div :if={@role != "tool_call"} class="chat-md">{Phoenix.HTML.raw(format_md(@content))}</div>
     </div>
     """
   end
 
+  # `tool`-role messages never reach here (dropped in `to_provider_messages/1`), so this
+  # only ever renders a user's or an agent's own text - raw HTML found in it is escaped,
+  # never executed or silently dropped (see MDEx's safety guide: `render: [escape: true]`
+  # is the "show it, don't run it" mode). `hardbreaks: true` keeps a single newline a
+  # visible line break, matching how a chat message reads when someone just presses enter.
   defp format_md(text) do
-    text
-    |> Phoenix.HTML.html_escape()
-    |> Phoenix.HTML.safe_to_string()
-    |> String.replace(~r/\*\*(.+?)\*\*/s, ~S(<strong>\1</strong>))
-    |> String.replace(
-      ~r/`([^`\n]+)`/,
-      ~S(<code class="rounded bg-black/30 px-1 py-0.5">\1</code>)
-    )
+    MDEx.to_html!(text, extension: [table: true], render: [hardbreaks: true, escape: true])
   end
 
   attr :running, :boolean, required: true
