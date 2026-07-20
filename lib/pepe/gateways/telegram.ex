@@ -30,12 +30,20 @@ defmodule Pepe.Gateways.Telegram do
         "allowed_users": [67890],      // optional user allowlist; empty = any user
         "require_mention": true,       // optional; in groups only reply when @mentioned
         "reactions": "own",            // optional; own (default) | all | off - see below
+        "quick_reactions": false,      // optional; off (default) | true - see below
         "agent": "assistant"           // the agent this bot talks to
       }
 
   `reactions` decides which 👍/👎 the agent hears: `own` (the default) delivers only a
   reaction on a message the bot itself sent (feedback on its own answers), `all` delivers
   every reaction, `off` delivers none.
+
+  `quick_reactions`, off by default, lets a message that's *only* a thank-you or a bare
+  emoji ("valeu!", "obrigada", a lone ❤️) get a native reaction back instead of a full reply -
+  no model call, no answer to write, just an emoji on the message, the way a person would
+  answer it. Deliberately narrow: anything with real content beyond that (a question, a
+  second sentence, a phrase it doesn't recognize) falls through to the normal reply path
+  unchanged, so turning this on can only ever skip an answer nobody needed.
 
   ## Forum topics
 
@@ -786,13 +794,20 @@ defmodule Pepe.Gateways.Telegram do
         # In a group, tie the reply to the question so it's clear what's being answered; in a DM
         # there's only one thread, so a quote would just be clutter (nil = no reply target).
         reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
+        stripped = strip_mention(said)
+        quick = quick_reaction_emoji(b, stripped)
 
         Task.start(fn ->
           put_bot(b)
           put_thread(thread_id)
-          put_chat(chat_id)
-          put_reply_to(reply_to)
-          respond(chat_id, user_id, message["message_id"], strip_mention(said))
+
+          if quick do
+            set_reaction(chat_id, message["message_id"], quick)
+          else
+            put_chat(chat_id)
+            put_reply_to(reply_to)
+            respond(chat_id, user_id, message["message_id"], stripped)
+          end
         end)
 
       true ->
@@ -904,6 +919,43 @@ defmodule Pepe.Gateways.Telegram do
     case bot()["reactions"] do
       m when m in ["off", "own", "all"] -> m
       _ -> "own"
+    end
+  end
+
+  # A pure thank-you or a bare emoji, nothing else, gets a native reaction instead of a model
+  # call: `nil` for anything that isn't a clean match, so the caller falls through to the normal
+  # reply path. The length cap and the exact anchors (^...$) are what make this safe to run with
+  # no human review - a real question is never short enough or plain enough to match by accident.
+  defp quick_reaction_emoji(bot, text) do
+    if bot["quick_reactions"] == true, do: match_quick_reaction(String.trim(to_string(text))), else: nil
+  end
+
+  @quick_reaction_words [
+    {~r/^(muito\s+)?obrigad[oa]+s?!*$/iu, "❤️"},
+    {~r/^val+eu+s*!*$/iu, "🔥"},
+    {~r/^vlw+!*$/iu, "🔥"},
+    {~r/^gracias!*$/iu, "❤️"},
+    {~r/^thanks?( you)?!*$/iu, "❤️"},
+    {~r/^ty!*$/iu, "❤️"}
+  ]
+
+  @quick_reaction_emojis ~w(👍 ❤️ ❤ 🔥 🎉 🙏 👏)
+
+  defp match_quick_reaction(""), do: nil
+  defp match_quick_reaction(text) when byte_size(text) > 40, do: nil
+
+  defp match_quick_reaction(text) do
+    Enum.find_value(@quick_reaction_words, fn {re, emoji} -> Regex.match?(re, text) && emoji end) ||
+      emoji_only_echo(text)
+  end
+
+  # A message that's nothing but emoji (one or a short run of them, e.g. "🙏🙏"): react with
+  # whichever of ours it already used, or a generic 👍 for one we don't recognize as a reaction.
+  defp emoji_only_echo(text) do
+    graphemes = String.graphemes(text)
+
+    if graphemes != [] and Enum.all?(graphemes, &(&1 in @quick_reaction_emojis)) do
+      List.first(graphemes)
     end
   end
 
@@ -2309,6 +2361,19 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
+  @doc "Post a native poll to `target` (a session/delivery key). `options` is 2-10 strings."
+  def deliver_poll(target, question, options, opts \\ []) do
+    case resolve_delivery(target) do
+      {bot, chat_id, thread} ->
+        put_bot(bot)
+        put_thread(thread)
+        if token(), do: send_poll(chat_id, question, options, opts), else: {:error, :no_token}
+
+      :error ->
+        {:error, :no_bot}
+    end
+  end
+
   # Send an Opus .ogg as a native Telegram voice note (the reply-in-voice path). Best-effort: a
   # failure is logged, never raised, since the text reply already went out.
   defp send_voice(chat_id, path) do
@@ -2345,6 +2410,30 @@ defmodule Pepe.Gateways.Telegram do
 
     :ok
   end
+
+  # `opts`: :anonymous (default true), :multiple (default false), :type ("regular" | "quiz",
+  # default "regular"), :correct_option_id (required by Telegram when :type is "quiz").
+  defp send_poll(chat_id, question, options, opts) do
+    payload =
+      with_thread(%{
+        chat_id: chat_id,
+        question: question,
+        options: Enum.map(options, &%{text: &1}),
+        is_anonymous: Keyword.get(opts, :anonymous, true),
+        allows_multiple_answers: Keyword.get(opts, :multiple, false),
+        type: Keyword.get(opts, :type, "regular")
+      })
+      |> put_if_present(:correct_option_id, opts[:correct_option_id])
+
+    case Req.post(api_url(token(), "sendPoll"), json: payload) do
+      {:ok, %{status: 200}} -> :ok
+      {:ok, %{status: status, body: body}} -> {:error, {:telegram, status, body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp put_if_present(map, _key, nil), do: map
+  defp put_if_present(map, key, value), do: Map.put(map, key, value)
 
   defp send_document(chat_id, path, caption) do
     fields =

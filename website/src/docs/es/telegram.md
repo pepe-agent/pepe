@@ -84,6 +84,13 @@ configuración, y cada uno acepta las mismas claves que el predeterminado:
 - `allowed_chats` y `allowed_users`: las listas de ids autorizados. Déjalas fuera
   y el bot habla con cualquiera.
 - `require_mention`: en un grupo, responder solo cuando se @menciona al bot.
+- `reactions`: qué 👍/👎 en un mensaje llegan al agente como feedback — `own`
+  (por defecto, solo reacciones en los propios mensajes del bot), `all` u
+  `off`.
+- `quick_reactions`: desactivado por defecto. Activado, un mensaje que es solo
+  un agradecimiento o un emoji suelto ("¡gracias!", un ❤️ solo) recibe una
+  reacción nativa en vez de una respuesta completa, sin gastar una llamada al
+  modelo. Todo lo que tenga contenido real sigue recibiendo respuesta normal.
 - `trainers`: de quién aprende el bot, y quién puede ejecutar sus comandos de
   operador.
 

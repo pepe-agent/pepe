@@ -83,6 +83,12 @@ the same keys as the default one:
 - `allowed_chats` and `allowed_users`: the id allowlists. Leave them out and the
   bot talks to anyone.
 - `require_mention`: in a group, only reply when the bot is @mentioned.
+- `reactions`: which 👍/👎 on a message reach the agent as feedback — `own`
+  (default, only reactions on the bot's own messages), `all`, or `off`.
+- `quick_reactions`: off by default. When on, a message that's only a
+  thank-you or a bare emoji ("thanks!", a lone ❤️) gets a native reaction back
+  instead of a full reply — no model call spent on it. Anything with real
+  content still gets a normal answer.
 - `trainers`: who the bot learns from, and who may run its operator commands.
 
 `/whoami` in a chat is the easy way to find the ids for those allowlists. It

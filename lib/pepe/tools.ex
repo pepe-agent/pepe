@@ -43,6 +43,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Skill
   alias Pepe.Tools.SwitchAgent
   alias Pepe.Tools.TelegramAccess
+  alias Pepe.Tools.TelegramPoll
   alias Pepe.Tools.Watch
   alias Pepe.Tools.WebSearch
   alias Pepe.Tools.WriteFile
@@ -84,7 +85,8 @@ defmodule Pepe.Tools do
     SetRoute,
     Review,
     Watch,
-    TelegramAccess
+    TelegramAccess,
+    TelegramPoll
   ]
 
   @doc "All tool modules - built-ins plus loaded plugins."
