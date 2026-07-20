@@ -184,8 +184,25 @@ defmodule Pepe.Agent.GoalLoop do
     case LLM.chat(model, [Message.system("You grade results against a criterion. Reply with JSON only."), Message.user(prompt)],
            max_tokens: 500
          ) do
-      {:ok, %{content: content}} when is_binary(content) -> parse_verdict(content)
-      other -> %{met: false, feedback: "the reviewer could not be reached (#{inspect(other)})"}
+      {:ok, %{content: content} = result} when is_binary(content) ->
+        meter(key, model, result[:usage])
+        parse_verdict(content)
+
+      other ->
+        %{met: false, feedback: "the reviewer could not be reached (#{inspect(other)})"}
+    end
+  end
+
+  # The judge is a real, separately-billed model call - meter it the same as any other, so
+  # it doesn't silently vanish from spend the way an aux-model call that nobody thought to
+  # meter would.
+  defp meter(key, model, usage) when is_map(usage), do: Pepe.Usage.record(agent_name(key), model, usage)
+  defp meter(_key, _model, _usage), do: :ok
+
+  defp agent_name(key) do
+    case Session.status(key) do
+      %{agent: agent} when is_binary(agent) -> agent
+      _ -> "unknown"
     end
   end
 

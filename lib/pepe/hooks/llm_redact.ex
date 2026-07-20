@@ -25,9 +25,10 @@ defmodule Pepe.Hooks.LlmRedact do
   def run(stage, text, settings, ctx) when stage in [:inbound, :tool_result] do
     with name when is_binary(name) <- settings["model"],
          model when not is_nil(model) <- Config.get_model(name),
-         {:ok, %{content: content}} when is_binary(content) <-
+         {:ok, %{content: content} = result} when is_binary(content) <-
            Pepe.LLM.chat(model, prompt(text, ctx["map"] || []), []),
          {:ok, redacted, entries} <- parse(content) do
+      meter(ctx["agent"], model, result[:usage])
       {:ok, redacted, entries}
     else
       failure ->
@@ -56,6 +57,13 @@ defmodule Pepe.Hooks.LlmRedact do
   defp fail_reason({:ok, _}, _settings), do: "model returned a non-text response"
   defp fail_reason(:error, _settings), do: "could not parse the model's redaction response as JSON"
   defp fail_reason(_other, _settings), do: "unexpected failure"
+
+  # Runs on every inbound/tool-result message once enabled - a real, recurring model
+  # call that must not silently vanish from spend just because it isn't the main turn.
+  defp meter(agent_name, model, usage) when is_binary(agent_name) and is_map(usage),
+    do: Pepe.Usage.record(agent_name, model, usage)
+
+  defp meter(_agent_name, _model, _usage), do: :ok
 
   @impl true
   def config_schema do

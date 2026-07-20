@@ -156,7 +156,7 @@ defmodule Pepe.Agent.Runtime do
   defp loop(agent, chain, messages, _specs, ctx, opts, 0) do
     nudge = Message.user(@out_of_turns_nudge)
     chat_opts = [temperature: agent.temperature]
-    to_send = Compaction.compact(messages, hd(chain))
+    to_send = Compaction.compact(messages, hd(chain), agent.name)
 
     case chat_with_failover(chain, to_send ++ [nudge], chat_opts, ctx, opts) do
       {:ok, %{content: content}} when is_binary(content) and content != "" ->
@@ -190,7 +190,7 @@ defmodule Pepe.Agent.Runtime do
     # the caller (Session.spawn_run) recovers this turn's new messages by dropping the prior history
     # by length - if compaction shrank the list in place, that drop would eat into the turn and
     # silently lose it (and re-summarize every turn after). A no-op until the history is large.
-    to_send = Compaction.compact(messages, hd(chain))
+    to_send = Compaction.compact(messages, hd(chain), agent.name)
 
     result = chat_with_failover(chain, to_send, chat_opts, ctx, opts)
 

@@ -406,7 +406,7 @@ defmodule Pepe.Agent.Session do
     case resolve_agent(state) do
       %{midrun_fold: true} = agent ->
         classify_model = agent.triage_model || agent.model || Config.default_model_name()
-        task = classify_midrun(classify_model, state.pending_resume, text)
+        task = classify_midrun(classify_model, state.pending_resume, text, agent.name)
         {:noreply, %{state | classifying: %{from: from, text: text, opts: opts, ref: task.ref}}}
 
       _ ->
@@ -705,7 +705,7 @@ defmodule Pepe.Agent.Session do
         # Review before compacting, while the full detail is still here.
         if state.learn_allowed, do: Pepe.Agent.Reflect.review_async(agent, state.messages)
 
-        case Pepe.Agent.Compaction.compact_now(state.messages, Config.model_for_agent(agent)) do
+        case Pepe.Agent.Compaction.compact_now(state.messages, Config.model_for_agent(agent), agent.name) do
           {:ok, messages, summary} ->
             {:reply, {:ok, summary}, persist(%{state | messages: messages})}
 
@@ -1072,13 +1072,13 @@ defmodule Pepe.Agent.Session do
   # model, unreachable, or slower than @triage_timeout_ms - always treated the
   # same as :complex by the caller, i.e. proceed on the agent's own model
   # unchanged, but kept distinct here so it shows up honestly on the trace).
-  defp triage_verdict(triage_model_name, text) do
+  defp triage_verdict(triage_model_name, text, agent_name) do
     task =
       Task.async(fn ->
         try do
           case Config.get_model(triage_model_name) do
             nil -> {:error, :no_such_model}
-            model -> LLM.chat(model, [Message.system(@triage_prompt), Message.user(text)])
+            model -> {model, LLM.chat(model, [Message.system(@triage_prompt), Message.user(text)])}
           end
         rescue
           e -> {:error, Exception.message(e)}
@@ -1088,7 +1088,8 @@ defmodule Pepe.Agent.Session do
       end)
 
     case Task.yield(task, @triage_timeout_ms) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {:ok, %{content: content}}} ->
+      {:ok, {model, {:ok, %{content: content} = result}}} ->
+        meter(agent_name, model, result[:usage])
         if content |> to_string() |> String.trim() |> String.upcase() =~ "SIMPLE", do: :simple, else: :complex
 
       _ ->
@@ -1099,6 +1100,12 @@ defmodule Pepe.Agent.Session do
   catch
     _, _ -> :failed
   end
+
+  # A triage/classification call is a real, separately-billed model call - meter it, same
+  # as the main turn, so complexity-routing and mid-run-fold checks don't silently vanish
+  # from the operator's spend numbers.
+  defp meter(agent_name, model, usage) when is_map(usage), do: Pepe.Usage.record(agent_name, model, usage)
+  defp meter(_agent_name, _model, _usage), do: :ok
 
   # Same bounded-wait shape as `triage_verdict/2`, but never blocks its caller: this
   # runs from inside `handle_call`, where blocking on an LLM call would freeze the
@@ -1120,7 +1127,7 @@ defmodule Pepe.Agent.Session do
   unsure, reply QUEUE.
   """
 
-  defp classify_midrun(triage_model_name, running_text, new_text) do
+  defp classify_midrun(triage_model_name, running_text, new_text, agent_name) do
     Task.async(fn ->
       try do
         inner =
@@ -1131,12 +1138,13 @@ defmodule Pepe.Agent.Session do
 
               model ->
                 prompt = "CURRENTLY WORKING ON: #{running_text}\n\nNEW MESSAGE: #{new_text}"
-                LLM.chat(model, [Message.system(@midrun_prompt), Message.user(prompt)])
+                {model, LLM.chat(model, [Message.system(@midrun_prompt), Message.user(prompt)])}
             end
           end)
 
         case Task.yield(inner, @midrun_timeout_ms) || Task.shutdown(inner, :brutal_kill) do
-          {:ok, {:ok, %{content: content}}} ->
+          {:ok, {model, {:ok, %{content: content} = result}}} ->
+            meter(agent_name, model, result[:usage])
             if content |> to_string() |> String.trim() |> String.upcase() =~ "FOLD", do: :fold, else: :queue
 
           _ ->
@@ -1190,7 +1198,7 @@ defmodule Pepe.Agent.Session do
             # leaves the agent on its own already-configured model, unchanged.
             agent =
               if should_triage? do
-                case triage_verdict(agent.triage_model, redacted) do
+                case triage_verdict(agent.triage_model, redacted, agent.name) do
                   :simple ->
                     Pepe.Trace.event({:triage, :simple, agent.triage_model, agent.simple_model})
                     set_model_if_unset(key, agent.simple_model)

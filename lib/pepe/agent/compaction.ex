@@ -51,11 +51,13 @@ defmodule Pepe.Agent.Compaction do
 
   @doc """
   Condense `messages` for `model` **when needed** (near the window), returning the
-  (possibly) shorter list. Used automatically inside the conversation loop.
+  (possibly) shorter list. Used automatically inside the conversation loop. `agent_name`
+  meters the summarizing call to the right agent - a compaction that goes unnoticed
+  because nobody thought to bill for it is exactly the gap this parameter closes.
   """
-  def compact(messages, model) do
+  def compact(messages, model, agent_name \\ nil) do
     if needs?(messages, model) do
-      case compact_now(messages, model) do
+      case compact_now(messages, model, agent_name) do
         {:ok, compacted, _summary} -> compacted
         _ -> messages
       end
@@ -69,15 +71,16 @@ defmodule Pepe.Agent.Compaction do
   `{:ok, new_messages, summary}`, `{:ok, messages, "nothing to compact yet"}` when
   there's too little to summarize, or `{:error, reason}` (including `:no_model`).
   """
-  def compact_now(_messages, nil), do: {:error, :no_model}
+  def compact_now(messages, model, agent_name \\ nil)
+  def compact_now(_messages, nil, _agent_name), do: {:error, :no_model}
 
-  def compact_now(messages, model) do
+  def compact_now(messages, model, agent_name) do
     {head, middle, tail} = split(messages, round(window(model) * @keep_tail))
 
     if length(middle) < @min_middle do
       {:ok, messages, "nothing to compact yet"}
     else
-      case summarize(middle, model) do
+      case summarize(middle, model, agent_name) do
         {:ok, summary} ->
           compacted = head ++ [summary_message(summary)] ++ tail
           Logger.info("[compaction] condensed history ~#{estimate_tokens(messages)} -> ~#{estimate_tokens(compacted)} tokens")
@@ -107,7 +110,7 @@ defmodule Pepe.Agent.Compaction do
   defp drop_leading_tool_results([%{"role" => "tool"} | rest]), do: drop_leading_tool_results(rest)
   defp drop_leading_tool_results(tail), do: tail
 
-  defp summarize(middle, model) do
+  defp summarize(middle, model, agent_name) do
     prompt =
       "Summarize the following conversation excerpt concisely. Preserve decisions made, " <>
         "facts established, current task state, and any identifiers, paths or values verbatim. " <>
@@ -118,11 +121,22 @@ defmodule Pepe.Agent.Compaction do
            [Message.system("You summarize conversations faithfully and compactly."), Message.user(prompt)],
            max_tokens: 800
          ) do
-      {:ok, %{content: c}} when is_binary(c) and c != "" -> {:ok, c}
-      {:ok, _} -> {:error, :empty_summary}
-      {:error, reason} -> {:error, reason}
+      {:ok, %{content: c} = result} when is_binary(c) and c != "" ->
+        meter(agent_name, model, result[:usage])
+        {:ok, c}
+
+      {:ok, _} ->
+        {:error, :empty_summary}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
+
+  defp meter(agent_name, model, usage) when is_binary(agent_name) and is_map(usage),
+    do: Pepe.Usage.record(agent_name, model, usage)
+
+  defp meter(_agent_name, _model, _usage), do: :ok
 
   # A `<system-reminder>` user turn, NOT a second `system` message. The Anthropic and Responses
   # adapters keep only the FIRST system message and drop the rest - a mid-list `system` summary

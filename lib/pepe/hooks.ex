@@ -52,6 +52,11 @@ defmodule Pepe.Hooks do
   @spec transform(atom(), String.t(), Pepe.Config.Agent.t() | nil, map()) ::
           {String.t(), [map()]}
   def transform(stage, text, agent, ctx \\ %{}) do
+    # Carries the calling agent's handle to any hook that makes its own LLM call
+    # (llm_redact), so that call meters against the right agent instead of vanishing
+    # from spend entirely. Never overrides a caller-supplied "agent" already in ctx.
+    ctx = Map.put_new(ctx, "agent", agent && agent.name)
+
     Enum.reduce(hooks_for(agent), {text, []}, fn {name, mod, settings}, {txt, entries} ->
       if stage in mod.stages() do
         apply_hook(stage, name, mod, settings, ctx, txt, entries)

@@ -101,12 +101,10 @@ defmodule Pepe.Doctor do
   )
 
   defp unknown_key_checks do
-    known = MapSet.new(@known_top_level_keys)
-
     unknown =
       Config.load()
       |> Map.keys()
-      |> Enum.reject(&MapSet.member?(known, &1))
+      |> Enum.reject(&(&1 in @known_top_level_keys))
 
     case unknown do
       [] -> [{"config", "top-level keys", :ok}]
