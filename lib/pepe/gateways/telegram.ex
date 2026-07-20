@@ -320,13 +320,13 @@ defmodule Pepe.Gateways.Telegram do
 
   # The agent this bot is bound to (its whole reason for existing), else the global
   # default. This is how "this channel talks only to agent X" works per bot.
-  # A forum topic bound to its own agent wins; then the bot's agent; then the global default.
+  # A chat (or one of its forum topics) bound to its own agent wins; then the bot's
+  # agent; then the global default.
   defp agent_default, do: topic_agent() || bot()["agent"] || Config.default_agent_name()
 
   defp topic_agent do
     with chat_id when not is_nil(chat_id) <- chat_dict(),
-         t when not is_nil(t) <- thread(),
-         name when is_binary(name) <- Config.telegram_topic_agent(bot_name(), chat_id, t),
+         name when is_binary(name) <- Config.telegram_topic_agent(bot_name(), chat_id, thread()),
          true <- Config.get_agent(name) != nil do
       name
     else
@@ -334,18 +334,32 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # In a forum topic, `/agent` binds the topic to that agent *persistently* (kept in config,
-  # survives `/new` and a restart), so a "support" topic stays the support agent. Anywhere else
-  # it is just this session's switch.
+  # `/agent` binds the chat (or, inside a forum topic, that topic) to the given agent
+  # *persistently* (kept in config, survives `/new` and a restart) - so "this group talks
+  # to the support agent" is still true after a deploy, not just until the session
+  # process holding it in memory happens to go away.
   defp bind_agent(chat_id, name) do
-    case thread() do
-      nil ->
-        gettext("Switched to agent %{name}.", name: name)
+    Config.bind_telegram_topic(bot_name(), chat_id, thread(), name)
 
-      t ->
-        Config.bind_telegram_topic(bot_name(), chat_id, t, name)
-        gettext("This topic is now bound to agent %{name} (kept across /new and restarts).", name: name)
+    case thread() do
+      nil -> gettext("Switched to agent %{name} (kept across /new and restarts).", name: name)
+      _ -> gettext("This topic is now bound to agent %{name} (kept across /new and restarts).", name: name)
     end
+  end
+
+  @doc """
+  If `key` is a Telegram session, durably bind its chat (or forum topic) to `agent_name`
+  - the same persistence `/agent` gets, reachable from a tool call instead of a human
+  typing the slash command. No-op (and no error) for any other channel.
+  """
+  @spec persist_agent_binding(String.t(), String.t()) :: :ok
+  def persist_agent_binding(key, agent_name) do
+    case parse_topic_key(key) do
+      {bot, chat, thread} -> Config.bind_telegram_topic(bot, chat, thread, agent_name)
+      :error -> :ok
+    end
+
+    :ok
   end
 
   defp presence(nil), do: nil
@@ -800,19 +814,21 @@ defmodule Pepe.Gateways.Telegram do
         Task.start(fn ->
           put_bot(b)
           put_thread(thread_id)
-
-          if quick do
-            set_reaction(chat_id, message["message_id"], quick)
-          else
-            put_chat(chat_id)
-            put_reply_to(reply_to)
-            respond(chat_id, user_id, message["message_id"], stripped)
-          end
+          react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to)
         end)
 
       true ->
         :ok
     end
+  end
+
+  defp react_or_respond(quick, chat_id, _user_id, message_id, _stripped, _reply_to) when is_binary(quick),
+    do: set_reaction(chat_id, message_id, quick)
+
+  defp react_or_respond(nil, chat_id, user_id, message_id, stripped, reply_to) do
+    put_chat(chat_id)
+    put_reply_to(reply_to)
+    respond(chat_id, user_id, message_id, stripped)
   end
 
   # Record a blocked user for approval, but only when the bot runs `require_approval` and the chat
@@ -822,10 +838,26 @@ defmodule Pepe.Gateways.Telegram do
     tg = bot()
 
     if tg["require_approval"] == true and allowlisted?(tg["allowed_chats"], chat_id) and not is_nil(user_id) do
-      Config.add_telegram_pending(bot_name(), pending_user(message, chat_id, user_id))
+      entry = pending_user(message, chat_id, user_id)
+      Config.add_telegram_pending(bot_name(), entry)
+      Logger.info("[telegram] queued #{entry["name"]} (id #{user_id}) for approval in chat #{chat_id}")
+      react_blocked(chat_id, message["message_id"])
     end
 
     :ok
+  end
+
+  # A blocked sender otherwise gets pure silence, which reads as the bot being broken
+  # rather than as "you're not approved yet" - a native reaction says the message
+  # landed without spending a reply on someone who isn't allowed one, and gives the
+  # operator a visible marker in the chat itself for which messages got blocked.
+  defp react_blocked(chat_id, message_id) do
+    b = bot()
+
+    Task.start(fn ->
+      put_bot(b)
+      set_reaction(chat_id, message_id, "👎")
+    end)
   end
 
   defp pending_user(message, chat_id, user_id) do

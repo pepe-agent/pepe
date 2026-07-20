@@ -51,6 +51,21 @@ defmodule Pepe.TelegramApprovalTest do
       refute 2 in (Config.telegram_bot("default")["allowed_users"] || [])
     end
 
+    test "several blocked messages arriving at once don't lose each other's queue entries" do
+      # Mirrors a real incident: a blocked user sends several messages in quick succession, each
+      # spawning its own concurrent call into add_telegram_pending (Telegram.maybe_queue_pending/3
+      # runs in its own Task per message). update_telegram_bot/2 used to read the bot config,
+      # compute the update, and write it back as two separate steps - a classic TOCTOU race where
+      # a second caller's write could silently revert a first caller's queue entry. Now atomic via
+      # update_cas/1.
+      1..20
+      |> Enum.map(fn i -> Task.async(fn -> Config.add_telegram_pending("default", user(rem(i, 5), "user-#{rem(i, 5)}")) end) end)
+      |> Task.await_many(10_000)
+
+      ids = Config.telegram_pending("default") |> Enum.map(& &1["id"]) |> Enum.sort()
+      assert ids == [0, 1, 2, 3, 4]
+    end
+
     test "an already-allowed user is not re-queued" do
       Config.update_telegram_bot("default", &Map.put(&1, "allowed_users", [5]))
       Config.add_telegram_pending("default", user(5, "known"))

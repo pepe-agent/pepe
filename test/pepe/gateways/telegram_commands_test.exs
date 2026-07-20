@@ -525,13 +525,14 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
   end
 
   describe "deny-by-default approval (require_approval)" do
-    test "an unknown user is queued for approval, not answered", %{chat: chat} do
+    test "an unknown user is queued for approval, not answered, and their message gets a reaction", %{chat: chat} do
       start_bot!(%{"require_approval" => true})
 
       say(chat, "hi", user: @outsider)
       refute_receive {:sent, ^chat, _text, _buttons}, 500
 
       assert [%{"id" => @outsider}] = Config.telegram_pending("default")
+      assert_receive {:reaction, ^chat, [%{"emoji" => "👎"}]}, 2_000
     end
 
     test "an approved user (allowed_users) is answered normally", %{chat: chat} do
@@ -897,6 +898,18 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
       say(chat, "/status")
       assert await_reply(chat) =~ "Agent: sales"
+    end
+
+    # A plain chat (no forum topic) used to only switch the in-memory session - lost the
+    # moment its process went away (a restart, a deploy, TTL eviction). It now persists
+    # the same way a forum topic's binding always has.
+    test "/agent in a plain chat persists, not just the in-memory session", %{chat: chat} do
+      Config.put_agent(%Pepe.Config.Agent{name: "sales", model: "mock", system_prompt: "You close deals."})
+
+      say(chat, "/agent sales")
+      assert await_reply(chat) =~ "kept across /new and restarts"
+
+      assert Config.telegram_topic_agent("default", chat, nil) == "sales"
     end
 
     test "/tools lists what the agent can actually reach for", %{chat: chat} do

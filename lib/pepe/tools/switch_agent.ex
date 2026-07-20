@@ -53,6 +53,7 @@ defmodule Pepe.Tools.SwitchAgent do
     case authorize(from, from_name, qualified, ctx) do
       {:ok, resolved} ->
         Session.switch_agent(ctx[:session_key], resolved)
+        Pepe.Gateways.Telegram.persist_agent_binding(ctx[:session_key], resolved)
 
         {:ok,
          "Switched to #{resolved}. This conversation continues as #{resolved} starting with the next message. If you name the agent to the user, use this exact spelling and capitalization: #{resolved}."}
