@@ -12,6 +12,11 @@ When an agent routes a message, the called agent answers in a fresh run, and its
 comes back to the caller as the tool result. A hop limit and a cycle check stop chains
 of routed calls from looping forever.
 
+`send_to_agent` never changes who's actually talking to the user: it's a one-off
+consult, and the caller stays the agent answering the conversation. Handing the *whole*
+conversation to another agent from now on is `switch_agent`, a different tool covered
+below.
+
 ## Adding a route
 
 ```bash
@@ -49,10 +54,34 @@ boundary. Bare peer names in <code>--can-message</code> resolve inside the agent
 project, and the CLI refuses a route between two agents that live in different
 projects.</div>
 
+## Handing off the whole conversation (`switch_agent`)
+
+`send_to_agent` is a one-off consult; `switch_agent` is the other thing: the agent
+answering right now hands the **rest of the conversation** to a different agent. It's
+the same effect as the user typing `/agent NAME` themselves, just reachable from a
+plain request ("connect me with billing", "let me talk to support directly") instead
+of the slash command.
+
+```text
+Let me talk to the billing agent directly.
+```
+
+The agent calls `switch_agent` with `target: "billing"`. Its own reply to *this* turn
+still goes out from the agent that's already answering ("sure, connecting you now");
+the switch only takes effect starting with the next message, the same as `/agent`
+already behaves. The new agent starts from a fresh context; it doesn't inherit this
+conversation's history.
+
+It uses the exact same `can_message` allowlist as `send_to_agent`: if an agent can
+message a peer, it can also hand the conversation to it, no separate route to
+configure. Unlike `send_to_agent`, `switch_agent` **does** go through the normal
+permission gate by default: it changes who answers every message after this one, a
+bigger action a human could too easily wave through without noticing.
+
 ## Routing and the permission gate
 
-The route allowlist *is* the authorization for the call. An operator already decided,
-in configuration, that this agent may message that agent, so the `send_to_agent` call
+The route allowlist *is* the authorization for the `send_to_agent` call. An operator
+already decided, in configuration, that this agent may message that agent, so the call
 itself is not put through the human permission gate. It simply runs.
 
 That is exactly why the allowlist is directed and closed by default instead of

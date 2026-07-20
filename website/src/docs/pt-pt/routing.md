@@ -13,6 +13,11 @@ Quando um agente encaminha uma mensagem, o agente chamado responde numa execuç�
 a resposta chega a quem chamou como resultado da ferramenta. Um limite de saltos e uma
 verificação de ciclos impedem que as cadeias de chamadas entrem em ciclo infinito.
 
+O `send_to_agent` nunca muda quem está de facto a falar com o utilizador: é uma
+consulta pontual, e quem chamou continua a ser o agente que responde à conversa. Passar
+a conversa **inteira** a outro agente a partir de agora é o `switch_agent`, uma
+ferramenta diferente, abordada mais abaixo.
+
 ## Criar uma rota
 
 ```bash
@@ -52,11 +57,35 @@ fronteira de um projeto. Os nomes simples em <code>--can-message</code> são res
 dentro do próprio projeto do agente, e a CLI recusa uma rota entre dois agentes que
 estejam em projetos diferentes.</div>
 
+## Passar a conversa inteira a outro agente (`switch_agent`)
+
+O `send_to_agent` é uma consulta pontual; o `switch_agent` é outra coisa: o agente que
+está a responder agora passa o **resto da conversa** a outro agente. É o mesmo efeito
+de o utilizador digitar `/agent NOME` por si próprio, só que acessível por um pedido
+comum ("liga-me ao billing", "quero falar diretamente com o suporte") em vez do
+comando de barra.
+
+```text
+Liga-me diretamente ao agente billing.
+```
+
+O agente chama `switch_agent` com `target: "billing"`. A resposta dele a *este* turno
+continua a sair do agente que já está a responder ("certo, a ligar-te agora"); a
+troca só entra em vigor a partir da mensagem seguinte, o mesmo comportamento que o
+`/agent` já tem. O novo agente começa com um contexto limpo; não herda o histórico
+desta conversa.
+
+Usa exatamente a mesma lista `can_message` do `send_to_agent`: se um agente pode
+enviar mensagens a um par, também pode passar-lhe a conversa, sem precisar de
+configurar uma rota separada. Ao contrário do `send_to_agent`, o `switch_agent`
+**passa** pela barreira de permissão normal por omissão: muda quem responde a cada
+mensagem a partir daqui, uma ação maior que passa despercebida com facilidade.
+
 ## Encaminhamento e a barreira de permissão
 
-A lista de rotas permitidas *é* a autorização da chamada. O operador já decidiu, na
-configuração, que este agente pode enviar mensagens àquele agente, por isso a própria
-chamada de `send_to_agent` não passa pela barreira de permissão humana. Simplesmente
+A lista de rotas permitidas *é* a autorização da chamada do `send_to_agent`. O operador
+já decidiu, na configuração, que este agente pode enviar mensagens àquele agente, por
+isso a própria chamada não passa pela barreira de permissão humana. Simplesmente
 executa.
 
 É precisamente por isso que a lista é dirigida e fechada por omissão, em vez de simétrica

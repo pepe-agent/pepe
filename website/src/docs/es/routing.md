@@ -12,6 +12,11 @@ Cuando un agente enruta un mensaje, el agente llamado responde en una ejecución
 su respuesta vuelve a quien llamó como resultado de la herramienta. Un límite de saltos
 y una comprobación de ciclos evitan que las cadenas de llamadas se queden en bucle.
 
+`send_to_agent` nunca cambia con quién habla realmente el usuario: es una consulta
+puntual, y quien llamó sigue siendo el agente que responde la conversación. Pasar la
+conversación **entera** a otro agente a partir de ahora es `switch_agent`, una
+herramienta distinta, que se explica más abajo.
+
 ## Crear una ruta
 
 ```bash
@@ -50,11 +55,35 @@ frontera de un proyecto. Los nombres simples en <code>--can-message</code> se re
 dentro del propio proyecto del agente, y la CLI rechaza una ruta entre dos agentes que
 viven en proyectos distintos.</div>
 
+## Pasar la conversación entera a otro agente (`switch_agent`)
+
+`send_to_agent` es una consulta puntual; `switch_agent` es la otra cosa: el agente que
+está respondiendo ahora mismo le pasa el **resto de la conversación** a otro agente. Es
+el mismo efecto que si el usuario escribiera `/agent NOMBRE` él mismo, solo que
+accesible desde una petición normal ("conéctame con billing", "quiero hablar
+directamente con soporte") en vez del comando de barra.
+
+```text
+Conéctame directamente con el agente billing.
+```
+
+El agente llama a `switch_agent` con `target: "billing"`. Su respuesta a *este* turno
+sigue saliendo del agente que ya está respondiendo ("vale, te conecto ahora"); el
+cambio solo entra en vigor a partir del siguiente mensaje, el mismo comportamiento que
+ya tiene `/agent`. El nuevo agente empieza con un contexto limpio; no hereda el
+historial de esta conversación.
+
+Usa exactamente la misma lista `can_message` que `send_to_agent`: si un agente puede
+enviar mensajes a un par, también puede pasarle la conversación, sin necesidad de
+configurar una ruta aparte. A diferencia de `send_to_agent`, `switch_agent` **sí** pasa
+por la barrera de permisos normal por defecto: cambia quién responde a cada mensaje a
+partir de ahora, una acción más grande que pasa desapercibida con facilidad.
+
 ## El enrutamiento y la barrera de permisos
 
-La lista de rutas permitidas *es* la autorización de la llamada. El operador ya decidió,
-en la configuración, que este agente puede enviar mensajes a aquel agente, así que la
-llamada a `send_to_agent` no pasa por la barrera de permisos humana. Simplemente se
+La lista de rutas permitidas *es* la autorización de la llamada a `send_to_agent`. El
+operador ya decidió, en la configuración, que este agente puede enviar mensajes a aquel
+agente, así que la llamada no pasa por la barrera de permisos humana. Simplemente se
 ejecuta.
 
 Por eso mismo la lista es dirigida y está cerrada por defecto, en lugar de ser simétrica

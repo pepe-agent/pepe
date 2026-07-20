@@ -57,6 +57,16 @@ defmodule Pepe.Agent.Session do
   def set_agent(key, agent_name), do: GenServer.call(via(key), {:set_agent, agent_name})
 
   @doc """
+  Ask the session to switch its bound agent **after the current turn**: how an agent
+  hands its own conversation to another agent (the `switch_agent` tool), triggered by
+  a plain request in chat rather than the human typing `/agent NAME`. Like
+  `end_session/1`, the in-flight reply still goes out under the agent that's already
+  answering; the next message is the first one the new agent sees, with a fresh
+  context (same as `set_agent/2`'s own immediate-switch behavior).
+  """
+  def switch_agent(key, agent_name), do: GenServer.cast(via(key), {:switch_agent, agent_name})
+
+  @doc """
   Override the model connection for this session only - the agent's own config on
   disk is never touched. `model_name` is a connection name (as stored on
   `Pepe.Config.Agent.model`); pass `nil` to clear the override and fall back to the
@@ -244,6 +254,7 @@ defmodule Pepe.Agent.Session do
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
         reset_pending: false,
+        switch_pending: nil,
         ttl_ref: nil
       })
 
@@ -265,6 +276,29 @@ defmodule Pepe.Agent.Session do
 
     state
   end
+
+  # What agent (and history) the session carries into its NEXT turn, once this one has
+  # actually landed in `state.messages` (see the `handle_info({:run_done, ...})` clause
+  # below). Priority: a pending agent switch (`switch_agent/2`, deferred while this turn
+  # was running) beats a pending reset (`end_session`) beats the normal history carry-
+  # over: a switch already starts fresh under the new agent, so there's nothing left to
+  # additionally reset. Re-checks the target still exists at apply time (the window
+  # between the tool call and the turn finishing is small, but not zero) and falls back
+  # to staying on the agent that just answered if it's gone in the meantime, rather than
+  # binding the conversation to a ghost.
+  defp resolve_post_turn_agent(%{switch_pending: target}, agent_name, _all_messages, _entries) when is_binary(target) do
+    if Config.get_agent(target) do
+      {target, init_messages(target), []}
+    else
+      {agent_name, init_messages(agent_name), []}
+    end
+  end
+
+  defp resolve_post_turn_agent(%{reset_pending: true}, agent_name, _all_messages, _entries),
+    do: {agent_name, init_messages(agent_name), []}
+
+  defp resolve_post_turn_agent(state, agent_name, all_messages, entries),
+    do: {agent_name, cap_retained_tool_results(all_messages), state.pii_map ++ entries}
 
   # Mark a turn as in flight right before running it, so a crash mid-turn leaves a
   # durable trace `Pepe.Agent.SessionSupervisor.restore/0` can pick up on the next
@@ -746,20 +780,16 @@ defmodule Pepe.Agent.Session do
           reply(from, {:ok, turn_reply})
           reply_folded(folded, {:ok, turn_reply})
 
-          # If the agent called `end_session` this turn, clear the context (and the
-          # reversible map) now that the reply is out - the next message starts fresh.
-          {messages, pii_map} =
-            if state.reset_pending,
-              do: {init_messages(agent_name), []},
-              else: {cap_retained_tool_results(all_messages), state.pii_map ++ entries}
+          {next_agent, messages, pii_map} = resolve_post_turn_agent(state, agent_name, all_messages, entries)
 
           state =
             %{
               state
-              | agent_name: agent_name,
+              | agent_name: next_agent,
                 messages: messages,
                 running: nil,
                 reset_pending: false,
+                switch_pending: nil,
                 pii_map: pii_map,
                 pending_resume: nil
             }
@@ -862,6 +892,19 @@ defmodule Pepe.Agent.Session do
   # into a later user turn would silently discard that turn's own history.
   def handle_cast(:end_session, state) do
     {:noreply, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], reset_pending: false})}
+  end
+
+  # An agent handed its own conversation to another agent (the `switch_agent` tool) -
+  # same deferred-vs-immediate split as `end_session` above, and for the same reason:
+  # rebinding `agent_name`/wiping `messages` while the run task is mid-flight (reading
+  # its own snapshot of the history) would corrupt whatever that task reports back.
+  @impl true
+  def handle_cast({:switch_agent, agent_name}, %{running: running} = state) when is_map(running) do
+    {:noreply, %{state | switch_pending: agent_name}}
+  end
+
+  def handle_cast({:switch_agent, agent_name}, state) do
+    {:noreply, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), switch_pending: nil})}
   end
 
   # TTL eviction: re-armed on every message; nil ttl_ms = never expire.
