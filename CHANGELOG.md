@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-07-20
+
+### Fixed
+- **An agent without `switch_agent` could still make it sound like it had connected the user to someone else.** The 0.9.1 fix stopped `send_to_agent` from claiming a connection outright, but an agent could still reach for an unrelated tool (`manage_channel`'s Telegram forum-topic binding, in one real case) and relay its technical error back to the user verbatim. Every Pepe agent now gets two new rules in its shared system prompt: don't describe a fallback action as if it satisfied a request it didn't, and persistence ("try another way") is for finding information, not for improvising a capability that isn't there. Every genuine tool-execution failure also now carries a reminder, attached to the error itself rather than only stated once in the system prompt, never to quote the raw error or a tool's internal mechanism back to the user. `manage_channel`'s `bind_topic` description was also narrowed so it no longer reads as a general-purpose "connect this to an agent" action.
+- **`send_to_agent` and `switch_agent` could refuse a same-project agent whose name was typed in a different case than it's stored** ("engenheiro" instead of "Engenheiro"), with a discreet "isn't available to you" that looked like a permissions problem. Both now match `can_message` case-insensitively, same as `/agent NAME` already did.
+- **Creating or renaming an agent, model connection, or project to a name that differed from an existing one only by case silently overwrote it** instead of refusing, since only agent lookup (not creation) was ever case-aware. All three now resolve names case-insensitively end to end, and creating/renaming into a case-variant of a different existing entity is refused rather than merged into it; a pure case change of an entity's own name still works. Surfaced with a clear message in the CLI, the interactive setup wizard, and the dashboard.
+
 ## [0.9.1] - 2026-07-20
 
 ### Fixed
@@ -499,7 +506,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/pepe-agent/pepe/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/pepe-agent/pepe/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/pepe-agent/pepe/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/pepe-agent/pepe/compare/v0.7.0...v0.8.0
