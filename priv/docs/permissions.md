@@ -8,18 +8,30 @@ without being dangerous.
 1. **Tool allowlist** - an agent can only call tools in its `tools` list. A capability
    is just having its tool. If a tool isn't listed, the model never sees it.
 2. **Permission gate (per call)** - when a tool *is* called:
-   - Read-only tools run freely: `read_file`, `list_dir`, `fetch_url`, `web_search`,
-     `config_get`, `skill`, `docs`, `send_to_agent`.
+   - Tools that carry no risk of their own run freely: `read_file`, `list_dir`,
+     `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill`,
+     `send_to_agent`, `ask_user`.
    - Everything else (running code, writing/moving files, changing config, MCP tools,
      any plugin tool) needs **authorization** - the surface asks the user
      (Telegram buttons, console menu, dashboard prompt). Unknown tools default to
      risky (safe default).
    - Decisions: allow once / for this session / always (persisted on the agent's
      `auto_approve`) / deny.
-   - A surface with no human to ask (the HTTP API) runs freely.
+   - A surface with no human to ask (the HTTP API, a webhook, a cron, a watch) refuses
+     a gated tool outright instead of running it unwatched - see "No human, no
+     surprises" below.
 3. **In-tool guards** - some tools add their own scoping (e.g. `manage_channel` never
    touches the protected default bot; `manage_agent` only touches agents in
    `can_manage`; secrets must be `${ENV}` refs).
+
+## `ask_user` is unrisky, but not unconditional
+
+`ask_user` never asks for authorization - presenting a multiple-choice question carries
+no risk of its own. It still needs an actual interactive person on the other end to
+answer it (Telegram buttons, the console menu, the dashboard picker); on a surface with
+nobody there, the call fails outright with a clear error instead of hanging forever
+waiting for a button nobody can press. Prefer an ordinary reply for an open-ended
+question - `ask_user` is for a genuine pick among a short list of options.
 
 ## The owner's primary agent
 

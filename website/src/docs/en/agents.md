@@ -171,6 +171,7 @@ The built-in set covers the common ground:
 | `fetch_url`, `web_search` | Read a web page or search the web. |
 | `send_file` | Deliver a file the agent produced on the current channel. |
 | `send_to_agent` | Message another agent (subject to `can_message`). |
+| `ask_user` | Ask you to pick one of a few options, as real tappable buttons/menu where the channel supports it. |
 | `schedule_task`, `watch` | Create recurring jobs and one-shot "notify me when X" watches. |
 | `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Manage agents, tools, and routing from chat. |
 | `manage_channel`, `end_session` | Connect and close messaging channels from chat. |
@@ -194,8 +195,19 @@ console, a chat channel), the runtime asks you to authorize the call. You can an
 - Deny. Never remembered, so it is asked again.
 
 Put a tool on `auto_approve` yourself to skip the prompt from the start. On surfaces
-with no human to ask (for example the HTTP API) gated tools are allowed to run so the
-request does not stall.
+with no human to ask (for example the HTTP API, a webhook, a cron job) a gated tool is
+refused rather than run unwatched - only what is already on `auto_approve` executes.
+
+### Asking you to choose
+
+Some questions are better answered with a tap than a typed reply. `ask_user` lets an
+agent present a genuine multiple-choice question and get the pick back as part of the
+same turn, instead of guessing or ending its turn and hoping the next message answers
+the right thing. Telegram renders it as real inline buttons; the console, as a numbered
+menu; the dashboard chat, as clickable options. It runs freely - asking a question
+carries no risk of its own, so it is never gated - but it only works where there is an
+interactive person to ask: the HTTP API, a webhook, or an unattended cron/watch run
+refuses the call outright rather than hang waiting for a button nobody can press.
 
 ### Do it by chat
 

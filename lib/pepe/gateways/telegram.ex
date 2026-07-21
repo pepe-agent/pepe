@@ -74,17 +74,18 @@ defmodule Pepe.Gateways.Telegram do
   # The emoji dropped on the user's own message while the agent works (reaction mode).
   @work_reaction "👀"
 
-  # Pending permission prompts: request_id => the waiting session pid. Lives in a
+  # Pending interactive prompts: request_id => the waiting task pid (a permission
+  # decision, or an ask_user pick - same shape, different entry arity). Lives in a
   # public ETS table so the poll loop (this process) can answer a `receive` that's
-  # blocking in a Session process.
+  # blocking in a turn's own task.
   @pending :pepe_tg_pending
-  # How long to wait for a button press before denying.
+  # How long to wait for a button press before denying/timing out.
   @perm_timeout 300_000
 
-  # Tool-approval prompts already answered this turn (chat_id => message_id), so
-  # they can be deleted once the turn ends - each has already served its purpose
-  # (confirming the tap), and leaving it in the transcript afterward is just
-  # permission-bookkeeping clutter next to the actual conversation.
+  # Prompts already answered this turn (chat_id => message_id) - permission asks and
+  # ask_user picks alike - so they can be deleted once the turn ends: each has already
+  # served its purpose (confirming the tap), and leaving it in the transcript afterward
+  # is just bookkeeping clutter next to the actual conversation.
   @prompt_log :pepe_tg_prompt_log
 
   # An album (several photos/videos sent together) arrives as separate updates sharing a
@@ -677,6 +678,19 @@ defmodule Pepe.Gateways.Telegram do
 
     if active?() and may_approve?(chat_id, user_id) do
       deliver_permission(data, cq)
+    end
+  end
+
+  # A tapped `ask_user` option. Answering is conversational content, not a privilege
+  # decision, so any allowed user may tap it (no trainers-only restriction, unlike
+  # the permission buttons above).
+  defp handle_update(%{"callback_query" => %{"data" => "ask:" <> _ = data} = cq}) do
+    answer_callback(cq["id"])
+    chat_id = get_in(cq, ["message", "chat", "id"])
+    user_id = get_in(cq, ["from", "id"])
+
+    if active?() and allowed?(chat_id, user_id) do
+      deliver_ask(data, cq)
     end
   end
 
@@ -1449,6 +1463,7 @@ defmodule Pepe.Gateways.Telegram do
     try do
       case Pepe.Agent.chat(session_key(chat_id), agent, text,
              authorize: authorizer(chat_id),
+             ask_user: ask_user_fn(chat_id),
              learn: learn?(),
              # A file a stranger sent is not a message the user wrote, and it lands in the
              # model's context all the same. Pre-approved tools stop being trusted for this
@@ -1544,6 +1559,20 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
+  # The `ask_user` callback the `ask_user` tool calls for a genuine multiple-choice
+  # question. Same shape as `authorizer/1` above: render real inline buttons, block
+  # until the poll loop delivers the tapped one (or time out).
+  defp ask_user_fn(chat_id) do
+    b = bot()
+    t = thread()
+
+    fn question, choices ->
+      put_bot(b)
+      put_thread(t)
+      request_ask(chat_id, question, choices)
+    end
+  end
+
   # Who may press a risky-tool permission button. When the bot distinguishes trainers from
   # ordinary allowed users, only a trainer may approve - otherwise, in a group, any allowed user
   # could approve another user's risky action (e.g. a `bash` prompt). A personal bot with no
@@ -1589,6 +1618,43 @@ defmodule Pepe.Gateways.Telegram do
              with_thread(%{
                chat_id: chat_id,
                text: text,
+               parse_mode: "HTML",
+               reply_markup: %{inline_keyboard: buttons}
+             })
+         ) do
+      {:ok, %{body: %{"result" => %{"message_id" => mid}}}} -> mid
+      _ -> nil
+    end
+  end
+
+  defp request_ask(chat_id, question, choices) do
+    id = System.unique_integer([:positive])
+    :ets.insert(@pending, {id, self(), choices})
+    message_id = send_ask_prompt(chat_id, id, question, choices)
+
+    receive do
+      {:ask_reply, ^id, pick} -> {:ok, pick}
+    after
+      @perm_timeout ->
+        :ets.delete(@pending, id)
+        edit_expired(chat_id, message_id)
+        :timeout
+    end
+  end
+
+  defp send_ask_prompt(chat_id, id, question, choices) do
+    Config.put_locale()
+
+    buttons =
+      choices
+      |> Enum.with_index()
+      |> Enum.map(fn {choice, i} -> [%{text: choice, callback_data: "ask:#{id}:#{i}"}] end)
+
+    case Req.post(api_url(token(), "sendMessage"),
+           json:
+             with_thread(%{
+               chat_id: chat_id,
+               text: esc(question),
                parse_mode: "HTML",
                reply_markup: %{inline_keyboard: buttons}
              })
@@ -1672,6 +1738,43 @@ defmodule Pepe.Gateways.Telegram do
 
       _ ->
         :ok
+    end
+  end
+
+  # "ask:<id>:<index>" -> wake the waiting task with the chosen option's text.
+  defp deliver_ask("ask:" <> rest, cq) do
+    case String.split(rest, ":") do
+      [id_str, index_str] ->
+        id = String.to_integer(id_str)
+        index = String.to_integer(index_str)
+
+        case :ets.take(@pending, id) do
+          [{^id, pid, choices}] ->
+            pick = Enum.at(choices, index)
+            close_ask(cq, pick)
+            send(pid, {:ask_reply, id, pick})
+
+          _ ->
+            edit_expired(get_in(cq, ["message", "chat", "id"]), get_in(cq, ["message", "message_id"]))
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  # Replace the ask_user prompt's buttons with the picked option, so the chat shows what was
+  # answered instead of dead buttons.
+  defp close_ask(cq, pick) do
+    chat_id = get_in(cq, ["message", "chat", "id"])
+    message_id = get_in(cq, ["message", "message_id"])
+
+    if chat_id && message_id do
+      :ets.insert(@prompt_log, {chat_id, message_id})
+
+      Req.post(api_url(token(), "editMessageText"),
+        json: %{chat_id: chat_id, message_id: message_id, text: esc(pick)}
+      )
     end
   end
 
@@ -1917,7 +2020,10 @@ defmodule Pepe.Gateways.Telegram do
     send_chat_action(chat_id, "typing")
     agent = agent_default()
 
-    case Pepe.Agent.aside(session_key(chat_id), agent, question, authorize: authorizer(chat_id)) do
+    case Pepe.Agent.aside(session_key(chat_id), agent, question,
+           authorize: authorizer(chat_id),
+           ask_user: ask_user_fn(chat_id)
+         ) do
       {:ok, reply} ->
         send_message(chat_id, reply)
 

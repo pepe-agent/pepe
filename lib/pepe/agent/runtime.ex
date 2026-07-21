@@ -23,6 +23,11 @@ defmodule Pepe.Agent.Runtime do
   operator pre-approved on the agent runs and everything else is refused. Pass
   `:untrusted` when the opening message already carries content from a stranger (a
   document sent in), which withdraws pre-approval for the run.
+
+  `:ask_user` is the same shape for a different purpose: the `ask_user` tool's own
+  multiple-choice prompt, rendered natively by whatever surface supplied the
+  callback. With no `:ask_user` the tool fails outright instead of hanging on a
+  button nobody can press.
   """
 
   require Logger
@@ -130,6 +135,7 @@ defmodule Pepe.Agent.Runtime do
       agent: agent,
       session_key: opts[:session_key],
       authorize: opts[:authorize],
+      ask_user: opts[:ask_user],
       # When true (autonomous consolidation), file writes are staged for review
       # instead of applied - see Pepe.Approval.
       review: opts[:review] == true,

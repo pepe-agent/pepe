@@ -179,6 +179,7 @@ El conjunto integrado cubre lo esencial:
 | `fetch_url`, `web_search` | Lee una página web o busca en la web. |
 | `send_file` | Entrega un archivo que el agente produjo en el canal actual. |
 | `send_to_agent` | Envía un mensaje a otro agente (sujeto a `can_message`). |
+| `ask_user` | Te pide que elijas una entre varias opciones, con botones/menú reales donde el canal lo permite. |
 | `schedule_task`, `watch` | Crea trabajos recurrentes y vigilancias de una sola vez del tipo "avísame cuando pase X". |
 | `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gestiona agentes, herramientas y enrutamiento desde el chat. |
 | `manage_channel`, `end_session` | Conecta y cierra canales de mensajería desde el chat. |
@@ -204,9 +205,22 @@ autorizar la llamada. Puedes responder:
 - Denegar. Nunca se recuerda, así que se vuelve a preguntar.
 
 Pon tú mismo una herramienta en `auto_approve` para saltarte el aviso desde el
-principio. En superficies sin una persona a quien preguntar (por ejemplo la API
-HTTP) las herramientas sujetas a la barrera de permisos se ejecutan igualmente, para
-que la petición no se quede detenida.
+principio. En superficies sin una persona a quien preguntar (por ejemplo la API HTTP,
+un webhook, una tarea cron) una herramienta sujeta a la barrera se rechaza en lugar de
+ejecutarse sin vigilancia: solo corre lo que ya está en `auto_approve`.
+
+### Pedirte que elijas
+
+Algunas preguntas se responden mejor con un toque que con una respuesta escrita.
+`ask_user` permite a un agente presentar una pregunta de opción múltiple genuina y
+recibir la elección de vuelta dentro del mismo turno, en lugar de adivinar o terminar
+su turno esperando que el siguiente mensaje responda justo lo que preguntó. Telegram lo
+muestra como botones en línea reales; la consola, como un menú numerado; el chat del
+panel, como opciones pulsables. Se ejecuta libremente (preguntar no conlleva ningún
+riesgo propio, así que nunca pasa por la barrera), pero solo funciona donde hay una
+persona interactiva a quien preguntar: la API HTTP, un webhook o una ejecución
+desatendida de cron/watch rechazan la llamada directamente en vez de quedarse esperando
+un botón que nadie puede pulsar.
 
 ### Hazlo por chat
 

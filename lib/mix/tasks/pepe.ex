@@ -2366,6 +2366,7 @@ defmodule Mix.Tasks.Pepe do
         stream: true,
         on_event: goal_events(),
         authorize: Pepe.Gateways.TUI.authorizer(),
+        ask_user: Pepe.Gateways.TUI.ask_user_fn(),
         max_attempts: opts[:max_attempts]
       ]
       |> then(&if(opts[:judge], do: Keyword.put(&1, :judge_model, opts[:judge]), else: &1))
@@ -2416,7 +2417,8 @@ defmodule Mix.Tasks.Pepe do
     case Pepe.Agent.oneshot(agent_name, prompt,
            stream: true,
            on_event: Pepe.Gateways.TUI.stream_events(),
-           authorize: Pepe.Gateways.TUI.authorizer()
+           authorize: Pepe.Gateways.TUI.authorizer(),
+           ask_user: Pepe.Gateways.TUI.ask_user_fn()
          ) do
       {:ok, _content, _msgs} -> puts("")
       {:error, reason} -> error("\n#{inspect(reason)}")

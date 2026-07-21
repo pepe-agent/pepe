@@ -64,6 +64,7 @@ defmodule PepeWeb.ChatLive do
        activity: [],
        input: "",
        pending_perm: nil,
+       pending_ask: nil,
        focus: nil
      )}
   end
@@ -165,7 +166,7 @@ defmodule PepeWeb.ChatLive do
               </div>
               <.bubble :for={m <- visible(@messages, @window)} role={m.role} content={m.content} />
               <.bubble :if={@running and @streaming != ""} role="assistant" content={@streaming} />
-              <.activity :if={(@running or @activity != []) and !@pending_perm} running={@running} steps={@activity} />
+              <.activity :if={(@running or @activity != []) and !@pending_perm and !@pending_ask} running={@running} steps={@activity} />
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-amber-600/60 bg-amber-950/30 p-3">
                 <div class="mb-2 text-[15px]">
@@ -174,6 +175,15 @@ defmodule PepeWeb.ChatLive do
                 <div class="flex flex-wrap gap-2">
                   <button :for={d <- Prompt.options()} phx-click="perm" phx-value-id={@pending_perm.id} phx-value-decision={Prompt.token(d)} class={btn_ghost()}>
                     {Prompt.label(d)}
+                  </button>
+                </div>
+              </div>
+
+              <div :if={@pending_ask} class="max-w-2xl rounded-xl border border-orange-600/60 bg-orange-950/20 p-3">
+                <div class="mb-2 text-[15px]">❓ {@pending_ask.question}</div>
+                <div class="flex flex-wrap gap-2">
+                  <button :for={choice <- @pending_ask.choices} phx-click="ask_user_pick" phx-value-id={@pending_ask.id} phx-value-choice={choice} class={btn_ghost()}>
+                    {choice}
                   </button>
                 </div>
               </div>
@@ -406,7 +416,8 @@ defmodule PepeWeb.ChatLive do
        streaming: "",
        running: false,
        activity: [],
-       pending_perm: nil
+       pending_perm: nil,
+       pending_ask: nil
      )
      |> put_flash(:info, gettext("🧠 New conversation started."))}
   end
@@ -423,6 +434,16 @@ defmodule PepeWeb.ChatLive do
          %{id: ^id, pid: pid} <- socket.assigns.pending_perm do
       send(pid, {:perm_reply, id, Prompt.from_token(token)})
       {:noreply, assign(socket, pending_perm: nil)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("ask_user_pick", %{"id" => id, "choice" => choice}, socket) do
+    with {id, ""} <- Integer.parse(to_string(id)),
+         %{id: ^id, pid: pid} <- socket.assigns.pending_ask do
+      send(pid, {:ask_reply, id, choice})
+      {:noreply, assign(socket, pending_ask: nil)}
     else
       _ -> {:noreply, socket}
     end
@@ -491,6 +512,9 @@ defmodule PepeWeb.ChatLive do
   defp apply_event({:permission_request, id, name, requester}, socket),
     do: assign(socket, pending_perm: %{id: id, tool: name, pid: requester})
 
+  defp apply_event({:ask_request, id, question, choices, requester}, socket),
+    do: assign(socket, pending_ask: %{id: id, question: question, choices: choices, pid: requester})
+
   # `:done` fires from inside the run task, before the session has absorbed the turn, so
   # the history read here can still be one turn behind. Show the answer right away
   # anyway, because waiting would leave the reader staring at a blank; `:committed`
@@ -505,6 +529,7 @@ defmodule PepeWeb.ChatLive do
       streaming: "",
       running: false,
       pending_perm: nil,
+      pending_ask: nil,
       sessions: list_sessions(socket.assigns.scope)
     )
   end
@@ -517,7 +542,7 @@ defmodule PepeWeb.ChatLive do
 
   defp apply_event({:error, _reason}, socket) do
     socket
-    |> assign(running: false, streaming: "", activity: [], pending_perm: nil)
+    |> assign(running: false, streaming: "", activity: [], pending_perm: nil, pending_ask: nil)
     |> put_flash(:error, gettext("The run failed. Check the model connection."))
   end
 
@@ -572,16 +597,16 @@ defmodule PepeWeb.ChatLive do
   end
 
   defp stream_reply(key, text) do
-    {on_event, authorize} = session_callbacks(key)
+    {on_event, authorize, ask_user} = session_callbacks(key)
 
     spawn(fn ->
-      Session.chat(key, text, stream: true, on_event: on_event, authorize: authorize)
+      Session.chat(key, text, stream: true, on_event: on_event, authorize: authorize, ask_user: ask_user)
     end)
   end
 
-  # Stream a run's events to this chat over PubSub, and route its permission prompts to
-  # the operator. Shared by a normal turn and by a goal loop (whose attempts are just
-  # turns, so they stream the same way).
+  # Stream a run's events to this chat over PubSub, and route its permission prompts and
+  # ask_user questions to the operator. Shared by a normal turn and by a goal loop (whose
+  # attempts are just turns, so they stream the same way).
   defp session_callbacks(key) do
     topic = topic(key)
 
@@ -606,7 +631,24 @@ defmodule PepeWeb.ChatLive do
       end
     end
 
-    {on_event, authorize}
+    ask_user = fn question, choices ->
+      id = System.unique_integer([:positive])
+      requester = self()
+
+      Phoenix.PubSub.broadcast(
+        Pepe.PubSub,
+        topic,
+        {:session_event, key, {:ask_request, id, question, choices, requester}}
+      )
+
+      receive do
+        {:ask_reply, ^id, choice} -> {:ok, choice}
+      after
+        120_000 -> :timeout
+      end
+    end
+
+    {on_event, authorize, ask_user}
   end
 
   # `/goal <objective> | <success criterion>` - work, have an independent reviewer check
@@ -621,10 +663,15 @@ defmodule PepeWeb.ChatLive do
 
     case parts do
       [objective, criteria] when objective != "" and criteria != "" ->
-        {on_event, authorize} = session_callbacks(key)
+        {on_event, authorize, ask_user} = session_callbacks(key)
 
         spawn(fn ->
-          GoalLoop.run(key, objective, criteria, stream: true, on_event: on_event, authorize: authorize)
+          GoalLoop.run(key, objective, criteria,
+            stream: true,
+            on_event: on_event,
+            authorize: authorize,
+            ask_user: ask_user
+          )
         end)
 
         socket
@@ -665,6 +712,7 @@ defmodule PepeWeb.ChatLive do
       running: false,
       activity: [],
       pending_perm: nil,
+      pending_ask: nil,
       input: ""
     )
     |> put_flash(:info, gettext("🧠 New conversation started."))

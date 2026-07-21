@@ -9,6 +9,7 @@ defmodule Pepe.Tools do
   restart. Built-ins win on a name collision.
   """
 
+  alias Pepe.Tools.AskUser
   alias Pepe.Tools.Bash
   alias Pepe.Tools.Board
   alias Pepe.Tools.Commitment
@@ -50,6 +51,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.WriteFile
 
   @builtin [
+    AskUser,
     Bash,
     RunScript,
     ReadFile,

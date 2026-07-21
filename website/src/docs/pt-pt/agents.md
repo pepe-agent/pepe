@@ -178,6 +178,7 @@ O conjunto integrado cobre o essencial:
 | `fetch_url`, `web_search` | Lê uma página web ou pesquisa na web. |
 | `send_file` | Entrega um ficheiro que o agente produziu no canal atual. |
 | `send_to_agent` | Envia mensagem a outro agente (sujeito a `can_message`). |
+| `ask_user` | Pede-te para escolheres entre algumas opções, com botões/menu reais onde o canal o permite. |
 | `schedule_task`, `watch` | Cria tarefas recorrentes e vigias de uma só vez do tipo "avisa-me quando X". |
 | `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gere agentes, ferramentas e encaminhamento pelo chat. |
 | `manage_channel`, `end_session` | Liga e fecha canais de mensagens pelo chat. |
@@ -203,8 +204,22 @@ chamada. Podes responder:
 - Recusar. Nunca é lembrado, por isso é perguntado de novo.
 
 Coloca tu próprio uma ferramenta em `auto_approve` para saltar o aviso desde o
-início. Em superfícies sem pessoa a quem perguntar (por exemplo a API HTTP), as
-ferramentas com barreira são autorizadas a correr para que o pedido não fique preso.
+início. Em superfícies sem pessoa a quem perguntar (por exemplo a API HTTP, um
+webhook, uma tarefa cron), uma ferramenta com barreira é recusada em vez de correr sem
+supervisão: só corre o que já está em `auto_approve`.
+
+### A pedir-te para escolheres
+
+Algumas perguntas respondem-se melhor com um toque do que com uma resposta escrita.
+O `ask_user` permite a um agente apresentar uma pergunta de escolha múltipla genuína e
+receber a escolha de volta dentro do mesmo turno, em vez de adivinhar ou terminar o
+turno à espera que a mensagem seguinte responda exatamente ao que foi perguntado. No
+Telegram aparece como botões inline reais; na consola, como um menu numerado; no chat
+do painel, como opções clicáveis. Corre livremente (perguntar não tem risco nenhum, por
+isso nunca passa pela barreira de permissões), mas só funciona onde há uma pessoa
+interativa a quem perguntar: a API HTTP, um webhook ou uma execução não supervisionada
+de cron/watch recusam a chamada de imediato, em vez de ficarem à espera de um botão que
+ninguém pode carregar.
 
 ### Fá-lo pela conversa
 

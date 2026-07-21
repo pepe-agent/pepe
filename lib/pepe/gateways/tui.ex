@@ -146,6 +146,15 @@ defmodule Pepe.Gateways.TUI do
     end
   end
 
+  @doc "The console `ask_user` callback - an arrow-key menu over the tool's own choices."
+  @spec ask_user_fn() :: (String.t(), [String.t()] -> {:ok, String.t()})
+  def ask_user_fn do
+    fn question, choices ->
+      pick = Pepe.TUI.select(choices, label: bold(question))
+      {:ok, pick}
+    end
+  end
+
   # Give a denial an optional free-text reason, threaded back into the agent's
   # context (see Pepe.Permissions.denied_message/2) instead of a bare refusal.
   defp maybe_deny_reason do
@@ -206,7 +215,8 @@ defmodule Pepe.Gateways.TUI do
     case Session.chat(key, text,
            stream: true,
            on_event: stream_events(),
-           authorize: authorizer()
+           authorize: authorizer(),
+           ask_user: ask_user_fn()
          ) do
       {:ok, _reply} -> IO.puts("")
       {:error, reason} -> error("\n#{inspect(reason)}")

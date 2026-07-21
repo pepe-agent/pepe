@@ -178,6 +178,7 @@ O conjunto embutido cobre o essencial:
 | `fetch_url`, `web_search` | Lê uma página web ou busca na web. |
 | `send_file` | Entrega um arquivo que o agente produziu no canal atual. |
 | `send_to_agent` | Envia mensagem a outro agente (sujeito a `can_message`). |
+| `ask_user` | Pede para você escolher entre algumas opções, com botões/menu reais onde o canal permite. |
 | `schedule_task`, `watch` | Cria tarefas recorrentes e vigias de uma vez só do tipo "me avise quando X". |
 | `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gerencia agentes, ferramentas e roteamento pelo chat. |
 | `manage_channel`, `end_session` | Conecta e fecha canais de mensagens pelo chat. |
@@ -202,8 +203,22 @@ chamada. Você pode responder:
 - Negar. Nunca lembrado, então é perguntado de novo.
 
 Coloque você mesmo uma ferramenta em `auto_approve` para pular o pedido desde o
-início. Em superfícies sem pessoa a quem perguntar (por exemplo a API HTTP), as
-ferramentas com barreira são autorizadas a rodar para que a requisição não trave.
+início. Em superfícies sem pessoa a quem perguntar (por exemplo a API HTTP, um
+webhook, uma tarefa cron), uma ferramenta com barreira é recusada em vez de rodar sem
+supervisão: só executa o que já está em `auto_approve`.
+
+### Pedindo para você escolher
+
+Algumas perguntas são melhor respondidas com um toque do que com uma resposta digitada.
+O `ask_user` permite que um agente apresente uma pergunta de múltipla escolha de
+verdade e receba a escolha de volta dentro do mesmo turno, em vez de adivinhar ou
+encerrar o turno esperando que a próxima mensagem responda exatamente o que foi
+perguntado. No Telegram aparece como botões inline reais; no console, como um menu
+numerado; no chat do painel, como opções clicáveis. Ele roda livremente (perguntar não
+carrega risco algum, então nunca passa pela barreira de permissão), mas só funciona
+onde existe uma pessoa interativa para perguntar: a API HTTP, um webhook ou uma
+execução não supervisionada de cron/watch recusam a chamada na hora, em vez de ficar
+esperando um botão que ninguém pode apertar.
 
 ### Faça pela conversa
 

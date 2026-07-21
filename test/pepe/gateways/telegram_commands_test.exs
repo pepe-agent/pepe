@@ -98,6 +98,11 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
         :tool ->
           if last["role"] == "tool", do: model_reply(conn, "ran it", nil), else: model_reply(conn, nil, bash_call())
 
+        :ask_user ->
+          if last["role"] == "tool",
+            do: model_reply(conn, "you picked #{last["content"]}", nil),
+            else: model_reply(conn, nil, ask_user_call())
+
         # Five tools at once: the shape that turns one progress note into ten edits.
         :burst ->
           if last["role"] == "tool", do: model_reply(conn, "all done", nil), else: model_reply(conn, nil, many_calls())
@@ -133,6 +138,19 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
     defp bash_call do
       [%{"id" => "c1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"true"})}}]
+    end
+
+    defp ask_user_call do
+      [
+        %{
+          "id" => "c1",
+          "type" => "function",
+          "function" => %{
+            "name" => "ask_user",
+            "arguments" => ~s({"question":"Pizza or sushi?","choices":["Pizza","Sushi"]})
+          }
+        }
+      ]
     end
 
     # What a model actually does when the work splits: several reads at once. They run
@@ -743,6 +761,84 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
       # The prompt is never closed and the tool never runs: an outsider cannot approve a
       # risky command in someone else's chat.
+      refute_receive {:edited, ^chat, _text}, 500
+    end
+  end
+
+  describe "the native ask_user prompt" do
+    setup %{chat: chat} do
+      Config.put_agent(%Pepe.Config.Agent{
+        name: "assistant",
+        model: "mock",
+        system_prompt: "You help. CHAT-#{chat}",
+        tools: ["ask_user"],
+        max_iterations: 4
+      })
+
+      :ok
+    end
+
+    test "the question renders as real buttons, and the tap is what answers it", %{chat: chat} do
+      start_bot!()
+      model_answers(:ask_user)
+
+      say(chat, "help me decide")
+
+      assert_receive {:sent, ^chat, prompt, [_ | _] = buttons}, 5_000
+      assert prompt =~ "Pizza or sushi?"
+
+      flat = List.flatten(buttons)
+      assert Enum.map(flat, & &1["text"]) == ["Pizza", "Sushi"]
+      assert Enum.all?(Enum.map(flat, & &1["callback_data"]), &String.starts_with?(&1, "ask:"))
+
+      [sushi] = Enum.filter(flat, &(&1["text"] == "Sushi"))
+
+      # Nothing has run yet: the turn is parked on the button, same as a permission prompt.
+      refute_receive {:sent, ^chat, _text, _buttons}, 300
+
+      tap_button(chat, sushi["callback_data"])
+
+      # The prompt is closed with the pick (no dangling buttons), then the turn continues
+      # with the answer as the tool's own result.
+      assert_receive {:edited, ^chat, "Sushi"}, 5_000
+      assert await_reply(chat) =~ "you picked Sushi"
+    end
+
+    test "a stale/expired tap is told so instead of silently doing nothing", %{chat: chat} do
+      start_bot!()
+      model_answers(:ask_user)
+
+      say(chat, "help me decide")
+      assert [first | _] = await_buttons(chat)
+
+      # Answer it once - the pending entry is gone after this.
+      tap_button(chat, first)
+      assert_receive {:edited, ^chat, _pick}, 5_000
+      await_reply(chat)
+
+      # Tapping the very same (now-stale) button again finds no waiter.
+      tap_button(chat, first)
+      assert_receive {:edited, ^chat, expired}, 5_000
+      assert expired =~ "expired"
+    end
+
+    test "a tap by someone outside the allowlist does nothing", %{chat: chat} do
+      start_bot!(%{"allowed_users" => [@user]})
+      model_answers(:ask_user)
+
+      say(chat, "help me decide")
+      assert [first | _] = await_buttons(chat)
+
+      push(%{
+        "update_id" => System.unique_integer([:positive]),
+        "callback_query" => %{
+          "id" => "cb-outsider",
+          "data" => first,
+          "from" => %{"id" => @outsider},
+          "message" => %{"message_id" => 777, "chat" => %{"id" => chat}}
+        }
+      })
+
       refute_receive {:edited, ^chat, _text}, 500
     end
   end
