@@ -481,7 +481,13 @@ defmodule Pepe.Agent.Runtime do
   # error - just fetched over MCP instead of fetch_url/web_search, so it taints too. Every
   # mcp__<server>__<tool> call counts, not a fixed list: which servers/tools an agent has is
   # config, not something this module should have to know about ahead of time.
-  @outside_content ~w(fetch_url web_search)
+  #
+  # `delegate` taints too, and for the same reason: its own workers hold fetch_url/web_search,
+  # so its result is a proxy for exactly the outside content this taint exists to catch - a
+  # worker reading a hostile page can steer what comes back, which then reaches this run's
+  # context looking like an ordinary tool result. Untainted, that content would still enjoy
+  # this run's own auto_approve, which is the whole thing tainting is supposed to withdraw.
+  @outside_content ~w(fetch_url web_search delegate)
 
   defp taint_if_outside(name) when name in @outside_content, do: Pepe.Permissions.taint()
   defp taint_if_outside(name), do: if(Pepe.MCP.mcp_tool?(name), do: Pepe.Permissions.taint(), else: :ok)

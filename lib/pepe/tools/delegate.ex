@@ -193,7 +193,11 @@ defmodule Pepe.Tools.Delegate do
 
     case SessionSupervisor.ensure(session_key, agent_name) do
       {:ok, _pid} ->
-        case Session.chat(session_key, prompt, []) do
+        # untrusted: true - the results are workers' own fetch_url/web_search output, the
+        # same outside content that taints the synchronous path (see Runtime's
+        # @outside_content). This turn opens WITH that content already in hand, not by
+        # calling a tool for it, so it must start tainted rather than earn it mid-turn.
+        case Session.chat(session_key, prompt, untrusted: true) do
           {:ok, _reply} -> :ok
           {:error, reason} -> Logger.warning("[delegate] background results couldn't be delivered to #{session_key}: #{inspect(reason)}")
         end
