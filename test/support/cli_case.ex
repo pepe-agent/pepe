@@ -22,6 +22,7 @@ defmodule Pepe.CLICase do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     # Commands that need the runtime go through `with_app/2`, which rewrites these
     # globals for the whole VM; leaking one would silently reconfigure the app for

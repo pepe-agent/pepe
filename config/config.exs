@@ -7,16 +7,19 @@
 # General application configuration
 import Config
 
-# Pepe keeps no database by default - model connections, agents and gateway
-# credentials live in a JSON config file (see Pepe.Config). Ecto deps remain
-# available if you want to add persistence later.
+# Model connections, agents and gateway credentials live in a JSON config file (see
+# Pepe.Config), not a database - that part hasn't changed. Pepe.Repo (SQLite, see its
+# moduledoc) is for operational data that grows with usage instead: commitments today,
+# more to come.
 config :pepe,
-  ecto_repos: [],
+  ecto_repos: [Pepe.Repo],
   generators: [timestamp_type: :utc_datetime],
   # A runtime-readable Mix.env(), so code that must never touch disk under test
   # (Pepe.Agent.Session's persistence guard) can check it without depending on
   # the Mix module at runtime (unavailable in a release build).
   env: config_env()
+
+config :ecto, :json_library, Jason
 
 # Configure the endpoint
 config :pepe, PepeWeb.Endpoint,

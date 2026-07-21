@@ -62,6 +62,7 @@ defmodule Pepe.Agent.CommitmentExtractTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
@@ -161,12 +162,6 @@ defmodule Pepe.Agent.CommitmentExtractTest do
     assert commitment.origin_type == "agent_promise"
     assert commitment.text == "check the deploy and report back"
     assert is_integer(commitment.due_at)
-
-    # Extraction runs in its own spawned Task (see maybe_extract/1), a fresh process with
-    # an empty process dictionary - regression for that Task not tagging its own writes,
-    # which used to leave them showing "unknown" in the journal.
-    [entry | _] = Pepe.Config.Journal.recent()
-    assert entry["source"] == "commitments:extract"
   end
 
   test "a low-confidence extraction lands awaiting confirmation instead of scheduled" do

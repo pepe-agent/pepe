@@ -1,17 +1,8 @@
 import Config
 
-# Configure your database
-#
-# The MIX_TEST_PARTITION environment variable can be used
-# to provide built-in test partitioning in CI environment.
-# Run `mix help test` for more information.
-config :pepe, Pepe.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "pepe_test#{System.get_env("MIX_TEST_PARTITION")}",
-  pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: System.schedulers_online() * 2
+# No Repo config block here on purpose: Pepe.Repo is never auto-started under
+# `Application.start/2` in :test (see application.ex) - each test that touches it
+# starts its own instance, pointed at that test's own PEPE_HOME, via Pepe.RepoSetup.
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

@@ -199,7 +199,7 @@ defmodule Pepe.Doctor do
   # Security: secrets stored in the clear, and a server with no dashboard password.
   defp security_checks do
     secret_checks =
-      case plaintext_secrets(Config.load(), []) do
+      case plaintext_secrets(Config.load(), []) ++ commitment_plaintext_secrets() do
         [] ->
           [{"security", "secrets", :ok}]
 
@@ -294,6 +294,22 @@ defmodule Pepe.Doctor do
   end
 
   defp plaintext_secrets(_v, _path), do: []
+
+  # Commitments moved off config.json onto Pepe.Repo (see Pepe.Config.Commitment) - the
+  # generic walk above only ever sees config.json, so without this, a credential that
+  # ended up in a commitment's `origin` map (or anywhere else in it) would silently stop
+  # being caught the moment it left the file. The `origin.key`-is-a-session-key-not-a-
+  # credential exception (origin_routing_key?/2) applies here exactly as it does to a
+  # watch's origin, since it is the same shape and the same reasoning.
+  defp commitment_plaintext_secrets do
+    Config.commitments()
+    |> Enum.flat_map(fn c ->
+      c
+      |> Map.from_struct()
+      |> Map.drop([:__meta__, :id, :normalized_text])
+      |> plaintext_secrets(["commitments", c.id])
+    end)
+  end
 
   @oauth_protocol_fields ~w(token_url token_content_type client_id provider expires_at)
 

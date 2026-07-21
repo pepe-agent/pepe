@@ -22,6 +22,7 @@ defmodule Pepe.Agent.SwitchAgentTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_agent(%Agent{name: "eng", system_prompt: "eng", tools: [], max_iterations: 5})
     Config.put_agent(%Agent{name: "sup", system_prompt: "sup", tools: [], max_iterations: 5})

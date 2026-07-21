@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Commitments now live in a local SQLite store (`Pepe.Repo`) instead of `config.json`** - the first of several growing, operational subsystems (watches, board, traces and usage are the planned next ones) moving off a file that used to be rewritten in full on every single write, a cost that only grows as an install sees more real use. Agent/model/channel definitions are unaffected and stay in `config.json`, which remains the right fit there (editable, git-diffable, portable). The public `Pepe.Config` commitment functions are unchanged in name and shape, so nothing that already used them needed to change. An existing install migrates its old commitments with the new `mix pepe config migrate-commitments` command - explicit and operator-run, never automatic, safe to run more than once, and it leaves `config.json` untouched if anything fails partway so nothing is silently lost.
+
 ### Changed
 - **`bash`/`run_script` no longer interrupt for a command that carries no risk at all** (no delete, network, sudo, inline code, or write) when there's an actual person on the other end to have been asked - a plain `ls`, `cat`, `git status`, or `pytest` just runs, the same free pass an in-workspace `read_file` already gets. A surface with nobody to ask (the HTTP API, a webhook, a cron, a `delegate` worker) still refuses anything not in `auto_approve`, unchanged - only the interactive case got quieter. The risk classifier was also tightened alongside this: `rm file` (not just `rm -rf`) now flags as a delete, and anything piped into a shell interpreter (not just after a literal `curl`/`wget`) flags as download-and-run.
 

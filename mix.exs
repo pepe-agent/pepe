@@ -94,7 +94,10 @@ defmodule Pepe.MixProject do
       {:phoenix, "~> 1.8.8"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
-      {:postgrex, ">= 0.0.0"},
+      # Operational data that grows with usage (commitments, and more to come) - not
+      # config.json, which stays a plain file for definitions. Ships its own SQLite via
+      # rustler_precompiled, the same mechanism `mdex` below already uses.
+      {:ecto_sqlite3, "~> 0.24"},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},

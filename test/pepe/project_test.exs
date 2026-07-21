@@ -11,6 +11,7 @@ defmodule Pepe.ProjectTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
@@ -173,6 +174,41 @@ defmodule Pepe.ProjectTest do
       assert Config.get_agent("helper") == nil
       # can_message is stored by id, so the route now resolves to the new handle - not dangling.
       assert Config.get_agent("boss").can_message == ["default/assistant"]
+    end
+
+    test "re-binds a commitment bound to the renamed agent, both the resolved-id and the orphaned-handle case" do
+      Config.put_agent(%Agent{name: "helper", system_prompt: "h"})
+
+      {:ok, resolved} =
+        Config.create_commitment(%Pepe.Config.Commitment{
+          text: "a promise from a real agent",
+          agent: "helper",
+          origin_type: "agent_promise"
+        })
+
+      # A commitment stored (however it got that way - an already-orphaned reference, not
+      # a fresh one: Config.create_commitment/1 would resolve "helper" to its stable id,
+      # same as `resolved` above, so this bypasses that resolution on purpose) with the raw
+      # handle string itself, not the agent's stable id - the one case
+      # Config.rewrite_commitment_agent_binding/2 actually exists for.
+      orphaned =
+        Pepe.Config.Commitment.changeset(%Pepe.Config.Commitment{}, %{
+          text: "a promise tied to the raw handle",
+          agent: "default/helper",
+          origin_type: "agent_promise"
+        })
+        |> Ecto.Changeset.put_change(:id, "c_orphan_test")
+        |> Pepe.Repo.insert!()
+
+      assert orphaned.agent == "default/helper"
+
+      assert :ok = Config.rename_agent("helper", "assistant")
+
+      # The common case follows for free (read_agent_ref/1 re-resolves the current handle
+      # for the same stable id) - no rebinding needed, but still worth confirming it holds.
+      assert Config.get_commitment(resolved.id).agent == "default/assistant"
+      # The fallback case: an exact-match rewrite of the raw handle string itself.
+      assert Config.get_commitment(orphaned.id).agent == "default/assistant"
     end
   end
 

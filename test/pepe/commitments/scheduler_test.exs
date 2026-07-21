@@ -51,6 +51,7 @@ defmodule Pepe.Commitments.SchedulerTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
     File.write!(Path.join(home, "config.json"), Jason.encode!(%{}))
 
     start_supervised!({Task.Supervisor, name: Pepe.Commitments.TaskSupervisor})
@@ -99,12 +100,6 @@ defmodule Pepe.Commitments.SchedulerTest do
     assert_receive {:watch_message, ^origin, "send the report"}, 2_000
     wait_until(fn -> match?(%{state: "delivered"}, Config.get_commitment(id)) end)
     assert Config.get_commitment(id).pending_delivery == nil
-
-    # The fire runs in its own spawned Task (run_fire/1), not the scheduler's own process
-    # that tagged "commitments" in init/1 - regression for that Task's writes showing
-    # "unknown" in the journal instead.
-    [entry | _] = Pepe.Config.Journal.recent()
-    assert entry["source"] == "commitments"
   end
 
   test "a due agent_promise re-runs the original session and delivers its real reply" do

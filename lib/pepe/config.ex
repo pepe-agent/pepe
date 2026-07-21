@@ -910,10 +910,14 @@ defmodule Pepe.Config do
   defp clear_agent_bindings(config, ids) do
     bound? = fn ref -> is_binary(ref) and MapSet.member?(ids, agent_id_for(config, ref)) end
 
+    # Not config.json - a side effect alongside the pure map transform below, using the
+    # same `ids` this function already received (already-resolved agent ids, exactly what
+    # reject_commitments_bound_to/1 needs - see its own comment).
+    reject_commitments_bound_to(ids)
+
     config
     |> reject_bound_entries("crons", bound?)
     |> reject_bound_entries("watches", bound?)
-    |> reject_bound_entries("commitments", bound?)
     |> reject_bound_entries("api_tokens", bound?)
     |> reject_bound_entries("webhooks", bound?)
     |> blank_bound_agent("telegram", bound?)
@@ -995,7 +999,6 @@ defmodule Pepe.Config do
       |> remap_model_names(old, new)
       |> rewrite_agent_binding("crons", old, new)
       |> rewrite_agent_binding("watches", old, new)
-      |> rewrite_agent_binding("commitments", old, new)
       |> rewrite_bot_bindings(old, new)
       |> rewrite_token_scopes(old, new)
       |> remap_field("default_agent", old, new)
@@ -1003,6 +1006,7 @@ defmodule Pepe.Config do
     end)
 
     move_project_dirs(old, new)
+    rewrite_commitment_project_binding(old, new)
     :ok
   end
 
@@ -1202,7 +1206,7 @@ defmodule Pepe.Config do
     agents = keep_owned_agents(config["agents"], project_id_for(config, co))
     crons = config["crons"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     watches = config["watches"] |> resolve_section_agents(config) |> keep_agent_bound(co)
-    commitments = config["commitments"] |> resolve_section_agents(config) |> keep_agent_bound(co)
+    commitments = commitments_raw_map() |> resolve_section_agents(config) |> keep_agent_bound(co)
     telegrams = config["telegrams"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     tokens = config["api_tokens"] |> resolve_section_agents(config) |> keep_tokens(co)
     webhooks = config["webhooks"] |> resolve_section_agents(config) |> keep_webhooks(co)
@@ -1886,6 +1890,7 @@ defmodule Pepe.Config do
 
     if get_in(result, ["agents", id, "bare"]) == new_bare do
       Pepe.Agent.Workspace.rename(old_handle, new_handle)
+      rewrite_commitment_agent_binding(old_handle, new_handle)
       :ok
     else
       {:error, :already_exists}
@@ -1910,7 +1915,6 @@ defmodule Pepe.Config do
     end)
     |> rewrite_agent_binding("crons", old, new)
     |> rewrite_agent_binding("watches", old, new)
-    |> rewrite_agent_binding("commitments", old, new)
     |> rewrite_bot_bindings(old, new)
     |> rewrite_token_scopes(old, new)
     |> remap_field("default_agent", old, new)
@@ -2180,22 +2184,28 @@ defmodule Pepe.Config do
   ###
   ### Commitments (agent- or user-made follow-ups, extracted automatically after a turn)
   ###
+  ### Backed by Pepe.Repo (SQLite), not config.json - see Pepe.Config.Commitment and
+  ### Pepe.Repo's moduledocs. This is the one section of this module that isn't a plain
+  ### map read/write; everything below keeps the exact same names/arities/return shapes
+  ### the rest of the codebase already calls, so no caller outside this section needed to
+  ### change when the storage moved.
+  ###
+
+  import Ecto.Query, only: [from: 2]
 
   alias Pepe.Config.Commitment
+  alias Pepe.Repo
 
   @doc "All commitments, as `Pepe.Config.Commitment` structs, sorted by id."
   def commitments do
-    load()
-    |> Map.get("commitments", %{})
-    |> Enum.map(fn {id, map} -> Commitment.from_map(Map.put(map, "id", id)) |> resolve_commitment_agent() end)
-    |> Enum.sort_by(& &1.id)
+    Commitment |> from(order_by: :id) |> Repo.all() |> Enum.map(&resolve_commitment_agent/1)
   end
 
   @doc "Fetch one commitment by id, or nil."
   def get_commitment(id) do
-    case load() |> get_in(["commitments", id]) do
+    case Repo.get(Commitment, id) do
       nil -> nil
-      map -> Commitment.from_map(Map.put(map, "id", id)) |> resolve_commitment_agent()
+      commitment -> resolve_commitment_agent(commitment)
     end
   end
 
@@ -2204,71 +2214,133 @@ defmodule Pepe.Config do
   @doc """
   Create or replace a commitment (keyed by its `id`). For human-driven updates
   (`confirm`/`cancel`, the scheduler marking it delivered) where the caller already has
-  the id - not for a fresh extraction, see `create_commitment/1`.
+  the id - not for a fresh extraction, see `create_commitment/1`. An atomic upsert
+  (insert, or fully replace every column but `id` if the row already exists) - the same
+  "caller provides the whole row" contract `Map.put/3` gave against the old config.json
+  map. Callers use this purely for effect; none read its return value.
   """
   def put_commitment(%Commitment{id: id} = commitment) when is_binary(id) do
-    map = %{commitment | agent: store_agent_ref(commitment.agent)} |> Map.from_struct() |> Map.delete(:id) |> stringify()
+    stored = %{commitment | agent: store_agent_ref(commitment.agent)}
+    changeset = Commitment.changeset(stored, Map.from_struct(stored))
 
-    update(fn config ->
-      config
-      |> update_in(["commitments"], fn c -> Map.put(c || %{}, id, map) end)
-    end)
+    Repo.insert(changeset,
+      on_conflict: {:replace_all_except, [:id]},
+      conflict_target: :id
+    )
   end
 
-  @doc "Delete a commitment by id."
+  @doc "Delete a commitment by id. A no-op, not an error, if it doesn't exist."
   def delete_commitment(id) do
-    update(fn config ->
-      config
-      |> update_in(["commitments"], &Map.delete(&1 || %{}, id))
-    end)
+    from(c in Commitment, where: c.id == ^id) |> Repo.delete_all()
+    :ok
   end
 
   @doc """
   Insert a freshly-extracted commitment, atomically skipping the insert when an active
   (`awaiting_confirmation`/`scheduled`) commitment already exists for the same agent with
   near-identical text. Extraction runs automatically after every turn, so this
-  check-then-write must happen inside the same `update_cas/1` callback, not as a separate
-  `commitments/0` read followed by `put_commitment/1` - two turns racing to store the same
-  restated commitment is a real scenario, not a hypothetical one.
+  check-then-write must happen atomically, not as a separate `commitments/0` read
+  followed by `put_commitment/1` - two turns racing to store the same restated
+  commitment is a real scenario, not a hypothetical one. Enforced by a partial unique
+  index (`agent`, `normalized_text`, only while `state` is active - see the migration),
+  a *stronger* guarantee than the old in-process CAS ever gave: that only serialized
+  writes within one BEAM process, so two concurrent `mix pepe` OS processes got no
+  protection at all; a DB-level index protects across processes too.
   """
   @spec create_commitment(Commitment.t()) :: {:ok, Commitment.t()} | {:error, :duplicate} | {:error, term()}
   def create_commitment(%Commitment{} = commitment) do
     id = generate_commitment_id()
     agent_ref = store_agent_ref(commitment.agent)
-    norm = normalize_commitment_text(commitment.text)
+    stored = %{commitment | id: id, agent: agent_ref}
+    changeset = Commitment.changeset(stored, Map.from_struct(stored))
 
-    update_cas(fn config ->
-      if duplicate_commitment?(config, agent_ref, norm) do
-        {:error, :duplicate}
-      else
-        map = %{commitment | agent: agent_ref} |> Map.from_struct() |> Map.delete(:id) |> stringify()
-        {:ok, update_in(config, ["commitments"], &Map.put(&1 || %{}, id, map))}
-      end
-    end)
-    |> case do
-      {:ok, new_config} ->
-        {:ok, get_in(new_config, ["commitments", id]) |> Map.put("id", id) |> Commitment.from_map() |> resolve_commitment_agent()}
+    case Repo.insert(changeset) do
+      {:ok, saved} ->
+        {:ok, resolve_commitment_agent(saved)}
 
-      {:error, _} = err ->
-        err
+      {:error, changeset} ->
+        # This table has exactly one unique index, so any :unique-typed error is
+        # unambiguously this one - matching by error type rather than guessing which
+        # field name the adapter attaches a composite constraint's violation to.
+        if Enum.any?(changeset.errors, &match?({_, {_, [{:constraint, :unique} | _]}}, &1)) do
+          {:error, :duplicate}
+        else
+          {:error, changeset.errors}
+        end
     end
   end
 
-  defp duplicate_commitment?(config, agent_ref, norm) do
-    config
-    |> Map.get("commitments", %{})
-    |> Enum.any?(fn {_id, m} ->
-      m["agent"] == agent_ref and m["state"] in ["awaiting_confirmation", "scheduled"] and
-        normalize_commitment_text(m["text"]) == norm
+  defp generate_commitment_id, do: "c_" <> (:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower))
+
+  # For Pepe.Bundle.extract/2 (single-project export): the same `%{id => %{"agent" => ...,
+  # ...}}` raw shape config.json's own "commitments" section used to have, built from
+  # Pepe.Repo instead - keeps a bundle self-contained/portable (no SQLite dependency for
+  # the receiving install), at the cost of a restored *extract* needing to run
+  # `mix pepe migrate commitments` once afterward (a full PEPE_HOME backup/restore needs
+  # no such step - it already carries data/pepe.db directly). Deliberately NOT
+  # `commitments/0`: that resolves `agent` to a handle already, and resolve_section_agents/2
+  # (the same helper crons/watches already go through) expects the raw stored id so it can
+  # do that resolution itself.
+  defp commitments_raw_map do
+    Commitment
+    |> Repo.all()
+    |> Map.new(fn c ->
+      {c.id,
+       %{
+         "text" => c.text,
+         "source_excerpt" => c.source_excerpt,
+         "due_when" => c.due_when,
+         "due_at" => c.due_at,
+         "origin_type" => c.origin_type,
+         "agent" => c.agent,
+         "origin" => c.origin,
+         "confidence" => c.confidence,
+         "state" => c.state,
+         "created_at" => c.created_at,
+         "delivered_at" => c.delivered_at,
+         "last_error" => c.last_error,
+         "pending_delivery" => c.pending_delivery,
+         "firing_at" => c.firing_at
+       }}
     end)
   end
 
-  defp normalize_commitment_text(text) when is_binary(text),
-    do: text |> String.downcase() |> String.replace(~r/[[:punct:]]/u, "") |> String.trim()
+  # `commitment.agent` is normally the agent's own resolved, stable id (`store_agent_ref`) -
+  # opaque, not `project/name`-shaped, so it is immune to both an agent rename and a project
+  # rename in the common case; the id doesn't change, only the handle/slug does, and
+  # `read_agent_ref/1` already re-resolves the current handle from that stable id on every
+  # read. These two functions only ever do something in the fallback case where
+  # `store_agent_ref` couldn't resolve a handle at write time and stored the raw handle
+  # instead - an orphaned/unresolved reference, not the everyday path.
 
-  defp normalize_commitment_text(_), do: ""
+  # Called on an agent rename: `old`/`new` are handles (e.g. "acme/support"), an exact match.
+  defp rewrite_commitment_agent_binding(old, new) when is_binary(old) and is_binary(new) do
+    from(c in Commitment, where: c.agent == ^old) |> Repo.update_all(set: [agent: new])
+    :ok
+  end
 
-  defp generate_commitment_id, do: "c_" <> (:crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower))
+  # Called on a project rename: `old`/`new` are project slugs. Not a single clean UPDATE (the
+  # replacement handle differs per row, since each keeps its own agent name) - a small
+  # per-row loop, correctness over cleverness since this only ever touches an
+  # already-orphaned reference.
+  defp rewrite_commitment_project_binding(old_slug, new_slug) do
+    from(c in Commitment, where: like(c.agent, ^"#{old_slug}/%"))
+    |> Repo.all()
+    |> Enum.each(fn c ->
+      new_handle = Pepe.Project.handle(new_slug, Pepe.Project.name_of(c.agent))
+      Repo.update_all(from(x in Commitment, where: x.id == ^c.id), set: [agent: new_handle])
+    end)
+
+    :ok
+  end
+
+  # Called when an agent (or a whole project's agents) is deleted - `ids` is the MapSet of
+  # agent ids being dropped, already resolved by the caller (Config.clear_agent_bindings/2).
+  defp reject_commitments_bound_to(ids) do
+    ids = MapSet.to_list(ids)
+    from(c in Commitment, where: c.agent in ^ids) |> Repo.delete_all()
+    :ok
+  end
 
   ###
   ### API access tokens

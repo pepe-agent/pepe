@@ -36,11 +36,13 @@ end
 config :pepe, PepeWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
-  # Pepe ships as a standalone CLI (escript / Burrito release) and keeps **no
-  # database** (`ecto_repos: []`), so we never require DATABASE_URL. The HTTP
-  # endpoint is only used by `pepe serve`; it signs no persistent cookies, so a
-  # random per-run secret is fine when SECRET_KEY_BASE isn't provided. This keeps
-  # the distributed binary runnable with zero environment setup.
+  # Pepe ships as a standalone CLI (escript / Burrito release) and keeps no
+  # separate database server - Pepe.Repo is a local SQLite file resolved from
+  # PEPE_HOME at boot (see Pepe.Repo.init/2), not from a DATABASE_URL, so there's
+  # nothing to configure here. The HTTP endpoint is only used by `pepe serve`; it
+  # signs no persistent cookies, so a random per-run secret is fine when
+  # SECRET_KEY_BASE isn't provided. This keeps the distributed binary runnable
+  # with zero environment setup.
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") || Base.encode64(:crypto.strong_rand_bytes(48))
 

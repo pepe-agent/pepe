@@ -10,6 +10,7 @@ defmodule Pepe.RenameProjectTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
@@ -93,17 +94,49 @@ defmodule Pepe.RenameProjectTest do
 
     assert is_binary(raw)
 
+    {:ok, commitment} =
+      Config.create_commitment(%Pepe.Config.Commitment{
+        text: "check the deploy",
+        agent: "acme/sales",
+        origin_type: "agent_promise"
+      })
+
     assert Config.rename_project("acme", "umbrella") == :ok
 
     assert Config.get_cron("c1").agent == "umbrella/sales"
     assert Config.get_watch("w1").agent == "umbrella/support"
     assert Config.telegram_bot("sales")["agent"] == "umbrella/sales"
+    assert Config.get_commitment(commitment.id).agent == "umbrella/sales"
 
     [tok] = Config.api_tokens()
     assert tok["project"] == "umbrella"
     assert tok["agent"] == "umbrella/sales"
     # the cron prompt (free text) is untouched
     assert Config.get_cron("c1").prompt == "hi"
+  end
+
+  # A commitment's `agent` is normally the agent's own resolved, stable id (an opaque
+  # string, immune to a project rename in the common case above - it follows for free via
+  # read_agent_ref/1 re-resolving the current handle every time, no rebinding needed).
+  # Pepe.Config.rewrite_commitment_project_binding/2 only does real work in the fallback
+  # case this test exercises directly: an agent handle that never resolved to an id in
+  # the first place (store_agent_ref falls back to the raw handle when the agent can't be
+  # found), which is exactly the kind of edge case a move from a generic map-rewrite
+  # helper to hand-written SQL can silently drop.
+  test "re-binds a commitment's orphaned, never-resolved agent handle on project rename" do
+    Config.add_project("acme", %{})
+
+    {:ok, commitment} =
+      Config.create_commitment(%Pepe.Config.Commitment{
+        text: "an old promise",
+        agent: "acme/ghost",
+        origin_type: "agent_promise"
+      })
+
+    assert commitment.agent == "acme/ghost"
+
+    assert Config.rename_project("acme", "umbrella") == :ok
+    assert Config.get_commitment(commitment.id).agent == "umbrella/ghost"
   end
 
   test "moves the workspace and usage directories on disk" do

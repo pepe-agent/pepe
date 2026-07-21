@@ -78,36 +78,69 @@ defmodule Pepe.Application do
         {Phoenix.PubSub, name: Pepe.PubSub},
         # Serializes all config writes so concurrent read-modify-write mutations can't lose each
         # other's changes. Started early: everything below may write config.
-        Pepe.Config.Writer,
-        # Registry + dynamic supervisor for live agent conversation sessions
-        {Registry, keys: :unique, name: Pepe.Agent.Registry},
-        Pepe.Agent.SessionSupervisor,
-        # In-memory session-scoped tool approvals (the `:session` permission grant)
-        Pepe.Permissions.SessionStore,
-        # Owns the short-lived cache of secrets fetched from a vault (exec:/file: refs).
-        Pepe.Secrets.Vault,
-        # MCP tool servers: a registry + dynamic supervisor; clients start on demand.
-        {Registry, keys: :unique, name: Pepe.MCP.Registry},
-        {DynamicSupervisor, name: Pepe.MCP.DynSup, strategy: :one_for_one},
-        # Heartbeat: ephemeral system-events queue + the anti-spam cooldown gate.
-        Pepe.Heartbeat.Events,
-        Pepe.Heartbeat.Cooldown,
-        # Where live TUI/WebSocket sessions register so a fired watch can reach them.
-        {Registry, keys: :duplicate, name: Pepe.Watch.Subscribers},
-        # Self-healing tracker for permanently-gone Telegram chats.
-        Pepe.Gateways.Reachability,
-        # Messaging gateways (Telegram, ...). No-ops when not configured.
-        Pepe.Gateways.Supervisor,
-        # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).
-        PepeWeb.LoginThrottle,
-        # Per-session rate limiter for the embeddable chat widget (in-memory ETS, no DB).
-        PepeWeb.WidgetThrottle,
-        # Per-chat rate limiter for inbound Telegram messages (in-memory ETS, no DB).
-        Pepe.Gateways.Telegram.Throttle
-      ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
+        Pepe.Config.Writer
+      ] ++
+        repo_children() ++
+        [
+          # Registry + dynamic supervisor for live agent conversation sessions
+          {Registry, keys: :unique, name: Pepe.Agent.Registry},
+          Pepe.Agent.SessionSupervisor,
+          # In-memory session-scoped tool approvals (the `:session` permission grant)
+          Pepe.Permissions.SessionStore,
+          # Owns the short-lived cache of secrets fetched from a vault (exec:/file: refs).
+          Pepe.Secrets.Vault,
+          # MCP tool servers: a registry + dynamic supervisor; clients start on demand.
+          {Registry, keys: :unique, name: Pepe.MCP.Registry},
+          {DynamicSupervisor, name: Pepe.MCP.DynSup, strategy: :one_for_one},
+          # Heartbeat: ephemeral system-events queue + the anti-spam cooldown gate.
+          Pepe.Heartbeat.Events,
+          Pepe.Heartbeat.Cooldown,
+          # Where live TUI/WebSocket sessions register so a fired watch can reach them.
+          {Registry, keys: :duplicate, name: Pepe.Watch.Subscribers},
+          # Self-healing tracker for permanently-gone Telegram chats.
+          Pepe.Gateways.Reachability,
+          # Messaging gateways (Telegram, ...). No-ops when not configured.
+          Pepe.Gateways.Supervisor,
+          # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).
+          PepeWeb.LoginThrottle,
+          # Per-session rate limiter for the embeddable chat widget (in-memory ETS, no DB).
+          PepeWeb.WidgetThrottle,
+          # Per-chat rate limiter for inbound Telegram messages (in-memory ETS, no DB).
+          Pepe.Gateways.Telegram.Throttle
+        ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Pepe.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    with {:ok, pid} <- Supervisor.start_link(children, opts) do
+      migrate_repo()
+      {:ok, pid}
+    end
+  end
+
+  # Synchronous, not a supervised Task: everything that touches Pepe.Repo (starting
+  # with the very first commitment a fresh install ever writes) needs the schema to
+  # already exist, and nothing guarantees a background Task finishes before
+  # Application.start/2 returns control to its caller. Cheap and versioned (Ecto skips
+  # what's already applied), so paying this once per boot is not a real cost.
+  defp migrate_repo do
+    if Application.get_env(:pepe, :env) != :test do
+      Ecto.Migrator.run(Pepe.Repo, Application.app_dir(:pepe, "priv/repo/migrations"), :up, all: true)
+    end
+  end
+
+  # Pepe.Repo (SQLite, operational data - see its moduledoc) is unconditional in
+  # every real boot: even a bare one-shot `mix pepe run` needs to write, e.g. a
+  # commitment CommitmentExtract notices after the turn. Never auto-started under
+  # :test, though - if it were, the first test file that boots the whole app would
+  # register it permanently (an Ecto Repo is a named process, one per BEAM), and
+  # every later test's own `start_supervised!(Pepe.Repo, ...)` (see Pepe.RepoSetup,
+  # pointed at that test's own PEPE_HOME) would collide with `{:already_started,
+  # _}`. Schema migrations run synchronously right after the tree starts (see
+  # migrate_repo/0), not here - the one-time *data* migration (existing config.json
+  # entries into a new table) is instead an explicit `mix pepe migrate ...` command
+  # an operator runs deliberately, never automatic.
+  defp repo_children do
+    if Application.get_env(:pepe, :env) == :test, do: [], else: [Pepe.Repo]
   end
 
   # When session persistence is on, re-spawn the saved sessions on boot (off the

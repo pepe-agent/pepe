@@ -1,14 +1,16 @@
 import Config
 
-# Configure your database
+# The database itself (:database, the actual file path) is resolved at start_link
+# time from PEPE_HOME - see Pepe.Repo.init/2 - not set here. SQLite is single-writer
+# regardless of pool size, so a pool of 1 lets Ecto's own connection queue serialize
+# writes instead of fighting SQLITE_BUSY retries; wal mode is also what makes a hot
+# file-copy backup (`mix pepe backup`) safe to take while the app is running.
 config :pepe, Pepe.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "pepe_dev",
+  pool_size: 1,
+  journal_mode: :wal,
+  busy_timeout: 5_000,
   stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  pool_size: 10
+  show_sensitive_data_on_connection_error: true
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
