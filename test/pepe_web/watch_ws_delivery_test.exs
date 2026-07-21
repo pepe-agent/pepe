@@ -15,6 +15,7 @@ defmodule PepeWeb.WatchWsDeliveryTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     config = %{
       "default_agent" => "assistant",

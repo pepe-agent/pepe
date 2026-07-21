@@ -20,32 +20,49 @@ defmodule Pepe.Config.Watch do
   `origin` records where to deliver - `%{"channel" => "telegram", "chat_id" => ...}` -
   captured when the watch is created, so the reply lands on the channel you asked from
   even after a restart.
+
+  Backed by `Pepe.Repo` (SQLite), not `config.json` - see that module's moduledoc for why.
   """
 
-  @derive Jason.Encoder
-  defstruct id: nil,
-            description: nil,
-            agent: nil,
-            trigger: %{},
-            on_fire: %{},
-            origin: %{},
-            interval_s: 120,
-            max_checks: 720,
-            checks: 0,
-            # pending | paused | done | expired | cancelled
-            state: "pending",
-            created: nil,
-            last_check: nil,
-            next_check: nil,
-            last_error: nil,
-            # Notification text held here when the origin channel was unreachable.
-            pending_delivery: nil
+  use Ecto.Schema
+
+  import Ecto.Changeset
+
+  # App-generated string ids, not Ecto's default autoincrement integer.
+  @primary_key {:id, :string, autogenerate: false}
+  # An Ecto schema struct carries a hidden __meta__ that isn't itself Jason-encodable.
+  @derive {Jason.Encoder, except: [:__meta__]}
+  schema "watches" do
+    field :description, :string
+    field :agent, :string
+    field :trigger, :map, default: %{}
+    field :on_fire, :map, default: %{}
+    field :origin, :map, default: %{}
+    field :interval_s, :integer, default: 120
+    field :max_checks, :integer, default: 720
+    field :checks, :integer, default: 0
+    # pending | paused | done | expired | cancelled
+    field :state, :string, default: "pending"
+    field :created, :integer
+    field :last_check, :integer
+    field :next_check, :integer
+    field :last_error, :string
+    # Notification text held here when the origin channel was unreachable.
+    field :pending_delivery, :string
+  end
 
   @type t :: %__MODULE__{}
 
-  @spec from_map(map()) :: t()
+  @fields ~w(id description agent trigger on_fire origin interval_s max_checks checks
+             state created last_check next_check last_error pending_delivery)a
+
+  @spec changeset(t(), map()) :: Ecto.Changeset.t()
+  def changeset(watch, attrs), do: cast(watch, attrs, @fields)
+
+  @doc "Parse a raw config.json map (the pre-migration on-disk shape) into a changeset."
+  @spec from_map(map()) :: Ecto.Changeset.t()
   def from_map(map) when is_map(map) do
-    %__MODULE__{
+    changeset(%__MODULE__{}, %{
       id: map["id"],
       description: map["description"],
       agent: map["agent"],
@@ -61,6 +78,6 @@ defmodule Pepe.Config.Watch do
       next_check: map["next_check"],
       last_error: map["last_error"],
       pending_delivery: map["pending_delivery"]
-    }
+    })
   end
 end

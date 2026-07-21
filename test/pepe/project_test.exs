@@ -210,6 +210,34 @@ defmodule Pepe.ProjectTest do
       # The fallback case: an exact-match rewrite of the raw handle string itself.
       assert Config.get_commitment(orphaned.id).agent == "default/assistant"
     end
+
+    test "re-binds a watch bound to the renamed agent, both the resolved-id and the orphaned-handle case" do
+      Config.put_agent(%Agent{name: "helper", system_prompt: "h"})
+
+      resolved = %Pepe.Config.Watch{id: "w_resolved", agent: "helper", trigger: %{}}
+      Config.put_watch(resolved)
+
+      # Bypasses put_watch/1's own store_agent_ref resolution on purpose, the same way the
+      # commitment test above does - the one case Config.rewrite_watch_agent_binding/2
+      # actually exists for.
+      orphaned =
+        Pepe.Config.Watch.changeset(%Pepe.Config.Watch{}, %{
+          agent: "default/helper",
+          trigger: %{}
+        })
+        |> Ecto.Changeset.put_change(:id, "w_orphan_test")
+        |> Pepe.Repo.insert!()
+
+      assert orphaned.agent == "default/helper"
+
+      assert :ok = Config.rename_agent("helper", "assistant")
+
+      # The common case follows for free (read_agent_ref/1 re-resolves the current handle
+      # for the same stable id) - no rebinding needed, but still worth confirming it holds.
+      assert Config.get_watch("w_resolved").agent == "default/assistant"
+      # The fallback case: an exact-match rewrite of the raw handle string itself.
+      assert Config.get_watch("w_orphan_test").agent == "default/assistant"
+    end
   end
 
   describe "scoped agent listing" do

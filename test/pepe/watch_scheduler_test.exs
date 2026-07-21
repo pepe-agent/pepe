@@ -65,12 +65,6 @@ defmodule Pepe.Watch.SchedulerTest do
     # tolerate exactly that.
     wait_until(fn -> match?(%{state: "done"}, Config.get_watch(id)) end)
     assert Config.get_watch(id).pending_delivery == nil
-
-    # The actual fire runs in its own spawned Task (run_check/1), not the scheduler's own
-    # process that tagged "watch" in init/1 - regression for that Task's writes showing
-    # "unknown" in the journal instead.
-    [entry | _] = Pepe.Config.Journal.recent()
-    assert entry["source"] == "watch"
   end
 
   test "a check task that crashes releases the busy guard instead of leaking it forever" do

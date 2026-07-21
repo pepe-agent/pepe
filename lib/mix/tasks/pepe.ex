@@ -125,6 +125,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
       mix pepe config migrate-commitments      # one-time: import commitments into the new store
+      mix pepe config migrate-data             # one-time: import the remaining legacy sections (watches, ...)
       mix pepe backup [--output FILE.tgz]      # archive the whole ~/.pepe + list the secret env vars to save
       mix pepe extract PROJECT [--output FILE.tgz]  # lift ONE project out as a standalone (root) install
       mix pepe restore FILE.tgz [--force]      # restore a backup or an extract into ~/.pepe
@@ -181,6 +182,7 @@ defmodule Mix.Tasks.Pepe do
   # Needs the full app (Pepe.Repo), unlike every other `config` subcommand - matched here,
   # ahead of the generic clause below, since function clauses are tried in order.
   def dispatch(["config", "migrate-commitments" | _rest]), do: with_app([], fn -> migrate_commitments_cmd() end)
+  def dispatch(["config", "migrate-data" | _rest]), do: with_app([], fn -> migrate_data_cmd() end)
   def dispatch(["config" | rest]), do: with_config(fn -> config_cmd(rest) end)
   def dispatch(["dashboard" | rest]), do: with_config(fn -> dashboard_cmd(rest) end)
   def dispatch(["backup", "help" | _]), do: backup_help()
@@ -3735,6 +3737,46 @@ defmodule Mix.Tasks.Pepe do
 
   defp already_present_note(%{already_present: 0}), do: ""
   defp already_present_note(%{already_present: n}), do: " (#{n} already migrated)"
+
+  # One-time import of every remaining subsystem's legacy data into Pepe.Repo - see
+  # Pepe.Config.MigrateData's moduledoc. `migrate-commitments` stays its own standalone
+  # command (already shipped before this existed), not folded in here.
+  defp migrate_data_cmd do
+    Pepe.Config.MigrateData.run()
+    |> Enum.each(fn {subsystem, report} -> print_migrate_data_result(subsystem, report) end)
+  end
+
+  defp print_migrate_data_result(subsystem, {:error, :not_empty}) do
+    error("#{subsystem}: table already has rows - refusing to import (already migrated?)")
+  end
+
+  defp print_migrate_data_result(subsystem, {:error, reason}) do
+    error("#{subsystem}: #{reason}")
+  end
+
+  defp print_migrate_data_result(subsystem, %{imported: 0, already_present: 0, failed: []}) do
+    info("#{subsystem}: nothing to migrate")
+  end
+
+  defp print_migrate_data_result(subsystem, %{imported: 0, failed: []}) do
+    info("#{subsystem}: nothing to migrate")
+  end
+
+  defp print_migrate_data_result(subsystem, %{failed: [], already_present: _} = report) do
+    ok("#{subsystem}: migrated #{report.imported}#{already_present_note(report)}")
+  end
+
+  defp print_migrate_data_result(subsystem, %{failed: []} = report) do
+    ok("#{subsystem}: migrated #{report.imported}")
+  end
+
+  defp print_migrate_data_result(subsystem, report) do
+    error("#{subsystem}: #{length(report.failed)} entr#{if length(report.failed) == 1, do: "y", else: "ies"} failed, left in place:")
+    Enum.each(report.failed, &print_migrate_data_failure/1)
+  end
+
+  defp print_migrate_data_failure({id, reason}), do: info("  #{id}: #{inspect(reason)}")
+  defp print_migrate_data_failure(reason), do: info("  #{inspect(reason)}")
 
   defp print_journal_line(entry) do
     external = if entry["external"], do: " " <> dim("[external]"), else: ""

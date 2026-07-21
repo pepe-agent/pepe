@@ -912,12 +912,13 @@ defmodule Pepe.Config do
 
     # Not config.json - a side effect alongside the pure map transform below, using the
     # same `ids` this function already received (already-resolved agent ids, exactly what
-    # reject_commitments_bound_to/1 needs - see its own comment).
+    # reject_commitments_bound_to/1 and reject_watches_bound_to/1 need - see their own
+    # comments).
     reject_commitments_bound_to(ids)
+    reject_watches_bound_to(ids)
 
     config
     |> reject_bound_entries("crons", bound?)
-    |> reject_bound_entries("watches", bound?)
     |> reject_bound_entries("api_tokens", bound?)
     |> reject_bound_entries("webhooks", bound?)
     |> blank_bound_agent("telegram", bound?)
@@ -998,7 +999,6 @@ defmodule Pepe.Config do
       |> remap_agents_refs(old, new)
       |> remap_model_names(old, new)
       |> rewrite_agent_binding("crons", old, new)
-      |> rewrite_agent_binding("watches", old, new)
       |> rewrite_bot_bindings(old, new)
       |> rewrite_token_scopes(old, new)
       |> remap_field("default_agent", old, new)
@@ -1007,6 +1007,7 @@ defmodule Pepe.Config do
 
     move_project_dirs(old, new)
     rewrite_commitment_project_binding(old, new)
+    rewrite_watch_project_binding(old, new)
     :ok
   end
 
@@ -1205,7 +1206,7 @@ defmodule Pepe.Config do
   defp build_extracted(config, co) do
     agents = keep_owned_agents(config["agents"], project_id_for(config, co))
     crons = config["crons"] |> resolve_section_agents(config) |> keep_agent_bound(co)
-    watches = config["watches"] |> resolve_section_agents(config) |> keep_agent_bound(co)
+    watches = watches_raw_map() |> resolve_section_agents(config) |> keep_agent_bound(co)
     commitments = commitments_raw_map() |> resolve_section_agents(config) |> keep_agent_bound(co)
     telegrams = config["telegrams"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     tokens = config["api_tokens"] |> resolve_section_agents(config) |> keep_tokens(co)
@@ -1891,6 +1892,7 @@ defmodule Pepe.Config do
     if get_in(result, ["agents", id, "bare"]) == new_bare do
       Pepe.Agent.Workspace.rename(old_handle, new_handle)
       rewrite_commitment_agent_binding(old_handle, new_handle)
+      rewrite_watch_agent_binding(old_handle, new_handle)
       :ok
     else
       {:error, :already_exists}
@@ -1914,7 +1916,6 @@ defmodule Pepe.Config do
       Map.new(agents || %{}, fn {id, m} -> {id, rewrite_agent_refs(m, old, new)} end)
     end)
     |> rewrite_agent_binding("crons", old, new)
-    |> rewrite_agent_binding("watches", old, new)
     |> rewrite_bot_bindings(old, new)
     |> rewrite_token_scopes(old, new)
     |> remap_field("default_agent", old, new)
@@ -2142,59 +2143,113 @@ defmodule Pepe.Config do
   ###
   ### Watches (one-shot "notify me when X" commitments)
   ###
+  ### Backed by Pepe.Repo (SQLite), not config.json - see Pepe.Config.Watch's moduledoc.
+  ### Same shape as the Commitments section below: every name/arity/return shape callers
+  ### already used is unchanged, only what's behind it moved.
+  ###
+
+  import Ecto.Query, only: [from: 2]
 
   alias Pepe.Config.Watch
+  alias Pepe.Repo
 
   @doc "All watches, as `Pepe.Config.Watch` structs, sorted by id."
   def watches do
-    load()
-    |> Map.get("watches", %{})
-    |> Enum.map(fn {id, map} -> Watch.from_map(Map.put(map, "id", id)) |> resolve_watch_agent() end)
-    |> Enum.sort_by(& &1.id)
+    Watch |> from(order_by: :id) |> Repo.all() |> Enum.map(&resolve_watch_agent/1)
   end
 
   @doc "Fetch one watch by id, or nil."
   def get_watch(id) do
-    case load() |> get_in(["watches", id]) do
+    case Repo.get(Watch, id) do
       nil -> nil
-      map -> Watch.from_map(Map.put(map, "id", id)) |> resolve_watch_agent()
+      watch -> resolve_watch_agent(watch)
     end
   end
 
   defp resolve_watch_agent(%Watch{agent: agent} = watch), do: %{watch | agent: read_agent_ref(agent)}
 
-  @doc "Create or replace a watch (keyed by its `id`)."
+  @doc """
+  Create or replace a watch (keyed by its `id`). An atomic upsert (insert, or fully
+  replace every column but `id` if the row already exists), same as `put_commitment/1`
+  below - callers use this purely for effect; none read its return value.
+  """
   def put_watch(%Watch{id: id} = watch) when is_binary(id) do
-    map = %{watch | agent: store_agent_ref(watch.agent)} |> Map.from_struct() |> Map.delete(:id) |> stringify()
+    stored = %{watch | agent: store_agent_ref(watch.agent)}
+    changeset = Watch.changeset(stored, Map.from_struct(stored))
+    Repo.insert(changeset, on_conflict: {:replace_all_except, [:id]}, conflict_target: :id)
+  end
 
-    update(fn config ->
-      config
-      |> update_in(["watches"], fn w -> Map.put(w || %{}, id, map) end)
+  @doc "Delete a watch by id. A no-op, not an error, if it doesn't exist."
+  def delete_watch(id) do
+    from(w in Watch, where: w.id == ^id) |> Repo.delete_all()
+    :ok
+  end
+
+  # For Pepe.Bundle.extract/2 (single-project export): the same `%{id => %{"agent" => ...,
+  # ...}}` raw shape config.json's own "watches" section used to have, built from Pepe.Repo
+  # instead - see commitments_raw_map/0's own comment for why this can't just be watches/0.
+  defp watches_raw_map do
+    Watch
+    |> Repo.all()
+    |> Map.new(fn w ->
+      {w.id,
+       %{
+         "description" => w.description,
+         "agent" => w.agent,
+         "trigger" => w.trigger,
+         "on_fire" => w.on_fire,
+         "origin" => w.origin,
+         "interval_s" => w.interval_s,
+         "max_checks" => w.max_checks,
+         "checks" => w.checks,
+         "state" => w.state,
+         "created" => w.created,
+         "last_check" => w.last_check,
+         "next_check" => w.next_check,
+         "last_error" => w.last_error,
+         "pending_delivery" => w.pending_delivery
+       }}
     end)
   end
 
-  @doc "Delete a watch by id."
-  def delete_watch(id) do
-    update(fn config ->
-      config
-      |> update_in(["watches"], &Map.delete(&1 || %{}, id))
+  # Called on an agent rename: `old`/`new` are handles (e.g. "acme/support"), an exact match.
+  defp rewrite_watch_agent_binding(old, new) when is_binary(old) and is_binary(new) do
+    from(w in Watch, where: w.agent == ^old) |> Repo.update_all(set: [agent: new])
+    :ok
+  end
+
+  # Called on a project rename: `old`/`new` are project slugs. Not a single clean UPDATE (the
+  # replacement handle differs per row, since each keeps its own agent name) - a small
+  # per-row loop, same as rewrite_commitment_project_binding/2 below.
+  defp rewrite_watch_project_binding(old_slug, new_slug) do
+    from(w in Watch, where: like(w.agent, ^"#{old_slug}/%"))
+    |> Repo.all()
+    |> Enum.each(fn w ->
+      new_handle = Pepe.Project.handle(new_slug, Pepe.Project.name_of(w.agent))
+      Repo.update_all(from(x in Watch, where: x.id == ^w.id), set: [agent: new_handle])
     end)
+
+    :ok
+  end
+
+  # Called when an agent (or a whole project's agents) is deleted - `ids` is the MapSet of
+  # agent ids being dropped, already resolved by the caller (Config.clear_agent_bindings/2).
+  defp reject_watches_bound_to(ids) do
+    ids = MapSet.to_list(ids)
+    from(w in Watch, where: w.agent in ^ids) |> Repo.delete_all()
+    :ok
   end
 
   ###
   ### Commitments (agent- or user-made follow-ups, extracted automatically after a turn)
   ###
   ### Backed by Pepe.Repo (SQLite), not config.json - see Pepe.Config.Commitment and
-  ### Pepe.Repo's moduledocs. This is the one section of this module that isn't a plain
-  ### map read/write; everything below keeps the exact same names/arities/return shapes
-  ### the rest of the codebase already calls, so no caller outside this section needed to
-  ### change when the storage moved.
+  ### Pepe.Repo's moduledocs. Same shape as the Watches section above: everything below
+  ### keeps the exact same names/arities/return shapes the rest of the codebase already
+  ### calls, so no caller outside this section needed to change when the storage moved.
   ###
 
-  import Ecto.Query, only: [from: 2]
-
   alias Pepe.Config.Commitment
-  alias Pepe.Repo
 
   @doc "All commitments, as `Pepe.Config.Commitment` structs, sorted by id."
   def commitments do

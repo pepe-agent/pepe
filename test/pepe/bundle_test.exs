@@ -126,6 +126,19 @@ defmodule Pepe.BundleTest do
       assert entry["agent"] == "sales"
     end
 
+    test "a watch bound to the project travels de-scoped; another project's does not leak" do
+      seed_two_projects()
+
+      Config.put_watch(%Config.Watch{id: "w_acme", agent: "acme/sales", trigger: %{}})
+      Config.put_watch(%Config.Watch{id: "w_globex", agent: "globex/bot", trigger: %{}})
+
+      assert {:ok, config, _report} = Config.extract_config("acme")
+
+      assert [{"w_acme", entry}] = Map.to_list(config["watches"])
+      # De-scoped like crons/commitments: the bare handle, no "acme/" prefix.
+      assert entry["agent"] == "sales"
+    end
+
     test "the secrets report includes vault-opening credentials, not only ${VAR} refs" do
       seed_two_projects()
       # A vault-based setup: the model's key is fetched by a command, and the resolver needs

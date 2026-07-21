@@ -112,6 +112,20 @@ defmodule Pepe.DoctorTest do
     refute Enum.any?(checks, &match?({"state", "unmigrated commitments", _}, &1))
   end
 
+  test "state: a legacy unmigrated watches section in config.json is flagged" do
+    Config.update(fn config -> Map.put(config, "watches", %{"w1" => %{"description" => "x", "agent" => "a"}}) end)
+
+    checks = Doctor.checks()
+
+    assert Enum.any?(checks, &match?({"state", "unmigrated watches", {:warn, _}}, &1))
+  end
+
+  test "state: says nothing once watches have been migrated (or never existed)" do
+    refute Map.has_key?(Config.load(), "watches")
+    checks = Doctor.checks()
+    refute Enum.any?(checks, &match?({"state", "unmigrated watches", _}, &1))
+  end
+
   test "security: a commitment/watch's origin.key (a session key, not a credential) is not a false positive" do
     Config.put_commitment(%Config.Commitment{
       id: "c1",

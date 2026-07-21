@@ -139,6 +139,22 @@ defmodule Pepe.RenameProjectTest do
     assert Config.get_commitment(commitment.id).agent == "umbrella/ghost"
   end
 
+  # Same fallback case as above, for Pepe.Config.rewrite_watch_project_binding/2:
+  # put_watch/1 resolves `agent` via store_agent_ref/1 exactly like create_commitment/1
+  # does, so an agent handle that never resolved to a real id falls back to the raw
+  # handle - the one case the generic map-rewrite this replaced always handled for free.
+  test "re-binds a watch's orphaned, never-resolved agent handle on project rename" do
+    Config.add_project("acme", %{})
+
+    watch = %Pepe.Config.Watch{id: "w_ghost", agent: "acme/ghost", trigger: %{}}
+    Config.put_watch(watch)
+
+    assert Config.get_watch("w_ghost").agent == "acme/ghost"
+
+    assert Config.rename_project("acme", "umbrella") == :ok
+    assert Config.get_watch("w_ghost").agent == "umbrella/ghost"
+  end
+
   test "moves the workspace and usage directories on disk" do
     seed()
     # create a workspace file + a usage ledger entry under acme

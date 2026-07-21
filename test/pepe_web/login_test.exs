@@ -18,6 +18,7 @@ defmodule PepeWeb.LoginTest do
     prev_pw = System.get_env("PEPE_DASHBOARD_PASSWORD")
     System.put_env("PEPE_HOME", home)
     System.delete_env("PEPE_DASHBOARD_PASSWORD")
+    Pepe.RepoSetup.start!()
 
     Config.put_agent(%Config.Agent{name: "assistant", system_prompt: "hi"})
     Config.save(Map.put(Config.load(), "default_agent", "assistant"))

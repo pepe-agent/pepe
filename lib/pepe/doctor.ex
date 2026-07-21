@@ -380,17 +380,19 @@ defmodule Pepe.Doctor do
     end
   end
 
-  # A legacy "commitments" section left in config.json (from before Pepe.Config.Commitment
-  # moved to Pepe.Repo) means `mix pepe config migrate-commitments` was never run - every
-  # commitment that was there before the upgrade is invisible to Config.commitments/0 now,
-  # silently: no error, no crash, they just stop firing. Nothing else in the codebase
+  # A legacy "commitments"/"watches" section left in config.json (from before those moved
+  # to Pepe.Repo) means their one-time migration command was never run - every entry that
+  # was there before the upgrade is invisible to Config.commitments/0 / Config.watches/0
+  # now, silently: no error, no crash, they just stop firing. Nothing else in the codebase
   # would ever surface that on its own.
   defp migration_checks do
-    if Map.has_key?(Config.load(), "commitments") do
-      [
-        {"state", "unmigrated commitments",
-         {:warn, "config.json still has a \"commitments\" section - run `mix pepe config migrate-commitments` to import it"}}
-      ]
+    legacy_check(Config.load(), "commitments", "mix pepe config migrate-commitments") ++
+      legacy_check(Config.load(), "watches", "mix pepe config migrate-data")
+  end
+
+  defp legacy_check(config, key, command) do
+    if Map.has_key?(config, key) do
+      [{"state", "unmigrated #{key}", {:warn, "config.json still has a \"#{key}\" section - run `#{command}` to import it"}}]
     else
       []
     end
