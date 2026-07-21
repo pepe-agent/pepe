@@ -253,13 +253,20 @@ defmodule Pepe.Doctor do
   # that is unmistakably a credential (`sk-...`, `ghp_...`) whatever it was filed under, which
   # is how a token passed positionally in an argument list gets caught: there, it has no key
   # name to give it away.
+  #
+  # `origin.key` is the one legitimate exception to the name check: Watch and Commitment both
+  # carry an `origin` map (`Watch.Delivery.origin_from_ctx/1`) whose `key` is a session key -
+  # the same string already shown plainly in the dashboard sidebar, not a credential. Matching
+  # "key" as a whole word (needed to catch a real `some_key: "sk-..."` typo) makes every one of
+  # them a false positive otherwise; the value-shaped check right below still catches a genuine
+  # credential that somehow ended up there anyway.
   defp plaintext_secrets(map, path) when is_map(map) do
     Enum.flat_map(map, fn {k, v} ->
       here = path ++ [to_string(k)]
 
       cond do
         is_map(v) or is_list(v) -> plaintext_secrets(v, here)
-        Pepe.Secrets.secret_key?(k) and plaintext_value?(v) -> [Enum.join(here, ".")]
+        Pepe.Secrets.secret_key?(k) and not origin_routing_key?(k, path) and plaintext_value?(v) -> [Enum.join(here, ".")]
         Pepe.Secrets.plaintext?(v) -> [Enum.join(here, ".")]
         true -> []
       end
@@ -273,6 +280,8 @@ defmodule Pepe.Doctor do
   end
 
   defp plaintext_secrets(_v, _path), do: []
+
+  defp origin_routing_key?(k, path), do: to_string(k) == "key" and List.last(path) == "origin"
 
   # For a key that already announces itself as a secret, any non-empty value that is not an
   # ${ENV_VAR} reference is a finding - it does not also have to look like a credential.

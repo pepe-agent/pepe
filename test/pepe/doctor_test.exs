@@ -97,6 +97,30 @@ defmodule Pepe.DoctorTest do
     assert Enum.any?(checks, &match?({"security", "dashboard password", {:warn, _}}, &1))
   end
 
+  test "security: a commitment/watch's origin.key (a session key, not a credential) is not a false positive" do
+    Config.put_commitment(%Config.Commitment{
+      id: "c1",
+      text: "renew the cert",
+      origin: %{"channel" => "telegram", "key" => "telegram:123456"}
+    })
+
+    checks = Doctor.checks()
+
+    refute Enum.any?(checks, &match?({"security", "plaintext secret at" <> _, _}, &1))
+  end
+
+  test "security: a real credential that ended up under origin.key is still caught" do
+    Config.put_commitment(%Config.Commitment{
+      id: "c2",
+      text: "renew the cert",
+      origin: %{"channel" => "telegram", "key" => "sk-live-abcdefghijklmnopqrstuvwx"}
+    })
+
+    checks = Doctor.checks()
+
+    assert Enum.any?(checks, &match?({"security", "plaintext secret at" <> _, {:warn, _}}, &1))
+  end
+
   test "channel: flags an unknown provider and a missing agent" do
     Config.put_webhook("bad", %{"provider" => "nope", "agent" => "x", "config" => %{}})
     Config.put_webhook("good", %{"provider" => "slack", "agent" => "ghost", "config" => %{}})
