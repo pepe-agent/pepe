@@ -19,7 +19,20 @@ defmodule Pepe.Config.Journal do
   restore from a `.bak` file. Surfaced as `"external" => true`, not as an error: the
   file-stamp cache in `Pepe.Config.load/1` is explicitly designed to pick up exactly
   this kind of out-of-band edit, so it must never be blocked, only made visible.
+
+  Backed by `Pepe.Repo` (SQLite), not a `.jsonl` file - `recent/1`'s `ORDER BY id DESC
+  LIMIT n` is a cheap index-range scan regardless of how large this ever grows, unlike
+  the old "read the whole file, split every line, decode each" it replaced. No retention
+  cap here: the query stays cheap even unbounded, so there's nothing to gain by adding
+  one preemptively.
   """
+
+  require Logger
+
+  import Ecto.Query, only: [from: 2]
+
+  alias Pepe.Config.Journal.Entry
+  alias Pepe.Repo
 
   @doc "Tag every config write this process makes with `source` (e.g. \"cli\", \"dashboard\", \"chat:manage_agent\")."
   @spec put_source(String.t()) :: :ok
@@ -34,7 +47,7 @@ defmodule Pepe.Config.Journal do
 
   @doc """
   Append one entry recording a config write - the top-level keys that actually
-  changed between `old_config` and `new_config`. A no-op (nothing appended) when
+  changed between `old_config` and `new_config`. A no-op (nothing inserted) when
   nothing changed and the write wasn't flagged `external?`.
   """
   @spec record(String.t(), map(), map(), keyword()) :: :ok
@@ -43,39 +56,34 @@ defmodule Pepe.Config.Journal do
     external? = opts[:external?] == true
 
     if changed != [] or external? do
-      append(%{
-        "at" => System.system_time(:second),
-        "source" => source,
-        "changed" => changed,
-        "external" => external?
-      })
+      insert(%Entry{at: System.system_time(:second), source: source, changed: changed, external: external?})
     end
 
     :ok
   end
 
+  # This is a diagnostic trail, not the write it's describing - `Config.save/1` above this
+  # in `Writer.do_update/3` has already committed the real change to disk by the time this
+  # runs. A Repo hiccup here (most commonly: no Repo running at all, the normal state of a
+  # bare `ExUnit.Case` test that never touches operational data) must never turn an
+  # already-successful config write into a raised exception - same reasoning, and the same
+  # rescue-and-log shape, as `Pepe.Store`'s own tolerance for a Mnesia hiccup.
+  defp insert(%Entry{} = entry) do
+    Repo.insert!(entry)
+  rescue
+    e -> Logger.warning("[config journal] #{Exception.message(e)}")
+  end
+
   @doc "The `limit` most recent journal entries, newest first."
   @spec recent(pos_integer()) :: [map()]
   def recent(limit \\ 200) do
-    case File.read(path()) do
-      {:ok, body} ->
-        body
-        |> String.split("\n", trim: true)
-        |> Enum.map(&safe_decode/1)
-        |> Enum.reject(&is_nil/1)
-        |> Enum.take(-limit)
-        |> Enum.reverse()
-
-      {:error, _} ->
-        []
-    end
+    from(e in Entry, order_by: [desc: e.id], limit: ^limit)
+    |> Repo.all()
+    |> Enum.map(&to_map/1)
   end
 
-  defp safe_decode(line) do
-    case Jason.decode(line) do
-      {:ok, map} -> map
-      {:error, _} -> nil
-    end
+  defp to_map(%Entry{} = e) do
+    %{"at" => e.at, "source" => e.source, "changed" => e.changed, "external" => e.external}
   end
 
   defp changed_keys(old, new) do
@@ -84,12 +92,4 @@ defmodule Pepe.Config.Journal do
     |> Enum.filter(fn k -> Map.get(old, k) != Map.get(new, k) end)
     |> Enum.sort()
   end
-
-  defp append(entry) do
-    path = path()
-    File.mkdir_p!(Path.dirname(path))
-    File.write(path, Jason.encode!(entry) <> "\n", [:append])
-  end
-
-  defp path, do: Path.join([Pepe.Config.home(), "data", "config_journal.jsonl"])
 end

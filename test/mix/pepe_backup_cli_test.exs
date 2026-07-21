@@ -18,6 +18,7 @@ defmodule Mix.Tasks.PepeBackupCliTest do
 
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
     out = Path.join(System.tmp_dir!(), "bk_#{System.unique_integer([:positive])}.tgz")
 
     on_exit(fn ->

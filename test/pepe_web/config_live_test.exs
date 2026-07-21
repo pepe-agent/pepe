@@ -20,6 +20,7 @@ defmodule PepeWeb.ConfigLiveTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_model(%Config.Model{name: "tts-model", base_url: "http://x", model: "m"})
 

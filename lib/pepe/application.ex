@@ -124,7 +124,7 @@ defmodule Pepe.Application do
   # what's already applied), so paying this once per boot is not a real cost.
   defp migrate_repo do
     if Application.get_env(:pepe, :env) != :test do
-      Ecto.Migrator.run(Pepe.Repo, Application.app_dir(:pepe, "priv/repo/migrations"), :up, all: true)
+      Pepe.Repo.migrate!()
     end
   end
 

@@ -13,6 +13,7 @@ defmodule Pepe.Watch.SchedulerTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
     File.write!(Path.join(home, "config.json"), Jason.encode!(%{}))
 
     start_supervised!({Task.Supervisor, name: Pepe.Watch.TaskSupervisor})

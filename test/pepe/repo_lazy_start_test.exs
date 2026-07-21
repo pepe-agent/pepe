@@ -28,6 +28,18 @@ defmodule Pepe.RepoLazyStartTest do
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
+      # ensure_started/0 below starts Pepe.Repo with a bare start_link/1, not
+      # start_supervised!/1 - that's the whole point of this file (proving with_config
+      # itself boots it, not something that happens to already be running). A real
+      # `mix pepe` one-shot then exits its whole OS process, but this test suite is one
+      # long-lived BEAM instance: left running, it stays registered under Pepe.Repo's name
+      # for every later test in the suite, and every one of them starts it their own way
+      # (Pepe.RepoSetup.start!/0's start_supervised!/1) - which then fails on
+      # {:already_started, _} the moment it collides with this leftover.
+      case Process.whereis(Pepe.Repo) do
+        nil -> :ok
+        pid -> GenServer.stop(pid)
+      end
     end)
 
     :ok
