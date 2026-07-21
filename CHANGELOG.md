@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-21
+
 ### Added
 - Traces can now be grouped by conversation ("Group by conversation" toggle), each session collapsed into one row with its run count and total tokens/cost across every run in it; expand a row to see the individual runs.
 - The dashboard's conversation sidebar now shows a session's raw key (e.g. `telegram:-123456`) in small text under its title, so a Telegram-originated conversation is identifiable even before it has an AI-generated title.
@@ -530,7 +532,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/pepe-agent/pepe/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/pepe-agent/pepe/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/pepe-agent/pepe/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/pepe-agent/pepe/compare/v0.8.0...v0.9.0
