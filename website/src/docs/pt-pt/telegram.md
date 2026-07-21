@@ -301,6 +301,17 @@ momento em que um envio para ela volta a resultar, por exemplo porque a pessoa
 desbloqueou o bot, a marca é retirada automaticamente. Não há nada para repor à
 mão.
 
+### Uma resposta sobrevive a um reinício a meio do envio
+
+Se o Pepe reiniciar (um deploy, uma falha) no momento exato em que estava a enviar a
+resposta de um turno, essa resposta não se perde: é reenviada assim que o bot volta a
+funcionar, antes de começar a tratar seja o que for de novo. Quando o reinício
+aconteceu com o envio genuinamente em curso (por isso não há certeza se a mensagem já
+chegou), a cópia reenviada leva o prefixo "♻️ Recovered reply", para que um possível
+duplicado fique sempre sinalizado em vez de se repetir em silêncio. Uma resposta que
+nunca chegou a ser enviada sai limpa, sem prefixo. Isto não precisa de nenhuma
+configuração e não há nada para repor à mão.
+
 ### Idioma e erros
 
 As mensagens fixas do próprio Pepe (respostas de comando, botões, recusas) seguem

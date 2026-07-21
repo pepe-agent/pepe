@@ -292,6 +292,16 @@ API calls and no log noise. The moment a send to it succeeds again, for instance
 because the user unblocked the bot, the chat is un-marked automatically. There is
 nothing to reset by hand.
 
+### A reply survives a restart mid-send
+
+If Pepe restarts (a deploy, a crash) at the exact moment it was sending a turn's
+answer, that answer isn't lost: it's redelivered as soon as the bot comes back up,
+before it starts handling anything new. When the restart happened while the send was
+genuinely in flight (so it isn't certain whether the message already went through),
+the redelivered copy is prefixed with "♻️ Recovered reply", so a possible duplicate is
+always labeled rather than silently repeated. A reply that never started sending goes
+out clean, no prefix. This needs no configuration and has nothing to reset by hand.
+
 ### Language and errors
 
 Pepe's own fixed messages (command replies, buttons, refusals) follow the

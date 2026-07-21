@@ -66,6 +66,7 @@ defmodule Pepe.Gateways.Telegram do
 
   alias Pepe.Project
   alias Pepe.Config
+  alias Pepe.DeliveryLedger
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
 
@@ -386,6 +387,11 @@ defmodule Pepe.Gateways.Telegram do
     Task.start(fn ->
       put_bot(b)
       register_commands()
+    end)
+
+    Task.start(fn ->
+      put_bot(b)
+      redeliver_pending(b)
     end)
 
     send(self(), :poll)
@@ -2529,9 +2535,60 @@ defmodule Pepe.Gateways.Telegram do
 
   # Deliver the agent's reply: always the text (the record), plus a voice note when the turn came in
   # by voice and TTS is configured. The audio is a bonus - a TTS failure is logged, never surfaced.
+  #
+  # The text send is durably tracked (Pepe.DeliveryLedger): the turn already spent its tokens by
+  # this point, and the reply exists only in this process's local variable until send_message
+  # actually gets it out - a crash between here and Telegram's ack would otherwise lose it with no
+  # trace. See redeliver_pending/1 for the boot-time recovery half of this.
   defp deliver_reply(chat_id, reply) do
-    send_message(chat_id, reply)
+    deliver_tracked(chat_id, reply)
     maybe_send_voice(chat_id, reply)
+  end
+
+  defp deliver_tracked(chat_id, content) do
+    meta = %{bot: bot_name(), chat_id: chat_id, thread_id: thread()}
+    id = DeliveryLedger.record(session_key(chat_id), "telegram", meta, content)
+    attempt_send(id, chat_id, content)
+  end
+
+  # Shared by a fresh reply (deliver_tracked/2, id just recorded) and a redelivery at
+  # boot (redeliver_row/1, id already exists from a previous, now-dead run) - either
+  # way, the ledger checkpoint is the same: mark it attempting, send, mark the outcome.
+  defp attempt_send(id, chat_id, content) do
+    DeliveryLedger.mark_attempting(id)
+
+    try do
+      send_message(chat_id, content)
+      DeliveryLedger.mark_delivered(id)
+    rescue
+      e ->
+        DeliveryLedger.mark_failed(id, Exception.message(e))
+        reraise e, __STACKTRACE__
+    end
+  end
+
+  @recovered_marker "♻️ Recovered reply - I restarted while sending this, so it might be a duplicate:\n\n"
+
+  # Redeliver whatever this bot owed a chat when it last went down mid-send (or never even
+  # started sending). Runs once at boot, before the poll loop starts handling new updates -
+  # spawned rather than inline so a slow or stuck redelivery can't hold up startup.
+  defp redeliver_pending(bot) do
+    name = bot["name"] || "default"
+
+    "telegram"
+    |> DeliveryLedger.sweep_recoverable(&(&1.meta.bot == name))
+    |> Enum.each(&redeliver_row/1)
+  end
+
+  defp redeliver_row(row) do
+    content = if row.needs_marker, do: @recovered_marker <> row.content, else: row.content
+    put_thread(row.meta.thread_id)
+    Logger.info("[telegram] redelivering a reply owed to chat #{row.meta.chat_id} from before the restart")
+    attempt_send(row.id, row.meta.chat_id, content)
+  rescue
+    e -> Logger.warning("[telegram] redelivery of #{row.id} raised: #{safe_inspect(e)}")
+  after
+    put_thread(nil)
   end
 
   defp maybe_send_voice(chat_id, reply) do

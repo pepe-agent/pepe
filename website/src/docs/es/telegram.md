@@ -300,6 +300,17 @@ hay llamadas de API desperdiciadas ni ruido en el registro. En el momento en que
 envío a ese chat vuelve a funcionar, por ejemplo porque la persona desbloqueó al
 bot, la marca se retira automáticamente. No hay nada que reiniciar a mano.
 
+### Una respuesta sobrevive a un reinicio a mitad de envío
+
+Si Pepe se reinicia (un despliegue, una caída) justo en el momento en que estaba
+enviando la respuesta de un turno, esa respuesta no se pierde: se reenvía en cuanto el
+bot vuelve a estar en línea, antes de que empiece a atender nada nuevo. Cuando el
+reinicio ocurrió mientras el envío estaba genuinamente en curso (así que no hay certeza
+de si el mensaje ya llegó), la copia reenviada lleva el prefijo "♻️ Recovered reply",
+para que un posible duplicado quede siempre señalado en vez de repetirse en silencio.
+Una respuesta que nunca llegó a enviarse sale limpia, sin prefijo. No necesita ninguna
+configuración y no hay nada que reiniciar a mano.
+
 ### Idioma y errores
 
 Los mensajes fijos del propio Pepe (respuestas de comando, botones, negativas)

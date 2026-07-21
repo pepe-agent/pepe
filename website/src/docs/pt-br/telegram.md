@@ -299,6 +299,17 @@ Não há chamadas de API desperdiçadas nem barulho no log. No momento em que um
 envio para ele volta a dar certo, por exemplo porque a pessoa desbloqueou o bot, a
 marca é retirada automaticamente. Não há nada para reiniciar na mão.
 
+### Uma resposta sobrevive a um reinício no meio do envio
+
+Se o Pepe reiniciar (um deploy, uma queda) no exato momento em que estava enviando a
+resposta de um turno, essa resposta não se perde: ela é reenviada assim que o bot volta
+a funcionar, antes de começar a tratar qualquer coisa nova. Quando o reinício aconteceu
+com o envio genuinamente em andamento (então não dá para saber com certeza se a
+mensagem já chegou), a cópia reenviada vem com o prefixo "♻️ Recovered reply", para que
+uma possível duplicata sempre fique sinalizada em vez de se repetir em silêncio. Uma
+resposta que nunca chegou a ser enviada sai limpa, sem prefixo. Isso não precisa de
+nenhuma configuração e não há nada para reiniciar na mão.
+
 ### Idioma e erros
 
 As mensagens fixas do próprio Pepe (respostas de comando, botões, recusas) seguem
