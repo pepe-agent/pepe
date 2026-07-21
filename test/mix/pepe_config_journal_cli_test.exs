@@ -45,9 +45,13 @@ defmodule Mix.Tasks.PepeConfigJournalCliTest do
   test "flags a write the running process didn't make as external" do
     Config.put_agent(%Config.Agent{name: "assistant", tools: []})
 
+    # Config.save/1 already writes pretty JSON, so re-encoding the same map the same way
+    # is a same-size, likely same-mtime no-op - force a *different* mtime deterministically
+    # (no real sleep) instead of waiting out its ~1s resolution by wall clock.
     raw = File.read!(Config.path())
-    Process.sleep(1100)
-    File.write!(Config.path(), Jason.encode!(Jason.decode!(raw), pretty: true))
+    File.write!(Config.path(), raw)
+    {mtime, _size} = Config.file_stamp()
+    File.touch!(Config.path(), mtime + 2)
 
     Pepe.Config.Journal.put_source("cli")
     Config.put_agent(%Config.Agent{name: "someone-else", tools: []})

@@ -96,13 +96,15 @@ defmodule Pepe.Config.JournalTest do
 
     # Simulate a hand-edit: touch the file directly, bypassing Config.Writer entirely,
     # then make a real write through the writer and confirm it notices the gap.
+    # `Config.save/1` already writes pretty-printed JSON, so re-encoding the same map the
+    # same way is a same-size, likely same-mtime no-op - not the "editor saved this file"
+    # the writer needs to actually see. Force a *different* mtime deterministically (no
+    # real sleep, unlike waiting out mtime's ~1s resolution by wall clock) so the stamp
+    # {mtime, size} file_stamp/0 compares is guaranteed to differ.
     raw = File.read!(Config.path())
     File.write!(Config.path(), raw)
-    # Force a different mtime+size than what the writer last recorded, the same way an
-    # editor saving the file would - append whitespace inside the JSON is invalid, so
-    # instead wait a tick and rewrite with a trivial reformat (still valid JSON).
-    Process.sleep(1100)
-    File.write!(Config.path(), Jason.encode!(Jason.decode!(raw), pretty: true))
+    {mtime, _size} = Config.file_stamp()
+    File.touch!(Config.path(), mtime + 2)
 
     Journal.put_source("cli")
     Config.put_agent(%Config.Agent{name: "someone-else", tools: []})
