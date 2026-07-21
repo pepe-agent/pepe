@@ -76,4 +76,20 @@ defmodule Pepe.Tools.CommitmentTest do
     assert {:error, msg} = CommitmentTool.run(%{"action" => "confirm"}, %{})
     assert msg =~ "needs an `id`"
   end
+
+  # A model reaching for "create" (there is no such action - commitments are only ever
+  # noticed automatically) used to get the same generic "needs an `action`" error a
+  # genuinely missing action gets, which reads as "you forgot the parameter" rather than
+  # "that value doesn't exist" - so the model retried the identical broken call instead of
+  # correcting course. This name-and-redirect message is specifically for that case.
+  test "an unrecognized action is named and redirected, not confused with a missing one" do
+    assert {:error, msg} = CommitmentTool.run(%{"action" => "create", "value" => "pay rent"}, %{})
+    assert msg =~ "\"create\" isn't a real action"
+    assert msg =~ "no tool call needed"
+  end
+
+  test "a genuinely missing action still gets its own distinct message" do
+    assert {:error, msg} = CommitmentTool.run(%{}, %{})
+    assert msg == "commitment needs an `action`"
+  end
 end

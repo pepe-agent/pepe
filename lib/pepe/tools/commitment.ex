@@ -55,6 +55,15 @@ defmodule Pepe.Tools.Commitment do
   def run(%{"action" => "confirm", "id" => id} = args, _ctx), do: confirm(id, args["due_when"])
   def run(%{"action" => "cancel", "id" => id}, _ctx), do: cancel(id)
   def run(%{"action" => action}, _ctx) when action in ["confirm", "cancel"], do: {:error, "#{action} needs an `id`"}
+
+  def run(%{"action" => action}, _ctx) when is_binary(action) do
+    {:error,
+     "\"#{action}\" isn't a real action here - only list, confirm, cancel exist. There is " <>
+       "no create: a commitment is never made by calling this tool, it's noticed on its own " <>
+       "right after your reply. To promise a follow-up, just say so in your reply, plainly, " <>
+       "as you normally would - no tool call needed for that."}
+  end
+
   def run(_args, _ctx), do: {:error, "commitment needs an `action`"}
 
   defp confirm(id, due_when) do
