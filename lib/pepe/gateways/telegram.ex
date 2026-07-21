@@ -2567,21 +2567,22 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  @recovered_marker "♻️ Recovered reply - I restarted while sending this, so it might be a duplicate:\n\n"
-
   # Redeliver whatever this bot owed a chat when it last went down mid-send (or never even
   # started sending). Runs once at boot, before the poll loop starts handling new updates -
   # spawned rather than inline so a slow or stuck redelivery can't hold up startup.
   defp redeliver_pending(bot) do
     name = bot["name"] || "default"
+    Config.put_locale()
 
     "telegram"
     |> DeliveryLedger.sweep_recoverable(&(&1.meta.bot == name))
     |> Enum.each(&redeliver_row/1)
   end
 
+  defp recovered_marker, do: gettext("♻️ Recovered reply - I restarted while sending this, so it might be a duplicate:\n\n")
+
   defp redeliver_row(row) do
-    content = if row.needs_marker, do: @recovered_marker <> row.content, else: row.content
+    content = if row.needs_marker, do: recovered_marker() <> row.content, else: row.content
     put_thread(row.meta.thread_id)
     Logger.info("[telegram] redelivering a reply owed to chat #{row.meta.chat_id} from before the restart")
     attempt_send(row.id, row.meta.chat_id, content)
