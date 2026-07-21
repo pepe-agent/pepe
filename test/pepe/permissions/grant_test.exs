@@ -50,18 +50,23 @@ defmodule Pepe.Permissions.GrantTest do
     }
   end
 
-  test "approving bash on a harmless command does not also approve rm -rf" do
+  test "approving bash on a risky command does not also approve rm -rf" do
     ctx = asking_ctx(agent!([]))
 
-    # The human is looking at a directory listing when they say "always allow bash".
-    assert :allow = Permissions.gate("bash", bash("ls build/"), ctx)
-    assert_receive {:asked, "bash", _, []}
+    # A harmless read of the command text alone never reaches the human at all any more (see
+    # `Pepe.Permissions.interactive_and_risk_free?/3`) - so this flagship test needs an actual
+    # risk hint to reach `ask/4` in the first place. The human is looking at a network call
+    # when they say "always allow bash".
+    assert :allow = Permissions.gate("bash", bash("curl -I https://example.com"), ctx)
+    assert_receive {:asked, "bash", _, risks}
+    assert :network in risks
 
     # What got written down is what they were actually looking at.
-    assert Config.get_agent("worker").auto_approve == ["bash:none"]
+    assert Config.get_agent("worker").auto_approve == ["bash:network"]
 
-    # A second harmless call runs without asking. This is the part that has to keep working,
-    # or people turn the gate off out of irritation and we have made things worse.
+    # A harmless call runs free without ever needing to ask at all, the same free pass an
+    # in-workspace `read_file` already gets - not because of the grant above, but because it
+    # carries no risk hint of its own.
     ctx = %{ctx | agent: Config.get_agent("worker")}
     assert :allow = Permissions.gate("bash", bash("cat README.md"), ctx)
     refute_receive {:asked, _, _, _}, 50
@@ -75,9 +80,12 @@ defmodule Pepe.Permissions.GrantTest do
   end
 
   test "the grant widens as you say yes, and does not pile up" do
+    # "ls" carries no risk hint at all - it would no longer reach `ask/4` here (interactive
+    # ctx, zero risk: the free pass short-circuits before this), so every step below actually
+    # has to carry a risk of its own to exercise the widening.
     ctx = asking_ctx(agent!([]))
 
-    Permissions.gate("bash", bash("ls"), ctx)
+    Permissions.gate("bash", bash("sudo apt update"), ctx)
     ctx = %{ctx | agent: Config.get_agent("worker")}
     Permissions.gate("bash", bash("rm -rf tmp"), ctx)
     ctx = %{ctx | agent: Config.get_agent("worker")}
@@ -87,6 +95,7 @@ defmodule Pepe.Permissions.GrantTest do
     # entries nobody can read.
     assert [grant] = Config.get_agent("worker").auto_approve
     assert {"bash", risks} = Grant.parse(grant)
+    assert :elevated in risks
     assert :deletes in risks
     assert :network in risks
   end

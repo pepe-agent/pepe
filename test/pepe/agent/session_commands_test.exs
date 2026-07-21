@@ -43,7 +43,7 @@ defmodule Pepe.Agent.SessionCommandsTest do
     end
 
     defp bash_call do
-      [%{"id" => "call_1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"true"})}}]
+      [%{"id" => "call_1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"rm -rf /tmp/x"})}}]
     end
 
     defp reply(conn, content, tool_calls) do

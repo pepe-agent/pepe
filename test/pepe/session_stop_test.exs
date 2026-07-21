@@ -27,7 +27,7 @@ defmodule Pepe.Agent.SessionStopTest do
           tool_call = %{
             "id" => "call_1",
             "type" => "function",
-            "function" => %{"name" => "bash", "arguments" => ~s({"command":"echo hi"})}
+            "function" => %{"name" => "bash", "arguments" => ~s({"command":"rm -rf /tmp/x"})}
           }
 
           %{"role" => "assistant", "content" => nil, "tool_calls" => [tool_call]}

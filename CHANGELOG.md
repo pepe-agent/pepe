@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+- **`bash`/`run_script` no longer interrupt for a command that carries no risk at all** (no delete, network, sudo, inline code, or write) when there's an actual person on the other end to have been asked - a plain `ls`, `cat`, `git status`, or `pytest` just runs, the same free pass an in-workspace `read_file` already gets. A surface with nobody to ask (the HTTP API, a webhook, a cron, a `delegate` worker) still refuses anything not in `auto_approve`, unchanged - only the interactive case got quieter. The risk classifier was also tightened alongside this: `rm file` (not just `rm -rf`) now flags as a delete, and anything piped into a shell interpreter (not just after a literal `curl`/`wget`) flags as download-and-run.
+
 ## [0.10.0] - 2026-07-21
 
 ### Added

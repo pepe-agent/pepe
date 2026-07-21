@@ -10,6 +10,13 @@ defmodule Pepe.Permissions do
   (Telegram inline buttons, the CLI's arrow-key menu, ...). The core only defines the
   decision contract and remembers the answer.
 
+  `bash`/`run_script` get one more free pass beyond `@always_safe`: a call that trips no
+  `Pepe.Permissions.Risk` hint at all runs without asking **when there's a human actually
+  on the line** to have been asked - the same reasoning that already lets an in-workspace
+  `read_file` through. With nobody on the line (a webhook, a cron, a `delegate` worker), that
+  free pass does not apply; only an explicit `auto_approve` runs there, same as always. See
+  `@ask_free_when_interactive` below for why the two lists stay separate.
+
   A decision is one of:
 
     * `:once`    - allow just this call; ask again next time.
@@ -67,6 +74,18 @@ defmodule Pepe.Permissions do
   # listed - including drop-in plugin tools - requires approval (the safe default).
   @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent ask_user)
 
+  # Unlike @always_safe, these get no free pass when there is nobody to ask (an API token, a
+  # webhook, a cron, a `delegate` worker): `Pepe.Permissions.Risk`'s text heuristic is exactly
+  # that, a heuristic ("text lies", see `Pepe.Permissions.Grant`'s moduledoc), and it must never
+  # be the sole thing standing between an unattended surface and a shell. With a human actually
+  # on the line, though, a `bash`/`run_script` call that trips no risk hint at all (no delete, no
+  # network, no sudo, no inline eval, no write) is the same kind of harmless as an in-workspace
+  # `read_file` - so it runs free there too, instead of interrupting for something nobody would
+  # ever say no to. `requires_approval?/1` stays true for both: `Pepe.Tools.Delegate`'s worker
+  # filter reads it to decide what an unattended worker may hold, and this list must not widen
+  # that.
+  @ask_free_when_interactive ~w(bash run_script)
+
   @type decision :: :once | :session | :always | :deny | {:deny, String.t()}
 
   @doc "Whether a tool needs authorization before it can run."
@@ -86,7 +105,11 @@ defmodule Pepe.Permissions do
       # the workspace; the moment one reaches an absolute or `..` path it picks up a risk hint
       # and stops short-circuiting here, falling through to the taint check and the gate.
       not requires_approval?(name) and risks == [] -> :allow
+      # Checked BEFORE the interactive free pass below: tainted content is exactly what turns a
+      # risk-free-looking command into a problem (the moduledoc's own example is a bare `env`
+      # asked for by a poisoned document), so a tainted run still asks even for these.
       tainted?(ctx) -> ask(name, args, risks, ctx)
+      interactive_and_risk_free?(name, risks, ctx) -> :allow
       preapproved?(name, risks, ctx) -> :allow
       true -> ask(name, args, risks, ctx)
     end
@@ -152,6 +175,13 @@ defmodule Pepe.Permissions do
     "Error: the user did not authorize running `#{name}` (reason: #{reason}). Do not retry it - " <>
       "consider a different approach or ask the user what to do instead."
   end
+
+  # A human is "on the line" exactly when there's a real authorize callback to answer to -
+  # the same test `ask/4` itself uses to tell an interactive surface from an unattended one.
+  defp interactive_and_risk_free?(name, [], ctx),
+    do: name in @ask_free_when_interactive and is_function(ctx[:authorize], 3)
+
+  defp interactive_and_risk_free?(_name, _risks, _ctx), do: false
 
   # Pre-approved either persistently (on the agent) or for this session - and approved for
   # *this* call, not merely for a tool of the same name (see Pepe.Permissions.Grant).

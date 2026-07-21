@@ -24,6 +24,8 @@ Every tool call passes through a gate before it runs. Read-only tools run freely
 
 The tools that never ask are the read-only ones: `read_file`, `list_dir`, `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill`, and `send_to_agent`. Anything not on that list, including any drop-in plugin tool, is treated as risky and requires approval. That is a deliberately safe default: an unknown tool is assumed to be dangerous.
 
+`bash` and `run_script` get one more free pass, narrower than that list: a call that trips none of the risk hints below (no delete, no network, no sudo, no inline code, no write) runs without asking too, **but only when there is a person actually on the other end to have been asked**. A plain `ls`, `cat`, `git status`, or `pytest` no longer interrupts you; a command the risk classifier recognizes as touching the network, deleting something, or writing a file still stops and asks, same as always - it is a text heuristic, not a full shell parser, so treat it the same way as the rest of this section: a real help against everyday commands, not a boundary. On a surface with nobody to ask (the HTTP API, a webhook, a cron, a `delegate` worker), that free pass does not apply - only what is in `auto_approve` runs there.
+
 When a risky tool has not been pre-approved, the runtime asks the person on the other end. Each surface renders that prompt in its own native way (inline buttons in a chat channel, an arrow-key menu in the CLI), but the decision is always one of four:
 
 - `once`: allow just this call, ask again next time.

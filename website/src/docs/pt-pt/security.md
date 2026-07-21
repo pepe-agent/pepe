@@ -24,6 +24,8 @@ Cada chamada de ferramenta passa por uma barreira antes de correr. As ferramenta
 
 As ferramentas que nunca perguntam são as de leitura apenas: `read_file`, `list_dir`, `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` e `send_to_agent`. Tudo o que não conste dessa lista, incluindo qualquer ferramenta de plugin acrescentada, é tratado como arriscado e exige aprovação. Trata-se de uma predefinição deliberadamente segura: presume-se que uma ferramenta desconhecida é perigosa.
 
+O `bash` e o `run_script` ganham mais uma dispensa, mais restrita do que essa lista: uma chamada que não desperta nenhum dos sinais de risco abaixo (sem apagar nada, sem rede, sem sudo, sem código embutido, sem escrita) também corre sem perguntar, **mas só quando há uma pessoa real do outro lado para ter sido perguntada**. Um `ls`, `cat`, `git status` ou `pytest` comum deixa de interromper; um comando que o classificador de risco reconhece como mexendo na rede, apagando algo ou escrevendo um ficheiro continua a parar para perguntar, como sempre - é uma heurística de texto, não um parser de shell completo, por isso trate-a como o resto desta secção: uma ajuda real contra comandos do dia a dia, não uma fronteira. Numa superfície sem ninguém para perguntar (a API HTTP, um webhook, um cron, um worker do `delegate`), essa dispensa não se aplica - só corre o que estiver em `auto_approve`.
+
 Quando uma ferramenta arriscada não foi aprovada de antemão, o runtime pergunta a pessoa do outro lado. Cada superfície apresenta esse pedido à sua maneira nativa (botões incorporados num canal de conversa, um menu com as setas do teclado na CLI), mas a decisão é sempre uma de quatro:
 
 - `once`: permite apenas esta chamada, volta a perguntar da próxima vez.

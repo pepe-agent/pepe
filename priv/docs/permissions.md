@@ -11,6 +11,11 @@ without being dangerous.
    - Tools that carry no risk of their own run freely: `read_file`, `list_dir`,
      `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill`,
      `send_to_agent`, `ask_user`.
+   - `bash`/`run_script` get the same free pass, but only for a specific call that
+     trips none of `Pepe.Permissions.Risk`'s hints (no delete, network, sudo, inline
+     eval, or write) - a plain `ls`/`cat`/`git status` never interrupts - **and only
+     when there's an actual person on the other end to have been asked.** On a surface
+     with nobody there it does not apply; see "No human, no surprises" below.
    - Everything else (running code, writing/moving files, changing config, MCP tools,
      any plugin tool) needs **authorization** - the surface asks the user
      (Telegram buttons, console menu, dashboard prompt). Unknown tools default to

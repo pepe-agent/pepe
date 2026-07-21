@@ -33,7 +33,7 @@ defmodule Pepe.Agent.SessionMidRunGuardsTest do
             "role" => "assistant",
             "content" => nil,
             "tool_calls" => [
-              %{"id" => "c1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"echo hi"})}}
+              %{"id" => "c1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"rm -rf /tmp/x"})}}
             ]
           }
         end

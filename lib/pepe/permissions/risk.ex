@@ -130,8 +130,13 @@ defmodule Pepe.Permissions.Risk do
 
     [
       {:inline_eval, inline_eval?(t)},
-      {:download_exec, Regex.match?(~r/(curl|wget)[^|]*\|\s*(sh|bash|zsh)/, t)},
-      {:deletes, Regex.match?(~r/\brm\s+-|\brmdir\b|\bunlink\b/, t)},
+      # Not just `curl | sh`: anything piped into a shell interpreter, since a download tool
+      # hidden behind a pipeline (`base64 -d payload | sh`) is the same shape of risk without
+      # a curl/wget literal in the command for the older, narrower pattern to catch.
+      {:download_exec, Regex.match?(~r/\|\s*(sh|bash|zsh)\b/, t)},
+      # Any `rm`, not just one carrying a flag: `rm file.txt` deletes a file exactly as much as
+      # `rm -f file.txt` does, and used to slip through unflagged.
+      {:deletes, Regex.match?(~r/\brm\b|\brmdir\b|\bunlink\b/, t)},
       {:elevated, Regex.match?(~r/\bsudo\b|\bdoas\b/, t)},
       {:network, Regex.match?(~r/\b(curl|wget|nc|ssh|scp)\b/, t)},
       {:writes_file, Regex.match?(~r/>\s*\/|\btee\b/, t)}

@@ -136,8 +136,12 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       end
     end
 
+    # A command that actually carries a risk hint (`Pepe.Permissions.Risk`): a risk-free one no
+    # longer reaches the permission prompt at all when a human is on the line (see
+    # `Pepe.Permissions.interactive_and_risk_free?/3`), which is exactly what several tests
+    # below need to still exercise.
     defp bash_call do
-      [%{"id" => "c1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"true"})}}]
+      [%{"id" => "c1", "type" => "function", "function" => %{"name" => "bash", "arguments" => ~s({"command":"rm -rf /tmp/x"})}}]
     end
 
     defp ask_user_call do
@@ -712,7 +716,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       # The prompt names the tool and shows what it would run, so the tap is informed.
       assert_receive {:sent, ^chat, prompt, [_ | _] = buttons}, 5_000
       assert prompt =~ "bash"
-      assert prompt =~ "true"
+      assert prompt =~ "rm -rf"
 
       [%{"callback_data" => allow_once} | _] = List.flatten(buttons)
       assert allow_once =~ ~r/^perm:\d+:once$/
@@ -875,7 +879,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       say(chat, "do the thing")
 
       said = everything_said(chat)
-      assert Enum.any?(said, &(&1 =~ "bash" and &1 =~ "true"))
+      assert Enum.any?(said, &(&1 =~ "bash" and &1 =~ "rm -rf"))
     end
 
     test "verbose mode also shows why: what the model said before reaching for the tool",

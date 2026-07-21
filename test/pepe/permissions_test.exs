@@ -141,19 +141,42 @@ defmodule Pepe.PermissionsTest do
   end
 
   test "deny refuses and is never remembered", %{agent: agent} do
+    # A risky command: a risk-free one no longer reaches `ask/4` at all (see
+    # "a risk-free bash/run_script call never asks when a human is on the line" below).
     ctx = %{agent: agent, session_key: "s1", authorize: fn _, _, _ -> :deny end}
-    assert Permissions.gate("bash", "{}", ctx) == :deny
+    assert Permissions.gate("bash", ~s({"command":"rm -rf x"}), ctx) == :deny
     # Asked again next time (not remembered).
     parent = self()
     ctx2 = %{ctx | authorize: fn _, _, _ -> send(parent, :asked) && :deny end}
-    assert Permissions.gate("bash", "{}", ctx2) == :deny
+    assert Permissions.gate("bash", ~s({"command":"rm -rf x"}), ctx2) == :deny
     assert_received :asked
   end
 
   test "deny with a reason carries the reason through and is never remembered", %{agent: agent} do
     ctx = %{agent: agent, session_key: "s1b", authorize: fn _, _, _ -> {:deny, "too risky right now"} end}
-    assert Permissions.gate("bash", "{}", ctx) == {:deny, "too risky right now"}
+    assert Permissions.gate("bash", ~s({"command":"rm -rf x"}), ctx) == {:deny, "too risky right now"}
     refute SessionStore.member?("s1b", "bash")
+  end
+
+  test "a risk-free bash/run_script call never asks when a human is on the line", %{agent: agent} do
+    # `agent.auto_approve` is `[]` (see the module setup) - this proves the free pass, not a
+    # grant: nothing was ever pre-approved, and it still never reaches `ctx.authorize`.
+    ctx = %{agent: agent, session_key: "s5", authorize: fn _, _, _ -> flunk("should not ask") end}
+
+    assert Permissions.gate("bash", ~s({"command":"ls -la"}), ctx) == :allow
+    assert Permissions.gate("run_script", ~s({"language":"bash","code":"echo hi"}), ctx) == :allow
+
+    # Nothing was remembered either - the free pass isn't a grant, it just never asked.
+    refute SessionStore.member?("s5", "bash")
+    refute SessionStore.member?("s5", "run_script")
+
+    # Its twin: the exact same calls, with nobody to ask, still fall back to the "no one to
+    # ask" refusal - the free pass never applies on an unattended surface (see
+    # `Pepe.Tools.Delegate.readable/1`, which relies on this staying true for its workers).
+    unattended = %{agent: agent}
+    assert {:deny, why} = Permissions.gate("bash", ~s({"command":"ls -la"}), unattended)
+    assert why =~ "no one to ask"
+    assert {:deny, _} = Permissions.gate("run_script", ~s({"language":"bash","code":"echo hi"}), unattended)
   end
 
   test "denied_message includes the reason when present, generic without one" do
@@ -168,7 +191,7 @@ defmodule Pepe.PermissionsTest do
 
   test "once allows this call only, remembers nothing", %{agent: agent} do
     ctx = %{agent: agent, session_key: "s2", authorize: fn _, _, _ -> :once end}
-    assert Permissions.gate("bash", "{}", ctx) == :allow
+    assert Permissions.gate("bash", ~s({"command":"rm -rf x"}), ctx) == :allow
     refute SessionStore.member?("s2", "bash")
 
     assert Config.get_agent("zak") == nil or
@@ -186,10 +209,11 @@ defmodule Pepe.PermissionsTest do
 
     key = "telegram:42"
     ctx = %{agent: agent, session_key: key, authorize: authorize}
+    command = ~s({"command":"rm -rf x"})
 
-    assert Permissions.gate("bash", "{}", ctx) == :allow
+    assert Permissions.gate("bash", command, ctx) == :allow
     # Second call is pre-approved - the authorizer is not invoked again.
-    assert Permissions.gate("bash", "{}", ctx) == :allow
+    assert Permissions.gate("bash", command, ctx) == :allow
     assert :counters.get(asks, 1) == 1
     assert SessionStore.member?(key, "bash")
 
@@ -218,12 +242,13 @@ defmodule Pepe.PermissionsTest do
        %{agent: agent} do
     Config.put_agent(agent)
     ctx = %{agent: agent, session_key: "s4", authorize: fn _, _, _ -> :always end}
+    command = ~s({"command":"rm -rf x"})
 
-    assert Permissions.gate("bash", "{}", ctx) == :allow
+    assert Permissions.gate("bash", command, ctx) == :allow
 
     # Still the *same* (stale) ctx.agent, as a real agentic loop would reuse for the
     # rest of this turn - a second bash call must not re-prompt.
     ctx_still_stale = %{ctx | authorize: fn _, _, _ -> flunk("should not ask again") end}
-    assert Permissions.gate("bash", "{}", ctx_still_stale) == :allow
+    assert Permissions.gate("bash", command, ctx_still_stale) == :allow
   end
 end
