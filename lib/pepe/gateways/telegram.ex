@@ -2557,14 +2557,17 @@ defmodule Pepe.Gateways.Telegram do
   defp attempt_send(id, chat_id, content) do
     DeliveryLedger.mark_attempting(id)
 
-    try do
-      send_message(chat_id, content)
-      DeliveryLedger.mark_delivered(id)
-    rescue
-      e ->
-        DeliveryLedger.mark_failed(id, Exception.message(e))
-        reraise e, __STACKTRACE__
+    case send_message(chat_id, content) do
+      :ok ->
+        DeliveryLedger.mark_delivered(id)
+
+      {:error, reason} ->
+        DeliveryLedger.mark_failed(id, safe_inspect(reason))
     end
+  rescue
+    e ->
+      DeliveryLedger.mark_failed(id, Exception.message(e))
+      reraise e, __STACKTRACE__
   end
 
   # Redeliver whatever this bot owed a chat when it last went down mid-send (or never even
@@ -2945,18 +2948,33 @@ defmodule Pepe.Gateways.Telegram do
     Req.post(api_url(token(), "deleteMessage"), json: %{chat_id: chat_id, message_id: id})
   end
 
+  # Returns `:ok` only once every chunk genuinely reached Telegram (status 200) -
+  # `Pepe.DeliveryLedger`'s attempt_send/3 depends on this being real, not "didn't
+  # raise": a 429/403/5xx/transport error is the ordinary way a send fails, and none of
+  # those raise an Elixir exception, so this used to look identical to success to a
+  # caller that only checked for a crash.
+  @spec send_message(term(), String.t()) :: :ok | {:error, term()}
   defp send_message(chat_id, text) do
-    unless dead_target?(chat_id) do
+    if dead_target?(chat_id) do
+      {:error, :dead_target}
+    else
       # Telegram caps messages at 4096 chars. Chunk the plain text, then render each
-      # chunk as HTML so a split never lands inside a tag.
+      # chunk as HTML so a split never lands inside a tag. The whole message counts as
+      # delivered only if every chunk does; the first failure wins.
       text
       |> chunk(4000)
-      |> Enum.each(fn part -> post_part(chat_id, part) end)
+      |> Enum.reduce(:ok, fn part, acc ->
+        case acc do
+          :ok -> post_part(chat_id, part)
+          error -> error
+        end
+      end)
     end
   end
 
   # Send one chunk as Telegram HTML (so **bold**/`code`/links render); if the API
   # rejects the formatting, resend it as plain text so the message still arrives.
+  # Returns `:ok` / `{:error, response}` from whichever attempt actually ran.
   defp post_part(chat_id, part) do
     url = api_url(token(), "sendMessage")
     html = Pepe.Gateways.Telegram.Markdown.to_html(part)
@@ -2964,14 +2982,20 @@ defmodule Pepe.Gateways.Telegram do
     reply = take_reply_to()
     result = post_with_retry(url, with_reply(reply, with_thread(%{chat_id: chat_id, text: html, parse_mode: "HTML"})))
 
-    case result do
-      {:ok, %{status: 200}} ->
-        track_delivery(result, chat_id)
+    response =
+      case result do
+        {:ok, %{status: 200}} ->
+          track_delivery(result, chat_id)
 
-      _ ->
-        url
-        |> post_with_retry(with_reply(reply, with_thread(%{chat_id: chat_id, text: part})))
-        |> track_delivery(chat_id)
+        _ ->
+          url
+          |> post_with_retry(with_reply(reply, with_thread(%{chat_id: chat_id, text: part})))
+          |> track_delivery(chat_id)
+      end
+
+    case response do
+      {:ok, %{status: 200}} -> :ok
+      other -> {:error, other}
     end
   end
 

@@ -55,9 +55,14 @@ defmodule Pepe.DeliveryLedger do
     id
   end
 
-  @doc "Right before the send attempt."
+  @doc """
+  Right before the send attempt. Counts as an attempt on its own (not just
+  `mark_failed/2`) - a hard crash right after this point leaves the row `"attempting"`
+  with no later checkpoint to bump the count, and without this it could survive
+  `@max_attempts` worth of boots on the same crash-inducing content forever.
+  """
   @spec mark_attempting(String.t()) :: :ok
-  def mark_attempting(id), do: update(id, &%{&1 | state: "attempting"})
+  def mark_attempting(id), do: update(id, &%{&1 | state: "attempting", attempts: &1.attempts + 1})
 
   @doc "The send succeeded - nothing left to track."
   @spec mark_delivered(String.t()) :: :ok
@@ -66,11 +71,12 @@ defmodule Pepe.DeliveryLedger do
     :ok
   end
 
-  @doc "The send definitely failed. Kept around (with a bumped attempt count) for the next sweep."
+  @doc """
+  The send definitely failed. Kept around for the next sweep - `mark_attempting/1`
+  already counted this attempt, so this only records why it failed.
+  """
   @spec mark_failed(String.t(), String.t()) :: :ok
-  def mark_failed(id, reason) do
-    update(id, &%{&1 | state: "failed", last_error: to_string(reason), attempts: &1.attempts + 1})
-  end
+  def mark_failed(id, reason), do: update(id, &%{&1 | state: "failed", last_error: to_string(reason)})
 
   @doc """
   Claim every recoverable row for `channel` that also matches `filter` (e.g. "this
