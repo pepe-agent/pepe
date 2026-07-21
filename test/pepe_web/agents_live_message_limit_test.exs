@@ -17,6 +17,7 @@ defmodule PepeWeb.AgentsLiveMessageLimitTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_model(%Model{name: "primary", base_url: "https://x", model: "gpt-a"})
     Config.put_agent(%Agent{name: "assistant", model: "primary"})

@@ -9,6 +9,7 @@ defmodule Pepe.MessageLimitTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.add_project("acme", %{"message_limit" => 3})
 
@@ -101,8 +102,8 @@ defmodule Pepe.MessageLimitTest do
     refute Usage.over_message_limit?("acme")
 
     # Messages recorded before the reset still exist in the ledger (audit trail).
-    entries = Pepe.Usage.Messages.scope_dir("acme") |> File.ls!()
-    assert entries != []
+    entries = Pepe.Repo.all(Pepe.Usage.MessageEvent)
+    assert Enum.count(entries, &(&1.project == "acme" and not &1.reset)) == 3
   end
 
   test "only messages recorded after a reset count toward the cap again" do

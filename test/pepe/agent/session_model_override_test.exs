@@ -31,6 +31,7 @@ defmodule Pepe.Agent.SessionModelOverrideTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, server_a} = Bandit.start_link(plug: {MarkerPlug, marker: "FROM-A"}, port: 0, scheme: :http)
     {:ok, {_addr, port_a}} = ThousandIsland.listener_info(server_a)

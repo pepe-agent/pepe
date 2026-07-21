@@ -201,36 +201,42 @@ defmodule Pepe.Bundle do
   end
 
   # The project's usage ledger becomes the extracted install's **default project** ledger, with
-  # each line's `agent` handle de-scoped and its `project` field repointed to the default slug so
-  # the archive's billing history matches its now-default-project agents.
+  # each entry's `agent` handle de-scoped and its `project` field repointed to the default slug
+  # so the archive's billing history matches its now-default-project agents. Usage lives in
+  # Pepe.Repo now, not a file tree - written back out in the same one-file-per-month .jsonl
+  # shape the archive format already used, so a restored extract still just needs the same
+  # `mix pepe config migrate-data` follow-up every other subsystem's extract does (see
+  # Pepe.Config.commitments_raw_map/0's own comment for why a bundle stays self-contained
+  # rather than carrying a SQLite dependency for the receiving install).
   defp copy_usage(root, project) do
-    src = Log.scope_dir(project)
+    entries = Log.entries(project)
 
-    if File.dir?(src) do
+    if entries != [] do
       dst = Path.join([root, "data", "usage", @extracted_slug])
       File.mkdir_p!(dst)
 
-      for file <- File.ls!(src), String.ends_with?(file, ".jsonl") do
-        lines =
-          Path.join(src, file)
-          |> File.stream!()
-          |> Enum.map(&descope_usage_line/1)
-
-        File.write!(Path.join(dst, file), lines)
-      end
+      entries
+      |> Enum.map(&descope_usage_entry/1)
+      |> Enum.group_by(&usage_month_filename(&1["at"]))
+      |> Enum.each(fn {file, es} ->
+        body = Enum.map_join(es, "", &(Jason.encode!(Map.delete(&1, "project")) <> "\n"))
+        File.write!(Path.join(dst, file), body)
+      end)
     end
   end
 
-  defp descope_usage_line(line) do
-    case Jason.decode(line) do
-      {:ok, %{"agent" => agent} = entry} when is_binary(agent) ->
-        rescoped = Map.put(entry, "project", @extracted_slug)
-        Jason.encode!(%{rescoped | "agent" => Pepe.Project.name_of(agent)}) <> "\n"
-
-      _ ->
-        line
-    end
+  defp descope_usage_entry(%{"agent" => agent} = entry) when is_binary(agent) do
+    entry |> Map.put("project", @extracted_slug) |> Map.put("agent", Pepe.Project.name_of(agent))
   end
+
+  defp descope_usage_entry(entry), do: Map.put(entry, "project", @extracted_slug)
+
+  defp usage_month_filename(at) when is_integer(at) do
+    dt = DateTime.from_unix!(at)
+    :io_lib.format("~4..0B-~2..0B.jsonl", [dt.year, dt.month]) |> to_string()
+  end
+
+  defp usage_month_filename(_), do: "unknown.jsonl"
 
   # Plugins and skills are install-wide capability, not tenant data - an agent that used a skill
   # keeps working in the bundle only if they come along.

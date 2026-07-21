@@ -72,6 +72,7 @@ defmodule Pepe.Agent.SessionCommandsTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, _} = Agent.start_link(fn -> :ok end, name: :session_cmd_mode)
     {:ok, server} = Bandit.start_link(plug: MockPlug, port: 0, scheme: :http, startup_log: false)

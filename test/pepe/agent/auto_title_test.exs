@@ -54,6 +54,7 @@ defmodule Pepe.Agent.AutoTitleTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, _} = Elixir.Agent.start_link(fn -> [] end, name: :at_seen)
     {:ok, _} = Elixir.Agent.start_link(fn -> "Deploying with Docker" end, name: :at_title)

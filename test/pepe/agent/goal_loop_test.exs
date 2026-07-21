@@ -73,6 +73,7 @@ defmodule Pepe.Agent.GoalLoopTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, _} = Agent.start_link(fn -> 0 end, name: :goal_test_judge)
     {:ok, _} = Agent.start_link(fn -> 999 end, name: :goal_test_pass_after)

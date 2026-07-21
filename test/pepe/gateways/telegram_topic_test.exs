@@ -66,6 +66,7 @@ defmodule Pepe.Gateways.TelegramTopicTest do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     test_pid = self()
     {:ok, _} = Elixir.Agent.start_link(fn -> [] end, name: :tg_topic_updates)

@@ -155,9 +155,9 @@ defmodule Pepe.RenameProjectTest do
     assert Config.get_watch("w_ghost").agent == "umbrella/ghost"
   end
 
-  test "moves the workspace and usage directories on disk" do
+  test "moves the workspace directory on disk and re-scopes usage/traces/message-count data" do
     seed()
-    # create a workspace file + a usage ledger entry under acme
+    # create a workspace file + a usage ledger entry + a trace + a message-count entry under acme
     File.mkdir_p!(Workspace.dir("acme/sales"))
     File.write!(Path.join(Workspace.dir("acme/sales"), "MEMORY.md"), "remember me")
 
@@ -166,6 +166,11 @@ defmodule Pepe.RenameProjectTest do
       "completion_tokens" => 0
     })
 
+    Pepe.Usage.record_message("acme")
+
+    assert Pepe.Trace.start("acme/sales", nil) == :started
+    Pepe.Trace.finish({:ok, "done", []})
+
     assert Config.rename_project("acme", "umbrella") == :ok
 
     # old dirs gone, new dirs carry the content
@@ -173,5 +178,9 @@ defmodule Pepe.RenameProjectTest do
     assert File.read!(Path.join(Workspace.dir("umbrella/sales"), "MEMORY.md")) == "remember me"
     assert Pepe.Usage.summary("umbrella", :month).totals.total == 1000
     assert Pepe.Usage.summary("acme", :month).totals.total == 0
+    assert Pepe.Usage.message_count_month_to_date("umbrella") == 1
+    assert Pepe.Usage.message_count_month_to_date("acme") == 0
+    assert match?([_], Pepe.Trace.recent("umbrella"))
+    assert Pepe.Trace.recent("acme") == []
   end
 end

@@ -5,8 +5,9 @@ client per project.
 
 ## What gets recorded
 
-Each call the runtime makes to a model appends one line to a durable, append-only
-ledger under `~/.pepe/data/usage/<slug>/YYYY-MM.jsonl`:
+Each call the runtime makes to a model appends one row to a durable, append-only
+ledger in Pepe's local SQLite store (`Pepe.Repo`), keyed by project - not a file you'd
+read directly, but each row carries the same fields the old ledger's lines did:
 
 ```json
 {"at": 1720000000, "agent": "acme/sales", "model": "gpt-4o", "in": 812, "out": 143}

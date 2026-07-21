@@ -126,7 +126,7 @@ defmodule Pepe.Usage do
   @spec month_to_date(String.t() | nil) :: float()
   def month_to_date(project) do
     tz = Config.default_timezone()
-    key = bucket_key(System.os_time(:second), :month, tz)
+    {from_at, to_at, _label} = month_range(nil, tz)
     reset_at = Config.project_budget_reset_at(project)
     cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
@@ -138,10 +138,8 @@ defmodule Pepe.Usage do
     # never the reverse, or the reset would look like it silently did nothing.
     entries =
       project
-      |> Log.entries_near()
-      |> Enum.filter(fn e ->
-        bucket_key(e["at"], :month, tz) == key and (is_nil(reset_at) or e["at"] > reset_at)
-      end)
+      |> Log.entries_between(from_at, to_at)
+      |> Enum.filter(&(is_nil(reset_at) or &1["at"] > reset_at))
 
     prices = price_lookup(entries, models, cache)
     markups = markup_lookup(entries)
@@ -306,10 +304,7 @@ defmodule Pepe.Usage do
     cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
 
-    raw_entries =
-      project
-      |> Log.entries()
-      |> Enum.filter(fn e -> is_integer(e["at"]) and e["at"] >= from and e["at"] < to end)
+    raw_entries = Log.entries_between(project, from, to)
 
     prices = price_lookup(raw_entries, models, cache)
     markups = markup_lookup(raw_entries)
@@ -332,8 +327,13 @@ defmodule Pepe.Usage do
     }
   end
 
-  # {from_unix, to_unix, "YYYY-MM"} for a month string (default the current month).
-  defp month_range(month, tz) do
+  @doc """
+  `{from_unix, to_unix, "YYYY-MM"}` for a month string (default the current month, in
+  `tz`). Shared with `Pepe.Usage.Messages`, which needs the same current-month boundary
+  math for its own counter.
+  """
+  @spec month_range(String.t() | nil, String.t()) :: {integer(), integer(), String.t()}
+  def month_range(month, tz) do
     {y, m} = parse_month(month, tz)
     {ny, nm} = if m == 12, do: {y + 1, 1}, else: {y, m + 1}
     {start_of_month(y, m, tz), start_of_month(ny, nm, tz), pad([y, m], "~4..0B-~2..0B")}

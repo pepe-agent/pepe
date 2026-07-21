@@ -25,6 +25,7 @@ defmodule Pepe.Agent.SessionMessageLimitTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, server} = Bandit.start_link(plug: OkPlug, port: 0, scheme: :http)
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)

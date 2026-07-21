@@ -206,6 +206,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     test_pid = self()
     {:ok, _} = Agent.start_link(fn -> [] end, name: :tg_cmd_updates)

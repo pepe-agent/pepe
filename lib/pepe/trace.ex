@@ -137,6 +137,17 @@ defmodule Pepe.Trace do
 
   # --- reading (dashboard / CLI) -----------------------------------------------------
 
+  @doc """
+  Re-point every trace recorded under `old` (a project slug) to `new` - called on a
+  project rename (`Pepe.Config.rename_project/2`) so a project's trace history follows
+  it, the same way its workspace directory does.
+  """
+  @spec rescope_project(String.t(), String.t()) :: :ok
+  def rescope_project(old, new) do
+    from(t in Entry, where: t.scope == ^old) |> Repo.update_all(set: [scope: new])
+    :ok
+  end
+
   @doc "Scopes (projects + root) that have any recorded trace."
   def scopes do
     from(t in Entry, distinct: true, select: t.scope, order_by: t.scope) |> Repo.all()

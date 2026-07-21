@@ -5,7 +5,7 @@ description: Mide cada llamada al modelo por proyecto, ponle precio, aplica un m
 
 ## Cuánto cuesta una llamada
 
-Cada llamada al modelo se mide y se atribuye al proyecto del agente, así puedes facturarle a un cliente por token. La medición ocurre en el único punto por el que pasan todas las superficies (la consola, la API HTTP `/v1`, el WebSocket, Telegram y todos los canales por webhook), y se va anexando a un ledger duradero, de solo adición, en `~/.pepe/data/usage/<slug>/YYYY-MM.jsonl` (donde `<slug>` es el slug del proyecto, p. ej. `default`). Ese archivo es el rastro de auditoría de lo que se cobra.
+Cada llamada al modelo se mide y se atribuye al proyecto del agente, así puedes facturarle a un cliente por token. La medición ocurre en el único punto por el que pasan todas las superficies (la consola, la API HTTP `/v1`, el WebSocket, Telegram y todos los canales por webhook), y se va anexando a un ledger duradero, de solo adición, en el mismo pequeño archivo SQLite embebido que los compromisos, las vigilancias y los traces, agrupado por proyecto (p. ej. `default`). Ese es el rastro de auditoría de lo que se cobra. ¿Actualizas desde un Pepe más antiguo que lo escribía como un archivo JSONL por proyecto por mes bajo `~/.pepe/data/usage/<slug>/YYYY-MM.jsonl`? Ejecuta `mix pepe config migrate-data` una vez para traer las entradas antiguas - los archivos de origen se dejan intactos, no se borran, así que puedes eliminar ese directorio a mano una vez que confirmes la importación.
 
 El **coste** es `tokens × el precio del modelo`, cotizado por cada 1M de tokens. Un precio se resuelve por capas, y gana la primera capa que responde:
 

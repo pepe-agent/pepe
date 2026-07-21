@@ -17,6 +17,7 @@ defmodule Pepe.Budget.AlertTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     # A unique project per test: the dedup lives in the shared (Mnesia) Store, so a fixed slug would
     # leak the "already alerted this month" marker from one test into the next.

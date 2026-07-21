@@ -75,6 +75,7 @@ defmodule Pepe.Tools.DelegateTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, _} = Elixir.Agent.start_link(fn -> 0 end, name: :dg_delay)
     {:ok, _} = Elixir.Agent.start_link(fn -> false end, name: :dg_fail)

@@ -52,6 +52,7 @@ defmodule Pepe.PiiRoundtripTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_hook_settings("pii_redact", %{"packs" => ["br", "intl"]})
     Config.put_model(%Model{name: "mock", base_url: "http://127.0.0.1:#{port}", api_key: "x", model: "m"})

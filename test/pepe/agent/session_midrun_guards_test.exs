@@ -51,6 +51,7 @@ defmodule Pepe.Agent.SessionMidRunGuardsTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, server} = Bandit.start_link(plug: BashPlug, port: 0, scheme: :http)
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)

@@ -61,9 +61,11 @@ defmodule Pepe.BundleTest do
     File.mkdir_p!(Path.join([Config.home(), "projects", "acme", "shared"]))
     File.write!(Path.join([Config.home(), "projects", "acme", "shared", "notes.md"]), "shared acme note")
 
-    usage = Path.join([Config.home(), "data", "usage", "acme"])
-    File.mkdir_p!(usage)
-    File.write!(Path.join(usage, "2026-07.jsonl"), ~s({"at":1720000000,"agent":"acme/sales","model":"g","in":10,"out":5}\n))
+    # 2026-07-15T00:00:00Z - the extract/restore round trip test below expects this
+    # specific month's ledger file to travel, so the seeded entry has to actually fall in it
+    # (the old file-copy implementation didn't care, since it copied whatever file existed
+    # under whatever name; the Repo-backed one derives the filename from this timestamp).
+    Pepe.Usage.Log.append("acme", %{"at" => 1_784_073_600, "agent" => "acme/sales", "model" => "g", "in" => 10, "out" => 5})
   end
 
   describe "Config.extract_config/1" do

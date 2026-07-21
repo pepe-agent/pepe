@@ -12,6 +12,7 @@ defmodule Pepe.BudgetTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.add_project("acme", %{"budget" => 0.01})
     Config.put_model(%Model{name: "m", base_url: "http://x/v1", model: "m", input_price: 1.0, output_price: 1.0})

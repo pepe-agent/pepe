@@ -29,6 +29,7 @@ defmodule Pepe.Agent.SessionGoalReminderTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, _} = Agent.start_link(fn -> [] end, name: :goal_reminder_capture)
     {:ok, server} = Bandit.start_link(plug: CapturePlug, port: 0, scheme: :http)

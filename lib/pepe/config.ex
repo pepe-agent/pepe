@@ -1011,6 +1011,9 @@ defmodule Pepe.Config do
     move_project_dirs(old, new)
     rewrite_commitment_project_binding(old, new)
     rewrite_watch_project_binding(old, new)
+    Pepe.Trace.rescope_project(old, new)
+    Pepe.Usage.Log.rescope_project(old, new)
+    Pepe.Usage.Messages.rescope_project(old, new)
     :ok
   end
 
@@ -1131,8 +1134,13 @@ defmodule Pepe.Config do
     end
   end
 
-  # Move every per-scope directory keyed by a project's slug when the slug is renamed: the agents'
-  # workspaces/shared under `projects/<slug>/`, and the usage, traces and messages ledgers.
+  # Move every per-scope directory keyed by a project's slug when the slug is renamed: the
+  # agents' workspaces/shared under `projects/<slug>/`. The usage/traces/messages ledgers
+  # used to live here too - now Pepe.Repo-backed (see rescope_project/2 in each of Pepe.Trace,
+  # Pepe.Usage.Log, Pepe.Usage.Messages, called alongside this one in do_rename_project/2),
+  # but this still tries to move their old directories too: a harmless no-op once migrated,
+  # and what keeps a not-yet-migrated install's legacy files under the right slug for whenever
+  # `mix pepe config migrate-data` eventually runs.
   defp move_project_dirs(old, new) do
     for base <- [
           Path.join(home(), "projects"),

@@ -25,12 +25,18 @@ defmodule Pepe.Config.MigrateDataTest do
     {:ok, home: home}
   end
 
+  @empty_usage %{
+    usage_entries: %{imported: 0, failed: []},
+    message_events: %{imported: 0, failed: []}
+  }
+
   test "nothing to migrate anywhere" do
     assert MigrateData.run() == [
              config_journal: %{imported: 0, failed: []},
              watches: %{imported: 0, already_present: 0, failed: []},
              traces: %{imported: 0, already_present: 0, failed: []},
-             boards: %{imported: 0, already_present: 0, failed: []}
+             boards: %{imported: 0, already_present: 0, failed: []},
+             usage: @empty_usage
            ]
   end
 
@@ -46,7 +52,8 @@ defmodule Pepe.Config.MigrateDataTest do
              config_journal: %{imported: 0, failed: []},
              watches: %{imported: 1, already_present: 0, failed: []},
              traces: %{imported: 0, already_present: 0, failed: []},
-             boards: %{imported: 0, already_present: 0, failed: []}
+             boards: %{imported: 0, already_present: 0, failed: []},
+             usage: @empty_usage
            ]
   end
 
@@ -60,5 +67,6 @@ defmodule Pepe.Config.MigrateDataTest do
     assert results.watches == %{imported: 1, already_present: 0, failed: []}
     assert results.traces == %{imported: 0, already_present: 0, failed: []}
     assert results.boards == %{imported: 0, already_present: 0, failed: []}
+    assert results.usage == @empty_usage
   end
 end
