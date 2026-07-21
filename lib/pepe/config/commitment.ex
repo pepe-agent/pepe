@@ -28,14 +28,18 @@ defmodule Pepe.Config.Commitment do
             agent: nil,
             origin: %{},
             confidence: nil,
-            # awaiting_confirmation | scheduled | delivered | cancelled | expired
+            # awaiting_confirmation | scheduled | firing | delivered | cancelled | expired
             state: "awaiting_confirmation",
             created_at: nil,
             delivered_at: nil,
             last_error: nil,
             # Fired but delivery failed (origin unreachable, session crashed) - held here
             # for the scheduler's next-tick retry, same shape as a watch's pending delivery.
-            pending_delivery: nil
+            pending_delivery: nil,
+            # Set the moment state becomes "firing" (see Pepe.Commitments.Scheduler) - an
+            # agent_promise's own fulfillment (re-running a real session) can take real time
+            # and can crash mid-way, and this is the only record that it was ever attempted.
+            firing_at: nil
 
   @type t :: %__MODULE__{}
 
@@ -55,7 +59,8 @@ defmodule Pepe.Config.Commitment do
       created_at: map["created_at"],
       delivered_at: map["delivered_at"],
       last_error: map["last_error"],
-      pending_delivery: map["pending_delivery"]
+      pending_delivery: map["pending_delivery"],
+      firing_at: map["firing_at"]
     }
   end
 end

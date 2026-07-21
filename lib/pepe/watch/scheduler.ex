@@ -33,61 +33,72 @@ defmodule Pepe.Watch.Scheduler do
   def init(_opts) do
     Pepe.Config.Journal.put_source("watch")
     schedule_tick()
-    {:ok, %{busy: MapSet.new()}}
+    {:ok, %{busy: MapSet.new(), refs: %{}}}
   end
 
   @impl true
   def handle_info(:tick, state) do
     now = System.system_time(:second)
-    busy = Enum.reduce(Config.watches(), state.busy, &maybe_run(&1, &2, now))
+    state = Enum.reduce(Config.watches(), state, &maybe_run(&1, &2, now))
     schedule_tick()
-    {:noreply, %{state | busy: busy}}
+    {:noreply, state}
   end
 
-  # A check/delivery task finished for this watch id - clear the in-flight guard.
-  def handle_info({:done, id}, state),
-    do: {:noreply, %{state | busy: MapSet.delete(state.busy, id)}}
+  # A check/delivery task ended, however it ended (a plain finish, a crash, an exit) -
+  # clear the in-flight guard. Monitored (not a bare `Task.start` + self-reported
+  # `{:done, id}`) so a task that dies partway through - Delivery.deliver/2 raising, the
+  # process being killed on shutdown - still releases its watch instead of leaving it
+  # stuck "in flight" forever, the same fix already applied to Pepe.Cron.Scheduler.
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+    case Map.pop(state.refs, ref) do
+      {nil, _} -> {:noreply, state}
+      {id, refs} -> {:noreply, %{state | refs: refs, busy: MapSet.delete(state.busy, id)}}
+    end
+  end
 
-  defp maybe_run(watch, busy, now) do
+  defp maybe_run(watch, state, now) do
     cond do
-      MapSet.member?(busy, watch.id) ->
-        busy
+      MapSet.member?(state.busy, watch.id) ->
+        state
 
       Watch.due?(watch, now) ->
-        run_check(watch)
-        MapSet.put(busy, watch.id)
+        start(watch, state, &run_check/1)
 
       # Fired earlier but the channel was down - retry only the delivery.
       watch.pending_delivery ->
-        run_retry(watch)
-        MapSet.put(busy, watch.id)
+        start(watch, state, &run_retry/1)
 
       true ->
-        busy
+        state
+    end
+  end
+
+  # Supervised (not a bare Task.start) so a graceful shutdown can see and drain in-flight
+  # checks/deliveries instead of the VM just killing them - see Pepe.Application.prep_stop/1.
+  # Monitored so the in-flight guard is released by the run ending, whatever ending it gets.
+  defp start(watch, state, fun) do
+    case Task.Supervisor.start_child(Pepe.Watch.TaskSupervisor, fn -> fun.(watch) end) do
+      {:ok, pid} ->
+        ref = Process.monitor(pid)
+        %{state | busy: MapSet.put(state.busy, watch.id), refs: Map.put(state.refs, ref, watch.id)}
+
+      _ ->
+        Logger.warning("watch #{watch.id}: could not start the run")
+        state
     end
   end
 
   defp run_check(watch) do
-    parent = self()
-
-    Task.start(fn ->
-      Pepe.Config.Journal.put_source("watch")
-      {updated, text} = Watch.evaluate(watch)
-      # Persist the new state (e.g. `done`) BEFORE delivering - at-most-once fire.
-      Config.put_watch(updated)
-      if text, do: deliver(updated, text)
-      send(parent, {:done, watch.id})
-    end)
+    Pepe.Config.Journal.put_source("watch")
+    {updated, text} = Watch.evaluate(watch)
+    # Persist the new state (e.g. `done`) BEFORE delivering - at-most-once fire.
+    Config.put_watch(updated)
+    if text, do: deliver(updated, text)
   end
 
   defp run_retry(watch) do
-    parent = self()
-
-    Task.start(fn ->
-      Pepe.Config.Journal.put_source("watch")
-      deliver(watch, watch.pending_delivery)
-      send(parent, {:done, watch.id})
-    end)
+    Pepe.Config.Journal.put_source("watch")
+    deliver(watch, watch.pending_delivery)
   end
 
   # Deliver, recording the outcome: cleared on success, held for retry on failure.

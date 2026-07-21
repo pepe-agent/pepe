@@ -24,6 +24,8 @@ defmodule Pepe.Application do
   def prep_stop(state) do
     drain_tasks(Pepe.Cron.TaskSupervisor, "cron job")
     drain_tasks(Pepe.Board.TaskSupervisor, "board card")
+    drain_tasks(Pepe.Watch.TaskSupervisor, "watch")
+    drain_tasks(Pepe.Commitments.TaskSupervisor, "commitment")
     state
   end
 
@@ -139,8 +141,8 @@ defmodule Pepe.Application do
     # schedulers on one config double-fire.)
     maybe_children(server?, [{Task.Supervisor, name: Pepe.Cron.TaskSupervisor}, Pepe.Cron.Scheduler]) ++
       maybe_children(server?, [{Task.Supervisor, name: Pepe.Board.TaskSupervisor}, Pepe.Board.Scheduler]) ++
-      maybe_children(server? or persist?, [Pepe.Watch.Scheduler]) ++
-      maybe_children(server? or persist?, [Pepe.Commitments.Scheduler])
+      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Watch.TaskSupervisor}, Pepe.Watch.Scheduler]) ++
+      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Commitments.TaskSupervisor}, Pepe.Commitments.Scheduler])
   end
 
   defp maybe_children(true, children), do: children

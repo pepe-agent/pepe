@@ -15,6 +15,7 @@ defmodule Pepe.Watch.SchedulerTest do
     System.put_env("PEPE_HOME", home)
     File.write!(Path.join(home, "config.json"), Jason.encode!(%{}))
 
+    start_supervised!({Task.Supervisor, name: Pepe.Watch.TaskSupervisor})
     start_supervised!(Scheduler)
 
     on_exit(fn ->
@@ -41,6 +42,14 @@ defmodule Pepe.Watch.SchedulerTest do
     end
   end
 
+  defp busy?(id), do: MapSet.member?(:sys.get_state(Scheduler).busy, id)
+
+  defp wait_for_child do
+    wait_until(fn -> Task.Supervisor.children(Pepe.Watch.TaskSupervisor) != [] end)
+    [pid] = Task.Supervisor.children(Pepe.Watch.TaskSupervisor)
+    pid
+  end
+
   test "a due watch whose probe passes fires, delivers, and becomes done" do
     id =
       put(
@@ -61,6 +70,28 @@ defmodule Pepe.Watch.SchedulerTest do
     # "unknown" in the journal instead.
     [entry | _] = Pepe.Config.Journal.recent()
     assert entry["source"] == "watch"
+  end
+
+  test "a check task that crashes releases the busy guard instead of leaking it forever" do
+    id =
+      put(
+        trigger: %{"type" => "probe", "command" => "sleep 5"},
+        on_fire: %{"type" => "template", "text" => "up"},
+        origin: %{"channel" => "log"}
+      )
+
+    tick()
+    assert busy?(id)
+
+    pid = wait_for_child()
+    ref = Process.monitor(pid)
+    Process.exit(pid, :kill)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :killed}, 2_000
+
+    # The scheduler's own guard clears too, not just the OS process - a later tick can
+    # retry this watch, it doesn't stay "in flight" forever because the killed task never
+    # got to send a self-reported "done".
+    wait_until(fn -> not busy?(id) end)
   end
 
   test "a probe that isn't satisfied stays pending and bumps the counter" do

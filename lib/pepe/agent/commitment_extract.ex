@@ -21,6 +21,8 @@ defmodule Pepe.Agent.CommitmentExtract do
   next (the scheduler, and why "who made the promise" changes how it's delivered).
   """
 
+  use Gettext, backend: Pepe.Gettext
+
   alias Pepe.Agent.Utility
   alias Pepe.Commitments.DueDate
   alias Pepe.Config
@@ -189,11 +191,16 @@ defmodule Pepe.Agent.CommitmentExtract do
   # failure this feature exists to prevent. One direct question, sent once, not a
   # repeated reminder.
   defp ask_confirmation(%Commitment{} = c) do
-    when_text = c.due_when || "an unclear time"
+    Config.put_locale()
+    when_text = c.due_when || gettext("an unclear time")
 
     Delivery.deliver(
       c.origin,
-      "Did you want me to remember this: \"#{c.text}\" (due #{when_text})? Say yes to confirm, or ignore to let it drop."
+      gettext(
+        "Did you want me to remember this: \"%{text}\" (due %{when_text})? Say yes to confirm, or ignore to let it drop.",
+        text: c.text,
+        when_text: when_text
+      )
     )
   end
 

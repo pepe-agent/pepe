@@ -14,6 +14,7 @@ defmodule Pepe.Agent.CommitmentExtractTest do
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
+  alias Pepe.Watch.Delivery
 
   defmodule MainPlug do
     @moduledoc false
@@ -193,6 +194,38 @@ defmodule Pepe.Agent.CommitmentExtractTest do
 
     [commitment] = Config.commitments()
     assert commitment.state == "awaiting_confirmation"
+  end
+
+  test "landing awaiting confirmation asks once, through gettext, not a hardcoded string" do
+    reply = "Sure, I'll look into it tomorrow."
+    put_main(reply)
+
+    extraction =
+      Jason.encode!(%{
+        "commitment" => true,
+        "who" => "agent",
+        "text" => "look into it",
+        "source_excerpt" => reply,
+        "due_when" => "tomorrow",
+        "confidence" => 0.2
+      })
+
+    utility = put_utility(extraction)
+    put_agent(utility_model: utility)
+    # "web:" resolves to a deliverable ("ws") origin (see Delivery.origin_from_ctx/1) -
+    # unlike this file's own new_key/0 ("test:commitments:..."), which falls through to
+    # the silent "log" channel and can't be asserted on via PubSub.
+    key = "web:commit-confirm-#{System.unique_integer([:positive])}"
+    origin = %{"channel" => "ws", "key" => key}
+    {:ok, _} = Registry.register(Pepe.Watch.Subscribers, Delivery.topic(origin), nil)
+    Phoenix.PubSub.subscribe(Pepe.PubSub, Delivery.topic(origin))
+
+    {:ok, _pid} = SessionSupervisor.ensure(key, "main")
+    assert {:ok, ^reply} = Session.chat(key, "please look into it")
+
+    assert_receive {:watch_message, ^origin, text}, 2_000
+    assert text =~ "look into it"
+    assert text =~ "tomorrow"
   end
 
   test "a fabricated source_excerpt (not actually in the transcript) is discarded" do

@@ -22,6 +22,7 @@ defmodule PepeWeb.WatchWsDeliveryTest do
     }
 
     File.write!(Path.join(home, "config.json"), Jason.encode!(config))
+    start_supervised!({Task.Supervisor, name: Pepe.Watch.TaskSupervisor})
     start_supervised!(Scheduler)
 
     on_exit(fn ->
