@@ -386,8 +386,12 @@ defmodule Pepe.Doctor do
   # now, silently: no error, no crash, they just stop firing. Nothing else in the codebase
   # would ever surface that on its own.
   defp migration_checks do
-    legacy_check(Config.load(), "commitments", "mix pepe config migrate-commitments") ++
-      legacy_check(Config.load(), "watches", "mix pepe config migrate-data")
+    config = Config.load()
+
+    legacy_check(config, "commitments", "mix pepe config migrate-commitments") ++
+      legacy_check(config, "watches", "mix pepe config migrate-data") ++
+      legacy_check(config, "boards", "mix pepe config migrate-data") ++
+      legacy_check(config, "board_cards", "mix pepe config migrate-data")
   end
 
   defp legacy_check(config, key, command) do

@@ -120,6 +120,27 @@ defmodule Pepe.DoctorTest do
     assert Enum.any?(checks, &match?({"state", "unmigrated watches", {:warn, _}}, &1))
   end
 
+  test "state: legacy unmigrated boards/board_cards sections in config.json are flagged" do
+    Config.update(fn config ->
+      config
+      |> Map.put("boards", %{"b1" => %{"name" => "eng"}})
+      |> Map.put("board_cards", %{"c1" => %{"board" => "b1"}})
+    end)
+
+    checks = Doctor.checks()
+
+    assert Enum.any?(checks, &match?({"state", "unmigrated boards", {:warn, _}}, &1))
+    assert Enum.any?(checks, &match?({"state", "unmigrated board_cards", {:warn, _}}, &1))
+  end
+
+  test "state: says nothing once boards/board_cards have been migrated (or never existed)" do
+    refute Map.has_key?(Config.load(), "boards")
+    refute Map.has_key?(Config.load(), "board_cards")
+    checks = Doctor.checks()
+    refute Enum.any?(checks, &match?({"state", "unmigrated boards", _}, &1))
+    refute Enum.any?(checks, &match?({"state", "unmigrated board_cards", _}, &1))
+  end
+
   test "state: says nothing once watches have been migrated (or never existed)" do
     refute Map.has_key?(Config.load(), "watches")
     checks = Doctor.checks()

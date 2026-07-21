@@ -21,6 +21,7 @@ defmodule Pepe.Board.SchedulerTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     start_supervised!({Task.Supervisor, name: Pepe.Board.TaskSupervisor})
     start_supervised!(Scheduler)

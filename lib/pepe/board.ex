@@ -3,12 +3,24 @@ defmodule Pepe.Board do
   Card lifecycle: creating, linking dependencies, claiming, and moving a card through its
   status pipeline (`triage → todo → ready → running → done | blocked → archived`).
 
-  Every state-changing operation here goes through `Pepe.Config.update_cas/1` with its
-  precondition read from the config `update_cas` hands it, not one fetched earlier: that is
-  what makes a `claim` race-free against a concurrent claim with no extra lock (see
-  `Pepe.Config.Writer.update_cas/1`). The one rule that must never be broken anywhere in this
-  module: no `get_in(config, ...)` followed by a *separate* `Config.update.../1` call; read
-  and write happen inside the same `update_cas` callback, always.
+  Every state-changing operation here is atomic against `Pepe.Repo` directly, by
+  precondition shape:
+
+    * A precondition on the card's own columns (`claim`, `complete`, `block`, `unblock`,
+      `force_ready`, `unarchive`, `archive/2`, `reclaim_if_timed_out/2`) is one
+      conditional `UPDATE ... WHERE id = ? AND <precondition>` - the returned row count
+      *is* the atomic result (1 = won, 0 = lost), no transaction needed.
+    * A precondition that reads *other* cards (`link/2`, `create_card/1`,
+      `promote_if_ready/1` - the acyclic-dependency check walks the whole board's graph)
+      runs inside `Pepe.Repo.transaction/1`: read, decide, write, all in one transaction.
+    * `create_board/1`'s precondition ("this id isn't taken yet") is a single
+      `INSERT ... ON CONFLICT DO NOTHING`, whose returned row count is the same kind of
+      atomic signal as the conditional-UPDATE case.
+
+  This replaces the old `Pepe.Config.update_cas/1`-based design (still there, unused,
+  now that this was its last real caller): the same "read and write happen atomically,
+  no separate get-then-write" guarantee, expressed against the database instead of a
+  whole-file compare-and-swap.
 
   `Pepe.Board.Scheduler` is the tick-driven caller of `promote_if_ready/1`,
   `reclaim_if_timed_out/2`, and dispatch; `Pepe.Tools.Board` and the dashboard are the other
@@ -16,9 +28,12 @@ defmodule Pepe.Board do
   these, on purpose (see the scheduler's moduledoc for why).
   """
 
+  import Ecto.Query, only: [from: 2]
+
   alias Pepe.Config
   alias Pepe.Config.Board
   alias Pepe.Config.BoardCard
+  alias Pepe.Repo
 
   @doc "PubSub topic carrying `{:board_event, card_id, event}` for every card change."
   def events_topic, do: "boards:events"
@@ -30,21 +45,21 @@ defmodule Pepe.Board do
     name = fetch(attrs, :name)
     id = Pepe.Project.handle(project, name)
 
-    Config.update_cas(fn config ->
-      if get_in(config, ["boards", id]) do
-        {:error, :already_exists}
-      else
-        board_map = %{
-          "project" => project,
-          "name" => name,
-          "auto_dispatch" => fetch(attrs, :auto_dispatch) || false,
-          "claim_timeout_s" => fetch(attrs, :claim_timeout_s) || 1800
-        }
+    row = %{
+      id: id,
+      project: project,
+      name: name,
+      auto_dispatch: fetch(attrs, :auto_dispatch) || false,
+      claim_timeout_s: fetch(attrs, :claim_timeout_s) || 1800
+    }
 
-        {:ok, update_in(config, ["boards"], &Map.put(&1 || %{}, id, board_map))}
-      end
-    end)
-    |> extract(["boards", id], &Board.from_map/1)
+    # ON CONFLICT DO NOTHING's returned row count is the atomic "did this id already
+    # exist" signal - same idiom the migration modules already use, no read-then-write
+    # gap at all (stronger than a transaction-wrapped existence check would be).
+    case Repo.insert_all(Board, [row], on_conflict: :nothing) do
+      {1, _} -> {:ok, struct(Board, row)}
+      {0, _} -> {:error, :already_exists}
+    end
   end
 
   @doc """
@@ -72,50 +87,54 @@ defmodule Pepe.Board do
     depends_on = fetch(attrs, :depends_on) || []
     id = new_card_id()
 
-    Config.update_cas(fn config ->
+    Repo.transaction(fn ->
       cond do
-        is_nil(get_in(config, ["boards", board_id])) ->
-          {:error, :board_not_found}
+        is_nil(Repo.get(Board, board_id)) ->
+          Repo.rollback(:board_not_found)
 
-        not valid_deps?(config, board_id, id, depends_on) ->
-          {:error, :invalid_dependency}
+        not valid_deps?(board_id, id, depends_on) ->
+          Repo.rollback(:invalid_dependency)
 
         true ->
           ts = now()
 
-          card_map = %{
-            "board" => board_id,
-            "title" => fetch(attrs, :title),
-            "body" => fetch(attrs, :body),
-            "assignee" => fetch(attrs, :assignee),
-            "status" => fetch(attrs, :status) || "todo",
-            "priority" => fetch(attrs, :priority) || 0,
-            "depends_on" => depends_on,
-            "auto_dispatch" => fetch(attrs, :auto_dispatch),
-            "claimed_by" => nil,
-            "claimed_at" => nil,
-            "block_reason" => nil,
-            "created_at" => ts,
-            "updated_at" => ts
-          }
+          changeset =
+            BoardCard.changeset(%BoardCard{}, %{
+              id: id,
+              board: board_id,
+              title: fetch(attrs, :title),
+              body: fetch(attrs, :body),
+              assignee: fetch(attrs, :assignee),
+              status: fetch(attrs, :status) || "todo",
+              priority: fetch(attrs, :priority) || 0,
+              depends_on: depends_on,
+              auto_dispatch: fetch(attrs, :auto_dispatch),
+              created_at: ts,
+              updated_at: ts
+            })
 
-          {:ok, update_in(config, ["board_cards"], &Map.put(&1 || %{}, id, card_map))}
+          Repo.insert!(changeset)
       end
     end)
-    |> extract(["board_cards", id], &BoardCard.from_map/1)
-    |> tap_ok(fn _card -> log_event(id, "created", %{}) end)
+    |> tap_ok(fn card -> log_event(card.id, "created", %{}) end)
   end
 
   @doc "Add a dependency edge to an existing card. Same validation as `create_card/1`."
   @spec link(String.t(), String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def link(card_id, depends_on_id) do
-    cas_card(card_id, fn config, m ->
-      new_deps = Enum.uniq([depends_on_id | m["depends_on"] || []])
+    Repo.transaction(fn ->
+      case Repo.get(BoardCard, card_id) do
+        nil ->
+          Repo.rollback(:not_found)
 
-      if valid_deps?(config, m["board"], card_id, new_deps) do
-        {:ok, put_in(config, ["board_cards", card_id], Map.merge(m, %{"depends_on" => new_deps, "updated_at" => now()}))}
-      else
-        {:error, :invalid_dependency}
+        card ->
+          new_deps = Enum.uniq([depends_on_id | card.depends_on])
+
+          if valid_deps?(card.board, card_id, new_deps) do
+            card |> BoardCard.changeset(%{depends_on: new_deps, updated_at: now()}) |> Repo.update!()
+          else
+            Repo.rollback(:invalid_dependency)
+          end
       end
     end)
     |> tap_ok(fn _card -> log_event(card_id, "linked", %{"depends_on" => depends_on_id}) end)
@@ -123,34 +142,33 @@ defmodule Pepe.Board do
 
   @doc """
   Override (`true`/`false`) or clear (`nil`) this card's own `auto_dispatch`, regardless
-  of its board's setting; see `effective_auto_dispatch?/2`. Never touches its status.
+  of its board's setting; see `effective_auto_dispatch?/2`. Never touches its status. No
+  precondition to check, so this is a plain unconditional update.
   """
   @spec set_auto_dispatch(String.t(), boolean() | nil) :: {:ok, BoardCard.t()} | {:error, term()}
   def set_auto_dispatch(card_id, value) when is_boolean(value) or is_nil(value) do
-    cas_card(card_id, fn config, m ->
-      {:ok, put_in(config, ["board_cards", card_id], Map.merge(m, %{"auto_dispatch" => value, "updated_at" => now()}))}
-    end)
+    update_unconditionally(card_id, auto_dispatch: value)
     |> tap_ok(fn _card -> log_event(card_id, "auto_dispatch_set", %{"value" => value}) end)
   end
 
   @doc "`ready → running`. Works whether or not the board has `auto_dispatch` on."
   @spec claim(String.t(), String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def claim(card_id, claimant) do
-    transition(card_id, "ready", %{"status" => "running", "claimed_by" => claimant, "claimed_at" => now()})
+    transition(card_id, "ready", status: "running", claimed_by: claimant, claimed_at: now())
     |> tap_ok(fn _card -> log_event(card_id, "claimed", %{"by" => claimant}) end)
   end
 
   @doc "`running → done`."
   @spec complete(String.t(), String.t() | nil) :: {:ok, BoardCard.t()} | {:error, term()}
   def complete(card_id, result \\ nil) do
-    transition(card_id, "running", %{"status" => "done"})
+    transition(card_id, "running", status: "done")
     |> tap_ok(fn _card -> log_event(card_id, "completed", %{"result" => result}) end)
   end
 
   @doc "`running → blocked`, with a reason."
   @spec block(String.t(), String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def block(card_id, reason) do
-    transition(card_id, "running", %{"status" => "blocked", "block_reason" => reason})
+    transition(card_id, "running", status: "blocked", block_reason: reason)
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => reason}) end)
   end
 
@@ -159,21 +177,21 @@ defmodule Pepe.Board do
   def block_if_still_running(card_id) do
     reason = "worker exited without completing"
 
-    transition(card_id, "running", %{"status" => "blocked", "block_reason" => reason})
+    transition(card_id, "running", status: "blocked", block_reason: reason)
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => reason}) end)
   end
 
   @doc "`blocked → ready`, clearing the claim."
   @spec unblock(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def unblock(card_id) do
-    transition(card_id, "blocked", %{"status" => "ready", "claimed_by" => nil, "claimed_at" => nil, "block_reason" => nil})
+    transition(card_id, "blocked", status: "ready", claimed_by: nil, claimed_at: nil, block_reason: nil)
     |> tap_ok(fn _card -> log_event(card_id, "unblocked", %{}) end)
   end
 
   @doc "`todo → ready`, bypassing the dependency gate."
   @spec force_ready(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def force_ready(card_id) do
-    transition(card_id, "todo", %{"status" => "ready"})
+    transition(card_id, "todo", status: "ready")
     |> tap_ok(fn _card -> log_event(card_id, "forced_ready", %{}) end)
   end
 
@@ -185,20 +203,36 @@ defmodule Pepe.Board do
   def archive(card_id, opts \\ []) do
     force? = Keyword.get(opts, :force, false)
 
-    cas_card(card_id, fn config, m ->
-      cond do
-        m["status"] == "archived" -> {:error, :already_archived}
-        m["status"] == "running" and not force? -> {:error, :running}
-        true -> {:ok, put_in(config, ["board_cards", card_id], Map.merge(m, %{"status" => "archived", "updated_at" => now()}))}
+    # Not a fixed from_status (archive/2 has two independent preconditions, not one status
+    # transition): the WHERE clause itself is what makes "not already archived, and not
+    # running unless forced" atomic, same as every other transition here.
+    query =
+      if force? do
+        from(c in BoardCard, where: c.id == ^card_id and c.status != "archived")
+      else
+        from(c in BoardCard, where: c.id == ^card_id and c.status not in ["archived", "running"])
       end
-    end)
+
+    case Repo.update_all(query, set: [status: "archived", updated_at: now()]) do
+      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
+      {0, _} -> archive_error(card_id, force?)
+    end
     |> tap_ok(fn _card -> log_event(card_id, "archived", %{}) end)
+  end
+
+  defp archive_error(card_id, force?) do
+    case Repo.get(BoardCard, card_id) do
+      nil -> {:error, :not_found}
+      %{status: "archived"} -> {:error, :already_archived}
+      %{status: "running"} when not force? -> {:error, :running}
+      _ -> {:error, :conflict}
+    end
   end
 
   @doc "`archived → todo`."
   @spec unarchive(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def unarchive(card_id) do
-    transition(card_id, "archived", %{"status" => "todo"})
+    transition(card_id, "archived", status: "todo")
     |> tap_ok(fn _card -> log_event(card_id, "unarchived", %{}) end)
   end
 
@@ -220,16 +254,29 @@ defmodule Pepe.Board do
   """
   @spec promote_if_ready(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def promote_if_ready(card_id) do
-    cas_card(card_id, fn config, m ->
-      cards = get_in(config, ["board_cards"]) || %{}
-      deps = m["depends_on"] || []
+    Repo.transaction(fn ->
+      case Repo.get(BoardCard, card_id) do
+        nil ->
+          Repo.rollback(:not_found)
 
-      cond do
-        m["status"] != "todo" -> {:error, :not_todo}
-        not Enum.all?(deps, &(get_in(cards, [&1, "status"]) == "done")) -> {:error, :deps_not_done}
-        true -> {:ok, put_in(config, ["board_cards", card_id], Map.merge(m, %{"status" => "ready", "updated_at" => now()}))}
+        %{status: "todo"} = card ->
+          if deps_done?(card.depends_on) do
+            card |> BoardCard.changeset(%{status: "ready", updated_at: now()}) |> Repo.update!()
+          else
+            Repo.rollback(:deps_not_done)
+          end
+
+        _card ->
+          Repo.rollback(:not_todo)
       end
     end)
+  end
+
+  defp deps_done?([]), do: true
+
+  defp deps_done?(dep_ids) do
+    statuses = from(c in BoardCard, where: c.id in ^dep_ids, select: {c.id, c.status}) |> Repo.all() |> Map.new()
+    Enum.all?(dep_ids, &(statuses[&1] == "done"))
   end
 
   @doc """
@@ -240,25 +287,23 @@ defmodule Pepe.Board do
   def reclaim_if_timed_out(_card_id, timeout_s) when timeout_s in [0, nil], do: {:error, :no_timeout}
 
   def reclaim_if_timed_out(card_id, timeout_s) do
-    cas_card(card_id, &reclaim_card(&1, card_id, &2, timeout_s))
+    cutoff = now() - timeout_s
+    query = from(c in BoardCard, where: c.id == ^card_id and c.status == "running" and c.claimed_at < ^cutoff)
+
+    case Repo.update_all(query, set: [status: "blocked", block_reason: "claim timed out", updated_at: now()]) do
+      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
+      {0, _} -> reclaim_error(card_id)
+    end
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => "claim timed out"}) end)
   end
 
-  defp reclaim_card(config, card_id, %{"status" => "running", "claimed_at" => claimed_at} = m, timeout_s)
-       when is_integer(claimed_at) do
-    if now() - claimed_at > timeout_s do
-      {:ok,
-       put_in(
-         config,
-         ["board_cards", card_id],
-         Map.merge(m, %{"status" => "blocked", "block_reason" => "claim timed out", "updated_at" => now()})
-       )}
-    else
-      {:error, :not_timed_out}
+  defp reclaim_error(card_id) do
+    case Repo.get(BoardCard, card_id) do
+      nil -> {:error, :not_found}
+      %{status: "running", claimed_at: c} when is_integer(c) -> {:error, :not_timed_out}
+      _ -> {:error, :not_applicable}
     end
   end
-
-  defp reclaim_card(_config, _card_id, _m, _timeout_s), do: {:error, :not_applicable}
 
   @doc """
   `ready` cards on `board_id` with an assignee and no current claim, ordered highest-priority
@@ -287,37 +332,39 @@ defmodule Pepe.Board do
   ###
 
   # A generic `status_from → patch` transition, the shape every simple state change shares
-  # (claim/complete/block/unblock/force_ready/unarchive). `archive/2` and `promote_if_ready/1`
-  # have their own precondition logic and don't fit this shape.
+  # (claim/complete/block/unblock/force_ready/unarchive). One conditional UPDATE, gated on
+  # both id and the precondition status - the returned row count is the atomic result, no
+  # transaction needed. `archive/2` and `promote_if_ready/1` have their own precondition
+  # logic and don't fit this shape.
   defp transition(card_id, from_status, patch) do
-    cas_card(card_id, fn config, m ->
-      if m["status"] == from_status do
-        {:ok, put_in(config, ["board_cards", card_id], Map.merge(m, Map.put(patch, "updated_at", now())))}
-      else
-        {:error, {:unexpected_status, m["status"]}}
-      end
-    end)
+    patch = Keyword.put(patch, :updated_at, now())
+    query = from(c in BoardCard, where: c.id == ^card_id and c.status == ^from_status)
+
+    case Repo.update_all(query, set: patch) do
+      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
+      {0, _} -> transition_error(card_id, from_status)
+    end
   end
 
-  # Runs `fun.(config, card_map)` (which must return `{:ok, new_config} | {:error, reason}`,
-  # the `Config.update_cas/1` contract) against the freshly loaded config, only if the card
-  # exists, and turns a success back into `{:ok, %BoardCard{}}`.
-  defp cas_card(card_id, fun) do
-    Config.update_cas(fn config ->
-      case get_in(config, ["board_cards", card_id]) do
-        nil -> {:error, :not_found}
-        card_map -> fun.(config, card_map)
-      end
-    end)
-    |> extract(["board_cards", card_id], &BoardCard.from_map/1)
+  defp transition_error(card_id, _from_status) do
+    case Repo.get(BoardCard, card_id) do
+      nil -> {:error, :not_found}
+      %{status: actual} -> {:error, {:unexpected_status, actual}}
+    end
   end
 
-  defp extract({:ok, new_config}, path, from_map) do
-    [id | _] = Enum.reverse(path)
-    {:ok, get_in(new_config, path) |> Map.put("id", id) |> from_map.()}
-  end
+  # set_auto_dispatch/2's shape: no precondition, so a plain unconditional update - still
+  # goes through the same {count, _} check to report :not_found instead of silently
+  # succeeding at nothing on an id that doesn't exist.
+  defp update_unconditionally(card_id, patch) do
+    patch = Keyword.put(patch, :updated_at, now())
+    query = from(c in BoardCard, where: c.id == ^card_id)
 
-  defp extract({:error, _} = err, _path, _from_map), do: err
+    case Repo.update_all(query, set: patch) do
+      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
+      {0, _} -> {:error, :not_found}
+    end
+  end
 
   defp tap_ok({:ok, value} = result, fun) do
     fun.(value)
@@ -329,10 +376,10 @@ defmodule Pepe.Board do
   # Every dependency must exist, belong to the same board (cross-board deps are rejected
   # outright), and adding this edge must not create a cycle: checked by asking whether the
   # graph already reaches back to `card_id` starting from any proposed dependency.
-  defp valid_deps?(config, board_id, card_id, depends_on) do
-    cards = get_in(config, ["board_cards"]) || %{}
+  defp valid_deps?(board_id, card_id, depends_on) do
+    cards = from(c in BoardCard, where: c.board == ^board_id) |> Repo.all() |> Map.new(&{&1.id, &1})
 
-    Enum.all?(depends_on, &match?(%{"board" => ^board_id}, cards[&1])) and
+    Enum.all?(depends_on, &match?(%BoardCard{board: ^board_id}, cards[&1])) and
       not Enum.any?(depends_on, &reaches?(cards, &1, card_id, []))
   end
 
@@ -343,7 +390,8 @@ defmodule Pepe.Board do
       false
     else
       seen = [current | seen]
-      get_in(cards, [current, "depends_on"]) |> List.wrap() |> Enum.any?(&reaches?(cards, &1, target, seen))
+      deps = if cards[current], do: cards[current].depends_on, else: []
+      Enum.any?(deps, &reaches?(cards, &1, target, seen))
     end
   end
 

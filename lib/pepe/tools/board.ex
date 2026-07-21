@@ -139,7 +139,6 @@ defmodule Pepe.Tools.Board do
     case Board.create_board(attrs) do
       {:ok, board} -> {:ok, "Created board #{board.id}."}
       {:error, :already_exists} -> {:error, "a board named #{args["name"]} already exists there"}
-      {:error, reason} -> {:error, "could not create board: #{inspect(reason)}"}
     end
   end
 

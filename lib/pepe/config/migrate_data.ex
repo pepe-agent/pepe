@@ -20,7 +20,8 @@ defmodule Pepe.Config.MigrateData do
     [
       config_journal: safe_run(&Pepe.Config.Journal.Migration.run/0),
       watches: safe_run(&Pepe.Watches.Migration.run/0),
-      traces: safe_run(&Pepe.Trace.Migration.run/0)
+      traces: safe_run(&Pepe.Trace.Migration.run/0),
+      boards: safe_run(&Pepe.Board.Migration.run/0)
     ]
   end
 

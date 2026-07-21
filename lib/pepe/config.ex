@@ -29,12 +29,15 @@ defmodule Pepe.Config do
   interpolated against the environment at read time, never persisted expanded.
   """
 
+  import Ecto.Query, only: [from: 2]
+
   alias Pepe.Project
   alias Pepe.Config.Agent
   alias Pepe.Config.Board
   alias Pepe.Config.BoardCard
   alias Pepe.Config.Cron
   alias Pepe.Config.Model
+  alias Pepe.Repo
 
   # The slug of the project a fresh install is born with, and the one every command falls back to
   # when no project is given. It is a normal, renameable project; this is only its initial slug.
@@ -2054,22 +2057,18 @@ defmodule Pepe.Config do
   ###
   ### Boards (durable task/work-item tracking, see Pepe.Board)
   ###
+  ### Backed by Pepe.Repo (SQLite), not config.json - see Pepe.Config.Board's moduledoc.
+  ### Same shape as the Watches/Commitments sections: every name/arity/return shape
+  ### callers already used is unchanged, only what's behind it moved. `board` is a real
+  ### foreign key (board_cards.board -> boards.id, on_delete: :delete_all), so deleting a
+  ### board's row cascades to its cards at the database level - see delete_board/2.
+  ###
 
   @doc "All boards, as `Pepe.Config.Board` structs, sorted by id."
-  def boards do
-    load()
-    |> Map.get("boards", %{})
-    |> Enum.map(fn {id, map} -> Board.from_map(Map.put(map, "id", id)) end)
-    |> Enum.sort_by(& &1.id)
-  end
+  def boards, do: Board |> from(order_by: :id) |> Repo.all()
 
   @doc "Fetch one board by id, or nil."
-  def get_board(id) do
-    case load() |> get_in(["boards", id]) do
-      nil -> nil
-      map -> Board.from_map(Map.put(map, "id", id))
-    end
-  end
+  def get_board(id), do: Repo.get(Board, id)
 
   @doc """
   Create or replace a board's own settings (keyed by its `id`): used to edit an existing
@@ -2077,14 +2076,15 @@ defmodule Pepe.Config do
   through `Pepe.Board.create_board/1` instead, which guards against a name collision.
   """
   def put_board(%Board{id: id} = board) when is_binary(id) do
-    map = board |> Map.from_struct() |> Map.delete(:id) |> stringify()
-    update(fn config -> update_in(config, ["boards"], &Map.put(&1 || %{}, id, map)) end)
+    changeset = Board.changeset(board, Map.from_struct(board))
+    Repo.insert(changeset, on_conflict: {:replace_all_except, [:id]}, conflict_target: :id)
   end
 
   @doc """
-  Delete a board by id. Refuses unless it has no cards; `force: true` cascades (drops its
-  cards too). Only touches config; deleting a card's `Pepe.Board.Log` file is the caller's
-  job (see `Pepe.Board.delete_board/2`, the entry point that also does that).
+  Delete a board by id. Refuses unless it has no cards; `force: true` cascades (the
+  foreign key drops its cards too, once the row itself is deleted). Only touches Pepe.Repo;
+  deleting a card's `Pepe.Board.Log` file is the caller's job (see `Pepe.Board.delete_board/2`,
+  the entry point that also does that).
   """
   def delete_board(id, opts \\ []) do
     cards = board_cards_for(id)
@@ -2092,52 +2092,35 @@ defmodule Pepe.Config do
     if cards != [] and not Keyword.get(opts, :force, false) do
       {:error, {:not_empty, length(cards)}}
     else
-      update(&do_delete_board(&1, id))
+      from(b in Board, where: b.id == ^id) |> Repo.delete_all()
       :ok
     end
   end
 
-  defp do_delete_board(config, id) do
-    config
-    |> update_in(["boards"], &Map.delete(&1 || %{}, id))
-    |> update_in(["board_cards"], &reject_cards_for_board(&1, id))
-  end
-
-  defp reject_cards_for_board(all, board_id), do: Map.reject(all || %{}, fn {_cid, m} -> m["board"] == board_id end)
-
   @doc "All board cards, as `Pepe.Config.BoardCard` structs, sorted by id."
-  def board_cards do
-    load()
-    |> Map.get("board_cards", %{})
-    |> Enum.map(fn {id, map} -> BoardCard.from_map(Map.put(map, "id", id)) end)
-    |> Enum.sort_by(& &1.id)
-  end
+  def board_cards, do: BoardCard |> from(order_by: :id) |> Repo.all()
 
   @doc "Cards belonging to one board, sorted by id."
-  def board_cards_for(board_id), do: Enum.filter(board_cards(), &(&1.board == board_id))
+  def board_cards_for(board_id), do: from(c in BoardCard, where: c.board == ^board_id, order_by: :id) |> Repo.all()
 
   @doc "Fetch one board card by id, or nil."
-  def get_board_card(id) do
-    case load() |> get_in(["board_cards", id]) do
-      nil -> nil
-      map -> BoardCard.from_map(Map.put(map, "id", id))
-    end
-  end
+  def get_board_card(id), do: Repo.get(BoardCard, id)
 
   @doc """
   Create or replace a board card (keyed by its `id`) with no precondition check: used for
   a plain field edit (the dashboard changing a title/priority). Anything with a status
-  precondition (a claim, a transition) goes through `Pepe.Board` instead, which uses
-  `update_cas/1` so two concurrent callers can't both win.
+  precondition (a claim, a transition) goes through `Pepe.Board` instead, which checks it
+  atomically against the database, so two concurrent callers can't both win.
   """
   def put_board_card(%BoardCard{id: id} = card) when is_binary(id) do
-    map = card |> Map.from_struct() |> Map.delete(:id) |> stringify()
-    update(fn config -> update_in(config, ["board_cards"], &Map.put(&1 || %{}, id, map)) end)
+    changeset = BoardCard.changeset(card, Map.from_struct(card))
+    Repo.insert(changeset, on_conflict: {:replace_all_except, [:id]}, conflict_target: :id)
   end
 
   @doc "Delete a board card by id."
   def delete_board_card(id) do
-    update(fn config -> update_in(config, ["board_cards"], &Map.delete(&1 || %{}, id)) end)
+    from(c in BoardCard, where: c.id == ^id) |> Repo.delete_all()
+    :ok
   end
 
   ###
@@ -2148,10 +2131,7 @@ defmodule Pepe.Config do
   ### already used is unchanged, only what's behind it moved.
   ###
 
-  import Ecto.Query, only: [from: 2]
-
   alias Pepe.Config.Watch
-  alias Pepe.Repo
 
   @doc "All watches, as `Pepe.Config.Watch` structs, sorted by id."
   def watches do

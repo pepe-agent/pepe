@@ -280,9 +280,6 @@ defmodule PepeWeb.BoardLive do
 
         {:error, :already_exists} ->
           {:noreply, put_flash(socket, :error, gettext("A board with that name already exists there."))}
-
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, gettext("Could not create the board."))}
       end
     else
       {:noreply, assign(socket, board_form: to_form(cs, as: :board))}
