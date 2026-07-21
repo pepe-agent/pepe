@@ -121,6 +121,63 @@ defmodule Pepe.DoctorTest do
     assert Enum.any?(checks, &match?({"security", "plaintext secret at" <> _, {:warn, _}}, &1))
   end
 
+  # Regression: found on a real production install (Nexus) - an OAuth-connected model (Codex,
+  # signed in via `Pepe.OAuth`) tripped 5 separate "plaintext secret" warnings, none of them a
+  # human-typed credential: token_url/client_id/token_content_type/provider/expires_at are the
+  # provider's own fixed flow spec (`Pepe.Providers`), written verbatim by
+  # `Pepe.OAuth.subscription_connection/4`, never something a person pasted in. `refresh` and
+  # `api_key` ARE live credentials, but ones `Pepe.OAuth.persist_refresh/3` rewrites on every
+  # token refresh - there is no `${ENV_VAR}` either could become, so warning "move it to an env
+  # var" is actively wrong advice for them, not just noisy.
+  test "security: an OAuth-connected model's own bookkeeping is not a plaintext-secret false positive" do
+    Config.put_model(%Config.Model{
+      name: "codex",
+      base_url: "https://api.openai.com/v1",
+      api_key: "live-access-token-abcdefghijklmnopqrstuvwxyz",
+      model: "gpt-5-codex",
+      oauth: %{
+        "provider" => "codex",
+        "refresh" => "live-refresh-token-abcdefghijklmnopqrstuvwxyz",
+        "expires_at" => 1_800_000_000,
+        "token_url" => "https://auth.openai.com/oauth/token",
+        "client_id" => "app_EMoamEEZ73f0CkXaXp7hrann",
+        "token_content_type" => "json"
+      }
+    })
+
+    checks = Doctor.checks()
+
+    refute Enum.any?(checks, &match?({"security", "plaintext secret at" <> _, _}, &1))
+  end
+
+  test "security: a model's api_key with no oauth is still caught, even if it looks token-shaped" do
+    Config.put_model(%Config.Model{
+      name: "plain",
+      base_url: "x",
+      api_key: "live-access-token-abcdefghijklmnopqrstuvwxyz",
+      model: "id"
+    })
+
+    checks = Doctor.checks()
+
+    assert Enum.any?(checks, fn
+             {"security", "plaintext secret at " <> subject, {:warn, _}} -> subject =~ ".api_key"
+             _ -> false
+           end)
+  end
+
+  # Regression: same production install - an MCP server's launcher script path
+  # ("/data/projects/default/agents/admin/scripts/github-mcp.sh") tripped the value-shape
+  # heuristic (long, made only of the characters a credential is made of), even though the
+  # actual secret lives inside that script's own environment, never in config.json.
+  test "security: an MCP command that is a long file path is not a plaintext-secret false positive" do
+    Config.put_mcp_server("github", %{"command" => "/data/projects/default/agents/admin/scripts/github-mcp.sh"})
+
+    checks = Doctor.checks()
+
+    refute Enum.any?(checks, &match?({"security", "plaintext secret at" <> _, _}, &1))
+  end
+
   test "channel: flags an unknown provider and a missing agent" do
     Config.put_webhook("bad", %{"provider" => "nope", "agent" => "x", "config" => %{}})
     Config.put_webhook("good", %{"provider" => "slack", "agent" => "ghost", "config" => %{}})

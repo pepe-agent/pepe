@@ -67,6 +67,15 @@ defmodule Pepe.Secrets do
   # Either it announces itself (a known provider prefix), or it is a long opaque run of the
   # characters credentials are made of. Short values are left alone: "true", a port, a model
   # name. We would rather miss a short token than cry wolf on every setting in the file.
+  #
+  # The opaque-run pattern has to allow `/` (some tokens are base64url or carry one as a
+  # separator), which means it also matches an ordinary absolute file path - an MCP server's
+  # `command` pointing at a launcher script (`/data/projects/.../github-mcp.sh`) is exactly as
+  # long and exactly as "opaque" by this regex as a real credential would be. A real credential
+  # never starts with `/`, so a leading slash rules a value out before the shape check runs,
+  # without narrowing what the shape check still catches everywhere else.
+  defp credential_shaped?("/" <> _), do: false
+
   defp credential_shaped?(value) do
     Regex.match?(~r/^(sk-|xox[baprs]-|ghp_|gho_|ghu_|ghs_|github_pat_|glpat-|AIza|hf_|pk-|Bearer\s)/i, value) or
       (String.length(value) >= 24 and Regex.match?(~r/^[A-Za-z0-9_\-\.\/\+=]{24,}$/, value))

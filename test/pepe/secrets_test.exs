@@ -173,6 +173,18 @@ defmodule Pepe.SecretsTest do
       refute Secrets.plaintext?("-y")
     end
 
+    # Regression: found on a real production install - an MCP server's `command` pointing at a
+    # launcher script was long enough, and made only of the characters the opaque-run pattern
+    # matches (letters, digits, `/`, `.`, `-`), to look exactly as "credential-shaped" as a real
+    # token. A real credential never starts with `/`; an absolute path always does.
+    test "a long absolute path is not credential-shaped, even past the length threshold" do
+      refute Secrets.plaintext?("/data/projects/default/agents/admin/scripts/github-mcp.sh")
+      refute Secrets.plaintext?("/Users/jhonathas/.pepe/data/projects/default/agents/x/scripts/y.sh")
+
+      # A real credential still is, path-shaped characters or not.
+      assert Secrets.plaintext?("sk" <> "-abcdefghijklmnopqrstuvwxyz123456")
+    end
+
     test "masking shows which token it is without handing it over again" do
       masked = Secrets.mask("ghp" <> "_1234567890abcdefghijklmnopqrstuvwxyz")
 

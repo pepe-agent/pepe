@@ -8,7 +8,9 @@ All notable changes to this project are documented here. Format follows
 ### Changed
 - **`bash`/`run_script` no longer interrupt for a command that carries no risk at all** (no delete, network, sudo, inline code, or write) when there's an actual person on the other end to have been asked - a plain `ls`, `cat`, `git status`, or `pytest` just runs, the same free pass an in-workspace `read_file` already gets. A surface with nobody to ask (the HTTP API, a webhook, a cron, a `delegate` worker) still refuses anything not in `auto_approve`, unchanged - only the interactive case got quieter. The risk classifier was also tightened alongside this: `rm file` (not just `rm -rf`) now flags as a delete, and anything piped into a shell interpreter (not just after a literal `curl`/`wget`) flags as download-and-run.
 
-## [0.10.0] - 2026-07-21
+### Fixed
+- **`mix pepe doctor` flagged an OAuth-connected model's own bookkeeping (token URL, client ID, content type, the rotating access/refresh tokens `Pepe.OAuth` itself writes) as plaintext secrets typed in by a person**, up to 5 false warnings for a single subscription sign-in, with advice ("move it to `${ENV_VAR}`") that cannot actually be followed for a token the app has to keep rewriting on every refresh. The provider's own fixed protocol fields are no longer flagged at all; the two genuinely live, rotating credentials are still excluded from this warning specifically, since the file's own permission check (already run separately) is what actually protects them.
+- **An MCP server's `command` pointing at a local launcher script could also be flagged as a plaintext secret** - a long absolute path is made of the same characters (letters, digits, `/`, `.`, `-`) the "opaque credential" heuristic looks for. A value starting with `/` is no longer considered credential-shaped.
 
 ### Added
 - Traces can now be grouped by conversation ("Group by conversation" toggle), each session collapsed into one row with its run count and total tokens/cost across every run in it; expand a row to see the individual runs.

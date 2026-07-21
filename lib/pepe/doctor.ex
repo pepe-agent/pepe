@@ -254,18 +254,32 @@ defmodule Pepe.Doctor do
   # is how a token passed positionally in an argument list gets caught: there, it has no key
   # name to give it away.
   #
-  # `origin.key` is the one legitimate exception to the name check: Watch and Commitment both
+  # `origin.key` is one legitimate exception to the name check: Watch and Commitment both
   # carry an `origin` map (`Watch.Delivery.origin_from_ctx/1`) whose `key` is a session key -
   # the same string already shown plainly in the dashboard sidebar, not a credential. Matching
   # "key" as a whole word (needed to catch a real `some_key: "sk-..."` typo) makes every one of
   # them a false positive otherwise; the value-shaped check right below still catches a genuine
   # credential that somehow ended up there anyway.
+  #
+  # An OAuth-connected model's own `oauth` map is a second: `token_url`/`client_id`/
+  # `token_content_type`/`provider`/`expires_at` are written verbatim from the provider's
+  # fixed flow spec in `Pepe.Providers` (see `Pepe.OAuth.subscription_connection/4`), never
+  # typed in by anyone - `token_url` is the provider's own public token endpoint, `client_id`
+  # is the public identifier of a PKCE flow that has no client_secret to begin with. Flagging
+  # them the same as a real leaked token drowns the ones that matter in noise about a URL and
+  # an enum. `refresh`, and a model's own `api_key` once it has that `oauth` map, are the
+  # opposite case: real live credentials, correctly excluded here too, but for a different
+  # reason - `Pepe.OAuth.persist_refresh/3` rewrites both on every token refresh, so there is
+  # no `${ENV_VAR}` either could ever be turned into (the app itself needs write access to
+  # rotate it); what protects them is the config file's own permissions, already covered by
+  # `file_perms_checks/0` below, not this warning's "move it to an env var" advice.
   defp plaintext_secrets(map, path) when is_map(map) do
     Enum.flat_map(map, fn {k, v} ->
       here = path ++ [to_string(k)]
 
       cond do
         is_map(v) or is_list(v) -> plaintext_secrets(v, here)
+        oauth_managed_key?(k, path, map) -> []
         Pepe.Secrets.secret_key?(k) and not origin_routing_key?(k, path) and plaintext_value?(v) -> [Enum.join(here, ".")]
         Pepe.Secrets.plaintext?(v) -> [Enum.join(here, ".")]
         true -> []
@@ -280,6 +294,17 @@ defmodule Pepe.Doctor do
   end
 
   defp plaintext_secrets(_v, _path), do: []
+
+  @oauth_protocol_fields ~w(token_url token_content_type client_id provider expires_at)
+
+  # Order matters: the literal "api_key" clause must be tried before the generic one below,
+  # or it would never be reached (a bare variable pattern matches anything).
+  defp oauth_managed_key?("api_key", _path, map), do: is_map(map["oauth"])
+
+  defp oauth_managed_key?(k, path, _map) do
+    key = to_string(k)
+    (key in @oauth_protocol_fields or key == "refresh") and List.last(path) == "oauth"
+  end
 
   defp origin_routing_key?(k, path), do: to_string(k) == "key" and List.last(path) == "origin"
 
