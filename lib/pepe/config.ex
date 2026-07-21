@@ -174,7 +174,10 @@ defmodule Pepe.Config do
     map
   end
 
-  defp file_stamp do
+  @doc false
+  # Public for Pepe.Config.Writer, which uses it to notice a config.json write it
+  # didn't make itself (see Pepe.Config.Journal).
+  def file_stamp do
     case File.stat(path(), time: :posix) do
       {:ok, %File.Stat{mtime: mtime, size: size}} -> {mtime, size}
       {:error, _} -> :absent

@@ -313,6 +313,8 @@ defmodule Pepe.Tools do
   defp execute_builtin(name, raw_args, ctx) do
     with mod when not is_nil(mod) <- get(name),
          {:ok, args} <- decode_args(raw_args) do
+      Pepe.Config.Journal.put_source("chat:#{name}")
+
       try do
         case mod.run(args, ctx) do
           {:ok, result} -> to_string(result)

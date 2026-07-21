@@ -7,6 +7,7 @@ defmodule PepeWeb.ConfigLive do
   use Gettext, backend: Pepe.Gettext
 
   import PepeWeb.DashUI
+  import PepeWeb.DashData
 
   alias Pepe.Config
 
@@ -26,7 +27,8 @@ defmodule PepeWeb.ConfigLive do
        media_audio: Config.media()["audio"] || %{},
        # nil = not checked yet · :checking · :up_to_date · a version string when newer.
        update: nil,
-       can_self_update: not Pepe.Update.running_from_source?()
+       can_self_update: not Pepe.Update.running_from_source?(),
+       journal: Config.Journal.recent(15)
      )}
   end
 
@@ -141,6 +143,22 @@ defmodule PepeWeb.ConfigLive do
                 </label>
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
               </form>
+            </div>
+          </.form_section>
+
+          <.form_section :if={@journal != []} title={gettext("Recent changes")}>
+            <p class={hlp()}>
+              {gettext("Who touched config.json, when, and which top-level sections changed - never the values. \"external\" means the file changed since this process's own last write: a hand-edit, a second `mix pepe` process, or a restore from a .bak file.")}
+            </p>
+            <div class="space-y-1.5 text-sm">
+              <div :for={entry <- @journal} class="flex items-center gap-2 border-b border-zinc-800/60 py-1.5 last:border-0">
+                <span class="w-36 shrink-0 font-mono text-xs text-zinc-500">{local_datetime(entry["at"])}</span>
+                <span class="w-28 shrink-0 truncate text-zinc-300">{entry["source"]}</span>
+                <span class="min-w-0 flex-1 truncate text-zinc-500">{Enum.join(entry["changed"] || [], ", ")}</span>
+                <span :if={entry["external"]} class="shrink-0 rounded bg-amber-700/60 px-1.5 text-xs text-amber-200">
+                  {gettext("external")}
+                </span>
+              </div>
             </div>
           </.form_section>
 

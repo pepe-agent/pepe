@@ -44,6 +44,7 @@ defmodule Pepe.Cron.Scheduler do
 
   @impl true
   def init(_opts) do
+    Pepe.Config.Journal.put_source("cron")
     schedule_tick()
     {:ok, %{fired: %{}, price_check: 0, budget_check: 0, running: %{}, refs: %{}}}
   end

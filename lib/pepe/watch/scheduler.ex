@@ -31,6 +31,7 @@ defmodule Pepe.Watch.Scheduler do
 
   @impl true
   def init(_opts) do
+    Pepe.Config.Journal.put_source("watch")
     schedule_tick()
     {:ok, %{busy: MapSet.new()}}
   end

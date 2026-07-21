@@ -31,6 +31,7 @@ defmodule Pepe.Board.Scheduler do
 
   @impl true
   def init(_opts) do
+    Pepe.Config.Journal.put_source("board")
     schedule_tick()
     {:ok, %{running: %{}, refs: %{}}}
   end

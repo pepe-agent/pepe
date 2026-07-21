@@ -141,6 +141,7 @@ defmodule Mix.Tasks.Pepe do
     # Ensure the project is compiled (mix tasks don't recompile by default).
     Mix.Task.run("compile", ["--no-deps-check"])
     apply_locale()
+    Pepe.Config.Journal.put_source("cli")
     dispatch(argv)
   end
 
@@ -3671,6 +3672,26 @@ defmodule Mix.Tasks.Pepe do
     error("usage: pepe config language <code>  (one of: #{codes})")
   end
 
+  # Who touched config.json, when, and which top-level sections changed - never the
+  # values. Mirrors the dashboard's "Recent changes" panel (config_live.ex).
+  defp config_cmd(["journal" | rest]) do
+    limit =
+      case rest do
+        [n | _] -> String.to_integer(n)
+        [] -> 20
+      end
+
+    case Config.Journal.recent(limit) do
+      [] ->
+        info("no config changes recorded yet")
+
+      entries ->
+        Enum.each(entries, &print_journal_line/1)
+    end
+  rescue
+    ArgumentError -> error("usage: pepe config journal [N]  (N = how many entries, default 20)")
+  end
+
   defp config_cmd(_) do
     info("config file: #{Config.path()}")
     info("language: #{Config.locale()}  (change with: pepe config language <code>)")
@@ -3678,6 +3699,12 @@ defmodule Mix.Tasks.Pepe do
     info("default agent: #{Config.default_agent_name() || "(none)"}")
     info("models: #{Config.models() |> Enum.map_join(", ", & &1.name)}")
     info("agents: #{Config.agents() |> Enum.map_join(", ", & &1.name)}")
+  end
+
+  defp print_journal_line(entry) do
+    external = if entry["external"], do: " " <> dim("[external]"), else: ""
+    changed = Enum.join(entry["changed"] || [], ", ")
+    puts("#{local_datetime(entry["at"])}  #{bold(entry["source"])}  #{dim(changed)}#{external}")
   end
 
   ###

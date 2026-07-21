@@ -12,6 +12,7 @@ defmodule Pepe.CLI do
     # `pepe ...` instead of `mix pepe ...` - this entry point has no `mix`.
     Process.put(:pepe_cli_standalone, true)
     Mix.Tasks.Pepe.apply_locale()
+    Pepe.Config.Journal.put_source("cli")
     Mix.Tasks.Pepe.dispatch(argv)
   end
 end

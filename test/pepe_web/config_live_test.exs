@@ -33,6 +33,16 @@ defmodule PepeWeb.ConfigLiveTest do
 
   defp conn, do: %{build_conn() | host: "localhost"}
 
+  test "recent config changes show up, with the source that made them" do
+    Pepe.Config.Journal.put_source("cli")
+    Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+    {:ok, _view, html} = live(conn(), "/config")
+    assert html =~ "Recent changes"
+    assert html =~ "cli"
+    assert html =~ "agents"
+  end
+
   test "the model connection shows up as an option in both media forms" do
     {:ok, view, html} = live(conn(), "/config")
     assert html =~ "tts-model"
