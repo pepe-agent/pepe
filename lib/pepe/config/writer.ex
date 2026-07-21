@@ -11,11 +11,13 @@ defmodule Pepe.Config.Writer do
   `Pepe.Config.update/1` is the public entry; nothing should write the file any other way.
 
   Every write is also journaled (`Pepe.Config.Journal`) with its source and which top-level
-  keys changed - see that module. Journaling happens only along the real GenServer path, where
-  state can track "the stamp right after my own last write" to notice a write this process
-  didn't make; the inline fallback (no writer process up, or a nested call already inside one)
-  has no persistent state to compare against and skips it, same as a single `mix pepe` one-shot
-  process has no earlier write of its own to compare against anyway.
+  keys changed - see that module. Source tagging works the same everywhere, from
+  `Journal.source()` read in the calling process either way. External-write *detection*
+  is the one part that only works along the real GenServer path, where state can track "the
+  stamp right after my own last write" to notice a write this process didn't make; the inline
+  fallback (no writer process up, or a nested call already inside one) has no persistent state
+  to compare against and always reports `external?: false`, same as a single `mix pepe`
+  one-shot process has no earlier write of its own to compare against anyway.
   """
   use GenServer
 
@@ -33,8 +35,8 @@ defmodule Pepe.Config.Writer do
   @spec update((map() -> map())) :: map()
   def update(fun) when is_function(fun, 1) do
     case Process.whereis(__MODULE__) do
-      nil -> do_update(fun, "unknown", false)
-      pid when pid == self() -> do_update(fun, "unknown", false)
+      nil -> do_update(fun, Journal.source(), false)
+      pid when pid == self() -> do_update(fun, Journal.source(), false)
       _pid -> GenServer.call(__MODULE__, {:update, fun, Journal.source()}, :infinity)
     end
   end
@@ -52,8 +54,8 @@ defmodule Pepe.Config.Writer do
   @spec update_cas((map() -> {:ok, map()} | {:error, term()})) :: {:ok, map()} | {:error, term()}
   def update_cas(fun) when is_function(fun, 1) do
     case Process.whereis(__MODULE__) do
-      nil -> do_update_cas(fun, "unknown", false)
-      pid when pid == self() -> do_update_cas(fun, "unknown", false)
+      nil -> do_update_cas(fun, Journal.source(), false)
+      pid when pid == self() -> do_update_cas(fun, Journal.source(), false)
       _pid -> GenServer.call(__MODULE__, {:update_cas, fun, Journal.source()}, :infinity)
     end
   end

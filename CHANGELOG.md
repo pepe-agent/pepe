@@ -23,6 +23,7 @@ All notable changes to this project are documented here. Format follows
 - A blocked Telegram message now gets a 👎 reaction (instead of pure silence) and a log line naming who was queued, so a blocked sender isn't left wondering whether the bot is broken, and an operator can always tell who tried to reach it.
 - **`/agent` and `switch_agent` only persisted an agent switch in a Telegram forum topic** - anywhere else (a DM, an ordinary group), the switch lived only in the session's memory and was silently lost on every restart or redeploy, even though the confirmation message never said so. Both now persist the same way in every chat, not just topics.
 - **Several model calls outside the main turn loop went unmetered**: the goal-loop judge, complexity-triage and midrun-fold classification calls, conversation compaction's summarizer, and the `llm_redact` hook (which runs on every message once enabled). None of it reached the usage ledger, so real spend was invisible on the usage/billing pages. All now record the same as any other call.
+- **Every `mix pepe` one-shot command's config journal entry showed source `"unknown"` instead of `"cli"`.** `Config.Writer` only runs a persistent GenServer under `mix pepe serve`/gateways; a single one-shot command falls back to an inline updater that hardcoded the literal string `"unknown"` instead of reading the source the CLI had actually tagged the process with, silently losing it on the single most common way `mix pepe` runs.
 
 ## [0.9.2] - 2026-07-20
 

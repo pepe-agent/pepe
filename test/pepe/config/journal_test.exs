@@ -37,6 +37,30 @@ defmodule Pepe.Config.JournalTest do
     assert entry["external"] == false
   end
 
+  # Regression: a single `mix pepe` one-shot never has the Writer GenServer running (only
+  # `mix pepe serve`/gateways do), so `update/1` falls back to running inline - and that
+  # fallback used to hardcode the literal string "unknown" instead of reading the caller's
+  # own tagged source, silently losing "cli" on the single most common way this ships.
+  test "source tagging survives the inline fallback (no Writer process running)" do
+    Journal.put_source("cli")
+    GenServer.stop(Pepe.Config.Writer, :normal)
+
+    Config.put_agent(%Config.Agent{name: "assistant", tools: []})
+
+    [entry | _] = Journal.recent()
+    assert entry["source"] == "cli"
+  after
+    wait_for_writer()
+  end
+
+  defp wait_for_writer(tries \\ 50) do
+    cond do
+      Process.whereis(Pepe.Config.Writer) -> :ok
+      tries <= 0 -> flunk("Pepe.Config.Writer never came back up")
+      true -> Process.sleep(20) && wait_for_writer(tries - 1)
+    end
+  end
+
   test "a write with no actual change is not journaled" do
     Journal.put_source("cli")
     Config.put_agent(%Config.Agent{name: "assistant", tools: []})
