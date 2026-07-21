@@ -45,6 +45,14 @@ delegate(tasks: [...], agent: "researcher")
 
 This runs the workers as a different agent, with that agent's persona and tools, still stripped of anything that acts. It obeys the same directed allowlist as `send_to_agent`: an agent may borrow the identity of another only if it was already allowed to message it. One authority for the act, not a second and weaker one. Routes are covered on the [Agents](../agents/) page.
 
+## Not waiting for it
+
+```
+delegate(tasks: [...], background: true)
+```
+
+The same fan-out, dispatched without waiting: the call returns right away with an acknowledgment, so the agent can keep working or tell you it's on it, and the results arrive later as an ordinary follow-up message in the same conversation once every worker is done. Worth reaching for when the fan-out is genuinely slow (several pages to read, a worker with real thinking to do) - waiting a few seconds is still simpler and needs no explanation to the user. Only works inside a real conversation: a one-shot run has no session to deliver the results back into.
+
 ## What it costs
 
 Every worker is a real model call, metered and billed like any other, against the same project. Eight workers is eight turns. That is the trade: you are buying back wall-clock time and context-window room, and you are paying for it in tokens. For a task that would not have fitted in one window at all, it is not really a trade.

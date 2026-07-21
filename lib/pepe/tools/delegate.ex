@@ -30,13 +30,33 @@ defmodule Pepe.Tools.Delegate do
 
   Workers also cannot delegate. Without that, one task becomes eight becomes sixty-four,
   and the bill arrives before the answer does.
+
+  ## Waiting is the default; `background: true` is the escape hatch
+
+  A normal call blocks the turn until every worker answers or times out - fine for a
+  handful of quick lookups, but a genuinely slow fan-out (a dozen pages to read, a
+  worker that itself has real thinking to do) leaves the conversation silent for
+  minutes with nothing to show for it. `background: true` dispatches the same fan-out
+  without waiting: the call returns immediately with an acknowledgment, so the model
+  can keep working or tell the user it's on it, and the results arrive later as an
+  ordinary follow-up message in the same conversation - delivered by re-running this
+  session with the results in hand, the exact mechanism an agent's own promise-to-
+  follow-up already uses (`Pepe.Commitments.Scheduler`), so the reply reaches whatever
+  channel the conversation is already on with no new delivery code. Only available
+  inside a real conversation: a background worker needs a session to report back to,
+  so a one-shot run (`mix pepe run`, the HTTP API's oneshot form) refuses it outright
+  rather than silently dropping the results nobody could ever receive.
   """
 
   @behaviour Pepe.Tools.Tool
 
+  require Logger
+
   import Pepe.Tools.Tool, only: [function: 3]
 
   alias Pepe.Agent.Runtime
+  alias Pepe.Agent.Session
+  alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
   alias Pepe.Permissions
 
@@ -68,6 +88,13 @@ defmodule Pepe.Tools.Delegate do
       write, run commands, install anything or delegate further. If a task needs something \
       done rather than found out, do it yourself afterwards.
 
+      By default this waits for every worker and returns their answers. Set "background": \
+      true to dispatch without waiting instead - the call returns right away with an \
+      acknowledgment, and the results arrive later as a follow-up message in this same \
+      conversation. Use that for a fan-out slow enough that waiting would leave the user \
+      looking at silence; keep waiting for anything that answers in a few seconds. Only \
+      works inside a real conversation, not a one-shot run.
+
       Up to #{@max_tasks} tasks per call.
       """,
       %{
@@ -81,6 +108,10 @@ defmodule Pepe.Tools.Delegate do
           "agent" => %{
             "type" => "string",
             "description" => "Optional: run the workers as this agent instead of yourself. It must be one you're allowed to message."
+          },
+          "background" => %{
+            "type" => "boolean",
+            "description" => "Dispatch without waiting; results arrive as a follow-up message. Default false."
           }
         },
         "required" => ["tasks"]
@@ -104,6 +135,9 @@ defmodule Pepe.Tools.Delegate do
       length(tasks) > @max_tasks ->
         {:error, "too many tasks (#{length(tasks)}); #{@max_tasks} at most - split the work"}
 
+      args["background"] == true ->
+        dispatch_background(tasks, args["agent"], ctx)
+
       true ->
         dispatch(tasks, args["agent"], ctx)
     end
@@ -115,6 +149,57 @@ defmodule Pepe.Tools.Delegate do
     case worker(as_agent, ctx) do
       {:ok, worker} -> {:ok, fan_out(tasks, worker, ctx)}
       {:error, _} = error -> error
+    end
+  end
+
+  # A worker needs no session (it never speaks for itself to anyone), but delivering its
+  # results back *later* does - that is the whole difference from the synchronous path.
+  defp dispatch_background(tasks, as_agent, ctx) do
+    with {:ok, session_key} <- require_session(ctx),
+         {:ok, worker} <- worker(as_agent, ctx) do
+      agent_name = ctx.agent.name
+
+      Task.start(fn ->
+        results = fan_out(tasks, worker, ctx)
+        deliver_background_results(session_key, agent_name, results)
+      end)
+
+      {:ok,
+       "Dispatched #{length(tasks)} background task(s) - a follow-up message with the " <>
+         "results will arrive in this conversation once they're all done. Keep going now, " <>
+         "or answer the user without waiting for them."}
+    end
+  end
+
+  defp require_session(%{session_key: key}) when is_binary(key), do: {:ok, key}
+
+  defp require_session(_ctx),
+    do: {:error, "background delegation needs a real conversation to report the results back to - use it without `background` here"}
+
+  # Re-runs the session with the results in hand, the same delivery mechanism an agent's own
+  # promise-to-follow-up already uses (Pepe.Commitments.Scheduler) - the agent's own reply then
+  # reaches whatever channel the conversation is already on, no new delivery code needed. If the
+  # session is gone (a `/new`, the process crashed) the results are simply lost - the same
+  # tolerance the rest of this codebase already has for a fired watch or commitment landing on a
+  # conversation that no longer exists.
+  defp deliver_background_results(session_key, agent_name, results) do
+    prompt = """
+    The background research you dispatched just finished. Here's what came back:
+
+    #{results}
+
+    Reply to the user with what you found - a real answer, not just "done".
+    """
+
+    case SessionSupervisor.ensure(session_key, agent_name) do
+      {:ok, _pid} ->
+        case Session.chat(session_key, prompt, []) do
+          {:ok, _reply} -> :ok
+          {:error, reason} -> Logger.warning("[delegate] background results couldn't be delivered to #{session_key}: #{inspect(reason)}")
+        end
+
+      _ ->
+        Logger.warning("[delegate] background results dropped: session #{session_key} is gone")
     end
   end
 

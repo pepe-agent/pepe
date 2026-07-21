@@ -36,6 +36,16 @@ Up to **8 tasks** per call. If the work is bigger than that, split it and call t
 `delegate(tasks: [...], agent: "researcher")` runs the workers as another agent, with its
 persona. You may only name an agent you are already allowed to message.
 
+## Not waiting for it
+
+`delegate(tasks: [...], background: true)` dispatches the same fan-out without waiting.
+The call returns right away with an acknowledgment - keep working, or tell the user
+you're on it - and the results arrive later as a follow-up message in this same
+conversation, once every worker is done. Reach for this when the fan-out is slow enough
+that waiting would leave the user staring at silence; for anything that answers in a few
+seconds, just wait normally. Only works inside a real conversation - a one-shot run has
+no session to deliver the results back into, so `background` is refused there.
+
 ## The cost
 
 Every worker is a real model call, billed like any other. Eight workers is eight turns.

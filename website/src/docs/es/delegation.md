@@ -45,6 +45,14 @@ delegate(tasks: [...], agent: "researcher")
 
 Esto ejecuta los workers como un agente distinto, con la persona y las herramientas de ese agente, igualmente despojadas de todo lo que actúa. Obedece a la misma lista de permisos dirigida que `send_to_agent`: un agente solo puede tomar prestada la identidad de otro si ya tenía permiso para escribirle. Una autoridad para el acto, no una segunda y más débil. Las rutas se explican en la página [Agentes](../agents/).
 
+## Sin esperar la respuesta
+
+```
+delegate(tasks: [...], background: true)
+```
+
+El mismo reparto de tareas, pero sin esperar: la llamada vuelve enseguida con un acuse de recibo, así el agente puede seguir trabajando o avisarte de que ya se está ocupando, y los resultados llegan después como un mensaje de seguimiento normal en la misma conversación en cuanto todos los workers terminan. Vale la pena usarlo cuando el reparto es genuinamente lento (varias páginas por leer, un worker con verdadero trabajo de razonamiento por delante); esperar unos segundos sigue siendo más simple y no necesita explicación para el usuario. Solo funciona dentro de una conversación real: una ejecución de un solo turno no tiene sesión a la que entregarle los resultados.
+
 ## Lo que cuesta
 
 Cada worker es una llamada de modelo real, medida y facturada como cualquier otra, al mismo proyecto. Ocho workers son ocho turnos. Ese es el trato: estás recomprando tiempo de reloj y sitio en la ventana de contexto, y lo pagas en tokens. Para una tarea que no habría cabido en una sola ventana, ni siquiera llega a ser un trato.

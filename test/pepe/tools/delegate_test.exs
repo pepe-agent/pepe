@@ -11,6 +11,7 @@ defmodule Pepe.Tools.DelegateTest do
   """
   use ExUnit.Case, async: false
 
+  alias Pepe.Agent.Session
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
@@ -67,6 +68,8 @@ defmodule Pepe.Tools.DelegateTest do
   end
 
   setup do
+    {:ok, _} = Application.ensure_all_started(:pepe)
+
     home = Path.join(System.tmp_dir!(), "pepe_dg_#{System.unique_integer([:positive])}")
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
@@ -91,6 +94,12 @@ defmodule Pepe.Tools.DelegateTest do
     Config.put_agent(parent)
 
     on_exit(fn ->
+      # A background delivery spins up a real Session, which touches Pepe.Store (Mnesia) -
+      # bootstrapped once for the whole VM run and pointed at *this* test's tmp dir. Reset it
+      # before that dir is deleted below, or the next test to touch Store finds Mnesia still
+      # wired to a directory that no longer exists (same convention as store_test.exs).
+      :mnesia.stop()
+      :persistent_term.erase({Pepe.Store, :ready})
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
     end)
@@ -179,5 +188,65 @@ defmodule Pepe.Tools.DelegateTest do
     assert {:error, _} = Delegate.run(%{"tasks" => []}, ctx)
     assert {:error, _} = Delegate.run(%{"tasks" => ["  "]}, ctx)
     assert {:error, _} = Delegate.run(%{}, ctx)
+  end
+
+  describe "background: true" do
+    defp wait_until(fun, tries \\ 100) do
+      cond do
+        fun.() -> :ok
+        tries <= 0 -> flunk("condition not met in time")
+        true -> Process.sleep(20) && wait_until(fun, tries - 1)
+      end
+    end
+
+    test "returns immediately with an acknowledgment, not the results", %{ctx: ctx} do
+      Elixir.Agent.update(:dg_delay, fn _ -> 300 end)
+      key = "test:bg-#{System.unique_integer([:positive])}"
+      ctx = Map.put(ctx, :session_key, key)
+
+      {micros, {:ok, ack}} =
+        :timer.tc(fn -> Delegate.run(%{"tasks" => ["check acme"], "background" => true}, ctx) end)
+
+      assert div(micros, 1000) < 250, "background dispatch waited on the worker instead of returning right away"
+      assert ack =~ "Dispatched 1 background task"
+      assert ack =~ "follow-up message"
+      refute ack =~ "check acme"
+
+      # Let the background task actually finish delivering before the test (and its config
+      # dir) go away - otherwise it's a straggler racing the next test's teardown, same
+      # caveat documented for the Telegram gateway's own unlinked reply tasks. Registration
+      # alone isn't enough to wait on: the session exists as soon as it's spawned, well
+      # before the delivery turn (a real model round-trip) actually finishes.
+      wait_until(fn ->
+        case Registry.lookup(Pepe.Agent.Registry, key) do
+          [] -> false
+          [_ | _] -> Enum.any?(Session.history(key), &(&1["role"] == "assistant"))
+        end
+      end)
+    end
+
+    test "the results are delivered as a follow-up turn in the same session", %{ctx: ctx} do
+      key = "test:bg-#{System.unique_integer([:positive])}"
+      ctx = Map.put(ctx, :session_key, key)
+
+      assert {:ok, _ack} = Delegate.run(%{"tasks" => ["check acme"], "background" => true}, ctx)
+
+      wait_until(fn ->
+        case Registry.lookup(Pepe.Agent.Registry, key) do
+          [] ->
+            false
+
+          [_ | _] ->
+            key
+            |> Session.history()
+            |> Enum.any?(&(&1["role"] == "assistant" and String.contains?(&1["content"] || "", "check acme")))
+        end
+      end)
+    end
+
+    test "without a session, it refuses rather than silently drop the eventual results", %{ctx: ctx} do
+      assert {:error, why} = Delegate.run(%{"tasks" => ["check acme"], "background" => true}, ctx)
+      assert why =~ "real conversation"
+    end
   end
 end
