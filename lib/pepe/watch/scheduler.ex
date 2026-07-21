@@ -71,6 +71,7 @@ defmodule Pepe.Watch.Scheduler do
     parent = self()
 
     Task.start(fn ->
+      Pepe.Config.Journal.put_source("watch")
       {updated, text} = Watch.evaluate(watch)
       # Persist the new state (e.g. `done`) BEFORE delivering - at-most-once fire.
       Config.put_watch(updated)
@@ -83,6 +84,7 @@ defmodule Pepe.Watch.Scheduler do
     parent = self()
 
     Task.start(fn ->
+      Pepe.Config.Journal.put_source("watch")
       deliver(watch, watch.pending_delivery)
       send(parent, {:done, watch.id})
     end)

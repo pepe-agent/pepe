@@ -70,6 +70,7 @@ defmodule Pepe.Commitments.Scheduler do
     parent = self()
 
     Task.start(fn ->
+      Pepe.Config.Journal.put_source("commitments")
       text = produce_text(c)
       # Persist "delivered" BEFORE attempting delivery - at-most-once fire, same
       # contract as Watch. If producing the text itself crashed (the agent_promise
@@ -89,6 +90,7 @@ defmodule Pepe.Commitments.Scheduler do
     parent = self()
 
     Task.start(fn ->
+      Pepe.Config.Journal.put_source("commitments")
       deliver(c, c.pending_delivery)
       send(parent, {:done, c.id})
     end)
