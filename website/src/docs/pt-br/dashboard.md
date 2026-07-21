@@ -20,11 +20,18 @@ As sessões vivem dentro do processo em execução, então rode tudo a partir do
 
 As ferramentas arriscadas também são autorizadas ali mesmo. A execução pausa e mostra um pedido de permitir/negar, que é a versão web dos botões que um usuário do Telegram recebe, a menos que o agente já tenha aquela ferramenta pré-aprovada. O agente dono onipotente nunca pergunta. Veja [Segurança e ambiente isolado](../security/) para entender como a barreira decide.
 
+## Torre de controle
+
+O Chat mostra uma conversa por vez. A **Torre de controle** mostra todas as sessões ao vivo de uma vez, em todos os canais (Telegram, a API, o widget, este mesmo painel), numa única tabela: canal, agente, modelo, número de turnos, e se está rodando um turno agora. Use-a para ver tudo que está acontecendo em toda a instalação sem entrar em cada conversa individualmente, filtrar por agente ou canal, pular direto para uma delas (abre no Chat), ou parar uma que travou no meio de um turno.
+
+Ela reflete o que está vivo na memória deste processo, atualizando a cada poucos segundos, não é um histórico nem um relatório de custo. Para saber quanto uma conversa realmente custou, veja a visão "agrupar por conversa" do **Traces**.
+
 ## O que tem na barra lateral
 
 A barra lateral espelha a CLI, então quase tudo que você faz com o comando `pepe` também dá para fazer aqui:
 
 - **Chat**: conversar com uma sessão.
+- **Torre de controle**: todas as sessões ao vivo, em todos os canais, numa única tela.
 - **Projects**: criar, editar e excluir projetos e a margem de cobrança de cada um, inclusive o projeto default. Veja [Projetos](../projects/).
 - **Agents**: criar, editar e excluir agentes, com persona, modelo, ferramentas, rotas, escopo de administração e qual deles é o padrão.
 - **Models**: adicionar, remover e editar conexões de modelo, definir um preço por modelo e escolher o padrão.

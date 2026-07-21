@@ -178,7 +178,7 @@ defmodule Pepe.Agent.SessionCommandsTest do
     test "reports the bound agent, the resolved model id and the turns taken", %{key: key} do
       start!(key)
 
-      assert Session.status(key) == %{agent: "helper", model: "mock-model", turns: 0}
+      assert Session.status(key) == %{agent: "helper", model: "mock-model", turns: 0, running: false}
 
       {:ok, _} = Session.chat(key, "one", authorize: allow())
       {:ok, _} = Session.chat(key, "two", authorize: allow())

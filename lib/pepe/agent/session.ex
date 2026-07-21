@@ -150,7 +150,7 @@ defmodule Pepe.Agent.Session do
   @spec heartbeat(term()) :: {:ok, String.t()} | :silent | {:error, term()}
   def heartbeat(key), do: GenServer.call(via(key), :heartbeat, 120_000)
 
-  @doc "Return `%{agent:, model:, turns:}` for the session."
+  @doc "Return `%{agent:, model:, turns:, running:}` for the session."
   def status(key), do: GenServer.call(via(key), :status)
 
   @doc "Summarize older turns into one message to free up context."
@@ -686,7 +686,13 @@ defmodule Pepe.Agent.Session do
   def handle_call(:status, _from, state) do
     turns = Enum.count(state.messages, &(&1["role"] == "user"))
 
-    {:reply, %{agent: state.agent_name, model: model_id(state.agent_name, state.model_override), turns: turns}, state}
+    {:reply,
+     %{
+       agent: state.agent_name,
+       model: model_id(state.agent_name, state.model_override),
+       turns: turns,
+       running: state.running != nil
+     }, state}
   end
 
   # Refuse mid-run: a compaction computed from the pre-turn history would be overwritten by

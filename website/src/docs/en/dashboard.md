@@ -20,11 +20,18 @@ Sessions live inside the running process, so run everything from the one `pepe s
 
 Risky tools are authorized inline here too. The run pauses and shows an allow/deny prompt, which is the web version of the buttons a Telegram user gets, unless the agent has already pre-approved that tool. The omnipotent owner agent never prompts. See [Security and sandbox](../security/) for how the gate decides.
 
+## Control tower
+
+Chat shows one conversation at a time. **Control tower** shows every live session at once, across every channel - Telegram, the API, the widget, this same dashboard - in a single table: channel, agent, model, turn count, and whether it's running a turn right now. Use it to see everything happening across the whole install without clicking into each conversation individually, filter by agent or channel, jump straight into one (opens it in Chat), or stop one that's stuck mid-turn.
+
+It reflects what's live in this process's memory, refreshed every few seconds - not a history or a cost report. For what a conversation actually cost, see **Traces**' "group by conversation" view instead.
+
 ## What the sidebar holds
 
 The left sidebar mirrors the CLI, so almost everything you can do with the `pepe` command you can also do here:
 
 - **Chat**: talk to a session.
+- **Control tower**: every live session across every channel, on one screen.
 - **Projects**: create, edit and delete tenant scopes and their billing markup. See [Projects](../projects/).
 - **Agents**: create, edit and delete agents, with their persona, model, tools, routes, admin scope, and which one is the default.
 - **Models**: add, remove and edit model connections, set a per-model price, and pick the default.
