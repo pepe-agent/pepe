@@ -74,7 +74,6 @@ defmodule PepeWeb.Router do
       live "/", OverviewLive
       live "/overview", OverviewLive
       live "/chat", ChatLive
-      live "/tower", ControlTowerLive
       live "/projects", ProjectsLive
       live "/agents", AgentsLive
       live "/models", ModelsLive

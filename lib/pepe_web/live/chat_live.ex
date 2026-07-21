@@ -126,10 +126,15 @@ defmodule PepeWeb.ChatLive do
                 </div>
                 <div :for={s <- items} class={["group mx-2 mb-0.5 flex items-center rounded-lg transition hover:bg-zinc-800/70", @selected == s.key && "bg-zinc-800"]}>
                   <button phx-click="select" phx-value-key={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
-                    <div class="truncate text-[15px] font-medium">{s.title || session_suffix(s.key)}</div>
+                    <div class="flex items-center gap-1.5 truncate text-[15px] font-medium">
+                      <span :if={s.running} class="inline-block h-2 w-2 shrink-0 rounded-full bg-orange-500" title={gettext("Running now")}></span>
+                      <span class="truncate">{s.title || session_suffix(s.key)}</span>
+                    </div>
                     <div class="truncate text-sm text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
                     <div class="truncate text-xs text-zinc-600">{s.key}</div>
                   </button>
+                  <button :if={s.running} phx-click="stop_session" phx-value-key={s.key} title={gettext("Stop")}
+                    class="px-2 py-2 text-sm text-zinc-500 opacity-0 transition hover:text-red-400 group-hover:opacity-100">{gettext("Stop")}</button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
                     class="px-3 py-2 text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100">✕</button>
                 </div>
@@ -341,6 +346,15 @@ defmodule PepeWeb.ChatLive do
 
   def handle_event("select", %{"key" => key}, socket) do
     {:noreply, push_patch(socket, to: ~p"/chat?chat=#{key}")}
+  end
+
+  def handle_event("stop_session", %{"key" => key}, socket) do
+    Session.stop(key)
+    socket = assign(socket, sessions: list_sessions(socket.assigns.scope))
+
+    if socket.assigns.selected == key,
+      do: {:noreply, assign(socket, running: false, streaming: "", activity: [])},
+      else: {:noreply, socket}
   end
 
   def handle_event("delete", %{"key" => key}, socket) do
@@ -918,9 +932,10 @@ defmodule PepeWeb.ChatLive do
 
   defp session_card(key, true) do
     s = status(key)
-    %{key: key, title: SessionTitles.get(key), type: session_type(key), agent: s.agent, model: s.model, turns: s.turns}
+    %{key: key, title: SessionTitles.get(key), type: session_type(key), agent: s.agent, model: s.model, turns: s.turns, running: s.running}
   end
 
+  # A persisted-but-dead session has no process to be running a turn.
   defp session_card(key, false) do
     case SessionPersistence.load(key) do
       {:ok, agent, messages, _pii_map, _pending} ->
@@ -930,11 +945,12 @@ defmodule PepeWeb.ChatLive do
           type: session_type(key),
           agent: agent,
           model: model_of(agent),
-          turns: Enum.count(messages, &(&1["role"] == "user"))
+          turns: Enum.count(messages, &(&1["role"] == "user")),
+          running: false
         }
 
       :error ->
-        %{key: key, title: SessionTitles.get(key), type: session_type(key), agent: nil, model: nil, turns: 0}
+        %{key: key, title: SessionTitles.get(key), type: session_type(key), agent: nil, model: nil, turns: 0, running: false}
     end
   end
 
@@ -1014,9 +1030,9 @@ defmodule PepeWeb.ChatLive do
   defp status(key) do
     Session.status(key)
   rescue
-    _ -> %{agent: nil, model: nil, turns: 0}
+    _ -> %{agent: nil, model: nil, turns: 0, running: false}
   catch
-    :exit, _ -> %{agent: nil, model: nil, turns: 0}
+    :exit, _ -> %{agent: nil, model: nil, turns: 0, running: false}
   end
 
   defp topic(key), do: "session:" <> key

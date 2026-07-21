@@ -14,24 +14,17 @@ Desde un clon del código fuente, compila los assets una vez con `mix assets.bui
 
 ## Sesiones y conversación
 
-El panel abre con una lista viva de sesiones a la izquierda y un panel de conversación con streaming a la derecha. Elige una sesión para leer su historial y hablar con su agente, y la respuesta llega token a token. `New chat` inicia una sesión nueva, y cada sesión muestra su agente, su modelo y su número de turnos.
+El panel abre con una lista viva de sesiones a la izquierda y un panel de conversación con streaming a la derecha. Elige una sesión para leer su historial y hablar con su agente, y la respuesta llega token a token. `New chat` inicia una sesión nueva, y cada sesión muestra su agente, su modelo y su número de turnos; una sesión que está ejecutando un turno ahora mismo tiene un pequeño indicador en vivo, con un botón `Stop` justo ahí en la lista para interrumpir una que se quedó atascada, sin tener que abrirla primero.
 
 Las sesiones viven dentro del proceso en marcha, así que ejecuta todo desde el único proceso `pepe serve`. Así el panel ve todas las sesiones, incluidas las que llegaron por Telegram.
 
 Las herramientas arriesgadas también se autorizan ahí mismo. La ejecución se detiene y muestra un aviso de permitir/denegar, que es la versión web de los botones que recibe un usuario de Telegram, salvo que el agente ya tenga esa herramienta preaprobada. El agente propietario omnipotente nunca pregunta. Mira [Seguridad y entorno aislado](../security/) para ver cómo decide la barrera.
-
-## Torre de control
-
-Chat muestra una conversación a la vez. **Torre de control** muestra todas las sesiones en vivo a la vez, en todos los canales (Telegram, la API, el widget, este mismo panel) en una sola tabla: canal, agente, modelo, número de turnos, y si está ejecutando un turno en este momento. Úsala para ver todo lo que pasa en toda la instalación sin entrar en cada conversación una por una, filtrar por agente o canal, saltar directamente a una (la abre en Chat), o detener una que se quedó atascada a mitad de turno.
-
-Refleja lo que está vivo en la memoria de este proceso, actualizándose cada pocos segundos, no es un historial ni un informe de coste. Para saber qué costó realmente una conversación, mira la vista "agrupar por conversación" de **Traces**.
 
 ## Qué hay en la barra lateral
 
 La barra lateral refleja la CLI, así que casi todo lo que haces con el comando `pepe` también lo puedes hacer aquí:
 
 - **Chat**: conversar con una sesión.
-- **Torre de control**: todas las sesiones en vivo, en todos los canales, en una sola pantalla.
 - **Projects**: crear, editar y eliminar proyectos y su margen de facturación. Mira [Proyectos](../projects/).
 - **Agents**: crear, editar y eliminar agentes, con su persona, modelo, herramientas, rutas, ámbito de administración y cuál es el agente por defecto.
 - **Models**: añadir, quitar y editar conexiones de modelo, fijar un precio por modelo y elegir el predeterminado.
