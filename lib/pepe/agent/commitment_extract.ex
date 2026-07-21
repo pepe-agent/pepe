@@ -83,10 +83,7 @@ defmodule Pepe.Agent.CommitmentExtract do
     with %{commitments: true} = agent <- Config.get_agent(agent_name),
          model when not is_nil(model) <- Utility.model(agent),
          true <- has_temporal_reference?(user_text, assistant_text) do
-      Task.start(fn ->
-        Pepe.Config.Journal.put_source("commitments:extract")
-        extract_now(key, agent, model, user_text, assistant_text, messages)
-      end)
+      Task.start(fn -> extract_now(key, agent, model, user_text, assistant_text, messages) end)
     end
 
     :ok

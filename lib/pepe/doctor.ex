@@ -38,6 +38,7 @@ defmodule Pepe.Doctor do
         cron_checks() ++
         webhook_checks() ++
         state_checks() ++
+        migration_checks() ++
         plugin_checks() ++
         skill_checks() ++
         unknown_key_checks()
@@ -376,6 +377,22 @@ defmodule Pepe.Doctor do
     case orphans do
       [] -> [{"state", "agent directories", :ok}]
       orphans -> orphans
+    end
+  end
+
+  # A legacy "commitments" section left in config.json (from before Pepe.Config.Commitment
+  # moved to Pepe.Repo) means `mix pepe config migrate-commitments` was never run - every
+  # commitment that was there before the upgrade is invisible to Config.commitments/0 now,
+  # silently: no error, no crash, they just stop firing. Nothing else in the codebase
+  # would ever surface that on its own.
+  defp migration_checks do
+    if Map.has_key?(Config.load(), "commitments") do
+      [
+        {"state", "unmigrated commitments",
+         {:warn, "config.json still has a \"commitments\" section - run `mix pepe config migrate-commitments` to import it"}}
+      ]
+    else
+      []
     end
   end
 

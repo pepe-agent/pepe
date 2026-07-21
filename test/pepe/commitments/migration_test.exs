@@ -121,4 +121,19 @@ defmodule Pepe.Commitments.MigrationTest do
     # The one good entry still isn't lost while the bad one is sorted out.
     assert Config.get_commitment("c_good").text == "a fine commitment"
   end
+
+  test "an entry whose value isn't even a map is reported, not a crash" do
+    # A hand-edited config.json is not guaranteed to hold the shape this ever wrote -
+    # a non-map value used to raise BadMapError and take the whole import down with it.
+    write_legacy_commitments(%{
+      "c_good" => %{"text" => "a fine commitment", "agent" => "eng"},
+      "c_weird" => "not even a map"
+    })
+
+    report = Migration.run()
+
+    assert report.imported == 1
+    assert [{"c_weird", _reason}] = report.failed
+    assert Config.load() |> Map.has_key?("commitments")
+  end
 end

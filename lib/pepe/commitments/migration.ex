@@ -34,7 +34,7 @@ defmodule Pepe.Commitments.Migration do
 
     {oks, fails} =
       raw
-      |> Enum.map(fn {id, map} -> {id, import_one(Map.put(map, "id", id))} end)
+      |> Enum.map(fn {id, entry} -> {id, import_entry(id, entry)} end)
       |> Enum.split_with(fn {_id, result} -> match?({:ok, _}, result) end)
 
     report = %{
@@ -57,6 +57,12 @@ defmodule Pepe.Commitments.Migration do
 
     report
   end
+
+  # A legacy entry's value should always be a map (that's the only shape anything ever
+  # wrote), but this reads a file an operator could have hand-edited - fail this one entry
+  # into `report.failed`, not a crash that takes the whole import down with it.
+  defp import_entry(_id, entry) when not is_map(entry), do: {:error, {:not_a_map, entry}}
+  defp import_entry(id, entry), do: import_one(Map.put(entry, "id", id))
 
   defp import_one(map) do
     changeset = Commitment.from_map(map)

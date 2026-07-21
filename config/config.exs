@@ -21,6 +21,14 @@ config :pepe,
 
 config :ecto, :json_library, Jason
 
+# Shared across every real env (dev/prod/release, not :test - see config/test.exs and
+# Pepe.RepoSetup) since none of this depends on which one is running: SQLite is
+# single-writer regardless of pool size, so a pool of 1 lets Ecto's own connection queue
+# serialize writes instead of fighting SQLITE_BUSY retries - the adapter's own default
+# pool (5) reintroduces exactly the contention this exists to avoid. wal mode is also
+# what makes a hot file-copy backup (`mix pepe backup`) safe to take while the app runs.
+config :pepe, Pepe.Repo, pool_size: 1, journal_mode: :wal, busy_timeout: 5_000
+
 # Configure the endpoint
 config :pepe, PepeWeb.Endpoint,
   url: [host: "localhost"],

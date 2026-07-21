@@ -101,6 +101,31 @@ defmodule Pepe.BundleTest do
       assert Config.extract_config("nope") == {:error, :not_found}
     end
 
+    test "a commitment bound to the project travels de-scoped; another project's does not leak" do
+      seed_two_projects()
+
+      {:ok, acme_commitment} =
+        Config.create_commitment(%Config.Commitment{
+          text: "follow up with acme",
+          agent: "acme/sales",
+          origin_type: "agent_promise"
+        })
+
+      {:ok, _globex_commitment} =
+        Config.create_commitment(%Config.Commitment{
+          text: "follow up with globex",
+          agent: "globex/bot",
+          origin_type: "agent_promise"
+        })
+
+      assert {:ok, config, _report} = Config.extract_config("acme")
+
+      assert [{_id, entry}] = Map.to_list(config["commitments"])
+      assert entry["text"] == acme_commitment.text
+      # De-scoped like crons/watches: the bare handle, no "acme/" prefix.
+      assert entry["agent"] == "sales"
+    end
+
     test "the secrets report includes vault-opening credentials, not only ${VAR} refs" do
       seed_two_projects()
       # A vault-based setup: the model's key is fetched by a command, and the resolver needs

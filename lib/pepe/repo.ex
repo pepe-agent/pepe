@@ -22,4 +22,32 @@ defmodule Pepe.Repo do
     File.mkdir_p!(Path.dirname(path))
     {:ok, Keyword.put(config, :database, path)}
   end
+
+  @doc """
+  Start this repo (and run its schema migrations) if it isn't already running -
+  idempotent, safe to call from anywhere that's about to touch it.
+
+  `Pepe.Repo` is an unconditional child under a real app boot (`Pepe.Application`),
+  but several `mix pepe` commands (`agent`/`project` remove/rename, `extract`) dispatch
+  through `with_config`, which never boots the app at all - config.json-only commands
+  that now also touch commitments via `Pepe.Config`. Mirrors `Pepe.Store`'s own lazy
+  Mnesia bootstrap for exactly the same reason: some callers have no supervision tree
+  to have started it for them.
+  """
+  @spec ensure_started() :: :ok
+  def ensure_started do
+    # `with_config`-only commands (agent/project remove/rename, extract) never start the
+    # :ecto_sql/:ecto/:db_connection/:exqlite applications at all (with_config only starts
+    # :jason) - Ecto.Repo.Registry, which start_link/1 below needs, lives in one of those.
+    {:ok, _} = Application.ensure_all_started(:ecto_sql)
+
+    case start_link([]) do
+      {:ok, _pid} ->
+        Ecto.Migrator.run(__MODULE__, Application.app_dir(:pepe, "priv/repo/migrations"), :up, all: true, log: false)
+        :ok
+
+      {:error, {:already_started, _pid}} ->
+        :ok
+    end
+  end
 end

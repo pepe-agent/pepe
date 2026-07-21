@@ -287,9 +287,16 @@ defmodule Mix.Tasks.Pepe do
   ### bootstrapping
   ###
 
-  # Config-only commands: just need Jason + File IO.
+  # Config-only commands: just need Jason + File IO. Pepe.Repo (SQLite - commitments and
+  # more to come) is unconditional under a real app boot (with_app below), but these
+  # commands never boot the app at all - several of them (agent/project remove/rename,
+  # extract) still reach Pepe.Config functions that touch commitments, so this is the one
+  # place that needs to guarantee Pepe.Repo is available too, once, for every command that
+  # dispatches through here - not scattered as a defensive check inside each of those
+  # functions individually.
   defp with_config(fun) do
     {:ok, _} = Application.ensure_all_started(:jason)
+    Pepe.Repo.ensure_started()
     fun.()
   end
 
@@ -3944,10 +3951,10 @@ defmodule Mix.Tasks.Pepe do
     write over an existing, non-empty ~/.pepe unless you pass --force. Re-export the
     ${ENV_VAR} secrets it lists afterwards; they live outside the archive.
 
-    Restoring a project EXTRACT (not a full backup) also needs `mix pepe migrate
-    commitments` run once afterward: an extract's config.json still carries commitments
-    the portable way (so the archive stays a plain file, no SQLite dependency), and needs
-    importing into the fresh install's own store.
+    Restoring a project EXTRACT (not a full backup) also needs `mix pepe config
+    migrate-commitments` run once afterward: an extract's config.json still carries
+    commitments the portable way (so the archive stays a plain file, no SQLite
+    dependency), and needs importing into the fresh install's own store.
     """)
   end
 

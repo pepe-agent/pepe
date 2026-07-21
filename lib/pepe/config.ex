@@ -2276,8 +2276,8 @@ defmodule Pepe.Config do
   # ...}}` raw shape config.json's own "commitments" section used to have, built from
   # Pepe.Repo instead - keeps a bundle self-contained/portable (no SQLite dependency for
   # the receiving install), at the cost of a restored *extract* needing to run
-  # `mix pepe migrate commitments` once afterward (a full PEPE_HOME backup/restore needs
-  # no such step - it already carries data/pepe.db directly). Deliberately NOT
+  # `mix pepe config migrate-commitments` once afterward (a full PEPE_HOME backup/restore
+  # needs no such step - it already carries data/pepe.db directly). Deliberately NOT
   # `commitments/0`: that resolves `agent` to a handle already, and resolve_section_agents/2
   # (the same helper crons/watches already go through) expects the raw stored id so it can
   # do that resolution itself.

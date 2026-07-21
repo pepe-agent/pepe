@@ -35,7 +35,6 @@ defmodule Pepe.Commitments.Scheduler do
 
   @impl true
   def init(_opts) do
-    Pepe.Config.Journal.put_source("commitments")
     schedule_tick()
     {:ok, %{busy: MapSet.new(), refs: %{}}}
   end
@@ -96,7 +95,6 @@ defmodule Pepe.Commitments.Scheduler do
   end
 
   defp run_fire(c) do
-    Pepe.Config.Journal.put_source("commitments")
     Config.put_locale()
     # Persist "firing" BEFORE producing the text - true at-most-once, unlike Watch's own
     # contract (which this used to just claim to match): a user_reminder's text is free
@@ -120,7 +118,6 @@ defmodule Pepe.Commitments.Scheduler do
   end
 
   defp run_retry(c) do
-    Pepe.Config.Journal.put_source("commitments")
     deliver(c, c.pending_delivery)
   end
 
