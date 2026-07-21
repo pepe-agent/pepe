@@ -12,21 +12,32 @@ defmodule Pepe.Trace do
   file once. A sub-agent run nested in the same process folds its events into the
   outer trace instead of starting a second one, so a trace shows the whole tree of work.
 
-  Traces are capped per scope (the oldest are trimmed) so the directory stays bounded.
+  Traces are capped per scope (the oldest are trimmed) so the table stays bounded.
   They are diagnostic, not a billing record - that is `Pepe.Usage.Log`.
+
+  Backed by `Pepe.Repo` (SQLite), not one JSON file per run - see `Pepe.Config.Journal`'s
+  moduledoc for the same reasoning (this codebase's other operational subsystems moved
+  the same way). Every public function here still takes/returns the exact same
+  string-keyed maps the old JSON files held; the atom/string boundary conversion happens
+  entirely inside this module, invisible to every caller (the runtime, the dashboard, the
+  CLI, `Pepe.Eval.FromTrace`).
   """
 
-  alias Pepe.Project
+  import Ecto.Query, only: [from: 2]
+
   alias Pepe.Config
+  alias Pepe.Project
+  alias Pepe.Repo
+  alias Pepe.Trace.Entry
 
   @key :pepe_trace
   @keep 200
   @clip 4_000
 
-  @doc "Root directory holding the per-scope trace files."
+  @doc "Root directory holding the legacy, pre-migration per-scope trace files."
   def dir, do: Path.join([Config.home(), "data", "traces"])
 
-  @doc "The directory for one scope (`nil`/`\"root\"` -> `root/`)."
+  @doc "The legacy directory for one scope (`nil`/`\"root\"` -> `root/`)."
   def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
 
   # --- recording (called from the runtime, inside the run's own process) -------------
@@ -95,7 +106,7 @@ defmodule Pepe.Trace do
     :ok
   end
 
-  @doc "Write the accumulated trace for this process to disk and clear it. Returns the id."
+  @doc "Persist the accumulated trace for this process and clear it. Returns the id."
   def finish(result) do
     case Process.get(@key) do
       nil ->
@@ -104,19 +115,20 @@ defmodule Pepe.Trace do
       t ->
         Process.delete(@key)
 
-        entry = %{
-          "id" => t.id,
-          "at" => t.at,
-          "agent" => t.agent,
-          "session" => t.session,
-          "source" => t.source,
-          "prompt" => t.prompt,
-          "ms" => System.monotonic_time(:millisecond) - t.t0,
-          "outcome" => outcome(result),
-          "events" => Enum.reverse(t.events)
+        row = %{
+          id: t.id,
+          scope: scope_name(t.scope),
+          at: t.at,
+          agent: t.agent,
+          session: t.session,
+          source: t.source,
+          prompt: t.prompt,
+          ms: System.monotonic_time(:millisecond) - t.t0,
+          outcome: outcome(result),
+          events: Enum.reverse(t.events)
         }
 
-        write(t.scope, entry)
+        write(row)
         t.id
     end
   rescue
@@ -127,10 +139,7 @@ defmodule Pepe.Trace do
 
   @doc "Scopes (projects + root) that have any recorded trace."
   def scopes do
-    case File.ls(dir()) do
-      {:ok, names} -> Enum.sort(names)
-      _ -> []
-    end
+    from(t in Entry, distinct: true, select: t.scope, order_by: t.scope) |> Repo.all()
   end
 
   @doc """
@@ -138,47 +147,38 @@ defmodule Pepe.Trace do
   the index). `limit` caps how many are returned.
   """
   def recent(scope, limit \\ 50) do
-    scope
-    |> files()
-    |> Enum.reverse()
-    |> Enum.take(limit)
-    |> Enum.map(&read_summary(scope, &1))
-    |> Enum.reject(&is_nil/1)
+    from(t in Entry, where: t.scope == ^scope, order_by: [desc: t.at], limit: ^limit)
+    |> Repo.all()
+    |> Enum.map(&summarize/1)
   end
 
   @doc "Load one full trace (with its events) by id, or `nil` if it is gone."
   def get(scope, id) do
-    with {:ok, body} <- File.read(Path.join(scope_dir(scope), "#{id}.json")),
-         {:ok, map} <- Jason.decode(body) do
-      map
-    else
-      _ -> nil
+    case Repo.get_by(Entry, scope: scope, id: id) do
+      nil -> nil
+      entry -> to_map(entry)
     end
   end
 
   # --- internals ---------------------------------------------------------------------
 
-  defp files(scope) do
-    case File.ls(scope_dir(scope)) do
-      {:ok, names} ->
-        names |> Enum.filter(&String.ends_with?(&1, ".json")) |> Enum.sort()
-
-      _ ->
-        []
-    end
+  defp to_map(%Entry{} = e) do
+    %{
+      "id" => e.id,
+      "at" => e.at,
+      "agent" => e.agent,
+      "session" => e.session,
+      "source" => e.source,
+      "prompt" => e.prompt,
+      "ms" => e.ms,
+      "outcome" => e.outcome,
+      "events" => e.events
+    }
   end
 
-  defp read_summary(scope, file) do
-    case File.read(Path.join(scope_dir(scope), file)) do
-      {:ok, body} ->
-        case Jason.decode(body) do
-          {:ok, m} -> Map.drop(m, ["events"]) |> Map.put("tools", tool_names(m)) |> Map.put("usage", usage_list(m))
-          _ -> nil
-        end
-
-      _ ->
-        nil
-    end
+  defp summarize(%Entry{} = e) do
+    m = to_map(e)
+    m |> Map.drop(["events"]) |> Map.put("tools", tool_names(m)) |> Map.put("usage", usage_list(m))
   end
 
   defp tool_names(%{"events" => events}) when is_list(events) do
@@ -195,23 +195,29 @@ defmodule Pepe.Trace do
 
   defp usage_list(_), do: []
 
-  defp write(scope, entry) do
-    d = scope_dir(scope)
-    File.mkdir_p!(d)
-    File.write!(Path.join(d, "#{entry["id"]}.json"), Jason.encode!(entry))
-    trim(scope)
+  defp write(row) do
+    Repo.insert_all(Entry, [row])
+    trim(row.scope)
     :ok
   end
 
+  # SQLite's `DELETE ... LIMIT` isn't guaranteed compiled into exqlite's bundled build,
+  # so this is two statements: how many is this scope over, then delete exactly those
+  # (the oldest ones), by id.
   defp trim(scope) do
-    kept = files(scope)
+    count = from(t in Entry, where: t.scope == ^scope) |> Repo.aggregate(:count)
 
-    if length(kept) > @keep do
-      d = scope_dir(scope)
+    if count > @keep do
+      ids =
+        from(t in Entry,
+          where: t.scope == ^scope,
+          order_by: [asc: t.at, asc: t.id],
+          limit: ^(count - @keep),
+          select: t.id
+        )
+        |> Repo.all()
 
-      kept
-      |> Enum.take(length(kept) - @keep)
-      |> Enum.each(fn f -> File.rm(Path.join(d, f)) end)
+      from(t in Entry, where: t.id in ^ids) |> Repo.delete_all()
     end
   end
 

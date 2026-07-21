@@ -64,6 +64,7 @@ defmodule Pepe.Eval.FromTraceTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     {:ok, server} = Bandit.start_link(plug: Plug1, port: 0, startup_log: false)
     {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
@@ -149,19 +150,17 @@ defmodule Pepe.Eval.FromTraceTest do
   test "a run that failed is not something to keep doing" do
     # A trace of a turn that died. Promoting it would freeze the failure as the expectation
     # and, worse, hand you a green suite for it.
-    dir = Path.join([Trace.dir(), "default"])
-    File.mkdir_p!(dir)
-
-    File.write!(
-      Path.join(dir, "dead.json"),
-      Jason.encode!(%{
-        "id" => "dead",
-        "agent" => "clerk",
-        "prompt" => "what is the price?",
-        "outcome" => %{"kind" => "error", "reason" => ":no_model_configured"},
-        "events" => []
-      })
-    )
+    Pepe.Repo.insert_all(Pepe.Trace.Entry, [
+      %{
+        id: "dead",
+        scope: "default",
+        at: System.os_time(:second),
+        agent: "clerk",
+        prompt: "what is the price?",
+        outcome: %{"kind" => "error", "reason" => ":no_model_configured"},
+        events: []
+      }
+    ])
 
     assert {:error, why} = FromTrace.build("default", "dead")
     assert why =~ "failed"

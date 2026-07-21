@@ -28,7 +28,8 @@ defmodule Pepe.Config.MigrateDataTest do
   test "nothing to migrate anywhere" do
     assert MigrateData.run() == [
              config_journal: %{imported: 0, failed: []},
-             watches: %{imported: 0, already_present: 0, failed: []}
+             watches: %{imported: 0, already_present: 0, failed: []},
+             traces: %{imported: 0, already_present: 0, failed: []}
            ]
   end
 
@@ -42,11 +43,12 @@ defmodule Pepe.Config.MigrateDataTest do
 
     assert MigrateData.run() == [
              config_journal: %{imported: 0, failed: []},
-             watches: %{imported: 1, already_present: 0, failed: []}
+             watches: %{imported: 1, already_present: 0, failed: []},
+             traces: %{imported: 0, already_present: 0, failed: []}
            ]
   end
 
-  test "one subsystem refusing (non-empty table) does not block another from importing" do
+  test "one subsystem refusing (non-empty table) does not block the others from importing" do
     Repo.insert!(%Entry{at: 1, source: "cli", changed: ["agents"], external: false})
     seed_legacy_watches(%{"w1" => %{"description" => "x", "agent" => "eng"}})
 
@@ -54,5 +56,6 @@ defmodule Pepe.Config.MigrateDataTest do
 
     assert results.config_journal == {:error, :not_empty}
     assert results.watches == %{imported: 1, already_present: 0, failed: []}
+    assert results.traces == %{imported: 0, already_present: 0, failed: []}
   end
 end

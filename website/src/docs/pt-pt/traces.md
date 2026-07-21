@@ -39,10 +39,14 @@ pepe traces 1720000000123456      # reproduz uma execução por id, passo a pass
 
 ## Onde ficam os traces
 
-Os traces são escritos como um ficheiro JSON por execução, em
-`<PEPE_HOME>/data/traces/<slug>/<id>.json`, e o projeto default fica sob `default/`. O
-diretório tem um teto por âmbito, por isso os traces mais antigos vão sendo
-descartados e ele mantém-se limitado. Argumentos e resultados de ferramenta muito
-longos são cortados no registo guardado.
+Os traces vivem no mesmo pequeno ficheiro SQLite embutido dos compromissos e das
+vigilâncias, agrupados por projeto (o projeto default usa `default`). A quantidade
+guardada tem um teto por projeto, por isso os traces mais antigos vão sendo descartados
+e a tabela mantém-se limitada. Argumentos e resultados de ferramenta muito longos são
+cortados no registo guardado. A atualizar a partir de um Pepe mais antigo que escrevia
+os traces como um ficheiro JSON por execução em
+`<PEPE_HOME>/data/traces/<slug>/<id>.json`? Corre `mix pepe config migrate-data` uma vez
+para trazer os antigos - os ficheiros de origem ficam intactos, não são apagados, por
+isso podes remover essa pasta à mão depois de confirmares a importação.
 
 <div class="note"><strong>Diagnóstico, não registo de faturação.</strong> Os traces existem para explicar uma execução, e são descartados e cortados para se manterem limitados. A contabilidade de tokens para faturas vive no <a href="../billing/">livro-razão de utilização</a>, separado e só de acréscimo.</div>

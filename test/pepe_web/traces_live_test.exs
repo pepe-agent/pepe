@@ -15,6 +15,7 @@ defmodule PepeWeb.TracesLiveTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     # record one run to show up in the list, in this process's pdict
     Trace.start("assistant", "api:1", "read the readme")
