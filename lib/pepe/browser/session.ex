@@ -78,13 +78,29 @@ defmodule Pepe.Browser.Session do
 
   @impl true
   def init(key) do
+    ensure_no_dbus_hang()
+
     with {:ok, exe} <- find_chrome(),
-         {:ok, browser} <- CDPEx.launch(chrome_binary: exe, headless: true, launch_timeout: 20_000),
+         {:ok, browser} <- CDPEx.launch(chrome_binary: exe, headless: true, launch_timeout: 30_000),
          {:ok, page} <- CDPEx.new_page(browser),
          {:ok, _guard} <- start_request_guard(page) do
       {:ok, %{key: key, browser: browser, page: page, idle_timer: schedule_idle()}}
     else
       {:error, reason} -> {:stop, {:browser_start_failed, reason}}
+    end
+  end
+
+  # Headless Chrome on a Linux host with no D-Bus session bus (a CI runner, most
+  # containers) logs "Failed to connect to the bus: Could not parse server address"
+  # repeatedly and, on at least one real machine this was confirmed against (a GitHub
+  # Actions Ubuntu runner - the first time this tool's live tests ever ran against a
+  # real CI Chrome), never reaches the point of opening its DevTools port at all before
+  # the launch timeout gives up. Pointing DBUS_SESSION_BUS_ADDRESS at something Chrome
+  # fails to connect to immediately, instead of retrying, is the standard workaround for
+  # exactly this - only applied if the caller hasn't already configured a real bus.
+  defp ensure_no_dbus_hang do
+    if is_nil(System.get_env("DBUS_SESSION_BUS_ADDRESS")) do
+      System.put_env("DBUS_SESSION_BUS_ADDRESS", "/dev/null")
     end
   end
 
