@@ -58,15 +58,33 @@ defmodule Pepe.Config.MigrateDataTest do
   end
 
   test "one subsystem refusing (non-empty table) does not block the others from importing" do
-    Repo.insert!(%Entry{at: 1, source: "cli", changed: ["agents"], external: false})
+    Repo.insert!(%Pepe.Usage.Entry{project: "acme", at: 1, agent: "eng", model: "m", in: 1, out: 1, sub: false, cached: 0})
     seed_legacy_watches(%{"w1" => %{"description" => "x", "agent" => "eng"}})
 
     results = MigrateData.run() |> Map.new()
 
-    assert results.config_journal == {:error, :not_empty}
+    assert results.config_journal == %{imported: 0, failed: []}
     assert results.watches == %{imported: 1, already_present: 0, failed: []}
     assert results.traces == %{imported: 0, already_present: 0, failed: []}
     assert results.boards == %{imported: 0, already_present: 0, failed: []}
-    assert results.usage == @empty_usage
+    assert results.usage.usage_entries == {:error, :not_empty}
+  end
+
+  # config_journal is deliberately not gated on the table being empty (see its own
+  # migration moduledoc): Journal.record/4 writes to this exact table on every ordinary
+  # config write, with or without this command ever running, so any real install is
+  # likely to already have unrelated rows here by the time an operator gets around to
+  # running migrate-data.
+  test "unrelated rows already in the journal table (from ordinary app usage before this ever ran) don't block importing the legacy journal file" do
+    home = System.get_env("PEPE_HOME")
+    File.mkdir_p!(Path.join(home, "data"))
+    File.write!(Path.join([home, "data", "config_journal.jsonl"]), Jason.encode!(%{"at" => 1, "source" => "cli", "changed" => []}) <> "\n")
+    Repo.insert!(%Entry{at: 999, source: "unrelated", changed: ["agents"], external: false})
+    seed_legacy_watches(%{"w1" => %{"description" => "x", "agent" => "eng"}})
+
+    results = MigrateData.run() |> Map.new()
+
+    assert results.config_journal == %{imported: 1, failed: []}
+    assert results.watches == %{imported: 1, already_present: 0, failed: []}
   end
 end

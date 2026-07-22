@@ -10,10 +10,9 @@ defmodule Pepe.Usage.Migration do
   every field (the same agent making two same-sized calls in the same second). Deduping
   on content risks silently dropping a real billing record, which is a worse failure here
   than anywhere else in this migration: this only ever imports into *empty* tables, and
-  refuses with a clear reason otherwise, the same gate `Pepe.Config.Journal.Migration`
-  uses for the same reason. The source files are never deleted, even on success - a
-  billing audit trail is safer left stale than risked on a bug in this importer. Remove
-  `data/usage/` and `data/messages/` by hand once satisfied.
+  refuses with a clear reason otherwise. The source files are never deleted, even on
+  success - a billing audit trail is safer left stale than risked on a bug in this
+  importer. Remove `data/usage/` and `data/messages/` by hand once satisfied.
 
   All-or-nothing per table: if any legacy file fails to read/parse, *nothing* is inserted
   and the table is left empty - a partial import (some months in, some files unreadable)

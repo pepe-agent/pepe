@@ -9,10 +9,20 @@ defmodule Pepe.Config.Journal.Migration do
   field identical (the same source making two no-op-adjacent writes in the same second).
   Deduping on content here risks silently dropping a real entry instead of a genuine
   duplicate, which is a worse failure for an audit trail than simply refusing to
-  re-import: this only ever runs against an *empty* `config_journal_entries` table, and
-  refuses with a clear reason otherwise. The source `.jsonl` file is never deleted (a
-  hiccup here should never destroy a still-unread audit trail) - remove it by hand once
-  satisfied.
+  re-import.
+
+  So idempotency is keyed on the source *file*, not on the table's row count: an early
+  version of this gated on "table still empty," but `Pepe.Config.Journal.record/4` writes
+  to this exact table on every ordinary config write from the moment this ships, with or
+  without this migration ever having run - by the time an operator gets around to running
+  it, the table has almost certainly already picked up unrelated rows (routine day-to-day
+  config edits, or even another subsystem's own migration deleting its config.json key in
+  the very same `mix pepe config migrate-data` invocation), which would falsely read as
+  "already migrated" and permanently block a legacy import that never actually happened.
+  A successful run (the whole insert is one transaction: no partial import to leave the
+  table in an ambiguous state) renames the source file rather than deleting it - preserved
+  for inspection, but its absence is what makes a re-run a safe, instant no-op regardless
+  of whatever else has since landed in the table.
   """
 
   alias Pepe.Config.Journal.Entry
@@ -25,35 +35,36 @@ defmodule Pepe.Config.Journal.Migration do
   # installs with the most history to bring over.
   @chunk_size 1000
 
-  @type report :: %{imported: non_neg_integer(), failed: [term()]} | {:error, :not_empty}
+  @type report :: %{imported: non_neg_integer(), failed: [term()]}
 
-  @doc "Import every line of the legacy config journal file, if the table is still empty."
+  @doc "Import every line of the legacy config journal file, if it still exists (see the moduledoc)."
   @spec run() :: report()
   def run do
-    if Repo.aggregate(Entry, :count) > 0 do
-      {:error, :not_empty}
-    else
-      import_file()
+    case File.read(path()) do
+      {:ok, body} -> import_body(body)
+      {:error, :enoent} -> %{imported: 0, failed: []}
     end
   end
 
-  defp import_file do
-    case File.read(path()) do
-      {:ok, body} ->
-        {rows, failed} =
-          body
-          |> String.split("\n", trim: true)
-          |> Enum.map(&decode_line/1)
-          |> Enum.split_with(&match?({:ok, _}, &1))
+  defp import_body(body) do
+    {rows, failed} =
+      body
+      |> String.split("\n", trim: true)
+      |> Enum.map(&decode_line/1)
+      |> Enum.split_with(&match?({:ok, _}, &1))
 
-        rows = Enum.map(rows, fn {:ok, row} -> row end)
-        if rows != [], do: rows |> Enum.chunk_every(@chunk_size) |> Enum.each(&Repo.insert_all(Entry, &1))
+    rows = Enum.map(rows, fn {:ok, row} -> row end)
 
-        %{imported: length(rows), failed: Enum.map(failed, fn {:error, reason} -> reason end)}
+    Repo.transaction(fn ->
+      if rows != [], do: rows |> Enum.chunk_every(@chunk_size) |> Enum.each(&Repo.insert_all(Entry, &1))
+    end)
 
-      {:error, :enoent} ->
-        %{imported: 0, failed: []}
-    end
+    # This file's job is done either way: well-formed lines are in, malformed ones are
+    # permanently reported below and never retried. Renamed, not deleted, so the trail
+    # stays inspectable.
+    File.rename!(path(), imported_path())
+
+    %{imported: length(rows), failed: Enum.map(failed, fn {:error, reason} -> reason end)}
   end
 
   defp decode_line(line) do
@@ -66,4 +77,5 @@ defmodule Pepe.Config.Journal.Migration do
   end
 
   defp path, do: Path.join([Pepe.Config.home(), "data", "config_journal.jsonl"])
+  defp imported_path, do: path() <> ".imported"
 end

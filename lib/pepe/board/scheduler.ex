@@ -7,10 +7,11 @@ defmodule Pepe.Board.Scheduler do
 
   There is no separate coordinator process gating card mutations. This scheduler and
   `Pepe.Tools.Board` (and the dashboard) all call straight into `Pepe.Board`'s functions,
-  which themselves serialize the actual read-check-write through `Config.update_cas/1`;
-  see `Pepe.Board`'s moduledoc. Funnelling this scheduler's own tick through one more
-  GenServer.call would only make the slow part (a full `config.json` rewrite) block every
-  other board's tick while one claim is mid-write.
+  which themselves serialize the actual read-check-write as one atomic conditional
+  `UPDATE` (or transaction, for the few that need to read other cards) against
+  `Pepe.Repo`; see `Pepe.Board`'s moduledoc. Funnelling this scheduler's own tick
+  through one more GenServer.call would only make the slow part (a card mutation)
+  block every other board's tick while one claim is mid-write.
 
   Like `Pepe.Cron.Scheduler`, a dispatch's claim is released only by its task's `:DOWN`:
   a message that arrives however the run ends (a normal finish that never called
@@ -57,8 +58,8 @@ defmodule Pepe.Board.Scheduler do
       {nil, _} ->
         {:noreply, state}
 
-      {card_id, refs} ->
-        Pepe.Board.block_if_still_running(card_id)
+      {{card_id, claimed_by, claimed_at}, refs} ->
+        Pepe.Board.block_if_still_running(card_id, claimed_by, claimed_at)
         {:noreply, %{state | refs: refs, running: Map.delete(state.running, card_id)}}
     end
   end
@@ -106,7 +107,8 @@ defmodule Pepe.Board.Scheduler do
     case Task.Supervisor.start_child(Pepe.Board.TaskSupervisor, fn -> dispatch(card, key) end) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
-        %{state | running: Map.put(state.running, card.id, ref), refs: Map.put(state.refs, ref, card.id)}
+        claim = {card.id, card.claimed_by, card.claimed_at}
+        %{state | running: Map.put(state.running, card.id, ref), refs: Map.put(state.refs, ref, claim)}
 
       _ ->
         Logger.warning("board card #{card.id}: could not start the run")

@@ -153,6 +153,47 @@ defmodule Pepe.ProjectTest do
       assert Enum.map(Config.crons(), & &1.id) == ["c2"]
       assert Config.telegram()["agent"] == nil
     end
+
+    test "a bound commitment/watch is removed too, in both the resolved-id and the orphaned-handle case" do
+      Config.put_agent(%Agent{name: "sales", system_prompt: "s"})
+      Config.put_agent(%Agent{name: "keeper", system_prompt: "k"})
+
+      {:ok, resolved_commitment} =
+        Config.create_commitment(%Pepe.Config.Commitment{text: "a promise", agent: "sales", origin_type: "agent_promise"})
+
+      # Bypasses create_commitment/1's own store_agent_ref resolution on purpose - the one
+      # case reject_commitments_bound_to/2 exists for: an already-orphaned raw-handle
+      # reference, not a fresh one.
+      orphaned_commitment =
+        Pepe.Config.Commitment.changeset(%Pepe.Config.Commitment{}, %{
+          text: "an orphaned promise",
+          agent: "default/sales",
+          origin_type: "agent_promise"
+        })
+        |> Ecto.Changeset.put_change(:id, "c_orphan_test")
+        |> Pepe.Repo.insert!()
+
+      Config.put_watch(%Pepe.Config.Watch{id: "w_resolved", agent: "sales", trigger: %{}})
+
+      Pepe.Config.Watch.changeset(%Pepe.Config.Watch{}, %{agent: "default/sales", trigger: %{}})
+      |> Ecto.Changeset.put_change(:id, "w_orphan_test")
+      |> Pepe.Repo.insert!()
+
+      {:ok, kept_commitment} =
+        Config.create_commitment(%Pepe.Config.Commitment{text: "a kept promise", agent: "keeper", origin_type: "agent_promise"})
+
+      Config.put_watch(%Pepe.Config.Watch{id: "w_kept", agent: "keeper", trigger: %{}})
+
+      Config.delete_agent("sales")
+
+      assert Config.get_commitment(resolved_commitment.id) == nil
+      assert Config.get_commitment(orphaned_commitment.id) == nil
+      assert Config.get_commitment(kept_commitment.id)
+
+      assert Config.get_watch("w_resolved") == nil
+      assert Config.get_watch("w_orphan_test") == nil
+      assert Config.get_watch("w_kept")
+    end
   end
 
   describe "name validation (path-traversal defense)" do

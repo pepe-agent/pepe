@@ -916,12 +916,11 @@ defmodule Pepe.Config do
   defp clear_agent_bindings(config, ids) do
     bound? = fn ref -> is_binary(ref) and MapSet.member?(ids, agent_id_for(config, ref)) end
 
-    # Not config.json - a side effect alongside the pure map transform below, using the
-    # same `ids` this function already received (already-resolved agent ids, exactly what
-    # reject_commitments_bound_to/1 and reject_watches_bound_to/1 need - see their own
-    # comments).
-    reject_commitments_bound_to(ids)
-    reject_watches_bound_to(ids)
+    # Not config.json - a side effect alongside the pure map transform below. `config`
+    # (agents still present) is threaded through so these two can resolve a fallback
+    # unresolved-handle binding exactly like `bound?` above does - see their own comments.
+    reject_commitments_bound_to(config, ids)
+    reject_watches_bound_to(config, ids)
 
     config
     |> reject_bound_entries("crons", bound?)
@@ -2113,13 +2112,26 @@ defmodule Pepe.Config do
   the entry point that also does that).
   """
   def delete_board(id, opts \\ []) do
-    cards = board_cards_for(id)
+    force? = Keyword.get(opts, :force, false)
 
-    if cards != [] and not Keyword.get(opts, :force, false) do
-      {:error, {:not_empty, length(cards)}}
-    else
-      from(b in Board, where: b.id == ^id) |> Repo.delete_all()
-      :ok
+    # The emptiness check and the delete run inside one transaction, not as two separate
+    # top-level calls: `Pepe.Board.create_card/1` runs in its own transaction too, and
+    # `pool_size: 1` only serializes calls made *inside* a live transaction (see
+    # Pepe.Repo's moduledoc) - a plain check-then-delete could let a brand-new card commit
+    # in the gap between them and get cascaded away by a delete that was supposed to
+    # refuse on a non-empty board.
+    Repo.transaction(fn ->
+      cards = board_cards_for(id)
+
+      if cards != [] and not force? do
+        Repo.rollback({:not_empty, length(cards)})
+      else
+        from(b in Board, where: b.id == ^id) |> Repo.delete_all()
+      end
+    end)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -2240,9 +2252,19 @@ defmodule Pepe.Config do
 
   # Called when an agent (or a whole project's agents) is deleted - `ids` is the MapSet of
   # agent ids being dropped, already resolved by the caller (Config.clear_agent_bindings/2).
-  defp reject_watches_bound_to(ids) do
-    ids = MapSet.to_list(ids)
-    from(w in Watch, where: w.agent in ^ids) |> Repo.delete_all()
+  # A plain `where: agent in ^ids` would only catch the common case (`watch.agent` already
+  # holding a resolved id) - resolving every row's `agent` through `agent_id_for/2` first
+  # (same as `clear_agent_bindings/2`'s own `bound?`) also catches the fallback case where
+  # `store_agent_ref` never resolved a handle at write time and stored it raw; missing that
+  # left an orphaned watch surviving the very delete it should have been swept up by.
+  defp reject_watches_bound_to(config, ids) do
+    bound_ids =
+      Watch
+      |> Repo.all()
+      |> Enum.filter(fn w -> is_binary(w.agent) and MapSet.member?(ids, agent_id_for(config, w.agent)) end)
+      |> Enum.map(& &1.id)
+
+    if bound_ids != [], do: from(w in Watch, where: w.id in ^bound_ids) |> Repo.delete_all()
     :ok
   end
 
@@ -2397,9 +2419,15 @@ defmodule Pepe.Config do
 
   # Called when an agent (or a whole project's agents) is deleted - `ids` is the MapSet of
   # agent ids being dropped, already resolved by the caller (Config.clear_agent_bindings/2).
-  defp reject_commitments_bound_to(ids) do
-    ids = MapSet.to_list(ids)
-    from(c in Commitment, where: c.agent in ^ids) |> Repo.delete_all()
+  # See `reject_watches_bound_to/2`'s comment - same fallback-handle gap, same fix.
+  defp reject_commitments_bound_to(config, ids) do
+    bound_ids =
+      Commitment
+      |> Repo.all()
+      |> Enum.filter(fn c -> is_binary(c.agent) and MapSet.member?(ids, agent_id_for(config, c.agent)) end)
+      |> Enum.map(& &1.id)
+
+    if bound_ids != [], do: from(c in Commitment, where: c.id in ^bound_ids) |> Repo.delete_all()
     :ok
   end
 

@@ -17,10 +17,11 @@ defmodule Pepe.Board do
       `INSERT ... ON CONFLICT DO NOTHING`, whose returned row count is the same kind of
       atomic signal as the conditional-UPDATE case.
 
-  This replaces the old `Pepe.Config.update_cas/1`-based design (still there, unused,
-  now that this was its last real caller): the same "read and write happen atomically,
-  no separate get-then-write" guarantee, expressed against the database instead of a
-  whole-file compare-and-swap.
+  This replaces the old `Pepe.Config.update_cas/1`-based design this module used to run
+  on: the same "read and write happen atomically, no separate get-then-write" guarantee,
+  expressed against the database instead of a whole-file compare-and-swap.
+  `update_cas/1` itself is still very much alive - `put_model`, `put_agent`, and
+  `update_telegram_bot` all still go through it - just no longer for cards.
 
   `Pepe.Board.Scheduler` is the tick-driven caller of `promote_if_ready/1`,
   `reclaim_if_timed_out/2`, and dispatch; `Pepe.Tools.Board` and the dashboard are the other
@@ -172,12 +173,29 @@ defmodule Pepe.Board do
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => reason}) end)
   end
 
-  @doc "If still `running`, block it: the dispatch working on it ended without calling `complete`/`block`."
-  @spec block_if_still_running(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
-  def block_if_still_running(card_id) do
+  @doc """
+  If still `running` under the same claim (`claimed_by`/`claimed_at` both match what the
+  caller captured when it dispatched this run), block it: the dispatch working on it ended
+  without calling `complete`/`block`. The claim pair is what makes this safe against the
+  ABA race a bare status check would miss - the card could have been blocked-on-timeout,
+  unblocked, and reclaimed by an unrelated dispatch in between, and a status-only check
+  would then block that *new* claim instead of a no-op. `claimed_at` alone isn't enough:
+  it's second-granularity (the same precision as every other timestamp here), so two
+  claims landing in the same wall-clock second would otherwise collide.
+  """
+  @spec block_if_still_running(String.t(), String.t(), integer()) :: {:ok, BoardCard.t()} | {:error, term()}
+  def block_if_still_running(card_id, claimed_by, claimed_at) do
     reason = "worker exited without completing"
 
-    transition(card_id, "running", status: "blocked", block_reason: reason)
+    query =
+      from(c in BoardCard,
+        where: c.id == ^card_id and c.status == "running" and c.claimed_by == ^claimed_by and c.claimed_at == ^claimed_at
+      )
+
+    case update_and_get(query, [status: "blocked", block_reason: reason], card_id) do
+      {:ok, card} -> {:ok, card}
+      :miss -> {:error, :stale_claim}
+    end
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => reason}) end)
   end
 
@@ -213,9 +231,9 @@ defmodule Pepe.Board do
         from(c in BoardCard, where: c.id == ^card_id and c.status not in ["archived", "running"])
       end
 
-    case Repo.update_all(query, set: [status: "archived", updated_at: now()]) do
-      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
-      {0, _} -> archive_error(card_id, force?)
+    case update_and_get(query, [status: "archived"], card_id) do
+      {:ok, card} -> {:ok, card}
+      :miss -> archive_error(card_id, force?)
     end
     |> tap_ok(fn _card -> log_event(card_id, "archived", %{}) end)
   end
@@ -290,9 +308,9 @@ defmodule Pepe.Board do
     cutoff = now() - timeout_s
     query = from(c in BoardCard, where: c.id == ^card_id and c.status == "running" and c.claimed_at < ^cutoff)
 
-    case Repo.update_all(query, set: [status: "blocked", block_reason: "claim timed out", updated_at: now()]) do
-      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
-      {0, _} -> reclaim_error(card_id)
+    case update_and_get(query, [status: "blocked", block_reason: "claim timed out"], card_id) do
+      {:ok, card} -> {:ok, card}
+      :miss -> reclaim_error(card_id)
     end
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => "claim timed out"}) end)
   end
@@ -333,16 +351,15 @@ defmodule Pepe.Board do
 
   # A generic `status_from → patch` transition, the shape every simple state change shares
   # (claim/complete/block/unblock/force_ready/unarchive). One conditional UPDATE, gated on
-  # both id and the precondition status - the returned row count is the atomic result, no
-  # transaction needed. `archive/2` and `promote_if_ready/1` have their own precondition
-  # logic and don't fit this shape.
+  # both id and the precondition status - the returned row count is the atomic result.
+  # `archive/2` and `promote_if_ready/1` have their own precondition logic and don't fit
+  # this shape.
   defp transition(card_id, from_status, patch) do
-    patch = Keyword.put(patch, :updated_at, now())
     query = from(c in BoardCard, where: c.id == ^card_id and c.status == ^from_status)
 
-    case Repo.update_all(query, set: patch) do
-      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
-      {0, _} -> transition_error(card_id, from_status)
+    case update_and_get(query, patch, card_id) do
+      {:ok, card} -> {:ok, card}
+      :miss -> transition_error(card_id, from_status)
     end
   end
 
@@ -357,12 +374,33 @@ defmodule Pepe.Board do
   # goes through the same {count, _} check to report :not_found instead of silently
   # succeeding at nothing on an id that doesn't exist.
   defp update_unconditionally(card_id, patch) do
-    patch = Keyword.put(patch, :updated_at, now())
     query = from(c in BoardCard, where: c.id == ^card_id)
 
-    case Repo.update_all(query, set: patch) do
-      {1, _} -> {:ok, Repo.get(BoardCard, card_id)}
-      {0, _} -> {:error, :not_found}
+    case update_and_get(query, patch, card_id) do
+      {:ok, card} -> {:ok, card}
+      :miss -> {:error, :not_found}
+    end
+  end
+
+  # The conditional UPDATE's returned row count is already the atomic "did this precondition
+  # hold" signal - but a separate, later `Repo.get` to hand the caller the fresh row is not
+  # atomic with it: `pool_size: 1` only serializes calls made *inside* the same transaction
+  # (see the moduledoc), so two consecutive top-level calls from this process can still be
+  # interleaved by a concurrent delete (e.g. the card's board being force-deleted) landing
+  # between the write and the read. Wrapping both in one transaction closes that gap instead
+  # of handing a caller a `{:ok, nil}` for a row that no longer exists.
+  defp update_and_get(query, patch, card_id) do
+    patch = Keyword.put(patch, :updated_at, now())
+
+    Repo.transaction(fn ->
+      case Repo.update_all(query, set: patch) do
+        {1, _} -> Repo.get(BoardCard, card_id)
+        {0, _} -> nil
+      end
+    end)
+    |> case do
+      {:ok, nil} -> :miss
+      {:ok, card} -> {:ok, card}
     end
   end
 

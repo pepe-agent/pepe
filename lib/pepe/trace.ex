@@ -23,6 +23,8 @@ defmodule Pepe.Trace do
   CLI, `Pepe.Eval.FromTrace`).
   """
 
+  require Logger
+
   import Ecto.Query, only: [from: 2]
 
   alias Pepe.Config
@@ -132,7 +134,13 @@ defmodule Pepe.Trace do
         t.id
     end
   rescue
-    _ -> :ok
+    # A trace is diagnostic, not the run it's describing - the run itself already
+    # finished by the time this executes, so a Repo hiccup here must never turn an
+    # already-successful run into a crash. Silent was the wrong choice, though: unlike
+    # `Pepe.Config.Journal.record/4`'s equivalent rescue, this one used to swallow the
+    # error with no trace of it anywhere, which made a genuinely broken trace pipeline
+    # indistinguishable from one quietly working - logged now, same as the journal's.
+    e -> Logger.warning("[trace] #{Exception.message(e)}")
   end
 
   # --- reading (dashboard / CLI) -----------------------------------------------------

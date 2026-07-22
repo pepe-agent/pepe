@@ -79,13 +79,23 @@ defmodule Pepe.Board.Migration do
 
     if changeset.valid? do
       row = changeset |> Ecto.Changeset.apply_changes() |> Map.from_struct() |> Map.drop([:__meta__])
-
-      case Repo.insert_all(schema, [row], on_conflict: :nothing) do
-        {1, _} -> {:ok, :inserted}
-        {0, _} -> {:ok, :already_present}
-      end
+      insert_row(schema, row)
     else
       {:error, changeset.errors}
     end
+  end
+
+  # board_cards carries a real FK to boards.id, which on_conflict: :nothing does not shield
+  # against - a card whose board was deleted (or never migrated, e.g. hand-edited
+  # config.json) raises instead of returning a row count, and insert_all has no changeset to
+  # translate that into. Caught here so one orphaned card fails as its own report entry
+  # instead of aborting every other row still to be imported.
+  defp insert_row(schema, row) do
+    case Repo.insert_all(schema, [row], on_conflict: :nothing) do
+      {1, _} -> {:ok, :inserted}
+      {0, _} -> {:ok, :already_present}
+    end
+  rescue
+    e -> {:error, {:insert_failed, Exception.message(e)}}
   end
 end

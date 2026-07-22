@@ -1,8 +1,10 @@
 defmodule Pepe.Repo do
   @moduledoc """
-  The operational-data store: commitments today, more to come (watches, board,
-  traces, usage) - not `config.json`, which stays a plain file for definitions
-  (agents, models, channels) that don't grow with usage.
+  The operational-data store: commitments, the config journal, watches, traces, boards,
+  and usage - not `config.json`, which stays a plain file for definitions (agents, models,
+  channels) that don't grow with usage. Existing on-disk/config.json data for any of these
+  moves over via an explicit, operator-run `mix pepe config migrate-commitments` (just
+  commitments) or `mix pepe config migrate-data` (everything else), never automatically.
 
   A single SQLite file under `PEPE_HOME`, mirroring where `Pepe.Store` (Mnesia)
   already puts its own data (`Pepe.Store.start_mnesia/0`).

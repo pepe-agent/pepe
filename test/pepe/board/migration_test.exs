@@ -81,4 +81,17 @@ defmodule Pepe.Board.MigrationTest do
     assert [{"b_weird", _reason}] = report.failed
     assert Config.load() |> Map.has_key?("boards")
   end
+
+  test "a card whose board doesn't exist fails as its own entry instead of crashing the run" do
+    write_legacy(
+      %{},
+      %{"c_orphan" => %{"board" => "no_such_board", "title" => "x", "status" => "todo"}}
+    )
+
+    report = Migration.run()
+
+    assert report.imported == 0
+    assert [{"c_orphan", _reason}] = report.failed
+    assert Config.load() |> Map.has_key?("board_cards")
+  end
 end

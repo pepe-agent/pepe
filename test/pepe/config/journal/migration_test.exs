@@ -2,8 +2,8 @@ defmodule Pepe.Config.Journal.MigrationTest do
   @moduledoc """
   `Pepe.Config.Journal.Migration.run/0` - the one-time, operator-run import of the old
   `data/config_journal.jsonl` file into `Pepe.Repo`. Unlike commitments/watches, entries
-  have no natural id, so this only ever imports into an empty table - see its own
-  moduledoc for why.
+  have no natural id, so idempotency is keyed on the source file's presence (renamed away
+  on success), not on the table's row count - see its own moduledoc for why.
   """
   use ExUnit.Case, async: false
 
@@ -52,18 +52,30 @@ defmodule Pepe.Config.Journal.MigrationTest do
     assert [%{source: "cli", external: false}, %{source: "dashboard", external: true}] = entries
   end
 
-  test "the legacy file is never deleted, even after a successful import", %{home: home} do
+  test "the legacy file is renamed, not deleted, after a successful import", %{home: home} do
     write_legacy_file(home, [%{"at" => 1, "source" => "cli", "changed" => [], "external" => false}])
 
     Migration.run()
 
-    assert File.exists?(legacy_path(home))
+    refute File.exists?(legacy_path(home))
+    assert File.read!(legacy_path(home) <> ".imported") =~ ~s("source":"cli")
   end
 
-  test "refuses to run against a non-empty table, instead of risking a content-based dedupe" do
-    Repo.insert!(%Entry{at: 1, source: "cli", changed: ["agents"], external: false})
+  test "a retry after a successful import is a safe, instant no-op", %{home: home} do
+    write_legacy_file(home, [%{"at" => 1, "source" => "cli", "changed" => [], "external" => false}])
 
-    assert Migration.run() == {:error, :not_empty}
+    assert Migration.run() == %{imported: 1, failed: []}
+    assert Migration.run() == %{imported: 0, failed: []}
+    assert Repo.aggregate(Entry, :count) == 1
+  end
+
+  test "unrelated rows already in the table (ordinary app usage, or another subsystem's own migration writing to config in the same run) do not block a legacy import that never actually ran",
+       %{home: home} do
+    write_legacy_file(home, [%{"at" => 1, "source" => "cli", "changed" => [], "external" => false}])
+    Repo.insert!(%Entry{at: 999, source: "unrelated", changed: ["agents"], external: false})
+
+    assert Migration.run() == %{imported: 1, failed: []}
+    assert Repo.aggregate(Entry, :count) == 2
   end
 
   test "a malformed line is reported, the well-formed ones still import", %{home: home} do

@@ -160,6 +160,39 @@ defmodule Pepe.BoardTest do
     end
   end
 
+  describe "block_if_still_running/3" do
+    test "blocks a card still running under the claim the caller captured" do
+      board = new_board()
+      card = new_card(board)
+      Board.force_ready(card.id)
+      {:ok, claimed} = Board.claim(card.id, "worker-a")
+
+      {:ok, blocked} = Board.block_if_still_running(card.id, claimed.claimed_by, claimed.claimed_at)
+      assert blocked.status == "blocked"
+      assert blocked.block_reason == "worker exited without completing"
+    end
+
+    test "is a no-op against a stale claim (ABA: reclaimed by someone else since)" do
+      board = new_board()
+      card = new_card(board)
+      Board.force_ready(card.id)
+      {:ok, claimed_a} = Board.claim(card.id, "worker-a")
+
+      # worker-a's dispatch died; before its :DOWN is handled, the card gets unstuck and
+      # reclaimed by a completely different, still-legitimate run - the claimant differs
+      # even if claimed_at (second-granularity) happens to coincide.
+      Board.block(card.id, "reclaimed manually")
+      Board.unblock(card.id)
+      {:ok, claimed_b} = Board.claim(card.id, "worker-b")
+      assert claimed_b.claimed_by != claimed_a.claimed_by
+
+      assert Board.block_if_still_running(card.id, claimed_a.claimed_by, claimed_a.claimed_at) == {:error, :stale_claim}
+      still_running = Config.get_board_card(card.id)
+      assert still_running.status == "running"
+      assert still_running.claimed_by == "worker-b"
+    end
+  end
+
   describe "the rest of the state machine" do
     test "complete: running -> done" do
       board = new_board()
