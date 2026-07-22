@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-07-22
+
+### Fixed
+- **`browser` could hang for the full launch timeout and fail to start at all on a Linux host with no D-Bus session bus** - the normal state in a Docker container, including the official Pepe image. Chrome logged repeated "Failed to connect to the bus" and never reached its DevTools port. Worked around the same way headless-CI Chrome setups generally do (pointing `DBUS_SESSION_BUS_ADDRESS` at something Chrome fails against immediately instead of retrying, only when not already set) plus a more generous launch timeout for a cold start on a loaded host.
+- The website's `astro` dependency bumped to 7.1.3, fixing three reflected-XSS advisories (two with published CVEs) in the docs site's build tooling - not part of the Pepe application itself, but worth a real fix rather than sitting flagged.
+
+### Changed
+- The `release` GitHub Actions workflow no longer builds or publishes binaries/a Docker image on a tag pushed on top of a failing test/credo/dialyzer/website-build run - it now runs that whole suite first and stops if it doesn't pass, the same gate a merge already has.
+
 ## [0.10.1] - 2026-07-22
 
 ### Fixed
@@ -581,7 +590,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/pepe-agent/pepe/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/pepe-agent/pepe/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/pepe-agent/pepe/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/pepe-agent/pepe/compare/v0.9.1...v0.9.2
