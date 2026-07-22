@@ -1116,25 +1116,48 @@ defmodule Pepe.Gateways.Telegram do
     Config.put_locale()
     send_chat_action(entry.chat_id, "typing")
 
+    results = Enum.map(entry.items, fn i -> {i.kind, download_file(i.file_id, i.kind)} end)
+
     downloaded =
-      entry.items
-      |> Enum.map(fn i -> {i.kind, download_file(i.file_id, i.kind)} end)
-      |> Enum.flat_map(fn
+      Enum.flat_map(results, fn
         {kind, {:ok, path}} -> [{kind, path}]
         _ -> []
       end)
 
+    failed = Enum.filter(results, fn {_kind, r} -> match?({:error, _}, r) end)
+
     cond do
       downloaded == [] ->
-        send_message(entry.chat_id, friendly_error(:download))
+        reason = if all_too_large?(failed), do: :too_large, else: :download
+        send_message(entry.chat_id, friendly_error(reason))
 
       addressed?(entry.caption, entry.chat_type, entry.chat_id) ->
+        # A file that failed to download used to just vanish from the album with no word to
+        # anyone - sending 2 files and having one silently dropped read as "it ignored one",
+        # not as a download failure, since nothing ever said so.
+        if failed != [], do: send_message(entry.chat_id, album_partial_failure_note(failed, length(entry.items)))
         {images, files} = album_media(downloaded)
         prompt = if images == [], do: album_prompt(files, entry.caption), else: album_vision_prompt(files, length(images), entry.caption)
         chat_with_agent(entry.chat_id, nil, prompt, untrusted: true, images: images)
 
       true ->
         :ok
+    end
+  end
+
+  defp all_too_large?(failed), do: failed != [] and Enum.all?(failed, fn {_kind, {:error, reason}} -> reason == :too_large end)
+
+  defp album_partial_failure_note(failed, total) do
+    n = length(failed)
+
+    if all_too_large?(failed) do
+      gettext(
+        "%{n} of the %{total} files you sent were too big for me to download here (Telegram bots can only fetch files up to 20MB this way) - I only saved the rest.",
+        n: n,
+        total: total
+      )
+    else
+      gettext("%{n} of the %{total} files you sent couldn't be downloaded - I only saved the rest.", n: n, total: total)
     end
   end
 
@@ -1205,9 +1228,9 @@ defmodule Pepe.Gateways.Telegram do
           :unavailable -> unread(inbound, kind, path)
         end
 
-      :error ->
-        Logger.warning("[telegram] could not download #{kind} #{file_id}")
-        send_message(inbound.chat_id, friendly_error(:download))
+      {:error, reason} ->
+        Logger.warning("[telegram] could not download #{kind} #{file_id}: #{inspect(reason)}")
+        send_message(inbound.chat_id, friendly_error(reason))
     end
   end
 
@@ -1351,17 +1374,25 @@ defmodule Pepe.Gateways.Telegram do
       File.write!(Path.join(dir, name), body)
       {:ok, "media/#{name}"}
     else
-      _ -> :error
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :download}
     end
   end
 
+  # Telegram's Bot API `getFile` refuses anything over 20MB outright (a platform limit, not
+  # ours - lifting it needs a self-hosted Local Bot API Server, which this gateway does not
+  # run) - distinguished from any other download failure so the human actually gets told why,
+  # instead of a generic "couldn't download" that leaves a 26MB PDF looking like a fluke.
   defp telegram_file_path(file_id) do
     case Req.get(api_url(token(), "getFile"), params: [file_id: file_id]) do
       {:ok, %{status: 200, body: %{"ok" => true, "result" => %{"file_path" => path}}}} ->
         {:ok, path}
 
+      {:ok, %{body: %{"description" => desc}}} when is_binary(desc) ->
+        if String.contains?(desc, "too big"), do: {:error, :too_large}, else: {:error, :download}
+
       _ ->
-        :error
+        {:error, :download}
     end
   end
 
@@ -1525,6 +1556,12 @@ defmodule Pepe.Gateways.Telegram do
 
   defp friendly_error(:download),
     do: gettext("I couldn't download that file. Could you send it again?")
+
+  defp friendly_error(:too_large),
+    do:
+      gettext(
+        "That file is too big for me to download here - Telegram bots can only fetch files up to 20MB this way. Could you send a smaller version, or share it another way?"
+      )
 
   defp friendly_error(%{reason: :timeout}),
     do: gettext("That took too long. Could you try again, please?")

@@ -72,11 +72,28 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     end
 
     get "/bot:token/getFile" do
-      case safe_get(:tg_cmd_files, :default) do
+      mode =
+        case safe_get(:tg_cmd_files, :default) do
+          # A map keys per-file_id behavior (e.g. one file in an album too big, the other fine);
+          # anything else is the same mode for every file, as before.
+          modes when is_map(modes) -> Map.get(modes, conn.query_params["file_id"], :default)
+          mode -> mode
+        end
+
+      case mode do
         # 404 rather than 5xx: it fails the lookup just the same, and Req does not spend
         # three retries and seconds of backoff on it, which the suite would feel.
-        :fail -> Plug.Conn.send_resp(conn, 404, "gone")
-        ext -> json(conn, %{"ok" => true, "result" => %{"file_path" => "stuff/file#{ext}"}})
+        :fail ->
+          Plug.Conn.send_resp(conn, 404, "gone")
+
+        # The real shape Telegram's Bot API returns for a file over its 20MB getFile cap.
+        :too_large ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(400, ~s({"ok":false,"error_code":400,"description":"Bad Request: file is too big"}))
+
+        ext ->
+          json(conn, %{"ok" => true, "result" => %{"file_path" => "stuff/file#{ext}"}})
       end
     end
 
@@ -327,6 +344,26 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
         "document" => %{"file_id" => "doc1"}
       }
     })
+  end
+
+  # Two documents sent together, sharing a media_group_id - the shape Telegram uses for
+  # "several files in one message", which the gateway buffers and flushes as one album.
+  defp send_album(chat, file_ids, caption) do
+    group_id = "grp-#{System.unique_integer([:positive])}"
+
+    Enum.each(file_ids, fn file_id ->
+      push(%{
+        "update_id" => System.unique_integer([:positive]),
+        "message" => %{
+          "message_id" => System.unique_integer([:positive]),
+          "chat" => %{"id" => chat, "type" => "private"},
+          "from" => %{"id" => @user},
+          "caption" => caption,
+          "media_group_id" => group_id,
+          "document" => %{"file_id" => file_id}
+        }
+      })
+    end)
   end
 
   defp tap_button(chat, callback_data, user \\ @user) do
@@ -703,6 +740,42 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
       assert await_reply(chat) =~ "couldn't download that file"
       # The agent was never bothered with a file that does not exist.
+      refute_receive {:llm, ^chat, _prompt}, 300
+    end
+
+    test "a file over Telegram's 20MB bot cap gets a specific reason, not a generic failure", %{chat: chat} do
+      downloads(:too_large)
+      send_document(chat)
+
+      reply = await_reply(chat)
+      assert reply =~ "too big for me to download"
+      assert reply =~ "20MB"
+      refute_receive {:llm, ^chat, _prompt}, 300
+    end
+
+    test "one file too big in a batch of two doesn't silently drop it - the agent still gets the other one, and the human is told", %{
+      chat: chat
+    } do
+      Agent.update(:tg_cmd_files, fn _ -> %{"ok1" => ".pdf", "big1" => :too_large} end)
+      send_album(chat, ["ok1", "big1"], "file these")
+
+      # Told about the partial failure, in plain terms, before the agent's own reply.
+      note = await_reply(chat)
+      assert note =~ "1 of the 2 files"
+      assert note =~ "too big"
+
+      # The album still goes to the agent - with only the file that actually downloaded (the
+      # generated filename doesn't carry the Telegram file_id, so "1 files" is the checkable
+      # proof that the failed one didn't sneak in as a second entry).
+      assert_receive {:llm, ^chat, prompt}, 5_000
+      assert prompt =~ "1 files together"
+    end
+
+    test "every file in a batch failing still reports it plainly, same as a single failed download", %{chat: chat} do
+      downloads(:too_large)
+      send_album(chat, ["big1", "big2"], "file these")
+
+      assert await_reply(chat) =~ "too big for me to download"
       refute_receive {:llm, ^chat, _prompt}, 300
     end
   end
