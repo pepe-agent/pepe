@@ -41,6 +41,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ScheduleTask
   alias Pepe.Tools.SendFile
   alias Pepe.Tools.SendToAgent
+  alias Pepe.Tools.SessionSearch
   alias Pepe.Tools.SetRoute
   alias Pepe.Tools.Skill
   alias Pepe.Tools.SwitchAgent
@@ -89,6 +90,7 @@ defmodule Pepe.Tools do
     Review,
     Watch,
     Commitment,
+    SessionSearch,
     TelegramAccess,
     TelegramPoll
   ]

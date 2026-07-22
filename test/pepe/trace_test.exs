@@ -124,4 +124,59 @@ defmodule Pepe.TraceTest do
     kinds = Trace.get("default", id)["events"] |> Enum.map(& &1["t"])
     assert kinds == ["assistant"]
   end
+
+  describe "for_session/3, sessions/2, search/3" do
+    test "for_session/3 returns only that session's turns, oldest first" do
+      Trace.start("bot", "telegram:1", "first")
+      Trace.finish({:ok, "a", []})
+      Trace.start("bot", "telegram:2", "other session")
+      Trace.finish({:ok, "b", []})
+      Trace.start("bot", "telegram:1", "second")
+      Trace.finish({:ok, "c", []})
+
+      turns = Trace.for_session("default", "telegram:1")
+      assert Enum.map(turns, & &1["prompt"]) == ["first", "second"]
+    end
+
+    test "sessions/2 lists distinct sessions with a turn count, most recently active first" do
+      Trace.start("bot", "telegram:1")
+      Trace.finish({:ok, "a", []})
+      Trace.start("bot", "telegram:2")
+      Trace.finish({:ok, "b", []})
+      Trace.start("bot", "telegram:1")
+      Trace.finish({:ok, "c", []})
+
+      sessions = Trace.sessions("default")
+      assert Enum.map(sessions, & &1["session"]) == ["telegram:1", "telegram:2"]
+      assert Enum.find(sessions, &(&1["session"] == "telegram:1"))["turns"] == 2
+    end
+
+    test "sessions/2 excludes stateless runs (no session key at all)" do
+      Trace.start("bot", nil)
+      Trace.finish({:ok, "a", []})
+
+      assert Trace.sessions("default") == []
+    end
+
+    test "search/3 matches the prompt, case-insensitively" do
+      Trace.start("bot", nil, "check the invoice totals")
+      Trace.finish({:ok, "done", []})
+      Trace.start("bot", nil, "something unrelated")
+      Trace.finish({:ok, "done", []})
+
+      [match] = Trace.search("default", "INVOICE")
+      assert match["prompt"] =~ "invoice"
+    end
+
+    test "search/3 matches tool-call arguments too, not just the prompt" do
+      Trace.start("bot", nil, "do the thing")
+      Trace.event({:tool_call, "read_file", ~s({"path":"budget-2026.csv"})})
+      Trace.finish({:ok, "done", []})
+      Trace.start("bot", nil, "do another thing")
+      Trace.finish({:ok, "done", []})
+
+      [match] = Trace.search("default", "budget-2026")
+      assert match["prompt"] == "do the thing"
+    end
+  end
 end

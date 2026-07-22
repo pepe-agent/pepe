@@ -187,6 +187,66 @@ defmodule Pepe.Trace do
     end
   end
 
+  @doc """
+  Every trace recorded under one session key, oldest first (the order a conversation
+  actually happened in) - the turn-by-turn history behind a session, once its own
+  process (and any crash-recovery mirror `Pepe.Agent.SessionPersistence` keeps) is gone.
+  Light list, same shape as `recent/2` (no event stream).
+  """
+  @spec for_session(String.t(), String.t(), pos_integer()) :: [map()]
+  def for_session(scope, session, limit \\ 200) do
+    from(t in Entry, where: t.scope == ^scope and t.session == ^session, order_by: [asc: t.at], limit: ^limit)
+    |> Repo.all()
+    |> Enum.map(&summarize/1)
+  end
+
+  @doc """
+  Distinct session keys with at least one trace in `scope`, newest activity first, each
+  with its turn count and last-seen time - "what conversations have happened here."
+  `nil`/blank session keys (a one-shot CLI run, a cron, anything with no session) are
+  excluded: there is nothing to list a "session" for.
+  """
+  @spec sessions(String.t(), pos_integer()) :: [map()]
+  def sessions(scope, limit \\ 50) do
+    from(t in Entry,
+      where: t.scope == ^scope and not is_nil(t.session) and t.session != "",
+      group_by: t.session,
+      select: %{session: t.session, turns: count(t.id), last_at: max(t.at)},
+      # `at` is second-granularity, so two sessions active in the same second tie -
+      # `id` (a microsecond timestamp string) breaks that the same direction, newest last.
+      order_by: [desc: max(t.at), desc: max(t.id)],
+      limit: ^limit
+    )
+    |> Repo.all()
+    |> Enum.map(fn %{session: s, turns: n, last_at: at} -> %{"session" => s, "turns" => n, "last_at" => at} end)
+  end
+
+  @doc """
+  Traces in `scope` whose prompt or tool-call/result text contains `query` (case-
+  insensitive substring - no full-text index exists, and does not need to at the scale
+  one scope's traces stay bounded to, see `@keep`). Newest first, without the full event
+  stream (use `get/2` for one trace's complete transcript).
+  """
+  @spec search(String.t(), String.t(), pos_integer()) :: [map()]
+  def search(scope, query, limit \\ 50) when is_binary(query) and query != "" do
+    needle = String.downcase(query)
+
+    from(t in Entry, where: t.scope == ^scope, order_by: [desc: t.at])
+    |> Repo.all()
+    |> Enum.filter(&matches?(&1, needle))
+    |> Enum.take(limit)
+    |> Enum.map(&summarize/1)
+  end
+
+  defp matches?(%Entry{} = e, needle) do
+    haystack =
+      [e.prompt | Enum.map(e.events || [], &(&1["args"] || &1["out"] || &1["text"] || ""))]
+      |> Enum.join(" ")
+      |> String.downcase()
+
+    String.contains?(haystack, needle)
+  end
+
   # --- internals ---------------------------------------------------------------------
 
   defp to_map(%Entry{} = e) do
