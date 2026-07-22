@@ -12,6 +12,9 @@ on:
   push:
     branches: [master]
   pull_request:
+  # Lets release.yml call this whole suite as a gate before it builds/publishes anything -
+  # a release must reverify the exact tagged commit, not trust a possibly-stale prior run.
+  workflow_call:
 
 # A second push to the same branch cancels the first: the older run's answer is about
 # code nobody has anymore.
