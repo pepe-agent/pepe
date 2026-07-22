@@ -13,9 +13,14 @@ defmodule Pepe.Config.Cron do
             name: nil,
             agent: nil,
             prompt: nil,
-            # "prompt" (run the agent on `prompt`) or "consolidate" (a memory-housekeeping
-            # pass over the agent's standing memory, ignoring `prompt`).
+            # "prompt" (run the agent on `prompt`), "consolidate" (a memory-housekeeping pass
+            # over the agent's standing memory, ignoring `prompt`), or "flow" (replay a
+            # Pepe.Flow promoted for this agent, named in `flow` below, calling no model at
+            # all - ignoring `prompt` the same way "consolidate" does).
             kind: "prompt",
+            # Only meaningful when kind == "flow": the Pepe.Flow's name (looked up under
+            # this cron's own `agent`).
+            flow: nil,
             # standard cron expression, e.g. "0 8 * * *"
             schedule: nil,
             timezone: "Etc/UTC",
@@ -45,6 +50,7 @@ defmodule Pepe.Config.Cron do
       agent: map["agent"],
       prompt: map["prompt"],
       kind: map["kind"] || "prompt",
+      flow: map["flow"],
       schedule: map["schedule"],
       timezone: map["timezone"] || "Etc/UTC",
       model: map["model"],

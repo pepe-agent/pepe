@@ -161,9 +161,23 @@ defmodule Pepe.Cron do
     _ -> :ok
   end
 
-  # A "consolidate" cron runs the restricted memory-housekeeping pass; a normal cron runs
-  # the agent on its stored prompt.
+  # A "consolidate" cron runs the restricted memory-housekeeping pass; a "flow" cron
+  # replays a promoted Pepe.Flow, no model call at all; a normal cron runs the agent on
+  # its stored prompt.
   defp run_job(%Cron{kind: "consolidate"} = cron), do: Pepe.Agent.consolidate(cron.agent)
+
+  defp run_job(%Cron{kind: "flow", agent: agent, flow: flow_name} = _cron) do
+    case Pepe.Flow.get(agent, flow_name) do
+      nil ->
+        {:error, {:unknown_flow, flow_name}}
+
+      flow ->
+        case Pepe.Flow.run(flow) do
+          {:ok, results} -> {:ok, "flow #{flow_name} completed (#{length(results)} step(s))", []}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
 
   defp run_job(%Cron{} = cron) do
     opts = [source: "cron"] ++ if(cron.model, do: [model: Config.get_model(cron.model)], else: [])

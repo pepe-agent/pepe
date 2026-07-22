@@ -20,7 +20,7 @@ export const docsNav: { group: string; slugs: string[] }[] = [
     group: "channels",
     slugs: ["channels", "telegram", "voice", "documents", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],
   },
-  { group: "automate", slugs: ["goals", "scheduled", "board", "watches", "commitments"] },
+  { group: "automate", slugs: ["goals", "scheduled", "flows", "board", "watches", "commitments"] },
   { group: "api", slugs: ["api", "sessions", "auth", "websocket", "clients"] },
   { group: "extend", slugs: ["plugins", "mcp"] },
   { group: "operate", slugs: ["security", "privacy", "dashboard", "backup", "by-chat", "traces", "evals", "contributing"] },

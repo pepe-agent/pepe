@@ -114,6 +114,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe usage export --project CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
       mix pepe traces [--project CO] [ID]        # inspect/replay recent agent runs
+      mix pepe flow list|promote|show|remove|run ... # promote a proven trace sequence into a script
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
@@ -175,6 +176,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "backup" | _]), do: backup_help()
   def dispatch(["help", "extract" | _]), do: extract_help()
   def dispatch(["help", "restore" | _]), do: restore_help()
+  def dispatch(["help", "flow" | _]), do: flow_cmd(["help"])
 
   def dispatch(["setup" | _]), do: with_config(&setup/0)
   def dispatch(["config" | rest]), do: with_config(fn -> config_cmd(rest) end)
@@ -207,6 +209,12 @@ defmodule Mix.Tasks.Pepe do
   # running, exactly like Config.update/1 already does for a one-shot command); none of them
   # call a model, so with_config's fast boot is enough.
   def dispatch(["board" | rest]), do: with_config(fn -> board_cmd(rest) end)
+
+  # `flow run` actually executes the promoted steps (may include bash, needing the full app
+  # and its sandbox supervision); promote/list/show/remove only touch Pepe.Repo, which
+  # with_config already starts.
+  def dispatch(["flow", "run" | rest]), do: with_app([], fn -> flow_cmd(["run" | rest]) end)
+  def dispatch(["flow" | rest]), do: with_config(fn -> flow_cmd(rest) end)
   def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
   def dispatch(["review" | rest]), do: with_app([], fn -> review_cmd(rest) end)
   def dispatch(["update" | _]), do: with_app([], fn -> update_cmd() end)
@@ -1127,6 +1135,165 @@ defmodule Mix.Tasks.Pepe do
   defp trace_outcome(%{"kind" => "error", "reason" => r}), do: red("error: #{r}")
   defp trace_outcome(%{"kind" => "ok"}), do: green("ok")
   defp trace_outcome(_), do: dim("?")
+
+  ###
+  ### flow (promote a proven trace sequence into a replayable script)
+  ###
+
+  defp flow_cmd(["help"]), do: flow_help()
+
+  defp flow_cmd(["list" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [agent: :string])
+
+    case opts[:agent] do
+      nil ->
+        error("usage: mix pepe flow list --agent NAME")
+
+      agent ->
+        case Pepe.Flow.for_agent(agent) do
+          [] -> info("no flows for #{agent} yet. promote one: mix pepe flow promote NAME --agent #{agent} --from ID1,ID2")
+          flows -> Enum.each(flows, &print_flow_line/1)
+        end
+    end
+  end
+
+  defp flow_cmd(["promote", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [agent: :string, from: :string, overwrite: :boolean])
+    trace_ids = (opts[:from] || "") |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+
+    case {opts[:agent], trace_ids} do
+      {nil, _} ->
+        error("usage: mix pepe flow promote NAME --agent AGENT --from ID1,ID2[,...] [--overwrite]")
+
+      {agent, ids} when length(ids) >= 2 ->
+        case Pepe.Flow.promote_from_traces(name, agent, ids, overwrite: opts[:overwrite] == true) do
+          {:ok, flow} ->
+            ok("promoted #{green(name)} for #{agent}: #{length(flow["steps"])} step(s)")
+            Enum.each(flow["steps"], &puts("  → #{&1["tool"]} #{dim(&1["args"] || "")}"))
+
+          {:error, reason} ->
+            error("could not promote: #{describe_flow_error(reason)}")
+        end
+
+      _ ->
+        error("--from needs at least 2 trace ids, comma-separated (a single run proves nothing about reliability)")
+    end
+  end
+
+  defp flow_cmd(["show", agent, name | _]) do
+    case Pepe.Flow.get(agent, name) do
+      nil ->
+        error("no flow #{name} for #{agent}")
+
+      flow ->
+        puts("#{bold(flow["name"])}  #{dim(flow["agent"])}")
+        puts(dim("promoted from: #{Enum.join(flow["source_trace_ids"], ", ")}"))
+        if flow["last_run"], do: puts(dim("last run: #{local_datetime(flow["last_run"])} - #{flow["last_result"]}"))
+        puts("")
+        Enum.each(flow["steps"], &puts("  → #{&1["tool"]} #{dim(&1["args"] || "")}"))
+    end
+  end
+
+  defp flow_cmd(["remove", agent, name | _]) do
+    case Pepe.Flow.get(agent, name) do
+      nil ->
+        error("no flow #{name} for #{agent}")
+
+      _ ->
+        Pepe.Flow.delete(agent, name)
+        ok("removed #{name} for #{agent}")
+    end
+  end
+
+  defp flow_cmd(["schedule", agent, name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [schedule: :string, timezone: :string, deliver: :string])
+
+    with {:ok, flow} <- flow_or_error(agent, name),
+         {:ok, schedule} <- require_opt(opts, :schedule),
+         {:ok, _} <- Pepe.Cron.parse(schedule) do
+      cron = %Pepe.Config.Cron{
+        id: cron_id(name),
+        name: name,
+        agent: agent,
+        kind: "flow",
+        flow: flow["name"],
+        schedule: schedule,
+        timezone: opts[:timezone] || Config.default_timezone(),
+        deliver: opts[:deliver] || "none",
+        enabled: true
+      }
+
+      Config.put_cron(cron)
+      ok("scheduled flow #{green(name)} for #{agent}: #{green(cron.id)} (#{schedule})")
+    else
+      {:error, :missing, key} -> error("flow schedule needs --#{key}")
+      {:error, :no_such_flow} -> error("no flow #{name} for #{agent} - promote it first")
+      {:error, msg} -> error("invalid --schedule: #{msg}")
+    end
+  end
+
+  defp flow_cmd(["run", agent, name | _]) do
+    case Pepe.Flow.get(agent, name) do
+      nil ->
+        error("no flow #{name} for #{agent}")
+
+      flow ->
+        case Pepe.Flow.run(flow) do
+          {:ok, results} ->
+            ok("ran #{name}: #{length(results)} step(s) completed")
+
+          {:error, reason} ->
+            error("flow stopped: #{describe_flow_error(reason)}")
+        end
+    end
+  end
+
+  defp flow_cmd(_), do: flow_help()
+
+  defp flow_or_error(agent, name) do
+    case Pepe.Flow.get(agent, name) do
+      nil -> {:error, :no_such_flow}
+      flow -> {:ok, flow}
+    end
+  end
+
+  defp flow_help do
+    info("""
+    mix pepe flow - promote a proven, repeated tool-call sequence into a script that
+    replays without calling the model. See lib/pepe/flow.ex's moduledoc for the design.
+
+      list --agent AGENT                              list an agent's flows
+      promote NAME --agent AGENT --from ID1,ID2[,...] [--overwrite]
+                                                         promote 2+ identical traces (see `mix pepe traces`)
+      show AGENT NAME                                   the steps a flow replays
+      remove AGENT NAME
+      run AGENT NAME                                    replay it now
+      schedule AGENT NAME --schedule "..." [--timezone TZ] [--deliver ...]
+                                                         run it on a schedule (a cron of kind "flow")
+
+    A flow only replays a step whose tool is already in the agent's own auto_approve -
+    there is nobody watching a flow run to ask, same as any other unattended surface.
+    """)
+  end
+
+  defp print_flow_line(f) do
+    last = if f["last_run"], do: "#{dim(f["last_result"])} #{dim(local_datetime(f["last_run"]))}", else: dim("never run")
+    puts("  #{bold(f["name"])}  #{dim("#{length(f["steps"])} step(s)")}  #{last}")
+  end
+
+  defp describe_flow_error(:trace_not_found), do: "one of those trace ids doesn't exist"
+  defp describe_flow_error(:unknown_agent), do: "unknown agent"
+  defp describe_flow_error(:already_exists), do: "a flow with that name already exists - pass --overwrite to replace it"
+  defp describe_flow_error(:need_at_least_two_traces), do: "need at least 2 trace ids"
+  defp describe_flow_error(:no_tool_calls), do: "those traces made no tool calls - nothing to promote"
+
+  defp describe_flow_error(:traces_dont_match),
+    do:
+      "those traces didn't make the exact same tool calls, in the same order, with the same arguments - flows only replay identical sequences (see mix pepe flow help)"
+
+  defp describe_flow_error({:denied, tool}), do: "#{tool} isn't in this agent's auto_approve - nobody is here to ask while a flow runs"
+  defp describe_flow_error({:denied, tool, reason}), do: "#{tool} refused: #{reason}"
+  defp describe_flow_error(other), do: inspect(other)
 
   defp clip_line(nil), do: ""
 
