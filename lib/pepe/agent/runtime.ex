@@ -100,6 +100,7 @@ defmodule Pepe.Agent.Runtime do
     # from the caller is how a run is born tainted when its opening message already carries a
     # document.
     Pepe.Permissions.untaint()
+    Pepe.Permissions.clear_run_grants()
     if opts[:untrusted] == true, do: Pepe.Permissions.taint()
 
     # The failover chain: an explicit :model wins (single-entry chain); otherwise the

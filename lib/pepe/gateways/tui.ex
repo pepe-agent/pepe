@@ -139,7 +139,7 @@ defmodule Pepe.Gateways.TUI do
           "\n" <>
           dim(Prompt.scope_note(ctx[:risks] || []))
 
-      case Pepe.TUI.select(Prompt.options(), label: label, render_as: &Prompt.label/1) do
+      case Pepe.TUI.select(Prompt.options(ctx[:tainted] == true), label: label, render_as: &Prompt.label/1) do
         :deny -> maybe_deny_reason()
         decision -> decision
       end

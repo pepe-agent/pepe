@@ -85,7 +85,11 @@ defmodule Pepe.PermissionsTest do
 
   describe "content from a stranger suspends pre-approval" do
     setup do
-      on_exit(fn -> Process.delete(:pepe_untrusted_content) end)
+      on_exit(fn ->
+        Process.delete(:pepe_untrusted_content)
+        Permissions.clear_run_grants()
+      end)
+
       :ok
     end
 
@@ -129,6 +133,69 @@ defmodule Pepe.PermissionsTest do
       # Tainting must not break the agent's ability to *answer* about the document it was
       # sent. Reading is what it is there to do.
       assert Permissions.gate("read_file", "{}", %{agent: %Agent{name: "zak"}}) == :allow
+    end
+
+    test "this_run stops a tainted run from re-asking for every call shaped like one already approved" do
+      agent = %Agent{name: "zak", auto_approve: []}
+      Permissions.taint()
+      asks = :counters.new(1, [])
+
+      ctx = %{
+        agent: agent,
+        authorize: fn _n, _a, _c ->
+          :counters.add(asks, 1, 1)
+          :this_run
+        end
+      }
+
+      # First call: still asks (this_run has not been granted yet).
+      assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
+      assert :counters.get(asks, 1) == 1
+
+      # A second call shaped the same way (same tool, no worse risks) is now covered by the
+      # this_run grant from the first answer - no second ask, still inside the same run.
+      assert Permissions.gate("bash", ~s({"command":"pwd"}), ctx) == :allow
+      assert :counters.get(asks, 1) == 1
+    end
+
+    test "this_run does not cover a genuinely riskier call than the one it was granted for" do
+      agent = %Agent{name: "zak", auto_approve: []}
+      Permissions.taint()
+      test = self()
+      ctx = %{agent: agent, authorize: fn _n, _a, _c -> send(test, :asked) && :this_run end}
+
+      assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
+      assert_received :asked
+
+      # rm -rf flags a delete risk the human never saw when granting this_run for a plain `ls`.
+      assert Permissions.gate("bash", ~s({"command":"rm -rf build"}), ctx) == :allow
+      assert_received :asked
+    end
+
+    test "this_run never survives past the run it was granted in" do
+      agent = %Agent{name: "zak", auto_approve: []}
+      Permissions.taint()
+      ctx = %{agent: agent, authorize: fn _n, _a, _c -> :this_run end}
+
+      assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
+      assert Permissions.run_grants() != []
+
+      # A fresh run clears it - exactly what Pepe.Agent.Runtime.run/3 does alongside untaint/0.
+      Permissions.clear_run_grants()
+      assert Permissions.run_grants() == []
+
+      test = self()
+      ctx2 = %{ctx | authorize: fn _n, _a, _c -> send(test, :asked) && :deny end}
+      Permissions.gate("bash", ~s({"command":"ls"}), ctx2)
+      assert_received :asked
+    end
+
+    test "this_run is never offered (and irrelevant) outside a tainted run - session/always already cover that case" do
+      # Untainted: this_run simply isn't reachable through the gate's own logic, since
+      # preapproved?/2 (session/always) is checked first. Confirms it's purely additive.
+      agent = %Agent{name: "zak", auto_approve: ["bash:none"]}
+      ctx = %{agent: agent, authorize: fn _, _, _ -> flunk("should not ask") end}
+      assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
     end
   end
 

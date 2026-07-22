@@ -178,7 +178,7 @@ defmodule PepeWeb.ChatLive do
                   🔐 {gettext("Allow me to run the")} <code class="text-amber-300">{@pending_perm.tool}</code> {gettext("tool?")}
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <button :for={d <- Prompt.options()} phx-click="perm" phx-value-id={@pending_perm.id} phx-value-decision={Prompt.token(d)} class={btn_ghost()}>
+                  <button :for={d <- Prompt.options(@pending_perm.tainted)} phx-click="perm" phx-value-id={@pending_perm.id} phx-value-decision={Prompt.token(d)} class={btn_ghost()}>
                     {Prompt.label(d)}
                   </button>
                 </div>
@@ -523,8 +523,8 @@ defmodule PepeWeb.ChatLive do
   defp apply_event({:tool_call, name, _args}, socket),
     do: update(socket, :activity, &(&1 ++ [gettext("Running %{tool}", tool: name)]))
 
-  defp apply_event({:permission_request, id, name, requester}, socket),
-    do: assign(socket, pending_perm: %{id: id, tool: name, pid: requester})
+  defp apply_event({:permission_request, id, name, requester, tainted?}, socket),
+    do: assign(socket, pending_perm: %{id: id, tool: name, pid: requester, tainted: tainted?})
 
   defp apply_event({:ask_request, id, question, choices, requester}, socket),
     do: assign(socket, pending_ask: %{id: id, question: question, choices: choices, pid: requester})
@@ -628,14 +628,14 @@ defmodule PepeWeb.ChatLive do
       Phoenix.PubSub.broadcast(Pepe.PubSub, topic, {:session_event, key, event})
     end
 
-    authorize = fn name, _args, _ctx ->
+    authorize = fn name, _args, ctx ->
       id = System.unique_integer([:positive])
       requester = self()
 
       Phoenix.PubSub.broadcast(
         Pepe.PubSub,
         topic,
-        {:session_event, key, {:permission_request, id, name, requester}}
+        {:session_event, key, {:permission_request, id, name, requester, ctx[:tainted] == true}}
       )
 
       receive do

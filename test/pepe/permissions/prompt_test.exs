@@ -10,25 +10,31 @@ defmodule Pepe.Permissions.PromptTest do
   alias Pepe.Permissions.Prompt
   alias Pepe.Permissions.Risk
 
-  test "options/0 offers exactly the four decisions, in display order" do
+  test "options/0 offers exactly the four decisions, in display order, when not tainted" do
     assert Prompt.options() == [:once, :session, :always, :deny]
+    assert Prompt.options(false) == [:once, :session, :always, :deny]
+  end
+
+  test "options/1 with tainted: true inserts this_run, since a session/always tap does nothing until the next run" do
+    assert Prompt.options(true) == [:once, :this_run, :session, :always, :deny]
   end
 
   test "every decision has a label and an outcome, and neither is blank" do
-    for decision <- Prompt.options() do
+    for decision <- Prompt.options(true) do
       assert Prompt.label(decision) != ""
       assert Prompt.outcome(decision) != ""
     end
   end
 
   test "token/1 and from_token/1 round-trip every decision" do
-    for decision <- Prompt.options() do
+    for decision <- Prompt.options(true) do
       assert Prompt.from_token(Prompt.token(decision)) == decision
     end
   end
 
   test "token/1 is a stable, locale-independent string (not the translated label)" do
     assert Prompt.token(:once) == "once"
+    assert Prompt.token(:this_run) == "this_run"
     assert Prompt.token(:session) == "session"
     assert Prompt.token(:always) == "always"
     assert Prompt.token(:deny) == "deny"

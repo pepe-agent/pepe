@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **A tainted run (one that took in an uploaded document, a fetched page, etc.) re-asked for approval on every single risky tool call, even calls shaped exactly like one already approved a moment earlier in that same run** - tapping "Always allow" or "Allow for this session" mid-run silently did nothing until a future run. A new "Allow for the rest of this task" answer actually works for the remainder of the current tainted run, without weakening the protection taint exists for: it only ever covers a decision made *during* that same run, by a human looking at the actual tainted content, and it is gone the instant that run ends.
+
 ### Added
 - **Commitments now live in a local SQLite store (`Pepe.Repo`) instead of `config.json`** - the first of several growing, operational subsystems (watches, board, traces and usage are the planned next ones) moving off a file that used to be rewritten in full on every single write, a cost that only grows as an install sees more real use. Agent/model/channel definitions are unaffected and stay in `config.json`, which remains the right fit there (editable, git-diffable, portable). The public `Pepe.Config` commitment functions are unchanged in name and shape, so nothing that already used them needed to change.
 - **The config journal (`mix pepe config journal`, the dashboard's "Recent changes" panel) now lives in the same SQLite store too**, instead of a `.jsonl` file read and re-decoded in full on every look. A hiccup writing an entry (most notably: the store not being reachable yet) never blocks the config write it was describing - the write already succeeded by the time the journal is touched, and this is a diagnostic trail, not the source of truth.

@@ -1558,10 +1558,10 @@ defmodule Pepe.Gateways.Telegram do
     b = bot()
     t = thread()
 
-    fn name, args, _ctx ->
+    fn name, args, ctx ->
       put_bot(b)
       put_thread(t)
-      request_authorization(chat_id, name, args)
+      request_authorization(chat_id, name, args, ctx[:tainted] == true)
     end
   end
 
@@ -1591,10 +1591,10 @@ defmodule Pepe.Gateways.Telegram do
       end
   end
 
-  defp request_authorization(chat_id, name, args) do
+  defp request_authorization(chat_id, name, args, tainted?) do
     id = System.unique_integer([:positive])
     :ets.insert(@pending, {id, self()})
-    message_id = send_permission_prompt(chat_id, id, name, args)
+    message_id = send_permission_prompt(chat_id, id, name, args, tainted?)
 
     receive do
       {:perm_reply, ^id, decision} -> decision
@@ -1608,14 +1608,14 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp send_permission_prompt(chat_id, id, name, args) do
+  defp send_permission_prompt(chat_id, id, name, args, tainted?) do
     Config.put_locale()
     map = decode_args(args)
     text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map)
 
     # One button per shared decision, rendered as Telegram's inline keyboard.
     buttons =
-      Enum.map(Prompt.options(), fn decision ->
+      Enum.map(Prompt.options(tainted?), fn decision ->
         [%{text: Prompt.label(decision), callback_data: "perm:#{id}:#{Prompt.token(decision)}"}]
       end)
 

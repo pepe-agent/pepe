@@ -15,14 +15,24 @@ defmodule Pepe.Permissions.Prompt do
   alias Pepe.Permissions
 
   @options [:once, :session, :always, :deny]
+  @all_options [:once, :this_run, :session, :always, :deny]
 
-  @doc "The decisions offered to the user, in display order."
-  @spec options() :: [Permissions.decision()]
-  def options, do: @options
+  @doc """
+  The decisions offered to the user, in display order. `:this_run` only appears while the
+  current run is tainted (pass the `:tainted` flag from the call's own `ctx`) - offering it
+  outside a tainted run would just be a confusing synonym for `:session`, since untainted
+  pre-approval already works normally. See `Pepe.Permissions`' moduledoc for why `:this_run`
+  exists at all.
+  """
+  @spec options(boolean()) :: [Permissions.decision()]
+  def options(tainted? \\ false)
+  def options(true), do: @all_options
+  def options(false), do: @options
 
   @doc "The button/menu label for a decision (translated, current locale)."
   @spec label(Permissions.decision()) :: String.t()
   def label(:once), do: gettext("✅ Allow once")
+  def label(:this_run), do: gettext("🔁 Allow for the rest of this task")
   def label(:session), do: gettext("💬 Allow for this session")
   def label(:always), do: gettext("♾️ Always allow")
   def label(:deny), do: gettext("🚫 Don't allow")
@@ -30,13 +40,14 @@ defmodule Pepe.Permissions.Prompt do
   @doc "The confirmation shown after a decision is made (translated)."
   @spec outcome(Permissions.decision()) :: String.t()
   def outcome(:once), do: gettext("✅ Allowed once.")
+  def outcome(:this_run), do: gettext("🔁 Allowed for the rest of this task.")
   def outcome(:session), do: gettext("💬 Allowed for this session.")
   def outcome(:always), do: gettext("♾️ Always allowed.")
   def outcome(:deny), do: gettext("🚫 Not allowed.")
 
   @doc "A short, stable, locale-independent token for a decision (for payloads)."
   @spec token(Permissions.decision()) :: String.t()
-  def token(decision) when decision in @options, do: Atom.to_string(decision)
+  def token(decision) when decision in @all_options, do: Atom.to_string(decision)
 
   @doc """
   Parse a token back into a decision. Unknown tokens map to `:deny` - the safe
@@ -44,6 +55,7 @@ defmodule Pepe.Permissions.Prompt do
   """
   @spec from_token(String.t()) :: Permissions.decision()
   def from_token("once"), do: :once
+  def from_token("this_run"), do: :this_run
   def from_token("session"), do: :session
   def from_token("always"), do: :always
   def from_token(_other), do: :deny
@@ -72,11 +84,11 @@ defmodule Pepe.Permissions.Prompt do
   """
   @spec scope_note([Pepe.Permissions.Risk.kind()]) :: String.t()
   def scope_note([]) do
-    gettext("Allowing for the session or always covers calls like this one, which flag no risk. Anything riskier will ask again.")
+    gettext("Any of these covers calls like this one, which flag no risk. Anything riskier will ask again.")
   end
 
   def scope_note(risks) do
-    gettext("Allowing for the session or always covers %{tool} calls that %{risks}. Anything else it does will ask again.",
+    gettext("Any of these covers %{tool} calls that %{risks}. Anything else it does will ask again.",
       tool: gettext("this tool's"),
       risks: Enum.map_join(risks, ", ", &Pepe.Permissions.Risk.label/1)
     )
