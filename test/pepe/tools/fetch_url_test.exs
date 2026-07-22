@@ -1,7 +1,20 @@
 defmodule Pepe.Tools.FetchUrlTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+  use Mimic
 
   alias Pepe.Tools.FetchUrl
+
+  @html_article """
+  <html><head><title>A Real Article</title></head><body>
+    <nav><a href="/">Home</a></nav>
+    <article><p>#{String.duplicate("This is the actual article content a reader wants. ", 6)}</p></article>
+    <footer>Copyright 2026. Privacy policy.</footer>
+  </body></html>
+  """
+
+  defp stub_response(status, headers, body) do
+    Mimic.stub(Req, :get, fn _url, _opts -> {:ok, %{status: status, headers: headers, body: body}} end)
+  end
 
   test "rejects non-http(s) schemes" do
     assert {:error, msg} = FetchUrl.run(%{"url" => "file:///etc/passwd"}, %{})
@@ -52,5 +65,65 @@ defmodule Pepe.Tools.FetchUrlTest do
     assert {:error, msg} = FetchUrl.run(%{"url" => "http://localhost/"}, %{})
     assert msg =~ "internal/private"
     refute msg =~ "could not resolve"
+  end
+
+  describe "readable-text extraction" do
+    test "an HTML response is reduced to its readable text by default" do
+      stub_response(200, %{"content-type" => ["text/html; charset=utf-8"]}, @html_article)
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/article"}, %{})
+
+      assert out =~ "status=200"
+      assert out =~ "A Real Article"
+      assert out =~ "actual article content"
+      refute out =~ "Copyright"
+      refute out =~ "Home"
+    end
+
+    test "raw: true skips extraction and returns the body untouched" do
+      stub_response(200, %{"content-type" => ["text/html; charset=utf-8"]}, @html_article)
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/article", "raw" => true}, %{})
+
+      assert out =~ "<article>"
+      assert out =~ "<nav>"
+      assert out =~ "Copyright"
+    end
+
+    test "a non-HTML content type is never run through extraction" do
+      stub_response(200, %{"content-type" => ["application/json"]}, ~s({"hello":"world"}))
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/api"}, %{})
+
+      assert out == "status=200\n{\"hello\":\"world\"}"
+    end
+
+    test "a response with no content-type header falls back to the raw body" do
+      stub_response(200, %{}, "plain text, no headers at all")
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/x"}, %{})
+
+      assert out == "status=200\nplain text, no headers at all"
+    end
+
+    test "HTML with nothing extractable (a link list, no real prose) falls back to the raw body" do
+      thin_html = ~s(<html><head><title>t</title></head><body><a href="/1">One</a> <a href="/2">Two</a></body></html>)
+      stub_response(200, %{"content-type" => ["text/html"]}, thin_html)
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/links"}, %{})
+
+      assert out =~ "<html>"
+      assert out =~ "<a href="
+    end
+
+    test "a page over the size cap skips extraction entirely rather than parsing something huge" do
+      huge = "<html><head><title>t</title></head><body><article>" <> String.duplicate("x", 3_000_001) <> "</article></body></html>"
+      stub_response(200, %{"content-type" => ["text/html"]}, huge)
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/huge"}, %{})
+
+      # Never reaches Pepe.Readable at all - just the existing raw+truncate path.
+      assert out =~ "...(truncated)"
+    end
   end
 end

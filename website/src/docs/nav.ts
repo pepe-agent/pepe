@@ -15,7 +15,7 @@ import type { Locale } from "../i18n/ui";
 export const docsNav: { group: string; slugs: string[] }[] = [
   { group: "start", slugs: ["index", "install", "docker", "quickstart"] },
   { group: "configure", slugs: ["models", "agents", "config", "secrets", "billing", "projects"] },
-  { group: "capabilities", slugs: ["skills", "learning", "routing", "delegation", "admin-agents", "browser"] },
+  { group: "capabilities", slugs: ["skills", "learning", "routing", "delegation", "admin-agents", "browser", "fetch-url"] },
   {
     group: "channels",
     slugs: ["channels", "telegram", "voice", "documents", "whatsapp", "slack", "discord", "msteams", "googlechat", "webhooks", "widget"],

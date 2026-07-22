@@ -104,6 +104,11 @@ defmodule Pepe.MixProject do
       {:heroicons, github: "tailwindlabs/heroicons", tag: "v2.2.0", sparse: "optimized", app: false, compile: false, depth: 1},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
+      # HTML parsing for `fetch_url`'s readable-text extraction (Pepe.Readable) - the
+      # actual "readability" hex package pulls in httpoison/hackney (for a URL-fetching
+      # convenience function this never calls) which conflicts with the idna version
+      # already locked here, so this builds the extraction directly on Floki instead.
+      {:floki, "~> 0.36"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0"},
