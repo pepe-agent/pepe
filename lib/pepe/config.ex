@@ -782,6 +782,9 @@ defmodule Pepe.Config do
       project_exists?(slug) ->
         {:error, :already_exists}
 
+      orphaned_repo_data?(slug) ->
+        {:error, :slug_has_orphaned_data}
+
       true ->
         update(&insert_project(&1, generate_project_id(), slug, meta))
         :ok
@@ -972,8 +975,12 @@ defmodule Pepe.Config do
   untouched. Also moves its workspace and usage directories on disk. Free text (prompts,
   descriptions) is never touched.
 
-  Fails on an invalid or already-taken new slug, or an unknown project. Best done while idle: any
-  in-flight session keyed by an old handle simply finishes; new requests use the new handle.
+  Fails on an invalid or already-taken new slug, or an unknown project. Also fails if the new
+  slug still has retained usage/message/trace history from a *different*, already-deleted
+  project (`delete_project/2` never purges that data - see its own moduledoc): renaming into
+  it would silently merge two unrelated tenants' billing and conversation history under one
+  name, with no way to tell them apart afterward. Best done while idle: any in-flight session
+  keyed by an old handle simply finishes; new requests use the new handle.
   """
   def rename_project(id_or_slug, new_slug) do
     project = get_project(id_or_slug)
@@ -989,8 +996,19 @@ defmodule Pepe.Config do
       is_nil(project) -> {:error, :not_found}
       old == new_slug -> :ok
       not is_nil(other) and other["id"] != project["id"] -> {:error, :already_exists}
+      old != new_slug and orphaned_repo_data?(new_slug) -> {:error, :slug_has_orphaned_data}
       true -> do_rename_project(old, new_slug)
     end
+  end
+
+  # A slug with no live project can still carry real Pepe.Repo data: delete_project/2
+  # deliberately never purges usage/message/trace history (an audit trail), so a deleted
+  # project's billing and conversation history can sit there indefinitely, waiting to be
+  # silently adopted by whatever gets renamed into that slug next.
+  defp orphaned_repo_data?(slug) do
+    Pepe.Usage.Log.any_for_project?(slug) or
+      Pepe.Usage.Messages.any_for_project?(slug) or
+      Pepe.Trace.any_for_scope?(slug)
   end
 
   defp do_rename_project(old, new) do

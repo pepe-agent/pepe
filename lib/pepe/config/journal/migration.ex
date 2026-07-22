@@ -18,6 +18,13 @@ defmodule Pepe.Config.Journal.Migration do
   alias Pepe.Config.Journal.Entry
   alias Pepe.Repo
 
+  # Comfortably under SQLite's ?1..?32766 bind-parameter ceiling for this schema's 4
+  # columns - a single unchunked insert_all on a real journal history can hit that limit
+  # (confirmed empirically: it raises "variable number must be between ?1 and ?32766",
+  # not a graceful error), which would make this importer unusable for exactly the
+  # installs with the most history to bring over.
+  @chunk_size 1000
+
   @type report :: %{imported: non_neg_integer(), failed: [term()]} | {:error, :not_empty}
 
   @doc "Import every line of the legacy config journal file, if the table is still empty."
@@ -40,7 +47,7 @@ defmodule Pepe.Config.Journal.Migration do
           |> Enum.split_with(&match?({:ok, _}, &1))
 
         rows = Enum.map(rows, fn {:ok, row} -> row end)
-        if rows != [], do: Repo.insert_all(Entry, rows)
+        if rows != [], do: rows |> Enum.chunk_every(@chunk_size) |> Enum.each(&Repo.insert_all(Entry, &1))
 
         %{imported: length(rows), failed: Enum.map(failed, fn {:error, reason} -> reason end)}
 
@@ -50,7 +57,8 @@ defmodule Pepe.Config.Journal.Migration do
   end
 
   defp decode_line(line) do
-    with {:ok, %{"at" => at, "source" => source, "changed" => changed} = map} <- Jason.decode(line) do
+    with {:ok, %{"at" => at, "source" => source} = map} when is_integer(at) and is_binary(source) <- Jason.decode(line) do
+      changed = if is_list(map["changed"]), do: map["changed"], else: []
       {:ok, %{at: at, source: source, changed: changed, external: map["external"] == true}}
     else
       _ -> {:error, {:malformed_line, line}}

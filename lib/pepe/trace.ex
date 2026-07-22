@@ -148,6 +148,20 @@ defmodule Pepe.Trace do
     :ok
   end
 
+  @doc """
+  Whether `scope` has any traces at all, ever - see
+  `Pepe.Usage.Log.any_for_project?/1`'s moduledoc for why `Pepe.Config.rename_project/2`
+  checks this against the new slug before renaming. Traces carry real conversation
+  content (prompts, tool arguments/results), so this matters even more here than for the
+  aggregate usage/message counters - a merge would mix one tenant's actual transcripts
+  into another's history, not just a number.
+  """
+  @spec any_for_scope?(String.t() | nil) :: boolean()
+  def any_for_scope?(scope) do
+    name = scope_name(scope)
+    from(t in Entry, where: t.scope == ^name) |> Repo.exists?()
+  end
+
   @doc "Scopes (projects + root) that have any recorded trace."
   def scopes do
     from(t in Entry, distinct: true, select: t.scope, order_by: t.scope) |> Repo.all()

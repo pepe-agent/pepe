@@ -2249,8 +2249,8 @@ msgstr ""
 " MCP (Sentry, GitHub, ...). Mantenha segredos seguros escrevendo tokens como"
 " ${ENV_VAR}."
 
-#: lib/pepe_web/live/projects_live.ex:410
-#: lib/pepe_web/live/projects_live.ex:440
+#: lib/pepe_web/live/projects_live.ex:418
+#: lib/pepe_web/live/projects_live.ex:456
 #, elixir-autogen, elixir-format
 msgid "Invalid name. Use letters, digits, - and _."
 msgstr "Nome inválido. Use letras, dígitos, - e _."
@@ -3961,7 +3961,7 @@ msgstr "Digite os números que quer marcar (ex: 1 3) e tecle Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:3422
+#: lib/mix/tasks/pepe.ex:3447
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -3981,17 +3981,17 @@ msgstr "n = próxima página  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:3236
+#: lib/mix/tasks/pepe.ex:3261
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (pode usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:3237
+#: lib/mix/tasks/pepe.ex:3262
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:3245
+#: lib/mix/tasks/pepe.ex:3270
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -4558,12 +4558,12 @@ msgstr "Projeto %{name} criado."
 msgid "Project %{name} removed."
 msgstr "Projeto %{name} removido."
 
-#: lib/pepe_web/live/projects_live.ex:447
+#: lib/pepe_web/live/projects_live.ex:463
 #, elixir-autogen, elixir-format
 msgid "Project %{name} updated."
 msgstr "Projeto %{name} atualizado."
 
-#: lib/pepe_web/live/projects_live.ex:448
+#: lib/pepe_web/live/projects_live.ex:464
 #, elixir-autogen, elixir-format
 msgid "Project %{old} renamed to %{new}."
 msgstr "Projeto %{old} renomeado para %{new}."
@@ -4589,7 +4589,7 @@ msgid "That agent is not in the chosen project."
 msgstr "Esse agente não está no projeto escolhido."
 
 #: lib/pepe_web/live/projects_live.ex:407
-#: lib/pepe_web/live/projects_live.ex:437
+#: lib/pepe_web/live/projects_live.ex:445
 #, elixir-autogen, elixir-format
 msgid "That project already exists."
 msgstr "Esse projeto já existe."
@@ -5017,7 +5017,7 @@ msgstr "Board"
 msgid "Board created."
 msgstr "Board criado."
 
-#: lib/pepe_web/live/board_live.ex:330
+#: lib/pepe_web/live/board_live.ex:327
 #, elixir-autogen, elixir-format
 msgid "Card created."
 msgstr "Card criado."
@@ -5032,12 +5032,7 @@ msgstr "Reivindicar"
 msgid "Claim timeout (seconds)"
 msgstr "Tempo limite de reivindicação (segundos)"
 
-#: lib/pepe_web/live/board_live.ex:285
-#, elixir-autogen, elixir-format
-msgid "Could not create the board."
-msgstr "Não foi possível criar o board."
-
-#: lib/pepe_web/live/board_live.ex:333
+#: lib/pepe_web/live/board_live.ex:330
 #, elixir-autogen, elixir-format
 msgid "Could not create the card."
 msgstr "Não foi possível criar o card."
@@ -5280,7 +5275,7 @@ msgstr "Cards de tarefa duráveis com dependências, reivindicados e trabalhados
 msgid "Everything the assignee needs to know: this is all it gets, no chat memory."
 msgstr "Tudo que o responsável precisa saber: é só isso que ele recebe, sem memória de chat."
 
-#: lib/pepe_web/live/board_live.ex:303
+#: lib/pepe_web/live/board_live.ex:300
 #, elixir-autogen, elixir-format
 msgid "This board has %{n} card(s). Delete them first."
 msgstr "Este board tem %{n} card(s). Exclua-os primeiro."
@@ -5437,27 +5432,33 @@ msgstr "Ainda falta uma data clara, ex: \"amanhã\" ou \"sexta\"."
 msgid "e.g. \"tomorrow\", \"Friday\""
 msgstr "ex: \"amanhã\", \"sexta\""
 
-#: lib/pepe/commitments/scheduler.ex:146
+#: lib/pepe/commitments/scheduler.ex:143
 #, elixir-autogen, elixir-format
 msgid "(couldn't follow up on \"%{text}\": %{reason})"
 msgstr "(não consegui dar retorno sobre \"%{text}\": %{reason})"
 
-#: lib/pepe/commitments/scheduler.ex:154
+#: lib/pepe/commitments/scheduler.ex:151
 #, elixir-autogen, elixir-format
 msgid "(couldn't follow up on \"%{text}\": no conversation to resume)"
 msgstr "(não consegui dar retorno sobre \"%{text}\": não há conversa para retomar)"
 
-#: lib/pepe/commitments/scheduler.ex:150
+#: lib/pepe/commitments/scheduler.ex:147
 #, elixir-autogen, elixir-format
 msgid "(couldn't follow up on \"%{text}\": the conversation is gone)"
 msgstr "(não consegui dar retorno sobre \"%{text}\": a conversa não existe mais)"
 
-#: lib/pepe/agent/commitment_extract.ex:199
+#: lib/pepe/agent/commitment_extract.ex:196
 #, elixir-autogen, elixir-format
 msgid "Did you want me to remember this: \"%{text}\" (due %{when_text})? Say yes to confirm, or ignore to let it drop."
 msgstr "Você queria que eu lembrasse disto: \"%{text}\" (previsto para %{when_text})? Diga sim para confirmar, ou ignore para deixar cair."
 
-#: lib/pepe/agent/commitment_extract.ex:195
+#: lib/pepe/agent/commitment_extract.ex:192
 #, elixir-autogen, elixir-format
 msgid "an unclear time"
 msgstr "um horário indefinido"
+
+#: lib/pepe_web/live/projects_live.ex:414
+#: lib/pepe_web/live/projects_live.ex:452
+#, elixir-autogen, elixir-format
+msgid "That name still has usage/message/trace history from a different, deleted project. Pick another name."
+msgstr "Esse nome ainda tem histórico de uso/mensagens/traces de um projeto diferente, já excluído. Escolha outro nome."

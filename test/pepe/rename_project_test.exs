@@ -43,6 +43,27 @@ defmodule Pepe.RenameProjectTest do
     assert Config.rename_project("acme", "acme") == :ok
   end
 
+  # delete_project/2 never purges usage/message/trace history (it's an audit trail) - so a
+  # deleted project's billing/conversation history can sit under its old slug indefinitely.
+  # Renaming a *different*, live project into that same slug must not silently adopt it.
+  test "refuses to rename into a slug that still has orphaned usage/message/trace history" do
+    Config.add_project("acme")
+    Config.add_project("beta")
+    Pepe.Usage.Log.append("beta", %{"at" => 1, "agent" => "beta/x", "model" => "m", "in" => 10, "out" => 5})
+    Config.delete_project("beta", force: true)
+
+    assert Config.rename_project("acme", "beta") == {:error, :slug_has_orphaned_data}
+    # acme is untouched - still there under its own name, nothing merged.
+    assert Config.get_project("acme")
+  end
+
+  test "renaming a project back onto its own current slug is still a no-op, even with its own history" do
+    Config.add_project("acme")
+    Pepe.Usage.Log.append("acme", %{"at" => 1, "agent" => "acme/x", "model" => "m", "in" => 10, "out" => 5})
+
+    assert Config.rename_project("acme", "acme") == :ok
+  end
+
   test "re-keys the project, its agents, models and routes" do
     seed()
     assert Config.rename_project("acme", "umbrella") == :ok

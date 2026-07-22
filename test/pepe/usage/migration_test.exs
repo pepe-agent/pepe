@@ -90,13 +90,54 @@ defmodule Pepe.Usage.MigrationTest do
     assert report.message_events == %{imported: 1, failed: []}
   end
 
-  test "a malformed legacy file is reported, the well-formed ones still import" do
+  test "a malformed legacy file blocks the whole import - all or nothing, not a partial commit" do
+    # If a good file's rows committed while a bad file's were skipped, the bad file's month
+    # could never be retried afterward (a re-run refuses against a non-empty table) - so
+    # nothing at all is inserted until every file reads clean.
     write_legacy_usage("acme", "2026-07.jsonl", [%{"at" => 1, "agent" => "a", "model" => "m", "in" => 1, "out" => 1}])
     File.write!(Path.join(Log.scope_dir("acme"), "bad.jsonl"), "not even json\n")
 
     report = Migration.run()
 
-    assert report.usage_entries.imported == 1
+    assert report.usage_entries.imported == 0
     assert [{_path, _reason}] = report.usage_entries.failed
+    assert Repo.all(Entry) == []
+    # Nothing committed, so a re-run (after the operator fixes/removes the bad file) can
+    # still succeed - the table is still empty.
+    assert Repo.aggregate(Entry, :count) == 0
+  end
+
+  test "a row that can't satisfy a NOT NULL column rolls the whole import back, not a partial crash" do
+    write_legacy_usage("acme", "2026-07.jsonl", [
+      %{"at" => 1, "agent" => "a", "model" => "m", "in" => 1, "out" => 1},
+      %{"agent" => "a", "model" => "m", "in" => 1, "out" => 1}
+    ])
+
+    report = Migration.run()
+
+    assert report.usage_entries.imported == 0
+    assert [_reason] = report.usage_entries.failed
+    assert Repo.all(Entry) == []
+  end
+
+  test "a legacy row missing in/out coerces to 0, same tolerance the live write path has" do
+    write_legacy_usage("acme", "2026-07.jsonl", [%{"at" => 1, "agent" => "a", "model" => "m"}])
+
+    report = Migration.run()
+
+    assert report.usage_entries == %{imported: 1, failed: []}
+    assert [%Entry{in: 0, out: 0}] = Repo.all(Entry)
+  end
+
+  test "importing a large ledger (past SQLite's bind-parameter ceiling) still works" do
+    # usage_entries has 8 columns; a single unchunked insert_all hits SQLite's ?1..?32766
+    # ceiling well under 5000 rows (confirmed empirically at ~4095) - this pins the fix.
+    lines = for i <- 1..5000, do: %{"at" => i, "agent" => "a", "model" => "m", "in" => 1, "out" => 1}
+    write_legacy_usage("acme", "2026-07.jsonl", lines)
+
+    report = Migration.run()
+
+    assert report.usage_entries == %{imported: 5000, failed: []}
+    assert Repo.aggregate(Entry, :count) == 5000
   end
 end

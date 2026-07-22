@@ -2197,8 +2197,8 @@ msgstr ""
 msgid "Give agents extra abilities from external tool servers like MCP (Sentry, GitHub, ...). Keep secrets safe by writing tokens as ${ENV_VAR}."
 msgstr ""
 
-#: lib/pepe_web/live/projects_live.ex:410
-#: lib/pepe_web/live/projects_live.ex:440
+#: lib/pepe_web/live/projects_live.ex:418
+#: lib/pepe_web/live/projects_live.ex:456
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Invalid name. Use letters, digits, - and _."
 msgstr ""
@@ -3796,7 +3796,7 @@ msgstr ""
 msgid "empty Enter to finish"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:3422
+#: lib/mix/tasks/pepe.ex:3447
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr ""
@@ -3816,17 +3816,17 @@ msgstr ""
 msgid "page %{page}/%{pages}"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:3236
+#: lib/mix/tasks/pepe.ex:3261
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:3237
+#: lib/mix/tasks/pepe.ex:3262
 #, elixir-autogen, elixir-format, fuzzy
 msgid " (optional)"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:3245
+#: lib/mix/tasks/pepe.ex:3270
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -4348,12 +4348,12 @@ msgstr ""
 msgid "Project %{name} removed."
 msgstr ""
 
-#: lib/pepe_web/live/projects_live.ex:447
+#: lib/pepe_web/live/projects_live.ex:463
 #, elixir-autogen, elixir-format
 msgid "Project %{name} updated."
 msgstr ""
 
-#: lib/pepe_web/live/projects_live.ex:448
+#: lib/pepe_web/live/projects_live.ex:464
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Project %{old} renamed to %{new}."
 msgstr ""
@@ -4375,7 +4375,7 @@ msgid "That agent is not in the chosen project."
 msgstr "That agent is not in the chosen company."
 
 #: lib/pepe_web/live/projects_live.ex:407
-#: lib/pepe_web/live/projects_live.ex:437
+#: lib/pepe_web/live/projects_live.ex:445
 #, elixir-autogen, elixir-format, fuzzy
 msgid "That project already exists."
 msgstr ""
@@ -4780,7 +4780,7 @@ msgstr ""
 msgid "Board created."
 msgstr ""
 
-#: lib/pepe_web/live/board_live.ex:330
+#: lib/pepe_web/live/board_live.ex:327
 #, elixir-autogen, elixir-format
 msgid "Card created."
 msgstr ""
@@ -4795,12 +4795,7 @@ msgstr ""
 msgid "Claim timeout (seconds)"
 msgstr ""
 
-#: lib/pepe_web/live/board_live.ex:285
-#, elixir-autogen, elixir-format, fuzzy
-msgid "Could not create the board."
-msgstr ""
-
-#: lib/pepe_web/live/board_live.ex:333
+#: lib/pepe_web/live/board_live.ex:330
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Could not create the card."
 msgstr ""
@@ -5043,7 +5038,7 @@ msgstr ""
 msgid "Everything the assignee needs to know: this is all it gets, no chat memory."
 msgstr ""
 
-#: lib/pepe_web/live/board_live.ex:303
+#: lib/pepe_web/live/board_live.ex:300
 #, elixir-autogen, elixir-format
 msgid "This board has %{n} card(s). Delete them first."
 msgstr ""
@@ -5200,27 +5195,33 @@ msgstr ""
 msgid "e.g. \"tomorrow\", \"Friday\""
 msgstr ""
 
-#: lib/pepe/commitments/scheduler.ex:146
+#: lib/pepe/commitments/scheduler.ex:143
 #, elixir-autogen, elixir-format
 msgid "(couldn't follow up on \"%{text}\": %{reason})"
 msgstr ""
 
-#: lib/pepe/commitments/scheduler.ex:154
+#: lib/pepe/commitments/scheduler.ex:151
 #, elixir-autogen, elixir-format
 msgid "(couldn't follow up on \"%{text}\": no conversation to resume)"
 msgstr ""
 
-#: lib/pepe/commitments/scheduler.ex:150
+#: lib/pepe/commitments/scheduler.ex:147
 #, elixir-autogen, elixir-format
 msgid "(couldn't follow up on \"%{text}\": the conversation is gone)"
 msgstr ""
 
-#: lib/pepe/agent/commitment_extract.ex:199
+#: lib/pepe/agent/commitment_extract.ex:196
 #, elixir-autogen, elixir-format
 msgid "Did you want me to remember this: \"%{text}\" (due %{when_text})? Say yes to confirm, or ignore to let it drop."
 msgstr ""
 
-#: lib/pepe/agent/commitment_extract.ex:195
+#: lib/pepe/agent/commitment_extract.ex:192
 #, elixir-autogen, elixir-format
 msgid "an unclear time"
+msgstr ""
+
+#: lib/pepe_web/live/projects_live.ex:414
+#: lib/pepe_web/live/projects_live.ex:452
+#, elixir-autogen, elixir-format
+msgid "That name still has usage/message/trace history from a different, deleted project. Pick another name."
 msgstr ""

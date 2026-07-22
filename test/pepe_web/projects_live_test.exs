@@ -154,6 +154,21 @@ defmodule PepeWeb.ProjectsLiveTest do
     assert Config.project_slugs() == ["acme", "globex"]
   end
 
+  test "renaming onto a slug with orphaned history from a different, deleted project is refused" do
+    :ok = Config.add_project("acme")
+    :ok = Config.add_project("beta")
+    Pepe.Usage.Log.append("beta", %{"at" => 1, "agent" => "beta/x", "model" => "m", "in" => 10, "out" => 5})
+    Config.delete_project("beta", force: true)
+
+    {:ok, view, _html} = live(conn(), "/projects")
+
+    render_click(view, "project_edit", %{"name" => "acme"})
+    html = save(view, %{"name" => "beta"})
+
+    assert html =~ "still has usage/message/trace history"
+    assert Config.project_slugs() == ["acme"]
+  end
+
   test "editing a project updates its metadata without renaming it" do
     :ok = Config.add_project("acme")
 

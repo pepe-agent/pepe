@@ -64,6 +64,19 @@ defmodule Pepe.Usage.Log do
     :ok
   end
 
+  @doc """
+  Whether `project` has any usage entries at all, ever - `Pepe.Config.rename_project/2`
+  checks this against the *new* slug before renaming, so a rename can't silently merge a
+  live project's future entries with a different, already-deleted project's retained
+  billing history sitting under that same slug (`delete_project/2` never purges usage
+  data - see its own moduledoc).
+  """
+  @spec any_for_project?(String.t() | nil) :: boolean()
+  def any_for_project?(scope) do
+    name = scope_name(scope)
+    from(e in Entry, where: e.project == ^name) |> Repo.exists?()
+  end
+
   @doc "Scopes (projects + root) that have any recorded usage."
   def scopes do
     from(e in Entry, distinct: true, select: e.project, order_by: e.project) |> Repo.all()

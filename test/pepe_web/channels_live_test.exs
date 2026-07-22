@@ -16,6 +16,7 @@ defmodule PepeWeb.ChannelsLiveTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_agent(%Agent{name: "assistant"})
     Config.put_agent(%Agent{name: "sales"})

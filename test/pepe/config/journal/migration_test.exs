@@ -79,4 +79,32 @@ defmodule Pepe.Config.Journal.MigrationTest do
     assert report.imported == 1
     assert [{:malformed_line, "not even json"}] = report.failed
   end
+
+  test "a line missing at/source, or with the wrong type for either, is reported instead of crashing at insert", %{
+    home: home
+  } do
+    write_legacy_file(home, [
+      %{"at" => 1, "source" => "cli", "changed" => [], "external" => false},
+      %{"source" => "cli", "changed" => []},
+      %{"at" => "not-a-number", "source" => "cli", "changed" => []},
+      %{"at" => 2, "source" => nil, "changed" => []}
+    ])
+
+    report = Migration.run()
+
+    assert report.imported == 1
+    assert length(report.failed) == 3
+  end
+
+  test "importing a large journal (past SQLite's bind-parameter ceiling) still works", %{home: home} do
+    # This schema has 4 columns; a single unchunked insert_all hits SQLite's ?1..?32766
+    # ceiling well under 10000 rows - this pins the fix.
+    lines = for i <- 1..10_000, do: %{"at" => i, "source" => "cli", "changed" => ["agents"], "external" => false}
+    write_legacy_file(home, lines)
+
+    report = Migration.run()
+
+    assert report == %{imported: 10_000, failed: []}
+    assert Repo.aggregate(Entry, :count) == 10_000
+  end
 end

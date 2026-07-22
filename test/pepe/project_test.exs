@@ -111,6 +111,32 @@ defmodule Pepe.ProjectTest do
       # The automation of the deleted project's agent is gone; the unrelated one survives.
       assert Enum.map(Config.crons(), & &1.id) == ["c2"]
     end
+
+    test "delete_project/2 never purges usage/message/trace history - it's an audit trail" do
+      Config.add_project("acme")
+      Pepe.Usage.Log.append("acme", %{"at" => 1, "agent" => "acme/vendas", "model" => "m", "in" => 10, "out" => 5})
+      Pepe.Usage.Messages.record("acme")
+      assert Pepe.Trace.start("acme/vendas", nil) == :started
+      Pepe.Trace.finish({:ok, "done", []})
+
+      assert :ok = Config.delete_project("acme", force: true)
+
+      assert Pepe.Usage.Log.any_for_project?("acme")
+      assert Pepe.Usage.Messages.any_for_project?("acme")
+      assert Pepe.Trace.any_for_scope?("acme")
+    end
+
+    test "add_project/2 refuses a slug with orphaned data from a different, deleted project" do
+      Config.add_project("acme")
+      Pepe.Usage.Log.append("acme", %{"at" => 1, "agent" => "acme/vendas", "model" => "m", "in" => 10, "out" => 5})
+      Config.delete_project("acme", force: true)
+
+      assert {:error, :slug_has_orphaned_data} = Config.add_project("acme")
+    end
+
+    test "add_project/2 still works on a slug with no orphaned data" do
+      assert :ok = Config.add_project("brand-new")
+    end
   end
 
   describe "deleting an agent clears its bound automations" do

@@ -40,6 +40,17 @@ defmodule Pepe.Usage.Messages do
     :ok
   end
 
+  @doc """
+  Whether `project` has any message events at all, ever - see
+  `Pepe.Usage.Log.any_for_project?/1`'s moduledoc for why `Pepe.Config.rename_project/2`
+  checks this against the new slug before renaming.
+  """
+  @spec any_for_project?(String.t() | nil) :: boolean()
+  def any_for_project?(scope) do
+    name = scope_name(scope)
+    from(m in MessageEvent, where: m.project == ^name) |> Repo.exists?()
+  end
+
   @doc "Record one customer-originated message for `project` (`nil` counts against root)."
   @spec record(String.t() | nil) :: :ok
   def record(project), do: insert(project, false)

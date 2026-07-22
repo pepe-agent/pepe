@@ -406,6 +406,14 @@ defmodule PepeWeb.ProjectsLive do
       {:error, :already_exists} ->
         {:noreply, put_flash(socket, :error, gettext("That project already exists."))}
 
+      {:error, :slug_has_orphaned_data} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("That name still has usage/message/trace history from a different, deleted project. Pick another name.")
+         )}
+
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Invalid name. Use letters, digits, - and _."))}
     end
@@ -435,6 +443,14 @@ defmodule PepeWeb.ProjectsLive do
 
       {:error, :already_exists} ->
         {:noreply, put_flash(socket, :error, gettext("That project already exists."))}
+
+      {:error, :slug_has_orphaned_data} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("That name still has usage/message/trace history from a different, deleted project. Pick another name.")
+         )}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, gettext("Invalid name. Use letters, digits, - and _."))}

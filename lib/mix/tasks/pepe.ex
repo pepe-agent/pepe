@@ -1504,6 +1504,12 @@ defmodule Mix.Tasks.Pepe do
 
       {:error, :already_exists} ->
         error("project #{name} already exists")
+
+      {:error, :slug_has_orphaned_data} ->
+        error(
+          "#{name} still has usage/message/trace history from a different, already-deleted " <>
+            "project - creating a project here would merge the two. Pick another name."
+        )
     end
   end
 
@@ -1612,6 +1618,12 @@ defmodule Mix.Tasks.Pepe do
 
       {:error, :invalid_slug} ->
         error("invalid name #{inspect(new)} - use letters, digits, - and _ only")
+
+      {:error, :slug_has_orphaned_data} ->
+        error(
+          "#{new} still has usage/message/trace history from a different, already-deleted " <>
+            "project - renaming into it would merge the two. Pick another name."
+        )
     end
   end
 
