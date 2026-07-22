@@ -196,7 +196,10 @@ defmodule Pepe.Tools.BoardTest do
       assert out =~ "heartbeat recorded"
       refreshed = Config.get_board_card(card.id)
       assert refreshed.status == "running"
-      assert refreshed.claimed_at > stale_at
+      # claimed_at is the claim's identity token (block_if_still_running/3's ABA guard) -
+      # a heartbeat must not move it; only the separate heartbeated_at column does.
+      assert refreshed.claimed_at == stale_at
+      assert refreshed.heartbeated_at > stale_at
     end
 
     test "heartbeat infers card_id from a dispatched session, same as complete/block/comment" do

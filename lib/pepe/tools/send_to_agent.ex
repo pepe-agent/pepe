@@ -128,7 +128,7 @@ defmodule Pepe.Tools.SendToAgent do
           untrusted: Pepe.Permissions.tainted?(ctx)
         ]
 
-        case Runtime.converse(agent, prompt, opts) do
+        case run_nested(agent, prompt, opts) do
           {:ok, reply, _msgs} ->
             {:ok,
              "#{to} replied:\n#{reply}\n\n(One-off consult only: you're still the one talking to the user. Don't say this connected them to #{to} or that #{to} is handling the conversation now.)"}
@@ -136,6 +136,23 @@ defmodule Pepe.Tools.SendToAgent do
           {:error, reason} ->
             {:error, "#{to} could not reply: #{inspect(reason)}"}
         end
+    end
+  end
+
+  # Runtime.converse/3 runs the nested turn in THIS process (send_to_agent has no
+  # concurrent?/0 - it answers inline, not by fanning out into a Task), and
+  # Runtime.run/3 unconditionally resets both the taint flag and :this_run grants at the
+  # start of every run - correct for a genuinely fresh top-level run, but wrong here: it
+  # would wipe out whatever this (the calling run's) process dictionary was already
+  # holding, and anything the nested run itself adds would otherwise leak into the
+  # calling run's remaining turn once this returns. See Pepe.Permissions.snapshot/0.
+  defp run_nested(agent, prompt, opts) do
+    snapshot = Pepe.Permissions.snapshot()
+
+    try do
+      Runtime.converse(agent, prompt, opts)
+    after
+      Pepe.Permissions.restore(snapshot)
     end
   end
 end

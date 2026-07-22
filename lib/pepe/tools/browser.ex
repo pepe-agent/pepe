@@ -73,13 +73,19 @@ defmodule Pepe.Tools.Browser do
 
   defp dispatch("snapshot", _args, key), do: Browser.snapshot(key)
 
-  defp dispatch("click", %{"ref" => ref}, key), do: Browser.click(key, ref)
+  defp dispatch("click", %{"ref" => ref}, key) when is_integer(ref), do: Browser.click(key, ref)
+  defp dispatch("click", %{"ref" => _ref}, _key), do: {:error, "ref must be an integer"}
   defp dispatch("click", _args, _key), do: {:error, "click needs a `ref`"}
 
-  defp dispatch("type", %{"ref" => ref, "text" => text}, key), do: Browser.type(key, ref, text)
+  defp dispatch("type", %{"ref" => ref, "text" => text}, key) when is_integer(ref), do: Browser.type(key, ref, text)
+  defp dispatch("type", %{"ref" => _ref, "text" => _text}, _key), do: {:error, "ref must be an integer"}
   defp dispatch("type", _args, _key), do: {:error, "type needs a `ref` and `text`"}
 
-  defp dispatch("press", %{"key" => key_name} = args, key), do: Browser.press(key, args["ref"], key_name)
+  defp dispatch("press", %{"key" => key_name, "ref" => ref}, key) when is_integer(ref) or is_nil(ref),
+    do: Browser.press(key, ref, key_name)
+
+  defp dispatch("press", %{"key" => _key_name, "ref" => _ref}, _key), do: {:error, "ref must be an integer"}
+  defp dispatch("press", %{"key" => key_name}, key), do: Browser.press(key, nil, key_name)
   defp dispatch("press", _args, _key), do: {:error, "press needs a `key`"}
 
   defp dispatch("close", _args, key), do: Browser.close(key)

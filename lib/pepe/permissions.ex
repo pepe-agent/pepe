@@ -112,7 +112,8 @@ defmodule Pepe.Permissions do
   """
   @spec gate(String.t(), term(), map()) :: :allow | :deny | {:deny, String.t()}
   def gate(name, args, ctx) do
-    risks = Risk.hints(name, decode(args))
+    decoded = decode(args)
+    risks = Risk.hints(name, decoded)
 
     cond do
       # Always-safe, but only while it carries no risk. `read_file`/`list_dir` are free inside
@@ -125,7 +126,7 @@ defmodule Pepe.Permissions do
       # for a grant the human handed out *during this same tainted run* (`:this_run`, see the
       # moduledoc), which is the one kind of pre-approval taint does not need to suspend.
       tainted?(ctx) -> if run_scoped?(name, risks), do: :allow, else: ask(name, args, risks, ctx)
-      interactive_and_risk_free?(name, risks, ctx) -> :allow
+      interactive_and_risk_free?(name, decoded, risks, ctx) -> :allow
       preapproved?(name, risks, ctx) -> :allow
       true -> ask(name, args, risks, ctx)
     end
@@ -175,6 +176,29 @@ defmodule Pepe.Permissions do
   end
 
   @doc """
+  Snapshot this process's taint flag and `:this_run` grants, to restore afterward with
+  `restore/1` around an in-process nested `Pepe.Agent.Runtime` call - the way
+  `Pepe.Tools.SendToAgent` answers inline (in the calling run's own process, not a Task,
+  since it isn't `concurrent?/0`) rather than fanning out. `Runtime.run/3` unconditionally
+  resets both at the start of *every* run - correct for a genuinely fresh top-level run (a
+  new process per gateway call), but wrong for a nested one: without this, it would wipe
+  out whatever the outer, still-in-progress run's process dictionary was holding, and
+  anything the nested run itself adds (its own `:this_run` grants, a taint it picks up from
+  its own tool calls) would otherwise leak into the outer run's remaining turn once the
+  nested call returns.
+  """
+  @spec snapshot() :: {boolean(), [String.t()]}
+  def snapshot, do: {tainted?(%{}), run_grants()}
+
+  @doc "Restore a snapshot taken by snapshot/0."
+  @spec restore({boolean(), [String.t()]}) :: :ok
+  def restore({tainted?, grants}) do
+    if tainted?, do: taint(), else: untaint()
+    Process.put(@run_grants, grants)
+    :ok
+  end
+
+  @doc """
   Has this run taken in content from outside, in a way that should withdraw pre-approval?
 
   An agent with `trust_untrusted_content` set has been deliberately trusted to act on what
@@ -214,10 +238,21 @@ defmodule Pepe.Permissions do
 
   # A human is "on the line" exactly when there's a real authorize callback to answer to -
   # the same test `ask/4` itself uses to tell an interactive surface from an unattended one.
-  defp interactive_and_risk_free?(name, [], ctx),
-    do: name in @ask_free_when_interactive and is_function(ctx[:authorize], 3)
+  defp interactive_and_risk_free?(name, args, [], ctx),
+    do: name in @ask_free_when_interactive and command_classifiable?(name, args) and is_function(ctx[:authorize], 3)
 
-  defp interactive_and_risk_free?(_name, _risks, _ctx), do: false
+  defp interactive_and_risk_free?(_name, _args, _risks, _ctx), do: false
+
+  # `risks == []` here means "Pepe.Permissions.Risk's command-text heuristic found nothing" -
+  # and that heuristic is written for shell syntax. For `bash` that's always true. For
+  # `run_script`, it's only true when the resolved interpreter is actually a shell (`bash`/
+  # `sh`); a python/node/ruby/elixir one-liner can delete files or open a socket without
+  # tripping a single regex written for `rm`/`curl`/`sudo`, so an empty `risks` list there
+  # means "the classifier couldn't read this," not "this is safe" - the free pass must not
+  # extend to it, and it falls through to `preapproved?`/`ask` like anything else unclassified.
+  defp command_classifiable?("bash", _args), do: true
+  defp command_classifiable?("run_script", args), do: Pepe.Tools.RunScript.resolved_bin(args) in ["bash", "sh"]
+  defp command_classifiable?(_name, _args), do: true
 
   # Pre-approved either persistently (on the agent) or for this session - and approved for
   # *this* call, not merely for a tool of the same name (see Pepe.Permissions.Grant).
@@ -279,9 +314,20 @@ defmodule Pepe.Permissions do
     :session
   end
 
-  defp remember(:this_run, name, risks, _ctx) do
-    add_run_grant(Grant.for(name, risks))
-    :this_run
+  # `:this_run` only means anything while the run it was granted in is actually tainted -
+  # every surface only offers the button then. But `ctx.authorize`'s callback answer isn't
+  # itself proof of that (client-controlled input on a surface like Telegram could in theory
+  # replay a `:this_run` token outside that window), so this checks it directly rather than
+  # trusting the surface: granted before taint, it would otherwise survive into the exact
+  # post-taint window `:this_run` exists to NOT cover (see the moduledoc's "content from a
+  # stranger suspends pre-approval"). Falls back to `:once` instead of silently doing nothing.
+  defp remember(:this_run, name, risks, ctx) do
+    if tainted?(ctx) do
+      add_run_grant(Grant.for(name, risks))
+      :this_run
+    else
+      :once
+    end
   end
 
   defp remember(decision, _name, _risks, _ctx), do: decision

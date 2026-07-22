@@ -171,9 +171,17 @@ defmodule PepeWeb.OpenAIController do
     if Enum.any?(messages, &(&1["role"] == "system")) do
       messages
     else
-      [Message.system(Pepe.Agent.Workspace.system_prompt(agent)) | messages]
+      [Message.system(agent_system_prompt(agent)) | messages]
     end
   end
+
+  # "_passthrough" isn't a real agent - it's a bare model connection wearing an ephemeral
+  # struct so the rest of this controller can treat it uniformly. It has no docs, no skills,
+  # no tools (`tools: [], max_iterations: 1`), so wrapping it in Workspace.system_prompt/1's
+  # full framework scaffolding (behavior contract, docs/skills indexes, boot files) would hand
+  # a raw-model client instructions about a framework it never opted into. Keep its bare seed.
+  defp agent_system_prompt(%{name: "_passthrough"} = agent), do: agent.system_prompt
+  defp agent_system_prompt(agent), do: Pepe.Agent.Workspace.system_prompt(agent)
 
   ###
   ### stateful sessions

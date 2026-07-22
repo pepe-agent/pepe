@@ -45,3 +45,13 @@ If the user asks why a task seems to have stopped running, look at its history
 (`logs`): a run of skips means the job takes longer than its own schedule allows. Tell
 them so, and offer the three real fixes: a longer interval, less work per run, or
 `overlap: true` if running it on top of itself is genuinely what they want.
+
+## Flows aren't scheduled this way
+
+A **flow** (a proven, identical tool-call sequence promoted from real traces - see the
+`docs` tool for `flows` if it's in your index) can also run on a schedule, but not
+through `schedule_task`: that's an operator action (`mix pepe flow schedule`), not
+something you create from chat. If a user asks to "schedule my flow," tell them that's
+set up by an operator on the CLI, not something you can do here - don't offer to create
+it as a regular scheduled task instead, since a flow replays exact tool calls with no
+model in the loop, which `schedule_task`'s agent-turn model does not do.

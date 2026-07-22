@@ -15,9 +15,20 @@ defmodule Pepe.Browser.Session do
   Navigation targets go through the same rule `Pepe.Tools.FetchUrl` already
   enforces (http/https only, no internal/private address) - a browser reaches
   the same network the app does, so it's the same SSRF surface, just steered by
-  clicks instead of a bare GET. Like that check, this only guards the URL handed
-  to `open` - a page that itself redirects or links onward isn't re-checked,
-  which is the same accepted gap `fetch_url` documents for its own redirect hops.
+  clicks instead of a bare GET. Unlike a first read of `fetch_url` might
+  suggest, that tool re-validates every redirect hop, not just the first URL -
+  so a browser that only checked the URL handed to `open` and never again would
+  be a strictly weaker guard, not "the same accepted gap." Every request the
+  page itself makes after that (a link click, a JS-triggered navigation, a form
+  submit, the page's own background fetch/XHR calls) is checked too, via CDP's
+  `Fetch` domain request interception: each request is validated the same way
+  `open` validates its own URL, and failed outright (`Fetch.failRequest`) if it
+  resolves to an internal/private address, before Chrome ever sends it.
+  Non-http(s) requests (`data:`, `blob:`, and the like - ordinary parts of any
+  page, not a network fetch to an arbitrary host) are let through unchecked;
+  they aren't this guard's concern. See `start_request_guard/1` for why that
+  interception is armed and resolved from a small separate linked process
+  instead of this GenServer itself.
   """
 
   use GenServer
@@ -69,7 +80,8 @@ defmodule Pepe.Browser.Session do
   def init(key) do
     with {:ok, exe} <- find_chrome(),
          {:ok, browser} <- CDPEx.launch(chrome_binary: exe, headless: true, launch_timeout: 20_000),
-         {:ok, page} <- CDPEx.new_page(browser) do
+         {:ok, page} <- CDPEx.new_page(browser),
+         {:ok, _guard} <- start_request_guard(page) do
       {:ok, %{key: key, browser: browser, page: page, idle_timer: schedule_idle()}}
     else
       {:error, reason} -> {:stop, {:browser_start_failed, reason}}
@@ -128,8 +140,67 @@ defmodule Pepe.Browser.Session do
     {:stop, :normal, state}
   end
 
+  def handle_info(_msg, state), do: {:noreply, state}
+
   @impl true
   def terminate(_reason, state), do: stop_browser(state[:browser])
+
+  ###
+  ### request guard - see the moduledoc
+  ###
+
+  # `CDPEx.Page.enable_request_interception/2` delivers every `Fetch.requestPaused` pause
+  # to whichever process called it, and that same process must keep running afterward to
+  # resolve each one - but `navigate/click/type/press` above block THIS GenServer inside a
+  # raw `receive` of their own (cdp_ex's own implementation, not a `GenServer.call` to some
+  # other process), waiting for the very CDP response that can't arrive until the page's own
+  # requests are unpaused. Arming interception on this process and handling pauses in its
+  # `handle_info` would self-deadlock: stuck in `receive` for `navigate` to finish, never
+  # reaching `handle_info` to unpause the request `navigate` is itself waiting on. A small
+  # linked, independent process avoids that entirely - it owns the interception subscription
+  # and its own receive loop, decoupled from whatever this GenServer is blocked doing.
+  defp start_request_guard(page) do
+    parent = self()
+    ref = make_ref()
+
+    guard =
+      spawn_link(fn ->
+        case CDPEx.Page.enable_request_interception(page) do
+          :ok ->
+            send(parent, {ref, :ok})
+            request_guard_loop(page)
+
+          {:error, reason} ->
+            send(parent, {ref, {:error, reason}})
+        end
+      end)
+
+    receive do
+      {^ref, :ok} -> {:ok, guard}
+      {^ref, {:error, reason}} -> {:error, reason}
+    after
+      10_000 -> {:error, :interception_arm_timeout}
+    end
+  end
+
+  defp request_guard_loop(page) do
+    receive do
+      {:cdp_event, _conn, "Fetch.requestPaused", %{"requestId" => id} = params, _sid} ->
+        url = get_in(params, ["request", "url"]) || ""
+
+        if request_url_allowed?(url) do
+          CDPEx.Page.continue_request(page, id)
+        else
+          Logger.warning("[browser] blocked a request to #{inspect(url)}")
+          CDPEx.Page.fail_request(page, id, reason: :blocked_by_client)
+        end
+
+        request_guard_loop(page)
+
+      _other ->
+        request_guard_loop(page)
+    end
+  end
 
   ###
   ### navigation + snapshot
@@ -150,6 +221,13 @@ defmodule Pepe.Browser.Session do
   @snapshot_js """
   (() => {
     const clip = (s, n) => (s || '').replace(/\\s+/g, ' ').trim().slice(0, n);
+    // Clear every ref left over from the previous snapshot first: without this, an
+    // element that drops out of this snapshot's interactive set (removed, hidden,
+    // re-rendered) keeps whatever number it was tagged with, and a new element that
+    // takes its place in the DOM could be handed that same now-stale number - "click
+    // ref 3" would then hit whichever element the page currently has at ref 3, not the
+    // one the model was actually shown.
+    document.querySelectorAll('[data-pepe-ref]').forEach((el) => el.removeAttribute('data-pepe-ref'));
     const nodes = Array.from(document.querySelectorAll(
       'a[href], button, input, textarea, select, [role="button"], [role="link"], [onclick]'
     )).slice(0, #{@max_elements});
@@ -265,8 +343,31 @@ defmodule Pepe.Browser.Session do
   ### SSRF guard - see the moduledoc; mirrors `Pepe.Tools.FetchUrl`'s own.
   ###
 
-  defp validate_url(url) do
+  # Exposed (not private) so the guard's actual logic is directly unit-testable without a
+  # live Chrome/network round trip - see test/pepe/browser/session_test.exs. No network
+  # side effect of its own beyond the DNS resolution `check_host/1` already needs.
+  @doc false
+  @spec validate_url(String.t()) :: :ok | {:error, String.t()}
+  def validate_url(url) do
     with {:ok, host} <- parse_host(url), do: check_host(host)
+  end
+
+  # The permissive counterpart used by the request guard above: unlike `validate_url/1`
+  # (which *requires* http/https, since there's no legitimate reason to `open` a bare
+  # "file:" or "data:" URL as a starting page), this only cares about requests that could
+  # actually reach an internal/private host over the network - a `data:`/`blob:`/`about:`
+  # request is an ordinary synthetic resource, not a network fetch to an arbitrary host,
+  # and blocking those would break normal pages. Also exposed for direct unit testing.
+  @doc false
+  @spec request_url_allowed?(String.t()) :: boolean()
+  def request_url_allowed?(url) do
+    case URI.new(url) do
+      {:ok, %URI{scheme: scheme, host: host}} when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        check_host(host) == :ok
+
+      _ ->
+        true
+    end
   end
 
   defp parse_host(url) do

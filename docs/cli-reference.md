@@ -161,6 +161,21 @@ mix pepe watch pause <id> | resume <id> | cancel <id>
 mix pepe cron list|add|run|logs ...   # recurring agent jobs (see Scheduled tasks)
 ```
 
+### Flows (proven tool-call sequences)
+
+Promote 2+ traces with the identical tool-call sequence into a named flow that replays
+without calling the model at all; only a step whose tool is already in the agent's own
+`auto_approve` runs, since nobody is watching a flow run to ask.
+
+```bash
+mix pepe flow list AGENT
+mix pepe flow promote NAME --agent AGENT --from ID1,ID2[,...] [--overwrite]
+mix pepe flow show AGENT NAME
+mix pepe flow remove AGENT NAME
+mix pepe flow run AGENT NAME                                    # replay it now
+mix pepe flow schedule AGENT NAME --schedule "..." [--timezone TZ] [--deliver ...]
+```
+
 ### Learning
 
 ```bash

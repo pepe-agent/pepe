@@ -204,18 +204,24 @@ defmodule Pepe.Trace do
   Distinct session keys with at least one trace in `scope`, newest activity first, each
   with its turn count and last-seen time - "what conversations have happened here."
   `nil`/blank session keys (a one-shot CLI run, a cron, anything with no session) are
-  excluded: there is nothing to list a "session" for.
+  excluded: there is nothing to list a "session" for. `session`, when given, restricts
+  this to just that one session key - filtered at the query level (not after `limit` is
+  already applied), so `Pepe.Tools.SessionSearch`'s own-session-only default still finds
+  a session whose own activity is older than `limit` other sessions' more recent ones.
   """
-  @spec sessions(String.t(), pos_integer()) :: [map()]
-  def sessions(scope, limit \\ 50) do
-    from(t in Trace,
-      where: t.scope == ^scope and not is_nil(t.session) and t.session != "",
-      group_by: t.session,
-      select: %{session: t.session, turns: count(t.id), last_at: max(t.at)},
-      # `at` is second-granularity, so two sessions active in the same second tie -
-      # `id` (a microsecond timestamp string) breaks that the same direction, newest last.
-      order_by: [desc: max(t.at), desc: max(t.id)],
-      limit: ^limit
+  @spec sessions(String.t(), pos_integer(), String.t() | nil) :: [map()]
+  def sessions(scope, limit \\ 50, session \\ nil) do
+    from(t in Trace, where: t.scope == ^scope and not is_nil(t.session) and t.session != "")
+    |> maybe_filter_session(session)
+    |> then(
+      &from(t in &1,
+        group_by: t.session,
+        select: %{session: t.session, turns: count(t.id), last_at: max(t.at)},
+        # `at` is second-granularity, so two sessions active in the same second tie -
+        # `id` (a microsecond timestamp string) breaks that the same direction, newest last.
+        order_by: [desc: max(t.at), desc: max(t.id)],
+        limit: ^limit
+      )
     )
     |> Repo.all()
     |> Enum.map(fn %{session: s, turns: n, last_at: at} -> %{"session" => s, "turns" => n, "last_at" => at} end)
@@ -225,18 +231,24 @@ defmodule Pepe.Trace do
   Traces in `scope` whose prompt or tool-call/result text contains `query` (case-
   insensitive substring - no full-text index exists, and does not need to at the scale
   one scope's traces stay bounded to, see `@keep`). Newest first, without the full event
-  stream (use `get/2` for one trace's complete transcript).
+  stream (use `get/2` for one trace's complete transcript). `session`, when given,
+  restricts this to just that one session key - see `sessions/3` for why that has to
+  happen at the query level, not by filtering an already-`limit`-capped result.
   """
-  @spec search(String.t(), String.t(), pos_integer()) :: [map()]
-  def search(scope, query, limit \\ 50) when is_binary(query) and query != "" do
+  @spec search(String.t(), String.t(), pos_integer(), String.t() | nil) :: [map()]
+  def search(scope, query, limit \\ 50, session \\ nil) when is_binary(query) and query != "" do
     needle = String.downcase(query)
 
     from(t in Trace, where: t.scope == ^scope, order_by: [desc: t.at])
+    |> maybe_filter_session(session)
     |> Repo.all()
     |> Enum.filter(&matches?(&1, needle))
     |> Enum.take(limit)
     |> Enum.map(&summarize/1)
   end
+
+  defp maybe_filter_session(query, nil), do: query
+  defp maybe_filter_session(query, session), do: from(t in query, where: t.session == ^session)
 
   defp matches?(%Trace{} = e, needle) do
     haystack =

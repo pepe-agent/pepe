@@ -74,4 +74,14 @@ defmodule Pepe.BrowserTest do
     assert {:error, msg} = Pepe.Browser.open(key, "https:///no-host")
     assert msg =~ "http/https"
   end
+
+  test "clicking a real link navigates normally, without deadlocking on the request guard", %{key: key} do
+    # A real regression test for the request-guard deadlock this session fixed: arming CDP
+    # Fetch-domain interception and resolving it from a separate linked process (rather than
+    # this same GenServer, which blocks itself inside navigate/click's own `receive`) is what
+    # keeps ordinary navigation working at all once every request has to be resolved.
+    {:ok, _} = Pepe.Browser.open(key, "https://example.com")
+    assert {:ok, text} = Pepe.Browser.click(key, 0)
+    assert text =~ "iana.org"
+  end
 end

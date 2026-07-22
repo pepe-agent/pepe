@@ -128,12 +128,30 @@ defmodule Pepe.Browser.FetcherTest do
       assert {:error, :unsupported_platform} = Fetcher.resolve_platform({:unix, :linux}, "riscv64-unknown-linux-gnu")
     end
 
-    test "windows x86_64 uses Chrome for Testing's win64 build" do
-      assert {:ok, {:cft, "win64"}} = Fetcher.resolve_platform({:win32, :nt}, "x86_64-pc-windows-msvc")
+    # `:erlang.system_info(:system_architecture)` is always the literal string "win32" on
+    # real Windows, 32-bit or 64-bit alike - that's the whole bug this closes (a prior fix
+    # this session used `"x86_64-pc-windows-msvc"` here, a triple no real Windows ERTS
+    # ever produces, so the test passed without proving anything about a real machine).
+    # The third argument is the actual signal on Windows: see windows_arch_hint/0.
+
+    test "windows 64-bit (PROCESSOR_ARCHITECTURE=AMD64) uses Chrome for Testing's win64 build" do
+      assert {:ok, {:cft, "win64"}} = Fetcher.resolve_platform({:win32, :nt}, "win32", "AMD64")
     end
 
-    test "windows non-x86_64 uses Chrome for Testing's win32 build" do
-      assert {:ok, {:cft, "win32"}} = Fetcher.resolve_platform({:win32, :nt}, "win32")
+    test "windows 64-bit ARM (PROCESSOR_ARCHITECTURE=ARM64) also uses the win64 build" do
+      assert {:ok, {:cft, "win64"}} = Fetcher.resolve_platform({:win32, :nt}, "win32", "ARM64")
+    end
+
+    test "a 32-bit process on 64-bit Windows (PROCESSOR_ARCHITEW6432=AMD64) still resolves win64" do
+      assert {:ok, {:cft, "win64"}} = Fetcher.resolve_platform({:win32, :nt}, "win32", "AMD64")
+    end
+
+    test "windows 32-bit (PROCESSOR_ARCHITECTURE=x86) uses Chrome for Testing's win32 build" do
+      assert {:ok, {:cft, "win32"}} = Fetcher.resolve_platform({:win32, :nt}, "win32", "x86")
+    end
+
+    test "no arch hint available at all falls back to win32, not a guess" do
+      assert {:ok, {:cft, "win32"}} = Fetcher.resolve_platform({:win32, :nt}, "win32", nil)
     end
   end
 

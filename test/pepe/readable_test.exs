@@ -32,6 +32,34 @@ defmodule Pepe.ReadableTest do
     refute text =~ "tracking"
   end
 
+  test "a loose list (<li><p>) and a <blockquote><p> don't duplicate their text" do
+    html = """
+    <html>
+    <head><title>t</title></head>
+    <body>
+      <article>
+        <p>An opening paragraph with enough real content here to matter to a reader.</p>
+        <ul>
+          <li><p>First loose-list item, the shape rendered Markdown/READMEs commonly produce.</p></li>
+          <li><p>Second loose-list item, also wrapped in its own paragraph tag by the renderer.</p></li>
+        </ul>
+        <blockquote><p>A quoted paragraph nested inside a blockquote element here.</p></blockquote>
+        <p>A closing paragraph, again with enough real content to matter to a reader.</p>
+      </article>
+    </body>
+    </html>
+    """
+
+    assert {:ok, %{text: text}} = Readable.extract(html)
+    assert count_occurrences(text, "First loose-list item") == 1
+    assert count_occurrences(text, "Second loose-list item") == 1
+    assert count_occurrences(text, "A quoted paragraph") == 1
+  end
+
+  defp count_occurrences(text, needle) do
+    text |> String.split(needle) |> length() |> Kernel.-(1)
+  end
+
   test "an infobox/data table doesn't crowd out the actual prose" do
     prose = String.duplicate("Real article prose that a reader actually came here for. ", 10)
 

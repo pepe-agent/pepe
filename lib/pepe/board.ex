@@ -200,11 +200,17 @@ defmodule Pepe.Board do
   end
 
   @doc """
-  Bump a `running` claim's `claimed_at` to now, so `reclaim_if_timed_out/2` doesn't
+  Bump a `running` claim's liveness clock to now, so `reclaim_if_timed_out/2` doesn't
   treat still-active work as stalled. Only takes effect while `card_id` is still
   `running` under `claimed_by` - the same claim-pair guard `block_if_still_running/3`
   uses, so a heartbeat from a claim that's already moved on (blocked-on-timeout,
   unblocked, reclaimed by someone else) can't resurrect it.
+
+  Deliberately does NOT touch `claimed_at`: that column doubles as the claim's identity
+  token (`block_if_still_running/3` and the scheduler's own dispatch-time capture both key
+  off it), so mutating it here would let a heartbeat mid-run invalidate the exact safety
+  net that's supposed to catch this claim if its worker later dies. `heartbeated_at` is a
+  separate liveness-only column instead.
 
   For a long `claim_timeout_s`, most claims never need this at all; it exists for
   the other end - a claim that genuinely runs longer than the board's timeout,
@@ -216,7 +222,7 @@ defmodule Pepe.Board do
   def heartbeat(card_id, claimed_by) do
     query = from(c in BoardCard, where: c.id == ^card_id and c.status == "running" and c.claimed_by == ^claimed_by)
 
-    case update_and_get(query, [claimed_at: now()], card_id) do
+    case update_and_get(query, [heartbeated_at: now()], card_id) do
       {:ok, card} -> {:ok, card}
       :miss -> heartbeat_error(card_id, claimed_by)
     end
@@ -331,15 +337,22 @@ defmodule Pepe.Board do
   end
 
   @doc """
-  If `card_id` is `running` and its claim has outlived `timeout_s`, block it (a stalled
-  claim). `timeout_s` of `0`/`nil` means the board never auto-blocks on timeout.
+  If `card_id` is `running` and its claim has outlived `timeout_s` with no more recent
+  heartbeat, block it (a stalled claim). `timeout_s` of `0`/`nil` means the board never
+  auto-blocks on timeout.
   """
   @spec reclaim_if_timed_out(String.t(), integer() | nil) :: {:ok, BoardCard.t()} | {:error, term()}
   def reclaim_if_timed_out(_card_id, timeout_s) when timeout_s in [0, nil], do: {:error, :no_timeout}
 
   def reclaim_if_timed_out(card_id, timeout_s) do
     cutoff = now() - timeout_s
-    query = from(c in BoardCard, where: c.id == ^card_id and c.status == "running" and c.claimed_at < ^cutoff)
+
+    query =
+      from(c in BoardCard,
+        where:
+          c.id == ^card_id and c.status == "running" and c.claimed_at < ^cutoff and
+            (is_nil(c.heartbeated_at) or c.heartbeated_at < ^cutoff)
+      )
 
     case update_and_get(query, [status: "blocked", block_reason: "claim timed out"], card_id) do
       {:ok, card} -> {:ok, card}

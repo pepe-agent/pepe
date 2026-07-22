@@ -26,6 +26,17 @@ defmodule Pepe.Security.ExternalContentTest do
     assert EC.sanitize(text) == "hello world"
   end
 
+  test "strips a control token even when a zero-width character is smuggled into the middle of it" do
+    # Removing invisibles has to run BEFORE stripping tokens - otherwise the ZWSP defeats
+    # the token regex, then gets stripped anyway, silently reassembling the real token.
+    text = "before <|im\u{200B}_start|> after"
+    out = EC.sanitize(text)
+    refute out =~ "<|im_start|>"
+    refute out =~ "im_start"
+    assert out =~ "before"
+    assert out =~ "after"
+  end
+
   test "leaves ordinary text untouched and passes non-binaries through" do
     assert EC.sanitize("just a normal sentence, nothing to strip.") ==
              "just a normal sentence, nothing to strip."

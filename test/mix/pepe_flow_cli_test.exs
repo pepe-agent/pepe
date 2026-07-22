@@ -35,8 +35,18 @@ defmodule Mix.Tasks.PepeFlowCliTest do
   defp pepe_err(argv), do: capture_io(:stderr, fn -> Mix.Tasks.Pepe.dispatch(argv) end)
 
   defp record_trace(agent, calls) do
-    assert Trace.start(agent, nil) == :started
-    Enum.each(calls, fn {name, args} -> Trace.event({:tool_call, name, args}) end)
+    # Real usage (Pepe.Agent.Runtime) always starts a trace under the agent's already-
+    # canonical `.name`, and always logs a tool_result alongside each tool_call - matching
+    # both here is what makes promote_from_traces/4's "these traces all belong to this
+    # agent, and every call in them actually succeeded" checks (Pepe.Flow) meaningful.
+    canonical = Config.get_agent(agent).name
+    assert Trace.start(canonical, nil) == :started
+
+    Enum.each(calls, fn {name, args} ->
+      Trace.event({:tool_call, name, args})
+      Trace.event({:tool_result, name, "ok"})
+    end)
+
     Trace.finish({:ok, "done", []})
   end
 

@@ -108,6 +108,12 @@ defmodule Pepe.Flow do
       not is_nil(get(agent.name, name)) and opts[:overwrite] != true ->
         {:error, :already_exists}
 
+      not Enum.all?(traces, &(&1["agent"] == agent.name)) ->
+        {:error, :trace_wrong_agent}
+
+      not Enum.all?(traces, &trace_clean?/1) ->
+        {:error, :trace_not_clean}
+
       true ->
         case traces |> Enum.map(&tool_call_steps/1) |> Enum.uniq() do
           [[]] ->
@@ -127,6 +133,31 @@ defmodule Pepe.Flow do
   # A trace id alone doesn't say which project scoped it - the same lookup
   # Mix.Tasks.Pepe.find_trace/2 already does for `mix pepe traces ID`.
   defp find_trace(id), do: Enum.find_value(Trace.scopes(), fn s -> Trace.get(s, id) end)
+
+  # A trace only counts as "proven" if the run it came from actually finished cleanly and
+  # every tool call in it actually succeeded. `tool_call_steps/1` alone can't tell a call
+  # that worked from one the human denied or that crashed - both leave the exact same
+  # `tool_call` event behind. This pairs each `tool_call` with its matching `tool_result`
+  # (Pepe.Agent.Runtime.run_tools/3 emits exactly one of each, per call, in the same
+  # relative order) and checks what actually happened, not just that the call was made.
+  defp trace_clean?(trace) do
+    get_in(trace, ["outcome", "kind"]) == "ok" and calls_all_succeeded?(trace["events"] || [])
+  end
+
+  defp calls_all_succeeded?(events) do
+    calls = Enum.filter(events, &(&1["t"] == "tool_call"))
+    results = Enum.filter(events, &(&1["t"] == "tool_result"))
+
+    length(calls) == length(results) and
+      Enum.zip(calls, results)
+      |> Enum.all?(fn {call, result} -> not clipped?(call["args"]) and not Tools.error?(result["out"] || "") end)
+  end
+
+  # A call whose recorded args were too long got truncated (Pepe.Trace's own @clip) before
+  # they ever reached storage - promoting it would replay that truncated, likely-invalid
+  # JSON instead of what the agent actually sent.
+  defp clipped?(args) when is_binary(args), do: String.ends_with?(args, " (clipped)")
+  defp clipped?(_), do: false
 
   defp create(name, agent, steps, trace_ids) do
     id = new_id()
@@ -184,12 +215,19 @@ defmodule Pepe.Flow do
           out = Tools.execute(call, ctx)
           Trace.event({:tool_call, name, args})
           Trace.event({:tool_result, name, out})
-          {:cont, {:ok, [out | acc]}}
+
+          if Tools.error?(out) do
+            {:halt, {:error, {:step_failed, name, out}}}
+          else
+            {:cont, {:ok, [out | acc]}}
+          end
 
         :deny ->
+          Trace.event({:tool_denied, name, nil})
           {:halt, {:error, {:denied, name}}}
 
         {:deny, reason} ->
+          Trace.event({:tool_denied, name, reason})
           {:halt, {:error, {:denied, name, reason}}}
       end
     end)

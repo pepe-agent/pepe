@@ -192,6 +192,17 @@ defmodule Pepe.Tools do
   end
 
   @doc """
+  Whether a tool result string represents a failure - a crash, invalid arguments, an
+  unknown tool, or a permission denial - rather than real output. Every failure path in
+  `execute/2` (see `annotate_error/1`) and every denial (`Pepe.Permissions.denied_message/2`)
+  produces a string starting with this prefix, so a caller that needs to tell the two apart
+  without re-parsing the reason (e.g. `Pepe.Flow`, replaying without a model to ask) can
+  check this instead of pattern-matching on text it doesn't own.
+  """
+  @spec error?(String.t()) :: boolean()
+  def error?(result) when is_binary(result), do: String.starts_with?(result, "Error: ")
+
+  @doc """
   Run the tool body and nothing else. No redaction, no spilling.
 
   Split out from `execute/2` so the runtime can run concurrent tools in tasks while keeping

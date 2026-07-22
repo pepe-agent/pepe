@@ -21,20 +21,28 @@ defmodule Pepe.Browser.SystemDeps do
   if they'd typed the command directly.
   """
 
+  # apt-get gets two alternatives, tried in order: the package is called "chromium" on
+  # Debian, but on Ubuntu that name has no installable candidate at all (it's a
+  # transitional package pointing at a snap) - the real one there is "chromium-browser".
+  # Every other manager here ships a real "chromium" package under every distro that
+  # provides it, confirmed against each one's own repo metadata, so one alternative is enough.
   @candidates [
-    {"apt-get", ["apt-get", "install", "-y", "chromium"]},
-    {"dnf", ["dnf", "install", "-y", "chromium"]},
-    {"yum", ["yum", "install", "-y", "chromium"]},
-    {"pacman", ["pacman", "-S", "--noconfirm", "chromium"]},
-    {"apk", ["apk", "add", "chromium"]},
-    {"zypper", ["zypper", "install", "-y", "chromium"]}
+    {"apt-get", [["apt-get", "install", "-y", "chromium"], ["apt-get", "install", "-y", "chromium-browser"]]},
+    {"dnf", [["dnf", "install", "-y", "chromium"]]},
+    {"yum", [["yum", "install", "-y", "chromium"]]},
+    {"pacman", [["pacman", "-S", "--noconfirm", "chromium"]]},
+    {"apk", [["apk", "add", "chromium"]]},
+    {"zypper", [["zypper", "install", "-y", "chromium"]]}
   ]
 
-  @doc "`{manager, [executable | args]}` for the first package manager found on PATH, or `:not_found`."
-  @spec detect() :: {String.t(), [String.t()]} | :not_found
+  @doc """
+  `{manager, [[executable | args], ...]}` for the first package manager found on PATH, or
+  `:not_found` - one or more argv alternatives to try in order (see `@candidates`).
+  """
+  @spec detect() :: {String.t(), [[String.t()]]} | :not_found
   def detect do
-    Enum.find_value(@candidates, :not_found, fn {bin, cmd} ->
-      if System.find_executable(bin), do: {bin, cmd}
+    Enum.find_value(@candidates, :not_found, fn {bin, cmds} ->
+      if System.find_executable(bin), do: {bin, cmds}
     end)
   end
 
@@ -50,17 +58,21 @@ defmodule Pepe.Browser.SystemDeps do
   end
 
   @doc """
-  Run the detected install command, streaming its output live (package managers print
-  real progress, and `sudo` needs the real terminal for its password prompt either
-  way). `:ok | {:error, exit_status}`.
+  Run the detected install command(s), streaming output live (package managers print
+  real progress, and `sudo` needs the real terminal for its password prompt either way).
+  Tries each argv alternative in order, stopping at the first success - see `@candidates`
+  for why apt-get can have more than one. `:ok | {:error, exit_status}` (the last
+  alternative's status, if every one of them failed).
   """
-  @spec install([String.t()]) :: :ok | {:error, non_neg_integer()}
-  def install([exe | args]) do
-    {run_exe, run_args} = if root?(), do: {exe, args}, else: {"sudo", [exe | args]}
+  @spec install([[String.t()]]) :: :ok | {:error, non_neg_integer()}
+  def install(candidates) when is_list(candidates) do
+    Enum.reduce_while(candidates, {:error, 1}, fn [exe | args], _last_error ->
+      {run_exe, run_args} = if root?(), do: {exe, args}, else: {"sudo", [exe | args]}
 
-    case System.cmd(run_exe, run_args, into: IO.stream(:stdio, :line), stderr_to_stdout: true) do
-      {_collectable, 0} -> :ok
-      {_collectable, status} -> {:error, status}
-    end
+      case System.cmd(run_exe, run_args, into: IO.stream(:stdio, :line), stderr_to_stdout: true) do
+        {_collectable, 0} -> {:halt, :ok}
+        {_collectable, status} -> {:cont, {:error, status}}
+      end
+    end)
   end
 end

@@ -33,7 +33,11 @@ defmodule Pepe.FlowTest do
   end
 
   defp record_trace(agent, calls) do
-    assert Trace.start(agent, nil) == :started
+    # Real usage (Pepe.Agent.Runtime) always starts a trace under the agent's already-
+    # canonical `.name` - matching that here is what makes promote_from_traces/4's own
+    # "these traces all belong to this agent" check (Pepe.Flow) meaningful to test.
+    canonical = Config.get_agent(agent).name
+    assert Trace.start(canonical, nil) == :started
 
     Enum.each(calls, fn {name, args} ->
       Trace.event({:tool_call, name, args})

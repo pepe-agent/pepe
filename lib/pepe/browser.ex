@@ -50,7 +50,11 @@ defmodule Pepe.Browser do
     spec = %{
       id: {:browser, key},
       start: {Session, :start_link, [key, [name: via(key)]]},
-      restart: :temporary
+      restart: :temporary,
+      # Matches CDPEx.Browser's own child_spec/1 recommendation: terminate/2 has to wait
+      # on CDPEx.stop/1 tearing down a real OS Chrome process, and the default 5s OTP
+      # shutdown budget can be tight for that under load.
+      shutdown: 10_000
     }
 
     case DynamicSupervisor.start_child(@sup, spec) do
@@ -72,9 +76,9 @@ defmodule Pepe.Browser do
   end
 
   defp browser_start_failed_message(:unsupported_platform) do
-    "Google's Chrome for Testing feed has no build for this machine's OS/CPU (e.g. " <>
-      "Linux on ARM isn't published) - install Chromium yourself via your system's " <>
-      "package manager and put it on PATH, or set PEPE_CHROME_BINARY to its path."
+    "neither Google's Chrome for Testing feed nor Playwright's own download has a build " <>
+      "for this machine's OS/CPU - install Chromium yourself via your system's package " <>
+      "manager and put it on PATH, or set PEPE_CHROME_BINARY to its path."
   end
 
   defp browser_start_failed_message({:manifest_fetch_failed, reason}) do
@@ -93,7 +97,7 @@ defmodule Pepe.Browser do
       "install Chrome/Chromium yourself and put it on PATH, or set PEPE_CHROME_BINARY."
   end
 
-  defp browser_start_failed_message(reason) when reason in [:executable_not_found_in_archive] do
+  defp browser_start_failed_message(:executable_not_found_in_archive) do
     "downloaded a Chrome build but couldn't find its executable in the archive " <>
       "(Google likely changed the archive layout) - install Chrome/Chromium yourself " <>
       "instead and put it on PATH, or set PEPE_CHROME_BINARY."
@@ -122,9 +126,20 @@ defmodule Pepe.Browser do
   # deregistering (a normal OTP `{:stop, reason, reply, state}` ordering, not a bug in
   # it), so a call landing in that window would otherwise crash with a raw `:noproc`
   # exit instead of the same clean "no session open" every other caller already gets.
+  # Matched narrowly on purpose: catching every `:exit` reason here used to also turn a
+  # real `GenServer.call` timeout (Chrome stuck mid-navigation) and an actual session
+  # crash into the same misleading "no session open" - masking that the session was, in
+  # fact, still there.
   defp safe_call(fun) do
     fun.()
   catch
-    :exit, _ -> {:error, "no browser session open - use \"open\" first"}
+    :exit, {reason, _} when reason in [:noproc, :normal, :shutdown] ->
+      {:error, "no browser session open - use \"open\" first"}
+
+    :exit, {:timeout, _} ->
+      {:error, "the browser didn't respond in time - it may be stuck on a slow page; try again, or close and reopen"}
+
+    :exit, reason ->
+      {:error, "the browser session crashed (#{inspect(reason)})"}
   end
 end

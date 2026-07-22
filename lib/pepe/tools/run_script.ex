@@ -88,6 +88,20 @@ defmodule Pepe.Tools.RunScript do
     end
   end
 
+  @doc """
+  The resolved interpreter binary for `args` (inline `code` + `language`, or a `file`'s
+  extension) - `nil` if neither resolves. `Pepe.Permissions` uses this to decide whether
+  `Pepe.Permissions.Risk`'s command-text heuristic (written for shell syntax) can actually
+  see this call's content at all, before ever giving it the interactive free pass.
+  """
+  @spec resolved_bin(map()) :: String.t() | nil
+  def resolved_bin(args) do
+    case language(args) do
+      {:ok, {bin, _ext}} -> bin
+      {:error, _} -> nil
+    end
+  end
+
   defp language(%{"language" => lang}) when is_binary(lang) do
     case @langs[String.downcase(lang)] do
       nil -> {:error, "unsupported language #{lang} (use python, node, ruby, bash or elixir)"}

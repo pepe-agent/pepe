@@ -7,7 +7,14 @@ defmodule Pepe.Tools.SessionSearch do
   that outlives a session and is worth searching.
 
   Scoped to the calling agent's own project - one project's conversations are not
-  another's to read, same boundary every other project-scoped tool already holds.
+  another's to read, same boundary every other project-scoped tool already holds. Within
+  that, `agent.session_search_scope` decides how far a single call can actually see:
+  `"self"` (the default, and the safe one) restricts every action to the calling
+  session's own history only; `"project"` (opt-in) restores full project-wide visibility.
+  An agent that only ever talks to one operator/team has no one else's conversation to
+  leak and can safely widen to `"project"`; an agent serving several different end
+  customers under the same project must stay `"self"`, or one customer asking to "search
+  my past conversations" could read another's.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -58,7 +65,7 @@ defmodule Pepe.Tools.SessionSearch do
   def run(%{"action" => action} = args, ctx) do
     case ctx[:agent] do
       nil -> {:error, "no calling agent in context"}
-      agent -> dispatch(action, args, scope_of(agent))
+      agent -> dispatch(action, args, scope_of(agent), bound_session(agent, ctx))
     end
   end
 
@@ -70,41 +77,61 @@ defmodule Pepe.Tools.SessionSearch do
   # match that, not the raw nil.
   defp scope_of(agent), do: Project.of(agent.name) || Config.default_project_slug()
 
-  defp dispatch("list_sessions", args, scope) do
-    case Trace.sessions(scope, limit(args)) do
+  # `nil` means "no restriction" (opted into "project"); any other value is the exact
+  # session key every action gets locked to. An agent left on the "self" default with no
+  # session in ctx at all (a one-shot CLI run, a cron) gets the empty string instead of
+  # `nil` - it must never fall through to unrestricted just because there was nothing to
+  # restrict TO.
+  defp bound_session(%{session_search_scope: "project"}, _ctx), do: nil
+  defp bound_session(_agent, ctx), do: ctx[:session_key] || ""
+
+  defp dispatch("list_sessions", args, scope, bound) do
+    case Trace.sessions(scope, limit(args), bound) do
       [] -> {:ok, "No conversations recorded yet."}
       sessions -> {:ok, Enum.map_join(sessions, "\n", &describe_session_line/1)}
     end
   end
 
-  defp dispatch("search", args, scope) do
+  defp dispatch("search", args, scope, bound) do
     with {:ok, query} <- require_arg(args, "query") do
-      case Trace.search(scope, query, limit(args)) do
+      case Trace.search(scope, query, limit(args), bound) do
         [] -> {:ok, "No matches for #{inspect(query)}."}
         traces -> {:ok, Enum.map_join(traces, "\n", &describe_trace_line/1)}
       end
     end
   end
 
-  defp dispatch("session_history", args, scope) do
+  defp dispatch("session_history", args, scope, bound) do
     with {:ok, session} <- require_arg(args, "session") do
-      case Trace.for_session(scope, session, limit(args, 200)) do
-        [] -> {:ok, "No turns recorded for #{session}."}
-        traces -> {:ok, Enum.map_join(traces, "\n", &describe_trace_line/1)}
+      if session_visible?(session, bound) do
+        case Trace.for_session(scope, session, limit(args, 200)) do
+          [] -> {:ok, "No turns recorded for #{session}."}
+          traces -> {:ok, Enum.map_join(traces, "\n", &describe_trace_line/1)}
+        end
+      else
+        # Same message a genuinely-empty session gets - a call scoped to "self" must not
+        # distinguish "that session doesn't exist" from "that session isn't yours."
+        {:ok, "No turns recorded for #{session}."}
       end
     end
   end
 
-  defp dispatch("show", args, scope) do
+  defp dispatch("show", args, scope, bound) do
     with {:ok, trace_id} <- require_arg(args, "trace_id") do
       case Trace.get(scope, trace_id) do
-        nil -> {:error, "no such trace: #{trace_id}"}
-        trace -> {:ok, describe_transcript(trace)}
+        nil ->
+          {:error, "no such trace: #{trace_id}"}
+
+        trace ->
+          if session_visible?(trace["session"], bound), do: {:ok, describe_transcript(trace)}, else: {:error, "no such trace: #{trace_id}"}
       end
     end
   end
 
-  defp dispatch(other, _args, _scope), do: {:error, "unknown action: #{other}"}
+  defp dispatch(other, _args, _scope, _bound), do: {:error, "unknown action: #{other}"}
+
+  defp session_visible?(_session, nil), do: true
+  defp session_visible?(session, bound), do: session == bound
 
   defp limit(args, default \\ 50), do: args["limit"] || default
 

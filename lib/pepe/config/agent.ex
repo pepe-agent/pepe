@@ -105,7 +105,15 @@ defmodule Pepe.Config.Agent do
             # tracks it - a user's own reminder gets a message back at the right time, an
             # agent's own promise gets its session re-run so the work actually happens before
             # anything is said to have been done. See Pepe.Agent.CommitmentExtract.
-            commitments: false
+            commitments: false,
+            # How far `session_search` can see: "self" (the default, and the safe one) - only
+            # the calling session's own history - or "project" - every session in the same
+            # project, the old, always-on behavior. An agent talking to one operator/team is
+            # fine widened to "project" (there's nobody else's conversation to leak); an agent
+            # serving several different end customers under one project must stay "self", or
+            # one customer asking "search my past conversations" can read another's. See
+            # Pepe.Tools.SessionSearch.
+            session_search_scope: "self"
 
   @type t :: %__MODULE__{}
 
@@ -149,7 +157,8 @@ defmodule Pepe.Config.Agent do
       | exempt_message_limit: map["exempt_message_limit"] || false,
         trust_untrusted_content: map["trust_untrusted_content"] || false,
         midrun_fold: map["midrun_fold"] || false,
-        commitments: map["commitments"] || false
+        commitments: map["commitments"] || false,
+        session_search_scope: map["session_search_scope"] || "self"
     }
   end
 end

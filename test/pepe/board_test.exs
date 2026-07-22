@@ -206,7 +206,11 @@ defmodule Pepe.BoardTest do
 
       {:ok, alive} = Board.heartbeat(card.id, "worker-a")
       assert alive.status == "running"
-      assert alive.claimed_at > stale.claimed_at
+      # claimed_at itself is untouched - it's the claim's identity token
+      # (block_if_still_running/3's ABA guard keys off it); only the separate
+      # heartbeated_at liveness column moves.
+      assert alive.claimed_at == stale.claimed_at
+      assert alive.heartbeated_at > stale.claimed_at
 
       # The bug this closes: before the heartbeat, this exact staleness would have been
       # force-blocked as stalled (see reclaim_if_timed_out/2's own tests above) even
@@ -238,6 +242,22 @@ defmodule Pepe.BoardTest do
 
     test "refuses an unknown card" do
       assert Board.heartbeat("nope", "worker-a") == {:error, :not_found}
+    end
+
+    test "a heartbeat during the run doesn't invalidate the scheduler's own dispatch-time claim token" do
+      board = new_board()
+      card = new_card(board)
+      Board.force_ready(card.id)
+      {:ok, claimed} = Board.claim(card.id, "worker-a")
+
+      # The scheduler captures {id, claimed_by, claimed_at} at dispatch time and holds onto
+      # it to guard against the worker dying without calling complete/block - see
+      # block_if_still_running/3's own moduledoc. A heartbeat happening mid-run must not
+      # change what that captured token means.
+      {:ok, _alive} = Board.heartbeat(card.id, "worker-a")
+
+      assert {:ok, blocked} = Board.block_if_still_running(card.id, "worker-a", claimed.claimed_at)
+      assert blocked.status == "blocked"
     end
   end
 

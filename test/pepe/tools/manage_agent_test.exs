@@ -202,6 +202,40 @@ defmodule Pepe.Tools.ManageAgentTest do
       assert Config.get_agent("vendas").trust_untrusted_content == false
     end
 
+    test "session_search_project_wide can be turned on from an ordinary conversation" do
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "session_search_project_wide", "value" => "on"},
+                 ctx(["vendas"])
+               )
+
+      assert Config.get_agent("vendas").session_search_scope == "project"
+    end
+
+    test "session_search_project_wide: but NOT from a run that has itself taken in a stranger's content" do
+      Pepe.Permissions.taint()
+
+      assert {:error, why} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "session_search_project_wide", "value" => "on"},
+                 ctx(["vendas"])
+               )
+
+      assert why =~ "outside"
+      assert Config.get_agent("vendas").session_search_scope == "self"
+
+      # Turning it OFF from a tainted run is still fine: tightening never needs guarding.
+      Config.put_agent(%{Config.get_agent("vendas") | session_search_scope: "project"})
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "vendas", "flag" => "session_search_project_wide", "value" => "off"},
+                 ctx(["vendas"])
+               )
+
+      assert Config.get_agent("vendas").session_search_scope == "self"
+    end
+
     test "an unknown flag or a bad value is refused" do
       assert {:error, _} =
                ManageAgent.run(
@@ -230,6 +264,7 @@ defmodule Pepe.Tools.ManageAgentTest do
       assert {:ok, text} = ManageAgent.run(%{"action" => "get", "target" => "vendas"}, ctx(["vendas"]))
       assert text =~ "trust_untrusted_content=off"
       assert text =~ "exempt_message_limit=off"
+      assert text =~ "session_search_project_wide=off"
     end
   end
 

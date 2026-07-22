@@ -33,8 +33,16 @@ defmodule Pepe.CronFlowTest do
   end
 
   defp record_trace(agent, calls) do
-    assert Trace.start(agent, nil) == :started
-    Enum.each(calls, fn {name, args} -> Trace.event({:tool_call, name, args}) end)
+    # See Pepe.FlowTest's own record_trace/2 for why this canonicalizes the agent and
+    # logs a tool_result alongside each tool_call.
+    canonical = Config.get_agent(agent).name
+    assert Trace.start(canonical, nil) == :started
+
+    Enum.each(calls, fn {name, args} ->
+      Trace.event({:tool_call, name, args})
+      Trace.event({:tool_result, name, "ok"})
+    end)
+
     Trace.finish({:ok, "done", []})
   end
 

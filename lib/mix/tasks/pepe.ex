@@ -1284,14 +1284,15 @@ defmodule Mix.Tasks.Pepe do
 
   defp browser_cmd(["install"]) do
     case Pepe.Browser.SystemDeps.detect() do
-      {manager, cmd} ->
+      {manager, candidates} ->
         needs_sudo? = not Pepe.Browser.SystemDeps.root?()
-        shown = if needs_sudo?, do: "sudo " <> Enum.join(cmd, " "), else: Enum.join(cmd, " ")
+        shown = Enum.map_join(candidates, "\n    ", &command_line(&1, needs_sudo?))
         info("Detected #{manager}. Installing a browser the `browser` tool can drive:\n")
         info("    #{shown}\n")
+        if length(candidates) > 1, do: info("(tries each in order until one works - the package name differs by distro)\n")
         if needs_sudo?, do: info("(enter your password if prompted)\n")
 
-        case Pepe.Browser.SystemDeps.install(cmd) do
+        case Pepe.Browser.SystemDeps.install(candidates) do
           :ok ->
             info("\nDone - the browser tool finds it automatically now, no further configuration needed.")
 
@@ -1305,6 +1306,8 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp browser_cmd(_), do: browser_help()
+
+  defp command_line(cmd, needs_sudo?), do: if(needs_sudo?, do: "sudo " <> Enum.join(cmd, " "), else: Enum.join(cmd, " "))
 
   # A downloaded browser links against Chrome for Testing's own bundled pieces plus
   # whatever the OS itself always provides (macOS frameworks, Windows DLLs) - never
@@ -1372,8 +1375,16 @@ defmodule Mix.Tasks.Pepe do
     do:
       "those traces didn't make the exact same tool calls, in the same order, with the same arguments - flows only replay identical sequences (see mix pepe flow help)"
 
+  defp describe_flow_error(:trace_wrong_agent),
+    do: "those traces weren't all made by this agent - a flow only replays what its own agent proved"
+
+  defp describe_flow_error(:trace_not_clean),
+    do:
+      "one of those traces didn't fully succeed (a denied or failed tool call, or a step whose arguments were too long to record in full) - only clean traces can be promoted"
+
   defp describe_flow_error({:denied, tool}), do: "#{tool} isn't in this agent's auto_approve - nobody is here to ask while a flow runs"
   defp describe_flow_error({:denied, tool, reason}), do: "#{tool} refused: #{reason}"
+  defp describe_flow_error({:step_failed, tool, out}), do: "#{tool} failed, so the flow stopped here: #{out}"
   defp describe_flow_error(other), do: inspect(other)
 
   defp clip_line(nil), do: ""
@@ -2351,6 +2362,7 @@ defmodule Mix.Tasks.Pepe do
           trust_untrusted_content: :boolean,
           midrun_fold: :boolean,
           commitments: :boolean,
+          session_search_project_wide: :boolean,
           admin: :boolean
         ]
       )
@@ -2557,7 +2569,8 @@ defmodule Mix.Tasks.Pepe do
       exempt_message_limit: opts[:exempt_message_limit] || false,
       trust_untrusted_content: opts[:trust_untrusted_content] || false,
       midrun_fold: opts[:midrun_fold] || false,
-      commitments: opts[:commitments] || false
+      commitments: opts[:commitments] || false,
+      session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self")
     }
   end
 

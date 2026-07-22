@@ -82,12 +82,22 @@ defmodule Pepe.Browser.Fetcher do
          {:ok, url} <- resolve_download_url(source, plat) do
       Logger.info("[browser] no Chrome found - downloading one (~100-200MB, one time)")
 
-      with {:ok, zip} <- fetch_zip(url),
-           {:ok, extracted} <- extract(zip),
-           {:ok, exe} <- install(extracted, source, plat) do
-        File.rm(zip)
-        Logger.info("[browser] downloaded a browser to #{exe}")
-        {:ok, exe}
+      case fetch_zip(url) do
+        {:ok, zip} ->
+          result =
+            with {:ok, extracted} <- extract(zip),
+                 {:ok, exe} <- install(extracted, source, plat) do
+              Logger.info("[browser] downloaded a browser to #{exe}")
+              {:ok, exe}
+            end
+
+          # Always, not just on success: a failed extract/install still leaves the
+          # downloaded zip (up to ~200MB) behind in the tmp dir otherwise.
+          File.rm(zip)
+          result
+
+        {:error, _} = error ->
+          error
       end
     end
   end
@@ -96,22 +106,22 @@ defmodule Pepe.Browser.Fetcher do
   ### platform
   ###
 
-  defp platform, do: resolve_platform(:os.type(), arch_string())
+  defp platform, do: resolve_platform(:os.type(), arch_string(), windows_arch_hint())
 
   # {source, platform-string}: which feed to fetch from, and that feed's own name for
-  # this OS/CPU. A pure function of (os_type, arch) - `platform/0` is the only caller
-  # that actually reads the real machine, so this stays directly testable without
-  # mocking `:os`/`:erlang` themselves (risky: those are called by unrelated code
+  # this OS/CPU. A pure function of (os_type, arch, windows_arch_hint) - `platform/0` is
+  # the only caller that actually reads the real machine, so this stays directly testable
+  # without mocking `:os`/`:erlang` themselves (risky: those are called by unrelated code
   # throughout the same test process, not just this one). Chrome for Testing covers
   # everything except Linux on ARM (no build published there at all - confirmed
   # against Google's own manifest); that one case routes to Playwright's CDN instead
   # (see moduledoc).
   @doc false
-  def resolve_platform(os_type, arch) do
+  def resolve_platform(os_type, arch, windows_arch_hint \\ nil) do
     case os_type do
       {:unix, :darwin} -> if arm64?(arch), do: {:ok, {:cft, "mac-arm64"}}, else: {:ok, {:cft, "mac-x64"}}
       {:unix, _linux} -> resolve_linux_platform(arch)
-      {:win32, _} -> if String.starts_with?(arch, "x86_64"), do: {:ok, {:cft, "win64"}}, else: {:ok, {:cft, "win32"}}
+      {:win32, _} -> if windows_64bit?(windows_arch_hint), do: {:ok, {:cft, "win64"}}, else: {:ok, {:cft, "win32"}}
     end
   end
 
@@ -124,6 +134,20 @@ defmodule Pepe.Browser.Fetcher do
   end
 
   defp arch_string, do: :erlang.system_info(:system_architecture) |> List.to_string()
+
+  # On every other OS, `arch_string/0` is a real CPU triple - but on Windows,
+  # `:erlang.system_info(:system_architecture)` is always the literal string "win32",
+  # 32-bit or 64-bit machine alike (an ERTS/Windows build detail, not a CPU name), so
+  # `resolve_platform/3`'s win32 branch needs a different signal entirely. Windows itself
+  # sets `PROCESSOR_ARCHITEW6432` only for a 32-bit process running under WOW64 on a
+  # 64-bit OS, holding the *real* architecture then; `PROCESSOR_ARCHITECTURE` alone is
+  # enough the rest of the time (a native 64-bit process already reports its own real
+  # 64-bit architecture there). Not read inside resolve_platform/3 itself so that
+  # function stays a pure, directly-testable function of its arguments.
+  defp windows_arch_hint, do: System.get_env("PROCESSOR_ARCHITEW6432") || System.get_env("PROCESSOR_ARCHITECTURE")
+
+  defp windows_64bit?(hint) when is_binary(hint), do: String.upcase(hint) in ["AMD64", "ARM64"]
+  defp windows_64bit?(_hint), do: false
 
   # `:erlang.system_info(:system_architecture)` returns a full target triple
   # ("aarch64-apple-darwin", "x86_64-pc-linux-gnu"), not a bare arch name - matching it
@@ -143,7 +167,7 @@ defmodule Pepe.Browser.Fetcher do
 
   defp resolve_download_url(:cft, plat) do
     case Req.get(@cft_manifest_url, receive_timeout: @manifest_timeout) do
-      {:ok, %{status: 200, body: body}} -> find_cft_url(decode(body), plat)
+      {:ok, %{status: 200, body: body}} -> with_decoded(body, &find_cft_url(&1, plat))
       {:ok, %{status: status}} -> {:error, {:manifest_fetch_failed, status}}
       {:error, reason} -> {:error, {:manifest_fetch_failed, reason}}
     end
@@ -151,14 +175,23 @@ defmodule Pepe.Browser.Fetcher do
 
   defp resolve_download_url(:playwright, plat) do
     case Req.get(@playwright_manifest_url, receive_timeout: @manifest_timeout) do
-      {:ok, %{status: 200, body: body}} -> find_playwright_url(decode(body), plat)
+      {:ok, %{status: 200, body: body}} -> with_decoded(body, &find_playwright_url(&1, plat))
       {:ok, %{status: status}} -> {:error, {:manifest_fetch_failed, status}}
       {:error, reason} -> {:error, {:manifest_fetch_failed, reason}}
     end
   end
 
-  defp decode(body) when is_binary(body), do: Jason.decode!(body)
-  defp decode(body), do: body
+  # A 200 with a body that isn't valid JSON (a captive portal, a misbehaving proxy) must
+  # become the same `manifest_fetch_failed` a bad status already does, not an unhandled
+  # `Jason.decode!` crash that turns into `Session.init`'s generic "could not start" message.
+  defp with_decoded(body, fun) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} -> fun.(decoded)
+      {:error, reason} -> {:error, {:manifest_fetch_failed, {:invalid_json, reason}}}
+    end
+  end
+
+  defp with_decoded(body, fun), do: fun.(body)
 
   # Public (but undocumented) purely so tests can feed a fixture manifest directly,
   # the same reason `resolve_platform/2` is - real manifest shapes were confirmed with
@@ -188,9 +221,18 @@ defmodule Pepe.Browser.Fetcher do
     tmp = Path.join(System.tmp_dir!(), "pepe-chrome-#{System.unique_integer([:positive])}.zip")
 
     case Req.get(url, receive_timeout: @download_timeout, into: File.stream!(tmp)) do
-      {:ok, %{status: 200}} -> {:ok, tmp}
-      {:ok, %{status: status}} -> {:error, {:download_failed, status}}
-      {:error, reason} -> {:error, {:download_failed, reason}}
+      {:ok, %{status: 200}} ->
+        {:ok, tmp}
+
+      {:ok, %{status: status}} ->
+        # `into: File.stream!/1` writes the response body (an error page, on a non-200)
+        # to `tmp` as it streams - clean it up rather than leaving a stray file behind.
+        File.rm(tmp)
+        {:error, {:download_failed, status}}
+
+      {:error, reason} ->
+        File.rm(tmp)
+        {:error, {:download_failed, reason}}
     end
   end
 

@@ -37,6 +37,7 @@ defmodule Pepe.Config do
   alias Pepe.Config.BoardCard
   alias Pepe.Config.Cron
   alias Pepe.Config.Model
+  alias Pepe.Flow.Flow
   alias Pepe.Repo
 
   # The slug of the project a fresh install is born with, and the one every command falls back to
@@ -921,6 +922,7 @@ defmodule Pepe.Config do
     # unresolved-handle binding exactly like `bound?` above does - see their own comments.
     reject_commitments_bound_to(config, ids)
     reject_watches_bound_to(config, ids)
+    reject_flows_bound_to(config, ids)
 
     config
     |> reject_bound_entries("crons", bound?)
@@ -1028,6 +1030,7 @@ defmodule Pepe.Config do
     move_project_dirs(old, new)
     rewrite_commitment_project_binding(old, new)
     rewrite_watch_project_binding(old, new)
+    rewrite_flow_project_binding(old, new)
     Pepe.Trace.rescope_project(old, new)
     Pepe.Usage.Log.rescope_project(old, new)
     Pepe.Usage.Messages.rescope_project(old, new)
@@ -1913,6 +1916,7 @@ defmodule Pepe.Config do
       Pepe.Agent.Workspace.rename(old_handle, new_handle)
       rewrite_commitment_agent_binding(old_handle, new_handle)
       rewrite_watch_agent_binding(old_handle, new_handle)
+      rewrite_flow_agent_binding(old_handle, new_handle)
       :ok
     else
       {:error, :already_exists}
@@ -2257,6 +2261,43 @@ defmodule Pepe.Config do
       |> Enum.map(& &1.id)
 
     if bound_ids != [], do: from(w in Watch, where: w.id in ^bound_ids) |> Repo.delete_all()
+    :ok
+  end
+
+  # Called on an agent rename: `old`/`new` are handles (e.g. "acme/support"), an exact match.
+  # Same shape as rewrite_watch_agent_binding/2 above - a flow is bound to its promoting
+  # agent's handle the same way a watch is bound to its owner's.
+  defp rewrite_flow_agent_binding(old, new) when is_binary(old) and is_binary(new) do
+    from(f in Flow, where: f.agent == ^old) |> Repo.update_all(set: [agent: new])
+    :ok
+  end
+
+  # Called on a project rename: `old_slug`/`new_slug` are project slugs. Same per-row shape
+  # as rewrite_watch_project_binding/2 above - the replacement handle differs per row.
+  defp rewrite_flow_project_binding(old_slug, new_slug) do
+    from(f in Flow, where: like(f.agent, ^"#{old_slug}/%"))
+    |> Repo.all()
+    |> Enum.each(fn f ->
+      new_handle = Pepe.Project.handle(new_slug, Pepe.Project.name_of(f.agent))
+      Repo.update_all(from(x in Flow, where: x.id == ^f.id), set: [agent: new_handle])
+    end)
+
+    :ok
+  end
+
+  # Called when an agent (or a whole project's agents) is deleted - `ids` is the MapSet of
+  # agent ids being dropped. Same fallback-handle resolution as reject_watches_bound_to/2
+  # above: a flow is only ever created with an already-resolved handle
+  # (Pepe.Flow.promote_from_traces/4 stores `agent.name`), but resolving through
+  # `agent_id_for/2` keeps this consistent with its siblings rather than assuming that.
+  defp reject_flows_bound_to(config, ids) do
+    bound_ids =
+      Flow
+      |> Repo.all()
+      |> Enum.filter(fn f -> is_binary(f.agent) and MapSet.member?(ids, agent_id_for(config, f.agent)) end)
+      |> Enum.map(& &1.id)
+
+    if bound_ids != [], do: from(f in Flow, where: f.id in ^bound_ids) |> Repo.delete_all()
     :ok
   end
 

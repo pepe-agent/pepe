@@ -7,6 +7,8 @@ A própria memória de um agente sobre uma conversa vive só no processo ativo d
 
 A ferramenta `session_search` dá ao agente uma forma de procurar e ler esse histórico diretamente, sem precisares de colar o contexto antigo de volta. É sempre segura (sem pedido de permissão, a mesma postura de `read_file`), e fica limitada ao projeto do próprio agente que a chamou - as conversas de um projeto não são para procurar noutro.
 
+**Dentro desse projeto, até onde uma chamada consegue ver depende do `session_search_scope` do agente.** Por omissão (`"self"`), cada ação só alcança o histórico da própria conversa que está a chamar - a definição segura para um agente que fala com vários clientes finais diferentes, em que um cliente a pedir "procura as minhas conversas antigas" nunca pode acabar a ler as de outro. Alarga para `"project"` (uma caixa de seleção na página de edição do agente, ou a flag `session_search_project_wide` do `manage_agent`) só para um agente que fala com um único operador/equipa - uma ferramenta interna sem conversa de outra pessoa no mesmo projeto para vazar.
+
 ## O que faz
 
 - **`list_sessions`** - que conversas aconteceram nesse projeto, as mais recentemente ativas primeiro, cada uma com a sua contagem de turnos.

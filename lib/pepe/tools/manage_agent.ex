@@ -78,6 +78,14 @@ defmodule Pepe.Tools.ManageAgent do
             being asked to. Turn it ON for "have it remember what it promises", "track
             reminders automatically". Needs a `utility_model` set on the target or this
             does nothing - warn the operator if they haven't set one.
+          - session_search_project_wide: whether the target's session_search tool can see
+            every conversation in its project (ON), or only the calling conversation's own
+            history (OFF, the safe default). Off is correct for an agent talking to several
+            different end customers - otherwise one customer asking to "search my past
+            conversations" could read another's. Only turn this ON for an agent that talks
+            to one operator/team, with nobody else's conversation to leak. Like
+            trust_untrusted_content, turning it ON reopens a boundary, so it cannot be done
+            from a run that has itself taken in outside content.
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -99,7 +107,7 @@ defmodule Pepe.Tools.ManageAgent do
           "flag" => %{
             "type" => "string",
             "description" => "For set_flag: which switch.",
-            "enum" => ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments)
+            "enum" => ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments session_search_project_wide)
           }
         },
         "required" => ["action"]
@@ -232,7 +240,8 @@ defmodule Pepe.Tools.ManageAgent do
     "trust_untrusted_content" => :trust_untrusted_content,
     "exempt_message_limit" => :exempt_message_limit,
     "midrun_fold" => :midrun_fold,
-    "commitments" => :commitments
+    "commitments" => :commitments,
+    "session_search_project_wide" => :session_search_scope
   }
 
   defp set_flag(target, flag_name, value, ctx) do
@@ -240,10 +249,17 @@ defmodule Pepe.Tools.ManageAgent do
          {:ok, on?} <- parse_on_off(value),
          :ok <- guard_trust(field, on?, ctx),
          {:ok, agent} <- get(target) do
-      Config.put_agent(Map.put(agent, field, on?))
+      Config.put_agent(Map.put(agent, field, flag_value(field, on?)))
       {:ok, "#{target}: #{flag_name} is #{(on? && "on") || "off"} now."}
     end
   end
+
+  # session_search_scope is stored as "self"/"project" (not a bare boolean, matching
+  # Pepe.Config.Agent's own field shape), but exposed here as an on/off switch like every
+  # other flag - the natural-language mapping is what the operator/user actually says.
+  defp flag_value(:session_search_scope, true), do: "project"
+  defp flag_value(:session_search_scope, false), do: "self"
+  defp flag_value(_field, on?), do: on?
 
   defp known_flag(name) do
     case @flags[name] do
@@ -268,6 +284,21 @@ defmodule Pepe.Tools.ManageAgent do
       {:error,
        "Refusing to enable trust_untrusted_content from a run that has taken in outside " <>
          "content. Set it from the CLI, the dashboard, or a conversation with no document in it."}
+    else
+      :ok
+    end
+  end
+
+  # Same reasoning as trust_untrusted_content above: widening session_search from "self"
+  # to "project" reopens a boundary (another end customer's conversation becomes
+  # reachable), so it cannot be done from a run that has itself taken in outside content
+  # either - an injected "widen my own visibility" instruction must not be able to grant
+  # itself cross-customer read access.
+  defp guard_trust(:session_search_scope, true, ctx) do
+    if Pepe.Permissions.tainted?(ctx) do
+      {:error,
+       "Refusing to widen session_search to project-wide from a run that has taken in " <>
+         "outside content. Set it from the CLI, the dashboard, or a conversation with no document in it."}
     else
       :ok
     end
@@ -317,7 +348,7 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
-    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}
+    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}, session_search_project_wide=#{on_off(a.session_search_scope == "project")}
     persona: #{persona_preview(a.name)}
     """
   end

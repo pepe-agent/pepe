@@ -7,6 +7,8 @@ An agent's own memory of a conversation lives only in that conversation's live p
 
 The `session_search` tool gives an agent a way to search and read that history directly, without you having to paste old context back in. It is always-safe (no permission prompt, the same posture as `read_file`), and it is scoped to the calling agent's own project - one project's conversations are not another's to search.
 
+**Within that project, how far one call can actually see depends on the agent's `session_search_scope`.** By default (`"self"`), every action only ever reaches the calling conversation's own history - the safe setting for an agent that talks to several different end customers, where one customer asking to "search my past conversations" must never be able to read another's. Widen it to `"project"` (a checkbox on the agent's edit page, or `manage_agent`'s `session_search_project_wide` flag) only for an agent with one operator/team on the other end - an internal tool with nobody else's conversation in the same project to leak.
+
 ## What it can do
 
 - **`list_sessions`** - which conversations have happened in this project, most recently active first, each with its turn count.

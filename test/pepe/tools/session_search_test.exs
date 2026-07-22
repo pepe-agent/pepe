@@ -26,7 +26,11 @@ defmodule Pepe.Tools.SessionSearchTest do
     :ok
   end
 
-  defp ctx(agent_name \\ "assistant"), do: %{agent: %Agent{name: agent_name}}
+  # These tests cover search/list/history mechanics, not the self/project scope boundary
+  # (see the "session_search_scope" describe block below for that) - explicitly opted
+  # into "project" scope so a trace with no session key (a one-shot run) or a different
+  # session key than the caller's own still shows up, matching what they each assert.
+  defp ctx(agent_name \\ "assistant"), do: %{agent: %Agent{name: agent_name, session_search_scope: "project"}}
 
   test "refuses without a calling agent in context" do
     assert SessionSearch.run(%{"action" => "list_sessions"}, %{}) == {:error, "no calling agent in context"}
@@ -107,5 +111,84 @@ defmodule Pepe.Tools.SessionSearchTest do
 
     {:ok, out} = SessionSearch.run(%{"action" => "search", "query" => "own thing"}, ctx("globex/bot"))
     assert out =~ "No matches"
+  end
+
+  describe "session_search_scope (an agent talking to several different end customers must not leak across them)" do
+    defp self_ctx(session_key), do: %{agent: %Agent{name: "assistant"}, session_key: session_key}
+
+    test "the default (\"self\") is the Agent struct's own default, not something a caller has to opt into" do
+      assert %Agent{}.session_search_scope == "self"
+    end
+
+    test "list_sessions only shows the caller's own session, not another customer's, by default" do
+      Trace.start("assistant", "telegram:me")
+      Trace.finish({:ok, "a", []})
+      Trace.start("assistant", "telegram:someone-else")
+      Trace.finish({:ok, "b", []})
+
+      {:ok, out} = SessionSearch.run(%{"action" => "list_sessions"}, self_ctx("telegram:me"))
+      assert out =~ "telegram:me"
+      refute out =~ "telegram:someone-else"
+    end
+
+    test "search only matches the caller's own session's content, not another customer's" do
+      Trace.start("assistant", "telegram:me", "my own invoice question")
+      Trace.finish({:ok, "done", []})
+      Trace.start("assistant", "telegram:someone-else", "someone else's invoice question")
+      Trace.finish({:ok, "done", []})
+
+      {:ok, out} = SessionSearch.run(%{"action" => "search", "query" => "invoice"}, self_ctx("telegram:me"))
+      assert out =~ "my own invoice question"
+      refute out =~ "someone else's invoice question"
+    end
+
+    test "session_history refuses another customer's session key, reporting it the same as empty" do
+      Trace.start("assistant", "telegram:someone-else", "private stuff")
+      Trace.finish({:ok, "done", []})
+
+      assert SessionSearch.run(%{"action" => "session_history", "session" => "telegram:someone-else"}, self_ctx("telegram:me")) ==
+               {:ok, "No turns recorded for telegram:someone-else."}
+    end
+
+    test "session_history still works for the caller's own session key" do
+      Trace.start("assistant", "telegram:me", "first")
+      Trace.finish({:ok, "a", []})
+
+      {:ok, out} = SessionSearch.run(%{"action" => "session_history", "session" => "telegram:me"}, self_ctx("telegram:me"))
+      assert out =~ "first"
+    end
+
+    test "show refuses a trace_id belonging to another customer's session" do
+      Trace.start("assistant", "telegram:someone-else", "private stuff")
+      id = Trace.finish({:ok, "done", []})
+
+      assert SessionSearch.run(%{"action" => "show", "trace_id" => id}, self_ctx("telegram:me")) ==
+               {:error, "no such trace: #{id}"}
+    end
+
+    test "show still works for a trace_id belonging to the caller's own session" do
+      Trace.start("assistant", "telegram:me", "my own thing")
+      id = Trace.finish({:ok, "done", []})
+
+      {:ok, out} = SessionSearch.run(%{"action" => "show", "trace_id" => id}, self_ctx("telegram:me"))
+      assert out =~ "my own thing"
+    end
+
+    test "with no session key in ctx at all (a one-shot run), self scope sees nothing rather than falling open" do
+      Trace.start("assistant", "telegram:someone-else")
+      Trace.finish({:ok, "done", []})
+
+      assert SessionSearch.run(%{"action" => "list_sessions"}, %{agent: %Agent{name: "assistant"}}) ==
+               {:ok, "No conversations recorded yet."}
+    end
+
+    test "an agent explicitly opted into \"project\" scope keeps the old, full-project visibility" do
+      Trace.start("assistant", "telegram:someone-else", "widened on purpose")
+      Trace.finish({:ok, "done", []})
+
+      wide_ctx = %{agent: %Agent{name: "assistant", session_search_scope: "project"}, session_key: "telegram:me"}
+      {:ok, out} = SessionSearch.run(%{"action" => "search", "query" => "widened"}, wide_ctx)
+      assert out =~ "widened on purpose"
+    end
   end
 end

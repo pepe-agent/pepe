@@ -44,7 +44,11 @@ defmodule Mix.Tasks.PepeBoardHeartbeatCliTest do
     out = pepe(["board", "card", "heartbeat", card.id])
 
     assert out =~ "heartbeat recorded"
-    assert Config.get_board_card(card.id).claimed_at > stale_at
+    refreshed = Config.get_board_card(card.id)
+    # claimed_at is the claim's identity token (block_if_still_running/3's ABA guard) -
+    # a heartbeat must not move it; only the separate heartbeated_at column does.
+    assert refreshed.claimed_at == stale_at
+    assert refreshed.heartbeated_at > stale_at
   end
 
   test "--as names a specific claimant" do

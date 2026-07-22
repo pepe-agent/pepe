@@ -329,6 +329,20 @@ defmodule PepeWeb.AgentsLive do
                   <p class={hlp()}>{gettext("Normally, once the agent takes in a file or a fetched page, its auto-approved tools go back to asking, so a hidden instruction in that content can't run unattended. Turn this on for a trusted owner's agent that must act on documents you send it — it reopens that path, so only for an agent you trust for exactly that.")}</p>
                 </span>
               </label>
+
+              <label class="flex items-start gap-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  name="session_search_project_wide"
+                  value="true"
+                  checked={@edit_agent[:session_search_scope] == "project"}
+                  class="mt-0.5"
+                />
+                <span>
+                  {gettext("Let session_search see every conversation in this project, not just the caller's own")}
+                  <p class={hlp()}>{gettext("Off (the default) is safe for an agent that talks to several different end customers: session_search only ever reaches the calling conversation's own history. Turn this on only for an agent with one operator/team on the other end, where there's no other customer's conversation to leak.")}</p>
+                </span>
+              </label>
             </.form_section>
 
             <.form_section :if={!@edit_agent.new?} title={gettext("Assembled prompt")}>
@@ -389,7 +403,8 @@ defmodule PepeWeb.AgentsLive do
       tool_progress: nil,
       exempt_message_limit: false,
       midrun_fold: false,
-      commitments: false
+      commitments: false,
+      session_search_scope: "self"
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -507,7 +522,8 @@ defmodule PepeWeb.AgentsLive do
         exempt_message_limit: params["exempt_message_limit"] == "true",
         trust_untrusted_content: params["trust_untrusted_content"] == "true",
         midrun_fold: params["midrun_fold"] == "true",
-        commitments: params["commitments"] == "true"
+        commitments: params["commitments"] == "true",
+        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self")
     }
 
     case Config.put_agent(agent) do
@@ -555,7 +571,8 @@ defmodule PepeWeb.AgentsLive do
         exempt_message_limit: params["exempt_message_limit"] == "true",
         trust_untrusted_content: params["trust_untrusted_content"] == "true",
         midrun_fold: params["midrun_fold"] == "true",
-        commitments: params["commitments"] == "true"
+        commitments: params["commitments"] == "true",
+        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self")
     }
 
     {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}

@@ -46,6 +46,10 @@ defmodule Pepe.Config.BoardCard do
     # when not `running`.
     field :claimed_by, :string
     field :claimed_at, :integer
+    # Bumped by `Pepe.Board.heartbeat/2` while a long-running claim is still alive - kept
+    # separate from `claimed_at`, which doubles as the claim's identity token (see
+    # `Pepe.Board.block_if_still_running/3`). nil until the first heartbeat.
+    field :heartbeated_at, :integer
     # Set on any `running → blocked` transition (explicit `block`, a timeout, or a
     # dispatch that ended without calling `complete`/`block`): always present on a
     # blocked card, so the dashboard/tool never has to guess why.
@@ -57,7 +61,7 @@ defmodule Pepe.Config.BoardCard do
   @type t :: %__MODULE__{}
 
   @fields ~w(id board title body assignee status priority depends_on auto_dispatch
-             claimed_by claimed_at block_reason created_at updated_at)a
+             claimed_by claimed_at heartbeated_at block_reason created_at updated_at)a
 
   @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(card, attrs), do: cast(card, attrs, @fields)

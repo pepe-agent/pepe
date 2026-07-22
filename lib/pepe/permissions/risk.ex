@@ -132,16 +132,23 @@ defmodule Pepe.Permissions.Risk do
 
     [
       {:inline_eval, inline_eval?(t)},
-      # Not just `curl | sh`: anything piped into a shell interpreter, since a download tool
-      # hidden behind a pipeline (`base64 -d payload | sh`) is the same shape of risk without
-      # a curl/wget literal in the command for the older, narrower pattern to catch.
-      {:download_exec, Regex.match?(~r/\|\s*(sh|bash|zsh)\b/, t)},
+      # Not just `curl | sh`: anything piped into a shell OR scripting-language interpreter
+      # (optionally by a full path, `/bin/sh`, `/usr/bin/env python3`), since a download tool
+      # hidden behind a pipeline (`base64 -d payload | python3`, `curl ... | /bin/sh`) is the
+      # same shape of risk without a `curl | sh` literal for the older, narrower pattern to catch.
+      {:download_exec, Regex.match?(~r/\|\s*(?:\S*\/)?(sh|bash|zsh|python3?|perl|ruby|node)\b/, t)},
       # Any `rm`, not just one carrying a flag: `rm file.txt` deletes a file exactly as much as
-      # `rm -f file.txt` does, and used to slip through unflagged.
-      {:deletes, Regex.match?(~r/\brm\b|\brmdir\b|\bunlink\b/, t)},
+      # `rm -f file.txt` does. `find ... -delete` and `dd` (overwriting a target) delete the
+      # same way without the word "rm" anywhere in the command.
+      {:deletes, Regex.match?(~r/\brm\b|\brmdir\b|\bunlink\b|-delete\b|\bdd\b/, t)},
       {:elevated, Regex.match?(~r/\bsudo\b|\bdoas\b/, t)},
       {:network, Regex.match?(~r/\b(curl|wget|nc|ssh|scp)\b/, t)},
-      {:writes_file, Regex.match?(~r/>\s*\/|\btee\b/, t)}
+      # Not just an absolute-path redirect or `tee`: a relative one (`> notes.txt`) writes a
+      # file exactly as much as `> /tmp/notes.txt` does (excluding `>&1`-style fd duplication,
+      # which writes nothing). `mv`/`cp` relocate or overwrite a file the same way; `chmod`
+      # turns whatever a prior step just wrote into something that can run on its own later
+      # (a dropped git hook, a cron entry) - the same shape of risk as the write itself.
+      {:writes_file, Regex.match?(~r/>{1,2}\s*[^\s&]|\btee\b|\bmv\b|\bcp\b|\bchmod\b/, t)}
     ]
     |> Enum.filter(&elem(&1, 1))
     |> Enum.map(&elem(&1, 0))

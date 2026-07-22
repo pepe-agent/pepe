@@ -48,7 +48,7 @@ defmodule Pepe.Readable do
       clean = Floki.filter_out(doc, Enum.join(@noise_selectors, ", "))
       text = clean |> best_candidate() |> extract_text()
 
-      if String.length(text) >= @min_text_length do
+      if byte_size(text) >= @min_text_length do
         {:ok, %{title: title, text: text}}
       else
         :error
@@ -83,12 +83,7 @@ defmodule Pepe.Readable do
   end
 
   defp best_scored_block(clean) do
-    candidates = Floki.find(clean, "div, section, td")
-
-    case candidates do
-      [] -> clean
-      _ -> Enum.max_by(candidates, &block_score/1, fn -> clean end)
-    end
+    clean |> Floki.find("div, section, td") |> Enum.max_by(&block_score/1, fn -> clean end)
   end
 
   # Text outside any link, minus a per-link-count penalty (a block with many
@@ -112,11 +107,27 @@ defmodule Pepe.Readable do
   defp extract_text(node) do
     node
     |> Floki.find("p, h1, h2, h3, h4, h5, h6, li, blockquote, pre")
+    |> top_level_only()
     |> case do
       [] -> node |> Floki.text(sep: "\n\n") |> normalize_whitespace()
       blocks -> blocks |> Enum.map_join("\n\n", &(&1 |> Floki.text() |> String.trim())) |> normalize_whitespace()
     end
   end
+
+  # Floki.find/2 returns nested matches too - a "loose list" (`<li><p>text</p></li>`,
+  # common in rendered Markdown/READMEs) or a `<blockquote><p>text</p></blockquote>`
+  # matches both the outer and the inner element, so naively joining every match's own
+  # `Floki.text()` would put that same text in the output twice. Keep only the outermost
+  # match in each nested group - its own `Floki.text()` already carries whatever text its
+  # matched descendants have.
+  defp top_level_only(blocks) do
+    Enum.reject(blocks, fn block -> Enum.any?(blocks, &(&1 != block and contains?(&1, block))) end)
+  end
+
+  defp contains?({_tag, _attrs, children}, target) when is_list(children),
+    do: Enum.any?(children, &(&1 == target or contains?(&1, target)))
+
+  defp contains?(_node, _target), do: false
 
   defp normalize_whitespace(text) do
     text

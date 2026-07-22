@@ -37,9 +37,13 @@ defmodule Pepe.Security.ExternalContent do
   """
   @spec sanitize(term()) :: term()
   def sanitize(text) when is_binary(text) do
+    # Invisible characters removed FIRST: a control token split by one (e.g. a zero-width
+    # space slipped into the middle of `<|im_start|>`) doesn't match @special_tokens as
+    # written, and stripping tokens first would then delete the invisible character and
+    # leave the two halves rejoined, right back into a real, intact token. Order matters.
     text
-    |> String.replace(@special_tokens, " ")
     |> String.replace(@invisible, "")
+    |> String.replace(@special_tokens, " ")
   end
 
   def sanitize(other), do: other
