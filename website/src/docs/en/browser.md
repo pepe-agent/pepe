@@ -41,7 +41,7 @@ A browser under an agent's control reaches the same network the app does, so `br
 2. Whatever's already installed - checked on `PATH` and in each OS's normal install locations (`/Applications` on macOS, `Program Files` and the per-user install folder on Windows), so a browser you already have is used as-is, container or not.
 3. **A one-time automatic download** if neither of those found anything: a small, display-less `chrome-headless-shell` build from Google's own Chrome for Testing feed, cached under `~/.cache/pepe/browser/` so this only happens once per machine. Turn it off with `PEPE_BROWSER_AUTO_DOWNLOAD=0` if you'd rather install one yourself and see a clear error instead.
 
-The default image doesn't include the browser package itself (the same reasoning that keeps ffmpeg out - see the Dockerfile) - but it does include the shared libraries `chrome-headless-shell` needs to actually launch once downloaded, since `browser` is a built-in tool, not an optional extra. So step 3 is what runs by default in Docker, and it works out of the box: no build arg needed, on an `amd64` host (Google doesn't publish a Chrome for Testing build for Linux on ARM - see below). If you'd rather bake a full browser into the image instead of downloading at runtime:
+The default image doesn't include the browser package itself (the same reasoning that keeps ffmpeg out - see the Dockerfile) - but it does include the shared libraries a downloaded browser needs to actually launch, on both architectures the official image ships (`amd64` and `arm64`), since `browser` is a built-in tool, not an optional extra. So step 3 is what runs by default in Docker, and it works out of the box: no build arg needed, no manual install, on either architecture - including an Apple Silicon Mac or an ARM cloud host, not just `amd64`. If you'd rather bake a full browser into the image instead of downloading at runtime:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
@@ -49,4 +49,4 @@ docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 
 ## Linux on ARM
 
-Chrome for Testing has no Linux ARM build, so step 3 can't help there - `browser` returns a clear "unsupported platform" error instead of silently failing. Install Chromium yourself via your system's package manager and put it on `PATH`, or set `PEPE_CHROME_BINARY`.
+Google doesn't publish a Chrome for Testing build for Linux on ARM, so step 3 uses Playwright's own CDN there instead (a plain HTTPS download, same as Chrome for Testing - no npm or Node.js involved) - the one difference is it downloads full Chromium rather than the smaller headless-only build, since that CDN doesn't serve a headless-only build as its own artifact. Either way, this is automatic: an ARM host doesn't need any special configuration, in Docker or outside it.

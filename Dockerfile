@@ -134,31 +134,38 @@ RUN apt-get update -y \
        libstdc++6 openssl libncurses6 locales ca-certificates curl git \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Runtime shared libraries `chrome-headless-shell` needs to LAUNCH - not Chromium
-# itself, which stays out of the default image (see PEPE_IMAGE_APT_PACKAGES below).
-# `browser` isn't optional-extra like ffmpeg: it's a built-in tool (Pepe.Browser),
-# same standing as `bash` or `fetch_url`, and it now downloads its own browser
-# binary automatically on first use (Pepe.Browser.Fetcher) - but a downloaded
+# Runtime shared libraries the browser Pepe.Browser.Fetcher downloads needs to
+# LAUNCH - not Chromium itself, which stays out of the default image (see
+# PEPE_IMAGE_APT_PACKAGES below). `browser` isn't optional-extra like ffmpeg: it's
+# a built-in tool (Pepe.Browser), same standing as `bash` or `fetch_url`, and it
+# downloads its own browser binary automatically on first use - but a downloaded
 # binary still needs these to dynamically link against, and a minimal Debian image
-# has none of them. This exact list was verified empirically against this same
-# base image and Chrome for Testing's linux64 chrome-headless-shell build (`ldd`
-# for missing sonames, then a real launch and page navigation) - not copied from a
-# generic "how to run Chrome on Debian" guide, several of which list packages this
-# UI-less build never actually links against (no libgtk-3-0, no libcairo2, no
-# libpango). Trixie renamed several of these with a t64 suffix as part of the
-# 64-bit time_t transition (confirmed live: `apt-get install libasound2` really
-# does resolve to `libasound2t64` via Debian's own transitional package) - the
-# names below are the pre-transition ones on purpose, since those transitional
-# packages exist specifically so this doesn't need updating on the next Debian
-# bump. 53 packages, ~56MB fetched - real cost, but nowhere near what installing
-# actual Chromium (plus a second, redundant copy of the very binary Fetcher
-# already downloads) would add.
+# has none of them.
+#
+# This list covers BOTH of Fetcher's download shapes, since this one Dockerfile
+# builds both architectures the official multi-arch image ships:
+#   - amd64: Chrome for Testing's `chrome-headless-shell` - display-less, no GTK/X11
+#     windowing needed at all.
+#   - arm64: Google publishes no Chrome for Testing build for Linux on ARM, so this
+#     is Playwright's CDN instead, which only serves full Chromium there (not
+#     headless-shell as its own artifact) - a real UI-capable browser, and a real
+#     larger dependency set (libcairo2/libpango-1.0-0/libcups2 on top of the
+#     headless-shell set) even though it never opens a window in this container.
+# Every package below was found by actually running `ldd` against a real downloaded
+# build of each on this same base image, then confirming a real launch and page
+# navigation - not copied from a generic "how to run Chrome on Debian" guide (which
+# is where libgtk-3-0 would have come from, and headless-shell never links against
+# it). Trixie renamed several of these with a t64 suffix as part of the 64-bit
+# time_t transition (confirmed live: `apt-get install libasound2` really does
+# resolve to `libasound2t64` via Debian's own transitional package) - the names
+# below are the pre-transition ones on purpose, since those transitional packages
+# exist specifically so this doesn't need updating on the next Debian bump.
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends \
        libglib2.0-0 libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libdbus-1-3 \
        libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
        libgbm1 libexpat1 libxcb1 libxkbcommon0 libasound2 libatspi2.0-0 \
-       fonts-liberation fontconfig \
+       fonts-liberation fontconfig libcups2 libcairo2 libpango-1.0-0 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Extra system packages, without writing a Dockerfile of your own:

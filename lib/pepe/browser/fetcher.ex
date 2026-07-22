@@ -9,12 +9,22 @@ defmodule Pepe.Browser.Fetcher do
   `/tools` doc already describes: regenerable, architecture-bound, not backed up),
   so this only runs once per machine.
 
+  **Linux on ARM is the one platform Chrome for Testing doesn't publish for at
+  all** (confirmed against Google's own manifest, not assumed) - Playwright's own
+  CDN is the fallback there instead, fetched the same way (its `browsers.json`
+  manifest, then a plain HTTPS download, no npm/Node.js involved). That CDN also
+  doesn't serve `chrome-headless-shell` as its own artifact (every URL shape tried
+  returned a gateway error - confirmed empirically, not assumed either), so the
+  ARM path downloads full Chromium instead: a real, larger fallback, but a
+  fallback only Linux ARM hosts ever take.
+
   Deliberately narrower than a full Playwright/Puppeteer install: no `--with-deps`,
-  no system package installation (that needs `apt`/root, which a headless-shell
-  binary launch does not - though the *shared libraries* it links against still
-  have to already be on the machine; on a from-scratch minimal Linux image with
-  none of them, downloading the binary alone won't make it launch - see
-  `PEPE_IMAGE_APT_PACKAGES=chromium` for that case instead).
+  no system package installation (that needs `apt`/root, which a downloaded binary
+  launch does not - though the *shared libraries* it links against still have to
+  already be on the machine; on a from-scratch minimal Linux image with none of
+  them, downloading the binary alone won't make it launch - see
+  `PEPE_IMAGE_APT_PACKAGES=chromium` for that case instead, or the Dockerfile's own
+  bundled set for the official image).
 
   Opt out with `PEPE_BROWSER_AUTO_DOWNLOAD=0` if you'd rather this fail with a
   clear error and install Chrome yourself.
@@ -22,10 +32,19 @@ defmodule Pepe.Browser.Fetcher do
 
   require Logger
 
-  @manifest_url "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
-  @product "chrome-headless-shell"
+  @cft_manifest_url "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+  @cft_product "chrome-headless-shell"
+
+  # Pinned to a real release tag, not `main` - Chrome for Testing's own manifest is
+  # explicitly curated as "last known good"; Playwright's `browsers.json` on its
+  # development branch carries no such guarantee, so a stable tag is the closer
+  # equivalent. Bump this occasionally, same spirit as the Dockerfile's own pinned
+  # versions - it only affects the one platform (Linux ARM) that has no other source.
+  @playwright_manifest_url "https://raw.githubusercontent.com/microsoft/playwright/release-1.55/packages/playwright-core/browsers.json"
+  @playwright_download_host "https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds"
+
   @manifest_timeout 15_000
-  @download_timeout 120_000
+  @download_timeout 180_000
 
   @doc "A cached download if one exists, else fetch and cache one. `{:ok, path} | {:error, reason}`."
   def ensure_chrome do
@@ -49,8 +68,8 @@ defmodule Pepe.Browser.Fetcher do
 
   defp cached_binary do
     case platform() do
-      {:ok, plat} ->
-        exe = Path.join(cache_dir(), executable_name(plat))
+      {:ok, {source, plat}} ->
+        exe = Path.join(cache_dir(), executable_name(source, plat))
         if File.exists?(exe), do: {:ok, exe}, else: :none
 
       {:error, _} ->
@@ -59,15 +78,15 @@ defmodule Pepe.Browser.Fetcher do
   end
 
   defp download do
-    with {:ok, plat} <- platform(),
-         {:ok, url} <- resolve_download_url(plat) do
-      Logger.info("[browser] no Chrome found - downloading chrome-headless-shell (~100-150MB, one time)")
+    with {:ok, {source, plat}} <- platform(),
+         {:ok, url} <- resolve_download_url(source, plat) do
+      Logger.info("[browser] no Chrome found - downloading one (~100-200MB, one time)")
 
       with {:ok, zip} <- fetch_zip(url),
            {:ok, extracted} <- extract(zip),
-           {:ok, exe} <- install(extracted, plat) do
+           {:ok, exe} <- install(extracted, source, plat) do
         File.rm(zip)
-        Logger.info("[browser] downloaded chrome-headless-shell to #{exe}")
+        Logger.info("[browser] downloaded a browser to #{exe}")
         {:ok, exe}
       end
     end
@@ -77,17 +96,30 @@ defmodule Pepe.Browser.Fetcher do
   ### platform
   ###
 
-  # Google publishes Chrome for Testing for these five platform strings only - no
-  # Linux ARM build exists, so a Linux ARM host correctly falls through to
-  # :unsupported_platform (a real gap, not a bug: install Chromium via the system
-  # package manager there instead).
-  defp platform do
-    arch = arch_string()
+  defp platform, do: resolve_platform(:os.type(), arch_string())
 
-    case :os.type() do
-      {:unix, :darwin} -> if arm64?(arch), do: {:ok, "mac-arm64"}, else: {:ok, "mac-x64"}
-      {:unix, _linux} -> if String.starts_with?(arch, "x86_64"), do: {:ok, "linux64"}, else: {:error, :unsupported_platform}
-      {:win32, _} -> if String.starts_with?(arch, "x86_64"), do: {:ok, "win64"}, else: {:ok, "win32"}
+  # {source, platform-string}: which feed to fetch from, and that feed's own name for
+  # this OS/CPU. A pure function of (os_type, arch) - `platform/0` is the only caller
+  # that actually reads the real machine, so this stays directly testable without
+  # mocking `:os`/`:erlang` themselves (risky: those are called by unrelated code
+  # throughout the same test process, not just this one). Chrome for Testing covers
+  # everything except Linux on ARM (no build published there at all - confirmed
+  # against Google's own manifest); that one case routes to Playwright's CDN instead
+  # (see moduledoc).
+  @doc false
+  def resolve_platform(os_type, arch) do
+    case os_type do
+      {:unix, :darwin} -> if arm64?(arch), do: {:ok, {:cft, "mac-arm64"}}, else: {:ok, {:cft, "mac-x64"}}
+      {:unix, _linux} -> resolve_linux_platform(arch)
+      {:win32, _} -> if String.starts_with?(arch, "x86_64"), do: {:ok, {:cft, "win64"}}, else: {:ok, {:cft, "win32"}}
+    end
+  end
+
+  defp resolve_linux_platform(arch) do
+    cond do
+      String.starts_with?(arch, "x86_64") -> {:ok, {:cft, "linux64"}}
+      arm64?(arch) -> {:ok, {:playwright, "linux-arm64"}}
+      true -> {:error, :unsupported_platform}
     end
   end
 
@@ -101,16 +133,25 @@ defmodule Pepe.Browser.Fetcher do
   # silently instead of loudly). Prefix match instead, everywhere arch is checked.
   defp arm64?(arch), do: String.starts_with?(arch, "aarch64") or String.starts_with?(arch, "arm64")
 
-  defp executable_name(plat) when plat in ["win32", "win64"], do: "chrome-headless-shell.exe"
-  defp executable_name(_plat), do: "chrome-headless-shell"
+  defp executable_name(:cft, plat) when plat in ["win32", "win64"], do: "chrome-headless-shell.exe"
+  defp executable_name(:cft, _plat), do: "chrome-headless-shell"
+  defp executable_name(:playwright, _plat), do: "chrome"
 
   ###
   ### manifest + download
   ###
 
-  defp resolve_download_url(plat) do
-    case Req.get(@manifest_url, receive_timeout: @manifest_timeout) do
-      {:ok, %{status: 200, body: body}} -> find_platform_url(decode(body), plat)
+  defp resolve_download_url(:cft, plat) do
+    case Req.get(@cft_manifest_url, receive_timeout: @manifest_timeout) do
+      {:ok, %{status: 200, body: body}} -> find_cft_url(decode(body), plat)
+      {:ok, %{status: status}} -> {:error, {:manifest_fetch_failed, status}}
+      {:error, reason} -> {:error, {:manifest_fetch_failed, reason}}
+    end
+  end
+
+  defp resolve_download_url(:playwright, plat) do
+    case Req.get(@playwright_manifest_url, receive_timeout: @manifest_timeout) do
+      {:ok, %{status: 200, body: body}} -> find_playwright_url(decode(body), plat)
       {:ok, %{status: status}} -> {:error, {:manifest_fetch_failed, status}}
       {:error, reason} -> {:error, {:manifest_fetch_failed, reason}}
     end
@@ -119,11 +160,26 @@ defmodule Pepe.Browser.Fetcher do
   defp decode(body) when is_binary(body), do: Jason.decode!(body)
   defp decode(body), do: body
 
-  defp find_platform_url(manifest, plat) do
-    downloads = get_in(manifest, ["channels", "Stable", "downloads", @product]) || []
+  # Public (but undocumented) purely so tests can feed a fixture manifest directly,
+  # the same reason `resolve_platform/2` is - real manifest shapes were confirmed with
+  # a live fetch before being encoded here, but the parsing logic itself deserves its
+  # own regression coverage independent of mocking the HTTP layer.
+  @doc false
+  def find_cft_url(manifest, plat) do
+    downloads = get_in(manifest, ["channels", "Stable", "downloads", @cft_product]) || []
 
     case Enum.find(downloads, &(&1["platform"] == plat)) do
       %{"url" => url} -> {:ok, url}
+      nil -> {:error, {:no_download_for_platform, plat}}
+    end
+  end
+
+  @doc false
+  def find_playwright_url(manifest, plat) do
+    browsers = manifest["browsers"] || []
+
+    case Enum.find(browsers, &(&1["name"] == "chromium")) do
+      %{"revision" => rev} -> {:ok, "#{@playwright_download_host}/chromium/#{rev}/chromium-#{plat}.zip"}
       nil -> {:error, {:no_download_for_platform, plat}}
     end
   end
@@ -152,12 +208,13 @@ defmodule Pepe.Browser.Fetcher do
     end
   end
 
-  # The archive nests the executable one level down (e.g. `chrome-headless-shell-linux64/`),
-  # a name that itself carries the CfT version/platform and isn't worth hardcoding - find it
-  # by name instead, and move its whole containing directory into the cache (the executable
-  # needs its .pak/.dat/shared-lib siblings sitting right next to it to run at all).
-  defp install(extracted_dir, plat) do
-    exe_name = executable_name(plat)
+  # The archive nests the executable one level down (e.g. `chrome-headless-shell-linux64/`
+  # or, for Playwright, `chrome-linux/`) - a name that itself carries the version/platform
+  # and isn't worth hardcoding - find it by name instead, and move its whole containing
+  # directory into the cache (the executable needs its .pak/.dat/shared-lib siblings
+  # sitting right next to it to run at all).
+  defp install(extracted_dir, source, plat) do
+    exe_name = executable_name(source, plat)
 
     case find_executable(extracted_dir, exe_name) do
       {:ok, found} ->

@@ -95,4 +95,95 @@ defmodule Pepe.Browser.FetcherTest do
 
     assert {:error, {:no_download_for_platform, _plat}} = Fetcher.ensure_chrome()
   end
+
+  describe "resolve_platform/2" do
+    # A pure function of (os_type, arch-string) - tested directly rather than through
+    # `ensure_chrome/0`, since faking what machine this is by mocking `:os`/`:erlang`
+    # themselves would affect unrelated code sharing the same test process. This is
+    # exactly the shape of bug a live download test already caught once (arch string is
+    # a full target triple, not a bare name - an exact `in [...]` match silently never
+    # matches), so every branch gets its own case instead of one happy-path check.
+
+    test "macOS arm64 uses Chrome for Testing's mac-arm64 build" do
+      assert {:ok, {:cft, "mac-arm64"}} = Fetcher.resolve_platform({:unix, :darwin}, "aarch64-apple-darwin23.0.0")
+    end
+
+    test "macOS intel uses Chrome for Testing's mac-x64 build" do
+      assert {:ok, {:cft, "mac-x64"}} = Fetcher.resolve_platform({:unix, :darwin}, "x86_64-apple-darwin23.0.0")
+    end
+
+    test "linux x86_64 uses Chrome for Testing's linux64 build" do
+      assert {:ok, {:cft, "linux64"}} = Fetcher.resolve_platform({:unix, :linux}, "x86_64-pc-linux-gnu")
+    end
+
+    test "linux aarch64 falls back to Playwright's CDN, not Chrome for Testing" do
+      assert {:ok, {:playwright, "linux-arm64"}} = Fetcher.resolve_platform({:unix, :linux}, "aarch64-unknown-linux-gnu")
+    end
+
+    test "linux arm64 (the other common triple spelling) also routes to Playwright" do
+      assert {:ok, {:playwright, "linux-arm64"}} = Fetcher.resolve_platform({:unix, :linux}, "arm64-unknown-linux-gnu")
+    end
+
+    test "an unrecognized linux arch is reported, not guessed at" do
+      assert {:error, :unsupported_platform} = Fetcher.resolve_platform({:unix, :linux}, "riscv64-unknown-linux-gnu")
+    end
+
+    test "windows x86_64 uses Chrome for Testing's win64 build" do
+      assert {:ok, {:cft, "win64"}} = Fetcher.resolve_platform({:win32, :nt}, "x86_64-pc-windows-msvc")
+    end
+
+    test "windows non-x86_64 uses Chrome for Testing's win32 build" do
+      assert {:ok, {:cft, "win32"}} = Fetcher.resolve_platform({:win32, :nt}, "win32")
+    end
+  end
+
+  describe "find_playwright_url/2" do
+    # A real shape, fetched live from Playwright's own browsers.json before being
+    # trimmed down to a fixture here.
+    @playwright_manifest %{
+      "browsers" => [
+        %{"name" => "chromium", "revision" => "1193", "browserVersion" => "140.0.7339.186"},
+        %{"name" => "chromium-headless-shell", "revision" => "1193"},
+        %{"name" => "firefox", "revision" => "1490"}
+      ]
+    }
+
+    test "builds a URL matching Playwright's real, curl-verified download host and path shape" do
+      # host + /builds/chromium/<revision>/chromium-<platform>.zip was confirmed with a live
+      # curl against the real CDN before being asserted here: a 200 for chromium-linux-arm64.zip,
+      # chromium-linux.zip, chromium-win64.zip, and chromium-mac-arm64.zip.
+      assert {:ok, url} = Fetcher.find_playwright_url(@playwright_manifest, "linux-arm64")
+
+      assert url ==
+               "https://playwright.download.prss.microsoft.com/dbazure/download/playwright/builds/chromium/1193/chromium-linux-arm64.zip"
+    end
+
+    test "uses the full chromium entry's revision, not chromium-headless-shell's" do
+      # Deliberate: Playwright's CDN doesn't serve chromium-headless-shell as its own
+      # artifact (every URL shape tried returned a gateway error, confirmed live) - the
+      # ARM fallback downloads full Chromium, so it must resolve the "chromium" entry
+      # specifically, not whichever browser entry happens to come first.
+      manifest = %{
+        "browsers" => [%{"name" => "chromium-headless-shell", "revision" => "999"}, %{"name" => "chromium", "revision" => "1193"}]
+      }
+
+      assert {:ok, url} = Fetcher.find_playwright_url(manifest, "linux-arm64")
+      assert url =~ "/chromium/1193/"
+    end
+
+    test "reports clearly when the manifest has no chromium entry at all" do
+      assert {:error, {:no_download_for_platform, "linux-arm64"}} =
+               Fetcher.find_playwright_url(%{"browsers" => [%{"name" => "firefox", "revision" => "1"}]}, "linux-arm64")
+    end
+  end
+
+  describe "find_cft_url/2" do
+    test "finds the matching platform's URL" do
+      assert {:ok, "https://example.test/linux64.zip"} = Fetcher.find_cft_url(@manifest, "linux64")
+    end
+
+    test "reports clearly when no download is listed for the platform" do
+      assert {:error, {:no_download_for_platform, "linux-arm64"}} = Fetcher.find_cft_url(@manifest, "linux-arm64")
+    end
+  end
 end
