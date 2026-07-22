@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-22
+
 ### Fixed
 - **`session_search` could let one end customer read another's conversation history within the same project** - it was scoped to the calling agent's own project (correct), but not to the calling *session*, so an agent serving several different end customers under one project (a support bot) had no boundary between them: any customer asking "search my past conversations" could reach every other customer's too. Now defaults to `"self"` - every action only ever reaches the calling session's own history. An agent that genuinely has no other customer's conversation to leak (one operator/team on the other end) can opt back into the old, full-project behavior via a new `session_search_scope` setting (a checkbox on the agent's edit page, or `manage_agent`'s `session_search_project_wide` flag) - like `trust_untrusted_content`, widening it can't be done from a run that has itself taken in outside content.
 - **`browser`'s SSRF guard only checked the URL handed to `open` - any request the page itself made afterward (a link click, a JS-triggered redirect, a form submit, the page's own background fetch/XHR) reached the network unchecked.** Every request now goes through CDP's `Fetch`-domain request interception, validated the same way `open` validates its own URL, and failed outright before Chrome ever sends it if it resolves to an internal/private address. Fixing this the straightforward way (handling it on the same process driving navigation) would have self-deadlocked the browser entirely, since that process blocks itself waiting on the very request the interception needs to resolve - it's handled by a small separate linked process instead.
@@ -579,7 +581,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/pepe-agent/pepe/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/pepe-agent/pepe/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/pepe-agent/pepe/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/pepe-agent/pepe/compare/v0.9.0...v0.9.1
