@@ -33,12 +33,18 @@ Os elementos são identificados por número, não por um seletor CSS que terias 
 
 Um navegador sob controlo de um agente alcança a mesma rede que a aplicação, por isso o `browser` aplica a mesma regra do `fetch_url`: apenas `http`/`https`, e nunca um endereço interno ou privado (loopback, RFC1918, link-local, metadados da nuvem). E como um navegador a sério é uma superfície bem maior do que uma ferramenta apenas de leitura (os scripts da própria página correm, uma sessão iniciada pode ficar exposta, usa CPU e memória reais), o `browser` não é sempre-seguro: cada chamada passa pelo mesmo pedido de permissão do `bash`.
 
-## Precisa de Chrome
+## Como consegue um navegador
 
-O `browser` precisa de um binário real de Chromium ou Chrome na máquina que corre o Pepe - não vem instalado por omissão, nem no contentor nem fora dele. No Docker, ativa-o ao construir a imagem:
+O `browser` precisa de um binário real de Chrome/Chromium/Edge/Brave para controlar. Procura por esta ordem:
+
+1. `PEPE_CHROME_BINARY`, se o definires - um caminho explícito ganha a tudo o resto.
+2. O que já estiver instalado - verificado no `PATH` e nos locais normais de instalação de cada sistema (`/Applications` no macOS, `Program Files` e a pasta de instalação por utilizador no Windows), portanto um navegador que já tenhas é usado tal como está, em contentor ou não.
+3. **Uma transferência automática, uma única vez**, se nenhum dos anteriores encontrar nada: um build pequeno e sem interface do `chrome-headless-shell`, vindo do feed oficial Chrome for Testing da Google, guardado em cache em `~/.cache/pepe/browser/` para que isto só aconteça uma vez por máquina. Desliga com `PEPE_BROWSER_AUTO_DOWNLOAD=0` se preferires instalar um tu próprio e ver um erro claro em vez disso.
+
+No Docker, a imagem base não inclui nenhum pacote de navegador (a mesma lógica que mantém o ffmpeg de fora - ver o Dockerfile), portanto o passo 3 é o que corre de facto lá por omissão. Se preferires embutir um na imagem em vez de transferir em tempo de execução:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 ```
 
-Fora do Docker, instala o Chromium (ou Chrome) e garante que fica no `PATH`, ou aponta o `PEPE_CHROME_BINARY` para o seu executável. Sem nenhum dos dois, o `browser` devolve um erro claro em vez de falhar em silêncio.
+Uma imagem de contentor mínima pode não ter as bibliotecas partilhadas de que um binário transferido ainda precisa para *arrancar*, mesmo já estando presente - se o `browser` reportar uma falha ao arrancar em vez de um erro de binário em falta, esse build arg (que traz toda a cadeia de dependências do Chromium via `apt`) é a solução, não o `PEPE_CHROME_BINARY`.

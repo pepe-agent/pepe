@@ -28,12 +28,17 @@ defmodule Pepe.Browser.Session do
   @max_elements 150
   @max_text 4_000
 
-  # Debian package name first (what `PEPE_IMAGE_APT_PACKAGES=chromium` installs),
-  # then common Linux alternatives, then macOS's default install location - the
-  # last one only matters for local development, since no server ships an app
-  # bundle.
-  @chrome_candidates ~w(chromium chromium-browser google-chrome google-chrome-stable)
-  @chrome_app_paths ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"]
+  # Priority mirrors what openclaw/hermes both actually probe (checked directly in
+  # their own source, not guessed): a full browser the machine already has beats
+  # downloading one. PATH names first - the Debian package name `PEPE_IMAGE_APT_
+  # PACKAGES=chromium` installs, plus what an apt/brew/choco install of any of the
+  # four Chromium-based browsers actually lands on PATH as - then (in
+  # `chrome_app_paths/0`) the well-known per-OS install locations a GUI installer
+  # uses without ever touching PATH.
+  @chrome_candidates ~w(
+    chromium chromium-browser google-chrome google-chrome-stable chrome
+    microsoft-edge microsoft-edge-stable brave-browser
+  )
 
   ###
   ### API
@@ -41,8 +46,13 @@ defmodule Pepe.Browser.Session do
 
   def start_link(key, opts \\ []), do: GenServer.start_link(__MODULE__, key, opts)
 
-  @doc "Is a Chromium/Chrome binary available to launch? Used to skip live tests when none is installed."
-  def chrome_available?, do: match?({:ok, _}, find_chrome())
+  @doc """
+  Is a Chromium/Chrome binary already on this machine - no download attempted?
+  Used to skip live tests when none is installed, deliberately without triggering
+  `Pepe.Browser.Fetcher`'s real download (a test run must never depend on network
+  access or spend ~100MB just to decide whether to skip).
+  """
+  def chrome_available?, do: match?({:ok, _}, find_local_chrome())
 
   def open(pid, url), do: GenServer.call(pid, {:open, url}, @action_timeout + 5_000)
   def snapshot(pid), do: GenServer.call(pid, :snapshot, @action_timeout + 5_000)
@@ -192,7 +202,19 @@ defmodule Pepe.Browser.Session do
   ### chrome discovery
   ###
 
+  # The real acquisition path a launch uses: whatever's already on the machine, and
+  # failing that, `Pepe.Browser.Fetcher`'s one-time download.
   defp find_chrome do
+    case find_local_chrome() do
+      {:ok, exe} -> {:ok, exe}
+      {:error, _} -> Pepe.Browser.Fetcher.ensure_chrome()
+    end
+  end
+
+  # No network: an explicit override, then whatever's already installed. This is its
+  # own function (not just `find_chrome/0` without the fallback) because
+  # `chrome_available?/0` needs a check that never has a network side effect.
+  defp find_local_chrome do
     case Application.get_env(:pepe, :chrome_binary) || System.get_env("PEPE_CHROME_BINARY") do
       path when is_binary(path) and path != "" -> {:ok, path}
       _ -> find_chrome_candidate()
@@ -201,12 +223,42 @@ defmodule Pepe.Browser.Session do
 
   defp find_chrome_candidate do
     on_path = Enum.find_value(@chrome_candidates, &System.find_executable/1)
-    app_bundle = Enum.find(@chrome_app_paths, &File.exists?/1)
+    app_bundle = Enum.find(chrome_app_paths(), &File.exists?/1)
 
     case on_path || app_bundle do
       nil -> {:error, :chrome_not_found}
       exe -> {:ok, exe}
     end
+  end
+
+  # A GUI install (as opposed to a package-manager one) lands in a fixed per-OS
+  # location that never touches PATH, so `find_executable/1` above would miss it
+  # entirely - the same reason openclaw's own browser-selection docs check these
+  # same paths before falling back to anything else. Priority within each OS
+  # (Chrome, then Brave, then Edge, then Chromium) matches openclaw's own order.
+  defp chrome_app_paths do
+    local_app_data = System.get_env("LOCALAPPDATA") || System.get_env("USERPROFILE")
+
+    [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      "C:/Program Files/Google/Chrome/Application/chrome.exe",
+      "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+      "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe",
+      "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
+      "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+    ] ++ windows_user_paths(local_app_data)
+  end
+
+  # A non-admin Windows install of Chrome (very common - it's what "just click the
+  # installer" does without a UAC prompt) lands under the user's own AppData, not
+  # Program Files.
+  defp windows_user_paths(nil), do: []
+
+  defp windows_user_paths(local_app_data) do
+    ["#{local_app_data}/Google/Chrome/Application/chrome.exe"]
   end
 
   ###

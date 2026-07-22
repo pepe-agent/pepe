@@ -33,12 +33,18 @@ Elements are addressed by number, not by a CSS selector you'd have to write your
 
 A browser under an agent's control reaches the same network the app does, so `browser` enforces the same rule `fetch_url` does: only `http`/`https`, and never an internal or private address (loopback, RFC1918, link-local, cloud metadata). And because a real browser is a materially bigger surface than a read-only tool - the page's own scripts run, a signed-in session could be exposed, it uses real CPU and memory - `browser` is not always-safe: every call goes through the same permission prompt as `bash`.
 
-## Chrome required
+## Getting a browser
 
-`browser` needs an actual Chromium or Chrome binary on the machine running Pepe - it isn't installed by default, in the container or otherwise. In Docker, opt in at build time:
+`browser` needs an actual Chrome/Chromium/Edge/Brave binary to drive. It looks in this order:
+
+1. `PEPE_CHROME_BINARY`, if you set it - an explicit path wins over everything else.
+2. Whatever's already installed - checked on `PATH` and in each OS's normal install locations (`/Applications` on macOS, `Program Files` and the per-user install folder on Windows), so a browser you already have is used as-is, container or not.
+3. **A one-time automatic download** if neither of those found anything: a small, display-less `chrome-headless-shell` build from Google's own Chrome for Testing feed, cached under `~/.cache/pepe/browser/` so this only happens once per machine. Turn it off with `PEPE_BROWSER_AUTO_DOWNLOAD=0` if you'd rather install one yourself and see a clear error instead.
+
+In Docker, the base image doesn't include a browser package (the same reasoning that keeps ffmpeg out - see the Dockerfile), so step 3 is what actually runs there by default. If you'd rather bake one into the image instead of downloading at runtime:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 ```
 
-Outside Docker, install Chromium (or Chrome) and make sure it's on `PATH`, or point `PEPE_CHROME_BINARY` at its executable. With neither, `browser` returns a clear error instead of failing silently.
+A minimal container image can be missing shared libraries a downloaded binary still needs to *launch* even once present - if `browser` reports a launch failure rather than a missing-binary error, that build arg (which pulls Chromium's full dependency chain via `apt`) is the fix, not `PEPE_CHROME_BINARY`.
