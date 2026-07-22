@@ -115,6 +115,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
       mix pepe traces [--project CO] [ID]        # inspect/replay recent agent runs
       mix pepe flow list|promote|show|remove|run ... # promote a proven trace sequence into a script
+      mix pepe browser install                  # host-level help for the `browser` agent tool
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
@@ -177,6 +178,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "extract" | _]), do: extract_help()
   def dispatch(["help", "restore" | _]), do: restore_help()
   def dispatch(["help", "flow" | _]), do: flow_cmd(["help"])
+  def dispatch(["help", "browser" | _]), do: browser_cmd(["help"])
 
   def dispatch(["setup" | _]), do: with_config(&setup/0)
   def dispatch(["config" | rest]), do: with_config(fn -> config_cmd(rest) end)
@@ -215,6 +217,8 @@ defmodule Mix.Tasks.Pepe do
   # with_config already starts.
   def dispatch(["flow", "run" | rest]), do: with_app([], fn -> flow_cmd(["run" | rest]) end)
   def dispatch(["flow" | rest]), do: with_config(fn -> flow_cmd(rest) end)
+  # Pure host detection (package manager on PATH, current uid) - no config/app needed at all.
+  def dispatch(["browser" | rest]), do: browser_cmd(rest)
   def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
   def dispatch(["review" | rest]), do: with_app([], fn -> review_cmd(rest) end)
   def dispatch(["update" | _]), do: with_app([], fn -> update_cmd() end)
@@ -1273,6 +1277,83 @@ defmodule Mix.Tasks.Pepe do
 
     A flow only replays a step whose tool is already in the agent's own auto_approve -
     there is nobody watching a flow run to ask, same as any other unattended surface.
+    """)
+  end
+
+  ### browser (host-level help for the `browser` agent tool - see Pepe.Browser.Fetcher)
+
+  defp browser_cmd(["install"]) do
+    case Pepe.Browser.SystemDeps.detect() do
+      {manager, cmd} ->
+        needs_sudo? = not Pepe.Browser.SystemDeps.root?()
+        shown = if needs_sudo?, do: "sudo " <> Enum.join(cmd, " "), else: Enum.join(cmd, " ")
+        info("Detected #{manager}. Installing a browser the `browser` tool can drive:\n")
+        info("    #{shown}\n")
+        if needs_sudo?, do: info("(enter your password if prompted)\n")
+
+        case Pepe.Browser.SystemDeps.install(cmd) do
+          :ok ->
+            info("\nDone - the browser tool finds it automatically now, no further configuration needed.")
+
+          {:error, status} ->
+            error("\n#{manager} exited with status #{status} - see its output above for why.")
+        end
+
+      :not_found ->
+        browser_install_not_found_message(:os.type())
+    end
+  end
+
+  defp browser_cmd(_), do: browser_help()
+
+  # A downloaded browser links against Chrome for Testing's own bundled pieces plus
+  # whatever the OS itself always provides (macOS frameworks, Windows DLLs) - never
+  # anything installed separately through a package manager the way Linux's shared
+  # libraries are - so there is nothing this command could install on either OS, and
+  # nothing it needs to: `browser` already downloads and launches on its own there.
+  defp browser_install_not_found_message({:unix, :darwin}) do
+    info("""
+    Nothing to install here - macOS already has everything a downloaded browser
+    needs to run. The `browser` tool downloads one automatically the first time
+    it's used, and just works.
+
+    If it still doesn't (an unusual setup, or you'd rather point it at a specific
+    browser), set PEPE_CHROME_BINARY to that browser's executable path.
+    """)
+  end
+
+  defp browser_install_not_found_message({:win32, _}) do
+    info("""
+    Nothing to install here - Windows already has everything a downloaded browser
+    needs to run. The `browser` tool downloads one automatically the first time
+    it's used, and just works.
+
+    If it still doesn't (an unusual setup, or you'd rather point it at a specific
+    browser), set PEPE_CHROME_BINARY to that browser's executable path.
+    """)
+  end
+
+  defp browser_install_not_found_message(_linux_or_other) do
+    info("""
+    Couldn't detect a known Linux package manager (apt-get/dnf/yum/pacman/apk/zypper).
+
+    Install Chrome, Chromium, Edge, or Brave yourself and make sure it's on PATH,
+    or set PEPE_CHROME_BINARY to its executable path.
+    """)
+  end
+
+  defp browser_help do
+    info("""
+    mix pepe browser install - detect this Linux host's package manager and install a
+    browser the `browser` agent tool can drive.
+
+    Not needed on macOS or Windows (a downloaded browser links against what the OS
+    already provides there), and not needed in the official Docker image either (it
+    already ships what a downloaded browser needs to launch) - this is for a Linux
+    host running Pepe directly, outside a container, where that isn't guaranteed.
+    Runs the install for real (with `sudo` if not already root) - you already asked
+    for exactly this by running the command, the same as if you'd typed the package
+    manager invocation yourself.
     """)
   end
 

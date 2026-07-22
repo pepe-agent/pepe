@@ -47,6 +47,16 @@ A imagem por omissão não inclui o pacote do navegador em si (a mesma lógica q
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 ```
 
+## Fora do Docker no Linux
+
+Um navegador transferido precisa de bibliotecas partilhadas que o sistema base já tem de fornecer - fora do Docker isso não está garantido da forma como está na imagem oficial: uma distro de ambiente de trabalho normalmente já as tem (outras aplicações com interface gráfica dependem das mesmas bibliotecas), mas um servidor mínimo ou headless pode não ter. Se o `browser` transferir com sucesso mas falhar ao arrancar, corre:
+
+```
+mix pepe browser install
+```
+
+Deteta o teu gestor de pacotes (`apt`/`dnf`/`yum`/`pacman`/`apk`/`zypper`) e instala um navegador completo através dele, pedindo a tua palavra-passe de `sudo` se precisar - já pediste exatamente isso ao correres o comando. Depois de instalado, o `browser` encontra-o diretamente no `PATH` e deixa de transferir seja o que for.
+
 ## Linux em ARM
 
 A Google não publica um build de Chrome for Testing para Linux em ARM, portanto ali o passo 3 usa o próprio CDN do Playwright em vez disso (uma transferência HTTPS normal, tal como o Chrome for Testing - sem npm nem Node.js envolvido) - a única diferença é que transfere o Chromium completo em vez do build mais pequeno sem interface, visto que esse CDN não disponibiliza um build sem interface como artefacto próprio. De qualquer forma, isto é automático: um anfitrião ARM não precisa de nenhuma configuração especial, nem no Docker nem fora dele.

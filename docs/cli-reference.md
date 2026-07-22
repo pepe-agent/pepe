@@ -199,6 +199,7 @@ mix pepe review [approve|reject ID]  # approve/reject autonomous writes staged f
 mix pepe backup [--output FILE.tgz]  # archive ~/.pepe + list the secret env vars to save
 mix pepe migrate SOURCE [--dry-run]  # import models/agents from another runtime (see Migrating)
 mix pepe update                      # self-update the binary to the latest release
+mix pepe browser install             # detect the package manager and install a browser (see Browser)
 ```
 
 ### Dashboard
