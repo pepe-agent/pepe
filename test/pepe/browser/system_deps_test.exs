@@ -3,6 +3,17 @@ defmodule Pepe.Browser.SystemDepsTest do
 
   alias Pepe.Browser.SystemDeps
 
+  # Replaces PATH entirely, not prepends: a real package manager genuinely on this
+  # machine's PATH (any real Linux box, including CI runners) would otherwise still be
+  # found further down it, behind the fixture - defeating the isolation these tests
+  # depend on (and, for install/1's tests, risking a real `sudo`/package-manager
+  # invocation instead of the fake scripts placed in `dir`).
+  defp with_fake_path(dir) do
+    prev_path = System.get_env("PATH")
+    System.put_env("PATH", dir)
+    on_exit(fn -> System.put_env("PATH", prev_path) end)
+  end
+
   describe "detect/0" do
     test "finds nothing when none of the known package managers are on PATH" do
       # This test machine's own real PATH - no fake managers injected. If it happens
@@ -20,14 +31,8 @@ defmodule Pepe.Browser.SystemDepsTest do
       File.mkdir_p!(dir)
       File.write!(Path.join(dir, "dnf"), "#!/bin/sh\nexit 0\n")
       File.chmod!(Path.join(dir, "dnf"), 0o755)
-
-      prev_path = System.get_env("PATH")
-      System.put_env("PATH", dir <> ":" <> prev_path)
-
-      on_exit(fn ->
-        System.put_env("PATH", prev_path)
-        File.rm_rf(dir)
-      end)
+      with_fake_path(dir)
+      on_exit(fn -> File.rm_rf(dir) end)
 
       assert {"dnf", [["dnf", "install", "-y", "chromium"]]} = SystemDeps.detect()
     end
@@ -37,14 +42,8 @@ defmodule Pepe.Browser.SystemDepsTest do
       File.mkdir_p!(dir)
       File.write!(Path.join(dir, "apt-get"), "#!/bin/sh\nexit 0\n")
       File.chmod!(Path.join(dir, "apt-get"), 0o755)
-
-      prev_path = System.get_env("PATH")
-      System.put_env("PATH", dir <> ":" <> prev_path)
-
-      on_exit(fn ->
-        System.put_env("PATH", prev_path)
-        File.rm_rf(dir)
-      end)
+      with_fake_path(dir)
+      on_exit(fn -> File.rm_rf(dir) end)
 
       assert {"apt-get",
               [
@@ -68,14 +67,8 @@ defmodule Pepe.Browser.SystemDepsTest do
     setup do
       dir = Path.join(System.tmp_dir!(), "pepe_sysdeps_install_#{System.unique_integer([:positive])}")
       File.mkdir_p!(dir)
-
-      prev_path = System.get_env("PATH")
-      System.put_env("PATH", dir <> ":" <> prev_path)
-
-      on_exit(fn ->
-        System.put_env("PATH", prev_path)
-        File.rm_rf(dir)
-      end)
+      with_fake_path(dir)
+      on_exit(fn -> File.rm_rf(dir) end)
 
       %{dir: dir}
     end
@@ -88,7 +81,9 @@ defmodule Pepe.Browser.SystemDepsTest do
 
     test "prefixes with sudo when not already root", %{dir: dir} do
       marker = Path.join(dir, "sudo_was_called")
-      fake_executable!(dir, "sudo", "#!/bin/sh\ntouch #{marker}\nexec \"$@\"\n")
+      # `: > marker` (a shell builtin no-op + redirection), not `touch` - PATH is just
+      # `dir` for this test (see with_fake_path/1), so an external `touch` isn't on it.
+      fake_executable!(dir, "sudo", "#!/bin/sh\n: > #{marker}\nexec \"$@\"\n")
       fake_executable!(dir, "apt-get", "#!/bin/sh\nexit 0\n")
 
       assert :ok = SystemDeps.install([["apt-get", "install", "-y", "chromium"]])

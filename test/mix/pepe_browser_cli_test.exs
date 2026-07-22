@@ -17,9 +17,17 @@ defmodule Mix.Tasks.PepeBrowserCliTest do
     File.chmod!(path, 0o755)
   end
 
+  # Replaces PATH entirely rather than prepending to it: a machine that genuinely has a
+  # real package manager on it (any real Linux box, including the CI runner this suite
+  # itself runs on) would otherwise still find the real one further down PATH, behind the
+  # fake dir - a "no package manager" test could then find (and, worse, actually invoke)
+  # a real `apt-get`/`sudo` instead of the fixture, found via a real, live install as a
+  # test failure the hard way (this is exactly what happened on a real Ubuntu CI runner
+  # before this fix: the "no known package manager" test hung on a real `sudo apt-get
+  # install` command it never meant to run at all).
   defp with_fake_path(dir) do
     prev_path = System.get_env("PATH")
-    System.put_env("PATH", dir <> ":" <> prev_path)
+    System.put_env("PATH", dir)
     on_exit(fn -> System.put_env("PATH", prev_path) end)
   end
 
