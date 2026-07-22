@@ -57,7 +57,7 @@ defmodule Pepe.Config.MigrateDataTest do
            ]
   end
 
-  test "one subsystem refusing (non-empty table) does not block the others from importing" do
+  test "unrelated rows already sitting in a subsystem's table (ordinary live usage, before this ever ran) don't block the others from importing" do
     Repo.insert!(%Pepe.Usage.Entry{project: "acme", at: 1, agent: "eng", model: "m", in: 1, out: 1, sub: false, cached: 0})
     seed_legacy_watches(%{"w1" => %{"description" => "x", "agent" => "eng"}})
 
@@ -67,7 +67,21 @@ defmodule Pepe.Config.MigrateDataTest do
     assert results.watches == %{imported: 1, already_present: 0, failed: []}
     assert results.traces == %{imported: 0, already_present: 0, failed: []}
     assert results.boards == %{imported: 0, already_present: 0, failed: []}
-    assert results.usage.usage_entries == {:error, :not_empty}
+    assert results.usage.usage_entries == %{imported: 0, failed: []}
+  end
+
+  test "one subsystem's own per-entry failure does not block the others from importing" do
+    Config.save(
+      Config.load()
+      |> Map.put("board_cards", %{"c_bad" => %{"board" => "no_such_board", "title" => "x", "priority" => "not-a-number"}})
+    )
+
+    seed_legacy_watches(%{"w1" => %{"description" => "x", "agent" => "eng"}})
+
+    results = MigrateData.run() |> Map.new()
+
+    assert [{"c_bad", _reason}] = results.boards.failed
+    assert results.watches == %{imported: 1, already_present: 0, failed: []}
   end
 
   # config_journal is deliberately not gated on the table being empty (see its own

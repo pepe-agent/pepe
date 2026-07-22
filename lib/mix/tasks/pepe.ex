@@ -3758,16 +3758,13 @@ defmodule Mix.Tasks.Pepe do
     |> Enum.each(fn {subsystem, report} -> print_migrate_data_result(subsystem, report) end)
   end
 
-  # Usage.Migration's own two-table report (usage_entries/message_events each get their
-  # own empty-table gate, so one can refuse while the other imports fine) - print each
-  # half under its own qualified label rather than forcing it into the flat shape.
+  # Usage.Migration's own two-table report (usage_entries/message_events each key off
+  # their own legacy directory independently, so one can have nothing left to do while
+  # the other still imports fine) - print each half under its own qualified label rather
+  # than forcing it into the flat shape.
   defp print_migrate_data_result(subsystem, %{usage_entries: _, message_events: _} = report) do
     print_migrate_data_result("#{subsystem}.usage_entries", report.usage_entries)
     print_migrate_data_result("#{subsystem}.message_events", report.message_events)
-  end
-
-  defp print_migrate_data_result(subsystem, {:error, :not_empty}) do
-    error("#{subsystem}: table already has rows - refusing to import (already migrated?)")
   end
 
   defp print_migrate_data_result(subsystem, {:error, reason}) do
