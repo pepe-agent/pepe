@@ -41,10 +41,12 @@ Um navegador sob controle de um agente alcança a mesma rede que a aplicação, 
 2. O que já estiver instalado - checado no `PATH` e nos locais normais de instalação de cada sistema (`/Applications` no macOS, `Program Files` e a pasta de instalação por usuário no Windows), então um navegador que você já tem é usado do jeito que está, em container ou não.
 3. **Um download automático, uma única vez**, se nenhum dos dois anteriores achar nada: um build pequeno e sem interface do `chrome-headless-shell`, vindo direto do feed oficial Chrome for Testing do Google, guardado em cache em `~/.cache/pepe/browser/` pra isso só acontecer uma vez por máquina. Desliga com `PEPE_BROWSER_AUTO_DOWNLOAD=0` se preferir instalar um você mesmo e ver um erro claro em vez disso.
 
-No Docker, a imagem base não inclui nenhum pacote de navegador (a mesma lógica que mantém o ffmpeg de fora - ver o Dockerfile), então o passo 3 é o que roda de verdade lá por padrão. Se preferir embutir um na imagem em vez de baixar em tempo de execução:
+A imagem padrão não inclui o pacote do navegador em si (a mesma lógica que mantém o ffmpeg de fora - ver o Dockerfile), mas inclui as bibliotecas compartilhadas que o `chrome-headless-shell` precisa pra arrancar depois de baixado, já que `browser` é uma ferramenta nativa, não um extra opcional. Então o passo 3 é o que roda por padrão no Docker, e funciona direto: sem precisar de nenhum build arg, num host `amd64` (o Google não publica um build de Chrome for Testing pra Linux em ARM - ver abaixo). Se preferir embutir um navegador completo na imagem em vez de baixar em tempo de execução:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 ```
 
-Uma imagem de container mínima pode não ter as bibliotecas compartilhadas que um binário baixado ainda precisa pra *iniciar*, mesmo já estando presente - se `browser` reportar uma falha ao iniciar em vez de um erro de binário faltando, esse build arg (que traz toda a cadeia de dependências do Chromium via `apt`) é a solução, não o `PEPE_CHROME_BINARY`.
+## Linux em ARM
+
+O Chrome for Testing não tem build pra Linux ARM, então o passo 3 não ajuda ali - `browser` devolve um erro claro de "plataforma não suportada" em vez de falhar em silêncio. Instale o Chromium você mesmo via o gerenciador de pacotes do seu sistema e coloque no `PATH`, ou defina `PEPE_CHROME_BINARY`.

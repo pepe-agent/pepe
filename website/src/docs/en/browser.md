@@ -41,10 +41,12 @@ A browser under an agent's control reaches the same network the app does, so `br
 2. Whatever's already installed - checked on `PATH` and in each OS's normal install locations (`/Applications` on macOS, `Program Files` and the per-user install folder on Windows), so a browser you already have is used as-is, container or not.
 3. **A one-time automatic download** if neither of those found anything: a small, display-less `chrome-headless-shell` build from Google's own Chrome for Testing feed, cached under `~/.cache/pepe/browser/` so this only happens once per machine. Turn it off with `PEPE_BROWSER_AUTO_DOWNLOAD=0` if you'd rather install one yourself and see a clear error instead.
 
-In Docker, the base image doesn't include a browser package (the same reasoning that keeps ffmpeg out - see the Dockerfile), so step 3 is what actually runs there by default. If you'd rather bake one into the image instead of downloading at runtime:
+The default image doesn't include the browser package itself (the same reasoning that keeps ffmpeg out - see the Dockerfile) - but it does include the shared libraries `chrome-headless-shell` needs to actually launch once downloaded, since `browser` is a built-in tool, not an optional extra. So step 3 is what runs by default in Docker, and it works out of the box: no build arg needed, on an `amd64` host (Google doesn't publish a Chrome for Testing build for Linux on ARM - see below). If you'd rather bake a full browser into the image instead of downloading at runtime:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 ```
 
-A minimal container image can be missing shared libraries a downloaded binary still needs to *launch* even once present - if `browser` reports a launch failure rather than a missing-binary error, that build arg (which pulls Chromium's full dependency chain via `apt`) is the fix, not `PEPE_CHROME_BINARY`.
+## Linux on ARM
+
+Chrome for Testing has no Linux ARM build, so step 3 can't help there - `browser` returns a clear "unsupported platform" error instead of silently failing. Install Chromium yourself via your system's package manager and put it on `PATH`, or set `PEPE_CHROME_BINARY`.
