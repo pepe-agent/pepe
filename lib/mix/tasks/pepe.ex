@@ -124,8 +124,6 @@ defmodule Mix.Tasks.Pepe do
       mix pepe update                          # self-update the binary to the latest release
       mix pepe setup                           # guided setup: model, agent, channels, plugins, migrate, dashboard
       mix pepe config                          # show config path + summary
-      mix pepe config migrate-commitments      # one-time: import commitments into the new store
-      mix pepe config migrate-data             # one-time: import the remaining legacy sections (watches, ...)
       mix pepe backup [--output FILE.tgz]      # archive the whole ~/.pepe + list the secret env vars to save
       mix pepe extract PROJECT [--output FILE.tgz]  # lift ONE project out as a standalone (root) install
       mix pepe restore FILE.tgz [--force]      # restore a backup or an extract into ~/.pepe
@@ -179,10 +177,6 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "restore" | _]), do: restore_help()
 
   def dispatch(["setup" | _]), do: with_config(&setup/0)
-  # Needs the full app (Pepe.Repo), unlike every other `config` subcommand - matched here,
-  # ahead of the generic clause below, since function clauses are tried in order.
-  def dispatch(["config", "migrate-commitments" | _rest]), do: with_app([], fn -> migrate_commitments_cmd() end)
-  def dispatch(["config", "migrate-data" | _rest]), do: with_app([], fn -> migrate_data_cmd() end)
   def dispatch(["config" | rest]), do: with_config(fn -> config_cmd(rest) end)
   def dispatch(["dashboard" | rest]), do: with_config(fn -> dashboard_cmd(rest) end)
   def dispatch(["backup", "help" | _]), do: backup_help()
@@ -3728,73 +3722,6 @@ defmodule Mix.Tasks.Pepe do
     info("agents: #{Config.agents() |> Enum.map_join(", ", & &1.name)}")
   end
 
-  # One-time import of commitments from config.json's old "commitments" section into
-  # Pepe.Repo - see Pepe.Commitments.Migration's moduledoc. Safe to run more than once.
-  defp migrate_commitments_cmd do
-    report = Pepe.Commitments.Migration.run()
-
-    cond do
-      report.imported == 0 and report.already_present == 0 and report.failed == [] ->
-        info("nothing to migrate - config.json has no commitments section")
-
-      report.failed == [] ->
-        ok("migrated #{report.imported} commitment(s)#{already_present_note(report)} - config.json's commitments section is now removed")
-
-      true ->
-        error("#{length(report.failed)} entr#{if length(report.failed) == 1, do: "y", else: "ies"} failed, config.json left untouched:")
-        Enum.each(report.failed, fn {id, reason} -> info("  #{id}: #{inspect(reason)}") end)
-        info("fix the entries above in config.json and re-run - already-migrated ones are skipped, not re-imported")
-    end
-  end
-
-  defp already_present_note(%{already_present: 0}), do: ""
-  defp already_present_note(%{already_present: n}), do: " (#{n} already migrated)"
-
-  # One-time import of every remaining subsystem's legacy data into Pepe.Repo - see
-  # Pepe.Config.MigrateData's moduledoc. `migrate-commitments` stays its own standalone
-  # command (already shipped before this existed), not folded in here.
-  defp migrate_data_cmd do
-    Pepe.Config.MigrateData.run()
-    |> Enum.each(fn {subsystem, report} -> print_migrate_data_result(subsystem, report) end)
-  end
-
-  # Usage.Migration's own two-table report (usage_entries/message_events each key off
-  # their own legacy directory independently, so one can have nothing left to do while
-  # the other still imports fine) - print each half under its own qualified label rather
-  # than forcing it into the flat shape.
-  defp print_migrate_data_result(subsystem, %{usage_entries: _, message_events: _} = report) do
-    print_migrate_data_result("#{subsystem}.usage_entries", report.usage_entries)
-    print_migrate_data_result("#{subsystem}.message_events", report.message_events)
-  end
-
-  defp print_migrate_data_result(subsystem, {:error, reason}) do
-    error("#{subsystem}: #{reason}")
-  end
-
-  defp print_migrate_data_result(subsystem, %{imported: 0, already_present: 0, failed: []}) do
-    info("#{subsystem}: nothing to migrate")
-  end
-
-  defp print_migrate_data_result(subsystem, %{imported: 0, failed: []}) do
-    info("#{subsystem}: nothing to migrate")
-  end
-
-  defp print_migrate_data_result(subsystem, %{failed: [], already_present: _} = report) do
-    ok("#{subsystem}: migrated #{report.imported}#{already_present_note(report)}")
-  end
-
-  defp print_migrate_data_result(subsystem, %{failed: []} = report) do
-    ok("#{subsystem}: migrated #{report.imported}")
-  end
-
-  defp print_migrate_data_result(subsystem, report) do
-    error("#{subsystem}: #{length(report.failed)} entr#{if length(report.failed) == 1, do: "y", else: "ies"} failed, left in place:")
-    Enum.each(report.failed, &print_migrate_data_failure/1)
-  end
-
-  defp print_migrate_data_failure({id, reason}), do: info("  #{id}: #{inspect(reason)}")
-  defp print_migrate_data_failure(reason), do: info("  #{inspect(reason)}")
-
   defp print_journal_line(entry) do
     external = if entry["external"], do: " " <> dim("[external]"), else: ""
     changed = Enum.join(entry["changed"] || [], ", ")
@@ -4010,10 +3937,11 @@ defmodule Mix.Tasks.Pepe do
     write over an existing, non-empty ~/.pepe unless you pass --force. Re-export the
     ${ENV_VAR} secrets it lists afterwards; they live outside the archive.
 
-    Restoring a project EXTRACT (not a full backup) also needs `mix pepe config
-    migrate-commitments` run once afterward: an extract's config.json still carries
-    commitments the portable way (so the archive stays a plain file, no SQLite
-    dependency), and needs importing into the fresh install's own store.
+    A project EXTRACT (not a full backup) carries its commitments, watches, and usage
+    history in a portable, pre-SQLite shape (so the archive stays a plain file, no
+    Pepe.Repo dependency) - restoring one currently does not bring that data into the
+    fresh install's own store; it stays sitting in config.json/data files, unused, until
+    that gap is closed.
     """)
   end
 

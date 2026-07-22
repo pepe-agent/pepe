@@ -5,7 +5,7 @@ description: Meter every model call per project, price it, mark up what you char
 
 ## What a call costs
 
-Every model call is metered and attributed to the agent's project, so you can bill a client per token. Metering happens at the single point every surface flows through (the console, the HTTP `/v1` API, the WebSocket, Telegram, and every webhook channel), and it appends to a durable, append-only ledger in the same small embedded SQLite file as commitments, watches and traces, keyed by project (e.g. `default`). That's the audit trail for what gets charged. Upgrading from an older Pepe that wrote it as one JSONL file per project per month under `~/.pepe/data/usage/<slug>/YYYY-MM.jsonl`? Run `mix pepe config migrate-data` once to bring the old entries over - the source files are left in place, not deleted, so you can remove that directory by hand once you've confirmed the import.
+Every model call is metered and attributed to the agent's project, so you can bill a client per token. Metering happens at the single point every surface flows through (the console, the HTTP `/v1` API, the WebSocket, Telegram, and every webhook channel), and it appends to a durable, append-only ledger in the same small embedded SQLite file as commitments, watches and traces, keyed by project (e.g. `default`). That's the audit trail for what gets charged.
 
 **Cost** is `tokens × the model's price`, quoted per 1M tokens. A price is resolved in layers, and the first layer that answers wins:
 

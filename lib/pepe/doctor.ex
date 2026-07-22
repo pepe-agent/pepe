@@ -38,7 +38,6 @@ defmodule Pepe.Doctor do
         cron_checks() ++
         webhook_checks() ++
         state_checks() ++
-        migration_checks() ++
         plugin_checks() ++
         skill_checks() ++
         unknown_key_checks()
@@ -377,28 +376,6 @@ defmodule Pepe.Doctor do
     case orphans do
       [] -> [{"state", "agent directories", :ok}]
       orphans -> orphans
-    end
-  end
-
-  # A legacy "commitments"/"watches" section left in config.json (from before those moved
-  # to Pepe.Repo) means their one-time migration command was never run - every entry that
-  # was there before the upgrade is invisible to Config.commitments/0 / Config.watches/0
-  # now, silently: no error, no crash, they just stop firing. Nothing else in the codebase
-  # would ever surface that on its own.
-  defp migration_checks do
-    config = Config.load()
-
-    legacy_check(config, "commitments", "mix pepe config migrate-commitments") ++
-      legacy_check(config, "watches", "mix pepe config migrate-data") ++
-      legacy_check(config, "boards", "mix pepe config migrate-data") ++
-      legacy_check(config, "board_cards", "mix pepe config migrate-data")
-  end
-
-  defp legacy_check(config, key, command) do
-    if Map.has_key?(config, key) do
-      [{"state", "unmigrated #{key}", {:warn, "config.json still has a \"#{key}\" section - run `#{command}` to import it"}}]
-    else
-      []
     end
   end
 

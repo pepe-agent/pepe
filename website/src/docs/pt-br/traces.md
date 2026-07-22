@@ -43,9 +43,6 @@ Os traces vivem no mesmo pequeno arquivo SQLite embutido dos compromissos e das 
 agrupados por projeto (o projeto default usa `default`). A quantidade guardada tem um
 teto por projeto, então os traces mais antigos vão sendo descartados e a tabela se
 mantém limitada. Argumentos e resultados de ferramenta muito longos são cortados no
-registro salvo. Atualizando de um Pepe mais antigo que gravava os traces como um arquivo
-JSON por execução em `<PEPE_HOME>/data/traces/<slug>/<id>.json`? Rode `mix pepe config
-migrate-data` uma vez pra trazer os antigos - os arquivos de origem ficam intactos, não
-são apagados, então você pode remover essa pasta na mão depois de confirmar a importação.
+registro salvo.
 
 <div class="note"><strong>Diagnóstico, não registro de cobrança.</strong> Os traces existem para explicar uma execução, e são descartados e cortados para se manterem limitados. A contabilidade de tokens para faturamento vive no <a href="../billing/">livro-razão de uso</a>, separado e somente-acréscimo.</div>

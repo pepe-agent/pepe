@@ -44,10 +44,6 @@ Los traces viven en el mismo pequeño archivo SQLite embebido que los compromiso
 vigilancias, agrupados por proyecto (el proyecto por defecto usa `default`). El número
 guardado tiene un tope por proyecto, así que los traces más antiguos se van recortando y
 la tabla se mantiene acotada. Los argumentos y los resultados de herramienta muy largos
-se recortan en el registro guardado. ¿Actualizas desde un Pepe más antiguo que escribía
-los traces como un archivo JSON por ejecución bajo
-`<PEPE_HOME>/data/traces/<slug>/<id>.json`? Ejecuta `mix pepe config migrate-data` una
-vez para traer los antiguos - los archivos de origen se dejan intactos, no se borran, así
-que puedes eliminar ese directorio a mano una vez que confirmes la importación.
+se recortan en el registro guardado.
 
 <div class="note"><strong>Diagnóstico, no registro de facturación.</strong> Los traces existen para explicar una ejecución, y se recortan para mantenerse acotados. La contabilidad de tokens para facturar vive en el <a href="../billing/">libro de uso</a>, separado y de solo adición.</div>

@@ -40,9 +40,6 @@ pepe traces 1720000000123456      # replay one run by id, step by step
 Traces live in the same small embedded SQLite file as commitments and watches, keyed by
 project (the default project uses `default`). Kept count is capped per project, so the
 oldest traces are trimmed and the table stays bounded. Long tool arguments and results
-are clipped in the stored record. Upgrading from an older Pepe that wrote traces as one
-JSON file per run under `<PEPE_HOME>/data/traces/<slug>/<id>.json`? Run `mix pepe config
-migrate-data` once to bring the old ones over - the source files are left in place, not
-deleted, so you can remove that directory by hand once you've confirmed the import.
+are clipped in the stored record.
 
 <div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and they are trimmed and clipped to stay bounded. Token accounting for invoices lives in the separate, append-only <a href="../billing/">usage ledger</a>.</div>

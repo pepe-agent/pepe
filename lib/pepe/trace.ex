@@ -36,12 +36,6 @@ defmodule Pepe.Trace do
   @keep 200
   @clip 4_000
 
-  @doc "Root directory holding the legacy, pre-migration per-scope trace files."
-  def dir, do: Path.join([Config.home(), "data", "traces"])
-
-  @doc "The legacy directory for one scope (`nil`/`\"root\"` -> `root/`)."
-  def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
-
   # --- recording (called from the runtime, inside the run's own process) -------------
 
   @doc """

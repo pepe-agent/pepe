@@ -1151,24 +1151,16 @@ defmodule Pepe.Config do
     end
   end
 
-  # Move every per-scope directory keyed by a project's slug when the slug is renamed: the
-  # agents' workspaces/shared under `projects/<slug>/`. The usage/traces/messages ledgers
-  # used to live here too - now Pepe.Repo-backed (see rescope_project/2 in each of Pepe.Trace,
-  # Pepe.Usage.Log, Pepe.Usage.Messages, called alongside this one in do_rename_project/2),
-  # but this still tries to move their old directories too: a harmless no-op once migrated,
-  # and what keeps a not-yet-migrated install's legacy files under the right slug for whenever
-  # `mix pepe config migrate-data` eventually runs.
+  # Move the agents' workspaces/shared under `projects/<slug>/` when a project's slug is
+  # renamed. The usage/traces/messages ledgers used to live in their own per-scope
+  # directories here too - now Pepe.Repo-backed (see rescope_project/2 in each of
+  # Pepe.Trace, Pepe.Usage.Log, Pepe.Usage.Messages, called alongside this one in
+  # do_rename_project/2), so there is nothing left under `data/` for this to move.
   defp move_project_dirs(old, new) do
-    for base <- [
-          Path.join(home(), "projects"),
-          Path.join([home(), "data", "usage"]),
-          Path.join([home(), "data", "traces"]),
-          Path.join([home(), "data", "messages"])
-        ] do
-      src = Path.join(base, old)
-      dst = Path.join(base, new)
-      if File.dir?(src) and not File.exists?(dst), do: File.rename(src, dst)
-    end
+    base = Path.join(home(), "projects")
+    src = Path.join(base, old)
+    dst = Path.join(base, new)
+    if File.dir?(src) and not File.exists?(dst), do: File.rename(src, dst)
 
     :ok
   end
@@ -2358,10 +2350,10 @@ defmodule Pepe.Config do
   # For Pepe.Bundle.extract/2 (single-project export): the same `%{id => %{"agent" => ...,
   # ...}}` raw shape config.json's own "commitments" section used to have, built from
   # Pepe.Repo instead - keeps a bundle self-contained/portable (no SQLite dependency for
-  # the receiving install), at the cost of a restored *extract* needing to run
-  # `mix pepe config migrate-commitments` once afterward (a full PEPE_HOME backup/restore
-  # needs no such step - it already carries data/pepe.db directly). Deliberately NOT
-  # `commitments/0`: that resolves `agent` to a handle already, and resolve_section_agents/2
+  # the receiving install). There is currently no importer to bring this back into a fresh
+  # install's own store on restore (a full PEPE_HOME backup/restore needs no such step - it
+  # already carries data/pepe.db directly; only a project *extract* is affected). Deliberately
+  # NOT `commitments/0`: that resolves `agent` to a handle already, and resolve_section_agents/2
   # (the same helper crons/watches already go through) expects the raw stored id so it can
   # do that resolution itself.
   defp commitments_raw_map do

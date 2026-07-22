@@ -98,55 +98,6 @@ defmodule Pepe.DoctorTest do
     assert Enum.any?(checks, &match?({"security", "dashboard password", {:warn, _}}, &1))
   end
 
-  test "state: a legacy unmigrated commitments section in config.json is flagged" do
-    Config.update(fn config -> Map.put(config, "commitments", %{"c1" => %{"text" => "x", "agent" => "a"}}) end)
-
-    checks = Doctor.checks()
-
-    assert Enum.any?(checks, &match?({"state", "unmigrated commitments", {:warn, _}}, &1))
-  end
-
-  test "state: says nothing once commitments have been migrated (or never existed)" do
-    refute Map.has_key?(Config.load(), "commitments")
-    checks = Doctor.checks()
-    refute Enum.any?(checks, &match?({"state", "unmigrated commitments", _}, &1))
-  end
-
-  test "state: a legacy unmigrated watches section in config.json is flagged" do
-    Config.update(fn config -> Map.put(config, "watches", %{"w1" => %{"description" => "x", "agent" => "a"}}) end)
-
-    checks = Doctor.checks()
-
-    assert Enum.any?(checks, &match?({"state", "unmigrated watches", {:warn, _}}, &1))
-  end
-
-  test "state: legacy unmigrated boards/board_cards sections in config.json are flagged" do
-    Config.update(fn config ->
-      config
-      |> Map.put("boards", %{"b1" => %{"name" => "eng"}})
-      |> Map.put("board_cards", %{"c1" => %{"board" => "b1"}})
-    end)
-
-    checks = Doctor.checks()
-
-    assert Enum.any?(checks, &match?({"state", "unmigrated boards", {:warn, _}}, &1))
-    assert Enum.any?(checks, &match?({"state", "unmigrated board_cards", {:warn, _}}, &1))
-  end
-
-  test "state: says nothing once boards/board_cards have been migrated (or never existed)" do
-    refute Map.has_key?(Config.load(), "boards")
-    refute Map.has_key?(Config.load(), "board_cards")
-    checks = Doctor.checks()
-    refute Enum.any?(checks, &match?({"state", "unmigrated boards", _}, &1))
-    refute Enum.any?(checks, &match?({"state", "unmigrated board_cards", _}, &1))
-  end
-
-  test "state: says nothing once watches have been migrated (or never existed)" do
-    refute Map.has_key?(Config.load(), "watches")
-    checks = Doctor.checks()
-    refute Enum.any?(checks, &match?({"state", "unmigrated watches", _}, &1))
-  end
-
   test "security: a commitment/watch's origin.key (a session key, not a credential) is not a false positive" do
     Config.put_commitment(%Config.Commitment{
       id: "c1",

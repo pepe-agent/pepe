@@ -15,20 +15,6 @@ defmodule Pepe.Usage.Messages do
   alias Pepe.Repo
   alias Pepe.Usage.MessageEvent
 
-  @doc "Root directory holding the legacy, pre-migration per-project message counter files."
-  def dir, do: Path.join([Config.home(), "data", "messages"])
-
-  @doc "The legacy directory for one scope (`nil`/`\"root\"` -> `root/`)."
-  def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
-
-  @doc "Scopes with a legacy, pre-migration counter directory still on disk - for `Pepe.Usage.Migration`."
-  def scopes_on_disk do
-    case File.ls(dir()) do
-      {:ok, names} -> Enum.sort(names)
-      _ -> []
-    end
-  end
-
   @doc """
   Re-point every message event recorded under `old` (a project slug) to `new` - called
   on a project rename (`Pepe.Config.rename_project/2`) so a project's message-count

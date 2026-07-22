@@ -18,20 +18,6 @@ defmodule Pepe.Usage.Log do
   alias Pepe.Repo
   alias Pepe.Usage.Entry
 
-  @doc "Root directory holding the legacy, pre-migration per-project usage ledger files."
-  def dir, do: Path.join([Config.home(), "data", "usage"])
-
-  @doc "The legacy directory for one scope (`nil`/`\"root\"` -> `root/`)."
-  def scope_dir(scope), do: Path.join(dir(), scope_name(scope))
-
-  @doc "Scopes with a legacy, pre-migration ledger directory still on disk - for `Pepe.Usage.Migration`."
-  def scopes_on_disk do
-    case File.ls(dir()) do
-      {:ok, names} -> Enum.sort(names)
-      _ -> []
-    end
-  end
-
   @doc """
   Append one usage entry to `project`'s ledger. `entry` carries `at`, `agent`, `model`,
   `in`, `out`, and optionally `sub`/`cached`.

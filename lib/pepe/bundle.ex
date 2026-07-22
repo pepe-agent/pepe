@@ -204,10 +204,10 @@ defmodule Pepe.Bundle do
   # each entry's `agent` handle de-scoped and its `project` field repointed to the default slug
   # so the archive's billing history matches its now-default-project agents. Usage lives in
   # Pepe.Repo now, not a file tree - written back out in the same one-file-per-month .jsonl
-  # shape the archive format already used, so a restored extract still just needs the same
-  # `mix pepe config migrate-data` follow-up every other subsystem's extract does (see
-  # Pepe.Config.commitments_raw_map/0's own comment for why a bundle stays self-contained
-  # rather than carrying a SQLite dependency for the receiving install).
+  # shape the archive format already used (see Pepe.Config.commitments_raw_map/0's own
+  # comment for why a bundle stays self-contained rather than carrying a SQLite dependency
+  # for the receiving install; there is currently no importer to bring this back into a
+  # restored extract's own store).
   defp copy_usage(root, project) do
     entries = Log.entries(project)
 
