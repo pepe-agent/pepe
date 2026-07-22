@@ -7,25 +7,48 @@ name: ci
 # Deliberately NOT the `precommit` alias: that one runs `mix format`, which *rewrites*
 # files. In CI a formatting problem must fail the build, not be quietly fixed inside a
 # container nobody will ever look at again.
+#
+# A version tag (`v*`) additionally builds and publishes a release, once the four jobs
+# above pass - see the `binaries`/`image`/`manifest` jobs below. This used to be a
+# separate `release.yml` that re-ran this entire suite a second time as a gate (calling
+# this file via `workflow_call`): same commit, same tests, twice - real CI minutes spent
+# proving the same thing twice, every release. One workflow, one run per push, is what
+# that gate actually needed: the release jobs just `needs:` the jobs already above them.
+#
+# Two ways to get Pepe, built from the same tag:
+#
+#   * the self-contained `pepe` binaries (Burrito), published as GitHub Release
+#     assets - what the curl one-liner installer downloads;
+#   * a container image on GHCR - `docker pull ghcr.io/pepe-agent/pepe`.
+#
+# Cut a release by pushing a version tag:
+#
+#     git tag v0.3.0
+#     git push origin v0.3.0
+#
+# Running it by hand (workflow_dispatch) builds **only the image**, tagged `edge`, and
+# publishes no GitHub Release - the cheap path for testing changes to the image itself;
+# the Burrito matrix is the slow, expensive half of this file.
 
 on:
   push:
     branches: [master]
+    tags:
+      - "v*"
   pull_request:
-  # Lets release.yml call this whole suite as a gate before it builds/publishes anything -
-  # a release must reverify the exact tagged commit, not trust a possibly-stale prior run.
-  workflow_call:
+  workflow_dispatch:
 
-# A second push to the same branch cancels the first: the older run's answer is about
-# code nobody has anymore.
+# A second push to the same branch/tag cancels the first: the older run's answer is
+# about code nobody has anymore.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# These three (here, release.yml, and the Dockerfile's ARGs) must say the same thing. They
-# had drifted: the release binaries were compiled with Elixir 1.18 while the container image
-# used 1.20.2, so one tag shipped two artifacts out of two compilers. Nobody noticed, and
-# nobody would have, until dialyzer failed here on a warning that only 1.18 emits.
+# These three (here, the release jobs below, and the Dockerfile's ARGs) must say the same
+# thing. They had drifted once: the release binaries were compiled with Elixir 1.18 while
+# the container image used 1.20.2, so one tag shipped two artifacts out of two compilers.
+# Nobody noticed, and nobody would have, until dialyzer failed here on a warning that only
+# 1.18 emits.
 #
 # Elixir 1.20.2 is the latest. OTP is deliberately NOT: 29 is out, and Burrito 1.5.0 (the
 # latest, and what packages the binaries users download) cannot build against it. The whole
@@ -39,6 +62,7 @@ env:
   MIX_ENV: test
   ELIXIR_VERSION: "1.20.2"
   OTP_VERSION: "28.5.0.3"
+  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   test:
@@ -174,3 +198,208 @@ jobs:
         run: mix dialyzer --plt
 
       - run: mix dialyzer --format github
+
+  # Everything below only ever runs on a version tag (or workflow_dispatch, for the image
+  # alone) - `if:` on each job says so explicitly, since this file also runs on ordinary
+  # branch pushes and PRs now. `needs:` on the four jobs above is the actual release gate:
+  # a failed/skipped test, credo, website, or dialyzer job stops binaries/image from ever
+  # starting, the same way a required check blocks a merge.
+
+  # The self-contained binaries. Tag pushes only - there is no release to attach
+  # them to otherwise, and they are what makes this workflow expensive.
+  binaries:
+    needs: [test, credo, website, dialyzer]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Erlang/Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          # OTP 28 exactly, and it is pinned from both sides.
+          #
+          # Not lower: Pepe.TUI's arrow-key select/multiselect needs OTP 28's raw terminal
+          # mode (:shell.start_interactive({:noshell, :raw})) to actually suppress echo. On
+          # 27 the call still returns :ok, so the menu draws and then the arrow keys leak
+          # their escape sequences onto the screen instead of being captured.
+          #
+          # Not higher: OTP 29 is out, and Burrito 1.5.0 (the latest) cannot build against
+          # it. The Zig link step fails and no binary is produced at all. Checked by
+          # building all five targets in a Linux container on both: 28 gives five, 29 gives
+          # none. Bump this when Burrito supports 29, not before, and keep the jobs above
+          # and the Dockerfile in step when you do.
+          #
+          # Burrito bundles this exact OTP series' ERTS into every target, so the version
+          # here is what end users actually run, not merely what builds it.
+          otp-version: "28.5.0.3"
+          elixir-version: "1.20.2"
+
+      # The one action here still on Node 20. Upstream has no Node 24 release (v2.2.1 is
+      # the latest, and it still declares node20), so the runner forces it onto Node 24
+      # and warns about it. There is nothing to do on our side until they ship one, so
+      # this is not an oversight: don't "fix" it by inventing a version tag.
+      - name: Install Zig (Burrito cross-compiler)
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.15.2"
+
+      - name: Install packagers Burrito shells out to
+        run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
+
+      - name: Fetch deps
+        run: mix deps.get --only prod
+        env:
+          MIX_ENV: prod
+
+      - name: Build and digest the dashboard's static assets
+        run: mix assets.setup && mix compile && mix assets.deploy
+        env:
+          MIX_ENV: prod
+
+      - name: Build the self-contained binaries
+        run: mix release
+        env:
+          MIX_ENV: prod
+
+      - name: Extract this version's CHANGELOG.md section
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") { found=1; next }
+              next
+            }
+            found && /^\[.+\]:/ { exit }
+            found { print }
+          ' CHANGELOG.md | sed '/./,$!d' > release_notes.md
+          cat release_notes.md
+
+      # `pepe update` refuses to install an asset it cannot check against this file, so a
+      # release without it is a release nobody can auto-update to. The names here must
+      # match the asset names exactly: that is what Pepe.Update looks itself up by.
+      - name: Checksum the binaries
+        working-directory: burrito_out
+        run: |
+          sha256sum pepe_* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish binaries to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            burrito_out/pepe_*
+            burrito_out/SHA256SUMS
+          fail_on_unmatched_files: true
+          body_path: release_notes.md
+          generate_release_notes: true
+
+  # One job per architecture, each on its own native runner. ubuntu-24.04-arm is
+  # free on public repos, so arm64 compiles at full speed instead of crawling
+  # under QEMU. Each pushes an image *by digest* (no tag); `manifest` below is
+  # what unites them under one name, so a `docker pull` resolves to the right one.
+  image:
+    name: image (${{ matrix.arch }})
+    needs: [test, credo, website, dialyzer]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+
+      - name: Hand the digest to the manifest job
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  # The tags live here, not on the per-arch images: this is the manifest list that
+  # makes `docker pull ghcr.io/pepe-agent/pepe` serve arm64 to an M-series Mac and
+  # amd64 to a server, from one name.
+  manifest:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # v0.3.0 publishes three names for one digest: `0.3.0` never moves, `0.3` follows the
+      # patches on that line, and `latest` follows the newest stable release.
+      #
+      # `latest=auto` rather than "any tag starting with v": it is metadata-action's own
+      # rule, and it knows a pre-release is not a release. Tagging latest by hand would
+      # hand `docker pull` a v0.4.0-rc1 the moment one exists. For the same reason
+      # {{major}}.{{minor}} is skipped on a pre-release, so `0.4` never points at an rc.
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=auto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Create the multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+
+      - name: Check what we published
+        run: docker buildx imagetools inspect ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
