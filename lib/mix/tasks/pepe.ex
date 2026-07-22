@@ -4757,6 +4757,13 @@ defmodule Mix.Tasks.Pepe do
     case Pepe.Update.run() do
       {:ok, :updated, v} ->
         ok("updated to v#{v}  (previous binary kept as pepe.old) - restart pepe to run it")
+        # An update only ever swaps the binary - it never touches an agent's own persona/
+        # config, but the scaffolding Pepe itself wraps around every agent's prompt (see
+        # Pepe.Agent.Workspace.system_prompt/1) is baked into the code, so a real release can
+        # still change what every agent is actually told, for every agent, the moment it runs.
+        # Named here instead of left silent: read CHANGELOG.md for what changed, and
+        # `mix pepe agent prompt NAME` shows exactly what any one agent's prompt looks like now.
+        info(dim("see CHANGELOG.md for what changed - `mix pepe agent prompt NAME` shows any agent's assembled prompt as it stands now"))
 
       {:ok, :up_to_date, v} ->
         ok("already on the latest version (v#{v})")
