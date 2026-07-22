@@ -2998,16 +2998,12 @@ defmodule Pepe.Gateways.Telegram do
       # Telegram caps messages at 4096 chars. Chunk the plain text, then render each
       # chunk as HTML so a split never lands inside a tag. The whole message counts as
       # delivered only if every chunk does; the first failure wins.
-      text
-      |> chunk(4000)
-      |> Enum.reduce(:ok, fn part, acc ->
-        case acc do
-          :ok -> post_part(chat_id, part)
-          error -> error
-        end
-      end)
+      text |> chunk(4000) |> Enum.reduce(:ok, fn part, acc -> send_chunk(chat_id, part, acc) end)
     end
   end
+
+  defp send_chunk(chat_id, part, :ok), do: post_part(chat_id, part)
+  defp send_chunk(_chat_id, _part, error), do: error
 
   # Send one chunk as Telegram HTML (so **bold**/`code`/links render); if the API
   # rejects the formatting, resend it as plain text so the message still arrives.

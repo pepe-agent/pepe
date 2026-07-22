@@ -43,17 +43,8 @@ defmodule Pepe.Readable do
   """
   @spec extract(String.t()) :: {:ok, %{title: String.t(), text: String.t()}} | :error
   def extract(html) when is_binary(html) do
-    with {:ok, doc} <- Floki.parse_document(html) do
-      title = extract_title(doc)
-      clean = Floki.filter_out(doc, Enum.join(@noise_selectors, ", "))
-      text = clean |> best_candidate() |> extract_text()
-
-      if byte_size(text) >= @min_text_length do
-        {:ok, %{title: title, text: text}}
-      else
-        :error
-      end
-    else
+    case Floki.parse_document(html) do
+      {:ok, doc} -> extract_from_document(doc)
       _ -> :error
     end
   rescue
@@ -61,6 +52,14 @@ defmodule Pepe.Readable do
   end
 
   def extract(_), do: :error
+
+  defp extract_from_document(doc) do
+    title = extract_title(doc)
+    clean = Floki.filter_out(doc, Enum.join(@noise_selectors, ", "))
+    text = clean |> best_candidate() |> extract_text()
+
+    if byte_size(text) >= @min_text_length, do: {:ok, %{title: title, text: text}}, else: :error
+  end
 
   defp extract_title(doc) do
     case Floki.find(doc, "title") do
@@ -73,13 +72,14 @@ defmodule Pepe.Readable do
   # no need to score alternatives once the page has already told us where the
   # article is. Only falls through to scoring when none is present/substantial.
   defp best_candidate(clean) do
-    @content_selectors
-    |> Enum.find_value(fn selector ->
-      case Floki.find(clean, selector) do
-        [node | _] -> if text_length(node) >= @min_text_length, do: node
-        [] -> nil
-      end
-    end) || best_scored_block(clean)
+    Enum.find_value(@content_selectors, fn selector -> substantial_match(clean, selector) end) || best_scored_block(clean)
+  end
+
+  defp substantial_match(clean, selector) do
+    case Floki.find(clean, selector) do
+      [node | _] -> if text_length(node) >= @min_text_length, do: node
+      [] -> nil
+    end
   end
 
   defp best_scored_block(clean) do

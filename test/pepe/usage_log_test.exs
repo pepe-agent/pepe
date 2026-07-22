@@ -41,7 +41,7 @@ defmodule Pepe.Usage.LogTest do
     to = unix(2026, 7, 1)
 
     entries = Log.entries_between("p", from, to)
-    assert length(entries) == 2
+    assert [_, _] = entries
     assert Enum.all?(entries, &(&1["at"] >= from and &1["at"] < to))
   end
 

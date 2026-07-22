@@ -90,7 +90,7 @@ defmodule Pepe.Flow do
           {:ok, map()} | {:error, term()}
   def promote_from_traces(name, agent, trace_ids, opts \\ [])
 
-  def promote_from_traces(name, agent_ref, trace_ids, opts) when length(trace_ids) >= 2 do
+  def promote_from_traces(name, agent_ref, [_, _ | _] = trace_ids, opts) do
     traces = Enum.map(trace_ids, &find_trace/1)
     # Canonicalized once, up front: a Cron's own `agent` field round-trips through the
     # same resolution (Config.resolve_cron_agent/1), so a "flow" cron built from a bare
@@ -98,37 +98,27 @@ defmodule Pepe.Flow do
     # with at run time - not whatever shorthand the operator happened to type.
     agent = Config.get_agent(agent_ref)
 
-    cond do
-      Enum.any?(traces, &is_nil/1) ->
-        {:error, :trace_not_found}
-
-      is_nil(agent) ->
-        {:error, :unknown_agent}
-
-      not is_nil(get(agent.name, name)) and opts[:overwrite] != true ->
-        {:error, :already_exists}
-
-      not Enum.all?(traces, &(&1["agent"] == agent.name)) ->
-        {:error, :trace_wrong_agent}
-
-      not Enum.all?(traces, &trace_clean?/1) ->
-        {:error, :trace_not_clean}
-
-      true ->
-        case traces |> Enum.map(&tool_call_steps/1) |> Enum.uniq() do
-          [[]] ->
-            {:error, :no_tool_calls}
-
-          [steps] ->
-            create(name, agent.name, steps, trace_ids)
-
-          _ ->
-            {:error, :traces_dont_match}
-        end
+    with :ok <- validate_promotion(name, agent, traces, opts) do
+      case traces |> Enum.map(&tool_call_steps/1) |> Enum.uniq() do
+        [[]] -> {:error, :no_tool_calls}
+        [steps] -> create(name, agent.name, steps, trace_ids)
+        _ -> {:error, :traces_dont_match}
+      end
     end
   end
 
   def promote_from_traces(_name, _agent, _trace_ids, _opts), do: {:error, :need_at_least_two_traces}
+
+  defp validate_promotion(name, agent, traces, opts) do
+    cond do
+      Enum.any?(traces, &is_nil/1) -> {:error, :trace_not_found}
+      is_nil(agent) -> {:error, :unknown_agent}
+      not is_nil(get(agent.name, name)) and opts[:overwrite] != true -> {:error, :already_exists}
+      not Enum.all?(traces, &(&1["agent"] == agent.name)) -> {:error, :trace_wrong_agent}
+      not Enum.all?(traces, &trace_clean?/1) -> {:error, :trace_not_clean}
+      true -> :ok
+    end
+  end
 
   # A trace id alone doesn't say which project scoped it - the same lookup
   # Mix.Tasks.Pepe.find_trace/2 already does for `mix pepe traces ID`.
@@ -205,36 +195,45 @@ defmodule Pepe.Flow do
   end
 
   defp replay(steps, ctx) do
-    Enum.reduce_while(steps, {:ok, []}, fn step, {:ok, acc} ->
-      name = step["tool"]
-      args = step["args"]
-
-      case Permissions.gate(name, args, ctx) do
-        :allow ->
-          call = %{"function" => %{"name" => name, "arguments" => args}}
-          out = Tools.execute(call, ctx)
-          Trace.event({:tool_call, name, args})
-          Trace.event({:tool_result, name, out})
-
-          if Tools.error?(out) do
-            {:halt, {:error, {:step_failed, name, out}}}
-          else
-            {:cont, {:ok, [out | acc]}}
-          end
-
-        :deny ->
-          Trace.event({:tool_denied, name, nil})
-          {:halt, {:error, {:denied, name}}}
-
-        {:deny, reason} ->
-          Trace.event({:tool_denied, name, reason})
-          {:halt, {:error, {:denied, name, reason}}}
-      end
-    end)
+    Enum.reduce_while(steps, {:ok, []}, fn step, {:ok, acc} -> replay_step(step, ctx, acc) end)
     |> case do
       {:ok, results} -> {:ok, Enum.reverse(results)}
       error -> error
     end
+  end
+
+  defp replay_step(step, ctx, acc) do
+    name = step["tool"]
+    args = step["args"]
+
+    case Permissions.gate(name, args, ctx) do
+      :allow -> run_step(name, args, ctx, acc)
+      :deny -> deny_step(name, nil)
+      {:deny, reason} -> deny_step(name, reason)
+    end
+  end
+
+  defp run_step(name, args, ctx, acc) do
+    call = %{"function" => %{"name" => name, "arguments" => args}}
+    out = Tools.execute(call, ctx)
+    Trace.event({:tool_call, name, args})
+    Trace.event({:tool_result, name, out})
+
+    if Tools.error?(out) do
+      {:halt, {:error, {:step_failed, name, out}}}
+    else
+      {:cont, {:ok, [out | acc]}}
+    end
+  end
+
+  defp deny_step(name, nil) do
+    Trace.event({:tool_denied, name, nil})
+    {:halt, {:error, {:denied, name}}}
+  end
+
+  defp deny_step(name, reason) do
+    Trace.event({:tool_denied, name, reason})
+    {:halt, {:error, {:denied, name, reason}}}
   end
 
   defp to_outcome({:ok, _}), do: {:ok, "flow completed", []}

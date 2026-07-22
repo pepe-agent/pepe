@@ -78,9 +78,12 @@ defmodule Pepe.Config.Commitment do
   end
 
   # The text a fresh changeset should normalize is whichever one attrs actually supplies
-  # (a plain map may use either string or atom keys, matching from_map/1 and struct updates).
-  defp get_field_after_cast(commitment, attrs),
-    do: attrs[:text] || attrs["text"] || commitment.text
+  # (a plain map may use either string or atom keys, matching from_map/1 and struct updates) -
+  # normalize the map's keys to strings once, rather than checking both key types per lookup.
+  defp get_field_after_cast(commitment, attrs) do
+    normalized = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    normalized["text"] || commitment.text
+  end
 
   @doc "Lowercased, punctuation-stripped, whitespace-trimmed - what the unique index compares."
   @spec normalize_text(String.t() | nil) :: String.t() | nil

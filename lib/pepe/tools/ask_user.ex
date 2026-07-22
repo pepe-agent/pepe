@@ -71,12 +71,13 @@ defmodule Pepe.Tools.AskUser do
 
   defp validate(question, choices) do
     trimmed = Enum.map(choices, &(is_binary(&1) && String.trim(&1)))
+    count = length(choices)
 
     cond do
       String.trim(question) == "" ->
         {:error, "question can't be blank"}
 
-      length(choices) < 2 or length(choices) > 6 ->
+      count < 2 or count > 6 ->
         {:error, "choices must have between 2 and 6 options"}
 
       Enum.any?(trimmed, &(&1 in [false, ""])) ->

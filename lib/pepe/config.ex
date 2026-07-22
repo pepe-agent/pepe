@@ -984,21 +984,35 @@ defmodule Pepe.Config do
   keyed by an old handle simply finishes; new requests use the new handle.
   """
   def rename_project(id_or_slug, new_slug) do
-    project = get_project(id_or_slug)
-    old = project && project["slug"]
-    # A pure case change of the project's own slug ("Acme" -> "acme") is not a collision
-    # with itself: compare against the id `new_slug` resolves to, not the slug string,
-    # since `get_project/1` is case-insensitive and would otherwise see the project's own
-    # current slug as already taken by someone else.
-    other = project && get_project(new_slug)
+    case get_project(id_or_slug) do
+      nil -> {:error, :not_found}
+      project -> rename_existing_project(project, new_slug)
+    end
+  end
+
+  defp rename_existing_project(project, new_slug) do
+    old = project["slug"]
 
     cond do
       not Project.valid_name?(new_slug) -> {:error, :invalid_slug}
-      is_nil(project) -> {:error, :not_found}
+      # A pure case change of the project's own slug ("Acme" -> "acme") is not a collision
+      # with itself.
       old == new_slug -> :ok
-      not is_nil(other) and other["id"] != project["id"] -> {:error, :already_exists}
-      old != new_slug and orphaned_repo_data?(new_slug) -> {:error, :slug_has_orphaned_data}
+      slug_taken_by_another?(new_slug, project) -> {:error, :already_exists}
+      # Reaching here already means old != new_slug (the clause above would have
+      # returned :ok otherwise).
+      orphaned_repo_data?(new_slug) -> {:error, :slug_has_orphaned_data}
       true -> do_rename_project(old, new_slug)
+    end
+  end
+
+  # Compares against the id `new_slug` resolves to, not the slug string, since
+  # `get_project/1` is case-insensitive and would otherwise see the project's own current
+  # slug as already taken by someone else.
+  defp slug_taken_by_another?(new_slug, project) do
+    case get_project(new_slug) do
+      nil -> false
+      other -> other["id"] != project["id"]
     end
   end
 

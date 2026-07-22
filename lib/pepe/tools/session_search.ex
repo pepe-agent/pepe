@@ -103,32 +103,42 @@ defmodule Pepe.Tools.SessionSearch do
 
   defp dispatch("session_history", args, scope, bound) do
     with {:ok, session} <- require_arg(args, "session") do
-      if session_visible?(session, bound) do
-        case Trace.for_session(scope, session, limit(args, 200)) do
-          [] -> {:ok, "No turns recorded for #{session}."}
-          traces -> {:ok, Enum.map_join(traces, "\n", &describe_trace_line/1)}
-        end
-      else
-        # Same message a genuinely-empty session gets - a call scoped to "self" must not
-        # distinguish "that session doesn't exist" from "that session isn't yours."
-        {:ok, "No turns recorded for #{session}."}
-      end
+      describe_session_history(scope, session, bound, limit(args, 200))
     end
   end
 
   defp dispatch("show", args, scope, bound) do
     with {:ok, trace_id} <- require_arg(args, "trace_id") do
-      case Trace.get(scope, trace_id) do
-        nil ->
-          {:error, "no such trace: #{trace_id}"}
-
-        trace ->
-          if session_visible?(trace["session"], bound), do: {:ok, describe_transcript(trace)}, else: {:error, "no such trace: #{trace_id}"}
-      end
+      show_trace(scope, trace_id, bound)
     end
   end
 
   defp dispatch(other, _args, _scope, _bound), do: {:error, "unknown action: #{other}"}
+
+  defp describe_session_history(scope, session, bound, limit) do
+    if session_visible?(session, bound) do
+      case Trace.for_session(scope, session, limit) do
+        [] -> {:ok, "No turns recorded for #{session}."}
+        traces -> {:ok, Enum.map_join(traces, "\n", &describe_trace_line/1)}
+      end
+    else
+      # Same message a genuinely-empty session gets - a call scoped to "self" must not
+      # distinguish "that session doesn't exist" from "that session isn't yours."
+      {:ok, "No turns recorded for #{session}."}
+    end
+  end
+
+  defp show_trace(scope, trace_id, bound) do
+    case Trace.get(scope, trace_id) do
+      nil ->
+        {:error, "no such trace: #{trace_id}"}
+
+      trace ->
+        if session_visible?(trace["session"], bound),
+          do: {:ok, describe_transcript(trace)},
+          else: {:error, "no such trace: #{trace_id}"}
+    end
+  end
 
   defp session_visible?(_session, nil), do: true
   defp session_visible?(session, bound), do: session == bound

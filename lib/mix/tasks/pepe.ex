@@ -1169,7 +1169,7 @@ defmodule Mix.Tasks.Pepe do
       {nil, _} ->
         error("usage: mix pepe flow promote NAME --agent AGENT --from ID1,ID2[,...] [--overwrite]")
 
-      {agent, ids} when length(ids) >= 2 ->
+      {agent, [_, _ | _] = ids} ->
         case Pepe.Flow.promote_from_traces(name, agent, ids, overwrite: opts[:overwrite] == true) do
           {:ok, flow} ->
             ok("promoted #{green(name)} for #{agent}: #{length(flow["steps"])} step(s)")
@@ -1289,7 +1289,7 @@ defmodule Mix.Tasks.Pepe do
         shown = Enum.map_join(candidates, "\n    ", &command_line(&1, needs_sudo?))
         info("Detected #{manager}. Installing a browser the `browser` tool can drive:\n")
         info("    #{shown}\n")
-        if length(candidates) > 1, do: info("(tries each in order until one works - the package name differs by distro)\n")
+        if match?([_, _ | _], candidates), do: info("(tries each in order until one works - the package name differs by distro)\n")
         if needs_sudo?, do: info("(enter your password if prompted)\n")
 
         case Pepe.Browser.SystemDeps.install(candidates) do

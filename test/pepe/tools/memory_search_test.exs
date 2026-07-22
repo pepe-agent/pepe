@@ -61,7 +61,7 @@ defmodule Pepe.Tools.MemorySearchTest do
     File.write!(Path.join(dir, "MEMORY.md"), "match one.\n\nmatch two.\n\nmatch three.")
 
     assert {:ok, out} = MemorySearch.run(%{"query" => "match", "limit" => 1}, ctx("zak"))
-    assert length(String.split(out, "\n\n")) == 1
+    assert [_] = String.split(out, "\n\n")
   end
 
   test "requires a query" do

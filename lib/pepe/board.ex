@@ -123,22 +123,24 @@ defmodule Pepe.Board do
   @doc "Add a dependency edge to an existing card. Same validation as `create_card/1`."
   @spec link(String.t(), String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def link(card_id, depends_on_id) do
-    Repo.transaction(fn ->
-      case Repo.get(BoardCard, card_id) do
-        nil ->
-          Repo.rollback(:not_found)
-
-        card ->
-          new_deps = Enum.uniq([depends_on_id | card.depends_on])
-
-          if valid_deps?(card.board, card_id, new_deps) do
-            card |> BoardCard.changeset(%{depends_on: new_deps, updated_at: now()}) |> Repo.update!()
-          else
-            Repo.rollback(:invalid_dependency)
-          end
-      end
-    end)
+    Repo.transaction(fn -> do_link(card_id, depends_on_id) end)
     |> tap_ok(fn _card -> log_event(card_id, "linked", %{"depends_on" => depends_on_id}) end)
+  end
+
+  defp do_link(card_id, depends_on_id) do
+    case Repo.get(BoardCard, card_id) do
+      nil ->
+        Repo.rollback(:not_found)
+
+      card ->
+        new_deps = Enum.uniq([depends_on_id | card.depends_on])
+
+        if valid_deps?(card.board, card_id, new_deps) do
+          card |> BoardCard.changeset(%{depends_on: new_deps, updated_at: now()}) |> Repo.update!()
+        else
+          Repo.rollback(:invalid_dependency)
+        end
+    end
   end
 
   @doc """
@@ -311,22 +313,24 @@ defmodule Pepe.Board do
   """
   @spec promote_if_ready(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def promote_if_ready(card_id) do
-    Repo.transaction(fn ->
-      case Repo.get(BoardCard, card_id) do
-        nil ->
-          Repo.rollback(:not_found)
+    Repo.transaction(fn -> do_promote_if_ready(card_id) end)
+  end
 
-        %{status: "todo"} = card ->
-          if deps_done?(card.depends_on) do
-            card |> BoardCard.changeset(%{status: "ready", updated_at: now()}) |> Repo.update!()
-          else
-            Repo.rollback(:deps_not_done)
-          end
+  defp do_promote_if_ready(card_id) do
+    case Repo.get(BoardCard, card_id) do
+      nil ->
+        Repo.rollback(:not_found)
 
-        _card ->
-          Repo.rollback(:not_todo)
-      end
-    end)
+      %{status: "todo"} = card ->
+        if deps_done?(card.depends_on) do
+          card |> BoardCard.changeset(%{status: "ready", updated_at: now()}) |> Repo.update!()
+        else
+          Repo.rollback(:deps_not_done)
+        end
+
+      _card ->
+        Repo.rollback(:not_todo)
+    end
   end
 
   defp deps_done?([]), do: true

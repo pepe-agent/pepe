@@ -83,23 +83,24 @@ defmodule Pepe.Browser.Fetcher do
       Logger.info("[browser] no Chrome found - downloading one (~100-200MB, one time)")
 
       case fetch_zip(url) do
-        {:ok, zip} ->
-          result =
-            with {:ok, extracted} <- extract(zip),
-                 {:ok, exe} <- install(extracted, source, plat) do
-              Logger.info("[browser] downloaded a browser to #{exe}")
-              {:ok, exe}
-            end
-
-          # Always, not just on success: a failed extract/install still leaves the
-          # downloaded zip (up to ~200MB) behind in the tmp dir otherwise.
-          File.rm(zip)
-          result
-
-        {:error, _} = error ->
-          error
+        {:ok, zip} -> extract_and_install(zip, source, plat)
+        {:error, _} = error -> error
       end
     end
+  end
+
+  # Always removes the downloaded zip, not just on success: a failed extract/install
+  # still leaves the download (up to ~200MB) behind in the tmp dir otherwise.
+  defp extract_and_install(zip, source, plat) do
+    result =
+      with {:ok, extracted} <- extract(zip),
+           {:ok, exe} <- install(extracted, source, plat) do
+        Logger.info("[browser] downloaded a browser to #{exe}")
+        {:ok, exe}
+      end
+
+    File.rm(zip)
+    result
   end
 
   ###
