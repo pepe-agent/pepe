@@ -16,7 +16,7 @@ defmodule Pepe.Usage.Log do
 
   alias Pepe.Config
   alias Pepe.Repo
-  alias Pepe.Usage.Entry
+  alias Pepe.Usage.Usage
 
   @doc """
   Append one usage entry to `project`'s ledger. `entry` carries `at`, `agent`, `model`,
@@ -35,7 +35,7 @@ defmodule Pepe.Usage.Log do
       cached: entry["cached"]
     }
 
-    Repo.insert_all(Entry, [row])
+    Repo.insert_all(Usage, [row])
     :ok
   end
 
@@ -46,7 +46,7 @@ defmodule Pepe.Usage.Log do
   """
   @spec rescope_project(String.t(), String.t()) :: :ok
   def rescope_project(old, new) do
-    from(e in Entry, where: e.project == ^old) |> Repo.update_all(set: [project: new])
+    from(e in Usage, where: e.project == ^old) |> Repo.update_all(set: [project: new])
     :ok
   end
 
@@ -60,12 +60,12 @@ defmodule Pepe.Usage.Log do
   @spec any_for_project?(String.t() | nil) :: boolean()
   def any_for_project?(scope) do
     name = scope_name(scope)
-    from(e in Entry, where: e.project == ^name) |> Repo.exists?()
+    from(e in Usage, where: e.project == ^name) |> Repo.exists?()
   end
 
   @doc "Scopes (projects + root) that have any recorded usage."
   def scopes do
-    from(e in Entry, distinct: true, select: e.project, order_by: e.project) |> Repo.all()
+    from(e in Usage, distinct: true, select: e.project, order_by: e.project) |> Repo.all()
   end
 
   @doc """
@@ -75,15 +75,15 @@ defmodule Pepe.Usage.Log do
   @spec entries(String.t() | nil) :: [map()]
   def entries(scope) do
     name = scope_name(scope)
-    from(e in Entry, where: e.project == ^name, order_by: e.id) |> Repo.all() |> Enum.map(&to_map/1)
+    from(e in Usage, where: e.project == ^name, order_by: e.id) |> Repo.all() |> Enum.map(&to_map/1)
   end
 
   @doc "All entries across the given scopes (or all scopes when `:all`)."
   @spec entries_for(:all | [String.t()]) :: [map()]
-  def entries_for(:all), do: from(e in Entry, order_by: e.id) |> Repo.all() |> Enum.map(&to_map/1)
+  def entries_for(:all), do: from(e in Usage, order_by: e.id) |> Repo.all() |> Enum.map(&to_map/1)
 
   def entries_for(list) when is_list(list) do
-    from(e in Entry, where: e.project in ^list, order_by: e.id) |> Repo.all() |> Enum.map(&to_map/1)
+    from(e in Usage, where: e.project in ^list, order_by: e.id) |> Repo.all() |> Enum.map(&to_map/1)
   end
 
   @doc """
@@ -95,12 +95,12 @@ defmodule Pepe.Usage.Log do
   def entries_between(scope, from_at, to_at) do
     name = scope_name(scope)
 
-    from(e in Entry, where: e.project == ^name and e.at >= ^from_at and e.at < ^to_at, order_by: e.id)
+    from(e in Usage, where: e.project == ^name and e.at >= ^from_at and e.at < ^to_at, order_by: e.id)
     |> Repo.all()
     |> Enum.map(&to_map/1)
   end
 
-  defp to_map(%Entry{} = e) do
+  defp to_map(%Usage{} = e) do
     base = %{"at" => e.at, "agent" => e.agent, "model" => e.model, "in" => e.in, "out" => e.out, "project" => e.project}
     base = if e.sub, do: Map.put(base, "sub", true), else: base
     if e.cached && e.cached > 0, do: Map.put(base, "cached", e.cached), else: base

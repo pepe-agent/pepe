@@ -29,14 +29,14 @@ defmodule Pepe.Flow do
       else nobody is watching - not a new one invented for flows.
 
   Backed by `Pepe.Repo` (SQLite), matching every other operational subsystem here. Every
-  public function takes/returns bare string-keyed maps, not the `Pepe.Flow.Entry` schema -
+  public function takes/returns bare string-keyed maps, not the `Pepe.Flow.Flow` schema -
   same boundary `Pepe.Trace` already draws.
   """
 
   import Ecto.Query, only: [from: 2]
 
   alias Pepe.Config
-  alias Pepe.Flow.Entry
+  alias Pepe.Flow.Flow
   alias Pepe.Permissions
   alias Pepe.Repo
   alias Pepe.Tools
@@ -47,7 +47,7 @@ defmodule Pepe.Flow do
   def for_agent(agent_ref) do
     case canonical_agent(agent_ref) do
       nil -> []
-      agent -> from(f in Entry, where: f.agent == ^agent, order_by: f.name) |> Repo.all() |> Enum.map(&to_map/1)
+      agent -> from(f in Flow, where: f.agent == ^agent, order_by: f.name) |> Repo.all() |> Enum.map(&to_map/1)
     end
   end
 
@@ -65,7 +65,7 @@ defmodule Pepe.Flow do
         nil
 
       agent ->
-        case Repo.get_by(Entry, agent: agent, name: name) do
+        case Repo.get_by(Flow, agent: agent, name: name) do
           nil -> nil
           entry -> to_map(entry)
         end
@@ -133,7 +133,7 @@ defmodule Pepe.Flow do
     now = System.system_time(:second)
     row = %{id: id, name: name, agent: agent, steps: steps, source_trace_ids: trace_ids, created_at: now}
 
-    Repo.insert_all(Entry, [row], on_conflict: {:replace, [:steps, :source_trace_ids, :created_at]}, conflict_target: [:agent, :name])
+    Repo.insert_all(Flow, [row], on_conflict: {:replace, [:steps, :source_trace_ids, :created_at]}, conflict_target: [:agent, :name])
     {:ok, get(agent, name)}
   end
 
@@ -142,7 +142,7 @@ defmodule Pepe.Flow do
   def delete(agent_ref, name) do
     case canonical_agent(agent_ref) do
       nil -> :ok
-      agent -> from(f in Entry, where: f.agent == ^agent and f.name == ^name) |> Repo.delete_all() |> then(fn _ -> :ok end)
+      agent -> from(f in Flow, where: f.agent == ^agent and f.name == ^name) |> Repo.delete_all() |> then(fn _ -> :ok end)
     end
   end
 
@@ -205,7 +205,7 @@ defmodule Pepe.Flow do
   defp record_result(flow, result) do
     outcome = if match?({:ok, _}, result), do: "ok", else: "error: #{inspect(elem(result, 1))}"
 
-    from(f in Entry, where: f.agent == ^flow["agent"] and f.name == ^flow["name"])
+    from(f in Flow, where: f.agent == ^flow["agent"] and f.name == ^flow["name"])
     |> Repo.update_all(set: [last_run: System.system_time(:second), last_result: outcome])
   end
 
@@ -218,7 +218,7 @@ defmodule Pepe.Flow do
     |> Enum.map(&%{"tool" => &1["name"], "args" => &1["args"]})
   end
 
-  defp to_map(%Entry{} = e) do
+  defp to_map(%Flow{} = e) do
     %{
       "id" => e.id,
       "name" => e.name,

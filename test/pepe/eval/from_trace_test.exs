@@ -150,7 +150,7 @@ defmodule Pepe.Eval.FromTraceTest do
   test "a run that failed is not something to keep doing" do
     # A trace of a turn that died. Promoting it would freeze the failure as the expectation
     # and, worse, hand you a green suite for it.
-    Pepe.Repo.insert_all(Pepe.Trace.Entry, [
+    Pepe.Repo.insert_all(Pepe.Trace.Trace, [
       %{
         id: "dead",
         scope: "default",

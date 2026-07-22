@@ -30,7 +30,7 @@ defmodule Pepe.Trace do
   alias Pepe.Config
   alias Pepe.Project
   alias Pepe.Repo
-  alias Pepe.Trace.Entry
+  alias Pepe.Trace.Trace
 
   @key :pepe_trace
   @keep 200
@@ -146,7 +146,7 @@ defmodule Pepe.Trace do
   """
   @spec rescope_project(String.t(), String.t()) :: :ok
   def rescope_project(old, new) do
-    from(t in Entry, where: t.scope == ^old) |> Repo.update_all(set: [scope: new])
+    from(t in Trace, where: t.scope == ^old) |> Repo.update_all(set: [scope: new])
     :ok
   end
 
@@ -161,12 +161,12 @@ defmodule Pepe.Trace do
   @spec any_for_scope?(String.t() | nil) :: boolean()
   def any_for_scope?(scope) do
     name = scope_name(scope)
-    from(t in Entry, where: t.scope == ^name) |> Repo.exists?()
+    from(t in Trace, where: t.scope == ^name) |> Repo.exists?()
   end
 
   @doc "Scopes (projects + root) that have any recorded trace."
   def scopes do
-    from(t in Entry, distinct: true, select: t.scope, order_by: t.scope) |> Repo.all()
+    from(t in Trace, distinct: true, select: t.scope, order_by: t.scope) |> Repo.all()
   end
 
   @doc """
@@ -174,14 +174,14 @@ defmodule Pepe.Trace do
   the index). `limit` caps how many are returned.
   """
   def recent(scope, limit \\ 50) do
-    from(t in Entry, where: t.scope == ^scope, order_by: [desc: t.at], limit: ^limit)
+    from(t in Trace, where: t.scope == ^scope, order_by: [desc: t.at], limit: ^limit)
     |> Repo.all()
     |> Enum.map(&summarize/1)
   end
 
   @doc "Load one full trace (with its events) by id, or `nil` if it is gone."
   def get(scope, id) do
-    case Repo.get_by(Entry, scope: scope, id: id) do
+    case Repo.get_by(Trace, scope: scope, id: id) do
       nil -> nil
       entry -> to_map(entry)
     end
@@ -195,7 +195,7 @@ defmodule Pepe.Trace do
   """
   @spec for_session(String.t(), String.t(), pos_integer()) :: [map()]
   def for_session(scope, session, limit \\ 200) do
-    from(t in Entry, where: t.scope == ^scope and t.session == ^session, order_by: [asc: t.at], limit: ^limit)
+    from(t in Trace, where: t.scope == ^scope and t.session == ^session, order_by: [asc: t.at], limit: ^limit)
     |> Repo.all()
     |> Enum.map(&summarize/1)
   end
@@ -208,7 +208,7 @@ defmodule Pepe.Trace do
   """
   @spec sessions(String.t(), pos_integer()) :: [map()]
   def sessions(scope, limit \\ 50) do
-    from(t in Entry,
+    from(t in Trace,
       where: t.scope == ^scope and not is_nil(t.session) and t.session != "",
       group_by: t.session,
       select: %{session: t.session, turns: count(t.id), last_at: max(t.at)},
@@ -231,14 +231,14 @@ defmodule Pepe.Trace do
   def search(scope, query, limit \\ 50) when is_binary(query) and query != "" do
     needle = String.downcase(query)
 
-    from(t in Entry, where: t.scope == ^scope, order_by: [desc: t.at])
+    from(t in Trace, where: t.scope == ^scope, order_by: [desc: t.at])
     |> Repo.all()
     |> Enum.filter(&matches?(&1, needle))
     |> Enum.take(limit)
     |> Enum.map(&summarize/1)
   end
 
-  defp matches?(%Entry{} = e, needle) do
+  defp matches?(%Trace{} = e, needle) do
     haystack =
       [e.prompt | Enum.map(e.events || [], &(&1["args"] || &1["out"] || &1["text"] || ""))]
       |> Enum.join(" ")
@@ -249,7 +249,7 @@ defmodule Pepe.Trace do
 
   # --- internals ---------------------------------------------------------------------
 
-  defp to_map(%Entry{} = e) do
+  defp to_map(%Trace{} = e) do
     %{
       "id" => e.id,
       "at" => e.at,
@@ -263,7 +263,7 @@ defmodule Pepe.Trace do
     }
   end
 
-  defp summarize(%Entry{} = e) do
+  defp summarize(%Trace{} = e) do
     m = to_map(e)
     m |> Map.drop(["events"]) |> Map.put("tools", tool_names(m)) |> Map.put("usage", usage_list(m))
   end
@@ -283,7 +283,7 @@ defmodule Pepe.Trace do
   defp usage_list(_), do: []
 
   defp write(row) do
-    Repo.insert_all(Entry, [row])
+    Repo.insert_all(Trace, [row])
     trim(row.scope)
     :ok
   end
@@ -292,11 +292,11 @@ defmodule Pepe.Trace do
   # so this is two statements: how many is this scope over, then delete exactly those
   # (the oldest ones), by id.
   defp trim(scope) do
-    count = from(t in Entry, where: t.scope == ^scope) |> Repo.aggregate(:count)
+    count = from(t in Trace, where: t.scope == ^scope) |> Repo.aggregate(:count)
 
     if count > @keep do
       ids =
-        from(t in Entry,
+        from(t in Trace,
           where: t.scope == ^scope,
           order_by: [asc: t.at, asc: t.id],
           limit: ^(count - @keep),
@@ -304,7 +304,7 @@ defmodule Pepe.Trace do
         )
         |> Repo.all()
 
-      from(t in Entry, where: t.id in ^ids) |> Repo.delete_all()
+      from(t in Trace, where: t.id in ^ids) |> Repo.delete_all()
     end
   end
 

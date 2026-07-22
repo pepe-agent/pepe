@@ -1,4 +1,4 @@
-defmodule Pepe.Trace.Entry do
+defmodule Pepe.Trace.Trace do
   @moduledoc """
   One row of `Pepe.Trace` - see that module's moduledoc for what it records. The schema
   itself is internal: every public `Pepe.Trace` function takes/returns a bare

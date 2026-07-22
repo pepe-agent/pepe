@@ -1,4 +1,4 @@
-defmodule Pepe.Usage.Entry do
+defmodule Pepe.Usage.Usage do
   @moduledoc """
   One row of `Pepe.Usage.Log` - see that module's moduledoc for what it records. The
   schema itself is internal: every public `Pepe.Usage.Log` function takes/returns a bare
