@@ -42,6 +42,11 @@ deliberately kept separate:
 - **Skills** are about *technique*. The reviewer prefers updating a rich existing
   skill over spawning a narrow new one.
 
+To find one thing without reading a whole file, an agent has the `memory_search`
+tool: a plain, case-insensitive search over its own `MEMORY.md`/`USER.md`/`people.md`
+entries, each match tagged with the file it came from. It's lexical, not semantic -
+no embeddings, no extra API call - which fits memory that's kept small on purpose.
+
 The review is a background run with its tools restricted to file and skill
 management. It has no shell and no network, so it can update the workspace and
 nothing else, and the live session is left untouched. It fires on `/compact`, on idle

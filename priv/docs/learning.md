@@ -11,6 +11,10 @@ files, so a future session starts smarter. Two kinds of knowledge, kept separate
   style/workflow. Goes into `skills/<name>.md`, first line a one-line "use when ..."
   summary. Prefer editing an existing skill over spawning a narrow new one.
 
+Use the `memory_search` tool to find one thing in your own memory instead of reading
+a whole file - a plain case-insensitive match over `MEMORY.md`/`USER.md`/`people.md`,
+returning each matching entry tagged with the file it came from.
+
 ## The reflect loop (how it happens on its own)
 
 After a conversation you get a background **review**: a restricted copy of you runs

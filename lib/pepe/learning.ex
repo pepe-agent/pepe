@@ -28,6 +28,9 @@ defmodule Pepe.Learning do
 
   @memory_files ~w(MEMORY.md USER.md people.md)
 
+  @doc "The per-agent memory file names TimeLearn (and `memory_search`) read: `MEMORY.md`, `USER.md`, `people.md`."
+  def memory_files, do: @memory_files
+
   @doc "The learning timeline for `agent_name` - skills + its memory, newest first."
   @spec timeline(String.t() | nil) :: [learning_node()]
   def timeline(agent_name) do
@@ -109,8 +112,9 @@ defmodule Pepe.Learning do
     end)
   end
 
-  # Split a memory file into entries: blank-line-separated blocks, trimmed.
-  defp entries(content) do
+  @doc "Split a memory file's content into entries: blank-line-separated blocks, trimmed."
+  @spec entries(String.t()) :: [String.t()]
+  def entries(content) do
     content
     |> String.split(~r/\n\s*\n/)
     |> Enum.map(&String.trim/1)

@@ -32,6 +32,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ManagePepe
   alias Pepe.Tools.ManagePlugin
   alias Pepe.Tools.ManageToken
+  alias Pepe.Tools.MemorySearch
   alias Pepe.Tools.MoveFile
   alias Pepe.Tools.Plan
   alias Pepe.Tools.ReadFile
@@ -93,6 +94,7 @@ defmodule Pepe.Tools do
     Watch,
     Commitment,
     SessionSearch,
+    MemorySearch,
     TelegramAccess,
     TelegramPoll
   ]

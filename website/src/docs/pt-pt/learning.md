@@ -42,6 +42,13 @@ separadas de propósito:
 - **Competências** são sobre *técnica*. O revisor prefere atualizar uma competência existente e
   rica a criar uma nova e estreita.
 
+Para encontrar uma coisa em concreto sem ler o ficheiro todo, o agente tem a
+ferramenta `memory_search`: uma pesquisa simples, sem distinguir maiúsculas de
+minúsculas, sobre as suas próprias entradas de `MEMORY.md`/`USER.md`/`people.md`,
+cada resultado marcado com o ficheiro de onde veio. É lexical, não semântica - sem
+embeddings, sem uma chamada extra a uma API - o que encaixa numa memória mantida
+pequena de propósito.
+
 A revisão é uma execução em segundo plano com as ferramentas restritas à gestão de ficheiros e
 competências. Não tem shell nem rede, por isso pode atualizar o workspace e mais nada, e a
 sessão ao vivo fica intocada. Dispara no `/compact`, na inatividade (cerca de 90 segundos depois

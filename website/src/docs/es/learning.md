@@ -42,6 +42,12 @@ mantenidas aparte a propósito:
 - **Habilidades** tratan sobre *técnica*. El revisor prefiere actualizar una habilidad existente
   y rica antes que crear una nueva y estrecha.
 
+Para encontrar algo puntual sin leer un archivo entero, el agente tiene la herramienta
+`memory_search`: una búsqueda simple, sin distinguir mayúsculas, sobre sus propias
+entradas de `MEMORY.md`/`USER.md`/`people.md`, cada resultado marcado con el archivo
+del que viene. Es léxica, no semántica - sin embeddings, sin una llamada extra a una
+API - lo que encaja con una memoria mantenida pequeña a propósito.
+
 La revisión es una ejecución en segundo plano con las herramientas restringidas a la gestión de
 archivos y habilidades. No tiene shell ni red, así que puede actualizar el workspace y nada más,
 y la sesión en vivo queda intacta. Se dispara con `/compact`, por inactividad (unos 90 segundos
