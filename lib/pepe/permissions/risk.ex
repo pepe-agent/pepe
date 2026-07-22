@@ -117,6 +117,8 @@ defmodule Pepe.Permissions.Risk do
   # Risks implied by the tool itself, regardless of args.
   defp tool_hints(name) when name in ["write_file", "edit_file", "move_file"], do: [:writes_file]
 
+  defp tool_hints("browser"), do: [:network]
+
   defp tool_hints(name) when name in ["config_set", "enable_tool", "set_route", "rename_agent"],
     do: [:changes_config]
 

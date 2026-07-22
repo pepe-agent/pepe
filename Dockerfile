@@ -38,6 +38,13 @@
 #
 #          docker build --build-arg PEPE_IMAGE_APT_PACKAGES="postgresql-client" .
 #
+#      The `browser` tool (a real headless Chrome, driven over CDP - see Pepe.Browser)
+#      is the same story: it needs a Chromium on the image, and isn't in the base list
+#      below for the exact reason ffmpeg isn't (see the runtime stage) - a full browser
+#      is not a thin default any more than ffmpeg's 121MB was, so it stays opt-in:
+#
+#          docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
+#
 #      or derive from ours if you prefer a Dockerfile you keep:
 #
 #          FROM ghcr.io/pepe-agent/pepe

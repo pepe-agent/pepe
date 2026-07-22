@@ -92,6 +92,9 @@ defmodule Pepe.Application do
           # MCP tool servers: a registry + dynamic supervisor; clients start on demand.
           {Registry, keys: :unique, name: Pepe.MCP.Registry},
           {DynamicSupervisor, name: Pepe.MCP.DynSup, strategy: :one_for_one},
+          # The `browser` tool's Chrome sessions: same lazy registry + dynamic supervisor shape.
+          {Registry, keys: :unique, name: Pepe.Browser.Registry},
+          {DynamicSupervisor, name: Pepe.Browser.DynSup, strategy: :one_for_one},
           # Heartbeat: ephemeral system-events queue + the anti-spam cooldown gate.
           Pepe.Heartbeat.Events,
           Pepe.Heartbeat.Cooldown,
