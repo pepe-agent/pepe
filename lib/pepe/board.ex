@@ -199,6 +199,39 @@ defmodule Pepe.Board do
     |> tap_ok(fn _card -> log_event(card_id, "blocked", %{"reason" => reason}) end)
   end
 
+  @doc """
+  Bump a `running` claim's `claimed_at` to now, so `reclaim_if_timed_out/2` doesn't
+  treat still-active work as stalled. Only takes effect while `card_id` is still
+  `running` under `claimed_by` - the same claim-pair guard `block_if_still_running/3`
+  uses, so a heartbeat from a claim that's already moved on (blocked-on-timeout,
+  unblocked, reclaimed by someone else) can't resurrect it.
+
+  For a long `claim_timeout_s`, most claims never need this at all; it exists for
+  the other end - a claim that genuinely runs longer than the board's timeout,
+  where nothing else tells the board the work is still alive. Call it periodically
+  during a long task, not on every step: it's a liveness signal, not progress logging
+  (see `comment/3` for that).
+  """
+  @spec heartbeat(String.t(), String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
+  def heartbeat(card_id, claimed_by) do
+    query = from(c in BoardCard, where: c.id == ^card_id and c.status == "running" and c.claimed_by == ^claimed_by)
+
+    case update_and_get(query, [claimed_at: now()], card_id) do
+      {:ok, card} -> {:ok, card}
+      :miss -> heartbeat_error(card_id, claimed_by)
+    end
+    |> tap_ok(fn _card -> log_event(card_id, "heartbeat", %{"by" => claimed_by}) end)
+  end
+
+  defp heartbeat_error(card_id, claimed_by) do
+    case Repo.get(BoardCard, card_id) do
+      nil -> {:error, :not_found}
+      %{status: "running", claimed_by: ^claimed_by} -> {:error, :conflict}
+      %{status: "running"} -> {:error, :not_your_claim}
+      %{status: status} -> {:error, {:unexpected_status, status}}
+    end
+  end
+
   @doc "`blocked → ready`, clearing the claim."
   @spec unblock(String.t()) :: {:ok, BoardCard.t()} | {:error, term()}
   def unblock(card_id) do

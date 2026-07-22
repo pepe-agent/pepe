@@ -48,6 +48,7 @@ pepe board card auto-dispatch ID on|off|inherit  # anula el dispatch de esta tar
 pepe board card claim ID [--as NOMBRE]
 pepe board card complete ID [--text NOTA]
 pepe board card block ID --text MOTIVO
+pepe board card heartbeat ID [--as NOMBRE] # reinicia el reloj de expiración de una reclamación activa
 pepe board card unblock ID
 pepe board card comment ID --text NOTA   # una nota, sin cambiar el estado
 pepe board card archive ID [--force]     # --force archiva incluso una tarjeta en ejecución
@@ -83,3 +84,5 @@ Con `auto_dispatch` desactivado (por defecto), una tarjeta `ready` solo espera: 
 Cualquier tarjeta concreta puede anular la configuración de su propio board: forzar que una tarjeta se dispare sola dentro de un board normalmente manual, o forzar que una tarjeta se quede manual en un board normalmente automático. Configúralo al crear la tarjeta, cámbialo después desde el panel (un selector pequeño en la propia tarjeta), la CLI (`card auto-dispatch ID on|off|inherit`), o por chat (`board set_auto_dispatch`).
 
 `claim_timeout_s` es la red de seguridad para una ejecución despachada que se queda callada: si una reclamación sobrevive más allá de ese tiempo, la tarjeta se bloquea con "claim timed out" en vez de quedar reclamada para siempre. Lo mismo ocurre si la sesión despachada termina (normalmente o cayéndose) sin llamar nunca a `complete` o `block`: eso se trata como una violación de protocolo, no se reintenta en silencio.
+
+Para un trabajo que genuinamente tarda más que `claim_timeout_s`, llama a `board heartbeat` periódicamente (o `pepe board card heartbeat ID` desde fuera de la sesión) - reinicia el reloj de expiración sin cambiar el estado, así la tarjeta no se bloquea por inactividad mientras sigue trabajándose de verdad. Es una señal de actividad, no un registro de progreso - usa `comment` para las actualizaciones que quieras dejar en el historial.

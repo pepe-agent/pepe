@@ -48,6 +48,7 @@ pepe board card auto-dispatch ID on|off|inherit  # sobrescreve o dispatch deste 
 pepe board card claim ID [--as NOME]
 pepe board card complete ID [--text NOTA]
 pepe board card block ID --text MOTIVO
+pepe board card heartbeat ID [--as NOME] # reinicia o relógio de expiração de um claim em execução
 pepe board card unblock ID
 pepe board card comment ID --text NOTA   # uma nota, sem mudar o status
 pepe board card archive ID [--force]     # --force arquiva até um card em execução
@@ -83,3 +84,5 @@ Com `auto_dispatch` desligado (o padrão), um card `ready` só espera: nada o di
 Qualquer card específico pode sobrescrever a configuração do próprio board: forçar um card a disparar sozinho dentro de um board normalmente manual, ou forçar um card a ficar manual num board normalmente automático. Defina isso na criação do card, mude depois pelo painel (um seletor pequeno no próprio card), pela CLI (`card auto-dispatch ID on|off|inherit`), ou por chat (`board set_auto_dispatch`).
 
 `claim_timeout_s` é a rede de segurança para uma execução despachada que fica muda: se uma reivindicação sobrevive além dele, o card é bloqueado com "claim timed out" em vez de ficar reivindicado para sempre. A mesma coisa acontece se a sessão despachada terminar (normalmente ou travando) sem nunca chamar `complete` ou `block`: isso é tratado como uma violação de protocolo, não é repetido silenciosamente.
+
+Pra um trabalho que genuinamente demora mais que `claim_timeout_s`, chame `board heartbeat` periodicamente (ou `pepe board card heartbeat ID` de fora da sessão) - isso reinicia o relógio de expiração sem mudar o status, então o card não é bloqueado por inatividade enquanto ainda está sendo trabalhado de verdade. É um sinal de atividade, não um registro de progresso - use `comment` pras atualizações que você quer deixar no histórico.

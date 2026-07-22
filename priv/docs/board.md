@@ -55,6 +55,11 @@ agent managing another's board), pass `card_id` explicitly.
   whoever looks at it next.
 - `board comment text: "..."` to leave a note without changing status, useful for
   progress updates on something that will take a while.
+- `board heartbeat` if the work genuinely runs longer than the board's
+  `claim_timeout_s`: resets the stall clock so you don't get force-blocked as
+  stuck while still actually working. Call it periodically during a long task,
+  not on every step - it's a liveness signal, not progress logging (use
+  `comment` for that).
 
 **If you were assigned to a board with `auto_dispatch: true`, you need `board` in your
 own `auto_approve` list.** A dispatched session has no human attached to approve

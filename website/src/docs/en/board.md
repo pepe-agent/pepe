@@ -64,6 +64,7 @@ pepe board card auto-dispatch ID on|off|inherit  # override this card's own disp
 pepe board card claim ID [--as NAME]
 pepe board card complete ID [--text NOTE]
 pepe board card block ID --text REASON
+pepe board card heartbeat ID [--as NAME] # reset the stall-timeout clock on a running claim
 pepe board card unblock ID
 pepe board card comment ID --text NOTE   # a note, no status change
 pepe board card archive ID [--force]     # --force also archives a running card
@@ -126,3 +127,9 @@ outlives it, the card is blocked with "claim timed out" rather than left claimed
 forever. The same thing happens if the dispatched session ends (normally or by
 crashing) without ever calling `complete` or `block`: that's treated as a protocol
 violation, not silently retried.
+
+For work that genuinely takes longer than `claim_timeout_s`, call `board heartbeat`
+periodically (or `pepe board card heartbeat ID` from outside the session) - it resets
+the stall clock without changing status, so the card isn't force-blocked while it's
+still actually being worked. It's a liveness signal, not progress logging - use
+`comment` for updates you want in the card's history.

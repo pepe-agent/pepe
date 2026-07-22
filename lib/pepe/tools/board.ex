@@ -71,6 +71,11 @@ defmodule Pepe.Tools.Board do
         optional `text` (a short result note).
       - block: `running` -> `blocked`, `card_id` optional (inferred); needs `text` \
         (why: "waiting on X", "needs a human decision", ...).
+      - heartbeat: still working a `running` claim - resets its stall-timeout clock so \
+        the board doesn't treat genuinely ongoing work as stalled. `card_id` optional \
+        (inferred). Call this periodically during a task that runs longer than the \
+        board's claim_timeout_s, not on every step - it's a liveness signal, not \
+        progress logging (use comment for that).
       - unblock: `blocked` -> `ready`, clearing the claim; needs `card_id`.
       - comment: leave a note on a card's history without changing its status; \
         `card_id` optional (inferred); needs `text`.
@@ -83,7 +88,7 @@ defmodule Pepe.Tools.Board do
           "action" => %{
             "type" => "string",
             "enum" =>
-              ~w(list_boards create_board list_cards show_card create_card link force_ready set_auto_dispatch claim complete block unblock comment archive),
+              ~w(list_boards create_board list_cards show_card create_card link force_ready set_auto_dispatch claim complete block heartbeat unblock comment archive),
             "description" => "What to do."
           },
           "board_id" => %{"type" => "string", "description" => "For create_card/list_cards."},
@@ -226,6 +231,16 @@ defmodule Pepe.Tools.Board do
     end
   end
 
+  defp dispatch("heartbeat", args, ctx) do
+    with {:ok, card_id} <- card_id_arg(args, ctx) do
+      case Board.heartbeat(card_id, claimant(ctx)) do
+        {:ok, _card} -> {:ok, "#{card_id} heartbeat recorded."}
+        {:error, :not_your_claim} -> {:error, "#{card_id} is claimed by someone else"}
+        other -> respond_transition(other)
+      end
+    end
+  end
+
   defp dispatch("unblock", args, _ctx) do
     with {:ok, card_id} <- require_arg(args, "card_id"), do: respond_transition(Board.unblock(card_id))
   end
@@ -298,6 +313,7 @@ defmodule Pepe.Tools.Board do
   defp respond_error({:unexpected_status, status}), do: {:error, "can't do that from status #{status}"}
   defp respond_error(:not_found), do: {:error, "no such card"}
   defp respond_error(:no_timeout), do: {:error, "this board has no claim_timeout_s configured"}
+  defp respond_error(:conflict), do: {:error, "the card changed concurrently - try again"}
   defp respond_error(reason), do: {:error, inspect(reason)}
 
   defp describe_board(board) do

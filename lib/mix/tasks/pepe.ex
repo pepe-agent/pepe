@@ -4767,6 +4767,15 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp board_cmd(["card", "heartbeat", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [as: :string])
+
+    case Pepe.Board.heartbeat(id, opts[:as] || "cli") do
+      {:ok, _card} -> ok("#{id} heartbeat recorded")
+      {:error, reason} -> print_card_error(id, reason)
+    end
+  end
+
   defp board_cmd(["card", "unblock", id | _]), do: print_card_transition(Pepe.Board.unblock(id), id)
 
   defp board_cmd(["card", "comment", id | rest]) do
@@ -4812,6 +4821,7 @@ defmodule Mix.Tasks.Pepe do
       card claim ID [--as NAME]               ready -> running
       card complete ID [--text NOTE]          running -> done
       card block ID --text REASON             running -> blocked
+      card heartbeat ID [--as NAME]           resets the stall-timeout clock on a running claim
       card unblock ID                         blocked -> ready
       card comment ID --text NOTE             leave a note, no status change
       card archive ID [--force]               archive (--force works on a running card too)
@@ -4830,6 +4840,8 @@ defmodule Mix.Tasks.Pepe do
 
   defp print_card_error(id, {:unexpected_status, status}), do: error("#{id}: can't do that from status #{status}")
   defp print_card_error(id, :not_found), do: error("unknown card: #{id}")
+  defp print_card_error(id, :not_your_claim), do: error("#{id}: claimed by someone else")
+  defp print_card_error(id, :conflict), do: error("#{id}: changed concurrently, try again")
   defp print_card_error(id, reason), do: error("#{id}: #{inspect(reason)}")
 
   defp parse_depends_on(nil), do: []

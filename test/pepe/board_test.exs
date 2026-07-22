@@ -193,6 +193,54 @@ defmodule Pepe.BoardTest do
     end
   end
 
+  describe "heartbeat/2" do
+    test "resets a stale claim's clock, so a still-active claim survives reclaim_if_timed_out" do
+      board = new_board()
+      card = new_card(board)
+      Board.force_ready(card.id)
+      {:ok, claimed} = Board.claim(card.id, "worker-a")
+
+      # Same simulated-staleness technique reclaim_if_timed_out/2's own tests use.
+      stale = %{claimed | claimed_at: System.system_time(:second) - 100}
+      Config.put_board_card(stale)
+
+      {:ok, alive} = Board.heartbeat(card.id, "worker-a")
+      assert alive.status == "running"
+      assert alive.claimed_at > stale.claimed_at
+
+      # The bug this closes: before the heartbeat, this exact staleness would have been
+      # force-blocked as stalled (see reclaim_if_timed_out/2's own tests above) even
+      # though the claim was genuinely still alive.
+      assert Board.reclaim_if_timed_out(card.id, 10) == {:error, :not_timed_out}
+    end
+
+    test "is a no-op against a stale claim (ABA: reclaimed by someone else since)" do
+      board = new_board()
+      card = new_card(board)
+      Board.force_ready(card.id)
+      {:ok, _claimed_a} = Board.claim(card.id, "worker-a")
+
+      Board.block(card.id, "reclaimed manually")
+      Board.unblock(card.id)
+      {:ok, _claimed_b} = Board.claim(card.id, "worker-b")
+
+      assert Board.heartbeat(card.id, "worker-a") == {:error, :not_your_claim}
+      still_running = Config.get_board_card(card.id)
+      assert still_running.claimed_by == "worker-b"
+    end
+
+    test "refuses a card that isn't running at all" do
+      board = new_board()
+      card = new_card(board)
+
+      assert Board.heartbeat(card.id, "worker-a") == {:error, {:unexpected_status, "todo"}}
+    end
+
+    test "refuses an unknown card" do
+      assert Board.heartbeat("nope", "worker-a") == {:error, :not_found}
+    end
+  end
+
   describe "the rest of the state machine" do
     test "complete: running -> done" do
       board = new_board()

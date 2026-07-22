@@ -182,6 +182,43 @@ defmodule Pepe.Tools.BoardTest do
       {:ok, out} = BoardTool.run(%{"action" => "show_card", "card_id" => card.id}, ctx())
       assert out =~ "checking on this"
     end
+
+    test "heartbeat resets the stall clock without changing status" do
+      {:ok, board} = Board.create_board(%{project: nil, name: "eng"})
+      {:ok, card} = Board.create_card(%{board: board.id, title: "x"})
+      Board.force_ready(card.id)
+      {:ok, claimed} = Board.claim(card.id, "worker")
+      stale_at = System.system_time(:second) - 100
+      Config.put_board_card(%{claimed | claimed_at: stale_at})
+
+      {:ok, out} = BoardTool.run(%{"action" => "heartbeat", "card_id" => card.id}, ctx())
+
+      assert out =~ "heartbeat recorded"
+      refreshed = Config.get_board_card(card.id)
+      assert refreshed.status == "running"
+      assert refreshed.claimed_at > stale_at
+    end
+
+    test "heartbeat infers card_id from a dispatched session, same as complete/block/comment" do
+      {:ok, board} = Board.create_board(%{project: nil, name: "eng"})
+      {:ok, card} = Board.create_card(%{board: board.id, title: "x", assignee: "worker"})
+      Board.force_ready(card.id)
+      Board.claim(card.id, "worker")
+
+      session_key = "board:#{board.id}:#{card.id}"
+      {:ok, out} = BoardTool.run(%{"action" => "heartbeat"}, ctx("worker", session_key))
+      assert out =~ "heartbeat recorded"
+    end
+
+    test "heartbeat from someone else's claim is a clean error" do
+      {:ok, board} = Board.create_board(%{project: nil, name: "eng"})
+      {:ok, card} = Board.create_card(%{board: board.id, title: "x"})
+      Board.force_ready(card.id)
+      Board.claim(card.id, "worker-a")
+
+      assert {:error, msg} = BoardTool.run(%{"action" => "heartbeat", "card_id" => card.id}, ctx("worker-b"))
+      assert msg =~ "claimed by someone else"
+    end
   end
 
   test "unblock moves a blocked card back to ready" do
