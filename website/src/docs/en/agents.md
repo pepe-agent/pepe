@@ -437,6 +437,10 @@ pepe agent add NAME \
 # List agents in a project, or every agent everywhere.
 pepe agent list [--project PROJECT | --all]
 
+# Print the fully-assembled system prompt - not just the persona field, everything Pepe
+# builds around it. See "Seeing exactly what the model sees" below.
+pepe agent prompt NAME [--project PROJECT]
+
 # Directed messaging: let FROM message TO.
 pepe agent route FROM TO [--remove] [--project PROJECT]
 
@@ -493,3 +497,18 @@ check at `GET /health`.
 **Through a messaging channel.** Bind an agent to a Telegram, WhatsApp, Slack,
 Discord, Microsoft Teams, or Google Chat connection, or to a generic inbound webhook,
 and it answers there with the same loop and the same tools.
+
+## Seeing exactly what the model sees
+
+The `system_prompt` field is only the seed. What actually goes to the model as the
+system message also includes the agent's persona/identity/boot files if it has them,
+a short behavior contract, the current time, and an index of the docs and skills it
+knows about - none of which shows up if you only read the field on disk. To see the
+whole thing, assembled exactly the way a real conversation would send it:
+
+```bash
+pepe agent prompt NAME
+```
+
+The dashboard's agent edit page has the same view, under **Assembled prompt** -
+collapsed by default, since it can run long.

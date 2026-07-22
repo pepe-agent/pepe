@@ -2148,6 +2148,21 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # Dumps exactly what the model sees as the system message - not just the agent's own
+  # `system_prompt` seed, but everything Pepe.Agent.Workspace.system_prompt/1 builds around it
+  # (persona/identity/boot files, the behavior contract, the current-time note, the docs/skills
+  # indexes). The same assembly every real surface goes through (Session, Runtime, and now the
+  # `/v1` API too), printed plainly so it can be read, diffed, or piped straight into a file.
+  defp agent_cmd(["prompt", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [project: :string])
+    handle = Project.handle(opts[:project], name)
+
+    case Config.get_agent(handle) do
+      nil -> error("unknown agent: #{handle}")
+      agent -> puts(Pepe.Agent.Workspace.system_prompt(agent))
+    end
+  end
+
   defp agent_cmd(["rename", old, new | _]) do
     case Config.rename_agent(old, new) do
       :ok ->
@@ -2238,6 +2253,7 @@ defmodule Mix.Tasks.Pepe do
       add NAME [--model M] [--prompt "..."] [--tools t1,t2]
                [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--project CO]
       list [--project CO | --all]                          list agents (+ routes)
+      prompt NAME [--project CO]                            print the fully-assembled system prompt
       route FROM TO [--remove] [--project CO]              directed A->B messaging
       manage ADMIN TARGET [--remove] [--project CO]        let ADMIN administer TARGET (or "*")
       rename OLD NEW                                        rename + move its dir

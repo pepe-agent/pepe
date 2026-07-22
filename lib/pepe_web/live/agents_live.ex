@@ -331,6 +331,18 @@ defmodule PepeWeb.AgentsLive do
               </label>
             </.form_section>
 
+            <.form_section :if={!@edit_agent.new?} title={gettext("Assembled prompt")}>
+              <details class="text-sm">
+                <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200">
+                  {gettext("What the model actually sees, not just the persona above")}
+                </summary>
+                <p class={hlp()}>
+                  {gettext("The persona field above is only the seed - this is it plus everything Pepe assembles around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time). Exactly what every real conversation with this agent sends as the system message.")}
+                </p>
+                <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">{assembled_prompt(@edit_agent)}</pre>
+              </details>
+            </.form_section>
+
             <div class="flex gap-2 pt-1">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="agent_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -345,6 +357,11 @@ defmodule PepeWeb.AgentsLive do
 
   # A short, one-line description for a tool, taken from its spec.
   defp tool_hint(name), do: Pepe.Tools.summary(name)
+
+  # The exact system message a real conversation with this agent would get - the same
+  # Pepe.Agent.Workspace.system_prompt/1 every surface (Session, Runtime, the /v1 API) already
+  # goes through, not the bare persona field the form above edits.
+  defp assembled_prompt(agent), do: Pepe.Agent.Workspace.system_prompt(agent)
 
   defp hook_hint("pii_redact"), do: gettext("Regex: CPF, email, cards, phones")
   defp hook_hint("llm_redact"), do: gettext("A local model masks names/free text (reversible)")

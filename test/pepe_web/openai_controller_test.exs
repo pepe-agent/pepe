@@ -94,6 +94,27 @@ defmodule PepeWeb.OpenAIControllerTest do
     assert roles == ["system", "user", "assistant", "user", "assistant"]
   end
 
+  test "a caller with no system message of its own gets the fully-assembled prompt, not just the bare system_prompt field" do
+    sid = "assembled-#{System.unique_integer([:positive])}"
+
+    build_conn()
+    |> put_req_header("content-type", "application/json")
+    |> post("/v1/chat/completions", %{
+      "model" => "assistant",
+      "session_id" => sid,
+      "messages" => [%{"role" => "user", "content" => "oi"}]
+    })
+
+    system = Pepe.Agent.Session.history(akey(sid)) |> Enum.find(&(&1["role"] == "system"))
+
+    # The agent's own seed is in there ...
+    assert system["content"] =~ "You are helpful."
+    # ... but so is the framework scaffolding every other surface (Telegram, the console, a
+    # WebSocket session) already gets around it - the same
+    # Pepe.Agent.Workspace.system_prompt/1 they all go through, not the bare field alone.
+    assert system["content"] =~ "## Current time"
+  end
+
   test "the standard OpenAI `user` field keys the session when no session_id is sent" do
     uid = "u-#{System.unique_integer([:positive])}"
 

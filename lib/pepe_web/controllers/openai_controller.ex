@@ -161,11 +161,17 @@ defmodule PepeWeb.OpenAIController do
   defp maybe_put(map, _k, nil), do: map
   defp maybe_put(map, k, v), do: Map.put(map, k, v)
 
+  # Matches what every other surface sends: the agent's own system_prompt is only the seed -
+  # Pepe.Agent.Workspace.system_prompt/1 is what actually assembles persona/identity/boot files,
+  # the behavior contract, docs/skills indexes and the rest of the framework scaffolding around
+  # it. Using the bare seed here used to mean an OpenAI-compatible client that sent no system
+  # message of its own got a noticeably thinner prompt than the same agent talking over Telegram,
+  # the console, or a WebSocket session - the same agent, quietly not the same agent.
   defp prepend_system(messages, agent) do
     if Enum.any?(messages, &(&1["role"] == "system")) do
       messages
     else
-      [Message.system(agent.system_prompt) | messages]
+      [Message.system(Pepe.Agent.Workspace.system_prompt(agent)) | messages]
     end
   end
 

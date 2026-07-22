@@ -457,6 +457,10 @@ pepe agent add NAME \
 # Lista agentes num âmbito, ou todos os agentes.
 pepe agent list [--project PROJ | --all]
 
+# Imprime o system prompt totalmente montado - não só o campo de persona, tudo o que o
+# Pepe constrói à volta dele. Ver "A ver exatamente o que o modelo vê" abaixo.
+pepe agent prompt NAME [--project PROJ]
+
 # Directed messaging: let FROM message TO.
 pepe agent route FROM TO [--remove] [--project PROJ]
 
@@ -513,3 +517,18 @@ saúde em `GET /health`.
 **Através de um canal de mensagens.** Liga um agente a uma ligação de Telegram,
 WhatsApp, Slack, Discord, Microsoft Teams ou Google Chat, ou a um webhook de entrada
 genérico, e ele responde ali com o mesmo ciclo e as mesmas ferramentas.
+
+## A ver exatamente o que o modelo vê
+
+O campo `system_prompt` é só a semente. O que realmente vai para o modelo como
+mensagem de sistema também inclui os ficheiros de persona/identidade/boot do agente,
+se os tiver, um contrato de comportamento curto, a hora atual e um índice dos docs e
+skills que conhece - nada disto aparece se só leres o campo no disco. Para ver a
+coisa toda, montada exatamente como uma conversa real a enviaria:
+
+```bash
+pepe agent prompt NAME
+```
+
+A página de edição do agente no dashboard tem a mesma vista, em **Prompt montado**
+- recolhida por predefinição, já que pode ficar longa.
