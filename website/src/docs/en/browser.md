@@ -31,7 +31,7 @@ Elements are addressed by number, not by a CSS selector you'd have to write your
 
 ## Security posture
 
-A browser under an agent's control reaches the same network the app does, so `browser` enforces the same rule `fetch_url` does: only `http`/`https`, and never an internal or private address (loopback, RFC1918, link-local, cloud metadata). And because a real browser is a materially bigger surface than a read-only tool - the page's own scripts run, a signed-in session could be exposed, it uses real CPU and memory - `browser` is not always-safe: every call goes through the same permission prompt as `bash`.
+A browser under an agent's control reaches the same network the app does, so `browser` enforces the same rule `fetch_url` does: only `http`/`https`, and never an internal or private address (loopback, RFC1918, link-local, cloud metadata). That check does not stop at the URL you hand to `open` - a link the page itself links to, a JavaScript redirect, a form submit, or the page's own background requests are all checked the same way, and failed before Chrome ever sends them, not just the one address you typed. And because a real browser is a materially bigger surface than a read-only tool - the page's own scripts run, a signed-in session could be exposed, it uses real CPU and memory - `browser` is not always-safe: every call goes through the same permission prompt as `bash`.
 
 ## Getting a browser
 

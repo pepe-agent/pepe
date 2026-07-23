@@ -32,6 +32,8 @@ Pepe comprueba que cada trace que indicaste realmente hizo la misma secuencia ex
 
 Ese rechazo es intencional. Inferir automáticamente "esta parte varía, esta no" a partir de un puñado de ejemplos es la única parte de esta idea que es realmente arriesgada - si se falla ahí, un flow pasa a hacer, en silencio, algo que ninguno de los traces de origen hizo jamás. Un flow sigue siendo réplica exacta y nada más; elegir traces que de verdad son idénticos es responsabilidad tuya, la misma revisión que haría una persona antes de confiar un script para que corra sin supervisión.
 
+La promoción también rechaza un trace que no sea genuinamente "comprobado", aunque la secuencia coincida: uno que contenga una llamada que la propia barrera de permisos del agente denegó, un paso que de hecho falló, o argumentos demasiado largos como para haberse registrado completos (`Pepe.Trace` recorta los muy largos para almacenarlos) - nada de eso es una llamada que de verdad viste tener éxito. También rechaza traces que no fueron hechos todos por el agente para el que estás promocionando, ya que las rutas relativas de un paso reproducido se resuelven dentro del propio workspace de *ese* agente.
+
 ## Gestionar flows
 
 ```bash
@@ -53,6 +55,6 @@ pepe flow schedule assistant weekly-digest --schedule "0 8 * * 1" --deliver "tel
 
 Esto crea una tarea programada (ver [Tareas programadas](../scheduled/)) de tipo `"flow"` en vez de `"prompt"`. Todo sobre cómo se dispara, qué pasa si la ejecución anterior sigue en curso, y dónde vive su historial de ejecuciones es igual que para cualquier otra tarea programada.
 
-<div class="note"><strong>Nadie está observando la ejecución de un flow.</strong> Un flow se dispara desde un temporizador, no desde una conversación, así que no hay nadie ahí para aprobar un paso arriesgado en el momento. Un flow solo ejecuta un paso cuya herramienta ya está en el <code>auto_approve</code> del propio agente - la misma regla que ya rige cualquier otra superficie sin supervisión (un webhook, un token de API). Un paso que no está preaprobado detiene todo el flow en vez de saltarlo en silencio, y dice exactamente qué herramienta necesitaba.</div>
+<div class="note"><strong>Nadie está observando la ejecución de un flow.</strong> Un flow se dispara desde un temporizador, no desde una conversación, así que no hay nadie ahí para aprobar un paso arriesgado en el momento. Un flow solo ejecuta un paso cuya herramienta ya está en el <code>auto_approve</code> del propio agente - la misma regla que ya rige cualquier otra superficie sin supervisión (un webhook, un token de API). Un paso que no está preaprobado, o un paso que de hecho falla al reproducirse (un archivo faltante, un tropiezo de red, argumentos incorrectos), detiene todo el flow ahí mismo en vez de saltarlo o seguir adelante - el historial de la ejecución dice exactamente qué paso y por qué.</div>
 
 Cada ejecución de un flow sigue registrando un [trace](../traces/) normal, así que el historial de un flow programado se puede inspeccionar igual que el de cualquier otra ejecución.

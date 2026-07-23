@@ -7,6 +7,8 @@ description: Run agents on recurring cron schedules.
 
 A task is a self-contained prompt, a schedule, a timezone, and a place to deliver the result. When it fires, Pepe runs the agent on that prompt in a **fresh session with no chat history**. Nothing from any earlier conversation is carried in, so the prompt has to say everything the run needs (what to do, which data to look at, the time window).
 
+<div class="note">Once a task's prompt reliably does the exact same thing every time, a real model call on each run is pure overhead. See <a href="../flows/">Flows</a> for a scheduled task that replays a proven, exact tool-call sequence instead of a prompt - no model call at all.</div>
+
 ### Create a task from the CLI
 
 ```bash

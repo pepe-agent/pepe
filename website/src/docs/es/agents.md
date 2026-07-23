@@ -198,6 +198,9 @@ puede preguntar a una persona (la consola, un canal de chat), el runtime te pide
 autorizar la llamada. Puedes responder:
 
 - Permitir una vez. Vuelve a preguntar la próxima vez.
+- Permitir durante el resto de esta ejecución. Solo se ofrece mientras la ejecución
+  ha ingerido contenido de fuera (ver [Seguridad y entorno aislado](../security/)):
+  el único tipo de pre-aprobación que sigue funcionando realmente durante esa ventana.
 - Permitir durante el resto de esta sesión. Se guarda en memoria y se olvida al
   reiniciar.
 - Permitir siempre. Se persiste en el agente añadiendo la herramienta a su lista

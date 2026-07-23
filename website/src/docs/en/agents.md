@@ -189,6 +189,9 @@ When a risky tool has not been pre-approved and the surface can ask a human (the
 console, a chat channel), the runtime asks you to authorize the call. You can answer:
 
 - Allow once. Ask again next time.
+- Allow for the rest of this run. Only offered while the run has taken in content
+  from outside (see [Security and sandbox](../security/)) - the one kind of
+  pre-approval that actually keeps working during that window.
 - Allow for the rest of this session. Kept in memory, forgotten on restart.
 - Allow always. Persisted on the agent by adding the tool to its `auto_approve`
   list.

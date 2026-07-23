@@ -31,7 +31,7 @@ Los elementos se identifican por número, no por un selector CSS que tendrías q
 
 ## Postura de seguridad
 
-Un navegador bajo el control de un agente llega a la misma red que la aplicación, así que `browser` aplica la misma regla que `fetch_url`: solo `http`/`https`, y nunca una dirección interna o privada (loopback, RFC1918, link-local, metadatos de la nube). Y porque un navegador real es una superficie bastante mayor que una herramienta de solo lectura (los scripts propios de la página se ejecutan, una sesión iniciada podría quedar expuesta, usa CPU y memoria reales), `browser` no es siempre-segura: cada llamada pasa por el mismo aviso de permiso que `bash`.
+Un navegador bajo el control de un agente llega a la misma red que la aplicación, así que `browser` aplica la misma regla que `fetch_url`: solo `http`/`https`, y nunca una dirección interna o privada (loopback, RFC1918, link-local, metadatos de la nube). Esa comprobación no se limita a la URL que le pasas a `open` - un enlace al que la propia página enlaza, una redirección de JavaScript, el envío de un formulario, o las propias peticiones de fondo de la página se comprueban de la misma forma, y se bloquean antes de que Chrome llegue siquiera a enviarlas, no solo la dirección que tú escribiste. Y porque un navegador real es una superficie bastante mayor que una herramienta de solo lectura (los scripts propios de la página se ejecutan, una sesión iniciada podría quedar expuesta, usa CPU y memoria reales), `browser` no es siempre-segura: cada llamada pasa por el mismo aviso de permiso que `bash`.
 
 ## Cómo consigue un navegador
 

@@ -7,6 +7,8 @@ description: Ejecuta agentes en horarios cron recurrentes.
 
 Una tarea es un prompt autocontenido, un horario, una zona horaria y un lugar donde entregar el resultado. Cuando se dispara, Pepe ejecuta el agente sobre ese prompt en una **sesión nueva y sin historial de chat**. No se arrastra nada de ninguna conversación anterior, así que el prompt tiene que decir todo lo que la ejecución necesita (qué hacer, qué datos mirar, la ventana de tiempo).
 
+<div class="note">Cuando el prompt de una tarea siempre termina haciendo exactamente lo mismo, una llamada real al modelo en cada ejecución es puro coste extra. Consulta <a href="../flows/">Flows</a> para una tarea programada que reproduce una secuencia de llamadas a herramientas comprobada y exacta en lugar de un prompt - sin ninguna llamada al modelo.</div>
+
 ### Crear una tarea desde la CLI
 
 ```bash

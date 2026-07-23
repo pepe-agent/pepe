@@ -32,6 +32,8 @@ O Pepe confere se cada trace que você indicou realmente fez a mesma sequência 
 
 Essa recusa é proposital. Inferir automaticamente "essa parte varia, essa não" a partir de alguns exemplos é a única parte dessa ideia que é genuinamente arriscada - errar nisso e um flow passa a fazer, em silêncio, algo que nenhum dos traces de origem jamais fez. Um flow continua sendo replay exato e só isso; escolher traces que realmente são idênticos é responsabilidade sua, a mesma revisão que uma pessoa faria antes de confiar um script pra rodar sem supervisão.
 
+A promoção também recusa um trace que não seja genuinamente "comprovado", mesmo que a sequência bata: um que contenha uma chamada que a própria barreira de permissão do agente negou, um passo que de fato falhou, ou argumentos longos demais para terem sido registrados por completo (`Pepe.Trace` corta os muito longos para armazenamento) - nada disso é uma chamada que você de fato viu dar certo. Ela também recusa traces que não foram todos feitos pelo agente para o qual você está promovendo, já que os caminhos relativos de um passo reproduzido se resolvem dentro do workspace daquele agente específico.
+
 ## Gerenciando flows
 
 ```bash
@@ -53,6 +55,6 @@ pepe flow schedule assistant weekly-digest --schedule "0 8 * * 1" --deliver "tel
 
 Isso cria uma tarefa agendada (veja [Tarefas agendadas](../scheduled/)) do tipo `"flow"` em vez de `"prompt"`. Tudo sobre como ela dispara, o que acontece se a execução anterior ainda estiver rodando, e onde o histórico de execuções fica é o mesmo de qualquer outra tarefa agendada.
 
-<div class="note"><strong>Ninguém está observando a execução de um flow.</strong> Um flow é disparado por um timer, não por uma conversa, então não há ninguém ali para aprovar um passo arriscado no momento. Um flow só executa um passo cuja ferramenta já está no <code>auto_approve</code> do próprio agente - a mesma regra que já governa qualquer outra superfície sem supervisão (um webhook, um token de API). Um passo que não está pré-aprovado interrompe o flow inteiro em vez de ser pulado em silêncio, e diz exatamente qual ferramenta precisava.</div>
+<div class="note"><strong>Ninguém está observando a execução de um flow.</strong> Um flow é disparado por um timer, não por uma conversa, então não há ninguém ali para aprovar um passo arriscado no momento. Um flow só executa um passo cuja ferramenta já está no <code>auto_approve</code> do próprio agente - a mesma regra que já governa qualquer outra superfície sem supervisão (um webhook, um token de API). Um passo que não está pré-aprovado, ou um passo que de fato falha ao ser reproduzido (um arquivo faltando, um soluço de rede, argumentos errados), interrompe o flow inteiro ali mesmo em vez de pulá-lo ou seguir em frente - o histórico da execução diz exatamente qual passo e por quê.</div>
 
 Toda execução de flow ainda grava um [trace](../traces/) normal, então o histórico de um flow agendado é inspecionável do mesmo jeito que o de qualquer outra execução.
