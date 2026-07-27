@@ -162,9 +162,11 @@ defmodule Pepe.MCP.Client.Sse do
     {:ok, %{state | reader: reader}}
   end
 
+  # `Req.get` returns one of exactly these two, so there is no third clause to write: a
+  # catch-all here would be unreachable, which dialyzer says out loud rather than leaving
+  # it to rot as reassuring-looking dead code.
   defp stream_end({:ok, %{status: status}}), do: {:status, status}
   defp stream_end({:error, reason}), do: reason
-  defp stream_end(other), do: other
 
   # Nothing can be sent until the server has told us where to send it.
   defp await_endpoint(state) do

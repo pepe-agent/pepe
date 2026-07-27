@@ -104,9 +104,8 @@ defmodule Pepe.MCP.OAuth do
     with {:ok, spec} <- remote_spec(server),
          {:ok, meta} <- discover(spec.url),
          {:ok, client} <- client_identity(server, meta, spec),
-         {:ok, tokens} <- Pepe.OAuth.login(flow(meta, client, spec)),
-         {:ok, credential} <- persist(server, spec, meta, client, tokens) do
-      {:ok, credential}
+         {:ok, tokens} <- Pepe.OAuth.login(flow(meta, client, spec)) do
+      persist(server, spec, meta, client, tokens)
     end
   end
 
@@ -170,9 +169,8 @@ defmodule Pepe.MCP.OAuth do
   """
   @spec discover(String.t()) :: {:ok, map()} | {:error, term()}
   def discover(url) do
-    with {:ok, issuer} <- authorization_server_for(url),
-         {:ok, meta} <- server_metadata(issuer) do
-      {:ok, meta}
+    with {:ok, issuer} <- authorization_server_for(url) do
+      server_metadata(issuer)
     end
   end
 

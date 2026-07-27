@@ -147,10 +147,7 @@ defmodule Pepe.MCP.Client.Http do
   defp exchange(state, request, id, mode \\ :tool) do
     case post(state, request, @call_timeout, retry_for(mode)) do
       {:ok, %{status: status} = resp} when status in 200..299 ->
-        case extract(resp, id) do
-          {:ok, response} -> if mode == :raw, do: {:ok, response}, else: Protocol.tool_result(response)
-          {:error, reason} -> {:error, reason}
-        end
+        resp |> extract(id) |> shape(mode)
 
       {:ok, %{status: 401}} ->
         {:error, :unauthorized}
@@ -167,6 +164,11 @@ defmodule Pepe.MCP.Client.Http do
   # `tools/list` read and change nothing - but a `tools/call` is whatever the tool does, and
   # a timeout is not proof it did not run. Retrying one that already created an issue creates
   # a second one. The stdio transport has never retried anything; this keeps that promise.
+  # The handshake wants the JSON-RPC envelope itself; a tool call wants the text an agent sees.
+  defp shape({:ok, response}, :raw), do: {:ok, response}
+  defp shape({:ok, response}, _mode), do: Protocol.tool_result(response)
+  defp shape({:error, reason}, _mode), do: {:error, reason}
+
   defp post(state, message, timeout, retry \\ :transient) do
     Req.post(state.url,
       json: message,

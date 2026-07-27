@@ -216,15 +216,15 @@ defmodule Pepe.Tools.ManageMcp do
         "No MCP servers configured."
 
       servers ->
-        Enum.map_join(servers, "\n", fn {name, cfg} ->
-          if cfg["url"] do
-            "• #{name}: #{cfg["url"]} (remote, auth: #{auth_state(name, cfg)})"
-          else
-            "• #{name}: #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"
-          end
-        end)
+        Enum.map_join(servers, "\n", &server_line/1)
     end
   end
+
+  defp server_line({name, %{"url" => url} = cfg}) when is_binary(url),
+    do: "• #{name}: #{url} (remote, auth: #{auth_state(name, cfg)})"
+
+  defp server_line({name, cfg}),
+    do: "• #{name}: #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"
 
   defp auth_state(name, cfg) do
     cond do
