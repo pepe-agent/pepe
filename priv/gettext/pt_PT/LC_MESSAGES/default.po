@@ -14,7 +14,7 @@ msgstr ""
 msgid "(default)"
 msgstr "(predefinido)"
 
-#: lib/pepe/gateways/telegram.ex:3162
+#: lib/pepe/gateways/telegram.ex:3158
 #, elixir-autogen, elixir-format
 msgid "(empty response)"
 msgstr "(resposta vazia)"
@@ -660,7 +660,7 @@ msgstr "Chave de API"
 msgid "Add bot"
 msgstr "Adicionar bot"
 
-#: lib/pepe_web/live/agents_live.ex:523
+#: lib/pepe_web/live/agents_live.ex:539
 #, elixir-autogen, elixir-format
 msgid "Agent %{name} saved."
 msgstr "Agente %{name} guardado."
@@ -694,7 +694,7 @@ msgstr "Bot %{name} adicionado."
 msgid "Bot token"
 msgstr "Token do bot"
 
-#: lib/pepe_web/live/agents_live.ex:348
+#: lib/pepe_web/live/agents_live.ex:362
 #: lib/pepe_web/live/board_live.ex:137
 #: lib/pepe_web/live/board_live.ex:170
 #: lib/pepe_web/live/channels_live.ex:235
@@ -711,7 +711,7 @@ msgstr "Token do bot"
 #: lib/pepe_web/live/plugins_live.ex:129
 #: lib/pepe_web/live/projects_live.ex:280
 #: lib/pepe_web/live/scheduled_live.ex:171
-#: lib/pepe_web/live/tool_servers_live.ex:94
+#: lib/pepe_web/live/tool_servers_live.ex:170
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Cancelar"
@@ -874,7 +874,7 @@ msgstr "Modelos"
 #: lib/pepe_web/live/models_live.ex:303
 #: lib/pepe_web/live/projects_live.ex:236
 #: lib/pepe_web/live/scheduled_live.ex:108
-#: lib/pepe_web/live/tool_servers_live.ex:85
+#: lib/pepe_web/live/tool_servers_live.ex:146
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "Nome"
@@ -934,7 +934,7 @@ msgstr "Enviar o resultado para"
 msgid "Run now"
 msgstr "Executar agora"
 
-#: lib/pepe_web/live/agents_live.ex:347
+#: lib/pepe_web/live/agents_live.ex:361
 #: lib/pepe_web/live/channels_live.ex:425
 #: lib/pepe_web/live/config_live.ex:100
 #: lib/pepe_web/live/config_live.ex:144
@@ -945,7 +945,7 @@ msgstr "Executar agora"
 #: lib/pepe_web/live/plugins_live.ex:128
 #: lib/pepe_web/live/projects_live.ex:279
 #: lib/pepe_web/live/scheduled_live.ex:170
-#: lib/pepe_web/live/tool_servers_live.ex:93
+#: lib/pepe_web/live/tool_servers_live.ex:169
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "Guardar"
@@ -1179,44 +1179,44 @@ msgstr "?"
 msgid "✓ it's set."
 msgstr "✓ está definida."
 
-#: lib/pepe_web/live/tool_servers_live.ex:81
+#: lib/pepe_web/live/tool_servers_live.ex:142
 #, elixir-autogen, elixir-format
 msgid "+ New MCP server"
 msgstr "+ Novo servidor MCP"
 
-#: lib/pepe_web/live/tool_servers_live.ex:88
+#: lib/pepe_web/live/tool_servers_live.ex:164
 #, elixir-autogen, elixir-format
 msgid "Arguments"
 msgstr "Argumentos"
 
-#: lib/pepe_web/live/tool_servers_live.ex:86
+#: lib/pepe_web/live/tool_servers_live.ex:162
 #, elixir-autogen, elixir-format
 msgid "Command"
 msgstr "Comando"
 
-#: lib/pepe_web/live/tool_servers_live.ex:70
+#: lib/pepe_web/live/tool_servers_live.ex:131
 #, elixir-autogen, elixir-format
 msgid "Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only."
 msgstr ""
 "Dá a um agente apenas as ferramentas de leitura (separador Agentes -> "
 "Ferramentas) para o manteres só de leitura."
 
-#: lib/pepe_web/live/tool_servers_live.ex:128
+#: lib/pepe_web/live/tool_servers_live.ex:215
 #, elixir-autogen, elixir-format
 msgid "MCP server %{name} saved - validate it."
 msgstr "Servidor MCP %{name} guardado - valida-o."
 
-#: lib/pepe_web/live/tool_servers_live.ex:60
+#: lib/pepe_web/live/tool_servers_live.ex:100
 #, elixir-autogen, elixir-format
 msgid "Remove MCP server %{name}?"
 msgstr "Remover o servidor MCP %{name}?"
 
-#: lib/pepe_web/live/tool_servers_live.ex:58
+#: lib/pepe_web/live/tool_servers_live.ex:98
 #, elixir-autogen, elixir-format
 msgid "Validate (list tools)"
 msgstr "Validar (listar ferramentas)"
 
-#: lib/pepe_web/live/tool_servers_live.ex:64
+#: lib/pepe_web/live/tool_servers_live.ex:125
 #, elixir-autogen, elixir-format
 msgid "Connecting..."
 msgstr "A ligar..."
@@ -1254,7 +1254,7 @@ msgstr "(ou cole um novo token)"
 msgid "+ New connection"
 msgstr "+ Nova ligação"
 
-#: lib/pepe_web/live/tool_servers_live.ex:49
+#: lib/pepe_web/live/tool_servers_live.ex:89
 #, elixir-autogen, elixir-format
 msgid "+ New server"
 msgstr "+ Novo servidor"
@@ -2012,6 +2012,7 @@ msgid "Sign in to the dashboard"
 msgstr "Inicia sessão no painel"
 
 #: lib/pepe_web/live/dash_ui.ex:215
+#: lib/pepe_web/live/tool_servers_live.ex:115
 #, elixir-autogen, elixir-format
 msgid "Sign out"
 msgstr "Terminar sessão"
@@ -2133,12 +2134,12 @@ msgstr "Voltar aos canais"
 msgid "Back to models"
 msgstr "Voltar aos modelos"
 
-#: lib/pepe_web/live/tool_servers_live.ex:50
+#: lib/pepe_web/live/tool_servers_live.ex:90
 #, elixir-autogen, elixir-format
 msgid "Back to servers"
 msgstr "Voltar aos servidores"
 
-#: lib/pepe_web/live/tool_servers_live.ex:76
+#: lib/pepe_web/live/tool_servers_live.ex:137
 #, elixir-autogen, elixir-format
 msgid "No MCP servers yet. Add one with “+ New server”."
 msgstr "Ainda não há servidores MCP. Adiciona um com “+ Novo servidor”."
@@ -2154,27 +2155,27 @@ msgstr "Inválido: %{msg}"
 #: lib/pepe_web/live/connections_component.ex:264
 #: lib/pepe_web/live/projects_live.ex:233
 #: lib/pepe_web/live/scheduled_live.ex:106
-#: lib/pepe_web/live/tool_servers_live.ex:83
+#: lib/pepe_web/live/tool_servers_live.ex:144
 #, elixir-autogen, elixir-format
 msgid "Please fix the errors below."
 msgstr "Corrige os erros abaixo."
 
-#: lib/pepe_web/live/agents_live.ex:369
+#: lib/pepe_web/live/agents_live.ex:383
 #, elixir-autogen, elixir-format
 msgid "Microsoft Presidio over HTTP"
 msgstr "Microsoft Presidio via HTTP"
 
-#: lib/pepe_web/live/agents_live.ex:366
+#: lib/pepe_web/live/agents_live.ex:380
 #, elixir-autogen, elixir-format
 msgid "Regex: CPF, email, cards, phones"
 msgstr "Regex: CPF, email, cartões, telefones"
 
-#: lib/pepe_web/live/agents_live.ex:368
+#: lib/pepe_web/live/agents_live.ex:382
 #, elixir-autogen, elixir-format
 msgid "Your own redaction endpoint"
 msgstr "O teu próprio endpoint de ocultação"
 
-#: lib/pepe_web/live/agents_live.ex:367
+#: lib/pepe_web/live/agents_live.ex:381
 #, elixir-autogen, elixir-format
 msgid "A local model masks names/free text (reversible)"
 msgstr "Um modelo local oculta nomes e texto livre (reversível)"
@@ -2244,7 +2245,7 @@ msgstr ""
 "Do @BotFather. Dica: usa uma referência de variável de ambiente para "
 "manteres o token fora do ficheiro de configuração."
 
-#: lib/pepe_web/live/tool_servers_live.ex:47
+#: lib/pepe_web/live/tool_servers_live.ex:87
 #, elixir-autogen, elixir-format
 msgid "Give agents extra abilities from external tool servers like MCP (Sentry, GitHub, ...). Keep secrets safe by writing tokens as ${ENV_VAR}."
 msgstr ""
@@ -2271,7 +2272,7 @@ msgstr ""
 "Ligado: o valor real é restaurado na resposta. Desligado: só de ida; tanto o"
 " modelo como tu ficam com a versão ocultada."
 
-#: lib/pepe_web/live/tool_servers_live.ex:90
+#: lib/pepe_web/live/tool_servers_live.ex:166
 #, elixir-autogen, elixir-format
 msgid "Put the token as ${ENV_VAR}. The secret stays out of the config file."
 msgstr ""
@@ -2315,7 +2316,7 @@ msgstr ""
 " das mais recentes para as mais antigas. Clica em qualquer item para o leres"
 " e editares."
 
-#: lib/pepe_web/live/tool_servers_live.ex:73
+#: lib/pepe_web/live/tool_servers_live.ex:134
 #, elixir-autogen, elixir-format
 msgid "Couldn't connect. Check the command and the env var token"
 msgstr ""
@@ -2370,13 +2371,13 @@ msgstr ""
 msgid "Task updated."
 msgstr "Tarefa atualizada."
 
-#: lib/pepe_web/live/tool_servers_live.ex:145
+#: lib/pepe_web/live/tool_servers_live.ex:262
 #, elixir-autogen, elixir-format
 msgid "MCP server %{name} restarted (reconnects on next use)."
 msgstr ""
 "Servidor MCP %{name} reiniciado (volta a ligar-se na próxima utilização)."
 
-#: lib/pepe_web/live/tool_servers_live.ex:59
+#: lib/pepe_web/live/tool_servers_live.ex:99
 #, elixir-autogen, elixir-format
 msgid "Recovery: reconnect if this server seems stuck"
 msgstr "Recuperação: volta a ligar se este servidor parecer bloqueado"
@@ -2386,7 +2387,7 @@ msgstr "Recuperação: volta a ligar se este servidor parecer bloqueado"
 msgid "Recovery: respawn the pollers if the gateway seems stuck"
 msgstr "Recuperação: relança os pollers se o gateway parecer bloqueado"
 
-#: lib/pepe_web/live/tool_servers_live.ex:59
+#: lib/pepe_web/live/tool_servers_live.ex:99
 #, elixir-autogen, elixir-format
 msgid "Restart"
 msgstr "Reiniciar"
@@ -3974,7 +3975,7 @@ msgstr "Escreve os números que queres marcar (ex.: 1 3) e prime Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:3457
+#: lib/mix/tasks/pepe.ex:3721
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -3994,17 +3995,17 @@ msgstr "n = página seguinte  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:3271
+#: lib/mix/tasks/pepe.ex:3535
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (podes usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:3272
+#: lib/mix/tasks/pepe.ex:3536
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:3280
+#: lib/mix/tasks/pepe.ex:3544
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -4031,6 +4032,7 @@ msgid "Connecting %{label}"
 msgstr "A ligar %{label}"
 
 #: lib/pepe_web/live/models_live.ex:199
+#: lib/pepe_web/live/tool_servers_live.ex:122
 #, elixir-autogen, elixir-format
 msgid "Finish"
 msgstr "Concluir"
@@ -4062,6 +4064,8 @@ msgstr "Iniciar sessão com uma subscrição"
 
 #: lib/pepe_web/live/models_live.ex:534
 #: lib/pepe_web/live/models_live.ex:646
+#: lib/pepe_web/live/tool_servers_live.ex:287
+#: lib/pepe_web/live/tool_servers_live.ex:316
 #, elixir-autogen, elixir-format
 msgid "Sign-in failed: %{reason}"
 msgstr "Falha no início de sessão: %{reason}"
@@ -4278,7 +4282,7 @@ msgstr "Este mês: %{cost} · %{count} mensagens"
 msgid "Wait for the current turn to finish."
 msgstr "Aguarda que o turno atual termine."
 
-#: lib/pepe/gateways/telegram.ex:3254
+#: lib/pepe/gateways/telegram.ex:3250
 #, elixir-autogen, elixir-format
 msgid "That command isn't available here."
 msgstr "Esse comando não está disponível aqui."
@@ -4645,7 +4649,7 @@ msgstr ""
 "atingir o limite mensal de mensagens de clientes. Não afeta o limite de "
 "gastos, que é separado."
 
-#: lib/pepe_web/live/agents_live.ex:533
+#: lib/pepe_web/live/agents_live.ex:549
 #, elixir-autogen, elixir-format
 msgid "Couldn't save %{name}: the name must be letters, digits, - or _."
 msgstr ""
@@ -5295,7 +5299,7 @@ msgstr "Este cartão ainda está em execução. Arquivar mesmo assim?"
 msgid "%{n} runs"
 msgstr "%{n} execuções"
 
-#: lib/pepe_web/live/agents_live.ex:485
+#: lib/pepe_web/live/agents_live.ex:500
 #, elixir-autogen, elixir-format
 msgid "An agent named %{name} already exists (maybe with different capitalization)."
 msgstr "Já existe um agente chamado %{name} (talvez com capitalização diferente)."
@@ -5503,17 +5507,117 @@ msgstr "🔁 Permitir pelo resto desta tarefa"
 msgid "🔁 Allowed for the rest of this task."
 msgstr "🔁 Permitido pelo resto desta tarefa."
 
-#: lib/pepe_web/live/agents_live.ex:334
+#: lib/pepe_web/live/agents_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "Assembled prompt"
 msgstr "Prompt montado"
 
-#: lib/pepe_web/live/agents_live.ex:340
+#: lib/pepe_web/live/agents_live.ex:354
 #, elixir-autogen, elixir-format
 msgid "The persona field above is only the seed - this is it plus everything Pepe assembles around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time). Exactly what every real conversation with this agent sends as the system message."
 msgstr "O campo de persona acima é só a semente - isto é ela mais tudo o que o Pepe monta à volta dela (ficheiros de identidade/boot, o contrato de comportamento, docs e skills que conhece, a hora atual). Exatamente o que qualquer conversa real com este agente envia como mensagem de sistema."
 
-#: lib/pepe_web/live/agents_live.ex:337
+#: lib/pepe_web/live/agents_live.ex:351
 #, elixir-autogen, elixir-format
 msgid "What the model actually sees, not just the persona above"
 msgstr "O que o modelo realmente vê, não só a persona acima"
+
+#: lib/pepe_web/live/tool_servers_live.ex:236
+#, elixir-autogen, elixir-format
+msgid "Couldn't start sign-in: %{reason}"
+msgstr "Não foi possível iniciar o início de sessão: %{reason}"
+
+#: lib/pepe_web/live/tool_servers_live.ex:158
+#, elixir-autogen, elixir-format
+msgid "Headers"
+msgstr "Cabeçalhos"
+
+#: lib/pepe_web/live/tool_servers_live.ex:150
+#, elixir-autogen, elixir-format
+msgid "Kind"
+msgstr "Tipo"
+
+#: lib/pepe_web/live/agents_live.ex:342
+#, elixir-autogen, elixir-format
+msgid "Let session_search see every conversation in this project, not just the caller's own"
+msgstr "Deixar o session_search ver todas as conversas deste projeto, não apenas as de quem chamou"
+
+#: lib/pepe_web/live/tool_servers_live.ex:151
+#, elixir-autogen, elixir-format
+msgid "Local (a command on this machine)"
+msgstr "Local (um comando nesta máquina)"
+
+#: lib/pepe_web/live/tool_servers_live.ex:111
+#, elixir-autogen, elixir-format
+msgid "No credential"
+msgstr "Sem credencial"
+
+#: lib/pepe_web/live/agents_live.ex:343
+#, elixir-autogen, elixir-format
+msgid "Off (the default) is safe for an agent that talks to several different end customers: session_search only ever reaches the calling conversation's own history. Turn this on only for an agent with one operator/team on the other end, where there's no other customer's conversation to leak."
+msgstr "Desligado (a predefinição) é seguro para um agente que atende vários clientes finais diferentes: o session_search só alcança o histórico da própria conversa que o chamou. Ligue isto apenas para um agente com um operador/equipa do outro lado, onde não há conversa de outro cliente para expor."
+
+#: lib/pepe_web/live/tool_servers_live.ex:160
+#, elixir-autogen, elixir-format
+msgid "One per line, as Key: value. Leave empty for a server that wants OAuth - you sign in after saving."
+msgstr "Um por linha, como Chave: valor. Deixe vazio para um servidor que pede OAuth; entra depois de guardar."
+
+#: lib/pepe_web/live/tool_servers_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "Open this link to authorize, then come back:"
+msgstr "Abra esta ligação para autorizar e volte aqui:"
+
+#: lib/pepe_web/live/tool_servers_live.ex:121
+#, elixir-autogen, elixir-format
+msgid "Paste the code if the browser can't reach this machine"
+msgstr "Cole o código se o navegador não conseguir alcançar esta máquina"
+
+#: lib/pepe_web/live/tool_servers_live.ex:151
+#, elixir-autogen, elixir-format
+msgid "Remote (an URL over HTTP)"
+msgstr "Remoto (um URL por HTTP)"
+
+#: lib/pepe_web/live/tool_servers_live.ex:113
+#, elixir-autogen, elixir-format
+msgid "Sign in again"
+msgstr "Entrar de novo"
+
+#: lib/pepe_web/live/tool_servers_live.ex:113
+#, elixir-autogen, elixir-format
+msgid "Sign in with OAuth"
+msgstr "Entrar com OAuth"
+
+#: lib/pepe_web/live/tool_servers_live.ex:311
+#, elixir-autogen, elixir-format
+msgid "Signed in to %{name}."
+msgstr "Sessão iniciada em %{name}."
+
+#: lib/pepe_web/live/tool_servers_live.ex:110
+#, elixir-autogen, elixir-format
+msgid "Signed in with OAuth"
+msgstr "Sessão iniciada com OAuth"
+
+#: lib/pepe_web/live/tool_servers_live.ex:253
+#, elixir-autogen, elixir-format
+msgid "Signed out of %{name}."
+msgstr "Sessão terminada em %{name}."
+
+#: lib/pepe_web/live/tool_servers_live.ex:109
+#, elixir-autogen, elixir-format
+msgid "Static key from a header"
+msgstr "Chave estática vinda de um cabeçalho"
+
+#: lib/pepe_web/live/tool_servers_live.ex:155
+#, elixir-autogen, elixir-format
+msgid "The transport is negotiated automatically."
+msgstr "O transporte é negociado automaticamente."
+
+#: lib/pepe_web/live/tool_servers_live.ex:233
+#, elixir-autogen, elixir-format
+msgid "This server's authorization server doesn't allow dynamic registration - pin a client_id in config.json."
+msgstr "O servidor de autorização deste servidor não permite registo dinâmico. Fixe um client_id no config.json."
+
+#: lib/pepe_web/live/tool_servers_live.ex:154
+#, elixir-autogen, elixir-format
+msgid "URL"
+msgstr "URL"

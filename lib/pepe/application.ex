@@ -92,6 +92,13 @@ defmodule Pepe.Application do
           # MCP tool servers: a registry + dynamic supervisor; clients start on demand.
           {Registry, keys: :unique, name: Pepe.MCP.Registry},
           {DynamicSupervisor, name: Pepe.MCP.DynSup, strategy: :one_for_one},
+          # In-flight calls to a *remote* MCP server. The stdio transport gets concurrency
+          # for free (its port is asynchronous), but an HTTP one has to run each request
+          # somewhere that isn't the client GenServer, or a slow tool blocks every other
+          # agent talking to that same server. Unconditional, like the two above: a CLI
+          # one-shot can call an MCP tool too, and a supervisor that only exists while
+          # serving would leave that path with nowhere to run.
+          {Task.Supervisor, name: Pepe.MCP.TaskSupervisor},
           # The `browser` tool's Chrome sessions: same lazy registry + dynamic supervisor shape.
           {Registry, keys: :unique, name: Pepe.Browser.Registry},
           {DynamicSupervisor, name: Pepe.Browser.DynSup, strategy: :one_for_one},

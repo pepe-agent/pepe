@@ -5,15 +5,27 @@ description: Conecte servidores do Model Context Protocol para que as ferramenta
 
 Conecte servidores **MCP (Model Context Protocol)**, como Sentry ou GitHub, e as
 ferramentas deles passam a ser chamáveis pelos agentes como se fossem nativas. Os
-servidores sobem por stdio sob demanda (via `npx`, então **não há nada para
-instalar na mão**), e os tokens entram como referências `${ENV_VAR}`.
+tokens entram como referências `${ENV_VAR}`.
+
+Um servidor é de um de dois tipos:
+
+* **Remoto** - uma URL acessada por HTTP. Nada roda na sua máquina; você precisa do
+  endereço e de uma credencial.
+* **Local** - um comando que sobe por stdio sob demanda (via `npx`, então **não há
+  nada para instalar na mão**), rodando ao lado do Pepe.
 
 ## Adicionando um servidor
 
 ```bash
+# remoto: um servidor hospedado, acessado por HTTP
+pepe mcp add memclaw --url https://memclaw.net/mcp \
+  --header "Authorization: Bearer ${MEMCLAW_API_KEY}"
+
+# local: um servidor que o Pepe sobe sozinho
 pepe mcp add sentry --command npx \
   --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
-pepe mcp tools sentry     # sobe o servidor e lista as ferramentas (valida a conexão)
+
+pepe mcp tools sentry     # conecta e lista as ferramentas (valida a conexão)
 pepe mcp list
 ```
 
@@ -22,6 +34,38 @@ então ele serve também como teste de conexão. Um comando errado, um argumento
 errado ou um token inválido aparecem ali, e não no meio de uma conversa.
 
 As definições dos servidores ficam em `~/.pepe/config.json`, sob `"mcp"`.
+
+## Servidores remotos: o transporte se escolhe sozinho
+
+Existem duas maneiras de um servidor MCP remoto conversar, e só dá para distinguir
+tentando: o **Streamable HTTP**, que é o que um servidor publicado hoje fala, e o par
+mais antigo **HTTP+SSE**, do qual alguns ainda não migraram. O Pepe tenta o mais novo e
+cai para o outro, então você passa só a URL.
+
+Fixe com `--transport streamable` ou `--transport sse` apenas se a negociação errar.
+Errar o palpite tem exatamente a cara de uma URL quebrada, e é por isso que o fallback é
+o padrão em vez de uma opção que você precisaria conhecer.
+
+## Entrando em um servidor que pede OAuth
+
+Alguns servidores hospedados não aceitam chave de API nenhuma e respondem `401` até você
+entrar:
+
+```bash
+pepe mcp login memclaw
+```
+
+O Pepe pergunta ao servidor onde fica o servidor de autorização dele, se registra lá como
+cliente, abre seu navegador e guarda a concessão. Nada precisa ser preenchido na mão, nem
+client id, nem endpoint, porque o motivo de existir a etapa de descoberta é justamente
+que ninguém te contou nada disso. Por SSH, onde não há navegador para abrir, ele imprime
+o link e aceita o código colado.
+
+A concessão é renovada sozinha quando expira. O `pepe mcp logout NOME` a esquece. A
+página MCP do dashboard faz o mesmo login por botão, e mostra em quais servidores você
+já entrou.
+
+<div class="note"><strong>Os tokens não ficam no <code>config.json</code>.</strong> Uma chave estática que você mesmo configura vive no ambiente e é referenciada como <code>${VAR}</code>. Uma concessão OAuth não funciona assim, ela gira sozinha, então fica guardada no banco local do Pepe e nunca é escrita no arquivo de configuração.</div>
 
 ## Como as ferramentas são nomeadas
 

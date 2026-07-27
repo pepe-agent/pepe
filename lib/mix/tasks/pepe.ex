@@ -119,7 +119,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
-      mix pepe mcp add|list|tools|remove ...      # external tool servers (MCP: Sentry, GitHub, ...)
+      mix pepe mcp add|list|tools|login|remove ... # external tool servers (MCP: local or remote)
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
       mix pepe version                         # what's running, and which build
@@ -230,6 +230,9 @@ defmodule Mix.Tasks.Pepe do
 
   # `mcp tools` launches the server (needs the app); the rest just edit config.
   def dispatch(["mcp", "tools" | rest]), do: with_app([], fn -> mcp_cmd(["tools" | rest]) end)
+  # login/logout reach the network and the SQLite grant store, so they need the app too.
+  def dispatch(["mcp", "login" | rest]), do: with_app([], fn -> mcp_cmd(["login" | rest]) end)
+  def dispatch(["mcp", "logout" | rest]), do: with_app([], fn -> mcp_cmd(["logout" | rest]) end)
   def dispatch(["mcp" | rest]), do: with_config(fn -> mcp_cmd(rest) end)
 
   # `usage prices --refresh` fetches over the network (needs Req/the app);
@@ -4909,16 +4912,54 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp mcp_cmd(["add", name | rest]) do
-    {opts, _, _} = OptionParser.parse(rest, strict: [command: :string, args: :string])
+    {opts, _, _} =
+      OptionParser.parse(rest,
+        strict: [command: :string, args: :string, url: :string, header: :keep, transport: :string]
+      )
 
-    if is_nil(opts[:command]) do
-      error("mcp add needs --command (e.g. npx)")
-    else
-      args = if opts[:args], do: String.split(opts[:args], " ", trim: true), else: []
-      Config.put_mcp_server(name, %{"command" => opts[:command], "args" => args, "env" => %{}})
-      ok("MCP server #{green(name)} saved")
-      info(dim("validate: mix pepe mcp tools #{name}"))
+    cond do
+      opts[:url] && opts[:command] ->
+        error("mcp add takes --url or --command, not both - a server is remote or local, not both")
+
+      opts[:url] ->
+        save_mcp_server(name, remote_server(opts))
+
+      opts[:command] ->
+        args = if opts[:args], do: String.split(opts[:args], " ", trim: true), else: []
+        save_mcp_server(name, %{"command" => opts[:command], "args" => args, "env" => %{}})
+
+      true ->
+        error("mcp add needs --url (remote) or --command (local, e.g. npx)")
     end
+  end
+
+  defp mcp_cmd(["login", name | _]) do
+    case Pepe.MCP.OAuth.login(name) do
+      {:ok, credential} ->
+        ok("signed in to #{green(name)}")
+        info(dim("   issuer: #{credential.issuer}"))
+        info(dim("   scope : #{credential.scope || "(none requested)"}"))
+        info(dim("validate: mix pepe mcp tools #{name}"))
+
+      {:error, {:unknown_server, _}} ->
+        error("unknown MCP server: #{name}")
+
+      {:error, {:not_a_remote_server, _}} ->
+        error("#{name} is a local (stdio) server - OAuth only applies to a --url server")
+
+      {:error, :mcp_no_registration_endpoint} ->
+        error("this authorization server has no dynamic registration")
+        info(dim("   create a client by hand there, then pin it in config.json:"))
+        info(dim(~s(   "mcp": {"#{name}": {"oauth": {"client_id": "${MCP_CLIENT_ID}"}}})))
+
+      {:error, reason} ->
+        error("sign-in failed: #{inspect(reason)}")
+    end
+  end
+
+  defp mcp_cmd(["logout", name | _]) do
+    Pepe.MCP.OAuth.logout(name)
+    ok("forgot the stored grant for #{green(name)}")
   end
 
   defp mcp_cmd(["tools", name | _]) do
@@ -4948,18 +4989,68 @@ defmodule Mix.Tasks.Pepe do
     mix pepe mcp - external tool servers (Model Context Protocol)
 
       add NAME --command npx --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
+      add NAME --url https://host/mcp --header "Authorization: Bearer ${MCP_TOKEN}"
       list                       list configured servers
-      tools NAME                 launch it and list its tools (validate)
+      tools NAME                 connect and list its tools (validate)
+      login NAME                 OAuth sign-in for a remote server (opens a browser)
+      logout NAME                forget a stored OAuth grant
       remove NAME
 
-    Put tokens as ${ENV_VAR} refs. Grant an agent only the read tools by adding
-    names like mcp__NAME__<tool> to its --tools (see: mix pepe agent).
+    A server is either LOCAL (--command, spawned over stdio) or REMOTE (--url, reached
+    over HTTP). A remote one negotiates its transport by itself; pin it with
+    --transport streamable|sse only if the negotiation gets it wrong.
+
+    Remote auth, in order of preference: a static key via --header, or `login` for a
+    server that wants OAuth. Put tokens as ${ENV_VAR} refs. Grant an agent only the read
+    tools by adding names like mcp__NAME__<tool> to its --tools (see: mix pepe agent).
     """)
+  end
+
+  defp remote_server(opts) do
+    %{
+      "url" => opts[:url],
+      "headers" => parse_headers(opts),
+      "transport" => opts[:transport] || "auto"
+    }
+  end
+
+  # --header "Authorization: Bearer ${TOKEN}", repeatable. Split on the FIRST colon only:
+  # the value is routinely a URL or a scheme-prefixed credential with colons of its own.
+  defp parse_headers(opts) do
+    opts
+    |> Keyword.get_values(:header)
+    |> Enum.flat_map(fn header ->
+      case String.split(header, ":", parts: 2) do
+        [key, value] -> [{String.trim(key), String.trim(value)}]
+        _ -> []
+      end
+    end)
+    |> Enum.into(%{})
+  end
+
+  defp save_mcp_server(name, map) do
+    Config.put_mcp_server(name, map)
+    ok("MCP server #{green(name)} saved")
+    info(dim("validate: mix pepe mcp tools #{name}"))
   end
 
   defp print_mcp_server_line({name, cfg}) do
     info("\n#{bold(name)}")
-    info(dim("   #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"))
+
+    if cfg["url"] do
+      info(dim("   #{cfg["url"]}  (#{cfg["transport"] || "auto"})"))
+      info(dim("   auth: #{mcp_auth_label(name, cfg)}"))
+    else
+      info(dim("   #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"))
+    end
+  end
+
+  defp mcp_auth_label(name, cfg) do
+    cond do
+      map_size(cfg["headers"] || %{}) > 0 -> "header (#{Enum.join(Map.keys(cfg["headers"]), ", ")})"
+      Pepe.MCP.OAuth.credential(name) -> "oauth (signed in)"
+      true -> "none - add --header, or run: mix pepe mcp login #{name}"
+    end
   end
 
   defp print_mcp_tools(name) do

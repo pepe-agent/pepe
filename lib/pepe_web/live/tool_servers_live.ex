@@ -20,19 +20,59 @@ defmodule PepeWeb.ToolServersLive do
        mcp: Config.mcp_servers(),
        mcp_tools: %{},
        edit_mcp: nil,
-       form: mcp_form(%{"command" => "npx"})
+       login: nil,
+       form: blank_form()
      )}
   end
 
   defp mcp_changeset(attrs) do
-    types = %{name: :string, command: :string, args: :string}
+    types = %{
+      name: :string,
+      kind: :string,
+      command: :string,
+      args: :string,
+      url: :string,
+      headers: :string
+    }
 
-    {%{}, types}
-    |> Changeset.cast(attrs, Map.keys(types))
-    |> Changeset.validate_required([:name, :command])
+    changeset =
+      {%{}, types}
+      |> Changeset.cast(attrs, Map.keys(types))
+      |> Changeset.validate_required([:name])
+
+    # A server is one kind or the other, and the field that matters is the one its kind
+    # names - requiring both would make every remote server fail on a missing command.
+    case Changeset.get_field(changeset, :kind) do
+      "remote" -> Changeset.validate_required(changeset, [:url])
+      _ -> Changeset.validate_required(changeset, [:command])
+    end
   end
 
   defp mcp_form(attrs), do: to_form(mcp_changeset(attrs), as: :mcp)
+
+  defp blank_form, do: mcp_form(%{"kind" => "remote", "command" => "npx"})
+
+  # "Key: value" per line, split on the first colon only (a value is routinely a URL or a
+  # scheme-prefixed credential with colons of its own).
+  defp parse_headers(text) do
+    (text || "")
+    |> String.split("\n")
+    |> Enum.flat_map(fn line ->
+      case String.split(line, ":", parts: 2) do
+        [key, value] when key != "" -> [{String.trim(key), String.trim(value)}]
+        _ -> []
+      end
+    end)
+    |> Enum.into(%{})
+  end
+
+  defp auth_state(name, cfg) do
+    cond do
+      map_size(cfg["headers"] || %{}) > 0 -> :header
+      Pepe.MCP.OAuth.credential(name) -> :oauth
+      true -> :none
+    end
+  end
 
   @impl true
   def render(assigns) do
@@ -60,7 +100,28 @@ defmodule PepeWeb.ToolServersLive do
                 <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-sm text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
+            <div :if={cfg["url"]} class="mt-1 text-sm text-zinc-400">
+              <code>{cfg["url"]}</code>
+              <span class="text-zinc-500">· {cfg["transport"] || "auto"}</span>
+            </div>
+            <div :if={!cfg["url"]} class="mt-1 text-sm text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
+            <div :if={cfg["url"]} class="mt-1 flex items-center gap-2 text-sm">
+              <span :if={auth_state(name, cfg) == :header} class="text-zinc-500">🔑 {gettext("Static key from a header")}</span>
+              <span :if={auth_state(name, cfg) == :oauth} class="text-emerald-400">✓ {gettext("Signed in with OAuth")}</span>
+              <span :if={auth_state(name, cfg) == :none} class="text-amber-400">{gettext("No credential")}</span>
+              <button :if={auth_state(name, cfg) != :header} phx-click="mcp_login" phx-value-name={name} class={btn_ghost()}>
+                {if auth_state(name, cfg) == :oauth, do: gettext("Sign in again"), else: gettext("Sign in with OAuth")}
+              </button>
+              <button :if={auth_state(name, cfg) == :oauth} phx-click="mcp_logout" phx-value-name={name} class={btn_ghost()}>{gettext("Sign out")}</button>
+            </div>
+            <div :if={@login && @login.server == name} class="mt-2 space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+              <p class="text-sm text-zinc-300">{gettext("Open this link to authorize, then come back:")}</p>
+              <a href={@login.url} target="_blank" rel="noopener" class="block break-all text-sm text-sky-400 hover:underline">{@login.url}</a>
+              <form phx-submit="mcp_login_code" class="flex gap-2">
+                <input name="code" placeholder={gettext("Paste the code if the browser can't reach this machine")} class={fld()} />
+                <button type="submit" class={btn()}>{gettext("Finish")}</button>
+              </form>
+            </div>
             <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("Connecting...")}</div>
             <div :if={is_list(@mcp_tools[name])} class="mt-2 space-y-1">
               <div :for={t <- @mcp_tools[name]} class="text-sm text-zinc-400">
@@ -83,8 +144,23 @@ defmodule PepeWeb.ToolServersLive do
               {gettext("Please fix the errors below.")}
             </div>
             <.input field={@form[:name]} label={gettext("Name")} placeholder="sentry" />
-            <.input field={@form[:command]} label={gettext("Command")} />
-            <div>
+            <.input
+              field={@form[:kind]}
+              type="select"
+              label={gettext("Kind")}
+              options={[{gettext("Remote (an URL over HTTP)"), "remote"}, {gettext("Local (a command on this machine)"), "local"}]}
+            />
+            <div :if={@form[:kind].value != "local"}>
+              <.input field={@form[:url]} label={gettext("URL")} class={[fld(), "font-mono"]} placeholder="https://mcp.example.com/mcp" />
+              <p class={hlp()}>{gettext("The transport is negotiated automatically.")}</p>
+            </div>
+            <div :if={@form[:kind].value != "local"}>
+              <.input field={@form[:headers]} type="textarea" label={gettext("Headers")} class={[fld(), "font-mono"]}
+                placeholder={"Authorization: Bearer ${MCP_TOKEN}"} />
+              <p class={hlp()}>{gettext("One per line, as Key: value. Leave empty for a server that wants OAuth - you sign in after saving.")}</p>
+            </div>
+            <.input :if={@form[:kind].value == "local"} field={@form[:command]} label={gettext("Command")} />
+            <div :if={@form[:kind].value == "local"}>
               <.input field={@form[:args]} label={gettext("Arguments")} class={[fld(), "font-mono"]}
                 placeholder={"-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"} />
               <p class={hlp()}>{gettext("Put the token as ${ENV_VAR}. The secret stays out of the config file.")}</p>
@@ -103,7 +179,7 @@ defmodule PepeWeb.ToolServersLive do
 
   @impl true
   def handle_event("mcp_new", _p, socket),
-    do: {:noreply, assign(socket, edit_mcp: %{}, form: mcp_form(%{"command" => "npx"}))}
+    do: {:noreply, assign(socket, edit_mcp: %{}, form: blank_form())}
 
   def handle_event("mcp_cancel", _p, socket), do: {:noreply, assign(socket, edit_mcp: nil)}
 
@@ -116,11 +192,22 @@ defmodule PepeWeb.ToolServersLive do
     if cs.valid? do
       name = Changeset.get_field(cs, :name)
 
-      Config.put_mcp_server(name, %{
-        "command" => String.trim(Changeset.get_field(cs, :command)),
-        "args" => String.split(p["args"] || "", " ", trim: true),
-        "env" => %{}
-      })
+      definition =
+        if Changeset.get_field(cs, :kind) == "remote" do
+          %{
+            "url" => String.trim(Changeset.get_field(cs, :url)),
+            "headers" => parse_headers(p["headers"]),
+            "transport" => "auto"
+          }
+        else
+          %{
+            "command" => String.trim(Changeset.get_field(cs, :command)),
+            "args" => String.split(p["args"] || "", " ", trim: true),
+            "env" => %{}
+          }
+        end
+
+      Config.put_mcp_server(name, definition)
 
       {:noreply,
        socket
@@ -134,6 +221,40 @@ defmodule PepeWeb.ToolServersLive do
   def handle_event("mcp_remove", %{"name" => name}, socket) do
     Config.delete_mcp_server(name)
     {:noreply, assign(socket, mcp: Config.mcp_servers())}
+  end
+
+  def handle_event("mcp_login", %{"name" => name}, socket) do
+    case Pepe.MCP.OAuth.begin(name, self()) do
+      {:ok, session, url} ->
+        {:noreply, assign(socket, login: %{server: name, url: url, session: session})}
+
+      {:error, :mcp_no_registration_endpoint} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext("This server's authorization server doesn't allow dynamic registration - pin a client_id in config.json.")
+         )}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, gettext("Couldn't start sign-in: %{reason}", reason: inspect(reason)))}
+    end
+  end
+
+  def handle_event("mcp_login_code", %{"code" => code}, socket) when code != "" do
+    {:noreply, complete_login(socket, Pepe.OAuth.extract_code(code))}
+  end
+
+  def handle_event("mcp_login_code", _p, socket), do: {:noreply, socket}
+
+  def handle_event("mcp_logout", %{"name" => name}, socket) do
+    Pepe.MCP.OAuth.logout(name)
+    Pepe.MCP.restart(name)
+
+    {:noreply,
+     socket
+     |> assign(mcp: Config.mcp_servers())
+     |> put_flash(:info, gettext("Signed out of %{name}.", name: name))}
   end
 
   def handle_event("mcp_restart", %{"name" => name}, socket) do
@@ -159,6 +280,17 @@ defmodule PepeWeb.ToolServersLive do
   def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   @impl true
+  # The browser came back to the loopback callback on its own - no pasting needed.
+  def handle_info({:oauth_code, _ref, code}, socket),
+    do: {:noreply, complete_login(socket, code)}
+
+  def handle_info({:oauth_error, _ref, reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(login: nil)
+     |> put_flash(:error, gettext("Sign-in failed: %{reason}", reason: inspect(reason)))}
+  end
+
   def handle_info({:mcp_validated, name, result}, socket) do
     value =
       case result do
@@ -167,5 +299,25 @@ defmodule PepeWeb.ToolServersLive do
       end
 
     {:noreply, update(socket, :mcp_tools, &Map.put(&1, name, value))}
+  end
+
+  defp complete_login(%{assigns: %{login: nil}} = socket, _code), do: socket
+
+  defp complete_login(%{assigns: %{login: login}} = socket, code) do
+    case Pepe.MCP.OAuth.finish(login.session, code) do
+      {:ok, _credential} ->
+        # Drop any client already connected without the token, so the next use reconnects
+        # with it instead of staying unauthorized until something restarts.
+        Pepe.MCP.restart(login.server)
+
+        socket
+        |> assign(login: nil, mcp: Config.mcp_servers())
+        |> put_flash(:info, gettext("Signed in to %{name}.", name: login.server))
+
+      {:error, reason} ->
+        socket
+        |> assign(login: nil)
+        |> put_flash(:error, gettext("Sign-in failed: %{reason}", reason: inspect(reason)))
+    end
   end
 end

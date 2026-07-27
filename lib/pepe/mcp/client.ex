@@ -1,6 +1,9 @@
 defmodule Pepe.MCP.Client do
   @moduledoc """
-  A minimal **MCP (Model Context Protocol)** client over stdio.
+  A minimal **MCP (Model Context Protocol)** client over stdio - the transport for a server
+  that runs as a local child process. Remote servers are reached over HTTP instead
+  (`Pepe.MCP.Client.Http`, `Pepe.MCP.Client.Sse`); the messages are identical either way and
+  live in `Pepe.MCP.Protocol`.
 
   Launches an MCP server as a child process (e.g. `npx -y @sentry/mcp-server`),
   speaks JSON-RPC 2.0 line-by-line over its stdin/stdout, performs the
@@ -14,14 +17,15 @@ defmodule Pepe.MCP.Client do
   State: `%{port, tools: [%{"name","description","inputSchema"}], next_id, pending}`.
   """
 
+  @behaviour Pepe.MCP.Transport
+
   use GenServer
   require Logger
 
+  alias Pepe.MCP.Protocol
+
   @handshake_timeout 30_000
   @call_timeout 60_000
-
-  @client_info %{"name" => "pepe", "version" => "0.1.0"}
-  @protocol "2025-06-18"
 
   ###
   ### API
@@ -31,14 +35,17 @@ defmodule Pepe.MCP.Client do
   Start a client for a server spec: `%{command: "npx", args: [...], env: %{...}}`.
   `${ENV_VAR}` references in args/env are interpolated at spawn time.
   """
+  @impl Pepe.MCP.Transport
   def start_link(spec, opts \\ []) do
     GenServer.start_link(__MODULE__, spec, opts)
   end
 
   @doc "The tools the server advertises (`[%{\"name\", \"description\", \"inputSchema\"}]`)."
+  @impl Pepe.MCP.Transport
   def list_tools(pid), do: GenServer.call(pid, :list_tools)
 
   @doc "Call a tool by name with a map of arguments. Returns `{:ok, text} | {:error, reason}`."
+  @impl Pepe.MCP.Transport
   def call_tool(pid, name, args),
     do: GenServer.call(pid, {:call_tool, name, args}, @call_timeout + 5_000)
 
@@ -95,7 +102,7 @@ defmodule Pepe.MCP.Client do
         state
 
       {from, pending} ->
-        GenServer.reply(from, tool_result(msg))
+        GenServer.reply(from, Protocol.tool_result(msg))
         %{state | pending: pending}
     end
   end
@@ -107,17 +114,13 @@ defmodule Pepe.MCP.Client do
   ###
 
   defp handshake(port) do
-    send_rpc(port, 1, "initialize", %{
-      "protocolVersion" => @protocol,
-      "capabilities" => %{},
-      "clientInfo" => @client_info
-    })
+    send_rpc(port, 1, "initialize", Protocol.initialize_params())
 
     with {:ok, _init, buf} <- await(port, 1, ""),
          :ok <- send_notification(port, "notifications/initialized", %{}),
          :ok <- send_rpc(port, 2, "tools/list", %{}),
          {:ok, resp, _buf} <- await(port, 2, buf) do
-      {:ok, get_in(resp, ["result", "tools"]) || []}
+      {:ok, Protocol.tools_from(resp)}
     end
   end
 
@@ -155,7 +158,7 @@ defmodule Pepe.MCP.Client do
   defp executable(_), do: {:error, :no_command}
 
   defp open_port(exe, spec) do
-    args = spec |> Map.get(:args, []) |> Enum.map(&interp/1)
+    args = spec |> Map.get(:args, []) |> Enum.map(&Protocol.interp/1)
     env = spec |> Map.get(:env, %{}) |> env_list()
 
     port =
@@ -173,26 +176,20 @@ defmodule Pepe.MCP.Client do
 
   defp env_list(env) when is_map(env) do
     Enum.map(env, fn {k, v} ->
-      {String.to_charlist(to_string(k)), String.to_charlist(interp(to_string(v)))}
+      {String.to_charlist(to_string(k)), String.to_charlist(Protocol.interp(to_string(v)))}
     end)
   end
 
   defp env_list(_), do: []
 
-  # Interpolate ${ENV_VAR} references (keeps secrets out of the config file).
-  defp interp(value) when is_binary(value), do: Pepe.Config.interpolate(value) || ""
-  defp interp(value), do: value
-
   defp send_rpc(port, id, method, params) do
-    line =
-      Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "method" => method, "params" => params})
-
+    line = Jason.encode!(Protocol.request(id, method, params))
     Port.command(port, line <> "\n")
     :ok
   end
 
   defp send_notification(port, method, params) do
-    line = Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})
+    line = Jason.encode!(Protocol.notification(method, params))
     Port.command(port, line <> "\n")
     :ok
   end
@@ -216,21 +213,6 @@ defmodule Pepe.MCP.Client do
 
     {messages, rest}
   end
-
-  # Flatten an MCP tool result's content blocks into text.
-  defp tool_result(%{"result" => %{"content" => content}}) when is_list(content) do
-    text =
-      Enum.map_join(content, "\n", fn
-        %{"type" => "text", "text" => t} -> t
-        other -> Jason.encode!(other)
-      end)
-
-    {:ok, text}
-  end
-
-  defp tool_result(%{"result" => result}), do: {:ok, Jason.encode!(result)}
-  defp tool_result(%{"error" => error}), do: {:error, error}
-  defp tool_result(_), do: {:error, :bad_response}
 
   defp safe_close(port) do
     if Port.info(port), do: Port.close(port)

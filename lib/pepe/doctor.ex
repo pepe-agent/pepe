@@ -543,13 +543,34 @@ defmodule Pepe.Doctor do
   end
 
   defp mcp_checks do
-    Enum.map(Config.mcp_servers(), fn {name, _cfg} ->
+    Enum.map(Config.mcp_servers(), fn {name, cfg} ->
       case Pepe.MCP.tools(name) do
-        {:ok, tools} -> {"mcp", name, ok_note("#{length(tools)} tools")}
-        {:error, reason} -> {"mcp", name, {:error, "unreachable: #{describe(reason)}"}}
+        {:ok, tools} ->
+          {"mcp", name, ok_note("#{length(tools)} tools#{transport_note(cfg)}")}
+
+        # A remote server rejecting us with no credential configured is not a mystery, and
+        # saying "unreachable" for it sends the operator to check DNS and firewalls for
+        # something one command fixes.
+        {:error, reason} ->
+          {"mcp", name, {:error, "unreachable: #{describe(reason)}#{auth_hint(name, cfg, reason)}"}}
       end
     end)
   end
+
+  defp transport_note(%{"url" => url}) when is_binary(url), do: " (remote)"
+  defp transport_note(_cfg), do: ""
+
+  defp auth_hint(name, %{"url" => url}, reason) when is_binary(url) do
+    unauthorized? = reason |> inspect() |> String.contains?(["401", "unauthorized"])
+
+    cond do
+      not unauthorized? -> ""
+      Pepe.MCP.OAuth.credential(name) -> " - the stored OAuth grant was refused; sign in again"
+      true -> " - no credential: add a header, or run `mix pepe mcp login #{name}`"
+    end
+  end
+
+  defp auth_hint(_name, _cfg, _reason), do: ""
 
   defp ok_note(_note), do: :ok
 

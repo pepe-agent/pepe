@@ -18,6 +18,7 @@ defmodule Pepe.MCP do
 
   alias Pepe.Config
   alias Pepe.MCP.Client
+  alias Pepe.MCP.Transport
 
   @registry Pepe.MCP.Registry
   @sup Pepe.MCP.DynSup
@@ -25,10 +26,14 @@ defmodule Pepe.MCP do
   @doc "Is this an MCP tool name (`mcp__...`)?"
   def mcp_tool?(name), do: is_binary(name) and String.starts_with?(name, "mcp__")
 
-  @doc "Ensure the client for `server` is running, starting it if needed."
+  @doc """
+  Ensure the client for `server` is running, starting it if needed. Returns
+  `{:ok, pid, transport_module}` - the module travels with the pid because which one is
+  speaking to a given server is decided by its config, not by this module.
+  """
   def ensure(server) do
     case Registry.lookup(@registry, server) do
-      [{pid, _}] -> {:ok, pid}
+      [{pid, module}] -> {:ok, pid, module}
       [] -> start(server)
     end
   end
@@ -45,24 +50,49 @@ defmodule Pepe.MCP do
   end
 
   defp start(server) do
-    case Config.mcp_server(server) do
-      nil ->
-        {:error, {:unknown_server, server}}
-
-      spec ->
-        DynamicSupervisor.start_child(@sup, %{
-          id: {:mcp, server},
-          start: {Client, :start_link, [spec, [name: via(server)]]},
-          restart: :temporary
-        })
+    with {:ok, spec} <- spec(server),
+         {:ok, module} <- Transport.for_spec(spec) do
+      spawn_transport(server, spec, module)
     end
   end
 
-  defp via(server), do: {:via, Registry, {@registry, server}}
+  defp spec(server) do
+    case Config.mcp_server(server) do
+      nil -> {:error, {:unknown_server, server}}
+      spec -> {:ok, spec}
+    end
+  end
+
+  defp spawn_transport(server, spec, module) do
+    case DynamicSupervisor.start_child(@sup, %{
+           id: {:mcp, server},
+           start: {module, :start_link, [spec, [name: via(server, module)]]},
+           restart: :temporary
+         }) do
+      {:ok, pid} ->
+        {:ok, pid, module}
+
+      # The server answered "not here" to a Streamable POST. On an explicit
+      # `transport: "streamable"` that is the final answer; on the default it means we
+      # guessed the newer of two protocols that are told apart only by trying, so try the
+      # older one before reporting a failure the operator would read as a broken URL.
+      {:error, {:mcp_not_streamable, _}} = error ->
+        if module == Client.Http and spec[:transport] in [nil, "auto"] do
+          spawn_transport(server, spec, Client.Sse)
+        else
+          error
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp via(server, module), do: {:via, Registry, {@registry, server, module}}
 
   @doc "List a server's advertised tools: `{:ok, [%{\"name\", ...}]}` or `{:error, _}`."
   def tools(server) do
-    with {:ok, pid} <- ensure(server), do: {:ok, Client.list_tools(pid)}
+    with {:ok, pid, module} <- ensure(server), do: {:ok, module.list_tools(pid)}
   end
 
   @doc """
@@ -97,8 +127,8 @@ defmodule Pepe.MCP do
   def call(name, args) do
     {server, tool} = parse(name)
 
-    with {:ok, pid} <- ensure(server),
-         {:ok, out} <- Client.call_tool(pid, tool, args) do
+    with {:ok, pid, module} <- ensure(server),
+         {:ok, out} <- module.call_tool(pid, tool, args) do
       {:ok, out}
     else
       {:error, reason} -> {:error, inspect(reason)}

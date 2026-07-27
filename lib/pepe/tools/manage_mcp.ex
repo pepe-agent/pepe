@@ -3,15 +3,27 @@ defmodule Pepe.Tools.ManageMcp do
   Let an agent connect and inspect **MCP (Model Context Protocol) servers** - external
   tool providers like Sentry or GitHub - from a conversation.
 
-  The typical flow (autonomous, no manual install because the server is launched via
-  `npx` on demand):
+  A server is either **local** (a `command` spawned over stdio, e.g. `npx`) or **remote** (a
+  `url` reached over HTTP). Remote is the newer half and the easier one to grant: nothing has
+  to be installed on the box, so a hosted server needs only its URL and a credential.
 
-    1. `add` a server with its command/args, putting any token in as a `${ENV_VAR}`
-       reference so the secret never touches the chat or the config file.
+  The typical flow (autonomous, no manual install because a local server is launched via
+  `npx` on demand and a remote one runs somewhere else entirely):
+
+    1. `add` a server with its command/args or its url/headers, putting any token in as a
+       `${ENV_VAR}` reference so the secret never touches the chat or the config file.
     2. `tools` it to validate the connection **live** and see what it offers.
     3. Grant an agent the *read-only* subset by adding the specific tool names
        (e.g. `mcp__sentry__find_organizations`) to that agent's tools with
        `manage_agent` - leaving the mutating ones (`mcp__sentry__update_issue`) out.
+
+  **Signing in with OAuth is not an action here**, and that is a decision rather than an
+  omission. It needs a browser and a human at it, so an agent cannot complete it; what it
+  could do is produce a link and ask someone to authorize it, which is the shape of a
+  phishing message and would be one if the agent were ever talked into pointing it
+  somewhere else. The operator runs `mix pepe mcp login NAME` (or clicks the button on the
+  dashboard's MCP page) and the agent says so. `logout` *is* here: it only removes access,
+  which is the direction that is safe to be wrong about.
 
   It's a risky tool (in the allowlist + through the permission gate).
 
@@ -40,22 +52,41 @@ defmodule Pepe.Tools.ManageMcp do
       """
       Connect and inspect MCP (Model Context Protocol) servers - external tool \
       providers. Put tokens as ${ENV_VAR} references, never raw. Actions:
-      - add: register a server - needs `name`, `command` (e.g. "npx"), `args` (array, \
-        e.g. ["-y","@sentry/mcp-server@latest","--access-token","${SENTRY_AUTH_TOKEN}"]); \
+      - add: register a server - needs `name` plus EITHER `url` (a remote server over \
+        HTTP, with optional `headers` like {"Authorization": "Bearer ${MCP_TOKEN}"}) \
+        OR `command` (e.g. "npx") with `args` (array, e.g. \
+        ["-y","@sentry/mcp-server@latest","--access-token","${SENTRY_AUTH_TOKEN}"]) and \
         optional `env` (object of ${ENV} refs).
-      - tools: launch the server and list its tools live to validate - needs `name`. \
+      - tools: connect to the server and list its tools live to validate - needs `name`. \
         Their agent-facing names are mcp__<name>__<tool>.
-      - list: show configured servers.
+      - list: show configured servers and, for remote ones, what credential they have.
       - remove: delete a server - needs `name`.
+      - logout: forget a remote server's stored OAuth grant - needs `name`.
+
+      A remote server that answers 401 wants OAuth, which cannot be done from a chat (it \
+      opens a browser). Say so and give the operator the command: mix pepe mcp login NAME.
 
       After adding, grant an agent only the READ tools via manage_agent (add_tool).
       """,
       %{
         "type" => "object",
         "properties" => %{
-          "action" => %{"type" => "string", "enum" => ~w(add tools list remove)},
+          "action" => %{"type" => "string", "enum" => ~w(add tools list remove logout)},
           "name" => %{"type" => "string", "description" => "The server name."},
-          "command" => %{"type" => "string", "description" => "Executable, e.g. \"npx\"."},
+          "command" => %{"type" => "string", "description" => "Local server: executable, e.g. \"npx\"."},
+          "url" => %{
+            "type" => "string",
+            "description" => "Remote server: its MCP endpoint URL. Use instead of command."
+          },
+          "headers" => %{
+            "type" => "object",
+            "description" => "Remote server auth headers (values may be ${ENV_VAR})."
+          },
+          "transport" => %{
+            "type" => "string",
+            "enum" => ~w(auto streamable sse),
+            "description" => "Remote server only. Leave unset: it negotiates. Pin it only if that fails."
+          },
           "args" => %{
             "type" => "array",
             "items" => %{"type" => "string"},
@@ -82,22 +113,42 @@ defmodule Pepe.Tools.ManageMcp do
   defp dispatch("add", args), do: add(args)
   defp dispatch("tools", %{"name" => name}), do: list_tools(name)
   defp dispatch("remove", %{"name" => name}), do: remove(name)
+  defp dispatch("logout", %{"name" => name}), do: logout(name)
   defp dispatch(other, _args), do: {:error, "unknown or incomplete action: #{other}"}
 
   defp add(args) do
     with {:ok, name} <- fetch(args, "name"),
-         {:ok, command} <- fetch(args, "command") do
-      args_list = args["args"] || []
-      env = args["env"] || %{}
-
-      Config.put_mcp_server(name, %{"command" => command, "args" => args_list, "env" => env})
+         {:ok, definition, secrets} <- definition(args) do
+      Config.put_mcp_server(name, definition)
 
       saved = "MCP server #{name} saved. Run `tools` on it to validate, then grant an agent its read tools."
 
-      # The env map is where a token actually goes, and it used to be the one place nobody
-      # looked: the old guard read the args array only, so `env: {"GITHUB_TOKEN": "ghp_..."}`
-      # sailed through into config.json in the clear, unmentioned.
-      {:ok, saved <> Pepe.Secrets.warning(raw_secrets(args_list, env), "the MCP server #{name}")}
+      # The env/headers map is where a token actually goes, and it used to be the one place
+      # nobody looked: the old guard read the args array only, so
+      # `env: {"GITHUB_TOKEN": "ghp_..."}` sailed through into config.json in the clear,
+      # unmentioned. `headers` is the same hole on the remote side, so it is scanned too.
+      {:ok, saved <> Pepe.Secrets.warning(secrets, "the MCP server #{name}")}
+    end
+  end
+
+  # Remote (url) or local (command) - one or the other, never both, since the two are
+  # different servers wearing one name and only one of them would ever be used.
+  defp definition(%{"url" => url} = args) when is_binary(url) and url != "" do
+    headers = args["headers"] || %{}
+
+    {:ok, %{"url" => url, "headers" => headers, "transport" => args["transport"] || "auto"}, Pepe.Secrets.plaintext_in(headers)}
+  end
+
+  defp definition(args) do
+    case fetch(args, "command") do
+      {:ok, command} ->
+        args_list = args["args"] || []
+        env = args["env"] || %{}
+
+        {:ok, %{"command" => command, "args" => args_list, "env" => env}, raw_secrets(args_list, env)}
+
+      _ ->
+        {:error, "a server needs either `url` (remote) or `command` (local)"}
     end
   end
 
@@ -130,6 +181,20 @@ defmodule Pepe.Tools.ManageMcp do
     end
   end
 
+  # Signing IN is not here on purpose (see the moduledoc). Signing OUT is: it only ever
+  # removes access, needs no browser, and is the thing someone asks for in a hurry.
+  defp logout(name) do
+    case Pepe.MCP.OAuth.credential(name) do
+      nil ->
+        {:ok, "#{name} had no stored OAuth grant - nothing to forget."}
+
+      _ ->
+        Pepe.MCP.OAuth.logout(name)
+        Pepe.MCP.restart(name)
+        {:ok, "Forgot the OAuth grant for #{name}. It will need `mix pepe mcp login #{name}` again."}
+    end
+  end
+
   defp remove(name) do
     case Config.mcp_server(name) do
       nil ->
@@ -152,8 +217,20 @@ defmodule Pepe.Tools.ManageMcp do
 
       servers ->
         Enum.map_join(servers, "\n", fn {name, cfg} ->
-          "• #{name}: #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"
+          if cfg["url"] do
+            "• #{name}: #{cfg["url"]} (remote, auth: #{auth_state(name, cfg)})"
+          else
+            "• #{name}: #{cfg["command"]} #{Enum.join(cfg["args"] || [], " ")}"
+          end
         end)
+    end
+  end
+
+  defp auth_state(name, cfg) do
+    cond do
+      map_size(cfg["headers"] || %{}) > 0 -> "a static key from a header"
+      Pepe.MCP.OAuth.credential(name) -> "signed in with OAuth"
+      true -> "NONE - a 401 from it means this, not a bad URL"
     end
   end
 

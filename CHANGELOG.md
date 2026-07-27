@@ -5,6 +5,19 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **MCP servers can now be remote, not just local.** Until now a server had to be a `command` Pepe spawned over stdio, so reaching a hosted MCP server meant installing Node and running a bridge process (`npx mcp-remote ...`) beside Pepe - which the official Docker image cannot do, since it ships no Node and the agent is not root. A server can now be a plain URL: `mix pepe mcp add NAME --url https://host/mcp --header "Authorization: Bearer ${TOKEN}"`, or the same from the dashboard's MCP page, or from a conversation via `manage_mcp`. Everything downstream is unchanged - the tools are still `mcp__<server>__<tool>`, still scoped by the agent's tool allowlist, still through the permission gate.
+- Both remote MCP transports are supported and **negotiated automatically**: Streamable HTTP (spec revision 2025-03-26) and the older HTTP+SSE pair (2024-11-05). The two are distinguishable only by trying one, and guessing wrong is indistinguishable from a broken URL, so Pepe tries the newer and falls back rather than making it a flag you have to know about. `--transport streamable|sse` pins it when the negotiation gets it wrong.
+- **OAuth 2.1 sign-in for remote MCP servers** (`mix pepe mcp login NAME`, or a button on the dashboard's MCP page), for hosted servers that take no API key. Nothing has to be filled in by hand: Pepe reads the server's protected-resource document (RFC 9728) to find its authorization server, reads that server's metadata (RFC 8414), and registers itself as a client (RFC 7591) before running the ordinary authorization-code + PKCE flow. Tokens are audience-bound to the server they were issued for (RFC 8707) and refreshed automatically; `mix pepe mcp logout NAME` forgets a grant. Over SSH it prints the link and takes the pasted code, like the existing provider sign-ins.
+- The `manage_mcp` tool covers remote servers too, so an agent can add and diagnose one from a conversation: `url`, `headers`, `transport`, a `logout` action, and a `list` that reports each remote server's credential state. Signing *in* is deliberately not an agent action - it needs a browser, and an agent producing an authorization link for a human to click is the shape of a phishing message; the tool says which command to run instead.
+- `mix pepe mcp list` and `pepe doctor` now report a remote server's credential state, and an unauthorized remote server says so instead of reporting the generic "unreachable" that sends you to check DNS for something one command fixes.
+
+### Fixed
+- **An MCP tool that failed was reported to the agent as having succeeded.** A server signals a failed call in-band, as `isError: true` on an otherwise-normal result; Pepe read only the JSON-RPC envelope, so the failure text came back as a successful result and the agent went on building on it. Now an error.
+
+### Changed
+- MCP OAuth grants are stored in Pepe's SQLite database rather than `config.json`. Unlike every other credential, they cannot be `${ENV_VAR}` references - an access token expires on its own schedule and a refresh token is replaced by the act of using it, so nothing outside Pepe knows the current value.
+
 ## [0.10.2] - 2026-07-22
 
 ### Fixed

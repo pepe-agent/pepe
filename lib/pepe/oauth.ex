@@ -138,14 +138,26 @@ defmodule Pepe.OAuth do
   # Unknown expiry -> assume valid (refresh would happen on a 401 instead).
   defp fresh?(_), do: true
 
-  defp refresh(oauth) do
+  @doc """
+  Exchange a refresh token for a fresh access token, against any OAuth map carrying
+  `token_url` / `refresh` / `client_id`. Public because MCP servers
+  (`Pepe.MCP.OAuth`) hold their tokens in their own store rather than on a
+  `Pepe.Config.Model`, and refreshing is the one part of that they must not
+  reimplement - a second copy is how the two drift on the details that bite
+  (`client_secret` for a confidential client, `resource` for an audience-bound token).
+  """
+  @spec refresh(map()) :: {:ok, map()} | {:error, term()}
+  def refresh(oauth) do
     {:ok, _} = Application.ensure_all_started(:req)
 
-    body = %{
-      "grant_type" => "refresh_token",
-      "refresh_token" => oauth["refresh"],
-      "client_id" => oauth["client_id"]
-    }
+    body =
+      %{
+        "grant_type" => "refresh_token",
+        "refresh_token" => oauth["refresh"],
+        "client_id" => oauth["client_id"]
+      }
+      |> Map.merge(oauth["token_extra_params"] || %{})
+      |> maybe_put_secret(oauth["client_secret"])
 
     result =
       case oauth["token_content_type"] do
@@ -336,6 +348,10 @@ defmodule Pepe.OAuth do
         "redirect_uri" => flow.redirect_uri
       }
       |> maybe_put_state(flow, state)
+      # `resource` for MCP's audience-bound tokens, and anything else a flow needs the
+      # token endpoint to see but the authorize link already carried separately.
+      |> Map.merge(flow[:token_extra_params] || %{})
+      |> maybe_put_secret(flow[:client_secret])
 
     post_token(flow, body)
   end
@@ -343,6 +359,12 @@ defmodule Pepe.OAuth do
   defp maybe_put_state(body, flow, state) do
     if flow[:token_includes_state], do: Map.put(body, "state", state), else: body
   end
+
+  # A public client (PKCE only) has no secret; a dynamically registered one may.
+  defp maybe_put_secret(body, secret) when is_binary(secret) and secret != "",
+    do: Map.put(body, "client_secret", secret)
+
+  defp maybe_put_secret(body, _secret), do: body
 
   defp post_token(flow, body) do
     result =

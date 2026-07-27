@@ -3021,7 +3021,15 @@ defmodule Pepe.Config do
   """
   def mcp_servers, do: load() |> Map.get("mcp", %{})
 
-  @doc "One MCP server spec by name, as an atom-keyed map ready for Pepe.MCP.Client, or nil."
+  @doc """
+  One MCP server spec by name, as an atom-keyed map ready for a transport, or nil.
+
+  Two kinds of server share this shape. A `command` is a local process spawned over stdio;
+  a `url` is a remote server reached over HTTP, where `headers` carries whatever static
+  credential it wants (as `${ENV_VAR}` refs) and `oauth` pins the client identity for
+  servers that refuse dynamic registration. `name` rides along because a remote transport
+  needs it to find that server's stored OAuth grant.
+  """
   def mcp_server(name) do
     case mcp_servers()[name] do
       nil ->
@@ -3029,9 +3037,14 @@ defmodule Pepe.Config do
 
       map ->
         %{
+          name: name,
           command: map["command"],
           args: map["args"] || [],
-          env: map["env"] || %{}
+          env: map["env"] || %{},
+          url: map["url"],
+          headers: map["headers"] || %{},
+          transport: map["transport"] || "auto",
+          oauth: map["oauth"] || %{}
         }
     end
   end

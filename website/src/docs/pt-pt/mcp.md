@@ -5,16 +5,27 @@ description: Liga servidores do Model Context Protocol para que as ferramentas d
 
 Liga servidores **MCP (Model Context Protocol)**, como o Sentry ou o GitHub, e as
 ferramentas deles passam a poder ser chamadas pelos agentes como se fossem
-nativas. Os servidores arrancam por stdio a pedido (através do `npx`, por isso
-**não há nada para instalar à mão**), e os tokens entram como referências
-`${ENV_VAR}`.
+nativas. Os tokens entram como referências `${ENV_VAR}`.
+
+Um servidor é de um de dois tipos:
+
+* **Remoto** - um URL alcançado por HTTP. Nada corre na sua máquina; precisa do
+  endereço e de uma credencial.
+* **Local** - um comando que arranca por stdio a pedido (através do `npx`, por isso
+  **não há nada para instalar à mão**), a correr ao lado do Pepe.
 
 ## Adicionar um servidor
 
 ```bash
+# remoto: um servidor alojado, alcançado por HTTP
+pepe mcp add memclaw --url https://memclaw.net/mcp \
+  --header "Authorization: Bearer ${MEMCLAW_API_KEY}"
+
+# local: um servidor que o Pepe arranca sozinho
 pepe mcp add sentry --command npx \
   --args "-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"
-pepe mcp tools sentry     # arranca o servidor e lista as ferramentas (valida a ligação)
+
+pepe mcp tools sentry     # liga-se e lista as ferramentas (valida a ligação)
 pepe mcp list
 ```
 
@@ -23,6 +34,38 @@ isso também serve de teste de ligação. Um comando errado, um argumento errado
 um token inválido aparecem aí, e não a meio de uma conversa.
 
 As definições dos servidores ficam em `~/.pepe/config.json`, sob `"mcp"`.
+
+## Servidores remotos: o transporte escolhe-se sozinho
+
+Há duas maneiras de um servidor MCP remoto falar, e só se distinguem tentando: o
+**Streamable HTTP**, que é o que um servidor publicado hoje fala, e o par mais antigo
+**HTTP+SSE**, do qual alguns ainda não migraram. O Pepe tenta o mais recente e recua para
+o outro, por isso basta dar-lhe o URL.
+
+Fixe com `--transport streamable` ou `--transport sse` apenas se a negociação falhar.
+Falhar o palpite tem exactamente o aspecto de um URL partido, e é por isso que o recuo é
+o comportamento por omissão em vez de uma opção que teria de conhecer.
+
+## Entrar num servidor que pede OAuth
+
+Alguns servidores alojados não aceitam qualquer chave de API e respondem `401` até
+entrar:
+
+```bash
+pepe mcp login memclaw
+```
+
+O Pepe pergunta ao servidor onde fica o servidor de autorização dele, regista-se lá como
+cliente, abre o seu navegador e guarda a concessão. Nada tem de ser preenchido à mão, nem
+client id, nem endpoint, porque a razão de existir o passo de descoberta é precisamente
+que ninguém lhe disse nada disso. Por SSH, onde não há navegador para abrir, imprime a
+ligação e aceita o código colado.
+
+A concessão é renovada sozinha quando expira. O `pepe mcp logout NOME` esquece-a. A
+página MCP do painel faz o mesmo início de sessão com um botão, e mostra em que
+servidores já entrou.
+
+<div class="note"><strong>Os tokens não ficam no <code>config.json</code>.</strong> Uma chave estática que configura você mesmo vive no ambiente e é referenciada como <code>${VAR}</code>. Uma concessão OAuth não funciona assim, roda sozinha, por isso fica guardada na base de dados local do Pepe e nunca é escrita no ficheiro de configuração.</div>
 
 ## Como as ferramentas são nomeadas
 
