@@ -383,6 +383,24 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     text
   end
 
+  # The unsolicited-delivery paths (a cron's `deliver/2`, a watch's origin chat) hand the
+  # chat id in different shapes - a string from one, an integer from the other - so this
+  # compares them as strings instead of pinning one form, which is why those two tests
+  # stopped pinning at all and started accepting a `:sent` for *any* chat. Anything for a
+  # different chat is skipped, not read as ours: the gateway's reply tasks are unlinked and
+  # the API base is global, so a straggler owed to an earlier test genuinely does arrive
+  # here, and the boot-time delivery-ledger sweep can produce one on purpose.
+  defp await_delivery(chat, timeout \\ 5_000) do
+    want = to_string(chat)
+
+    receive do
+      {:sent, sent_to, text, _buttons} ->
+        if to_string(sent_to) == want, do: text, else: await_delivery(chat, timeout)
+    after
+      timeout -> flunk("nothing delivered to chat #{want} within #{timeout}ms")
+    end
+  end
+
   defp await_buttons(chat) do
     assert_receive {:sent, ^chat, _text, [_ | _] = buttons}, 5_000
     buttons |> List.flatten() |> Enum.map(& &1["callback_data"])
@@ -1017,8 +1035,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
     test "deliver/2 reaches the default bot's chat", %{chat: chat} do
       assert Telegram.deliver(to_string(chat), "the cron ran") == :ok
-      assert_receive {:sent, chat, "the cron ran", _buttons}, 5_000
-      assert to_string(chat) == to_string(chat)
+      assert await_delivery(chat) == "the cron ran"
     end
 
     test "deliver/2 to a bot that does not exist is a no-op, not a crash", %{chat: chat} do
@@ -1041,9 +1058,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
     test "a fired watch is delivered to its origin chat", %{chat: chat} do
       assert Telegram.deliver_watch(%{"chat_id" => chat}, "the price dropped") == :ok
-      assert_receive {:sent, chat, text, _buttons}, 5_000
-      assert to_string(chat) == to_string(chat)
-      assert text =~ "the price dropped"
+      assert await_delivery(chat) =~ "the price dropped"
     end
 
     test "a watch with no chat, or on a bot that is gone, is reported rather than dropped silently", %{chat: chat} do
