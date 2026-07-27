@@ -70,7 +70,11 @@ a:hover { color: #ffb877; }
   text-transform: uppercase; color: var(--accent-soft);
   border: 1px solid rgba(234, 88, 12, 0.35); border-radius: 999px; padding: 5px 14px; margin-bottom: 22px;
 }
-.hero h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 20px; font-weight: 800; }
+/* `balance` evens out the lines instead of filling each one and dropping whatever
+   is left onto the next, which is what left a lone "IA" on a line of its own on a
+   phone. It applies between the forced breaks, so each half of the title is
+   balanced on its own. */
+.hero h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 20px; font-weight: 800; text-wrap: balance; }
 .hero h1 .grad, .section-head h2 .grad { background: linear-gradient(120deg, #fb923c, #f59e0b 60%, #eab308); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero p.lead { font-size: clamp(17px, 2.4vw, 21px); color: var(--muted); max-width: 720px; margin: 0 auto 34px; }
 .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
@@ -316,8 +320,17 @@ section[id] { scroll-margin-top: 86px; }
 @media (max-width: 720px) {
   .why-grid { grid-template-columns: 1fr; text-align: center; justify-items: center; gap: 24px; }
   .widget-promo-grid { grid-template-columns: 1fr; text-align: center; justify-items: center; gap: 24px; }
-  .flow { flex-direction: column; }
-  .flow-arrow { transform: rotate(90deg); padding: 2px 0; }
+  /* Stacked, the cross axis is horizontal, so the row layout's `flex-start` (which
+     meant "align by the top") silently becomes "align to the left" and pins the
+     arrow to the margin with the cards beside it. Both have to be restated. */
+  .flow { flex-direction: column; align-items: center; }
+  .flow-arrow { transform: rotate(90deg); padding: 2px 0; align-self: center; }
+  /* A fixed 232px column wastes half a phone screen and squeezes each example into
+     more lines than it needs. */
+  .flow-step { width: 100%; max-width: 420px; }
+  /* The 80px floor exists to land four captions on one baseline across a row.
+     Stacked there is no row to line up with, and it is dead space in every box. */
+  .flow-chip { min-height: 0; }
 }
 
 /* ---- CTA band ---- */
