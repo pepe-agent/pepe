@@ -234,6 +234,13 @@ docker compose logs -f          # sigue el log
 docker compose exec pepe bin/pepe remote   # una shell IEx en el nodo en ejecución
 ```
 
+## Ponerlo en un servidor
+
+Todo lo anterior corre en una sola máquina, alcanzable en `localhost`. Detrás de un
+dominio, con TLS y proxy inverso, cuatro cosas más pasan a importar, y ninguna es culpa
+de Docker. Consulta [Desplegar en un servidor](/es/docs/deploy/) para Compose detrás de
+Caddy, Docker Swarm detrás de Traefik, y Kamal.
+
 ## Actualización
 
 Con Compose:

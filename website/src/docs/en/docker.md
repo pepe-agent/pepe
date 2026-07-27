@@ -230,6 +230,13 @@ docker compose logs -f          # follow the log
 docker compose exec pepe bin/pepe remote   # an IEx shell into the running node
 ```
 
+## Putting it on a server
+
+Everything above runs on one machine, reachable at `localhost`. Behind a domain, with
+TLS and a reverse proxy, four more things matter and none of them are Docker's doing.
+See [Deploying to a server](/en/docs/deploy/) for Compose behind Caddy, Docker Swarm
+behind Traefik, and Kamal.
+
 ## Upgrading
 
 With Compose:
