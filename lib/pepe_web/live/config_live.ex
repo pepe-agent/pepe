@@ -36,7 +36,7 @@ defmodule PepeWeb.ConfigLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="config" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -78,7 +78,7 @@ defmodule PepeWeb.ConfigLive do
           <button phx-click="config_reload" class={btn_ghost()}>{gettext("Reload from disk")}</button>
         </.view_header>
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6">
           <.form_section title={gettext("Media")}>
             <div class="grid gap-6 md:grid-cols-2">
               <form phx-submit="media_tts_save" class="space-y-3">
@@ -123,7 +123,7 @@ defmodule PepeWeb.ConfigLive do
                     class={fld()}
                   />
                 </div>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid gap-3 sm:grid-cols-3">
                   <div>
                     <label class={lbl()} for="audio_language">{gettext("Language")}</label>
                     <input id="audio_language" name="language" type="text" value={@media_audio["language"]} class={fld()} />

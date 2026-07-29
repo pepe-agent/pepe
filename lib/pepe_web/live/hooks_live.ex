@@ -47,7 +47,7 @@ defmodule PepeWeb.HooksLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="hooks" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -56,7 +56,7 @@ defmodule PepeWeb.HooksLive do
           desc={gettext("Redact PII on the message flow before it reaches a model. Configure a hook here, then enable it on an agent (Agents). Empty = no redaction (raw text).")}
         />
 
-        <div class="min-h-0 flex-1 overflow-y-auto p-6">
+        <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <%= if @editing do %>
             {form_panel(assigns)}
           <% else %>
@@ -188,7 +188,7 @@ defmodule PepeWeb.HooksLive do
     <.text_field name="url" label={gettext("Endpoint URL")} value={@edit["url"]} hint={gettext("Used for both directions unless you set separate URLs below.")} />
     <.text_field name="inbound_url" label={gettext("Inbound URL (optional)")} value={@edit["inbound_url"]} />
     <.text_field name="outbound_url" label={gettext("Outbound URL (optional)")} value={@edit["outbound_url"]} />
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid gap-3 sm:grid-cols-2">
       <.text_field name="basic_user" label={gettext("Basic auth user")} value={get_in(@edit, ["basic_auth", "user"])} />
       <.text_field name="basic_password" label={gettext("Basic auth password")} value={get_in(@edit, ["basic_auth", "password"])} />
     </div>
@@ -204,7 +204,7 @@ defmodule PepeWeb.HooksLive do
     ~H"""
     <.text_field name="analyzer_url" label={gettext("Analyzer URL")} value={@edit["analyzer_url"]} />
     <.text_field name="anonymizer_url" label={gettext("Anonymizer URL")} value={@edit["anonymizer_url"]} />
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid gap-3 sm:grid-cols-2">
       <.text_field name="language" label={gettext("Language")} value={@edit["language"] || "en"} />
       <.text_field name="score_threshold" label={gettext("Score threshold")} value={@edit["score_threshold"]} hint="0.0 - 1.0" />
     </div>

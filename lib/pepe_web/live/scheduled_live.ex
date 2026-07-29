@@ -83,7 +83,7 @@ defmodule PepeWeb.ScheduledLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="cron" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -96,7 +96,7 @@ defmodule PepeWeb.ScheduledLive do
           <button :if={@viewing_log} phx-click="cron_log_close" class={btn_ghost()}>&larr; {gettext("Back to tasks")}</button>
         </.view_header>
 
-        <div :if={@creating} class="min-h-0 flex-1 overflow-y-auto p-6">
+        <div :if={@creating} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div class="max-w-2xl">
             <.form id="cron-form" for={@form} phx-submit="cron_create" phx-change="cron_validate" class="space-y-4">
               <div class="text-lg font-semibold">
@@ -111,7 +111,7 @@ defmodule PepeWeb.ScheduledLive do
                   label={gettext("What to do")} placeholder={gettext("Check the 06:00 XML load and report anything off.")} />
                 <p class={hlp()}>{gettext("(runs fresh each time, no chat memory)")}</p>
               </div>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label class={lbl()}>{gettext("When")} <span class="text-zinc-600">{gettext("(cron)")}</span></label>
                   <select name="cron[schedule]" class={fld()}>
@@ -141,7 +141,7 @@ defmodule PepeWeb.ScheduledLive do
                   </select>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label class={lbl()}>{gettext("Agent")}</label>
                   <select name="cron[agent]" class={fld()}>
@@ -175,7 +175,7 @@ defmodule PepeWeb.ScheduledLive do
           </div>
         </div>
 
-        <div :if={@viewing_log} class="min-h-0 flex-1 overflow-y-auto p-6">
+        <div :if={@viewing_log} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <% cron = Enum.find(@crons, &(&1.id == @viewing_log)) %>
           <div :if={cron} class="max-w-3xl">
             <div class="text-lg font-semibold">{cron.name}</div>
@@ -206,9 +206,9 @@ defmodule PepeWeb.ScheduledLive do
           </div>
         </div>
 
-        <div :if={!@creating and !@viewing_log} class="flex-1 space-y-4 overflow-y-auto p-6">
+        <div :if={!@creating and !@viewing_log} class="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
           <div :for={c <- scoped_by_agent(@crons, @scope, & &1.agent)} class={card()}>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{c.name}</span>
                 <span class={["ml-2 rounded px-1.5 text-sm", c.enabled && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
@@ -222,7 +222,7 @@ defmodule PepeWeb.ScheduledLive do
                   {gettext("running")}
                 </span>
               </div>
-              <div class="flex shrink-0 gap-1 text-sm">
+              <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button phx-click="cron_run" phx-value-id={c.id} disabled={MapSet.member?(@running, c.id)}
                   class={[btn_ghost(), "disabled:opacity-50"]}>
                   {if MapSet.member?(@running, c.id), do: gettext("Running..."), else: gettext("Run now")}

@@ -39,7 +39,7 @@ defmodule PepeWeb.PluginsLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="plugins" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -48,7 +48,7 @@ defmodule PepeWeb.PluginsLive do
           desc={gettext("Install channels and tools that load at runtime, no rebuild. The code is security-scanned first; a plugin runs with full access, so install only from a source you trust.")}
         />
 
-        <div class="flex-1 space-y-6 overflow-y-auto p-6">
+        <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
           <div class={card()}>
             <label class={lbl()}>{gettext("Install a plugin")}</label>
 
@@ -96,7 +96,7 @@ defmodule PepeWeb.PluginsLive do
                 </div>
                 <div :if={manifest_desc(p)} class="mt-0.5 truncate text-[15px] text-zinc-400">{manifest_desc(p)}</div>
               </div>
-              <div class="flex shrink-0 gap-1">
+              <div class="flex shrink-0 flex-wrap gap-1">
                 <button :if={configurable?(p)} phx-click="configure" phx-value-name={p.name} class={btn_ghost()}>{gettext("Configure")}</button>
                 <button phx-click="remove" phx-value-name={p.name}
                   data-confirm={gettext("Remove plugin %{name}?", name: p.name)}
@@ -110,9 +110,9 @@ defmodule PepeWeb.PluginsLive do
       <%!-- Plugin settings, driven by the manifest's config schema --%>
       <div :if={@settings_name} class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div class="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-zinc-800 bg-zinc-950" phx-click-away="settings_cancel">
-          <div class="border-b border-zinc-800 px-6 py-4 text-lg font-semibold">{gettext("Configure %{name}", name: @settings_name)}</div>
+          <div class="border-b border-zinc-800 px-4 py-4 text-lg sm:px-6 font-semibold">{gettext("Configure %{name}", name: @settings_name)}</div>
           <form phx-submit="settings_save" class="flex min-h-0 flex-1 flex-col">
-            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
               <div :for={f <- @settings_schema}>
                 <label class={lbl()}>{f["label"]}</label>
                 <select :if={f["type"] == "select"} name={"cfg[" <> f["key"] <> "]"} class={fld()}>
@@ -124,7 +124,7 @@ defmodule PepeWeb.PluginsLive do
                 <p :if={f["type"] == "secret" and !f["hint"]} class={hlp()}>{gettext("Secret: write ${ENV_VAR} to keep it out of the config file.")}</p>
               </div>
             </div>
-            <div class="flex gap-2 border-t border-zinc-800 px-6 py-4">
+            <div class="flex gap-2 border-t border-zinc-800 px-4 py-4 sm:px-6">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="settings_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>

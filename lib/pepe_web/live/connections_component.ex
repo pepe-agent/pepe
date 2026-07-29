@@ -64,14 +64,14 @@ defmodule PepeWeb.ConnectionsComponent do
         </div>
 
         <div :for={{slug, e} <- conns_for(@webhooks, p.name)} class={[card(), "mb-2"]}>
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <span class="font-medium">{slug}</span>
               <span class={["ml-2 rounded px-1.5 text-sm", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
                 {e["mode"] || "support"}
               </span>
             </div>
-            <div class="flex shrink-0 gap-1 text-sm">
+            <div class="flex shrink-0 flex-wrap gap-1 text-sm">
               <button phx-click="edit" phx-value-slug={slug} phx-target={@myself} class={btn_ghost()}>{gettext("Edit")}</button>
               <button
                 phx-click="delete"
@@ -129,7 +129,7 @@ defmodule PepeWeb.ConnectionsComponent do
             <p :if={!@form_errors["slug"]} class={hlp()}>{gettext("A unique id used in the webhook URL.")}</p>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class={lbl()}>{gettext("Project")}</label>
               <select name="project" class={fld()}>

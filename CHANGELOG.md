@@ -5,7 +5,10 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
-## [0.11.0] - 2026-07-27
+### Fixed
+- **The dashboard is now usable on a phone.** It was built for a wide window only: the 256px sidebar stayed on screen at every width, so on a 390px phone the content got the 134px left over and every section read one word per line, with the page scrolling sideways. The sidebar is now an off-canvas drawer below 768px, opened by a hamburger in each section's header and closed by the backdrop, the Escape key or picking a destination; from 768px up the layout is exactly what it was. Section headers stack their actions under the title, two-column form rows become one, padding tightens, and the row actions that only appeared on hover (stop, delete a conversation) are always visible on a touch screen, where there is no hover.
+- The Chat section splits into the conversation list and the open thread only from 1024px. Below that it shows one at a time - the list, then the thread with a back button - instead of squeezing a third column next to the sidebar.
+- The dashboard is sized with `dvh` rather than `vh`, so a mobile browser's collapsing address bar no longer pushes the chat composer (and the buttons at the bottom of a form) off the bottom of the screen. The sign-in page no longer overflows a narrow screen either.
 
 ### Added
 - **MCP servers can now be remote, not just local.** Until now a server had to be a `command` Pepe spawned over stdio, so reaching a hosted MCP server meant installing Node and running a bridge process (`npx mcp-remote ...`) beside Pepe - which the official Docker image cannot do, since it ships no Node and the agent is not root. A server can now be a plain URL: `mix pepe mcp add NAME --url https://host/mcp --header "Authorization: Bearer ${TOKEN}"`, or the same from the dashboard's MCP page, or from a conversation via `manage_mcp`. Everything downstream is unchanged - the tools are still `mcp__<server>__<tool>`, still scoped by the agent's tool allowlist, still through the permission gate.

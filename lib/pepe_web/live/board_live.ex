@@ -93,7 +93,7 @@ defmodule PepeWeb.BoardLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="board" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -108,7 +108,7 @@ defmodule PepeWeb.BoardLive do
           <button :if={@creating_board} phx-click="board_cancel" class={btn_ghost()}>&larr; {gettext("Back")}</button>
         </.view_header>
 
-        <div :if={@creating_board} class="min-h-0 flex-1 overflow-y-auto p-6">
+        <div :if={@creating_board} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div class="max-w-lg">
             <.form id="board-form" for={@board_form} phx-submit="board_create" class="space-y-4">
               <div class="text-lg font-semibold">{gettext("+ New board")}</div>
@@ -140,14 +140,14 @@ defmodule PepeWeb.BoardLive do
           </div>
         </div>
 
-        <div :if={@creating_card} class="min-h-0 flex-1 overflow-y-auto p-6">
+        <div :if={@creating_card} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div class="max-w-lg">
             <.form id="card-form" for={@card_form} phx-submit="card_create" class="space-y-4">
               <div class="text-lg font-semibold">{gettext("+ New card")}</div>
               <.input field={@card_form[:title]} label={gettext("Title")} placeholder={gettext("Fix the checkout timeout")} />
               <.input field={@card_form[:body]} type="textarea" rows="3" label={gettext("What needs doing")}
                 placeholder={gettext("Everything the assignee needs to know: this is all it gets, no chat memory.")} />
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label class={lbl()}>{gettext("Assignee")}</label>
                   <select name="card[assignee]" class={fld()}>
@@ -173,9 +173,9 @@ defmodule PepeWeb.BoardLive do
           </div>
         </div>
 
-        <div :if={!@selected and !@creating_board and !@creating_card} class="flex-1 space-y-4 overflow-y-auto p-6">
+        <div :if={!@selected and !@creating_board and !@creating_card} class="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
           <div :for={b <- @boards} class={[card(), "cursor-pointer"]} phx-click="board_select" phx-value-id={b.id}>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{b.name}</span>
                 <span class="ml-2 text-sm text-zinc-500">{b.id}</span>
@@ -189,7 +189,7 @@ defmodule PepeWeb.BoardLive do
           <p :if={@boards == []} class="text-[15px] text-zinc-500">{gettext("No boards yet. Create one with “+ New board”.")}</p>
         </div>
 
-        <div :if={@selected && !@creating_card} class="flex-1 overflow-x-auto overflow-y-auto p-6">
+        <div :if={@selected && !@creating_card} class="flex-1 overflow-x-auto overflow-y-auto p-4 sm:p-6">
           <div class="mb-4 flex items-center gap-3">
             <span class="text-lg font-semibold">{Enum.find(@boards, &(&1.id == @selected)) |> then(& &1 && &1.name)}</span>
             <label class="flex items-center gap-1.5 text-sm text-zinc-400">

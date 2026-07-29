@@ -85,7 +85,7 @@ defmodule PepeWeb.ChannelsLive do
 
   defp widget_appearance_fields(assigns) do
     ~H"""
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid gap-3 sm:grid-cols-2">
       <div class="col-span-2">
         <label class={lbl()}>{gettext("Title")}</label>
         <input name={"#{@prefix}[title]"} value={@values["title"]} placeholder="Chat" class={fld()} />
@@ -136,7 +136,7 @@ defmodule PepeWeb.ChannelsLive do
 
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="bots" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -151,7 +151,7 @@ defmodule PepeWeb.ChannelsLive do
           <button :if={@edit_bot} phx-click="bot_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
           <button :if={@adding != nil} phx-click="add_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
         </.view_header>
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <%!-- LIST: channel groups only for what exists, plus one "Add a channel" picker --%>
           <div :if={!@edit_bot and @adding == nil} class="space-y-6">
             <%!-- One picker for every channel type: Telegram plus each webhook provider - kept at
@@ -172,7 +172,7 @@ defmodule PepeWeb.ChannelsLive do
 
             <%!-- Just-minted widget token, with a ready-to-paste snippet --%>
             <div :if={@widget_raw} class="rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0 text-sm">
                   <span class="font-semibold text-amber-200">{gettext("Widget created")}</span>
                   <span class="text-amber-200/70">- {gettext("paste this snippet on your site.")}</span>
@@ -200,14 +200,14 @@ defmodule PepeWeb.ChannelsLive do
               </div>
 
               <div :for={b <- @scoped_bots} class={[card(), "mb-2"]}>
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">
                     <span class="font-medium">{b["name"]}</span>
                     <span class={["ml-2 rounded px-1.5 text-sm", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
                       {(bot_active?(b) && gettext("active")) || gettext("inactive")}
                     </span>
                   </div>
-                  <div class="flex shrink-0 gap-1 text-sm">
+                  <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                     <button phx-click="bot_edit" phx-value-name={b["name"]} class={btn_ghost()}>{gettext("Edit")}</button>
                     <button phx-click="bot_remove" phx-value-name={b["name"]}
                       data-confirm={gettext("Remove bot %{name}?", name: b["name"])} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
@@ -226,11 +226,11 @@ defmodule PepeWeb.ChannelsLive do
               </div>
 
               <div :for={t <- @scoped_widget_tokens} class={[card(), "mb-2"]}>
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">
                     <span class="font-medium">{t["label"] || gettext("Unlabeled")}</span>
                   </div>
-                  <div class="flex shrink-0 gap-2">
+                  <div class="flex shrink-0 flex-wrap gap-2">
                     <button phx-click="widget_edit" phx-value-id={t["id"]} class={btn_ghost()}>
                       {if @edit_widget == t["id"], do: gettext("Cancel"), else: gettext("Edit appearance")}
                     </button>
@@ -364,7 +364,7 @@ defmodule PepeWeb.ChannelsLive do
                           </div>
                           <div class="truncate text-xs text-zinc-500">{u["sample"]}</div>
                         </div>
-                        <div class="flex shrink-0 gap-1.5">
+                        <div class="flex shrink-0 flex-wrap gap-1.5">
                           <button
                             type="button"
                             phx-click="bot_approve_user"

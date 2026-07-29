@@ -29,6 +29,25 @@ defmodule PepeWeb.DashUI do
   defp nav_group_cls,
     do: "px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-zinc-600"
 
+  @doc """
+  The root of a section's page: the flex row that holds the sidebar and the `<main>`.
+  `h-dvh` rather than `h-screen` so a mobile browser's collapsing address bar doesn't
+  push the bottom of the page (a chat composer, a form's buttons) out of reach.
+  """
+  def shell_cls, do: "flex h-dvh overflow-hidden bg-zinc-950 text-zinc-100"
+
+  @doc """
+  The scrollable body of a section, under its header. Tighter padding on a phone,
+  where 24px of chrome on each side is a sixth of the screen.
+  """
+  def body_cls, do: "flex-1 overflow-y-auto p-4 sm:p-6"
+
+  # The id of the checkbox that drives the mobile drawer. The sidebar renders it; every
+  # `<label for=...>` pointing at it (the hamburger, the backdrop) toggles the drawer with
+  # no JavaScript and no LiveView state, so a section doesn't need an event handler to have
+  # a working menu.
+  defp nav_toggle_id, do: "pepe-nav-toggle"
+
   # A button that copies `@value` to the clipboard, swapping to a checkmark for 1.5s.
   attr :value, :string, required: true
   attr :id, :string, required: true
@@ -75,7 +94,7 @@ defmodule PepeWeb.DashUI do
   """
   def form_section(assigns) do
     ~H"""
-    <div class="space-y-6 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-6">
+    <div class="space-y-6 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4 sm:p-6">
       <div class="border-b border-zinc-800 pb-3 text-sm font-semibold uppercase tracking-wide text-zinc-200">
         {@title}
       </div>
@@ -89,18 +108,47 @@ defmodule PepeWeb.DashUI do
   attr :desc, :string, required: true
   slot :inner_block
 
-  @doc "A consistent header for a section: icon + title, a one-line description, and optional actions."
+  @doc """
+  A consistent header for a section: icon + title, a one-line description, and optional
+  actions. Below `md` the actions drop under the title instead of fighting it for width,
+  and the hamburger that opens the nav drawer sits to the left of the title.
+  """
   def view_header(assigns) do
     ~H"""
-    <header class="flex items-center justify-between gap-4 border-b border-zinc-800 px-7 py-6">
-      <div class="min-w-0">
-        <div class="flex items-center gap-3 text-2xl font-bold tracking-tight">
-          <span>{@icon}</span> <span class="truncate">{@title}</span>
+    <header class="flex flex-col gap-3 border-b border-zinc-800 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-4 md:px-7 md:py-6">
+      <div class="flex min-w-0 items-start gap-3">
+        <.nav_toggle />
+        <div class="min-w-0">
+          <div class="flex items-center gap-3 text-xl font-bold tracking-tight sm:text-2xl">
+            <span>{@icon}</span> <span class="truncate">{@title}</span>
+          </div>
+          <div class="mt-2 max-w-3xl text-[15px] leading-relaxed text-zinc-400 sm:text-base">{@desc}</div>
         </div>
-        <div class="mt-2 max-w-3xl text-base leading-relaxed text-zinc-400">{@desc}</div>
       </div>
-      <div class="flex shrink-0 items-center gap-2">{render_slot(@inner_block)}</div>
+      <div class="flex shrink-0 flex-wrap items-center gap-2">{render_slot(@inner_block)}</div>
     </header>
+    """
+  end
+
+  @doc """
+  The hamburger that opens the nav drawer. A `<label>`, not a button: it flips the
+  sidebar's checkbox, so it works on any section without that section handling an event.
+  Hidden from `md` up, where the sidebar is always on screen.
+  """
+  attr :class, :any, default: "mt-0.5"
+
+  def nav_toggle(assigns) do
+    ~H"""
+    <label
+      for={nav_toggle_id()}
+      aria-label={gettext("Open the menu")}
+      class={[
+        "inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 transition hover:border-zinc-700 hover:text-white md:hidden",
+        @class
+      ]}
+    >
+      <.icon name="hero-bars-3" class="size-5" />
+    </label>
     """
   end
 
@@ -132,10 +180,32 @@ defmodule PepeWeb.DashUI do
   The left navigation sidebar, shared by every section. `active` is the current
   section's path key (e.g. "agents") for highlighting. The workspace scope selector
   drives `set_scope`/`project_add`/`toggle_new_project`, which each LiveView handles.
+
+  Below `md` it is an off-canvas drawer: a hidden checkbox (`peer`) that every
+  `<.nav_toggle />` and the backdrop toggle, sliding the panel in over the content.
+  From `md` up the checkbox stops mattering and it is the plain static column again.
   """
   def sidebar(assigns) do
     ~H"""
-    <aside class="flex w-64 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/40">
+    <%!-- `md:hidden` (not just `sr-only`) so on a wide screen, where the drawer doesn't
+          exist, this control is out of the tab order and out of the a11y tree entirely.
+          `display: none` on a peer doesn't affect `peer-checked:` on its siblings. --%>
+    <input
+      type="checkbox"
+      id={nav_toggle_id()}
+      class="peer sr-only md:hidden"
+      aria-label={gettext("Navigation menu")}
+      phx-hook=".NavDrawer"
+    />
+    <%!-- The backdrop closes the drawer when tapped. `md:hidden` beats the peer-driven
+          opacity because it sets `display`, so it can't linger on a wide screen. --%>
+    <label
+      for={nav_toggle_id()}
+      aria-hidden="true"
+      class="pointer-events-none fixed inset-0 z-30 bg-black/60 opacity-0 transition-opacity duration-200 peer-checked:pointer-events-auto peer-checked:opacity-100 md:hidden"
+    >
+    </label>
+    <aside class="fixed inset-y-0 left-0 z-40 flex w-[17rem] max-w-[85vw] -translate-x-full flex-col border-r border-zinc-800 bg-zinc-950 transition-transform duration-200 ease-out peer-checked:translate-x-0 md:static md:z-auto md:w-64 md:max-w-none md:shrink-0 md:translate-x-0 md:bg-zinc-900/40">
       <.link navigate={~p"/"} class="flex items-center gap-2.5 border-b border-zinc-800 px-5 py-5">
         <svg width="28" height="38" viewBox="16 8 32 44" class="mt-1 shrink-0" role="img" aria-label="Pepe">
           <g stroke="#a1a1aa" stroke-width="3" stroke-linecap="round" fill="none">
@@ -217,6 +287,27 @@ defmodule PepeWeb.DashUI do
         {gettext("Local dashboard · localhost")}
       </div>
     </aside>
+
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".NavDrawer">
+      export default {
+        mounted() {
+          // The drawer is CSS state, so nothing else would ever close it. Close it when a
+          // nav link takes us somewhere (only a real redirect or patch - a form change also
+          // fires the loading event, and the project selector lives inside the drawer),
+          // and on Escape.
+          this.onNav = (e) => {
+            if (["redirect", "patch"].includes(e.detail && e.detail.kind)) this.el.checked = false
+          }
+          this.onKey = (e) => { if (e.key === "Escape") this.el.checked = false }
+          window.addEventListener("phx:page-loading-start", this.onNav)
+          window.addEventListener("keydown", this.onKey)
+        },
+        destroyed() {
+          window.removeEventListener("phx:page-loading-start", this.onNav)
+          window.removeEventListener("keydown", this.onKey)
+        }
+      }
+    </script>
     """
   end
 

@@ -37,7 +37,7 @@ defmodule PepeWeb.LearningLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="learn" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -63,7 +63,7 @@ defmodule PepeWeb.LearningLive do
           <button :if={@editing} phx-click="learn_close" class={btn_ghost()}>{gettext("<- Back")}</button>
         </.view_header>
 
-        <div :if={@editing} class="flex min-h-0 flex-1 flex-col gap-3 p-6">
+        <div :if={@editing} class="flex min-h-0 flex-1 flex-col gap-3 p-4 sm:p-6">
           <div class="text-[15px]">
             <span class="font-medium">{@editing.title}</span>
             <span class="ml-2 text-sm text-zinc-500">{@editing.path}</span>
@@ -79,7 +79,7 @@ defmodule PepeWeb.LearningLive do
           </form>
         </div>
 
-        <div :if={!@editing} class="flex-1 space-y-2 overflow-y-auto p-6">
+        <div :if={!@editing} class="flex-1 space-y-2 overflow-y-auto p-4 sm:p-6">
           <div :if={@pending != []} class="mb-4 rounded-xl border border-amber-800/50 bg-amber-950/20 p-3">
             <div class="mb-2 text-sm font-semibold text-amber-200">
               {gettext("%{count} write(s) awaiting your review", count: length(@pending))}
@@ -90,7 +90,7 @@ defmodule PepeWeb.LearningLive do
                 <div class="text-[15px]"><span class="font-medium">{p["tool"]}</span> <span class="text-zinc-500">by {p["agent"]}</span></div>
                 <div class="truncate font-mono text-sm text-zinc-400">{String.slice(to_string(get_in(p, ["tool_call", "function", "arguments"]) || ""), 0, 200)}</div>
               </div>
-              <div class="flex shrink-0 gap-1">
+              <div class="flex shrink-0 flex-wrap gap-1">
                 <button phx-click="approve_write" phx-value-id={p["id"]} class={btn_ghost()}>{gettext("Approve")}</button>
                 <button phx-click="reject_write" phx-value-id={p["id"]} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>{gettext("Reject")}</button>
               </div>

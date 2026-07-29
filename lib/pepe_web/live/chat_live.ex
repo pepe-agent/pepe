@@ -84,15 +84,25 @@ defmodule PepeWeb.ChatLive do
 
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="chat" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <div class="flex h-full min-w-0">
-          <div class="flex w-80 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30">
+          <%!-- Two panes only from `lg`. Below that it's one at a time: the list until a
+                conversation is picked, then the thread (with a back button in its header).
+                The split is `lg`, not `md`, because at 768px the nav sidebar is already back
+                and a third column would leave the thread about 190px wide. --%>
+          <div class={[
+            "flex w-full min-w-0 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/30 lg:w-80",
+            @selected && "hidden lg:flex"
+          ]}>
             <div class="border-b border-zinc-800 p-3">
-              <button phx-click="new_chat" class="w-full rounded-lg bg-orange-600 px-3 py-2 text-[15px] font-medium transition hover:bg-orange-500">
-                + {gettext("New chat")}
-              </button>
+              <div class="flex items-center gap-2">
+                <.nav_toggle class="mt-0" />
+                <button phx-click="new_chat" class="flex-1 rounded-lg bg-orange-600 px-3 py-2 text-[15px] font-medium transition hover:bg-orange-500">
+                  + {gettext("New chat")}
+                </button>
+              </div>
               <p class="mt-2 px-1 text-xs leading-relaxed text-zinc-500">
                 {gettext("Every conversation (web, Telegram, API and console) appears here.")}
               </p>
@@ -134,9 +144,9 @@ defmodule PepeWeb.ChatLive do
                     <div class="truncate text-xs text-zinc-600">{s.key}</div>
                   </button>
                   <button :if={s.running} phx-click="stop_session" phx-value-key={s.key} title={gettext("Stop")}
-                    class="px-2 py-2 text-sm text-zinc-500 opacity-0 transition hover:text-red-400 group-hover:opacity-100">{gettext("Stop")}</button>
+                    class="px-2 py-2 text-sm text-zinc-500 transition hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100">{gettext("Stop")}</button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
-                    class="px-3 py-2 text-zinc-600 opacity-0 transition hover:text-red-400 group-hover:opacity-100">✕</button>
+                    class="px-3 py-2 text-zinc-600 transition hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100">✕</button>
                 </div>
               </div>
               <p :if={@sessions == []} class="px-4 py-6 text-[15px] text-zinc-500">
@@ -149,12 +159,19 @@ defmodule PepeWeb.ChatLive do
           </div>
 
           <div :if={@selected} class="flex min-w-0 flex-1 flex-col">
-            <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
-              <div class="min-w-0 truncate">
+            <header class="flex items-center gap-2 border-b border-zinc-800 px-3 py-3 sm:px-5">
+              <button
+                phx-click="close_chat"
+                aria-label={gettext("Back to conversations")}
+                class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 transition hover:border-zinc-700 hover:text-white lg:hidden"
+              >
+                <.icon name="hero-arrow-left" class="size-5" />
+              </button>
+              <div class="min-w-0 flex-1 truncate">
                 <div class="truncate font-medium">{SessionTitles.get(@selected) || session_suffix(@selected)}</div>
                 <div class="truncate text-sm text-zinc-500">{@agent || "-"} · {@selected}</div>
               </div>
-              <div class="flex gap-2">
+              <div class="flex shrink-0 flex-wrap gap-2">
                 <button phx-click="reset" class={btn_ghost()}>{gettext("New")}</button>
                 <button phx-click="stop" disabled={!@running} class={[btn_ghost(), "disabled:opacity-40"]}>{gettext("Stop")}</button>
               </div>
@@ -211,7 +228,9 @@ defmodule PepeWeb.ChatLive do
             </div>
           </div>
 
-          <div :if={!@selected} class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <%!-- On a phone the (full-width) list is already the empty state, so this
+                "pick one on the left" panel only makes sense from `md` up. --%>
+          <div :if={!@selected} class="hidden flex-1 flex-col items-center justify-center gap-3 px-4 text-center lg:flex">
             <div class="text-5xl opacity-40">💬</div>
             <div class="max-w-xs text-[15px] text-zinc-400">{gettext("Pick a conversation on the left, or start a new one to talk to your agent.")}</div>
             <button phx-click="new_chat" class={btn()}>+ {gettext("New chat")}</button>
@@ -346,6 +365,27 @@ defmodule PepeWeb.ChatLive do
 
   def handle_event("select", %{"key" => key}, socket) do
     {:noreply, push_patch(socket, to: ~p"/chat?chat=#{key}")}
+  end
+
+  # Deselecting the open conversation. Only reachable from the phone layout's back button,
+  # where the thread covers the whole screen and the list is the only way back to it.
+  def handle_event("close_chat", _params, socket) do
+    unsubscribe(socket.assigns.selected)
+
+    {:noreply,
+     socket
+     |> assign(
+       selected: nil,
+       agent: nil,
+       messages: [],
+       streaming: "",
+       running: false,
+       activity: [],
+       pending_perm: nil,
+       pending_ask: nil,
+       focus: nil
+     )
+     |> push_patch(to: ~p"/chat")}
   end
 
   def handle_event("stop_session", %{"key" => key}, socket) do

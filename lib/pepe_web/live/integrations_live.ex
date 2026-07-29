@@ -31,7 +31,7 @@ defmodule PepeWeb.IntegrationsLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="integrations" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -40,7 +40,7 @@ defmodule PepeWeb.IntegrationsLive do
           desc={gettext("Connect channel plugins to your agents. Each provider's fields come from the plugin itself; fill them in, then paste the webhook URL into the provider.")}
         />
 
-        <div class="min-h-0 flex-1 overflow-y-auto p-6">
+        <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <div :if={@providers == []} class="max-w-3xl rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
             <p>{gettext("No channel plugins installed yet.")}</p>
             <p class="mt-2">

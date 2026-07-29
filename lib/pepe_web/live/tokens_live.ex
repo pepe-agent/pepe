@@ -35,7 +35,7 @@ defmodule PepeWeb.TokensLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="tokens" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -44,9 +44,9 @@ defmodule PepeWeb.TokensLive do
           desc={gettext("Bearer tokens for the OpenAI-compatible /v1 API. With no token the API answers only loopback (localhost) callers; any remote caller must present a token. Once any token exists, every caller (local or remote) needs one. Minting the first token is what secures a network-exposed server.")}
         />
 
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <div :if={@raw} class="mb-6 max-w-2xl rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0 text-sm">
                 <span class="font-semibold text-amber-200">{gettext("Copy this token now")}</span>
                 <span class="text-amber-200/70">- {gettext("shown only once, store it somewhere safe.")}</span>
@@ -113,7 +113,7 @@ defmodule PepeWeb.TokensLive do
 
           <div class="space-y-3">
             <div :for={t <- scoped_tokens(@tokens, @scope)} class={card()}>
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                   <span class="font-medium">{t["label"] || gettext("Unlabeled")}</span>
                   <span class="ml-2 text-sm text-zinc-500">{token_scope(t)}</span>

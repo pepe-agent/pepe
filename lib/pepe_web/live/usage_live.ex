@@ -48,7 +48,7 @@ defmodule PepeWeb.UsageLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="usage" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -64,7 +64,7 @@ defmodule PepeWeb.UsageLive do
           </div>
         </.view_header>
 
-        <div class="flex-1 space-y-5 overflow-y-auto p-6">
+        <div class="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
           <div class="flex flex-wrap items-center gap-1">
             <span class="mr-2 text-sm text-zinc-500">{gettext("Cycle")}</span>
             <button :for={{g, label} <- granularity_options()} phx-click="set_granularity" phx-value-g={g}
@@ -96,7 +96,12 @@ defmodule PepeWeb.UsageLive do
 
           <div>
             <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("By cycle")}</div>
-            <div class="overflow-x-auto rounded-xl border border-zinc-800">
+            <%!-- The empty state is its own block, not a `colspan` row: inside the table it
+                  would inherit the 640px min width and scroll out of sight on a phone. --%>
+            <div :if={@summary.buckets == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-[15px] text-zinc-500">
+              {gettext("No usage recorded yet for this scope.")}
+            </div>
+            <div :if={@summary.buckets != []} class="overflow-x-auto rounded-xl border border-zinc-800">
               <table class="w-full min-w-[640px] text-[15px]">
                 <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
                   <tr>
@@ -116,9 +121,6 @@ defmodule PepeWeb.UsageLive do
                     <td class="px-3 py-2 text-right">{tokens(b.total)}</td>
                     <td class="px-3 py-2 text-right text-zinc-400">{money(b.cost, @summary.currency)}</td>
                     <td class="px-3 py-2 text-right font-medium">{money(b.billable, @summary.currency)}</td>
-                  </tr>
-                  <tr :if={@summary.buckets == []}>
-                    <td colspan="6" class="px-3 py-6 text-center text-[15px] text-zinc-500">{gettext("No usage recorded yet for this scope.")}</td>
                   </tr>
                 </tbody>
               </table>

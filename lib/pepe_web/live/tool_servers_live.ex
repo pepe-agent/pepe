@@ -78,7 +78,7 @@ defmodule PepeWeb.ToolServersLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="mcp" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -89,12 +89,12 @@ defmodule PepeWeb.ToolServersLive do
           <button :if={!@edit_mcp} phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
           <button :if={@edit_mcp} phx-click="mcp_cancel" class={btn_ghost()}>&larr; {gettext("Back to servers")}</button>
         </.view_header>
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <div :if={!@edit_mcp} class="space-y-3">
           <div :for={{name, cfg} <- @mcp} class={card()}>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span class="font-medium">{name}</span>
-              <div class="flex shrink-0 gap-1 text-sm">
+              <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button phx-click="mcp_validate" phx-value-name={name} class={btn_ghost()}>{gettext("Validate (list tools)")}</button>
                 <button phx-click="mcp_restart" phx-value-name={name} class={btn_ghost()} title={gettext("Recovery: reconnect if this server seems stuck")}>↻ {gettext("Restart")}</button>
                 <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>

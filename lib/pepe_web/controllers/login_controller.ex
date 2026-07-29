@@ -78,8 +78,8 @@ defmodule PepeWeb.LoginController do
     <style>
       *{box-sizing:border-box} body{margin:0;background:#09090b;color:#e4e4e7;
         font:15px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;
-        display:flex;min-height:100vh;align-items:center;justify-content:center}
-      .card{width:320px;padding:28px;border:1px solid #27272a;border-radius:16px;background:#18181b}
+        display:flex;min-height:100dvh;align-items:center;justify-content:center;padding:16px}
+      .card{width:100%;max-width:320px;padding:28px;border:1px solid #27272a;border-radius:16px;background:#18181b}
       .brand{display:flex;align-items:center;gap:8px;margin-bottom:18px}
       .brand b{font-size:18px} .brand span{font-size:11px;color:#71717a}
       label{display:block;font-size:12px;color:#a1a1aa;margin-bottom:6px}

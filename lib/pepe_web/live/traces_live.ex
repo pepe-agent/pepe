@@ -217,7 +217,7 @@ defmodule PepeWeb.TracesLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="traces" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -257,7 +257,7 @@ defmodule PepeWeb.TracesLive do
             f_from={@f_from}
             f_to={@f_to}
           />
-          <div class="flex-1 overflow-y-auto p-6">
+          <div class="flex-1 overflow-y-auto p-4 sm:p-6">
             <.trace_list :if={!@selected and !@group_by_session} traces={@traces} total={@total} models={@models} cache={@price_cache} />
             <.session_list
               :if={!@selected and @group_by_session}
@@ -293,7 +293,7 @@ defmodule PepeWeb.TracesLive do
 
   defp filter_bar(assigns) do
     ~H"""
-    <form id="trace-filters" phx-change="filter" class="flex flex-wrap items-end gap-3 border-b border-zinc-800 px-6 py-3">
+    <form id="trace-filters" phx-change="filter" class="flex flex-wrap items-end gap-3 border-b border-zinc-800 px-4 py-3 sm:px-6">
       <div>
         <label class="mb-1 block text-xs font-medium text-zinc-500">{gettext("Agent")}</label>
         <select name="agent" class={[fld(), "py-1.5"]}>
@@ -344,7 +344,7 @@ defmodule PepeWeb.TracesLive do
 
   defp pager(assigns) do
     ~H"""
-    <div class="flex items-center justify-between border-t border-zinc-800 px-6 py-3 text-sm text-zinc-500">
+    <div class="flex items-center justify-between border-t border-zinc-800 px-4 py-3 text-sm sm:px-6 text-zinc-500">
       <span>{gettext("%{from}-%{to} of %{total}", from: @from, to: @to, total: @total)}</span>
       <div class="flex items-center gap-2">
         <button phx-click="page" phx-value-page={@page - 1} disabled={@page <= 1} class={[btn_ghost(), @page <= 1 && "opacity-40"]}>

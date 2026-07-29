@@ -65,7 +65,7 @@ defmodule PepeWeb.ProjectsLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="projects" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -77,15 +77,15 @@ defmodule PepeWeb.ProjectsLive do
           <button :if={@editing} phx-click="project_cancel" class={btn_ghost()}>&larr; {gettext("Back to projects")}</button>
         </.view_header>
 
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <div :if={!@editing} class="space-y-3">
           <div class={card()}>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{gettext("Principal")}</span>
                 <span class="ml-2 text-sm text-zinc-500">{gettext("%{count} agents", count: length(Config.agents_in(nil)))}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-sm">
+              <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <.link navigate={~p"/overview?scope=root"} class={btn_ghost()}>{gettext("Open")}</.link>
                 <button phx-click="project_edit" phx-value-name="root" class={btn_ghost()}>{gettext("Edit")}</button>
               </div>
@@ -144,12 +144,12 @@ defmodule PepeWeb.ProjectsLive do
             </div>
           </div>
           <div :for={name <- @projects} class={card()}>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{name}</span>
                 <span class="ml-2 text-sm text-zinc-500">{gettext("%{count} agents", count: length(Config.agents_in(name)))}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-sm">
+              <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <.link navigate={~p"/overview?scope=#{name}"} class={btn_ghost()}>{gettext("Open")}</.link>
                 <button phx-click="project_edit" phx-value-name={name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button

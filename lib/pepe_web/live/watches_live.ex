@@ -24,7 +24,7 @@ defmodule PepeWeb.WatchesLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="watches" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -32,18 +32,18 @@ defmodule PepeWeb.WatchesLive do
           title={gettext("Watches")}
           desc={gettext("One-shot “notify me when X happens”. A watch checks a condition on a timer, messages you once when it's met, then stops. Create them from chat.")}
         />
-        <div class="flex-1 space-y-3 overflow-y-auto p-6">
+        <div class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
           <div :if={@watches == []} class="text-[15px] text-zinc-500">
             {gettext("No watches. Ask an agent to \"notify me when ...\" from chat.")}
           </div>
           <div :for={w <- scoped_by_agent(@watches, @scope, & &1.agent)} class={card()}>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{w.description}</span>
                 <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{w.state}</span>
                 <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("Fired · delivering")}</span>
               </div>
-              <div class="flex shrink-0 gap-1 text-sm">
+              <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button :if={w.state == "pending"} phx-click="watch_pause" phx-value-id={w.id} class={btn_ghost()}>{gettext("Pause")}</button>
                 <button :if={w.state == "paused"} phx-click="watch_resume" phx-value-id={w.id} class={btn_ghost()}>{gettext("Resume")}</button>
                 <button phx-click="watch_cancel" phx-value-id={w.id} data-confirm={gettext("Cancel watch %{name}?", name: w.description)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>

@@ -24,7 +24,7 @@ defmodule PepeWeb.CommitmentsLive do
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
-    <div class="flex h-screen bg-zinc-950 text-zinc-100">
+    <div class={shell_cls()}>
       <.sidebar active="commitments" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
@@ -32,7 +32,7 @@ defmodule PepeWeb.CommitmentsLive do
           title={gettext("Commitments")}
           desc={gettext("Follow-ups noticed automatically from conversation - a user asking to be reminded, or an agent promising to check on something. Not created by hand; toggle \"commitments\" on an agent to turn this on.")}
         />
-        <div class="flex-1 space-y-6 overflow-y-auto p-6">
+        <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
           <div :if={@commitments == []} class="text-[15px] text-zinc-500">
             {gettext("No commitments yet.")}
           </div>
@@ -71,13 +71,13 @@ defmodule PepeWeb.CommitmentsLive do
       <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
       <div class="space-y-3">
         <div :for={c <- @commitments} class={card()}>
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <span class="font-medium">{c.text}</span>
               <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{c.origin_type}</span>
               <span :if={c.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("Fired · delivering")}</span>
             </div>
-            <div :if={c.state != "awaiting_confirmation" or is_integer(c.due_at)} class="flex shrink-0 gap-1 text-sm">
+            <div :if={c.state != "awaiting_confirmation" or is_integer(c.due_at)} class="flex shrink-0 flex-wrap gap-1 text-sm">
               <button :if={c.state == "awaiting_confirmation"} phx-click="confirm" phx-value-id={c.id} class={btn_ghost()}>{gettext("Confirm")}</button>
               <button phx-click="cancel" phx-value-id={c.id} data-confirm={gettext("Cancel commitment %{name}?", name: c.text)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
             </div>
