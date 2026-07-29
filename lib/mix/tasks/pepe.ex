@@ -42,10 +42,20 @@ defmodule Mix.Tasks.Pepe do
   (`--project`) or a single agent (`--agent HANDLE`).
 
       mix pepe token add [--project CO] [--agent HANDLE] [--label "..."]
+      mix pepe token add --project CO --no-chat --usage --prices billable
       mix pepe token add --agent HANDLE --widget --allowed-origin https://example.com
       mix pepe token list
+      mix pepe token permissions ID [--no-chat] [--usage] [--prices V] [--content]
       mix pepe token update ID [--title ...] [--greeting ...] ...
       mix pepe token revoke ID
+
+  Scope says *whose* data a token reaches; permissions say *what it may do* with it.
+  A token may chat and may not read usage unless told otherwise, so nothing an
+  existing token can do changes. `--no-chat --usage` mints a read-only billing token
+  (the shape to hand a client); `--prices` picks how much money it sees - `billable`
+  (with markup, the default), `list` (no markup) or `all` (adds cost and margin, for
+  a token you hold yourself). `--content` additionally lets a run's detail include
+  the prompt and tool arguments. See `mix pepe usage` for the reports themselves.
 
   `--widget` mints a token meant to sit in public page source (an embedded chat
   widget's script tag), so it must be `--agent`-locked. `--allowed-origin` registers
@@ -990,6 +1000,19 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # `usage runs` - the same money, grouped by the message that spent it rather than by the
+  # clock. One inbound message is often several model calls (answer, tool, answer again), and
+  # the per-cycle report cannot show that: it only ever sees the calls.
+  defp usage_cmd(["runs" | rest]) do
+    {opts, args} =
+      OptionParser.parse!(rest, strict: [project: :string, agent: :string, source: :string, session: :string, limit: :integer])
+
+    case args do
+      [id | _] -> print_run(opts[:project] || :all, id)
+      [] -> print_runs(opts)
+    end
+  end
+
   defp usage_cmd(["help"]), do: usage_help()
 
   defp usage_cmd(rest) do
@@ -1007,6 +1030,98 @@ defmodule Mix.Tasks.Pepe do
         s = Pepe.Usage.summary(scope, gran, limit: opts[:limit] || 24)
         print_usage(s, scope)
     end
+  end
+
+  defp print_runs(opts) do
+    scope = opts[:project] || :all
+
+    filters =
+      [agent: opts[:agent], source: opts[:source], session: opts[:session], limit: opts[:limit] || 20]
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+
+    runs = Pepe.Usage.Runs.list(scope, filters)
+    money = run_money(scope, runs)
+    currency = Config.currency()
+
+    puts("#{bold("runs")} · #{if scope == :all, do: "all scopes", else: scope} · #{currency}\n")
+
+    if runs == [] do
+      info("no runs recorded yet for this scope.")
+    else
+      Enum.each(runs, &print_run_line(&1, Map.get(money, &1["id"]), currency))
+      puts("\n#{dim("one run's breakdown: mix pepe usage runs <id>")}")
+    end
+  end
+
+  defp print_run_line(run, totals, currency) do
+    tools = if run["tools"] == [], do: dim("no tools"), else: Enum.join(Enum.uniq(run["tools"]), ",")
+    calls = if totals, do: totals.count, else: 0
+
+    puts(
+      "  #{bold(run["id"])}  #{local_datetime(run["at"])}  #{String.pad_trailing(to_string(run["agent"]), 18)} " <>
+        "#{String.pad_leading("#{calls} calls", 9)}  " <>
+        "#{String.pad_leading(fmt_money(if(totals, do: totals.billable, else: 0.0), currency), 12)}  " <>
+        "#{run["source"] || "-"} · #{tools}"
+    )
+  end
+
+  defp print_run(scope, id) do
+    case Pepe.Usage.Runs.get(scope, id) do
+      nil ->
+        error("no run with id #{id}#{if scope == :all, do: "", else: " in #{scope}"}")
+
+      run ->
+        currency = Config.currency()
+        entries = scope |> Pepe.Usage.Log.entries_for_run(run["id"]) |> Pepe.Usage.price_entries()
+
+        puts("#{bold("run #{run["id"]}")} · #{run["project"]} · #{local_datetime(run["at"])}\n")
+        puts("  agent    #{run["agent"]}")
+        puts("  source   #{run["source"] || "-"}#{if run["session"], do: " · #{run["session"]}", else: ""}")
+        puts("  outcome  #{run["outcome"] || "-"} in #{run["ms"] || 0}ms")
+        puts("  tools    #{if run["tools"] == [], do: "none", else: Enum.join(run["tools"], " → ")}")
+
+        puts("\n#{bold("model calls")} #{dim("(each one re-sends the context the last tool result grew)")}")
+        Enum.each(entries, &print_run_call(&1, currency))
+
+        totals = sum_priced(entries)
+
+        puts(
+          "\n  #{bold(String.pad_trailing("TOTAL", 24))} #{String.pad_leading(fmt_tok(totals.total), 10)} tok  " <>
+            "cost #{String.pad_leading(fmt_money(totals.cost, currency), 12)}  " <>
+            "bill #{String.pad_leading(fmt_money(totals.billable, currency), 12)}"
+        )
+    end
+  end
+
+  defp print_run_call(entry, currency) do
+    cached = if (entry["cached"] || 0) > 0, do: dim(" #{fmt_tok(entry["cached"])} cached"), else: ""
+
+    puts(
+      "  #{String.pad_trailing(to_string(entry["model"]), 24)} " <>
+        "#{String.pad_leading(fmt_tok(entry["in"] + entry["out"]), 10)} tok  " <>
+        "cost #{String.pad_leading(fmt_money(entry["cost"], currency), 12)}  " <>
+        "bill #{String.pad_leading(fmt_money(entry["billable"], currency), 12)}#{cached}"
+    )
+  end
+
+  # {run id => summed money}, for a whole page of runs in one ledger read.
+  defp run_money(scope, runs) do
+    scope
+    |> Pepe.Usage.Log.entries_for_runs(Enum.map(runs, & &1["id"]))
+    |> Pepe.Usage.price_entries()
+    |> Enum.group_by(& &1["run_id"])
+    |> Map.new(fn {run_id, entries} -> {run_id, sum_priced(entries)} end)
+  end
+
+  defp sum_priced(entries) do
+    Enum.reduce(entries, %{count: 0, total: 0, cost: 0.0, billable: 0.0}, fn e, acc ->
+      %{
+        count: acc.count + 1,
+        total: acc.total + e["in"] + e["out"],
+        cost: acc.cost + e["cost"],
+        billable: acc.billable + e["billable"]
+      }
+    end)
   end
 
   defp print_usage(s, scope) do
@@ -1552,8 +1667,12 @@ defmodule Mix.Tasks.Pepe do
 
       usage [--project NAME] [--granularity CYCLE] [--limit N]
                                     report token usage & cost by cycle
+      usage runs [--project NAME] [--agent H] [--source S] [--session K] [--limit N]
+                                    one line per inbound message: its tools, its
+                                      model calls, what it cost
                                     CYCLE = hour|day|week|month|year (default month)
                                     no --project = all scopes, broken down per project
+      usage runs ID                 that one message, call by call
       usage prices [--refresh]      show (or refresh) the live price cache
       usage export --project NAME [--month YYYY-MM] [--format markdown|csv] [--output FILE]
                                     generate a client invoice (an agent can do this
@@ -1562,6 +1681,14 @@ defmodule Mix.Tasks.Pepe do
     Cost = tokens × the model's price (set per model, or auto from the price book).
     The amount to bill = cost × the project's markup (set per project; blank = 1.0).
     Every model call is metered automatically and attributed to the agent's project.
+
+    A cycle report counts model calls; `usage runs` counts messages. One message is
+    often several calls - the agent answers, runs a tool, is fed the result, answers
+    again - and what makes it expensive is the number of calls, not the number of
+    tools: each iteration re-sends a context the last tool result just grew.
+
+    The same reports are readable over HTTP by a client's own billing system, with a
+    token minted to read and nothing else: mix pepe token add --no-chat --usage
     """)
   end
 
@@ -2093,12 +2220,15 @@ defmodule Mix.Tasks.Pepe do
 
   @token_appearance_switches [title: :string, logo: :string, color: :string, theme: :string, greeting: :string, position: :string]
 
+  # `--chat` is a negatable boolean, so `--no-chat` mints a token that may only read.
+  @token_permission_switches [chat: :boolean, usage: :boolean, prices: :string, content: :boolean]
+
   defp token_cmd(["add" | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
         strict:
           [project: :string, agent: :string, label: :string, widget: :boolean, allowed_origin: :string] ++
-            @token_appearance_switches
+            @token_appearance_switches ++ @token_permission_switches
       )
 
     attrs =
@@ -2108,11 +2238,15 @@ defmodule Mix.Tasks.Pepe do
         label: opts[:label],
         widget: opts[:widget] == true,
         allowed_origin: opts[:allowed_origin]
-      ] ++ Keyword.take(opts, Keyword.keys(@token_appearance_switches))
+      ] ++ Keyword.take(opts, Keyword.keys(@token_appearance_switches)) ++ token_permissions(opts)
 
-    case Config.add_api_token(attrs) do
-      {:ok, raw, id} -> print_new_token(raw, id, opts)
-      {:error, reason} -> print_token_add_error(reason, opts)
+    if valid_prices?(opts[:prices]) do
+      case Config.add_api_token(attrs) do
+        {:ok, raw, id} -> print_new_token(raw, id, opts)
+        {:error, reason} -> print_token_add_error(reason, opts)
+      end
+    else
+      prices_error()
     end
   end
 
@@ -2133,6 +2267,21 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp token_cmd(["permissions", id | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: @token_permission_switches)
+
+    cond do
+      not valid_prices?(opts[:prices]) ->
+        prices_error()
+
+      token_permissions(opts) == [] ->
+        error("nothing to change - pass at least one of --chat/--no-chat, --usage/--no-usage, --prices, --content")
+
+      true ->
+        apply_token_permissions(id, token_permissions(opts))
+    end
+  end
+
   defp token_cmd(["update", id | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: @token_appearance_switches)
 
@@ -2148,11 +2297,14 @@ defmodule Mix.Tasks.Pepe do
     #{bold("mix pepe token")} - API access tokens for /v1
 
       add [--project CO] [--agent HANDLE] [--label "..."]   mint a token (shown once
-                                                              for a regular token;
+          [--no-chat] [--usage] [--prices V] [--content]      for a regular token;
                                                               retrievable via `list`
                                                               for --widget)
-      list                                                  list tokens (scope + fingerprint,
-                                                              or a widget token's full value)
+      list                                                  list tokens (scope, permissions
+                                                              + fingerprint, or a widget
+                                                              token's full value)
+      permissions ID [--no-chat] [--usage] [--prices V]     change what a token may do,
+                     [--content]                             in place (never its secret)
       revoke ID                                             revoke a token
       update ID [--title ...] [--logo ...] [--color ...]    edit a WIDGET token's
              [--theme dark|light] [--greeting ...]           appearance in place -
@@ -2162,12 +2314,58 @@ defmodule Mix.Tasks.Pepe do
     `Authorization: Bearer pepe_...`. A token scoped to a project reaches only its
     agents; scoped to an agent, only that one.
 
+    #{bold("Permissions")} - scope says whose data; these say what may be done with it.
+    A token may chat by default and may NOT read usage, so nothing an existing token
+    can do changes.
+
+      --no-chat      may not run agents (a read-only, billing-integration token)
+      --usage        may read /v1/usage
+      --prices V     how much money it sees: billable (with markup, the default),
+                     list (no markup), or all (adds cost + margin - operator only)
+      --content      a run's detail may include the prompt and tool arguments/output
+
+    A client's token wants `--no-chat --usage --prices billable`. Give `--prices all`
+    or `--content` only to a token you hold yourself.
+
     --widget mints a public, embeddable-chat-widget token (see `mix pepe token add
     --agent HANDLE --widget --allowed-origin https://example.com`); add appearance
     with --title/--logo/--color/--theme/--greeting/--position on either `add` or
     `update` - a widget token's raw value stays retrievable since it sits in public
     page source already, unlike a regular token's.
     """)
+  end
+
+  # `--content` is the flag; `usage_content` is the field. Only keys the operator actually
+  # passed are forwarded, so the defaults stay in one place (`Pepe.ApiToken`) rather than
+  # being restated here.
+  defp token_permissions(opts) do
+    [chat: opts[:chat], usage: opts[:usage], usage_content: opts[:content], prices: opts[:prices]]
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+  end
+
+  # A typo in `--prices` would otherwise be narrowed to "billable" down in `Pepe.ApiToken`, and
+  # the operator would be told the token was updated while it saw something other than what
+  # they asked for. Fail-closed is right; fail-closed and silent is not.
+  defp valid_prices?(nil), do: true
+  defp valid_prices?(view), do: view in Pepe.ApiToken.price_views()
+
+  defp prices_error,
+    do: error("--prices must be one of: #{Enum.join(Pepe.ApiToken.price_views(), ", ")}")
+
+  defp apply_token_permissions(id, changes) do
+    case Config.set_api_token_permissions(id, changes) do
+      :ok ->
+        ok("token #{id} permissions updated")
+
+      {:error, :not_found} ->
+        error("unknown token id: #{id}")
+
+      {:error, :widget_cannot_read_usage} ->
+        error("a widget token sits in public page source - it can never read usage")
+
+      {:error, :no_permissions} ->
+        error("that would leave the token able to do nothing - keep --chat or add --usage")
+    end
   end
 
   defp print_new_token(raw, id, opts) do
@@ -2200,6 +2398,15 @@ defmodule Mix.Tasks.Pepe do
   defp print_token_add_error(:agent_out_of_scope, opts),
     do: error("agent #{opts[:agent]} is not in project #{opts[:project] || "(root)"}")
 
+  defp print_token_add_error(:widget_cannot_read_usage, _opts),
+    do: error("a widget token sits in public page source - it can never read usage")
+
+  defp print_token_add_error(:no_permissions, _opts),
+    do: error("--no-chat without --usage would mint a token that can do nothing")
+
+  defp print_token_add_error(:content_needs_usage, _opts),
+    do: error("--content only means something with --usage (it unlocks content on a usage read)")
+
   defp print_token_line(t) do
     scope = t["agent"] || t["project"] || "default"
     label = if t["label"], do: " - #{t["label"]}", else: ""
@@ -2207,7 +2414,16 @@ defmodule Mix.Tasks.Pepe do
     # A widget token's raw value is retrievable (public page source anyway);
     # a regular token only ever shows its safe fingerprint prefix.
     shown = if t["kind"] == "widget", do: t["token"], else: t["prefix"]
-    puts("#{bold(t["id"])}  #{shown}  [#{scope}]#{kind}#{label}")
+    puts("#{bold(t["id"])}  #{shown}  [#{scope}] #{dim(token_permission_label(t))}#{kind}#{label}")
+  end
+
+  defp token_permission_label(t) do
+    p = Pepe.ApiToken.permissions(t)
+
+    [chat: p.chat, usage: p.usage, content: p.usage_content]
+    |> Enum.filter(fn {_name, on?} -> on? end)
+    |> Enum.map(fn {name, _on?} -> to_string(name) end)
+    |> then(fn granted -> Enum.join(granted ++ if(p.usage, do: [p.prices], else: []), "+") end)
   end
 
   ###

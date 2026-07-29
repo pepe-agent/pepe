@@ -44,6 +44,36 @@ fingerprint - its raw value was never stored). `revoke` needs the `id` from `lis
 { "action": "revoke", "id": "tok_7f3a" }
 ```
 
+## The permissions - what a token may do with what it reaches
+
+Scope answers *whose* data; permissions answer *what may be done with it*. Defaults keep
+every existing token exactly as it was: a token **may** chat and **may not** read usage.
+
+- `chat` (default `true`) - may run agents.
+- `usage` (default `false`) - may read `/v1/usage`, the billing figures.
+- `prices` (default `"billable"`) - how much money a usage read shows: `"billable"` is
+  what the client pays (list price with the project's markup), `"list"` is the same
+  tokens with no markup, `"all"` adds our cost and the margin.
+- `usage_content` (default `false`) - a run's detail may include the prompt and each
+  tool's arguments and output.
+
+Give a **client** `chat: false, usage: true` and leave `prices` at `"billable"`. Never give
+a client `"all"` or `usage_content`: the first hands over the margin, the second hands over
+transcripts. A widget token can never read usage at all.
+
+```jsonc
+// a read-only billing token for a client's finance system
+{ "action": "create", "project": "acme", "chat": false, "usage": true, "label": "acme billing" }
+
+// change what an existing token may do, without rotating its secret
+{ "action": "permissions", "id": "tok_7f3a", "prices": "list" }
+{ "action": "permissions", "id": "tok_7f3a", "usage": false }
+```
+
+Only the keys you pass to `permissions` change; the rest stay as they were. If the user
+asks for a token "to see the usage", that is `chat: false, usage: true` - confirm whether
+they want the markup shown before you pick `prices`.
+
 ## Widget tokens - the public exception
 
 A **widget** token is meant to sit in a public page's `<script>` tag (an embedded

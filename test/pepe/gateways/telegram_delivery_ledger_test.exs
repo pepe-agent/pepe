@@ -62,6 +62,8 @@ defmodule Pepe.Gateways.TelegramDeliveryLedgerTest do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    # Somebody else's undelivered reply must not be "recovered" into the middle of this test.
+    Pepe.Test.LedgerDrain.drain!()
 
     test_pid = self()
     {:ok, _} = Agent.start_link(fn -> test_pid end, name: :tg_ledger_test_pid)
@@ -85,6 +87,11 @@ defmodule Pepe.Gateways.TelegramDeliveryLedgerTest do
       if prev_home, do: System.put_env("PEPE_HOME", prev_home), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
     end)
+
+    # Registered last so it runs FIRST: a session still mid-turn has to be stopped while the
+    # config and PEPE_HOME it is running against still exist, or it carries on into the next
+    # test and calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
 
     {:ok, chat: chat}
   end
@@ -138,6 +145,20 @@ defmodule Pepe.Gateways.TelegramDeliveryLedgerTest do
     start_bot!()
 
     refute_receive {:sent, ^chat, "already done"}, 500
+  end
+
+  test "a row written by an older shape does not take the whole sweep down with it", %{chat: chat} do
+    # The ledger outlives restarts and upgrades, so it can hold a row whose `meta` predates the
+    # `:bot` key entirely. The boot filter used to read `.bot` and raise a KeyError on it, inside
+    # the spawned sweep task - killing the sweep in silence, so every OTHER bot's owed reply was
+    # lost to one row from a previous version. It must be skipped, not fatal.
+    DeliveryLedger.record("telegram:legacy:#{chat}", "telegram", %{chat_id: chat, thread_id: nil}, "from an older pepe")
+    DeliveryLedger.record("telegram:#{chat}", "telegram", %{bot: "default", chat_id: chat, thread_id: nil}, "still owed")
+
+    start_bot!()
+
+    assert_receive {:sent, ^chat, "still owed"}, 2_000
+    refute_receive {:sent, ^chat, "from an older pepe"}, 500
   end
 
   test "a row belonging to a different bot name is left for that bot, not sent by this one", %{chat: chat} do

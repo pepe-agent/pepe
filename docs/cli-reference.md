@@ -139,9 +139,22 @@ mix pepe token add --project acme --label "acme mobile app"   # prints pepe_... 
 mix pepe token add --agent acme/sales --label "one integration"
 mix pepe token add --agent acme/sales --widget \
   --allowed-origin https://example.com     # a token safe to embed in public page source
-mix pepe token list                        # id · fingerprint · scope · label
+mix pepe token list                        # id · fingerprint · scope · permissions · label
 mix pepe token update <id> --greeting "Hi! How can I help?"
 mix pepe token revoke <id>
+```
+
+Scope says *whose* data a token reaches; permissions say *what it may do* with it. A token
+may chat and may not read usage unless told otherwise, so nothing an existing token can do
+changes. See **[Usage API](https://pepe-agent.com/en/docs/usage-api/)**.
+
+```bash
+# a read-only billing token: reads /v1/usage, cannot run an agent, sees only what
+# the client pays (--prices list drops the markup; --prices all adds cost + margin)
+mix pepe token add --project acme --no-chat --usage --prices billable
+
+mix pepe token permissions <id> --prices list   # change in place, secret untouched
+mix pepe token permissions <id> --no-usage
 ```
 
 ### Watches (one-shot "notify me when X")
@@ -190,11 +203,19 @@ mix pepe learn status                      # which agents consolidate on a sched
 ```bash
 mix pepe usage                                  # tokens & cost by cycle, per project
 mix pepe usage --project acme --granularity day
+mix pepe usage runs [--project acme] [--source telegram] [--agent H] [--limit N]
+                                                # one line per inbound message
+mix pepe usage runs <id>                        # that message, model call by model call
 mix pepe usage export --project acme            # a client invoice (Markdown, or --format csv)
 mix pepe usage prices [--refresh]               # show/refresh the live model price cache
 mix pepe traces [--project NAME] [--limit N]    # list recent agent runs (any surface)
 mix pepe traces <id>                            # replay one run step by step
 ```
+
+The same figures are readable over HTTP with a usage-scoped token: `GET /v1/usage`
+(buckets), `/v1/usage/events` (one row per model call), `/v1/usage/runs` (one row per
+inbound message) and `/v1/usage/runs/:id` (that message, call by call). See
+**[Usage API](https://pepe-agent.com/en/docs/usage-api/)**.
 
 ### Tool servers, plugins and privacy hooks
 

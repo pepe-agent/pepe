@@ -62,6 +62,11 @@ defmodule Pepe.Commitments.SchedulerTest do
       File.rm_rf(home)
     end)
 
+    # Registered last so it runs FIRST: a run still in flight has to be stopped while the config
+    # and PEPE_HOME it is running against still exist, or it carries on into the next test and
+    # calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
+
     :ok
   end
 
@@ -168,16 +173,28 @@ defmodule Pepe.Commitments.SchedulerTest do
 
       def init(opts), do: opts
 
+      # Only reports a call that carries *this* commitment's text. The plug's port is this
+      # test's alone, but that is not enough: a model call left in flight by an earlier test
+      # resolves its connection when it finally runs, reads the config this test just wrote,
+      # and lands here - satisfying a `refute_receive` that has no way to tell the two apart.
       def call(conn, opts) do
-        send(Keyword.fetch!(opts, :test_pid), :model_was_called)
-        {:ok, _body, conn} = read_body(conn)
+        {:ok, body, conn} = read_body(conn)
+
+        if String.contains?(body, Keyword.fetch!(opts, :marker)) do
+          send(Keyword.fetch!(opts, :test_pid), :model_was_called)
+        end
+
         message = %{"role" => "assistant", "content" => "should never happen"}
         payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => "stop"}]}
         conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
       end
     end
 
-    {:ok, server} = Bandit.start_link(plug: {NeverCalledPlug, test_pid: test_pid}, port: 0, scheme: :http)
+    marker = "check something #{System.unique_integer([:positive])}"
+
+    {:ok, server} =
+      Bandit.start_link(plug: {NeverCalledPlug, test_pid: test_pid, marker: marker}, port: 0, scheme: :http)
+
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
     on_exit(fn -> Process.exit(server, :normal) end)
 
@@ -191,7 +208,7 @@ defmodule Pepe.Commitments.SchedulerTest do
         state: "firing",
         firing_at: System.system_time(:second) - 3600,
         origin_type: "agent_promise",
-        text: "check something",
+        text: marker,
         agent: "assistant"
       )
 

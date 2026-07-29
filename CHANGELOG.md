@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **A usage API, so a client's own billing system can read what it spent.** `GET /v1/usage` (aggregated into hour/day/week/month/year buckets), `/v1/usage/events` (one row per model call), `/v1/usage/runs` (one row per inbound message) and `/v1/usage/runs/:id` (that message, call by call). Same bearer token as the rest of `/v1`, filtered by `project`, `agent`, `model`, `source`, `session`, `run_id` and a time window, and paged on an opaque cursor. The aggregate defaults to the last 90 days and reports the window it used, since summing a window means reading all of it and an unbounded default would let any usage token walk the whole ledger once per request. Until now the figures existed only on the dashboard and in `mix pepe usage`, so handing a client their own numbers meant exporting an invoice by hand.
+- **A token now carries permissions, not just a scope.** Scope says whose data it reaches; the permissions say what it may do with it. `--no-chat` mints a token that may only read (the shape to hand a client, since the same credential could otherwise spend your model budget), `--usage` lets it read `/v1/usage`, `--prices billable|list|all` decides how much of the money a read shows, and `--content` lets a run's detail include the prompt and tool arguments. Defaults keep every existing token exactly as it was: it may chat, and it may not read usage. `mix pepe token permissions ID ...` changes them in place without rotating the secret, and the same fields are on the dashboard's Tokens page and in the `manage_token` tool. A widget token can never read usage, and keeps the defaults its form never asks it about.
+- **The ledger now records which message each model call belonged to.** One inbound message often costs several calls (the agent answers, calls a tool, is fed the result, calls another), and until now those were unrelated rows. Each entry carries the run, session and source it came from, and a separate durable row per run records what that message did: which tools it called, how long it took, how it ended. It holds no conversation content, unlike traces, which is why it is kept rather than trimmed.
+- **The dashboard and the CLI can now read usage by message, not only by cycle.** A "By message" table on the Usage page lists each inbound message with the tools it ran, how many model calls that took, how long it lasted and what it costs; clicking a row expands it into those calls one by one. Same view from the terminal with `mix pepe usage runs`, and `mix pepe usage runs ID` for a single message. A cycle report counts model *calls* and so could never answer "why did that one message cost that much" - a message that runs three tools is four model calls, each re-sending a context the last tool result grew.
+
+### Changed
+- `mix pepe token list` shows each token's permissions alongside its scope and fingerprint.
+
 ## [0.11.1] - 2026-07-29
 
 ### Fixed

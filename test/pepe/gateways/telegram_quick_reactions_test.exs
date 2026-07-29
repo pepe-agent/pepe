@@ -41,7 +41,7 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
     end
 
     post "/chat/completions" do
-      send(test_pid(), :llm_called)
+      send(test_pid(), {:llm_called, said(conn)})
 
       json(conn, %{
         "id" => "x",
@@ -51,6 +51,26 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
 
     match _ do
       json(conn, %{"ok" => true, "result" => true})
+    end
+
+    # What the user actually said, so every model call is pinnable to the message that caused
+    # it - the way `{:sent, chat, _}` and `{:reaction, chat, _}` already were.
+    #
+    # `:llm_called` used to carry nothing at all, and the pid it goes to is a global reassigned
+    # per test, so a model call left in flight by an earlier test arrived in the *next* test's
+    # mailbox and satisfied its `refute_receive`. Stamping it with the api key (which carries
+    # the chat id) was not enough: the leaked run resolves its model connection at call time,
+    # reads the config the *new* test just wrote, and presents the new test's key. The prompt is
+    # the one thing already fixed in the request when it leaked.
+    defp said(conn) do
+      conn.body_params
+      |> Map.get("messages", [])
+      |> Enum.filter(&(&1["role"] == "user"))
+      |> List.last()
+      |> case do
+        %{"content" => content} when is_binary(content) -> content
+        _ -> nil
+      end
     end
 
     defp safe_take(name, default) do
@@ -66,6 +86,8 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    # Somebody else's undelivered reply must not be "recovered" into the middle of this test.
+    Pepe.Test.LedgerDrain.drain!()
     Pepe.RepoSetup.start!()
 
     test_pid = self()
@@ -89,6 +111,11 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
       if prev_home, do: System.put_env("PEPE_HOME", prev_home), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
     end)
+
+    # Registered last so it runs FIRST: a session still mid-turn has to be stopped while the
+    # config and PEPE_HOME it is running against still exist, or it carries on into the next
+    # test and calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
 
     {:ok, chat: chat}
   end
@@ -118,7 +145,7 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
     start_bot!()
     say(chat, "obrigado!")
 
-    assert_receive :llm_called, 5_000
+    assert_receive {:llm_called, "obrigado!"}, 5_000
     assert_receive {:sent, ^chat, "here is my answer"}, 5_000
   end
 
@@ -128,7 +155,7 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
 
     assert_receive {:reaction, ^chat, [%{"emoji" => emoji}]}, 5_000
     assert emoji in ["🔥", "❤️"]
-    refute_receive :llm_called, 300
+    refute_receive {:llm_called, "valeu!"}, 300
   end
 
   test "enabled: a bare emoji message gets echoed back as a reaction", %{chat: chat} do
@@ -136,14 +163,14 @@ defmodule Pepe.Gateways.TelegramQuickReactionsTest do
     say(chat, "🙏")
 
     assert_receive {:reaction, ^chat, [%{"emoji" => "🙏"}]}, 5_000
-    refute_receive :llm_called, 300
+    refute_receive {:llm_called, "🙏"}, 300
   end
 
   test "enabled: a real question still goes to the model, even a short one", %{chat: chat} do
     start_bot!(%{"quick_reactions" => true})
     say(chat, "obrigado, mas ainda tenho uma duvida")
 
-    assert_receive :llm_called, 5_000
+    assert_receive {:llm_called, "obrigado, mas ainda tenho uma duvida"}, 5_000
     assert_receive {:sent, ^chat, "here is my answer"}, 5_000
   end
 end

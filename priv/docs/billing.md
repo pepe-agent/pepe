@@ -10,8 +10,14 @@ ledger in Pepe's local SQLite store (`Pepe.Repo`), keyed by project - not a file
 read directly, but each row carries the same fields the old ledger's lines did:
 
 ```json
-{"at": 1720000000, "agent": "acme/sales", "model": "gpt-4o", "in": 812, "out": 143}
+{"at": 1720000000, "agent": "acme/sales", "model": "gpt-4o", "in": 812, "out": 143,
+ "run_id": "1720000000123456", "session": "telegram:12345", "source": "telegram"}
 ```
+
+The `run_id` is what groups several calls back into the one message that caused them: an
+agent that answers, calls a tool, is fed the result and answers again spent four calls on
+one message. A separate row per run records what that message actually did (which tools,
+how long, how it ended), with no conversation content in it.
 
 The project comes from the agent's handle (`acme/sales` -> project `acme`; a
 bare-name agent -> the `default` project). Metering happens at the one point every
@@ -63,7 +69,21 @@ top.
   mix pepe usage                                  # all scopes, by month, per project
   mix pepe usage --project acme --granularity day
   mix pepe usage prices --refresh                 # update the live price cache
+  mix pepe usage runs [--project acme]            # one line per inbound message
+  mix pepe usage runs <id>                        # that message, call by call
   ```
+
+  A cycle report counts model *calls*; `usage runs` counts *messages*. Use it when
+  someone asks why one message cost what it did: it shows the tools it ran, how many
+  model calls that took and how long it lasted. The cost is the number of calls, not
+  the number of tools - each iteration re-sends a context the last tool result grew.
+
+- **HTTP** - the same figures with a usage-scoped token, for a client's own billing
+  system: `GET /v1/usage` (buckets), `/v1/usage/events` (one row per model call),
+  `/v1/usage/runs` (one row per inbound message, with its tools and time) and
+  `/v1/usage/runs/:id` (that message, call by call). Mint the token with the
+  `manage_token` tool: `chat: false, usage: true` for a client, and see
+  `docs("authentication")` before choosing what money it may see.
 
 ## Invoices
 

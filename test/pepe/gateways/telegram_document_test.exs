@@ -94,6 +94,8 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    # Somebody else's undelivered reply must not be "recovered" into the middle of this test.
+    Pepe.Test.LedgerDrain.drain!()
     Pepe.RepoSetup.start!()
 
     test_pid = self()
@@ -130,6 +132,11 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
       File.rm_rf(home)
     end)
 
+    # Registered last so it runs FIRST: a session still mid-turn has to be stopped while the
+    # config and PEPE_HOME it is running against still exist, or it carries on into the next
+    # test and calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
+
     # A chat of its own. The session is keyed on the chat id, so a shared one would let each
     # test read the documents of the one before it, and the model mock would happily report
     # them as this test's.
@@ -161,16 +168,26 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
     Elixir.Agent.update(:tg_doc_updates, &(&1 ++ [update]))
   end
 
+  # The model call this turn caused, not merely the first model call to arrive.
+  #
+  # A turn can trigger a second, unrelated call on the same mock - the learning pass is one,
+  # and it opens with "[Background review - the user will NOT see this turn.]". Taking whichever
+  # arrives first made these assertions fail intermittently against that prompt's text, which
+  # reads as the document handling being broken when it is not.
+  defp model_saw!(marker, timeout \\ 5_000) do
+    assert_receive {:model_saw, said}, timeout
+    if String.contains?(said, marker), do: said, else: model_saw!(marker, timeout)
+  end
+
   test "the text of the document reaches the model, in the same message", %{chat: chat} do
     start_bot!()
 
     send_document(chat, "prices.txt", "The annual plan costs 990 euros.", caption: "how much is the annual plan?")
 
-    assert_receive {:model_saw, said}, 5_000
+    said = model_saw!("how much is the annual plan?")
 
     # The instruction and the material arrive as one thing. The agent answers about the
     # content instead of first having to go and find it.
-    assert said =~ "how much is the annual plan?"
     assert said =~ "The annual plan costs 990 euros."
     assert said =~ "prices.txt"
 
@@ -186,7 +203,7 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
 
     send_document(chat, "note.md", "# Deploy\n\nRun it on Friday.", caption: "when?")
 
-    assert_receive {:model_saw, said}, 5_000
+    said = model_saw!("when?")
     assert said =~ "Run it on Friday."
   end
 
@@ -195,7 +212,7 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
 
     send_document(chat, "book.txt", String.duplicate("word ", 20_000), caption: "summarise")
 
-    assert_receive {:model_saw, said}, 5_000
+    said = model_saw!("summarise")
 
     # Handed over in part, so one attachment cannot eat the context window, and told where the
     # rest is so it can go and read it if it has to.
@@ -210,7 +227,7 @@ defmodule Pepe.Gateways.TelegramDocumentTest do
     # and decides, at the permission gate, what to do with it.
     send_document(chat, "stuff.zip", "PK\x03\x04 not really", caption: "what is in here?")
 
-    assert_receive {:model_saw, said}, 5_000
+    said = model_saw!("what is in here?")
 
     refute said =~ "--- Attached file"
     assert said =~ "media/"

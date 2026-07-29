@@ -13,6 +13,13 @@ defmodule PepeWeb.Router do
     plug PepeWeb.ApiAuth
   end
 
+  # Reading the billing record is a permission of its own, not something every valid token
+  # carries - see PepeWeb.UsageAuth, which is also where the reach of the one doing the
+  # reading is resolved.
+  pipeline :usage_api do
+    plug PepeWeb.UsageAuth
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
     # Fail-closed: without a dashboard password, only genuine loopback clients get in.
@@ -100,6 +107,16 @@ defmodule PepeWeb.Router do
 
     get "/models", OpenAIController, :models
     post "/chat/completions", OpenAIController, :chat_completions
+  end
+
+  # Usage & billing reads. Same bearer token as /v1 above, plus the usage permission.
+  scope "/v1/usage", PepeWeb do
+    pipe_through [:v1_api, :usage_api]
+
+    get "/", UsageController, :summary
+    get "/events", UsageController, :events
+    get "/runs", UsageController, :runs
+    get "/runs/:id", UsageController, :run
   end
 
   # Enable LiveDashboard in development

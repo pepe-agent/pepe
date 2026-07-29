@@ -1047,6 +1047,7 @@ defmodule Pepe.Config do
     rewrite_flow_project_binding(old, new)
     Pepe.Trace.rescope_project(old, new)
     Pepe.Usage.Log.rescope_project(old, new)
+    Pepe.Usage.Runs.rescope_project(old, new)
     Pepe.Usage.Messages.rescope_project(old, new)
     :ok
   end
@@ -2505,6 +2506,13 @@ defmodule Pepe.Config do
   and only its hash is stored - a leaked config can't be replayed. `agent` must be
   within `project`.
 
+  Permissions come from `opts` and default to today's behaviour, a token that may chat and
+  nothing else: `chat: false` to mint a token that may only read, `usage: true` to let it
+  read `/v1/usage`, `prices: "billable" | "list" | "all"` for how much of the money it may
+  see, and `usage_content: true` to let a run's detail include conversation content. See
+  `Pepe.ApiToken`'s moduledoc. A widget token may never read usage (it lives in public page
+  source), and a token allowed to do neither is refused rather than minted dead.
+
   Pass `widget: true` to mint a **widget token**: meant to sit in public page source
   (an embedded chat bubble's script tag), so it must be `agent`-locked (never
   project-wide or root - a public credential always pins to one known-safe agent).
@@ -2534,13 +2542,22 @@ defmodule Pepe.Config do
     agent = opts[:agent]
     widget? = opts[:widget] == true
 
-    case validate_api_token(project, agent, widget?) do
+    case validate_api_token(project, agent, widget?, opts) do
       :ok -> create_api_token(project, agent, widget?, opts)
       error -> error
     end
   end
 
-  defp validate_api_token(project, agent, widget?) do
+  # Split in two along the line the two halves already fall on: who the token may reach, and
+  # what it may do once there (see `Pepe.ApiToken`). Scope is checked first, so a token naming
+  # an agent that doesn't exist is told that, rather than being told about its permissions.
+  defp validate_api_token(project, agent, widget?, opts) do
+    with :ok <- validate_token_scope(project, agent, widget?) do
+      validate_token_permissions(widget?, opts)
+    end
+  end
+
+  defp validate_token_scope(project, agent, widget?) do
     cond do
       widget? and is_nil(agent) -> {:error, :widget_needs_agent}
       unknown_project?(project) -> {:error, :unknown_project}
@@ -2549,6 +2566,26 @@ defmodule Pepe.Config do
       true -> :ok
     end
   end
+
+  defp validate_token_permissions(widget?, opts) do
+    cond do
+      # A widget token sits in public page source, where anyone can read it. Whatever else it
+      # may do, it may never read the billing record.
+      widget? and usage_requested?(opts) -> {:error, :widget_cannot_read_usage}
+      no_permissions?(opts) -> {:error, :no_permissions}
+      content_without_usage?(opts) -> {:error, :content_needs_usage}
+      true -> :ok
+    end
+  end
+
+  defp content_without_usage?(opts), do: opts[:usage_content] == true and opts[:usage] != true
+
+  defp usage_requested?(opts), do: opts[:usage] == true or opts[:usage_content] == true
+
+  # A token that may neither chat nor read usage can do nothing at all - almost always a
+  # `--no-chat` that forgot its `--usage`, and silently minting a dead credential is worse
+  # than refusing.
+  defp no_permissions?(opts), do: opts[:chat] == false and opts[:usage] != true
 
   defp unknown_project?(project), do: project && not project_exists?(project)
 
@@ -2573,6 +2610,7 @@ defmodule Pepe.Config do
       |> maybe_put("allowed_origin", widget? && blank_to_nil(opts[:allowed_origin]))
       |> maybe_put("token", widget? && raw)
       |> put_appearance(widget?, opts)
+      |> put_permissions(opts)
 
     update(fn config ->
       config
@@ -2581,6 +2619,27 @@ defmodule Pepe.Config do
 
     {:ok, raw, id}
   end
+
+  # Permissions are written only where they differ from the default (`chat` on, everything
+  # else off), so a plain chat token's entry keeps exactly the shape it has always had, and
+  # a config.json diff shows only what somebody actually chose.
+  defp put_permissions(entry, opts) do
+    entry
+    |> put_flag("chat", opts[:chat] == false, false)
+    |> put_flag("usage", opts[:usage] == true, true)
+    |> put_flag("usage_content", opts[:usage_content] == true, true)
+    |> then(fn e ->
+      case opts[:prices] do
+        nil -> e
+        view -> Map.put(e, "prices", Pepe.ApiToken.price_view(view))
+      end
+    end)
+  end
+
+  # `maybe_put/3` drops a `false` value (it treats it as "absent"), which is the wrong
+  # reading for a permission that is deliberately off.
+  defp put_flag(entry, _key, false, _value), do: entry
+  defp put_flag(entry, key, true, value), do: Map.put(entry, key, value)
 
   defp put_appearance(entry, false, _opts), do: entry
 
@@ -2628,6 +2687,62 @@ defmodule Pepe.Config do
 
   defp blank_to_nil(v) when is_binary(v), do: if(String.trim(v) == "", do: nil, else: String.trim(v))
   defp blank_to_nil(v), do: v
+
+  @doc """
+  Change a token's **permissions** in place - `chat`, `usage`, `prices`, `usage_content`
+  (see `Pepe.ApiToken`). Only the keys `opts` actually carries are touched, so flipping one
+  can't silently reset the others.
+
+  In place, unlike the token's scope or hash (which stay rotate-only): a permission is not a
+  secret, and revoking a client's access to the billing figures should not also invalidate
+  the credential their integration is running on.
+
+  Returns `:ok`, `{:error, :not_found}`, `{:error, :widget_cannot_read_usage}` or
+  `{:error, :no_permissions}`.
+  """
+  @spec set_api_token_permissions(String.t(), keyword()) :: :ok | {:error, atom()}
+  def set_api_token_permissions(id, opts) do
+    case get_in(load(), ["api_tokens", id]) do
+      nil ->
+        {:error, :not_found}
+
+      entry ->
+        merged = merge_permissions(entry, opts)
+        perms = Pepe.ApiToken.permissions(merged)
+
+        cond do
+          entry["kind"] == "widget" and perms.usage -> {:error, :widget_cannot_read_usage}
+          not perms.chat and not perms.usage -> {:error, :no_permissions}
+          true -> save_token_entry(id, merged)
+        end
+    end
+  end
+
+  defp save_token_entry(id, entry) do
+    update(fn config -> put_in(config, ["api_tokens", id], entry) end)
+    :ok
+  end
+
+  # Content without usage is meaningless (there is no read to attach it to), so it follows
+  # `usage` down rather than being left dangling behind a permission that is now off.
+  defp merge_permissions(entry, opts) do
+    entry
+    |> merge_flag("chat", opts, :chat)
+    |> merge_flag("usage", opts, :usage)
+    |> merge_flag("usage_content", opts, :usage_content)
+    |> then(fn e -> if e["usage"] == true, do: e, else: Map.delete(e, "usage_content") end)
+    |> then(fn e ->
+      if Keyword.has_key?(opts, :prices),
+        do: Map.put(e, "prices", Pepe.ApiToken.price_view(opts[:prices])),
+        else: e
+    end)
+  end
+
+  defp merge_flag(entry, key, opts, opt_key) do
+    if Keyword.has_key?(opts, opt_key),
+      do: Map.put(entry, key, opts[opt_key] == true),
+      else: entry
+  end
 
   @doc "Revoke a token by id."
   def revoke_api_token(id) do
@@ -2682,13 +2797,21 @@ defmodule Pepe.Config do
   allowed_origin: o}` (`project`/`agent`/`allowed_origin` may be nil; `kind` is
   `"widget"` for a widget token, else nil) when it matches a stored hash, or `nil`
   when it doesn't.
+
+  The scope also carries the token's permissions (`chat`, `usage`, `prices`,
+  `usage_content` - see `Pepe.ApiToken.permissions/1`), already resolved against their
+  defaults, so nothing downstream has to reason about a key an older entry never had.
   """
   def verify_api_token(raw) when is_binary(raw) do
     hash = Pepe.ApiToken.hash(raw)
 
     case Enum.find(api_tokens(), &token_hash_match?(&1, hash)) do
-      nil -> nil
-      t -> %{project: t["project"], agent: t["agent"], kind: t["kind"], allowed_origin: t["allowed_origin"]}
+      nil ->
+        nil
+
+      t ->
+        %{project: t["project"], agent: t["agent"], kind: t["kind"], allowed_origin: t["allowed_origin"]}
+        |> Map.merge(Pepe.ApiToken.permissions(t))
     end
   end
 

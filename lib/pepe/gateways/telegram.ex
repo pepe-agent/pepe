@@ -2614,8 +2614,12 @@ defmodule Pepe.Gateways.Telegram do
     name = bot["name"] || "default"
     Config.put_locale()
 
+    # `Map.get`, not `.bot`: the ledger survives restarts and upgrades, so it can hold a row
+    # whose `meta` was written by an older shape that had no `:bot` at all. A KeyError here
+    # would raise inside the spawned task and take the *whole* sweep down with it, silently -
+    # every other bot's owed reply lost to one row from a previous version.
     "telegram"
-    |> DeliveryLedger.sweep_recoverable(&(&1.meta.bot == name))
+    |> DeliveryLedger.sweep_recoverable(&(Map.get(&1.meta, :bot) == name))
     |> Enum.each(&redeliver_row/1)
   end
 

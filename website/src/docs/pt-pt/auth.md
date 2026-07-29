@@ -155,6 +155,26 @@ Um token transporta um âmbito que decide a que agentes consegue chegar. Do mais
 
 `GET /v1/models` respeita o âmbito: um token de projeto ou de agente vê apenas os seus próprios agentes, nunca os de outro projeto, e nunca as ligações de modelo puras.
 
+### Permissões de token
+
+O âmbito diz *de quem* são os dados que o token alcança. Um conjunto separado de permissões diz *o que pode fazer* com eles, e as predefinições deixam cada token que já criaste exatamente como estava: **pode** executar agentes e **não pode** ler consumo.
+
+| Flag | Predefinição | O que dá acesso |
+| --- | --- | --- |
+| `--chat` / `--no-chat` | ligado | executar agentes (`/v1/chat/completions`, o WebSocket) |
+| `--usage` | desligado | ler o `/v1/usage`, os números de faturação |
+| `--prices` | `billable` | quanto dos valores é mostrado numa leitura de consumo |
+| `--content` | desligado | o detalhe de uma execução pode incluir o prompt e os argumentos e o resultado das ferramentas |
+
+```bash
+# token de faturação apenas de leitura para um cliente: lê os números, não gasta o teu orçamento
+pepe token add --project acme --no-chat --usage --prices billable
+
+pepe token permissions abc123 --prices list    # altera no sítio, sem mexer no segredo
+```
+
+As duas metades são independentes de propósito. Sem elas, dar ao cliente visibilidade do próprio gasto significava dar-lhe também uma credencial capaz de executar agentes na tua conta. Veja a [API de consumo](../usage-api/) para o que essas leituras devolvem.
+
 ## Encaminhamento multi-tenant: dá ao projeto X o seu próprio acesso
 
 Os âmbitos são a forma de distribuir acesso à API por projeto. Para dar a um projeto a sua própria chave, gera um token com âmbito de projeto:

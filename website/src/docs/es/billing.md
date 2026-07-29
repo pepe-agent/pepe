@@ -120,3 +120,7 @@ pepe usage help                              # el recorrido completo
 En el panel, la sección Usage & billing muestra tokens, coste e importe a facturar por ciclo (hora, día, semana, mes, año), con desgloses por proyecto, modelo y agente. Los precios por modelo se definen en Models, luego Edit; el margen de un proyecto en Projects, luego Edit.
 
 La moneda es solo una etiqueta. Por defecto es `USD` y la cambias definiendo `"currency"` en `config.json`. No hay conversión de divisas, así que el número está en la moneda en la que tu proveedor cotiza sus precios.
+
+En el panel, la misma página termina con una tabla **Por mensaje**: una fila por mensaje entrante, con las herramientas que ejecutó, cuántas llamadas al modelo costó, cuánto duró y cuánto cuesta. Haz clic en una fila para ver esas llamadas una a una. La misma vista es `pepe usage runs`, y `pepe usage runs <id>` para un solo mensaje. Un informe por ciclo cuenta llamadas al modelo y por eso nunca puede mostrar esto; lo que encarece un mensaje es su número de llamadas, no su número de herramientas, porque cada iteración reenvía un contexto que el resultado de la herramienta anterior acaba de agrandar.
+
+Las mismas cifras también se pueden leer por HTTP, desde el sistema de facturación del propio cliente, con un token creado solo para leer: consulta la [API de consumo](../usage-api/). Baja un nivel por debajo de la factura, hasta cuánto costó un solo mensaje y qué herramientas ejecutó.

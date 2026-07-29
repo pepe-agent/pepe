@@ -16,5 +16,8 @@ defmodule Pepe.Usage.Usage do
     field :out, :integer
     field :sub, :boolean, default: false
     field :cached, :integer
+    field :run_id, :string
+    field :session, :string
+    field :source, :string
   end
 end

@@ -166,4 +166,55 @@ defmodule Pepe.Tools.ManageTokenTest do
       assert {:error, _} = ManageToken.run(%{"action" => "update", "id" => "nope", "title" => "x"}, ctx())
     end
   end
+
+  describe "permissions" do
+    test "mints a read-only billing token, and changes it later without touching the secret" do
+      assert {:ok, _} = ManageToken.run(%{"action" => "create", "label" => "client", "chat" => false, "usage" => true}, ctx())
+      [token] = Config.api_tokens()
+
+      perms = Pepe.ApiToken.permissions(token)
+      refute perms.chat
+      assert perms.usage
+      assert perms.prices == "billable"
+
+      args = %{"action" => "permissions", "id" => token["id"], "prices" => "all"}
+      assert {:ok, out} = ManageToken.run(args, ctx())
+      assert out =~ "all"
+
+      [updated] = Config.api_tokens()
+      assert Pepe.ApiToken.permissions(updated).prices == "all"
+      # Narrowing what it may see never invalidates the credential itself.
+      assert updated["hash"] == token["hash"]
+    end
+
+    test "a permission that is not a boolean is refused, never coerced" do
+      {:ok, _} = ManageToken.run(%{"action" => "create", "label" => "c", "usage" => true}, ctx())
+      [token] = Config.api_tokens()
+
+      # Everything downstream is fail-closed, so a string \"true\" would read as false and
+      # silently REVOKE the permission the caller was asking to grant. That must be an error.
+      args = %{"action" => "permissions", "id" => token["id"], "chat" => "true"}
+      assert {:error, msg} = ManageToken.run(args, ctx())
+      assert msg =~ "must be true or false"
+
+      assert Pepe.ApiToken.permissions(hd(Config.api_tokens())).chat
+    end
+
+    test "an unknown price view is refused rather than narrowed in silence" do
+      {:ok, _} = ManageToken.run(%{"action" => "create", "label" => "c", "usage" => true, "prices" => "all"}, ctx())
+      [token] = Config.api_tokens()
+
+      args = %{"action" => "permissions", "id" => token["id"], "prices" => "everything"}
+      assert {:error, msg} = ManageToken.run(args, ctx())
+      assert msg =~ "prices must be one of"
+
+      assert Pepe.ApiToken.permissions(hd(Config.api_tokens())).prices == "all"
+    end
+
+    test "a widget token can never be given the billing record" do
+      args = %{"action" => "create", "widget" => true, "agent" => "assistant", "usage" => true}
+      assert {:error, msg} = ManageToken.run(args, ctx())
+      assert msg =~ "public page source"
+    end
+  end
 end

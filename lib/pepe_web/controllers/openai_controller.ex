@@ -44,6 +44,11 @@ defmodule PepeWeb.OpenAIController do
     {agent, model} = resolve(params["model"], scope)
 
     cond do
+      # One gate for "may this token run an agent at all", ahead of every question about
+      # *which* agent - a token minted read-only (usage only) stops here.
+      not ApiScope.chat?(scope) ->
+        error(conn, 403, "this token is not allowed to run agents")
+
       # A named agent that resolved to nothing under a real (non-open) scope is out of
       # bounds - refuse without revealing whether it exists elsewhere.
       is_nil(agent) and scope != :unrestricted and present?(params["model"]) ->

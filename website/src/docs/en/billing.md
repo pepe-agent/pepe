@@ -120,3 +120,7 @@ pepe usage help                              # the full walkthrough
 On the dashboard, the Usage & billing section shows tokens, cost, and amount to bill by cycle (hour, day, week, month, year), with breakdowns by project, model, and agent. Per-model prices are set under Models, then Edit; a project's markup under Projects, then Edit.
 
 Currency is a label only. It defaults to `USD` and you change it by setting `"currency"` in `config.json`. There is no FX conversion, so the number is in whatever currency your provider quotes its prices.
+
+On the dashboard, the same page ends with a **By message** table: one row per incoming message, with the tools it ran, how many model calls that took, how long it lasted and what it costs. Click a row to see those calls one by one. The same view is `pepe usage runs`, and `pepe usage runs <id>` for one message. A cycle report counts model calls and so can never show this; what makes a message expensive is its number of calls, not its number of tools, because each iteration re-sends a context the last tool result just grew.
+
+The same figures are also readable over HTTP, by the client's own billing system, with a token minted to read and nothing else: see the [Usage API](../usage-api/). It goes one level finer than the invoice does, down to what a single message cost and which tools it ran.

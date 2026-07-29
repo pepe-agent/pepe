@@ -87,12 +87,29 @@ defmodule Pepe.Usage do
       # provider reports no cache hits (or an older Pepe), and those entries read exactly as before.
       entry = if subscription?, do: Map.put(entry, "sub", true), else: entry
       entry = if cached > 0, do: Map.put(entry, "cached", min(cached, in_tok)), else: entry
+      entry = put_run(entry, Pepe.Trace.current())
 
       Log.append(Project.of(to_string(agent_handle)), entry)
     end
 
     :ok
   end
+
+  # Stamp the entry with the run it belongs to, so several calls made while answering one
+  # message can be grouped back into that message (see `Pepe.Usage.Runs`). Absent outside a
+  # run, and absent on every entry written before this existed - both read back as a call
+  # that belongs to no run, which is what they are.
+  defp put_run(entry, %{id: id} = run) when is_binary(id) do
+    entry
+    |> Map.put("run_id", id)
+    |> maybe_put("session", run[:session])
+    |> maybe_put("source", run[:source])
+  end
+
+  defp put_run(entry, _none), do: entry
+
+  defp maybe_put(entry, _key, nil), do: entry
+  defp maybe_put(entry, key, value), do: Map.put(entry, key, value)
 
   # Cache-read input tokens the provider reported, across the shapes they use: a normalized top-level
   # `cached_tokens` (the Anthropic/Responses adapters set this), or OpenAI's nested
@@ -221,9 +238,14 @@ defmodule Pepe.Usage do
   @doc """
   Aggregate a scope's usage into buckets at `granularity`.
 
-  `scope` is `nil`/`\"root\"` (root only), a project name, or `:all`/`\"all\"`.
+  `scope` is `nil`/`\"root\"` (root only), a project name, a list of project slugs, or
+  `:all`/`\"all\"`.
+
   Options: `:tz` (billing-day timezone, default the configured one), `:limit`
-  (most-recent buckets to return, default 60).
+  (most-recent buckets to return, default 60), and any of `:agent`, `:model`, `:source`,
+  `:session`, `:run_id`, `:from`, `:to`, which narrow *which entries are summed* (not just
+  which are shown) - an agent-locked token's report has to leave the rest of its project's
+  spend out of the totals, not merely out of the breakdown.
 
   Returns a map with `:buckets` (each `%{key, in, out, total, list, cost, billable}`,
   oldest->newest), `:totals`, and `:by_model` / `:by_agent` / `:by_project` breakdowns, plus
@@ -234,16 +256,8 @@ defmodule Pepe.Usage do
     tz = opts[:tz] || Config.default_timezone()
     limit = opts[:limit] || 60
 
-    # Load the live price cache and every model's manual price once, up front, and
-    # resolve price/markup per distinct model/project (not per row - see
-    # price_lookup/3), so pricing thousands of ledger entries never touches disk or
-    # rescans the price book per row.
-    cache = Pricing.load_cache()
     models = Map.new(Config.models(), &{&1.name, &1})
-    entries = load_entries(scope)
-    prices = price_lookup(entries, models, cache)
-    markups = markup_lookup(entries)
-    priced = Enum.map(entries, &price(&1, prices, markups))
+    priced = scope |> load_entries(opts) |> price_entries(models)
 
     buckets =
       priced
@@ -301,14 +315,7 @@ defmodule Pepe.Usage do
     tz = opts[:tz] || Config.default_timezone()
     {from, to, label} = month_range(opts[:month], tz)
 
-    cache = Pricing.load_cache()
-    models = Map.new(Config.models(), &{&1.name, &1})
-
-    raw_entries = Log.entries_between(project, from, to)
-
-    prices = price_lookup(raw_entries, models, cache)
-    markups = markup_lookup(raw_entries)
-    entries = Enum.map(raw_entries, &price(&1, prices, markups))
+    entries = project |> Log.entries_between(from, to) |> price_entries()
 
     line_items =
       entries
@@ -370,8 +377,32 @@ defmodule Pepe.Usage do
 
   ## internals
 
-  defp load_entries(scope) when scope in [:all, "all"], do: Log.entries_for(:all)
-  defp load_entries(scope), do: Log.entries(scope)
+  @doc """
+  Decorate raw ledger entries with their money - `list`, `billable` and `cost` (see this
+  module's moduledoc for what each of the three means).
+
+  Loads the live price cache and every model's manual price once, up front, and resolves
+  price/markup per *distinct* model and project rather than per row: a ledger has thousands
+  of rows but a handful of distinct models, and `price_for/3`'s cache-miss fallback scans
+  the whole price book, so resolving per row made pricing a month of usage scale with row
+  count × price-book size instead of just row count.
+  """
+  @spec price_entries([map()], map() | nil) :: [map()]
+  def price_entries(entries, models \\ nil) do
+    models = models || Map.new(Config.models(), &{&1.name, &1})
+    cache = Pricing.load_cache()
+    prices = price_lookup(entries, models, cache)
+    markups = markup_lookup(entries)
+
+    Enum.map(entries, &price(&1, prices, markups))
+  end
+
+  @filters ~w(agent model source session run_id from to)a
+
+  defp load_entries(scope, opts) do
+    scope = if scope in [:all, "all"], do: :all, else: scope
+    Log.filtered(scope, Keyword.take(opts, @filters))
+  end
 
   # {model name => {input_price, output_price}} for just the distinct models present
   # in `entries`, resolved once - a ledger has thousands of rows but usually a

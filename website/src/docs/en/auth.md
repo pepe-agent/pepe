@@ -153,6 +153,26 @@ A token carries a scope that decides which agents it can reach. From narrowest t
 * **Project** (`--project PROJECT`): any agent inside that project. A bare `model` name qualifies into that project automatically, and a request for an agent belonging to a different project is refused with `403`.
 * **Neither**: the default project. This is what every command operates on when you do not scope it. It can reach the default project's agents (those with a bare, un-namespaced name) and, uniquely, fall back to bare model connections by name.
 
+### Token permissions
+
+The scope says *whose* data a token reaches. A separate set of permissions says *what it may do* with it, and the defaults leave every token you have already minted exactly as it was: it **may** run agents, and it **may not** read usage.
+
+| Flag | Default | What it grants |
+| --- | --- | --- |
+| `--chat` / `--no-chat` | on | run agents (`/v1/chat/completions`, the WebSocket) |
+| `--usage` | off | read `/v1/usage`, the billing figures |
+| `--prices` | `billable` | how much of the money a usage read shows |
+| `--content` | off | a run's detail may include the prompt and tool arguments/output |
+
+```bash
+# a read-only billing token for a client: reads the figures, cannot spend your budget
+pepe token add --project acme --no-chat --usage --prices billable
+
+pepe token permissions abc123 --prices list    # change in place, secret untouched
+```
+
+The two halves are independent on purpose. Without them, giving a client visibility into their own spend meant giving them a credential that could also run agents on your account. See the [Usage API](../usage-api/) for what those reads return.
+
 ### What each scope sees in `GET /v1/models`
 
 | Token | Returns |

@@ -66,6 +66,8 @@ defmodule Pepe.Gateways.TelegramTopicTest do
     File.mkdir_p!(home)
     prev_home = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    # Somebody else's undelivered reply must not be "recovered" into the middle of this test.
+    Pepe.Test.LedgerDrain.drain!()
     Pepe.RepoSetup.start!()
 
     test_pid = self()
@@ -90,6 +92,11 @@ defmodule Pepe.Gateways.TelegramTopicTest do
       if prev_home, do: System.put_env("PEPE_HOME", prev_home), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
     end)
+
+    # Registered last so it runs FIRST: a session still mid-turn has to be stopped while the
+    # config and PEPE_HOME it is running against still exist, or it carries on into the next
+    # test and calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
 
     %{chat: -1_000_000 - System.unique_integer([:positive])}
   end

@@ -5,6 +5,10 @@ defmodule Pepe.ApiScope do
 
   A scope is `:unrestricted` (the API is open because no tokens are configured) or
   `%{project: c, agent: a}` (either may be nil). See `Pepe.ApiToken`.
+
+  It also answers what the token may *do* - run agents, read usage, how much of the money
+  it may see - so both surfaces read the same permission from the same place instead of
+  each deciding what a missing field means.
   """
 
   alias Pepe.Project
@@ -46,6 +50,47 @@ defmodule Pepe.ApiScope do
   def root_or_open?(:unrestricted), do: true
   def root_or_open?(%{project: nil, agent: nil}), do: true
   def root_or_open?(_), do: false
+
+  @doc """
+  May this scope run agents? True unless the token was explicitly minted read-only - see
+  `Pepe.ApiToken`'s moduledoc for why the default falls this way.
+  """
+  def chat?(:unrestricted), do: true
+  def chat?(%{chat: false}), do: false
+  def chat?(_), do: true
+
+  @doc "May this scope read `/v1/usage`? Off unless the token was minted for it."
+  def usage?(:unrestricted), do: true
+  def usage?(%{usage: true}), do: true
+  def usage?(_), do: false
+
+  @doc """
+  How much of the money this scope may see: `"billable"` (with markup), `"list"` (no
+  markup) or `"all"` (adds `cost` and `margin`). Decided by the token, never by the
+  request.
+  """
+  def prices(:unrestricted), do: "all"
+  def prices(%{prices: view}), do: Pepe.ApiToken.price_view(view)
+  def prices(_), do: "billable"
+
+  @doc "May a run's detail include conversation content (prompt, tool arguments, tool output)?"
+  def usage_content?(:unrestricted), do: true
+  def usage_content?(%{usage_content: true, usage: true}), do: true
+  def usage_content?(_), do: false
+
+  @doc """
+  Which projects a scope may read usage for: `:all` for the open/root scope, otherwise the
+  one project it is confined to. An agent-locked token is confined further still, by
+  `usage_agent/1`.
+  """
+  def usage_scope(:unrestricted), do: :all
+  def usage_scope(%{agent: agent}) when is_binary(agent), do: [Config.resolve_scope(Project.of(agent))]
+  def usage_scope(%{project: project}) when is_binary(project), do: [Config.resolve_scope(project)]
+  def usage_scope(_), do: :all
+
+  @doc "The single agent a scope's usage reads are pinned to, or `nil` when it may see a whole project."
+  def usage_agent(%{agent: agent}) when is_binary(agent), do: agent
+  def usage_agent(_), do: nil
 
   # Resolve a name to an agent only if it lives in `project` (bare names qualify in).
   defp scoped_agent(name, project) do

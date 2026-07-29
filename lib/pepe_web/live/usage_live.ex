@@ -13,6 +13,10 @@ defmodule PepeWeb.UsageLive do
 
   alias Pepe.Config
   alias Pepe.Pricing
+  alias Pepe.Usage.Log
+  alias Pepe.Usage.Runs
+
+  @runs_shown 25
 
   @granularities %{
     "hour" => :hour,
@@ -35,14 +39,46 @@ defmodule PepeWeb.UsageLive do
        refreshing: false,
        cache_info: Pricing.cache_info()
      )
-     |> load_summary()}
+     |> assign(open_run: nil)
+     |> load_summary()
+     |> load_runs()}
   end
 
   defp load_summary(socket) do
     gran = Map.get(@granularities, socket.assigns.granularity, :day)
-    scope_arg = if socket.assigns.scope == "all", do: :all, else: socket.assigns.scope
-    assign(socket, summary: Pepe.Usage.summary(scope_arg, gran, tz: Config.default_timezone()))
+    assign(socket, summary: Pepe.Usage.summary(scope_arg(socket), gran, tz: Config.default_timezone()))
   end
+
+  # The last messages, each with the several model calls it actually took. A cycle report
+  # counts calls and so can never show this: what makes one message expensive is its number
+  # of iterations, because each one re-sends a context the previous tool result just grew.
+  defp load_runs(socket) do
+    scope = scope_arg(socket)
+    runs = Runs.list(scope, limit: @runs_shown)
+
+    assign(socket, runs: runs, run_money: run_money(scope, runs))
+  end
+
+  defp run_money(scope, runs) do
+    scope
+    |> Log.entries_for_runs(Enum.map(runs, & &1["id"]))
+    |> Pepe.Usage.price_entries()
+    |> Enum.group_by(& &1["run_id"])
+    |> Map.new(fn {run_id, entries} -> {run_id, sum_priced(entries)} end)
+  end
+
+  defp sum_priced(entries) do
+    Enum.reduce(entries, %{calls: 0, total: 0, cost: 0.0, billable: 0.0}, fn e, acc ->
+      %{
+        calls: acc.calls + 1,
+        total: acc.total + e["in"] + e["out"],
+        cost: acc.cost + e["cost"],
+        billable: acc.billable + e["billable"]
+      }
+    end)
+  end
+
+  defp scope_arg(socket), do: if(socket.assigns.scope == "all", do: :all, else: socket.assigns.scope)
 
   @impl true
   def render(assigns) do
@@ -135,6 +171,74 @@ defmodule PepeWeb.UsageLive do
             <.breakdown title={gettext("By agent")} currency={@summary.currency}
               rows={Enum.map(@summary.by_agent, &{&1.key, &1.total, &1.cost, &1.billable})} bill?={false} />
           </div>
+
+          <div>
+            <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("By message")}</div>
+            <p class="mb-2 text-sm text-zinc-500">
+              {gettext("One line per incoming message. A message often costs several model calls: the agent answers, runs a tool, reads the result and answers again. What makes it expensive is the number of calls, not the number of tools, because each one re-sends a context the last tool result just grew.")}
+            </p>
+
+            <div :if={@runs == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-[15px] text-zinc-500">
+              {gettext("No messages recorded yet for this scope.")}
+            </div>
+
+            <div :if={@runs != []} class="overflow-x-auto rounded-xl border border-zinc-800">
+              <table class="w-full min-w-[720px] text-[15px]">
+                <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
+                  <tr>
+                    <th class="px-3 py-2 font-medium">{gettext("When")}</th>
+                    <th class="px-3 py-2 font-medium">{gettext("Agent")}</th>
+                    <th class="px-3 py-2 font-medium">{gettext("Came from")}</th>
+                    <th class="px-3 py-2 font-medium">{gettext("Tools")}</th>
+                    <th class="px-3 py-2 text-right font-medium">{gettext("Calls")}</th>
+                    <th class="px-3 py-2 text-right font-medium">{gettext("Took")}</th>
+                    <th class="px-3 py-2 text-right font-medium">{gettext("To bill")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <%= for run <- @runs do %>
+                    <tr
+                      phx-click="toggle_run"
+                      phx-value-id={run["id"]}
+                      class="cursor-pointer border-t border-zinc-800/70 hover:bg-zinc-800/40"
+                    >
+                      <td class="px-3 py-2 font-mono text-sm text-zinc-400">{run_time(run["at"])}</td>
+                      <td class="px-3 py-2 truncate text-zinc-300">{run["agent"]}</td>
+                      <td class="px-3 py-2 text-sm text-zinc-500">{run["source"] || "-"}</td>
+                      <td class="px-3 py-2 text-sm text-zinc-400">
+                        {(run["tools"] == [] && gettext("none")) || Enum.join(Enum.uniq(run["tools"]), ", ")}
+                      </td>
+                      <td class="px-3 py-2 text-right">{money_of(@run_money, run["id"], :calls)}</td>
+                      <td class="px-3 py-2 text-right text-sm text-zinc-500">{duration(run["ms"])}</td>
+                      <td class="px-3 py-2 text-right font-medium">
+                        {money(money_of(@run_money, run["id"], :billable), @summary.currency)}
+                      </td>
+                    </tr>
+                    <tr :if={@open_run && @open_run["id"] == run["id"]} class="border-t border-zinc-800/70 bg-zinc-950/60">
+                      <td colspan="7" class="px-3 py-3">
+                        <div class="mb-2 text-sm text-zinc-500">
+                          {gettext("Every model call this message took, in order")}
+                        </div>
+                        <div :for={call <- @open_run["calls"]} class="flex items-center justify-between gap-3 py-1 text-sm">
+                          <span class="min-w-0 truncate font-mono text-zinc-400">{call["model"]}</span>
+                          <span class="flex shrink-0 items-center gap-4">
+                            <span class="text-zinc-500">{tokens(call["in"] + call["out"])} tok</span>
+                            <span :if={(call["cached"] || 0) > 0} class="text-zinc-600">
+                              {gettext("%{n} cached", n: tokens(call["cached"]))}
+                            </span>
+                            <span class="w-24 text-right">{money(call["billable"], @summary.currency)}</span>
+                          </span>
+                        </div>
+                        <div :if={@open_run["calls"] == []} class="py-1 text-sm text-zinc-600">
+                          {gettext("No metered call recorded for this message.")}
+                        </div>
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </main>
     </div>
@@ -180,9 +284,32 @@ defmodule PepeWeb.UsageLive do
     """
   end
 
+  defp money_of(run_money, id, field) do
+    case Map.get(run_money, id) do
+      nil -> if field == :calls, do: 0, else: 0.0
+      totals -> Map.fetch!(totals, field)
+    end
+  end
+
+  defp run_time(at), do: at |> DateTime.from_unix!() |> Calendar.strftime("%d/%m %H:%M:%S")
+
+  defp duration(nil), do: "-"
+  defp duration(ms) when ms < 1_000, do: "#{ms}ms"
+  defp duration(ms), do: "#{Float.round(ms / 1000, 1)}s"
+
   @impl true
   def handle_event("set_granularity", %{"g" => g}, socket) when is_map_key(@granularities, g) do
     {:noreply, socket |> assign(granularity: g) |> load_summary()}
+  end
+
+  # The breakdown is only loaded when a row is opened: a page of runs would otherwise read
+  # and price every call behind every one of them just to render the collapsed rows.
+  def handle_event("toggle_run", %{"id" => id}, socket) do
+    if socket.assigns.open_run && socket.assigns.open_run["id"] == id do
+      {:noreply, assign(socket, open_run: nil)}
+    else
+      {:noreply, assign(socket, open_run: %{"id" => id, "calls" => run_calls(socket, id)})}
+    end
   end
 
   def handle_event("refresh_prices", _p, socket) do
@@ -199,6 +326,10 @@ defmodule PepeWeb.UsageLive do
 
   def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
+  defp run_calls(socket, id) do
+    socket |> scope_arg() |> Log.entries_for_run(id) |> Pepe.Usage.price_entries()
+  end
+
   @impl true
   def handle_info({:prices_refreshed, result}, socket) do
     socket =
@@ -210,6 +341,12 @@ defmodule PepeWeb.UsageLive do
           put_flash(socket, :error, gettext("Couldn't refresh prices. Check the connection."))
       end
 
-    {:noreply, socket |> assign(refreshing: false, cache_info: Pricing.cache_info()) |> load_summary()}
+    # Runs reload too: their money is priced from the same cache the refresh just replaced,
+    # so leaving them alone would show new prices above and old prices below.
+    {:noreply,
+     socket
+     |> assign(refreshing: false, cache_info: Pricing.cache_info())
+     |> load_summary()
+     |> load_runs()}
   end
 end

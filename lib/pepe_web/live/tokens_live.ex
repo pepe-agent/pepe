@@ -27,6 +27,7 @@ defmodule PepeWeb.TokensLive do
        tokens: Config.api_tokens(),
        token_project: nil,
        token_widget: false,
+       token_usage: false,
        raw: nil
      )}
   end
@@ -105,6 +106,43 @@ defmodule PepeWeb.TokensLive do
                 <p class={hlp()}>{gettext("The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above - a public token always pins to one.")}</p>
               </div>
 
+              <div :if={!@token_widget} class="space-y-3 rounded-xl border border-zinc-800 p-3">
+                <div class="text-sm font-semibold text-zinc-400">{gettext("What this token may do")}</div>
+
+                <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                  <input type="checkbox" name="chat" value="true" checked class="h-4 w-4 accent-orange-500" />
+                  {gettext("Run agents")}
+                </label>
+
+                <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                  <input
+                    type="checkbox"
+                    name="usage"
+                    value="true"
+                    checked={@token_usage}
+                    phx-click="token_toggle_usage"
+                    class="h-4 w-4 accent-orange-500"
+                  />
+                  {gettext("Read usage and billing (/v1/usage)")}
+                </label>
+
+                <div :if={@token_usage}>
+                  <label class={lbl()}>{gettext("Money it may see")}</label>
+                  <select name="prices" class={fld()}>
+                    <option value="billable">{gettext("Billable - with the project's markup (what the client pays)")}</option>
+                    <option value="list">{gettext("List - the model's price, no markup")}</option>
+                    <option value="all">{gettext("Everything - adds our cost and the margin")}</option>
+                  </select>
+                  <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
+                </div>
+
+                <label :if={@token_usage} class="flex items-center gap-2 text-[15px] text-zinc-300">
+                  <input type="checkbox" name="content" value="true" class="h-4 w-4 accent-orange-500" />
+                  {gettext("Also show conversation content in a run's detail")}
+                </label>
+                <p :if={@token_usage} class={hlp()}>{gettext("Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output.")}</p>
+              </div>
+
               <div class="pt-1">
                 <button type="submit" class={btn()}>{gettext("Generate token")}</button>
               </div>
@@ -133,6 +171,42 @@ defmodule PepeWeb.TokensLive do
               </div>
               <div :if={t["kind"] != "widget"} class="mt-1 font-mono text-sm text-zinc-400">{t["prefix"]}</div>
               <div class="mt-0.5 text-sm text-zinc-500">{gettext("Id %{id}", id: t["id"])}</div>
+
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                <span :for={badge <- permission_badges(t)} class="rounded-full border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-400">
+                  {badge}
+                </span>
+              </div>
+
+              <details :if={t["kind"] != "widget"} class="mt-2">
+                <summary class="cursor-pointer text-sm text-zinc-500 hover:text-zinc-300">{gettext("Change what it may do")}</summary>
+                <form phx-submit="token_permissions" class="mt-2 space-y-2">
+                  <input type="hidden" name="token_id" value={t["id"]} />
+
+                  <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                    <input type="checkbox" name="chat" value="true" checked={permissions(t).chat} class="h-4 w-4 accent-orange-500" />
+                    {gettext("Run agents")}
+                  </label>
+
+                  <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                    <input type="checkbox" name="usage" value="true" checked={permissions(t).usage} class="h-4 w-4 accent-orange-500" />
+                    {gettext("Read usage and billing (/v1/usage)")}
+                  </label>
+
+                  <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                    <input type="checkbox" name="content" value="true" checked={permissions(t).usage_content} class="h-4 w-4 accent-orange-500" />
+                    {gettext("Also show conversation content in a run's detail")}
+                  </label>
+
+                  <select name="prices" class={fld()}>
+                    <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable - with the project's markup (what the client pays)")}</option>
+                    <option value="list" selected={permissions(t).prices == "list"}>{gettext("List - the model's price, no markup")}</option>
+                    <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything - adds our cost and the margin")}</option>
+                  </select>
+
+                  <button type="submit" class={btn_ghost()}>{gettext("Save")}</button>
+                </form>
+              </details>
             </div>
             <p :if={scoped_tokens(@tokens, @scope) == []} class="text-[15px] text-zinc-500">
               {gettext("No tokens yet. The /v1 API is open to localhost only. Create one to require a token from every caller.")}
@@ -153,20 +227,40 @@ defmodule PepeWeb.TokensLive do
     {:noreply, assign(socket, token_widget: !socket.assigns.token_widget)}
   end
 
+  def handle_event("token_toggle_usage", _params, socket) do
+    {:noreply, assign(socket, token_usage: !socket.assigns.token_usage)}
+  end
+
+  def handle_event("token_permissions", %{"token_id" => id} = params, socket) do
+    case Config.set_api_token_permissions(id, permission_opts(params)) do
+      :ok ->
+        {:noreply,
+         socket
+         |> assign(tokens: Config.api_tokens())
+         |> put_flash(:info, gettext("Permissions updated."))}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, token_error(reason))}
+    end
+  end
+
   def handle_event("token_create", params, socket) do
-    opts = [
-      label: blank(params["label"]),
-      project: blank(params["project"]),
-      agent: blank(params["agent"]),
-      widget: params["widget"] == "true",
-      allowed_origin: blank(params["allowed_origin"])
-    ]
+    widget? = params["widget"] == "true"
+
+    opts =
+      [
+        label: blank(params["label"]),
+        project: blank(params["project"]),
+        agent: blank(params["agent"]),
+        widget: widget?,
+        allowed_origin: blank(params["allowed_origin"])
+      ] ++ create_permission_opts(params, widget?)
 
     case Config.add_api_token(opts) do
       {:ok, raw, _id} ->
         {:noreply,
          socket
-         |> assign(tokens: Config.api_tokens(), raw: raw, token_widget: false)
+         |> assign(tokens: Config.api_tokens(), raw: raw, token_widget: false, token_usage: false)
          |> put_flash(:info, gettext("Token created. Copy it now, it will not be shown again."))}
 
       {:error, reason} ->
@@ -217,10 +311,70 @@ defmodule PepeWeb.TokensLive do
     end
   end
 
+  defp permissions(t), do: Pepe.ApiToken.permissions(t)
+
+  # An unchecked checkbox submits nothing, so every flag is read as "present means on".
+  # Both forms post all four together, which is what lets absence mean off rather than
+  # "unchanged" - a half-submitted permission set is how one silently stays granted.
+  #
+  # Which is also why this must never be applied to a form that did not render the fields:
+  # the widget form hides the whole permissions block, so reading it here would turn every
+  # absent checkbox into an explicit `false` and refuse the token as good for nothing. See
+  # `create_permission_opts/2`.
+  defp permission_opts(params) do
+    [
+      chat: params["chat"] == "true",
+      usage: params["usage"] == "true",
+      usage_content: params["usage"] == "true" and params["content"] == "true",
+      prices: params["prices"] || "billable"
+    ]
+  end
+
+  # A widget token has no permissions form (it may only ever chat), so it gets no permission
+  # opts at all and keeps the defaults. Otherwise the default price view is left out rather
+  # than written: `Pepe.Config.add_api_token/1` only stores what differs from the default, so
+  # sending it back would put a redundant `"prices": "billable"` in every entry.
+  #
+  # The *edit* form is different and always sends `prices` (see `token_permissions`): there,
+  # omitting it would mean "leave it as it was", and a token narrowed from `all` to
+  # `billable` would silently keep seeing the margin.
+  defp create_permission_opts(_params, true = _widget?), do: []
+
+  defp create_permission_opts(params, _widget?) do
+    opts = permission_opts(params)
+    if opts[:prices] == "billable", do: Keyword.delete(opts, :prices), else: opts
+  end
+
+  # What a token can do, at a glance, in the order it matters: what it may run, what it may
+  # read, and how much of the money that read shows.
+  defp permission_badges(t) do
+    p = permissions(t)
+
+    []
+    |> then(&if p.chat, do: &1 ++ [gettext("chat")], else: &1)
+    |> then(&if p.usage, do: &1 ++ [gettext("usage"), price_badge(p.prices)], else: &1)
+    |> then(&if p.usage_content, do: &1 ++ [gettext("content")], else: &1)
+  end
+
+  defp price_badge("all"), do: gettext("cost + margin")
+  defp price_badge("list"), do: gettext("no markup")
+  defp price_badge(_billable), do: gettext("billable")
+
   defp token_error(:unknown_project), do: gettext("That project does not exist.")
   defp token_error(:agent_out_of_scope), do: gettext("That agent is not in the chosen project.")
   defp token_error(:unknown_agent), do: gettext("That agent does not exist.")
 
   defp token_error(:widget_needs_agent),
     do: gettext("A public widget token must be locked to one agent - pick one above.")
+
+  defp token_error(:widget_cannot_read_usage),
+    do: gettext("A widget token sits in public page source, so it can never read usage.")
+
+  defp token_error(:no_permissions),
+    do: gettext("That leaves the token able to do nothing - keep \"Run agents\" or add \"Read usage\".")
+
+  defp token_error(:content_needs_usage),
+    do: gettext("Conversation content only means something together with \"Read usage\".")
+
+  defp token_error(:not_found), do: gettext("That token no longer exists.")
 end

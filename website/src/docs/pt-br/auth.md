@@ -155,6 +155,26 @@ Um token carrega um escopo que decide quais agentes ele pode alcançar. Do mais 
 
 `GET /v1/models` respeita o escopo: um token de projeto ou de agente vê apenas os próprios agentes, nunca os de outro projeto, e nunca as conexões de modelo puras.
 
+### Permissões de token
+
+O escopo diz *de quem* são os dados que o token alcança. Um conjunto separado de permissões diz *o que ele pode fazer* com eles, e os padrões deixam todo token que você já criou exatamente como estava: ele **pode** rodar agentes e **não pode** ler consumo.
+
+| Flag | Padrão | O que libera |
+| --- | --- | --- |
+| `--chat` / `--no-chat` | ligado | rodar agentes (`/v1/chat/completions`, o WebSocket) |
+| `--usage` | desligado | ler o `/v1/usage`, os números de cobrança |
+| `--prices` | `billable` | quanto dos valores uma leitura de consumo mostra |
+| `--content` | desligado | o detalhe de uma execução pode incluir o prompt e os argumentos e a saída das ferramentas |
+
+```bash
+# token de cobrança somente leitura para um cliente: lê os números, não gasta seu orçamento
+pepe token add --project acme --no-chat --usage --prices billable
+
+pepe token permissions abc123 --prices list    # muda no lugar, sem mexer no segredo
+```
+
+As duas metades são independentes de propósito. Sem elas, dar ao cliente visibilidade do próprio gasto significava dar junto uma credencial capaz de rodar agentes na sua conta. Veja a [API de consumo](../usage-api/) para o que essas leituras devolvem.
+
 ## Roteamento multiprojeto: dê ao projeto X seu próprio acesso
 
 Escopos são a forma de distribuir acesso à API por projeto. Para dar a um projeto a chave dele, gere um token com escopo de projeto:

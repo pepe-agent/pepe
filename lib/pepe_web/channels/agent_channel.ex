@@ -44,7 +44,12 @@ defmodule PepeWeb.AgentChannel do
     # agent outside what its token allows.
     requested = if topic in ["", "default"], do: nil, else: topic
 
-    case ApiScope.authorize_agent(requested, scope) do
+    # One gate, at the join: a token minted read-only (usage only) never reaches an agent
+    # channel at all, so no later message path has to remember to re-check it.
+    case chat_agent(requested, scope) do
+      {:error, reason} ->
+        {:error, %{reason: reason}}
+
       nil ->
         {:error, %{reason: "agent not accessible: #{inspect(topic)}"}}
 
@@ -70,6 +75,12 @@ defmodule PepeWeb.AgentChannel do
         socket = assign(socket, agent: agent, watch_key: key, lang: blank_to_nil(payload["lang"]))
         {:ok, %{history: visible_history(key)}, socket}
     end
+  end
+
+  defp chat_agent(requested, scope) do
+    if ApiScope.chat?(scope),
+      do: ApiScope.authorize_agent(requested, scope),
+      else: {:error, "this token is not allowed to run agents"}
   end
 
   defp visible_history(key) do

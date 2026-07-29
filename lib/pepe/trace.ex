@@ -91,6 +91,22 @@ defmodule Pepe.Trace do
     :ok
   end
 
+  @doc """
+  The run in progress in this process as `%{id:, session:, source:}`, or `nil` when there
+  is none. What `Pepe.Usage.record/3` stamps onto each metered model call, so the ledger
+  can group a run's several calls back into the one message that caused them.
+
+  Background metering that happens outside a run (session titling, compaction) sees `nil`
+  here, which is the honest answer: it belongs to no single message.
+  """
+  @spec current() :: %{id: String.t(), session: String.t() | nil, source: String.t() | nil} | nil
+  def current do
+    case Process.get(@key) do
+      nil -> nil
+      t -> %{id: t.id, session: t.session, source: t.source}
+    end
+  end
+
   @doc "Append one runtime lifecycle event to the in-progress trace (no-op if none)."
   def event(ev) do
     case {Process.get(@key), encode_event(ev)} do
@@ -124,6 +140,9 @@ defmodule Pepe.Trace do
           events: Enum.reverse(t.events)
         }
 
+        # The run's billing-side row first: it holds no transcript and is never trimmed, so
+        # it must not be lost to a failure in writing or trimming the (diagnostic) trace.
+        Pepe.Usage.Runs.record(row)
         write(row)
         t.id
     end

@@ -120,3 +120,7 @@ O `usage export` transforma o mês de um projeto numa fatura de cliente, em Mark
 No painel, a seção Usage & billing mostra tokens, custo e valor a cobrar por ciclo (hora, dia, semana, mês, ano), com quebras por projeto, modelo e agente. Os preços por modelo são definidos em Models, depois Edit; a margem de um projeto em Projects, depois Edit.
 
 A moeda é apenas um rótulo. O padrão é `USD` e você muda definindo `"currency"` no `config.json`. Não há conversão de câmbio, então o número está na moeda em que o seu provedor cota os preços dele.
+
+No painel, a mesma página termina com uma tabela **Por mensagem**: uma linha por mensagem recebida, com as ferramentas que ela rodou, quantas chamadas de modelo isso levou, quanto tempo durou e quanto custa. Clique numa linha para ver essas chamadas uma a uma. A mesma visão é `pepe usage runs`, e `pepe usage runs <id>` para uma mensagem só. Um relatório por ciclo conta chamadas de modelo e por isso nunca consegue mostrar isso; o que encarece uma mensagem é o número de chamadas, não o de ferramentas, porque cada iteração reenvia um contexto que o resultado da ferramenta anterior acabou de aumentar.
+
+Os mesmos números também podem ser lidos por HTTP, pelo sistema de cobrança do próprio cliente, com um token criado só para ler: veja a [API de consumo](../usage-api/). Ela desce um nível abaixo da fatura, até quanto custou uma única mensagem e quais ferramentas ela rodou.

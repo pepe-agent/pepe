@@ -19,6 +19,13 @@ defmodule PepeWeb.ChatLiveRunningTest do
   @endpoint PepeWeb.Endpoint
 
   # A model that answers slowly enough that a test can catch the session mid-turn.
+  #
+  # The window has to cover a LiveView mount *and* a click, not just the `Process.sleep(150)`
+  # each test does before mounting. At 400ms it did not: under a loaded suite the mount alone
+  # could eat the remaining 250ms, the answer landed first, and "clicking Stop interrupts the
+  # turn" got `{:ok, "done"}` back instead of `{:error, :stopped}` - the run it was supposed
+  # to interrupt had already finished. Three seconds is slack, not a weaker assertion: the
+  # turn still has to actually stop, it is only given room to still be running when asked to.
   defmodule SlowPlug do
     @moduledoc false
     import Plug.Conn
@@ -27,7 +34,7 @@ defmodule PepeWeb.ChatLiveRunningTest do
 
     def call(conn, _opts) do
       {:ok, _body, conn} = read_body(conn)
-      Process.sleep(400)
+      Process.sleep(3_000)
       message = %{"role" => "assistant", "content" => "done"}
       payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => "stop"}]}
       conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
@@ -54,6 +61,11 @@ defmodule PepeWeb.ChatLiveRunningTest do
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
     end)
+
+    # Registered last so it runs FIRST: a run still in flight has to be stopped while the config
+    # and PEPE_HOME it is running against still exist, or it carries on into the next test and
+    # calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
 
     {:ok, key: "web:running-#{System.unique_integer([:positive])}"}
   end
