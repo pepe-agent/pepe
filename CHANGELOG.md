@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.12.0] - 2026-07-29
 
 ### Added
 - **A usage API, so a client's own billing system can read what it spent.** `GET /v1/usage` (aggregated into hour/day/week/month/year buckets), `/v1/usage/events` (one row per model call), `/v1/usage/runs` (one row per inbound message) and `/v1/usage/runs/:id` (that message, call by call). Same bearer token as the rest of `/v1`, filtered by `project`, `agent`, `model`, `source`, `session`, `run_id` and a time window, and paged on an opaque cursor. The aggregate defaults to the last 90 days and reports the window it used, since summing a window means reading all of it and an unbounded default would let any usage token walk the whole ledger once per request. Until now the figures existed only on the dashboard and in `mix pepe usage`, so handing a client their own numbers meant exporting an invoice by hand.
@@ -624,7 +624,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/pepe-agent/pepe/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/pepe-agent/pepe/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/pepe-agent/pepe/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/pepe-agent/pepe/compare/v0.10.1...v0.10.2
