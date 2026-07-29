@@ -89,6 +89,11 @@ defmodule Pepe.Agent.SessionMidRunFoldTest do
       File.rm_rf(home)
     end)
 
+    # Registered last so it runs FIRST: a run still in flight has to be stopped while the config
+    # and PEPE_HOME it is running against still exist, or it carries on into the next test and
+    # calls that test's mock. See Pepe.Test.Sessions.
+    on_exit(&Pepe.Test.Sessions.stop_all!/0)
+
     # Two calls, a real sleep in between (via a bash tool call) so there's a genuine
     # window for a steer to land before the second call - see `tool_first` above.
     main_port = start_mock(:main, "final answer", tool_first: true)
