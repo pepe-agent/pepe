@@ -219,7 +219,7 @@ defmodule PepeWeb.UsageApiTest do
 
     # An explicit limit still caps the series - that is what it is for.
     capped = get_json("k_bill", "/v1/usage?from=1&granularity=day&limit=1") |> json_response(200)
-    assert length(capped["buckets"]) == 1
+    assert [_one] = capped["buckets"]
   end
 
   test "a project token cannot read another project by naming it" do
@@ -240,7 +240,7 @@ defmodule PepeWeb.UsageApiTest do
   test "events return one row per model call, with the run it belongs to" do
     body = get_json("k_bill", "/v1/usage/events") |> json_response(200)
 
-    assert length(body["data"]) == 3
+    assert [_, _, _] = body["data"]
     assert Enum.all?(body["data"], &(&1["project"] == "acme"))
     assert Enum.count(body["data"], &(&1["run_id"] == "1000")) == 2
     refute body["has_more"]
@@ -251,14 +251,16 @@ defmodule PepeWeb.UsageApiTest do
     assert first["has_more"]
 
     next = get_json("k_bill", "/v1/usage/events?limit=2&cursor=#{first["next_cursor"]}") |> json_response(200)
-    assert length(next["data"]) == 1
+    assert [_last] = next["data"]
     refute next["has_more"]
   end
 
   test "events can be narrowed to one session" do
     body = get_json("k_bill", "/v1/usage/events?session=telegram:7") |> json_response(200)
 
-    assert length(body["data"]) == 2
+    # The two calls of run 1000, and not the third acme call, which has no session.
+    assert [_, _] = body["data"]
+    assert Enum.all?(body["data"], &(&1["session"] == "telegram:7"))
   end
 
   ###
@@ -268,7 +270,7 @@ defmodule PepeWeb.UsageApiTest do
   test "runs return one row per message, with its tools and its summed cost" do
     body = get_json("k_bill", "/v1/usage/runs") |> json_response(200)
 
-    assert length(body["data"]) == 2
+    assert [_, _] = body["data"]
     run = Enum.find(body["data"], &(&1["id"] == "1000"))
 
     assert run["tools"] == ["bash"]
@@ -309,7 +311,7 @@ defmodule PepeWeb.UsageApiTest do
 
     assert body["object"] == "usage.run"
     assert body["calls"] == 2
-    assert length(body["breakdown"]) == 2
+    assert [_first, _second] = body["breakdown"]
     assert Enum.map(body["breakdown"], & &1["model"]) == ["mock", "mock"]
     assert body["billable"] == 0.00008
   end

@@ -83,7 +83,7 @@ defmodule PepeWeb.UsageLiveRunsTest do
 
     assert opened =~ "Every model call this message took"
     # Two calls behind one message: the point of the whole table.
-    assert opened |> String.split("mock") |> length() >= 3
+    assert opened |> String.split("mock") |> Enum.drop(1) |> Enum.count() >= 2
   end
 
   test "clicking the same row again closes it" do

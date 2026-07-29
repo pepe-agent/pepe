@@ -41,12 +41,12 @@ defmodule Pepe.UsageRunLinkTest do
     id = Trace.finish({:ok, "done", []})
 
     entries = Log.entries(nil)
-    assert length(entries) == 2
+    assert [_, _] = entries
     assert Enum.all?(entries, &(&1["run_id"] == id))
     assert Enum.all?(entries, &(&1["session"] == "telegram:7"))
     assert Enum.all?(entries, &(&1["source"] == "telegram"))
 
-    assert Log.entries_for_run(nil, id) |> length() == 2
+    assert [_, _] = Log.entries_for_run(nil, id)
   end
 
   test "metering outside a run belongs to no run rather than to the last one" do
@@ -104,6 +104,6 @@ defmodule Pepe.UsageRunLinkTest do
     # One message, one run row - not one per agent that worked on it.
     assert [run] = Runs.list(nil)
     assert run["id"] == id
-    assert Log.entries_for_run(nil, id) |> length() == 1
+    assert [_only] = Log.entries_for_run(nil, id)
   end
 end

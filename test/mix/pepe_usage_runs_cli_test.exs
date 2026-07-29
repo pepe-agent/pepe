@@ -113,8 +113,9 @@ defmodule Mix.Tasks.PepeUsageRunsCliTest do
     assert out =~ "run 1000"
     assert out =~ "bash → read_file"
     assert out =~ "ok in 4210ms"
-    # Three metered calls, and a TOTAL that is their sum rather than any one of them.
-    assert out |> String.split("mock") |> length() == 4
+    # One line per metered call, three of them, plus a TOTAL that is their sum rather than
+    # any one of them.
+    assert out |> String.split("mock") |> Enum.drop(1) |> Enum.count() == 3
     assert out =~ "TOTAL"
   end
 
