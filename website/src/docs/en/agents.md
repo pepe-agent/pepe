@@ -106,7 +106,7 @@ below); asking it to touch one outside that scope is politely refused.
 | `description` | A short human note. Never sent to the model. | none |
 | `model` | The name of a model connection. Leave it unset to use the project's default model. | project default |
 | `system_prompt` | The persona and instructions the agent runs with. | `You are Pepe, a helpful AI agent.` (a seed prompt) |
-| `tools` | The list of tool names this agent may call. Only these are offered to the model. | all tools when `--tools` is omitted at creation |
+| `tools` | The list of tool names this agent may call. Only these are offered to the model. | all tools - a new agent starts with everything enabled; remove what you don't want |
 | `auto_approve` | Tools this agent may run without asking for permission. `["*"]` means every tool. | `[]` |
 | `can_message` | Other agents this one may send messages to (a directed route). | `[]` |
 | `can_manage` | Which agents this one may administer. See [Administering agents](#administering-agents). | `null` (itself only) |

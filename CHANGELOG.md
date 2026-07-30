@@ -3,7 +3,10 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.12.0] - 2026-07-29
+## [Unreleased]
+
+### Changed
+- **A new agent now defaults to every built-in tool enabled, instead of none.** The dashboard's "+ New agent" form now pre-checks every tool (the CLI's `mix pepe agent add` and `mix pepe setup` already worked this way - omit `--tools` and it grants everything); a `config.json` agent entry with no `"tools"` key at all resolves the same way. This includes tools with real system reach (`bash`, `manage_agent`, `manage_token`, `manage_pepe`, `manage_mcp`, `manage_plugin`, `schedule_task`, `watch`, `delegate`, ...), so review a freshly created agent's tool list and remove what it shouldn't have, rather than assuming it starts with nothing. This closes a gap where an agent silently lacked an unrelated, easy-to-forget tool (e.g. `send_file`) because whoever set it up hand-picked a list and missed one. An agent created by another agent via `manage_agent`'s `create` action is unchanged and still starts with no tools, since that path has no human reviewing a checklist before the agent exists.
 
 ### Added
 - **A usage API, so a client's own billing system can read what it spent.** `GET /v1/usage` (aggregated into hour/day/week/month/year buckets), `/v1/usage/events` (one row per model call), `/v1/usage/runs` (one row per inbound message) and `/v1/usage/runs/:id` (that message, call by call). Same bearer token as the rest of `/v1`, filtered by `project`, `agent`, `model`, `source`, `session`, `run_id` and a time window, and paged on an opaque cursor. The aggregate defaults to the last 90 days and reports the window it used, since summing a window means reading all of it and an unbounded default would let any usage token walk the whole ledger once per request. Until now the figures existed only on the dashboard and in `mix pepe usage`, so handing a client their own numbers meant exporting an invoice by hand.

@@ -109,7 +109,7 @@ toque uno fuera de ese alcance se rechaza con cortesía.
 | `description` | Una nota breve para humanos. Nunca se envía al modelo. | ninguno |
 | `model` | El nombre de una conexión de modelo. Déjalo sin definir para usar el modelo predeterminado del proyecto. | predeterminado del proyecto |
 | `system_prompt` | La personalidad y las instrucciones con las que se ejecuta el agente. | `Eres Pepe, un agente de IA útil.` (un prompt inicial) |
-| `tools` | La lista de nombres de herramientas que este agente puede llamar. Solo estas se ofrecen al modelo. | todas las herramientas cuando se omite `--tools` al crear |
+| `tools` | La lista de nombres de herramientas que este agente puede llamar. Solo estas se ofrecen al modelo. | todas las herramientas - un agente nuevo nace con todo habilitado; quitas lo que no quieras |
 | `auto_approve` | Herramientas que este agente puede ejecutar sin pedir permiso. `["*"]` significa todas. | `[]` |
 | `can_message` | Otros agentes a los que este puede enviar mensajes (una ruta dirigida). | `[]` |
 | `can_manage` | Qué agentes puede administrar este. Mira [Administrar agentes](#administrar-agentes). | `null` (solo a sí mismo) |

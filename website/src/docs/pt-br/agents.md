@@ -109,7 +109,7 @@ fora desse escopo é recusado com educação.
 | `description` | Uma nota curta para humanos. Nunca enviada ao modelo. | nenhum |
 | `model` | O nome de uma conexão de modelo. Deixe sem definir para usar o modelo padrão do escopo. | padrão do escopo |
 | `system_prompt` | A personalidade e as instruções com que o agente roda. | `Você é o Pepe, um agente de IA prestativo.` (um prompt inicial) |
-| `tools` | A lista de nomes de ferramentas que este agente pode chamar. Só essas são oferecidas ao modelo. | todas as ferramentas quando `--tools` é omitido na criação |
+| `tools` | A lista de nomes de ferramentas que este agente pode chamar. Só essas são oferecidas ao modelo. | todas as ferramentas - um agente novo já nasce com tudo habilitado; você remove o que não quiser |
 | `auto_approve` | Ferramentas que este agente pode executar sem pedir permissão. `["*"]` significa todas. | `[]` |
 | `can_message` | Outros agentes para os quais este pode enviar mensagens (uma rota direcionada). | `[]` |
 | `can_manage` | Quais agentes este pode administrar. Veja [Administrar agentes](#administrar-agentes). | `null` (só ele mesmo) |

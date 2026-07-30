@@ -390,7 +390,10 @@ defmodule PepeWeb.AgentsLive do
       name: "",
       system_prompt: "",
       model: nil,
-      tools: [],
+      # Every tool checked by default - same as the CLI (`mix pepe agent add` with no
+      # `--tools`) and `mix pepe setup` already do. The operator unchecks what they don't
+      # want instead of having to remember and pick everything they do.
+      tools: Pepe.Tools.names(),
       auto_approve: [],
       can_message: [],
       can_manage: nil,

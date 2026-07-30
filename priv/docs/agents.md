@@ -10,7 +10,9 @@ admin scope - see below).
 - **persona** - the system prompt. Stored as `SOUL.md` in the agent's workspace
   (`~/.pepe/agents/<name>/`); falls back to the config `system_prompt` seed.
 - **tools** - the allowlist. A capability = having its tool. Includes built-ins,
-  `mcp__<server>__<tool>` MCP tools, and plugin tools.
+  `mcp__<server>__<tool>` MCP tools, and plugin tools. A new agent defaults to
+  every tool enabled - remove the ones you don't want this agent to have,
+  rather than having to list everything it should.
 - **can_message** - directed routing: which agents it may message.
 - **can_manage** - admin scope: which agents it may administer (see below).
 - **memory** - `MEMORY.md` / `USER.md` in its workspace.

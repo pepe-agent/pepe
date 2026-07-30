@@ -109,7 +109,7 @@ fora desse âmbito é recusado com cortesia.
 | `description` | Uma nota curta para humanos. Nunca enviada ao modelo. | nenhum |
 | `model` | O nome de uma ligação de modelo. Deixa por definir para usar o modelo predefinido do âmbito. | predefinição do âmbito |
 | `system_prompt` | A personalidade e as instruções com que o agente corre. | `És o Pepe, um agente de IA prestável.` (um prompt inicial) |
-| `tools` | A lista de nomes de ferramentas que este agente pode chamar. Só estas são oferecidas ao modelo. | todas as ferramentas quando `--tools` é omitido na criação |
+| `tools` | A lista de nomes de ferramentas que este agente pode chamar. Só estas são oferecidas ao modelo. | todas as ferramentas - um agente novo já nasce com tudo ativado; retiras o que não quiseres |
 | `auto_approve` | Ferramentas que este agente pode executar sem pedir permissão. `["*"]` significa todas. | `[]` |
 | `can_message` | Outros agentes aos quais este pode enviar mensagens (uma rota dirigida). | `[]` |
 | `can_manage` | Que agentes este pode administrar. Vê [Administrar agentes](#administrar-agentes). | `null` (só a si próprio) |

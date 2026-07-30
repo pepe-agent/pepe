@@ -43,4 +43,15 @@ defmodule PepeWeb.AgentsLiveNewTest do
     assert html =~ ~s(name="max_iterations")
     assert html =~ ~s(name="tool_progress")
   end
+
+  test "the new-agent form pre-checks every tool, so nothing has to be remembered by hand" do
+    {:ok, view, _html} = live(conn(), "/agents")
+
+    html = render_click(view, "agent_new", %{})
+
+    for tool <- Pepe.Tools.names() do
+      assert html =~ ~r/name="tools\[\]"\s+value="#{Regex.escape(tool)}"\s+checked/,
+             "expected the #{tool} checkbox to be pre-checked in the new-agent form"
+    end
+  end
 end

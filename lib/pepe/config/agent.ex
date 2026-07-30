@@ -131,7 +131,11 @@ defmodule Pepe.Config.Agent do
       description: map["description"],
       model: map["model"],
       system_prompt: map["system_prompt"] || @default_prompt,
-      tools: map["tools"] || [],
+      # No "tools" key at all (a hand-written config.json entry, or one predating this field)
+      # means "not decided yet" - default to every tool, same as the CLI and dashboard already
+      # do for a freshly created agent. An operator removes what they don't want, rather than
+      # having to remember and list everything they do.
+      tools: map["tools"] || Pepe.Tools.names(),
       auto_approve: map["auto_approve"] || [],
       can_message: map["can_message"] || [],
       # Preserve nil (the "itself only" default) vs [] (nobody) - don't coalesce.

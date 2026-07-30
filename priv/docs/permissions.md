@@ -6,7 +6,9 @@ without being dangerous.
 ## The layers
 
 1. **Tool allowlist** - an agent can only call tools in its `tools` list. A capability
-   is just having its tool. If a tool isn't listed, the model never sees it.
+   is just having its tool. If a tool isn't listed, the model never sees it. A newly
+   created agent defaults to every tool enabled; an operator removes what they don't
+   want rather than opting each one in.
 2. **Permission gate (per call)** - when a tool *is* called:
    - Tools that carry no risk of their own run freely: `read_file`, `list_dir`,
      `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill`,
