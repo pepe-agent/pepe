@@ -135,7 +135,7 @@ A ferramenta `schedule_task` suporta as mesmas ações da CLI: `create`, `list`,
 
 Criar trabalho agendado pela conversa é deliberadamente protegido duas vezes, porque uma tarefa roda sozinha depois:
 
-1. **A ferramenta precisa estar concedida ao agente.** Um agente só pode agendar algo se `schedule_task` estiver na lista de permissões dele. Agentes sem ela simplesmente não conseguem.
+1. **A ferramenta precisa estar na lista de permissões do agente.** Um agente novo já nasce com `schedule_task` habilitada, como qualquer outra ferramenta; remova-a da lista do agente se ele nunca deve poder agendar nada.
 2. **Cada criação ainda pergunta a você.** `schedule_task` passa pela barreira de permissão, então, a menos que tenha sido pré-aprovada, o runtime pede que você autorize a chamada específica antes de ela valer. Cada superfície mostra esse pedido do seu jeito nativo (botões embutidos no Telegram, um menu com as setas do teclado no terminal). Você pode responder só desta vez, pelo resto da sessão, sempre (lembrado no agente) ou negar.
 
-Assim uma tarefa nunca aparece pelas suas costas: o recurso é opcional, e cada tarefa concreta também é.
+Assim uma tarefa nunca aparece pelas suas costas: o recurso pode ser removido por agente, e cada tarefa concreta ainda depende da sua autorização por cima disso.

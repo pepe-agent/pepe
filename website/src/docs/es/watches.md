@@ -56,7 +56,7 @@ Abre la página **Watches** bajo `pepe serve` para ver cada vigilancia con su es
 
 ### Hazlo por chat
 
-Pídelo en lenguaje natural y el agente crea la vigilancia a través de su herramienta `watch`. Igual que `schedule_task`, la herramienta `watch` tiene que estar en el conjunto del agente y pasa por el mismo aviso de permiso en cada creación, así que aplica la misma doble aprobación.
+Pídelo en lenguaje natural y el agente crea la vigilancia a través de su herramienta `watch`. Igual que `schedule_task`, la herramienta `watch` viene habilitada por defecto (quítala de las herramientas del agente si nunca debería crear una) y sigue pasando por el mismo aviso de permiso en cada creación.
 
 > Avísame cuando termine el despliegue. Revisa cada pocos minutos.
 

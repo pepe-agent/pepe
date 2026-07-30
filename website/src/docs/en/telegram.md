@@ -181,9 +181,12 @@ The waiver lives on that group's own conversation, not the bot, so it never
 leaks into any other group the same bot is in, and a fresh conversation
 (`/new`) forgets it.
 
-A group conversation is one shared session across everyone in it, with no
-per-sender labeling. If your agent needs to tell people apart, say so in its
-prompt. The bot is also blind to anything not addressed to it: a message that
+A group conversation is one shared session across everyone in it. Each inbound
+message is tagged with the sender's name (`Alice: what's the status?`) so the
+model knows who it's answering turn by turn, instead of assuming whoever wrote
+last is the same person the thread was about earlier; a private chat is never
+tagged this way, since there's no one else it could be. The bot is also blind
+to anything not addressed to it: a message that
 doesn't @mention it (and isn't waived by `/mention off`) never reaches the
 agent at all, not even as silent context, so it can't "catch up" on chatter
 that happened before it was brought in.

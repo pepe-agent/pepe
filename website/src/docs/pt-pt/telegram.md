@@ -185,8 +185,12 @@ propaga para nenhum outro grupo em que o mesmo bot esteja, e uma conversa
 nova (`/new`) esquece-a.
 
 Uma conversa de grupo é uma única sessão partilhada entre todos os que estão
-nela, sem identificar quem disse o quê. Se o teu agente precisar de
-distinguir as pessoas, indica isso no prompt dele. O bot também é cego ao que
+nela. Cada mensagem recebida vem identificada com o nome de quem a enviou
+(`Alice: como está o estado?`), por isso o modelo sabe a quem está a
+responder em cada turno, em vez de presumir que quem escreveu por último é a
+mesma pessoa de quem se falava antes; uma conversa privada nunca vem
+identificada assim, já que não há mais ninguém que pudesse ser. O bot também
+é cego ao que
 não lhe é dirigido: uma mensagem que não o @menciona (e não está dispensada
 com `/mention off`) nunca chega ao agente, nem como contexto silencioso, por
 isso não consegue "pôr-se a par" do que se falou antes de ele ser trazido

@@ -830,11 +830,12 @@ defmodule Pepe.Gateways.Telegram do
         reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
         stripped = strip_mention(said)
         quick = quick_reaction_emoji(b, stripped)
+        tag = sender_tag(message, chat["type"])
 
         Task.start(fn ->
           put_bot(b)
           put_thread(thread_id)
-          react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to)
+          react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to, tag)
         end)
 
       true ->
@@ -842,14 +843,24 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp react_or_respond(quick, chat_id, _user_id, message_id, _stripped, _reply_to) when is_binary(quick),
+  defp react_or_respond(quick, chat_id, _user_id, message_id, _stripped, _reply_to, _tag) when is_binary(quick),
     do: set_reaction(chat_id, message_id, quick)
 
-  defp react_or_respond(nil, chat_id, user_id, message_id, stripped, reply_to) do
+  defp react_or_respond(nil, chat_id, user_id, message_id, stripped, reply_to, tag) do
     put_chat(chat_id)
     put_reply_to(reply_to)
-    respond(chat_id, user_id, message_id, stripped)
+    respond(chat_id, user_id, message_id, stripped, tag)
   end
+
+  # A DM has exactly one person on the other end, so tagging it would be pure noise; a group
+  # or a forum topic can have several, and until now the bot just kept addressing whoever it
+  # saw first in the session - tag the text with who actually sent it so the model doesn't
+  # have to guess.
+  defp sender_tag(_message, "private"), do: nil
+  defp sender_tag(message, _chat_type), do: sender_display_name(message["from"] || %{})
+
+  defp tag_text(nil, text), do: text
+  defp tag_text(name, text), do: "#{name}: #{text}"
 
   # Record a blocked user for approval, but only when the bot runs `require_approval` and the chat
   # itself is allowed - there is nothing to approve on a bot that answers everyone, and no point
@@ -1446,7 +1457,7 @@ defmodule Pepe.Gateways.Telegram do
   defp caption_line(""), do: ""
   defp caption_line(caption), do: "\n\nTheir caption: #{caption}"
 
-  defp respond(chat_id, user_id, msg_id, text) do
+  defp respond(chat_id, user_id, msg_id, text, sender_tag \\ nil) do
     Config.put_locale()
     put_learn(learn_allowed?(user_id))
 
@@ -1454,7 +1465,7 @@ defmodule Pepe.Gateways.Telegram do
       # /whoami is the one command that needs the sender id.
       {:command, "whoami", _args} -> whoami(chat_id, user_id)
       {:command, name, args} -> dispatch(chat_id, name, args)
-      :chat -> chat_with_agent(chat_id, msg_id, text)
+      :chat -> chat_with_agent(chat_id, msg_id, text, sender_tag: sender_tag)
     end
   end
 
@@ -1493,6 +1504,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp chat_with_agent(chat_id, msg_id, text, opts \\ []) do
     agent = bind_and_resolve_agent(chat_id)
+    text = tag_text(opts[:sender_tag], text)
 
     typing = keep_typing(chat_id)
     if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, @work_reaction)

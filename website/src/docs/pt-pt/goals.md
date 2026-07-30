@@ -87,7 +87,7 @@ Um objetivo não é um modo especial: envolve um turno normal. O agente continua
 
 ## Estado de trabalho dentro da conversa
 
-O `pepe goal` conduz uma execução inteira a partir de fora. Duas ferramentas separadas dão ao agente um estado de trabalho **por dentro**, para que se mantenha coerente ao longo de muitos turnos, em vez de reagir a uma mensagem de cada vez. Ambas são por conversa: vivem com a sessão, no armazenamento descartável, e cada chamada e o seu resultado aparecem na conversa e nos [Traces](/pt-pt/docs/traces/). Ambas são opcionais, por isso acrescentas `goal` e `update_plan` à lista de ferramentas de um agente.
+O `pepe goal` conduz uma execução inteira a partir de fora. Duas ferramentas separadas dão ao agente um estado de trabalho **por dentro**, para que se mantenha coerente ao longo de muitos turnos, em vez de reagir a uma mensagem de cada vez. Ambas são por conversa: vivem com a sessão, no armazenamento descartável, e cada chamada e o seu resultado aparecem na conversa e nos [Traces](/pt-pt/docs/traces/). Ambas são ferramentas como quaisquer outras, presentes por predefinição; retira `goal` e `update_plan` da lista de ferramentas de um agente se não quiseres que ele acompanhe um objetivo ou plano ao longo dos turnos.
 
 ### `goal`: a estrela-guia
 

@@ -56,7 +56,7 @@ Abre a página **Watches** sob `pepe serve` para ver cada vigilância com o seu 
 
 ### Fá-lo pela conversa
 
-Pede em linguagem simples e o agente cria a vigilância através da sua ferramenta `watch`. Tal como `schedule_task`, a ferramenta `watch` tem de estar no conjunto de ferramentas do agente e passa pelo mesmo pedido de permissão em cada criação, por isso aplica-se a mesma barreira de duplo consentimento.
+Pede em linguagem simples e o agente cria a vigilância através da sua ferramenta `watch`. Tal como `schedule_task`, a ferramenta `watch` já vem ativada por predefinição (retira-a das ferramentas do agente se ele nunca dever criar uma) e continua a passar pelo mesmo pedido de permissão em cada criação.
 
 > Avisa-me quando o deploy terminar. Verifica a cada poucos minutos.
 

@@ -135,7 +135,7 @@ La herramienta `schedule_task` admite las mismas acciones que la CLI: `create`, 
 
 Crear trabajo programado desde el chat está deliberadamente protegido dos veces, porque una tarea se ejecuta sola más tarde:
 
-1. **La herramienta tiene que estar concedida al agente.** Un agente solo puede programar algo si `schedule_task` está en su lista de permitidos. Los agentes sin ella simplemente no pueden.
+1. **La herramienta tiene que estar en la lista de permitidos del agente.** Un agente nuevo nace con `schedule_task` habilitada, como cualquier otra herramienta; quítala de la lista del agente si nunca debería poder programar nada.
 2. **Cada creación igual te pregunta.** `schedule_task` es una herramienta con control, así que a menos que se haya preaprobado, el runtime te pide autorizar la llamada concreta antes de que surta efecto. Cada superficie muestra ese aviso a su manera nativa (botones en línea en Telegram, un menú con las flechas del teclado en la terminal). Puedes responder solo por esta vez, por el resto de la sesión, siempre (recordado en el agente) o denegar.
 
-Así una tarea nunca aparece a tus espaldas: la capacidad es opcional, y cada tarea concreta también lo es.
+Así una tarea nunca aparece a tus espaldas: la capacidad se puede quitar por agente, y cada tarea concreta sigue dependiendo de tu autorización por encima de eso.

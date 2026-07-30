@@ -56,7 +56,7 @@ Abra a página **Watches** sob `pepe serve` para ver cada vigia com o estado, o 
 
 ### Faça pela conversa
 
-Peça em linguagem natural e o agente cria a vigia pela ferramenta `watch` dele. Assim como `schedule_task`, a ferramenta `watch` precisa estar no conjunto do agente e passa pelo mesmo pedido de permissão a cada criação, então vale o mesmo duplo aceite.
+Peça em linguagem natural e o agente cria a vigia pela ferramenta `watch` dele. Assim como `schedule_task`, a ferramenta `watch` já vem habilitada por padrão (remova-a das ferramentas do agente se ele nunca dever criar uma) e ainda passa pelo mesmo pedido de permissão a cada criação.
 
 > Me avise quando o deploy terminar. Cheque a cada poucos minutos.
 

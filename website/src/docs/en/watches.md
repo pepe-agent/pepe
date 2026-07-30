@@ -56,7 +56,7 @@ Open the **Watches** page under `pepe serve` to see every watch with its state, 
 
 ### Do it by chat
 
-Ask in plain language and the agent creates the watch through its `watch` tool. Like `schedule_task`, the `watch` tool has to be in the agent's toolset and goes through the same permission prompt on each create, so the same double opt-in gate applies.
+Ask in plain language and the agent creates the watch through its `watch` tool. Like `schedule_task`, the `watch` tool comes enabled by default (remove it from an agent's tools if it should never create one) and still goes through the same permission prompt on each create.
 
 > Let me know when the deploy finishes. Check every few minutes.
 

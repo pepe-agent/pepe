@@ -135,7 +135,7 @@ The `schedule_task` tool supports the same actions as the CLI: `create`, `list`,
 
 Creating scheduled work from chat is deliberately guarded twice, because a task runs unattended later:
 
-1. **The tool has to be granted to the agent.** An agent can only schedule anything if `schedule_task` is in its allowlist. Agents without it simply cannot.
+1. **The tool has to be on the agent's allowlist.** A new agent gets `schedule_task` by default like every other tool; remove it from an agent's tool list if it should never be able to schedule anything at all.
 2. **Each create still asks you.** `schedule_task` is a gated tool, so unless it has been pre-approved, the runtime asks you to authorize the specific call before it takes effect. Each surface renders that prompt in its own native way (inline buttons on Telegram, an arrow-key menu in the terminal). You can answer just this once, for the rest of the session, always (remembered on the agent), or deny.
 
-So a task never appears behind your back: the capability is opt-in, and each concrete task is opt-in too.
+So a task never appears behind your back: the capability can be removed per agent, and each concrete task still needs your authorization on top of that.

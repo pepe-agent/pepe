@@ -184,8 +184,11 @@ nenhum outro grupo em que o mesmo bot esteja, e uma conversa nova (`/new`)
 esquece ela.
 
 Uma conversa de grupo é uma única sessão compartilhada entre todo mundo que
-está nela, sem marcar quem disse o quê. Se seu agente precisa diferenciar as
-pessoas, avise isso no prompt dele. O bot também é cego para o que não é
+está nela. Cada mensagem recebida vem marcada com o nome de quem enviou
+(`Alice: como está o status?`), então o modelo sabe a quem está respondendo a
+cada turno, em vez de supor que quem escreveu por último é a mesma pessoa de
+quem o assunto era antes; uma conversa privada nunca vem marcada assim, já
+que não tem mais ninguém que poderia ser. O bot também é cego para o que não é
 endereçado a ele: uma mensagem que não o @menciona (e não está dispensada
 via `/mention off`) nunca chega ao agente, nem como contexto silencioso,
 então ele não consegue "se atualizar" sobre o que rolou antes dele entrar na
