@@ -24,6 +24,7 @@ All notable changes to this project are documented here. Format follows
 
 ### Changed
 - `mix pepe token list` shows each token's permissions alongside its scope and fingerprint.
+- **The dashboard's agent editor now opens each section (Persona, Model & fallbacks, Complexity routing, Chores, Capabilities, Access, Limits, Assembled prompt) collapsed by default**, instead of showing all eight as one long scroll. Click a section's title to open it. Every other form using the same section component (models, config, connections) is unchanged.
 
 ### Fixed
 - A Telegram permission prompt that nobody answered in 5 minutes was indistinguishable from an explicit denial - the agent got a bare "not authorized" and had no way to tell "try again" from "don't ask again." It now says the request timed out, matching how `ask_user`'s own prompt already reports its timeout.

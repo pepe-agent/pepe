@@ -121,7 +121,7 @@ defmodule PepeWeb.AgentsLive do
               {gettext("Please fix the errors below.")}
             </div>
 
-            <.form_section title={gettext("Persona")}>
+            <.form_section collapsible title={gettext("Persona")}>
               <.input field={@form[:name]} label={gettext("Name")} placeholder={gettext("assistant")}
                 readonly={!@edit_agent.new?} class={[fld(), !@edit_agent.new? && "opacity-60"]} />
 
@@ -131,7 +131,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Model & fallbacks")}>
+            <.form_section collapsible title={gettext("Model & fallbacks")}>
               <div>
                 <label class={lbl()}>{gettext("Model")}</label>
                 <select name="model" class={fld()}>
@@ -170,7 +170,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Complexity routing")}>
+            <.form_section collapsible title={gettext("Complexity routing")}>
               <p class={hlp()}>
                 {gettext("Optional: checks if the chat is simple or complex before the first reply. Simple -> the model below handles it. Complex -> this agent's own model (above) handles it. Best-effort: if the check fails, this agent's own model answers directly.")}
               </p>
@@ -213,7 +213,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Chores")}>
+            <.form_section collapsible title={gettext("Chores")}>
               <p class={hlp()}>
                 {gettext("Some calls are not the agent thinking, they are the agent tidying up: naming a conversation so this sidebar reads like something. Point them at a cheap connection you already have. Left off, a conversation is still named, from the first few words of what was asked - free, offline, and nobody's opening message is sent anywhere to be read.")}
               </p>
@@ -238,7 +238,7 @@ defmodule PepeWeb.AgentsLive do
               </label>
             </.form_section>
 
-            <.form_section title={gettext("Capabilities")}>
+            <.form_section collapsible title={gettext("Capabilities")}>
               <div>
                 <label class={lbl()}>
                   {gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span>
@@ -273,7 +273,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Access")}>
+            <.form_section collapsible title={gettext("Access")}>
               <div>
                 <label class={lbl()}>{gettext("Can message (agents it may talk to)")}</label>
                 <input name="can_message" value={Enum.join(@edit_agent.can_message, ",")} placeholder={gettext("e.g. helper, researcher")} class={fld()} />
@@ -292,7 +292,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Limits")}>
+            <.form_section collapsible title={gettext("Limits")}>
               <div>
                 <label class={lbl()}>{gettext("Max steps")} <span class="text-zinc-600">{gettext("(tool rounds per task)")}</span></label>
                 <input type="number" min="1" name="max_iterations" value={@edit_agent.max_iterations} placeholder={gettext("no limit")} class={fld()} />
@@ -353,7 +353,7 @@ defmodule PepeWeb.AgentsLive do
               </label>
             </.form_section>
 
-            <.form_section :if={!@edit_agent.new?} title={gettext("Assembled prompt")}>
+            <.form_section :if={!@edit_agent.new?} collapsible title={gettext("Assembled prompt")}>
               <details class="text-sm">
                 <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200">
                   {gettext("What the model actually sees, not just the persona above")}

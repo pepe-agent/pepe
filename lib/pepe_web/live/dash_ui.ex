@@ -85,6 +85,12 @@ defmodule PepeWeb.DashUI do
   end
 
   attr :title, :string, required: true
+  # Opt-in: a form with many sections (the agent editor) can pass collapsible so each one is
+  # a native <details> the operator opens on demand, instead of one long undifferentiated
+  # scroll. Other callers (models, config, connections) are untouched by this - false keeps
+  # the plain, always-open <div> every existing caller already renders.
+  attr :collapsible, :boolean, default: false
+  attr :open, :boolean, default: false
   slot :inner_block, required: true
 
   @doc """
@@ -94,12 +100,21 @@ defmodule PepeWeb.DashUI do
   """
   def form_section(assigns) do
     ~H"""
-    <div class="space-y-6 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4 sm:p-6">
+    <div :if={!@collapsible} class="space-y-6 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4 sm:p-6">
       <div class="border-b border-zinc-800 pb-3 text-sm font-semibold uppercase tracking-wide text-zinc-200">
         {@title}
       </div>
       {render_slot(@inner_block)}
     </div>
+    <details :if={@collapsible} open={@open} class="group rounded-xl border border-zinc-800/80 bg-zinc-900/30">
+      <summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-zinc-200 marker:hidden [&::-webkit-details-marker]:hidden sm:px-6 sm:py-4">
+        {@title}
+        <.icon name="hero-chevron-down" class="size-4 shrink-0 text-zinc-500 transition group-open:rotate-180" />
+      </summary>
+      <div class="space-y-6 border-t border-zinc-800 p-4 sm:p-6">
+        {render_slot(@inner_block)}
+      </div>
+    </details>
     """
   end
 
