@@ -23,6 +23,7 @@ All notable changes to this project are documented here. Format follows
 
 ### Fixed
 - A Telegram permission prompt that nobody answered in 5 minutes was indistinguishable from an explicit denial - the agent got a bare "not authorized" and had no way to tell "try again" from "don't ask again." It now says the request timed out, matching how `ask_user`'s own prompt already reports its timeout.
+- A model that kept sending slightly different malformed JSON as a tool call's arguments (rather than the exact same broken call) could burn its whole `max_iterations` budget retrying, since the existing stuck-loop guard only caught an *identical* repeated call. Three consecutive malformed-argument calls to the same tool, whatever the exact JSON differs, now trip the same guard a genuine repeated call already does.
 - An inbound webhook message (WhatsApp/Slack/Discord/Teams/Google Chat) never withdrew a session's `auto_approve` the way an attached Telegram document already did, so an agent bound to a support-mode webhook could run pre-approved tools for an anonymous sender with no taint protection applying. It's now tainted the same way every other "content from a stranger" entry point already is.
 
 ## [0.11.1] - 2026-07-29

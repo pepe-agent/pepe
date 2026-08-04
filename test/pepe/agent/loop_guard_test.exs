@@ -78,4 +78,28 @@ defmodule Pepe.Agent.LoopGuardTest do
       assert LoopGuard.stuck?([call("write_file", ~s({"p":"y"}))], prior)
     end
   end
+
+  describe "malformed tool-call arguments" do
+    test "three different malformed-JSON calls to the same tool are stuck" do
+      # A model "fixing" what it thinks was wrong produces different garbage each attempt -
+      # plain repetition detection (exact args match) would never catch this, since the args
+      # string differs every time. Malformed calls collapse to one signature per tool name.
+      prior = [turn("bash", "{not json"), turn("bash", "{also bad")]
+      assert LoopGuard.stuck?([call("bash", "nope")], prior)
+    end
+
+    test "two malformed calls is not enough" do
+      refute LoopGuard.stuck?([call("bash", "{not json")], [turn("bash", "{also bad")])
+    end
+
+    test "a malformed call followed by a valid one is not stuck" do
+      prior = [turn("bash", "{not json"), turn("bash", "{also bad")]
+      refute LoopGuard.stuck?([call("bash", ~s({"cmd":"ls"}))], prior)
+    end
+
+    test "malformed calls to two different tools don't collapse into one repeating signature" do
+      prior = [turn("bash", "{not json"), turn("read_file", "{also bad")]
+      refute LoopGuard.stuck?([call("bash", "nope")], prior)
+    end
+  end
 end

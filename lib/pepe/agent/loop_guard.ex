@@ -21,6 +21,13 @@ defmodule Pepe.Agent.LoopGuard do
 
   On a hit, the runtime drops the turn to its terminal branch, which strips the tools away and
   makes the model summarise what it has instead of asking for yet another turn.
+
+  A malformed-JSON call to the same tool collapses to one signature regardless of the exact
+  garbage (see `signature/1`), so a model that varies its broken JSON slightly each attempt -
+  rather than repeating the identical call - still trips repetition instead of burning the
+  whole iteration budget. This won't catch a provider's own streaming-assembly bug producing
+  garbled JSON unrelated to the model "getting it wrong" (see `Pepe.LLM`'s `bucket_index/2`),
+  but it still correctly stops the burn either way.
   """
 
   # The same call this many times running means it is not going to work the next time either.
@@ -78,6 +85,9 @@ defmodule Pepe.Agent.LoopGuard do
     |> Enum.all?(fn [a, b] -> a != b end)
   end
 
-  defp signature(%{"function" => %{"name" => name, "arguments" => args}}), do: {name, args}
+  defp signature(%{"function" => %{"name" => name, "arguments" => args}}) do
+    if Pepe.Tools.malformed_args?(args), do: {:malformed_args, name}, else: {name, args}
+  end
+
   defp signature(_), do: :unknown
 end

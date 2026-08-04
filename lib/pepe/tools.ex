@@ -383,4 +383,8 @@ defmodule Pepe.Tools do
       {:error, _} -> {:error, "malformed JSON"}
     end
   end
+
+  @doc "Would `execute/2` reject `raw` as malformed rather than running the tool at all?"
+  @spec malformed_args?(term()) :: boolean()
+  def malformed_args?(raw), do: match?({:error, _}, decode_args(raw))
 end
