@@ -98,6 +98,11 @@ defmodule Pepe.MixProject do
       # config.json, which stays a plain file for definitions. Ships its own SQLite via
       # rustler_precompiled, the same mechanism `mdex` below already uses.
       {:ecto_sqlite3, "~> 0.24"},
+      # The `db_query` tool's connections to an operator-configured external Postgres
+      # database (customer data, not Pepe's own store) - a standalone driver, not a full
+      # Ecto.Repo, since these are dynamic, runtime-configured, possibly-many connections
+      # rather than one static schema known at compile time.
+      {:postgrex, "~> 0.19"},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},

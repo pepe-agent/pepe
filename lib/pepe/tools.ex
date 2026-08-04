@@ -16,6 +16,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Commitment
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
+  alias Pepe.Tools.DbQuery
   alias Pepe.Tools.Delegate
   alias Pepe.Tools.Docs
   alias Pepe.Tools.Doctor
@@ -28,6 +29,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ListDir
   alias Pepe.Tools.ManageAgent
   alias Pepe.Tools.ManageChannel
+  alias Pepe.Tools.ManageDb
   alias Pepe.Tools.ManageMcp
   alias Pepe.Tools.ManagePepe
   alias Pepe.Tools.ManagePlugin
@@ -65,6 +67,7 @@ defmodule Pepe.Tools do
     FetchUrl,
     Browser,
     WebSearch,
+    DbQuery,
     SendFile,
     Invoice,
     EndSession,
@@ -80,6 +83,7 @@ defmodule Pepe.Tools do
     Board,
     ManageChannel,
     ManageAgent,
+    ManageDb,
     ManageMcp,
     ManagePepe,
     ManagePlugin,

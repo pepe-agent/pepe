@@ -256,6 +256,7 @@ defmodule PepeWeb.DashUI do
           <.nav_item active={@active} scope={@scope} to="agents" icon="🧩" label={gettext("Agents")} />
           <.nav_item active={@active} scope={@scope} to="models" icon="🔌" label={gettext("Models")} />
           <.nav_item active={@active} scope={@scope} to="mcp" icon="🧰" label="MCP" />
+          <.nav_item active={@active} scope={@scope} to="databases" icon="🗄️" label={gettext("Databases")} />
           <.nav_item active={@active} scope={@scope} to="plugins" icon="🧩" label={gettext("Plugins")} />
         </div>
         <div class="space-y-1">

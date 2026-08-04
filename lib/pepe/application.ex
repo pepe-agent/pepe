@@ -102,6 +102,11 @@ defmodule Pepe.Application do
           # The `browser` tool's Chrome sessions: same lazy registry + dynamic supervisor shape.
           {Registry, keys: :unique, name: Pepe.Browser.Registry},
           {DynamicSupervisor, name: Pepe.Browser.DynSup, strategy: :one_for_one},
+          # The `db_query` tool's Postgres connections: same lazy registry + dynamic
+          # supervisor shape. Unconditional, like the two above: a CLI one-shot can call
+          # the tool too.
+          {Registry, keys: :unique, name: Pepe.DB.Registry},
+          {DynamicSupervisor, name: Pepe.DB.DynSup, strategy: :one_for_one},
           # Heartbeat: ephemeral system-events queue + the anti-spam cooldown gate.
           Pepe.Heartbeat.Events,
           Pepe.Heartbeat.Cooldown,

@@ -202,6 +202,42 @@ defmodule Pepe.BundleTest do
       assert "ACME_WA_TOKEN" in report.secrets
     end
 
+    test "a db_connection of another project is not leaked; the project's own travels de-scoped" do
+      seed_two_projects()
+
+      Config.put_db_connection("acme_pg", %{
+        "engine" => "postgres",
+        "host" => "db.internal",
+        "database" => "billing",
+        "user" => "pepe_ro",
+        "password" => "${ACME_DB_PASSWORD}",
+        "project" => "acme",
+        "agent" => "acme/sales",
+        "tenant_column" => "company_id",
+        "tenant_binding" => %{"mode" => "fixed", "value" => "acme-inc"}
+      })
+
+      Config.put_db_connection("globex_pg", %{
+        "engine" => "postgres",
+        "host" => "db.internal",
+        "database" => "globex",
+        "user" => "pepe_ro",
+        "password" => "globex-secret-literal",
+        "project" => "globex",
+        "agent" => "globex/bot"
+      })
+
+      assert {:ok, config, report} = Config.extract_config("acme")
+
+      # globex's connection - and its literal password - never enter acme's bundle.
+      assert Map.keys(config["db_connections"]) == ["acme_pg"]
+      refute Jason.encode!(config) =~ "globex-secret-literal"
+
+      # acme's own connection travels, de-scoped to the root scope (project nil, agent bare).
+      assert %{"project" => nil, "agent" => "sales"} = config["db_connections"]["acme_pg"]
+      assert "ACME_DB_PASSWORD" in report.secrets
+    end
+
     test "a project-scoped API token (no agent) is kept, not dropped" do
       seed_two_projects()
       # `token add --project acme` with no agent: scoped by the project field alone. This is the

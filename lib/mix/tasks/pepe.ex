@@ -131,6 +131,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|login|remove ... # external tool servers (MCP: local or remote)
+      mix pepe db add|list|remove ...           # external Postgres connections for db_query (see Database)
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
       mix pepe version                         # what's running, and which build
@@ -245,6 +246,8 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["mcp", "login" | rest]), do: with_app([], fn -> mcp_cmd(["login" | rest]) end)
   def dispatch(["mcp", "logout" | rest]), do: with_app([], fn -> mcp_cmd(["logout" | rest]) end)
   def dispatch(["mcp" | rest]), do: with_config(fn -> mcp_cmd(rest) end)
+  # add/list/remove only ever touch config - no live connection needed to configure one.
+  def dispatch(["db" | rest]), do: with_config(fn -> db_cmd(rest) end)
 
   # `usage prices --refresh` fetches over the network (needs Req/the app);
   # reporting just reads the ledger files.
@@ -5589,6 +5592,146 @@ defmodule Mix.Tasks.Pepe do
   defp print_mcp_tool_line(name, t) do
     info("\n#{bold("mcp__#{name}__#{t["name"]}")}")
     info(dim("   #{String.slice(to_string(t["description"]), 0, 120)}"))
+  end
+
+  ###
+  ### db - external Postgres connections for the db_query tool
+  ###
+
+  defp db_cmd(["list" | _]) do
+    case Config.db_connections() do
+      m when map_size(m) == 0 ->
+        info(dim("no database connections. add one: mix pepe db add NAME --host ... --database ... --user ... --password ..."))
+
+      conns ->
+        info(bold("✦ database connections"))
+        Enum.each(conns, &print_db_connection_line/1)
+    end
+  end
+
+  defp db_cmd(["add", name | rest]) do
+    {opts, _, _} =
+      OptionParser.parse(rest,
+        strict: [
+          host: :string,
+          port: :integer,
+          database: :string,
+          user: :string,
+          password: :string,
+          tenant_column: :string,
+          tenant_mode: :string,
+          tenant_value: :string
+        ]
+      )
+
+    with {:ok, required} <- db_required_opts(opts),
+         {:ok, tenant_binding} <- db_tenant_binding(opts) do
+      save_db_connection(name, %{
+        "engine" => "postgres",
+        "host" => required.host,
+        "port" => opts[:port] || 5432,
+        "database" => required.database,
+        "user" => required.user,
+        "password" => required.password,
+        "tenant_column" => opts[:tenant_column],
+        "tenant_binding" => tenant_binding
+      })
+    else
+      {:error, msg} -> error(msg)
+    end
+  end
+
+  defp db_cmd(["remove", name | _]) do
+    case Config.db_connection(name) do
+      nil ->
+        error("unknown database connection: #{name}")
+
+      _ ->
+        Config.delete_db_connection(name)
+        ok("#{green(name)} removed")
+    end
+  end
+
+  defp db_cmd(_) do
+    info("""
+    mix pepe db - external Postgres connections for the db_query tool (Postgres only)
+
+      add NAME --host H --port 5432 --database D --user U --password ${DB_PASSWORD}
+      add NAME ... --tenant-column company_id --tenant-mode fixed --tenant-value acme-inc
+      add NAME ... --tenant-column company_id --tenant-mode agent_field --tenant-value project
+      list                       list configured connections
+      remove NAME
+
+    A connection with no --tenant-column is unscoped (a single-tenant database). One WITH
+    --tenant-column is tenant-scoped only if the database itself has a Row-Level Security
+    policy enforcing it - this command binds the trusted tenant value, it does not create
+    the policy. See the Database docs for the exact role/policy SQL to run once, by hand,
+    on the target database.
+
+    --tenant-mode fixed        --tenant-value is a literal (e.g. one connection per client)
+    --tenant-mode agent_field  --tenant-value is "project" or "bare" - resolved from the
+                               calling agent's own config at query time, never from the model
+
+    The model calling db_query never sees or sets the tenant value - see the Database docs.
+    """)
+  end
+
+  defp db_required_opts(opts) do
+    with {:ok, host} <- db_fetch_opt(opts, :host),
+         {:ok, database} <- db_fetch_opt(opts, :database),
+         {:ok, user} <- db_fetch_opt(opts, :user),
+         {:ok, password} <- db_fetch_opt(opts, :password) do
+      {:ok, %{host: host, database: database, user: user, password: password}}
+    end
+  end
+
+  defp db_fetch_opt(opts, key) do
+    case opts[key] do
+      v when is_binary(v) and v != "" -> {:ok, v}
+      _ -> {:error, "db add needs --#{key |> to_string() |> String.replace("_", "-")}"}
+    end
+  end
+
+  defp db_tenant_binding(opts) do
+    case opts[:tenant_column] do
+      col when is_binary(col) and col != "" ->
+        with {:ok, mode} <- db_fetch_opt(opts, :tenant_mode),
+             {:ok, value} <- db_fetch_opt(opts, :tenant_value),
+             :ok <- db_validate_tenant_mode(mode, value) do
+          {:ok, %{"mode" => mode, "value" => value}}
+        end
+
+      _ ->
+        {:ok, nil}
+    end
+  end
+
+  defp db_validate_tenant_mode("fixed", _value), do: :ok
+  defp db_validate_tenant_mode("agent_field", value) when value in ["project", "bare"], do: :ok
+
+  defp db_validate_tenant_mode("agent_field", _value),
+    do: {:error, ~s(--tenant-value must be "project" or "bare" with --tenant-mode agent_field)}
+
+  defp db_validate_tenant_mode(mode, _value), do: {:error, "--tenant-mode must be \"fixed\" or \"agent_field\", got #{inspect(mode)}"}
+
+  defp save_db_connection(name, map) do
+    Config.put_db_connection(name, map)
+    ok("database connection #{green(name)} saved")
+
+    case Pepe.Secrets.plaintext_in(map) do
+      [] -> :ok
+      secrets -> info(Pepe.Secrets.warning(secrets, "the database connection #{name}"))
+    end
+  end
+
+  defp print_db_connection_line({name, %{"tenant_column" => col}}) when is_binary(col) and col != "" do
+    info("\n#{bold(name)}")
+    info(dim("   tenant-scoped on #{col}"))
+  end
+
+  defp print_db_connection_line({name, _cfg}) do
+    info("\n#{bold(name)}")
+    info(dim("   unscoped"))
   end
 
   # `mix pepe review` - the queue of autonomous writes waiting for approval.

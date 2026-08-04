@@ -226,6 +226,7 @@ mix pepe mcp list|tools NAME|remove NAME               # inspect and manage (see
 mix pepe mcp login|logout NAME                         # OAuth sign-in for a remote server
 mix pepe plugin list|install|scan|remove # user plugins: tools & channels (see Plugins)
 mix pepe skill list|search|install|update|remove|audit|tap  # skill marketplace (see Skills)
+mix pepe db add|list|remove              # external Postgres connections for db_query (see Database)
 mix pepe hooks list                      # available privacy hooks (see Privacy hooks)
 mix pepe hooks generate "redact CPFs" [--model NAME] [--save]   # AI-write a redaction hook
 ```

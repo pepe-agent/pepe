@@ -519,7 +519,7 @@ defmodule Pepe.Agent.Runtime do
   # worker reading a hostile page can steer what comes back, which then reaches this run's
   # context looking like an ordinary tool result. Untainted, that content would still enjoy
   # this run's own auto_approve, which is the whole thing tainting is supposed to withdraw.
-  @outside_content ~w(fetch_url web_search delegate)
+  @outside_content ~w(fetch_url web_search delegate db_query)
 
   defp taint_if_outside(name) when name in @outside_content, do: Pepe.Permissions.taint()
   defp taint_if_outside(name), do: if(Pepe.MCP.mcp_tool?(name), do: Pepe.Permissions.taint(), else: :ok)

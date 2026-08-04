@@ -250,6 +250,68 @@ defmodule Pepe.Agent.UntrustedContentTest do
     assert bash_result["content"] =~ "content from outside"
   end
 
+  test "a db_query result taints the rest of the run, same as fetch_url", %{cwd: cwd} do
+    # Same shape as the MCP test above: taint_if_outside/1 keys on the tool NAME alone, so
+    # a call against an unconfigured connection (an error result) still exercises the exact
+    # path that matters here - no real Postgres needed.
+    defmodule DbQueryCaller do
+      @moduledoc false
+      import Plug.Conn
+
+      def init(opts), do: opts
+
+      def call(conn, _opts) do
+        {:ok, body, conn} = read_body(conn)
+        msgs = body |> Jason.decode!() |> Map.fetch!("messages")
+        tools = Enum.count(msgs, &(&1["role"] == "tool"))
+
+        call_for = fn name, args ->
+          %{
+            "role" => "assistant",
+            "content" => nil,
+            "tool_calls" => [
+              %{"id" => "c#{tools}", "type" => "function", "function" => %{"name" => name, "arguments" => args}}
+            ]
+          }
+        end
+
+        message =
+          case tools do
+            0 -> call_for.("db_query", ~s({"connection":"unconfigured","query":"SELECT 1"}))
+            1 -> call_for.("bash", ~s({"command":"env"}))
+            _ -> %{"role" => "assistant", "content" => "done"}
+          end
+
+        payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => "stop"}]}
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+      end
+    end
+
+    {:ok, server} = Bandit.start_link(plug: DbQueryCaller, port: 0, startup_log: false)
+    {:ok, {_ip, port}} = ThousandIsland.listener_info(server)
+
+    Config.put_model(%Model{name: "dbc", base_url: "http://127.0.0.1:#{port}", api_key: "k", model: "m"})
+
+    agent = %Agent{
+      name: "db-user",
+      model: "dbc",
+      system_prompt: "hi",
+      tools: ["bash", "db_query"],
+      auto_approve: ["*"],
+      max_iterations: 4
+    }
+
+    Config.put_agent(agent)
+
+    {:ok, _reply, messages} = Runtime.converse(agent, "look something up", cwd: cwd)
+
+    # The db_query call fails (no such connection configured) - doesn't matter. What changed
+    # is everything after it: bash, pre-approved for everything, was refused instead of
+    # running in silence.
+    assert [_db_result, bash_result] = Enum.filter(messages, &(&1["role"] == "tool"))
+    assert bash_result["content"] =~ "content from outside"
+  end
+
   test "delegate's result taints the rest of the run, same as fetch_url", %{cwd: cwd} do
     # delegate's own workers hold fetch_url/web_search - its result is a proxy for outside
     # content even though the parent never called fetch_url itself. Distinguish a worker

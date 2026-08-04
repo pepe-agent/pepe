@@ -1227,7 +1227,7 @@ defmodule Pepe.Config do
   # `projects` map and the `default_project` pointer are dropped: the bundle is bare single-tenant,
   # and load-time migration re-expands it into a fresh default project. The legacy single
   # `telegram` bot is dropped outright too.
-  @scoped_sections ~w(agents models crons watches commitments telegrams api_tokens webhooks)
+  @scoped_sections ~w(agents models crons watches commitments telegrams api_tokens webhooks db_connections)
   @dropped_sections ~w(projects default_project telegram)
 
   # A scope's billing/limits fields (kept in the project's own entry under `projects.<id>`).
@@ -1249,6 +1249,7 @@ defmodule Pepe.Config do
     telegrams = config["telegrams"] |> resolve_section_agents(config) |> keep_agent_bound(co)
     tokens = config["api_tokens"] |> resolve_section_agents(config) |> keep_tokens(co)
     webhooks = config["webhooks"] |> resolve_section_agents(config) |> keep_webhooks(co)
+    db_connections = config["db_connections"] |> resolve_section_agents(config) |> keep_db_connections(co)
     meta = project_meta_in(config, co)
 
     deps = model_deps(agents, [crons, watches, commitments, telegrams], meta)
@@ -1262,7 +1263,8 @@ defmodule Pepe.Config do
       "commitments" => descope_agent_bound(commitments, co),
       "telegrams" => descope_agent_bound(telegrams, co),
       "api_tokens" => descope_tokens(tokens, co),
-      "webhooks" => descope_webhooks(webhooks, co)
+      "webhooks" => descope_webhooks(webhooks, co),
+      "db_connections" => descope_db_connections(db_connections, co)
     }
 
     new =
@@ -1325,6 +1327,14 @@ defmodule Pepe.Config do
     do: Map.filter(section, fn {_slug, e} -> scoped_to?(e, co) end)
 
   defp keep_webhooks(_section, _co), do: %{}
+
+  # Same "project" or "agent" scoping as webhooks - a db_connections entry carries the same
+  # two fields (see Pepe.DB's moduledoc for why: ownership lives on the connection, not on
+  # the agent, matching every other named external connection in this file).
+  defp keep_db_connections(section, co) when is_map(section),
+    do: Map.filter(section, fn {_name, e} -> scoped_to?(e, co) end)
+
+  defp keep_db_connections(_section, _co), do: %{}
 
   # An entry belongs to `co` if its bare `"project"` names it, or its `"agent"` handle is in it.
   defp scoped_to?(entry, co),
@@ -1426,6 +1436,12 @@ defmodule Pepe.Config do
     end)
   end
 
+  defp descope_db_connections(section, co) do
+    Map.new(section, fn {name, e} ->
+      {name, e |> descope_scope_project(co) |> remap_field("agent", co, "")}
+    end)
+  end
+
   # A token's/webhook's `project` is a bare name, not a handle, and the root scope is `nil`
   # everywhere it is read (token_in_scope?, verify_api_token, webhook `norm`, the usage/agent
   # scoping). De-scoping it to root must land on `nil`, not the `""` a handle remap would give -
@@ -1484,8 +1500,9 @@ defmodule Pepe.Config do
   def literal_secrets(config) when is_map(config) do
     models = for {_id, m} <- config["models"] || %{}, label = model_literal(m), not is_nil(label), do: label
     hooks = for {slug, e} <- config["webhooks"] || %{}, webhook_literal?(e), do: "webhook:#{slug}"
+    dbs = for {name, e} <- config["db_connections"] || %{}, db_connection_literal?(e), do: "db_connection:#{name}"
 
-    (models ++ hooks) |> Enum.uniq() |> Enum.sort()
+    (models ++ hooks ++ dbs) |> Enum.uniq() |> Enum.sort()
   end
 
   defp model_literal(m) do
@@ -1500,6 +1517,10 @@ defmodule Pepe.Config do
     cfg = entry["config"] || %{}
     Enum.any?(@secret_config_keys, fn key -> raw_secret?(cfg[key]) end)
   end
+
+  # Unlike webhooks, a db_connections entry's password sits at the top level (no nested
+  # "config" sub-map), so this checks the entry itself against the same secret-key list.
+  defp db_connection_literal?(entry), do: Enum.any?(@secret_config_keys, fn key -> raw_secret?(entry[key]) end)
 
   # A non-empty string that is not one of the three reference forms is a credential sitting in
   # the file in the clear.
@@ -3185,6 +3206,60 @@ defmodule Pepe.Config do
     update(fn config ->
       config
       |> update_in(["mcp"], &Map.delete(&1 || %{}, name))
+    end)
+  end
+
+  ###
+  ### db_connections (the `db_query` tool's Postgres connections)
+  ###
+
+  @doc "Configured external database connections as `%{name => %{engine, host, ...}}`."
+  def db_connections, do: load() |> Map.get("db_connections", %{})
+
+  @doc """
+  One database connection spec by name, as an atom-keyed map ready to open, or nil.
+
+  `tenant_column`/`tenant_binding` are both optional - a connection with neither is a
+  plain, unscoped connection (no per-tenant isolation, e.g. a single-tenant project's own
+  database). `password` rides along still interpolated (`${ENV_VAR}`/`exec:`/`file:`
+  refs resolved at read time via `Config.interpolate/1`, matching every other credential
+  in this codebase) - never written expanded to `config.json`.
+  """
+  def db_connection(name) do
+    case db_connections()[name] do
+      nil ->
+        nil
+
+      map ->
+        %{
+          name: name,
+          engine: map["engine"] || "postgres",
+          host: map["host"],
+          port: map["port"],
+          database: map["database"],
+          user: map["user"],
+          password: interpolate(map["password"]),
+          tenant_column: map["tenant_column"],
+          tenant_binding: map["tenant_binding"],
+          project: map["project"],
+          agent: map["agent"]
+        }
+    end
+  end
+
+  @doc "Create or replace a database connection definition."
+  def put_db_connection(name, map) when is_binary(name) and is_map(map) do
+    update(fn config ->
+      config
+      |> update_in(["db_connections"], fn m -> Map.put(m || %{}, name, map) end)
+    end)
+  end
+
+  @doc "Delete a database connection definition."
+  def delete_db_connection(name) do
+    update(fn config ->
+      config
+      |> update_in(["db_connections"], &Map.delete(&1 || %{}, name))
     end)
   end
 
