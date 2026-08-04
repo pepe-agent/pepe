@@ -315,4 +315,95 @@ defmodule Pepe.WebhooksTest do
       assert opts2[:json]["text"] == "hello!"
     end
   end
+
+  describe "untrusted content taint" do
+    # A model that asks for a risky bash call on the first turn, then reports back whatever
+    # the tool result said once it comes back - so the test can see, in the delivered reply,
+    # whether the call actually ran or was refused.
+    defmodule RiskyToolPlug do
+      @moduledoc false
+      import Plug.Conn
+
+      def init(opts), do: opts
+
+      def call(conn, _opts) do
+        {:ok, body, conn} = read_body(conn)
+        msgs = body |> Jason.decode!() |> Map.fetch!("messages")
+
+        message =
+          if tool = Enum.find(msgs, &(&1["role"] == "tool")) do
+            %{"role" => "assistant", "content" => "tool said: #{tool["content"]}"}
+          else
+            %{
+              "role" => "assistant",
+              "content" => nil,
+              "tool_calls" => [
+                %{
+                  "id" => "c1",
+                  "type" => "function",
+                  "function" => %{"name" => "bash", "arguments" => Jason.encode!(%{"command" => "rm -rf /tmp/whatsapp_test_dummy"})}
+                }
+              ]
+            }
+          end
+
+        payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => "stop"}]}
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+      end
+    end
+
+    test "an inbound webhook message withdraws auto_approve, the same way an attached Telegram document already does" do
+      {:ok, server} = Bandit.start_link(plug: RiskyToolPlug, port: 0, scheme: :http)
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:#{port}", model: "gpt"})
+
+      # Pre-approved for everything, the way a real support agent is set up so it doesn't ask
+      # about every read - which is exactly the setup an anonymous webhook sender must not be
+      # able to exploit for a risky call with nobody watching.
+      Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: ["bash"], auto_approve: ["*"]})
+
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://graph.facebook.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"messages" => [%{"id" => "wamid.out"}]}}}
+      end)
+
+      e = entry()
+      Config.put_webhook("support", e)
+
+      body =
+        Jason.encode!(%{
+          "entry" => [
+            %{
+              "changes" => [
+                %{
+                  "value" => %{
+                    "messages" => [
+                      %{"from" => "5511999", "type" => "text", "text" => %{"body" => "clean up the temp dir"}, "id" => "wamid.in"}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        })
+
+      sig = "sha256=" <> (:crypto.mac(:hmac, :sha256, "s3cr3t", body) |> Base.encode16(case: :lower))
+
+      assert :ok =
+               Webhooks.handle_inbound("acme", "whatsapp", "support", body, Jason.decode!(body), %{
+                 "x-hub-signature-256" => sig
+               })
+
+      assert_receive {:delivered, _url, opts}, 1000
+      # Nobody was there to ask (webhooks pass `authorize: nil`) and the message is now
+      # tainted, so the pre-approved `bash` call was refused rather than silently run - see
+      # Pepe.Permissions' unattended_reason/1 for this exact wording.
+      assert opts[:json]["text"]["body"] =~ "content from outside"
+      refute opts[:json]["text"]["body"] =~ "/tmp/whatsapp_test_dummy"
+    end
+  end
 end

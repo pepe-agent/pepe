@@ -200,7 +200,10 @@ defmodule Pepe.Webhooks do
   end
 
   defp run_chat(entry, mod, key, from, text) do
-    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil) do
+    # A webhook sender is never the operator, the same "a stranger" content class every
+    # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
+    # was the one inbound surface that never withdrew auto_approve for it.
+    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil, untrusted: true) do
       {:ok, reply} ->
         mod.deliver(entry, from, reply)
 

@@ -95,7 +95,8 @@ defmodule Pepe.Tools.FetchUrlTest do
 
       {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/api"}, %{})
 
-      assert out == "status=200\n{\"hello\":\"world\"}"
+      assert out =~ "status=200"
+      assert out =~ ~s({"hello":"world"})
     end
 
     test "a response with no content-type header falls back to the raw body" do
@@ -103,7 +104,8 @@ defmodule Pepe.Tools.FetchUrlTest do
 
       {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/x"}, %{})
 
-      assert out == "status=200\nplain text, no headers at all"
+      assert out =~ "status=200"
+      assert out =~ "plain text, no headers at all"
     end
 
     test "HTML with nothing extractable (a link list, no real prose) falls back to the raw body" do
@@ -124,6 +126,21 @@ defmodule Pepe.Tools.FetchUrlTest do
 
       # Never reaches Pepe.Readable at all - just the existing raw+truncate path.
       assert out =~ "...(truncated)"
+    end
+  end
+
+  describe "untrusted content marker" do
+    test "the fetched content is wrapped in an explicit untrusted-content marker" do
+      stub_response(200, %{"content-type" => ["application/json"]}, ~s({"hello":"world"}))
+
+      {:ok, out} = FetchUrl.run(%{"url" => "https://example.com/api"}, %{})
+
+      assert out =~ "BEGIN UNTRUSTED EXTERNAL CONTENT"
+      assert out =~ "source: fetch_url"
+      assert out =~ "END UNTRUSTED EXTERNAL CONTENT"
+      # The status= line is Pepe's own bookkeeping, not part of what the page said - it
+      # stays outside the marker rather than being framed as untrusted itself.
+      assert out =~ ~r/\Astatus=200\n=== BEGIN UNTRUSTED/
     end
   end
 end

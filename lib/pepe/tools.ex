@@ -323,7 +323,11 @@ defmodule Pepe.Tools do
   defp execute_mcp(name, raw_args) do
     with {:ok, args} <- decode_args(raw_args),
          {:ok, out} <- Pepe.MCP.call(name, args) do
-      to_string(out)
+      # An MCP server is a third party like fetch_url/web_search - its result is content from
+      # outside the conversation, wrapped the same way (Pepe.Permissions.taint_if_outside/1
+      # already treats every MCP tool as "outside" for the taint boundary; this is the sibling
+      # marking for the content itself).
+      Pepe.Security.ExternalContent.mark_untrusted("mcp:#{name}", to_string(out))
     else
       {:error, reason} -> annotate_error("Error: #{name} failed: #{inspect(reason)}")
     end

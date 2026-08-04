@@ -134,8 +134,12 @@ defmodule Pepe.Tools.DelegateTest do
     refute out =~ "bash"
     refute out =~ "write_file"
 
-    # And it cannot delegate: without this, one task becomes eight becomes sixty-four.
-    refute out =~ "delegate"
+    # And it cannot delegate: without this, one task becomes eight becomes sixty-four. Checked
+    # against the reported tools list specifically, not the whole output - a worker's answer is
+    # now wrapped in an untrusted-content marker naming its own source as "delegate"
+    # (Pepe.Security.ExternalContent.mark_untrusted/2), which is a different, legitimate use of
+    # the word.
+    refute out =~ ~r/tools \[[^\]]*delegate/
   end
 
   test "they wait at the same time, not one after another", %{ctx: ctx} do

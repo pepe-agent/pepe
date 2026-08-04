@@ -272,7 +272,11 @@ defmodule Pepe.Tools.Delegate do
     ]
 
     case Runtime.converse(worker, task, opts) do
-      {:ok, reply, _messages} -> reply
+      # A worker's answer is content from outside this conversation - Pepe.Permissions already
+      # treats it that way (taint_if_outside/1 lists "delegate" itself); mark it the same way
+      # fetch_url/web_search results are, so the parent model reads it as reported material, not
+      # as instructions the worker is somehow able to hand up.
+      {:ok, reply, _messages} -> Pepe.Security.ExternalContent.mark_untrusted("delegate", reply)
       {:error, reason} -> "(failed: #{inspect(reason)})"
     end
   end

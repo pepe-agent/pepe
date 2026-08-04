@@ -93,11 +93,18 @@ defmodule Pepe.Tools.FetchUrl do
   end
 
   # The body is content from outside the conversation: strip model control tokens and invisible
-  # characters before it reaches the model (Pepe.Security.ExternalContent). The `status=` line is
-  # ours and stays as is.
+  # characters, then wrap it in an explicit untrusted-content marker (Pepe.Security.ExternalContent)
+  # before it reaches the model. The `status=` line is ours and stays outside the marker.
   defp format(%{status: status, headers: headers, body: body}, raw?) do
     text = stringify(body)
-    content = text |> maybe_extract(headers, raw?) |> truncate() |> Pepe.Security.ExternalContent.sanitize()
+
+    sanitized =
+      text
+      |> maybe_extract(headers, raw?)
+      |> truncate()
+      |> Pepe.Security.ExternalContent.sanitize()
+
+    content = Pepe.Security.ExternalContent.mark_untrusted("fetch_url", sanitized)
     "status=#{status}\n#{content}"
   end
 
