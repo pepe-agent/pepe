@@ -80,8 +80,10 @@ defmodule Pepe.Gateways.Telegram do
   # public ETS table so the poll loop (this process) can answer a `receive` that's
   # blocking in a turn's own task.
   @pending :pepe_tg_pending
-  # How long to wait for a button press before denying/timing out.
-  @perm_timeout 300_000
+  # How long to wait for a button press before denying/timing out. A function (not a plain
+  # module attribute) so a test can shrink it via Application config instead of waiting out
+  # the real default.
+  defp perm_timeout_ms, do: Application.get_env(:pepe, :telegram_perm_timeout_ms, 300_000)
 
   # Prompts already answered this turn (chat_id => message_id) - permission asks and
   # ask_user picks alike - so they can be deleted once the turn ends: each has already
@@ -1648,12 +1650,15 @@ defmodule Pepe.Gateways.Telegram do
     receive do
       {:perm_reply, ^id, decision} -> decision
     after
-      @perm_timeout ->
+      perm_timeout_ms() ->
         :ets.delete(@pending, id)
         # Tell the user the prompt expired instead of leaving stale, dead-on-click buttons (which is
         # what happens with two concurrent prompts and a slow answer - a real "I can't click it").
         edit_expired(chat_id, message_id)
-        :deny
+        # Distinct from an explicit deny tap (same shape `Pepe.Permissions` already supports for any
+        # denial with a reason): nobody answering must not read to the agent as "the user refused" -
+        # see the ask_user :timeout precedent right below, which already makes this distinction.
+        {:deny, "nobody answered in time (the permission request expired after 5 minutes)"}
     end
   end
 
@@ -1690,7 +1695,7 @@ defmodule Pepe.Gateways.Telegram do
     receive do
       {:ask_reply, ^id, pick} -> {:ok, pick}
     after
-      @perm_timeout ->
+      perm_timeout_ms() ->
         :ets.delete(@pending, id)
         edit_expired(chat_id, message_id)
         :timeout

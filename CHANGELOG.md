@@ -19,6 +19,9 @@ All notable changes to this project are documented here. Format follows
 ### Changed
 - `mix pepe token list` shows each token's permissions alongside its scope and fingerprint.
 
+### Fixed
+- A Telegram permission prompt that nobody answered in 5 minutes was indistinguishable from an explicit denial - the agent got a bare "not authorized" and had no way to tell "try again" from "don't ask again." It now says the request timed out, matching how `ask_user`'s own prompt already reports its timeout.
+
 ## [0.11.1] - 2026-07-29
 
 ### Fixed
