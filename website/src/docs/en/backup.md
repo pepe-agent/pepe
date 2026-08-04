@@ -14,6 +14,12 @@ pepe backup --output /path/x.tgz
 
 This is the "don't lose this machine" archive. It packs every project, every agent workspace, the shared space, sessions and the usage ledgers, and skips `data/mnesia/` (a disposable cache that rebuilds itself). Restored onto an empty box, it is the same machine again.
 
+The database (commitments, watches, traces, boards, usage) is never copied while it might be mid-write. Instead `backup` takes a transactionally-consistent snapshot through the live connection and verifies it before it goes in the archive — safe to run while Pepe is up, and the command aborts rather than ship a snapshot that failed the check. Re-check an archive you already have with:
+
+```bash
+pepe backup verify pepe-backup-2026-07-14.tgz
+```
+
 ## Extract: one project, on its own
 
 ```bash
@@ -33,6 +39,8 @@ pepe restore pepe-backup-2026-07-14.tgz --force
 ```
 
 A backup and an extract are the same shape — a `~/.pepe` inside a tarball — so one command restores both. It unpacks into `~/.pepe` (or `PEPE_HOME`). Because a restore **replaces** what is there, it refuses to write over a non-empty home unless you pass `--force`.
+
+A backup's database goes through the same integrity check on the way back in: restore refuses a database that fails it, and refuses to overwrite one that a live Pepe instance appears to be actively writing to — stop it first, then retry.
 
 ## Secrets are never in the archive
 

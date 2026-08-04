@@ -42,4 +42,41 @@ defmodule Mix.Tasks.PepeBackupCliTest do
     assert entries =~ "agents/zak/SOUL.md"
     refute entries =~ "mnesia"
   end
+
+  test "the database goes in as a verified snapshot, not a raw copy of the live file", %{out: out} do
+    # Something real committed to the live db, so the archived copy is proven to be a
+    # snapshot of actual data.
+    Pepe.Config.Journal.put_source("backup-cli-test")
+
+    output = capture_io(fn -> Mix.Tasks.Pepe.dispatch(["backup", "--output", out]) end)
+    assert output =~ "database (verified snapshot)"
+
+    entries = System.cmd("tar", ["tzf", out]) |> elem(0)
+    assert entries =~ "data/pepe.db"
+    refute entries =~ "pepe.db-wal"
+    refute entries =~ "pepe.db-shm"
+
+    stage = Path.join(System.tmp_dir!(), "pepe_bk_extract_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(stage)
+    System.cmd("tar", ["-xzf", out, "-C", stage])
+    [home_dir] = File.ls!(stage)
+    db = Path.join([stage, home_dir, "data", "pepe.db"])
+
+    assert File.regular?(db)
+    assert :ok = Pepe.Repo.Snapshot.integrity_check(db)
+
+    File.rm_rf(stage)
+  end
+
+  test "backup verify reports pass on a good archive", %{out: out} do
+    capture_io(fn -> Mix.Tasks.Pepe.dispatch(["backup", "--output", out]) end)
+
+    output = capture_io(fn -> Mix.Tasks.Pepe.dispatch(["backup", "verify", out]) end)
+    assert output =~ "passed integrity_check"
+  end
+
+  test "backup verify reports a missing archive plainly" do
+    output = capture_io(:stderr, fn -> Mix.Tasks.Pepe.dispatch(["backup", "verify", "/no/such/archive.tgz"]) end)
+    assert output =~ "no such archive"
+  end
 end

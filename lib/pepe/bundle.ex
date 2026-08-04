@@ -128,6 +128,8 @@ defmodule Pepe.Bundle do
     try do
       with :ok <- untar(archive, stage),
            {:ok, root} <- locate_root(stage),
+           :ok <- check_staged_database(root),
+           :ok <- check_no_live_writer(home),
            :ok <- stage_copy(root, incoming) do
         swap_into_place(incoming, home)
         config = Path.join(home, "config.json")
@@ -139,6 +141,36 @@ defmodule Pepe.Bundle do
         {:error, {:restore_failed, Exception.message(e)}}
     after
       File.rm_rf(stage)
+    end
+  end
+
+  # A full backup carries data/pepe.db as a VACUUM INTO snapshot (see Pepe.Repo.Snapshot);
+  # an extract carries no Pepe.Repo data at all (see the moduledoc's "What travels" section),
+  # so a missing file here is normal, not an error. Refuse the whole restore rather than ever
+  # swap a corrupt database into place - the archive on disk is untouched either way.
+  defp check_staged_database(root) do
+    db = Path.join([root, "data", "pepe.db"])
+
+    if File.regular?(db) do
+      case Pepe.Repo.Snapshot.integrity_check(db) do
+        :ok -> :ok
+        {:error, reason} -> {:error, {:corrupt_database, reason}}
+      end
+    else
+      :ok
+    end
+  end
+
+  # Never swap a fresh install into place while something is actively writing to the
+  # database already sitting at `home` - see Pepe.Repo.Snapshot.writable?/1 for exactly what
+  # this does and does not catch.
+  defp check_no_live_writer(home) do
+    db = Path.join([home, "data", "pepe.db"])
+
+    if File.regular?(db) and not Pepe.Repo.Snapshot.writable?(db) do
+      {:error, :database_in_use}
+    else
+      :ok
     end
   end
 

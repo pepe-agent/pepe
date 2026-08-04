@@ -4324,18 +4324,29 @@ defmodule Mix.Tasks.Pepe do
 
   defp backup_help do
     info("""
-    mix pepe backup - archive ~/.pepe (config + agent/project workspaces + sessions)
+    mix pepe backup - archive ~/.pepe (config + agent/project workspaces + sessions + database)
 
       backup [--output FILE.tgz]    # defaults to pepe-backup-YYYY-MM-DD.tgz
+      backup verify FILE.tgz        # re-check an existing archive's database
 
-    Also lists the ${ENV_VAR} secrets referenced in your config - they live
-    outside the files (never written expanded) and must be saved separately.
+    The database (commitments, watches, traces, boards, usage, ...) is included as a
+    verified, transactionally-consistent snapshot (`VACUUM INTO`), not a raw copy of the
+    live file - safe to run while Pepe is up. Also lists the ${ENV_VAR} secrets referenced
+    in your config - they live outside the files (never written expanded) and must be
+    saved separately.
     """)
   end
 
   # Tar up the durable parts of PEPE_HOME (config + agent/project workspaces +
-  # sessions), skip the disposable Mnesia cache, then list the ${ENV_VAR} secrets that
-  # live outside the files and must be saved separately.
+  # sessions + a verified database snapshot), skip the disposable Mnesia cache, then list
+  # the ${ENV_VAR} secrets that live outside the files and must be saved separately.
+  defp backup_cmd(["verify" | rest]) do
+    case rest do
+      [archive | _] -> run_backup_verify(archive)
+      [] -> error("which archive? usage: mix pepe backup verify FILE.tgz")
+    end
+  end
+
   defp backup_cmd(rest) do
     {opts, _} = OptionParser.parse!(rest, strict: [output: :string])
     home = Config.home()
@@ -4350,19 +4361,138 @@ defmodule Mix.Tasks.Pepe do
   defp run_backup(home, output) do
     out = Path.expand(output || "pepe-backup-#{Date.utc_today()}.tgz")
     base = Path.basename(home)
-    args = ["--exclude", "#{base}/data/mnesia", "-czf", out, "-C", Path.dirname(home), base]
 
-    case System.cmd("tar", args, stderr_to_stdout: true) do
-      {_, 0} ->
-        ok("backup written to #{green(out)}#{backup_size(out)}")
-        info("  included: config.json · agent & project workspaces · shared · sessions")
-        info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
-        report_backup_secrets(home)
+    case stage_db_snapshot(home, base) do
+      {:ok, :none} ->
+        tar_and_report(out, home, base, ["--exclude", "#{base}/data/mnesia"], nil)
 
-        info("\nRestore: extract into #{Path.dirname(home)}/ and re-export your secret env vars.")
+      {:ok, {:staged, snap_root, snap_rel}} ->
+        result =
+          tar_and_report(
+            out,
+            home,
+            base,
+            [
+              "--exclude",
+              "#{base}/data/mnesia",
+              "--exclude",
+              "#{base}/data/pepe.db",
+              "--exclude",
+              "#{base}/data/pepe.db-wal",
+              "--exclude",
+              "#{base}/data/pepe.db-shm"
+            ],
+            {snap_root, snap_rel}
+          )
 
-      {msg, _} ->
+        File.rm_rf(snap_root)
+        result
+
+      {:error, reason} ->
+        error("backup failed: could not take a consistent database snapshot (#{inspect(reason)})")
+    end
+  end
+
+  # A snapshot taken through the live Pepe.Repo connection (VACUUM INTO - transactionally
+  # consistent under WAL, no daemon stop needed) and verified before it's allowed anywhere
+  # near the archive. Aborts the whole backup rather than ever ship a database that failed
+  # the check - a backup silently missing its operational data is worse than a failed one.
+  defp stage_db_snapshot(home, base) do
+    db_path = Path.join([home, "data", "pepe.db"])
+
+    if File.regular?(db_path) do
+      stage = Path.join(System.tmp_dir!(), "pepe_backup_db_#{System.unique_integer([:positive])}")
+      rel = Path.join([base, "data", "pepe.db"])
+      dest = Path.join(stage, rel)
+
+      with :ok <- Pepe.Repo.Snapshot.vacuum_into(dest),
+           :ok <- Pepe.Repo.Snapshot.integrity_check(dest) do
+        {:ok, {:staged, stage, rel}}
+      else
+        {:error, reason} ->
+          File.rm_rf(stage)
+          {:error, reason}
+      end
+    else
+      {:ok, :none}
+    end
+  end
+
+  # tar can't apply an --exclude to one -C layer and not another (the pattern matches the
+  # final archived path, regardless of which -C added it) - excluding the live db AND
+  # re-adding the verified snapshot at that same path in one invocation would just exclude
+  # both. So this builds a plain tar first (exclude applies once, cleanly), appends the
+  # snapshot as a second step, then gzips - three System.cmd calls instead of one, but each
+  # step does exactly one thing.
+  defp tar_and_report(out, home, base, excludes, snapshot) do
+    plain = out <> ".tmp.tar"
+
+    with {_, 0} <- System.cmd("tar", excludes ++ ["-cf", plain, "-C", Path.dirname(home), base], stderr_to_stdout: true),
+         :ok <- append_snapshot(plain, snapshot),
+         {_, 0} <- System.cmd("gzip", ["-f", plain], stderr_to_stdout: true) do
+      File.rename!(plain <> ".gz", out)
+      ok("backup written to #{green(out)}#{backup_size(out)}")
+
+      info(
+        "  included: config.json · agent & project workspaces · shared · sessions" <>
+          if(snapshot, do: " · database (verified snapshot)", else: "")
+      )
+
+      info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
+      report_backup_secrets(home)
+      info("\nRestore: `mix pepe restore #{Path.basename(out)}`.")
+      :ok
+    else
+      {msg, _status} when is_binary(msg) ->
+        File.rm_rf(plain)
         error("backup failed: #{String.trim(msg)}")
+
+      {:error, reason} ->
+        File.rm_rf(plain)
+        error("backup failed while appending the database snapshot: #{inspect(reason)}")
+    end
+  end
+
+  defp append_snapshot(_plain, nil), do: :ok
+
+  defp append_snapshot(plain, {snap_root, snap_rel}) do
+    case System.cmd("tar", ["-rf", plain, "-C", snap_root, snap_rel], stderr_to_stdout: true) do
+      {_, 0} -> :ok
+      {msg, _} -> {:error, String.trim(msg)}
+    end
+  end
+
+  defp run_backup_verify(archive) do
+    if File.regular?(archive) do
+      stage = Path.join(System.tmp_dir!(), "pepe_backup_verify_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(stage)
+
+      try do
+        case System.cmd("tar", ["-xzf", Path.expand(archive), "-C", stage], stderr_to_stdout: true) do
+          {_, 0} -> report_verify(find_db_in(stage))
+          {msg, _} -> error("could not open #{archive}: #{String.trim(msg)}")
+        end
+      after
+        File.rm_rf(stage)
+      end
+    else
+      error("no such archive: #{archive}")
+    end
+  end
+
+  defp find_db_in(stage) do
+    stage
+    |> File.ls!()
+    |> Enum.map(&Path.join([stage, &1, "data", "pepe.db"]))
+    |> Enum.find(&File.regular?/1)
+  end
+
+  defp report_verify(nil), do: info("no database in this archive - nothing to verify (an extract carries no Pepe.Repo data).")
+
+  defp report_verify(db_path) do
+    case Pepe.Repo.Snapshot.integrity_check(db_path) do
+      :ok -> ok("database passed integrity_check")
+      {:error, reason} -> error("database FAILED integrity_check: #{inspect(reason)}")
     end
   end
 
@@ -4519,6 +4649,14 @@ defmodule Mix.Tasks.Pepe do
 
   defp restore_error({:restore_failed, msg}, _archive, _opts),
     do: "restore failed while writing - your existing install was left untouched: #{msg}"
+
+  defp restore_error({:corrupt_database, reason}, _archive, _opts),
+    do:
+      "the archive's database failed an integrity check (#{inspect(reason)}) - refusing to restore it. Your existing install was left untouched."
+
+  defp restore_error(:database_in_use, _archive, _opts),
+    do:
+      "a live Pepe instance appears to be writing to this database right now - stop it, then retry. Your existing install was left untouched."
 
   # Same shape as the backup secrets report: the ${ENV_VAR}s the archive references live
   # outside it and must be present on the destination.

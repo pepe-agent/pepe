@@ -14,6 +14,12 @@ pepe backup --output /ruta/x.tgz
 
 Este es el archivo del tipo «no pierdas esta máquina». Empaqueta todos los proyectos, todos los espacios de trabajo de los agentes, el espacio compartido, las sesiones y los libros de uso, y omite `data/mnesia/` (una caché desechable que se reconstruye sola). Restaurado en una máquina vacía, es la misma máquina otra vez.
 
+La base de datos (compromisos, watches, traces, boards, uso) nunca se copia mientras podría estar a mitad de una escritura. En su lugar, `backup` toma una instantánea con consistencia transaccional a través de la conexión activa y la verifica antes de incluirla en el archivo —segura de ejecutar con Pepe en marcha—, y el comando aborta en vez de enviar una instantánea que falló la verificación. Vuelve a comprobar un archivo que ya tengas con:
+
+```bash
+pepe backup verify pepe-backup-2026-07-14.tgz
+```
+
 ## Extracción: un proyecto, por su cuenta
 
 ```bash
@@ -33,6 +39,8 @@ pepe restore pepe-backup-2026-07-14.tgz --force
 ```
 
 Una copia de seguridad y una extracción tienen la misma forma —un `~/.pepe` dentro de un tarball—, así que un solo comando restaura ambas. Se descomprime en `~/.pepe` (o `PEPE_HOME`). Como una restauración **reemplaza** lo que hay, se niega a escribir sobre un directorio no vacío a menos que pases `--force`.
+
+La base de datos de una copia de seguridad pasa por la misma verificación de integridad al restaurarse: la restauración rechaza una base de datos que la falle, y rechaza sobrescribir una sobre la que una instancia de Pepe activa parece estar escribiendo en este momento —detenla primero, y vuelve a intentarlo.
 
 ## Los secretos nunca están en el archivo
 

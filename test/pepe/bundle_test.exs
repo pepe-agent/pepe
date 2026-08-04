@@ -360,4 +360,68 @@ defmodule Pepe.BundleTest do
       assert File.read!(Path.join(occupied, "config.json")) == ~s({"real":"install"})
     end
   end
+
+  describe "restore's database safety checks" do
+    # Hand-build a `~/.pepe`-shaped archive with an arbitrary `data/pepe.db` body, mirroring
+    # `locate_root/1`'s expectation of one top-level dir containing config.json - the shape
+    # `mix pepe backup` produces, without going through the CLI.
+    defp build_archive(db_body) do
+      stage = Path.join(System.tmp_dir!(), "pepe_bundle_archive_#{System.unique_integer([:positive])}")
+      base = "home"
+      root = Path.join(stage, base)
+      File.mkdir_p!(Path.join(root, "data"))
+      File.write!(Path.join(root, "config.json"), "{}")
+      if db_body, do: File.write!(Path.join([root, "data", "pepe.db"]), db_body)
+
+      out = Path.join(System.tmp_dir!(), "pepe_bundle_archive_#{System.unique_integer([:positive])}.tgz")
+      {_, 0} = System.cmd("tar", ["-czf", out, "-C", stage, base])
+      File.rm_rf(stage)
+      out
+    end
+
+    test "a corrupt database in the archive is refused, and the target home is left untouched" do
+      archive = build_archive("this is not a sqlite file, just plain bytes")
+      on_exit(fn -> File.rm(archive) end)
+
+      target = Path.join(System.tmp_dir!(), "pepe_bundle_target_#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf(target) end)
+
+      assert {:error, {:corrupt_database, _reason}} = Bundle.restore(archive, home: target)
+      refute File.exists?(target)
+    end
+
+    test "an archive with no database at all (an extract) restores normally - nothing to check" do
+      archive = build_archive(nil)
+      on_exit(fn -> File.rm(archive) end)
+
+      target = Path.join(System.tmp_dir!(), "pepe_bundle_target_#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf(target) end)
+
+      assert {:ok, %{home: ^target}} = Bundle.restore(archive, home: target)
+    end
+
+    test "restoring over a home whose database a live writer is using right now is refused", %{home: home} do
+      # Build a valid, verified snapshot the same way mix pepe backup does, so the archive
+      # itself is never the reason this is refused.
+      snap = Path.join(System.tmp_dir!(), "pepe_bundle_snap_#{System.unique_integer([:positive])}.db")
+      on_exit(fn -> File.rm(snap) end)
+      assert :ok = Pepe.Repo.Snapshot.vacuum_into(snap)
+      archive = build_archive(File.read!(snap))
+      on_exit(fn -> File.rm(archive) end)
+
+      # Hold an exclusive write lock on `home`'s own live database from a separate connection -
+      # exactly the "a daemon is actively writing" case the check exists to catch. No
+      # busy_timeout, so this fails fast instead of waiting.
+      db_path = Path.join([home, "data", "pepe.db"])
+      {:ok, conn} = Exqlite.Sqlite3.open(db_path)
+      :ok = Exqlite.Sqlite3.execute(conn, "BEGIN IMMEDIATE")
+
+      try do
+        assert Bundle.restore(archive, home: home, force: true) == {:error, :database_in_use}
+      after
+        Exqlite.Sqlite3.execute(conn, "ROLLBACK")
+        Exqlite.Sqlite3.close(conn)
+      end
+    end
+  end
 end
