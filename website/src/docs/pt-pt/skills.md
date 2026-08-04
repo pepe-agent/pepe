@@ -72,6 +72,33 @@ de segredos, comandos destrutivos, persistência e ofuscação. É uma segunda
 verificação, e não um substituto para leres o conteúdo, e nunca instala nada por
 si própria.
 
+## Instalar a partir de um marketplace
+
+`install-skill` (acima) é o caminho conversacional: um agente traz uma skill a partir de uma
+ligação que lhe dás. `mix pepe skill` é o caminho do operador, com um registo para pesquisar e
+uma história de atualização:
+
+```bash
+pepe skill search release            # pesquisa em cada tap mais o registo incluído
+pepe skill install cut-a-release     # instala pelo nome
+pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # ou diretamente
+pepe skill update cut-a-release      # volta a obtê-la a partir da fonte exata de onde foi instalada
+pepe skill tap add https://github.com/a-tua-equipa/pepe-skills   # adiciona um registo além do incluído
+```
+
+Cada instalação passa pela mesma análise de segurança estática que o `install-skill` usa; um
+veredito perigoso é recusado a menos que passes `--force`. A confiança é `"official"` só para
+o registo incluído no próprio repositório (curado por quem mantém o Pepe, vazio por defeito
+hoje - ainda não existe um registo alojado, só o mecanismo). Tudo o que é resolvido através de
+um tap que adicionaste, ou instalado com `--source`, é `"community"`: quando um agente o lê
+com a ferramenta `skill`, o seu conteúdo vem envolvido no mesmo marcador de conteúdo não
+fiável que uma página web obtida já carrega, até tu próprio o teres revisto.
+
+O `update` fica fixado à fonte exata a partir da qual a skill foi instalada - se o registo de
+um tap depois apontar esse nome para uma fonte *diferente*, o `update` recusa-se em vez de a
+seguir em silêncio. Uma skill com o mesmo nome vinda de outro lado só pode substituir uma já
+instalada através de um `install --force` explícito, nunca de uma atualização de rotina.
+
 ## Skills, plugins e scripts
 
 Os três pontos de extensão compõem-se, e juntos são o que permite pedir a um

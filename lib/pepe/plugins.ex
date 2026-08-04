@@ -186,7 +186,7 @@ defmodule Pepe.Plugins do
     end
   end
 
-  defp scan_staged(%{type: :exs, path: path}), do: scan_files([path])
+  defp scan_staged(%{type: :file, path: path}), do: scan_files([path])
   defp scan_staged(%{type: :dir, path: path}), do: scan_files(Path.wildcard(Path.join(path, "**/*.exs")))
 
   defp scan_files(paths) do
@@ -221,127 +221,16 @@ defmodule Pepe.Plugins do
 
   # --- staging: turn any source into a local path we can inspect -------------------
 
-  # Returns {:ok, %{type: :exs|:dir, path: ...}, cleanup_fun} or {:error, reason}.
-  defp stage("http" <> _ = url) do
-    cond do
-      github_repo?(url) -> stage_github(url)
-      String.ends_with?(url, ".exs") -> stage_download(url, :exs)
-      true -> stage_download(url, :archive)
-    end
-  end
+  # A package root is the dir holding manifest.json (or a .exs if there's no manifest) -
+  # generalized in Pepe.Sourcing as a predicate over a candidate file's basename.
+  defp stage(src), do: Pepe.Sourcing.stage(src, ".exs", &plugin_root_marker?/1)
 
-  defp stage(path) do
-    cond do
-      not (File.exists?(path) or File.dir?(path)) -> {:error, :not_found}
-      File.dir?(path) -> {:ok, %{type: :dir, path: path}, fn -> :ok end}
-      archive?(path) -> stage_archive(path, fn -> :ok end)
-      String.ends_with?(path, ".exs") -> {:ok, %{type: :exs, path: path}, fn -> :ok end}
-      true -> {:error, :unsupported_source}
-    end
-  end
-
-  # Download a URL, then treat it as a single `.exs` or as an archive to extract.
-  defp stage_download(url, kind) do
-    case download(url) do
-      {:ok, tmp} when kind == :exs -> {:ok, %{type: :exs, path: with_ext(tmp, url)}, fn -> File.rm(tmp) end}
-      {:ok, tmp} -> stage_archive(tmp, fn -> File.rm(tmp) end)
-      error -> error
-    end
-  end
-
-  # A GitHub repo URL is fetched as a source archive. `owner/repo`, optionally
-  # `.../tree/<branch>`; when no branch is given, `main` then `master` are tried.
-  defp github_repo?(url) do
-    case URI.parse(url) do
-      %{host: host, path: path} when is_binary(path) ->
-        host in ["github.com", "www.github.com"] and github_target(path) != nil and
-          not archive?(url) and not String.ends_with?(url, ".exs")
-
-      _ ->
-        false
-    end
-  end
-
-  defp stage_github(url) do
-    {owner, repo, branch} = github_target(URI.parse(url).path)
-    branches = if branch, do: [branch], else: ["main", "master"]
-    urls = Enum.map(branches, &"https://codeload.github.com/#{owner}/#{repo}/tar.gz/refs/heads/#{&1}")
-
-    case download_first(urls) do
-      {:ok, tmp} -> stage_archive(tmp, fn -> File.rm(tmp) end)
-      error -> error
-    end
-  end
-
-  @doc false
-  # `/owner/repo` or `/owner/repo/tree/branch` -> {owner, repo, branch|nil}, else nil.
-  def github_target(path) do
-    case path |> to_string() |> String.trim("/") |> String.split("/") do
-      [owner, repo | rest] when owner != "" and repo != "" ->
-        branch =
-          case rest do
-            ["tree", b | _] when b != "" -> b
-            _ -> nil
-          end
-
-        {owner, String.replace_suffix(repo, ".git", ""), branch}
-
-      _ ->
-        nil
-    end
-  end
-
-  defp download_first([url | rest]) do
-    case download(url) do
-      {:ok, tmp} -> {:ok, tmp}
-      _ when rest != [] -> download_first(rest)
-      error -> error
-    end
-  end
-
-  defp download_first([]), do: {:error, :not_found}
-
-  # A downloaded temp file has no extension; give it the source's so `place/1` names it.
-  defp with_ext(tmp, url) do
-    name = url |> URI.parse() |> Map.get(:path, "") |> to_string() |> Path.basename()
-    dest = if name != "", do: Path.join(Path.dirname(tmp), name), else: tmp <> ".exs"
-    if dest != tmp, do: File.rename(tmp, dest)
-    dest
-  end
-
-  defp stage_archive(archive_path, cleanup) do
-    tmp = Path.join(System.tmp_dir!(), "pepe_plugin_#{System.unique_integer([:positive])}")
-    File.mkdir_p!(tmp)
-
-    case :erl_tar.extract(String.to_charlist(archive_path), [:compressed, {:cwd, String.to_charlist(tmp)}]) do
-      :ok ->
-        {:ok, %{type: :dir, path: package_root(tmp)},
-         fn ->
-           cleanup.()
-           File.rm_rf(tmp)
-           :ok
-         end}
-
-      {:error, reason} ->
-        File.rm_rf(tmp)
-        cleanup.()
-        {:error, {:extract, reason}}
-    end
-  end
-
-  # The package root inside an extracted archive: the dir holding the manifest (or a `.exs`
-  # if there's no manifest), else the extraction root.
-  defp package_root(tmp) do
-    cond do
-      match = Enum.at(Path.wildcard(Path.join(tmp, "**/#{@manifest}")), 0) -> Path.dirname(match)
-      match = Enum.at(Path.wildcard(Path.join(tmp, "**/*.exs")), 0) -> Path.dirname(match)
-      true -> tmp
-    end
-  end
+  defp plugin_root_marker?(@manifest), do: true
+  defp plugin_root_marker?(name), do: String.ends_with?(name, ".exs")
 
   # --- placement: copy the staged plugin into the plugins dir ----------------------
 
-  defp place(%{type: :exs, path: path}) do
+  defp place(%{type: :file, path: path}) do
     File.mkdir_p!(dir())
     name = ensure_exs(Path.basename(path))
     File.cp!(path, Path.join(dir(), name))
@@ -425,21 +314,6 @@ defmodule Pepe.Plugins do
 
   defp scan_summary(_), do: "no detail"
 
-  defp download(url) do
-    case Req.get(url, receive_timeout: 30_000, redirect: true) do
-      {:ok, %{status: s, body: body}} when s in 200..299 ->
-        tmp = Path.join(System.tmp_dir!(), "pepe_dl_#{System.unique_integer([:positive])}")
-        File.write!(tmp, body)
-        {:ok, tmp}
-
-      {:ok, %{status: s}} ->
-        {:error, {:http, s}}
-
-      other ->
-        other
-    end
-  end
-
   defp read_manifest(package_dir) do
     with {:ok, body} <- File.read(Path.join(package_dir, @manifest)),
          {:ok, map} <- Jason.decode(body) do
@@ -457,8 +331,6 @@ defmodule Pepe.Plugins do
   end
 
   defp has_exs?(dir), do: Path.wildcard(Path.join(dir, "**/*.exs")) != []
-
-  defp archive?(path), do: String.ends_with?(path, ".tar.gz") or String.ends_with?(path, ".tgz")
 
   defp ensure_exs(name), do: if(String.ends_with?(name, ".exs"), do: name, else: name <> ".exs")
 end

@@ -127,6 +127,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe flow list|promote|show|remove|run ... # promote a proven trace sequence into a script
       mix pepe browser install                  # host-level help for the `browser` agent tool
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
+      mix pepe skill list|search|install|update ... # skill marketplace: taps + the bundled registry
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|login|remove ... # external tool servers (MCP: local or remote)
@@ -258,6 +259,13 @@ defmodule Mix.Tasks.Pepe do
     do: with_app([], fn -> plugin_cmd([sub | rest]) end)
 
   def dispatch(["plugin" | rest]), do: with_config(fn -> plugin_cmd(rest) end)
+
+  # `skill install`/`update`/`search` reach a tap or a registry over the network (needs Req);
+  # list/remove/audit/tap only touch config.json and local files.
+  def dispatch(["skill", sub | rest]) when sub in ["install", "update", "search"],
+    do: with_app([], fn -> skill_cmd([sub | rest]) end)
+
+  def dispatch(["skill" | rest]), do: with_config(fn -> skill_cmd(rest) end)
   def dispatch(["migrate" | rest]), do: with_config(fn -> migrate_cmd(rest) end)
   def dispatch(["project" | rest]), do: with_config(fn -> project_cmd(rest) end)
 
@@ -1658,6 +1666,164 @@ defmodule Mix.Tasks.Pepe do
 
     An agent holding the manage_plugin tool can scan/install/list/remove the same way
     from a chat - with no --force escape hatch; a dangerous verdict always stays here.
+    """)
+  end
+
+  ###
+  ### skill (marketplace)
+  ###
+
+  defp skill_cmd(["help"]), do: skill_help()
+  defp skill_cmd([]), do: skill_list()
+  defp skill_cmd(["list"]), do: skill_list()
+
+  defp skill_cmd(["search", query]) do
+    case Pepe.Skills.Marketplace.search(query) do
+      [] -> info("No skills found matching #{inspect(query)}. Add a tap first: mix pepe skill tap add URL")
+      results -> Enum.each(results, &print_skill_search_line/1)
+    end
+  end
+
+  defp skill_cmd(["search"]), do: error("usage: mix pepe skill search QUERY")
+
+  defp skill_cmd(["install", name | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [force: :boolean, source: :string])
+    result = Pepe.Skills.Marketplace.install(name, force: opts[:force] == true, source: opts[:source])
+    report_skill_install(name, result)
+  end
+
+  defp skill_cmd(["install"]), do: error("usage: mix pepe skill install NAME [--force] [--source URL]")
+
+  defp skill_cmd(["update"]) do
+    Enum.each(Pepe.Skills.Marketplace.update(nil), fn {name, result} -> report_skill_update(name, result) end)
+  end
+
+  defp skill_cmd(["update", name]), do: report_skill_update(name, Pepe.Skills.Marketplace.update(name))
+
+  defp skill_cmd(["remove", name]) do
+    case Pepe.Skills.Marketplace.remove(name) do
+      {:ok, _} -> ok("removed #{name}")
+      {:error, :not_found} -> error("no installed skill named #{name} (built-in and hand-authored skills aren't managed here)")
+    end
+  end
+
+  defp skill_cmd(["audit"]), do: Enum.each(Pepe.Skills.Marketplace.audit(nil), &print_skill_audit_line/1)
+  defp skill_cmd(["audit", name]), do: Enum.each(Pepe.Skills.Marketplace.audit(name), &print_skill_audit_line/1)
+
+  defp skill_cmd(["tap", "add", url]) do
+    Config.add_skill_tap(url)
+    ok("added tap #{url}")
+  end
+
+  defp skill_cmd(["tap", "remove", url]) do
+    Config.remove_skill_tap(url)
+    ok("removed tap #{url}")
+  end
+
+  defp skill_cmd(["tap", "list"]) do
+    case Config.skill_taps() do
+      [] -> info("No taps added. Add one: mix pepe skill tap add URL")
+      taps -> Enum.each(taps, &info("  #{&1}"))
+    end
+  end
+
+  defp skill_cmd(_), do: error(skill_usage())
+
+  defp skill_usage,
+    do:
+      "usage: mix pepe skill list|search QUERY|install NAME [--force] [--source URL]|update [NAME]|remove NAME|audit [NAME]|tap add|list|remove URL"
+
+  defp skill_list do
+    builtin_and_user = Pepe.Skills.list()
+    info(bold("skills") <> dim("  (#{length(builtin_and_user)} available: built-in + user)"))
+    Enum.each(builtin_and_user, fn {name, summary} -> info("  #{green(name)}#{if summary != "", do: dim(" - " <> summary), else: ""}") end)
+
+    case Pepe.Skills.Marketplace.list_installed() do
+      [] ->
+        :ok
+
+      installed ->
+        info("\n" <> bold("from the marketplace") <> dim(" (#{length(installed)})"))
+        Enum.each(installed, &print_installed_skill_line/1)
+    end
+  end
+
+  defp print_installed_skill_line(meta) do
+    info("  #{green(meta["name"])} #{dim("(#{meta["trust_level"]}, from #{meta["source"]})")}")
+  end
+
+  defp print_skill_search_line(%{name: name, trust_level: trust, source: source}) do
+    info("  #{green(name)} #{dim("(#{trust}) #{source}")}")
+  end
+
+  defp report_skill_install(_name, {:ok, installed_name, scan}) do
+    ok("installed #{green(installed_name)} into #{Pepe.Skills.user_dir()}")
+    if scan.verdict != :safe, do: info(Pepe.Skills.Sentinel.report(scan))
+  end
+
+  defp report_skill_install(_name, {:error, {:unsafe, scan}}) do
+    error("refused: the Sentinel flagged this skill as dangerous.")
+    info(Pepe.Skills.Sentinel.report(scan))
+    info(dim("If you have reviewed it and trust the source, re-run with --force."))
+  end
+
+  defp report_skill_install(name, {:error, :not_found}) do
+    error("no skill named #{name} in any tap or the bundled registry - pass --source URL to install directly")
+  end
+
+  defp report_skill_install(_name, {:error, reason}), do: error("install failed: #{inspect(reason)}")
+
+  defp report_skill_update(name, {:ok, installed_name, scan}) do
+    ok("updated #{green(installed_name || name)}")
+    if scan.verdict != :safe, do: info(Pepe.Skills.Sentinel.report(scan))
+  end
+
+  defp report_skill_update(_name, {:error, {:source_changed, pinned, other}}) do
+    error("refused: this name now resolves to a different source than it was installed from.")
+    info("  installed from: #{pinned}")
+    info("  now resolves to: #{other}")
+    info(dim("If that's expected, replace it explicitly: mix pepe skill install NAME --source #{other} --force"))
+  end
+
+  defp report_skill_update(name, {:error, :not_found}), do: error("no installed skill named #{name}")
+  defp report_skill_update(_name, {:error, reason}), do: error("update failed: #{inspect(reason)}")
+
+  defp print_skill_audit_line(%{name: name, verdict: verdict} = result) do
+    icon =
+      case verdict do
+        :safe -> green("✓")
+        :caution -> yellow("⚠")
+        :danger -> red("✗")
+        _ -> dim("?")
+      end
+
+    info("  #{icon} #{name} (#{verdict})")
+    findings = result[:findings] || []
+    if findings != [], do: info(Pepe.Skills.Sentinel.report(%{verdict: verdict, findings: findings}))
+  end
+
+  defp skill_help do
+    puts("""
+    #{bold("mix pepe skill")} - install and manage skills from a marketplace
+
+      skill list                          list built-in/user skills and marketplace installs
+      skill search QUERY                  search every tap plus the bundled registry
+      skill install NAME [--force]        install by name, resolved against taps/registry
+      skill install NAME --source URL     install directly from a URL/path/GitHub repo
+                                         (always "community" trust - nothing vouches for it)
+      skill update [NAME]                 re-fetch from the exact source a skill was
+                                         installed from; refuses if the name now resolves
+                                         to a DIFFERENT source (use install --force to
+                                         follow it deliberately)
+      skill remove NAME                   delete a marketplace-installed skill
+      skill audit [NAME]                  re-scan installed skill(s) in place
+      skill tap add|list|remove URL       manage extra registries beyond the bundled default
+
+    Every install goes through the same Sentinel scan a hand-installed skill already gets;
+    a dangerous verdict is refused unless --force. Trust is "official" only for the bundled,
+    in-repo registry (curated by the maintainers) - anything from a tap, or a direct
+    --source install, is "community": read via the skill tool, it's marked as untrusted
+    content the same way a fetched web page is, until you've reviewed it yourself.
     """)
   end
 

@@ -73,6 +73,33 @@ exfiltración de secretos, comandos destructivos, persistencia y ofuscación. Es
 una segunda comprobación, no un sustituto de leer el contenido, y nunca instala
 nada por su cuenta.
 
+## Instalar desde un marketplace
+
+`install-skill` (arriba) es la vía conversacional: un agente trae una skill desde un enlace
+que le das. `mix pepe skill` es la vía del operador, con un registro donde buscar y una
+historia de actualización:
+
+```bash
+pepe skill search release            # busca en cada tap más el registro incluido
+pepe skill install cut-a-release     # instala por nombre
+pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # o directamente
+pepe skill update cut-a-release      # vuelve a traerla desde la fuente exacta de la que se instaló
+pepe skill tap add https://github.com/tu-equipo/pepe-skills   # añade un registro más allá del incluido
+```
+
+Cada instalación pasa por el mismo escaneo de seguridad estático que usa `install-skill`; un
+veredicto peligroso se rechaza a menos que pases `--force`. La confianza es `"official"` solo
+para el registro incluido en el propio repositorio (curado por quienes mantienen Pepe, vacío
+por defecto hoy —todavía no existe un registro alojado, solo el mecanismo). Todo lo resuelto
+a través de un tap que hayas añadido, o instalado con `--source`, es `"community"`: cuando un
+agente lo lee con la herramienta `skill`, su contenido se envuelve en el mismo marcador de
+contenido no confiable que lleva una página web obtenida, hasta que tú mismo la hayas revisado.
+
+`update` queda fijado a la fuente exacta desde la que se instaló una skill —si el registro de
+un tap más tarde apunta ese nombre a una fuente *distinta*, `update` se niega en vez de
+seguirla en silencio. Una skill con el mismo nombre desde otro lado solo puede reemplazar una
+ya instalada mediante un `install --force` explícito, nunca una actualización rutinaria.
+
 ## Skills, plugins y scripts
 
 Los tres puntos de extensión se componen, y juntos son lo que permite pedirle a

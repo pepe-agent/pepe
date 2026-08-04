@@ -120,11 +120,4 @@ defmodule Pepe.PluginProviderTest do
     # forcing installs it anyway (and still reports the scan)
     assert {:ok, _name, %{verdict: :danger}} = Pepe.Plugins.install(danger, force: true)
   end
-
-  test "github_target parses owner/repo and an optional branch" do
-    assert Pepe.Plugins.github_target("/octocat/Hello-World") == {"octocat", "Hello-World", nil}
-    assert Pepe.Plugins.github_target("/user/repo/tree/dev") == {"user", "repo", "dev"}
-    assert Pepe.Plugins.github_target("/user/repo.git") == {"user", "repo", nil}
-    assert Pepe.Plugins.github_target("/onlyone") == nil
-  end
 end

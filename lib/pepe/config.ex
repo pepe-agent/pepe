@@ -3199,6 +3199,54 @@ defmodule Pepe.Config do
     end)
   end
 
+  @doc "Extra skill registries (\"taps\") beyond the bundled default, in the order they resolve."
+  def skill_taps, do: load() |> get_in(["skills", "taps"]) || []
+
+  @doc "Add a tap (a URL or GitHub repo) if not already present."
+  def add_skill_tap(url) when is_binary(url) do
+    update(fn config ->
+      # A single-level update_in - "skills" itself may not exist yet on a fresh config, and
+      # update_in with a two-level path crashes on a missing intermediate key (nil has no
+      # Access to update_in further into). Handle the nested "taps" key inside the updater.
+      update_in(config, ["skills"], fn skills ->
+        Map.update(skills || %{}, "taps", [url], fn taps -> Enum.uniq(taps ++ [url]) end)
+      end)
+    end)
+  end
+
+  @doc "Remove a tap."
+  def remove_skill_tap(url) when is_binary(url) do
+    update(fn config ->
+      update_in(config, ["skills"], fn skills ->
+        Map.update(skills || %{}, "taps", [], fn taps -> List.delete(taps, url) end)
+      end)
+    end)
+  end
+
+  @doc "Marketplace provenance for an installed skill (by name), or `nil` if hand-authored."
+  def installed_skill(name), do: load() |> get_in(["skills", "installed", name])
+
+  @doc "Every marketplace-installed skill's provenance, by name."
+  def installed_skills, do: load() |> get_in(["skills", "installed"]) || %{}
+
+  @doc "Record a skill's marketplace provenance (source, hash, trust_level, installed_at)."
+  def put_installed_skill(name, meta) when is_binary(name) and is_map(meta) do
+    update(fn config ->
+      update_in(config, ["skills"], fn skills ->
+        Map.update(skills || %{}, "installed", %{name => meta}, fn m -> Map.put(m, name, meta) end)
+      end)
+    end)
+  end
+
+  @doc "Forget a skill's marketplace provenance (it was removed)."
+  def remove_installed_skill(name) when is_binary(name) do
+    update(fn config ->
+      update_in(config, ["skills"], fn skills ->
+        Map.update(skills || %{}, "installed", %{}, &Map.delete(&1, name))
+      end)
+    end)
+  end
+
   def server do
     load() |> Map.get("server", %{"port" => 4000})
   end

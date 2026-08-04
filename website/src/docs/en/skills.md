@@ -70,6 +70,32 @@ disk. The scan flags prompt injection, secret exfiltration, destructive
 commands, persistence and obfuscation. It is a second check rather than a
 substitute for reading the content, and it never installs anything itself.
 
+## Installing from a marketplace
+
+`install-skill` (above) is the conversational path: an agent pulls one skill from a link you
+give it. `mix pepe skill` is the operator path, with a registry to search and an update story:
+
+```bash
+pepe skill search release            # search every tap plus the bundled registry
+pepe skill install cut-a-release     # install by name
+pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # or directly
+pepe skill update cut-a-release      # re-fetch from the exact source it was installed from
+pepe skill tap add https://github.com/your-team/pepe-skills   # add a registry beyond the bundled default
+```
+
+Every install goes through the same static security scan `install-skill` uses; a dangerous
+verdict is refused unless you pass `--force`. Trust is `"official"` only for the bundled,
+in-repo registry (curated by Pepe's own maintainers, empty by default today - there is no
+hosted registry yet, only the mechanism). Anything resolved through a tap you added, or
+installed with `--source`, is `"community"`: when an agent reads it with the `skill` tool,
+its content is wrapped in the same untrusted-content marker a fetched web page carries, until
+you've reviewed it yourself.
+
+`update` is pinned to the exact source a skill was installed from - if a tap's registry later
+points that name at a *different* source, `update` refuses rather than silently following it.
+A same-named skill from elsewhere can only replace an installed one via an explicit
+`install --force`, never a routine update.
+
 ## Skills, plugins and scripts
 
 The three extension points compose, and together they are what lets an agent be
