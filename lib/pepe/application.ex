@@ -109,6 +109,11 @@ defmodule Pepe.Application do
           {Registry, keys: :duplicate, name: Pepe.Watch.Subscribers},
           # Self-healing tracker for permanently-gone Telegram chats.
           Pepe.Gateways.Reachability,
+          # Skip a model connection that just failed transiently instead of retrying it every
+          # turn at the top of its failover chain.
+          Pepe.LLM.Cooldown,
+          # Cross-turn running-summary state for agents with micro_compaction enabled.
+          Pepe.Agent.MicroCompaction,
           # Messaging gateways (Telegram, ...). No-ops when not configured.
           Pepe.Gateways.Supervisor,
           # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).
