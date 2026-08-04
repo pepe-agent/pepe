@@ -164,7 +164,7 @@ defmodule Pepe.Agent.Runtime do
   defp loop(agent, chain, messages, _specs, ctx, opts, 0) do
     nudge = Message.user(@out_of_turns_nudge)
     chat_opts = [temperature: agent.temperature]
-    to_send = Compaction.compact(messages, hd(chain), agent.name)
+    to_send = compact_for_send(agent, chain, messages, ctx)
 
     case chat_with_failover(chain, to_send ++ [nudge], chat_opts, ctx, opts) do
       {:ok, %{content: content}} when is_binary(content) and content != "" ->
@@ -198,7 +198,7 @@ defmodule Pepe.Agent.Runtime do
     # the caller (Session.spawn_run) recovers this turn's new messages by dropping the prior history
     # by length - if compaction shrank the list in place, that drop would eat into the turn and
     # silently lose it (and re-summarize every turn after). A no-op until the history is large.
-    to_send = Compaction.compact(messages, hd(chain), agent.name)
+    to_send = compact_for_send(agent, chain, messages, ctx)
 
     result = chat_with_failover(chain, to_send, chat_opts, ctx, opts)
 
@@ -261,6 +261,15 @@ defmodule Pepe.Agent.Runtime do
       0 -> messages
     end
   end
+
+  # agent.micro_compaction opts into Compaction.micro_compact/4's amortized per-turn fold
+  # instead of the default full-middle resummarize-on-threshold. See Compaction's moduledoc
+  # for the tradeoff (prompt-cache prefix stability) this is opt-in for.
+  defp compact_for_send(%{micro_compaction: true} = agent, chain, messages, ctx),
+    do: Compaction.micro_compact(messages, hd(chain), agent.name, ctx[:session_key])
+
+  defp compact_for_send(agent, chain, messages, _ctx),
+    do: Compaction.compact(messages, hd(chain), agent.name)
 
   # Try each model in the chain; advance ONLY on transient failures (rate limit,
   # server error, network) - auth/request errors fail fast (a bad key on model B

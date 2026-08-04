@@ -156,6 +156,18 @@ resposta final (<code>done</code>) ou um erro (<code>error</code>). A CLI, o Web
 e os canais de mensagens mostram tudo ao vivo, e é por isso que vês a escrita e a
 atividade das ferramentas à medida que acontece, em vez de um único bloco no fim.</div>
 
+## Conversas longas: compactação
+
+Uma conversa não cresce para sempre dentro da janela de contexto do modelo. Quando o tamanho estimado ultrapassa cerca de 75% dela, o runtime substitui o **meio** do histórico por um resumo curto que o próprio modelo escreve, mantendo o system prompt e os turnos mais recentes tal como estão. Isto é automático e não precisa de configuração - a transcrição completa continua guardada (vê Traces), só o que é enviado ao modelo é condensado.
+
+Por defeito, esse resumo acontece **uma vez**, do zero, sempre que o limiar é ultrapassado de novo - suficiente para a maioria das conversas, mas uma que dure muito pode atingi-lo repetidamente, resumindo de cada vez um meio que só ficou maior. Um agente pode optar pelo `micro_compaction` em vez disso: quando a janela enche, dobra exatamente a troca mais antiga ainda não coberta num resumo contínuo a cada turno, um custo pequeno e constante em vez de uma paragem periódica. A contrapartida é real, por isso vem desligado por defeito: o resumo contínuo muda a cada turno assim que ativo, o que custa parte da estabilidade da cache de prompt de um fornecedor - vale a pena para uma conversa suficientemente longa para atingir o limiar com frequência, não para uma curta.
+
+```bash
+pepe agent add support --micro-compaction ...
+```
+
+Ou liga-o num agente existente a partir do editor de agentes do painel, ou pede a um agente com a tool `manage_agent` para ligar o interruptor `micro_compaction` noutro agente.
+
 ## Ferramentas e a barreira de permissão
 
 Uma ferramenta é uma capacidade. Um agente só pode fazer aquilo que a sua lista

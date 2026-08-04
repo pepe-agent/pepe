@@ -713,6 +713,10 @@ defmodule Pepe.Agent.Session do
 
         case Pepe.Agent.Compaction.compact_now(state.messages, Config.model_for_agent(agent), agent.name) do
           {:ok, messages, summary} ->
+            # A manual /compact just replaced the real running summary wholesale - any
+            # micro_compaction cache keyed to this session (an index into the old message
+            # list, plus a summary that's no longer the one in effect) is now meaningless.
+            Pepe.Agent.MicroCompaction.clear(state.key)
             {:reply, {:ok, summary}, persist(%{state | messages: messages})}
 
           {:error, reason} ->

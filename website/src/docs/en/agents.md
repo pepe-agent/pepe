@@ -150,6 +150,30 @@ final answer (<code>done</code>), or an error (<code>error</code>). The CLI, the
 WebSocket, and the messaging channels all render these live, which is why you see
 typing and tool activity as it happens rather than one blob at the end.</div>
 
+## Long conversations: compaction
+
+A conversation doesn't grow forever inside the model's context window. Once the estimated
+size crosses about 75% of it, the runtime replaces the **middle** of the history with a short
+summary the model writes of itself, keeping the system prompt and the most recent turns
+verbatim. This is automatic and needs no configuration - the full transcript is still kept
+(see Traces), only what's sent to the model gets condensed.
+
+By default, that summarization happens **once**, from scratch, each time the threshold is
+crossed again - fine for most conversations, but a long-running one can hit it repeatedly,
+each time re-summarizing a middle that's only gotten bigger. An agent can opt into
+`micro_compaction` instead: once the window fills, it folds exactly the oldest
+not-yet-covered exchange into a running summary every turn, a small, steady cost instead of
+a periodic stall. The tradeoff is real, which is why it's off by default: the running summary
+changes every turn once active, which costs a provider's prompt-cache prefix stability -
+worth it for a conversation long enough to hit the threshold often, not for a short one.
+
+```bash
+pepe agent add support --micro-compaction ...
+```
+
+Or toggle it on an existing agent from the dashboard's agent editor, or by asking an agent
+with the `manage_agent` tool to set the `micro_compaction` flag on another agent.
+
 ## Tools and the permission gate
 
 A tool is a capability. An agent can only do what its `tools` list allows. Give an

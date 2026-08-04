@@ -2582,6 +2582,7 @@ defmodule Mix.Tasks.Pepe do
           midrun_fold: :boolean,
           commitments: :boolean,
           session_search_project_wide: :boolean,
+          micro_compaction: :boolean,
           admin: :boolean
         ]
       )
@@ -2789,7 +2790,8 @@ defmodule Mix.Tasks.Pepe do
       trust_untrusted_content: opts[:trust_untrusted_content] || false,
       midrun_fold: opts[:midrun_fold] || false,
       commitments: opts[:commitments] || false,
-      session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self")
+      session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
+      micro_compaction: opts[:micro_compaction] || false
     }
   end
 

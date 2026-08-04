@@ -15,6 +15,7 @@ defmodule Pepe.Agent.Compaction do
   """
   require Logger
 
+  alias Pepe.Agent.MicroCompaction
   alias Pepe.LLM
   alias Pepe.LLM.Message
 
@@ -67,6 +68,37 @@ defmodule Pepe.Agent.Compaction do
   end
 
   @doc """
+  Opt-in per-turn amortized compaction (`agent.micro_compaction: true`). Instead of
+  resummarizing the whole middle from scratch every turn once the window's crossed - what
+  `compact/3` does, and why it re-pays for the whole, ever-growing middle every time it
+  retriggers - this folds exactly the OLDEST not-yet-covered exchange into a running summary
+  each call, so the input to that fold is always small (the running summary plus one
+  exchange), never the whole middle. Stays on `model`, same as `compact_now/3` - see
+  `Pepe.Agent.Utility`'s moduledoc for why a cheap utility model is deliberately not used for
+  anything the agent has to go on reasoning from, and compaction is exactly that.
+
+  Trades away prompt-cache prefix stability (the summary text changes turn over turn once
+  this kicks in, unlike `compact/3`'s no-op-until-large default) for a bounded, smooth
+  per-turn cost instead of one big mid-session stall - a real tradeoff, which is why this is
+  opt-in rather than the default.
+
+  `session_key` is the cross-turn identity the running summary is cached under
+  (`Pepe.Agent.MicroCompaction`); with no session (a stateless oneshot has nothing to amortize
+  across turns of) this falls back to ordinary `compact/3` behavior.
+  """
+  def micro_compact(messages, model, agent_name \\ nil, session_key)
+
+  def micro_compact(messages, model, agent_name, nil), do: compact(messages, model, agent_name)
+
+  def micro_compact(messages, model, agent_name, session_key) do
+    if needs?(messages, model) do
+      do_micro_compact(messages, model, agent_name, session_key)
+    else
+      messages
+    end
+  end
+
+  @doc """
   Condense `messages` **now**, regardless of size (the manual `/compact`). Returns
   `{:ok, new_messages, summary}`, `{:ok, messages, "nothing to compact yet"}` when
   there's too little to summarize, or `{:error, reason}` (including `:no_model`).
@@ -93,6 +125,79 @@ defmodule Pepe.Agent.Compaction do
   end
 
   # --- internals ------------------------------------------------------------------
+
+  defp do_micro_compact(messages, model, agent_name, session_key) do
+    {head, middle, tail} = split(messages, round(window(model) * @keep_tail))
+    all_exchanges = exchanges(middle)
+    eligible = length(all_exchanges)
+
+    {prior_summary, covered} = MicroCompaction.get(session_key) || {nil, 0}
+    covered = min(covered, eligible)
+
+    {summary, covered} =
+      if covered < eligible do
+        fold_one(prior_summary, Enum.at(all_exchanges, covered), model, agent_name, session_key, covered)
+      else
+        {prior_summary, covered}
+      end
+
+    unfolded = all_exchanges |> Enum.drop(covered) |> List.flatten()
+
+    if summary do
+      head ++ [summary_message(summary)] ++ unfolded ++ tail
+    else
+      messages
+    end
+  end
+
+  # Groups a message list into "exchanges" - each starting on a `user`-role message (the
+  # natural unit a fold covers), so a fold never splits an assistant tool-call from its
+  # results any more than `split/2`'s tail boundary already avoids doing. Any messages before
+  # the first user turn (possible if `middle` itself starts mid-exchange) form their own
+  # leading group.
+  defp exchanges(messages) do
+    Enum.chunk_while(
+      messages,
+      [],
+      fn
+        %{"role" => "user"} = m, [] -> {:cont, [m]}
+        %{"role" => "user"} = m, acc -> {:cont, Enum.reverse(acc), [m]}
+        m, acc -> {:cont, [m | acc]}
+      end,
+      fn acc -> {:cont, Enum.reverse(acc), []} end
+    )
+  end
+
+  defp fold_one(prior_summary, exchange, model, agent_name, session_key, covered) do
+    prompt = fold_prompt(prior_summary, render(exchange))
+
+    case LLM.chat(
+           model,
+           [Message.system("You keep a running summary of a conversation, faithfully and compactly."), Message.user(prompt)],
+           max_tokens: 400
+         ) do
+      {:ok, %{content: c} = result} when is_binary(c) and c != "" ->
+        meter(agent_name, model, result[:usage])
+        MicroCompaction.put(session_key, c, covered + 1)
+        {c, covered + 1}
+
+      _ ->
+        {prior_summary, covered}
+    end
+  end
+
+  defp fold_prompt(nil, exchange_text) do
+    "Summarize the following conversation excerpt concisely, as the start of a running " <>
+      "summary you'll keep extending. Preserve decisions, facts, current task state, and " <>
+      "any identifiers, paths or values verbatim. Output only the summary.\n\n" <> exchange_text
+  end
+
+  defp fold_prompt(prior_summary, exchange_text) do
+    "Here is the running summary of a conversation so far:\n\n#{prior_summary}\n\n" <>
+      "Fold the following next exchange into it, updating it to stay concise while " <>
+      "preserving decisions, facts, current task state, and identifiers/paths/values " <>
+      "verbatim. Output only the updated summary.\n\n" <> exchange_text
+  end
 
   defp take_tail(rest, keep_tokens) do
     {tail, _tokens} =

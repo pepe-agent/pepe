@@ -113,7 +113,15 @@ defmodule Pepe.Config.Agent do
             # serving several different end customers under one project must stay "self", or
             # one customer asking "search my past conversations" can read another's. See
             # Pepe.Tools.SessionSearch.
-            session_search_scope: "self"
+            session_search_scope: "self",
+            # Off by default. When on, Pepe.Agent.Compaction folds exactly the oldest
+            # not-yet-summarized exchange into a running summary every turn once the window's
+            # crossed, instead of resummarizing the whole (ever-growing) middle from scratch
+            # each time it retriggers - smaller, steadier per-turn cost instead of a sawtooth.
+            # Off by default because the tradeoff is real, not just an upside: the running
+            # summary changes every turn once active, which breaks a provider's prompt-cache
+            # prefix stability turn over turn. See Pepe.Agent.Compaction.micro_compact/4.
+            micro_compaction: false
 
   @type t :: %__MODULE__{}
 
@@ -162,7 +170,8 @@ defmodule Pepe.Config.Agent do
         trust_untrusted_content: map["trust_untrusted_content"] || false,
         midrun_fold: map["midrun_fold"] || false,
         commitments: map["commitments"] || false,
-        session_search_scope: map["session_search_scope"] || "self"
+        session_search_scope: map["session_search_scope"] || "self",
+        micro_compaction: map["micro_compaction"] || false
     }
   end
 end

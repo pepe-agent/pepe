@@ -343,6 +343,14 @@ defmodule PepeWeb.AgentsLive do
                   <p class={hlp()}>{gettext("Off (the default) is safe for an agent that talks to several different end customers: session_search only ever reaches the calling conversation's own history. Turn this on only for an agent with one operator/team on the other end, where there's no other customer's conversation to leak.")}</p>
                 </span>
               </label>
+
+              <label class="flex items-start gap-2.5 text-sm">
+                <input type="checkbox" name="micro_compaction" value="true" checked={@edit_agent[:micro_compaction]} class="mt-0.5" />
+                <span>
+                  {gettext("Micro-compaction (fold history gradually instead of resummarizing it all at once)")}
+                  <p class={hlp()}>{gettext("Once the context window fills, this folds only the oldest exchange into a running summary each turn instead of resummarizing the whole thing from scratch every time - smaller, steadier cost instead of one big stall. Trade-off: the summary changes every turn once active, which costs some of the model provider's prompt caching.")}</p>
+                </span>
+              </label>
             </.form_section>
 
             <.form_section :if={!@edit_agent.new?} title={gettext("Assembled prompt")}>
@@ -407,7 +415,8 @@ defmodule PepeWeb.AgentsLive do
       exempt_message_limit: false,
       midrun_fold: false,
       commitments: false,
-      session_search_scope: "self"
+      session_search_scope: "self",
+      micro_compaction: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -526,7 +535,8 @@ defmodule PepeWeb.AgentsLive do
         trust_untrusted_content: params["trust_untrusted_content"] == "true",
         midrun_fold: params["midrun_fold"] == "true",
         commitments: params["commitments"] == "true",
-        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self")
+        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
+        micro_compaction: params["micro_compaction"] == "true"
     }
 
     case Config.put_agent(agent) do
@@ -575,7 +585,8 @@ defmodule PepeWeb.AgentsLive do
         trust_untrusted_content: params["trust_untrusted_content"] == "true",
         midrun_fold: params["midrun_fold"] == "true",
         commitments: params["commitments"] == "true",
-        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self")
+        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
+        micro_compaction: params["micro_compaction"] == "true"
     }
 
     {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}

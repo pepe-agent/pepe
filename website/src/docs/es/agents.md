@@ -157,6 +157,18 @@ WebSocket y los canales de mensajería los muestran en vivo, y por eso ves la
 escritura y la actividad de herramientas a medida que ocurre en lugar de un solo
 bloque al final.</div>
 
+## Conversaciones largas: compactación
+
+Una conversación no crece para siempre dentro de la ventana de contexto del modelo. Una vez que el tamaño estimado supera cerca del 75% de ella, el runtime reemplaza el **medio** del historial con un resumen breve que el propio modelo escribe, manteniendo el system prompt y los turnos más recientes tal cual. Esto es automático y no necesita configuración —la transcripción completa se sigue guardando (consulta Traces), solo se condensa lo que se envía al modelo.
+
+Por defecto, ese resumen ocurre **una vez**, desde cero, cada vez que se vuelve a cruzar el umbral —bien para la mayoría de conversaciones, pero una que dura mucho puede alcanzarlo repetidamente, resumiendo cada vez un medio que solo se hizo más grande. Un agente puede optar por `micro_compaction` en su lugar: una vez que la ventana se llena, dobla exactamente el intercambio más antiguo aún no cubierto dentro de un resumen continuo en cada turno, un costo pequeño y constante en vez de una pausa periódica. La contrapartida es real, por eso está desactivado por defecto: el resumen continuo cambia en cada turno una vez activo, lo que cuesta algo de la estabilidad de la caché de prompt de un proveedor —vale la pena para una conversación lo bastante larga como para alcanzar el umbral con frecuencia, no para una corta.
+
+```bash
+pepe agent add support --micro-compaction ...
+```
+
+O actívalo en un agente existente desde el editor de agentes del panel, o pidiéndole a un agente con la tool `manage_agent` que active el interruptor `micro_compaction` en otro agente.
+
 ## Herramientas y la barrera de permisos
 
 Una herramienta es una capacidad. Un agente solo puede hacer lo que su lista
