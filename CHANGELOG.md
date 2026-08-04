@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-04
+
 ### Changed
 - **A new agent now defaults to every built-in tool enabled, instead of none.** The dashboard's "+ New agent" form now pre-checks every tool (the CLI's `mix pepe agent add` and `mix pepe setup` already worked this way - omit `--tools` and it grants everything); a `config.json` agent entry with no `"tools"` key at all resolves the same way. This includes tools with real system reach (`bash`, `manage_agent`, `manage_token`, `manage_pepe`, `manage_mcp`, `manage_plugin`, `schedule_task`, `watch`, `delegate`, ...), so review a freshly created agent's tool list and remove what it shouldn't have, rather than assuming it starts with nothing. This closes a gap where an agent silently lacked an unrelated, easy-to-forget tool (e.g. `send_file`) because whoever set it up hand-picked a list and missed one. An agent created by another agent via `manage_agent`'s `create` action is unchanged and still starts with no tools, since that path has no human reviewing a checklist before the agent exists.
 - **The base behavior contract (`Pepe.Agent.Workspace.behavior_contract/0`) now tells every agent that a shared channel can hold more than one person**, so it should trust only the name attached to the current message rather than assuming whoever spoke last is whoever the thread was about earlier, and should use a person's name when it helps, not as a reflex in every reply. This changes the actual system prompt of every existing agent, with no opt-in and nothing in `config.json` to diff - see `mix pepe agent prompt NAME` to check the effect on a given agent.
@@ -642,7 +644,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/pepe-agent/pepe/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/pepe-agent/pepe/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/pepe-agent/pepe/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/pepe-agent/pepe/compare/v0.10.2...v0.11.0
