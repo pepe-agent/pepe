@@ -38,6 +38,7 @@ defmodule Pepe.Agent.Runtime do
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
   alias Pepe.LLM
+  alias Pepe.LLM.Cooldown
   alias Pepe.LLM.Message
   alias Pepe.LLM.OutputCap
   alias Pepe.Tools
@@ -267,7 +268,26 @@ defmodule Pepe.Agent.Runtime do
   defp chat_with_failover(chain, messages, chat_opts, ctx, opts),
     do: chat_with_failover(chain, messages, chat_opts, ctx, opts, 0)
 
-  defp chat_with_failover([model | rest], messages, chat_opts, ctx, opts, capped) do
+  # A model still cooling down from a recent transient failure is skipped straight to the
+  # next one in the chain, without spending a real HTTP call on a connection that's likely to
+  # fail again - unless it's the only option left, in which case it's always tried anyway
+  # (fail-open: cooldown exists to save a wasted call, never to make an agent go silent).
+  defp chat_with_failover([model | rest], messages, chat_opts, ctx, opts, capped) when rest != [] do
+    if Cooldown.cooling_down?(model) do
+      require Logger
+
+      Logger.info("[llm] #{model.name} is cooling down, skipping straight to #{hd(rest).name}")
+      emit(opts, {:failover, model.name, hd(rest).name})
+      chat_with_failover(rest, messages, chat_opts, ctx, opts, 0)
+    else
+      do_chat_with_failover([model | rest], messages, chat_opts, ctx, opts, capped)
+    end
+  end
+
+  defp chat_with_failover(chain, messages, chat_opts, ctx, opts, capped),
+    do: do_chat_with_failover(chain, messages, chat_opts, ctx, opts, capped)
+
+  defp do_chat_with_failover([model | rest], messages, chat_opts, ctx, opts, capped) do
     result =
       if opts[:stream] do
         on_delta = fn text -> emit(opts, {:assistant_delta, text}) end
@@ -278,6 +298,7 @@ defmodule Pepe.Agent.Runtime do
 
     case result do
       {:ok, res} = ok ->
+        Cooldown.clear(model)
         record_usage(ctx, model, res[:usage], opts)
         ok
 
@@ -305,6 +326,7 @@ defmodule Pepe.Agent.Runtime do
     if rest != [] and transient?(reason) do
       require Logger
 
+      Cooldown.mark_failed(model, reason)
       Logger.warning("[llm] #{model.name} failed transiently, failing over: #{inspect(reason)}")
       emit(opts, {:failover, model.name, hd(rest).name})
 

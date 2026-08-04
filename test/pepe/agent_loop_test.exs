@@ -77,6 +77,15 @@ defmodule Pepe.AgentLoopTest do
     agent = Pepe.Config.get_agent("fo")
     assert {:ok, content, _msgs} = Runtime.converse(agent, "hi")
     assert content == "Hello from the mock!"
+
+    # The dead primary just failed transiently, so it's cooling down - a second turn must not
+    # spend another real (multiply-retried, several-second) HTTP attempt against it before
+    # falling through to the fallback again.
+    assert Pepe.LLM.Cooldown.cooling_down?(Pepe.Config.get_model("dead"))
+
+    {elapsed_us, {:ok, content2, _msgs2}} = :timer.tc(fn -> Runtime.converse(agent, "hi again") end)
+    assert content2 == "Hello from the mock!"
+    assert elapsed_us < 2_000_000, "expected the cooling-down primary to be skipped, but the second turn took #{elapsed_us / 1000}ms"
   end
 
   test "non-streaming chat returns assembled content", %{model: model} do
