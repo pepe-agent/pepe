@@ -3279,24 +3279,20 @@ defmodule Pepe.Config do
 
   @doc "Add a tap (a URL or GitHub repo) if not already present."
   def add_skill_tap(url) when is_binary(url) do
-    update(fn config ->
-      # A single-level update_in - "skills" itself may not exist yet on a fresh config, and
-      # update_in with a two-level path crashes on a missing intermediate key (nil has no
-      # Access to update_in further into). Handle the nested "taps" key inside the updater.
-      update_in(config, ["skills"], fn skills ->
-        Map.update(skills || %{}, "taps", [url], fn taps -> Enum.uniq(taps ++ [url]) end)
-      end)
-    end)
+    # A single-level update_in - "skills" itself may not exist yet on a fresh config, and
+    # update_in with a two-level path crashes on a missing intermediate key (nil has no
+    # Access to update_in further into). Handle the nested "taps" key inside the updater.
+    update(fn config -> update_in(config, ["skills"], &add_tap(&1, url)) end)
   end
+
+  defp add_tap(skills, url), do: Map.update(skills || %{}, "taps", [url], &Enum.uniq(&1 ++ [url]))
 
   @doc "Remove a tap."
   def remove_skill_tap(url) when is_binary(url) do
-    update(fn config ->
-      update_in(config, ["skills"], fn skills ->
-        Map.update(skills || %{}, "taps", [], fn taps -> List.delete(taps, url) end)
-      end)
-    end)
+    update(fn config -> update_in(config, ["skills"], &remove_tap(&1, url)) end)
   end
+
+  defp remove_tap(skills, url), do: Map.update(skills || %{}, "taps", [], &List.delete(&1, url))
 
   @doc "Marketplace provenance for an installed skill (by name), or `nil` if hand-authored."
   def installed_skill(name), do: load() |> get_in(["skills", "installed", name])
@@ -3306,12 +3302,11 @@ defmodule Pepe.Config do
 
   @doc "Record a skill's marketplace provenance (source, hash, trust_level, installed_at)."
   def put_installed_skill(name, meta) when is_binary(name) and is_map(meta) do
-    update(fn config ->
-      update_in(config, ["skills"], fn skills ->
-        Map.update(skills || %{}, "installed", %{name => meta}, fn m -> Map.put(m, name, meta) end)
-      end)
-    end)
+    update(fn config -> update_in(config, ["skills"], &put_installed(&1, name, meta)) end)
   end
+
+  defp put_installed(skills, name, meta),
+    do: Map.update(skills || %{}, "installed", %{name => meta}, &Map.put(&1, name, meta))
 
   @doc "Forget a skill's marketplace provenance (it was removed)."
   def remove_installed_skill(name) when is_binary(name) do

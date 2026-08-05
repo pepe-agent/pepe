@@ -233,19 +233,19 @@ defmodule Pepe.Skills.Marketplace do
   defp tap_index_urls(tap) do
     case URI.parse(tap) do
       %{host: host, path: path} when host in ["github.com", "www.github.com"] and is_binary(path) ->
-        case Sourcing.github_target(path) do
-          {owner, repo, branch} ->
-            branches = if branch, do: [branch], else: ["main", "master"]
-            Enum.map(branches, &"https://raw.githubusercontent.com/#{owner}/#{repo}/#{&1}/skills_registry.json")
-
-          nil ->
-            [tap]
-        end
+        github_index_urls(tap, Sourcing.github_target(path))
 
       _ ->
         [tap]
     end
   end
+
+  defp github_index_urls(_tap, {owner, repo, branch}) do
+    branches = if branch, do: [branch], else: ["main", "master"]
+    Enum.map(branches, &"https://raw.githubusercontent.com/#{owner}/#{repo}/#{&1}/skills_registry.json")
+  end
+
+  defp github_index_urls(tap, nil), do: [tap]
 
   defp fetch_json(url) do
     case Req.get(url, receive_timeout: 10_000) do

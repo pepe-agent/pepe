@@ -47,30 +47,30 @@ defmodule PepeWeb.DbConnectionsLive do
   defp validate_tenant(changeset) do
     case Changeset.get_field(changeset, :tenant_column) do
       col when is_binary(col) and col != "" ->
-        changeset = Changeset.validate_required(changeset, [:tenant_mode, :tenant_value])
+        tenant_mode = Changeset.get_field(changeset, :tenant_mode)
 
-        case Changeset.get_field(changeset, :tenant_mode) do
-          "agent_field" ->
-            if Changeset.get_field(changeset, :tenant_value) in ["project", "bare"] do
-              changeset
-            else
-              Changeset.add_error(changeset, :tenant_value, gettext(~s(must be "project" or "bare" for agent_field mode)))
-            end
-
-          "fixed" ->
-            changeset
-
-          nil ->
-            changeset
-
-          _ ->
-            Changeset.add_error(changeset, :tenant_mode, gettext(~s(must be "fixed" or "agent_field")))
-        end
+        changeset
+        |> Changeset.validate_required([:tenant_mode, :tenant_value])
+        |> validate_tenant_mode(tenant_mode)
 
       _ ->
         changeset
     end
   end
+
+  defp validate_tenant_mode(changeset, "agent_field") do
+    if Changeset.get_field(changeset, :tenant_value) in ["project", "bare"] do
+      changeset
+    else
+      Changeset.add_error(changeset, :tenant_value, gettext(~s(must be "project" or "bare" for agent_field mode)))
+    end
+  end
+
+  defp validate_tenant_mode(changeset, "fixed"), do: changeset
+  defp validate_tenant_mode(changeset, nil), do: changeset
+
+  defp validate_tenant_mode(changeset, _mode),
+    do: Changeset.add_error(changeset, :tenant_mode, gettext(~s(must be "fixed" or "agent_field")))
 
   defp conn_form(attrs), do: to_form(conn_changeset(attrs), as: :conn)
 

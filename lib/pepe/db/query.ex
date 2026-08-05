@@ -66,18 +66,20 @@ defmodule Pepe.DB.Query do
          {:ok, cfg} <- fetch_connection(conn_name),
          {:ok, tenant} <- resolve_tenant(cfg, ctx),
          {:ok, pid} <- DB.ensure(conn_name) do
-      # query/4 (not query!/4) on purpose: query! raises, and an exception raised inside a
-      # Postgrex.transaction/2 callback propagates OUT of transaction/2 itself rather than
-      # coming back as {:error, _} - explicit rollback/2 is what turns a failure into a
-      # clean {:error, reason} return here.
-      Postgrex.transaction(pid, fn conn ->
-        with :ok <- set_tenant(conn, tenant),
-             {:ok, result} <- Postgrex.query(conn, sql, []) do
-          result
-        else
-          {:error, reason} -> Postgrex.rollback(conn, reason)
-        end
-      end)
+      Postgrex.transaction(pid, &run_in_transaction(&1, sql, tenant))
+    end
+  end
+
+  # query/4 (not query!/4) on purpose: query! raises, and an exception raised inside a
+  # Postgrex.transaction/2 callback propagates OUT of transaction/2 itself rather than
+  # coming back as {:error, _} - explicit rollback/2 is what turns a failure into a
+  # clean {:error, reason} return here.
+  defp run_in_transaction(conn, sql, tenant) do
+    with :ok <- set_tenant(conn, tenant),
+         {:ok, result} <- Postgrex.query(conn, sql, []) do
+      result
+    else
+      {:error, reason} -> Postgrex.rollback(conn, reason)
     end
   end
 

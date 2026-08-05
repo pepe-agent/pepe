@@ -329,9 +329,10 @@ defmodule Pepe.WebhooksTest do
       def call(conn, _opts) do
         {:ok, body, conn} = read_body(conn)
         msgs = body |> Jason.decode!() |> Map.fetch!("messages")
+        tool = Enum.find(msgs, &(&1["role"] == "tool"))
 
         message =
-          if tool = Enum.find(msgs, &(&1["role"] == "tool")) do
+          if tool do
             %{"role" => "assistant", "content" => "tool said: #{tool["content"]}"}
           else
             %{
