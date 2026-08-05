@@ -29,13 +29,23 @@ defmodule Pepe.Permissions.Prompt do
   def options(true), do: @all_options
   def options(false), do: @options
 
-  @doc "The button/menu label for a decision (translated, current locale)."
-  @spec label(Permissions.decision()) :: String.t()
-  def label(:once), do: gettext("✅ Allow once")
-  def label(:this_run), do: gettext("🔁 Allow for the rest of this task")
-  def label(:session), do: gettext("💬 Allow for this session")
-  def label(:always), do: gettext("♾️ Always allow")
-  def label(:deny), do: gettext("🚫 Don't allow")
+  @doc """
+  The button/menu label for a decision (translated, current locale).
+
+  `:this_run` is marked "(recommended)" when `tainted?` is true: it's the one grant
+  that actually silences repeat prompts for the rest of a tainted run, since
+  `:session`/`:always` are suspended while tainted (see `Pepe.Permissions`' moduledoc) -
+  a person who taps the familiar "session"/"always" button here, out of habit, gets
+  asked again on the very next risky call and never finds out why.
+  """
+  @spec label(Permissions.decision(), boolean()) :: String.t()
+  def label(decision, tainted? \\ false)
+  def label(:this_run, true), do: gettext("🔁 Allow for the rest of this task (recommended)")
+  def label(:this_run, false), do: gettext("🔁 Allow for the rest of this task")
+  def label(:once, _tainted?), do: gettext("✅ Allow once")
+  def label(:session, _tainted?), do: gettext("💬 Allow for this session")
+  def label(:always, _tainted?), do: gettext("♾️ Always allow")
+  def label(:deny, _tainted?), do: gettext("🚫 Don't allow")
 
   @doc "The confirmation shown after a decision is made (translated)."
   @spec outcome(Permissions.decision()) :: String.t()
@@ -71,6 +81,19 @@ defmodule Pepe.Permissions.Prompt do
       "" -> gettext("🔐 Allow me to run the %{tool} tool?", tool: "`#{tool}`")
       desc -> gettext("🔐 Allow me to run the %{tool} tool — %{desc}?", tool: "`#{tool}`", desc: desc)
     end
+  end
+
+  @doc """
+  Why this prompt is showing up again even though "session"/"always" was already granted
+  earlier in the same task. Shown only while the run is tainted - explaining it once, right
+  where the person is about to pick an option, is cheaper than them wondering why a task
+  that "already got approved" is asking a fifth time.
+  """
+  @spec taint_note() :: String.t()
+  def taint_note do
+    gettext(
+      "This task read something from outside the conversation, so a standing \"session\"/\"always\" approval doesn't apply here. Pick \"Allow for the rest of this task\" to stop it asking again for the rest of this one."
+    )
   end
 
   @doc """

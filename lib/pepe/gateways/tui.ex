@@ -130,6 +130,9 @@ defmodule Pepe.Gateways.TUI do
   def authorizer do
     fn name, args, ctx ->
       Config.put_locale()
+      tainted? = ctx[:tainted] == true
+
+      note = if tainted?, do: "\n" <> dim("ℹ️ " <> Prompt.taint_note()), else: ""
 
       label =
         bold(Prompt.question(name)) <>
@@ -137,9 +140,10 @@ defmodule Pepe.Gateways.TUI do
           "\n" <>
           dim(one_line(args)) <>
           "\n" <>
-          dim(Prompt.scope_note(ctx[:risks] || []))
+          dim(Prompt.scope_note(ctx[:risks] || [])) <>
+          note
 
-      case Pepe.TUI.select(Prompt.options(ctx[:tainted] == true), label: label, render_as: &Prompt.label/1) do
+      case Pepe.TUI.select(Prompt.options(tainted?), label: label, render_as: &Prompt.label(&1, tainted?)) do
         :deny -> maybe_deny_reason()
         decision -> decision
       end

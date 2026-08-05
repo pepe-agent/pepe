@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+- **A permission prompt now explains itself when it's asking again mid-task, and marks the button that actually fixes it.** Once a run reads content from outside the conversation (a fetched page, an MCP result, ...) it's tainted, and a standing "session"/"always" approval stops applying until the run ends - only "Allow for the rest of this task" (`:this_run`) still does. Until now every option looked equally weighted, so tapping the familiar "session"/"always" button out of habit meant getting asked again on the very next risky call, with no explanation why. The prompt (Telegram, the dashboard chat, and the CLI) now says why it's asking again while tainted, and labels `:this_run` "(recommended)".
+
 ## [0.13.0] - 2026-08-04
 
 ### Changed

@@ -26,6 +26,22 @@ defmodule Pepe.Permissions.PromptTest do
     end
   end
 
+  test "this_run's label is marked recommended only while tainted" do
+    assert Prompt.label(:this_run, true) =~ "recommended"
+    refute Prompt.label(:this_run, false) =~ "recommended"
+    assert Prompt.label(:this_run) == Prompt.label(:this_run, false)
+  end
+
+  test "no other decision's label changes with taint" do
+    for decision <- [:once, :session, :always, :deny] do
+      assert Prompt.label(decision, true) == Prompt.label(decision, false)
+    end
+  end
+
+  test "taint_note/0 names the exact button that actually stops the repeat prompts" do
+    assert Prompt.taint_note() =~ "Allow for the rest of this task"
+  end
+
   test "token/1 and from_token/1 round-trip every decision" do
     for decision <- Prompt.options(true) do
       assert Prompt.from_token(Prompt.token(decision)) == decision

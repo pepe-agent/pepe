@@ -1665,12 +1665,13 @@ defmodule Pepe.Gateways.Telegram do
   defp send_permission_prompt(chat_id, id, name, args, tainted?) do
     Config.put_locale()
     map = decode_args(args)
-    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map)
+    note = if tainted?, do: "\n\nℹ️ " <> esc(Prompt.taint_note()), else: ""
+    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> note
 
     # One button per shared decision, rendered as Telegram's inline keyboard.
     buttons =
       Enum.map(Prompt.options(tainted?), fn decision ->
-        [%{text: Prompt.label(decision), callback_data: "perm:#{id}:#{Prompt.token(decision)}"}]
+        [%{text: Prompt.label(decision, tainted?), callback_data: "perm:#{id}:#{Prompt.token(decision)}"}]
       end)
 
     case Req.post(api_url(token(), "sendMessage"),

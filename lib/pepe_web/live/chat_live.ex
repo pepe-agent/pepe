@@ -194,9 +194,16 @@ defmodule PepeWeb.ChatLive do
                 <div class="mb-2 text-[15px]">
                   🔐 {gettext("Allow me to run the")} <code class="text-amber-300">{@pending_perm.tool}</code> {gettext("tool?")}
                 </div>
+                <p :if={@pending_perm.tainted} class="mb-2 text-sm text-zinc-400">ℹ️ {Prompt.taint_note()}</p>
                 <div class="flex flex-wrap gap-2">
-                  <button :for={d <- Prompt.options(@pending_perm.tainted)} phx-click="perm" phx-value-id={@pending_perm.id} phx-value-decision={Prompt.token(d)} class={btn_ghost()}>
-                    {Prompt.label(d)}
+                  <button
+                    :for={d <- Prompt.options(@pending_perm.tainted)}
+                    phx-click="perm"
+                    phx-value-id={@pending_perm.id}
+                    phx-value-decision={Prompt.token(d)}
+                    class={(d == :this_run && @pending_perm.tainted && btn()) || btn_ghost()}
+                  >
+                    {Prompt.label(d, @pending_perm.tainted)}
                   </button>
                 </div>
               </div>
