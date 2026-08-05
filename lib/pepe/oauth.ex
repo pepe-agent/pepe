@@ -315,7 +315,7 @@ defmodule Pepe.OAuth do
   end
 
   defp paste_code do
-    case Owl.IO.input(
+    case Pepe.TUI.input(
            label: "Paste the authorization code (or full redirect URL):",
            optional: true
          ) do

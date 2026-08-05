@@ -157,6 +157,10 @@ defmodule Mix.Tasks.Pepe do
     apply_locale()
     Pepe.Config.Journal.put_source("cli")
     dispatch(argv)
+  rescue
+    Pepe.TUI.EOFError ->
+      IO.puts(:stderr, gettext("No more input (stdin closed). Aborting."))
+      exit({:shutdown, 1})
   end
 
   # Apply the language chosen at setup so every CLI string Pepe emits (prompts,
@@ -591,7 +595,7 @@ defmodule Mix.Tasks.Pepe do
   defp add_model_interactively, do: model_add(prompt_name(), ["--default"], false)
 
   defp prompt_name do
-    Owl.IO.input(label: "Name for this connection:")
+    Pepe.TUI.input(label: "Name for this connection:")
     |> ensure_unique(model_names(), "model connection")
   end
 
@@ -764,8 +768,8 @@ defmodule Mix.Tasks.Pepe do
   # Step 3: resolve `{base_url, api_key, oauth}` for the chosen method. `oauth` is
   # nil except for a completed subscription sign-in (refresh/expiry metadata).
   defp apply_auth(_provider, %{type: :custom}) do
-    base_url = Owl.IO.input(label: "Base URL (OpenAI-compatible, e.g. https://host/v1):")
-    api_key = Owl.IO.input(label: "API key (or ${ENV_VAR}, blank for none):", optional: true)
+    base_url = Pepe.TUI.input(label: "Base URL (OpenAI-compatible, e.g. https://host/v1):")
+    api_key = Pepe.TUI.input(label: "API key (or ${ENV_VAR}, blank for none):", optional: true)
     {presence(base_url), presence(api_key), nil}
   end
 
@@ -814,7 +818,7 @@ defmodule Mix.Tasks.Pepe do
   # Read a secret: prefer the env var (stored as a ${VAR} placeholder so it never
   # lands in the config file); otherwise let the user paste it now.
   defp prompt_secret(nil) do
-    case Owl.IO.input(
+    case Pepe.TUI.input(
            label: "Token/API key (or ${ENV_VAR}, blank for none):",
            optional: true,
            secret: true
@@ -831,7 +835,7 @@ defmodule Mix.Tasks.Pepe do
     else
       info("#{env} is not set in your environment.")
 
-      case Owl.IO.input(
+      case Pepe.TUI.input(
              label: "Paste it now (saved to config), or Enter to use ${#{env}} later:",
              optional: true,
              secret: true
@@ -914,7 +918,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp filter_ids(ids) do
-    case Owl.IO.input(label: "Filter models (substring, blank for all):", optional: true) do
+    case Pepe.TUI.input(label: "Filter models (substring, blank for all):", optional: true) do
       blank when blank in [nil, ""] -> ids
       filter -> apply_filter(ids, filter)
     end
@@ -930,7 +934,7 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp prompt_model_id do
-    case Owl.IO.input(label: "Type the model id:", optional: true) do
+    case Pepe.TUI.input(label: "Type the model id:", optional: true) do
       blank when blank in [nil, ""] -> nil
       id -> id
     end
@@ -3596,7 +3600,7 @@ defmodule Mix.Tasks.Pepe do
     info(dim("Create a bot with @BotFather (https://t.me/BotFather), then paste its token.\n"))
 
     token =
-      case Owl.IO.input(
+      case Pepe.TUI.input(
              label: "Bot token (or ${ENV_VAR}; blank keeps current):",
              secret: true,
              optional: true
@@ -3644,7 +3648,7 @@ defmodule Mix.Tasks.Pepe do
     hint =
       if current == [], do: "blank = no restriction", else: "current: #{Enum.join(current, ", ")}"
 
-    case Owl.IO.input(label: "#{label}, comma-separated (#{hint}):", optional: true) do
+    case Pepe.TUI.input(label: "#{label}, comma-separated (#{hint}):", optional: true) do
       blank when blank in [nil, ""] ->
         current
 
@@ -3706,7 +3710,7 @@ defmodule Mix.Tasks.Pepe do
     info("Pepe keeps its config, data and workspaces under:")
     info("  " <> green(Config.short_path(current)) <> dim("  (#{current})"))
 
-    case Owl.IO.input(label: "Press Enter to use it, or type another folder:", optional: true) |> presence() do
+    case Pepe.TUI.input(label: "Press Enter to use it, or type another folder:", optional: true) |> presence() do
       nil ->
         :ok
 
@@ -3808,7 +3812,7 @@ defmodule Mix.Tasks.Pepe do
   defp interactive?, do: match?({:ok, _}, :io.columns())
 
   defp ask_yes?(question) do
-    case Owl.IO.input(label: question <> " [Y/n]", optional: true) do
+    case Pepe.TUI.input(label: question <> " [Y/n]", optional: true) do
       v when v in [nil, ""] -> true
       v -> String.downcase(String.trim(v)) in ["y", "yes", "s", "sim"]
     end
@@ -3892,7 +3896,7 @@ defmodule Mix.Tasks.Pepe do
         do: mod.config_schema(),
         else: []
 
-    slug = Owl.IO.input(label: "Connection name (slug):", optional: true) |> blank_default(provider)
+    slug = Pepe.TUI.input(label: "Connection name (slug):", optional: true) |> blank_default(provider)
     agent = pick_setup_agent()
 
     config =
@@ -3921,7 +3925,7 @@ defmodule Mix.Tasks.Pepe do
     required? = required_config_field?(field)
     hint = if field["type"] == "secret", do: dim(gettext(" (a ${ENV_VAR} reference is fine)")), else: ""
     tag = if required?, do: "", else: dim(gettext(" (optional)"))
-    value = Owl.IO.input(label: "#{field["label"]}#{tag}#{hint}:", optional: true) |> to_string() |> String.trim()
+    value = Pepe.TUI.input(label: "#{field["label"]}#{tag}#{hint}:", optional: true) |> to_string() |> String.trim()
 
     cond do
       value != "" ->
@@ -3953,7 +3957,7 @@ defmodule Mix.Tasks.Pepe do
     dashboard_cmd([])
 
     if not Config.dashboard_auth_required?() and Owl.IO.confirm(message: "\nSet a dashboard password now?", default: false) do
-      pass = Owl.IO.input(label: "Password (or a ${ENV_VAR} reference):", secret: true)
+      pass = Pepe.TUI.input(label: "Password (or a ${ENV_VAR} reference):", secret: true)
       if pass not in [nil, ""], do: dashboard_cmd(["password", pass])
     end
   end
@@ -3974,7 +3978,7 @@ defmodule Mix.Tasks.Pepe do
   defp detected_sources, do: Pepe.Migrate.detected()
 
   defp setup_plugin do
-    src = Owl.IO.input(label: "Plugin source (a local path, a .tar.gz, or a GitHub repo URL):", optional: true)
+    src = Pepe.TUI.input(label: "Plugin source (a local path, a .tar.gz, or a GitHub repo URL):", optional: true)
     if src not in [nil, ""], do: plugin_install(src, force: false)
   end
 
@@ -4005,7 +4009,7 @@ defmodule Mix.Tasks.Pepe do
           info(dim("no model connections yet - add one first (mix pepe model add), then come back"))
 
         name ->
-          voice = Owl.IO.input(label: "Voice:", optional: true) |> blank_default(tts["voice"] || "alloy")
+          voice = Pepe.TUI.input(label: "Voice:", optional: true) |> blank_default(tts["voice"] || "alloy")
           Config.put_media("tts", %{"model" => name, "voice" => voice})
           ok("voice replies on, using #{green(name)} (voice: #{voice})")
       end
@@ -4061,7 +4065,7 @@ defmodule Mix.Tasks.Pepe do
 
       {base_url, api_key, oauth} ->
         name =
-          Owl.IO.input(label: "Name this connection:", optional: true)
+          Pepe.TUI.input(label: "Name this connection:", optional: true)
           |> blank_default(default_conn_name(base_url))
           |> ensure_unique(model_names(), "model connection")
 
@@ -4113,7 +4117,7 @@ defmodule Mix.Tasks.Pepe do
   # override it. Blank keeps the current value.
   defp setup_timezone do
     tz =
-      Owl.IO.input(
+      Pepe.TUI.input(
         label:
           "Default timezone for scheduled tasks" <>
             dim(" (current: #{Config.default_timezone()})") <> ":",
@@ -4203,12 +4207,12 @@ defmodule Mix.Tasks.Pepe do
     primary? = primary? or agent_names() == []
 
     agent_name =
-      Owl.IO.input(label: "Agent name:", optional: true)
+      Pepe.TUI.input(label: "Agent name:", optional: true)
       |> blank_default("assistant")
       |> ensure_unique(agent_names(), "agent")
 
     system_prompt =
-      Owl.IO.input(label: "System prompt:", optional: true)
+      Pepe.TUI.input(label: "System prompt:", optional: true)
       |> blank_default("You are Pepe, a helpful AI agent.")
 
     tools = if primary?, do: Pepe.Tools.names(), else: pick_tools()
@@ -4258,7 +4262,7 @@ defmodule Mix.Tasks.Pepe do
   defp maybe_setup_dashboard do
     if not Config.dashboard_auth_required?() and
          Owl.IO.confirm(message: "\nSet a dashboard password (needed to reach it from another machine)?", default: false) do
-      pass = Owl.IO.input(label: "Password (or a ${ENV_VAR} reference):", secret: true)
+      pass = Pepe.TUI.input(label: "Password (or a ${ENV_VAR} reference):", secret: true)
       if pass not in [nil, ""], do: dashboard_cmd(["password", pass])
     end
   end
@@ -4289,7 +4293,7 @@ defmodule Mix.Tasks.Pepe do
           # collision guard on a name that merely looks the same.
           match
         else
-          Owl.IO.input(label: "Pick a different name:")
+          Pepe.TUI.input(label: "Pick a different name:")
           |> ensure_unique(existing, kind)
         end
     end

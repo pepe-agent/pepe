@@ -162,7 +162,7 @@ defmodule Pepe.Gateways.TUI do
   # Give a denial an optional free-text reason, threaded back into the agent's
   # context (see Pepe.Permissions.denied_message/2) instead of a bare refusal.
   defp maybe_deny_reason do
-    case Owl.IO.input(label: "Reason (optional):", optional: true) do
+    case Pepe.TUI.input(label: "Reason (optional):", optional: true) do
       blank when blank in [nil, ""] -> :deny
       reason -> {:deny, reason}
     end

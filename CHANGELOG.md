@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **An interactive CLI prompt (`mix pepe setup`, `model add`, the OAuth code paste, ...) whose stdin closed spun at 100%+ CPU forever instead of exiting.** Once the terminal that started a wizard goes away (or piped input runs out), every read returns EOF instantly; both `Owl.IO.input`'s required-field retry loop and `Pepe.TUI`'s own re-ask-on-blank turned that into a busy loop that never blocked again - one orphaned `mix pepe setup` was found still burning a full core 23 hours later. Prompts now go through `Pepe.TUI.input/1` (same options, same look), which raises `Pepe.TUI.EOFError` on a closed stdin; both CLI entry points catch it and abort with a clean message and exit code 1.
+
 ## [0.13.1] - 2026-08-04
 
 ### Changed

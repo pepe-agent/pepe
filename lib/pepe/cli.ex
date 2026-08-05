@@ -14,5 +14,9 @@ defmodule Pepe.CLI do
     Mix.Tasks.Pepe.apply_locale()
     Pepe.Config.Journal.put_source("cli")
     Mix.Tasks.Pepe.dispatch(argv)
+  rescue
+    Pepe.TUI.EOFError ->
+      IO.puts(:stderr, Gettext.gettext(Pepe.Gettext, "No more input (stdin closed). Aborting."))
+      System.halt(1)
   end
 end

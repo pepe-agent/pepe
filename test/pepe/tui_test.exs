@@ -79,6 +79,59 @@ defmodule Pepe.TUITest do
     end
   end
 
+  describe "input/1" do
+    test "returns the trimmed line" do
+      run(["  hello  "], fn -> send(self(), {:result, TUI.input(label: "Say:")}) end)
+      assert_received {:result, "hello"}
+    end
+
+    test "optional: a blank line returns nil" do
+      run([""], fn -> send(self(), {:result, TUI.input(label: "Say:", optional: true)}) end)
+      assert_received {:result, nil}
+    end
+
+    test "required: a blank line reprompts until something is typed" do
+      out = run(["", "value"], fn -> send(self(), {:result, TUI.input(label: "Say:")}) end)
+
+      assert out =~ "is required"
+      assert_received {:result, "value"}
+    end
+
+    test "cast errors reprompt with the error message" do
+      cast = fn
+        "ok" -> {:ok, :accepted}
+        _ -> {:error, "not ok"}
+      end
+
+      out = run(["nope", "ok"], fn -> send(self(), {:result, TUI.input(label: "Say:", cast: cast)}) end)
+
+      assert out =~ "not ok"
+      assert_received {:result, :accepted}
+    end
+
+    test "EOF raises instead of reprompting forever" do
+      capture_io([input: ""], fn ->
+        assert_raise Pepe.TUI.EOFError, fn -> TUI.input(label: "Say:") end
+      end)
+    end
+
+    test "EOF on a required field raises instead of looping" do
+      # The dangerous shape: required field + closed stdin. Owl.IO.input spun at
+      # 100% CPU here; ours must abort.
+      capture_io([input: "\n"], fn ->
+        assert_raise Pepe.TUI.EOFError, fn -> TUI.input(label: "Say:") end
+      end)
+    end
+  end
+
+  describe "select/2 on closed stdin" do
+    test "raises EOFError instead of busy-looping" do
+      capture_io([input: ""], fn ->
+        assert_raise Pepe.TUI.EOFError, fn -> TUI.select(["a", "b"]) end
+      end)
+    end
+  end
+
   describe "multiselect/2" do
     test "an empty list returns [] immediately with no prompt" do
       out = run([], fn -> send(self(), {:result, TUI.multiselect([])}) end)

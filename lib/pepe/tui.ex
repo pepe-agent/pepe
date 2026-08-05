@@ -5,7 +5,7 @@ defmodule Pepe.TUI do
   (e.g. OpenRouter's 300+ models) page with `n`/`p` instead of scrolling off
   the top.
 
-  Plain line-based input (via `Owl.IO.input`), so it works identically over a
+  Plain line-based input (via `input/1`), so it works identically over a
   real terminal, an SSH session, a pipe, or CI - no raw-terminal mode, nothing
   to detect or fall back from. Localized via `Pepe.Gettext`, following the
   language chosen at setup.
@@ -30,6 +30,83 @@ defmodule Pepe.TUI do
 
   defp render(opts), do: Keyword.get(opts, :render_as, &to_string/1)
   defp label(opts), do: opts[:label] && to_string(opts[:label])
+
+  @doc """
+  Ask for one line of input. Options mirror `Owl.IO.input/1`: `:label`,
+  `:optional` (blank answer allowed, returned as `nil`), `:cast` (a 1-arity
+  function returning `{:ok, value}` or `{:error, message}`) and `:secret`
+  (keeps the typed line off the screen).
+
+  Unlike `Owl.IO.input/1`, a closed stdin raises `Pepe.TUI.EOFError` instead of
+  re-prompting: once stdin is gone every read returns `:eof` instantly, so a
+  re-prompt loop never blocks again and pins a CPU core until someone kills
+  the process.
+  """
+  def input(opts \\ []) do
+    if label = opts[:label], do: Owl.IO.puts(label)
+
+    case read_line(Owl.Data.to_chardata(Owl.Data.tag("> ", :blue)), Keyword.get(opts, :secret, false)) do
+      line when is_binary(line) -> accept_or_reask(normalize(line), opts)
+      _eof_or_error -> raise Pepe.TUI.EOFError
+    end
+  end
+
+  defp normalize(line) do
+    case String.trim(line) do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp accept_or_reask(value, opts) do
+    with {:ok, value} <- require_value(value, opts),
+         {:ok, value} <- cast_value(value, opts) do
+      IO.puts([])
+      value
+    else
+      {:error, message} ->
+        Owl.IO.puts(Owl.Data.tag(to_string(message), :red))
+        input(opts)
+    end
+  end
+
+  defp require_value(nil, opts) do
+    if Keyword.get(opts, :optional, false), do: {:ok, nil}, else: {:error, gettext("is required")}
+  end
+
+  defp require_value(value, _opts), do: {:ok, value}
+
+  defp cast_value(value, opts) do
+    case opts[:cast] do
+      nil -> {:ok, value}
+      cast -> cast.(value)
+    end
+  end
+
+  defp read_line(prompt, false = _secret), do: IO.gets(prompt)
+
+  defp read_line(prompt, true = _secret) do
+    pid = spawn_link(fn -> obscure_prompt(prompt) end)
+    ref = make_ref()
+    value = IO.gets(prompt)
+    send(pid, {:done, self(), ref})
+    receive do: ({:done, ^pid, ^ref} -> :ok)
+    value
+  end
+
+  # Rewrites the prompt line every millisecond so whatever is typed never stays
+  # visible (the same trick the hex CLI and Owl use for password input).
+  defp obscure_prompt(prompt) do
+    receive do
+      {:done, parent, ref} ->
+        send(parent, {:done, self(), ref})
+        IO.write(:standard_error, "\e[2K\r")
+    after
+      1 ->
+        IO.write(:standard_error, ["\e[2K\r", prompt])
+        obscure_prompt(prompt)
+    end
+  end
 
   ###
   ### paginated numbered list
@@ -56,7 +133,7 @@ defmodule Pepe.TUI do
   defp ask_select(items, render, label, total, page) do
     pages = page_count(total)
 
-    case Owl.IO.input(label: select_hint(page, pages, total), cast: &parse_nav(&1, total), optional: true) do
+    case input(label: select_hint(page, pages, total), cast: &parse_nav(&1, total), optional: true) do
       :same -> ask_select(items, render, label, total, page)
       :next -> select_page(items, render, label, total, next_page(page, pages))
       :prev -> select_page(items, render, label, total, prev_page(page, pages))
@@ -77,7 +154,7 @@ defmodule Pepe.TUI do
   defp ask_multi(items, render, label, total, page, chosen) do
     pages = page_count(total)
 
-    case Owl.IO.input(label: multi_hint(page, pages, total, chosen), cast: &parse_multi(&1, total), optional: true) do
+    case input(label: multi_hint(page, pages, total, chosen), cast: &parse_multi(&1, total), optional: true) do
       :done ->
         finish_multi(items, chosen)
 
