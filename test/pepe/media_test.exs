@@ -49,6 +49,10 @@ defmodule Pepe.MediaTest do
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
+      # Explicit stop, not just process linkage: under `mix test --cover` (slower, different
+      # scheduling), the next test's setup can race a `:media_test_pid`-named start_link
+      # against this one not having been reaped yet, and lose with {:already_started, pid}.
+      if pid = Process.whereis(:media_test_pid), do: Agent.stop(pid)
     end)
 
     %{home: home, audio: audio, base_url: "http://127.0.0.1:#{port}"}

@@ -60,6 +60,10 @@ defmodule Pepe.Agent.OutputCapRetryTest do
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
+      # Explicit stop, not just process linkage: under `mix test --cover` (slower, different
+      # scheduling), the next test's setup can race a same-named start_link against this
+      # one not having been reaped yet, and lose with {:already_started, pid}.
+      for name <- [:oc_asked, :oc_limit], pid = Process.whereis(name), do: Elixir.Agent.stop(pid)
     end)
 
     %{port: port, cwd: home}
