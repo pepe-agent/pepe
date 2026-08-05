@@ -307,6 +307,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.runner }}
     permissions:
+      # A job-level `permissions:` block replaces the repo/org default entirely, not adds
+      # to it - `contents: read` has to be listed explicitly or actions/checkout has no
+      # read access at all (surfaces as a confusing "Repository not found", not a
+      # permissions error). Only started failing once release.yml's own default
+      # permissions stopped applying here, merged into this per-job scoping.
+      contents: read
       packages: write
     strategy:
       fail-fast: false
