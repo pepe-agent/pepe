@@ -19,6 +19,18 @@ defmodule Pepe.Permissions.PromptTest do
     assert Prompt.options(true) == [:once, :this_run, :session, :always, :deny]
   end
 
+  test "options/2 drops :session when there is no session to remember it against" do
+    assert Prompt.options(false, false) == [:once, :always, :deny]
+    assert Prompt.options(true, false) == [:once, :this_run, :always, :deny]
+    # Default (has_session? unset) stays true, so an existing 1-arity caller is unaffected.
+    assert Prompt.options(false) == Prompt.options(false, true)
+  end
+
+  test "policy_note/1 is nil when nothing forced the ask, and includes the reason otherwise" do
+    assert Prompt.policy_note(nil) == nil
+    assert Prompt.policy_note("looks unusual") =~ "looks unusual"
+  end
+
   test "every decision has a label and an outcome, and neither is blank" do
     for decision <- Prompt.options(true) do
       assert Prompt.label(decision) != ""

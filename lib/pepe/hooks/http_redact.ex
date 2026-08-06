@@ -23,6 +23,9 @@ defmodule Pepe.Hooks.HttpRedact do
   alias Pepe.Config
 
   @impl true
+  def name, do: "http_redact"
+
+  @impl true
   def stages, do: [:inbound, :outbound, :tool_result]
 
   @impl true

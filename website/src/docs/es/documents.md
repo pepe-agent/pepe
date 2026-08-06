@@ -14,7 +14,7 @@ El agente *puede* hacerlo por su cuenta, y hasta ahora tenía que hacerlo: ident
 | | |
 |---|---|
 | **Texto** (`.txt`, `.md`, `.csv`, `.json`, `.log`, `.xml` y similares) | Nada. Se lee el archivo. |
-| **`.docx`, `.xlsx`, `.pptx`** | Tampoco nada. Son archivos ZIP con XML dentro, y Erlang ya descomprime. Sin Python, sin paquete de sistema, sin bytes en la imagen. |
+| **`.docx`, `.xlsx`, `.pptx`** | Tampoco nada. Pepe lee estos formatos por su cuenta, sin nada extra que instalar. |
 | **`.pdf`** | `pdftotext`, donde la máquina lo tenga. Donde no, el agente vuelve a resolverlo por su cuenta e instala lo que necesita, una vez. |
 | **Cualquier otra cosa** | Cae al agente, que es lo que pasaba antes con todo. |
 
@@ -26,7 +26,7 @@ Solo se entrega la primera parte de un documento largo, para que un adjunto no s
 
 ## Los archivos comprimidos no se abren
 
-Un `.zip` o un `.tar.gz` es una caja, no un documento. No existe "el texto" de una caja, y descomprimir lo que un desconocido te envía es aceptar una bomba de descompresión y un salto de ruta en el mismo gesto. Cae al agente, que lo abre deliberadamente, con la barrera de permisos por delante, y mira lo que hay dentro antes de actuar.
+Un `.zip` o un `.tar.gz` es una caja, no un documento. No existe "el texto" de una caja, y descomprimir automáticamente lo que un desconocido te envía es peligroso: un archivo puede estar armado para llenarte el disco al abrirse, o para soltar ficheros fuera de su propia carpeta. Cae al agente, que lo abre deliberadamente, con la barrera de permisos por delante, y mira lo que hay dentro antes de actuar.
 
 Los formatos de Office son seguros precisamente porque **no** son genéricos: se lee una entrada, por su nombre, en memoria, y nunca se escribe nada en disco.
 

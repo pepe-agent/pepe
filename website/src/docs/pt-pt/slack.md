@@ -1,13 +1,14 @@
 ---
 title: Slack
-description: Liga uma aplicação do Slack a um agente do Pepe através da Events API.
+description: Põe um agente do Pepe no teu workspace do Slack para as pessoas falarem com ele em canais e mensagens diretas.
 ---
 
 ## Slack
 
-O Slack usa a Events API. Configura pela configuração guiada (ou pelo painel),
-que pede exatamente os campos necessários e imprime o URL de retorno a
-registar:
+Ligar o Slack permite que as pessoas falem com o agente dentro do próprio
+workspace. O Slack entrega as mensagens ao Pepe através da Events API;
+configura a ligação pela configuração guiada (ou pelo painel), que pede
+exatamente os campos necessários e imprime o URL de retorno a registar:
 
 ```bash
 pepe setup
@@ -36,8 +37,9 @@ como funciona a rota genérica por dentro.
 
 ### Mudar de modelo
 
-`/model` e `/models` só disparam numa ligação em modo `admin` com `commands`
-ativado; no `support`, são texto simples. `/models` lista os modelos
+Os comandos `/model` e `/models` permitem ver ou mudar o modelo de IA que
+responde. Só funcionam numa ligação em modo `admin` com `commands` ativado;
+no `support`, são tratados como texto normal. `/models` lista os modelos
 disponíveis para o projeto desta ligação; `/model` mostra o atual, ou muda-o:
 
 ```text
@@ -46,7 +48,8 @@ disponíveis para o projeto desta ligação; `/model` mostra o atual, ou muda-o:
 /model openrouter global        # muda para todos com quem esta ligação fala
 ```
 
-Qualquer pessoa numa conversa permitida pode mudar a sua própria sessão;
-mudá-lo **globalmente** está reservado a **formadores**, a mesma lista que
-rege a memória. Define `model_switch_locked: true` na ligação para desativar
-por completo a mudança de modelo para quem não é formador.
+Qualquer pessoa numa conversa permitida pode mudar o modelo da sua própria
+conversa. Mudá-lo **globalmente**, para todos com quem esta ligação fala,
+está reservado aos **formadores**, a mesma lista de confiança que rege a
+memória. Define `model_switch_locked: true` na ligação para desativar por
+completo a mudança de modelo para quem não é formador.

@@ -30,7 +30,7 @@ defmodule PepeWeb.CommitmentsLive do
         <.view_header
           icon="🤝"
           title={gettext("Commitments")}
-          desc={gettext("Follow-ups noticed automatically from conversation - a user asking to be reminded, or an agent promising to check on something. Not created by hand; toggle \"commitments\" on an agent to turn this on.")}
+          desc={gettext("Follow-ups an agent notices in conversation: a user asking to be reminded, or the agent promising to check on something. Not created by hand; enable \"commitments\" on an agent to turn this on.")}
         />
         <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
           <div :if={@commitments == []} class="text-[15px] text-zinc-500">
@@ -48,7 +48,7 @@ defmodule PepeWeb.CommitmentsLive do
           />
           <.commitment_section
             :if={firing(@commitments, @scope) != []}
-            title={gettext("Stuck (interrupted mid-delivery - cancel it, it will not retry on its own)")}
+            title={gettext("Stuck: interrupted mid-delivery. It will not retry on its own; cancel it.")}
             commitments={firing(@commitments, @scope)}
           />
           <.commitment_section

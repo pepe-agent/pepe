@@ -1,13 +1,15 @@
 ---
 title: Slack
-description: Conecta una app de Slack a un agente de Pepe mediante la Events API.
+description: Pon un agente de Pepe en tu espacio de Slack para que la gente hable con él en canales y mensajes directos.
 ---
 
 ## Slack
 
-Slack usa la Events API. Configúralo mediante la configuración guiada (o el
-panel), que pide exactamente los campos que necesita e imprime la URL de
-retorno para registrar:
+Conectar Slack permite que la gente hable con el agente dentro del propio
+espacio de trabajo. Slack entrega los mensajes a Pepe mediante su Events API;
+configura la conexión mediante la configuración guiada (o el panel), que pide
+exactamente los campos que necesita e imprime la URL de retorno para
+registrar:
 
 ```bash
 pepe setup
@@ -36,8 +38,9 @@ cómo funciona la ruta genérica por dentro.
 
 ### Cambiar de modelo
 
-`/model` y `/models` solo se activan en una conexión en modo `admin` con
-`commands` habilitado; en `support`, son texto plano. `/models` lista los
+Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
+responde. Solo funcionan en una conexión en modo `admin` con `commands`
+habilitado; en `support`, se tratan como texto normal. `/models` lista los
 modelos disponibles para el proyecto de esta conexión; `/model` muestra el
 actual, o lo cambia:
 
@@ -47,7 +50,8 @@ actual, o lo cambia:
 /model openrouter global        # cambia para todos con los que habla esta conexión
 ```
 
-Cualquiera en una conversación permitida puede cambiar su propia sesión;
-cambiarlo **globalmente** está reservado para **entrenadores**, la misma
-lista que rige la memoria. Pon `model_switch_locked: true` en la conexión para
+Cualquiera en una conversación permitida puede cambiar el modelo de su propia
+conversación. Cambiarlo **globalmente**, para todos con los que habla esta
+conexión, está reservado a los **entrenadores**, la misma lista de confianza
+que rige la memoria. Pon `model_switch_locked: true` en la conexión para
 desactivar el cambio de modelo por completo para quien no sea entrenador.

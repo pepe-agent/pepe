@@ -15,6 +15,8 @@ defmodule Pepe.LLM.Responses do
   Dispatched from `Pepe.LLM` when `model.api == "openai-responses"`.
   """
 
+  @behaviour Pepe.LLM.Adapter
+
   require Logger
 
   alias Pepe.Config.Model
@@ -23,12 +25,17 @@ defmodule Pepe.LLM.Responses do
   @originator "pepe"
   @auth_claim "https://api.openai.com/auth"
 
+  @impl true
+  def api, do: "openai-responses"
+
   @doc "Non-streaming: the endpoint only streams, so we collect the stream."
+  @impl true
   def chat(%Model{} = model, messages, opts \\ []) do
     stream_chat(model, messages, fn _ -> :ok end, opts)
   end
 
   @doc "Streaming Responses call. `on_delta` receives each assistant text fragment."
+  @impl true
   def stream_chat(%Model{} = model, messages, on_delta, opts \\ [])
       when is_function(on_delta, 1) do
     model = Pepe.OAuth.ensure_fresh(model)
@@ -56,6 +63,7 @@ defmodule Pepe.LLM.Responses do
   `GET {base}/codex/models?client_version=1.0.0` (the endpoint has no standard
   `/v1/models`). Filters out rows the picker should hide. Returns `{:ok, ids}`.
   """
+  @impl true
   def list_models(%Model{} = model) do
     headers = Map.put(headers(model), "accept", "application/json")
 

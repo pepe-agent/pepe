@@ -51,7 +51,7 @@ This runs the workers as a different agent, with that agent's persona and tools,
 delegate(tasks: [...], background: true)
 ```
 
-The same fan-out, dispatched without waiting: the call returns right away with an acknowledgment, so the agent can keep working or tell you it's on it, and the results arrive later as an ordinary follow-up message in the same conversation once every worker is done. Worth reaching for when the fan-out is genuinely slow (several pages to read, a worker with real thinking to do) - waiting a few seconds is still simpler and needs no explanation to the user. Only works inside a real conversation: a one-shot run has no session to deliver the results back into.
+The same fan-out, dispatched without waiting: the call returns right away with an acknowledgment, so the agent can keep working or tell you it's on it, and the results arrive later as an ordinary follow-up message in the same conversation once every worker is done. Worth reaching for when the fan-out is genuinely slow (several pages to read, a worker with real thinking to do). Waiting a few seconds is still simpler and needs no explanation to the user. Only works inside a real conversation: a one-shot run has no session to deliver the results back into.
 
 ## What it costs
 

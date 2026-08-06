@@ -59,7 +59,7 @@ En el modo con estado la respuesta incluye el `session_id` que usaste, para que 
 
 ### Recuperarse de un reinicio
 
-Si Pepe se cae a mitad de un turno (un despliegue, un fallo) mientras la persistencia de sesiones está activa, la conversación interrumpida no se pierde sin más. En el siguiente arranque, Pepe detecta cualquier sesión cuyo último turno no terminó, la reproduce como un seguimiento interno y entrega la respuesta a donde estaba ocurriendo la conversación (Telegram, el panel, el canal que sea), así que un mensaje interrumpido igual recibe respuesta en vez de desaparecer en silencio. Esto solo aplica a sesiones persistidas (`serve`/`gateway`), no a llamadas sueltas de `pepe run`.
+Si Pepe se cae a mitad de un turno (un despliegue, un fallo) mientras la persistencia de sesiones está activa, la conversación interrumpida no se pierde sin más. En el siguiente arranque, Pepe detecta cualquier sesión cuyo último turno no terminó, la reproduce como un seguimiento interno y entrega la respuesta a donde estaba ocurriendo la conversación (Telegram, el panel, el canal que sea). El mensaje interrumpido igual recibe respuesta en vez de desaparecer en silencio. Esto solo aplica a sesiones persistidas (`serve`/`gateway`), no a llamadas sueltas de `pepe run`.
 
 <div class="note"><strong>Aislamiento entre proyectos.</strong> Las claves de sesión están internamente delimitadas por proyecto. El mismo id de sesión usado bajo dos tokens distintos (dos proyectos distintos) nunca llega a la misma conversación, de modo que un proyecto nunca puede leer la sesión de otro.</div>
 

@@ -39,11 +39,10 @@ defmodule Pepe.Browser.Session do
   @max_elements 150
   @max_text 4_000
 
-  # Priority mirrors what openclaw/hermes both actually probe (checked directly in
-  # their own source, not guessed): a full browser the machine already has beats
-  # downloading one. PATH names first - the Debian package name `PEPE_IMAGE_APT_
-  # PACKAGES=chromium` installs, plus what an apt/brew/choco install of any of the
-  # four Chromium-based browsers actually lands on PATH as - then (in
+  # A full browser the machine already has beats downloading one, so PATH names
+  # come first - the Debian package name `PEPE_IMAGE_APT_PACKAGES=chromium`
+  # installs, plus what an apt/brew/choco install of any of the four
+  # Chromium-based browsers actually lands on PATH as - then (in
   # `chrome_app_paths/0`) the well-known per-OS install locations a GUI installer
   # uses without ever touching PATH.
   @chrome_candidates ~w(
@@ -327,9 +326,9 @@ defmodule Pepe.Browser.Session do
 
   # A GUI install (as opposed to a package-manager one) lands in a fixed per-OS
   # location that never touches PATH, so `find_executable/1` above would miss it
-  # entirely - the same reason openclaw's own browser-selection docs check these
-  # same paths before falling back to anything else. Priority within each OS
-  # (Chrome, then Brave, then Edge, then Chromium) matches openclaw's own order.
+  # entirely - these are exactly those known install locations, checked before
+  # falling back to anything else. Priority within each OS (Chrome, then Brave,
+  # then Edge, then Chromium) follows the same real-world install-share ordering.
   defp chrome_app_paths do
     local_app_data = System.get_env("LOCALAPPDATA") || System.get_env("USERPROFILE")
 

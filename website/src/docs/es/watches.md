@@ -1,6 +1,6 @@
 ---
 title: Vigilancias
-description: Crea vigilancias duraderas que avisan una sola vez cuando una condición se cumple.
+description: Dile a Pepe que vigile algo y te avise en el momento en que pase. Comprueba por su cuenta, sobrevive a reinicios y avisa exactamente una vez.
 ---
 
 ## Vigilancias

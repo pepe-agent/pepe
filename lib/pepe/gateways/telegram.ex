@@ -1612,7 +1612,14 @@ defmodule Pepe.Gateways.Telegram do
     fn name, args, ctx ->
       put_bot(b)
       put_thread(t)
-      request_authorization(chat_id, name, args, ctx[:tainted] == true)
+
+      prompt_ctx = %{
+        tainted?: ctx[:tainted] == true,
+        has_session?: is_binary(ctx[:session_key]),
+        policy_reason: ctx[:policy_reason]
+      }
+
+      request_authorization(chat_id, name, args, prompt_ctx)
     end
   end
 
@@ -1642,10 +1649,10 @@ defmodule Pepe.Gateways.Telegram do
       end
   end
 
-  defp request_authorization(chat_id, name, args, tainted?) do
+  defp request_authorization(chat_id, name, args, prompt_ctx) do
     id = System.unique_integer([:positive])
     :ets.insert(@pending, {id, self()})
-    message_id = send_permission_prompt(chat_id, id, name, args, tainted?)
+    message_id = send_permission_prompt(chat_id, id, name, args, prompt_ctx)
 
     receive do
       {:perm_reply, ^id, decision} -> decision
@@ -1662,15 +1669,17 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp send_permission_prompt(chat_id, id, name, args, tainted?) do
+  defp send_permission_prompt(chat_id, id, name, args, prompt_ctx) do
+    %{tainted?: tainted?, has_session?: has_session?, policy_reason: policy_reason} = prompt_ctx
     Config.put_locale()
     map = decode_args(args)
     note = if tainted?, do: "\n\nℹ️ " <> esc(Prompt.taint_note()), else: ""
-    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> note
+    policy = if p = Prompt.policy_note(policy_reason), do: "\n\n" <> esc(p), else: ""
+    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> policy <> note
 
     # One button per shared decision, rendered as Telegram's inline keyboard.
     buttons =
-      Enum.map(Prompt.options(tainted?), fn decision ->
+      Enum.map(Prompt.options(tainted?, has_session?), fn decision ->
         [%{text: Prompt.label(decision, tainted?), callback_data: "perm:#{id}:#{Prompt.token(decision)}"}]
       end)
 

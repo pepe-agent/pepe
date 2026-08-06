@@ -1,13 +1,14 @@
 ---
 title: Slack
-description: Connect a Slack app to a Pepe agent over the Events API.
+description: Put a Pepe agent in your Slack workspace so people can talk to it in channels and direct messages.
 ---
 
 ## Slack
 
-Slack uses the Events API. Configure it through the guided setup (or the
-dashboard), which asks for exactly the fields it needs and prints the callback
-URL to register:
+Connecting Slack lets people talk to the agent right inside your workspace.
+Slack delivers messages to Pepe through its Events API; configure the
+connection through the guided setup (or the dashboard), which asks for exactly
+the fields it needs and prints the callback URL to register:
 
 ```bash
 pepe setup
@@ -36,8 +37,9 @@ generic route works under the hood.
 
 ### Switching models
 
-`/model` and `/models` only fire on an `admin`-mode connection with
-`commands` enabled; on `support`, they are plain text. `/models` lists the
+The `/model` and `/models` commands let people check or change which AI model
+answers them. They work only on an `admin`-mode connection with `commands`
+enabled; on `support`, they are treated as plain text. `/models` lists the
 models available to this connection's project; `/model` shows the current
 one, or changes it:
 
@@ -47,7 +49,8 @@ one, or changes it:
 /model openrouter global        # switch for everyone this connection talks to
 ```
 
-Anyone in an allowed conversation may switch their own session; switching it
-**globally** is reserved for **trainers**, the same allowlist that gates
-memory. Set `model_switch_locked: true` on the connection to turn
-model-switching off entirely for non-trainers.
+Anyone in an allowed conversation may switch the model for their own
+conversation. Switching it **globally**, for everyone this connection talks
+to, is reserved for **trainers**, the same trusted list that controls memory.
+Set `model_switch_locked: true` on the connection to turn model-switching off
+entirely for non-trainers.

@@ -10,6 +10,9 @@ defmodule Pepe.Hooks.PiiRedact do
   alias Pepe.Hooks.PII.Recognizers
 
   @impl true
+  def name, do: "pii_redact"
+
+  @impl true
   def stages, do: [:inbound, :tool_result]
 
   @impl true

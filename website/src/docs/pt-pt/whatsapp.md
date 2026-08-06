@@ -1,28 +1,29 @@
 ---
 title: WhatsApp
-description: Liga webhooks da WhatsApp Cloud API a agentes do Pepe.
+description: Põe um agente do Pepe atrás do teu número de WhatsApp, usando a Cloud API da Meta.
 ---
 
 ## WhatsApp
 
-O WhatsApp usa a Cloud API da Meta. Ao contrário do Telegram, que o Pepe consulta,
-o WhatsApp **empurra** as mensagens de entrada para um webhook, por isso cada
-ligação recebe o seu próprio URL na rota de entrada genérica do Pepe:
+O WhatsApp usa a Cloud API da Meta. Ao contrário do Telegram, em que é o
+próprio Pepe que vai buscar as mensagens, o WhatsApp **entrega** cada mensagem
+recebida num endereço no teu servidor, por isso o Pepe precisa de estar
+acessível pela internet. Cada ligação recebe o seu próprio URL na rota de
+entrada do Pepe:
 
 ```
 /webhooks/:project/:provider/:slug        ex.:  /webhooks/acme/whatsapp/support
 ```
 
-Essa rota é uma superfície de webhook genérica, assente num registo de
-fornecedores, e não uma canalização específica do WhatsApp. O segmento
-`:project` é `default` quando não crias outros projetos. Um `GET` nesse URL responde ao
-aperto de mão de verificação da Meta. Um `POST` é uma mensagem de entrada: o
-respetivo `X-Hub-Signature-256` é verificado contra o app secret, o agente
-associado corre e a resposta volta pela Graph API. O `pepe serve` serve esta
-rota, por isso não há qualquer processo extra a executar.
+O segmento `:project` é `default` quando não crias outros projetos. O próprio
+Pepe responde ao aperto de mão de verificação da Meta nesse URL, e cada
+mensagem recebida tem a assinatura `X-Hub-Signature-256` verificada contra o
+app secret antes de o agente correr, por isso um pedido forjado nunca chega ao
+agente. A resposta volta pela Graph API. O `pepe serve` serve esta rota, por
+isso não há qualquer processo extra a executar.
 
 Podes manter tantas ligações quantas quiseres, cada uma associada ao seu próprio
-agente. É o equivalente por webhook dos vários bots do Telegram.
+agente. É a mesma ideia de executar vários bots do Telegram.
 
 O WhatsApp tem uma linha de comandos dedicada por ser o canal por webhook mais
 comum. Adiciona uma ligação:

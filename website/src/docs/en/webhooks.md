@@ -11,8 +11,9 @@ Every webhook channel, whatever the platform, is reachable at one route:
 https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<project>` is the tenant scope. Use `default` for the default project, or
-  another project's slug to wall a connection off to that tenant.
+- `<project>` is the project the connection belongs to. Use `default` for the
+  default project, or another project's slug to keep that connection isolated
+  to its own project.
 - `<provider>` is the platform name: `whatsapp`, `slack`, `discord`,
   `msteams`, or `googlechat`.
 - `<slug>` is the unique name you gave the connection.
@@ -75,10 +76,11 @@ answered), so `/mention` is a no-op there.
 
 ## Switching models
 
-`/model` and `/models` fire only on an `admin`-mode connection with `commands`
+The `/model` and `/models` commands let people check or change which AI model
+answers them. They work only on an `admin`-mode connection with `commands`
 enabled (see the mode comparison in [Channels](../channels/)); on `support`,
-they are plain text. `/models` lists the models available to the connection's
-project; `/model` shows the current one, or changes it:
+they are treated as plain text. `/models` lists the models available to the
+connection's project; `/model` shows the current one, or changes it:
 
 ```text
 /model openrouter               # ask whether to switch just this chat or everyone
@@ -86,11 +88,12 @@ project; `/model` shows the current one, or changes it:
 /model openrouter global        # switch for everyone this connection talks to
 ```
 
-Switching **globally** is reserved for **trainers** (the same allowlist that
-gates memory); everyone else in an allowed conversation can only switch their
-own session. Set `model_switch_locked: true` on the connection to turn it off
-entirely for non-trainers. This is the same mechanism WhatsApp uses; Telegram's
-version adds a tappable picker instead of typed commands.
+Switching **globally**, for everyone the connection talks to, is reserved for
+**trainers** (the same trusted list that controls memory); everyone else in an
+allowed conversation can only switch their own conversation. Set
+`model_switch_locked: true` on the connection to turn it off entirely for
+non-trainers. This is the same mechanism WhatsApp uses; Telegram's version
+adds a tappable picker instead of typed commands.
 
 ## Under the hood: the provider contract
 

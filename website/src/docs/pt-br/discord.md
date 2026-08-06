@@ -1,13 +1,14 @@
 ---
 title: Discord
-description: Ligue o endpoint de Interactions de um app do Discord a um agente do Pepe.
+description: Responda comandos de barra no seu servidor do Discord com um agente do Pepe.
 ---
 
 ## Discord
 
-O Discord é ligado pelo endpoint de Interactions (comandos de barra),
-então ele se encaixa no gateway de webhook em vez de uma conexão persistente.
-Configure pela configuração guiada (ou pelo painel):
+No Discord, as pessoas falam com o agente por um comando de barra (por
+exemplo, `/ask`). O Discord entrega esses comandos pelo endpoint de
+Interactions, que se encaixa no gateway de webhook do Pepe em vez de uma
+conexão persistente. Configure pela configuração guiada (ou pelo painel):
 
 ```bash
 pepe setup
@@ -35,12 +36,13 @@ como a rota genérica funciona por baixo dos panos.
 
 ### Trocando de modelo
 
-O comando que você registrou (`/ask` acima) carrega qualquer texto que você
-colocar na opção `prompt:` dele, então `/model` e `/models` chegam ao Pepe do
-mesmo jeito que qualquer outra mensagem, digitados nesse valor. Eles só
-disparam numa conexão em modo `admin` com `commands` habilitado; no
-`support`, viram texto puro. `/models` lista os modelos disponíveis para a
-projeto dessa conexão; `/model` mostra o atual, ou troca:
+Os comandos `/model` e `/models` deixam as pessoas ver ou trocar qual modelo
+de IA responde a elas. No Discord, eles chegam ao Pepe pelo comando que você
+registrou (`/ask` acima): o que você digitar na opção `prompt:` é a mensagem
+que o Pepe vê. Eles só funcionam numa conexão em modo `admin` com `commands`
+habilitado; no `support`, são tratados como texto comum. `/models` lista os
+modelos disponíveis para o projeto dessa conexão; `/model` mostra o atual, ou
+troca:
 
 ```text
 /model openrouter               # pergunta se troca só esse chat ou todos
@@ -48,7 +50,8 @@ projeto dessa conexão; `/model` mostra o atual, ou troca:
 /model openrouter global        # troca para todos com quem essa conexão fala
 ```
 
-Qualquer pessoa numa conversa permitida pode trocar sua própria sessão;
-trocar **globalmente** é reservado para **treinadores**, a mesma lista que
-controla a memória. Defina `model_switch_locked: true` na conexão para
-desativar totalmente a troca de modelo por quem não é treinador.
+Qualquer pessoa numa conversa permitida pode trocar o modelo da própria
+conversa. Trocar **globalmente**, para todos com quem essa conexão fala, é
+reservado aos **treinadores**, a mesma lista de confiança que controla a
+memória. Defina `model_switch_locked: true` na conexão para desativar
+totalmente a troca de modelo por quem não é treinador.

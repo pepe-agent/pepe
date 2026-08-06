@@ -19,6 +19,9 @@ defmodule Pepe.Hooks.LlmRedact do
   alias Pepe.LLM.Message
 
   @impl true
+  def name, do: "llm_redact"
+
+  @impl true
   def stages, do: [:inbound, :tool_result]
 
   @impl true

@@ -12,8 +12,9 @@ rota:
 https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<project>` é o âmbito do projeto. Usa `default` para o projeto default,
-  ou o slug de outro projeto para isolar uma ligação nesse projeto.
+- `<project>` é o projeto a que a ligação pertence. Usa `default` para o
+  projeto default, ou o slug de outro projeto para manter a ligação isolada
+  nesse projeto.
 - `<provider>` é o nome da plataforma: `whatsapp`, `slack`, `discord`, `msteams`
   ou `googlechat`.
 - `<slug>` é o nome único que deste à ligação.
@@ -77,9 +78,10 @@ sempre), por isso `/mention` não tem efeito nenhum aí.
 
 ## Mudar de modelo
 
-`/model` e `/models` só disparam numa ligação em modo `admin` com `commands`
-ativado (vê a comparação de modos em [Channels](../channels/)); no
-`support`, são texto simples. `/models` lista os modelos disponíveis para o
+Os comandos `/model` e `/models` permitem ver ou mudar o modelo de IA que
+responde. Só funcionam numa ligação em modo `admin` com `commands` ativado
+(vê a comparação de modos em [Channels](../channels/)); no `support`, são
+tratados como texto normal. `/models` lista os modelos disponíveis para o
 projeto da ligação; `/model` mostra o atual, ou muda-o:
 
 ```text
@@ -88,9 +90,10 @@ projeto da ligação; `/model` mostra o atual, ou muda-o:
 /model openrouter global        # muda para todos com quem esta ligação fala
 ```
 
-Mudá-lo **globalmente** está reservado a **formadores** (a mesma lista que
-rege a memória); qualquer outra pessoa numa conversa permitida só pode mudar a
-sua própria sessão. Define `model_switch_locked: true` na ligação para
-desativar isto por completo para quem não é formador. É o mesmo mecanismo
-que o WhatsApp usa; a versão do Telegram acrescenta um seletor com botões em
-vez de comandos escritos.
+Mudá-lo **globalmente**, para todos com quem a ligação fala, está reservado
+aos **formadores** (a mesma lista de confiança que rege a memória); qualquer
+outra pessoa numa conversa permitida só pode mudar a sua própria conversa.
+Define `model_switch_locked: true` na ligação para desativar isto por
+completo para quem não é formador. É o mesmo mecanismo que o WhatsApp usa; a
+versão do Telegram acrescenta um seletor com botões em vez de comandos
+escritos.

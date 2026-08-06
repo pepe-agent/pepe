@@ -173,6 +173,8 @@ Qualquer executável serve desde que rode seus argumentos (`program arg1 arg2 ..
 
 <div class="note"><strong>Não existe ambiente isolado de verdade que seja sem configuração e multiplataforma.</strong> Todo isolamento real precisa de um recurso do sistema operacional ou de uma ferramenta externa. Por isso o ambiente isolado é opcional e os padrões sempre ligados são a barreira mais as proteções. Quando os agentes rodam sem supervisão ou aprovam ferramentas automaticamente, trate o ambiente isolado como obrigatório, não opcional.</div>
 
+Um script wrapper é um caminho estático só, configurado uma vez, pra instalação inteira. Pra algo que um wrapper não consegue fazer - rodar um comando num host remoto via SSH, controlar um container runtime a partir de código de verdade em vez de shell, escolher um backend diferente por agente - um plugin pode assumir a execução por completo ocupando o slot `sandbox` ([slots](/docs/slots)), o mesmo mecanismo de ponto de extensão exclusivo que `memory` e `web_search` já usam. Veja [Plugins](/docs/plugins) pro formato do callback.
+
 ## Os segredos ficam como referências
 
 A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não há banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe as interpola com os valores do ambiente no momento da leitura e nunca persiste o valor expandido.
@@ -303,6 +305,30 @@ pepe token add --label "ci pipeline"
 ```
 
 O token em bruto é mostrado uma única vez e apenas o seu hash SHA-256 é armazenado, nunca o token em si. Um token pode ter escopo: `--project` o limita aos agentes de um projeto, e `--agent` o limita a um único agente (que precisa estar dentro daquele projeto). Gerencie-os com `pepe token list` e `pepe token revoke ID`, pela página de tokens da API do painel, ou pela conversa com um agente que tenha a ferramenta protegida `manage_token`. Para os formatos das requisições e o uso do SDK, veja a [página da API HTTP](../api/).
+
+## A rota HTTP própria de um plugin
+
+Um plugin pode reivindicar sua própria rota (`/plugin-routes/:plugin/*path`; veja
+[Plugins](/docs/plugins)) para coisas que o contrato fixo de um webhook não consegue carregar, como
+um callback de OAuth. Diferente dos tokens da API acima, o Pepe não coloca autenticação própria
+alguma na frente dela: o plugin recebe a requisição em bruto e é responsável pela verificação que
+o próprio protocolo dele exigir (um parâmetro `state` de OAuth, uma URL de callback assinada).
+E diferente de uma ferramenta, uma rota responde a *qualquer* requisição de entrada no momento em
+que está no ar, não só a uma que o próprio modelo do agente decidiu fazer: então reivindicar um
+prefixo de rota no código não expõe nada sozinho; `pepe plugin route enable NAME` é um segundo
+passo, explícito, que o operador dá deliberadamente, separado de instalar o plugin em si.
+
+Também não existe, de propósito, nenhum timeout sobre o próprio `call/2` de uma rota -
+diferente de todo outro ponto de chamada de plugin, que o Pepe limita e isola numa `Task`
+supervisionada, uma rota deve ser dona do próprio ciclo de vida da requisição (transmitir
+uma resposta, manter um long-poll aberto), o que um prazo genérico quebraria. Combinado
+com a falta de autenticação, isso significa que um plugin de rota com um bug (nem
+precisa ser malicioso - uma chamada HTTP de saída travada sem timeout próprio, um
+`GenServer.call` para algo que já não existe) pode manter uma conexão aberta
+indefinidamente, e quem chama sem se autenticar pode abrir quantas quiser. Habilite uma
+rota só para um plugin cujo `call/2` você confia que vai lidar com isso de forma
+responsável, e coloque-a atrás de um proxy reverso com seu próprio timeout de requisição
+se ela for alcançável pela internet aberta.
 
 ## Isolamento multiprojeto
 

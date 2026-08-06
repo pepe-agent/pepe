@@ -1,6 +1,6 @@
 ---
 title: Channels
-description: Understand channel types, bindings, sessions, file delivery, and routing.
+description: Put your agents on Telegram, WhatsApp, Slack and more. How channels work, who can talk to them, and how files and handoffs are delivered.
 ---
 
 A channel connects one of your agents to a place where people already talk.
@@ -31,12 +31,13 @@ existing channels instead of you adding each one by hand.
 
 Channels differ only in how a message reaches Pepe:
 
-- **Telegram** is a bot that Pepe polls. Nothing needs to be publicly
-  reachable. Add a token, bind it to an agent, run the gateway.
+- **Telegram** is a bot Pepe fetches messages from itself, so nothing on your
+  side needs to be reachable from the internet. Add a token, bind it to an
+  agent, run the gateway.
 - **Webhook channels** (WhatsApp, Slack, Discord, Microsoft Teams, Google Chat,
-  and a generic inbound route) receive messages that the platform pushes to a
-  callback URL. Pepe exposes one URL per connection. You register it with the
-  provider once.
+  and a generic inbound route) receive messages that the platform delivers to
+  an address on your server, so Pepe must be reachable from the internet. Pepe
+  exposes one URL per connection. You register it with the provider once.
 
 Every webhook channel, whatever the platform, is served by the same inbound
 endpoint:
@@ -45,8 +46,8 @@ endpoint:
 /webhooks/:project/:provider/:slug
 ```
 
-`:project` is the tenant scope, and it is `default` when you are not using
-extra projects. `:provider` is the platform name, and `:slug` is the name you gave the
+`:project` is the project the connection belongs to, and it is `default` when
+you are not using extra projects. `:provider` is the platform name, and `:slug` is the name you gave the
 connection. Adding a provider never adds a new endpoint.
 
 These are the webhook channels that ship with Pepe, and what each one needs:

@@ -48,7 +48,7 @@ Most do: a service-account token, an address, a profile. Name those, and only th
 "secrets": { "vault_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }
 ```
 
-Pepe has no idea what that variable means. It passes it to your resolver and nothing else from the environment goes with it, so a resolver fetching one secret cannot read the others on its way past.
+Pepe has no idea what that variable means. It passes it to the command you configured, and nothing else from the environment goes along with it, so a command fetching one secret cannot read the others on its way past.
 
 ### The honest costs
 

@@ -5,7 +5,7 @@ description: Chama o Pepe por JavaScript, Python, Ruby, PHP, Java, Elixir e WebS
 
 ## Exemplos de cliente
 
-Cada exemplo aponta para o servidor local. Onde é mostrado um token, remove-o se a tua API estiver aberta.
+Pontos de partida prontos a copiar e colar para chamares a API HTTP do Pepe a partir da tua linguagem. Cada exemplo aponta para o servidor local. Onde é mostrado um token, remove-o se a tua API estiver aberta.
 
 **curl**
 

@@ -136,27 +136,82 @@ defmodule Pepe.Permissions.Risk do
       # (optionally by a full path, `/bin/sh`, `/usr/bin/env python3`), since a download tool
       # hidden behind a pipeline (`base64 -d payload | python3`, `curl ... | /bin/sh`) is the
       # same shape of risk without a `curl | sh` literal for the older, narrower pattern to catch.
-      {:download_exec, Regex.match?(~r/\|\s*(?:\S*\/)?(sh|bash|zsh|python3?|perl|ruby|node)\b/, t)},
+      #
+      # The lookahead after the interpreter name requires whitespace/`;`/`&`/`|`/end-of-string,
+      # not `\b` alone: `\b` only checks the word BOUNDARY, so it happily matched the "sh" inside
+      # an unrelated `grep -E "\.(md|txt|sh)$"` pattern too (`|sh)` - `)` is a non-word char, so
+      # `\bsh\b` matched right there) - a real `| sh` invocation is never immediately followed by
+      # a closing paren/quote, only by more shell syntax or the end of the command.
+      {:download_exec, Regex.match?(~r/\|\s*(?:\S*\/)?(?:sh|bash|zsh|python3?|perl|ruby|node)(?=[\s;&|]|$)/, t)},
       # Any `rm`, not just one carrying a flag: `rm file.txt` deletes a file exactly as much as
       # `rm -f file.txt` does. `find ... -delete` and `dd` (overwriting a target) delete the
-      # same way without the word "rm" anywhere in the command.
-      {:deletes, Regex.match?(~r/\brm\b|\brmdir\b|\bunlink\b|-delete\b|\bdd\b/, t)},
+      # same way without the word "rm" anywhere in the command. `git clean -fd` deletes every
+      # untracked file in the tree without the word "rm" either; `shred` is a delete that also
+      # overwrites first, still a delete.
+      {:deletes, Regex.match?(~r/\brm\b|\brmdir\b|\bunlink\b|-delete\b|\bdd\b|\bgit\s+clean\b|\bshred\b/, t)},
       {:elevated, Regex.match?(~r/\bsudo\b|\bdoas\b/, t)},
-      {:network, Regex.match?(~r/\b(curl|wget|nc|ssh|scp)\b/, t)},
+      # `(?<![.\w-])` before the interpreter name: without it, `\bssh\b` matched the "ssh" inside
+      # a `~/.ssh` PATH (`cat ~/.ssh/config`, `ls ~/.ssh`), and `\bnc\b` matched the `-nc` flag
+      # some tools take (word boundaries alone don't see path separators or hyphens as
+      # "not part of the word" here the way plain English usage would suggest).
+      {:network, Regex.match?(~r/(?<![.\w-])(curl|wget|nc|ssh|scp)\b/, t)},
       # Not just an absolute-path redirect or `tee`: a relative one (`> notes.txt`) writes a
       # file exactly as much as `> /tmp/notes.txt` does (excluding `>&1`-style fd duplication,
-      # which writes nothing). `mv`/`cp` relocate or overwrite a file the same way; `chmod`
-      # turns whatever a prior step just wrote into something that can run on its own later
-      # (a dropped git hook, a cron entry) - the same shape of risk as the write itself.
-      {:writes_file, Regex.match?(~r/>{1,2}\s*[^\s&]|\btee\b|\bmv\b|\bcp\b|\bchmod\b/, t)}
+      # which writes nothing - `[^\s&]` already excludes it - and `> /dev/null`/`>/dev/null`,
+      # the standard "discard this output" idiom: it opens the null device, not a real file,
+      # and flagging it caught real users off guard - `2>/dev/null` on an otherwise risk-free
+      # `find`/`grep`/`cat` pipeline is not a write anyone needs to be asked about). `mv`/`cp`
+      # relocate or overwrite a file the same way; `chmod` turns whatever a prior step just
+      # wrote into something that can run on its own later (a dropped git hook, a cron entry)
+      # - the same shape of risk as the write itself. `sed -i` edits a file in place (the
+      # `edit_file` tool's own equivalent always flags `:writes_file`, so this must too);
+      # `truncate` zeroes a file's contents; `tar x...`/`unzip` write however many files an
+      # archive says to, with names the archive controls.
+      #
+      # (?<![-=|]) before the redirect: without it, Elixir's own `->`, `=>`, `|>` operators
+      # tripped this in every pipe/case/cond an agent's own bash grep'd for (verified live:
+      # `grep -rn "->" lib` flagged "writes to a file" in this very project). `<` is
+      # deliberately NOT in that set, unlike those three: bash has no `->`/`=>`/`|>` syntax
+      # at all, so those sequences can only ever be literal argument text (a grep pattern,
+      # say) - but `<>` is real, meaningful bash syntax (`3<>file.txt` opens a file for
+      # read+write without truncating), so excluding it would silently stop flagging a
+      # genuine file write instead of only ruling out an Elixir-source false positive.
+      # (?>>{1,2}) is still an ATOMIC group: without it, `>>` can backtrack down to matching
+      # just one `>`, leaving the second `>` to satisfy `[^\s&]` itself - which slips right
+      # past the /dev/null lookahead below it (verified live: `>> /dev/null` wrongly matched
+      # until this was atomic).
+      {:writes_file,
+       Regex.match?(
+         ~r/(?<![-=|])(?>>{1,2})\s*(?!\/dev\/null\b)[^\s&]|\btee\b|\bmv\b|\bcp\b|\bchmod\b|\bsed\b[^|;&\n]*\s-i\b|\btruncate\b|\btar\b\s+-?\w*x|\bunzip\b/,
+         t
+       )}
     ]
     |> Enum.filter(&elem(&1, 1))
     |> Enum.map(&elem(&1, 0))
   end
 
   # `python -c`, `node -e`, ... or a heredoc piped into a script interpreter.
+  #
+  # Between the interpreter and `-c`/`-e`, only more flags are allowed (`(?:\s+--?[\w-]+)*`),
+  # not `[^\n]*` (anything): the old, permissive version matched `python -m pip install -e .`
+  # (a routine dependency install) because "-e" appears ANYWHERE later in the line, regardless
+  # of what came before it. `pip`/`install`/`.` aren't flag-shaped, so the loop stops there and
+  # the mandatory `-c`/`-e` right after it never matches - while `python3 -u -c '...'` still
+  # does, since `-u` IS flag-shaped and the loop's backtracking still finds `-c` right after.
+  #
+  # Also catches an obfuscated payload run without an interpreter flag at all: `eval`, `source`,
+  # a piped `base64 -d`/`xxd -r` decode - none of these need `python -c` to execute code the
+  # human never sees in the clear.
+  #
+  # `eval`/`source` are only actual invocations at command position - right after the start
+  # of the string or a shell separator (`;`, `&&`, `||`, `|`, a newline, or `(`/backtick
+  # opening a subshell), with only whitespace in between. Without that anchor, the bare
+  # words matched anywhere on the line: `ls source/`, `find source -name "*.ex"`, a filename
+  # or grep pattern containing "eval" - none of those run anything, but all got flagged.
   defp inline_eval?(t) do
-    Regex.match?(~r/\b(python3?|node|ruby|perl|deno|php)\b[^\n]*\s-(c|e)\b/, t) or
-      (String.contains?(t, "<<") and Regex.match?(~r/\b(python3?|node|ruby|perl|deno|php)\b/, t))
+    Regex.match?(~r/\b(python3?|node|ruby|perl|deno|php)(?:\s+--?[\w-]+)*\s+-[ce]\b/, t) or
+      (String.contains?(t, "<<") and Regex.match?(~r/\b(python3?|node|ruby|perl|deno|php)\b/, t)) or
+      Regex.match?(~r/(?:\A|[;&|\n(`])\s*\b(eval|source)\b/, t) or
+      Regex.match?(~r/\bbase64\s+(-d|--decode)\b|\bxxd\s+-r\b/, t)
   end
 end

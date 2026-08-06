@@ -175,7 +175,7 @@ defmodule PepeWeb.ConnectionsComponent do
             />
             <p :if={f["hint"]} class={hlp()}>{f["hint"]}</p>
             <p :if={f["type"] == "secret"} class={hlp()}>
-              {gettext("Secret: you can write ${ENV_VAR} to keep it out of the config file.")}
+              {gettext("Write it as ${ENV_VAR} to keep the secret out of the config file.")}
             </p>
           </div>
         </.form_section>
@@ -305,7 +305,7 @@ defmodule PepeWeb.ConnectionsComponent do
   defp mode_hint(_),
     do:
       gettext(
-        "Support: a customer-facing channel. Each chat is isolated (nothing is remembered between them) and never becomes memory; slash commands are treated as plain text."
+        "Support: a customer-facing channel. Each chat starts fresh. Nothing carries over between chats or into memory, and slash commands are treated as plain text."
       )
 
   defp open_form(socket, name) do

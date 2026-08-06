@@ -1,13 +1,14 @@
 ---
 title: Slack
-description: Conecte um app do Slack a um agente do Pepe pela Events API.
+description: Coloque um agente do Pepe no seu workspace do Slack para as pessoas falarem com ele em canais e mensagens diretas.
 ---
 
 ## Slack
 
-O Slack usa a Events API. Configure pela configuração guiada (ou pelo painel),
-que pede exatamente os campos necessários e imprime a URL de retorno para
-registrar:
+Conectar o Slack permite que as pessoas falem com o agente dentro do próprio
+workspace. O Slack entrega as mensagens ao Pepe pela Events API; configure a
+conexão pela configuração guiada (ou pelo painel), que pede exatamente os
+campos necessários e imprime a URL de retorno para registrar:
 
 ```bash
 pepe setup
@@ -36,9 +37,11 @@ como a rota genérica funciona por baixo dos panos.
 
 ### Trocando de modelo
 
-`/model` e `/models` só disparam numa conexão em modo `admin` com `commands`
-habilitado; no `support`, viram texto puro. `/models` lista os modelos
-disponíveis para o projeto dessa conexão; `/model` mostra o atual, ou troca:
+Os comandos `/model` e `/models` deixam as pessoas ver ou trocar qual modelo
+de IA responde a elas. Eles só funcionam numa conexão em modo `admin` com
+`commands` habilitado; no `support`, são tratados como texto comum. `/models`
+lista os modelos disponíveis para o projeto dessa conexão; `/model` mostra o
+atual, ou troca:
 
 ```text
 /model openrouter               # pergunta se troca só esse chat ou todos
@@ -46,7 +49,8 @@ disponíveis para o projeto dessa conexão; `/model` mostra o atual, ou troca:
 /model openrouter global        # troca para todos com quem essa conexão fala
 ```
 
-Qualquer pessoa numa conversa permitida pode trocar sua própria sessão;
-trocar **globalmente** é reservado para **treinadores**, a mesma lista que
-controla a memória. Defina `model_switch_locked: true` na conexão para
-desativar totalmente a troca de modelo por quem não é treinador.
+Qualquer pessoa numa conversa permitida pode trocar o modelo da própria
+conversa. Trocar **globalmente**, para todos com quem essa conexão fala, é
+reservado aos **treinadores**, a mesma lista de confiança que controla a
+memória. Defina `model_switch_locked: true` na conexão para desativar
+totalmente a troca de modelo por quem não é treinador.

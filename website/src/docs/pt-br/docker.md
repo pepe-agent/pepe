@@ -46,8 +46,8 @@ numa amd64 colocaria no `PATH` executáveis que não rodam ali.
 
 ### Senha do painel
 
-Um container não é loopback. O Pepe o classifica como rede pública e, sem senha, responde
-403 a todas as requisições. O painel não sobe.
+Um container não conta como a sua própria máquina: o Pepe trata a rede dele como
+pública e, sem senha, recusa todas as requisições (HTTP 403). O painel não abre.
 
 ```bash
 -e PEPE_DASHBOARD_PASSWORD=...

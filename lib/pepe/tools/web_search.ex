@@ -1,8 +1,9 @@
 defmodule Pepe.Tools.WebSearch do
   @moduledoc """
-  Web search via the DuckDuckGo Instant Answer API (no key required). Returns a
-  compact summary plus related topics. Good enough for quick lookups; swap the
-  endpoint for a keyed provider for production-grade results.
+  Web search - whatever currently occupies the `web_search` slot (see `Pepe.Slots`),
+  DuckDuckGo's Instant Answer API by default. Returns a compact summary plus related
+  topics. The operator can point this at a keyed, production-grade provider instead
+  (`mix pepe slot set web_search NAME`) with no change here.
   """
   @behaviour Pepe.Tools.Tool
 
@@ -31,19 +32,15 @@ defmodule Pepe.Tools.WebSearch do
   def concurrent?, do: true
 
   @impl true
-  def run(%{"query" => query}, _ctx) do
-    params = [q: query, format: "json", no_html: 1, skip_disambig: 1]
-
-    case Req.get("https://api.duckduckgo.com/", params: params, receive_timeout: 20_000) do
-      {:ok, %{status: 200, body: body}} when is_map(body) ->
+  def run(%{"query" => query}, ctx) do
+    case Pepe.Search.search(query, [], ctx[:agent]) do
+      {:ok, results} ->
         # Results are content from outside the conversation: strip model control tokens and
         # invisible characters, then wrap them in an explicit untrusted-content marker
-        # (Pepe.Security.ExternalContent) before they reach the model.
-        sanitized = Pepe.Security.ExternalContent.sanitize(format(body))
+        # (Pepe.Security.ExternalContent) before they reach the model - the trust boundary
+        # stays here, in the tool, no matter which backend occupies the slot.
+        sanitized = Pepe.Security.ExternalContent.sanitize(format(results))
         {:ok, Pepe.Security.ExternalContent.mark_untrusted("web_search", sanitized)}
-
-      {:ok, %{status: status}} ->
-        {:error, "search returned status #{status}"}
 
       {:error, reason} ->
         {:error, "search failed: #{inspect(reason)}"}
@@ -52,24 +49,13 @@ defmodule Pepe.Tools.WebSearch do
 
   def run(_, _), do: {:error, "missing 'query'"}
 
-  defp format(body) do
-    abstract = body["AbstractText"] || body["Answer"] || ""
+  defp format([]), do: "No instant answer found."
 
-    related =
-      (body["RelatedTopics"] || [])
-      |> Enum.flat_map(fn
-        %{"Text" => text} when is_binary(text) -> [text]
-        _ -> []
-      end)
-      |> Enum.take(8)
-      |> Enum.map_join("\n", &("- " <> &1))
-
-    [abstract, related]
-    |> Enum.reject(&(&1 in [nil, ""]))
-    |> Enum.join("\n\n")
-    |> case do
-      "" -> "No instant answer found."
-      text -> text
-    end
+  defp format(results) do
+    Enum.map_join(results, "\n\n", fn r ->
+      [r.title, r.snippet, r.url]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join("\n")
+    end)
   end
 end

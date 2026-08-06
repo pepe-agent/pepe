@@ -1,13 +1,14 @@
 ---
 title: Discord
-description: Liga o endpoint de Interactions de uma aplicação do Discord a um agente do Pepe.
+description: Responde a comandos de barra no teu servidor do Discord com um agente do Pepe.
 ---
 
 ## Discord
 
-O Discord é ligado pelo ponto de acesso de Interactions (comandos de barra),
-por isso encaixa-se no gateway de webhook em vez de uma ligação persistente.
-Configura pela configuração guiada (ou pelo painel):
+No Discord, as pessoas falam com o agente através de um comando de barra (por
+exemplo, `/ask`). O Discord entrega esses comandos pelo ponto de acesso de
+Interactions, que se encaixa no gateway de webhook do Pepe em vez de uma
+ligação persistente. Configura pela configuração guiada (ou pelo painel):
 
 ```bash
 pepe setup
@@ -35,12 +36,12 @@ como funciona a rota genérica por dentro.
 
 ### Mudar de modelo
 
-O comando que registaste (`/ask` acima) transporta o texto que colocares na tua
-opção `prompt:`; por isso `/model` e `/models` chegam ao Pepe da mesma forma
-que qualquer outra mensagem, escritos nesse valor. Só disparam numa ligação em
-modo `admin` com `commands` ativado; no `support`, são texto simples.
-`/models` lista os modelos disponíveis para o projeto desta ligação; `/model`
-mostra o atual, ou muda-o:
+Os comandos `/model` e `/models` permitem ver ou mudar o modelo de IA que
+responde. No Discord, chegam ao Pepe através do comando que registaste
+(`/ask` acima): o que escreveres na opção `prompt:` é a mensagem que o Pepe
+vê. Só funcionam numa ligação em modo `admin` com `commands` ativado; no
+`support`, são tratados como texto normal. `/models` lista os modelos
+disponíveis para o projeto desta ligação; `/model` mostra o atual, ou muda-o:
 
 ```text
 /model openrouter               # pergunta se muda só este chat ou todos
@@ -48,7 +49,8 @@ mostra o atual, ou muda-o:
 /model openrouter global        # muda para todos com quem esta ligação fala
 ```
 
-Qualquer pessoa numa conversa permitida pode mudar a sua própria sessão;
-mudá-lo **globalmente** está reservado a **formadores**, a mesma lista que
-rege a memória. Define `model_switch_locked: true` na ligação para desativar
-por completo a mudança de modelo para quem não é formador.
+Qualquer pessoa numa conversa permitida pode mudar o modelo da sua própria
+conversa. Mudá-lo **globalmente**, para todos com quem esta ligação fala,
+está reservado aos **formadores**, a mesma lista de confiança que rege a
+memória. Define `model_switch_locked: true` na ligação para desativar por
+completo a mudança de modelo para quem não é formador.

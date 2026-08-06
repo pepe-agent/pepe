@@ -1,16 +1,17 @@
 ---
 title: Evals
-description: Reproduz prompts conhecidos num agente e verifica a resposta e as ferramentas que ele usou.
+description: Reproduz prompts que já correram bem e confirma que o agente continua a responder e a usar as ferramentas da mesma forma.
 ---
 
-Um **eval** reproduz um prompt conhecido num agente e faz asserções sobre a
-resposta e sobre as ferramentas que o agente usou. É a tua rede de regressão para
-comportamento: alteras um prompt, um modelo ou um conjunto de ferramentas, corres
-os evals e vês de imediato se alguma coisa que te importava se partiu.
+Um **eval** reproduz um prompt conhecido num agente e confere a resposta e as
+ferramentas que o agente usou. É a tua rede de segurança para comportamento:
+alteras um prompt, um modelo ou um conjunto de ferramentas, corres os evals e vês
+de imediato se alguma coisa que te importava se partiu.
 
-Isto importa porque os agentes não são determinísticos, por isso um teste de
-string exata é inútil. Um eval verifica aquilo que de facto interessa. Chamou a
-ferramenta certa? Mencionou a resposta? Evitou afirmar que não tem acesso?
+Isto importa porque um agente nunca responde duas vezes com exatamente as mesmas
+palavras, por isso um teste que espera um texto exato é inútil. Um eval confere
+aquilo que de facto interessa. Chamou a ferramenta certa? Mencionou a resposta?
+Evitou afirmar que não tem acesso?
 
 ## Os teus traces já são os dados de teste que tens
 

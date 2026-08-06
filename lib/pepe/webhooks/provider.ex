@@ -105,5 +105,17 @@ defmodule Pepe.Webhooks.Provider do
   """
   @callback addressed?(config :: map(), payload :: map()) :: boolean()
 
-  @optional_callbacks label: 0, config_schema: 0, respond: 3, deliver_file: 4, addressed?: 2
+  @doc """
+  Optional: send structured content (see `Pepe.Presentation`) rendered into this
+  platform's own native UI - Slack Block Kit, Discord embeds/components, a table drawn
+  as monospace text, whatever the platform actually supports. A provider that can't
+  render structure, or hasn't added support yet, can omit this entirely -
+  `Pepe.Webhooks.deliver_blocks/4` flattens the blocks to plain text
+  (`Pepe.Presentation.to_text/1`) and sends the result through `deliver/3` instead, so a
+  tool that emits blocks still works, just without the native rendering.
+  """
+  @callback deliver_blocks(config :: map(), to :: String.t(), blocks :: [Pepe.Presentation.block()]) ::
+              :ok | {:error, term()}
+
+  @optional_callbacks label: 0, config_schema: 0, respond: 3, deliver_file: 4, addressed?: 2, deliver_blocks: 3
 end

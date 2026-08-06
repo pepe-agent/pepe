@@ -27,15 +27,15 @@ defmodule PepeWeb.ChatLive do
     [
       {"/new", gettext("Start a fresh conversation")},
       {"/stop", gettext("Stop the current run")},
-      {"/inline", gettext("Feed a message into the running turn - TEXT")},
-      {"/goal", gettext("Pursue a goal until a reviewer approves - OBJECTIVE | SUCCESS CRITERION")},
+      {"/inline", gettext("Feed a message into the running turn: TEXT")},
+      {"/goal", gettext("Pursue a goal until a reviewer approves: OBJECTIVE | SUCCESS CRITERION")},
       {"/retry", gettext("Redo the last answer")},
       {"/fork", gettext("Branch this conversation into a new one")},
-      {"/name", gettext("Label this conversation in the sidebar - TEXT")},
+      {"/name", gettext("Label this conversation in the sidebar: TEXT")},
       {"/usage", gettext("Show this month's spend and message count")},
       {"/compact", gettext("Summarize history to free up context")},
       {"/models", gettext("List models available to this project")},
-      {"/model", gettext("Show or change the model - NAME [session|global]")}
+      {"/model", gettext("Show or change the model: NAME [session|global]")}
     ]
   end
 
@@ -60,6 +60,7 @@ defmodule PepeWeb.ChatLive do
        messages: [],
        window: @window,
        streaming: "",
+       streamed_run?: true,
        running: false,
        activity: [],
        input: "",
@@ -449,12 +450,12 @@ defmodule PepeWeb.ChatLive do
         {:noreply, run_slash_command(socket, text)}
 
       socket.assigns.selected && text != "" && not socket.assigns.running ->
-        stream_reply(socket.assigns.selected, text)
+        stream? = stream_reply(socket.assigns.selected, text)
 
         {:noreply,
          socket
          |> update(:messages, &(&1 ++ [%{role: "user", content: text}]))
-         |> assign(streaming: "", running: true, activity: [], input: "")}
+         |> assign(streaming: "", streamed_run?: stream?, running: true, activity: [], input: "")}
 
       true ->
         {:noreply, socket}
@@ -580,13 +581,26 @@ defmodule PepeWeb.ChatLive do
   # the history read here can still be one turn behind. Show the answer right away
   # anyway, because waiting would leave the reader staring at a blank; `:committed`
   # below then reconciles against the session, which is the source of truth.
+  #
+  # `:done`'s own `content` is always the model's raw reply - Runtime emits it before
+  # Pepe.Hooks.transform(:outbound, ...) ever runs (that happens after Runtime.run
+  # returns, in Session). For a streamed_run? this is no loss - the same raw text already
+  # streamed in as deltas, and `:committed` corrects it to the hooked version moments
+  # later either way. For a buffered (hooked) run there were no deltas to have already
+  # shown, so showing this raw content now would be the FIRST and only place it leaks
+  # unredacted - skip straight to waiting for `:committed` instead.
   defp apply_event({:done, content}, socket) do
     # Keep the activity strip briefly, then drop it - so the answer is already there to
     # read and only the machine chatter disappears (never a blank gap).
     Process.send_after(self(), :clear_activity, 2000)
 
+    messages =
+      if socket.assigns.streamed_run?,
+        do: ensure_reply(history(socket.assigns.selected), content),
+        else: socket.assigns.messages
+
     assign(socket,
-      messages: ensure_reply(history(socket.assigns.selected), content),
+      messages: messages,
       streaming: "",
       running: false,
       pending_perm: nil,
@@ -657,12 +671,20 @@ defmodule PepeWeb.ChatLive do
     end
   end
 
+  # Returns whether the run will actually stream - an agent with hooks configured never
+  # does (Pepe.Agent.stream_for?/1), since a live delta is always the model's raw,
+  # un-hooked text. Callers thread this into `streamed_run?` so `apply_event({:done, _})`
+  # knows whether to show that event's own (also raw) content or wait for `:committed`,
+  # which always carries the session's persisted - and therefore hooked - text.
   defp stream_reply(key, text) do
     {on_event, authorize, ask_user} = session_callbacks(key)
+    stream? = Pepe.Agent.stream_for?(Session.status(key).agent)
 
     spawn(fn ->
-      Session.chat(key, text, stream: true, on_event: on_event, authorize: authorize, ask_user: ask_user)
+      Session.chat(key, text, stream: stream?, on_event: on_event, authorize: authorize, ask_user: ask_user)
     end)
+
+    stream?
   end
 
   # Stream a run's events to this chat over PubSub, and route its permission prompts and
@@ -725,10 +747,11 @@ defmodule PepeWeb.ChatLive do
     case parts do
       [objective, criteria] when objective != "" and criteria != "" ->
         {on_event, authorize, ask_user} = session_callbacks(key)
+        stream? = Pepe.Agent.stream_for?(Session.status(key).agent)
 
         spawn(fn ->
           GoalLoop.run(key, objective, criteria,
-            stream: true,
+            stream: stream?,
             on_event: on_event,
             authorize: authorize,
             ask_user: ask_user
@@ -736,7 +759,7 @@ defmodule PepeWeb.ChatLive do
         end)
 
         socket
-        |> assign(input: "", streaming: "", running: true, activity: [])
+        |> assign(input: "", streaming: "", streamed_run?: stream?, running: true, activity: [])
         |> put_flash(:info, gettext("Pursuing the goal until a reviewer approves it."))
 
       _ ->
@@ -791,7 +814,7 @@ defmodule PepeWeb.ChatLive do
       cond do
         text == "" -> {:error, gettext("Usage: /inline TEXT")}
         match?(:ok, Session.inline(key, text)) -> {:info, gettext("Fed into the running turn.")}
-        true -> {:error, gettext("Nothing is running - send it as a normal message.")}
+        true -> {:error, gettext("Nothing is running. Send it as a normal message.")}
       end
 
     socket |> assign(input: "") |> put_flash(elem(flash, 0), elem(flash, 1))
@@ -864,12 +887,13 @@ defmodule PepeWeb.ChatLive do
 
       text = last_user_text(socket.assigns.messages) ->
         Session.undo(key)
-        stream_reply(key, text)
+        stream? = stream_reply(key, text)
 
         socket
         |> assign(
           messages: history(key) ++ [%{role: "user", content: text}],
           streaming: "",
+          streamed_run?: stream?,
           running: true,
           activity: [],
           input: ""

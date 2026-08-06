@@ -155,7 +155,7 @@ A token carries a scope that decides which agents it can reach. From narrowest t
 
 ### Token permissions
 
-The scope says *whose* data a token reaches. A separate set of permissions says *what it may do* with it, and the defaults leave every token you have already minted exactly as it was: it **may** run agents, and it **may not** read usage.
+The scope says *whose* data a token reaches. A separate set of permissions says *what it may do* with it. The defaults leave every token you have already minted exactly as it was: it **may** run agents, and it **may not** read usage.
 
 | Flag | Default | What it grants |
 | --- | --- | --- |

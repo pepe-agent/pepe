@@ -12,8 +12,9 @@ rota:
 https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<project>` é o escopo do projeto. Use `default` para o projeto default,
-  ou o slug de outro projeto para isolar uma conexão naquele projeto.
+- `<project>` é o projeto ao qual a conexão pertence. Use `default` para o
+  projeto default, ou o slug de outro projeto para manter a conexão isolada
+  naquele projeto.
 - `<provider>` é o nome da plataforma: `whatsapp`, `slack`, `discord`,
   `msteams` ou `googlechat`.
 - `<slug>` é o nome único que você deu à conexão.
@@ -77,10 +78,12 @@ para nenhum outro canal. WhatsApp e Discord não filtram por menção hoje
 
 ## Trocando de modelo
 
-`/model` e `/models` só disparam numa conexão em modo `admin` com `commands`
-habilitado (veja a comparação de modos em [Channels](../channels/)); no
-`support`, viram texto puro. `/models` lista os modelos disponíveis para a
-projeto da conexão; `/model` mostra o atual, ou troca:
+Os comandos `/model` e `/models` deixam as pessoas ver ou trocar qual modelo
+de IA responde a elas. Eles só funcionam numa conexão em modo `admin` com
+`commands` habilitado (veja a comparação de modos em
+[Channels](../channels/)); no `support`, são tratados como texto comum.
+`/models` lista os modelos disponíveis para o projeto da conexão; `/model`
+mostra o atual, ou troca:
 
 ```text
 /model openrouter               # pergunta se troca só esse chat ou todos
@@ -88,12 +91,12 @@ projeto da conexão; `/model` mostra o atual, ou troca:
 /model openrouter global        # troca para todos com quem essa conexão fala
 ```
 
-Trocar **globalmente** é reservado para **treinadores** (a mesma lista que
-controla a memória); qualquer outra pessoa numa conversa permitida só pode
-trocar sua própria sessão. Defina `model_switch_locked: true` na conexão para
-desativar isso totalmente para quem não é treinador. É o mesmo mecanismo que o
-WhatsApp usa; a versão do Telegram acrescenta um seletor com botões em vez de
-comandos digitados.
+Trocar **globalmente**, para todos com quem a conexão fala, é reservado aos
+**treinadores** (a mesma lista de confiança que controla a memória); qualquer
+outra pessoa numa conversa permitida só pode trocar a própria conversa.
+Defina `model_switch_locked: true` na conexão para desativar isso totalmente
+para quem não é treinador. É o mesmo mecanismo que o WhatsApp usa; a versão
+do Telegram acrescenta um seletor com botões em vez de comandos digitados.
 
 ## Por baixo dos panos: o contrato do provedor
 

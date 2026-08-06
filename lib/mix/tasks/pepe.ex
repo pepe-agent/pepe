@@ -132,6 +132,8 @@ defmodule Mix.Tasks.Pepe do
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|login|remove ... # external tool servers (MCP: local or remote)
       mix pepe db add|list|remove ...           # external Postgres connections for db_query (see Database)
+      mix pepe slot list|set|clear ...          # which plugin (if any) owns an exclusive extension point
+      mix pepe policy list|scope ...            # which agents/projects a Pepe.Permissions.Policy applies to
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
       mix pepe version                         # what's running, and which build
@@ -252,6 +254,12 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["mcp" | rest]), do: with_config(fn -> mcp_cmd(rest) end)
   # add/list/remove only ever touch config - no live connection needed to configure one.
   def dispatch(["db" | rest]), do: with_config(fn -> db_cmd(rest) end)
+  # list/set/clear only ever touch config - a slot's occupant is resolved lazily, per call.
+  def dispatch(["slot" | rest]), do: with_config(fn -> slot_cmd(rest) end)
+  # `policy list` needs the app up (it scans installed plugins via Pepe.Plugins); scope
+  # get/set/clear only ever touch config.
+  def dispatch(["policy", "list" | rest]), do: with_app([], fn -> policy_cmd(["list" | rest]) end)
+  def dispatch(["policy" | rest]), do: with_config(fn -> policy_cmd(rest) end)
 
   # `usage prices --refresh` fetches over the network (needs Req/the app);
   # reporting just reads the ledger files.
@@ -1567,7 +1575,65 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  defp plugin_cmd(_), do: error("usage: mix pepe plugin list|install SRC [--force]|scan SRC|remove NAME")
+  defp plugin_cmd(["route" | rest]), do: plugin_route_cmd(rest)
+
+  defp plugin_cmd(_),
+    do: error("usage: mix pepe plugin list|install SRC [--force]|scan SRC|remove NAME|route list|enable NAME|disable NAME")
+
+  defp plugin_route_cmd([]), do: plugin_route_list()
+  defp plugin_route_cmd(["list"]), do: plugin_route_list()
+
+  defp plugin_route_cmd(["enable", name]) do
+    Pepe.Config.enable_http_route_plugin(name)
+    ok("enabled the HTTP route for #{name} - reachable at /plugin-routes/#{name}/...")
+
+    info(
+      yellow("note: ") <>
+        "this route answers requests from anywhere on the network, not just localhost - " <>
+        "it does NOT go through the dashboard's password/loopback gate. Only enable a " <>
+        "plugin you trust to handle its own auth (e.g. an OAuth callback's state check)."
+    )
+
+    warn_if_unclaimed(name)
+  end
+
+  defp plugin_route_cmd(["disable", name]) do
+    Pepe.Config.disable_http_route_plugin(name)
+    ok("disabled the HTTP route for #{name}")
+  end
+
+  defp plugin_route_cmd(_), do: error("usage: mix pepe plugin route list|enable NAME|disable NAME")
+
+  # `NAME` here is a route_prefix/0 value, not necessarily a plugin's own file/package
+  # name - the two are usually the same but nothing enforces it, so enabling a name
+  # nothing currently claims (a typo, or a plugin whose route_prefix/0 differs from its
+  # own name) would otherwise silently do nothing useful. Not a refusal: the plugin might
+  # simply not be installed yet, or it might start claiming this prefix later - `enable`
+  # is a standing declaration, not a one-time check against what happens to be loaded now.
+  defp warn_if_unclaimed(name) do
+    unless Enum.any?(Pepe.PluginRoute.status(), &(&1.prefix == name)) do
+      info(dim("note: no installed plugin currently claims the route prefix #{inspect(name)} - check `mix pepe plugin route list`"))
+    end
+  end
+
+  defp plugin_route_list do
+    case Pepe.PluginRoute.status() do
+      [] ->
+        info("No installed plugin claims an HTTP route.")
+
+      routes ->
+        info(bold("plugin HTTP routes"))
+        Enum.each(routes, &print_plugin_route_line/1)
+    end
+  end
+
+  defp print_plugin_route_line(%{prefix: prefix, collision?: true}),
+    do: info("  #{red(prefix)}  BLOCKED - more than one installed plugin claims this prefix; rename one's route_prefix/0")
+
+  defp print_plugin_route_line(%{prefix: prefix, enabled?: true}), do: info("  #{green(prefix)}  /plugin-routes/#{prefix}/...  enabled")
+
+  defp print_plugin_route_line(%{prefix: prefix}),
+    do: info("  #{dim(prefix)}  disabled - enable with: mix pepe plugin route enable #{prefix}")
 
   defp plugin_install(src, force: force?) do
     case Pepe.Plugins.install(src, force: force?) do
@@ -1666,10 +1732,20 @@ defmodule Mix.Tasks.Pepe do
                                   first; a dangerous verdict is refused unless --force.
       plugin scan SRC             security-scan a plugin without installing it
       plugin remove NAME          delete an installed plugin
+      plugin route list           list plugins claiming their own HTTP route, and whether
+                                  each is enabled
+      plugin route enable NAME    expose a plugin's own route at
+                                  /plugin-routes/NAME/... (an OAuth callback, a custom
+                                  REST/RPC endpoint - see Pepe.PluginRoute)
+      plugin route disable NAME   stop answering at that route (back to a plain 404)
 
-    Plugins are Elixir loaded at runtime (no rebuild). One can add tools or channels (a
-    webhook provider). A plugin runs with full access to the app, so only install from a
-    source you trust. Example: the Chatwoot channel in examples/plugins.
+    Plugins are Elixir loaded at runtime (no rebuild). One can add tools, channels (a
+    webhook provider), or an HTTP route of its own. A plugin runs with full access to the
+    app, so only install from a source you trust. Example: the Chatwoot channel in
+    examples/plugins. A plugin's own HTTP route is a second, separate opt-in beyond
+    installing it - claiming a route prefix in code answers nothing until you `route
+    enable` it, since a route (unlike a tool) answers any inbound request, not just one
+    the agent's own model decided to make.
 
     An agent holding the manage_plugin tool can scan/install/list/remove the same way
     from a chat - with no --force escape hatch; a dangerous verdict always stays here.
@@ -2744,6 +2820,7 @@ defmodule Mix.Tasks.Pepe do
           can_message: :string,
           can_manage: :string,
           hooks: :string,
+          slots: :string,
           max_iterations: :integer,
           temperature: :float,
           triage_model: :string,
@@ -2903,8 +2980,9 @@ defmodule Mix.Tasks.Pepe do
     info("""
     mix pepe agent - manage agents
 
-      add NAME [--model M] [--prompt "..."] [--tools t1,t2]
-               [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--project CO]
+      add NAME [--model M] [--prompt "..."] [--tools t1,t2] [--hooks h1,h2]
+               [--slots slot:plugin,slot2:plugin2] [--can-message b,c]
+               [--can-manage x,y|*|none] [--admin] [--default] [--project CO]
       list [--project CO | --all]                          list agents (+ routes)
       prompt NAME [--project CO]                            print the fully-assembled system prompt
       route FROM TO [--remove] [--project CO]              directed A->B messaging
@@ -2954,6 +3032,7 @@ defmodule Mix.Tasks.Pepe do
       can_message: parse_can_message_opt(opts[:can_message], handle),
       can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle),
       hooks: parse_hooks_opt(opts[:hooks]),
+      slots: parse_slots_opt(opts[:slots]),
       max_iterations: opts[:max_iterations] || 12,
       temperature: opts[:temperature],
       triage_model: opts[:triage_model],
@@ -3002,6 +3081,35 @@ defmodule Mix.Tasks.Pepe do
   defp parse_hooks_opt(v) when v in [nil, ""], do: []
   defp parse_hooks_opt(str), do: str |> String.split(",") |> Enum.map(&String.trim/1)
 
+  # --slots memory:example_memory,web_search:other_plugin - an agent's own per-slot
+  # occupant override (Pepe.Slots.occupant/2). A malformed pair (no ":") is dropped rather
+  # than raising - one typo in a comma list shouldn't refuse the whole agent save.
+  defp parse_slots_opt(v) when v in [nil, ""], do: %{}
+
+  defp parse_slots_opt(str) do
+    str
+    |> String.split(",")
+    |> Enum.reduce(%{}, fn pair, acc ->
+      case String.split(pair, ":", parts: 2) do
+        [slot, occupant] -> put_known_slot(acc, String.trim(slot), String.trim(occupant))
+        _ -> acc
+      end
+    end)
+  end
+
+  # An unknown slot name (a typo - "memmory" for "memory") would otherwise persist
+  # silently and do nothing, exactly the failure mode `mix pepe policy scope`/`slot set`
+  # already refuse outright for the installation-wide setting (`Pepe.Config.put_slot/2`
+  # returns `{:error, :unknown_slot}`) - this is that same guard for `agent add --slots`.
+  defp put_known_slot(acc, slot, occupant) do
+    if slot in Pepe.Slots.names() do
+      Map.put(acc, slot, occupant)
+    else
+      error("--slots: #{inspect(slot)} isn't a known slot (known: #{Enum.join(Pepe.Slots.names(), ", ")}) - skipped")
+      acc
+    end
+  end
+
   # Only surface management scope when it's beyond the default (itself only).
   defp manages_line(nil), do: ""
   defp manages_line([]), do: "\n  ⚙ manages: nobody"
@@ -3048,12 +3156,13 @@ defmodule Mix.Tasks.Pepe do
 
   defp do_goal_cmd(objective, criteria, opts) do
     agent = opts[:agent] || Config.default_agent_name()
+    stream? = Pepe.Agent.stream_for?(agent)
     key = "cli-goal:#{System.unique_integer([:positive])}"
     {:ok, _pid} = Pepe.Agent.SessionSupervisor.ensure(key, agent)
 
     loop_opts =
       [
-        stream: true,
+        stream: stream?,
         on_event: goal_events(),
         authorize: Pepe.Gateways.TUI.authorizer(),
         ask_user: Pepe.Gateways.TUI.ask_user_fn(),
@@ -3063,10 +3172,12 @@ defmodule Mix.Tasks.Pepe do
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
     case Pepe.Agent.GoalLoop.run(key, objective, criteria, loop_opts) do
-      {:ok, :met, _answer, n} ->
+      {:ok, :met, answer, n} ->
+        if not stream?, do: puts(answer)
         puts("\n✅ Goal met after #{n} attempt(s).")
 
-      {:error, :max_attempts, _answer, missing} ->
+      {:error, :max_attempts, answer, missing} ->
+        if not stream?, do: puts(answer)
         error("\n🛑 Gave up at the attempt cap. Still missing: #{missing}")
 
       {:error, reason} ->
@@ -3103,14 +3214,20 @@ defmodule Mix.Tasks.Pepe do
             else: {nil, Enum.join(args, " ")}
       end
 
+    # An agent with hooks configured never streams live deltas - a delta is always the
+    # model's raw, un-hooked text (Pepe.Hooks.stream?/1), so a plugin/redaction hook
+    # mutating the reply would otherwise already be on screen before it ever ran. Buffer
+    # instead: request a non-streaming run and print the final, already-hooked text.
+    stream? = Pepe.Agent.stream_for?(agent_name)
+
     # Reuse the console gateway's rendering + permission prompt for the one-shot.
     case Pepe.Agent.oneshot(agent_name, prompt,
-           stream: true,
+           stream: stream?,
            on_event: Pepe.Gateways.TUI.stream_events(),
            authorize: Pepe.Gateways.TUI.authorizer(),
            ask_user: Pepe.Gateways.TUI.ask_user_fn()
          ) do
-      {:ok, _content, _msgs} -> puts("")
+      {:ok, content, _msgs} -> if stream?, do: puts(""), else: puts(content)
       {:error, reason} -> error("\n#{inspect(reason)}")
     end
   end
@@ -5737,6 +5854,118 @@ defmodule Mix.Tasks.Pepe do
     info("\n#{bold(name)}")
     info(dim("   unscoped"))
   end
+
+  ###
+  ### slot - which plugin (if any) occupies an exclusive extension point
+  ###
+
+  defp slot_cmd(["list" | _]) do
+    info(bold("✦ slots"))
+
+    Enum.each(Pepe.Slots.status(), fn s ->
+      note = if s.degraded?, do: dim(" (configured occupant unavailable, using default)"), else: ""
+      info("\n#{bold(s.slot)}")
+      info("   occupant: #{green(s.occupant)}#{note}")
+      if s.occupant != s.default, do: info(dim("   default:  #{s.default}"))
+    end)
+  end
+
+  defp slot_cmd(["set", slot, occupant | _]) do
+    case Pepe.Config.put_slot(slot, occupant) do
+      :ok -> ok("slot #{green(slot)} set to #{green(occupant)}")
+      {:error, :unknown_slot} -> error("unknown slot #{inspect(slot)} (known: #{Enum.join(Pepe.Slots.names(), ", ")})")
+    end
+  end
+
+  defp slot_cmd(["clear", slot | _]) do
+    case Pepe.Config.delete_slot(slot) do
+      :ok -> ok("slot #{green(slot)} reverted to its default")
+      {:error, :unknown_slot} -> error("unknown slot #{inspect(slot)} (known: #{Enum.join(Pepe.Slots.names(), ", ")})")
+    end
+  end
+
+  defp slot_cmd(_) do
+    info("""
+    #{bold("mix pepe slot")} - which plugin (if any) occupies an exclusive extension point
+
+      slot list                    every slot, its current occupant, and its default
+      slot set NAME PLUGIN         pin NAME (e.g. "memory") to an installed plugin's own name
+      slot clear NAME              revert NAME to its default (same as `slot set NAME default`)
+
+    A slot is exclusive: exactly one occupant answers for it, never a pile-up of several
+    plugins all trying to. If the configured occupant crashes, times out, or is no longer
+    installed, the call falls back to the default automatically - `slot list` flags this as
+    "configured occupant unavailable" so it doesn't go unnoticed. Known slots: #{Enum.join(Pepe.Slots.names(), ", ")}.
+
+    A slot's occupant can also be overridden per agent (`mix pepe agent add NAME --slots
+    memory:plugin_name`) or per project (`"default_slots"` in a project's config) - this
+    command only ever sets the installation-wide default.
+    """)
+  end
+
+  defp policy_cmd(["list" | _]) do
+    case Pepe.Permissions.Policy.status() do
+      [] ->
+        info(dim("no policy plugins installed"))
+
+      policies ->
+        info(bold("✦ policies"))
+        Enum.each(policies, &print_policy_line/1)
+    end
+  end
+
+  defp policy_cmd(["scope", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [agents: :string, projects: :string, clear: :boolean])
+
+    cond do
+      opts[:clear] ->
+        Pepe.Config.delete_policy_scope(name)
+        ok("policy #{green(name)} scope cleared - applies to every agent again")
+
+      opts[:agents] || opts[:projects] ->
+        scope =
+          %{}
+          |> maybe_put_list("agents", opts[:agents])
+          |> maybe_put_list("projects", opts[:projects])
+
+        Pepe.Config.put_policy_scope(name, scope)
+        ok("policy #{green(name)} scoped to #{describe_scope(scope)}")
+
+      true ->
+        error("usage: mix pepe policy scope NAME --agents a,b | --projects x,y | --clear")
+    end
+  end
+
+  defp policy_cmd(_) do
+    info("""
+    #{bold("mix pepe policy")} - which agents/projects a fail-closed Pepe.Permissions.Policy plugin applies to
+
+      policy list                                    every installed policy and its current scope
+      policy scope NAME --agents a,b [--projects x,y]  restrict NAME to these agents and/or projects
+      policy scope NAME --projects x,y                restrict NAME to every agent in these projects
+      policy scope NAME --clear                       unscope NAME - applies to every agent again (the default)
+
+    A policy still can't be opted out of by the agent it applies to - that's the whole point of
+    it being fail-closed. Scoping is the operator's call, made here or in "policy_scope" in
+    config.json, never the agent's own. No scope set for a policy's name means unscoped: every
+    agent, exactly like before this command existed.
+    """)
+  end
+
+  defp maybe_put_list(scope, _key, nil), do: scope
+  defp maybe_put_list(scope, key, str), do: Map.put(scope, key, str |> String.split(",") |> Enum.map(&String.trim/1))
+
+  defp describe_scope(scope) do
+    [
+      if(a = scope["agents"], do: "agents: #{Enum.join(a, ", ")}"),
+      if(p = scope["projects"], do: "projects: #{Enum.join(p, ", ")}")
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("; ")
+  end
+
+  defp print_policy_line(%{name: name, scope: nil}), do: info("#{bold(name)}\n  scope: #{dim("every agent")}")
+  defp print_policy_line(%{name: name, scope: scope}), do: info("#{bold(name)}\n  scope: #{describe_scope(scope)}")
 
   # `mix pepe review` - the queue of autonomous writes waiting for approval.
   defp review_cmd(["approve", id | _]) do

@@ -1,6 +1,6 @@
 ---
 title: Publicando em um servidor
-description: Coloque o Pepe em um servidor com domínio e TLS, usando Docker Compose, Docker Swarm ou Kamal.
+description: Coloque o Pepe em um servidor próprio, com nome de domínio e HTTPS, usando Docker Compose, Docker Swarm ou Kamal.
 ---
 
 O [Docker](/pt-br/docs/docker/) cobre o container em si. Esta página cobre o passo
@@ -14,8 +14,9 @@ nunca precisou pensar a respeito.
 ## Quatro coisas que mudam assim que ele sai do localhost
 
 **A senha do dashboard passa a ser obrigatória.** Já era no Docker, e a razão é a mesma
-aqui: o Pepe trata tudo que não é loopback como rede pública e devolve 403 para toda
-requisição sem ela. Atrás de um proxy reverso, isso é *toda* requisição.
+aqui: para o Pepe, só requisições vindas da própria máquina contam como privadas
+(loopback); todo o resto é rede pública, e sem senha cada requisição dessas é recusada
+com 403. Atrás de um proxy reverso, isso é *toda* requisição.
 
 **O `PHX_HOST` é o nome público.** O Pepe monta URLs absolutas a partir dele: os embeds do
 widget e as URLs de webhook que você entrega ao Telegram ou ao WhatsApp. Sem definir, ele
@@ -23,7 +24,8 @@ widget e as URLs de webhook que você entrega ao Telegram ou ao WhatsApp. Sem de
 
 **O `SECRET_KEY_BASE`, ou todo mundo é deslogado a cada deploy.** Sem ele, o Pepe gera um
 aleatório a cada boot, o que serve para um container avulso e é errado para um servidor:
-os cookies de sessão assinados com o segredo antigo deixam de validar. Gere uma vez
+depois de cada deploy o login de ninguém é mais reconhecido (os cookies de sessão foram
+assinados com o segredo antigo), e todo mundo entra de novo. Gere uma vez
 (`openssl rand -base64 48`) e guarde.
 
 **Dois ajustes existem só no `config.json`.** Eles não têm variável de ambiente, então são
@@ -38,13 +40,16 @@ docker exec -it <container> bin/pepe rpc '
   end)'
 ```
 
-O `allowed_hosts` fecha o DNS rebinding: com senha configurada e sem allowlist, o Pepe
-aceita qualquer `Host`, porque a senha é a tranca e ele não tem como saber qual domínio
-você quis dizer. O `trusted_proxies` é o que as pessoas pulam e depois diagnosticam
-errado: sem ele todo `X-Forwarded-For` é ignorado, então o limitador de tentativas de
-login vê o endereço do proxy para todo mundo e a internet inteira divide um balde só. Use
-a rede em que o seu proxy realmente está, não `0.0.0.0/0`. Confiar em qualquer cabeçalho
-de encaminhamento é o mesmo que não ter limitador nenhum.
+O `allowed_hosts` diz ao Pepe a quais domínios ele deve responder. Com senha configurada
+e sem allowlist, o Pepe aceita qualquer `Host`, porque a senha é a tranca e ele não tem
+como saber qual domínio você quis dizer; nomear o seu fecha um ataque chamado DNS
+rebinding, em que uma página maliciosa engana o navegador para alcançar o seu Pepe sob
+outro nome. O `trusted_proxies` é o que as pessoas pulam e depois diagnosticam errado:
+vazio, todo `X-Forwarded-For` é ignorado, então o limitador de tentativas de login não
+consegue distinguir os visitantes, vê o endereço do proxy para todo mundo e a internet
+inteira divide um balde só. Use a rede em que o seu proxy realmente está, não
+`0.0.0.0/0`. Confiar em qualquer cabeçalho de encaminhamento é o mesmo que não ter
+limitador nenhum.
 
 <div class="note"><strong>Uma réplica. Sempre.</strong> Dos dois stores que o Pepe mantém nesse volume, o risco não é bem o estado guardado nele. É que uma segunda instância roda um segundo scheduler, e todo cron, watch e compromisso dispara em dobro (a <a href="#o-único-padrão-a-mudar">seção do Kamal</a> destrincha isso, e vale para todas as ferramentas daqui). Dois containers em dois volumes são piores de um jeito mais silencioso: dois Pepes diferentes, cada um convencido de que é o único. Todos os exemplos abaixo fixam uma réplica, e onde o padrão do orquestrador é subir o novo container antes de derrubar o velho, isso também é desligado.</div>
 

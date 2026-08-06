@@ -22,6 +22,7 @@ defmodule PepeWeb.AgentSocket do
   alias PepeWeb.ApiAuth
 
   channel "agent:*", PepeWeb.AgentChannel
+  channel "realtime:*", PepeWeb.RealtimeChannel
 
   @impl true
   def connect(params, socket, connect_info) do

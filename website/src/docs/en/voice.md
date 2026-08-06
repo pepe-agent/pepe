@@ -78,7 +78,7 @@ pepe media tts --model openai --voice nova
 pepe media tts off
 ```
 
-The text reply is still what's saved as the lasting record - the audio is an extra, and
+The text reply is still what's saved as the lasting record. The audio is an extra, and
 it's length-capped so a long answer never becomes a five-minute clip. A TTS failure is
 silent: the text reply already went out, so nothing is lost, it just doesn't get a voice
 that turn. Same settings on the dashboard's Config page, and in `pepe setup` under

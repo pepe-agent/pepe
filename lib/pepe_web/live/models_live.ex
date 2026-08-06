@@ -250,7 +250,7 @@ defmodule PepeWeb.ModelsLive do
               <div>
                 <label class={lbl()}>{gettext("Fallbacks")}</label>
                 <p class={hlp()}>
-                  {gettext("Tried in this order when %{name} errors transiently (rate limit, 5xx, network) - the agent never sees the failure.", name: @edit_model.original_name)}
+                  {gettext("Tried in this order when %{name} errors transiently (rate limit, 5xx, network): the agent never sees the failure.", name: @edit_model.original_name)}
                 </p>
                 <div :if={@edit_model.fallbacks != []} class="mt-2 flex flex-wrap gap-2">
                   <span :for={{name, i} <- Enum.with_index(@edit_model.fallbacks)} class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 py-1 pl-2.5 pr-1.5 text-sm">
@@ -557,7 +557,7 @@ defmodule PepeWeb.ModelsLive do
       if final_raw == raw_name do
         gettext("Model %{name} saved.", name: name)
       else
-        gettext("A model connection named %{name} already exists - saved this one as %{final} instead.",
+        gettext("A model connection named %{name} already exists; saved this one as %{final} instead.",
           name: scope_name(raw_name, scope),
           final: name
         )

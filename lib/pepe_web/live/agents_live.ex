@@ -143,7 +143,7 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class={lbl()}>{gettext("Backup models")}</label>
                 <p class={hlp()}>
-                  {gettext("If this agent's model is down or times out, Pepe automatically retries the request on a backup model, in order. By default it uses the backup list already set on the model connection — you rarely need to touch this.")}
+                  {gettext("If this agent's model is down or times out, Pepe retries on the backup models in order. By default it uses the backup list already set on the model connection, so you rarely need to touch this.")}
                 </p>
 
                 <div :if={@edit_agent.fallbacks == nil} class="mt-2 flex items-center justify-between gap-3 text-sm">
@@ -215,7 +215,7 @@ defmodule PepeWeb.AgentsLive do
 
             <.form_section collapsible title={gettext("Chores")}>
               <p class={hlp()}>
-                {gettext("Some calls are not the agent thinking, they are the agent tidying up: naming a conversation so this sidebar reads like something. Point them at a cheap connection you already have. Left off, a conversation is still named, from the first few words of what was asked - free, offline, and nobody's opening message is sent anywhere to be read.")}
+                {gettext("Housekeeping calls, like naming a conversation for this sidebar, don't need the agent's main model: point them at a cheap connection you already have. Left off, conversations are still named from the first few words of the request. That's free, offline, and never sends anyone's opening message anywhere to be read.")}
               </p>
 
               <div>
@@ -230,7 +230,7 @@ defmodule PepeWeb.AgentsLive do
                 <input type="checkbox" name="commitments" value="true" checked={@edit_agent[:commitments]} class="mt-0.5" />
                 <span>
                   {gettext("Track commitments made in conversation")}
-                  <p class={hlp()}>{gettext("Notices a stated follow-up after each turn (\"remind me Friday\", \"I'll check and tell you tomorrow\") and tracks it without being asked twice. A user's own reminder gets a message back at the right time; this agent's own promise re-runs its session so the work actually happens before anything is said to have been done.")}</p>
+                  <p class={hlp()}>{gettext("Notices a stated follow-up after each turn (\"remind me Friday\", \"I'll check and tell you tomorrow\") and tracks it without being asked twice. A user's reminder comes back as a message at the right time. The agent's own promise re-runs its session first, so the work is actually done before the agent reports it done.")}</p>
                   <p :if={blank(@edit_agent[:utility_model]) == nil} class={[hlp(), "text-amber-500/80"]}>
                     {gettext("No utility model set above: this does nothing until one is.")}
                   </p>
@@ -244,7 +244,7 @@ defmodule PepeWeb.AgentsLive do
                   {gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span>
                   <span
                     class="ml-1 cursor-help text-zinc-600"
-                    title={gettext("The text under each tool is what it tells the AI model, always in English on purpose - it's an instruction for the model, not a translated interface label.")}
+                    title={gettext("The text under each tool is the instruction sent to the AI model. It stays in English on purpose: it's for the model, not a translated interface label.")}
                   >ⓘ</span>
                 </label>
                 <div class="grid gap-2 sm:grid-cols-2">
@@ -273,6 +273,26 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
+            <.form_section collapsible title={gettext("Extension slots")}>
+              <p class={hlp()}>
+                {gettext("Each slot hands one extension point to a single installed plugin: memory search, where a shell command actually runs, how long conversations get condensed, or the whole reasoning loop. \"Default\" inherits the installation's (or project's) choice; picking a name here overrides it for this agent only.")}
+              </p>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div :for={slot <- Pepe.Slots.names()}>
+                  <label class={lbl()}>{slot}</label>
+                  <select name={"slots[#{slot}]"} class={fld()}>
+                    <option value="" selected={blank(@edit_agent.slots[slot]) == nil}>{gettext("Default")}</option>
+                    <option :for={c <- Pepe.Slots.candidates(slot)} value={c.name} selected={@edit_agent.slots[slot] == c.name}>
+                      {slot_option_label(c)}
+                    </option>
+                    <option :if={stale_slot?(@edit_agent.slots[slot], Pepe.Slots.candidates(slot))} value={@edit_agent.slots[slot]} selected>
+                      {@edit_agent.slots[slot]} ({gettext("not installed")})
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </.form_section>
+
             <.form_section collapsible title={gettext("Access")}>
               <div>
                 <label class={lbl()}>{gettext("Can message (agents it may talk to)")}</label>
@@ -297,7 +317,7 @@ defmodule PepeWeb.AgentsLive do
                 <label class={lbl()}>{gettext("Max steps")} <span class="text-zinc-600">{gettext("(tool rounds per task)")}</span></label>
                 <input type="number" min="1" name="max_iterations" value={@edit_agent.max_iterations} placeholder={gettext("no limit")} class={fld()} />
                 <p class={hlp()}>
-                  <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("no limit — the agent runs a task until it's done (safest for real work).")}
+                  <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("no limit: the agent runs a task until it's done (safest for real work).")}
                   {gettext("Set a number only to deliberately cap long tasks. A low cap makes the agent quit multi-step work halfway and reply with what's left unfinished.")}
                 </p>
               </div>
@@ -326,7 +346,7 @@ defmodule PepeWeb.AgentsLive do
                 <input type="checkbox" name="trust_untrusted_content" value="true" checked={@edit_agent[:trust_untrusted_content]} class="mt-0.5" />
                 <span>
                   {gettext("Trust untrusted content (act on files & pages without re-asking)")}
-                  <p class={hlp()}>{gettext("Normally, once the agent takes in a file or a fetched page, its auto-approved tools go back to asking, so a hidden instruction in that content can't run unattended. Turn this on for a trusted owner's agent that must act on documents you send it — it reopens that path, so only for an agent you trust for exactly that.")}</p>
+                  <p class={hlp()}>{gettext("Normally, once the agent takes in a file or a fetched page, its auto-approved tools go back to asking, so a hidden instruction in that content can't run unattended. Turning this on reopens that path: a hidden instruction in what the agent reads can run tools unattended. Use it only for a trusted owner's agent that must act on documents you send it.")}</p>
                 </span>
               </label>
 
@@ -340,7 +360,7 @@ defmodule PepeWeb.AgentsLive do
                 />
                 <span>
                   {gettext("Let session_search see every conversation in this project, not just the caller's own")}
-                  <p class={hlp()}>{gettext("Off (the default) is safe for an agent that talks to several different end customers: session_search only ever reaches the calling conversation's own history. Turn this on only for an agent with one operator/team on the other end, where there's no other customer's conversation to leak.")}</p>
+                  <p class={hlp()}>{gettext("Off (the default), session_search only ever reaches the calling conversation's own history. On, it reaches every conversation in this project, including other agents'. Turn it on only for an agent with one operator/team on the other end, where there's no other customer's or agent's conversation to leak.")}</p>
                 </span>
               </label>
 
@@ -348,18 +368,18 @@ defmodule PepeWeb.AgentsLive do
                 <input type="checkbox" name="micro_compaction" value="true" checked={@edit_agent[:micro_compaction]} class="mt-0.5" />
                 <span>
                   {gettext("Micro-compaction (fold history gradually instead of resummarizing it all at once)")}
-                  <p class={hlp()}>{gettext("Once the context window fills, this folds only the oldest exchange into a running summary each turn instead of resummarizing the whole thing from scratch every time - smaller, steadier cost instead of one big stall. Trade-off: the summary changes every turn once active, which costs some of the model provider's prompt caching.")}</p>
+                  <p class={hlp()}>{gettext("Once the context window fills, each turn folds only the oldest exchange into a running summary instead of resummarizing everything from scratch: a smaller, steadier cost instead of one big stall. Trade-off: while active, the summary changes every turn, which costs some of the model provider's prompt caching.")}</p>
                 </span>
               </label>
             </.form_section>
 
             <.form_section :if={!@edit_agent.new?} collapsible title={gettext("Assembled prompt")}>
-              <details class="text-sm">
+              <details class="text-sm" open>
                 <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200">
                   {gettext("What the model actually sees, not just the persona above")}
                 </summary>
                 <p class={hlp()}>
-                  {gettext("The persona field above is only the seed - this is it plus everything Pepe assembles around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time). Exactly what every real conversation with this agent sends as the system message.")}
+                  {gettext("This is the exact system message every real conversation with this agent sends: the persona above is only the seed, and Pepe assembles the rest around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time).")}
                 </p>
                 <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">{assembled_prompt(@edit_agent)}</pre>
               </details>
@@ -379,6 +399,19 @@ defmodule PepeWeb.AgentsLive do
 
   # A short, one-line description for a tool, taken from its spec.
   defp tool_hint(name), do: Pepe.Tools.summary(name)
+
+  defp slot_option_label(%{name: name, default?: true}), do: name <> " " <> gettext("(builtin)")
+  defp slot_option_label(%{name: name}), do: name
+
+  # A stored override whose plugin no longer resolves as a candidate (uninstalled, or
+  # transiently failed to load - Pepe.Slots.candidates/1 recomputes from disk on every
+  # render) has no matching <option>, so nothing in the <select> would be `selected` and
+  # the browser silently falls back to the first option ("Default") - meaning the very
+  # next save of ANYTHING else on this agent would submit "" for this slot and erase the
+  # override with no warning. Rendering it as its own selected option keeps it round-
+  # tripping through unrelated saves instead of disappearing.
+  defp stale_slot?(nil, _candidates), do: false
+  defp stale_slot?(name, candidates), do: not Enum.any?(candidates, &(&1.name == name))
 
   # The exact system message a real conversation with this agent would get - the same
   # Pepe.Agent.Workspace.system_prompt/1 every surface (Session, Runtime, the /v1 API) already
@@ -406,6 +439,7 @@ defmodule PepeWeb.AgentsLive do
       can_message: [],
       can_manage: nil,
       hooks: [],
+      slots: %{},
       fallbacks: nil,
       triage_model: nil,
       simple_model: nil,
@@ -523,6 +557,7 @@ defmodule PepeWeb.AgentsLive do
         can_message: parse_list(params["can_message"]),
         can_manage: parse_manage(params["can_manage"]),
         hooks: params["hooks"] || [],
+        slots: parse_slots(params["slots"]),
         max_iterations: parse_iterations(params["max_iterations"]),
         tool_progress: blank(params["tool_progress"]),
         # Chip-list state lives in `edit_agent` (LiveView state), not `params` -
@@ -576,6 +611,7 @@ defmodule PepeWeb.AgentsLive do
         can_message: parse_list(params["can_message"]),
         can_manage: parse_manage(params["can_manage"]),
         hooks: params["hooks"] || [],
+        slots: parse_slots(params["slots"]),
         max_iterations: parse_iterations(params["max_iterations"]),
         tool_progress: blank(params["tool_progress"]),
         triage_model: blank(params["triage_model"]),

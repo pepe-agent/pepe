@@ -111,7 +111,7 @@ The response is a standard OpenAI chat completion object:
 }
 ```
 
-`pepe serve` runs in the foreground. For a real deployment, see [Dashboard](../dashboard/#keeping-it-running) for installing it as a persistent background service.
+`pepe serve` runs in the foreground. For a real deployment, see [Dashboard](../dashboard/#keeping-it-running) to install it as a persistent background service.
 
 ## Endpoints
 
@@ -128,7 +128,7 @@ Both live under `/v1`, so a client configured with `base_url = http://HOST:PORT/
 
 This is the one idea that makes everything else click. The `model` field in a chat request does not name a raw language model. It names a Pepe **agent**. When you send `"model": "assistant"`, Pepe runs the agent called `assistant`, with that agent's system prompt and its own set of tools. The agent runs the full tool-calling loop internally (call the model, run any tool calls, feed results back, repeat) and returns a single final answer in the usual completion shape.
 
-Resolution of the `model` field happens in this order:
+Pepe resolves the `model` field in this order:
 
 1. If the name matches an agent, that agent runs.
 2. If no agent matches but the name matches a bare model connection, Pepe wraps it in a minimal pass-through agent (no tools, single turn) and calls that model directly. This fallback is only available in the open or default-project scope (see [Token scopes](../auth/#token-scopes)).

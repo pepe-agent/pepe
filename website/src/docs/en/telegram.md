@@ -5,9 +5,10 @@ description: Create and manage Telegram bots connected to Pepe agents.
 
 ## Telegram
 
-Telegram is the quickest channel to stand up because it needs no public URL.
-Create a bot with @BotFather, copy its token, and register it. Pepe polls
-Telegram for new messages, so there is no webhook to expose.
+Telegram is the quickest channel to set up because it needs no public URL.
+Create a bot with @BotFather, copy its token, and register it. Pepe reaches
+out to Telegram for new messages itself, so nothing on your machine has to be
+exposed to the internet.
 
 Configure the default bot interactively:
 
@@ -83,11 +84,11 @@ the same keys as the default one:
 - `allowed_chats` and `allowed_users`: the id allowlists. Leave them out and the
   bot talks to anyone.
 - `require_mention`: in a group, only reply when the bot is @mentioned.
-- `reactions`: which 👍/👎 on a message reach the agent as feedback — `own`
+- `reactions`: which 👍/👎 on a message reach the agent as feedback: `own`
   (default, only reactions on the bot's own messages), `all`, or `off`.
 - `quick_reactions`: off by default. When on, a message that's only a
   thank-you or a bare emoji ("thanks!", a lone ❤️) gets a native reaction back
-  instead of a full reply — no model call spent on it. Anything with real
+  instead of a full reply, with no model call spent on it. Anything with real
   content still gets a normal answer.
 - `trainers`: who the bot learns from, and who may run its operator commands.
 
@@ -195,14 +196,14 @@ that happened before it was brought in.
 
 In a group that has **topics** turned on, each topic is its own conversation,
 and a reply lands back in the topic it came from. You can give a topic **its own
-agent**: run `/agent <name>` inside the topic — or just **ask** the agent to
-connect this topic to another one, and it does it for you — and it stays bound
+agent**: run `/agent <name>` inside the topic (or just **ask** the agent to
+connect this topic to another one, and it does it for you) and it stays bound
 to that agent, kept across `/new` and restarts. Names are matched
 case-insensitively, so `/agent engenheiro` finds an agent called `Engenheiro`. So one group can have a "support" topic answered
 by the support agent and an "engineering" topic by the engineer, side by side.
 The agent for a message is the topic's bound agent if it has one, otherwise the
 bot's `agent`, otherwise the global default. A bound topic still follows the
-group's mention rule — set `require_mention: false` (or `/mention off` in that
+group's mention rule: set `require_mention: false` (or `/mention off` in that
 topic) if you want it to answer without an @mention.
 
 ### Switch models mid-conversation

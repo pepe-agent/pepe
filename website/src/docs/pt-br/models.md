@@ -1,6 +1,6 @@
 ---
 title: Modelos
-description: Conecte provedores compatíveis com OpenAI e defina modelos padrão e de fallback.
+description: Conecte o Pepe a qualquer provedor de modelo compatível com OpenAI, escolha um padrão e adicione reservas que assumem quando um provedor tem um mau momento.
 ---
 
 ## 3. Conectar um modelo
@@ -69,13 +69,13 @@ trocar o modelo só para sua sessão; um treinador (a mesma lista que controla
 ## A conexão de modelo
 
 `model` nomeia uma conexão que você definiu com `pepe model add`. Deixá-lo sem
-definir significa que o agente usa o modelo padrão do seu escopo, então você pode
+definir significa que o agente usa o modelo padrão do seu projeto, então você pode
 apontar um conjunto inteiro de agentes para um provedor e trocar todos mudando um
 único padrão.
 
 Uma conexão de modelo pode carregar uma cadeia de fallback. Quando o modelo primário
-do agente falha com um erro transitório (um limite de taxa, um tempo esgotado, uma
-queda de rede ou um 5xx), o runtime desce pela cadeia e tenta de novo no próximo
+do agente falha com um erro passageiro (um limite de taxa, um tempo esgotado, uma
+queda de rede ou um 5xx), o Pepe desce pela cadeia e tenta de novo no próximo
 modelo, emitindo um evento `failover` enquanto o faz. Um erro grave como uma chave de
 API errada ou uma requisição mal formada falha na hora, já que outro endpoint não
 resolveria.

@@ -124,7 +124,7 @@ defmodule PepeWeb.BoardLive do
                 <input type="checkbox" name="board[auto_dispatch]" value="true" class="mt-0.5" />
                 <span>
                   {gettext("Auto-dispatch")}
-                  <p class={hlp()}>{gettext("A ready card with an assignee fires on its own. Off (the default): only an explicit claim starts one. Do that from here, or have the assignee call the board tool.")}</p>
+                  <p class={hlp()}>{gettext("On: a ready card with an assignee starts on its own. Off (the default): a card starts only when someone claims it, from this page or through the board tool.")}</p>
                 </span>
               </label>
               <div>

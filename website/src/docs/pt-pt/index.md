@@ -1,20 +1,19 @@
 ---
 title: Introdução
-description: O Pepe é um runtime de agentes de IA auto-alojado e agnóstico de modelo. Define agentes, liga qualquer modelo compatível com OpenAI e corre um ciclo real de chamada de ferramentas, sem base de dados e sem dependência de fornecedor.
+description: O Pepe corre agentes de IA na tua própria máquina. Descreve quem eles são, liga qualquer modelo compatível com OpenAI e deixa-os fazer trabalho a sério com ferramentas. Sem servidor de base de dados, sem dependência de fornecedor.
 ---
 
 ## O que é o Pepe
 
-O Pepe é um runtime de agentes de IA auto-alojado, construído em Elixir. Defines
-um **agente** (um nome, um prompt de sistema, um conjunto de ferramentas e uma
-ligação a um modelo), e o Pepe corre-o: envia a conversa para o modelo, executa
-qualquer ferramenta que o modelo peça, devolve os resultados e repete até o modelo
-produzir uma resposta final.
+O Pepe corre **agentes** de IA na tua própria máquina ou servidor. Descreves um
+agente uma vez (um nome, as suas instruções, as ferramentas que pode usar e o
+modelo com que pensa) e o Pepe trata do resto: quando chega um pedido, o agente
+trabalha por etapas, usando as suas ferramentas, até ter uma resposta a sério.
 
-Elixir/OTP importa aqui porque agentes são conversas longas, canais e tarefas em
-segundo plano, não apenas um pedido HTTP. O Pepe consegue manter muitas sessões
-supervisionadas com pouco overhead, o que ajuda a alojar uma equipa de agentes sem
-inflacionar a memória nem a CPU do servidor.
+Os agentes vivem muito tempo: conversas, canais, tarefas em segundo plano, não
+pedidos avulsos. O Pepe é construído em Elixir/OTP, uma tecnologia feita
+exatamente para esse tipo de trabalho, por isso um servidor modesto mantém uma
+equipa inteira de agentes a correr lado a lado sem gastar muita memória nem CPU.
 
 Esse ciclo interno é a razão de ser de tudo. Uma simples chamada de chat devolve
 texto. Um agente consegue mesmo fazer coisas: ler um ficheiro, correr um comando,
@@ -44,19 +43,16 @@ Este é o ciclo que o Pepe corre em cada turno:
 4. Volta ao passo 1. Para quando o modelo devolve uma resposta simples, ou quando
    o agente atinge o seu limite de segurança `max_iterations`.
 
-Pelo caminho, o runtime emite eventos de ciclo de vida para que qualquer
-superfície possa mostrar o progresso em tempo real: fragmentos de texto em
-streaming (`assistant_delta`), um turno completo do assistente (`assistant`),
-cada chamada de ferramenta (`tool_call`), cada resultado de ferramenta
-(`tool_result`), a resposta final (`done`) e os erros (`error`). As superfícies
-com streaming mostram os tokens à medida que chegam.
+Pelo caminho, o Pepe anuncia cada passo, para que qualquer superfície possa
+mostrar o progresso em tempo real: a resposta à medida que chega em streaming
+(`assistant_delta`), cada chamada de ferramenta e o seu resultado (`tool_call`,
+`tool_result`), a resposta final (`done`) e os erros (`error`).
 
-Ferramentas arriscadas (qualquer uma que corra um comando ou escreva um ficheiro)
-podem passar por uma barreira de permissão que pede ao utilizador para aprovar antes
-de a ferramenta correr. Se o utilizador recusar, o runtime emite um evento
-`tool_denied` e entrega ao modelo uma breve mensagem de "negado" em vez de correr
-a ferramenta, de modo que um agente nunca atua em silêncio na tua máquina sem o
-teu consentimento.
+As ferramentas arriscadas (qualquer uma que corra um comando ou escreva um
+ficheiro) podem ser configuradas para te pedir autorização primeiro. Se
+recusares, a ferramenta nunca corre: o modelo recebe apenas uma breve nota de
+"negado" (e é emitido um evento `tool_denied`), de modo que um agente nunca atua
+em silêncio na tua máquina sem o teu consentimento.
 
 <div class="note"><strong>Ferramentas incorporadas.</strong> Cada agente pode receber ferramentas como <code>bash</code>, <code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>list_dir</code>, <code>fetch_url</code> e <code>web_search</code>. Escolhes quais é que cada agente recebe ao criá-lo, por isso um bot de apoio e um agente de programação podem ter poderes muito diferentes.</div>
 
@@ -220,10 +216,11 @@ em vez de tentar de novo sem propósito.
 ### Sem base de dados
 
 Toda a configuração (ligações de modelo, agentes, canais, agendamentos) vive num
-único ficheiro JSON em `~/.pepe/config.json`. Não há nada para aprovisionar nem
-nada para migrar. Os segredos são escritos como referências `${ENV_VAR}` e
-expandidos apenas na leitura, por isso as tuas chaves nunca são escritas de volta
-no disco em texto simples.
+único ficheiro JSON em `~/.pepe/config.json`, fácil de ler, editar e guardar como
+cópia de segurança. Não há nada para instalar ao lado do Pepe nem nada para
+migrar. Os segredos são escritos como referências `${ENV_VAR}` e expandidos
+apenas na leitura, por isso as tuas chaves nunca são escritas de volta no disco
+em texto simples.
 
 ```json
 {
@@ -239,10 +236,9 @@ no disco em texto simples.
 
 ### Conversas isoladas
 
-Cada conversa corre como o seu próprio processo leve e supervisionado,
-identificado por um id de sessão. Muitas correm lado a lado, e uma falha numa
-nunca toca noutra, por isso um único turno defeituoso não consegue deitar abaixo o
-resto dos teus agentes.
+Cada conversa corre separada de todas as outras. Se uma correr mal, as restantes
+nem dão por isso: um único turno defeituoso não consegue deitar abaixo os teus
+outros agentes nem as tuas outras conversas.
 
 ### Multi-tenant quando precisas
 

@@ -3,18 +3,18 @@ title: Navegador
 description: Um agente consegue controlar um navegador real sem interface para páginas que precisam de JavaScript, login, ou passar por um fluxo com cliques.
 ---
 
-`fetch_url` é um GET simples por HTTP: não consegue rodar JavaScript, fazer login, nem clicar em nada. A ferramenta `browser` é para as páginas que precisam disso - um Chrome real, sem interface, controlado página por página, que persiste entre chamadas dentro da mesma conversa até você fechar.
+`fetch_url` é um GET simples por HTTP: não consegue rodar JavaScript, fazer login, nem clicar em nada. A ferramenta `browser` é para as páginas que precisam disso: um Chrome real, sem interface, controlado página por página, que persiste entre chamadas dentro da mesma conversa até você fechar.
 
 Cada conversa tem sua própria sessão de navegador, que começa na primeira chamada a `open` e se fecha sozinha depois de dez minutos parada, se nada a encerrar antes disso. Os cookies e a página atual continuam de uma chamada pra outra, então um login, um formulário de várias etapas, ou uma página que só revela conteúdo depois de um clique funcionam do jeito que funcionariam numa aba de verdade.
 
 ## O que ela faz
 
-- **`open`** - navega até uma URL (inicia o navegador da sessão se nenhum estiver rodando ainda). Devolve o título da página, seu texto visível, e uma lista numerada dos elementos em que dá pra agir.
-- **`snapshot`** - descreve de novo a página atual, no mesmo formato de `open`, sem navegar - útil depois que um script na página muda algo sem um carregamento completo.
-- **`click`** - clica no elemento numerado `ref` do último `open`/`snapshot`.
-- **`type`** - digita texto no elemento numerado `ref`.
-- **`press`** - pressiona uma tecla (por exemplo, "Enter"), opcionalmente focando um elemento antes.
-- **`close`** - encerra a sessão e libera o navegador.
+- **`open`**: navega até uma URL (inicia o navegador da sessão se nenhum estiver rodando ainda). Devolve o título da página, seu texto visível, e uma lista numerada dos elementos em que dá pra agir.
+- **`snapshot`**: descreve de novo a página atual, no mesmo formato de `open`, sem navegar. Útil depois que um script na página muda algo sem um carregamento completo.
+- **`click`**: clica no elemento numerado `ref` do último `open`/`snapshot`.
+- **`type`**: digita texto no elemento numerado `ref`.
+- **`press`**: pressiona uma tecla (por exemplo, "Enter"), opcionalmente focando um elemento antes.
+- **`close`**: encerra a sessão e libera o navegador.
 
 ```
 Você: Entra na página de status e me diz se algo está fora do ar.
@@ -31,17 +31,17 @@ Os elementos são identificados por número, não por um seletor CSS que você t
 
 ## Postura de segurança
 
-Um navegador sob controle de um agente alcança a mesma rede que a aplicação, então `browser` segue a mesma regra do `fetch_url`: só `http`/`https`, e nunca um endereço interno ou privado (loopback, RFC1918, link-local, metadados de nuvem). Essa checagem não para na URL que você passa pro `open` - um link para o qual a própria página aponta, um redirecionamento por JavaScript, o envio de um formulário, ou as próprias requisições em segundo plano da página são todos checados do mesmo jeito, e barrados antes mesmo de o Chrome chegar a enviá-los, não só o endereço que você digitou. E como um navegador de verdade é uma superfície bem maior que uma ferramenta só de leitura (os scripts da própria página rodam, uma sessão logada pode ficar exposta, ele usa CPU e memória de verdade), `browser` não é sempre-segura: toda chamada passa pelo mesmo aviso de permissão do `bash`.
+Um navegador sob controle de um agente alcança a mesma rede que a aplicação, então `browser` segue a mesma regra do `fetch_url`: só `http`/`https`, e nunca um endereço interno ou privado (loopback, RFC1918, link-local, metadados de nuvem). Essa checagem não para na URL que você passa pro `open`: um link para o qual a própria página aponta, um redirecionamento por JavaScript, o envio de um formulário, ou as próprias requisições em segundo plano da página são todos checados do mesmo jeito, e barrados antes mesmo de o Chrome chegar a enviá-los, não só o endereço que você digitou. E como um navegador de verdade é uma superfície bem maior que uma ferramenta só de leitura (os scripts da própria página rodam, uma sessão logada pode ficar exposta, ele usa CPU e memória de verdade), `browser` não é sempre-segura: toda chamada passa pelo mesmo aviso de permissão do `bash`.
 
 ## Como ele consegue um navegador
 
 `browser` precisa de um binário real de Chrome/Chromium/Edge/Brave pra controlar. Ele procura nesta ordem:
 
-1. `PEPE_CHROME_BINARY`, se você definir - um caminho explícito ganha de tudo o resto.
-2. O que já estiver instalado - checado no `PATH` e nos locais normais de instalação de cada sistema (`/Applications` no macOS, `Program Files` e a pasta de instalação por usuário no Windows), então um navegador que você já tem é usado do jeito que está, em container ou não.
+1. `PEPE_CHROME_BINARY`, se você definir: um caminho explícito ganha de tudo o resto.
+2. O que já estiver instalado, checado no `PATH` e nos locais normais de instalação de cada sistema (`/Applications` no macOS, `Program Files` e a pasta de instalação por usuário no Windows), então um navegador que você já tem é usado do jeito que está, em container ou não.
 3. **Um download automático, uma única vez**, se nenhum dos dois anteriores achar nada: um build pequeno e sem interface do `chrome-headless-shell`, vindo direto do feed oficial Chrome for Testing do Google, guardado em cache em `~/.cache/pepe/browser/` pra isso só acontecer uma vez por máquina. Desliga com `PEPE_BROWSER_AUTO_DOWNLOAD=0` se preferir instalar um você mesmo e ver um erro claro em vez disso.
 
-A imagem padrão não inclui o pacote do navegador em si (a mesma lógica que mantém o ffmpeg de fora - ver o Dockerfile), mas inclui as bibliotecas compartilhadas que um navegador baixado precisa pra arrancar, nas duas arquiteturas que a imagem oficial publica (`amd64` e `arm64`), já que `browser` é uma ferramenta nativa, não um extra opcional. Então o passo 3 é o que roda por padrão no Docker, e funciona direto: sem build arg, sem instalação manual, em qualquer uma das duas arquiteturas - incluindo um Mac com Apple Silicon ou um host ARM na nuvem, não só `amd64`. Se preferir embutir um navegador completo na imagem em vez de baixar em tempo de execução:
+A imagem padrão não inclui o pacote do navegador em si (a mesma lógica que mantém o ffmpeg de fora; ver o Dockerfile), mas inclui as bibliotecas compartilhadas que um navegador baixado precisa pra arrancar, nas duas arquiteturas que a imagem oficial publica (`amd64` e `arm64`), já que `browser` é uma ferramenta nativa, não um extra opcional. Então o passo 3 é o que roda por padrão no Docker, e funciona direto: sem build arg, sem instalação manual, em qualquer uma das duas arquiteturas, incluindo um Mac com Apple Silicon ou um host ARM na nuvem, não só `amd64`. Se preferir embutir um navegador completo na imagem em vez de baixar em tempo de execução:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
@@ -49,14 +49,14 @@ docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 
 ## Fora do Docker no Linux
 
-Um navegador baixado precisa de bibliotecas compartilhadas que o sistema base já tem que fornecer - fora do Docker isso não é garantido do jeito que é na imagem oficial: uma distro desktop normalmente já tem elas (outros apps com interface gráfica dependem das mesmas bibliotecas), mas um servidor mínimo ou headless pode não ter. Se o `browser` baixar com sucesso mas falhar ao arrancar, rode:
+Um navegador baixado precisa de bibliotecas compartilhadas que o sistema base já tem que fornecer, e fora do Docker isso não é garantido do jeito que é na imagem oficial: uma distro desktop normalmente já tem elas (outros apps com interface gráfica dependem das mesmas bibliotecas), mas um servidor mínimo ou headless pode não ter. Se o `browser` baixar com sucesso mas falhar ao arrancar, rode:
 
 ```
 mix pepe browser install
 ```
 
-Ele detecta seu gerenciador de pacotes (`apt`/`dnf`/`yum`/`pacman`/`apk`/`zypper`) e instala um navegador completo através dele, pedindo sua senha de `sudo` se precisar - você já pediu exatamente isso ao rodar o comando. Depois de instalado, o `browser` acha ele direto no `PATH` e para de baixar qualquer coisa.
+Ele detecta seu gerenciador de pacotes (`apt`/`dnf`/`yum`/`pacman`/`apk`/`zypper`) e instala um navegador completo através dele, pedindo sua senha de `sudo` se precisar; você já pediu exatamente isso ao rodar o comando. Depois de instalado, o `browser` acha ele direto no `PATH` e para de baixar qualquer coisa.
 
 ## Linux em ARM
 
-O Google não publica um build de Chrome for Testing pra Linux em ARM, então ali o passo 3 usa o próprio CDN do Playwright em vez disso (um download HTTPS normal, igual o Chrome for Testing - sem npm nem Node.js envolvido) - a única diferença é que baixa o Chromium completo em vez do build menor sem interface, já que esse CDN não oferece um build sem interface como artefato próprio. De qualquer forma, isso é automático: um host ARM não precisa de nenhuma configuração especial, nem no Docker nem fora dele.
+O Google não publica um build de Chrome for Testing pra Linux em ARM, então ali o passo 3 usa o próprio CDN do Playwright em vez disso (um download HTTPS normal, igual o Chrome for Testing, sem npm nem Node.js envolvido). A única diferença é que baixa o Chromium completo em vez do build menor sem interface, já que esse CDN não oferece um build sem interface como artefato próprio. De qualquer forma, isso é automático: um host ARM não precisa de nenhuma configuração especial, nem no Docker nem fora dele.

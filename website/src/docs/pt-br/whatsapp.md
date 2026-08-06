@@ -1,28 +1,28 @@
 ---
 title: WhatsApp
-description: Conecte webhooks da WhatsApp Cloud API a agentes do Pepe.
+description: Coloque um agente do Pepe atrás do seu número de WhatsApp, usando a Cloud API da Meta.
 ---
 
 ## WhatsApp
 
-O WhatsApp usa a Cloud API da Meta. Diferente do Telegram, que o Pepe consulta
-por polling, o WhatsApp **empurra** as mensagens de entrada para um webhook,
-então cada conexão ganha sua própria URL na rota de entrada genérica do Pepe:
+O WhatsApp usa a Cloud API da Meta. Diferente do Telegram, em que o próprio
+Pepe busca as mensagens, o WhatsApp **entrega** cada mensagem recebida em um
+endereço no seu servidor, então o Pepe precisa estar acessível pela internet.
+Cada conexão ganha sua própria URL na rota de entrada do Pepe:
 
 ```
 /webhooks/:project/:provider/:slug        ex.:  /webhooks/acme/whatsapp/support
 ```
 
-Essa rota é uma superfície de webhook genérica, apoiada em um registro de
-provedores, e não um encanamento específico do WhatsApp. O segmento `:project` é
-`default` quando você não cria projetos adicionais. Um `GET` nessa URL responde ao handshake de
-verificação da Meta. Um `POST` é uma mensagem de entrada: o `X-Hub-Signature-256`
-dela é verificado contra o app secret, o agente vinculado roda e a resposta volta
-pela Graph API. O `pepe serve` serve essa rota, então não há nenhum processo
-extra para rodar.
+O segmento `:project` é `default` quando você não cria projetos adicionais. O
+próprio Pepe responde ao handshake de verificação da Meta nessa URL, e cada
+mensagem recebida tem a assinatura `X-Hub-Signature-256` conferida contra o app
+secret antes de o agente rodar, então uma requisição forjada nunca chega ao
+agente. A resposta volta pela Graph API. O `pepe serve` serve essa rota, então
+não há nenhum processo extra para rodar.
 
 Você pode manter quantas conexões quiser, cada uma vinculada ao seu próprio
-agente. É o equivalente por webhook dos vários bots do Telegram.
+agente. É a mesma ideia de rodar vários bots do Telegram.
 
 O WhatsApp tem uma linha de comando dedicada por ser o canal por webhook mais
 comum. Adicione uma conexão:

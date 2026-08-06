@@ -1,11 +1,11 @@
 ---
 title: Board
-description: Cartões de tarefa duráveis, com dependências, para passar trabalho entre agentes e humanos.
+description: Uma lista de trabalho partilhada entre agentes e pessoas. Os cartões esperam a sua vez, respeitam dependências e sobrevivem a um reinício em vez de se perderem.
 ---
 
 ## O que é
 
-Um board é uma fila durável e retomável de itens de trabalho: **não** é um pipeline de vendas/CRM. Um cartão é um item de trabalho, não um contacto ou um lead. Enquanto uma tarefa agendada dispara o mesmo prompt num relógio recorrente, um cartão de board é um trabalho pontual que passa por um pipeline de estados, pode depender de outros cartões terminarem primeiro, e sobrevive a uma falha ou a um reinício em vez de simplesmente se perder.
+Um board é uma lista de trabalho partilhada entre agentes e pessoas: pões lá trabalho como cartões, e cada cartão é apanhado, trabalhado e concluído. É uma fila durável e retomável de itens de trabalho, **não** um pipeline de vendas/CRM: um cartão é um item de trabalho, não um contacto ou um lead. Enquanto uma tarefa agendada dispara o mesmo prompt num relógio recorrente, um cartão de board é um trabalho pontual que passa por um pipeline de estados, pode depender de outros cartões terminarem primeiro, e sobrevive a uma falha ou a um reinício em vez de simplesmente se perder.
 
 ```
 todo → ready → running → done | blocked → archived
@@ -85,4 +85,4 @@ Qualquer cartão específico pode substituir a definição do próprio board: fo
 
 `claim_timeout_s` é a rede de segurança para uma execução despachada que fica calada: se uma reivindicação sobrevive para lá dele, o cartão é bloqueado com "claim timed out" em vez de ficar reivindicado para sempre. O mesmo acontece se a sessão despachada terminar (normalmente ou a falhar) sem nunca chamar `complete` ou `block`: isso é tratado como uma violação de protocolo, não é repetido em silêncio.
 
-Para um trabalho que genuinamente demora mais do que `claim_timeout_s`, chama `board heartbeat` periodicamente (ou `pepe board card heartbeat ID` de fora da sessão) - reinicia o relógio de expiração sem mudar o estado, para o cartão não ser bloqueado por inatividade enquanto ainda está a ser trabalhado de verdade. É um sinal de atividade, não um registo de progresso - usa `comment` para as atualizações que queiras deixar no histórico.
+Para um trabalho que genuinamente demora mais do que `claim_timeout_s`, chama `board heartbeat` periodicamente (ou `pepe board card heartbeat ID` de fora da sessão). Isso reinicia o relógio de expiração sem mudar o estado, para o cartão não ser bloqueado por inatividade enquanto ainda está a ser trabalhado de verdade. É um sinal de atividade, não um registo de progresso: usa `comment` para as atualizações que queiras deixar no histórico.

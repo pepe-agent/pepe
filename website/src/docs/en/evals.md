@@ -1,16 +1,17 @@
 ---
 title: Evals
-description: Replay known prompts through an agent and assert on the reply and the tools it used.
+description: Replay prompts that once went well and check the agent still answers and uses its tools the same way.
 ---
 
-An **eval** replays a known prompt through an agent and asserts on the reply and
-on the tools the agent used. It is your regression net for behavior: change a
+An **eval** replays a known prompt through an agent and checks the reply and
+the tools the agent used. It is your safety net for behavior: change a
 prompt, a model, or a toolset, run the evals, and see immediately whether
 anything you cared about broke.
 
-This matters because agents are non-deterministic, so an exact-string test is
-useless. An eval asserts the things that actually matter. Did it call the right
-tool? Did it mention the answer? Did it avoid claiming it has no access?
+This matters because an agent never answers with the exact same words twice, so
+a test that expects an exact string is useless. An eval checks the things that
+actually matter. Did it call the right tool? Did it mention the answer? Did it
+avoid claiming it has no access?
 
 ## Your traces are the test data you already have
 

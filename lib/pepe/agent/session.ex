@@ -889,6 +889,12 @@ defmodule Pepe.Agent.Session do
   # ephemeral session also drops its persisted history.
   def handle_info(:ttl_expire, state), do: {:stop, :normal, maybe_clear(state)}
 
+  # Defense in depth, not a documented protocol: this process's mailbox must never crash
+  # a live conversation over a message it doesn't recognize - a stray send from anywhere
+  # (a misbehaving plugin process, a leftover monitor ref from a prior run) drops here
+  # instead of taking the Session, and everything it's holding, down with it.
+  def handle_info(_unrecognized, state), do: {:noreply, state}
+
   # An agent ended its own conversation - mark it so `:run_done` clears the context
   # once the current reply is delivered.
   @impl true
@@ -1247,6 +1253,13 @@ defmodule Pepe.Agent.Session do
                 other
             end
           rescue
+            # A closed stdin mid-run (the TUI's `authorize`/`ask_user` callback reading a
+            # permission prompt or an `ask_user` tool call from inside THIS task, not the
+            # CLI's own process) must not be swallowed into a generic error message here -
+            # the caller (Pepe.Gateways.TUI.say/2) re-raises it in its own process instead,
+            # where the CLI entry points' `rescue Pepe.TUI.EOFError` clause is actually
+            # watching, so the documented "stdin closed" message and exit code still apply.
+            _e in Pepe.TUI.EOFError -> {:error, :eof}
             e -> {:error, Exception.message(e)}
           catch
             kind, reason -> {:error, "run #{kind}: #{inspect(reason)}"}

@@ -225,8 +225,12 @@ mix pepe mcp add NAME --url URL --header "K: V"        # remote MCP server (HTTP
 mix pepe mcp list|tools NAME|remove NAME               # inspect and manage (see MCP)
 mix pepe mcp login|logout NAME                         # OAuth sign-in for a remote server
 mix pepe plugin list|install|scan|remove # user plugins: tools & channels (see Plugins)
+mix pepe plugin route list|enable NAME|disable NAME  # a plugin's own HTTP route (Pepe.PluginRoute)
 mix pepe skill list|search|install|update|remove|audit|tap  # skill marketplace (see Skills)
 mix pepe db add|list|remove              # external Postgres connections for db_query (see Database)
+mix pepe slot list|set|clear             # which plugin (if any) owns an exclusive extension point (see Slots)
+mix pepe policy list                     # every installed Pepe.Permissions.Policy plugin and its current scope
+mix pepe policy scope NAME --agents a,b [--projects x,y] | --clear   # limit which agents/projects NAME applies to
 mix pepe hooks list                      # available privacy hooks (see Privacy hooks)
 mix pepe hooks generate "redact CPFs" [--model NAME] [--save]   # AI-write a redaction hook
 ```

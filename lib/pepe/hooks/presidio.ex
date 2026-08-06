@@ -12,6 +12,9 @@ defmodule Pepe.Hooks.Presidio do
   @behaviour Pepe.Hooks.Hook
 
   @impl true
+  def name, do: "presidio"
+
+  @impl true
   def stages, do: [:inbound, :tool_result]
 
   @impl true

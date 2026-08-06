@@ -1,12 +1,13 @@
 ---
 title: Microsoft Teams
-description: Connect a Microsoft Teams bot to a Pepe agent over the Bot Framework.
+description: Put a Pepe agent in Microsoft Teams so your team can chat with it there.
 ---
 
 ## Microsoft Teams
 
-Teams uses the Bot Framework. Configure it through the guided setup (or the
-dashboard):
+Connecting Teams lets your team chat with the agent where they already work.
+Teams talks to bots through Microsoft's Bot Framework; configure the
+connection through the guided setup (or the dashboard):
 
 ```bash
 pepe setup
@@ -29,10 +30,11 @@ https://YOUR_HOST/webhooks/default/msteams/<slug>
 
 ### Inbound authentication
 
-Each inbound request carries an `Authorization: Bearer` Bot Framework token, and
-Pepe validates it (signature against Microsoft's published keys, issuer, and an
-audience equal to the bot's `app_id`) before the agent sees anything. So the
-endpoint accepts `POST`s straight from Microsoft — no validating proxy required.
+Pepe checks that every incoming request really comes from Microsoft before the
+agent sees anything: each request carries an `Authorization: Bearer` Bot
+Framework token, and Pepe validates it (signature against Microsoft's published
+keys, issuer, and an audience equal to the bot's `app_id`). So the endpoint
+accepts `POST`s straight from Microsoft, with no validating proxy required.
 If your proxy already performs that check, set `trust_proxy: true` on the
 connection to skip Pepe's.
 
@@ -42,8 +44,9 @@ generic route works under the hood.
 
 ### Switching models
 
-`/model` and `/models` only fire on an `admin`-mode connection with
-`commands` enabled; on `support`, they are plain text. `/models` lists the
+The `/model` and `/models` commands let people check or change which AI model
+answers them. They work only on an `admin`-mode connection with `commands`
+enabled; on `support`, they are treated as plain text. `/models` lists the
 models available to this connection's project; `/model` shows the current
 one, or changes it:
 
@@ -53,7 +56,8 @@ one, or changes it:
 /model openrouter global        # switch for everyone this connection talks to
 ```
 
-Anyone in an allowed conversation may switch their own session; switching it
-**globally** is reserved for **trainers**, the same allowlist that gates
-memory. Set `model_switch_locked: true` on the connection to turn
-model-switching off entirely for non-trainers.
+Anyone in an allowed conversation may switch the model for their own
+conversation. Switching it **globally**, for everyone this connection talks
+to, is reserved for **trainers**, the same trusted list that controls memory.
+Set `model_switch_locked: true` on the connection to turn model-switching off
+entirely for non-trainers.

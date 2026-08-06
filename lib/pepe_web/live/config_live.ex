@@ -42,7 +42,7 @@ defmodule PepeWeb.ConfigLive do
         <.view_header
           icon="⚙️"
           title={gettext("Configuration file")}
-          desc={gettext("The raw config.json the runtime reads. Edit and save; it's validated as JSON first, so a broken file is refused. Secrets stay as ${ENV_VAR} references, resolved at read time (never stored raw).")}
+          desc={gettext("The raw config.json the runtime reads. Saving validates the JSON first and refuses a broken file. Write secrets as ${ENV_VAR} references: Pepe resolves them at read time and never stores the raw value.")}
         >
           <form phx-change="set_locale" class="flex items-center gap-2">
             <label for="locale" class="text-sm text-zinc-400">{gettext("Language")}</label>
@@ -103,7 +103,7 @@ defmodule PepeWeb.ConfigLive do
               <form phx-submit="media_audio_save" class="space-y-3">
                 <div class="text-sm font-medium text-zinc-200">{gettext("Voice-note transcription")}</div>
                 <p class={hlp()}>
-                  {gettext("Unset, a connection already known to transcribe (OpenAI, Groq) is used automatically.")}
+                  {gettext("Leave unset and Pepe automatically uses a connection already known to transcribe (OpenAI, Groq).")}
                 </p>
                 <div>
                   <label class={lbl()} for="audio_model">{gettext("Model connection")}</label>
@@ -148,7 +148,7 @@ defmodule PepeWeb.ConfigLive do
 
           <.form_section :if={@journal != []} title={gettext("Recent changes")}>
             <p class={hlp()}>
-              {gettext("Who touched config.json, when, and which top-level sections changed - never the values. \"external\" means the file changed since this process's own last write: a hand-edit, a second `mix pepe` process, or a restore from a .bak file.")}
+              {gettext("Who touched config.json, when, and which top-level sections changed. It never records the values. \"external\" marks a change made since this process's own last write: a hand-edit, a second Pepe process, or a restore from a .bak file.")}
             </p>
             <div class="space-y-1.5 text-sm">
               <div :for={entry <- @journal} class="flex items-center gap-2 border-b border-zinc-800/60 py-1.5 last:border-0">

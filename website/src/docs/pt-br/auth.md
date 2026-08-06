@@ -157,7 +157,7 @@ Um token carrega um escopo que decide quais agentes ele pode alcançar. Do mais 
 
 ### Permissões de token
 
-O escopo diz *de quem* são os dados que o token alcança. Um conjunto separado de permissões diz *o que ele pode fazer* com eles, e os padrões deixam todo token que você já criou exatamente como estava: ele **pode** rodar agentes e **não pode** ler consumo.
+O escopo diz *de quem* são os dados que o token alcança. Um conjunto separado de permissões diz *o que ele pode fazer* com eles. Os padrões deixam todo token que você já criou exatamente como estava: ele **pode** rodar agentes e **não pode** ler consumo.
 
 | Flag | Padrão | O que libera |
 | --- | --- | --- |

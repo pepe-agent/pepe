@@ -33,16 +33,16 @@ defmodule Pepe.Tools.Bash do
 
     case Pepe.Sandbox.guard(command) do
       {:block, why} -> {:error, "refused: #{why}"}
-      :ok -> run_guarded(command, cwd, timeout)
+      :ok -> run_guarded(command, cwd, timeout, ctx[:agent])
     end
   end
 
   def run(_, _), do: {:error, "missing 'command'"}
 
-  defp run_guarded(command, cwd, timeout) do
+  defp run_guarded(command, cwd, timeout, agent) do
     task =
       Task.async(fn ->
-        Pepe.Sandbox.cmd("sh", ["-c", command], cd: cwd, stderr_to_stdout: true)
+        Pepe.Sandbox.cmd("sh", ["-c", command], [cd: cwd, stderr_to_stdout: true], agent)
       end)
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do

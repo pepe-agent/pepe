@@ -3,10 +3,25 @@ title: Plugins
 description: Extend Pepe with your own tools and channels by installing plugins with their own settings.
 ---
 
-A plugin adds a **tool** the model can call, or a **channel provider** (a new
-messaging platform), or both: Elixir compiled at runtime from
-`~/.pepe/plugins/`, no rebuild. These are the only two shapes a plugin can take
-today; a module is matched against whichever shape it implements.
+A plugin is a file you install to teach Pepe something new, with no rebuild and no
+restart: drop it in and it works. Most plugins do one of two things: add a **tool**
+the model can call, or add a **channel provider** (a new webhook-based messaging
+platform). This page covers those two shapes in depth, the most common by far, plus
+shorter looks at the rest below.
+
+A plugin can also take other shapes: a **persistent-connection channel** (one that
+needs a long-lived websocket, not just a webhook, see [Slots](/docs/slots)), an
+**HTTP route of its own** (an OAuth callback, a custom endpoint, see below), a
+**realtime audio provider** (duplex voice, see below), a **model protocol adapter**,
+a **hook** (rewrites conversation content for real, chained and inline, see below),
+a **policy** (vetoes a tool call, or a whole run, before it happens; a check that
+couldn't run counts as a refusal, so it fails closed), or a **run observer** (watches
+the loop from outside, read-only, the one shape that can't affect anything). A plugin
+can also occupy a [**slot**](/docs/slots): memory search, web search, the sandbox a
+shell command runs in, conversation compaction, or the entire reasoning loop.
+
+Under the hood, every plugin is Elixir compiled at runtime from `~/.pepe/plugins/`,
+and a module is matched against whichever shape(s) it implements.
 
 ## The Tool behaviour
 
@@ -95,6 +110,302 @@ registry.
 | `respond/3` | no | A **synchronous** HTTP reply to the raw `POST`, for protocols that need one before any agent work (Slack's URL-verification challenge, Discord's `PING`). `{:reply, status, content_type, body}` or `:cont` to fall through to `parse/1`. |
 | `deliver_file/4` | no | Sends a file as an attachment. Omit it and `send_file` just reports the channel can't receive files. |
 | `addressed?/2` | no | Does this payload address the bot, so it should get a reply? Lets a provider honor `require_mention` in group chats (default when omitted: always addressed). |
+| `deliver_blocks/3` | no | Renders structured content (see [Presentation blocks](#presentation-blocks) below) into the platform's own native UI. Omit it and the `send_presentation` tool still delivers, flattened to plain text through `deliver/3` instead. |
+
+### Presentation blocks
+
+A tool can send richer content than plain text (a table, a row of buttons) via the
+`send_presentation` tool and the shared `Pepe.Presentation` block schema:
+
+```
+%{"type" => "text", "text" => "..."}
+%{"type" => "table", "headers" => [...], "rows" => [[...], ...]}
+%{"type" => "buttons", "buttons" => [%{"label" => "...", "value" => "..."}]}
+```
+
+Slack renders these as real Block Kit today (a `section` per text/table block, an
+`actions` block of real buttons). A provider that hasn't added `deliver_blocks/3` yet
+still gets the content: `Pepe.Presentation.to_text/1` flattens it to readable plain text,
+sent through the provider's ordinary `deliver/3`. So a tool that sends blocks works on
+every channel immediately, richly only where a provider has bothered to render them.
+
+## The PluginRoute behaviour - a plugin's own HTTP route
+
+`Pepe.Webhooks.Provider`'s inbound event contract is fixed - one shape, for chat
+platforms. `Pepe.PluginRoute` is for anything that needs its own: an OAuth redirect
+callback that must land on Pepe's own public domain, a custom REST/RPC endpoint.
+
+```elixir
+@callback route_prefix() :: String.t()
+@callback call(conn :: Plug.Conn.t(), path :: [String.t()]) :: Plug.Conn.t()
+```
+
+`call/2` gets the raw `Plug.Conn` (already past the endpoint's own body-parsing) and
+the path segments after your own prefix - full control, the same as any hand-written
+Plug, since Pepe can't anticipate every shape a plugin's own protocol needs. A crashing
+`call/2` answers `500`, never takes the request process (or anything else) down with it.
+
+**Building one, step by step:**
+
+1. Write a module implementing `route_prefix/0` and `call/2`:
+
+   ```elixir
+   defmodule MyPlugin.OAuthCallback do
+     @behaviour Pepe.PluginRoute
+
+     @impl true
+     def route_prefix, do: "weather_oauth"
+
+     @impl true
+     def call(conn, _path) do
+       # handle the provider's redirect, exchange the code, etc.
+       Plug.Conn.send_resp(conn, 200, "connected")
+     end
+   end
+   ```
+
+2. Save it as `~/.pepe/plugins/weather_oauth.exs` and install it:
+   `pepe plugin install ~/.pepe/plugins/weather_oauth.exs`.
+3. **Enable the route explicitly** - claiming a prefix in code exposes nothing on its
+   own, a **second, deliberate** opt-in is required, because a route (unlike a tool)
+   answers any inbound request, not one the agent's own model decided to make:
+
+   ```bash
+   pepe plugin route list                 # every installed route-claiming plugin, enabled or not
+   pepe plugin route enable weather_oauth # now reachable at /plugin-routes/weather_oauth/...
+   pepe plugin route disable weather_oauth
+   ```
+
+4. Point whatever needs to reach it (an OAuth app's redirect URL, a webhook sender) at
+   `https://your-domain/plugin-routes/weather_oauth/...` - the path segments after the
+   prefix arrive in `call/2`'s second argument.
+
+## The Realtime provider behaviour - duplex audio
+
+None of Pepe's other extension points hold a continuous, two-way stream - a tool call,
+a webhook, a slot occupant are all request/response or one-shot. `Pepe.Realtime.Provider`
+is that primitive: a plugin owns everything about how inbound audio becomes an outbound
+reply (a hosted realtime model, a streaming-STT-then-TTS pipeline), and a new WebSocket
+channel carries the bytes.
+
+```elixir
+@callback name() :: String.t()
+@callback start(agent :: map(), opts :: keyword(), sink :: pid()) :: {:ok, session :: term()} | {:error, term()}
+@callback push_audio(session :: term(), chunk :: binary()) :: :ok | {:error, term()}
+@callback push_text(session :: term(), text :: String.t()) :: :ok | {:error, term()}   # optional
+@callback stop(session :: term()) :: :ok
+```
+
+A client joins `realtime:<agent_name>` (`realtime:default` for the default agent) with
+`{"provider": "your_provider_name"}` in the join payload, then pushes binary chunks on
+the `"audio"` event. `start/3`'s `sink` is the pid to send events back to for as long as
+the session lives: `{:realtime_audio, chunk}`, `{:realtime_text, text}`, or
+`{:realtime_stopped, reason}` if the provider ends the session on its own. Additive, not
+a slot - several providers can be installed, and a client picks one by name per
+connection; nothing needs enabling globally the way a `Pepe.PluginRoute` does. Pepe ships
+no realtime provider itself - this is the extension point a plugin fills in.
+
+**Building one, step by step:**
+
+1. Write a module implementing `name/0`, `start/3`, `push_audio/2`, `stop/1`, and
+   optionally `push_text/2`. The example below is an echo provider - it sends back
+   whatever audio it receives, plus a caption for each chunk. Good enough to develop
+   a client against before a real STT/TTS or hosted-model backend exists:
+
+   ```elixir
+   defmodule EchoRealtime do
+     @behaviour Pepe.Realtime.Provider
+
+     @impl true
+     def name, do: "echo_realtime"
+
+     @impl true
+     def start(agent, _opts, sink) do
+       send(sink, {:realtime_text, "session started for #{agent.name}"})
+       {:ok, sink}
+     end
+
+     @impl true
+     def push_audio(sink, chunk) do
+       send(sink, {:realtime_text, "echoing #{byte_size(chunk)} bytes"})
+       send(sink, {:realtime_audio, chunk})
+       :ok
+     end
+
+     @impl true
+     def push_text(sink, text) do
+       send(sink, {:realtime_text, "echo: " <> text})
+       :ok
+     end
+
+     @impl true
+     def stop(_sink), do: :ok
+   end
+   ```
+
+   `start/3`'s own `sink` argument doubles as the session term here, since this
+   provider has no real connection/process of its own to track - a provider talking to
+   an actual upstream (a hosted model, a local STT/TTS pipeline) would return something
+   that identifies *that*, and use `sink` only for sending events back.
+
+2. Save it as `~/.pepe/plugins/echo_realtime.exs` and install it:
+   `pepe plugin install ~/.pepe/plugins/echo_realtime.exs`. Nothing else to enable - a
+   realtime provider has no slot to pin and no route to turn on; it's live the moment
+   it's installed, waiting for a client to ask for it by name.
+3. From a client, join `realtime:<agent_name>` on the existing WebSocket
+   (`/socket/websocket`) naming it in the payload:
+
+   ```js
+   let ws = new WebSocket("ws://localhost:4000/socket/websocket");
+   ws.onmessage = (e) => console.log(JSON.parse(e.data));
+   ws.onopen = () => {
+     ws.send(JSON.stringify({
+       topic: "realtime:default", event: "phx_join",
+       payload: { provider: "echo_realtime" }, ref: 1
+     }));
+   };
+   ```
+
+4. Push binary chunks on the `"audio"` event once joined; `{:realtime_audio, ...}`/
+   `{:realtime_text, ...}` events come back the same way any other channel push does.
+
+## The Hook behaviour - real content mutation
+
+A hook actually rewrites conversation content, inline, on the same synchronous path
+`pii_redact`/`llm_redact`/`http_redact`/`presidio` already run on. This is how a
+context-compaction or content-redaction plugin does real work - not to be confused with
+a run observer (below), which can only watch.
+
+```elixir
+@callback name() :: String.t()
+@callback stages() :: [:inbound | :outbound | :learn | :tool_result]
+@callback run(stage, text :: String.t(), settings :: map(), ctx :: map()) ::
+            {:ok, String.t()} | {:ok, String.t(), [%{"fake" => String.t(), "real" => String.t()}]}
+```
+
+`:inbound` runs on the user's text before the model sees it; `:outbound` on the reply
+before it's sent back; `:tool_result` on a tool's raw output before it joins the
+conversation. An agent opts into hooks by name (`mix pepe agent add NAME --hooks
+your_hook,pii_redact`) - a plugin hook is additive alongside the four built-ins, and a
+built-in always wins a name clash, so pick a name distinct from `pii_redact`/`llm_redact`/
+`http_redact`/`presidio`.
+
+Hooks chain: with `--hooks bracket,exclaim`, `exclaim` sees `bracket`'s already-mutated
+text, in order - sequential, each one seeing the previous one's output, not a fan-out.
+Return the (possibly unchanged) text, and optionally a list of reversible-map entries
+(`fake` a token, `real` the value it replaced) if you want them restored on the way back out.
+
+**Fail-open, on purpose**: a hook that raises falls back to the input text rather than
+breaking the turn. A hook mutates or redacts - it never blocks. To veto a call outright,
+see `Pepe.Permissions.Policy` below, a deliberately different, narrower mechanism.
+
+## The Policy behaviour - vetoing a tool call
+
+A policy plugin can refuse a tool call before it runs, for a reason only your plugin
+knows (a company rule, an external allowlist service, a rate limiter).
+
+```elixir
+@callback name() :: String.t()
+@callback check(tool_name :: String.t(), args :: map(), ctx :: map()) ::
+            :allow | :ask | {:ask, String.t()} | :deny | {:deny, String.t()}
+```
+
+Every installed policy is consulted on **every** gate call, for every agent it applies
+to - not opt-in like a hook, since installing one only ever adds restriction. It's
+checked before Pepe's own pre-approval logic, so a policy can veto even a call the
+operator already marked `:always`-approved. Short of an outright refusal,
+`:ask`/`{:ask, reason}` forces a human to look at a call that would otherwise have been
+silently pre-approved - the reason shows up alongside the prompt. Most restrictive wins
+across every installed policy: `:deny` beats `:ask` beats `:allow`.
+
+"Applies to" can still be narrowed - by the operator, never by the agent itself, which
+would defeat the point:
+
+```bash
+pepe policy list                                      # every installed policy + its scope
+pepe policy scope no_bash_policy --agents support --projects acme
+pepe policy scope no_bash_policy --clear              # back to applying everywhere
+```
+
+or directly in `config.json` (`"policy_scope"`, by policy name). No entry for a policy's
+name means unscoped - every agent, the default and the original behavior. An agent can
+never opt itself out; only whoever configures the scope decides where a given policy is
+even consulted.
+
+**Fail-closed - the one deliberate exception in this whole plugin system.** Every other
+plugin surface in Pepe degrades to "as if it weren't installed" on a crash or timeout.
+A policy plugin is the opposite: a `check/3` that raises, hangs past its timeout, or
+returns anything other than an explicit `:allow` **denies the call**. A security check
+that couldn't run is not the same thing as one that passed.
+
+```elixir
+defmodule MyPlugin.NoBashPolicy do
+  @behaviour Pepe.Permissions.Policy
+
+  @impl true
+  def name, do: "no_bash_policy"
+
+  @impl true
+  def check("bash", _args, _ctx), do: {:deny, "bash is blocked on this instance"}
+  def check(_name, _args, _ctx), do: :allow
+end
+```
+
+Add an optional `check_run/3` to veto a whole run, before any tool call and before the
+first model call - the only way to say "don't process this message at all" (a banned
+sender, a message-level rate limit), since `check/3` never fires for a turn that never
+calls a tool:
+
+```elixir
+@callback check_run(agent :: map(), first_message :: String.t(), ctx :: map()) ::
+            :allow | :ask | {:ask, String.t()} | :deny | {:deny, String.t()}
+```
+
+## The RunObserver behaviour
+
+A run observer watches an agent's turn from outside - useful for logging, metrics, or
+alerting on what an agent does, without touching what it does. It is strictly
+observation-only: it never sees the conversation's message history, can't block a turn,
+and can't change anything about it, only find out what already happened, after the fact.
+
+```elixir
+@callback name() :: String.t()
+@callback subscriptions() :: [atom()]
+@callback handle_event(event :: atom(), payload :: term(), meta :: map()) :: any()
+```
+
+`subscriptions/0` names which event types you want - any of `:run_start`, `:tool_call`,
+`:tool_denied`, `:tool_result`, `:assistant`, `:assistant_delta`, `:failover`,
+`:output_cap`, `:usage`, `:inline`, `:done`, `:error`, `:run_end`. `handle_event/3` is
+called once per event you subscribed to, in the order the turn produced them. `payload`
+is the event tuple itself (e.g. `{:tool_result, "web_search", "..."}`) - with one
+exception: `:tool_call` arrives as `{:tool_call, name}`, without its arguments, since
+those haven't been through redaction yet and can carry secrets.
+
+A minimal example that logs every tool call and the final answer:
+
+```elixir
+defmodule MyPlugin.ToolLogger do
+  @behaviour Pepe.Agent.RunObserver
+  require Logger
+
+  @impl true
+  def name, do: "tool_logger"
+
+  @impl true
+  def subscriptions, do: [:tool_call, :done]
+
+  @impl true
+  def handle_event(:tool_call, {:tool_call, name}, _meta), do: Logger.info("tool called: #{name}")
+  def handle_event(:done, {:done, content}, _meta), do: Logger.info("run finished: #{String.slice(content, 0, 80)}")
+end
+```
+
+Dispatch is asynchronous and isolated: a hung or crashing observer never slows down or
+breaks the conversation it's watching. One that fails 3 times in a row is disabled -
+across every future run, not just the one that tripped it - so a broken observer never
+keeps paying its own detection cost forever, and never spams your logs with the same
+failure. There's nothing to grant an agent for this one - installed is enabled.
 
 ## The registry
 
@@ -133,8 +444,8 @@ first):
 ## Where plugins live and how they load
 
 Plugins live under `~/.pepe/plugins/` (follows `PEPE_HOME`). Pepe scans that
-folder recursively for `.exs` files, compiles each once, and recompiles only
-when its mtime changes. Drop a file in, it works with no restart; edit it,
+folder recursively for `.exs` files, compiles each once, and recompiles a file
+only when it changes on disk. Drop a file in, it works with no restart; edit it,
 the change lands on the next tool call. One file can define several modules
 (the Google example below ships four).
 
@@ -185,12 +496,13 @@ terminal if you still want it.
 ## The security scan
 
 A plugin is ordinary Elixir with full access to the running app; installing
-one is a trust decision, like adding any dependency. Install only from a source
-you trust, and prefer pinning a specific version or commit.
+one is a trust decision, the same as installing any other software on your
+machine. Install only from a source you trust, and prefer pinning a specific
+version or commit.
 
-Before it's placed on disk, `Pepe.Skills.Sentinel` statically scans it. It
-walks the **parse tree** rather than the raw text, so it flags dangerous calls
-precisely:
+Before it's placed on disk, `Pepe.Skills.Sentinel` scans the code. It reads
+the **structure** of the code (its parse tree), not just the raw text, so it
+flags dangerous calls precisely:
 
 - shelling out (`System.cmd`, `:os.cmd`),
 - dynamic eval (`Code.eval_string`),
@@ -200,10 +512,10 @@ precisely:
 - reading the environment or secret paths (`~/.ssh`, the Pepe config),
 - network access.
 
-Because it reads the AST, it catches the aliased and Erlang forms of those
-calls too, and it does not trip over the same words when they appear in a
-comment or a string. It never executes the code, and returns one of three
-verdicts:
+Because it reads the structure rather than the words, it catches the aliased
+and Erlang forms of those calls too, and it does not trip over the same words
+when they appear in a comment or a string. It never executes the code, and
+returns one of three verdicts:
 
 - **clean**: no findings.
 - **caution**: flagged but often legitimate (a channel plugin *should* make

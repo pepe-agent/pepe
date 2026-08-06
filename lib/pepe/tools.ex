@@ -44,6 +44,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ScanSkill
   alias Pepe.Tools.ScheduleTask
   alias Pepe.Tools.SendFile
+  alias Pepe.Tools.SendPresentation
   alias Pepe.Tools.SendToAgent
   alias Pepe.Tools.SessionSearch
   alias Pepe.Tools.SetRoute
@@ -69,6 +70,7 @@ defmodule Pepe.Tools do
     WebSearch,
     DbQuery,
     SendFile,
+    SendPresentation,
     Invoice,
     EndSession,
     Goal,
@@ -108,11 +110,26 @@ defmodule Pepe.Tools do
 
   @doc "Map of name => module. Built-ins take precedence over plugins on a clash."
   def by_name do
-    Map.new(plugins() ++ @builtin, fn mod -> {mod.name(), mod} end)
+    plugin_pairs =
+      Enum.flat_map(plugins(), fn mod ->
+        case Pepe.Plugins.safe_call(mod, :name, []) do
+          {:ok, name} when is_binary(name) -> [{name, mod}]
+          _ -> []
+        end
+      end)
+
+    Map.new(plugin_pairs ++ Enum.map(@builtin, &{&1.name(), &1}))
   end
 
-  @doc "List the names of all available tools."
-  def names, do: Enum.map(all(), & &1.name())
+  @doc "List the names of all available tools. Feeds Pepe.Config.Agent's own tools default, so a plugin whose name/0 raises is skipped rather than breaking agent config for everyone."
+  def names do
+    Enum.flat_map(all(), fn mod ->
+      case Pepe.Plugins.safe_call(mod, :name, []) do
+        {:ok, name} when is_binary(name) -> [name]
+        _ -> []
+      end
+    end)
+  end
 
   @doc "Look up a tool module by name."
   def get(name), do: Map.get(by_name(), name)

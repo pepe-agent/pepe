@@ -1,6 +1,6 @@
 ---
 title: Configuração
-description: Entenda onde o Pepe guarda configuração, segredos e estado de execução.
+description: Onde o Pepe guarda a sua configuração, como as suas chaves ficam fora dos arquivos e como fazer backup de tudo com um comando.
 ---
 
 ## Onde sua configuração vive
@@ -82,7 +82,7 @@ A compactação deliberadamente não usa o modelo utilitário. Um resumo mal esc
 
 ## Os segredos ficam como referências
 
-A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não há banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe as interpola contra o ambiente no momento da leitura e nunca persiste o valor expandido.
+A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não há banco de dados. Para manter as credenciais fora desse arquivo, escreva-as como referências `${ENV_VAR}`. O Pepe preenche o valor real a partir do ambiente no momento em que lê o arquivo, e o valor em si nunca é escrito em disco.
 
 ```json
 {
@@ -97,7 +97,7 @@ A configuração fica em um arquivo JSON simples em `~/.pepe/config.json`. Não 
 }
 ```
 
-Em tempo de execução a chave real é lida do ambiente. Em disco o arquivo só contém o marcador. O mesmo mecanismo funciona para os tokens de gateway, os ajustes de plugins e a senha do painel, então você pode versionar ou compartilhar uma configuração sem vazar nada. Exporte as variáveis antes de servir:
+Enquanto o Pepe roda, a chave real vem do ambiente. Em disco o arquivo só contém o marcador. O mesmo mecanismo funciona para os tokens de gateway, os ajustes de plugins e a senha do painel, então você pode versionar ou compartilhar uma configuração sem vazar nada. Exporte as variáveis antes de servir:
 
 ```bash
 export OPENROUTER_API_KEY=sk-...

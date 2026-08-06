@@ -121,4 +121,46 @@ defmodule Pepe.Tools.ManagePluginTest do
     assert {:error, msg} = ManagePlugin.run(%{"action" => "remove"}, ctx())
     assert msg =~ "name"
   end
+
+  describe "route_list - a plugin's own HTTP route (Pepe.PluginRoute), read-only" do
+    setup %{src_dir: _} = ctx do
+      home = System.get_env("PEPE_HOME")
+      File.mkdir_p!(Path.join(home, "plugins"))
+
+      File.write!(Path.join([home, "plugins", "webby.exs"]), """
+      defmodule ManagePluginTest.Webby do
+        @behaviour Pepe.PluginRoute
+        def route_prefix, do: "webby"
+        def call(conn, _path), do: Plug.Conn.send_resp(conn, 200, "ok")
+      end
+      """)
+
+      ctx
+    end
+
+    test "route_list reports a claimed-but-not-enabled route" do
+      assert {:ok, listing} = ManagePlugin.run(%{"action" => "route_list"}, ctx())
+      assert listing =~ "webby - claimed but not enabled"
+    end
+
+    test "route_list still reports \"not enabled\" after the operator enables it via config directly - the tool never flips this itself" do
+      Pepe.Config.enable_http_route_plugin("webby")
+
+      assert {:ok, listing} = ManagePlugin.run(%{"action" => "route_list"}, ctx())
+      assert listing =~ "webby - enabled"
+    end
+
+    # There is no route_enable/route_disable action here on purpose: enabling a plugin's
+    # HTTP route is an operator-only decision (mix pepe plugin route enable) - unlike
+    # every other action here, a route answers ANY inbound request, not one this agent's
+    # own model decided to make, and a grant already sitting on this tool (auto_approve,
+    # a stale ":always" from approving an install) must never silently also cover that.
+    test "route_enable/route_disable are not actions this tool exposes" do
+      assert {:error, msg} = ManagePlugin.run(%{"action" => "route_enable", "name" => "webby"}, ctx())
+      assert msg =~ "unknown action"
+
+      assert {:error, msg} = ManagePlugin.run(%{"action" => "route_disable", "name" => "webby"}, ctx())
+      assert msg =~ "unknown action"
+    end
+  end
 end

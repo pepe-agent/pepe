@@ -15,10 +15,11 @@ one-line summary are listed in the agent's context. When the topic comes up, the
 agent calls the `skill` tool with that name, reads the whole document, and
 follows it.
 
-That indirection is the entire point. An agent can carry dozens of procedures
-while paying only a line of context for each, and it opens the long version
-exactly when the work calls for it. The summary is simply the first non-empty
-line of the file, so that opening line should say when the skill applies.
+That is what keeps skills cheap. An agent can know dozens of procedures
+without them weighing the conversation down, because each one costs a single
+line until the moment the work actually calls for it. The summary is simply the
+first non-empty line of the file, so that opening line should say when the
+skill applies.
 
 <div class="note"><strong>The skill tool.</strong> An agent needs the <code>skill</code> tool in its tool list to read skills. Without it the skills are listed in its context but never opened.</div>
 
@@ -26,13 +27,13 @@ line of the file, so that opening line should say when the skill applies.
 
 These ship with Pepe, under `priv/skills/`:
 
-- **`skill-creator`** - how to create, edit, audit and improve skills (the meta-skill).
-- **`install-tool`** - write a plugin tool and enable it from chat.
-- **`write-a-script`** - solve complex tasks by writing and saving a program to run.
-- **`manage-routing`** - change agent-to-agent routes with `set_route`.
-- **`handle-media`** - understand a voice, audio, image or file input (transcribe, read), installing whatever it needs.
-- **`install-skill`** - install a skill from a URL, a gist, a repo, or another Pepe.
-- **`create-watch`** - set up a durable "check X and notify me when it happens" watch.
+- **`skill-creator`**: how to create, edit, audit and improve skills (the meta-skill).
+- **`install-tool`**: write a plugin tool and enable it from chat.
+- **`write-a-script`**: solve complex tasks by writing and saving a program to run.
+- **`manage-routing`**: change agent-to-agent routes with `set_route`.
+- **`handle-media`**: understand a voice, audio, image or file input (transcribe, read), installing whatever it needs.
+- **`install-skill`**: install a skill from a URL, a gist, a repo, or another Pepe.
+- **`create-watch`**: set up a durable "check X and notify me when it happens" watch.
 
 ## Writing your own
 
@@ -85,21 +86,21 @@ pepe skill tap add https://github.com/your-team/pepe-skills   # add a registry b
 
 Every install goes through the same static security scan `install-skill` uses; a dangerous
 verdict is refused unless you pass `--force`. Trust is `"official"` only for the bundled,
-in-repo registry (curated by Pepe's own maintainers, empty by default today - there is no
+in-repo registry (curated by Pepe's own maintainers, empty by default today: there is no
 hosted registry yet, only the mechanism). Anything resolved through a tap you added, or
 installed with `--source`, is `"community"`: when an agent reads it with the `skill` tool,
 its content is wrapped in the same untrusted-content marker a fetched web page carries, until
 you've reviewed it yourself.
 
-`update` is pinned to the exact source a skill was installed from - if a tap's registry later
+`update` is pinned to the exact source a skill was installed from. If a tap's registry later
 points that name at a *different* source, `update` refuses rather than silently following it.
 A same-named skill from elsewhere can only replace an installed one via an explicit
 `install --force`, never a routine update.
 
 ## Skills, plugins and scripts
 
-The three extension points compose, and together they are what lets an agent be
-asked in plain language to do something it cannot do yet.
+Skills, plugins and scripts work together, and that combination is what lets
+you ask an agent in plain language for something it cannot do yet.
 
 Combined with [plugins](../plugins/) and `enable_tool`, an agent can be told in
 chat to install a tool that does X. It reads the `install-tool` skill, writes

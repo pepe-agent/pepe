@@ -24,14 +24,14 @@ Every tool call passes through a gate before it runs. Read-only tools run freely
 
 The tools that never ask are the read-only ones: `read_file`, `list_dir`, `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill`, and `send_to_agent`. Anything not on that list, including any drop-in plugin tool, is treated as risky and requires approval. That is a deliberately safe default: an unknown tool is assumed to be dangerous.
 
-`bash` and `run_script` get one more free pass, narrower than that list: a call that trips none of the risk hints below (no delete, no network, no sudo, no inline code, no write) runs without asking too, **but only when there is a person actually on the other end to have been asked**. A plain `ls`, `cat`, `git status`, or `pytest` no longer interrupts you; a command the risk classifier recognizes as touching the network, deleting something, or writing a file still stops and asks, same as always - it is a text heuristic, not a full shell parser, so treat it the same way as the rest of this section: a real help against everyday commands, not a boundary. On a surface with nobody to ask (the HTTP API, a webhook, a cron, a `delegate` worker), that free pass does not apply - only what is in `auto_approve` runs there.
+`bash` and `run_script` get one more free pass, narrower than that list: a call that trips none of the risk hints below (no delete, no network, no sudo, no inline code, no write) runs without asking too, **but only when there is a person actually on the other end to have been asked**. A plain `ls`, `cat`, `git status`, or `pytest` no longer interrupts you; a command the risk classifier recognizes as touching the network, deleting something, or writing a file still stops and asks, same as always. It is a text heuristic, not a full shell parser, so treat it the same way as the rest of this section: a real help against everyday commands, not a boundary. On a surface with nobody to ask (the HTTP API, a webhook, a cron, a `delegate` worker), that free pass does not apply: only what is in `auto_approve` runs there.
 
 For `run_script`, that free pass only applies when the script's own language is `bash`/`sh`. The risk hints are written to read shell syntax, so a Python, Node, or Ruby one-liner that deletes files or opens a socket would otherwise look risk-free to the classifier and slip through unasked; every other language always goes through the normal gate instead.
 
 When a risky tool has not been pre-approved, the runtime asks the person on the other end. Each surface renders that prompt in its own native way (inline buttons in a chat channel, an arrow-key menu in the CLI), but the decision is always one of five:
 
 - `once`: allow just this call, ask again next time.
-- `this_run`: allow for the rest of *this run* only - see [Content from a stranger withdraws pre-approval](#content-from-a-stranger-withdraws-pre-approval) below for when this option actually shows up.
+- `this_run`: allow for the rest of *this run* only. See [Content from a stranger withdraws pre-approval](#content-from-a-stranger-withdraws-pre-approval) below for when this option actually shows up.
 - `session`: allow for the rest of this conversation. Kept in memory, forgotten when you start a new session or restart. Other sessions still ask.
 - `always`: allow from now on. Persisted on the agent in `config.json`.
 - `deny`: refuse. Never remembered, so the same call is asked again later.
@@ -106,7 +106,7 @@ A document sent into a chat, a page a `fetch_url` brought back, a `web_search` r
 
 So once a run has taken in content from outside, `auto_approve` stops applying to it for the rest of the run. The agent keeps every capability it had; what it loses is the silent path. A tool that would have run unasked now asks, and the person sees the actual command before it happens. On a surface with nobody to ask, the two rules meet and the answer is no: an injected document cannot run anything at all.
 
-While a run is tainted, `session` and `always` themselves stop taking effect immediately too - approving a call mid-run used to look like it worked and then silently do nothing until the *next* run. `this_run` is the answer that actually works in the moment: "this call, and ones shaped just like it, for the rest of the run I'm looking at right now" - a decision made by a person looking at the real tainted content in front of them, not a stale grant being applied after the fact to something new. It only ever exists while that same run is still tainted, and disappears the instant the run ends.
+While a run is tainted, `session` and `always` themselves stop taking effect immediately too: approving a call mid-run used to look like it worked and then silently do nothing until the *next* run. `this_run` is the answer that actually works in the moment: "this call, and ones shaped just like it, for the rest of the run I'm looking at right now". That is a decision made by a person looking at the real tainted content in front of them, not a stale grant being applied after the fact to something new. It only ever exists while that same run is still tainted, and disappears the instant the run ends.
 
 This is a real boundary rather than a plea in the prompt. It is deliberately not the whole answer, because content taken in on one turn stays in the conversation and a later turn still carries it. What it closes is the exploit that needs no human: a client attaching a booby-trapped PDF to a support bot, and the bot quietly running a command it was pre-approved for.
 
@@ -172,6 +172,8 @@ If you would rather point at your own wrapper, set the path directly in `config.
 Any executable works as long as it runs its arguments (`program arg1 arg2 ...`) isolated and honors `PEPE_SANDBOX_CWD`. Setup only warns, and never auto-installs, if the underlying tool (docker, firejail, sandbox-exec) is missing from your `PATH`.
 
 <div class="note"><strong>There is no zero-config, cross-platform true sandbox.</strong> Every real one needs an operating system feature or an external tool. That is why the sandbox is opt-in and the always-on defaults are the gate plus the guardrails. When agents run unattended or auto-approve tools, treat the sandbox as required, not optional.</div>
+
+A wrapper script is one static path, configured once, for the whole installation. For something a wrapper can't do (run a command on a remote host over SSH, drive a container runtime from real code instead of shell, pick a different backend per agent), a plugin can take over execution entirely by occupying the `sandbox` [slot](/docs/slots), the same exclusive-extension-point mechanism `memory` and `web_search` already use. See [Plugins](/docs/plugins) for the callback shape.
 
 ## Secrets stay as references
 
@@ -240,7 +242,7 @@ An agent granted the read-only `config_get` and `doctor` tools can report on you
 
 The `doctor` tool health-checks the whole setup and flags unset `${ENV}` secrets, agents pointing at missing models, invalid schedules, and unreachable connections. Pass `live: true` to also probe the network.
 
-<div class="note"><strong>Security-sensitive settings are not editable by the general config tool.</strong> The guarded `config_set` tool is fail-closed: it only touches a short allowlist (the default model and agent, language, timezone, a couple of Telegram flags, and `secrets.expose_env` — the list of env-var *names* the agent's shell keeps past the scrub, so it can open a vault it holds a token for). Secret *values*, tool allowlists, bot tokens, the sandbox wrapper, and the dashboard password are deliberately off that list, so `config_set` cannot change them. You set those yourself with the CLI or the dashboard. API tokens are the one thing an agent can mint by chat, but only through the separate, permission-gated `manage_token` tool, never through `config_set`.</div>
+<div class="note"><strong>Security-sensitive settings are not editable by the general config tool.</strong> The guarded `config_set` tool refuses anything not on a short allowlist (it is fail-closed). The list: the default model and agent, language, timezone, a couple of Telegram flags, and `secrets.expose_env`, the list of env-var *names* the agent's shell keeps past the scrub, so it can open a vault it holds a token for. Secret *values*, tool allowlists, bot tokens, the sandbox wrapper, and the dashboard password are deliberately off that list, so `config_set` cannot change them. You set those yourself with the CLI or the dashboard. API tokens are the one thing an agent can mint by chat, but only through the separate, permission-gated `manage_token` tool, never through `config_set`.</div>
 
 ## Redaction hooks (opt-in PII scrubbing)
 
@@ -292,17 +294,41 @@ The dashboard is open on localhost by default, which is convenient for local dev
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Bound to a public interface with no password, the dashboard fails closed and blocks remote clients until you set one. Full details live on the [Dashboard](../dashboard/) page: the `Host` allowlist and trusted-proxies settings for serving it behind a domain, and running it as a persistent service.
+Reachable from beyond your machine with no password set, the dashboard blocks every remote client until you set one: only the machine itself can open it, and a VM, a proxy or your office network count as outside (it fails closed rather than open). Full details live on the [Dashboard](../dashboard/) page: the `Host` allowlist and trusted-proxies settings for serving it behind a domain, and running it as a persistent service.
 
 ## API tokens
 
-With no token, the HTTP API answers only loopback (localhost) callers, so a local setup stays simple while a network-exposed server is never anonymous. Creating the first token flips it to closed for everyone: from then on every request to `/v1`, local or remote, needs an `Authorization: Bearer` header carrying a valid token. Mint one with:
+With no token, the HTTP API answers only calls made from the machine itself (localhost, or loopback), so a local setup stays simple while a network-exposed server is never anonymous. Creating the first token flips it to closed for everyone: from then on every request to `/v1`, local or remote, needs an `Authorization: Bearer` header carrying a valid token. Mint one with:
 
 ```bash
 pepe token add --label "ci pipeline"
 ```
 
 The raw token is shown once and only its SHA-256 hash is stored, never the token itself. A token can be scoped: `--project` limits it to one tenant's agents, and `--agent` limits it to a single agent (which must live inside that project). Manage them with `pepe token list` and `pepe token revoke ID`, from the dashboard's API tokens page, or by chat with an agent that has the guarded `manage_token` tool. For request shapes and SDK usage, see the [HTTP API page](../api/).
+
+## A plugin's own HTTP route
+
+A plugin can claim its own route (`/plugin-routes/:plugin/*path`, see
+[Plugins](/docs/plugins)) for things a webhook's fixed contract can't carry, like an
+OAuth callback. Know what enabling one means: anyone who can reach the server can call
+that route, because unlike the API tokens above, Pepe puts no authentication of its own
+in front of it. The plugin gets the raw request and is responsible for whatever
+verification its own protocol needs (an OAuth `state` parameter, a signed callback URL).
+And unlike a tool, a route answers *any* inbound request the moment it's live, not one
+the agent's own model decided to make. Claiming a route prefix in code exposes
+nothing on its own; `pepe plugin route enable NAME` is a second, explicit step the
+operator takes deliberately, separate from installing the plugin itself.
+
+There is also deliberately no timeout on a route's own `call/2`. Every other plugin call
+site is bounded and isolated by Pepe in a supervised `Task`; a route instead is
+expected to own its own request lifecycle (streaming a response, holding a long-poll
+open), which a generic deadline would break. Combined with no authentication, this means
+a route plugin with a bug (not even a malicious one: a stalled outbound HTTP call with
+no timeout of its own, a `GenServer.call` to something that's gone) can hold a connection
+open indefinitely, and an unauthenticated caller can open as many as they like. Enable a
+route only for a plugin whose own `call/2` you trust to handle that responsibly, and put
+it behind a reverse proxy with its own request timeout if it's reachable from the open
+internet.
 
 ## Multi-tenant scoping
 

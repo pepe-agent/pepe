@@ -12,6 +12,7 @@ defmodule Pepe.Gateways.Supervisor do
   use Supervisor
 
   alias Pepe.Config
+  alias Pepe.Gateways.PluginSupervisor
   alias Pepe.Gateways.Telegram
 
   def start_link(init_arg) do
@@ -39,13 +40,21 @@ defmodule Pepe.Gateways.Supervisor do
   # Kept for callers of the old name.
   def restart_telegram, do: reload_telegram()
 
+  @doc "Reconcile running plugin channels (`Pepe.Gateways.Channel`) with the current config - see `PluginSupervisor.reload_plugins/0`."
+  def reload_plugins, do: PluginSupervisor.reload_plugins()
+
   @impl true
   def init(_init_arg) do
+    # Default restart intensity (3 / 5s). PluginSupervisor exhausting its own 5-restarts/60s
+    # budget never counts against this one: it's registered `:transient` below, and a
+    # supervisor that gives up on its own restart intensity exits with reason `:shutdown` -
+    # which `:transient` does not restart, so nothing is added to this counter for that case.
+    # See PluginSupervisor's moduledoc for the rest of the isolation story.
     Supervisor.init(children(), strategy: :one_for_one)
   end
 
   defp children do
-    if enabled?(), do: telegram_specs(), else: []
+    if enabled?(), do: telegram_specs() ++ [Supervisor.child_spec(PluginSupervisor, restart: :transient)], else: []
   end
 
   # One supervised poller per active bot, each tagged with a unique id so several

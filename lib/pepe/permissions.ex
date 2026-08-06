@@ -80,6 +80,7 @@ defmodule Pepe.Permissions do
 
   alias Pepe.Config
   alias Pepe.Permissions.Grant
+  alias Pepe.Permissions.Policy
   alias Pepe.Permissions.Risk
   alias Pepe.Permissions.SessionStore
 
@@ -109,28 +110,137 @@ defmodule Pepe.Permissions do
   Decide whether `name` may run for this call. Returns `:allow`, `:deny`, or
   `{:deny, reason}` when the human attached a reason - asking the user via
   `ctx.authorize` when needed and remembering the grant.
+
+  A `Pepe.Permissions.Policy` plugin is consulted first, and can either veto a call this
+  gate would otherwise have allowed (even an `:always`-approved one - "most restrictive
+  wins", never the other way), or force it to ask a human even when it would have been
+  silently pre-approved - a policy doesn't have to be certain enough to outright block,
+  it can say "a person should look at this one". A
+  `{:deny, _}` is unconditional and never folds into the `cond` below - a hard veto must
+  never be bypassable by any grant, including the agent's own pre-existing
+  `auto_approve`.
+
+  `:ask` needs its own memory, separate from the tool's ordinary grant: it must still
+  force the question the FIRST time even when the tool is already covered by a
+  pre-existing `auto_approve` (that's the point of `:ask`), but once a human has
+  actually answered that specific question with `:always`/`:session`/`:this_run`,
+  re-asking forever for the same shape of call would make that answer meaningless. So a
+  policy-forced ask is remembered under its own namespaced grant key
+  (`"policy_ask__" <> tool`, never the bare tool name) - a human's answer to *this*
+  question never silently widens the tool's own ordinary grant, and the tool's own
+  ordinary grant never silently satisfies *this* question either. The wildcard
+  (`auto_approve: ["*"]`) is deliberately excluded from satisfying a policy's own
+  question too: "every tool, every risk" predates any policy the operator installs
+  later, and letting it silently answer a policy's question would mean the policy never
+  actually gets to ask at all, the one thing `:ask` exists to guarantee.
+
+  If the underlying call would ALSO have needed asking on its own (no ordinary grant of
+  its own either), a human's answer here is recorded a second time under the tool's own
+  ordinary key too - otherwise the very next identical call asks *again*, just for a
+  different, un-narrated reason (the tool's own grant, not the policy's), which reads to
+  a human as the exact same "I said always and it asked again" bug. This only happens
+  when the tool call had no coverage at all; a call the policy escalated on top of an
+  *already*-covered call is left alone, so answering the policy's question never quietly
+  widens a grant nobody asked to widen. See `Pepe.Permissions.Policy`.
   """
   @spec gate(String.t(), term(), map()) :: :allow | :deny | {:deny, String.t()}
   def gate(name, args, ctx) do
+    case Policy.veto(name, args, ctx) do
+      {:deny, _} = deny ->
+        deny
+
+      {:ask, reason} ->
+        gate_after_policy(name, args, Map.put(ctx, :policy_reason, reason))
+
+      :allow ->
+        gate_after_policy(name, args, ctx)
+    end
+  end
+
+  defp gate_after_policy(name, args, ctx) do
     decoded = decode(args)
     risks = Risk.hints(name, decoded)
+    # NOT a `:` separator - Pepe.Permissions.Grant.parse/1 itself splits a grant string on
+    # the FIRST `:` (`tool:risks`), so a synthetic key containing one would parse back with
+    # the wrong tool name and silently never match (caught by a test asking twice instead of
+    # once - this comment is the fix, not a guess).
+    policy_grant = "policy_ask__" <> name
 
+    # A policy wants a human to look at this - checked first, but stands aside once a human
+    # has already answered *this specific question*, whether that answer was persisted
+    # (`:always`/`:session`) or is scoped to this still-tainted run (`:this_run`) - never
+    # satisfied by the tool's own ordinary grant or its wildcard (see the moduledoc).
+    if ctx[:policy_reason] && not policy_answered?(policy_grant, risks, ctx) do
+      ask_forced_by_policy(name, args, decoded, risks, ctx, policy_grant)
+    else
+      gate_without_policy(name, args, decoded, risks, ctx)
+    end
+  end
+
+  defp ask_forced_by_policy(name, args, decoded, risks, ctx, policy_grant) do
+    also = unless would_allow_without_policy?(name, decoded, risks, ctx), do: name
+    ask(name, args, risks, ctx |> Map.put(:grant_key, policy_grant) |> Map.put(:also_grant, also))
+  end
+
+  defp gate_without_policy(name, args, decoded, risks, ctx) do
     cond do
       # Always-safe, but only while it carries no risk. `read_file`/`list_dir` are free inside
       # the workspace; the moment one reaches an absolute or `..` path it picks up a risk hint
       # and stops short-circuiting here, falling through to the taint check and the gate.
-      not requires_approval?(name) and risks == [] -> :allow
+      not requires_approval?(name) and risks == [] ->
+        :allow
+
       # Checked BEFORE the interactive free pass below: tainted content is exactly what turns a
       # risk-free-looking command into a problem (the moduledoc's own example is a bare `env`
       # asked for by a poisoned document), so a tainted run still asks even for these - except
       # for a grant the human handed out *during this same tainted run* (`:this_run`, see the
       # moduledoc), which is the one kind of pre-approval taint does not need to suspend.
-      tainted?(ctx) -> if run_scoped?(name, risks), do: :allow, else: ask(name, args, risks, ctx)
-      interactive_and_risk_free?(name, decoded, risks, ctx) -> :allow
-      preapproved?(name, risks, ctx) -> :allow
-      true -> ask(name, args, risks, ctx)
+      tainted?(ctx) ->
+        if run_scoped?(name, risks), do: :allow, else: ask(name, args, risks, ctx)
+
+      interactive_and_risk_free?(name, decoded, risks, ctx) ->
+        :allow
+
+      preapproved?(name, risks, ctx) ->
+        :allow
+
+      true ->
+        ask(name, args, risks, ctx)
     end
   end
+
+  # Would the ordinary (non-policy) gate logic have let this through without asking? Used only
+  # to decide whether a policy-forced ask's answer also needs to cover the tool's own grant
+  # (see the moduledoc) - deliberately mirrors gate_after_policy/3's own cond, minus the policy
+  # branch itself, rather than calling back into it (which would re-consult the policy and
+  # recurse).
+  defp would_allow_without_policy?(name, decoded, risks, ctx) do
+    (not requires_approval?(name) and risks == []) or
+      (tainted?(ctx) and run_scoped?(name, risks)) or
+      (not tainted?(ctx) and interactive_and_risk_free?(name, decoded, risks, ctx)) or
+      preapproved?(name, risks, ctx)
+  end
+
+  # Has a human already answered THIS policy's question - persisted, session-scoped, or granted
+  # for the rest of this tainted run? The wildcard is excluded from the first two on purpose
+  # (see the moduledoc): "every tool, every risk" must not silently stand in for a policy
+  # actually asking.
+  defp policy_answered?(policy_grant, risks, ctx) do
+    policy_persistent?(policy_grant, risks, ctx) or policy_session?(policy_grant, risks, ctx) or
+      run_scoped?(policy_grant, risks)
+  end
+
+  defp policy_persistent?(name, risks, %{agent: %{auto_approve: list}}) when is_list(list),
+    do: Grant.covers?(without_wildcard(list), name, risks)
+
+  defp policy_persistent?(_name, _risks, _ctx), do: false
+
+  defp policy_session?(name, risks, %{session_key: key}) when is_binary(key),
+    do: Grant.covers?(without_wildcard(SessionStore.grants(key)), name, risks)
+
+  defp policy_session?(_name, _risks, _ctx), do: false
+
+  defp without_wildcard(grants), do: Enum.reject(grants, &Grant.wildcard?/1)
 
   @run_grants :pepe_run_grants
 
@@ -214,9 +324,11 @@ defmodule Pepe.Permissions do
   def tainted?(%{tainted: tainted}) when is_boolean(tainted), do: tainted
   def tainted?(_ctx), do: Process.get(@taint) == true
 
-  defp decode(args) when is_map(args), do: args
+  @doc "Decode a tool call's raw arguments (already a map, or a JSON string) to a map."
+  @spec decode(term()) :: map()
+  def decode(args) when is_map(args), do: args
 
-  defp decode(args) do
+  def decode(args) do
     case Jason.decode(to_string(args)) do
       {:ok, map} when is_map(map) -> map
       _ -> %{}
@@ -276,9 +388,14 @@ defmodule Pepe.Permissions do
   defp ask(name, args, risks, ctx) do
     case ctx[:authorize] do
       fun when is_function(fun, 3) ->
-        fun.(name, args, ctx |> Map.put(:risks, risks) |> Map.put(:tainted, tainted?(ctx)))
-        |> remember(name, risks, ctx)
-        |> to_allow()
+        decision = fun.(name, args, ctx |> Map.put(:risks, risks) |> Map.put(:tainted, tainted?(ctx)))
+        result = remember(decision, ctx[:grant_key] || name, risks, ctx)
+        # A policy-forced ask whose underlying call had NO grant of its own (see
+        # gate_after_policy/3's `also_grant`): the human's single answer covers both
+        # questions, or the very next identical call asks again for the OTHER one - the
+        # same "I said always and it asked again" bug, just moved one level down.
+        if also = ctx[:also_grant], do: remember(decision, also, risks, ctx)
+        to_allow(result)
 
       _ ->
         # Nobody to ask. It is not pre-approved (or the run has taken in content from a

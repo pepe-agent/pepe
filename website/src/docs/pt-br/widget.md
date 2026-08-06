@@ -143,7 +143,7 @@ separadas do chat próprio do painel.
   recuperável e continua visível no painel/`manage_token list`. O que
   realmente o protege são os três pontos acima, não esconder a string.
 
-<div class="note"><strong>Dê um agente restrito.</strong> Um widget fica de
+<div class="note"><strong>Dê um agente restrito.</strong> Um widget fica
 exposto à internet pública, sem nenhum humano aprovando chamadas de
 ferramenta. Vincule-o a um agente limitado a ferramentas seguras, somente
 leitura ou voltadas ao cliente, a mesma orientação de qualquer canal voltado

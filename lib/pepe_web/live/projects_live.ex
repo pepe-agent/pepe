@@ -96,7 +96,7 @@ defmodule PepeWeb.ProjectsLive do
               </span>
               <span
                 :if={Config.project_budget(nil)}
-                title={gettext("Operational count toward the cap, not the billable total - see Usage for the real month total, unaffected by resets.")}
+                title={gettext("Spend counted toward the cap, not the billable total. See Usage for the real month total, which resets never touch.")}
                 class={[
                   "rounded px-1.5",
                   (@usage["root"].over_budget && "bg-red-800/60 text-red-200") ||
@@ -120,7 +120,7 @@ defmodule PepeWeb.ProjectsLive do
               </button>
               <span
                 :if={Config.project_message_limit(nil)}
-                title={gettext("Operational count toward the cap, not necessarily every message this month if it's been reset.")}
+                title={gettext("Messages counted toward the cap. A reset clears it, so it may not include every message this month.")}
                 class={[
                   "rounded px-1.5",
                   (@usage["root"].over_message_limit && "bg-red-800/60 text-red-200") ||
@@ -169,7 +169,7 @@ defmodule PepeWeb.ProjectsLive do
               </span>
               <span
                 :if={Config.project_budget(name)}
-                title={gettext("Operational count toward the cap, not the billable total - see Usage for the real month total, unaffected by resets.")}
+                title={gettext("Spend counted toward the cap, not the billable total. See Usage for the real month total, which resets never touch.")}
                 class={[
                   "rounded px-1.5",
                   (@usage[name].over_budget && "bg-red-800/60 text-red-200") ||
@@ -192,7 +192,7 @@ defmodule PepeWeb.ProjectsLive do
               </button>
               <span
                 :if={Config.project_message_limit(name)}
-                title={gettext("Operational count toward the cap, not necessarily every message this month if it's been reset.")}
+                title={gettext("Messages counted toward the cap. A reset clears it, so it may not include every message this month.")}
                 class={[
                   "rounded px-1.5",
                   (@usage[name].over_message_limit && "bg-red-800/60 text-red-200") ||
@@ -254,7 +254,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[markup]" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Multiplier applied to provider cost to get the amount to bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
+                  {gettext("Multiplies the provider cost into the amount you bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
                 </p>
               </div>
               <div>
@@ -272,7 +272,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[message_limit]" value={@editing.message_limit} placeholder="5000" inputmode="numeric" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Cap on customer messages for the month. When reached, this project's agents stop replying until next month (an agent can be exempted individually). Blank = no cap.")}
+                  {gettext("Monthly cap on customer messages. At the cap, this project's agents stop replying until next month; you can exempt individual agents. Blank = no cap.")}
                 </p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">

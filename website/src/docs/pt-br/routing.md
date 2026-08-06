@@ -1,6 +1,6 @@
 ---
 title: Roteamento entre agentes
-description: Deixe um agente passar trabalho para outro com a ferramenta send_to_agent, sob uma lista de rotas permitidas direcionada que diz exatamente quem pode chamar quem.
+description: Deixe um agente passar trabalho para outro com a ferramenta send_to_agent. Você decide exatamente quem pode chamar quem, um sentido de cada vez.
 ---
 
 Os agentes podem se falar através da ferramenta `send_to_agent`. Quem pode chamar quem

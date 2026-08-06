@@ -1,28 +1,28 @@
 ---
 title: WhatsApp
-description: Conecta webhooks de WhatsApp Cloud API a agentes de Pepe.
+description: Pon un agente de Pepe detrás de tu número de WhatsApp, usando la Cloud API de Meta.
 ---
 
 ## WhatsApp
 
-WhatsApp usa la Cloud API de Meta. A diferencia de Telegram, al que Pepe
-consulta, WhatsApp **empuja** los mensajes entrantes hacia un webhook, así que
-cada conexión recibe su propia URL en la ruta de entrada genérica de Pepe:
+WhatsApp usa la Cloud API de Meta. A diferencia de Telegram, donde el propio
+Pepe va a buscar los mensajes, WhatsApp **entrega** cada mensaje entrante en
+una dirección de tu servidor, así que Pepe tiene que ser accesible desde
+internet. Cada conexión recibe su propia URL en la ruta de entrada de Pepe:
 
 ```
 /webhooks/:project/:provider/:slug        p. ej.  /webhooks/acme/whatsapp/support
 ```
 
-Esa ruta es una superficie de webhook genérica, apoyada en un registro de
-proveedores, y no una tubería específica de WhatsApp. El segmento `:project` es
-`default` cuando no usas proyectos adicionales. Un `GET` en esa URL responde al handshake de
-verificación de Meta. Un `POST` es un mensaje entrante: su `X-Hub-Signature-256`
-se verifica contra el app secret, luego se ejecuta el agente vinculado y la
-respuesta vuelve por la Graph API. `pepe serve` sirve esta ruta, así que no hay
-ningún proceso extra que ejecutar.
+El segmento `:project` es `default` cuando no usas proyectos adicionales. El
+propio Pepe responde al handshake de verificación de Meta en esa URL, y cada
+mensaje entrante tiene su firma `X-Hub-Signature-256` comprobada contra el app
+secret antes de que se ejecute el agente, así que una petición falsificada
+nunca llega al agente. La respuesta vuelve por la Graph API. `pepe serve` sirve
+esta ruta, así que no hay ningún proceso extra que ejecutar.
 
 Puedes tener tantas conexiones como quieras, cada una vinculada a su propio
-agente. Es el equivalente por webhook de los varios bots de Telegram.
+agente. Es la misma idea que tener varios bots de Telegram.
 
 WhatsApp tiene una línea de comandos dedicada porque es el canal por webhook más
 común. Añade una conexión:

@@ -1,18 +1,19 @@
 ---
 title: MCP servers
-description: Connect Model Context Protocol servers so their tools become callable by your agents.
+description: Connect Model Context Protocol (MCP) servers, like GitHub or Sentry, and their ready-made tools become usable by your agents as if they were built in.
 ---
 
-Connect **MCP (Model Context Protocol)** servers, such as Sentry or GitHub, and
-their tools become callable by agents as if they were built in. Tokens go in as
-`${ENV_VAR}` references.
+**MCP (Model Context Protocol)** is a standard way for outside services to offer
+ready-made tools to AI agents, and many products publish one. Connect an MCP
+server, such as Sentry or GitHub, and its tools become callable by your agents
+as if they were built in. Tokens go in as `${ENV_VAR}` references.
 
 A server is one of two kinds:
 
-* **Remote** - a URL reached over HTTP. Nothing runs on your machine; you need the
+* **Remote**: a URL reached over HTTP. Nothing runs on your machine; you need the
   address and a credential.
-* **Local** - a command launched over stdio on demand (through `npx`, so there is
-  **nothing to install manually**), running beside Pepe.
+* **Local**: a program Pepe launches on demand and talks to directly (through
+  `npx`, so there is **nothing to install manually**), running beside Pepe.
 
 ## Adding a server
 

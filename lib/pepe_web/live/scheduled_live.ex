@@ -89,7 +89,7 @@ defmodule PepeWeb.ScheduledLive do
         <.view_header
           icon="🕒"
           title={gettext("Scheduled tasks")}
-          desc={gettext("Recurring jobs: an agent runs a fixed instruction on a schedule and reports the result. They fire while the server is running.")}
+          desc={gettext("Recurring jobs: an agent runs a fixed instruction on a schedule and reports the result. They fire only while the server is running.")}
         >
           <button :if={!@creating and !@viewing_log} phx-click="cron_new" class={btn()}>{gettext("+ New task")}</button>
           <button :if={@creating} phx-click="cron_cancel" class={btn_ghost()}>&larr; {gettext("Back to tasks")}</button>

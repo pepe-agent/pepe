@@ -14,10 +14,11 @@ Uma skill nunca é colada por inteiro no prompt do sistema. Só o nome e um resu
 de uma linha aparecem no contexto do agente. Quando o assunto surge, o agente
 chama a ferramenta `skill` com esse nome, lê o documento completo e o segue.
 
-É justamente essa indireção que importa. O agente carrega dezenas de
-procedimentos pagando apenas uma linha de contexto para cada um, e abre a versão
-longa exatamente quando o trabalho pede. O resumo é a primeira linha não vazia
-do arquivo, então essa linha de abertura deve dizer quando a skill se aplica.
+É isso que mantém as skills baratas. Um agente pode conhecer dezenas de
+procedimentos sem que eles pesem na conversa, porque cada um custa uma única
+linha até o momento em que o trabalho realmente pede por ele. O resumo é
+simplesmente a primeira linha não vazia do arquivo, então essa linha de
+abertura deve dizer quando a skill se aplica.
 
 <div class="note"><strong>A ferramenta skill.</strong> O agente precisa da ferramenta <code>skill</code> na sua lista de ferramentas para ler skills. Sem ela, as skills ficam listadas no contexto mas nunca são abertas.</div>
 
@@ -25,13 +26,13 @@ do arquivo, então essa linha de abertura deve dizer quando a skill se aplica.
 
 Estas já vêm com o Pepe, em `priv/skills/`:
 
-- **`skill-creator`** - como criar, editar, auditar e melhorar skills (a meta-skill).
-- **`install-tool`** - escrever uma ferramenta em plugin e habilitá-la pela conversa.
-- **`write-a-script`** - resolver tarefas complexas escrevendo e salvando um programa para rodar.
-- **`manage-routing`** - alterar rotas entre agentes com `set_route`.
-- **`handle-media`** - entender uma entrada de voz, áudio, imagem ou arquivo (transcrever, ler), instalando o que for preciso.
-- **`install-skill`** - instalar uma skill a partir de uma URL, um gist, um repositório ou outro Pepe.
-- **`create-watch`** - criar um watch durável do tipo "verifique X e me avise quando acontecer".
+- **`skill-creator`**: como criar, editar, auditar e melhorar skills (a meta-skill).
+- **`install-tool`**: escrever uma ferramenta em plugin e habilitá-la pela conversa.
+- **`write-a-script`**: resolver tarefas complexas escrevendo e salvando um programa para rodar.
+- **`manage-routing`**: alterar rotas entre agentes com `set_route`.
+- **`handle-media`**: entender uma entrada de voz, áudio, imagem ou arquivo (transcrever, ler), instalando o que for preciso.
+- **`install-skill`**: instalar uma skill a partir de uma URL, um gist, um repositório ou outro Pepe.
+- **`create-watch`**: criar um watch durável do tipo "verifique X e me avise quando acontecer".
 
 ## Escrevendo as suas
 
@@ -87,20 +88,20 @@ pepe skill tap add https://github.com/seu-time/pepe-skills   # adiciona um regis
 Toda instalação passa pela mesma varredura de segurança estática que `install-skill` usa; um
 veredito perigoso é recusado a menos que você passe `--force`. A confiança é `"official"` só
 para o registro embutido no próprio repositório (curado por quem mantém o Pepe, vazio por
-padrão hoje - ainda não existe um registro hospedado, só o mecanismo). Tudo o que é resolvido
+padrão hoje: ainda não existe um registro hospedado, só o mecanismo). Tudo o que é resolvido
 por um tap que você adicionou, ou instalado com `--source`, é `"community"`: quando um agente
 lê pela ferramenta `skill`, o conteúdo vem embrulhado no mesmo marcador de conteúdo não
 confiável que uma página web buscada já carrega, até você mesmo ter revisado.
 
-`update` fica fixado na fonte exata de onde a skill foi instalada - se o registro de um tap
+`update` fica fixado na fonte exata de onde a skill foi instalada. Se o registro de um tap
 depois apontar aquele nome para uma fonte *diferente*, `update` se recusa em vez de seguir em
 silêncio. Uma skill com o mesmo nome vinda de outro lugar só pode substituir uma já instalada
 por um `install --force` explícito, nunca por uma atualização de rotina.
 
 ## Skills, plugins e scripts
 
-Os três pontos de extensão se compõem, e juntos são o que permite pedir a um
-agente, em linguagem natural, algo que ele ainda não sabe fazer.
+Skills, plugins e scripts trabalham juntos, e é essa combinação que permite
+pedir a um agente, em linguagem natural, algo que ele ainda não sabe fazer.
 
 Combinado com [plugins](../plugins/) e o `enable_tool`, dá para pedir pela
 conversa que o agente instale uma ferramenta que faça X. Ele lê a skill

@@ -48,7 +48,7 @@ A maioria precisa: um token de conta de serviço, um endereço, um perfil. Nomei
 "secrets": { "vault_env": ["OP_SERVICE_ACCOUNT_TOKEN"] }
 ```
 
-O Pepe não faz ideia do que essa variável significa. Ele a passa ao seu resolvedor e nada mais do ambiente vai junto, então um resolvedor que busca um segredo não consegue ler os outros de passagem.
+O Pepe não faz ideia do que essa variável significa. Ele a passa ao comando que você configurou, e nada mais do ambiente vai junto, então um comando que busca um segredo não consegue ler os outros de passagem.
 
 ### Os custos honestos
 

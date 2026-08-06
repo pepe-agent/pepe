@@ -3263,6 +3263,79 @@ defmodule Pepe.Config do
     end)
   end
 
+  ###
+  ### slots (which plugin, if any, occupies an exclusive extension point - see Pepe.Slots)
+  ###
+
+  @doc "Every slot with a non-default occupant configured, as `%{slot_name => plugin_name}`."
+  def slots_config do
+    case load() |> Map.get("slots", %{}) do
+      m when is_map(m) -> m
+      _ -> %{}
+    end
+  end
+
+  @doc "The configured occupant name for `slot`, or nil if it's using the default."
+  def slot_occupant(slot), do: slots_config()[slot]
+
+  @doc """
+  Pin `slot` to `occupant` (a plugin name, or `"default"` to explicitly restore the
+  built-in). Refuses an unknown slot name; does NOT refuse an occupant that isn't
+  currently installed - configure-then-install, and restoring a bundle, are both valid
+  orderings, and `Pepe.Slots.occupant/1` already falls back safely either way.
+  """
+  def put_slot(slot, occupant) when is_binary(slot) and is_binary(occupant) do
+    if Pepe.Slots.known?(slot) do
+      update(fn config -> update_in(config, ["slots"], &Map.put(as_map(&1), slot, occupant)) end)
+      :ok
+    else
+      {:error, :unknown_slot}
+    end
+  end
+
+  @doc "Unpin `slot`, reverting it to the default occupant."
+  def delete_slot(slot) do
+    if Pepe.Slots.known?(slot) do
+      update(fn config -> update_in(config, ["slots"], &Map.delete(as_map(&1), slot)) end)
+      :ok
+    else
+      {:error, :unknown_slot}
+    end
+  end
+
+  # A hand-edited config.json can carry anything under "slots" - a malformed shape (a list,
+  # a string) must not crash a put/delete, same defensive stance as slots_config/0 above.
+  defp as_map(m) when is_map(m), do: m
+  defp as_map(_), do: %{}
+
+  ###
+  ### policy scope (which agents/projects a Pepe.Permissions.Policy plugin applies to - the
+  # operator's choice, never the agent's own: a policy still can't be opted out of by the
+  # agent it applies to, only scoped by whoever installs/configures it)
+  ###
+
+  @doc """
+  Global per-policy scope, as `%{policy_name => %{"agents" => [...], "projects" => [...]}}`.
+  No entry for a name means unscoped - it applies to every agent, the original (and still
+  the default) behavior.
+  """
+  def policy_scopes, do: load() |> Map.get("policy_scope", %{})
+
+  @doc "The scope for one policy by name, or nil if it's unscoped (applies everywhere)."
+  def policy_scope(name), do: policy_scopes()[name]
+
+  @doc "Replace one policy's scope - `%{\"agents\" => [...], \"projects\" => [...]}`, either key optional."
+  def put_policy_scope(name, scope) when is_binary(name) and is_map(scope) do
+    update(fn config -> update_in(config, ["policy_scope"], &Map.put(as_map(&1), name, scope)) end)
+    :ok
+  end
+
+  @doc "Remove a policy's scope entirely - it goes back to applying everywhere."
+  def delete_policy_scope(name) when is_binary(name) do
+    update(fn config -> update_in(config, ["policy_scope"], &Map.delete(as_map(&1), name)) end)
+    :ok
+  end
+
   @doc "Saved settings for a plugin (by name) as a `%{key => value}` map. Secrets may be `${ENV_VAR}` refs."
   def plugin_config(name), do: load() |> get_in(["plugins", name]) || %{}
 
@@ -3293,6 +3366,29 @@ defmodule Pepe.Config do
   end
 
   defp remove_tap(skills, url), do: Map.update(skills || %{}, "taps", [], &List.delete(&1, url))
+
+  ###
+  ### http_route_plugins (Pepe.PluginRoute - a plugin's own arbitrary HTTP route)
+  ###
+
+  @doc """
+  Plugin names explicitly enabled to receive inbound HTTP requests at
+  `/plugin-routes/:plugin/*path` (see `Pepe.PluginRoute`). Empty by default: a plugin
+  file claiming a route prefix does not, on its own, expose anything - the operator has
+  to name it here first, same as installing a plugin doesn't automatically pin it to a
+  slot or wire it into a channel.
+  """
+  def http_route_plugins, do: load() |> get_in(["http_route_plugins"]) || []
+
+  @doc "Enable a plugin's own HTTP route (its `route_prefix/0`), if not already enabled."
+  def enable_http_route_plugin(name) when is_binary(name) do
+    update(fn config -> update_in(config, ["http_route_plugins"], &Enum.uniq((&1 || []) ++ [name])) end)
+  end
+
+  @doc "Disable a plugin's HTTP route - it goes back to a plain 404, same as never having claimed one."
+  def disable_http_route_plugin(name) when is_binary(name) do
+    update(fn config -> update_in(config, ["http_route_plugins"], &List.delete(&1 || [], name)) end)
+  end
 
   @doc "Marketplace provenance for an installed skill (by name), or `nil` if hand-authored."
   def installed_skill(name), do: load() |> get_in(["skills", "installed", name])

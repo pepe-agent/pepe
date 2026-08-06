@@ -25,8 +25,8 @@ executar.
 
 ## 2. Configuração guiada (o caminho rápido)
 
-O `pepe setup` passa por autenticação do fornecedor, escolha do modelo, primeiro
-agente e canais opcionais.
+O `pepe setup` guia-te por tudo: iniciar sessão no fornecedor do modelo, escolher
+o modelo, criar o primeiro agente e, se quiseres, ligar um canal.
 
 ```bash
 pepe setup

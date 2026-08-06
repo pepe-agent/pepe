@@ -27,6 +27,42 @@ defmodule Pepe.Tools.WebSearchTest do
     assert out =~ "See also this."
   end
 
+  describe "the web_search slot is swappable" do
+    setup do
+      home = Path.join(System.tmp_dir!(), "pepe_wsslot_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(home, "plugins"))
+      prev = System.get_env("PEPE_HOME")
+      System.put_env("PEPE_HOME", home)
+
+      on_exit(fn ->
+        if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
+        File.rm_rf(home)
+      end)
+
+      {:ok, home: home}
+    end
+
+    test "pinning web_search to an installed plugin routes the tool through it, not DuckDuckGo", %{home: home} do
+      File.write!(Path.join([home, "plugins", "stub_search.exs"]), """
+      defmodule PepeWebSearchSlotTest.Stub do
+        @behaviour Pepe.Search.Backend
+        def name, do: "stub_search"
+        def slot, do: "web_search"
+        def search(query, _opts), do: {:ok, [%Pepe.Search.Result{title: "From the plugin", snippet: "matched \#{query}"}]}
+      end
+      """)
+
+      Pepe.Config.put_slot("web_search", "stub_search")
+
+      # Req is stubbed to fail loudly if DuckDuckGo is still the one actually called.
+      Mimic.stub(Req, :get, fn _url, _opts -> {:ok, %{status: 500, body: %{}}} end)
+
+      {:ok, out} = WebSearch.run(%{"query" => "pepe"}, %{})
+      assert out =~ "From the plugin"
+      assert out =~ "matched pepe"
+    end
+  end
+
   describe "untrusted content marker" do
     test "a result is wrapped in an explicit untrusted-content marker" do
       stub_response(200, %{"AbstractText" => "The answer.", "RelatedTopics" => []})

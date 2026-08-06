@@ -6,9 +6,9 @@ description: Cria e gere bots do Telegram ligados a agentes do Pepe.
 ## Telegram
 
 O Telegram é o canal mais rápido de pôr de pé porque não precisa de qualquer URL
-público. Cria um bot com o @BotFather, copia o respetivo token e regista-o. O Pepe
-consulta o Telegram à procura de mensagens novas, por isso não há webhook nenhum
-a expor.
+público. Cria um bot com o @BotFather, copia o respetivo token e regista-o. É o
+próprio Pepe que vai ao Telegram buscar as mensagens novas, por isso nada na tua
+máquina precisa de ficar exposto à internet.
 
 Configura o bot predefinido de forma interativa:
 
@@ -85,7 +85,7 @@ deles aceita as mesmas chaves do bot predefinido:
 - `allowed_chats` e `allowed_users`: as listas de ids autorizados. Deixa-as de
   fora e o bot fala com qualquer um.
 - `require_mention`: num grupo, só responder quando o bot é @mencionado.
-- `reactions`: que 👍/👎 numa mensagem chegam ao agente como feedback — `own`
+- `reactions`: que 👍/👎 numa mensagem chegam ao agente como feedback: `own`
   (padrão, só reações nas próprias mensagens do bot), `all` ou `off`.
 - `quick_reactions`: desligado por padrão. Ligado, uma mensagem que é só um
   agradecimento ou um emoji solto ("obrigado!", um ❤️ sozinho) recebe uma
@@ -200,15 +200,15 @@ para a conversa.
 
 Num grupo com **tópicos** ativados, cada tópico é uma conversa própria, e a
 resposta volta ao tópico de onde veio. Podes dar a um tópico **o seu próprio
-agente**: corre `/agent <nome>` dentro do tópico — ou simplesmente **pede** ao
-agente para ligar este tópico a outro, que ele faz por ti — e ele fica vinculado
+agente**: corre `/agent <nome>` dentro do tópico (ou simplesmente **pede** ao
+agente para ligar este tópico a outro, que ele faz por ti) e ele fica vinculado
 a esse agente, mantido através do `/new` e de reinícios. Os nomes são
 correspondidos sem distinguir maiúsculas, por isso `/agent engenheiro` encontra um
 agente chamado `Engenheiro`. Assim um grupo pode ter um
 tópico de "suporte" respondido pelo agente de suporte e um de "engenharia" pelo
 engenheiro, lado a lado. O agente de uma mensagem é o agente vinculado ao tópico,
 se houver; senão o `agent` do bot; senão a predefinição global. Um tópico
-vinculado ainda segue a regra de menção do grupo — põe `require_mention: false`
+vinculado ainda segue a regra de menção do grupo: põe `require_mention: false`
 (ou `/mention off` nesse tópico) se quiseres que responda sem @menção.
 
 ### Muda de modelo a meio de uma conversa

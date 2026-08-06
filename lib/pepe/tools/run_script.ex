@@ -77,7 +77,7 @@ defmodule Pepe.Tools.RunScript do
          {:ok, path, cleanup} <- source(args, ext, ctx) do
       try do
         {output, status} =
-          Pepe.Sandbox.cmd(bin, [path | script_args(args)], stderr_to_stdout: true, cd: cwd(ctx))
+          Pepe.Sandbox.cmd(bin, [path | script_args(args)], [stderr_to_stdout: true, cd: cwd(ctx)], ctx[:agent])
 
         {:ok, "exit #{status}\n" <> truncate(output)}
       rescue

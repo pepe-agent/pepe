@@ -1,12 +1,14 @@
 ---
 title: Board
-description: Durable task cards with dependencies, for handing off work between agents and humans.
+description: A shared to-do list for agents and people. Cards wait their turn, respect dependencies, and survive a restart instead of being lost.
 ---
 
 ## What it is
 
-A board is a durable, resumable queue of work items: **not** a sales/CRM pipeline. A
-card is a work item, not a contact or a lead. Where a scheduled task fires the same
+A board is a shared to-do list for agents and people: you put work on it as cards, and
+each card gets picked up, worked, and finished. It is a durable, resumable queue of
+work items, **not** a sales/CRM pipeline: a card is a piece of work, not a contact or
+a lead. Where a scheduled task fires the same
 prompt on a repeating clock, a board card is a one-off piece of work that moves through
 a status pipeline, can depend on other cards finishing first, and survives a crash or a
 restart instead of just being lost.
@@ -129,7 +131,7 @@ crashing) without ever calling `complete` or `block`: that's treated as a protoc
 violation, not silently retried.
 
 For work that genuinely takes longer than `claim_timeout_s`, call `board heartbeat`
-periodically (or `pepe board card heartbeat ID` from outside the session) - it resets
+periodically (or `pepe board card heartbeat ID` from outside the session). It resets
 the stall clock without changing status, so the card isn't force-blocked while it's
-still actually being worked. It's a liveness signal, not progress logging - use
+still actually being worked. It's a liveness signal, not progress logging: use
 `comment` for updates you want in the card's history.

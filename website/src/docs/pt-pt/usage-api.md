@@ -3,7 +3,7 @@ title: API de consumo
 description: Leia por HTTP o que foi gasto, com um token com âmbito, por mensagem, por chamada de modelo, com ou sem a sua margem.
 ---
 
-O mesmo token que executa um agente também pode ser criado para fazer o contrário: não executar nada, e apenas ler o que foi gasto. É para isso que serve o `/v1/usage`. Responde à pergunta que uma integração de faturação realmente faz, que não é "quanto custou este mês", mas "quanto custou *aquela mensagem*, e porquê".
+O `/v1/usage` é aquilo sobre que constróis uma integração de faturação: lê o que foi gasto, por HTTP, com um token que vê os números mas não executa nada. Responde à pergunta que a faturação realmente faz, que não é "quanto custou este mês", mas "quanto custou *aquela mensagem*, e porquê".
 
 Quatro endpoints, quatro níveis de detalhe sobre o mesmo ledger:
 
@@ -52,7 +52,7 @@ Cada chamada medida tem três números, e o `--prices` escolhe qual deles uma le
 * **`list`**: os mesmos tokens ao preço do modelo, sem markup aplicado.
 * **`all`**: ambos, mais `cost` (o que pagou de facto) e `margin`. A sua própria visão.
 
-`billable` e `list` são exclusivos, não cumulativos. Mostrar os dois entrega a razão entre eles, que é o markup, que é a margem. Um token com `list` está a ver preços de tabela *em vez de*, não além.
+`billable` e `list` são exclusivos, não cumulativos. Mostrar os dois revelaria a razão entre eles, e essa razão é o teu markup, a tua margem. Um token com `list` está a ver preços de tabela *em vez de*, não além.
 
 Quem decide isto é o token, nunca o pedido. Um cliente que chama `?prices=all` recebe de volta a visão do próprio token, não a que pediu.
 

@@ -9,6 +9,10 @@ defmodule Pepe.Hooks do
   way out. Both are applied by `Pepe.Agent.Session`, so every surface (WhatsApp,
   Telegram, API, console) gets it uniformly - like token metering.
 
+  The four built-in providers below are additive alongside plugin-supplied ones - see
+  `Pepe.Hooks.Hook`'s moduledoc for what a plugin hook actually unlocks (real content
+  mutation, not just observation).
+
   A third stage, `:tool_result`, runs on every tool's raw output before it ever
   joins the conversation or gets spilled to disk (see `Pepe.Tools.execute/2`) - a
   database query or file read can surface PII a human never typed, so it needs the
@@ -35,11 +39,26 @@ defmodule Pepe.Hooks do
     "presidio" => Pepe.Hooks.Presidio
   }
 
-  @doc "The hook module for a name, or nil."
-  def provider(name), do: Map.get(@providers, name)
+  @doc "The hook module for a name (built-in or plugin), or nil."
+  def provider(name), do: Map.get(registry(), name)
 
-  @doc "Registered hook names."
-  def names, do: Map.keys(@providers)
+  @doc "Registered hook names (built-in plus installed plugins)."
+  def names, do: registry() |> Map.keys() |> Enum.sort()
+
+  @doc "Every hook provider, built-ins winning any name clash with a plugin - see Pepe.Hooks.Hook."
+  def registry, do: Map.merge(plugin_providers(), @providers)
+
+  defp plugin_providers do
+    [{:name, 0}, {:stages, 0}, {:run, 4}]
+    |> Pepe.Plugins.implementing()
+    |> Enum.flat_map(fn mod ->
+      case Pepe.Plugins.safe_call(mod, :name, []) do
+        {:ok, name} when is_binary(name) -> [{name, mod}]
+        _ -> []
+      end
+    end)
+    |> Map.new()
+  end
 
   @doc """
   Run an agent's `stage` hooks over `text`. Returns `{text, entries}` where `entries`
@@ -122,6 +141,17 @@ defmodule Pepe.Hooks do
 
   @doc "Does this agent run any hooks at all? (fast path: skip the pipeline if not.)"
   def any?(agent), do: hooks_for(agent) != []
+
+  @doc """
+  Should a turn stream `:assistant_delta` events live? False whenever the agent has any
+  hook configured, since a live delta is the model's raw, un-hooked text - showing it
+  defeats an `:outbound` redaction/mutation hook before it ever runs (`transform/4` only
+  sees the complete reply, once the run returns). A caller that gets `false` here should
+  buffer instead: request a non-streaming run and render only the final, already-hooked
+  text once it comes back, rather than the deltas as they arrive.
+  """
+  @spec stream?(Pepe.Config.Agent.t() | nil) :: boolean()
+  def stream?(agent), do: not any?(agent)
 
   @doc "The `{name, module, settings}` list of hooks an agent runs - its own + project defaults."
   def hooks_for(nil), do: []

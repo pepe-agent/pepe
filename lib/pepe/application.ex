@@ -8,12 +8,37 @@ defmodule Pepe.Application do
 
   @impl true
   def start(_type, _args) do
+    suppress_mnesia_restart_notice()
+
     if release_cli?() do
       start_release_cli()
     else
       start_supervisor(maybe_endpoint())
     end
   end
+
+  # Pepe.Store (see its moduledoc) deliberately stops and restarts Mnesia once at boot to
+  # move it onto a disc schema - an internal implementation detail of the disposable store,
+  # not something an operator installing Pepe needs to see. OTP's own application_controller
+  # logs that stop unconditionally at :notice, which passes the default :info threshold
+  # (:notice outranks :info), so without this it would show on every real install:
+  # "[notice] Application mnesia exited: :stopped". Filtered by its exact report shape, not
+  # by silencing :notice in general - a genuine mnesia crash (any other `exited` reason)
+  # still gets through.
+  defp suppress_mnesia_restart_notice do
+    _ = :logger.add_primary_filter(:pepe_mnesia_restart_notice, {&filter_mnesia_restart/2, []})
+    :ok
+  end
+
+  defp filter_mnesia_restart(%{msg: {:report, %{report: report}}} = event, _extra) do
+    if is_list(report) and report[:application] == :mnesia and report[:exited] == :stopped do
+      :stop
+    else
+      event
+    end
+  end
+
+  defp filter_mnesia_restart(event, _extra), do: event
 
   # Runs while the supervision tree is still up, before it's torn down - the
   # only point where we can still see and wait on in-flight cron/board-card jobs. Without
@@ -107,6 +132,26 @@ defmodule Pepe.Application do
           # the tool too.
           {Registry, keys: :unique, name: Pepe.DB.Registry},
           {DynamicSupervisor, name: Pepe.DB.DynSup, strategy: :one_for_one},
+          # Where a non-default slot occupant (Pepe.Slots) runs, unlinked from the calling
+          # turn - a crashing/slow plugin degrades that one call, not the process asking.
+          # Capped: Pepe.Slots.Guard's own Task self-enforces its timeout regardless of
+          # whether its caller ever comes back for the result, so this doesn't grow
+          # unbounded - max_children is a hard ceiling on top of that, not the only guard.
+          {Task.Supervisor, name: Pepe.Slots.TaskSupervisor, max_children: 200},
+          # Where a plugin `.exs` is compiled - unlinked, with a hard deadline
+          # (Pepe.Plugins.compile_with_timeout/1), so a file that hangs at compile time
+          # can't freeze every plugin-facing surface (tools, slots, adapters, channels).
+          {Task.Supervisor, name: Pepe.Plugins.TaskSupervisor, max_children: 50},
+          # The cross-run circuit breaker for Pepe.Agent.RunObservers (installed
+          # observer plugins), plus the Task.Supervisor its per-run runner processes run
+          # under - same "a CLI one-shot needs this too" reasoning as the others above.
+          Pepe.Agent.RunObservers.Health,
+          {Task.Supervisor, name: Pepe.Agent.RunObservers.TaskSupervisor},
+          # Where a Pepe.Permissions.Policy plugin's check/3 runs, timed and unlinked -
+          # every tool call through Pepe.Permissions.gate/3 goes through this, so a
+          # policy plugin that hangs must still resolve (fail-closed) within its
+          # timeout rather than hanging the gate, and therefore the whole turn.
+          {Task.Supervisor, name: Pepe.Permissions.Policy.TaskSupervisor},
           # Heartbeat: ephemeral system-events queue + the anti-spam cooldown gate.
           Pepe.Heartbeat.Events,
           Pepe.Heartbeat.Cooldown,
@@ -144,7 +189,11 @@ defmodule Pepe.Application do
   # what's already applied), so paying this once per boot is not a real cost.
   defp migrate_repo do
     if Application.get_env(:pepe, :env) != :test do
-      Pepe.Repo.migrate!()
+      # log: false - Ecto.Migrator has its own logging switch, separate from
+      # Pepe.Repo's query log (see config/config.exs) - left unset it prints
+      # "Migrations already up" at :info on every single boot, forever, since
+      # there's essentially never anything to migrate after the first run.
+      Pepe.Repo.migrate!(log: false)
     end
   end
 

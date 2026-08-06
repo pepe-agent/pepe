@@ -40,15 +40,15 @@ Para una conversación continua:
 pepe chat assistant
 ```
 
-`pepe run` es una ejecución suelta y no guarda contexto. Para retomar una
-conversación en la terminal, usa una sesión de consola:
+`pepe run` responde una vez y olvida: nada pasa a la siguiente ejecución. Para
+retomar una conversación en la terminal más tarde, dale un nombre a la sesión:
 
 ```bash
 pepe chat assistant --session mi-sesion
 ```
 
-Cuando una herramienta quiera actuar sobre tu máquina, como ejecutar shell o
-escribir un archivo, Pepe pide aprobación antes.
+Cuando una herramienta quiera actuar sobre tu máquina, como ejecutar un comando o
+escribir un archivo, Pepe pide tu aprobación antes.
 
 ## 4. Sirve la API y el panel
 
@@ -56,7 +56,7 @@ escribir un archivo, Pepe pide aprobación antes.
 pepe serve --port 4000
 ```
 
-Esto expone el mismo agente en tres lugares:
+El mismo agente queda ahora accesible en tres lugares:
 
 - Panel local: `http://localhost:4000`
 - API compatible con OpenAI: `POST /v1/chat/completions`
@@ -70,7 +70,7 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"assistant","messages":[{"role":"user","content":"hola"}]}'
 ```
 
-<div class="note"><strong>La API empieza local.</strong> Sin tokens, solo las llamadas desde la misma máquina acceden a <code>/v1</code>. Crea un token con <code>pepe token add</code> antes de exponer el servidor.</div>
+<div class="note"><strong>La API empieza local.</strong> Hasta que crees un token, solo esta máquina puede llamar a <code>/v1</code>: nadie de fuera llega a tu agente. Crea uno con <code>pepe token add</code> antes de exponer el servidor.</div>
 
 ## 5. Conecta un canal
 
@@ -91,8 +91,8 @@ pepe cron add
 pepe watch add "site up" --probe "curl -sf https://example.com" --every 120
 ```
 
-Usa tareas programadas para rutinas recurrentes y vigilancias para avisos únicos
-cuando una condición cambie.
+Usa tareas programadas para lo que se repite, y vigilancias para que te avisen una
+sola vez cuando algo que te importa cambie.
 
 ## Siguientes pasos
 

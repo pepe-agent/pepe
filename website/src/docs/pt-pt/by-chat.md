@@ -3,9 +3,9 @@ title: Gerir pela conversa
 description: Permite que agentes de confiança configurem o Pepe em conversas em linguagem natural.
 ---
 
-Agentes de confiança podem gerir o Pepe pela conversa quando recebem as ferramentas de gestão correspondentes. Estas ações são protegidas porque alteram o estado do runtime ou libertam acesso.
+Podes reconfigurar o Pepe simplesmente pedindo a um agente, depois de dares a um agente de confiança as ferramentas de gestão correspondentes. Estas ações são protegidas: alteram a forma como o Pepe funciona ou libertam acesso, por isso pedem sempre a tua aprovação primeiro.
 
-O Pepe foi feito para que um agente consiga resolver um pedido sobre o próprio Pepe, do género "acrescenta um bot", "agenda isto", "liga o Sentry" ou "muda o fuso horário", sem código à medida para cada caso e sem nunca ser perigoso. Chega lá lendo a sua própria documentação, descobrindo o que tem permissão para alterar, usando um punhado de ferramentas protegidas para os caminhos mais comuns e verificando o próprio trabalho no fim.
+O Pepe foi feito para que um agente consiga resolver um pedido sobre o próprio Pepe, do género "acrescenta um bot", "agenda isto", "liga o Sentry" ou "muda o fuso horário", sem tratamento especial para cada caso e sem nunca ser perigoso. Chega lá lendo a sua própria documentação, descobrindo o que tem permissão para alterar, usando um punhado de ferramentas protegidas para os caminhos mais comuns e verificando o próprio trabalho no fim.
 
 ## Lê a sua própria documentação
 
@@ -13,7 +13,7 @@ Os guias práticos vêm com o Pepe, em `priv/docs/`, e cobrem agentes, canais, c
 
 ## Descobre o que é editável
 
-Chama o `config_set` sem argumento nenhum e ele devolve o seu próprio schema: as definições que pode editar, os valores atuais e os valores aceites. O conjunto editável é uma lista de permissões que falha fechada, a saber `default_model`, `default_agent`, `language`, `timezone`, `telegram.require_mention` / `telegram.enabled` e `secrets.expose_env` (os *nomes* de variáveis de ambiente que o shell do agente pode manter depois da limpeza, para abrir um cofre para o qual tem um token — só nomes, nunca um valor secreto). Tudo o resto é recusado, com uma indicação da ferramenta protegida certa para a tarefa: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task` ou `manage_token`. Os valores secretos nunca são editáveis pela conversa.
+Chama o `config_set` sem argumento nenhum e ele devolve o seu próprio schema: as definições que pode editar, os valores atuais e os valores aceites. O conjunto editável é uma lista curta e fixa: `default_model`, `default_agent`, `language`, `timezone`, `telegram.require_mention` / `telegram.enabled` e `secrets.expose_env` (os *nomes* de variáveis de ambiente que o shell do agente pode manter depois de o Pepe limpar o resto, para abrir um cofre para o qual tem um token; só nomes, nunca um valor secreto). Tudo o que estiver fora da lista é recusado, com uma indicação da ferramenta protegida certa para a tarefa: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task` ou `manage_token`. Os valores secretos nunca são editáveis pela conversa.
 
 ## Administrar agentes
 

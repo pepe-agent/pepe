@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Understand where Pepe stores configuration, secrets, and runtime state.
+description: Where Pepe keeps your setup, how your keys stay out of the files, and how to back everything up with one command.
 ---
 
 ## Where your setup lives
@@ -82,7 +82,7 @@ Compaction deliberately does not use the utility model. A summary written badly 
 
 ## Secrets stay as references
 
-Configuration lives in a plain JSON file at `~/.pepe/config.json`. There is no database. To keep credentials out of that file, write them as `${ENV_VAR}` references. Pepe interpolates them against the environment at read time and never persists the expanded value.
+Configuration lives in a plain JSON file at `~/.pepe/config.json`. There is no database. To keep credentials out of that file, write them as `${ENV_VAR}` references. Pepe fills in the real value from the environment at the moment it reads the file, and the value itself is never written to disk.
 
 ```json
 {
@@ -97,7 +97,7 @@ Configuration lives in a plain JSON file at `~/.pepe/config.json`. There is no d
 }
 ```
 
-At runtime the real key is read from the environment. On disk the file only ever contains the placeholder. The same mechanism works for gateway tokens, plugin settings, and the dashboard password, so you can commit or share a config without leaking anything. Export the variables before you serve:
+While Pepe is running, the real key comes from the environment. On disk the file only ever contains the placeholder. The same mechanism works for gateway tokens, plugin settings, and the dashboard password, so you can commit or share a config without leaking anything. Export the variables before you serve:
 
 ```bash
 export OPENROUTER_API_KEY=sk-...

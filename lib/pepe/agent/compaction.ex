@@ -12,10 +12,21 @@ defmodule Pepe.Agent.Compaction do
 
   Failure-safe: if the summarizing call fails, the original (uncondensed) messages are
   returned so a request never breaks just because compaction couldn't run.
+
+  This is also the builtin occupant of `Pepe.Slots`'s `"compaction"` slot - a plugin can
+  take over how a long conversation gets condensed (a different summarization strategy, a
+  non-LLM heuristic, one that calls out to an external service) the same way `memory`/
+  `web_search`/`sandbox` are already swappable. `compact/4` is the slot contract
+  (`Pepe.Agent.Runtime` calls it through `Pepe.Slots.Guard`, never `compact/3`/
+  `micro_compact/4` directly); those two stay as this module's own public API for any
+  other caller (the manual `/compact` command, tests) that wants the builtin behavior
+  specifically, bypassing whichever plugin might currently occupy the slot.
   """
   require Logger
 
   alias Pepe.Agent.MicroCompaction
+  alias Pepe.Config.Agent
+  alias Pepe.Config.Model
   alias Pepe.LLM
   alias Pepe.LLM.Message
 
@@ -26,6 +37,31 @@ defmodule Pepe.Agent.Compaction do
   @keep_tail 0.30
   # Don't bother summarizing fewer than this many middle messages.
   @min_middle 4
+
+  @doc false
+  def name, do: "builtin"
+
+  @doc false
+  def slot, do: "compaction"
+
+  @doc """
+  The `Pepe.Slots` "compaction" slot contract: condense `messages` for `model` (the
+  agent's own `micro_compaction` flag picks the strategy, same as `Pepe.Agent.Runtime`
+  used to decide inline before this became a slot), returning `{:ok, [message]}` always -
+  never an `{:error, _}`, since both underlying paths (`compact/3`, `micro_compact/4`)
+  already degrade to the original messages internally rather than fail. A non-default
+  occupant that crashes or times out still degrades via `Pepe.Slots.Guard`'s own
+  `:fallback` handling; this function only has to promise it never breaks the turn itself.
+  """
+  @spec compact(list(), Model.t(), Agent.t() | nil, String.t() | nil) :: {:ok, list()}
+  def compact(messages, model, %{micro_compaction: true} = agent, session_key),
+    do: {:ok, micro_compact(messages, model, agent.name, session_key)}
+
+  def compact(messages, model, agent, _session_key),
+    do: {:ok, compact(messages, model, agent_name(agent))}
+
+  defp agent_name(%{name: name}), do: name
+  defp agent_name(_), do: nil
 
   @doc "Rough token estimate for a message list (~4 chars/token + a little overhead)."
   def estimate_tokens(messages) do

@@ -27,7 +27,16 @@ config :ecto, :json_library, Jason
 # serialize writes instead of fighting SQLITE_BUSY retries - the adapter's own default
 # pool (5) reintroduces exactly the contention this exists to avoid. wal mode is also
 # what makes a hot file-copy backup (`mix pepe backup`) safe to take while the app runs.
-config :pepe, Pepe.Repo, pool_size: 1, journal_mode: :wal, busy_timeout: 5_000
+#
+# log: false - Ecto's own query logging, a separate mechanism from `config :logger,
+# level:` (raising the Logger level alone does NOT silence it - confirmed live: a `pepe
+# run` under prod config with `logger level: :info` still printed every query). Left at
+# Ecto's default, every `pepe run`/`pepe chat`/`pepe serve` request prints its raw SQL -
+# an internal implementation detail no end user asked to see. A contributor who wants
+# query visibility while developing can still pass `log: :debug` themselves, e.g. via
+# `iex -S mix` + `Ecto.Repo.put_dynamic_repo/1`-style ad hoc config, or briefly flip this
+# back locally - it doesn't need to be a standing, discoverable toggle for that.
+config :pepe, Pepe.Repo, pool_size: 1, journal_mode: :wal, busy_timeout: 5_000, log: false
 
 # Configure the endpoint
 config :pepe, PepeWeb.Endpoint,

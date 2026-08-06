@@ -1,13 +1,9 @@
 defmodule Pepe.Tools.MemorySearch do
   @moduledoc """
-  Search an agent's own memory (`MEMORY.md`, `USER.md`, `people.md`) instead of
-  reading a whole file to find one thing. Lexical, not semantic: a plain
-  case-insensitive substring match over the same blank-line-separated entries
-  `Pepe.Learning` already splits these files into for the TimeLearn timeline -
-  no embeddings API, no vector store, matching `session_search`'s own search
-  over `traces`. Memory files are kept small by design (the reflect/consolidate
-  loop exists specifically to stop them from growing), so a corpus this size has
-  little for embeddings to catch that substring matching would miss.
+  Search an agent's own memory (`MEMORY.md`, `USER.md`, `people.md`) instead of reading a
+  whole file to find one thing. A thin wrapper over `Pepe.Memory.search/3`, which runs
+  whatever currently occupies the `memory` slot (see `Pepe.Slots`) - the builtin lexical
+  search by default, or an installed backend the operator configured instead.
 
   Read-only and self-scoped (an agent's own memory only), so it's always-safe.
   """
@@ -15,9 +11,6 @@ defmodule Pepe.Tools.MemorySearch do
   @behaviour Pepe.Tools.Tool
 
   import Pepe.Tools.Tool, only: [function: 3]
-
-  alias Pepe.Agent.Workspace
-  alias Pepe.Learning
 
   @impl true
   def name, do: "memory_search"
@@ -53,31 +46,28 @@ defmodule Pepe.Tools.MemorySearch do
   def run(_args, _ctx), do: {:error, "memory_search needs a `query`"}
 
   defp search(agent, query, limit) do
-    limit = limit || 20
-    needle = String.downcase(query)
-    dir = Workspace.dir(agent.name)
-
-    matches =
-      Learning.memory_files()
-      |> Enum.flat_map(&file_matches(dir, &1, needle))
-      |> Enum.take(limit)
-
-    case matches do
-      [] -> {:ok, "No matches for #{inspect(query)}."}
-      _ -> {:ok, Enum.join(matches, "\n\n")}
+    case Pepe.Memory.search(agent.name, query, [limit: limit || 20], agent) do
+      {:ok, []} -> {:ok, "No matches for #{inspect(query)}."}
+      {:ok, hits} -> {:ok, format(hits, agent)}
+      {:error, reason} -> {:error, "memory search failed: #{inspect(reason)}"}
     end
   end
 
-  defp file_matches(dir, file, needle) do
-    case File.read(Path.join(dir, file)) do
-      {:ok, content} ->
-        content
-        |> Learning.entries()
-        |> Enum.filter(&String.contains?(String.downcase(&1), needle))
-        |> Enum.map(&"[#{file}] #{&1}")
+  defp format(hits, agent) do
+    text = Enum.map_join(hits, "\n\n", &"[#{&1.file}] #{&1.entry}")
 
-      _ ->
-        []
+    # The builtin only ever reads the agent's own MEMORY.md/USER.md/people.md - trusted,
+    # like the rest of its own workspace. A plugin occupying the memory slot instead could
+    # be backed by anything (a remote vector store, someone else's data) - content from
+    # outside the conversation, same class fetch_url/web_search results already get. Scoped
+    # to THIS agent - a per-agent slot override means one agent's plugin-backed answer and
+    # another's builtin one must not share a single global trust verdict.
+    if Pepe.Slots.plugin_answering?("memory", agent) do
+      text
+      |> Pepe.Security.ExternalContent.sanitize()
+      |> then(&Pepe.Security.ExternalContent.mark_untrusted("memory_search", &1))
+    else
+      text
     end
   end
 end

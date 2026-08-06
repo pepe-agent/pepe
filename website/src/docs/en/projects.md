@@ -5,15 +5,15 @@ description: Wall one tenant off from another so a single deployment can serve m
 
 ## What a project is
 
-A project is an isolated tenant scope. One deployment can serve many clients, and
+A project is a wall between clients. One Pepe install can serve many clients, and
 nothing crosses from one to another: not files, not routing, not model keys.
 
-Every tenant is a project, including the one you get out of the box. A fresh
+Every client (tenant) is a project, including the one you get out of the box. A fresh
 install has a single **default project** (slug `default`), and that is the project
-every command uses when you omit `--project`. Single-tenant use is unchanged: bare
-agent names resolve into the default project, so you never have to think about
-projects until you want a second tenant. Add one only when you have to wall tenants
-off from each other.
+every command uses when you omit `--project`. If you only serve yourself, nothing
+changes: bare agent names go to the default project, so you never have to think about
+projects until you want a second one. Add one only when you have to keep clients
+walled off from each other.
 
 <div class="note"><strong>The default project is a normal project.</strong> It
 shows up in <code>project list</code> like any other, it can be renamed, and it
@@ -29,8 +29,8 @@ and `globex/sales` are two different agents.
 
 The handle is what addresses everything: routing, sessions, and channel bindings
 all use it. Under the hood every project and every agent also carries a stable
-internal id, and it is that id, not the mutable name, that routing, permissions,
-defaults, and cron/bot/token bindings are recorded against. Renaming a project or
+internal id, and it is that id, not the name (which can change), that routing,
+permissions, defaults, and cron/bot/token bindings are recorded against. Renaming a project or
 an agent just relabels it and moves its directory; every reference follows, so
 nothing dangles.
 

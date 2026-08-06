@@ -1,13 +1,15 @@
 ---
 title: Discord
-description: Conecta el endpoint de Interactions de una app de Discord a un agente de Pepe.
+description: Responde comandos de barra en tu servidor de Discord con un agente de Pepe.
 ---
 
 ## Discord
 
-Discord se conecta a través del punto de acceso de Interactions (comandos de
-barra), así que encaja en la pasarela de webhook y no en una conexión
-persistente. Configúralo mediante la configuración guiada (o el panel):
+En Discord, la gente habla con el agente mediante un comando de barra (por
+ejemplo, `/ask`). Discord entrega esos comandos por su punto de acceso de
+Interactions, que encaja en la pasarela de webhook de Pepe y no en una
+conexión persistente. Configúralo mediante la configuración guiada (o el
+panel):
 
 ```bash
 pepe setup
@@ -35,12 +37,13 @@ cómo funciona la ruta genérica por dentro.
 
 ### Cambiar de modelo
 
-El comando que registraste (`/ask` arriba) lleva el texto que pongas en su
-opción `prompt:`, así que `/model` y `/models` llegan a Pepe igual que
-cualquier otro mensaje, escritos en ese valor. Solo se activan en una conexión
-en modo `admin` con `commands` habilitado; en `support`, son texto plano.
-`/models` lista los modelos disponibles para el proyecto de esta conexión;
-`/model` muestra el actual, o lo cambia:
+Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
+responde. En Discord llegan a Pepe a través del comando que registraste
+(`/ask` arriba): lo que escribas en su opción `prompt:` es el mensaje que
+Pepe ve. Solo funcionan en una conexión en modo `admin` con `commands`
+habilitado; en `support`, se tratan como texto normal. `/models` lista los
+modelos disponibles para el proyecto de esta conexión; `/model` muestra el
+actual, o lo cambia:
 
 ```text
 /model openrouter               # pregunta si cambiar solo este chat o todos
@@ -48,7 +51,8 @@ en modo `admin` con `commands` habilitado; en `support`, son texto plano.
 /model openrouter global        # cambia para todos con los que habla esta conexión
 ```
 
-Cualquiera en una conversación permitida puede cambiar su propia sesión;
-cambiarlo **globalmente** está reservado para **entrenadores**, la misma
-lista que rige la memoria. Pon `model_switch_locked: true` en la conexión para
+Cualquiera en una conversación permitida puede cambiar el modelo de su propia
+conversación. Cambiarlo **globalmente**, para todos con los que habla esta
+conexión, está reservado a los **entrenadores**, la misma lista de confianza
+que rige la memoria. Pon `model_switch_locked: true` en la conexión para
 desactivar el cambio de modelo por completo para quien no sea entrenador.

@@ -157,7 +157,7 @@ Um token transporta um âmbito que decide a que agentes consegue chegar. Do mais
 
 ### Permissões de token
 
-O âmbito diz *de quem* são os dados que o token alcança. Um conjunto separado de permissões diz *o que pode fazer* com eles, e as predefinições deixam cada token que já criaste exatamente como estava: **pode** executar agentes e **não pode** ler consumo.
+O âmbito diz *de quem* são os dados que o token alcança. Um conjunto separado de permissões diz *o que pode fazer* com eles. As predefinições deixam cada token que já criaste exatamente como estava: **pode** executar agentes e **não pode** ler consumo.
 
 | Flag | Predefinição | O que dá acesso |
 | --- | --- | --- |

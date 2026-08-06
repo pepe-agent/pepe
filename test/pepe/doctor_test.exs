@@ -44,6 +44,19 @@ defmodule Pepe.DoctorTest do
     assert {"config", "top-level keys", :ok} = List.keyfind(checks, "top-level keys", 1)
   end
 
+  test "http_route_plugins and policy_scope don't false-positive as unknown keys" do
+    # Regression: both are real, actively-written config sections
+    # (Pepe.Config.enable_http_route_plugin/1, put_policy_scope/2) that were missing from
+    # @known_top_level_keys - an operator running `mix pepe plugin route enable` or
+    # `mix pepe policy scope` would see "unknown top-level config key - a typo? it's
+    # doing nothing" about a section that is, in fact, doing exactly what they asked.
+    Config.enable_http_route_plugin("some_plugin")
+    Config.put_policy_scope("some_policy", %{"agents" => ["assistant"]})
+
+    checks = Doctor.checks()
+    assert {"config", "top-level keys", :ok} = List.keyfind(checks, "top-level keys", 1)
+  end
+
   test "passes when the referenced env var is set" do
     var = "PEPE_DOCTOR_SET_#{System.unique_integer([:positive])}"
     System.put_env(var, "value")
@@ -241,5 +254,20 @@ defmodule Pepe.DoctorTest do
     Config.save(%{"x" => 1})
     checks = Doctor.checks()
     assert List.keyfind(checks, "config file permissions", 1) == nil
+  end
+
+  test "slots default to ok when nothing is configured" do
+    checks = Doctor.checks()
+    assert {"slot", "memory", :ok} in checks
+    assert {"slot", "web_search", :ok} in checks
+  end
+
+  test "flags a slot pinned to a plugin that isn't installed" do
+    Config.put_slot("memory", "does_not_exist")
+
+    checks = Doctor.checks()
+    assert {"slot", "memory", {:warn, msg}} = Enum.find(checks, &match?({"slot", "memory", _}, &1))
+    assert msg =~ "does_not_exist"
+    assert msg =~ "using the default"
   end
 end

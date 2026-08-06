@@ -87,7 +87,7 @@ Un objetivo no es un modo especial: envuelve un turno normal. El agente conserva
 
 ## Estado de trabajo dentro de la conversación
 
-`pepe goal` dirige una ejecución entera desde fuera. Dos herramientas aparte le dan al agente un estado de trabajo **por dentro**, para que se mantenga coherente a lo largo de muchos turnos en lugar de reaccionar mensaje a mensaje. Ambas son por conversación: viven con la sesión, en el almacén desechable, y cada llamada y su resultado aparecen en el chat y en las [Trazas](/es/docs/traces/). Ambas son herramientas como cualquier otra, presentes por defecto; quita `goal` y `update_plan` de la lista de herramientas de un agente si no quieres que siga un objetivo o plan a lo largo de los turnos.
+`pepe goal` dirige una ejecución entera desde fuera. Dos herramientas aparte le dan al agente un estado de trabajo **por dentro**, para que se mantenga coherente a lo largo de muchos turnos en lugar de reaccionar mensaje a mensaje. Ambas son por conversación: pertenecen a la sesión y desaparecen con ella, y cada llamada y su resultado aparecen en el chat y en las [Trazas](/es/docs/traces/). Ambas son herramientas como cualquier otra, presentes por defecto; quita `goal` y `update_plan` de la lista de herramientas de un agente si no quieres que siga un objetivo o plan a lo largo de los turnos.
 
 ### `goal`: la estrella polar
 

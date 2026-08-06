@@ -24,6 +24,19 @@ defmodule Pepe.Sandbox do
   There is no zero-config, cross-platform *true* sandbox: every real one needs an OS
   feature or an external tool. So the honest defaults are the permission gate plus
   these guardrails; opt into a wrapper for isolation.
+
+  ## 3. A plugin can take over execution entirely (the `sandbox` slot)
+
+  This module is also the default occupant of `Pepe.Slots`' `"sandbox"` slot - `cmd/4`
+  routes through it. A plugin can occupy that slot (`name/0`, `slot/0` -> `"sandbox"`,
+  `run/3`) to run a command somewhere Pepe itself has no idea how to reach: SSH to a
+  remote host, a container runtime driven from Elixir instead of a wrapper script, a
+  managed exec service. Unlike the wrapper-script mechanism above (one static path,
+  configured once, installation-wide), a slot occupant is real Elixir code, isolated the
+  same way every other slot is (`Pepe.Slots.Guard`: a crash/timeout/malformed return
+  degrades to this module, never breaks the calling tool), and can be scoped per agent or
+  project (`Pepe.Slots.occupant/2`) - one agent can run its shell commands on a different
+  backend than every other agent, without a global change nobody else asked for.
   """
 
   alias Pepe.Config
@@ -149,24 +162,49 @@ defmodule Pepe.Sandbox do
     end
   end
 
+  @doc "This module's own name, as the `sandbox` slot's builtin occupant - see `Pepe.Slots`."
+  def name, do: "builtin"
+
+  @doc "The slot this module occupies by default - see `Pepe.Slots`."
+  def slot, do: "sandbox"
+
   @doc """
-  Run `program` with `argv` (like `System.cmd/3`), through the configured sandbox
-  wrapper when one is set, else directly. Returns `{output, exit_status}`.
+  The `sandbox` slot's default `run/3`: runs `program` with `argv` directly, or through the
+  configured wrapper (`Config.sandbox/0`) when one is set. `opts`' `:env` is already
+  scrubbed by `cmd/4` before this ever runs - true for whichever occupant answers, not
+  just this one.
+  """
+  @spec run(String.t(), [String.t()], keyword()) :: {:ok, {String.t(), non_neg_integer()}}
+  def run(program, argv, opts) do
+    result =
+      case Config.sandbox() do
+        nil ->
+          System.cmd(program, argv, opts)
+
+        wrapper ->
+          cwd = opts[:cd] || File.cwd!()
+          env = [{"PEPE_SANDBOX_CWD", cwd} | opts[:env]]
+          System.cmd(wrapper, [program | argv], Keyword.put(opts, :env, env))
+      end
+
+    {:ok, result}
+  end
+
+  @doc """
+  Run `program` with `argv` (like `System.cmd/3`), through whichever occupant answers the
+  `sandbox` slot for `agent` - the builtin (directly, or through the configured wrapper
+  script) unless a plugin is pinned; see `Pepe.Slots.occupant/2` and this module's
+  moduledoc. Returns `{output, exit_status}`.
 
   The child does **not** inherit Pepe's secrets. See `scrubbed_env/1`.
   """
-  @spec cmd(String.t(), [String.t()], keyword()) :: {String.t(), non_neg_integer()}
-  def cmd(program, argv, opts \\ []) do
+  @spec cmd(String.t(), [String.t()], keyword(), Pepe.Config.Agent.t() | nil) :: {String.t(), non_neg_integer()}
+  def cmd(program, argv, opts \\ [], agent \\ nil) do
     opts = Keyword.put(opts, :env, scrubbed_env(opts[:env] || []))
 
-    case Config.sandbox() do
-      nil ->
-        System.cmd(program, argv, opts)
-
-      wrapper ->
-        cwd = opts[:cd] || File.cwd!()
-        env = [{"PEPE_SANDBOX_CWD", cwd} | opts[:env]]
-        System.cmd(wrapper, [program | argv], Keyword.put(opts, :env, env))
+    case Pepe.Slots.Guard.call("sandbox", :run, [program, argv, opts], agent) do
+      {:ok, result} -> result
+      {:error, reason} -> {"sandbox execution failed: #{inspect(reason)}", 1}
     end
   end
 

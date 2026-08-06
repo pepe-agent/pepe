@@ -1,6 +1,6 @@
 ---
 title: Agent-to-agent routing
-description: Let one agent hand work to another with the send_to_agent tool, governed by a directed allowlist that says exactly who may call whom.
+description: Let one agent hand work to another with the send_to_agent tool. You decide exactly who may call whom, one direction at a time.
 ---
 
 Agents can message each other through the `send_to_agent` tool. Who may call whom is

@@ -117,6 +117,28 @@ defmodule PepeWeb.DashData do
     end
   end
 
+  @doc """
+  The per-agent `slots` override form param (`%{"memory" => "plugin_name", "harness" => ""}`)
+  -> the map `Pepe.Config.Agent.slots` actually stores. A slot left on "Default" in the form
+  submits as an empty string, meaning "no override, inherit" - dropped here rather than
+  stored as `""`, so an agent with everything on default keeps the same `%{}` it always did.
+  A key outside `Pepe.Slots.names/0` (a typo, a forged param - the `<select>` this normally
+  reads from only ever emits known slot names) is dropped rather than silently persisted,
+  matching `Pepe.Config.put_slot/2`'s own `{:error, :unknown_slot}` for the installation-wide
+  setting - the per-agent path had no equivalent guard until this. Anything that isn't even
+  a map (a forged non-map param) is treated the same as "nothing submitted".
+  """
+  def parse_slots(map) when is_map(map) do
+    known = Pepe.Slots.names()
+
+    map
+    |> Map.new(fn {k, v} -> {k, blank(v)} end)
+    |> reject_nil()
+    |> Map.filter(fn {k, _v} -> k in known end)
+  end
+
+  def parse_slots(_), do: %{}
+
   def manages_text([]), do: gettext("nobody")
   def manages_text(["*"]), do: gettext("all agents")
   def manages_text(list) when is_list(list), do: Enum.join(list, ", ")

@@ -131,19 +131,22 @@ defmodule Pepe.Gateways.TUI do
     fn name, args, ctx ->
       Config.put_locale()
       tainted? = ctx[:tainted] == true
+      has_session? = is_binary(ctx[:session_key])
 
       note = if tainted?, do: "\n" <> dim("ℹ️ " <> Prompt.taint_note()), else: ""
+      policy = if p = Prompt.policy_note(ctx[:policy_reason]), do: "\n" <> dim(p), else: ""
 
       label =
         bold(Prompt.question(name)) <>
           risk_lines(name, args) <>
           "\n" <>
           dim(one_line(args)) <>
+          policy <>
           "\n" <>
           dim(Prompt.scope_note(ctx[:risks] || [])) <>
           note
 
-      case Pepe.TUI.select(Prompt.options(tainted?), label: label, render_as: &Prompt.label(&1, tainted?)) do
+      case Pepe.TUI.select(Prompt.options(tainted?, has_session?), label: label, render_as: &Prompt.label(&1, tainted?)) do
         :deny -> maybe_deny_reason()
         decision -> decision
       end
@@ -215,15 +218,28 @@ defmodule Pepe.Gateways.TUI do
 
   defp say(key, text) do
     IO.write(bold("\nbot › "))
+    stream? = Pepe.Agent.stream_for?(Session.status(key).agent)
 
     case Session.chat(key, text,
-           stream: true,
+           stream: stream?,
            on_event: stream_events(),
            authorize: authorizer(),
            ask_user: ask_user_fn()
          ) do
-      {:ok, _reply} -> IO.puts("")
-      {:error, reason} -> error("\n#{inspect(reason)}")
+      {:ok, reply} ->
+        if stream?, do: IO.puts(""), else: IO.puts(reply)
+
+      # A closed stdin was hit inside the session's own run task (a permission prompt or
+      # ask_user call reading from a now-gone stdin), which rescues every exception into
+      # {:error, reason} so a crashing run task never wedges the session - see
+      # Pepe.Agent.Session's spawn_run/7. Re-raised HERE, in this process (not the task's),
+      # so it reaches the exact same `rescue Pepe.TUI.EOFError` clause in the CLI entry
+      # points that a closed stdin hit anywhere else in the REPL already goes through.
+      {:error, :eof} ->
+        raise Pepe.TUI.EOFError
+
+      {:error, reason} ->
+        error("\n#{inspect(reason)}")
     end
   end
 

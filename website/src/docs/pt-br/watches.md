@@ -1,6 +1,6 @@
 ---
 title: Vigias
-description: Crie monitores duráveis que avisam uma única vez quando uma condição se torna verdadeira.
+description: Diga ao Pepe para ficar de olho em algo e te avisar no momento em que acontecer. Ele checa sozinho, sobrevive a reinícios e avisa exatamente uma vez.
 ---
 
 ## Vigias

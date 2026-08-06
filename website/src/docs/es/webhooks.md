@@ -12,8 +12,9 @@ ruta:
 https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
-- `<project>` es el ámbito de cliente. Usa `default` para el proyecto por
-  defecto, o el slug de otro proyecto para aislar una conexión a ese cliente.
+- `<project>` es el proyecto al que pertenece la conexión. Usa `default` para
+  el proyecto por defecto, o el slug de otro proyecto para mantener esa
+  conexión aislada en ese proyecto.
 - `<provider>` es el nombre de la plataforma: `whatsapp`, `slack`, `discord`,
   `msteams` o `googlechat`.
 - `<slug>` es el nombre único que le diste a la conexión.
@@ -77,10 +78,12 @@ por menciones hoy (siempre responden), así que `/mention` no hace nada ahí.
 
 ## Cambiar de modelo
 
-`/model` y `/models` solo se activan en una conexión en modo `admin` con
-`commands` habilitado (ver la comparación de modos en [Channels](../channels/))
-- en `support`, son texto plano. `/models` lista los modelos disponibles para
-el proyecto de la conexión; `/model` muestra el actual, o lo cambia:
+Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
+responde. Solo funcionan en una conexión en modo `admin` con `commands`
+habilitado (ver la comparación de modos en [Channels](../channels/)); en
+`support`, se tratan como texto normal. `/models` lista los modelos
+disponibles para el proyecto de la conexión; `/model` muestra el actual, o lo
+cambia:
 
 ```text
 /model openrouter               # pregunta si cambiar solo este chat o todos
@@ -88,12 +91,13 @@ el proyecto de la conexión; `/model` muestra el actual, o lo cambia:
 /model openrouter global        # cambia para todos con los que habla esta conexión
 ```
 
-Cambiarlo **globalmente** está reservado para **entrenadores** (la misma
-lista que rige la memoria); cualquier otra persona en una conversación
-permitida solo puede cambiar su propia sesión. Pon `model_switch_locked: true`
-en la conexión para desactivarlo por completo para quien no sea entrenador.
-Es el mismo mecanismo que usa WhatsApp; la versión de Telegram añade un
-selector con botones en vez de comandos escritos.
+Cambiarlo **globalmente**, para todos con los que habla la conexión, está
+reservado a los **entrenadores** (la misma lista de confianza que rige la
+memoria); cualquier otra persona en una conversación permitida solo puede
+cambiar su propia conversación. Pon `model_switch_locked: true` en la
+conexión para desactivarlo por completo para quien no sea entrenador. Es el
+mismo mecanismo que usa WhatsApp; la versión de Telegram añade un selector
+con botones en vez de comandos escritos.
 
 ## Por dentro: el contrato del proveedor
 

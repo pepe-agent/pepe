@@ -42,7 +42,7 @@ defmodule PepeWeb.TokensLive do
         <.view_header
           icon="🔑"
           title={gettext("API tokens")}
-          desc={gettext("Bearer tokens for the OpenAI-compatible /v1 API. With no token the API answers only loopback (localhost) callers; any remote caller must present a token. Once any token exists, every caller (local or remote) needs one. Minting the first token is what secures a network-exposed server.")}
+          desc={gettext("Bearer tokens for the OpenAI-compatible /v1 API. With no token, only loopback (localhost) callers get through. Minting the first token requires one from everyone else too, local or remote: that's what secures a network-exposed server.")}
         />
 
         <div class="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -103,7 +103,7 @@ defmodule PepeWeb.TokensLive do
               <div :if={@token_widget}>
                 <label class={lbl()}>{gettext("Allowed origin")}</label>
                 <input name="allowed_origin" placeholder="https://example.com" class={fld()} />
-                <p class={hlp()}>{gettext("The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above - a public token always pins to one.")}</p>
+                <p class={hlp()}>{gettext("The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above: a public token always pins to one.")}</p>
               </div>
 
               <div :if={!@token_widget} class="space-y-3 rounded-xl border border-zinc-800 p-3">
@@ -129,9 +129,9 @@ defmodule PepeWeb.TokensLive do
                 <div :if={@token_usage}>
                   <label class={lbl()}>{gettext("Money it may see")}</label>
                   <select name="prices" class={fld()}>
-                    <option value="billable">{gettext("Billable - with the project's markup (what the client pays)")}</option>
-                    <option value="list">{gettext("List - the model's price, no markup")}</option>
-                    <option value="all">{gettext("Everything - adds our cost and the margin")}</option>
+                    <option value="billable">{gettext("Billable: with the project's markup (what the client pays)")}</option>
+                    <option value="list">{gettext("List: the model's price, no markup")}</option>
+                    <option value="all">{gettext("Everything: adds our cost and the margin")}</option>
                   </select>
                   <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
                 </div>
@@ -199,9 +199,9 @@ defmodule PepeWeb.TokensLive do
                   </label>
 
                   <select name="prices" class={fld()}>
-                    <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable - with the project's markup (what the client pays)")}</option>
-                    <option value="list" selected={permissions(t).prices == "list"}>{gettext("List - the model's price, no markup")}</option>
-                    <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything - adds our cost and the margin")}</option>
+                    <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable: with the project's markup (what the client pays)")}</option>
+                    <option value="list" selected={permissions(t).prices == "list"}>{gettext("List: the model's price, no markup")}</option>
+                    <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything: adds our cost and the margin")}</option>
                   </select>
 
                   <button type="submit" class={btn_ghost()}>{gettext("Save")}</button>
@@ -365,13 +365,13 @@ defmodule PepeWeb.TokensLive do
   defp token_error(:unknown_agent), do: gettext("That agent does not exist.")
 
   defp token_error(:widget_needs_agent),
-    do: gettext("A public widget token must be locked to one agent - pick one above.")
+    do: gettext("A public widget token must be locked to one agent. Pick one above.")
 
   defp token_error(:widget_cannot_read_usage),
     do: gettext("A widget token sits in public page source, so it can never read usage.")
 
   defp token_error(:no_permissions),
-    do: gettext("That leaves the token able to do nothing - keep \"Run agents\" or add \"Read usage\".")
+    do: gettext("That leaves the token able to do nothing: keep \"Run agents\" or add \"Read usage\".")
 
   defp token_error(:content_needs_usage),
     do: gettext("Conversation content only means something together with \"Read usage\".")

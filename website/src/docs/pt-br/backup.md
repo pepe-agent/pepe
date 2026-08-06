@@ -14,7 +14,7 @@ pepe backup --output /caminho/x.tgz
 
 Este é o arquivo do tipo "não perca esta máquina". Ele empacota todos os projetos, todos os workspaces dos agentes, o espaço compartilhado, as sessões e os livros-razão de uso, e pula `data/mnesia/` (um cache descartável que se reconstrói sozinho). Restaurado em uma máquina vazia, ele é a mesma máquina de novo.
 
-O banco de dados (compromissos, watches, traces, boards, uso) nunca é copiado enquanto pode estar no meio de uma escrita. Em vez disso, o `backup` tira um snapshot transacionalmente consistente através da conexão ativa e o verifica antes de colocá-lo no arquivo — seguro de rodar com o Pepe no ar —, e o comando aborta em vez de embarcar um snapshot que falhou na verificação. Reverifique um arquivo que você já tem com:
+Você pode rodar com o Pepe no ar. O banco de dados (compromissos, watches, traces, boards, uso) nunca é copiado enquanto pode estar no meio de uma escrita: em vez disso, o `backup` tira um snapshot através da conexão ativa, garantidamente consistente como retrato de um único instante (transacionalmente consistente), e o verifica antes de colocá-lo no arquivo. O comando aborta em vez de embarcar um snapshot que falhou na verificação. Reverifique um arquivo que você já tem com:
 
 ```bash
 pepe backup verify pepe-backup-2026-07-14.tgz
@@ -27,7 +27,7 @@ pepe extract acme                 # gera acme-extract-YYYY-MM-DD.tgz
 pepe extract acme --output /caminho/acme.tgz
 ```
 
-Um projeto que cresceu dentro de uma instalação compartilhada pode sair para rodar no próprio servidor. Você não chega lá copiando uma pasta, porque as entradas desse projeto estão entrelaçadas no `config.json` compartilhado como identificadores `acme/agente`. A extração reescreve esses identificadores para nomes simples do projeto default, então o arquivo é uma **instalação nova e de um único projeto que por acaso é aquele projeto** — coloque em um servidor novo e execute.
+Um projeto que cresceu dentro de uma instalação compartilhada pode sair para rodar no próprio servidor. Você não chega lá copiando uma pasta, porque as entradas desse projeto estão entrelaçadas no `config.json` compartilhado como identificadores `acme/agente`. A extração reescreve esses identificadores para nomes simples do projeto default, então o arquivo é uma **instalação nova e de um único projeto que por acaso é aquele projeto**: coloque em um servidor novo e execute.
 
 Só aquele projeto viaja: seus agentes, modelos, crons, watches, bots, tokens, workspaces e histórico de uso. Nada dos outros projetos vai junto. Se um dos seus agentes depende de um **modelo compartilhado** (um que vive no projeto default, não dentro do projeto extraído), esse modelo também é puxado para o arquivo, para o pacote funcionar em uma máquina vazia; o comando informa quais.
 
@@ -38,9 +38,9 @@ pepe restore acme-extract-2026-07-14.tgz
 pepe restore pepe-backup-2026-07-14.tgz --force
 ```
 
-Um backup e uma extração têm a mesma forma — um `~/.pepe` dentro de um tarball — então um único comando restaura os dois. Ele descompacta em `~/.pepe` (ou `PEPE_HOME`). Como uma restauração **substitui** o que está lá, ela se recusa a sobrescrever um diretório não vazio a menos que você passe `--force`.
+Um backup e uma extração têm a mesma forma (um `~/.pepe` dentro de um tarball), então um único comando restaura os dois. Ele descompacta em `~/.pepe` (ou `PEPE_HOME`). Como uma restauração **substitui** o que está lá, ela se recusa a sobrescrever um diretório não vazio a menos que você passe `--force`.
 
-O banco de dados de um backup passa pela mesma verificação de integridade na volta: a restauração recusa um banco de dados que falhe nela, e recusa sobrescrever um sobre o qual uma instância do Pepe ativa parece estar escrevendo agora — pare-a primeiro, depois tente de novo.
+O banco de dados de um backup passa pela mesma verificação de integridade na volta: a restauração recusa um banco de dados que falhe nela, e recusa sobrescrever um sobre o qual uma instância do Pepe ativa parece estar escrevendo agora: pare-a primeiro, depois tente de novo.
 
 ## Os segredos nunca estão no arquivo
 

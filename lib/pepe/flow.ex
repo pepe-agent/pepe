@@ -10,9 +10,9 @@ defmodule Pepe.Flow do
     * **Promotion is a human decision, not automatic detection.** `promote_from_traces/4`
       takes trace ids the operator already looked at (via `mix pepe traces`) and picked
       themselves - there is no background job guessing "this looks like a pattern." The
-      review r/openclaw's own thread wanted (a human confirms this is really the same
-      reliable flow) already happens at the moment the operator runs the command, so
-      there's no separate approval queue to build on top of it.
+      human confirmation that this is really the same reliable flow already happens at the
+      moment the operator runs the command, so there's no separate approval queue to build
+      on top of it.
     * **No templating, no parameterized inputs.** A flow replays the *exact* tool calls
       it was promoted from, argument for argument. Auto-inferring "this part varies,
       that part doesn't" from a handful of examples is the riskiest part of this whole

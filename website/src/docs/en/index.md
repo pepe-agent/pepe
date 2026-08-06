@@ -1,19 +1,19 @@
 ---
 title: Introduction
-description: Pepe is a self-hosted, model-agnostic AI agent runtime. Define agents, connect any OpenAI-compatible model, and run a real tool-calling loop, with no database and no vendor lock-in.
+description: Pepe runs AI agents on your own machine. Describe who they are, connect any OpenAI-compatible model, and let them do real work with tools. No database server, no vendor lock-in.
 ---
 
 ## What Pepe is
 
-Pepe is a self-hosted AI agent runtime built in Elixir. You define an **agent**
-(a name, a system prompt, a set of tools, and a model connection), and Pepe runs
-it: it sends the conversation to the model, executes any tools the model asks
-for, feeds the results back, and repeats until the model produces a final answer.
+Pepe runs AI **agents** on your own machine or server. You describe an agent
+once (a name, its instructions, the tools it may use, and which model it thinks
+with) and Pepe does the rest: when a request comes in, the agent works in steps,
+using its tools, until it has a real answer.
 
-Elixir/OTP matters here because agents are long-lived conversations, channels and
-background jobs, not just one HTTP request. Pepe can keep many supervised sessions
-running with low runtime overhead, which helps keep a team of agents inexpensive
-to host in terms of server memory and CPU.
+Agents are long-lived: conversations, channels, background jobs, not one-off
+requests. Pepe is built in Elixir/OTP, a technology made for exactly that shape
+of work, so one modest server keeps a whole team of agents running side by side
+without much memory or CPU.
 
 That inner loop is the whole point. A plain chat call returns text. An agent can
 actually do things: read a file, run a command, search the web, call your API,
@@ -40,17 +40,15 @@ Here is the cycle Pepe runs for every turn:
 4. Go back to step 1. Stop when the model returns a plain answer, or when the
    agent hits its `max_iterations` safety limit.
 
-Along the way the runtime emits lifecycle events so any surface can show progress
-in real time: streamed text fragments (`assistant_delta`), a full assistant turn
-(`assistant`), each tool call (`tool_call`), each tool result (`tool_result`),
-the final answer (`done`), and errors (`error`). Streaming surfaces render tokens
-as they arrive.
+Along the way Pepe announces each step, so any surface can show progress in real
+time: the answer as it streams in (`assistant_delta`), each tool call and its
+result (`tool_call`, `tool_result`), the final answer (`done`), and errors
+(`error`).
 
-Risky tools (anything that runs a command or writes a file) can be sent through a
-permission gate that asks the user to approve before the tool runs. If the user
-refuses, the runtime emits a `tool_denied` event and hands the model a short
-"denied" message instead of running the tool, so an agent never silently acts on
-your machine without consent.
+Risky tools (anything that runs a command or writes a file) can be made to ask
+you first. If you refuse, the tool never runs: the model just gets a short
+"denied" note (and a `tool_denied` event fires), so an agent never silently acts
+on your machine without consent.
 
 <div class="note"><strong>Built-in tools.</strong> Every agent can be given tools like <code>bash</code>, <code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>list_dir</code>, <code>fetch_url</code>, and <code>web_search</code>. You choose which ones each agent gets when you create it, so a support bot and a coding agent can have very different powers.</div>
 
@@ -142,11 +140,11 @@ straight from a conversation. Send it a plain message:
 > and summarize findings, and give it web_search and fetch_url.
 
 The agent uses `manage_agent` to `create` the new agent, set its persona, and add
-each tool. `manage_agent` is a guarded capability: the agent may only touch
-agents on its own allowlist, it is instructed to confirm the changes with you
-first, and because it is a risky tool each call still passes through the
-permission gate before anything is written. So you see the proposed change and
-approve it before it takes effect.
+each tool. `manage_agent` is deliberately guarded: the agent may only touch the
+agents it was explicitly allowed to manage, it is instructed to confirm the
+changes with you first, and because it is a risky tool each call still asks for
+your approval before anything is written. You see the proposed change and approve
+it before it takes effect.
 
 ## Connecting a model
 
@@ -207,11 +205,11 @@ a transient failure (a rate limit, a server error, a network blip) on one
 provider quietly rolls over to the next, while a bad key or a malformed request
 fails fast instead of retrying pointlessly.
 
-### No database
+### No database server
 
 All configuration (model connections, agents, channels, schedules) lives in a
-single JSON file at `~/.pepe/config.json`. There is nothing to provision and
-nothing to migrate. Secrets are written as `${ENV_VAR}` references and expanded
+single JSON file at `~/.pepe/config.json`, easy to read, edit, and back up.
+There is nothing to install alongside Pepe and nothing to migrate. Secrets are written as `${ENV_VAR}` references and expanded
 only when read, so your keys are never written back to disk in plain text.
 
 ```json
@@ -228,9 +226,9 @@ only when read, so your keys are never written back to disk in plain text.
 
 ### Isolated conversations
 
-Each conversation runs as its own lightweight, supervised process keyed by a
-session id. Many run side by side, and a crash in one never touches another, so a
-single bad turn cannot take down the rest of your agents.
+Each conversation runs separately from all the others. If one goes wrong, the
+rest never notice: a single bad turn cannot take down your other agents or
+conversations.
 
 ### Multi-tenant when you need it
 

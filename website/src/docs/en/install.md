@@ -24,8 +24,8 @@ Pepe stores its setup in `~/.pepe/config.json`. There is no database to run.
 
 ## 2. Guided setup (the fast path)
 
-`pepe setup` walks you through provider auth, model choice, the first agent, and
-optional channel setup.
+`pepe setup` walks you through everything: signing in to your model provider,
+picking a model, creating your first agent, and optionally connecting a channel.
 
 ```bash
 pepe setup

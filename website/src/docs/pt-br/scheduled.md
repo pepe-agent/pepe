@@ -1,13 +1,13 @@
 ---
 title: Tarefas agendadas
-description: Rode agentes em horários cron recorrentes.
+description: Peça a um agente para fazer algo por você em um horário fixo, sem ninguém no teclado. Um resumo matinal, uma checagem de hora em hora, entregue onde você quiser.
 ---
 
 ## Tarefas recorrentes
 
-Uma tarefa é um prompt autossuficiente, um horário, um fuso horário e um lugar para entregar o resultado. Quando dispara, o Pepe roda o agente sobre esse prompt em uma **sessão nova, sem histórico de chat**. Nada de nenhuma conversa anterior é carregado, então o prompt precisa dizer tudo o que a execução precisa (o que fazer, quais dados olhar, a janela de tempo).
+Uma tarefa agendada é um trabalho que você entrega uma vez a um agente e que passa a acontecer sozinho: "todo dia útil às 9, resuma os erros da noite e me mande". Por baixo, uma tarefa é um prompt autossuficiente, um horário, um fuso horário e um lugar para entregar o resultado. Quando dispara, o Pepe roda o agente sobre esse prompt em uma **sessão nova, sem histórico de chat**. Nada de nenhuma conversa anterior é carregado, então o prompt precisa dizer tudo o que a execução precisa (o que fazer, quais dados olhar, a janela de tempo).
 
-<div class="note">Quando o prompt de uma tarefa passa a fazer sempre exatamente a mesma coisa, uma chamada real ao modelo em cada execução é puro desperdício. Veja <a href="../flows/">Flows</a> para uma tarefa agendada que reproduz uma sequência exata e comprovada de chamadas de ferramenta em vez de um prompt - sem nenhuma chamada ao modelo.</div>
+<div class="note">Quando o prompt de uma tarefa passa a fazer sempre exatamente a mesma coisa, uma chamada real ao modelo em cada execução é puro desperdício. Veja <a href="../flows/">Flows</a> para uma tarefa agendada que reproduz uma sequência exata e comprovada de chamadas de ferramenta em vez de um prompt: sem nenhuma chamada ao modelo.</div>
 
 ### Criar uma tarefa pela CLI
 

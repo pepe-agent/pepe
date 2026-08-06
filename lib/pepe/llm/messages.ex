@@ -17,6 +17,8 @@ defmodule Pepe.LLM.Messages do
   when `model.api == "anthropic-messages"`.
   """
 
+  @behaviour Pepe.LLM.Adapter
+
   alias Pepe.Config.Model
   alias Pepe.LLM.SSE
 
@@ -25,12 +27,17 @@ defmodule Pepe.LLM.Messages do
   @client_id "You are Claude Code, Anthropic's official CLI for Claude."
   @default_max_tokens 4096
 
+  @impl true
+  def api, do: "anthropic-messages"
+
   @doc "Non-streaming: collect the stream and return the assembled result."
+  @impl true
   def chat(%Model{} = model, messages, opts \\ []) do
     stream_chat(model, messages, fn _ -> :ok end, opts)
   end
 
   @doc "Streaming Messages call. `on_delta` receives each assistant text fragment."
+  @impl true
   def stream_chat(%Model{} = model, messages, on_delta, opts \\ [])
       when is_function(on_delta, 1) do
     model = Pepe.OAuth.ensure_fresh(model)
@@ -54,6 +61,7 @@ defmodule Pepe.LLM.Messages do
   end
 
   @doc "List the Claude model ids via `GET {base}/models`. Returns `{:ok, ids}`."
+  @impl true
   def list_models(%Model{} = model) do
     model = Pepe.OAuth.ensure_fresh(model)
     headers = Map.put(headers(model), "accept", "application/json")

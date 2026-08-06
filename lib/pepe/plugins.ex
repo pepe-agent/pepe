@@ -24,6 +24,20 @@ defmodule Pepe.Plugins do
   @doc "Directory holding installed plugins."
   def dir, do: Path.join(Pepe.Config.home(), "plugins")
 
+  # Deliberately NOT cached, despite sitting on a hot path (Pepe.Permissions.gate/3, via
+  # Policy.veto/3, on every tool call; Pepe.Hooks.provider/1 at least twice a turn): every
+  # invalidation signal available from here is either too coarse or too easy to miss.
+  # `File.stat/1`'s mtime is second-granularity in the VM regardless of the underlying
+  # filesystem's own precision, so a write immediately followed by a read (install a plugin,
+  # then use it - the normal, expected CLI/dashboard flow) can land in the same wall-clock
+  # second and read stale - a real bug, not a theoretical one: it was caught live by this
+  # module's own test suite writing a plugin file and asserting it's visible right after. A
+  # plain TTL has the same problem for longer, and on a path that includes policy-veto
+  # plugin resolution, "occasionally stale for up to N seconds" is not a trade a security
+  # gate should make for a `Path.wildcard` call that, for the common case (a handful of
+  # plugin files on local disk), is microseconds. `load/1` below still caches each file's
+  # own *compiled modules* by mtime, so no plugin is ever recompiled on every call - only
+  # the directory listing itself is re-walked.
   @doc "Every module defined by a plugin `.exs` (recursively), compiled once per file."
   def modules do
     Path.wildcard(Path.join(dir(), "**/*.exs"))
@@ -36,6 +50,28 @@ defmodule Pepe.Plugins do
     Enum.filter(modules(), fn mod ->
       Code.ensure_loaded?(mod) and Enum.all?(funs, fn {f, a} -> function_exported?(mod, f, a) end)
     end)
+  end
+
+  @doc """
+  Call `mod.fun(args)` guarded against a raise/throw/exit. Returns `{:ok, result}`, or
+  `:error` (logged) on failure. For the metadata probes every plugin surface calls to
+  route a request to the right module (`name/0`, `slot/0`, `api/0`, ...) - these run in
+  the caller's own process, before any per-call isolation (`Pepe.Slots.Guard`,
+  `Pepe.Gateways.PluginSupervisor`'s own children) has a chance to kick in, so a broken
+  plugin's probe must not crash whoever was just trying to route around it.
+  """
+  @spec safe_call(module(), atom(), list()) :: {:ok, term()} | :error
+  def safe_call(mod, fun, args \\ []) do
+    {:ok, apply(mod, fun, args)}
+  rescue
+    error -> warn(mod, fun, args, Exception.message(error))
+  catch
+    kind, reason -> warn(mod, fun, args, "#{kind}: #{inspect(reason)}")
+  end
+
+  defp warn(mod, fun, args, detail) do
+    Logger.warning("[plugins] #{inspect(mod)}.#{fun}/#{length(args)} failed: #{detail}")
+    :error
   end
 
   @doc """
@@ -253,6 +289,16 @@ defmodule Pepe.Plugins do
 
   # --- helpers ---------------------------------------------------------------------
 
+  # A hanging `.exs` (a blocking `receive` with no `after`, an infinite loop at the top
+  # level) would otherwise freeze `Code.compile_file/1` forever, in the caller's own
+  # process - and every plugin-facing surface (Pepe.Tools.get/1, Pepe.LLM.Adapters.get/1,
+  # Pepe.Slots.Guard.call/3, ...) calls through here, so one bad file would take the whole
+  # installation down with it. `compile/1` is run in its own supervised, unlinked Task with
+  # a hard deadline; a timeout is cached exactly like a successful compile (keyed by the
+  # same mtime), so a permanently-hung file costs the wait once, not on every call - fixing
+  # it (which changes its mtime) is what makes it eligible to retry.
+  @compile_timeout 5_000
+
   defp load(path) do
     key = {__MODULE__, path}
 
@@ -260,7 +306,7 @@ defmodule Pepe.Plugins do
       {:ok, %{mtime: mtime}} ->
         case :persistent_term.get(key, nil) do
           {^mtime, mods} -> mods
-          _ -> cache(key, mtime, compile(path))
+          _ -> cache(key, mtime, compile_with_timeout(path))
         end
 
       _ ->
@@ -271,6 +317,89 @@ defmodule Pepe.Plugins do
   defp cache(key, mtime, mods) do
     :persistent_term.put(key, {mtime, mods})
     mods
+  end
+
+  # `Pepe.Plugins.TaskSupervisor` lives in `Pepe.Application`'s own supervision tree,
+  # which a lightweight, config-only CLI command (`mix pepe agent add`, `plugin route
+  # enable`, ... - anything routed through `Mix.Tasks.Pepe.with_config/1`, as opposed to
+  # `with_app/2`) never starts at all - not gated off, simply never brought up, since
+  # these commands were never expected to need the live app. That was true until any
+  # plugin actually existed on disk: the moment one does, `Pepe.Tools.names/0`/
+  # `Pepe.PluginRoute.status/0`/anything else that enumerates plugins reaches here and
+  # would otherwise crash outright with a `GenServer.call` on a nonexistent process -
+  # found live, running `mix pepe agent add`/`plugin route enable` against a real
+  # install with plugins present.
+  #
+  # The fallback still gets the SAME timeout/crash protection as the normal path - an
+  # ephemeral, throwaway `Task.Supervisor` started just for this one call, not a bare
+  # `compile(path)`. A bare call was the first fix here, on the reasoning that a
+  # lightweight CLI command is short-lived and the operator can just Ctrl-C a hang - but
+  # the actual condition this branch fires on is "the named supervisor isn't running",
+  # not "I am specifically a lightweight CLI command", and that's a strictly bigger set:
+  # any test that doesn't start `Pepe.Application` (most of this session's own new test
+  # files) hits this path too, and `test/pepe/plugins_test.exs` already has a fixture
+  # that hangs forever on purpose - a bare synchronous call would have hung the whole
+  # test run on it instead of timing out. `Task.async/1` (bare, no supervisor at all)
+  # isn't a safe substitute either: it LINKS to the caller, so a crash in the task would
+  # propagate straight to the caller instead of yielding a clean `{:exit, reason}` the
+  # way `async_nolink` does - which is the entire reason this codebase uses
+  # `Task.Supervisor.async_nolink/2` everywhere else instead of bare `Task.async/1`.
+  defp compile_with_timeout(path) do
+    case Process.whereis(Pepe.Plugins.TaskSupervisor) do
+      nil -> compile_with_timeout_ephemeral(path)
+      pid -> run_bounded(pid, path)
+    end
+  end
+
+  defp compile_with_timeout_ephemeral(path) do
+    {:ok, sup} = Task.Supervisor.start_link()
+
+    try do
+      run_bounded(sup, path)
+    after
+      Supervisor.stop(sup)
+    end
+  end
+
+  defp run_bounded(supervisor, path) do
+    case start_bounded(supervisor, path) do
+      {:ok, task} -> await_bounded(task, path)
+      :overloaded -> []
+    end
+  end
+
+  # `Task.Supervisor.async_nolink/2` raises synchronously, in the caller's own process,
+  # if the supervisor is already at `max_children` - a burst of concurrent plugin loads
+  # (several conversations calling `Pepe.Tools.by_name/0`, `Pepe.Hooks.registry/0`, ...
+  # all at once) would otherwise crash whoever happened to trigger the load, exactly the
+  # thing this whole module exists to prevent. Not cached: the caller gets `[]` for this
+  # one lookup, and the next call to `modules/0` tries again once load has eased.
+  defp start_bounded(supervisor, path) do
+    {:ok, Task.Supervisor.async_nolink(supervisor, fn -> compile(path) end)}
+  rescue
+    RuntimeError ->
+      Logger.warning("[plugins] #{Path.basename(path)} skipped: too many plugins loading concurrently")
+
+      :overloaded
+  end
+
+  defp await_bounded(task, path) do
+    case Task.yield(task, @compile_timeout) || Task.shutdown(task, :brutal_kill) do
+      {:ok, mods} ->
+        mods
+
+      {:exit, reason} ->
+        Logger.warning("[plugins] #{Path.basename(path)} crashed while loading: #{inspect(reason)}")
+        []
+
+      nil ->
+        Logger.error(
+          "[plugins] #{Path.basename(path)} took longer than #{@compile_timeout}ms to load - " <>
+            "skipping it (fix or remove the file, which changes its mtime and makes it eligible to retry)"
+        )
+
+        []
+    end
   end
 
   defp compile(path) do
@@ -289,6 +418,16 @@ defmodule Pepe.Plugins do
   rescue
     error ->
       Logger.warning("[plugins] failed to load #{path}: #{Exception.message(error)}")
+      []
+  catch
+    # A `throw`/`exit` at a plugin's own top level (not a `raise`) used to only ever
+    # reach here through compile_with_timeout_supervised/1's Task boundary, which
+    # catches it regardless of whether this function does - compile_with_timeout/1's
+    # synchronous fallback (no Task, no supervisor) calls straight into this function,
+    # so without this clause the same plugin that's handled fine on a normal boot would
+    # crash a lightweight CLI command outright the moment it isn't.
+    kind, reason ->
+      Logger.warning("[plugins] failed to load #{path}: #{kind}: #{inspect(reason)}")
       []
   end
 

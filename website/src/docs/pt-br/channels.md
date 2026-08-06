@@ -1,6 +1,6 @@
 ---
 title: Canais
-description: Entenda tipos de canal, vínculo com agentes, sessões, envio de arquivos e roteamento.
+description: Coloque seus agentes no Telegram, no WhatsApp, no Slack e em outros lugares. Como os canais funcionam, quem pode falar com eles e como arquivos e repasses são entregues.
 ---
 
 Um canal conecta um dos seus agentes a um lugar onde as pessoas já conversam.
@@ -32,12 +32,14 @@ canais que já existem lá, em vez de você adicionar cada um na mão.
 
 Os canais diferem apenas em como uma mensagem chega até o Pepe:
 
-- **Telegram** é um bot que o Pepe consulta por polling. Nada precisa ser acessível
-  publicamente. Adicione um token, vincule a um agente, execute o gateway.
+- **Telegram** é um bot de que o próprio Pepe busca as mensagens, então nada do
+  seu lado precisa ficar acessível na internet. Adicione um token, vincule a um
+  agente, execute o gateway.
 - **Canais por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google Chat
-  e uma rota de entrada genérica) recebem mensagens que a plataforma envia para
-  uma URL de retorno. O Pepe expõe uma URL por conexão. Você a registra uma
-  única vez com o provedor.
+  e uma rota de entrada genérica) recebem mensagens que a plataforma entrega em
+  um endereço no seu servidor, então o Pepe precisa estar acessível pela
+  internet. O Pepe expõe uma URL por conexão. Você a registra uma única vez com
+  o provedor.
 
 Todo canal por webhook, qualquer que seja a plataforma, é servido pelo mesmo
 endpoint de entrada:
@@ -46,7 +48,7 @@ endpoint de entrada:
 /webhooks/:project/:provider/:slug
 ```
 
-`:project` é o escopo do projeto, e é `default` quando você não cria projetos adicionais.
+`:project` é o projeto ao qual a conexão pertence, e é `default` quando você não cria projetos adicionais.
 `:provider` é o nome da plataforma, e `:slug` é o nome que você deu à conexão.
 Adicionar um provedor nunca adiciona um endpoint novo.
 
@@ -80,9 +82,9 @@ e traz repasse nativo para um humano. Os plugins de canal são configurados na a
   [Discord](../discord/).
 - **Microsoft Teams.** Registre um bot no Azure e aponte o messaging endpoint
   dele para a URL da conexão. O Pepe responde ao `serviceUrl` da activity com um
-  token gerado a partir das credenciais do app. Mantenha o endpoint atrás de um
-  proxy ou de um segredo: o JWT de entrada não é validado aqui. Veja
-  [Microsoft Teams](../msteams/).
+  token gerado a partir das credenciais do app. O JWT do Bot Framework que
+  chega é validado, então o endpoint aceita POSTs vindos diretamente da
+  Microsoft. Veja [Microsoft Teams](../msteams/).
 - **Google Chat.** Configure o endpoint de webhook (HTTP) do app para a URL da
   conexão e forneça um `access_token` OAuth da Chat API. As respostas são
   publicadas de volta no espaço. Mantenha o endpoint atrás de um proxy. Veja

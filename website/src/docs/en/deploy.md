@@ -1,6 +1,6 @@
 ---
 title: Deploying to a server
-description: Put Pepe on a server behind a domain and TLS, with Docker Compose, Docker Swarm or Kamal.
+description: Put Pepe on a server of its own, with a domain name and HTTPS, using Docker Compose, Docker Swarm or Kamal.
 ---
 
 [Docker](/en/docs/docker/) covers the container itself. This page covers the step after
@@ -13,8 +13,9 @@ locally they are all defaults you never had to think about.
 ## Four things that change the moment it leaves localhost
 
 **A dashboard password becomes mandatory.** It already was in Docker, and the reason is
-the same one here: Pepe treats anything that is not loopback as a public network and
-returns 403 to every request without one. Behind a reverse proxy that is *every* request.
+the same one here: to Pepe, only requests coming from the machine itself count as private
+(loopback); everything else is the public network, and without a password every such
+request is refused with a 403. Behind a reverse proxy that is *every* request.
 
 **`PHX_HOST` is the public name.** Pepe builds absolute URLs from it: widget embeds and
 the webhook URLs you hand to Telegram or WhatsApp. Left unset it is `localhost`, and
@@ -22,7 +23,8 @@ those URLs are quietly wrong while everything else works.
 
 **`SECRET_KEY_BASE`, or everyone is logged out on every deploy.** Unset, Pepe generates a
 random one at each boot, which is fine for a one-off container and wrong for a server:
-the session cookies signed by the old secret stop verifying. Generate it once
+after each deploy nobody's login is recognized anymore (the session cookies were signed
+by the old secret), and everyone signs in again. Generate it once
 (`openssl rand -base64 48`) and keep it.
 
 **Two settings live only in `config.json`.** They have no environment variable, so they
@@ -37,13 +39,15 @@ docker exec -it <container> bin/pepe rpc '
   end)'
 ```
 
-`allowed_hosts` closes DNS rebinding: with a password set and no allowlist, Pepe accepts
-any `Host` header, because the password is the gate and it has no way to know which domain
-you meant. `trusted_proxies` is the one people skip and then misdiagnose: without it every
-`X-Forwarded-For` is ignored, so the login rate limiter sees the proxy's address for
-everybody and the whole internet shares one bucket. Use the network your proxy actually
-sits on, not `0.0.0.0/0`. Trusting every forwarding header is the same as having no
-limiter at all.
+`allowed_hosts` names the domains Pepe should answer to. With a password set and no
+allowlist, Pepe accepts any `Host` header, because the password is the gate and it has no
+way to know which domain you meant; naming yours closes an attack called DNS rebinding,
+where a malicious page tricks a browser into reaching your Pepe under a different name.
+`trusted_proxies` is the one people skip and then misdiagnose: left empty, every
+`X-Forwarded-For` header is ignored, so the login rate limiter cannot tell visitors
+apart, sees the proxy's address for everybody, and the whole internet shares one bucket.
+Use the network your proxy actually sits on, not `0.0.0.0/0`. Trusting every forwarding
+header is the same as having no limiter at all.
 
 <div class="note"><strong>One replica. Always.</strong> Of the two stores Pepe keeps on that volume, the risk is not really the state on it. It is that a second instance runs a second scheduler, and every cron, watch and commitment fires twice (the <a href="#the-one-default-to-change">Kamal section</a> works through this, and it applies to every tool here). Two containers on two volumes are worse in a quieter way: two different Pepes, each convinced it is the only one. Every example below pins a single replica, and where the orchestrator's default is to start the new container before stopping the old one, that is turned off too.</div>
 

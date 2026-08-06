@@ -1,27 +1,28 @@
 ---
 title: WhatsApp
-description: Connect WhatsApp Cloud API webhooks to Pepe agents.
+description: Put a Pepe agent behind your WhatsApp number, using Meta's Cloud API.
 ---
 
 ## WhatsApp
 
-WhatsApp uses Meta's Cloud API. Unlike Telegram, which Pepe polls, WhatsApp
-**pushes** inbound messages to a webhook, so every connection gets its own URL on
-Pepe's generic inbound route:
+WhatsApp uses Meta's Cloud API. Unlike Telegram, where Pepe fetches messages
+itself, WhatsApp **delivers** each inbound message to an address on your
+server, so Pepe must be reachable from the internet. Every connection gets its
+own URL on Pepe's inbound route:
 
 ```
 /webhooks/:project/:provider/:slug        e.g.  /webhooks/acme/whatsapp/support
 ```
 
-That route is one generic webhook surface backed by a provider registry, not
-WhatsApp-specific plumbing. The `:project` segment is `default` when you are not
-using extra projects. A `GET` on the URL answers Meta's verification handshake. A
-`POST` is an inbound message: its `X-Hub-Signature-256` is verified against the
-app secret, then the bound agent runs and its reply goes back over the Graph API.
-`pepe serve` serves this route, so there is no extra process to run.
+The `:project` segment is `default` when you are not using extra projects.
+Pepe answers Meta's verification handshake on that URL itself, and every
+inbound message has its `X-Hub-Signature-256` signature checked against the
+app secret before the bound agent runs, so a forged request never reaches the
+agent. The reply goes back over the Graph API. `pepe serve` serves this route,
+so there is no extra process to run.
 
 You can run as many connections as you like, each bound to its own agent. It is
-the webhook analogue of Telegram's multiple bots.
+the same idea as running several Telegram bots.
 
 WhatsApp has a dedicated CLI because it is the most common webhook channel. Add a
 connection:

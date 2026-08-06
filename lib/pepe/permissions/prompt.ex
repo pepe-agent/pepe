@@ -23,11 +23,21 @@ defmodule Pepe.Permissions.Prompt do
   outside a tainted run would just be a confusing synonym for `:session`, since untainted
   pre-approval already works normally. See `Pepe.Permissions`' moduledoc for why `:this_run`
   exists at all.
+
+  `has_session?` (default `true`, so an existing caller passing only `tainted?` is
+  unaffected) drops `:session` when there is no `ctx.session_key` to remember it against -
+  a one-shot CLI call (`mix pepe run`, `oneshot/4`) has no session, and offering a button
+  that silently does nothing is worse than not offering it: the person picks it believing
+  it will stop the prompt from coming back, and it never does (that was a real bug - see
+  `Pepe.Permissions.gate/3`'s moduledoc).
   """
-  @spec options(boolean()) :: [Permissions.decision()]
-  def options(tainted? \\ false)
-  def options(true), do: @all_options
-  def options(false), do: @options
+  @spec options(boolean(), boolean()) :: [Permissions.decision()]
+  def options(tainted? \\ false, has_session? \\ true)
+  def options(true, has_session?), do: with_session(@all_options, has_session?)
+  def options(false, has_session?), do: with_session(@options, has_session?)
+
+  defp with_session(list, true), do: list
+  defp with_session(list, false), do: Enum.reject(list, &(&1 == :session))
 
   @doc """
   The button/menu label for a decision (translated, current locale).
@@ -95,6 +105,17 @@ defmodule Pepe.Permissions.Prompt do
       "This task read something from outside the conversation, so a standing \"session\"/\"always\" approval doesn't apply here. Pick \"Allow for the rest of this task\" to stop it asking again for the rest of this one."
     )
   end
+
+  @doc """
+  Why a `Pepe.Permissions.Policy` plugin is asking about this call specifically, or `nil`
+  when it wasn't a policy that forced this prompt. Shown so a human can tell a
+  policy-forced ask apart from the gate's own ordinary one - the two are remembered
+  under different grants (see `Pepe.Permissions.gate/3`'s moduledoc), so knowing which
+  question is being answered matters.
+  """
+  @spec policy_note(String.t() | nil) :: String.t() | nil
+  def policy_note(nil), do: nil
+  def policy_note(reason), do: gettext("🛡️ %{reason}", reason: reason)
 
   @doc """
   What a "session" or "always" answer will actually cover, given the risks of the call being

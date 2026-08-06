@@ -154,4 +154,67 @@ defmodule Pepe.SandboxTest do
 
     File.rm(wrapper)
   end
+
+  describe "the sandbox slot - a plugin can take over execution entirely" do
+    setup %{} = ctx do
+      File.mkdir_p!(Path.join(Config.home(), "plugins"))
+      ctx
+    end
+
+    test "a plugin pinned globally to the sandbox slot is called instead of the builtin" do
+      write_sandbox_plugin(Config.home(), "PepeSandboxTest.Fake", "fake_sandbox")
+      Config.put_slot("sandbox", "fake_sandbox")
+
+      assert Sandbox.cmd("sh", ["-c", "echo hi"], []) == {"[fake] ran sh", 7}
+    end
+
+    test "an agent's own slots override reaches only that agent, not the global default" do
+      write_sandbox_plugin(Config.home(), "PepeSandboxTest.Mine", "mine_sandbox")
+      agent = %Pepe.Config.Agent{name: "solo", slots: %{"sandbox" => "mine_sandbox"}}
+
+      assert Sandbox.cmd("sh", ["-c", "echo hi"], [], agent) == {"[fake] ran sh", 7}
+      # No agent (or a different one) still gets the real, direct execution.
+      assert {out, 0} = Sandbox.cmd("sh", ["-c", "echo hello"], stderr_to_stdout: true)
+      assert out =~ "hello"
+    end
+
+    test "a crashing sandbox plugin does NOT fall back to running the command on the host" do
+      # Unlike memory/web_search, sandbox's whole point is running a command somewhere
+      # other than the local host - falling back here would silently execute the agent's
+      # command on the host the moment an isolation backend fails, exactly what the slot
+      # is supposed to prevent. It must refuse instead (Pepe.Slots.degrade_mode/1 == :error).
+      write_sandbox_plugin(Config.home(), "PepeSandboxTest.Boom", "boom_sandbox", crash?: true)
+      Config.put_slot("sandbox", "boom_sandbox")
+
+      assert {out, 1} = Sandbox.cmd("sh", ["-c", "echo should never run"], stderr_to_stdout: true)
+      assert out =~ "sandbox execution failed"
+      refute out =~ "should never run"
+    end
+
+    test "bash routes through an agent's own sandbox override end to end" do
+      write_sandbox_plugin(Config.home(), "PepeSandboxTest.ForBash", "for_bash")
+      agent = %Pepe.Config.Agent{name: "scoped-bash", slots: %{"sandbox" => "for_bash"}}
+
+      assert {:ok, out} = Bash.run(%{"command" => "echo hi"}, %{cwd: System.tmp_dir!(), agent: agent})
+      assert out =~ "exit_status=7"
+      assert out =~ "[fake] ran sh"
+    end
+
+    defp write_sandbox_plugin(home, module, name, opts \\ []) do
+      body =
+        if opts[:crash?] do
+          "def run(_program, _argv, _opts), do: raise(\"boom\")"
+        else
+          "def run(program, _argv, _opts), do: {:ok, {\"[fake] ran \" <> program, 7}}"
+        end
+
+      File.write!(Path.join([home, "plugins", "#{name}.exs"]), """
+      defmodule #{module} do
+        def name, do: "#{name}"
+        def slot, do: "sandbox"
+        #{body}
+      end
+      """)
+    end
+  end
 end

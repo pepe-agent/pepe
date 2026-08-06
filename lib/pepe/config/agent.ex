@@ -30,6 +30,11 @@ defmodule Pepe.Config.Agent do
             # Privacy/transform hooks this agent runs on the message flow (redaction,
             # ...), by name - see `Pepe.Hooks`. Empty = none (raw, the default).
             hooks: [],
+            # Per-agent override of an exclusive slot's occupant (see `Pepe.Slots`), by slot
+            # name: `%{"memory" => "plugin_name"}`. Resolution is agent override -> project's
+            # own `default_slots` -> the installation-wide `slots` config -> the builtin.
+            # Empty = no override, inherit like every agent did before this existed.
+            slots: %{},
             # Tool-call rounds a task may take. `nil` (the default) imposes no task budget: an
             # agent runs until it is done, with `Pepe.Agent.LoopGuard` stopping a genuine spin
             # and a high backstop ceiling catching a runaway. Set a number to cap it deliberately.
@@ -149,6 +154,7 @@ defmodule Pepe.Config.Agent do
       # Preserve nil (the "itself only" default) vs [] (nobody) - don't coalesce.
       can_manage: map["can_manage"],
       hooks: map["hooks"] || [],
+      slots: (is_map(map["slots"]) && map["slots"]) || %{},
       max_iterations: map["max_iterations"],
       tool_progress: map["tool_progress"],
       temperature: map["temperature"],

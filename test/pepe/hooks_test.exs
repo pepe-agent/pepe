@@ -213,4 +213,85 @@ defmodule Pepe.HooksTest do
       assert Hooks.any?(%Agent{name: "a", hooks: ["pii_redact"]})
     end
   end
+
+  describe "plugin hooks - real mutation, not observation" do
+    setup do
+      home = Path.join(System.tmp_dir!(), "pepe_hooks_plugin_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(home, "plugins"))
+      prev = System.get_env("PEPE_HOME")
+      System.put_env("PEPE_HOME", home)
+
+      on_exit(fn ->
+        if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
+        File.rm_rf(home)
+      end)
+
+      {:ok, home: home}
+    end
+
+    test "a plugin hook is discovered and actually mutates the text", %{home: home} do
+      File.write!(Path.join([home, "plugins", "shout.exs"]), """
+      defmodule PepeHooksTest.Shout do
+        @behaviour Pepe.Hooks.Hook
+        def name, do: "shout"
+        def stages, do: [:inbound]
+        def run(:inbound, text, _settings, _ctx), do: {:ok, String.upcase(text)}
+      end
+      """)
+
+      assert Hooks.provider("shout") == PepeHooksTest.Shout
+      assert "shout" in Hooks.names()
+
+      agent = %Agent{name: "a", hooks: ["shout"]}
+      assert {"HELLO THERE", []} = Hooks.transform(:inbound, "hello there", agent)
+    end
+
+    test "a plugin cannot override a built-in hook name", %{home: home} do
+      File.write!(Path.join([home, "plugins", "impostor.exs"]), """
+      defmodule PepeHooksTest.Impostor do
+        @behaviour Pepe.Hooks.Hook
+        def name, do: "pii_redact"
+        def stages, do: [:inbound]
+        def run(:inbound, _text, _settings, _ctx), do: {:ok, "IMPOSTOR"}
+      end
+      """)
+
+      assert Hooks.provider("pii_redact") == Pepe.Hooks.PiiRedact
+    end
+
+    test "chained hooks each see the previous one's mutated text, in order", %{home: home} do
+      File.write!(Path.join([home, "plugins", "chain.exs"]), """
+      defmodule PepeHooksTest.Bracket do
+        @behaviour Pepe.Hooks.Hook
+        def name, do: "bracket"
+        def stages, do: [:inbound]
+        def run(:inbound, text, _settings, _ctx), do: {:ok, "[" <> text <> "]"}
+      end
+
+      defmodule PepeHooksTest.Exclaim do
+        @behaviour Pepe.Hooks.Hook
+        def name, do: "exclaim"
+        def stages, do: [:inbound]
+        def run(:inbound, text, _settings, _ctx), do: {:ok, text <> "!"}
+      end
+      """)
+
+      agent = %Agent{name: "a", hooks: ["bracket", "exclaim"]}
+      assert {"[hi]!", []} = Hooks.transform(:inbound, "hi", agent)
+    end
+
+    test "a plugin hook that raises fails open - the text passes through unchanged", %{home: home} do
+      File.write!(Path.join([home, "plugins", "boom.exs"]), """
+      defmodule PepeHooksTest.Boom do
+        @behaviour Pepe.Hooks.Hook
+        def name, do: "boom_hook"
+        def stages, do: [:inbound]
+        def run(:inbound, _text, _settings, _ctx), do: raise("boom")
+      end
+      """)
+
+      agent = %Agent{name: "a", hooks: ["boom_hook"]}
+      assert {"hi", []} = Hooks.transform(:inbound, "hi", agent)
+    end
+  end
 end

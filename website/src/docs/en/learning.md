@@ -44,8 +44,9 @@ deliberately kept separate:
 
 To find one thing without reading a whole file, an agent has the `memory_search`
 tool: a plain, case-insensitive search over its own `MEMORY.md`/`USER.md`/`people.md`
-entries, each match tagged with the file it came from. It's lexical, not semantic -
-no embeddings, no extra API call - which fits memory that's kept small on purpose.
+entries, each match tagged with the file it came from. It looks for the words
+themselves, not their meaning, and makes no model or API call, so it adds no cost
+and no delay: the right fit for a memory kept small on purpose.
 
 The review is a background run with its tools restricted to file and skill
 management. It has no shell and no network, so it can update the workspace and

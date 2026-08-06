@@ -217,6 +217,12 @@ defmodule PepeWeb.OpenAIController do
     end
   end
 
+  # An agent with hooks configured can't stream live deltas (Pepe.Hooks.stream?/1) - a
+  # delta is always the model's raw, un-hooked text, and Pepe.Agent.chat/4 only applies
+  # :outbound redaction/mutation once the full reply is in hand, after the turn returns.
+  # The client asked for stream: true and still gets a valid SSE response either way -
+  # with hooks, as one "content" chunk carrying the whole already-hooked reply instead of
+  # many incremental ones.
   defp session_response(conn, agent, session_id, text, true) do
     key = session_key(agent, session_id)
     id = "chatcmpl-" <> random_id()
@@ -227,6 +233,18 @@ defmodule PepeWeb.OpenAIController do
       |> put_resp_header("cache-control", "no-cache")
       |> send_chunked(200)
 
+    conn =
+      if Pepe.Hooks.stream?(agent) do
+        stream_session_deltas(conn, key, agent, text, id)
+      else
+        emit_buffered_sse(conn, id, agent.name, Pepe.Agent.chat(key, agent.name, text))
+      end
+
+    {:ok, conn} = chunk(conn, "data: [DONE]\n\n")
+    conn
+  end
+
+  defp stream_session_deltas(conn, key, agent, text, id) do
     parent = self()
 
     on_event = fn
@@ -246,8 +264,6 @@ defmodule PepeWeb.OpenAIController do
     # ceiling and kill it if it overruns, so a hung provider never leaves the request process and
     # its connection pinned forever (a slow resource-exhaustion vector under load).
     Task.shutdown(task, 5_000)
-
-    {:ok, conn} = chunk(conn, "data: [DONE]\n\n")
     conn
   end
 
@@ -259,13 +275,78 @@ defmodule PepeWeb.OpenAIController do
     messages = prepend_system(messages, agent)
     opts = if model, do: [model: model], else: []
 
-    case Runtime.run(agent, messages, opts) do
+    case run_with_hooks(agent, messages, opts) do
       {:ok, content, _all} ->
         json(conn, completion_object(agent.name, content))
 
       {:error, reason} ->
         upstream_error(conn, "agent error", reason)
     end
+  end
+
+  # Every /v1 call not backed by a Pepe.Agent.Session (stateless: no session_id was sent,
+  # so sync_response/stream_response call Runtime.run/3 directly) used to skip Pepe.Hooks
+  # entirely, streaming or not - a real agent (not just the "_passthrough" bare-model
+  # wrapper) reached over this API with `hooks` configured got neither the built-in
+  # PII/LLM/HTTP/Presidio redaction nor a plugin content-mutation hook, on a public HTTP
+  # surface. `:inbound` only sees the LATEST user message - a stateless client resends its
+  # own history on every call, and there is no server-side memory of an earlier turn to
+  # retroactively redact once it has already left.
+  defp run_with_hooks(agent, messages, opts) do
+    text = last_user_text(messages)
+    {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => []})
+    messages = replace_last_user_text(messages, redacted)
+    Pepe.Hooks.start_map(entries)
+
+    case Runtime.run(agent, messages, opts) do
+      {:ok, reply, all} ->
+        map = Pepe.Hooks.take_map()
+        {shown, _} = Pepe.Hooks.transform(:outbound, reply, agent, %{"map" => map})
+        {:ok, Pepe.Hooks.restore(shown, map), all}
+
+      other ->
+        Pepe.Hooks.take_map()
+        other
+    end
+  end
+
+  defp replace_last_user_text(messages, text) do
+    case last_user_index(messages) do
+      nil -> messages
+      idx -> List.update_at(messages, idx, &Map.put(&1, "content", text))
+    end
+  end
+
+  defp last_user_index(messages) do
+    messages
+    |> Enum.with_index()
+    |> Enum.filter(fn {m, _i} -> m["role"] == "user" end)
+    |> List.last()
+    |> case do
+      nil -> nil
+      {_m, i} -> i
+    end
+  end
+
+  # Emits a still-valid SSE response for a run that didn't (or couldn't) stream deltas:
+  # one "content" chunk with the whole reply, then the usual finish chunk. Accepts either
+  # `run_with_hooks/3`'s 3-tuple or `Pepe.Agent.chat/4`'s 2-tuple success shape.
+  defp emit_buffered_sse(conn, id, model_name, {:ok, content, _all}),
+    do: emit_buffered_sse(conn, id, model_name, {:ok, content})
+
+  defp emit_buffered_sse(conn, id, model_name, {:ok, content}) do
+    content_payload = chunk_object(id, model_name, %{"content" => content})
+    {:ok, conn} = chunk(conn, "data: #{Jason.encode!(content_payload)}\n\n")
+    finish_payload = chunk_object(id, model_name, %{}, "stop")
+    {:ok, conn} = chunk(conn, "data: #{Jason.encode!(finish_payload)}\n\n")
+    conn
+  end
+
+  defp emit_buffered_sse(conn, id, model_name, {:error, reason}) do
+    Logger.error("[/v1] stream error: #{inspect(reason)}")
+    payload = chunk_object(id, model_name, %{"content" => "\n[error: upstream request failed]"}, "stop")
+    {:ok, conn} = chunk(conn, "data: #{Jason.encode!(payload)}\n\n")
+    conn
   end
 
   # Never serialize the raw `reason` into the response: it can carry the provider's base_url,
@@ -307,6 +388,20 @@ defmodule PepeWeb.OpenAIController do
       |> put_resp_header("cache-control", "no-cache")
       |> send_chunked(200)
 
+    opts = if(model, do: [model: model], else: [])
+
+    conn =
+      if Pepe.Hooks.stream?(agent) do
+        stream_message_deltas(conn, agent, messages, id, opts)
+      else
+        emit_buffered_sse(conn, id, agent.name, run_with_hooks(agent, messages, opts))
+      end
+
+    {:ok, conn} = chunk(conn, "data: [DONE]\n\n")
+    conn
+  end
+
+  defp stream_message_deltas(conn, agent, messages, id, opts) do
     parent = self()
 
     on_event = fn
@@ -316,17 +411,14 @@ defmodule PepeWeb.OpenAIController do
       _ -> :ok
     end
 
-    opts = [stream: true, on_event: on_event] ++ if(model, do: [model: model], else: [])
-
-    task = Task.async(fn -> Runtime.run(agent, messages, opts) end)
+    run_opts = [stream: true, on_event: on_event] ++ opts
+    task = Task.async(fn -> run_with_hooks(agent, messages, run_opts) end)
 
     conn = stream_loop(conn, id, agent.name)
     # The stream loop already bounds itself (its `after 180_000`). Wait for the task with a finite
     # ceiling and kill it if it overruns, so a hung provider never leaves the request process and
     # its connection pinned forever (a slow resource-exhaustion vector under load).
     Task.shutdown(task, 5_000)
-
-    {:ok, conn} = chunk(conn, "data: [DONE]\n\n")
     conn
   end
 

@@ -28,6 +28,10 @@ defmodule Pepe.Agent.Runtime do
   multiple-choice prompt, rendered natively by whatever surface supplied the
   callback. With no `:ask_user` the tool fails outright instead of hanging on a
   button nobody can press.
+
+  Every event above (plus synthetic `:run_start`/`:run_end` bookends) is also fanned out,
+  asynchronously and best-effort, to any installed `Pepe.Agent.RunObserver` plugins - see
+  `Pepe.Agent.RunObservers`.
   """
 
   require Logger
@@ -51,6 +55,9 @@ defmodule Pepe.Agent.Runtime do
   @out_of_turns_nudge "You're out of turns for this task. Do not call any more tools - " <>
                         "reply now with your best summary of what you found or accomplished " <>
                         "so far, and what (if anything) is left unfinished."
+
+  @doc false
+  def name, do: "builtin"
 
   # Every option the loop reads. It has to be every one: a caller passing an option that
   # is missing here is a call Dialyzer says can never succeed, which is how `:review` and
@@ -81,10 +88,98 @@ defmodule Pepe.Agent.Runtime do
       Pepe.Trace.start(agent.name, opts[:session_key], last_user_text(messages), opts[:source]) ==
         :started
 
-    result = do_run(agent, messages, opts)
-    if own_trace?, do: Pepe.Trace.finish(result)
-    result
+    own_observers? = Pepe.Agent.RunObservers.attach(agent.name) == :started
+
+    try do
+      result = do_run_gated(agent, messages, opts)
+      if own_trace?, do: Pepe.Trace.finish(result)
+      if own_observers?, do: Pepe.Agent.RunObservers.finish(run_status(result))
+      result
+    after
+      # Runs in addition to the explicit finish/1 above on the normal path (safe: finish/1
+      # is a no-op the second time) - the only path that reaches THIS without having
+      # reached that one is a raise/exit, which is exactly what this exists to cover.
+      if own_observers?, do: Pepe.Agent.RunObservers.finish(:crashed)
+    end
   end
+
+  # The message-level counterpart to Pepe.Permissions.gate/3's own (tool-call-scoped)
+  # Policy.veto/3 check - a policy that opts into the optional check_run/3 callback (see
+  # Pepe.Permissions.Policy's moduledoc) can block a whole run before it starts, ahead of
+  # any tool call. Checked here, not inside do_run/3, so a blocked run never touches the
+  # model, never spends a taint/grant reset, and reports through the exact same
+  # trace/RunObservers finish path as any other run outcome.
+  defp do_run_gated(agent, messages, opts) do
+    case Pepe.Permissions.Policy.veto_run(agent, last_user_text(messages) || "", %{}) do
+      :allow -> run_via_harness(agent, messages, opts)
+      {_kind, reason} -> {:error, {:policy_denied, reason}}
+    end
+  end
+
+  # "harness" (Pepe.Slots) lets a plugin replace this whole loop - own its own turn/tool
+  # dispatch (delegating to an external agent CLI, say) instead of only a model call or a
+  # single tool. Dispatched here directly, not through Pepe.Slots.Guard like every other
+  # slot: Guard runs a non-default occupant in an isolated Task with an empty process
+  # dictionary, which is correct for a pure function (a memory search, a shell command)
+  # but wrong here - a harness occupant calls back into Pepe.Permissions/Pepe.Tools
+  # exactly as this module's own loop/7 does, and both read turn state (taint, run
+  # grants) from THIS process's dictionary. See Pepe.Agent.Harness's moduledoc.
+  defp run_via_harness(agent, messages, opts) do
+    case Pepe.Slots.occupant("harness", agent) do
+      __MODULE__ -> do_run(agent, messages, opts)
+      mod -> call_harness(mod, agent, messages, opts)
+    end
+  end
+
+  defp call_harness(mod, agent, messages, opts) do
+    # A harness plugin calls back into Pepe.Permissions exactly as the builtin loop does
+    # (see run_via_harness/3's own comment) - it needs the same clean-start reset do_run/3
+    # gives the builtin path, or it inherits whatever taint/grants happen to be sitting in
+    # this process (stale from an earlier run sharing it, or simply never set), and
+    # `opts[:untrusted]` - the mark that says this run's opening message already carries a
+    # stranger's content - would silently never reach a plugin harness at all.
+    reset_run_state(opts)
+
+    case mod.run(agent, messages, opts) do
+      {:ok, content, msgs} = ok when is_binary(content) and is_list(msgs) -> ok
+      {:error, _} = err -> err
+      other -> harness_failed(agent, messages, opts, {:bad_return, other})
+    end
+  rescue
+    e -> harness_failed(agent, messages, opts, {:crashed, Exception.message(e)})
+  catch
+    kind, reason -> harness_failed(agent, messages, opts, {:crashed, {kind, reason}})
+  end
+
+  # Pepe.Slots.degrade_mode("harness") is :error, not the more common :fallback: a harness
+  # that crashed mid-turn may already have taken real, non-idempotent action through its
+  # own means (sent a reply, run a tool), so silently re-running the whole turn on the
+  # builtin loop risks doing that work twice - the same reasoning "sandbox" uses.
+  defp harness_failed(agent, messages, opts, reason) do
+    Logger.error("[runtime] harness occupant #{inspect(Pepe.Slots.occupant("harness", agent))} failed (#{inspect(reason)})")
+
+    case Pepe.Slots.degrade_mode("harness") do
+      :fallback -> do_run(agent, messages, opts)
+      :error -> {:error, reason}
+    end
+  end
+
+  # Start clean. The "this run took in outside content" mark lives in the process
+  # dictionary (Pepe.Permissions), and a run gets its own process on every gateway. A run
+  # that shares a process with an earlier one (a test, a REPL, or a harness's own failed
+  # attempt falling back to the builtin) must not inherit its taint, and `:untrusted` from
+  # the caller is how a run is born tainted when its opening message already carries a
+  # document. Called at the top of both do_run/3 and call_harness/4 - whichever actually
+  # ends up owning the turn gets this exactly once, right before it starts.
+  defp reset_run_state(opts) do
+    Pepe.Permissions.untaint()
+    Pepe.Permissions.clear_run_grants()
+    if opts[:untrusted] == true, do: Pepe.Permissions.taint()
+  end
+
+  defp run_status({:ok, _content, _messages}), do: :ok
+  defp run_status({:error, {:policy_denied, _reason}}), do: :denied
+  defp run_status({:error, _reason}), do: :error
 
   # The most recent user message text, to label a trace with what triggered it.
   defp last_user_text(messages) do
@@ -95,14 +190,7 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp do_run(%Agent{} = agent, messages, opts) do
-    # Start clean. The "this run took in outside content" mark lives in the process dictionary
-    # (Pepe.Permissions), and a run gets its own process on every gateway. A run that shares a
-    # process with an earlier one (a test, a REPL) must not inherit its taint, and `:untrusted`
-    # from the caller is how a run is born tainted when its opening message already carries a
-    # document.
-    Pepe.Permissions.untaint()
-    Pepe.Permissions.clear_run_grants()
-    if opts[:untrusted] == true, do: Pepe.Permissions.taint()
+    reset_run_state(opts)
 
     # The failover chain: an explicit :model wins (single-entry chain); otherwise the
     # agent's model followed by that model's `fallbacks`. Transient errors advance.
@@ -262,14 +350,19 @@ defmodule Pepe.Agent.Runtime do
     end
   end
 
-  # agent.micro_compaction opts into Compaction.micro_compact/4's amortized per-turn fold
-  # instead of the default full-middle resummarize-on-threshold. See Compaction's moduledoc
-  # for the tradeoff (prompt-cache prefix stability) this is opt-in for.
-  defp compact_for_send(%{micro_compaction: true} = agent, chain, messages, ctx),
-    do: Compaction.micro_compact(messages, hd(chain), agent.name, ctx[:session_key])
-
-  defp compact_for_send(agent, chain, messages, _ctx),
-    do: Compaction.compact(messages, hd(chain), agent.name)
+  # Routed through the "compaction" slot (Pepe.Slots), not called directly - a plugin can
+  # take over condensation the same way memory/web_search/sandbox already can. The builtin
+  # occupant (Pepe.Agent.Compaction.compact/4) is where agent.micro_compaction's
+  # amortized-per-turn-fold-vs-full-resummarize choice actually lives now; see its
+  # moduledoc for that tradeoff. A crash/timeout degrades to the builtin for this call
+  # (Pepe.Slots.degrade_mode("compaction") == :fallback), and the builtin itself never
+  # errors, so `messages` unchanged is the only other possible outcome.
+  defp compact_for_send(agent, chain, messages, ctx) do
+    case Pepe.Slots.Guard.call("compaction", :compact, [messages, hd(chain), agent, ctx[:session_key]], agent) do
+      {:ok, compacted} -> compacted
+      {:error, _reason} -> messages
+    end
+  end
 
   # Try each model in the chain; advance ONLY on transient failures (rate limit,
   # server error, network) - auth/request errors fail fast (a bad key on model B
@@ -536,6 +629,7 @@ defmodule Pepe.Agent.Runtime do
 
   defp emit(opts, event) do
     Pepe.Trace.event(event)
+    Pepe.Agent.RunObservers.notify(event)
 
     case opts[:on_event] do
       fun when is_function(fun, 1) -> fun.(event)

@@ -20,6 +20,13 @@ defmodule PepeWeb.Router do
     plug PepeWeb.UsageAuth
   end
 
+  # A plugin's own HTTP route (Pepe.PluginRoute) - format is whatever that plugin's
+  # protocol needs (an OAuth callback redirect is a browser GET, a custom RPC endpoint
+  # might be JSON POST), so nothing is assumed here beyond "accept anything".
+  pipeline :plugin_route do
+    plug :accepts, ["*/*"]
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
     # Fail-closed: without a dashboard password, only genuine loopback clients get in.
@@ -61,6 +68,15 @@ defmodule PepeWeb.Router do
     pipe_through :api
 
     get "/:plugin/*path", AssetController, :show
+  end
+
+  # A plugin's own arbitrary HTTP route (Pepe.PluginRoute) - one route for every enabled
+  # plugin, resolved at request time. Every method funnels through :dispatch; the plugin
+  # decides what it answers to.
+  scope "/plugin-routes", PepeWeb do
+    pipe_through :plugin_route
+
+    match :*, "/:plugin/*path", PluginRouteController, :dispatch
   end
 
   # The web dashboard. Each section is a clean path; a specific conversation adds

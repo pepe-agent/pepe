@@ -5,7 +5,7 @@ description: Meter every model call per project, price it, mark up what you char
 
 ## What a call costs
 
-Every model call is metered and attributed to the agent's project, so you can bill a client per token. Metering happens at the single point every surface flows through (the console, the HTTP `/v1` API, the WebSocket, Telegram, and every webhook channel), and it appends to a durable, append-only ledger in the same small embedded SQLite file as commitments, watches and traces, keyed by project (e.g. `default`). That's the audit trail for what gets charged.
+Every model call is metered and attributed to the agent's project, so you can bill a client per token. No surface escapes the meter: the console, the HTTP `/v1` API, the WebSocket, Telegram, and every webhook channel all flow through the same point. Each call is appended to a ledger that is never rewritten, kept in the same small embedded SQLite file as commitments, watches and traces, keyed by project (e.g. `default`). That's the audit trail for what gets charged.
 
 **Cost** is `tokens × the model's price`, quoted per 1M tokens. A price is resolved in layers, and the first layer that answers wins:
 
@@ -56,9 +56,9 @@ Whether a call ran on a subscription is decided **when it is recorded**, not whe
 
 Every model call is metered per project (see Agents for what a project is and how to create one). On top of that metering, a project can optionally carry two independent monthly caps, plus a billing markup:
 
-- **Spend cap** (`--budget`) - a hard ceiling in your configured currency. Once the month-to-date billable total reaches it, that project's agents stop making new model calls until the cap resets.
-- **Message cap** (`--message-limit`) - a hard ceiling on customer-originated messages. Once reached, that project's agents stop replying to new inbound messages until it resets.
-- **Markup** (`--markup`) - a multiplier applied to provider cost to get what you bill the client (e.g. `1.3` = provider cost +30%). Unset means you bill exactly the provider cost.
+- **Spend cap** (`--budget`): a hard ceiling in your configured currency. Once the month-to-date billable total reaches it, that project's agents stop making new model calls until the cap resets.
+- **Message cap** (`--message-limit`): a hard ceiling on customer-originated messages. Once reached, that project's agents stop replying to new inbound messages until it resets.
+- **Markup** (`--markup`): a multiplier applied to provider cost to get what you bill the client (e.g. `1.3` = provider cost +30%). Unset means you bill exactly the provider cost.
 
 All three are optional and independent: set any of them, all of them, or none. The default project carries the same caps like any other, set with `pepe project set default ...` (or whatever you have renamed it to).
 

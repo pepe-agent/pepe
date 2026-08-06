@@ -46,8 +46,8 @@ restaurado en una amd64 pondría en el `PATH` ejecutables que allí no funcionan
 
 ### Contraseña del panel
 
-Un contenedor no es loopback. Pepe lo clasifica como red pública y, sin contraseña,
-responde 403 a todas las peticiones. El panel no arranca.
+Un contenedor no cuenta como tu propia máquina: Pepe trata su red como pública y,
+sin contraseña, rechaza todas las peticiones (HTTP 403). El panel no llega a abrirse.
 
 ```bash
 -e PEPE_DASHBOARD_PASSWORD=...

@@ -45,7 +45,7 @@ defmodule PepeWeb.PluginsLive do
         <.view_header
           icon="🧩"
           title={gettext("Plugins")}
-          desc={gettext("Install channels and tools that load at runtime, no rebuild. The code is security-scanned first; a plugin runs with full access, so install only from a source you trust.")}
+          desc={gettext("Install channels and tools that load at runtime, no rebuild. Pepe scans the code first, but a plugin runs with full access: install only from a source you trust.")}
         />
 
         <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
@@ -55,7 +55,7 @@ defmodule PepeWeb.PluginsLive do
             <p class="mb-3 flex items-start gap-2 text-[15px] text-amber-300">
               <span class="mt-0.5">⚠️</span>
               <span>
-                {gettext("A plugin is code that runs with full access to your data and this machine. Install one only from a source you know and trust, and review it first (use Scan). Never paste a link you don't understand.")}
+                {gettext("A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand.")}
               </span>
             </p>
 
@@ -72,7 +72,7 @@ defmodule PepeWeb.PluginsLive do
               <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4 accent-orange-500" />
               {gettext("I trust this source and understand it runs with full access to this machine.")}
             </label>
-            <p class={hlp()}>{gettext("A package carries a manifest.json; a bare .exs works too. Scanning is always safe, it never runs the code.")}</p>
+            <p class={hlp()}>{gettext("A package carries a manifest.json; a bare .exs works too. Scanning never runs the code, so it is always safe.")}</p>
 
             <div :if={@scan} class="mt-3">
               <.scan_report scan={@scan} />

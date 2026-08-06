@@ -1,15 +1,15 @@
 ---
 title: Agents
-description: Define an agent from a prompt, a model, and a set of tools, then let the runtime call the model, run tools, and loop until it has an answer.
+description: Describe an agent once, its instructions, its model, and its tools, and Pepe does the rest, calling the model and running tools until it has a real answer.
 ---
 
 ## What an agent is
 
-An agent is a small, declarative definition. It has a name, a system prompt that
-gives it a persona, a model connection to think with, and an allowlist of tools it
-is permitted to call. A handful of extra knobs (an iteration limit, a temperature,
-who it may talk to, who it may administer) round it out. That is the whole thing.
-The agent holds no logic of its own. The Pepe runtime does the work: it calls the
+An agent is a short description you write once: its name, its instructions (the
+system prompt that gives it a persona), which model it thinks with, and the list
+of tools it is allowed to call. A few extra settings (an iteration limit, a
+temperature, who it may talk to, who it may administer) round it out. That is the
+whole thing. The agent holds no logic of its own. Pepe does the work: it calls the
 model, runs any tools the model asks for, feeds the results back, and repeats until
 there is a final answer.
 
@@ -106,7 +106,7 @@ below); asking it to touch one outside that scope is politely refused.
 | `description` | A short human note. Never sent to the model. | none |
 | `model` | The name of a model connection. Leave it unset to use the project's default model. | project default |
 | `system_prompt` | The persona and instructions the agent runs with. | `You are Pepe, a helpful AI agent.` (a seed prompt) |
-| `tools` | The list of tool names this agent may call. Only these are offered to the model. | all tools - a new agent starts with everything enabled; remove what you don't want |
+| `tools` | The list of tool names this agent may call. Only these are offered to the model. | all tools: a new agent starts with everything enabled; remove what you don't want |
 | `auto_approve` | Tools this agent may run without asking for permission. `["*"]` means every tool. | `[]` |
 | `can_message` | Other agents this one may send messages to (a directed route). | `[]` |
 | `can_manage` | Which agents this one may administer. See [Administering agents](#administering-agents). | `null` (itself only) |
@@ -118,13 +118,13 @@ below); asking it to touch one outside that scope is politely refused.
 
 ## How the tool-calling loop runs
 
-When you send a turn to an agent, the runtime does this:
+When you send a message to an agent, Pepe does this:
 
-1. It calls the model with the conversation so far and the JSON specs for every tool
-   on the agent's allowlist.
+1. It calls the model with the conversation so far and a description of every tool
+   the agent is allowed to call.
 2. If the model replies with a final answer, that answer is returned and the loop
    ends.
-3. If the model instead asks to call one or more tools, the runtime runs each tool,
+3. If the model instead asks to call one or more tools, Pepe runs each tool,
    appends the results to the conversation, and goes back to step 1.
 4. This repeats until the model produces a final answer or the loop reaches
    `max_iterations`. If the cap is hit, the turn ends with the note
@@ -152,20 +152,22 @@ typing and tool activity as it happens rather than one blob at the end.</div>
 
 ## Long conversations: compaction
 
-A conversation doesn't grow forever inside the model's context window. Once the estimated
-size crosses about 75% of it, the runtime replaces the **middle** of the history with a short
-summary the model writes of itself, keeping the system prompt and the most recent turns
-verbatim. This is automatic and needs no configuration - the full transcript is still kept
-(see Traces), only what's sent to the model gets condensed.
+A conversation doesn't grow forever inside the model's context window (the amount of
+conversation a model can see at once). Once the estimated size crosses about 75% of it,
+Pepe replaces the **middle** of the history with a short summary the model writes of
+itself, keeping the system prompt and the most recent turns word for word. This is
+automatic and needs no configuration: the full transcript is still kept (see Traces),
+only what's sent to the model gets condensed.
 
 By default, that summarization happens **once**, from scratch, each time the threshold is
-crossed again - fine for most conversations, but a long-running one can hit it repeatedly,
-each time re-summarizing a middle that's only gotten bigger. An agent can opt into
-`micro_compaction` instead: once the window fills, it folds exactly the oldest
+crossed again. That is fine for most conversations, but a long-running one can hit it
+repeatedly, each time re-summarizing a middle that's only gotten bigger. An agent can opt
+into `micro_compaction` instead: once the window fills, it folds exactly the oldest
 not-yet-covered exchange into a running summary every turn, a small, steady cost instead of
-a periodic stall. The tradeoff is real, which is why it's off by default: the running summary
-changes every turn once active, which costs a provider's prompt-cache prefix stability -
-worth it for a conversation long enough to hit the threshold often, not for a short one.
+a periodic stall. The tradeoff is real, which is why it's off by default: once active, the
+running summary changes every turn, so the provider can no longer reuse its cached copy of
+the unchanged start of the prompt between calls. Worth it for a conversation long enough to
+hit the threshold often, not for a short one.
 
 ```bash
 pepe agent add support --micro-compaction ...
@@ -203,18 +205,18 @@ The built-in set covers the common ground:
 | `manage_plugin` | Install, scan, list, and remove community plugins (tools, channels) from chat. |
 | `config_get`, `config_set`, `doctor` | Inspect and change configuration under guardrails, run diagnostics. |
 
-Some tools are read-only and run freely: `read_file`, `list_dir`, `fetch_url`,
+Some tools only read things, so they run freely: `read_file`, `list_dir`, `fetch_url`,
 `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill`, and
-`send_to_agent` (which is governed by the `can_message` route allowlist instead).
+`send_to_agent` (which is governed by the `can_message` routes instead).
 Everything else, including any plugin tool, is treated as risky and passes through a
 permission gate before it executes.
 
 When a risky tool has not been pre-approved and the surface can ask a human (the
-console, a chat channel), the runtime asks you to authorize the call. You can answer:
+console, a chat channel), Pepe asks you to authorize the call. You can answer:
 
 - Allow once. Ask again next time.
 - Allow for the rest of this run. Only offered while the run has taken in content
-  from outside (see [Security and sandbox](../security/)) - the one kind of
+  from outside (see [Security and sandbox](../security/)): the one kind of
   pre-approval that actually keeps working during that window.
 - Allow for the rest of this session. Kept in memory, forgotten on restart.
 - Allow always. Persisted on the agent by adding the tool to its `auto_approve`
@@ -223,7 +225,7 @@ console, a chat channel), the runtime asks you to authorize the call. You can an
 
 Put a tool on `auto_approve` yourself to skip the prompt from the start. On surfaces
 with no human to ask (for example the HTTP API, a webhook, a cron job) a gated tool is
-refused rather than run unwatched - only what is already on `auto_approve` executes.
+refused rather than run unwatched: only what is already on `auto_approve` executes.
 
 ### Asking you to choose
 
@@ -231,9 +233,9 @@ Some questions are better answered with a tap than a typed reply. `ask_user` let
 agent present a genuine multiple-choice question and get the pick back as part of the
 same turn, instead of guessing or ending its turn and hoping the next message answers
 the right thing. Telegram renders it as real inline buttons; the console, as a numbered
-menu; the dashboard chat, as clickable options. It runs freely - asking a question
-carries no risk of its own, so it is never gated - but it only works where there is an
-interactive person to ask: the HTTP API, a webhook, or an unattended cron/watch run
+menu; the dashboard chat, as clickable options. It runs freely: asking a question
+carries no risk of its own, so it never needs approval. But it only works where there is
+an interactive person to ask: the HTTP API, a webhook, or an unattended cron/watch run
 refuses the call outright rather than hang waiting for a button nobody can press.
 
 ### Do it by chat
@@ -253,12 +255,12 @@ written.
 ## The model connection
 
 `model` names a connection you defined with `pepe model add`. Leaving it unset means
-the agent uses the default model for its scope, so you can point a whole set of
+the agent uses its project's default model, so you can point a whole set of
 agents at one provider and switch them all by changing one default.
 
 A model connection can carry a fallback chain. When the agent's primary model fails
-with a transient error (a rate limit, a timeout, a network blip, or a 5xx), the
-runtime walks down the chain and retries on the next model, emitting a `failover`
+with a passing error (a rate limit, a timeout, a network blip, or a 5xx), Pepe
+moves down the chain and retries on the next model, emitting a `failover`
 event as it does. A hard error like a bad API key or a malformed request fails fast
 instead, since another endpoint would not fix it.
 
@@ -279,9 +281,9 @@ other config edit.
 
 ## Complexity-based model routing
 
-An agent's own `model` is treated as the good default. Optionally, a cheap raw
-classification call can judge whether a chat is simple enough to *downgrade* to
-something cheaper, before the real turn even starts. No extra agent to configure,
+An agent's own `model` is treated as the good default. Optionally, a quick and cheap
+first check can judge whether a chat is simple enough to *downgrade* to
+a cheaper model, before the real turn even starts. No extra agent to configure,
 just two fields:
 
 - `triage_model`: a model connection that classifies the incoming message with a
@@ -318,7 +320,7 @@ can see exactly why a session ended up on one model instead of the other.
 
 ## The default agent
 
-One agent per scope can be the default. The default is what runs when you do not name
+One agent per project can be the default. The default is what runs when you do not name
 an agent:
 
 ```bash
@@ -344,7 +346,7 @@ themselves, and their risky calls go through the permission gate.
 
 ## Letting agents talk to each other
 
-`can_message` is a directed allowlist. If agent A lists agent B, then A may send B a
+`can_message` is a one-way list. If agent A lists agent B, then A may send B a
 message with the `send_to_agent` tool. The reverse is not implied. Add a route from
 the CLI:
 
@@ -530,12 +532,12 @@ and it answers there with the same loop and the same tools.
 The `system_prompt` field is only the seed. What actually goes to the model as the
 system message also includes the agent's persona/identity/boot files if it has them,
 a short behavior contract, the current time, and an index of the docs and skills it
-knows about - none of which shows up if you only read the field on disk. To see the
+knows about, none of which shows up if you only read the field on disk. To see the
 whole thing, assembled exactly the way a real conversation would send it:
 
 ```bash
 pepe agent prompt NAME
 ```
 
-The dashboard's agent edit page has the same view, under **Assembled prompt** -
+The dashboard's agent edit page has the same view, under **Assembled prompt**,
 collapsed by default, since it can run long.

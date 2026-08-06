@@ -45,8 +45,9 @@ e reposto numa amd64 iria colocar no `PATH` executáveis que ali não correm.
 
 ### Palavra-passe do painel
 
-Um contentor não é loopback. O Pepe classifica-o como rede pública e, sem palavra-passe,
-devolve 403 a todos os pedidos: o painel não chega a servir.
+Um contentor não conta como a tua própria máquina: o Pepe trata a rede dele como
+pública e, sem palavra-passe, recusa todos os pedidos (HTTP 403). O painel não chega
+a abrir.
 
 ```bash
 -e PEPE_DASHBOARD_PASSWORD=...

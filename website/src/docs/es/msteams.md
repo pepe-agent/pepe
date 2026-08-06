@@ -1,12 +1,13 @@
 ---
 title: Microsoft Teams
-description: Conecta un bot de Microsoft Teams a un agente de Pepe mediante el Bot Framework.
+description: Pon un agente de Pepe en Microsoft Teams para que tu equipo converse con él allí.
 ---
 
 ## Microsoft Teams
 
-Teams usa el Bot Framework. Configúralo mediante la configuración guiada (o el
-panel):
+Conectar Teams permite que tu equipo converse con el agente donde ya trabaja.
+Teams habla con los bots mediante el Bot Framework de Microsoft; configura la
+conexión mediante la configuración guiada (o el panel):
 
 ```bash
 pepe setup
@@ -29,12 +30,13 @@ https://YOUR_HOST/webhooks/default/msteams/<slug>
 
 ### Autenticación de entrada
 
-Cada solicitud entrante lleva un token del Bot Framework en `Authorization: Bearer`,
-y Pepe lo valida (firma contra las claves públicas de Microsoft, emisor y una
-audiencia igual al `app_id` del bot) antes de que el agente vea nada. Así el
-endpoint acepta `POST`s directamente desde Microsoft, sin necesidad de un proxy que
-valide. Si tu proxy ya realiza esa comprobación, define `trust_proxy: true` en la
-conexión para omitir la de Pepe.
+Pepe comprueba que cada solicitud entrante viene de verdad de Microsoft antes
+de que el agente vea nada: cada solicitud lleva un token del Bot Framework en
+`Authorization: Bearer`, y Pepe lo valida (firma contra las claves públicas
+de Microsoft, emisor y una audiencia igual al `app_id` del bot). Así el
+endpoint acepta `POST`s directamente desde Microsoft, sin necesidad de un
+proxy que valide. Si tu proxy ya realiza esa comprobación, define
+`trust_proxy: true` en la conexión para omitir la de Pepe.
 
 Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
 (`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y
@@ -42,8 +44,9 @@ cómo funciona la ruta genérica por dentro.
 
 ### Cambiar de modelo
 
-`/model` y `/models` solo se activan en una conexión en modo `admin` con
-`commands` habilitado; en `support`, son texto plano. `/models` lista los
+Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
+responde. Solo funcionan en una conexión en modo `admin` con `commands`
+habilitado; en `support`, se tratan como texto normal. `/models` lista los
 modelos disponibles para el proyecto de esta conexión; `/model` muestra el
 actual, o lo cambia:
 
@@ -53,7 +56,8 @@ actual, o lo cambia:
 /model openrouter global        # cambia para todos con los que habla esta conexión
 ```
 
-Cualquiera en una conversación permitida puede cambiar su propia sesión;
-cambiarlo **globalmente** está reservado para **entrenadores**, la misma
-lista que rige la memoria. Pon `model_switch_locked: true` en la conexión para
+Cualquiera en una conversación permitida puede cambiar el modelo de su propia
+conversación. Cambiarlo **globalmente**, para todos con los que habla esta
+conexión, está reservado a los **entrenadores**, la misma lista de confianza
+que rige la memoria. Pon `model_switch_locked: true` en la conexión para
 desactivar el cambio de modelo por completo para quien no sea entrenador.

@@ -225,7 +225,7 @@ defmodule PepeWeb.TracesLive do
           title={(@selected && gettext("Trace")) || gettext("Traces")}
           desc={
             (@selected && gettext("Replay of one run, step by step.")) ||
-              gettext("The last runs across every surface: the tools each called, how it ended and how long it took. Open one to replay it.")
+              gettext("Recent runs from every surface, with each run's outcome, duration and tools called. Open one to replay it step by step.")
           }
         >
           <%!-- Your traces are the test data you already have. When a run went right, this is
@@ -236,7 +236,7 @@ defmodule PepeWeb.TracesLive do
           </button>
           <span :if={@selected && @selected_recorded}
             class="inline-flex items-center rounded-md bg-zinc-800 px-3 py-1.5 text-sm text-zinc-400"
-            title={gettext("Saved to the \"recorded\" eval suite. Run it with: mix pepe eval recorded")}>
+            title={gettext("Saved to the \"recorded\" eval suite. Run it with: %{cmd} eval recorded", cmd: Pepe.Invocation.command())}>
             {gettext("✓ Saved as an eval case")}
           </span>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>

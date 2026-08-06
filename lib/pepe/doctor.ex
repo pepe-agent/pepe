@@ -40,6 +40,7 @@ defmodule Pepe.Doctor do
         state_checks() ++
         plugin_checks() ++
         skill_checks() ++
+        slot_checks() ++
         unknown_key_checks()
 
     if opts[:live] do
@@ -95,9 +96,9 @@ defmodule Pepe.Doctor do
   # doesn't warn about its own soon-to-be-migrated shape.
   @known_top_level_keys ~w(
     agents api_tokens board_cards boards commitments companies crons currency
-    dashboard default_agent default_model default_project hooks locale mcp media
-    models plugins projects review_writes root sandbox secrets server
-    telegram telegram_topics telegrams timezone watches webhooks
+    dashboard db_connections default_agent default_model default_project hooks http_route_plugins
+    locale mcp media models plugins policy_scope projects review_writes root sandbox secrets
+    server skills slots telegram telegram_topics telegrams timezone watches webhooks
   )
 
   defp unknown_key_checks do
@@ -449,6 +450,35 @@ defmodule Pepe.Doctor do
       _ ->
         []
     end
+  end
+
+  # A slot pinned to a plugin that no longer resolves (removed, renamed, or it never claimed
+  # this slot to begin with) silently runs the default instead - correct, fail-safe
+  # behavior (see Pepe.Slots), but "silently" is exactly what a diagnostic exists to end.
+  # An occupant that DOES resolve but whose last call still failed (Pepe.Slots.Health) is
+  # the other silent case: `degraded?` alone only catches "not installed", not "installed,
+  # configured, and currently unreliable".
+  defp slot_checks do
+    Enum.flat_map(Pepe.Slots.status(), fn s ->
+      cond do
+        s.degraded? ->
+          [
+            {"slot", s.slot,
+             {:warn,
+              "configured occupant #{inspect(Config.slot_occupant(s.slot))} isn't available; using the default (#{s.default}) instead"}}
+          ]
+
+        s.last_failure ->
+          [
+            {"slot", s.slot,
+             {:warn,
+              "occupant #{inspect(s.occupant)} failed its last call (#{inspect(s.last_failure.reason)}) at #{s.last_failure.at}; still configured, this call may have been intermittent"}}
+          ]
+
+        true ->
+          [{"slot", s.slot, :ok}]
+      end
+    end)
   end
 
   ###

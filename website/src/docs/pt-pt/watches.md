@@ -1,6 +1,6 @@
 ---
 title: Vigilâncias
-description: Cria monitores duráveis que avisam uma única vez quando uma condição se torna verdadeira.
+description: Diz ao Pepe para ficar de olho em algo e avisar-te no momento em que acontecer. Verifica sozinho, sobrevive a reinícios e avisa exatamente uma vez.
 ---
 
 ## Vigilâncias

@@ -1,13 +1,13 @@
 ---
 title: Traces
-description: Um registo durável e reproduzível daquilo que cada execução do agente fez de facto.
+description: Cada execução do agente deixa um registo que podes reproduzir mais tarde para veres exatamente o que ela fez.
 ---
 
-Cada execução de um agente deixa um **trace**: um registo durável e reproduzível
-daquilo que o agente fez de facto, seja qual for a superfície que a desencadeou (a
-CLI, a API HTTP, um WebSocket, uma mensagem do Telegram ou do WhatsApp, ou uma
-tarefa agendada). Um trace responde à pergunta "porque é que o agente fez aquilo?"
-muito depois de a execução ter terminado.
+Cada execução de um agente deixa um **trace**: um registo duradouro daquilo que o
+agente fez de facto, que podes reproduzir passo a passo, venha a execução de onde
+vier (a CLI, a API HTTP, um WebSocket, uma mensagem do Telegram ou do WhatsApp, ou
+uma tarefa agendada). Um trace responde à pergunta "porque é que o agente fez
+aquilo?" muito depois de a execução ter terminado.
 
 ## O que um trace guarda
 
@@ -39,10 +39,10 @@ pepe traces 1720000000123456      # reproduz uma execução por id, passo a pass
 
 ## Onde ficam os traces
 
-Os traces vivem no mesmo pequeno ficheiro SQLite embutido dos compromissos e das
-vigilâncias, agrupados por projeto (o projeto default usa `default`). A quantidade
-guardada tem um teto por projeto, por isso os traces mais antigos vão sendo descartados
-e a tabela mantém-se limitada. Argumentos e resultados de ferramenta muito longos são
-cortados no registo guardado.
+Os traces ficam guardados no mesmo pequeno ficheiro SQLite embutido dos compromissos e
+das vigilâncias, agrupados por projeto (o projeto default usa `default`). Cada projeto
+guarda apenas uma quantidade limitada de traces: à medida que chegam novos, os mais
+antigos são apagados, por isso o ficheiro nunca cresce sem limite. Argumentos e
+resultados de ferramenta muito longos são encurtados antes de serem guardados.
 
-<div class="note"><strong>Diagnóstico, não registo de faturação.</strong> Os traces existem para explicar uma execução, e são descartados e cortados para se manterem limitados. A contabilidade de tokens para faturas vive no <a href="../billing/">livro-razão de utilização</a>, separado e só de acréscimo.</div>
+<div class="note"><strong>Diagnóstico, não registo de faturação.</strong> Os traces existem para explicar uma execução, e os antigos ou demasiado grandes vão sendo cortados. Para contagens de tokens que possas faturar, usa o <a href="../billing/">livro-razão de utilização</a>, separado, que nunca perde um lançamento.</div>

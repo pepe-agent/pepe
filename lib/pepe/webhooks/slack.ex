@@ -147,6 +147,64 @@ defmodule Pepe.Webhooks.Slack do
     end
   end
 
+  @doc """
+  Renders `Pepe.Presentation` blocks into real Slack Block Kit (`section`s for text/table,
+  an `actions` block of real buttons) instead of falling back to plain text - Slack's
+  native rich-message format, sent the same way `deliver/3` does.
+  """
+  @impl true
+  def deliver_blocks(config, channel, blocks) do
+    token = Config.interpolate(provider_config(config)["bot_token"])
+
+    if is_binary(token) and token != "" do
+      case Req.post("#{@api}/chat.postMessage",
+             auth: {:bearer, token},
+             json: %{
+               "channel" => channel,
+               "text" => Pepe.Presentation.to_text(blocks),
+               "blocks" => blocks |> Enum.map(&to_block_kit/1) |> Enum.reject(&is_nil/1)
+             },
+             receive_timeout: 15_000
+           ) do
+        {:ok, %{status: s, body: %{"ok" => true}}} when s in 200..299 -> :ok
+        {:ok, %{status: s, body: body}} -> {:error, {:slack, s, body}}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, :no_bot_token}
+    end
+  end
+
+  defp to_block_kit(%{"type" => "text", "text" => text}) do
+    %{"type" => "section", "text" => %{"type" => "mrkdwn", "text" => text}}
+  end
+
+  # Block Kit has no native table element - a monospace mrkdwn block is the same
+  # rendering approach most Slack bots use for tabular data.
+  defp to_block_kit(%{"type" => "table"} = block) do
+    %{"type" => "section", "text" => %{"type" => "mrkdwn", "text" => "```\n#{Pepe.Presentation.to_text([block])}\n```"}}
+  end
+
+  defp to_block_kit(%{"type" => "buttons", "buttons" => buttons}) do
+    %{
+      "type" => "actions",
+      "elements" =>
+        Enum.map(buttons, fn b ->
+          %{
+            "type" => "button",
+            "text" => %{"type" => "plain_text", "text" => b["label"]},
+            "value" => to_string(b["value"] || b["label"])
+          }
+        end)
+    }
+  end
+
+  # An unrecognized block type: dropped rather than rendered as an empty section, which
+  # Slack's real API would reject with invalid_blocks and fail the whole message over one
+  # stray block - same "silently drop what a text fallback can't render" rule as
+  # `Pepe.Presentation.to_text/1` itself.
+  defp to_block_kit(_other), do: nil
+
   @impl true
   def deliver_file(config, channel, path, caption) do
     token = Config.interpolate(provider_config(config)["bot_token"])

@@ -82,7 +82,7 @@ export const ui = {
       "Timezone-aware cron inside Pepe. Agents can propose schedules from chat, gated by your approval.",
     "f.plugins.t": "Plugins at runtime",
     "f.plugins.d":
-      "Install a plugin, fill in its settings, and give agents new tools or channels right away.",
+      "Install a plugin - a new tool, a redaction hook, a safety policy, or a channel - and it's live right away, no rebuild.",
     "f.learn.t": "Learning & memory",
     "f.learn.d":
       "The agent remembers what it learns (facts, preferences, the people it deals with) and reuses it in later conversations. Read and edit any memory from the dashboard.",
@@ -253,7 +253,7 @@ export const ui = {
       "Cron con zona horaria dentro de Pepe. Los agentes pueden proponer tareas desde el chat, con tu aprobación.",
     "f.plugins.t": "Plugins en tiempo de ejecución",
     "f.plugins.d":
-      "Instala un plugin, completa su configuración y da a los agentes nuevas herramientas o canales al instante.",
+      "Instala un plugin - una herramienta nueva, un hook de redacción, una policy de seguridad o un canal - y queda activo al instante, sin recompilar.",
     "f.learn.t": "Aprendizaje y memoria",
     "f.learn.d":
       "El agente recuerda lo que aprende (hechos, preferencias, las personas con las que trata) y lo reutiliza en conversaciones posteriores. Lee y edita cualquier memoria desde el panel.",
@@ -424,7 +424,7 @@ export const ui = {
       "Cron com fuso horário dentro do Pepe. Agentes podem propor tarefas pelo chat, com a sua aprovação.",
     "f.plugins.t": "Plugins em runtime",
     "f.plugins.d":
-      "Instale um plugin, preencha a configuração e dê aos agentes novas ferramentas ou canais na hora.",
+      "Instale um plugin - uma ferramenta nova, um hook de redação, uma policy de segurança ou um canal - e ele já entra em ação, sem recompilar.",
     "f.learn.t": "Aprendizado e memória",
     "f.learn.d":
       "O agente lembra o que aprende (fatos, preferências, as pessoas com quem fala) e reaproveita nas próximas conversas. Leia e edite qualquer memória pelo painel.",
@@ -595,7 +595,7 @@ export const ui = {
       "Cron com fuso horário dentro do Pepe. Os agentes podem propor tarefas pelo chat, com a tua aprovação.",
     "f.plugins.t": "Plugins em tempo de execução",
     "f.plugins.d":
-      "Instala um plugin, preenche a configuração e dá aos agentes novas ferramentas ou canais de imediato.",
+      "Instala um plugin - uma ferramenta nova, um hook de redação, uma policy de segurança ou um canal - e fica ativo de imediato, sem recompilar.",
     "f.learn.t": "Aprendizagem e memória",
     "f.learn.d":
       "O agente lembra-se do que aprende (factos, preferências, as pessoas com quem fala) e reaproveita nas conversas seguintes. Lê e edita qualquer memória pelo painel.",

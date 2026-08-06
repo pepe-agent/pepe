@@ -11,9 +11,18 @@ defmodule PepeWeb.OpenAIControllerTest do
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
 
     home = Path.join(System.tmp_dir!(), "pepe_ctrl_#{System.unique_integer([:positive])}")
-    File.mkdir_p!(home)
+    File.mkdir_p!(Path.join(home, "plugins"))
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+
+    File.write!(Path.join([home, "plugins", "marker.exs"]), """
+    defmodule OpenAIControllerTest.Marker do
+      @behaviour Pepe.Hooks.Hook
+      def name, do: "marker"
+      def stages, do: [:outbound]
+      def run(:outbound, text, _settings, _ctx), do: {:ok, "[MUTATED] " <> text}
+    end
+    """)
 
     config = %{
       "default_model" => "mock",
@@ -26,7 +35,13 @@ defmodule PepeWeb.OpenAIControllerTest do
         }
       },
       "agents" => %{
-        "assistant" => %{"model" => "mock", "system_prompt" => "You are helpful.", "tools" => []}
+        "assistant" => %{"model" => "mock", "system_prompt" => "You are helpful.", "tools" => []},
+        "hooked" => %{
+          "model" => "mock",
+          "system_prompt" => "You are helpful.",
+          "tools" => [],
+          "hooks" => ["marker"]
+        }
       }
     }
 
@@ -259,5 +274,85 @@ defmodule PepeWeb.OpenAIControllerTest do
     assert api_keys_for(sid2) == [akey(sid2)]
     assert Pepe.Agent.Session.history(akey(sid1)) |> Enum.count(&(&1["role"] == "user")) == 1
     assert Pepe.Agent.Session.history(akey(sid2)) |> Enum.count(&(&1["role"] == "user")) == 1
+  end
+
+  # `sync_response`/`stream_response` (the stateless paths - no session_id) used to call
+  # Runtime.run/3 directly, skipping Pepe.Hooks entirely regardless of streaming. Found
+  # while extending the earlier oneshot/Hooks fix to every surface that streams live deltas.
+  test "a stateless (no session) non-streaming call still runs the agent's hooks" do
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "hooked",
+        "messages" => [%{"role" => "user", "content" => "hi"}]
+      })
+
+    body = json_response(conn, 200)
+    assert hd(body["choices"])["message"]["content"] == "[MUTATED] Hello from the mock!"
+  end
+
+  test "a stateless streaming call with hooks buffers into one content chunk, already hooked" do
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "hooked",
+        "stream" => true,
+        "messages" => [%{"role" => "user", "content" => "hi"}]
+      })
+
+    assert conn.status == 200
+    chunks = sse_content_chunks(conn.resp_body)
+    assert chunks == ["[MUTATED] Hello from the mock!"]
+  end
+
+  test "a session-backed streaming call with hooks buffers into one content chunk, already hooked" do
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "hooked",
+        "stream" => true,
+        "session_id" => "sess-hooked-#{System.unique_integer([:positive])}",
+        "messages" => [%{"role" => "user", "content" => "hi"}]
+      })
+
+    assert conn.status == 200
+    chunks = sse_content_chunks(conn.resp_body)
+    assert chunks == ["[MUTATED] Hello from the mock!"]
+  end
+
+  test "a streaming call with NO hooks still streams incremental raw deltas, unaffected" do
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> post("/v1/chat/completions", %{
+        "model" => "assistant",
+        "stream" => true,
+        "messages" => [%{"role" => "user", "content" => "hi"}]
+      })
+
+    assert conn.status == 200
+    chunks = sse_content_chunks(conn.resp_body)
+    # MockLLM sends "Hello from the mock!" as one delta chunk per word - more than one
+    # chunk here is what proves this call streamed live rather than buffering.
+    assert [_, _ | _] = chunks
+    assert Enum.join(chunks) == "Hello from the mock!"
+  end
+
+  # Every "content" delta payload's text, in order, from a chat.completion.chunk SSE body.
+  defp sse_content_chunks(body) do
+    body
+    |> String.split("\n\n", trim: true)
+    |> Enum.filter(&String.starts_with?(&1, "data: "))
+    |> Enum.reject(&(&1 == "data: [DONE]"))
+    |> Enum.map(fn line ->
+      line
+      |> String.replace_prefix("data: ", "")
+      |> Jason.decode!()
+      |> get_in(["choices", Access.at(0), "delta", "content"])
+    end)
+    |> Enum.reject(&(&1 in [nil, ""]))
   end
 end

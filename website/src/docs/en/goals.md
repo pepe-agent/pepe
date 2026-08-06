@@ -87,7 +87,7 @@ A goal is not a special mode: it wraps a normal turn. The agent still has all of
 
 ## Working state inside a conversation
 
-`pepe goal` drives a whole run from the outside. Two separate tools give an agent working state on the **inside**, so it stays coherent across many turns instead of reacting one message at a time. Both are per-conversation: they live with the session, in the disposable store, and each call and its result show up in the chat and in [Traces](/en/docs/traces/). Both are tools like any other, present by default; remove `goal` and `update_plan` from an agent's tool list if you don't want it tracking a goal or plan across turns.
+`pepe goal` drives a whole run from the outside. Two separate tools give an agent working state on the **inside**, so it stays coherent across many turns instead of reacting one message at a time. Both are per-conversation: they belong to the session and go away with it, and each call and its result show up in the chat and in [Traces](/en/docs/traces/). Both are tools like any other, present by default; remove `goal` and `update_plan` from an agent's tool list if you don't want it tracking a goal or plan across turns.
 
 ### `goal`: the north star
 

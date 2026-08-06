@@ -63,7 +63,7 @@ The password is read from `dashboard.password` in the config (interpolated), wit
 - `pepe dashboard hosts app.example.com,dash.example.com` sets the extra `Host` header values the dashboard accepts. This doubles as the anti DNS-rebinding allowlist.
 - `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lists the reverse proxies whose `X-Forwarded-For` header may be trusted. Empty by default, meaning no forwarding header is trusted.
 
-Bound to a public interface with no password, the dashboard fails closed and blocks remote clients until you set one.
+Reachable from beyond your machine with no password set, the dashboard blocks every remote client until you set one: only the machine itself can open it, and a VM, a proxy or your office network count as outside (it fails closed rather than open).
 
 ## Reaching it remotely
 

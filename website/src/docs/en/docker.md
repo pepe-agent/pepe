@@ -45,8 +45,9 @@ one would put executables on the `PATH` that cannot run there.
 
 ### Dashboard password
 
-A container is not loopback. Pepe classifies it as a public network and, without a
-password, returns 403 to every request: the dashboard will not serve.
+A container does not count as your own machine: Pepe treats its network as public
+and, without a password, refuses every request (HTTP 403). The dashboard will not
+serve.
 
 ```bash
 -e PEPE_DASHBOARD_PASSWORD=...

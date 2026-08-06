@@ -79,7 +79,7 @@ pepe media tts --model openai --voice nova
 pepe media tts off
 ```
 
-A resposta em texto continua a ser o registo que fica guardado — o áudio é um extra, e tem
+A resposta em texto continua a ser o registo que fica guardado. O áudio é um extra, e tem
 um limite de tamanho para uma resposta longa nunca se tornar um clip de cinco minutos. Uma
 falha no TTS é silenciosa: a resposta em texto já foi enviada, por isso nada se perde, só
 não ganha voz nesse turno. As mesmas opções estão na página Config do painel, e no

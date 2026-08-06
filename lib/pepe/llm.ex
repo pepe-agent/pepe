@@ -39,13 +39,14 @@ defmodule Pepe.LLM do
   @spec chat(Model.t(), [map()], keyword()) :: {:ok, result()} | {:error, term()}
   def chat(model, messages, opts \\ [])
 
-  def chat(%Model{api: "openai-responses"} = model, messages, opts),
-    do: Pepe.LLM.Responses.chat(model, messages, opts)
-
-  def chat(%Model{api: "anthropic-messages"} = model, messages, opts),
-    do: Pepe.LLM.Messages.chat(model, messages, opts)
-
   def chat(%Model{} = model, messages, opts) do
+    case Pepe.LLM.Adapters.get(model.api) do
+      nil -> chat_completions(model, messages, opts)
+      mod -> safe_adapter(mod, :chat, [model, messages, opts])
+    end
+  end
+
+  defp chat_completions(%Model{} = model, messages, opts) do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts, false)
 
@@ -79,16 +80,14 @@ defmodule Pepe.LLM do
           {:ok, result()} | {:error, term()}
   def stream_chat(model, messages, on_delta, opts \\ [])
 
-  def stream_chat(%Model{api: "openai-responses"} = model, messages, on_delta, opts)
-      when is_function(on_delta, 1),
-      do: Pepe.LLM.Responses.stream_chat(model, messages, on_delta, opts)
+  def stream_chat(%Model{} = model, messages, on_delta, opts) when is_function(on_delta, 1) do
+    case Pepe.LLM.Adapters.get(model.api) do
+      nil -> stream_completions(model, messages, on_delta, opts)
+      mod -> safe_adapter(mod, :stream_chat, [model, messages, on_delta, opts])
+    end
+  end
 
-  def stream_chat(%Model{api: "anthropic-messages"} = model, messages, on_delta, opts)
-      when is_function(on_delta, 1),
-      do: Pepe.LLM.Messages.stream_chat(model, messages, on_delta, opts)
-
-  def stream_chat(%Model{} = model, messages, on_delta, opts)
-      when is_function(on_delta, 1) do
+  defp stream_completions(%Model{} = model, messages, on_delta, opts) do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts, true)
     init = %{buffer: "", content: "", tool_calls: %{}, finish: nil, usage: nil, raw: ""}
@@ -116,13 +115,29 @@ defmodule Pepe.LLM do
   Returns `{:ok, [id, ...]}` (sorted) or `{:error, reason}`.
   """
   @spec list_models(Model.t()) :: {:ok, [String.t()]} | {:error, term()}
-  def list_models(%Model{api: "openai-responses"} = model),
-    do: Pepe.LLM.Responses.list_models(model)
-
-  def list_models(%Model{api: "anthropic-messages"} = model),
-    do: Pepe.LLM.Messages.list_models(model)
-
   def list_models(%Model{} = model) do
+    # list_models/1 is an optional adapter callback - an adapter that skips it (or a
+    # model.api the registry doesn't recognize at all) falls through to the generic
+    # /models probe below, which many providers share regardless of chat protocol.
+    case Pepe.LLM.Adapters.get(model.api) do
+      nil ->
+        models_endpoint(model)
+
+      mod ->
+        # Code.ensure_loaded?/1 first: function_exported?/3 (unlike a plain call through
+        # apply/3, which triggers the code server's normal on-demand loading) does NOT load
+        # an unloaded module first - it would otherwise report a real, compiled callback as
+        # missing the first time this module is touched on a given node (e.g. the escript
+        # CLI's very first command), silently falling back to the generic /models probe.
+        if Code.ensure_loaded?(mod) and function_exported?(mod, :list_models, 1) do
+          safe_adapter(mod, :list_models, [model])
+        else
+          models_endpoint(model)
+        end
+    end
+  end
+
+  defp models_endpoint(%Model{} = model) do
     url = String.trim_trailing(model.base_url, "/") <> "/models"
 
     case Req.get(url, headers: headers(model), receive_timeout: 30_000, retry: :transient) do
@@ -140,6 +155,18 @@ defmodule Pepe.LLM do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # A builtin adapter (Responses/Messages) is core code, trusted like the rest of this
+  # module. A plugin adapter is untrusted the same way any plugin is: a crash here becomes
+  # a normal {:error, _} the failover chain already knows how to handle (transient
+  # classification, cooldown), instead of taking down the calling Session.
+  defp safe_adapter(mod, fun, args) do
+    apply(mod, fun, args)
+  rescue
+    e -> {:error, {:adapter_crashed, mod, Exception.message(e)}}
+  catch
+    kind, reason -> {:error, {:adapter_crashed, mod, {kind, reason}}}
   end
 
   ###

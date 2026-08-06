@@ -40,6 +40,11 @@ defmodule Pepe.Tools.ManagePlugin do
         user what a plugin does before installing.
       - list: show installed plugins.
       - remove: delete an installed plugin - needs `name`.
+      - route_list: show which installed plugins claim their own HTTP route
+        (Pepe.PluginRoute) and whether each is enabled. Read-only - enabling or \
+        disabling a route is an operator-only decision (`mix pepe plugin route enable`), \
+        never something this tool does, since a route (unlike a tool) answers ANY \
+        inbound request, not just one this agent's own model decided to make.
 
       A plugin runs with full access to the app, same trust level as any dependency - \
       always scan or read the source before installing something from an untrusted link.
@@ -47,7 +52,7 @@ defmodule Pepe.Tools.ManagePlugin do
       %{
         "type" => "object",
         "properties" => %{
-          "action" => %{"type" => "string", "enum" => ~w(install scan list remove)},
+          "action" => %{"type" => "string", "enum" => ~w(install scan list remove route_list)},
           "src" => %{
             "type" => "string",
             "description" => "Local path, .tar.gz, or http(s)/GitHub URL (for install/scan)."
@@ -70,6 +75,7 @@ defmodule Pepe.Tools.ManagePlugin do
   defp dispatch("scan", %{"src" => src}), do: scan(src)
   defp dispatch("install", %{"src" => src}), do: install(src)
   defp dispatch("remove", %{"name" => name}), do: remove(name)
+  defp dispatch("route_list", _args), do: {:ok, render_routes()}
   defp dispatch("scan", _args), do: {:error, "scan needs `src`"}
   defp dispatch("install", _args), do: {:error, "install needs `src`"}
   defp dispatch("remove", _args), do: {:error, "remove needs `name`"}
@@ -126,4 +132,17 @@ defmodule Pepe.Tools.ManagePlugin do
     desc = get_in(p.manifest || %{}, ["description"])
     "• #{p.name} (#{p.kind})#{if desc, do: " - " <> desc, else: ""}"
   end
+
+  defp render_routes do
+    case Pepe.PluginRoute.status() do
+      [] -> "No installed plugin claims an HTTP route."
+      routes -> Enum.map_join(routes, "\n", &route_line/1)
+    end
+  end
+
+  defp route_line(%{prefix: prefix, collision?: true}),
+    do: "• #{prefix} - BLOCKED: more than one installed plugin claims this prefix; rename one's route_prefix/0"
+
+  defp route_line(%{prefix: prefix, enabled?: true}), do: "• #{prefix} - enabled at /plugin-routes/#{prefix}/..."
+  defp route_line(%{prefix: prefix}), do: "• #{prefix} - claimed but not enabled"
 end

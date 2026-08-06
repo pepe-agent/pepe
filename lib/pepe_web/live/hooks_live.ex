@@ -172,7 +172,7 @@ defmodule PepeWeb.HooksLive do
         <option value="">{gettext("Pick a configured model")}</option>
         <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
-      <p class={hlp()}>{gettext("Use a local model (e.g. Ollama). Picking a remote/hosted model here sends the raw, unredacted PII to that provider first, which defeats the purpose of this hook.")}</p>
+      <p class={hlp()}>{gettext("Use a local model (e.g. Ollama): a remote/hosted model here sends the raw, unredacted PII to that provider first, defeating the purpose of this hook.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-[15px] text-zinc-300">

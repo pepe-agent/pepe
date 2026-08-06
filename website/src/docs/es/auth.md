@@ -157,7 +157,7 @@ Un token lleva un ámbito que decide a qué agentes puede llegar. De lo más est
 
 ### Permisos de token
 
-El ámbito dice *de quién* son los datos que el token alcanza. Un conjunto aparte de permisos dice *qué puede hacer* con ellos, y los valores por defecto dejan cada token que ya has creado exactamente como estaba: **puede** ejecutar agentes y **no puede** leer el consumo.
+El ámbito dice *de quién* son los datos que el token alcanza. Un conjunto aparte de permisos dice *qué puede hacer* con ellos. Los valores por defecto dejan cada token que ya has creado exactamente como estaba: **puede** ejecutar agentes y **no puede** leer el consumo.
 
 | Flag | Por defecto | Qué concede |
 | --- | --- | --- |

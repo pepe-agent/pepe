@@ -1,16 +1,16 @@
 ---
 title: Agentes
-description: Defina um agente a partir de um prompt, um modelo e um conjunto de ferramentas, e deixe o runtime chamar o modelo, executar ferramentas e repetir o ciclo até chegar a uma resposta.
+description: Descreva um agente uma única vez, suas instruções, seu modelo e suas ferramentas, e o Pepe faz o resto, chamando o modelo e executando ferramentas até chegar a uma resposta de verdade.
 ---
 
 ## O que é um agente
 
-Um agente é uma definição pequena e declarativa. Ele tem um nome, um system prompt
-que lhe dá uma personalidade, uma conexão de modelo com a qual raciocinar e uma
-lista de ferramentas que ele tem permissão para chamar. Um punhado de ajustes extras
+Um agente é uma descrição curta que você escreve uma vez: o nome, as instruções
+(o system prompt que lhe dá uma personalidade), com qual modelo ele pensa e a
+lista de ferramentas que ele pode chamar. Alguns ajustes extras
 (um limite de iterações, uma temperatura, com quem ele pode falar, quem ele pode
 administrar) completam o conjunto. É isso. O agente não guarda lógica própria. O
-runtime do Pepe faz o trabalho: chama o modelo, executa as ferramentas que o modelo
+Pepe faz o trabalho: chama o modelo, executa as ferramentas que o modelo
 pedir, devolve os resultados e repete até haver uma resposta final.
 
 Cada agente vive como uma entrada dentro de um único arquivo JSON em
@@ -95,7 +95,7 @@ fetch_url.
 O agente chama `manage_agent` com `action: "create"`, e depois `set_persona`,
 `set_model` e `add_tool` para cada capacidade. `manage_agent` é uma ferramenta de
 risco: ela passa pela barreira de permissão, então numa superfície que consegue
-perguntar (o console, um canal de chat) o runtime te pede para autorizar a mudança
+perguntar (o console, um canal de chat) o Pepe te pede para autorizar a mudança
 antes de escrevê-la, e a própria ferramenta é instruída a confirmar o plano com você
 primeiro. Um agente só pode gerir os agentes dentro do seu escopo `can_manage`
 (tratado em [Administrar agentes](#administrar-agentes) mais abaixo); pedir para ele mexer em um que esteja
@@ -107,9 +107,9 @@ fora desse escopo é recusado com educação.
 |-------|--------------|---------|
 | `name` | A identidade do agente, e a chave sob a qual ele é armazenado e endereçado. Dentro de um projeto vira um identificador como `acme/assistant` (veja abaixo). | obrigatório |
 | `description` | Uma nota curta para humanos. Nunca enviada ao modelo. | nenhum |
-| `model` | O nome de uma conexão de modelo. Deixe sem definir para usar o modelo padrão do escopo. | padrão do escopo |
+| `model` | O nome de uma conexão de modelo. Deixe sem definir para usar o modelo padrão do projeto. | padrão do projeto |
 | `system_prompt` | A personalidade e as instruções com que o agente roda. | `Você é o Pepe, um agente de IA prestativo.` (um prompt inicial) |
-| `tools` | A lista de nomes de ferramentas que este agente pode chamar. Só essas são oferecidas ao modelo. | todas as ferramentas - um agente novo já nasce com tudo habilitado; você remove o que não quiser |
+| `tools` | A lista de nomes de ferramentas que este agente pode chamar. Só essas são oferecidas ao modelo. | todas as ferramentas: um agente novo já nasce com tudo habilitado; você remove o que não quiser |
 | `auto_approve` | Ferramentas que este agente pode executar sem pedir permissão. `["*"]` significa todas. | `[]` |
 | `can_message` | Outros agentes para os quais este pode enviar mensagens (uma rota direcionada). | `[]` |
 | `can_manage` | Quais agentes este pode administrar. Veja [Administrar agentes](#administrar-agentes). | `null` (só ele mesmo) |
@@ -121,13 +121,13 @@ fora desse escopo é recusado com educação.
 
 ## Como o ciclo de chamada de ferramentas roda
 
-Quando você envia um turno a um agente, o runtime faz o seguinte:
+Quando você envia uma mensagem a um agente, o Pepe faz o seguinte:
 
-1. Chama o modelo com a conversa até o momento e as especificações JSON de cada
-   ferramenta na lista permitida do agente.
+1. Chama o modelo com a conversa até o momento e uma descrição de cada
+   ferramenta que o agente pode chamar.
 2. Se o modelo responder com uma resposta final, essa resposta é devolvida e o ciclo
    termina.
-3. Se em vez disso o modelo pedir para chamar uma ou mais ferramentas, o runtime
+3. Se em vez disso o modelo pedir para chamar uma ou mais ferramentas, o Pepe
    executa cada uma, anexa os resultados à conversa e volta ao passo 1.
 4. Isso se repete até o modelo produzir uma resposta final ou o ciclo atingir
    `max_iterations`. Se o teto for atingido, o turno termina com a nota
@@ -158,9 +158,9 @@ ferramentas conforme acontece, em vez de um único bloco no fim.</div>
 
 ## Conversas longas: compactação
 
-Uma conversa não cresce para sempre dentro da janela de contexto do modelo. Quando o tamanho estimado passa de cerca de 75% dela, o runtime substitui o **meio** do histórico por um resumo curto que o próprio modelo escreve, mantendo o system prompt e os turnos mais recentes intactos. Isso é automático e não precisa de configuração - a transcrição completa continua guardada (veja Traces), só o que é enviado ao modelo é condensado.
+Uma conversa não cresce para sempre dentro da janela de contexto do modelo (a quantidade de conversa que um modelo consegue ver de uma vez). Quando o tamanho estimado passa de cerca de 75% dela, o Pepe substitui o **meio** do histórico por um resumo curto que o próprio modelo escreve, mantendo o system prompt e os turnos mais recentes intactos. Isso é automático e não precisa de configuração: a transcrição completa continua guardada (veja Traces), só o que é enviado ao modelo é condensado.
 
-Por padrão, esse resumo acontece **uma vez**, do zero, cada vez que o limite é cruzado de novo - bom o suficiente para a maioria das conversas, mas uma que dura muito pode bater nele repetidas vezes, resumindo de novo um meio que só ficou maior. Um agente pode optar pelo `micro_compaction` em vez disso: quando a janela enche, ele dobra exatamente a troca mais antiga ainda não coberta dentro de um resumo contínuo a cada turno, um custo pequeno e constante em vez de uma parada periódica. O trade-off é real, por isso vem desligado por padrão: o resumo contínuo muda a cada turno assim que ativo, o que custa parte da estabilidade do cache de prompt de um provedor - vale a pena para uma conversa longa o bastante para bater no limite com frequência, não para uma curta.
+Por padrão, esse resumo acontece **uma vez**, do zero, cada vez que o limite é cruzado de novo. Isso basta para a maioria das conversas, mas uma que dura muito pode bater nele repetidas vezes, resumindo de novo um meio que só ficou maior. Um agente pode optar pelo `micro_compaction` em vez disso: quando a janela enche, ele dobra exatamente a troca mais antiga ainda não coberta dentro de um resumo contínuo a cada turno, um custo pequeno e constante em vez de uma parada periódica. O trade-off é real, por isso vem desligado por padrão: assim que ativo, o resumo contínuo muda a cada turno, então o provedor não consegue mais reaproveitar a cópia em cache do início inalterado do prompt entre as chamadas. Vale a pena para uma conversa longa o bastante para bater no limite com frequência, não para uma curta.
 
 ```bash
 pepe agent add support --micro-compaction ...
@@ -198,19 +198,19 @@ O conjunto embutido cobre o essencial:
 | `manage_plugin` | Instala, varre, lista e remove plugins da comunidade (ferramentas, canais) pelo chat. |
 | `config_get`, `config_set`, `doctor` | Inspeciona e altera a configuração sob proteções, roda diagnósticos. |
 
-Algumas ferramentas são somente leitura e rodam livremente: `read_file`, `list_dir`,
+Algumas ferramentas só leem coisas, então rodam livremente: `read_file`, `list_dir`,
 `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` e
-`send_to_agent` (que é regida pela lista de rotas permitidas `can_message`). Todo o
+`send_to_agent` (que é regida pelas rotas `can_message`). Todo o
 resto, incluindo qualquer ferramenta de plugin, é tratado como de risco e passa por
 uma barreira de permissão antes de executar.
 
 Quando uma ferramenta de risco não foi pré-aprovada e a superfície consegue perguntar
-a uma pessoa (o console, um canal de chat), o runtime te pede para autorizar a
+a uma pessoa (o console, um canal de chat), o Pepe te pede para autorizar a
 chamada. Você pode responder:
 
 - Permitir uma vez. Pergunta de novo na próxima.
 - Permitir pelo resto desta execução. Só é oferecida enquanto a execução tiver
-  ingerido conteúdo de fora (veja [Segurança e ambiente isolado](../security/)) - o
+  ingerido conteúdo de fora (veja [Segurança e ambiente isolado](../security/)): o
   único tipo de pré-aprovação que realmente continua funcionando durante essa janela.
 - Permitir pelo resto desta sessão. Guardado em memória, esquecido ao reiniciar.
 - Permitir sempre. Persistido no agente adicionando a ferramenta à sua lista
@@ -252,13 +252,13 @@ concessão antes de ela ser escrita.
 ## A conexão de modelo
 
 `model` nomeia uma conexão que você definiu com `pepe model add`. Deixá-lo sem
-definir significa que o agente usa o modelo padrão do seu escopo, então você pode
+definir significa que o agente usa o modelo padrão do seu projeto, então você pode
 apontar um conjunto inteiro de agentes para um provedor e trocar todos mudando um
 único padrão.
 
 Uma conexão de modelo pode carregar uma cadeia de fallback. Quando o modelo primário
-do agente falha com um erro transitório (um limite de taxa, um tempo esgotado, uma
-queda de rede ou um 5xx), o runtime desce pela cadeia e tenta de novo no próximo
+do agente falha com um erro passageiro (um limite de taxa, um tempo esgotado, uma
+queda de rede ou um 5xx), o Pepe desce pela cadeia e tenta de novo no próximo
 modelo, emitindo um evento `failover` enquanto o faz. Um erro grave como uma chave de
 API errada ou uma requisição mal formada falha na hora, já que outro endpoint não
 resolveria.
@@ -281,9 +281,9 @@ qualquer outra edição de configuração.
 ## Roteamento de modelo por complexidade
 
 O próprio `model` de um agente é tratado como a boa opção padrão.
-Opcionalmente, uma chamada de classificação barata e direta pode julgar se uma
-conversa é simples o bastante para *descer* para algo mais barato, antes mesmo do
-turno de verdade começar. Sem agente extra para configurar, só dois campos:
+Opcionalmente, uma primeira verificação rápida e barata pode julgar se uma
+conversa é simples o bastante para *descer* para um modelo mais barato, antes mesmo
+do turno de verdade começar. Sem agente extra para configurar, só dois campos:
 
 - `triage_model`: uma conexão de modelo que classifica a mensagem recebida com
   um prompt fixo e embutido (não uma persona que você escreve); o Pepe só
@@ -321,7 +321,7 @@ modelo e não em outro.
 
 ## O agente padrão
 
-Um agente por escopo pode ser o padrão. O padrão é o que roda quando você não nomeia
+Um agente por projeto pode ser o padrão. O padrão é o que roda quando você não nomeia
 um agente:
 
 ```bash
@@ -349,7 +349,7 @@ barreira de permissão.
 
 ## Deixar os agentes conversarem entre si
 
-`can_message` é uma lista de rotas permitidas direcionada. Se o agente A inclui o
+`can_message` é uma lista de mão única. Se o agente A inclui o
 agente B, então A pode enviar a B uma mensagem com a ferramenta `send_to_agent`. O
 contrário não está implícito. Adicione uma rota pela CLI:
 
@@ -417,7 +417,7 @@ token) é por id, então nada fica pendurado quando o rótulo muda.
 
 ## Agentes multiprojeto
 
-Todo tenant é um projeto. Sem criar nenhum projeto adicional, tudo vive no projeto
+Todo cliente (tenant) é um projeto. Sem criar nenhum projeto adicional, tudo vive no projeto
 default (slug `default`), exatamente como uma instalação de cliente único sempre
 funcionou. Adicione outro projeto para isolar um cliente: seus agentes, workspaces,
 espaço compartilhado, conexões de modelo e roteamento ficam isolados de qualquer outro
@@ -535,12 +535,12 @@ e ele responde ali com o mesmo ciclo e as mesmas ferramentas.
 O campo `system_prompt` é só a semente. O que realmente vai pro modelo como mensagem
 de sistema também inclui os arquivos de persona/identidade/boot do agente, se ele
 tiver, um contrato de comportamento curto, o horário atual e um índice dos docs e
-skills que ele conhece - nada disso aparece se você só ler o campo no disco. Pra ver
+skills que ele conhece, nada disso aparece se você só ler o campo no disco. Pra ver
 a coisa toda, montada exatamente como uma conversa real enviaria:
 
 ```bash
 pepe agent prompt NAME
 ```
 
-A página de edição do agente no dashboard tem a mesma visão, em **Prompt montado**
-- recolhida por padrão, já que pode ficar longa.
+A página de edição do agente no dashboard tem a mesma visão, em **Prompt montado**,
+recolhida por padrão, já que pode ficar longa.

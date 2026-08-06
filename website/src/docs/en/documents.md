@@ -14,7 +14,7 @@ The agent *can* do this itself, and until now it had to: identify the file, choo
 | | |
 |---|---|
 | **Text** (`.txt`, `.md`, `.csv`, `.json`, `.log`, `.xml`, and their kind) | Nothing. The file is read. |
-| **`.docx`, `.xlsx`, `.pptx`** | Nothing either. They are ZIP archives of XML, and Erlang already unzips. No Python, no system package, no bytes on the image. |
+| **`.docx`, `.xlsx`, `.pptx`** | Nothing either. Pepe reads these formats itself, with nothing extra to install. |
 | **`.pdf`** | `pdftotext` where the machine has it. Where it does not, the agent falls back to working it out and installing what it needs, once. |
 | **Anything else** | Falls through to the agent, which is what used to happen for everything. |
 
@@ -26,7 +26,7 @@ Only the first part of a long document is handed over, so one attachment cannot 
 
 ## Archives are not opened
 
-A `.zip` or a `.tar.gz` is a box, not a document. There is no "the text" of it, and unpacking whatever a stranger sends you is how you accept a decompression bomb and a path traversal in the same gesture. It falls through to the agent, which opens it deliberately, at the permission gate, and looks at what is inside before acting on it.
+A `.zip` or a `.tar.gz` is a box, not a document. There is no "the text" of it, and automatically unpacking whatever a stranger sends you is dangerous: an archive can be built to flood your disk when opened, or to drop files outside its own folder. It falls through to the agent, which opens it deliberately, at the permission gate, and looks at what is inside before acting on it.
 
 The office formats are safe precisely because they are **not** general: one entry is read, by name, into memory, and nothing is ever written to disk.
 

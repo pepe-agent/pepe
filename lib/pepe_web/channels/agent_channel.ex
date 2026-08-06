@@ -177,6 +177,11 @@ defmodule PepeWeb.AgentChannel do
   defp run_prompt(socket, text) do
     key = socket.assigns.watch_key
     channel = self()
+    # An agent with hooks configured never streams (Pepe.Agent.stream_for?/1) - a live
+    # "delta" event would push the model's raw, un-hooked text over the wire before
+    # :outbound redaction/mutation ever runs. The "done" event below already carries the
+    # correctly hooked content either way; this just stops a delta from leaking ahead of it.
+    stream? = Pepe.Agent.stream_for?(Session.status(key).agent)
 
     on_event = fn
       {:assistant_delta, t} -> push_event(channel, "delta", %{text: t})
@@ -193,7 +198,7 @@ defmodule PepeWeb.AgentChannel do
       # as a trainer" concept for an anonymous visitor. `lang` (the site's declared
       # language, from the join payload) nudges the agent's first reply - see
       # Session's own first-turn-only guard.
-      opts = [stream: true, on_event: on_event, authorize: nil, learn: false, lang: socket.assigns[:lang]]
+      opts = [stream: stream?, on_event: on_event, authorize: nil, learn: false, lang: socket.assigns[:lang]]
 
       case Session.chat(key, text, opts) do
         {:ok, content} ->

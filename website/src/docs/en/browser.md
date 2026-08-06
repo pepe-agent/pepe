@@ -3,18 +3,18 @@ title: Browser
 description: An agent can drive a real headless browser for pages that need JavaScript, a login, or clicking through a flow.
 ---
 
-`fetch_url` is a plain HTTP GET: it can't render JavaScript, log in, or click anything. The `browser` tool is for the pages that need that - a real, headless Chrome, driven one page at a time, that persists across calls in the same conversation until you close it.
+`fetch_url` is a plain HTTP GET: it can't render JavaScript, log in, or click anything. The `browser` tool is for the pages that need that: a real, headless Chrome, driven one page at a time, that persists across calls in the same conversation until you close it.
 
 Each conversation gets its own browser session, started the first time it calls `open` and closed automatically after ten idle minutes if nothing ends it explicitly. Its cookies and current page carry over from one call to the next, so a login, a multi-step form, or a page that only reveals content after a click all work the way they would in a real tab.
 
 ## What it can do
 
-- **`open`** - navigate to a URL (starts the session's browser if none is running yet). Returns the page's title, its visible text, and a numbered list of the elements you can act on.
-- **`snapshot`** - re-describe the current page, same shape as `open`, without navigating - useful after a script on the page changes something without a full page load.
-- **`click`** - click the element numbered `ref` from the last `open`/`snapshot`.
-- **`type`** - type text into the element numbered `ref`.
-- **`press`** - press a keyboard key (e.g. "Enter"), optionally focused on an element first.
-- **`close`** - end the session and free its browser.
+- **`open`**: navigate to a URL (starts the session's browser if none is running yet). Returns the page's title, its visible text, and a numbered list of the elements you can act on.
+- **`snapshot`**: re-describe the current page, same shape as `open`, without navigating. Useful after a script on the page changes something without a full page load.
+- **`click`**: click the element numbered `ref` from the last `open`/`snapshot`.
+- **`type`**: type text into the element numbered `ref`.
+- **`press`**: press a keyboard key (e.g. "Enter"), optionally focused on an element first.
+- **`close`**: end the session and free its browser.
 
 ```
 You: Log into the status page and tell me if anything's down.
@@ -31,17 +31,17 @@ Elements are addressed by number, not by a CSS selector you'd have to write your
 
 ## Security posture
 
-A browser under an agent's control reaches the same network the app does, so `browser` enforces the same rule `fetch_url` does: only `http`/`https`, and never an internal or private address (loopback, RFC1918, link-local, cloud metadata). That check does not stop at the URL you hand to `open` - a link the page itself links to, a JavaScript redirect, a form submit, or the page's own background requests are all checked the same way, and failed before Chrome ever sends them, not just the one address you typed. And because a real browser is a materially bigger surface than a read-only tool - the page's own scripts run, a signed-in session could be exposed, it uses real CPU and memory - `browser` is not always-safe: every call goes through the same permission prompt as `bash`.
+A browser under an agent's control reaches the same network the app does, so `browser` enforces the same rule `fetch_url` does: only `http`/`https`, and never an internal or private address (loopback, RFC1918, link-local, cloud metadata). That check does not stop at the URL you hand to `open`: a link the page itself links to, a JavaScript redirect, a form submit, or the page's own background requests are all checked the same way, and blocked before Chrome ever sends them, not just the one address you typed. And because a real browser is a materially bigger surface than a read-only tool (the page's own scripts run, a signed-in session could be exposed, it uses real CPU and memory), `browser` is not always-safe: every call goes through the same permission prompt as `bash`.
 
 ## Getting a browser
 
 `browser` needs an actual Chrome/Chromium/Edge/Brave binary to drive. It looks in this order:
 
-1. `PEPE_CHROME_BINARY`, if you set it - an explicit path wins over everything else.
-2. Whatever's already installed - checked on `PATH` and in each OS's normal install locations (`/Applications` on macOS, `Program Files` and the per-user install folder on Windows), so a browser you already have is used as-is, container or not.
+1. `PEPE_CHROME_BINARY`, if you set it: an explicit path wins over everything else.
+2. Whatever's already installed, checked on `PATH` and in each OS's normal install locations (`/Applications` on macOS, `Program Files` and the per-user install folder on Windows), so a browser you already have is used as-is, container or not.
 3. **A one-time automatic download** if neither of those found anything: a small, display-less `chrome-headless-shell` build from Google's own Chrome for Testing feed, cached under `~/.cache/pepe/browser/` so this only happens once per machine. Turn it off with `PEPE_BROWSER_AUTO_DOWNLOAD=0` if you'd rather install one yourself and see a clear error instead.
 
-The default image doesn't include the browser package itself (the same reasoning that keeps ffmpeg out - see the Dockerfile) - but it does include the shared libraries a downloaded browser needs to actually launch, on both architectures the official image ships (`amd64` and `arm64`), since `browser` is a built-in tool, not an optional extra. So step 3 is what runs by default in Docker, and it works out of the box: no build arg needed, no manual install, on either architecture - including an Apple Silicon Mac or an ARM cloud host, not just `amd64`. If you'd rather bake a full browser into the image instead of downloading at runtime:
+The default image doesn't include the browser package itself (the same reasoning that keeps ffmpeg out; see the Dockerfile), but it does include the shared libraries a downloaded browser needs to actually launch, on both architectures the official image ships (`amd64` and `arm64`), since `browser` is a built-in tool, not an optional extra. So step 3 is what runs by default in Docker, and it works out of the box: no build arg needed, no manual install, on either architecture, including an Apple Silicon Mac or an ARM cloud host, not just `amd64`. If you'd rather bake a full browser into the image instead of downloading at runtime:
 
 ```
 docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
@@ -49,14 +49,14 @@ docker build --build-arg PEPE_IMAGE_APT_PACKAGES="chromium" .
 
 ## Outside Docker on Linux
 
-A downloaded browser needs shared libraries the base OS has to already provide, and outside Docker that's not guaranteed the way it is in the official image - a desktop Linux distro usually already has them (other GUI apps depend on the same libraries), but a minimal or headless server might not. If `browser` downloads successfully but fails to launch, run:
+A downloaded browser needs shared libraries the base OS has to already provide, and outside Docker that's not guaranteed the way it is in the official image: a desktop Linux distro usually already has them (other GUI apps depend on the same libraries), but a minimal or headless server might not. If `browser` downloads successfully but fails to launch, run:
 
 ```
 mix pepe browser install
 ```
 
-It detects your package manager (`apt`/`dnf`/`yum`/`pacman`/`apk`/`zypper`) and installs a full browser through it, prompting for your `sudo` password if it needs one - you already asked for exactly this by running the command. Once installed, `browser` finds it on `PATH` directly and stops downloading anything at all.
+It detects your package manager (`apt`/`dnf`/`yum`/`pacman`/`apk`/`zypper`) and installs a full browser through it, prompting for your `sudo` password if it needs one; you already asked for exactly this by running the command. Once installed, `browser` finds it on `PATH` directly and stops downloading anything at all.
 
 ## Linux on ARM
 
-Google doesn't publish a Chrome for Testing build for Linux on ARM, so step 3 uses Playwright's own CDN there instead (a plain HTTPS download, same as Chrome for Testing - no npm or Node.js involved) - the one difference is it downloads full Chromium rather than the smaller headless-only build, since that CDN doesn't serve a headless-only build as its own artifact. Either way, this is automatic: an ARM host doesn't need any special configuration, in Docker or outside it.
+Google doesn't publish a Chrome for Testing build for Linux on ARM, so step 3 uses Playwright's own CDN there instead (a plain HTTPS download, same as Chrome for Testing, with no npm or Node.js involved). The one difference is it downloads full Chromium rather than the smaller headless-only build, since that CDN doesn't serve a headless-only build as its own artifact. Either way, this is automatic: an ARM host doesn't need any special configuration, in Docker or outside it.

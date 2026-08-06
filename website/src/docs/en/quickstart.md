@@ -40,15 +40,15 @@ For an ongoing conversation:
 pepe chat assistant
 ```
 
-`pepe run` is a one-shot and does not keep context. To resume a terminal
-conversation, use a console session:
+`pepe run` answers once and forgets: nothing carries over to the next run. To
+pick a conversation back up later in the terminal, give the session a name:
 
 ```bash
 pepe chat assistant --session my-session
 ```
 
-When a tool wants to act on your machine, such as running shell or writing a file,
-Pepe asks for approval first.
+When a tool wants to act on your machine, such as running a command or writing a
+file, Pepe asks for your approval first.
 
 ## 4. Serve the API and dashboard
 
@@ -56,7 +56,7 @@ Pepe asks for approval first.
 pepe serve --port 4000
 ```
 
-This exposes the same agent in three places:
+The same agent is now reachable in three places:
 
 - Local dashboard: `http://localhost:4000`
 - OpenAI-compatible API: `POST /v1/chat/completions`
@@ -70,7 +70,7 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"assistant","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-<div class="note"><strong>The API starts local.</strong> With no tokens, only same-machine callers can access <code>/v1</code>. Create a token with <code>pepe token add</code> before exposing the server.</div>
+<div class="note"><strong>The API starts local.</strong> Until you create a token, only this machine can call <code>/v1</code>: nobody else can reach your agent. Create one with <code>pepe token add</code> before exposing the server.</div>
 
 ## 5. Connect a channel
 
@@ -91,8 +91,8 @@ pepe cron add
 pepe watch add "site up" --probe "curl -sf https://example.com" --every 120
 ```
 
-Use scheduled tasks for recurring routines and watches for one-shot notifications
-when a condition changes.
+Use scheduled tasks for work that repeats, and watches to be told once when
+something you care about changes.
 
 ## Next steps
 

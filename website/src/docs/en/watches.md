@@ -1,6 +1,6 @@
 ---
 title: Watches
-description: Create durable one-shot monitors that notify you when a condition becomes true.
+description: Tell Pepe to keep an eye on something and warn you the moment it happens. It checks on its own, survives restarts, and notifies you exactly once.
 ---
 
 ## Watches

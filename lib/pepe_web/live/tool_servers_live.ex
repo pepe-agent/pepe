@@ -84,7 +84,7 @@ defmodule PepeWeb.ToolServersLive do
         <.view_header
           icon="🧰"
           title="MCP"
-          desc={gettext("Give agents extra abilities from external tool servers like MCP (Sentry, GitHub, ...). Keep secrets safe by writing tokens as ${ENV_VAR}.")}
+          desc={gettext("Give agents extra tools from external MCP servers (Sentry, GitHub, ...). Write tokens as ${ENV_VAR} to keep secrets out of the config file.")}
         >
           <button :if={!@edit_mcp} phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
           <button :if={@edit_mcp} phx-click="mcp_cancel" class={btn_ghost()}>&larr; {gettext("Back to servers")}</button>
@@ -157,7 +157,7 @@ defmodule PepeWeb.ToolServersLive do
             <div :if={@form[:kind].value != "local"}>
               <.input field={@form[:headers]} type="textarea" label={gettext("Headers")} class={[fld(), "font-mono"]}
                 placeholder={"Authorization: Bearer ${MCP_TOKEN}"} />
-              <p class={hlp()}>{gettext("One per line, as Key: value. Leave empty for a server that wants OAuth - you sign in after saving.")}</p>
+              <p class={hlp()}>{gettext("One per line, as Key: value. Leave empty for a server that uses OAuth: you sign in after saving.")}</p>
             </div>
             <.input :if={@form[:kind].value == "local"} field={@form[:command]} label={gettext("Command")} />
             <div :if={@form[:kind].value == "local"}>
@@ -212,7 +212,7 @@ defmodule PepeWeb.ToolServersLive do
       {:noreply,
        socket
        |> assign(mcp: Config.mcp_servers(), edit_mcp: nil)
-       |> put_flash(:info, gettext("MCP server %{name} saved - validate it.", name: name))}
+       |> put_flash(:info, gettext("MCP server %{name} saved. Validate it.", name: name))}
     else
       {:noreply, assign(socket, form: to_form(%{cs | action: :validate}, as: :mcp))}
     end
@@ -233,7 +233,7 @@ defmodule PepeWeb.ToolServersLive do
          put_flash(
            socket,
            :error,
-           gettext("This server's authorization server doesn't allow dynamic registration - pin a client_id in config.json.")
+           gettext("This server's authorization server doesn't allow dynamic registration. Pin a client_id in config.json.")
          )}
 
       {:error, reason} ->

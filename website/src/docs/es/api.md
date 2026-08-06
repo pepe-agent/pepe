@@ -128,7 +128,7 @@ Ambos viven bajo `/v1`, así que un cliente configurado con `base_url = http://H
 
 Esta es la idea que hace que todo lo demás encaje. El campo `model` de una petición de chat no nombra un modelo de lenguaje crudo. Nombra un **agente** de Pepe. Cuando envías `"model": "assistant"`, Pepe ejecuta el agente llamado `assistant`, con el prompt de sistema de ese agente y su propio conjunto de herramientas. El agente ejecuta el bucle completo de llamadas a herramientas de forma interna (llama al modelo, ejecuta las llamadas a herramientas, devuelve los resultados, repite) y retorna una única respuesta final con la forma habitual de una completion.
 
-La resolución del campo `model` ocurre en este orden:
+Pepe resuelve el campo `model` en este orden:
 
 1. Si el nombre coincide con un agente, ese agente se ejecuta.
 2. Si ningún agente coincide pero el nombre coincide con una conexión de modelo pura, Pepe la envuelve en un agente mínimo de paso directo (sin herramientas, un solo turno) y llama a ese modelo directamente. Esta alternativa solo está disponible en el ámbito abierto o raíz (consulta [Ámbitos de token](../auth/#ámbitos-de-token)).

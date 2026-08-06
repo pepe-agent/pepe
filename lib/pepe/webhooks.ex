@@ -45,14 +45,43 @@ defmodule Pepe.Webhooks do
   @doc "Whether a provider name is one of the native, built-in channels."
   def builtin?(name), do: Map.has_key?(@builtin_providers, name)
 
-  @doc "The `%{name => module}` map of every provider, built-in plugins last (they win)."
+  @doc """
+  The `%{name => module}` map of every provider. `Map.merge/2` gives precedence to its
+  second argument on a key clash, so a plugin provider wins over a built-in of the same
+  name - the opposite rule from `Pepe.Tools`, and the deliberate way to replace a bundled
+  provider with your own version of it.
+  """
   def registry, do: Map.merge(@builtin_providers, plugin_providers())
+
+  @doc """
+  Send `blocks` (see `Pepe.Presentation`) to `to` through provider `mod`'s own
+  `deliver_blocks/3` when it implements one, else flattened to plain text
+  (`Pepe.Presentation.to_text/1`) through its ordinary `deliver/3`.
+  """
+  # No tighter a spec than term(): mod is a runtime-resolved plugin/provider module, so -
+  # same as deliver_file/4's own callers - dialyzer (correctly) can't guarantee the
+  # callback's own declared :ok | {:error, term()} actually holds. Callers still guard
+  # against anything else at runtime (see e.g. Pepe.Tools.SendPresentation's normalize/1).
+  @spec deliver_blocks(module(), map(), String.t(), [Pepe.Presentation.block()]) :: term()
+  def deliver_blocks(mod, entry, to, blocks) do
+    if Code.ensure_loaded?(mod) and function_exported?(mod, :deliver_blocks, 3) do
+      mod.deliver_blocks(entry, to, blocks)
+    else
+      mod.deliver(entry, to, Pepe.Presentation.to_text(blocks))
+    end
+  end
 
   # A plugin provider is any plugin module exporting `name/0` plus the Provider callbacks.
   defp plugin_providers do
     [{:name, 0}, {:verify, 2}, {:authenticate, 3}, {:parse, 1}, {:deliver, 3}]
     |> Pepe.Plugins.implementing()
-    |> Map.new(fn mod -> {mod.name(), mod} end)
+    |> Enum.flat_map(fn mod ->
+      case Pepe.Plugins.safe_call(mod, :name, []) do
+        {:ok, name} when is_binary(name) -> [{name, mod}]
+        _ -> []
+      end
+    end)
+    |> Map.new()
   end
 
   @doc """

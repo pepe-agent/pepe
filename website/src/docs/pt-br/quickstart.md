@@ -42,15 +42,15 @@ Para uma conversa contínua:
 pepe chat assistant
 ```
 
-`pepe run` é uma execução avulsa e não guarda contexto. Para retomar uma conversa
-no terminal, use uma sessão no console:
+`pepe run` responde uma vez e esquece: nada passa para a próxima execução. Para
+retomar uma conversa no terminal mais tarde, dê um nome à sessão:
 
 ```bash
 pepe chat assistant --session minha-sessao
 ```
 
-Quando uma ferramenta quiser agir na sua máquina, como rodar shell ou escrever um
-arquivo, o Pepe pede aprovação antes.
+Quando uma ferramenta quiser agir na sua máquina, como rodar um comando ou
+escrever um arquivo, o Pepe pede sua aprovação antes.
 
 ## 4. Sirva a API e o painel
 
@@ -58,7 +58,7 @@ arquivo, o Pepe pede aprovação antes.
 pepe serve --port 4000
 ```
 
-Isso expõe o mesmo agente em três lugares:
+O mesmo agente agora fica acessível em três lugares:
 
 - Painel local: `http://localhost:4000`
 - API compatível com OpenAI: `POST /v1/chat/completions`
@@ -72,7 +72,7 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"assistant","messages":[{"role":"user","content":"olá"}]}'
 ```
 
-<div class="note"><strong>A API começa local.</strong> Sem tokens, apenas chamadas da própria máquina acessam <code>/v1</code>. Crie um token com <code>pepe token add</code> antes de expor o servidor.</div>
+<div class="note"><strong>A API começa local.</strong> Enquanto você não criar um token, só esta máquina consegue chamar <code>/v1</code>: ninguém de fora alcança seu agente. Crie um com <code>pepe token add</code> antes de expor o servidor.</div>
 
 ## 5. Conecte um canal
 
@@ -93,8 +93,8 @@ pepe cron add
 pepe watch add "site up" --probe "curl -sf https://example.com" --every 120
 ```
 
-Use tarefas agendadas para rotinas recorrentes e vigias para avisos únicos quando
-uma condição mudar.
+Use tarefas agendadas para o que se repete, e vigias para ser avisado uma única
+vez quando algo que importa mudar.
 
 ## Próximos passos
 

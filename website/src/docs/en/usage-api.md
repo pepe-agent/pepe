@@ -3,7 +3,7 @@ title: Usage API
 description: Read what has been spent over HTTP with a scoped token, per message, per model call, with or without your markup.
 ---
 
-The same bearer token that runs an agent can also be minted to do the opposite: run nothing, and only read what has been spent. That is what `/v1/usage` is for. It answers the question a billing integration actually asks, which is not "what did this month cost" but "what did *that message* cost, and why".
+`/v1/usage` is what you build a billing integration on: it reads what has been spent, over HTTP, with a token that can see the figures but run nothing. It answers the question billing actually asks, which is not "what did this month cost" but "what did *that message* cost, and why".
 
 Four endpoints, four zoom levels on the same ledger:
 
@@ -52,7 +52,7 @@ Every metered call has three numbers, and `--prices` picks which of them a read 
 * **`list`**: the same tokens at the model's price, with no markup applied.
 * **`all`**: both, plus `cost` (what you actually paid) and `margin`. Your own view.
 
-`billable` and `list` are exclusive rather than cumulative. Showing both hands over their ratio, which is the markup, which is the margin. A token given `list` is being shown list prices *instead*, not as well.
+`billable` and `list` are exclusive rather than cumulative. Showing both would reveal their ratio, and that ratio is your markup, your margin. A token given `list` is being shown list prices *instead*, not as well.
 
 This is decided by the token, never by the request. A client that calls `?prices=all` gets its own token's view back, not the one it asked for.
 

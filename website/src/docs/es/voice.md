@@ -79,7 +79,7 @@ pepe media tts --model openai --voice nova
 pepe media tts off
 ```
 
-La respuesta en texto sigue siendo el registro que queda guardado — el audio es un extra, y
+La respuesta en texto sigue siendo el registro que queda guardado. El audio es un extra, y
 tiene un límite de tamaño para que una respuesta larga nunca se convierta en un clip de
 cinco minutos. Un fallo del TTS es silencioso: la respuesta en texto ya se envió, así que no
 se pierde nada, solo no lleva voz ese turno. Las mismas opciones están en la página Config

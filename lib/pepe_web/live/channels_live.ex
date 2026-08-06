@@ -142,7 +142,7 @@ defmodule PepeWeb.ChannelsLive do
         <.view_header
           icon="📡"
           title={gettext("Channels")}
-          desc={gettext("Connect your agents to messaging channels so people can chat with them: a Telegram bot, or a webhook channel like WhatsApp, Slack, Discord, Teams or Google Chat, each bound to an agent.")}
+          desc={gettext("Connect agents to messaging channels so people can chat with them: a Telegram bot, or a webhook channel like WhatsApp, Slack, Discord, Teams or Google Chat. Each channel binds to one agent.")}
         >
           <button :if={!@edit_bot and @adding == nil} phx-click="restart_gateway"
             data-confirm={gettext("Restart the Telegram gateway now?")} class={btn_ghost()} title={gettext("Recovery: respawn the pollers if the gateway seems stuck")}>
@@ -166,7 +166,7 @@ defmodule PepeWeb.ChannelsLive do
                 <button phx-click="add" phx-value-kind="widget" class={btn_ghost()}>{gettext("+ Widget")}</button>
               </div>
               <p class="mt-2 text-sm text-zinc-500">
-                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook. Fill in the credentials, then register the Webhook URL shown in the provider. A widget is a chat bubble you embed with a script tag.")}
+                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook: fill in the credentials, then register the Webhook URL you get here in the provider's settings. A widget is a chat bubble you embed on your site with a script tag.")}
               </p>
             </div>
 
@@ -239,7 +239,7 @@ defmodule PepeWeb.ChannelsLive do
                 </div>
                 <div class="mt-1 text-sm text-zinc-400">{gettext("Agent:")} {t["agent"] || gettext("(default)")}</div>
                 <div class="text-sm text-zinc-500">{gettext("Origin:")} {t["allowed_origin"] || gettext("no origin set")}</div>
-                <p class={hlp()}>{gettext("To point this widget at a different agent or origin, create a new one and revoke this one - agent/origin can't change after minting, but appearance can, right here.")}</p>
+                <p class={hlp()}>{gettext("Agent and origin are fixed at minting. To change them, create a new widget and revoke this one. Appearance stays editable right here.")}</p>
 
                 <form :if={@edit_widget == t["id"]} phx-submit="widget_edit_save" class="mt-3 border-t border-zinc-800 pt-3">
                   <input type="hidden" name="widget_id" value={t["id"]} />
@@ -285,16 +285,16 @@ defmodule PepeWeb.ChannelsLive do
                   <option value="">{gettext("Choose an agent...")}</option>
                   <option :for={a <- scoped_agent_names(@scope)} value={a}>{a}</option>
                 </select>
-                <p class={hlp()}>{gettext("A widget always pins to one agent - never a whole workspace.")}</p>
+                <p class={hlp()}>{gettext("A widget always pins to one agent, never a whole workspace.")}</p>
               </div>
               <div>
                 <label class={lbl()}>{gettext("Allowed origin")}</label>
                 <input name="widget[allowed_origin]" placeholder="https://example.com" class={fld()} />
-                <p class={hlp()}>{gettext("The site's scheme + host. The widget's connection is refused from anywhere else.")}</p>
+                <p class={hlp()}>{gettext("The site's scheme + host. Pepe refuses widget connections from any other origin.")}</p>
               </div>
               <div class="border-t border-zinc-800 pt-4">
                 <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Appearance")}</div>
-                <p class={hlp()}>{gettext("Optional - leave blank to use the embed snippet's own data-* attributes. Editable here later without touching the site.")}</p>
+                <p class={hlp()}>{gettext("Optional: blank fields fall back to the embed snippet's own data-* attributes. You can edit them here later without touching the site.")}</p>
                 <.widget_appearance_fields prefix="widget" values={%{}} />
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
@@ -326,18 +326,18 @@ defmodule PepeWeb.ChannelsLive do
                 </select>
                 <div class="mt-2 space-y-1 text-sm text-zinc-400">
                   <p>
-                    <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}) — {gettext("just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal.")}
+                    <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}): {gettext("just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal.")}
                   </p>
                   <p>
-                    <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span> — {gettext("a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing.")}
+                    <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span>: {gettext("a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing.")}
                   </p>
                   <p>
-                    <span class="text-zinc-200">💬 {gettext("Ambient")}</span> — {gettext("a single line describing the kind of work happening, with no tool names or per-step detail.")}
+                    <span class="text-zinc-200">💬 {gettext("Ambient")}</span>: {gettext("a single line describing the kind of work happening, with no tool names or per-step detail.")}
                   </p>
                   <p>
-                    <span class="text-zinc-200">🚫 {gettext("Nothing")}</span> — {gettext("no status message at all, just Telegram's native typing indicator.")}
+                    <span class="text-zinc-200">🚫 {gettext("Nothing")}</span>: {gettext("no status message at all, just Telegram's native typing indicator.")}
                   </p>
-                  <p class="pt-0.5 text-zinc-600">{gettext("Whichever you pick, the status message updates in place and is removed when the answer arrives, so only the reply stays in the chat.")}</p>
+                  <p class="pt-0.5 text-zinc-600">{gettext("Whichever you pick, the status message updates in place and disappears when the answer arrives. Only the reply stays in the chat.")}</p>
                 </div>
               </div>
               <div>
@@ -529,7 +529,7 @@ defmodule PepeWeb.ChannelsLive do
          )}
 
       {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, gettext("Couldn't save - the widget may have been removed."))}
+        {:noreply, put_flash(socket, :error, gettext("Couldn't save. The widget may have been removed."))}
     end
   end
 

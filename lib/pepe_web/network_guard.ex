@@ -92,7 +92,7 @@ defmodule PepeWeb.NetworkGuard do
         <p>You reached it from outside the local machine. For safety, Pepe serves the
         dashboard openly only to <strong>localhost</strong>.</p>
         <p>To allow this access, set a password on the server:</p>
-        <p><code>mix pepe dashboard password '&lt;your password&gt;'</code></p>
+        <p><code>#{Pepe.Invocation.command()} dashboard password '&lt;your password&gt;'</code></p>
         <p class="hint">Or keep it private: bind to <code>127.0.0.1</code> and tunnel in
         (SSH <code>-L</code>, a Multipass port-forward, or Tailscale). The
         <code>/v1</code> API and webhooks are unaffected - they use their own auth.</p>

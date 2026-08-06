@@ -5,7 +5,7 @@ description: Transmita eventos de agentes ao vivo por uma conexão WebSocket.
 
 ## WebSocket: streaming ao vivo
 
-O stream SSE por HTTP acima já basta para a maior parte do streaming de servidor a servidor e é mais simples de consumir. Recorra ao WebSocket quando estiver construindo uma interface interativa e quiser mais do que texto: ele revela cada chamada de ferramenta e cada resultado de ferramenta conforme acontece, e consegue empurrar uma notificação de vigilância disparada de volta para a mesma conexão.
+O WebSocket serve para construir interfaces interativas que mostram um agente trabalhando em tempo real. Ele transmite a resposta conforme ela é gerada, revela cada chamada de ferramenta e cada resultado de ferramenta conforme acontece, e consegue empurrar uma notificação de vigilância disparada de volta para a mesma conexão. Para streaming simples de servidor a servidor, o stream SSE da [API HTTP](../api/) costuma bastar, e é mais simples de consumir.
 
 ### Conectar
 

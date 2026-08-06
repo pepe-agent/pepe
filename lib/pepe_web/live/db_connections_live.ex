@@ -89,7 +89,7 @@ defmodule PepeWeb.DbConnectionsLive do
         <.view_header
           icon="🗄️"
           title={gettext("Databases")}
-          desc={gettext("Let an agent read from an external Postgres database with the db_query tool. A customer's own multi-tenancy is enforced by the database's own Row-Level Security, never by a value the model supplies - see the Database docs for the role/policy SQL to run once, by hand.")}
+          desc={gettext("Let an agent read from an external Postgres database with the db_query tool. The database's own Row-Level Security enforces tenant isolation, never a value the model supplies. See the Database docs for the role/policy SQL to run once, by hand.")}
         >
           <button :if={!@edit_conn} phx-click="conn_new" class={btn()}>{gettext("+ New connection")}</button>
           <button :if={@edit_conn} phx-click="conn_cancel" class={btn_ghost()}>&larr; {gettext("Back to connections")}</button>
@@ -236,7 +236,7 @@ defmodule PepeWeb.DbConnectionsLive do
 
   defp save_flash(name, %{"tenant_column" => col}) when is_binary(col) and col != "" do
     gettext(
-      "Database connection %{name} saved, tenant-scoped on %{col}. This protects nothing on its own - make sure Row-Level Security is set up on the database itself.",
+      "Database connection %{name} saved, tenant-scoped on %{col}. This protects nothing on its own: make sure Row-Level Security is set up on the database itself.",
       name: name,
       col: col
     )

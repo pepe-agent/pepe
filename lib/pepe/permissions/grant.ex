@@ -88,6 +88,10 @@ defmodule Pepe.Permissions.Grant do
   defp risk_string({:unknown, text}), do: text
   defp risk_string(kind), do: to_string(kind)
 
+  @doc "Is `grant` the wildcard (\"every tool, every risk\")?"
+  @spec wildcard?(String.t()) :: boolean()
+  def wildcard?(grant), do: grant == @wildcard
+
   @doc """
   Fold a new grant into an existing list, widening the one for that tool rather than piling
   up a second entry beside it. A config file nobody can read at a glance is a config file

@@ -1,12 +1,12 @@
 ---
 title: Traces
-description: A durable, replayable record of what every agent run actually did.
+description: Every agent run leaves a record you can replay later to see exactly what it did.
 ---
 
-Every agent run leaves a **trace**: a durable, replayable record of what the
-agent actually did, no matter which surface triggered it (the CLI, the HTTP API,
-a WebSocket, a Telegram or WhatsApp message, or a scheduled job). A trace answers
-"why did the agent do that?" long after the run is over.
+Every agent run leaves a **trace**: a lasting record of what the agent actually
+did, one you can replay step by step, no matter where the run started (the CLI,
+the HTTP API, a WebSocket, a Telegram or WhatsApp message, or a scheduled job).
+A trace answers "why did the agent do that?" long after the run is over.
 
 ## What a trace holds
 
@@ -37,9 +37,10 @@ pepe traces 1720000000123456      # replay one run by id, step by step
 
 ## Where traces live
 
-Traces live in the same small embedded SQLite file as commitments and watches, keyed by
-project (the default project uses `default`). Kept count is capped per project, so the
-oldest traces are trimmed and the table stays bounded. Long tool arguments and results
-are clipped in the stored record.
+Traces are stored in the same small built-in SQLite file as commitments and watches,
+grouped by project (the default project uses `default`). Each project keeps only a
+limited number of traces: as new ones arrive, the oldest are deleted, so the file
+never grows without limit. Very long tool arguments and results are shortened before
+being stored.
 
-<div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and they are trimmed and clipped to stay bounded. Token accounting for invoices lives in the separate, append-only <a href="../billing/">usage ledger</a>.</div>
+<div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and old or oversized ones get trimmed away. For token counts you can invoice on, use the separate <a href="../billing/">usage ledger</a>, which never drops an entry.</div>

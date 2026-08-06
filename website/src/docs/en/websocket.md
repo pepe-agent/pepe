@@ -5,7 +5,7 @@ description: Stream live agent events over a WebSocket connection.
 
 ## WebSocket: live streaming
 
-The HTTP SSE stream above is enough for most server-to-server streaming, and it is simpler to consume. Reach for the WebSocket when you are building an interactive UI and want more than text: it surfaces each tool call and tool result as it happens, and it can push a fired watch notification back to the same connection.
+The WebSocket is for building interactive UIs that show an agent working in real time. It streams the answer as it is generated, surfaces each tool call and tool result as it happens, and can push a fired watch notification back to the same connection. For plain server-to-server streaming, the SSE stream of the [HTTP API](../api/) is usually enough, and simpler to consume.
 
 ### Connect
 
