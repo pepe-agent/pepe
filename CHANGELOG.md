@@ -44,6 +44,9 @@ All notable changes to this project are documented here. Format follows
 ### Fixed
 - **pt-BR and pt-PT both translated the dashboard's "not installed" slot label as "não permitido" ("not allowed"), the wrong word entirely** - a stale fuzzy-matched translation, unrelated to any of this pass's own edits. Now "não instalado".
 
+### Security
+- **Bumped `postgrex` 0.22.3 → 0.22.4**, fixing a SQL injection via the `:comment` option on `Postgrex.stream/4` (GHSA-3gww-3f36-2388 / CVE-2026-66838). Pepe's own code never calls `Postgrex.stream/4` directly, but the fix is a drop-in patch update within the existing `~> 0.19` requirement.
+
 ## [0.13.1] - 2026-08-04
 
 ### Changed
