@@ -273,3 +273,19 @@ docker exec -it pepe bin/pepe remote            # ou: docker compose exec pepe b
 ```
 
 Abre uma shell IEx ligada à versão em execução, para inspecionares o sistema por dentro.
+
+Para um único comando `pepe` em vez de uma shell completa, usa `bin/pepe rpc` com
+`dispatch_attached/1`, os mesmos comandos que `pepe` corre em qualquer lugar, só que
+seguros de correr contra um nó que já está a servir:
+
+```bash
+docker exec pepe bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["agent", "list"])'
+```
+
+`bin/pepe <comando>` sozinho não funciona aqui: o container é uma versão pura, e o
+dispatch de CLI dela só ativa no binário Burrito, distribuído separadamente. `bin/pepe
+rpc`/`remote` é o caminho de entrada de qualquer forma. `dispatch_attached/1` existe
+porque vários comandos (`plugin install`, `eval`, `doctor`, `cron`, e outros, não só
+`run`/`chat`/`tui`) mexem em definições globais que deveriam ser decididas só no
+arranque. Isso é inofensivo num processo CLI recém-iniciado que já vai sair a seguir, mas não
+num nó que já está de pé e vai continuar assim.

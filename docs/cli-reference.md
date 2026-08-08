@@ -256,7 +256,8 @@ clients are blocked. See **[Dashboard](https://pepe-agent.com/en/docs/dashboard/
 
 ```bash
 mix pepe dashboard                            # show the current auth/host settings
-mix pepe dashboard password <value>           # require a login (--clear to remove)
+mix pepe dashboard password                   # prompt interactively, input hidden (--clear to remove)
+mix pepe dashboard password <value>           # a literal is hashed before it's written; a ${VAR} isn't
 mix pepe dashboard hosts app.example.com      # allow a non-localhost host (--clear to reset)
 mix pepe dashboard trusted-proxies 10.0.0.0/8 # trust a proxy's forwarded-for header
 ```

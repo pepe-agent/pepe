@@ -111,6 +111,22 @@ defmodule PepeWeb.LoginTest do
     assert {:error, {:redirect, %{to: "/login"}}} = live(re(out), "/")
   end
 
+  test "a bcrypt-hashed password (as `pepe dashboard password '<literal>'` now stores it) authenticates" do
+    hashed = Bcrypt.hash_pwd_salt("s3cret")
+    set_password(hashed)
+    assert Config.dashboard_password_hashed?()
+
+    login = get(conn(), "/login")
+    [_, token] = Regex.run(~r/name="_csrf_token" value="([^"]+)"/, html_response(login, 200))
+
+    wrong = login |> re() |> post("/login", %{"password" => "nope", "_csrf_token" => token})
+    assert response(wrong, 401)
+
+    ok = login |> re() |> post("/login", %{"password" => "s3cret", "_csrf_token" => token})
+    assert redirected_to(ok) == "/"
+    assert get_session(ok, :dashboard_authed) == true
+  end
+
   test "Host allowlist: a non-loopback Host is rejected (anti DNS-rebinding), unless allowed" do
     # no password + a foreign Host reaching loopback = a rebinding attempt -> 400
     rebind = %{build_conn() | host: "evil.example.com"}

@@ -56,7 +56,13 @@ O painel web fica aberto em localhost por padrão, o que é conveniente para o d
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Você pode passar uma senha literal ou uma referência `${ENV_VAR}` para que o segredo fique fora do arquivo. Uma vez definida a senha, o painel exige entrar em `/login`. Limpe-a com `pepe dashboard password --clear`.
+Você pode passar uma senha literal ou uma referência `${ENV_VAR}` para que o segredo fique fora do arquivo. Uma senha literal é hasheada antes de ser gravada na configuração, então nunca é legível a partir do arquivo (ou de um backup dele) depois de definida. Uma referência `${ENV_VAR}` não tem o que hashear, já que o segredo de verdade já mora fora do arquivo. Uma vez definida a senha, o painel exige entrar em `/login`. Limpe-a com `pepe dashboard password --clear`.
+
+Rode `pepe dashboard password` sem valor nenhum e ele pergunta interativamente, com a digitação escondida, útil para a senha nunca ir parar no histórico do shell ou numa listagem de `ps`:
+
+```bash
+pepe dashboard password
+```
 
 A senha é lida de `dashboard.password` na configuração (interpolada), com fallback para a variável de ambiente `PEPE_DASHBOARD_PASSWORD`. Dois ajustes relacionados reforçam um painel servido atrás de um domínio:
 

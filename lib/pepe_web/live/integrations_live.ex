@@ -45,7 +45,7 @@ defmodule PepeWeb.IntegrationsLive do
             <p>{gettext("No channel plugins installed yet.")}</p>
             <p class="mt-2">
               {gettext("Install one, then reload this page:")}
-              <code class="text-zinc-300">{Pepe.Invocation.command()} plugin install</code>
+              <code class="text-zinc-300">{Pepe.Invocation.hint(["plugin", "install"])}</code>
             </p>
             <p class="mt-1 text-sm text-zinc-600">{gettext("Built-in channels (Slack, Discord, Teams, Google Chat) live under Channels.")}</p>
           </div>

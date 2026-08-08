@@ -29,15 +29,14 @@ assinados com o segredo antigo), e todo mundo entra de novo. Gere uma vez
 (`openssl rand -base64 48`) e guarde.
 
 **Dois ajustes existem só no `config.json`.** Eles não têm variável de ambiente, então são
-aplicados depois do primeiro boot, e não passados na subida:
+aplicados depois do primeiro boot, e não passados na subida. O dispatch de CLI do próprio
+`pepe` do container só roda no binário Burrito, não nesse release puro, então o caminho é
+`bin/pepe rpc`, chamando `dispatch_attached/1` (seguro contra um nó que já está servindo -
+ver [Docker](/pt-br/docs/docker/#uma-shell-no-no)):
 
 ```bash
-docker exec -it <container> bin/pepe rpc '
-  Pepe.Config.update(fn c ->
-    c
-    |> put_in(["dashboard", "allowed_hosts"], ["agents.example.com"])
-    |> put_in(["dashboard", "trusted_proxies"], ["10.0.1.0/24"])
-  end)'
+docker exec -it <container> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "hosts", "agents.example.com"])'
+docker exec -it <container> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "trusted-proxies", "10.0.1.0/24"])'
 ```
 
 O `allowed_hosts` diz ao Pepe a quais domínios ele deve responder. Com senha configurada

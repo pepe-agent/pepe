@@ -56,10 +56,20 @@ defmodule PepeWeb.LoginController do
     conn |> configure_session(drop: true) |> redirect(to: "/login")
   end
 
+  # A literal password set via `pepe dashboard password '...'` is stored bcrypt-hashed
+  # (see `Mix.Tasks.Pepe.set_dashboard_password/1`). Anything else
+  # `Config.dashboard_password/0` can return (a `${ENV_VAR}`/vault-resolved value, or
+  # a password set before hashing existed) is plain text, and stays on the
+  # constant-time string comparison.
   defp valid?(password) do
     case Config.dashboard_password() do
-      real when is_binary(real) -> Plug.Crypto.secure_compare(to_string(password), real)
-      _ -> false
+      real when is_binary(real) ->
+        if Config.dashboard_password_hashed?(real),
+          do: Bcrypt.verify_pass(to_string(password), real),
+          else: Plug.Crypto.secure_compare(to_string(password), real)
+
+      _ ->
+        false
     end
   end
 

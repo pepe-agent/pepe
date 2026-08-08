@@ -295,6 +295,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["watch" | rest]), do: with_config(fn -> watch_cmd(rest) end)
   def dispatch(["model" | rest]), do: with_config(fn -> model_cmd(rest) end)
   def dispatch(["agent" | rest]), do: with_config(fn -> agent_cmd(rest) end)
+
   def dispatch(["run", "help" | _]), do: run_help()
   def dispatch(["run" | rest]), do: with_app([], fn -> run_cmd(rest) end)
   def dispatch(["goal" | rest]), do: with_app([persist: true], fn -> goal_cmd(rest) end)
@@ -327,6 +328,34 @@ defmodule Mix.Tasks.Pepe do
     help()
   end
 
+  @doc """
+  Same commands as `dispatch/1`, but safe to run against a node that is *already*
+  serving (attached via `bin/pepe rpc`/`remote` from inside a running container,
+  rather than a fresh CLI process). Every command that reaches `with_app/2`, not
+  just `run`/`chat`/`tui` but `eval`, `doctor`, `update`, `mcp`, `plugin install`,
+  `skill install`, `cron`, `policy list`, `usage prices`, `hooks generate`,
+  `learn consolidate` and more, does a global `Application.put_env` for
+  `serve_endpoint`/`start_gateways`/`persist_sessions` on every call. On a fresh
+  one-shot process that's harmless (the process exits right after), but on a live
+  node those flags stay flipped indefinitely: session persistence
+  (`Pepe.Agent.Session`) and the gateway supervisor's restart check
+  (`Pepe.Gateways.Supervisor.enabled?/0`) both read them at runtime, not just at
+  boot, so one attached command could silently disable Telegram gateway restarts or
+  session persistence for the rest of the server's life. Marking the *process*
+  (rather than enumerating commands, which an earlier version of this did, and
+  which missed every command above except the three named in this paragraph) means
+  every `with_app/2` call this dispatch reaches is covered, present and future,
+  with no per-command list to keep in sync.
+  """
+  def dispatch_attached(argv) do
+    Process.put(:pepe_attached, true)
+    # There's no `mix` here either (this runs inside `bin/pepe rpc`, not `mix pepe`),
+    # so any help/usage text built with the same `mix pepe` -> `pepe` substitution
+    # `Pepe.CLI.main/1` uses for the escript/Burrito binary should apply here too.
+    Process.put(:pepe_cli_standalone, true)
+    dispatch(argv)
+  end
+
   ###
   ### bootstrapping
   ###
@@ -347,7 +376,22 @@ defmodule Mix.Tasks.Pepe do
   # Commands that talk to a model / serve: start the full OTP app. `opts` decides
   # what to bring up - `serve: true` opens the HTTP endpoint, `gateways: true`
   # starts the messaging gateways (Telegram). Local `run`/`tui` pass neither.
+  #
+  # Skipped entirely when `dispatch_attached/1` marked this process: the node is
+  # already up and its serve/gateway/persistence shape was already decided at its
+  # own real boot, so re-running this dance would just overwrite those live flags
+  # out from under it, see `dispatch_attached/1`'s doc. Checked here (every
+  # `with_app/2` caller), not per-command, so nothing new added above needs to
+  # remember to opt in.
   defp with_app(opts, fun) do
+    if Process.get(:pepe_attached, false) do
+      fun.()
+    else
+      with_app_boot(opts, fun)
+    end
+  end
+
+  defp with_app_boot(opts, fun) do
     serve? = Keyword.get(opts, :serve, false)
     gateways? = Keyword.get(opts, :gateways, false)
     Application.put_env(:pepe, :serve_endpoint, serve?)
@@ -3365,7 +3409,7 @@ defmodule Mix.Tasks.Pepe do
         info(yellow("   dashboard: bound to a public interface with NO password."))
         info(yellow("   Remote access is blocked (fail-closed). To allow it:"))
 
-        info(yellow("     mix pepe dashboard password '<pass>'   (or bind to 127.0.0.1 and tunnel in)"))
+        info(yellow("     #{Pepe.Invocation.hint(["dashboard", "password"])}   (or bind to 127.0.0.1 and tunnel in)"))
     end
   end
 
@@ -3433,7 +3477,11 @@ defmodule Mix.Tasks.Pepe do
 
   defp tunnel_password_warning do
     unless Config.dashboard_auth_required?() do
-      info(yellow("   the dashboard is fail-closed over the tunnel until you set a password: mix pepe dashboard password '<pass>'"))
+      info(
+        yellow(
+          "   the dashboard is fail-closed over the tunnel until you set a password: #{Pepe.Invocation.hint(["dashboard", "password"])}"
+        )
+      )
     end
   end
 
@@ -4533,21 +4581,16 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  defp dashboard_cmd(["password", value]) when is_binary(value) do
-    Config.update(fn cfg ->
-      dash = cfg |> Map.get("dashboard", %{}) |> Map.put("password", value)
-      Map.put(cfg, "dashboard", dash)
-    end)
+  defp dashboard_cmd(["password", value]) when is_binary(value), do: set_dashboard_password(value)
 
-    ok("dashboard password set - the dashboard now requires signing in at /login")
-
-    if value =~ ~r/^\$\{.+\}$/ do
-      info(dim("   it references an env var, so export that variable before serving"))
-    end
-  end
-
+  # No value on the command line: prompt interactively instead of erroring, with
+  # input hidden (`Pepe.TUI.input(secret: true)`, the same helper `setup_dashboard`
+  # already uses): a literal password passed as an argv word otherwise lands in
+  # shell history and in a `ps` listing of every other user on the box for as long
+  # as the command runs.
   defp dashboard_cmd(["password"]) do
-    error("usage: mix pepe dashboard password '<password or ${ENV_VAR}>'  (or --clear)")
+    Pepe.TUI.input(secret: true, label: "Password (or a ${ENV_VAR} reference):")
+    |> set_dashboard_password()
   end
 
   defp dashboard_cmd(["hosts", "--clear"]),
@@ -4570,19 +4613,65 @@ defmodule Mix.Tasks.Pepe do
 
   defp dashboard_cmd(_), do: dashboard_status()
 
+  defp set_dashboard_password(value) do
+    # A reference (`${ENV_VAR}` or a `Pepe.Secrets.Vault` `exec:`/`file:`) is stored
+    # verbatim and resolved at read time (`Pepe.Config.interpolate/1`): the real
+    # secret never touches this file, so there's nothing here to hash. A literal
+    # password does touch this file, so it's hashed before being written:
+    # config.json (and every backup/.bak of it) used to hold it in plain text.
+    #
+    # This must match `Config.secret_reference?/1` exactly, not just "looks like
+    # `${...}`": a lowercase/mixed-case `${my_pw}` isn't a reference to
+    # `interpolate/1` either (it only matches `[A-Z0-9_]+`); it comes back out
+    # unresolved and literal, so storing it unhashed on a looser check would leave
+    # a plain-text "password" (the literal text `${my_pw}`) sitting in the file,
+    # exactly what this change exists to prevent.
+    reference? = Config.secret_reference?(value)
+    stored = if reference?, do: value, else: Bcrypt.hash_pwd_salt(value)
+
+    Config.update(fn cfg ->
+      dash = cfg |> Map.get("dashboard", %{}) |> Map.put("password", stored)
+      Map.put(cfg, "dashboard", dash)
+    end)
+
+    ok("dashboard password set: the dashboard now requires signing in at /login")
+
+    if reference? do
+      info(dim("   it references a secret kept outside the file, so make sure that's resolvable before serving"))
+    end
+  end
+
   defp dashboard_status do
     if Config.dashboard_auth_required?() do
-      info("dashboard auth: " <> green("on") <> " - a password is configured; login required")
+      info("dashboard auth: " <> green("on") <> ", a password is configured; login required")
+      maybe_warn_plaintext_password()
     else
-      info("dashboard auth: off - open to localhost only (remote clients are blocked)")
+      info("dashboard auth: off, open to localhost only (remote clients are blocked)")
 
-      info(dim("   enable it: mix pepe dashboard password '<pass>'   (or export PEPE_DASHBOARD_PASSWORD)"))
+      info(dim("   enable it: #{Pepe.Invocation.hint(["dashboard", "password"])}   (or export PEPE_DASHBOARD_PASSWORD)"))
     end
 
     info("   allowed hosts  : #{list_or(Config.dashboard_allowed_hosts(), "loopback names only")}")
 
     info("   trusted proxies: #{list_or(Config.dashboard_trusted_proxies(), "none")}")
-    info(dim("   set with: mix pepe dashboard hosts <h1,h2>  |  trusted-proxies <cidr,...>"))
+    info(dim("   set with: #{Pepe.Invocation.hint(["dashboard", "hosts"])} <h1,h2>  |  trusted-proxies <cidr,...>"))
+  end
+
+  # A password stored before hashing existed (or set with an older binary) stays
+  # accepted at login, see `PepeWeb.LoginController.valid?/1`, but never migrates
+  # itself, so it sits in `config.json` (and any backup of it) in plain text until
+  # someone notices. `secret_reference?` excludes a `${ENV_VAR}`/vault reference,
+  # which is correctly never hashed; only a genuine legacy literal gets this nudge.
+  defp maybe_warn_plaintext_password do
+    raw = get_in(Config.load(), ["dashboard", "password"])
+
+    if is_binary(raw) and not Config.secret_reference?(raw) and not Config.dashboard_password_hashed?(raw) do
+      info(
+        dim(
+          "   this password predates hashing and is still plain text on disk, re-set it to fix: #{Pepe.Invocation.hint(["dashboard", "password"])}"
+        )
+      )
+    end
   end
 
   defp list_or([], default), do: default

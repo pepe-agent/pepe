@@ -23,7 +23,7 @@ export const docsNav: { group: string; slugs: string[] }[] = [
   { group: "automate", slugs: ["goals", "scheduled", "flows", "board", "watches", "commitments"] },
   { group: "api", slugs: ["api", "sessions", "auth", "usage-api", "websocket", "clients"] },
   { group: "extend", slugs: ["plugins", "slots", "mcp", "database"] },
-  { group: "operate", slugs: ["deploy", "security", "privacy", "dashboard", "backup", "by-chat", "traces", "session-search", "evals", "contributing"] },
+  { group: "operate", slugs: ["deploy", "security", "privacy", "dashboard", "cli", "backup", "by-chat", "traces", "session-search", "evals", "contributing"] },
 ];
 
 export const allSlugs = docsNav.flatMap((g) => g.slugs);

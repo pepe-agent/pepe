@@ -3466,6 +3466,22 @@ defmodule Pepe.Config do
   @doc "Is the dashboard behind a password? (a dashboard password is configured)"
   def dashboard_auth_required?, do: not is_nil(dashboard_password())
 
+  @bcrypt_hash ~r/^\$2[aby]\$\d{2}\$[A-Za-z0-9.\/]{53}$/
+
+  @doc """
+  Whether the dashboard password is bcrypt-hashed, as `pepe dashboard password
+  '<literal>'` now stores it. False for a password resolved from a `${ENV_VAR}`/
+  vault reference (always plain text; nothing to hash, the real secret already
+  lives outside the file) or a literal password set before hashing existed (plain
+  text on disk, still accepted at login via a constant-time comparison, see
+  `PepeWeb.LoginController`). Single source of truth for the hash format so the
+  login check and this don't drift apart.
+  """
+  @spec dashboard_password_hashed?(String.t() | nil) :: boolean()
+  def dashboard_password_hashed?(password \\ dashboard_password())
+  def dashboard_password_hashed?(password) when is_binary(password), do: password =~ @bcrypt_hash
+  def dashboard_password_hashed?(_password), do: false
+
   @doc """
   When on, autonomous writes (memory/skill consolidation) are staged for review via
   `Pepe.Approval` instead of applied directly. Off by default (opt-in safety).
@@ -3653,6 +3669,22 @@ defmodule Pepe.Config do
   end
 
   def interpolate(value), do: value
+
+  @doc """
+  Whether `value` is a reference to a secret kept outside the file: a whole-string
+  `${ENV_VAR}` (uppercase only, matching `interpolate/1`'s own pattern exactly;
+  a lowercase or mixed-case `${...}` is NOT a reference to `interpolate/1`, it comes
+  back out unresolved and literal) or a `Pepe.Secrets.Vault` ref (`exec:`/`file:`).
+  `false` for anything `interpolate/1` would otherwise return unchanged, i.e. a
+  literal value. Used wherever a caller must decide whether to hash/encrypt a
+  literal before writing it, since a reference has nothing to hash, the real
+  secret already lives outside the file.
+  """
+  @spec secret_reference?(term()) :: boolean()
+  def secret_reference?(value) when is_binary(value),
+    do: Pepe.Secrets.Vault.ref?(value) or Regex.match?(~r/^\$\{[A-Z0-9_]+\}$/, value)
+
+  def secret_reference?(_value), do: false
 
   @doc """
   Environment variables a vault resolver is allowed to see (`secrets.vault_env` in the

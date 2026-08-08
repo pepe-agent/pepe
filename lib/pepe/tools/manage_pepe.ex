@@ -16,8 +16,11 @@ defmodule Pepe.Tools.ManagePepe do
     * **Blocking** commands that run forever: `serve` and a foreground `gateway`.
 
   `eval` is also refused because it registers a process-exit handler. For everything
-  else the command runs, its output is captured and returned, and any global settings a
-  command touches at boot are restored afterward so a running server is never disturbed.
+  else the command runs via `Mix.Tasks.Pepe.dispatch_attached/1`, the same dispatch
+  the CLI uses, except it never touches the global `serve_endpoint`/`start_gateways`/
+  `persist_sessions` app env a fresh CLI process would flip at boot, since this one is
+  running *inside* an already-live server, not booting a new one. See that function's
+  doc for why that distinction matters.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -27,10 +30,6 @@ defmodule Pepe.Tools.ManagePepe do
   # A command that reaches the model or blocks could take a while; cap it so a slipped
   # interactive prompt or a slow run can never hang the conversation.
   @timeout_ms 120_000
-
-  # Global app-env keys the CLI's `with_app` flips at boot; saved and restored around a
-  # dispatch so running a command by chat can't change how the live server behaves.
-  @guarded_env [:serve_endpoint, :start_gateways, :persist_sessions]
 
   @impl true
   def name, do: "manage_pepe"
@@ -98,27 +97,24 @@ defmodule Pepe.Tools.ManagePepe do
   end
 
   # Interactive or never-returning commands are refused; everything else runs.
+  # `dashboard password` with no value is its own interactive case (a hidden-input
+  # prompt), refused for the same reason as `setup`/`chat`/`tui`: there's no real
+  # terminal behind this call for it to read from, just a `StringIO` buffer, so it
+  # would hit EOF and error instead of prompting.
   defp blocked([first | _]) when first in ~w(setup chat tui serve eval), do: {:blocked, first}
   defp blocked(["gateway"]), do: {:blocked, "gateway"}
   defp blocked(["gateway", "telegram"]), do: {:blocked, "gateway telegram"}
   defp blocked(["gateway", "telegram", "setup" | _]), do: {:blocked, "gateway telegram setup"}
+  defp blocked(["dashboard", "password"]), do: {:blocked, "dashboard password (with no value)"}
   defp blocked(_), do: :ok
 
   defp run_captured(argv) do
-    saved = Enum.map(@guarded_env, fn key -> {key, Application.fetch_env(:pepe, key)} end)
-    saved_endpoint = Application.fetch_env(:pepe, PepeWeb.Endpoint)
-
     task = Task.async(fn -> capture(argv) end)
 
-    result =
-      case Task.yield(task, @timeout_ms) || Task.shutdown(task) do
-        {:ok, output} -> {:ok, present(output)}
-        _ -> {:error, "command timed out after #{div(@timeout_ms, 1000)}s (it may be blocking)"}
-      end
-
-    restore(@guarded_env, saved)
-    restore([PepeWeb.Endpoint], [{PepeWeb.Endpoint, saved_endpoint}])
-    result
+    case Task.yield(task, @timeout_ms) || Task.shutdown(task) do
+      {:ok, output} -> {:ok, present(output)}
+      _ -> {:error, "command timed out after #{div(@timeout_ms, 1000)}s (it may be blocking)"}
+    end
   end
 
   # Run the dispatcher with this process's output redirected into a string buffer.
@@ -128,7 +124,7 @@ defmodule Pepe.Tools.ManagePepe do
 
     outcome =
       try do
-        Mix.Tasks.Pepe.dispatch(argv)
+        Mix.Tasks.Pepe.dispatch_attached(argv)
         nil
       rescue
         e -> "error: #{Exception.message(e)}"
@@ -156,15 +152,4 @@ defmodule Pepe.Tools.ManagePepe do
 
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(text), do: text
-
-  # Put back each saved key, deleting it if it wasn't set before.
-  defp restore(keys, saved) do
-    Enum.each(keys, fn key ->
-      case List.keyfind(saved, key, 0) do
-        {^key, {:ok, value}} -> Application.put_env(:pepe, key, value)
-        {^key, :error} -> Application.delete_env(:pepe, key)
-        _ -> :ok
-      end
-    end)
-  end
 end

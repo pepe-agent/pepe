@@ -236,7 +236,7 @@ defmodule PepeWeb.TracesLive do
           </button>
           <span :if={@selected && @selected_recorded}
             class="inline-flex items-center rounded-md bg-zinc-800 px-3 py-1.5 text-sm text-zinc-400"
-            title={gettext("Saved to the \"recorded\" eval suite. Run it with: %{cmd} eval recorded", cmd: Pepe.Invocation.command())}>
+            title={gettext("Saved to the \"recorded\" eval suite. Run it with: %{cmd}", cmd: Pepe.Invocation.hint(["eval", "recorded"]))}>
             {gettext("✓ Saved as an eval case")}
           </span>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>

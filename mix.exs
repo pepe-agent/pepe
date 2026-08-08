@@ -129,6 +129,12 @@ defmodule Pepe.MixProject do
       {:tz, "~> 0.28"},
       # Rate limiting (the widget's public, unauthenticated-by-design endpoint).
       {:hammer, "~> 7.0"},
+      # Hashes a literal dashboard password before it's written to config.json.
+      # A `${ENV_VAR}` reference never touches this (the real secret stays out of the
+      # file entirely, same as every other credential), but a literal password typed
+      # via `pepe dashboard password '...'` used to be stored as plain text, readable
+      # from the live file or any backup/.bak of it.
+      {:bcrypt_elixir, "~> 3.0"},
       # Renders chat message markdown on the dashboard (tables, lists, headers, ...).
       {:mdex, "~> 0.7"},
       # The `browser` tool: drives a real Chrome over CDP directly (Mint.WebSocket) - no

@@ -92,7 +92,7 @@ defmodule PepeWeb.NetworkGuard do
         <p>You reached it from outside the local machine. For safety, Pepe serves the
         dashboard openly only to <strong>localhost</strong>.</p>
         <p>To allow this access, set a password on the server:</p>
-        <p><code>#{Pepe.Invocation.command()} dashboard password '&lt;your password&gt;'</code></p>
+        #{password_instructions()}
         <p class="hint">Or keep it private: bind to <code>127.0.0.1</code> and tunnel in
         (SSH <code>-L</code>, a Multipass port-forward, or Tailscale). The
         <code>/v1</code> API and webhooks are unaffected - they use their own auth.</p>
@@ -103,5 +103,26 @@ defmodule PepeWeb.NetworkGuard do
     conn
     |> put_resp_content_type("text/html")
     |> send_resp(403, body)
+  end
+
+  # `pepe dashboard password` (no value) prompts interactively with hidden input,
+  # the right way to set a literal password everywhere EXCEPT a plain OTP release
+  # (the Docker image): there, the only way in is `bin/pepe rpc`/`remote`, which has
+  # no real interactive terminal attached to the expression it evaluates, so an
+  # interactive prompt there would just hang. Point that case at
+  # `PEPE_DASHBOARD_PASSWORD` instead, already how a container sets any other
+  # secret (never written to config.json, no prompt needed).
+  defp password_instructions do
+    if Pepe.Invocation.plain_release?() do
+      """
+      <p>Set the <code>PEPE_DASHBOARD_PASSWORD</code> environment variable on the container and
+      restart it: config.json never sees it, and there's no interactive terminal here to prompt in.</p>
+      """
+    else
+      """
+      <p><code>#{Pepe.Invocation.hint(["dashboard", "password"]) |> Plug.HTML.html_escape()}</code>
+      prompts for it with the input hidden.</p>
+      """
+    end
   end
 end

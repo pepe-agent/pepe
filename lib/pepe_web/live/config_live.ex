@@ -150,7 +150,7 @@ defmodule PepeWeb.ConfigLive do
             <p class={hlp()}>
               {gettext("Who touched config.json, when, and which top-level sections changed. It never records the values. \"external\" marks a change made since this process's own last write: a hand-edit, a second Pepe process, or a restore from a .bak file.")}
             </p>
-            <div class="space-y-1.5 text-sm">
+            <div class="max-h-56 space-y-1.5 overflow-y-auto text-sm">
               <div :for={entry <- @journal} class="flex items-center gap-2 border-b border-zinc-800/60 py-1.5 last:border-0">
                 <span class="w-36 shrink-0 font-mono text-xs text-zinc-500">{local_datetime(entry["at"])}</span>
                 <span class="w-28 shrink-0 truncate text-zinc-300">{entry["source"]}</span>

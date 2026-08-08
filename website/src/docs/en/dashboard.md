@@ -56,7 +56,13 @@ The dashboard is open on localhost by default, which is convenient for local dev
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-You can pass a literal password or a `${ENV_VAR}` reference so the secret stays out of the file. Once a password is set, the dashboard requires signing in at `/login`. Clear it with `pepe dashboard password --clear`.
+You can pass a literal password or a `${ENV_VAR}` reference so the secret stays out of the file. A literal password is hashed before it's written to the config, so it's never readable from the file (or a backup of it) once set. A `${ENV_VAR}` reference has nothing to hash, since the real secret already lives outside the file. Once a password is set, the dashboard requires signing in at `/login`. Clear it with `pepe dashboard password --clear`.
+
+Run `pepe dashboard password` with no value and it prompts instead, with the input hidden as you type, useful so the password never lands in your shell history or a `ps` listing:
+
+```bash
+pepe dashboard password
+```
 
 The password is read from `dashboard.password` in the config (interpolated), with a fallback to the `PEPE_DASHBOARD_PASSWORD` environment variable. Two related settings harden a dashboard served behind a domain:
 

@@ -27,15 +27,14 @@ para un servidor: las cookies de sesión firmadas con el secreto anterior dejan 
 Genéralo una vez (`openssl rand -base64 48`) y consérvalo.
 
 **Dos ajustes viven solo en `config.json`.** No tienen variable de entorno, así que se
-aplican después del primer arranque, no se pasan al levantarlo:
+aplican después del primer arranque, no se pasan al levantarlo. El dispatch de CLI del
+propio `pepe` del contenedor solo funciona en el binario Burrito, no en esta release
+simple, así que el camino es `bin/pepe rpc`, llamando a `dispatch_attached/1` (seguro
+contra un nodo que ya está sirviendo, ver [Docker](/es/docs/docker/#acceso-al-nodo)):
 
 ```bash
-docker exec -it <contenedor> bin/pepe rpc '
-  Pepe.Config.update(fn c ->
-    c
-    |> put_in(["dashboard", "allowed_hosts"], ["agents.example.com"])
-    |> put_in(["dashboard", "trusted_proxies"], ["10.0.1.0/24"])
-  end)'
+docker exec -it <contenedor> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "hosts", "agents.example.com"])'
+docker exec -it <contenedor> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "trusted-proxies", "10.0.1.0/24"])'
 ```
 
 `allowed_hosts` cierra el DNS rebinding: con contraseña puesta y sin lista de permitidos,
