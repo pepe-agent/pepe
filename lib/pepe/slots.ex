@@ -34,17 +34,24 @@ defmodule Pepe.Slots do
   effect already happened before it hung. See `Pepe.Slots.Guard`.
   """
 
+  use Gettext, backend: Pepe.Gettext
+
   require Logger
 
   @doc """
-  The known slots: name => %{default, funs, degrade, timeout, validate}. `timeout`/
-  `validate` are absent on "harness", the one slot not dispatched through
+  The known slots: name => %{label, desc, default, funs, degrade, timeout, validate}.
+  `timeout`/`validate` are absent on "harness", the one slot not dispatched through
   `Pepe.Slots.Guard` - see its own comment below.
+
+  `label`/`desc` exist purely so a human-facing surface (the dashboard's agent editor,
+  `mix pepe slot list`) can name a slot in words instead of printing the raw key.
   """
   @spec definitions() :: %{String.t() => map()}
   def definitions do
     %{
       "memory" => %{
+        label: gettext("Memory search"),
+        desc: gettext("Where the agent looks things up in what it remembers."),
         default: Pepe.Memory.Builtin,
         funs: [{:name, 0}, {:slot, 0}, {:search, 3}],
         timeout: 3_000,
@@ -52,6 +59,8 @@ defmodule Pepe.Slots do
         degrade: :fallback
       },
       "web_search" => %{
+        label: gettext("Web search"),
+        desc: gettext("Which service answers the agent's searches on the web."),
         default: Pepe.Search.DuckDuckGo,
         funs: [{:name, 0}, {:slot, 0}, {:search, 2}],
         timeout: 20_000,
@@ -72,6 +81,8 @@ defmodule Pepe.Slots do
       # for the common, no-plugin-installed case. Generous on purpose for the plugin case: a
       # remote-exec backend genuinely can take longer than a local command.
       "sandbox" => %{
+        label: gettext("Command execution"),
+        desc: gettext("Where a command the agent runs actually executes."),
         default: Pepe.Sandbox,
         funs: [{:name, 0}, {:slot, 0}, {:run, 3}],
         timeout: 300_000,
@@ -84,6 +95,8 @@ defmodule Pepe.Slots do
       # or timeout here only means a worse (or no) condensation for this call, never a
       # broken turn, so this degrades like memory/web_search rather than sandbox.
       "compaction" => %{
+        label: gettext("Conversation condensing"),
+        desc: gettext("How a long conversation is shortened once it outgrows the model's memory."),
         default: Pepe.Agent.Compaction,
         funs: [{:name, 0}, {:slot, 0}, {:compact, 4}],
         timeout: 60_000,
@@ -101,6 +114,8 @@ defmodule Pepe.Slots do
       # silently re-running the whole turn from scratch on the builtin loop risks doing
       # that work twice, the same reasoning "sandbox" uses.
       "harness" => %{
+        label: gettext("Reasoning loop"),
+        desc: gettext("The whole think-and-act loop that drives one turn."),
         default: Pepe.Agent.Runtime,
         funs: [{:name, 0}, {:slot, 0}, {:run, 3}],
         degrade: :error
@@ -121,6 +136,14 @@ defmodule Pepe.Slots do
   @doc "Is `slot` one of the known slots?"
   @spec known?(String.t()) :: boolean()
   def known?(slot), do: Map.has_key?(definitions(), slot)
+
+  @doc "A human, translated name for `slot` - falls back to the raw key if none is declared."
+  @spec label_for(String.t()) :: String.t()
+  def label_for(slot), do: Map.get(fetch!(slot), :label) || slot
+
+  @doc "One line on what `slot` decides, for a human-facing surface. \"\" if none is declared."
+  @spec desc_for(String.t()) :: String.t()
+  def desc_for(slot), do: Map.get(fetch!(slot), :desc) || ""
 
   @doc "The default (builtin) module for `slot`."
   @spec default_for(String.t()) :: module()
