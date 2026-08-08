@@ -1,0 +1,164 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: lib/pepe/webhooks/googlechat.ex:39
+#: lib/pepe/webhooks/whatsapp.ex:39
+#, elixir-autogen, elixir-format
+msgid "Access token"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:36
+#, elixir-autogen, elixir-format
+msgid "App id"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:42
+#, elixir-autogen, elixir-format
+msgid "App password"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:45
+#, elixir-autogen, elixir-format
+msgid "App secret"
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:42
+#, elixir-autogen, elixir-format
+msgid "Application ID"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:33
+#, elixir-autogen, elixir-format
+msgid "Bot token"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:41
+#, elixir-autogen, elixir-format
+msgid "Graph API bearer token; store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:33
+#, elixir-autogen, elixir-format
+msgid "Phone number ID"
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:45
+#, elixir-autogen, elixir-format
+msgid "Project number"
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:36
+#, elixir-autogen, elixir-format
+msgid "Public key"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:54
+#: lib/pepe/webhooks/slack.ex:45
+#, elixir-autogen, elixir-format
+msgid "Require mention in channels"
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:55
+#, elixir-autogen, elixir-format
+msgid "Require mention in spaces"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:39
+#, elixir-autogen, elixir-format
+msgid "Signing secret"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:48
+#, elixir-autogen, elixir-format
+msgid "Tenant id"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:51
+#, elixir-autogen, elixir-format
+msgid "Verify token"
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:41
+#, elixir-autogen, elixir-format
+msgid "an OAuth token for the Chat API; store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:53
+#, elixir-autogen, elixir-format
+msgid "any string you choose; echoed during the subscribe handshake"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:41
+#, elixir-autogen, elixir-format
+msgid "from the app's Basic Information; store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:49
+#, elixir-autogen, elixir-format
+msgid "in a channel, reply only when the bot is @mentioned (default true); a direct message always replies"
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:59
+#, elixir-autogen, elixir-format
+msgid "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:58
+#, elixir-autogen, elixir-format
+msgid "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:50
+#, elixir-autogen, elixir-format
+msgid "the Azure tenant id (or botframework.com)"
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:48
+#, elixir-autogen, elixir-format
+msgid "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:38
+#, elixir-autogen, elixir-format
+msgid "the app's Public Key (hex), for signature verification"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:38
+#, elixir-autogen, elixir-format
+msgid "the bot's Microsoft app (client) id"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:44
+#, elixir-autogen, elixir-format
+msgid "the client secret; store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:35
+#, elixir-autogen, elixir-format
+msgid "the sending endpoint id from Meta"
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:44
+#, elixir-autogen, elixir-format
+msgid "used to post the reply"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:47
+#, elixir-autogen, elixir-format
+msgid "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:35
+#, elixir-autogen, elixir-format
+msgid "xoxb-... ; store as ${ENV_VAR}"
+msgstr ""
