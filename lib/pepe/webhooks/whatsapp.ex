@@ -13,6 +13,7 @@ defmodule Pepe.Webhooks.WhatsApp do
   window need pre-approved templates (not handled here).
   """
   @behaviour Pepe.Webhooks.Provider
+  use Gettext, backend: Pepe.Gettext
 
   alias Pepe.Config
 
@@ -27,19 +28,29 @@ defmodule Pepe.Webhooks.WhatsApp do
   @impl true
   def config_schema do
     [
-      %{"key" => "phone_number_id", "label" => "Phone number ID", "type" => "text", "hint" => "the sending endpoint id from Meta"},
-      %{"key" => "access_token", "label" => "Access token", "type" => "secret", "hint" => "Graph API bearer token; store as ${ENV_VAR}"},
+      %{
+        "key" => "phone_number_id",
+        "label" => dgettext("webhooks", "Phone number ID"),
+        "type" => "text",
+        "hint" => dgettext("webhooks", "the sending endpoint id from Meta")
+      },
+      %{
+        "key" => "access_token",
+        "label" => dgettext("webhooks", "Access token"),
+        "type" => "secret",
+        "hint" => dgettext("webhooks", "Graph API bearer token; store as ${ENV_VAR}")
+      },
       %{
         "key" => "app_secret",
-        "label" => "App secret",
+        "label" => dgettext("webhooks", "App secret"),
         "type" => "secret",
-        "hint" => "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}"
+        "hint" => dgettext("webhooks", "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}")
       },
       %{
         "key" => "verify_token",
-        "label" => "Verify token",
+        "label" => dgettext("webhooks", "Verify token"),
         "type" => "text",
-        "hint" => "any string you choose; echoed during the subscribe handshake"
+        "hint" => dgettext("webhooks", "any string you choose; echoed during the subscribe handshake")
       }
     ]
   end

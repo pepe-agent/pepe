@@ -14,6 +14,7 @@ defmodule Pepe.Webhooks.Discord do
   response and the real reply is posted as a follow-up once the agent finishes.
   """
   @behaviour Pepe.Webhooks.Provider
+  use Gettext, backend: Pepe.Gettext
 
   @api "https://discord.com/api/v10"
   @ping 1
@@ -32,11 +33,16 @@ defmodule Pepe.Webhooks.Discord do
     [
       %{
         "key" => "public_key",
-        "label" => "Public key",
+        "label" => dgettext("webhooks", "Public key"),
         "type" => "text",
-        "hint" => "the app's Public Key (hex), for signature verification"
+        "hint" => dgettext("webhooks", "the app's Public Key (hex), for signature verification")
       },
-      %{"key" => "application_id", "label" => "Application ID", "type" => "text", "hint" => "used to post the reply"}
+      %{
+        "key" => "application_id",
+        "label" => dgettext("webhooks", "Application ID"),
+        "type" => "text",
+        "hint" => dgettext("webhooks", "used to post the reply")
+      }
     ]
   end
 

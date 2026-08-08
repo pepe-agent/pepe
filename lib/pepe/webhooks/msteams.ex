@@ -18,6 +18,7 @@ defmodule Pepe.Webhooks.MsTeams do
   and its `serviceUrl`, so it is addressed back to the right chat.
   """
   @behaviour Pepe.Webhooks.Provider
+  use Gettext, backend: Pepe.Gettext
 
   alias Pepe.Config
 
@@ -30,15 +31,34 @@ defmodule Pepe.Webhooks.MsTeams do
   @impl true
   def config_schema do
     [
-      %{"key" => "app_id", "label" => "App id", "type" => "text", "hint" => "the bot's Microsoft app (client) id"},
-      %{"key" => "app_password", "label" => "App password", "type" => "secret", "hint" => "the client secret; store as ${ENV_VAR}"},
-      %{"key" => "tenant_id", "label" => "Tenant id", "type" => "text", "hint" => "the Azure tenant id (or botframework.com)"},
+      %{
+        "key" => "app_id",
+        "label" => dgettext("webhooks", "App id"),
+        "type" => "text",
+        "hint" => dgettext("webhooks", "the bot's Microsoft app (client) id")
+      },
+      %{
+        "key" => "app_password",
+        "label" => dgettext("webhooks", "App password"),
+        "type" => "secret",
+        "hint" => dgettext("webhooks", "the client secret; store as ${ENV_VAR}")
+      },
+      %{
+        "key" => "tenant_id",
+        "label" => dgettext("webhooks", "Tenant id"),
+        "type" => "text",
+        "hint" => dgettext("webhooks", "the Azure tenant id (or botframework.com)")
+      },
       %{
         "key" => "require_mention",
-        "label" => "Require mention in channels",
+        "label" => dgettext("webhooks", "Require mention in channels"),
         "type" => "select",
         "options" => ["true", "false"],
-        "hint" => "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
+        "hint" =>
+          dgettext(
+            "webhooks",
+            "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
+          )
       }
     ]
   end

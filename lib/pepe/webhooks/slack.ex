@@ -13,6 +13,7 @@ defmodule Pepe.Webhooks.Slack do
   `url_verification` handshake, answered synchronously here.
   """
   @behaviour Pepe.Webhooks.Provider
+  use Gettext, backend: Pepe.Gettext
 
   alias Pepe.Config
 
@@ -27,19 +28,25 @@ defmodule Pepe.Webhooks.Slack do
   @impl true
   def config_schema do
     [
-      %{"key" => "bot_token", "label" => "Bot token", "type" => "secret", "hint" => "xoxb-... ; store as ${ENV_VAR}"},
+      %{
+        "key" => "bot_token",
+        "label" => dgettext("webhooks", "Bot token"),
+        "type" => "secret",
+        "hint" => dgettext("webhooks", "xoxb-... ; store as ${ENV_VAR}")
+      },
       %{
         "key" => "signing_secret",
-        "label" => "Signing secret",
+        "label" => dgettext("webhooks", "Signing secret"),
         "type" => "secret",
-        "hint" => "from the app's Basic Information; store as ${ENV_VAR}"
+        "hint" => dgettext("webhooks", "from the app's Basic Information; store as ${ENV_VAR}")
       },
       %{
         "key" => "require_mention",
-        "label" => "Require mention in channels",
+        "label" => dgettext("webhooks", "Require mention in channels"),
         "type" => "select",
         "options" => ["true", "false"],
-        "hint" => "in a channel, reply only when the bot is @mentioned (default true); a direct message always replies"
+        "hint" =>
+          dgettext("webhooks", "in a channel, reply only when the bot is @mentioned (default true); a direct message always replies")
       }
     ]
   end

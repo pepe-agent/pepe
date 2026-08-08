@@ -19,6 +19,7 @@ defmodule Pepe.Webhooks.GoogleChat do
   to skip it. Only `MESSAGE` events from a human are acted on.
   """
   @behaviour Pepe.Webhooks.Provider
+  use Gettext, backend: Pepe.Gettext
 
   alias Pepe.Config
 
@@ -35,23 +36,30 @@ defmodule Pepe.Webhooks.GoogleChat do
     [
       %{
         "key" => "access_token",
-        "label" => "Access token",
+        "label" => dgettext("webhooks", "Access token"),
         "type" => "secret",
-        "hint" => "an OAuth token for the Chat API; store as ${ENV_VAR}"
+        "hint" => dgettext("webhooks", "an OAuth token for the Chat API; store as ${ENV_VAR}")
       },
       %{
         "key" => "project_number",
-        "label" => "Project number",
+        "label" => dgettext("webhooks", "Project number"),
         "type" => "text",
         "hint" =>
-          "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
+          dgettext(
+            "webhooks",
+            "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
+          )
       },
       %{
         "key" => "require_mention",
-        "label" => "Require mention in spaces",
+        "label" => dgettext("webhooks", "Require mention in spaces"),
         "type" => "select",
         "options" => ["true", "false"],
-        "hint" => "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
+        "hint" =>
+          dgettext(
+            "webhooks",
+            "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
+          )
       }
     ]
   end
