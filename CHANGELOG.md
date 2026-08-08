@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-08-08
+
 ### Fixed
 - **The raw `config.json` editor on the Configuration page still collapsed to a sliver on a normal-height screen, even after 0.14.0's fix.** That fix only capped the height of the "Recent changes" journal list above it; the editor's own `min-h-0` still let flexbox shrink it toward zero to make room for the journal and the Media section whenever their combined height, even now bounded, still exceeded the visible area. The editor now has a real minimum height (`min-h-[320px]`), so the page scrolls to it instead of squeezing it away.
 
@@ -704,7 +706,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/pepe-agent/pepe/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pepe-agent/pepe/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/pepe-agent/pepe/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/pepe-agent/pepe/compare/v0.12.0...v0.13.0
