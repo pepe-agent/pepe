@@ -79,6 +79,18 @@ defmodule PepeWeb.LearningLiveTest do
     refute html =~ "assistant remembers the XML load"
   end
 
+  test "a project scope shows one of that project's agents, never the global default" do
+    write_memory("assistant", "MEMORY.md", "assistant remembers the XML load")
+    Config.put_agent(%Agent{name: "acme/sales"})
+    write_memory("acme/sales", "MEMORY.md", "sales remembers the pricing table")
+
+    {:ok, _view, html} = live(conn(), "/learn?scope=acme")
+
+    # The picker only offers acme's agents, so the timeline below has to be acme's too.
+    assert html =~ "sales remembers the pricing table"
+    refute html =~ "assistant remembers the XML load"
+  end
+
   test "opening a memory item shows its file and saving writes it back" do
     path = write_memory("assistant", "MEMORY.md", "The XML load runs at 06:00.")
 
@@ -114,9 +126,19 @@ defmodule PepeWeb.LearningLiveTest do
 
     {:ok, _view, html} = live(conn(), "/learn")
 
-    assert html =~ "1 write(s) awaiting your review"
+    assert html =~ "1 write awaiting your review"
     assert html =~ "write_file"
     assert html =~ "assistant"
+  end
+
+  test "a staged write is described by its target file and what it does, not raw JSON" do
+    stage_write("assistant", "MEMORY.md", "a fact the agent invented")
+
+    {:ok, _view, html} = live(conn(), "/learn")
+
+    assert html =~ "MEMORY.md"
+    assert html =~ "Replaces the whole file with: a fact the agent invented"
+    refute html =~ "&quot;content&quot;:"
   end
 
   test "approving a staged write applies it and clears it from the queue" do
