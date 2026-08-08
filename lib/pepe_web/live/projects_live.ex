@@ -90,7 +90,7 @@ defmodule PepeWeb.ProjectsLive do
                 <button phx-click="project_edit" phx-value-name="root" class={btn_ghost()}>{gettext("Edit")}</button>
               </div>
             </div>
-            <div class="mt-1 flex items-center gap-2 text-sm">
+            <div class="mt-1 flex flex-wrap items-center gap-2 gap-y-1 text-sm">
               <span :if={Config.project_markup(nil) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
                 {gettext("markup ×%{m}", m: Config.project_markup(nil))}
               </span>
@@ -109,6 +109,7 @@ defmodule PepeWeb.ProjectsLive do
                   · {gettext("since %{date}", date: local_datetime(@usage["root"].budget_reset_at, "%m/%d"))}
                 </span>
               </span>
+              <span :if={Config.project_budget(nil)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
               <button
                 :if={Config.project_budget(nil)}
                 phx-click="project_reset_budget"
@@ -132,6 +133,7 @@ defmodule PepeWeb.ProjectsLive do
                   · {gettext("since %{date}", date: local_datetime(@usage["root"].messages_reset_at, "%m/%d"))}
                 </span>
               </span>
+              <span :if={Config.project_message_limit(nil)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
               <button
                 :if={Config.project_message_limit(nil)}
                 phx-click="project_reset_messages"
@@ -162,7 +164,7 @@ defmodule PepeWeb.ProjectsLive do
                 </button>
               </div>
             </div>
-            <div class="mt-1 flex items-center gap-2 text-sm">
+            <div class="mt-1 flex flex-wrap items-center gap-2 gap-y-1 text-sm">
               <span :if={desc_of(name)} class="text-zinc-400">{desc_of(name)}</span>
               <span :if={Config.project_markup(name) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
                 {gettext("markup ×%{m}", m: Config.project_markup(name))}
@@ -181,6 +183,7 @@ defmodule PepeWeb.ProjectsLive do
                   · {gettext("since %{date}", date: local_datetime(@usage[name].budget_reset_at, "%m/%d"))}
                 </span>
               </span>
+              <span :if={Config.project_budget(name)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
               <button
                 :if={Config.project_budget(name)}
                 phx-click="project_reset_budget"
@@ -204,6 +207,7 @@ defmodule PepeWeb.ProjectsLive do
                   · {gettext("since %{date}", date: local_datetime(@usage[name].messages_reset_at, "%m/%d"))}
                 </span>
               </span>
+              <span :if={Config.project_message_limit(name)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
               <button
                 :if={Config.project_message_limit(name)}
                 phx-click="project_reset_messages"
@@ -216,7 +220,7 @@ defmodule PepeWeb.ProjectsLive do
             </div>
           </div>
           <p :if={@projects == []} class="text-[15px] text-zinc-500">
-            {gettext("No projects yet. Everything lives in the root workspace. Create one to isolate a client or team.")}
+            {gettext("No projects yet. Everything lives in the Principal workspace. Create one to isolate a client or team.")}
           </p>
           </div>
 
@@ -232,7 +236,11 @@ defmodule PepeWeb.ProjectsLive do
               <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
                 {gettext("Please fix the errors below.")}
               </div>
-              <div :if={@editing.name != "root"}>
+              <%!-- `.input` wraps itself in its own `mb-4`, sized for a field with nothing under it.
+              This one has help text under it, so that margin would land between the input and its own
+              caption, reading as a gap between two unrelated things. Zero it and let `hlp()`'s `mt-1.5`
+              set the distance, the same as every hand-rolled field below. --%>
+              <div :if={@editing.name != "root"} class="[&>div]:mb-0">
                 <.input field={@form[:name]} label={gettext("Name")} placeholder="acme" />
                 <p class={hlp()}>
                   {if @editing.new?,

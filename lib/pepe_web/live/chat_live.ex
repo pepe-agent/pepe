@@ -57,6 +57,9 @@ defmodule PepeWeb.ChatLive do
        sessions: list_sessions(scope),
        selected: nil,
        agent: nil,
+       models: ModelSwitch.list_for(scope_project(scope)),
+       model_name: nil,
+       model_scope: "session",
        messages: [],
        window: @window,
        streaming: "",
@@ -116,14 +119,14 @@ defmodule PepeWeb.ChatLive do
                 autocomplete="off"
                 phx-debounce="200"
                 placeholder={gettext("Search conversations")}
-                class="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600"
+                class={[fld(), "py-1.5"]}
               />
               <div class="grid grid-cols-2 gap-2">
-                <select name="agent" class="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200">
+                <select name="agent" class={[fld(), "py-1.5"]}>
                   <option value="">{gettext("All agents")}</option>
                   <option :for={a <- session_agents(@sessions)} value={a} selected={a == @f_agent}>{a}</option>
                 </select>
-                <select name="channel" class="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200">
+                <select name="channel" class={[fld(), "py-1.5"]}>
                   <option value="">{gettext("All channels")}</option>
                   <option :for={c <- session_channels(@sessions)} value={c} selected={c == @f_channel}>{type_label(c)}</option>
                 </select>
@@ -136,18 +139,21 @@ defmodule PepeWeb.ChatLive do
                   {type_label(type)} <span class="text-zinc-700">· {length(items)}</span>
                 </div>
                 <div :for={s <- items} class={["group mx-2 mb-0.5 flex items-center rounded-lg transition hover:bg-zinc-800/70", @selected == s.key && "bg-zinc-800"]}>
-                  <button phx-click="select" phx-value-key={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
+                  <%!-- The raw session key is on the row's tooltip, not a third line: the
+                        thread header already prints it in full once the conversation is open. --%>
+                  <button phx-click="select" phx-value-key={s.key} title={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
                     <div class="flex items-center gap-1.5 truncate text-[15px] font-medium">
                       <span :if={s.running} class="inline-block h-2 w-2 shrink-0 rounded-full bg-orange-500" title={gettext("Running now")}></span>
                       <span class="truncate">{s.title || session_suffix(s.key)}</span>
                     </div>
                     <div class="truncate text-sm text-zinc-500">{s.agent || "-"} · {gettext("%{count} turns", count: s.turns)}</div>
-                    <div class="truncate text-xs text-zinc-600">{s.key}</div>
                   </button>
                   <button :if={s.running} phx-click="stop_session" phx-value-key={s.key} title={gettext("Stop")}
                     class="px-2 py-2 text-sm text-zinc-500 transition hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100">{gettext("Stop")}</button>
                   <button phx-click="delete" phx-value-key={s.key} data-confirm={gettext("Delete session %{key}?", key: s.key)} title={gettext("Delete session")}
-                    class="px-3 py-2 text-zinc-600 transition hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100">✕</button>
+                    class="px-3 py-2 text-zinc-600 transition hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100">
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
                 </div>
               </div>
               <p :if={@sessions == []} class="px-4 py-6 text-[15px] text-zinc-500">
@@ -160,7 +166,7 @@ defmodule PepeWeb.ChatLive do
           </div>
 
           <div :if={@selected} class="flex min-w-0 flex-1 flex-col">
-            <header class="flex items-center gap-2 border-b border-zinc-800 px-3 py-3 sm:px-5">
+            <header class="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-3 py-3 sm:px-5">
               <button
                 phx-click="close_chat"
                 aria-label={gettext("Back to conversations")}
@@ -172,15 +178,37 @@ defmodule PepeWeb.ChatLive do
                 <div class="truncate font-medium">{SessionTitles.get(@selected) || session_suffix(@selected)}</div>
                 <div class="truncate text-sm text-zinc-500">{@agent || "-"} · {@selected}</div>
               </div>
-              <div class="flex shrink-0 flex-wrap gap-2">
-                <button phx-click="reset" class={btn_ghost()}>{gettext("New")}</button>
+              <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <%!-- The model picker: the same closed sets the `/model` slash command works
+                      over (Pepe.ModelSwitch), so the dashboard no longer needs free text to
+                      change a conversation's model. The scope select only records where the
+                      NEXT change lands - it never applies anything on its own. --%>
+                <form :if={@models != []} id="chat-model-scope" phx-change="set_model_scope">
+                  <select name="scope" aria-label={gettext("Apply a model change to")} class={fld_sm()}>
+                    <option value="session" selected={@model_scope == "session"}>{gettext("This conversation")}</option>
+                    <option value="global" selected={@model_scope == "global"}>{gettext("Everyone")}</option>
+                  </select>
+                </form>
+                <form :if={@models != []} id="chat-model" phx-change="set_model">
+                  <select name="model" aria-label={gettext("Model")} class={fld_sm()}>
+                    <option value="" selected={is_nil(@model_name)}>{gettext("Model...")}</option>
+                    <option :for={m <- @models} value={m.name} selected={m.name == @model_name}>{m.name}</option>
+                  </select>
+                </form>
+                <button
+                  phx-click="reset"
+                  data-confirm={gettext("Erase this conversation's history? The messages above are deleted and can't be recovered.")}
+                  class={btn_ghost()}
+                >
+                  {gettext("Clear conversation")}
+                </button>
                 <button phx-click="stop" disabled={!@running} class={[btn_ghost(), "disabled:opacity-40"]}>{gettext("Stop")}</button>
               </div>
             </header>
 
             <.focus_panel :if={@focus} focus={@focus} />
 
-            <div id="chat-scroll" phx-hook=".ChatScroll" class="flex-1 space-y-3 overflow-y-auto p-5">
+            <div id="chat-scroll" phx-hook=".ChatScroll" class="flex-1 space-y-3 overflow-y-auto px-3 py-5 sm:px-5">
               <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-[15px] text-zinc-600">
                 {gettext("Fresh conversation. Send a message to start.")}
               </div>
@@ -192,9 +220,7 @@ defmodule PepeWeb.ChatLive do
               <.activity :if={(@running or @activity != []) and !@pending_perm and !@pending_ask} running={@running} steps={@activity} />
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-amber-600/60 bg-amber-950/30 p-3">
-                <div class="mb-2 text-[15px]">
-                  🔐 {gettext("Allow me to run the")} <code class="text-amber-300">{@pending_perm.tool}</code> {gettext("tool?")}
-                </div>
+                <.perm_question tool={@pending_perm.tool} />
                 <p :if={@pending_perm.tainted} class="mb-2 text-sm text-zinc-400">ℹ️ {Prompt.taint_note()}</p>
                 <div class="flex flex-wrap gap-2">
                   <button
@@ -219,19 +245,32 @@ defmodule PepeWeb.ChatLive do
               </div>
             </div>
 
-            <div class="relative border-t border-zinc-800 p-3">
-              <div :if={slash_matches(@input) != []} class="absolute bottom-full left-3 mb-2 w-72 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
+            <div class="relative border-t border-zinc-800 px-3 py-3 sm:px-5">
+              <%!-- The command name and its description are stacked, not side by side: a
+                    one-line row made every longer description (and most translations of
+                    the short ones) wrap into a ragged block. --%>
+              <div
+                :if={slash_matches(@input) != []}
+                class="absolute bottom-full left-3 mb-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl sm:left-5"
+              >
                 <button :for={{cmd, desc} <- slash_matches(@input)} type="button" phx-click="run_slash" phx-value-cmd={cmd}
-                  class="flex w-full items-baseline gap-2 px-3 py-2 text-left hover:bg-zinc-800">
-                  <span class="font-mono text-[15px] text-orange-400">{cmd}</span>
-                  <span class="text-sm text-zinc-500">{desc}</span>
+                  class="block w-full px-3 py-2 text-left hover:bg-zinc-800">
+                  <span class="block font-mono text-[15px] text-orange-400">{cmd}</span>
+                  <span class="block text-sm leading-snug text-zinc-500">{desc}</span>
                 </button>
               </div>
 
-              <form id="chat-compose" phx-submit="send" phx-change="type" class="flex gap-2">
-                <input name="text" value={@input} autocomplete="off" placeholder={gettext("Message...  (type / for commands)")}
-                  class="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
-                <button type="submit" class="rounded-lg bg-orange-600 px-5 py-2 font-medium transition hover:bg-orange-500">{gettext("Send")}</button>
+              <form id="chat-compose" phx-submit="send" phx-change="type" class="flex items-end gap-2">
+                <textarea
+                  id="chat-input"
+                  name="text"
+                  rows="1"
+                  phx-hook=".Composer"
+                  autocomplete="off"
+                  placeholder={gettext("Message...  (Enter to send, Shift+Enter for a new line)")}
+                  class={[fld(), "min-w-0 flex-1 resize-none"]}
+                >{@input}</textarea>
+                <button type="submit" class={btn()}>{gettext("Send")}</button>
               </form>
             </div>
           </div>
@@ -267,6 +306,41 @@ defmodule PepeWeb.ChatLive do
         }
       }
     </script>
+
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".Composer">
+      // The composer is a textarea so a prompt can have more than one line: Enter still
+      // sends (that's what a chat box does), Shift+Enter inserts a newline, and the box
+      // grows with the text up to a few lines before scrolling. `isComposing` keeps an
+      // IME's enter-to-accept from sending a half-typed word.
+      const MAX = 200
+
+      export default {
+        grow() {
+          this.el.style.height = "auto"
+          this.el.style.height = Math.min(this.el.scrollHeight, MAX) + "px"
+          this.el.style.overflowY = this.el.scrollHeight > MAX ? "auto" : "hidden"
+        },
+        mounted() {
+          this.onInput = () => this.grow()
+          this.onKeydown = (e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+              e.preventDefault()
+              if (this.el.form) this.el.form.requestSubmit()
+            }
+          }
+          this.el.addEventListener("input", this.onInput)
+          this.el.addEventListener("keydown", this.onKeydown)
+          this.grow()
+        },
+        updated() {
+          this.grow()
+        },
+        destroyed() {
+          this.el.removeEventListener("input", this.onInput)
+          this.el.removeEventListener("keydown", this.onKeydown)
+        }
+      }
+    </script>
     """
   end
 
@@ -275,13 +349,13 @@ defmodule PepeWeb.ChatLive do
   # A slim panel under the header showing the session's current goal and plan checklist.
   defp focus_panel(assigns) do
     ~H"""
-    <div class="border-b border-zinc-800 bg-zinc-900/40 px-5 py-3 text-[15px]">
+    <div class="border-b border-zinc-800 bg-zinc-900/40 px-3 py-3 text-[15px] sm:px-5">
       <div :if={@focus.goal} class="flex items-start gap-2">
         <span class="mt-0.5 text-zinc-500">🎯</span>
         <div class="min-w-0">
           <span class="font-medium">{@focus.goal["objective"]}</span>
           <span class={["ml-2 rounded-full px-2 py-0.5 text-xs font-medium", goal_badge(@focus.goal["status"])]}>
-            {@focus.goal["status"] || "active"}
+            {goal_status_label(@focus.goal["status"])}
           </span>
           <span :if={@focus.goal["attempt"]} class="ml-2 text-xs text-zinc-500">
             {gettext("attempt %{n}/%{max}", n: @focus.goal["attempt"], max: @focus.goal["max_attempts"])}
@@ -306,6 +380,15 @@ defmodule PepeWeb.ChatLive do
     """
   end
 
+  # The reader-facing wording for the goal statuses `Pepe.Tools.Goal` stores (the raw
+  # value used to be printed as-is, in English, whatever the dashboard's language).
+  # Same four values `goal_badge/1` colours, and an unknown one falls back to "active"
+  # exactly as the badge does.
+  defp goal_status_label("complete"), do: gettext("complete")
+  defp goal_status_label("blocked"), do: gettext("blocked")
+  defp goal_status_label("paused"), do: gettext("paused")
+  defp goal_status_label(_), do: gettext("active")
+
   defp goal_badge("complete"), do: "bg-green-500/15 text-green-400"
   defp goal_badge("blocked"), do: "bg-red-500/15 text-red-400"
   defp goal_badge("paused"), do: "bg-zinc-600/30 text-zinc-400"
@@ -314,6 +397,38 @@ defmodule PepeWeb.ChatLive do
   defp plan_box("done"), do: "✅"
   defp plan_box("in_progress"), do: "⏳"
   defp plan_box(_), do: "▫️"
+
+  attr :tool, :string, required: true
+
+  # The tool-authorization question. One sentence, one msgid: the tool name is a
+  # `%{tool}` placeholder inside it, so a translator can put it wherever their
+  # language needs it. It used to be two separate gettext calls with the `<code>`
+  # tag between them, which pinned the English word order and left translators
+  # smuggling whole clauses into the first fragment.
+  defp perm_question(assigns) do
+    {lead, tail} = perm_question_parts()
+    assigns = assign(assigns, lead: lead, tail: tail)
+
+    ~H"""
+    <div class="mb-2 text-[15px]">🔐 {@lead}<code class="text-amber-300">{@tool}</code>{@tail}</div>
+    """
+  end
+
+  # Gettext interpolation can only produce a string, and the tool name has to render
+  # inside a `<code>` tag. So interpolate a marker no message would ever contain, then
+  # split the translated sentence back apart around it - the two halves and the tool
+  # name are rendered as separate (HEEx-escaped) nodes. A translation that drops the
+  # placeholder still renders, with the name appended.
+  @perm_marker "\x00"
+
+  defp perm_question_parts do
+    gettext("Allow me to run the %{tool} tool?", tool: @perm_marker)
+    |> String.split(@perm_marker, parts: 2)
+    |> case do
+      [lead, tail] -> {lead, tail}
+      [whole] -> {whole <> " ", ""}
+    end
+  end
 
   attr :role, :string, required: true
   attr :content, :string, required: true
@@ -385,6 +500,7 @@ defmodule PepeWeb.ChatLive do
      |> assign(
        selected: nil,
        agent: nil,
+       model_name: nil,
        messages: [],
        streaming: "",
        running: false,
@@ -417,6 +533,7 @@ defmodule PepeWeb.ChatLive do
         assign(socket,
           selected: nil,
           agent: nil,
+          model_name: nil,
           messages: [],
           streaming: "",
           running: false,
@@ -488,6 +605,20 @@ defmodule PepeWeb.ChatLive do
     if socket.assigns.selected, do: Session.stop(socket.assigns.selected)
     {:noreply, assign(socket, running: false, streaming: "", activity: [])}
   end
+
+  # The header's model picker. It doesn't decide anything itself: both operands are the
+  # same closed sets `/model` works over, and applying goes through `ask_or_apply/4`, the
+  # very function the slash command calls.
+  def handle_event("set_model", %{"model" => name}, socket) when is_binary(name) do
+    if socket.assigns.selected && name != "",
+      do: {:noreply, ask_or_apply(socket, socket.assigns.selected, name, socket.assigns.model_scope)},
+      else: {:noreply, socket}
+  end
+
+  def handle_event("set_model_scope", %{"scope" => scope}, socket) when scope in ["session", "global"],
+    do: {:noreply, assign(socket, model_scope: scope)}
+
+  def handle_event("set_model_scope", _params, socket), do: {:noreply, socket}
 
   def handle_event("perm", %{"id" => id, "decision" => token}, socket) do
     # `id` comes over the socket and a client can send any string; `String.to_integer` would
@@ -643,10 +774,12 @@ defmodule PepeWeb.ChatLive do
     unsubscribe(socket.assigns.selected)
     SessionSupervisor.ensure(key, Config.default_agent_name())
     Phoenix.PubSub.subscribe(Pepe.PubSub, topic(key))
+    s = status(key)
 
     assign(socket,
       selected: key,
-      agent: status(key).agent,
+      agent: s.agent,
+      model_name: selected_model_name(socket.assigns.models, s.model),
       messages: history(key),
       window: @window,
       streaming: "",
@@ -660,6 +793,14 @@ defmodule PepeWeb.ChatLive do
   # once); "Load earlier messages" widens the window on demand.
   defp visible(messages, window) when length(messages) <= window, do: messages
   defp visible(messages, window), do: Enum.take(messages, -window)
+
+  # Which of the listed models the session is on. `Session.status/1` reports the provider
+  # model id (`gpt-a`); the picker lists connection names (`model-a`), so match one to the
+  # other. Nothing selected when the session's model isn't among this scope's connections.
+  defp selected_model_name(_models, nil), do: nil
+
+  defp selected_model_name(models, model_id),
+    do: Enum.find_value(models, fn m -> m.model == model_id && m.name end)
 
   # The session's current goal + plan (from the disposable store), for the focus panel.
   defp load_focus(nil), do: nil
@@ -964,7 +1105,7 @@ defmodule PepeWeb.ChatLive do
 
   defp report_model_result(socket, :ok, name, scope) do
     socket
-    |> assign(input: "")
+    |> assign(input: "", model_name: name)
     |> put_flash(:info, gettext("Model set to %{name} (%{scope}).", name: name, scope: scope_label(scope)))
   end
 

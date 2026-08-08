@@ -52,9 +52,13 @@ defmodule PepeWeb.HooksLive do
       <main class="flex min-w-0 flex-1 flex-col">
         <.view_header
           icon="🛡️"
-          title={gettext("Privacy hooks")}
+          title={gettext("Privacy")}
           desc={gettext("Redact PII on the message flow before it reaches a model. Configure a hook here, then enable it on an agent (Agents). Empty = no redaction (raw text).")}
-        />
+        >
+          <button :if={@editing} phx-click="cancel" class={btn_ghost()}>
+            &larr; {gettext("Back to Privacy")}
+          </button>
+        </.view_header>
 
         <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <%= if @editing do %>
@@ -79,9 +83,9 @@ defmodule PepeWeb.HooksLive do
                   </span>
                 </div>
                 <p class="mt-1.5 text-sm leading-relaxed text-zinc-500">{meta_desc(name)}</p>
-                <p class="mt-2 text-xs text-zinc-600">{used_by(@agents, name)}</p>
+                <p class="mt-2 text-sm text-zinc-400">{used_by(@agents, name)}</p>
                 <div class="mt-3 flex gap-2">
-                  <button phx-click="edit" phx-value-name={name} class={btn()}>{gettext("Configure")}</button>
+                  <button phx-click="edit" phx-value-name={name} class={btn_ghost()}>{gettext("Configure")}</button>
                   <button
                     :if={configured?(@settings, name)}
                     phx-click="clear"
@@ -104,14 +108,13 @@ defmodule PepeWeb.HooksLive do
   defp form_panel(assigns) do
     ~H"""
     <div class="max-w-2xl">
-      <button phx-click="cancel" class="mb-3 text-sm text-zinc-500 hover:text-zinc-300">
-        &larr; {gettext("Back to hooks")}
-      </button>
       <div class="mb-4 flex items-center gap-2">
         <span class="text-lg">{meta_icon(@editing)}</span>
         <div>
           <div class="font-medium">{meta_title(@editing)}</div>
-          <div class="text-sm text-zinc-500">{@editing}</div>
+          <div class="text-sm text-zinc-500">
+            {gettext("Config key: %{key}", key: @editing)}
+          </div>
         </div>
       </div>
 
@@ -131,7 +134,7 @@ defmodule PepeWeb.HooksLive do
     ~H"""
     <div>
       <label class={lbl()}>{gettext("Recognizer packs")}</label>
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <.check_card :for={p <- Map.keys(Recognizers.packs())} name="packs[]" value={p}
           checked={p in list(@edit, "packs")} hint={pack_hint(p)} />
       </div>
@@ -140,10 +143,11 @@ defmodule PepeWeb.HooksLive do
 
     <div>
       <label class={lbl()}>{gettext("Individual recognizers")}</label>
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <.check_card :for={r <- Recognizers.builtin_names()} name="recognizers[]" value={r}
-          checked={r in list(@edit, "recognizers")} />
+          checked={r in list(@edit, "recognizers")} hint={recognizer_hint(r)} />
       </div>
+      <p class={hlp()}>{gettext("A pack above already turns these on (br = cpf, cnpj, cep, phone_br), so ticking both is redundant, not additive. Use these to pick one recognizer without taking its whole pack.")}</p>
     </div>
 
     <div>
@@ -202,13 +206,47 @@ defmodule PepeWeb.HooksLive do
 
   defp fields(%{editing: "presidio"} = assigns) do
     ~H"""
-    <.text_field name="analyzer_url" label={gettext("Analyzer URL")} value={@edit["analyzer_url"]} />
-    <.text_field name="anonymizer_url" label={gettext("Anonymizer URL")} value={@edit["anonymizer_url"]} />
+    <.text_field
+      name="analyzer_url"
+      label={gettext("Analyzer URL")}
+      value={@edit["analyzer_url"]}
+      placeholder="http://localhost:5002"
+      hint={gettext("Your Presidio Analyzer service, the one that finds the PII. Self-hosted, e.g. http://localhost:5002.")}
+    />
+    <.text_field
+      name="anonymizer_url"
+      label={gettext("Anonymizer URL")}
+      value={@edit["anonymizer_url"]}
+      placeholder="http://localhost:5001"
+      hint={gettext("Your Presidio Anonymizer service, the one that replaces what the analyzer found. E.g. http://localhost:5001.")}
+    />
     <div class="grid gap-3 sm:grid-cols-2">
-      <.text_field name="language" label={gettext("Language")} value={@edit["language"] || "en"} />
-      <.text_field name="score_threshold" label={gettext("Score threshold")} value={@edit["score_threshold"]} hint="0.0 - 1.0" />
+      <.text_field
+        name="language"
+        label={gettext("Language")}
+        value={@edit["language"] || "en"}
+        placeholder="en"
+        hint={gettext("ISO code, e.g. en, pt, es. Not the language name.")}
+      />
+      <.text_field
+        name="score_threshold"
+        label={gettext("Score threshold")}
+        value={@edit["score_threshold"]}
+        type="number"
+        step="0.05"
+        min="0"
+        max="1"
+        placeholder="0.5"
+        hint={gettext("How sure Presidio has to be before it redacts something, from 0 to 1. Higher catches less but gets it wrong less often. Blank = Presidio's own default.")}
+      />
     </div>
-    <.text_field name="entities" label={gettext("Entities (comma-separated, optional)")} value={Enum.join(list(@edit, "entities"), ", ")} />
+    <.text_field
+      name="entities"
+      label={gettext("Entities (comma-separated, optional)")}
+      value={Enum.join(list(@edit, "entities"), ", ")}
+      placeholder="PERSON, EMAIL_ADDRESS, CREDIT_CARD"
+      hint={gettext("Which kinds of data to look for, by Presidio's own names (PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, ...). Blank = everything your Presidio install detects.")}
+    />
     """
   end
 
@@ -216,12 +254,15 @@ defmodule PepeWeb.HooksLive do
   attr :label, :string, required: true
   attr :value, :any, default: nil
   attr :hint, :string, default: nil
+  attr :type, :string, default: "text"
+  attr :placeholder, :string, default: nil
+  attr :rest, :global, include: ~w(step min max)
 
   defp text_field(assigns) do
     ~H"""
     <div>
       <label class={lbl()}>{@label}</label>
-      <input name={@name} value={@value} class={fld()} />
+      <input type={@type} name={@name} value={@value} placeholder={@placeholder} class={fld()} {@rest} />
       <p :if={@hint} class={hlp()}>{@hint}</p>
     </div>
     """
@@ -233,10 +274,12 @@ defmodule PepeWeb.HooksLive do
     <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
       <div class="mb-1.5 text-sm font-medium text-zinc-400">{gettext("How reversible works")}</div>
       <div class="space-y-0.5 font-mono text-xs leading-relaxed">
-        <div><span class="text-zinc-500">{gettext("you")}: </span><span class="text-zinc-300">meu CPF é 123.456.789-09</span></div>
-        <div><span class="text-zinc-500">{gettext("the model sees")}: </span><span class="text-orange-300">meu CPF é [CPF_1]</span></div>
-        <div><span class="text-zinc-500">{gettext("the model replies")}: </span><span class="text-orange-300">boleto do [CPF_1]</span></div>
-        <div><span class="text-zinc-500">{gettext("you get back")}: </span><span class="text-zinc-300">boleto do CPF 123.456.789-09</span> <span class="text-green-400">✓</span></div>
+        <%!-- Worked example, translated per locale on purpose: each language should show
+             the identifier its operators actually use (SSN in en, CPF in pt, DNI in es). --%>
+        <div><span class="text-zinc-500">{gettext("you")}: </span><span class="text-zinc-300">{gettext("my SSN is 123-45-6789")}</span></div>
+        <div><span class="text-zinc-500">{gettext("the model sees")}: </span><span class="text-orange-300">{gettext("my SSN is [SSN_1]")}</span></div>
+        <div><span class="text-zinc-500">{gettext("the model replies")}: </span><span class="text-orange-300">{gettext("invoice for [SSN_1]")}</span></div>
+        <div><span class="text-zinc-500">{gettext("you get back")}: </span><span class="text-zinc-300">{gettext("invoice for SSN 123-45-6789")}</span> <span class="text-green-400">✓</span></div>
       </div>
       <p class={hlp()}>{gettext("The swap back happens locally, so the model only ever handled the placeholder, never the real value.")}</p>
       <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: one-way, the model and you keep the masked version.")}</p>
@@ -261,14 +304,22 @@ defmodule PepeWeb.HooksLive do
 
   def handle_event("save", params, socket) do
     name = socket.assigns.editing
-    settings = build_settings(name, params)
-    Config.put_hook_settings(name, settings)
 
-    {:noreply,
-     socket
-     |> assign(editing: nil, edit: %{})
-     |> load()
-     |> put_flash(:info, gettext("Saved %{h}.", h: meta_title(name)))}
+    case build_settings(name, params) do
+      {:ok, settings} ->
+        Config.put_hook_settings(name, settings)
+
+        {:noreply,
+         socket
+         |> assign(editing: nil, edit: %{})
+         |> load()
+         |> put_flash(:info, gettext("Saved %{h}.", h: meta_title(name)))}
+
+      # Nothing is written and the form stays open with what was typed still in it.
+      # A value we can't parse has to say so, never be dropped on the floor.
+      {:error, message, edit} ->
+        {:noreply, socket |> assign(edit: edit) |> put_flash(:error, message)}
+    end
   end
 
   def handle_event("ai_toggle", %{"field" => field} = p, socket),
@@ -329,36 +380,52 @@ defmodule PepeWeb.HooksLive do
 
   # ---- build settings from form params ------------------------------------
 
+  # `{:ok, settings}` or `{:error, message, edit_to_keep_on_screen}`.
   defp build_settings("pii_redact", p) do
-    %{}
-    |> put_nonempty("packs", p["packs"] || [])
-    |> put_nonempty("recognizers", p["recognizers"] || [])
-    |> put_nonempty("custom", parse_custom(p["custom"]))
-    |> Map.put("reversible", p["reversible"] == "true")
+    {:ok,
+     %{}
+     |> put_nonempty("packs", p["packs"] || [])
+     |> put_nonempty("recognizers", p["recognizers"] || [])
+     |> put_nonempty("custom", parse_custom(p["custom"]))
+     |> Map.put("reversible", p["reversible"] == "true")}
   end
 
   defp build_settings("llm_redact", p) do
-    %{}
-    |> put_nonempty("model", p["model"])
-    |> Map.put("reversible", p["reversible"] == "true")
+    {:ok,
+     %{}
+     |> put_nonempty("model", p["model"])
+     |> Map.put("reversible", p["reversible"] == "true")}
   end
 
   defp build_settings("http_redact", p) do
-    %{}
-    |> put_nonempty("url", p["url"])
-    |> put_nonempty("inbound_url", p["inbound_url"])
-    |> put_nonempty("outbound_url", p["outbound_url"])
-    |> put_basic_auth(p)
-    |> put_nonempty("headers", parse_headers(p["headers"]))
+    {:ok,
+     %{}
+     |> put_nonempty("url", p["url"])
+     |> put_nonempty("inbound_url", p["inbound_url"])
+     |> put_nonempty("outbound_url", p["outbound_url"])
+     |> put_basic_auth(p)
+     |> put_nonempty("headers", parse_headers(p["headers"]))}
   end
 
   defp build_settings("presidio", p) do
-    %{}
-    |> put_nonempty("analyzer_url", p["analyzer_url"])
-    |> put_nonempty("anonymizer_url", p["anonymizer_url"])
-    |> put_nonempty("language", p["language"])
-    |> put_nonempty("entities", split_csv(p["entities"]))
-    |> put_float("score_threshold", p["score_threshold"])
+    base =
+      %{}
+      |> put_nonempty("analyzer_url", p["analyzer_url"])
+      |> put_nonempty("anonymizer_url", p["anonymizer_url"])
+      |> put_nonempty("language", p["language"])
+      |> put_nonempty("entities", split_csv(p["entities"]))
+
+    case parse_threshold(p["score_threshold"]) do
+      {:ok, nil} ->
+        {:ok, base}
+
+      {:ok, threshold} ->
+        {:ok, Map.put(base, "score_threshold", threshold)}
+
+      :error ->
+        {:error, gettext("Score threshold must be a number between 0 and 1, like 0.5. Nothing was saved."),
+         Map.put(base, "score_threshold", p["score_threshold"])}
+    end
   end
 
   defp put_basic_auth(map, p) do
@@ -418,12 +485,27 @@ defmodule PepeWeb.HooksLive do
   defp put_nonempty(map, _key, nil), do: map
   defp put_nonempty(map, key, value), do: Map.put(map, key, value)
 
-  defp put_float(map, key, s) do
-    case s && Float.parse(String.trim(s)) do
-      {f, _} -> Map.put(map, key, f)
-      _ -> map
+  # A confidence in 0..1, or `:error` so the caller can say so out loud. Blank is a
+  # legitimate "leave it to Presidio's default", not a failure. A comma decimal is
+  # accepted (a pt-BR keyboard types "0,5"); anything else that isn't a plain number
+  # in range is rejected rather than silently thrown away, which is what the old
+  # `Float.parse/1`-and-shrug did.
+  defp parse_threshold(nil), do: {:ok, nil}
+
+  defp parse_threshold(s) when is_binary(s) do
+    case s |> String.trim() |> String.replace(",", ".") do
+      "" ->
+        {:ok, nil}
+
+      normalized ->
+        case Float.parse(normalized) do
+          {f, ""} when f >= 0.0 and f <= 1.0 -> {:ok, f}
+          _ -> :error
+        end
     end
   end
+
+  defp parse_threshold(_), do: :error
 
   # ---- view helpers -------------------------------------------------------
 
@@ -432,6 +514,19 @@ defmodule PepeWeb.HooksLive do
   defp pack_hint("br"), do: gettext("CPF, CNPJ, CEP, phone")
   defp pack_hint("us"), do: gettext("SSN, phone")
   defp pack_hint(_), do: ""
+
+  # What each built-in recognizer actually matches: the raw names (cep, cnpj, ssn_us)
+  # mean nothing to an operator outside that country.
+  defp recognizer_hint("email"), do: gettext("email addresses")
+  defp recognizer_hint("ip"), do: gettext("IP addresses")
+  defp recognizer_hint("credit_card"), do: gettext("card numbers")
+  defp recognizer_hint("cpf"), do: gettext("Brazilian personal tax ID")
+  defp recognizer_hint("cnpj"), do: gettext("Brazilian company tax ID")
+  defp recognizer_hint("cep"), do: gettext("Brazilian postal code")
+  defp recognizer_hint("phone_br"), do: gettext("Brazilian phone numbers")
+  defp recognizer_hint("ssn_us"), do: gettext("US Social Security number")
+  defp recognizer_hint("phone_us"), do: gettext("US phone numbers")
+  defp recognizer_hint(_), do: ""
 
   defp configured?(settings, name), do: Map.get(settings, name, %{}) not in [nil, %{}]
 

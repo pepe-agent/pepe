@@ -24,6 +24,11 @@ defmodule PepeWeb.ConnectionsComponent do
   # `send_update(ConnectionsComponent, id: ..., open: provider_name)`.
   def update(%{open: name}, socket), do: {:ok, open_form(socket, name)}
 
+  # ...and close it again, so a parent that renders its own "Back" button in the page header
+  # can dismiss the form without duplicating the reset.
+  def update(%{close: true}, socket),
+    do: {:ok, assign(socket, adding: nil, editing_slug: nil, form_values: %{}, form_errors: %{})}
+
   def update(assigns, socket) do
     {:ok,
      socket
@@ -67,8 +72,8 @@ defmodule PepeWeb.ConnectionsComponent do
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <span class="font-medium">{slug}</span>
-              <span class={["ml-2 rounded px-1.5 text-sm", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
-                {e["mode"] || "support"}
+              <span class={["ml-2 rounded px-1.5 py-0.5 text-sm", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
+                {mode_badge(e["mode"])}
               </span>
             </div>
             <div class="flex shrink-0 flex-wrap gap-1 text-sm">
@@ -164,8 +169,14 @@ defmodule PepeWeb.ConnectionsComponent do
         <.form_section title={gettext("Provider credentials")}>
           <div :for={f <- @form_schema}>
             <label class={lbl()}>{f["label"]}</label>
+            <%!-- The blank option matters: without it the first value is shown and saved for a field
+                 nobody ever touched, which for require_mention silently flips the provider's own
+                 default. Blank round-trips to "unset" because build_config/2 drops empty values. --%>
             <select :if={f["type"] == "select"} name={"cfg[" <> f["key"] <> "]"} class={fld()}>
-              <option :for={o <- f["options"] || []} value={o} selected={cfgval(@form_values, f["key"]) == o}>{o}</option>
+              <option value="" selected={cfgval(@form_values, f["key"]) == ""}>{gettext("Not set (provider default)")}</option>
+              <option :for={o <- f["options"] || []} value={o} selected={cfgval(@form_values, f["key"]) == o}>
+                {option_label(f["options"], o)}
+              </option>
             </select>
             <input
               :if={f["type"] != "select"}
@@ -298,6 +309,29 @@ defmodule PepeWeb.ConnectionsComponent do
   end
 
   # ---- helpers -----------------------------------------------------------------------
+
+  # The stored value is "support"/"admin"; the badge shows the translated word, never the raw one.
+  defp mode_badge("admin"), do: gettext("Admin")
+  defp mode_badge(_), do: gettext("Support")
+
+  # A schema's option list is raw config values. When those values are just a boolean written as
+  # strings, the operator should read Yes/No, not `true`/`false`; anything else shows as-is,
+  # since only the provider knows what its own values mean.
+  defp option_label(options, o) do
+    if boolean_options?(options), do: boolean_label(o), else: o
+  end
+
+  defp boolean_options?(options) when is_list(options),
+    do: options |> Enum.map(&String.downcase(to_string(&1))) |> Enum.sort() == ["false", "true"]
+
+  defp boolean_options?(_), do: false
+
+  defp boolean_label(o) do
+    case String.downcase(to_string(o)) do
+      "true" -> gettext("Yes")
+      _ -> gettext("No")
+    end
+  end
 
   defp mode_hint("admin"),
     do: gettext("Admin: a channel you operate. History is kept, slash commands like /new work, and conversations can become memory.")

@@ -25,9 +25,14 @@ defmodule PepeWeb.TokensLive do
        projects: Config.project_slugs(),
        new_project: false,
        tokens: Config.api_tokens(),
+       creating: false,
        token_project: nil,
        token_widget: false,
        token_usage: false,
+       # Live "Read usage" state per open edit form, keyed by token id. The stored value only
+       # seeds it: the operator may tick the box now, and the content option has to follow
+       # immediately rather than after a save and a re-open.
+       edit_usage: %{},
        raw: nil
      )}
   end
@@ -43,14 +48,17 @@ defmodule PepeWeb.TokensLive do
           icon="🔑"
           title={gettext("API tokens")}
           desc={gettext("Bearer tokens for the OpenAI-compatible /v1 API. With no token, only loopback (localhost) callers get through. Minting the first token requires one from everyone else too, local or remote: that's what secures a network-exposed server.")}
-        />
+        >
+          <button :if={!@creating} phx-click="token_new" class={btn()}>{gettext("+ New token")}</button>
+          <button :if={@creating} phx-click="token_cancel" class={btn_ghost()}>&larr; {gettext("Back to tokens")}</button>
+        </.view_header>
 
         <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <div :if={@raw} class="mb-6 max-w-2xl rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0 text-sm">
-                <span class="font-semibold text-amber-200">{gettext("Copy this token now")}</span>
-                <span class="text-amber-200/70">- {gettext("shown only once, store it somewhere safe.")}</span>
+                <span class="font-semibold text-amber-200">{gettext("Copy this token now.")}</span>
+                <span class="ml-1 text-amber-200/70">{gettext("Shown only once. Store it somewhere safe.")}</span>
               </div>
               <button phx-click="token_dismiss" class="shrink-0 text-sm text-amber-200/70 hover:text-amber-200">{gettext("Dismiss")}</button>
             </div>
@@ -60,9 +68,8 @@ defmodule PepeWeb.TokensLive do
             </div>
           </div>
 
-          <div class={[card(), "mb-6 max-w-2xl"]}>
-            <div class="mb-4 text-lg font-semibold">{gettext("New token")}</div>
-            <form phx-submit="token_create" class="space-y-4">
+          <form :if={@creating} phx-submit="token_create" class="max-w-2xl space-y-4">
+            <.form_section title={gettext("New token")}>
               <div>
                 <label class={lbl()}>
                   {gettext("Label")} <span class="text-zinc-600">{gettext("(optional)")}</span>
@@ -88,68 +95,72 @@ defmodule PepeWeb.TokensLive do
                 <p class={hlp()}>{gettext("Lock the token to one agent, or leave it open to any agent in the scope above.")}</p>
               </div>
 
-              <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-                <input
-                  type="checkbox"
-                  name="widget"
-                  value="true"
-                  checked={@token_widget}
-                  phx-click="token_toggle_widget"
-                  class="h-4 w-4 accent-orange-500"
-                />
-                {gettext("Public widget token (for the embeddable chat widget)")}
-              </label>
+              <div>
+                <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                  <input
+                    type="checkbox"
+                    name="widget"
+                    value="true"
+                    checked={@token_widget}
+                    phx-click="token_toggle_widget"
+                    class={checkbox_cls()}
+                  />
+                  {gettext("Public widget token (for the embeddable chat widget)")}
+                </label>
+                <p class={hlp()}>{gettext("Its raw value sits in your page's public source: it must be pinned to one agent above, it can never read usage or billing, and it only answers from the single origin you allow.")}</p>
+              </div>
 
               <div :if={@token_widget}>
                 <label class={lbl()}>{gettext("Allowed origin")}</label>
                 <input name="allowed_origin" placeholder="https://example.com" class={fld()} />
                 <p class={hlp()}>{gettext("The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above: a public token always pins to one.")}</p>
               </div>
+            </.form_section>
 
-              <div :if={!@token_widget} class="space-y-3 rounded-xl border border-zinc-800 p-3">
-                <div class="text-sm font-semibold text-zinc-400">{gettext("What this token may do")}</div>
+            <.form_section :if={!@token_widget} title={gettext("What this token may do")}>
+              <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                <input type="checkbox" name="chat" value="true" checked class={checkbox_cls()} />
+                {gettext("Run agents")}
+              </label>
 
+              <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                <input
+                  type="checkbox"
+                  name="usage"
+                  value="true"
+                  checked={@token_usage}
+                  phx-click="token_toggle_usage"
+                  class={checkbox_cls()}
+                />
+                {gettext("Read usage and billing (/v1/usage)")}
+              </label>
+
+              <div :if={@token_usage}>
+                <label class={lbl()}>{gettext("Money it may see")}</label>
+                <select name="prices" class={fld()}>
+                  <option value="billable">{gettext("Billable: with the project's markup (what the client pays)")}</option>
+                  <option value="list">{gettext("List: the model's price, no markup")}</option>
+                  <option value="all">{gettext("Everything: adds our cost and the margin")}</option>
+                </select>
+                <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
+              </div>
+
+              <div :if={@token_usage}>
                 <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-                  <input type="checkbox" name="chat" value="true" checked class="h-4 w-4 accent-orange-500" />
-                  {gettext("Run agents")}
-                </label>
-
-                <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-                  <input
-                    type="checkbox"
-                    name="usage"
-                    value="true"
-                    checked={@token_usage}
-                    phx-click="token_toggle_usage"
-                    class="h-4 w-4 accent-orange-500"
-                  />
-                  {gettext("Read usage and billing (/v1/usage)")}
-                </label>
-
-                <div :if={@token_usage}>
-                  <label class={lbl()}>{gettext("Money it may see")}</label>
-                  <select name="prices" class={fld()}>
-                    <option value="billable">{gettext("Billable: with the project's markup (what the client pays)")}</option>
-                    <option value="list">{gettext("List: the model's price, no markup")}</option>
-                    <option value="all">{gettext("Everything: adds our cost and the margin")}</option>
-                  </select>
-                  <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
-                </div>
-
-                <label :if={@token_usage} class="flex items-center gap-2 text-[15px] text-zinc-300">
-                  <input type="checkbox" name="content" value="true" class="h-4 w-4 accent-orange-500" />
+                  <input type="checkbox" name="content" value="true" class={checkbox_cls()} />
                   {gettext("Also show conversation content in a run's detail")}
                 </label>
-                <p :if={@token_usage} class={hlp()}>{gettext("Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output.")}</p>
+                <p class={hlp()}>{gettext("Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output.")}</p>
               </div>
+            </.form_section>
 
-              <div class="pt-1">
-                <button type="submit" class={btn()}>{gettext("Generate token")}</button>
-              </div>
-            </form>
-          </div>
+            <div class="flex gap-2 pt-1">
+              <button type="submit" class={btn()}>{gettext("Generate token")}</button>
+              <button type="button" phx-click="token_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
+            </div>
+          </form>
 
-          <div class="space-y-3">
+          <div :if={!@creating} class="space-y-3">
             <div :for={t <- scoped_tokens(@tokens, @scope)} class={card()}>
               <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
@@ -180,29 +191,44 @@ defmodule PepeWeb.TokensLive do
 
               <details :if={t["kind"] != "widget"} class="mt-2">
                 <summary class="cursor-pointer text-sm text-zinc-500 hover:text-zinc-300">{gettext("Change what it may do")}</summary>
-                <form phx-submit="token_permissions" class="mt-2 space-y-2">
+                <form
+                  id={"token-perms-#{t["id"]}"}
+                  phx-submit="token_permissions"
+                  phx-change="token_permissions_change"
+                  class="mt-2 space-y-3"
+                >
                   <input type="hidden" name="token_id" value={t["id"]} />
 
                   <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-                    <input type="checkbox" name="chat" value="true" checked={permissions(t).chat} class="h-4 w-4 accent-orange-500" />
+                    <input type="checkbox" name="chat" value="true" checked={permissions(t).chat} class={checkbox_cls()} />
                     {gettext("Run agents")}
                   </label>
 
                   <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-                    <input type="checkbox" name="usage" value="true" checked={permissions(t).usage} class="h-4 w-4 accent-orange-500" />
+                    <input type="checkbox" name="usage" value="true" checked={permissions(t).usage} class={checkbox_cls()} />
                     {gettext("Read usage and billing (/v1/usage)")}
                   </label>
 
-                  <label class="flex items-center gap-2 text-[15px] text-zinc-300">
-                    <input type="checkbox" name="content" value="true" checked={permissions(t).usage_content} class="h-4 w-4 accent-orange-500" />
-                    {gettext("Also show conversation content in a run's detail")}
-                  </label>
+                  <%!-- Same gate as the create form, and for the same reason: the backend refuses
+                        content without usage (`:content_needs_usage`), so the option must not be
+                        offered until usage is on rather than fail on submit. --%>
+                  <div :if={editing_usage?(@edit_usage, t)}>
+                    <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                      <input type="checkbox" name="content" value="true" checked={permissions(t).usage_content} class={checkbox_cls()} />
+                      {gettext("Also show conversation content in a run's detail")}
+                    </label>
+                    <p class={hlp()}>{gettext("Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output.")}</p>
+                  </div>
 
-                  <select name="prices" class={fld()}>
-                    <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable: with the project's markup (what the client pays)")}</option>
-                    <option value="list" selected={permissions(t).prices == "list"}>{gettext("List: the model's price, no markup")}</option>
-                    <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything: adds our cost and the margin")}</option>
-                  </select>
+                  <div>
+                    <label class={lbl()}>{gettext("Money it may see")}</label>
+                    <select name="prices" class={fld()}>
+                      <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable: with the project's markup (what the client pays)")}</option>
+                      <option value="list" selected={permissions(t).prices == "list"}>{gettext("List: the model's price, no markup")}</option>
+                      <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything: adds our cost and the margin")}</option>
+                    </select>
+                    <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
+                  </div>
 
                   <button type="submit" class={btn_ghost()}>{gettext("Save")}</button>
                 </form>
@@ -219,6 +245,10 @@ defmodule PepeWeb.TokensLive do
   end
 
   @impl true
+  def handle_event("token_new", _p, socket), do: {:noreply, assign(socket, creating: true)}
+
+  def handle_event("token_cancel", _p, socket), do: {:noreply, close_create_form(socket)}
+
   def handle_event("token_pick_project", %{"project" => project}, socket) do
     {:noreply, assign(socket, token_project: blank(project))}
   end
@@ -231,12 +261,17 @@ defmodule PepeWeb.TokensLive do
     {:noreply, assign(socket, token_usage: !socket.assigns.token_usage)}
   end
 
+  # Keeps the open edit form's content option in step with its "Read usage" box before a save.
+  def handle_event("token_permissions_change", %{"token_id" => id} = params, socket) do
+    {:noreply, assign(socket, edit_usage: Map.put(socket.assigns.edit_usage, id, params["usage"] == "true"))}
+  end
+
   def handle_event("token_permissions", %{"token_id" => id} = params, socket) do
     case Config.set_api_token_permissions(id, permission_opts(params)) do
       :ok ->
         {:noreply,
          socket
-         |> assign(tokens: Config.api_tokens())
+         |> assign(tokens: Config.api_tokens(), edit_usage: Map.delete(socket.assigns.edit_usage, id))
          |> put_flash(:info, gettext("Permissions updated."))}
 
       {:error, reason} ->
@@ -260,7 +295,8 @@ defmodule PepeWeb.TokensLive do
       {:ok, raw, _id} ->
         {:noreply,
          socket
-         |> assign(tokens: Config.api_tokens(), raw: raw, token_widget: false, token_usage: false)
+         |> close_create_form()
+         |> assign(tokens: Config.api_tokens(), raw: raw)
          |> put_flash(:info, gettext("Token created. Copy it now, it will not be shown again."))}
 
       {:error, reason} ->
@@ -282,6 +318,15 @@ defmodule PepeWeb.TokensLive do
     do: {:noreply, assign(socket, new_project: !socket.assigns.new_project)}
 
   def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
+
+  # Back to the list, with the form's own state reset so the next "+ New token" opens clean
+  # rather than resuming the abandoned one.
+  defp close_create_form(socket),
+    do: assign(socket, creating: false, token_widget: false, token_usage: false, token_project: nil)
+
+  # Is "Read usage" on for this token's *open edit form*? The stored value only seeds it, so a
+  # box ticked a moment ago counts before any save.
+  defp editing_usage?(edit_usage, t), do: Map.get(edit_usage, t["id"], permissions(t).usage)
 
   # Agents available for the chosen scope: nil = root/Principal, else the project's agents.
   # A token carries its own project (nil = root), so scope by that directly - the

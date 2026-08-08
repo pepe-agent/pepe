@@ -40,14 +40,19 @@ defmodule PepeWeb.IntegrationsLive do
           desc={gettext("Connect channel plugins to your agents. Each provider's fields come from the plugin itself; fill them in, then paste the webhook URL into the provider.")}
         />
 
-        <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class={body_cls()}>
           <div :if={@providers == []} class="max-w-3xl rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
             <p>{gettext("No channel plugins installed yet.")}</p>
-            <p class="mt-2">
-              {gettext("Install one, then reload this page:")}
-              <code class="text-zinc-300">{Pepe.Invocation.hint(["plugin", "install"])}</code>
+            <%!-- The Plugins page installs from a URL right here, so send them there first; the
+                 CLI equivalent stays as a footnote for anyone already in a terminal. --%>
+            <p class="mt-3">
+              <.link navigate={~p"/plugins"} class={btn()}>{gettext("Install a plugin")}</.link>
             </p>
-            <p class="mt-1 text-sm text-zinc-600">{gettext("Built-in channels (Slack, Discord, Teams, Google Chat) live under Channels.")}</p>
+            <p class="mt-3 text-sm text-zinc-600">
+              {gettext("Or from a terminal:")}
+              <code class="text-zinc-400">{Pepe.Invocation.hint(["plugin", "install"])}</code>
+            </p>
+            <p class="mt-1 text-sm text-zinc-600">{gettext("Built-in channels (WhatsApp, Slack, Discord, Teams, Google Chat) live under Channels.")}</p>
           </div>
 
           <div :if={@providers != []} class="max-w-3xl">

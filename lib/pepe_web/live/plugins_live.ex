@@ -49,42 +49,50 @@ defmodule PepeWeb.PluginsLive do
         />
 
         <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
-          <div class={card()}>
-            <label class={lbl()}>{gettext("Install a plugin")}</label>
+          <.form_section title={gettext("Install a plugin")}>
+            <div>
+              <p class="mb-3 flex items-start gap-2 text-[15px] text-amber-300">
+                <span class="mt-0.5">⚠️</span>
+                <span>
+                  {gettext("A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand.")}
+                </span>
+              </p>
 
-            <p class="mb-3 flex items-start gap-2 text-[15px] text-amber-300">
-              <span class="mt-0.5">⚠️</span>
-              <span>
-                {gettext("A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand.")}
-              </span>
-            </p>
+              <%!-- The trust checkbox comes first on purpose: it is what ungreys Install, so the
+                   operator has to meet it before the button it unlocks. --%>
+              <label class="mb-3 flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4 accent-orange-500" />
+                {gettext("I trust this source and understand it runs with full access to this machine.")}
+              </label>
 
-            <form id="plugin-install" phx-submit="install" phx-change="src_change" class="flex gap-2">
-              <input name="src" value={@src} autocomplete="off"
-                placeholder={gettext("GitHub repo URL, a .tar.gz URL, or a local path")} class={fld()} />
-              <button type="button" phx-click="scan" disabled={@working or @src == ""} class={btn_ghost()}>{gettext("Scan")}</button>
-              <button type="submit" disabled={@working or @src == "" or not @trust} class={[btn(), "disabled:opacity-50"]}>
-                {if @working, do: gettext("Working..."), else: gettext("Install")}
-              </button>
-            </form>
+              <form id="plugin-install" phx-submit="install" phx-change="src_change" class="flex flex-col gap-2 sm:flex-row">
+                <input name="src" value={@src} autocomplete="off"
+                  placeholder={gettext("GitHub repo URL, a .tar.gz URL, or a local path")} class={fld()} />
+                <button type="button" phx-click="scan" disabled={@working or @src == ""} class={btn_ghost()}>{gettext("Scan")}</button>
+                <button type="submit" disabled={@working or @src == "" or not @trust} class={[btn(), "disabled:opacity-50"]}>
+                  {if @working, do: gettext("Working..."), else: gettext("Install")}
+                </button>
+              </form>
 
-            <label class="mt-2 flex items-center gap-2 text-sm text-zinc-300">
-              <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4 accent-orange-500" />
-              {gettext("I trust this source and understand it runs with full access to this machine.")}
-            </label>
-            <p class={hlp()}>{gettext("A package carries a manifest.json; a bare .exs works too. Scanning never runs the code, so it is always safe.")}</p>
+              <p :if={not @trust} class="mt-1.5 text-sm leading-relaxed text-amber-300/80">
+                {gettext("Install stays disabled until you tick the box above.")}
+              </p>
+              <p class={hlp()}>
+                {gettext("Paste where the plugin comes from: a GitHub repo (https://github.com/someone/my-plugin), a .tar.gz link, or a path on this machine (/home/me/plugins/my-plugin or /home/me/plugins/my-plugin.exs). Scan reads the code without running it, so it is always safe to press first.")}
+              </p>
 
-            <div :if={@scan} class="mt-3">
-              <.scan_report scan={@scan} />
-              <button :if={@blocked} phx-click="install_force" disabled={@working or not @trust}
-                class={[btn(), "mt-3 bg-red-600 hover:bg-red-500 disabled:opacity-50"]}>
-                {gettext("Install anyway (I have reviewed it)")}
-              </button>
+              <div :if={@scan} class="mt-3">
+                <.scan_report scan={@scan} />
+                <button :if={@blocked} phx-click="install_force" disabled={@working or not @trust}
+                  class={[btn(), "mt-3 bg-red-600 hover:bg-red-500 disabled:opacity-50"]}>
+                  {gettext("Install anyway (I have reviewed it)")}
+                </button>
+              </div>
             </div>
-          </div>
+          </.form_section>
 
           <div>
-            <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Installed")}</div>
+            <div class="mb-2 text-lg font-semibold">{gettext("Installed")}</div>
             <div :if={@packages == []} class="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-zinc-500">
               {gettext("No plugins installed yet.")}
             </div>
@@ -92,7 +100,9 @@ defmodule PepeWeb.PluginsLive do
               <div class="min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="font-medium">{p.name}</span>
-                  <span class="rounded bg-zinc-800 px-1.5 text-sm text-zinc-400">{p.kind}</span>
+                  <span class="rounded bg-zinc-800 px-1.5 text-sm text-zinc-400" title={kind_hint(p.kind)}>
+                    {kind_label(p.kind)}
+                  </span>
                 </div>
                 <div :if={manifest_desc(p)} class="mt-0.5 truncate text-[15px] text-zinc-400">{manifest_desc(p)}</div>
               </div>
@@ -272,7 +282,17 @@ defmodule PepeWeb.PluginsLive do
   defp settings_val(values, key), do: to_string(Map.get(values, key, ""))
 
   defp finding_where(%{file: file, line: line}) when is_binary(file), do: "#{file}:#{line}"
-  defp finding_where(%{line: line}), do: "line #{line}"
+  defp finding_where(%{line: line}), do: gettext("line %{n}", n: line)
+
+  # Only two kinds exist (see Pepe.Plugins.packages/0), so both get a plain-language
+  # label plus a tooltip saying what it means, instead of a raw internal atom.
+  defp kind_label(:package), do: gettext("package")
+  defp kind_label(:file), do: gettext("single file")
+  defp kind_label(other), do: to_string(other)
+
+  defp kind_hint(:package), do: gettext("A folder with a manifest.json describing the plugin, plus its code.")
+  defp kind_hint(:file), do: gettext("A single .exs script with no manifest.")
+  defp kind_hint(_), do: nil
 
   defp verdict_badge(:danger), do: "bg-red-500/15 text-red-400"
   defp verdict_badge(:caution), do: "bg-amber-500/15 text-amber-300"

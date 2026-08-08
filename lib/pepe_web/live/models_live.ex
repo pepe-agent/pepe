@@ -42,7 +42,7 @@ defmodule PepeWeb.ModelsLive do
         <label class={lbl()}>{gettext("Output price")} <span class="text-zinc-600">{gettext("/ 1M tok")}</span></label>
         <input name="output_price" value={@edit_model[:output_price]} placeholder={suggest_ph(@suggest, 1)} inputmode="decimal" class={fld()} />
       </div>
-      <p class="col-span-2 text-sm text-zinc-500">
+      <p class="text-sm text-zinc-500 sm:col-span-2">
         {gettext("Per 1M tokens, in %{currency}. Leave blank to use the known/auto price for this model.", currency: @currency)}
       </p>
     </div>
@@ -129,6 +129,32 @@ defmodule PepeWeb.ModelsLive do
       fallbacks: []
     }
 
+  # Correlation token for an edited connection's async model fetch. Not a provider key -
+  # editing starts from a saved connection, not from the provider picker - so it only has
+  # to be stable and unique enough that a late reply for another connection is dropped.
+  defp edit_token(m), do: {:edit, m.id || m.name}
+
+  # The env var an existing key already points at, when it's written as a whole-string
+  # `${VAR}` reference; nil when the key is a literal (or absent).
+  defp key_env(value) when is_binary(value) do
+    case Regex.run(~r/^\$\{([A-Z0-9_]+)\}$/, value) do
+      [_, var] -> var
+      _ -> nil
+    end
+  end
+
+  defp key_env(_value), do: nil
+
+  # The provider's ids, plus the model currently saved on this connection when the
+  # provider doesn't list it (a fine-tune, an alias, a since-retired id): editing a
+  # connection must never silently switch it to some other model.
+  defp model_choices(%{models: ids} = edit_model) when is_list(ids) do
+    case edit_model[:model_id] do
+      id when is_binary(id) and id != "" -> if id in ids, do: ids, else: [id | ids]
+      _ -> ids
+    end
+  end
+
   # Other connections this one may fall back to: not itself, not already chosen.
   defp fallback_candidates(models, scope, edit_model) do
     taken = MapSet.new([edit_model.original_name | edit_model.fallbacks])
@@ -198,7 +224,7 @@ defmodule PepeWeb.ModelsLive do
                 <input name="pasted" placeholder={gettext("paste the redirect URL or code")} class={fld()} />
                 <button type="submit" class={btn_ghost()}>{gettext("Finish")}</button>
               </form>
-              <button phx-click="oauth_cancel" class="text-sm text-zinc-500 hover:text-zinc-300">{gettext("Cancel")}</button>
+              <button phx-click="oauth_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>
           </div>
 
@@ -238,14 +264,31 @@ defmodule PepeWeb.ModelsLive do
               </div>
               <div>
                 <label class={lbl()}>{gettext("API key")}</label>
-                <input type="password" name="api_key" value={@edit_model.api_key} class={fld()} />
+                <input type="password" name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
+                <p :if={@edit_model.env} class={hlp()}>
+                  {gettext("Defaults to the %{env} env var (%{status}). Paste a key here to load its models now.",
+                    env: @edit_model.env, status: key_status(@edit_model.env))}
+                </p>
+                <p :if={!@edit_model.env} class={hlp()}>
+                  {gettext("Write it as ${ENV_VAR} to keep the secret out of the config file.")}
+                </p>
               </div>
             </.form_section>
 
             <.form_section title={gettext("Model & fallbacks")}>
               <div>
                 <label class={lbl()}>{gettext("Model")}</label>
-                <input name="model" value={@edit_model.model_id} class={fld()} />
+                <%!-- Same select-or-free-text as the new-connection form; while the provider's
+                      list is in flight the current id rides along hidden, so a save that only
+                      touched price or fallbacks never drops the model. --%>
+                <div :if={@edit_model.models == :loading} class="text-sm text-zinc-500">
+                  {gettext("Loading models...")}
+                  <input type="hidden" name="model" value={@edit_model.model_id} />
+                </div>
+                <select :if={is_list(@edit_model.models) and @edit_model.models != []} name="model" class={fld()}>
+                  <option :for={id <- model_choices(@edit_model)} value={id} selected={id == @edit_model.model_id}>{id}</option>
+                </select>
+                <input :if={@edit_model.models == []} name="model" value={@edit_model.model_id} class={fld()} />
               </div>
               <div>
                 <label class={lbl()}>{gettext("Fallbacks")}</label>
@@ -273,9 +316,9 @@ defmodule PepeWeb.ModelsLive do
             </.form_section>
 
             <.form_section title={gettext("Security")}>
-              <label class="flex items-center gap-2 text-sm text-zinc-300">
-                <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} />
-                {gettext("Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)")}
+              <label class="flex items-start gap-2.5 text-sm text-zinc-300">
+                <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} class={[checkbox_cls(), "mt-0.5"]} />
+                <span>{gettext("Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)")}</span>
               </label>
             </.form_section>
 
@@ -356,13 +399,18 @@ defmodule PepeWeb.ModelsLive do
         {:noreply, socket}
 
       m ->
+        # Same async model list the new-connection form gets. `provider` is only a
+        # correlation token here (no provider was picked), so the reply can be matched
+        # against the connection still being edited and ignored otherwise.
+        spawn_model_fetch(edit_token(m), m.base_url, Config.interpolate(m.api_key))
+
         {:noreply,
          assign(socket,
            edit_model: %{
              edit: true,
-             provider: nil,
-             env: nil,
-             models: [],
+             provider: edit_token(m),
+             env: key_env(m.api_key),
+             models: :loading,
              name: m.name,
              original_name: m.name,
              base_url: m.base_url,

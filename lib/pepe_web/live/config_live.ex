@@ -46,11 +46,7 @@ defmodule PepeWeb.ConfigLive do
         >
           <form phx-change="set_locale" class="flex items-center gap-2">
             <label for="locale" class="text-sm text-zinc-400">{gettext("Language")}</label>
-            <select
-              id="locale"
-              name="locale"
-              class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-            >
+            <select id="locale" name="locale" class={fld_sm()}>
               <option :for={{code, label} <- @locales} value={code} selected={code == @locale}>{label}</option>
             </select>
           </form>
@@ -78,14 +74,13 @@ defmodule PepeWeb.ConfigLive do
           <button phx-click="config_reload" class={btn_ghost()}>{gettext("Reload from disk")}</button>
         </.view_header>
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 sm:p-6">
-          <.form_section title={gettext("Media")}>
-            <div class="grid gap-6 md:grid-cols-2">
-              <form phx-submit="media_tts_save" class="space-y-3">
-                <div class="text-sm font-medium text-zinc-200">{gettext("Voice replies (text-to-speech)")}</div>
-                <p class={hlp()}>
-                  {gettext("Reply to a voice note with a voice note. Needs a model connection serving an OpenAI-compatible /audio/speech.")}
-                </p>
+        <div class={[body_cls(), "flex flex-col gap-6"]}>
+          <.form_section title={gettext("Voice replies (text-to-speech)")}>
+            <form phx-submit="media_tts_save" class="space-y-6">
+              <p class={hlp()}>
+                {gettext("Reply to a voice note with a voice note. Needs a model connection serving an OpenAI-compatible /audio/speech.")}
+              </p>
+              <div class="grid gap-6 sm:grid-cols-2">
                 <div>
                   <label class={lbl()} for="tts_model">{gettext("Model connection")}</label>
                   <select id="tts_model" name="model" class={fld()}>
@@ -97,14 +92,17 @@ defmodule PepeWeb.ConfigLive do
                   <label class={lbl()} for="tts_voice">{gettext("Voice")}</label>
                   <input id="tts_voice" name="voice" type="text" value={@media_tts["voice"] || "alloy"} class={fld()} />
                 </div>
-                <button type="submit" class={btn()}>{gettext("Save")}</button>
-              </form>
+              </div>
+              <button type="submit" class={btn()}>{gettext("Save")}</button>
+            </form>
+          </.form_section>
 
-              <form phx-submit="media_audio_save" class="space-y-3">
-                <div class="text-sm font-medium text-zinc-200">{gettext("Voice-note transcription")}</div>
-                <p class={hlp()}>
-                  {gettext("Leave unset and Pepe automatically uses a connection already known to transcribe (OpenAI, Groq).")}
-                </p>
+          <.form_section title={gettext("Voice-note transcription")}>
+            <form phx-submit="media_audio_save" class="space-y-6">
+              <p class={hlp()}>
+                {gettext("Leave unset and Pepe automatically uses a connection already known to transcribe (OpenAI, Groq).")}
+              </p>
+              <div class="grid gap-6 sm:grid-cols-2">
                 <div>
                   <label class={lbl()} for="audio_model">{gettext("Model connection")}</label>
                   <select id="audio_model" name="model" class={fld()}>
@@ -123,27 +121,32 @@ defmodule PepeWeb.ConfigLive do
                     class={fld()}
                   />
                 </div>
-                <div class="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <label class={lbl()} for="audio_language">{gettext("Language")}</label>
-                    <input id="audio_language" name="language" type="text" value={@media_audio["language"]} class={fld()} />
-                  </div>
-                  <div>
-                    <label class={lbl()} for="audio_max_mb">{gettext("Max MB")}</label>
-                    <input id="audio_max_mb" name="max_mb" type="number" value={@media_audio["max_mb"]} class={fld()} />
-                  </div>
-                  <div>
-                    <label class={lbl()} for="audio_timeout">{gettext("Timeout (s)")}</label>
-                    <input id="audio_timeout" name="timeout" type="number" value={@media_audio["timeout"]} class={fld()} />
-                  </div>
+              </div>
+              <div class="grid gap-6 sm:grid-cols-3">
+                <div>
+                  <label class={lbl()} for="audio_language">{gettext("Language")}</label>
+                  <input id="audio_language" name="language" type="text" value={@media_audio["language"]} class={fld()} />
+                  <p class={hlp()}>
+                    {gettext("Spoken language as an ISO code (pt, en, es), passed to the transcriber. Blank means auto-detect.")}
+                  </p>
                 </div>
-                <label class="flex items-center gap-2 text-sm text-zinc-300">
-                  <input type="checkbox" name="echo" value="true" checked={@media_audio["echo"] == true} class="h-4 w-4 accent-orange-500" />
-                  {gettext("Echo the transcript back before answering")}
-                </label>
-                <button type="submit" class={btn()}>{gettext("Save")}</button>
-              </form>
-            </div>
+                <div>
+                  <label class={lbl()} for="audio_max_mb">{gettext("Max MB")}</label>
+                  <input id="audio_max_mb" name="max_mb" type="number" value={@media_audio["max_mb"]} class={fld()} />
+                  <p class={hlp()}>{gettext("Largest voice note accepted. Anything bigger is refused instead of transcribed.")}</p>
+                </div>
+                <div>
+                  <label class={lbl()} for="audio_timeout">{gettext("Timeout (s)")}</label>
+                  <input id="audio_timeout" name="timeout" type="number" value={@media_audio["timeout"]} class={fld()} />
+                  <p class={hlp()}>{gettext("How long to wait for the transcription before giving up.")}</p>
+                </div>
+              </div>
+              <label class="flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" name="echo" value="true" checked={@media_audio["echo"] == true} class={checkbox_cls()} />
+                {gettext("Echo the transcript back before answering")}
+              </label>
+              <button type="submit" class={btn()}>{gettext("Save")}</button>
+            </form>
           </.form_section>
 
           <.form_section :if={@journal != []} title={gettext("Recent changes")}>
@@ -162,19 +165,21 @@ defmodule PepeWeb.ConfigLive do
             </div>
           </.form_section>
 
-          <form phx-submit="config_save" class="flex min-h-0 flex-1 flex-col gap-3">
-            <textarea
-              name="json"
-              spellcheck="false"
-              class="min-h-[320px] w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-            >{@config_text}</textarea>
-            <div class="flex items-center gap-3">
-              <button type="submit" class={btn()}>{gettext("Save config")}</button>
-              <span class="text-sm text-zinc-500">
-                {gettext("Saving replaces the whole file. Invalid JSON is rejected.")}
-              </span>
-            </div>
-          </form>
+          <.form_section title={gettext("config.json")}>
+            <form phx-submit="config_save" class="flex min-h-0 flex-1 flex-col gap-3">
+              <textarea
+                name="json"
+                spellcheck="false"
+                class="min-h-[320px] w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+              >{@config_text}</textarea>
+              <div class="flex items-center gap-3">
+                <button type="submit" class={btn()}>{gettext("Save config")}</button>
+                <span class="text-sm text-zinc-500">
+                  {gettext("Saving replaces the whole file. Invalid JSON is rejected.")}
+                </span>
+              </div>
+            </form>
+          </.form_section>
         </div>
       </main>
     </div>

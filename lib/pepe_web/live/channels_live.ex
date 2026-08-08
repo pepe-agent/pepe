@@ -77,6 +77,21 @@ defmodule PepeWeb.ChannelsLive do
   # Escape each value for double-quoted-attribute context.
   defp attr(v), do: v |> to_string() |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
+  # A widget colour is free text an operator typed, and the swatch drops it straight into a
+  # `style` attribute - so only a value that IS a hex colour is ever echoed back there.
+  @hex_color ~r/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+
+  defp hex_color?(v), do: is_binary(v) and Regex.match?(@hex_color, v)
+
+  defp hex_or_transparent(v), do: if(hex_color?(v), do: v, else: "transparent")
+
+  # nil (left blank) is fine - it just falls through to the embed snippet's own data-color.
+  defp color_error(nil), do: nil
+
+  defp color_error(v) when is_binary(v) do
+    if hex_color?(v), do: nil, else: gettext("Color must be a hex value like #ea580c.")
+  end
+
   # `values` is a widget token entry (or `%{}` for a fresh one) - reused by both the
   # create form and the edit form below, keyed by `prefix` so both can post-back
   # under their own form's namespace ("widget"/"widget_edit").
@@ -88,7 +103,7 @@ defmodule PepeWeb.ChannelsLive do
     <div class="grid gap-3 sm:grid-cols-2">
       <div class="col-span-2">
         <label class={lbl()}>{gettext("Title")}</label>
-        <input name={"#{@prefix}[title]"} value={@values["title"]} placeholder="Chat" class={fld()} />
+        <input name={"#{@prefix}[title]"} value={@values["title"]} placeholder={gettext("Chat")} class={fld()} />
       </div>
       <div class="col-span-2">
         <label class={lbl()}>{gettext("Logo URL")}</label>
@@ -96,7 +111,24 @@ defmodule PepeWeb.ChannelsLive do
       </div>
       <div>
         <label class={lbl()}>{gettext("Color")}</label>
-        <input name={"#{@prefix}[color]"} value={@values["color"]} placeholder="#ea580c" class={fld()} />
+        <%!-- Typed by hand rather than picked: a colour input can never be empty (it falls back to
+             #000000), and an unset colour has to stay unset so the embed snippet's own data-color
+             still wins. The swatch beside it previews whatever was typed, and `pattern` refuses a
+             malformed hex before the form is ever submitted. --%>
+        <div class="flex items-center gap-2">
+          <input
+            name={"#{@prefix}[color]"}
+            value={@values["color"]}
+            placeholder="#ea580c"
+            pattern="#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})"
+            title={gettext("A hex colour like #ea580c")}
+            class={[fld(), "min-w-0 flex-1 font-mono"]}
+          />
+          <span
+            class="h-9 w-9 shrink-0 rounded-lg border border-zinc-700"
+            style={"background-color: #{hex_or_transparent(@values["color"])}"}
+          />
+        </div>
       </div>
       <div>
         <label class={lbl()}>{gettext("Theme")}</label>
@@ -107,7 +139,7 @@ defmodule PepeWeb.ChannelsLive do
       </div>
       <div class="col-span-2">
         <label class={lbl()}>{gettext("Greeting")}</label>
-        <input name={"#{@prefix}[greeting]"} value={@values["greeting"]} placeholder="Hi! How can I help?" class={fld()} />
+        <input name={"#{@prefix}[greeting]"} value={@values["greeting"]} placeholder={gettext("Hi! How can I help?")} class={fld()} />
       </div>
       <div>
         <label class={lbl()}>{gettext("Position")}</label>
@@ -144,12 +176,13 @@ defmodule PepeWeb.ChannelsLive do
           title={gettext("Channels")}
           desc={gettext("Connect agents to messaging channels so people can chat with them: a Telegram bot, or a webhook channel like WhatsApp, Slack, Discord, Teams or Google Chat. Each channel binds to one agent.")}
         >
-          <button :if={!@edit_bot and @adding == nil} phx-click="restart_gateway"
+          <button :if={!@edit_bot and @adding == nil and not @adding_channel} phx-click="restart_gateway"
             data-confirm={gettext("Restart the Telegram gateway now?")} class={btn_ghost()} title={gettext("Recovery: respawn the pollers if the gateway seems stuck")}>
             ↻ {gettext("Restart gateway")}
           </button>
           <button :if={@edit_bot} phx-click="bot_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
           <button :if={@adding != nil} phx-click="add_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
+          <button :if={@adding_channel} phx-click="channel_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
         </.view_header>
         <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <%!-- LIST: channel groups only for what exists, plus one "Add a channel" picker --%>
@@ -171,7 +204,7 @@ defmodule PepeWeb.ChannelsLive do
             </div>
 
             <%!-- Just-minted widget token, with a ready-to-paste snippet --%>
-            <div :if={@widget_raw} class="rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
+            <div :if={@widget_raw && not @adding_channel} class="rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
               <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0 text-sm">
                   <span class="font-semibold text-amber-200">{gettext("Widget created")}</span>
@@ -203,7 +236,7 @@ defmodule PepeWeb.ChannelsLive do
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">
                     <span class="font-medium">{b["name"]}</span>
-                    <span class={["ml-2 rounded px-1.5 text-sm", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                    <span class={["ml-2 rounded px-1.5 py-0.5 text-sm", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
                       {(bot_active?(b) && gettext("active")) || gettext("inactive")}
                     </span>
                   </div>
@@ -230,7 +263,7 @@ defmodule PepeWeb.ChannelsLive do
                   <div class="min-w-0">
                     <span class="font-medium">{t["label"] || gettext("Unlabeled")}</span>
                   </div>
-                  <div class="flex shrink-0 flex-wrap gap-2">
+                  <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                     <button phx-click="widget_edit" phx-value-id={t["id"]} class={btn_ghost()}>
                       {if @edit_widget == t["id"], do: gettext("Cancel"), else: gettext("Edit appearance")}
                     </button>
@@ -295,7 +328,9 @@ defmodule PepeWeb.ChannelsLive do
               <div class="border-t border-zinc-800 pt-4">
                 <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Appearance")}</div>
                 <p class={hlp()}>{gettext("Optional: blank fields fall back to the embed snippet's own data-* attributes. You can edit them here later without touching the site.")}</p>
-                <.widget_appearance_fields prefix="widget" values={%{}} />
+                <div class="mt-3">
+                  <.widget_appearance_fields prefix="widget" values={%{}} />
+                </div>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
                 <button type="submit" class={btn()}>{gettext("Create widget")}</button>
@@ -324,26 +359,31 @@ defmodule PepeWeb.ChannelsLive do
                   <option value="ambient" selected={@edit_bot["tool_progress"] == "ambient"}>{gettext("Ambient")}</option>
                   <option value="off" selected={@edit_bot["tool_progress"] == "off"}>{gettext("Nothing")}</option>
                 </select>
-                <div class="mt-2 space-y-1 text-sm text-zinc-400">
-                  <p>
-                    <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}): {gettext("just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal.")}
-                  </p>
-                  <p>
-                    <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span>: {gettext("a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing.")}
-                  </p>
-                  <p>
-                    <span class="text-zinc-200">💬 {gettext("Ambient")}</span>: {gettext("a single line describing the kind of work happening, with no tool names or per-step detail.")}
-                  </p>
-                  <p>
-                    <span class="text-zinc-200">🚫 {gettext("Nothing")}</span>: {gettext("no status message at all, just Telegram's native typing indicator.")}
-                  </p>
-                  <p class="pt-0.5 text-zinc-600">{gettext("Whichever you pick, the status message updates in place and disappears when the answer arrives. Only the reply stays in the chat.")}</p>
-                </div>
+                <p class={hlp()}>{gettext("How much the bot says about what it is doing. Whichever you pick, the status updates in place and disappears when the answer arrives - only the reply stays in the chat.")}</p>
+                <%!-- The per-option detail is a wall of text next to a select that already names all
+                     four options, so it stays folded away until someone actually wants it. --%>
+                <details class="mt-2">
+                  <summary class="cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">{gettext("What each option does")}</summary>
+                  <div class="mt-2 space-y-1 text-sm text-zinc-400">
+                    <p>
+                      <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}): {gettext("just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal.")}
+                    </p>
+                    <p>
+                      <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span>: {gettext("a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing.")}
+                    </p>
+                    <p>
+                      <span class="text-zinc-200">💬 {gettext("Ambient")}</span>: {gettext("a single line describing the kind of work happening, with no tool names or per-step detail.")}
+                    </p>
+                    <p>
+                      <span class="text-zinc-200">🚫 {gettext("Nothing")}</span>: {gettext("no status message at all, just Telegram's native typing indicator.")}
+                    </p>
+                  </div>
+                </details>
               </div>
               <div>
                 <label class="flex items-center gap-2">
-                  <input type="checkbox" name="require_approval" value="true" checked={@edit_bot["require_approval"] == true} />
-                  <span class={lbl()}>{gettext("Require approval for new users")}</span>
+                  <input type="checkbox" name="require_approval" value="true" checked={@edit_bot["require_approval"] == true} class={checkbox_cls()} />
+                  <span class="text-[15px] text-zinc-300">{gettext("Require approval for new users")}</span>
                 </label>
                 <p class={hlp()}>{gettext("When on, the bot ignores anyone not on its allowlist. When off, it answers everyone (unless you set an explicit user allowlist).")}</p>
 
@@ -360,7 +400,7 @@ defmodule PepeWeb.ChannelsLive do
                       >
                         <div class="min-w-0">
                           <div class="text-sm text-zinc-200">
-                            {u["name"]} <span class="font-mono text-xs text-zinc-500">id {u["id"]}</span>
+                            {u["name"]} <span class="font-mono text-xs text-zinc-500">{gettext("id %{id}", id: u["id"])}</span>
                           </div>
                           <div class="truncate text-xs text-zinc-500">{u["sample"]}</div>
                         </div>
@@ -399,7 +439,7 @@ defmodule PepeWeb.ChannelsLive do
                         <div class="text-sm text-zinc-200">
                           <span :if={u["name"]}>{u["name"]}</span>
                           <span :if={!u["name"]} class="text-zinc-500">{gettext("(no name on record)")}</span>
-                          <span class="font-mono text-xs text-zinc-500">id {u["id"]}</span>
+                          <span class="font-mono text-xs text-zinc-500">{gettext("id %{id}", id: u["id"])}</span>
                         </div>
                         <button
                           type="button"
@@ -437,8 +477,11 @@ defmodule PepeWeb.ChannelsLive do
               </div>
               <.input field={@form[:name]} label={gettext("Name")} placeholder={gettext("sales")} />
               <div>
-                <.input field={@form[:token]} label={gettext("Bot token")} placeholder="123456:ABC...  or  ${SALES_BOT_TOKEN}" />
+                <.input field={@form[:token]} label={gettext("Bot token")} placeholder={"123456:ABC...  " <> gettext("or") <> "  ${SALES_BOT_TOKEN}"} />
                 <p class={hlp()}>{gettext("From @BotFather. Tip: use an env-var reference to keep the token out of the config file.")}</p>
+                <%!-- tool_progress and require_approval are edit-only fields, so say here what a
+                     brand-new bot will do until someone goes and changes them. --%>
+                <p class={hlp()}>{gettext("Once added, the bot reacts with 👀 while it works and answers everyone. Both are changeable under Edit.")}</p>
               </div>
               <div>
                 <label class={lbl()}>{gettext("This bot talks to")}</label>
@@ -472,32 +515,9 @@ defmodule PepeWeb.ChannelsLive do
   def handle_event("add_cancel", _p, socket), do: {:noreply, assign(socket, adding: nil)}
 
   def handle_event("widget_add", %{"widget" => p}, socket) do
-    opts = [
-      label: blank(p["label"]),
-      agent: blank(p["agent"]),
-      widget: true,
-      allowed_origin: blank(p["allowed_origin"]),
-      title: blank(p["title"]),
-      logo: blank(p["logo"]),
-      color: blank(p["color"]),
-      theme: blank(p["theme"]),
-      greeting: blank(p["greeting"]),
-      position: blank(p["position"])
-    ]
-
-    case Config.add_api_token(opts) do
-      {:ok, _raw, id} ->
-        tokens = Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget"))
-
-        {:noreply,
-         assign(socket,
-           widget_tokens: tokens,
-           widget_raw: Enum.find(tokens, &(&1["id"] == id)),
-           adding: nil
-         )}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, widget_error(reason))}
+    case color_error(blank(p["color"])) do
+      nil -> create_widget(p, socket)
+      msg -> {:noreply, put_flash(socket, :error, msg)}
     end
   end
 
@@ -509,27 +529,9 @@ defmodule PepeWeb.ChannelsLive do
   end
 
   def handle_event("widget_edit_save", %{"widget_id" => id, "widget_edit" => p}, socket) do
-    # No `label:` here - this form only edits appearance, and update_widget_token/2
-    # leaves label untouched unless the caller passes it explicitly.
-    opts = [
-      title: blank(p["title"]),
-      logo: blank(p["logo"]),
-      color: blank(p["color"]),
-      theme: blank(p["theme"]),
-      greeting: blank(p["greeting"]),
-      position: blank(p["position"])
-    ]
-
-    case Config.update_widget_token(id, opts) do
-      :ok ->
-        {:noreply,
-         assign(socket,
-           widget_tokens: Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget")),
-           edit_widget: nil
-         )}
-
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, gettext("Couldn't save. The widget may have been removed."))}
+    case color_error(blank(p["color"])) do
+      nil -> save_widget_appearance(id, p, socket)
+      msg -> {:noreply, put_flash(socket, :error, msg)}
     end
   end
 
@@ -537,6 +539,13 @@ defmodule PepeWeb.ChannelsLive do
   def handle_event("add_channel", %{"name" => name}, socket) do
     send_update(PepeWeb.ConnectionsComponent, id: "native-channels", open: name)
     {:noreply, assign(socket, adding_channel: true)}
+  end
+
+  # The header's back button for a webhook form: the form lives in the component, so ask it
+  # to close, same as its own Cancel button does.
+  def handle_event("channel_cancel", _p, socket) do
+    send_update(PepeWeb.ConnectionsComponent, id: "native-channels", close: true)
+    {:noreply, assign(socket, adding_channel: false)}
   end
 
   def handle_event("bot_add", %{"bot" => p}, socket) do
@@ -647,6 +656,61 @@ defmodule PepeWeb.ChannelsLive do
   def handle_info({:flash, kind, msg}, socket), do: {:noreply, put_flash(socket, kind, msg)}
 
   def handle_info({:channel_form, :closed}, socket), do: {:noreply, assign(socket, adding_channel: false)}
+
+  defp create_widget(p, socket) do
+    opts = [
+      label: blank(p["label"]),
+      agent: blank(p["agent"]),
+      widget: true,
+      allowed_origin: blank(p["allowed_origin"]),
+      title: blank(p["title"]),
+      logo: blank(p["logo"]),
+      color: blank(p["color"]),
+      theme: blank(p["theme"]),
+      greeting: blank(p["greeting"]),
+      position: blank(p["position"])
+    ]
+
+    case Config.add_api_token(opts) do
+      {:ok, _raw, id} ->
+        tokens = Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget"))
+
+        {:noreply,
+         assign(socket,
+           widget_tokens: tokens,
+           widget_raw: Enum.find(tokens, &(&1["id"] == id)),
+           adding: nil
+         )}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, widget_error(reason))}
+    end
+  end
+
+  defp save_widget_appearance(id, p, socket) do
+    # No `label:` here - this form only edits appearance, and update_widget_token/2
+    # leaves label untouched unless the caller passes it explicitly.
+    opts = [
+      title: blank(p["title"]),
+      logo: blank(p["logo"]),
+      color: blank(p["color"]),
+      theme: blank(p["theme"]),
+      greeting: blank(p["greeting"]),
+      position: blank(p["position"])
+    ]
+
+    case Config.update_widget_token(id, opts) do
+      :ok ->
+        {:noreply,
+         assign(socket,
+           widget_tokens: Config.api_tokens() |> Enum.filter(&(&1["kind"] == "widget")),
+           edit_widget: nil
+         )}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, gettext("Couldn't save. The widget may have been removed."))}
+    end
+  end
 
   # Does another bot (any but `exclude_name`) already resolve to this token? Compares
   # interpolated values so two ${ENV_VAR} refs to the same secret are caught too.
