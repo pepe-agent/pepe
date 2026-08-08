@@ -39,6 +39,22 @@ defmodule Pepe.Board do
   @doc "PubSub topic carrying `{:board_event, card_id, event}` for every card change."
   def events_topic, do: "boards:events"
 
+  @statuses ~w(triage todo ready running blocked done)
+
+  @doc """
+  The pipeline's working statuses, in order. The one canonical list: anything that renders
+  a card per status (the dashboard's columns) derives its set from here, so a status that
+  exists in the pipeline can never end up with no place to show - `triage` had exactly that
+  problem, real and reachable (`create_card(%{status: "triage"})`, and the default status of
+  `Pepe.Config.BoardCard.from_map/1`) but missing from the board page's hardcoded list, so a
+  card parked there rendered in no column at all.
+
+  `archived` is deliberately not here: it's the terminal state off the pipeline, listed on
+  its own (the board page shows it behind a toggle) rather than as another queue column.
+  """
+  @spec statuses() :: [String.t()]
+  def statuses, do: @statuses
+
   @doc "Create a board. Fails if `project`/`name` already identify one."
   @spec create_board(map()) :: {:ok, Board.t()} | {:error, term()}
   def create_board(attrs) do

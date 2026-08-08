@@ -55,6 +55,46 @@ defmodule Pepe.BoardTest do
       assert {:ok, _} = Board.create_board(%{project: "acme", name: "backlog"})
       assert {:ok, _} = Board.create_board(%{project: "globex", name: "backlog"})
     end
+
+    test "an explicit claim_timeout_s of 0 is kept as 0 (never), not replaced by the default" do
+      {:ok, board} = Board.create_board(%{project: nil, name: "no-timeout", claim_timeout_s: 0})
+
+      assert board.claim_timeout_s == 0
+      assert Config.get_board(board.id).claim_timeout_s == 0
+      assert Board.reclaim_if_timed_out("whatever", board.claim_timeout_s) == {:error, :no_timeout}
+    end
+  end
+
+  describe "statuses/0" do
+    test "lists every pipeline status a card can actually hold, archived excluded" do
+      assert Board.statuses() == ~w(triage todo ready running blocked done)
+    end
+
+    test "every status it lists is reachable, and every reachable one is listed" do
+      board = new_board()
+
+      # `triage` is the one that used to be missing: reachable both explicitly here and as
+      # the default of `Pepe.Config.BoardCard.from_map/1`.
+      triage = new_card(board, %{status: "triage"})
+      assert triage.status in Board.statuses()
+
+      todo = new_card(board)
+      assert todo.status == "todo"
+      {:ok, ready} = Board.force_ready(todo.id)
+      {:ok, running} = Board.claim(ready.id, "worker")
+      {:ok, blocked} = Board.block(running.id, "stuck")
+      {:ok, unblocked} = Board.unblock(blocked.id)
+      {:ok, rerunning} = Board.claim(unblocked.id, "worker")
+      {:ok, done} = Board.complete(rerunning.id)
+
+      for status <- ["ready", "running", "blocked", "done"], do: assert(status in Board.statuses())
+      assert done.status == "done"
+
+      # The terminal state is deliberately out of the pipeline list.
+      {:ok, archived} = Board.archive(done.id)
+      assert archived.status == "archived"
+      refute archived.status in Board.statuses()
+    end
   end
 
   describe "delete_board/2" do

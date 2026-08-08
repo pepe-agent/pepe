@@ -62,6 +62,48 @@ defmodule PepeWeb.BoardLiveTest do
     assert html =~ "auto-dispatch"
   end
 
+  test "a claim timeout of 0 is stored as \"never\", not silently turned into the 30-minute default" do
+    {:ok, view, _html} = live(conn(), "/board")
+
+    create_board(view, %{"name" => "Engineering", "claim_timeout_s" => "0"})
+
+    assert [board] = Config.boards()
+    assert board.claim_timeout_s == 0
+  end
+
+  test "leaving the claim timeout blank falls back to the default" do
+    {:ok, view, _html} = live(conn(), "/board")
+
+    create_board(view, %{"name" => "Engineering", "claim_timeout_s" => ""})
+
+    assert [board] = Config.boards()
+    assert board.claim_timeout_s == 1800
+  end
+
+  test "a card parked in triage gets its own column instead of vanishing from the page" do
+    {:ok, board} = Board.create_board(%{project: nil, name: "eng"})
+    {:ok, card} = Board.create_card(%{board: board.id, title: "not ready to work yet", status: "triage"})
+
+    {:ok, view, _html} = live(conn(), "/board")
+    html = render_click(view, "board_select", %{"id" => board.id})
+
+    assert html =~ "Triage"
+    assert html =~ "not ready to work yet"
+    assert html =~ card.id
+    refute html =~ "No cards yet."
+  end
+
+  test "an empty board shows only the empty state, not a row of empty columns" do
+    {:ok, board} = Board.create_board(%{project: nil, name: "eng"})
+
+    {:ok, view, _html} = live(conn(), "/board")
+    html = render_click(view, "board_select", %{"id" => board.id})
+
+    assert html =~ "No cards yet."
+    refute html =~ "Triage"
+    refute html =~ "To do"
+  end
+
   test "a board name collision is rejected" do
     {:ok, view, _html} = live(conn(), "/board")
     create_board(view, %{"name" => "Engineering"})

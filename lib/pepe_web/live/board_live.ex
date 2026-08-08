@@ -15,8 +15,6 @@ defmodule PepeWeb.BoardLive do
   alias Pepe.Board
   alias Pepe.Config
 
-  @statuses ~w(todo ready running blocked done)
-
   @impl true
   def mount(params, _session, socket) do
     if connected?(socket), do: Phoenix.PubSub.subscribe(Pepe.PubSub, Board.events_topic())
@@ -35,7 +33,9 @@ defmodule PepeWeb.BoardLive do
        creating_card: false,
        board_form: board_form(%{}),
        card_form: card_form(%{}),
-       statuses: @statuses
+       # Derived from Pepe.Board, never a second hardcoded list here: a status added to the
+       # pipeline gets a column on this page for free instead of silently rendering nowhere.
+       statuses: Board.statuses()
      )}
   end
 
@@ -83,11 +83,33 @@ defmodule PepeWeb.BoardLive do
   defp parse_tri_state_select("off"), do: false
   defp parse_tri_state_select(_), do: nil
 
+  # Not `parse_iterations/1`: that one folds 0 into nil ("no limit"), which is right for an
+  # iteration cap but backwards here. `Board.create_board/1` turns a nil `claim_timeout_s`
+  # into the 1800s default, so a typed 0 - which this field's own help text promises means
+  # "never" - would have silently become a 30-minute timeout, the exact opposite.
+  # `Board.reclaim_if_timed_out/2` already treats a stored 0 as "never"; this stores it.
+  # Blank or unparseable still means nil, i.e. "leave it at the default".
+  defp parse_timeout_s(v) do
+    case v |> to_string() |> String.trim() |> Integer.parse() do
+      {n, _} when n >= 0 -> n
+      _ -> nil
+    end
+  end
+
+  defp project_options(projects), do: [{gettext("Principal"), ""} | Enum.map(projects, &{&1, &1})]
+
+  defp project_value(scope) when scope in ["all", "root"], do: ""
+  defp project_value(scope), do: scope
+
+  defp column_label("triage"), do: gettext("Triage")
   defp column_label("todo"), do: gettext("To do")
   defp column_label("ready"), do: gettext("Ready")
   defp column_label("running"), do: gettext("Running")
   defp column_label("blocked"), do: gettext("Blocked")
   defp column_label("done"), do: gettext("Done")
+  # A status added to `Board.statuses/0` without a label here shows its raw name rather than
+  # crashing the page - visible enough to get fixed, harmless until it is.
+  defp column_label(status), do: status
 
   @impl true
   def render(assigns) do
@@ -109,27 +131,28 @@ defmodule PepeWeb.BoardLive do
         </.view_header>
 
         <div :if={@creating_board} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          <div class="max-w-lg">
-            <.form id="board-form" for={@board_form} phx-submit="board_create" class="space-y-4">
-              <div class="text-lg font-semibold">{gettext("+ New board")}</div>
+          <%!-- One field rhythm for both forms on this page: every field is a block ending in
+                `mb-4`, whether it comes from `.input` (which carries its own) or is hand-rolled
+                (which then wears it explicitly). The form itself adds no `space-y-*`, so the two
+                kinds can't end up 16px apart on one row and 32px on the next. --%>
+          <div class="max-w-2xl">
+            <.form id="board-form" for={@board_form} phx-submit="board_create">
+              <div class="mb-4 text-lg font-semibold">{gettext("+ New board")}</div>
               <.input field={@board_form[:name]} label={gettext("Name")} placeholder={gettext("Engineering")} />
-              <div>
-                <label class={lbl()}>{gettext("Project")}</label>
-                <select name="board[project]" class={fld()}>
-                  <option value="" selected={@scope in ["all", "root"]}>{gettext("Principal")}</option>
-                  <option :for={p <- @projects} value={p} selected={@scope == p}>{p}</option>
-                </select>
+              <.input type="select" id="board-project" name="board[project]" label={gettext("Project")}
+                value={project_value(@scope)} options={project_options(@projects)} />
+              <div class="mb-4">
+                <label class="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-300">
+                  <input type="checkbox" name="board[auto_dispatch]" value="true" class={[checkbox_cls(), "mt-0.5 shrink-0"]} />
+                  <span>
+                    <span class="block font-medium">{gettext("Auto-dispatch")}</span>
+                    <span class={[hlp(), "block"]}>{gettext("On: a ready card with an assignee starts on its own. Off (the default): a card starts only when someone claims it, from this page or through the board tool.")}</span>
+                  </span>
+                </label>
               </div>
-              <label class="flex items-start gap-2.5 text-sm">
-                <input type="checkbox" name="board[auto_dispatch]" value="true" class="mt-0.5" />
-                <span>
-                  {gettext("Auto-dispatch")}
-                  <p class={hlp()}>{gettext("On: a ready card with an assignee starts on its own. Off (the default): a card starts only when someone claims it, from this page or through the board tool.")}</p>
-                </span>
-              </label>
-              <div>
-                <label class={lbl()}>{gettext("Claim timeout (seconds)")}</label>
-                <input type="number" min="0" name="board[claim_timeout_s]" value="1800" class={fld()} />
+              <div class="mb-4">
+                <label class={lbl()} for="board-claim-timeout">{gettext("Claim timeout (seconds)")}</label>
+                <input id="board-claim-timeout" type="number" min="0" name="board[claim_timeout_s]" value="1800" class={fld()} />
                 <p class={hlp()}>{gettext("A running claim older than this is treated as stalled and blocked. 0 = never.")}</p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
@@ -141,25 +164,31 @@ defmodule PepeWeb.BoardLive do
         </div>
 
         <div :if={@creating_card} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          <div class="max-w-lg">
-            <.form id="card-form" for={@card_form} phx-submit="card_create" class="space-y-4">
-              <div class="text-lg font-semibold">{gettext("+ New card")}</div>
+          <div class="max-w-2xl">
+            <.form id="card-form" for={@card_form} phx-submit="card_create">
+              <div class="mb-4 text-lg font-semibold">{gettext("+ New card")}</div>
               <.input field={@card_form[:title]} label={gettext("Title")} placeholder={gettext("Fix the checkout timeout")} />
               <.input field={@card_form[:body]} type="textarea" rows="3" label={gettext("What needs doing")}
                 placeholder={gettext("Everything the assignee needs to know: this is all it gets, no chat memory.")} />
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label class={lbl()}>{gettext("Assignee")}</label>
-                  <select name="card[assignee]" class={fld()}>
+              <%!-- Column gap only: each cell already ends in its own `mb-4`, which is what
+                    separates this row from the next. --%>
+              <div class="grid gap-x-3 sm:grid-cols-2">
+                <div class="mb-4">
+                  <label class={lbl()} for="card-assignee">{gettext("Assignee")}</label>
+                  <select id="card-assignee" name="card[assignee]" class={fld()}>
                     <option value="">{gettext("(unassigned)")}</option>
                     <option :for={a <- scoped_agent_names(@scope)} value={a}>{a}</option>
                   </select>
                 </div>
-                <.input field={@card_form[:priority]} type="number" label={gettext("Priority")} value="0" />
+                <div class="mb-4">
+                  <label class={lbl()} for="card-priority">{gettext("Priority")}</label>
+                  <input id="card-priority" type="number" name="card[priority]" value="0" class={fld()} />
+                  <p class={hlp()}>{gettext("higher runs first (0 is normal)")}</p>
+                </div>
               </div>
-              <div>
-                <label class={lbl()}>{gettext("Auto-dispatch")} <span class="text-zinc-600">{gettext("(overrides the board's own setting)")}</span></label>
-                <select name="card[auto_dispatch]" class={fld()}>
+              <div class="mb-4">
+                <label class={lbl()} for="card-auto-dispatch">{gettext("Auto-dispatch")} <span class="text-zinc-600">{gettext("(overrides the board's own setting)")}</span></label>
+                <select id="card-auto-dispatch" name="card[auto_dispatch]" class={fld()}>
                   <option value="">{gettext("Inherit from the board")}</option>
                   <option value="true">{gettext("On for this card")}</option>
                   <option value="false">{gettext("Off for this card")}</option>
@@ -173,7 +202,7 @@ defmodule PepeWeb.BoardLive do
           </div>
         </div>
 
-        <div :if={!@selected and !@creating_board and !@creating_card} class="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+        <div :if={!@selected and !@creating_board and !@creating_card} class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
           <div :for={b <- @boards} class={[card(), "cursor-pointer"]} phx-click="board_select" phx-value-id={b.id}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
@@ -184,7 +213,9 @@ defmodule PepeWeb.BoardLive do
               <button phx-click="board_remove" phx-value-id={b.id} data-confirm={gettext("Remove board %{name}? Cards on it must be deleted first.", name: b.name)}
                 class={[btn_ghost(), "shrink-0 text-red-400 hover:text-red-300"]}>✕</button>
             </div>
-            <div class="mt-1 text-sm text-zinc-500">{length(Config.board_cards_for(b.id))} {gettext("card(s)")}</div>
+            <div class="mt-1 text-sm text-zinc-500">
+              {ngettext("%{count} card", "%{count} cards", length(Config.board_cards_for(b.id)))}
+            </div>
           </div>
           <p :if={@boards == []} class="text-[15px] text-zinc-500">{gettext("No boards yet. Create one with “+ New board”.")}</p>
         </div>
@@ -196,7 +227,10 @@ defmodule PepeWeb.BoardLive do
               <input type="checkbox" checked={@show_archived} phx-click="toggle_archived" class="accent-orange-500" /> {gettext("Show archived")}
             </label>
           </div>
-          <div class="flex gap-4">
+          <%!-- The empty state replaces the columns rather than trailing them: a board with no
+                cards would otherwise show six empty headers before saying there's nothing here. --%>
+          <p :if={@cards == []} class="text-[15px] text-zinc-500">{gettext("No cards yet. Create one with “+ New card”.")}</p>
+          <div :if={@cards != []} class="flex gap-4">
             <div :for={status <- @statuses} class="w-72 shrink-0">
               <div class="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
                 {column_label(status)} <span class="text-zinc-600">{length(column(@cards, status))}</span>
@@ -212,8 +246,7 @@ defmodule PepeWeb.BoardLive do
                   <div :if={c.block_reason} class="mt-1 text-sm text-amber-400">⚠ {c.block_reason}</div>
                   <div class="mt-2 flex items-center gap-1.5 text-sm text-zinc-500">
                     {gettext("auto-dispatch")}:
-                    <select phx-change="card_set_auto_dispatch" phx-value-id={c.id} name="value"
-                      class="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm text-zinc-300 outline-none transition hover:border-zinc-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500">
+                    <select phx-change="card_set_auto_dispatch" phx-value-id={c.id} name="value" class={fld_sm()}>
                       <option value="inherit" selected={is_nil(c.auto_dispatch)}>{gettext("inherit")}</option>
                       <option value="on" selected={c.auto_dispatch == true}>{gettext("on")}</option>
                       <option value="off" selected={c.auto_dispatch == false}>{gettext("off")}</option>
@@ -242,7 +275,6 @@ defmodule PepeWeb.BoardLive do
               </div>
             </div>
           </div>
-          <p :if={@cards == []} class="mt-4 text-[15px] text-zinc-500">{gettext("No cards yet. Create one with “+ New card”.")}</p>
         </div>
       </main>
     </div>
@@ -263,7 +295,7 @@ defmodule PepeWeb.BoardLive do
         name: Changeset.get_field(cs, :name),
         project: blank(p["project"]),
         auto_dispatch: p["auto_dispatch"] == "true",
-        claim_timeout_s: parse_iterations(p["claim_timeout_s"])
+        claim_timeout_s: parse_timeout_s(p["claim_timeout_s"])
       }
 
       case Board.create_board(attrs) do
