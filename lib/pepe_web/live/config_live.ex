@@ -166,7 +166,7 @@ defmodule PepeWeb.ConfigLive do
             <textarea
               name="json"
               spellcheck="false"
-              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+              class="min-h-[320px] w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
             >{@config_text}</textarea>
             <div class="flex items-center gap-3">
               <button type="submit" class={btn()}>{gettext("Save config")}</button>

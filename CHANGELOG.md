@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **The raw `config.json` editor on the Configuration page still collapsed to a sliver on a normal-height screen, even after 0.14.0's fix.** That fix only capped the height of the "Recent changes" journal list above it; the editor's own `min-h-0` still let flexbox shrink it toward zero to make room for the journal and the Media section whenever their combined height, even now bounded, still exceeded the visible area. The editor now has a real minimum height (`min-h-[320px]`), so the page scrolls to it instead of squeezing it away.
+
 ## [0.14.0] - 2026-08-08
 
 ### Fixed
