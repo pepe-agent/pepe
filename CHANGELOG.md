@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-08
+
 ### Fixed
 - **Instructional hints (the locked-dashboard page, the "no channel plugins" empty state, the "saved as eval case" tooltip, and several CLI usage lines) no longer suggest `mix pepe ...` inside a Docker container.** `Pepe.Invocation` only knew two contexts: the Burrito binary (`pepe ...`) or running from source (`mix pepe ...`), and defaulted to the latter for anything else, including the plain OTP release the official Docker image ships. `mix` doesn't exist there, so every one of these hints told a self-hosted operator to run a command their container doesn't have. `Pepe.Invocation.hint/1` now detects the plain-release case (via `RELEASE_NAME`, set by the standard release boot scripts) and points at `bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(...)'` instead, except the locked-dashboard page's password instructions specifically, which point at `PEPE_DASHBOARD_PASSWORD` there instead, since `rpc` has no real interactive terminal for the new hidden-input prompt below to read from.
 - **A literal dashboard password (`pepe dashboard password '<pass>'`) is now hashed (bcrypt) before it's written to `config.json`**, instead of stored as plain text, readable straight out of the live file or any `.bak`/backup of it. A reference to a secret kept outside the file (a `${ENV_VAR}`, or a `Pepe.Secrets.Vault` `exec:`/`file:`) is unaffected and stored verbatim, matching `Pepe.Config.interpolate/1`'s own rules exactly: a looser check here would either hash a reference into uselessness or leave a real password in plain text, so this is pinned by test against a lowercase `${my_pw}` (not a reference `interpolate/1` resolves either) and both vault prefixes. Older plain-text passwords already on disk keep working (login falls back to a constant-time string comparison when the stored value isn't a bcrypt hash) but never migrate themselves; `pepe dashboard` now nudges when it detects one still on disk.
@@ -699,7 +701,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/pepe-agent/pepe/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/pepe-agent/pepe/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/pepe-agent/pepe/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/pepe-agent/pepe/compare/v0.11.1...v0.12.0
