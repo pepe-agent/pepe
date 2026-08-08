@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: Every pepe command, grouped by what it manages: model connections, agents, projects, tokens, the dashboard, and more.
+description: Every pepe command, grouped by what it manages, model connections, agents, projects, tokens, the dashboard, and more.
 ---
 
 Everything in Pepe is reachable from the command line, grouped here the way you'd

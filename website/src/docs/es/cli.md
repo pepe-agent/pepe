@@ -1,6 +1,6 @@
 ---
 title: Referencia de la CLI
-description: Todos los comandos de pepe, agrupados por lo que gestionan: conexiones de modelo, agentes, proyectos, tokens, el panel, y más.
+description: Todos los comandos de pepe, agrupados por lo que gestionan, conexiones de modelo, agentes, proyectos, tokens, el panel, y más.
 ---
 
 Todo en Pepe es accesible desde la línea de comandos, agrupado aquí como realmente lo
