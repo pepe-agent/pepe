@@ -7,13 +7,27 @@ defmodule PepeWeb.DashUI do
   use PepeWeb, :html
   use Gettext, backend: Pepe.Gettext
 
+  alias PepeWeb.DashData
+
   # Shared Tailwind class strings (functions, since `@name` inside ~H means an assign).
   def fld,
     do:
       "w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
 
+  @doc """
+  A compact variant of `fld/0` for a control that has to sit inline with `btn_ghost/0`
+  buttons (a header action row, a filter bar) - `fld/0`'s own padding/text size renders
+  visibly taller than a `btn_ghost/0` beside it.
+  """
+  def fld_sm,
+    do:
+      "rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+
   def lbl, do: "mb-1.5 block text-sm font-medium text-zinc-300"
   def hlp, do: "mt-1.5 text-sm leading-relaxed text-zinc-500"
+
+  @doc "A plain checkbox styled to match `check_card/1`'s - every hand-rolled checkbox should use this instead of the browser default."
+  def checkbox_cls, do: "h-4 w-4 accent-orange-500"
 
   def card,
     do: "rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition hover:border-zinc-700"
@@ -38,9 +52,85 @@ defmodule PepeWeb.DashUI do
 
   @doc """
   The scrollable body of a section, under its header. Tighter padding on a phone,
-  where 24px of chrome on each side is a sixth of the screen.
+  where 24px of chrome on each side is a sixth of the screen. `min-h-0` lets it
+  actually shrink inside a flex column instead of forcing a sibling with its own
+  minimum size (a textarea, a form) to collapse to make room for it - see
+  `config_live.ex`'s editor. Extra bottom padding so the last element on the page
+  never sits flush against the viewport edge. Every section used to inline this
+  string by hand and had already drifted (three different variants); callers add
+  their own layout/`space-y-*` on top, e.g. `class={[body_cls(), "flex flex-col gap-6"]}`.
   """
-  def body_cls, do: "flex-1 overflow-y-auto p-4 sm:p-6"
+  def body_cls, do: "min-h-0 flex-1 overflow-y-auto p-4 pb-8 sm:p-6 sm:pb-10"
+
+  @doc """
+  A dashed-border placeholder for "nothing here yet", standardized from the two
+  shapes (`plugins_live.ex`, `integrations_live.ex`) that had already diverged
+  before this existed.
+  """
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  def empty_state(assigns) do
+    ~H"""
+    <div class={["rounded-xl border border-dashed border-zinc-800 p-8 text-center text-zinc-500", @class]}>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :sub, :any, default: nil
+  # `false` for the default color, or a Tailwind text-color class (e.g. "text-orange-400").
+  attr :accent, :any, default: false
+  attr :size, :string, default: "text-2xl"
+
+  @doc """
+  A single figure in a card: label, big value, optional sub-line. Was two
+  independently-drifted private copies (`overview_live.ex`, `usage_live.ex`) with
+  different sizes and accent colors - `size`/`accent` are exposed so each caller
+  keeps its own look without forking the markup again.
+  """
+  def stat(assigns) do
+    ~H"""
+    <div class={card()}>
+      <div class="text-sm text-zinc-500">{@label}</div>
+      <div class={["mt-1 font-semibold", @size, @accent || "text-zinc-100"]}>{@value}</div>
+      <div :if={@sub} class="mt-0.5 text-xs text-zinc-600">{@sub}</div>
+    </div>
+    """
+  end
+
+  attr :title, :string, required: true
+  attr :currency, :string, required: true
+  # Each row: %{key: string, total: integer (token count), cost: number}. A caller that
+  # needs to choose between two cost figures (billable vs. actual, `usage_live.ex`)
+  # resolves that itself and passes the already-chosen `cost` in - this component only
+  # ever renders one number per row.
+  attr :rows, :list, required: true
+
+  @doc """
+  A titled list of "name → tokens, cost" rows. Was two independently-drifted private
+  copies (`overview_live.ex`, `usage_live.ex`); the billable-vs-cost choice `usage_live`
+  needed stays in that screen's own data prep, not in this shared component.
+  """
+  def breakdown(assigns) do
+    ~H"""
+    <div>
+      <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
+      <div class="space-y-1 rounded-xl border border-zinc-800 p-2">
+        <div :for={r <- @rows} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-[15px] hover:bg-zinc-800/50">
+          <span class="min-w-0 truncate text-zinc-300">{r.key}</span>
+          <span class="flex shrink-0 items-center gap-3 text-sm">
+            <span class="text-zinc-500">{DashData.tokens(r.total)}</span>
+            <span class="w-20 text-right font-medium">{DashData.money(r.cost, @currency)}</span>
+          </span>
+        </div>
+        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("Nothing yet")}</p>
+      </div>
+    </div>
+    """
+  end
 
   # The id of the checkbox that drives the mobile drawer. The sidebar renders it; every
   # `<label for=...>` pointing at it (the hamburger, the backdrop) toggles the drawer with

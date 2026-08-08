@@ -180,7 +180,8 @@ defmodule PepeWeb.DashData do
   def model_suffix(nil), do: ""
   def model_suffix(model), do: " · #{model}"
 
-  def deliver_label("none"), do: gettext("Not sent")
+  def deliver_label("none"), do: gettext("Nowhere")
+  def deliver_label("log"), do: gettext("App log")
   def deliver_label("telegram:" <> id), do: "Telegram #{id}"
   def deliver_label(other), do: other
 
@@ -340,7 +341,8 @@ defmodule PepeWeb.DashData do
   def tokens(_), do: "0"
 
   @doc "A short label for how fresh the live price cache is."
-  def price_cache_label(nil), do: gettext("Using built-in seed prices (never refreshed)")
+  def price_cache_label(nil),
+    do: gettext("Using the built-in price list (never updated from the provider)")
 
   def price_cache_label(%{fetched_at: at, count: count}) do
     gettext("%{count} live prices · refreshed %{date}", count: count, date: local_datetime(at))

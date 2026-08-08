@@ -230,13 +230,18 @@ defmodule PepeWeb.TracesLive do
         >
           <%!-- Your traces are the test data you already have. When a run went right, this is
                 where you say so, and it becomes a case that has to keep going right. --%>
+          <span :if={@selected && !@selected_recorded} class="max-w-[14rem] text-xs leading-snug text-zinc-500">
+            {gettext("keeps this run as a regression check")}
+          </span>
           <button :if={@selected && !@selected_recorded} phx-click="promote" class={btn()}
             data-confirm={gettext("Keep this run as an eval case? It will assert that the agent still calls the same tools for this prompt.")}>
             {gettext("✓ This went right")}
           </button>
+          <%!-- Same padding/height as btn_ghost() so replacing the button on save doesn't
+                reflow the action row. --%>
           <span :if={@selected && @selected_recorded}
-            class="inline-flex items-center rounded-md bg-zinc-800 px-3 py-1.5 text-sm text-zinc-400"
-            title={gettext("Saved to the \"recorded\" eval suite. Run it with: %{cmd}", cmd: Pepe.Invocation.hint(["eval", "recorded"]))}>
+            class="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-800 px-3.5 py-2 text-sm text-zinc-400"
+            title={gettext("Saved to the \"recorded\" eval suite. From now on it's checked whenever you run your evals.")}>
             {gettext("✓ Saved as an eval case")}
           </span>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>
@@ -317,21 +322,22 @@ defmodule PepeWeb.TracesLive do
         </select>
       </div>
       <div>
-        <label class="mb-1 block text-xs font-medium text-zinc-500">{gettext("When")}</label>
+        <label class="mb-1 block text-xs font-medium text-zinc-500">{gettext("From")}</label>
         <input type="date" name="from" value={@f_from} class={[fld(), "py-1.5"]} />
       </div>
       <div>
         <label class="mb-1 block text-xs font-medium text-zinc-500">{gettext("Until")}</label>
         <input type="date" name="to" value={@f_to} class={[fld(), "py-1.5"]} />
       </div>
-      <button
-        :if={@f_agent != "" or @f_source != "" or @f_outcome != "" or @f_from != "" or @f_to != ""}
-        type="button"
-        phx-click="clear_filters"
-        class={[btn_ghost(), "mb-0.5"]}
-      >
-        {gettext("Clear")}
-      </button>
+      <%!-- Same wrapper shape as a field (an aria-hidden label spacer of the same height,
+            then the control), so the button lines up with the inputs on its own rather
+            than through a hand-tuned offset that only holds for the current field height. --%>
+      <div :if={@f_agent != "" or @f_source != "" or @f_outcome != "" or @f_from != "" or @f_to != ""}>
+        <span aria-hidden="true" class="mb-1 block text-xs font-medium">&nbsp;</span>
+        <button type="button" phx-click="clear_filters" class={btn_ghost()}>
+          {gettext("Clear")}
+        </button>
+      </div>
     </form>
     """
   end
@@ -363,13 +369,19 @@ defmodule PepeWeb.TracesLive do
   attr :total, :integer, required: true
   attr :models, :map, required: true
   attr :cache, :map, required: true
+  # Rendered inside another card (a session group's expanded body), which already draws the
+  # border and rounding - drawing our own too gives a double border with dead space between.
+  attr :nested, :boolean, default: false
 
   defp trace_list(assigns) do
     ~H"""
-    <div :if={@total == 0} class="rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
+    <div
+      :if={@total == 0}
+      class={["p-10 text-center text-zinc-500", !@nested && "rounded-xl border border-dashed border-zinc-800"]}
+    >
       {gettext("No runs match these filters. Every agent run, from any surface, shows up here.")}
     </div>
-    <div :if={@traces != []} class="overflow-x-auto rounded-xl border border-zinc-800">
+    <div :if={@traces != []} class={["overflow-x-auto", !@nested && "rounded-xl border border-zinc-800"]}>
       <table class="w-full min-w-[720px] text-[15px]">
         <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
           <tr>
@@ -460,8 +472,8 @@ defmodule PepeWeb.TracesLive do
             <div class="whitespace-nowrap font-mono text-xs text-zinc-500">{fmt_at(g.last_at)}</div>
           </div>
         </button>
-        <div :if={@expanded == g.id} class="border-t border-zinc-800 p-3">
-          <.trace_list traces={g.traces} total={length(g.traces)} models={@models} cache={@cache} />
+        <div :if={@expanded == g.id} class="border-t border-zinc-800">
+          <.trace_list traces={g.traces} total={length(g.traces)} models={@models} cache={@cache} nested />
         </div>
       </div>
     </div>
@@ -524,7 +536,7 @@ defmodule PepeWeb.TracesLive do
     ~H"""
     <div>
       <div class="text-[15px] font-medium text-orange-300">{gettext("Tool")} · {@ev["name"]}</div>
-      <pre class="mt-1 overflow-x-auto rounded-lg bg-zinc-950/70 p-2.5 text-xs text-zinc-400"><code>{@ev["args"]}</code></pre>
+      <.blob text={@ev["args"]} />
     </div>
     """
   end
@@ -533,7 +545,7 @@ defmodule PepeWeb.TracesLive do
     ~H"""
     <div>
       <div class="text-sm text-zinc-500">{gettext("Result")} · {@ev["name"]}</div>
-      <pre class="mt-1 overflow-x-auto rounded-lg bg-zinc-950/70 p-2.5 text-xs text-zinc-400"><code>{@ev["out"]}</code></pre>
+      <.blob text={@ev["out"]} />
     </div>
     """
   end
@@ -573,7 +585,7 @@ defmodule PepeWeb.TracesLive do
 
   defp event(%{ev: %{"t" => "hook"}} = assigns) do
     ~H"""
-    <div class="text-sm text-zinc-400">{gettext("Hook")} · {@ev["name"]} ({@ev["stage"]}): {hook_result_label(@ev)}</div>
+    <div class="text-sm text-zinc-400">{gettext("Hook")} · {@ev["name"]} ({stage_label(@ev["stage"])}): {hook_result_label(@ev)}</div>
     """
   end
 
@@ -593,10 +605,41 @@ defmodule PepeWeb.TracesLive do
 
   defp event(assigns), do: ~H""
 
+  attr :text, :any, default: nil
+
+  # A tool call's arguments or its result. Arguments arrive as raw JSON, so a call with more
+  # than one key is unreadable on a single line - pretty-print whatever parses as JSON, and
+  # leave anything else (plain tool output) exactly as it came. Height is capped with the
+  # block's own scrollbar rather than truncated: this is the screen for reading a run step by
+  # step, so a long result has to stay fully readable without burying the steps below it.
+  defp blob(assigns) do
+    ~H"""
+    <pre class="mt-1 max-h-72 overflow-auto rounded-lg bg-zinc-950/70 p-2.5 text-xs leading-relaxed text-zinc-400"><code>{pretty(@text)}</code></pre>
+    """
+  end
+
+  defp pretty(text) when is_binary(text) do
+    case Jason.decode(text) do
+      {:ok, data} when is_map(data) or is_list(data) -> Jason.encode!(data, pretty: true)
+      _ -> text
+    end
+  end
+
+  defp pretty(nil), do: ""
+  defp pretty(other), do: inspect(other)
+
   defp triage_verdict_label("simple"), do: gettext("simple")
   defp triage_verdict_label("complex"), do: gettext("complex")
   defp triage_verdict_label("failed"), do: gettext("unreachable, skipped")
   defp triage_verdict_label(v), do: v
+
+  # The point in the run a hook ran at (`Pepe.Hooks`): on the way in, on the way out, or on a
+  # tool's raw output before it joins the conversation.
+  defp stage_label("inbound"), do: gettext("inbound")
+  defp stage_label("outbound"), do: gettext("outbound")
+  defp stage_label("tool_result"), do: gettext("tool result")
+  defp stage_label(other) when is_binary(other), do: other
+  defp stage_label(_), do: "–"
 
   defp hook_result_label(%{"changed" => false}), do: gettext("no change")
 
@@ -754,6 +797,12 @@ defmodule PepeWeb.TracesLive do
   defp fmt_tokens(n) when is_integer(n), do: Integer.to_string(n)
   defp fmt_tokens(_), do: "0"
 
+  # The cost of a run, in the operator's configured currency. `DashData.money/2` owns the
+  # symbol and its spacing - the same formatter the Usage screen uses, so a run doesn't read
+  # as "R$ 0.12" there and "US$ 0.12" here. What it doesn't do is vary the precision, and a
+  # single run often costs a fraction of a cent, which its fixed two decimals would round to
+  # zero: so the number is re-rendered at the precision this screen needs and swapped into
+  # `money/2`'s output, leaving the currency itself with one definition.
   defp fmt_cost(c) when is_number(c) and c > 0 do
     decimals =
       cond do
@@ -762,7 +811,11 @@ defmodule PepeWeb.TracesLive do
         true -> 6
       end
 
-    "US$ " <> :erlang.float_to_binary(c * 1.0, decimals: decimals)
+    String.replace_suffix(
+      money(c, Config.currency()),
+      :erlang.float_to_binary(c / 1, decimals: 2),
+      :erlang.float_to_binary(c / 1, decimals: decimals)
+    )
   end
 
   defp fmt_cost(_), do: "–"

@@ -67,7 +67,8 @@ defmodule PepeWeb.UsageLiveRunsTest do
 
     {:ok, _view, html} = live(conn(), "/usage")
 
-    assert html =~ "telegram"
+    # The source is shown through a label, not as the raw "telegram" token.
+    assert html =~ "Telegram"
     assert html =~ "web_search"
     assert html =~ "4.2s"
   end

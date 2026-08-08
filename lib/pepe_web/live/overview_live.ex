@@ -26,7 +26,7 @@ defmodule PepeWeb.OverviewLive do
     {:ok,
      socket
      |> assign(
-       page_title: "Pepe · Overview",
+       page_title: "Pepe · " <> gettext("Overview"),
        scope: scope,
        projects: Config.project_slugs(),
        new_project: false,
@@ -97,7 +97,7 @@ defmodule PepeWeb.OverviewLive do
             <%!-- Cost is what we actually paid: token prices for API connections, plus the flat
                   monthly fee of each subscription that served a call. Not the tokens a
                   subscription served priced as if they had been bought. --%>
-            <.stat label={gettext("To bill this month")} value={money(@month.totals.billable, @month.currency)} sub={gettext("cost %{c}", c: money(@month.totals.cost + @month.subscriptions, @month.currency))} accent />
+            <.stat label={gettext("To bill this month")} value={money(@month.totals.billable, @month.currency)} sub={gettext("cost %{c} (what you pay the provider)", c: money(@month.totals.cost + @month.subscriptions, @month.currency))} accent="text-orange-400" />
           </div>
 
           <%!-- What the runtime costs to run, measured live rather than asserted. --%>
@@ -110,26 +110,39 @@ defmodule PepeWeb.OverviewLive do
               <.mini label={gettext("Memory")} value={"#{@footprint.memory_mb} MB"} />
               <.mini label={gettext("CPU")} value={if @cpu, do: "#{@cpu}%", else: "-"} />
               <.mini label={gettext("Conversations")} value={@footprint.sessions} />
-              <.mini label={gettext("Processes")} value={@footprint.processes} />
+              <.mini
+                label={gettext("Processes")}
+                value={@footprint.processes}
+                hint={gettext("internal tasks the runtime is juggling")}
+              />
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <.mini label={gettext("Agents")} value={@counts.agents} />
-            <.mini label={gettext("Projects")} value={@counts.projects} />
-            <.mini label={gettext("Models")} value={@counts.models} />
-            <.mini label={gettext("Channels")} value={@counts.channels} />
-            <.mini label={gettext("Automations")} value={@counts.automations} />
+          <div>
+            <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Configured")}</div>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <.mini label={gettext("Agents")} value={@counts.agents} />
+              <.mini label={gettext("Projects")} value={@counts.projects} />
+              <.mini label={gettext("Models")} value={@counts.models} />
+              <.mini label={gettext("Channels")} value={@counts.channels} />
+              <.mini label={gettext("Automations")} value={@counts.automations} />
+            </div>
           </div>
 
           <div class="grid gap-6 lg:grid-cols-2">
             <div>
-              <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Activity (last 14 days)")}</div>
+              <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("Activity (tokens, last 14 days)")}</div>
               <div class="flex h-32 items-end gap-1 rounded-xl border border-zinc-800 p-3">
-                <div :for={b <- @days} class="group relative flex-1" title={"#{b.key}: #{tokens(b.total)} tok"}>
+                <div :for={b <- @days} class="group relative flex-1" title={"#{b.key}: " <> gettext("%{n} tokens", n: tokens(b.total))}>
                   <div class="w-full rounded-t bg-orange-600/70" style={"height: #{bar_pct(b.total, @days)}%"}></div>
                 </div>
                 <p :if={@days == []} class="m-auto text-sm text-zinc-600">{gettext("No usage yet")}</p>
+              </div>
+              <%!-- The bars only ever had a `title=` tooltip, invisible on touch. Naming the
+                    first and last bucket under the chart gives the axis its two ends. --%>
+              <div :if={@days != []} class="mt-1 flex justify-between px-3 text-xs text-zinc-600">
+                <span>{List.first(@days).key}</span>
+                <span>{List.last(@days).key}</span>
               </div>
             </div>
 
@@ -159,51 +172,18 @@ defmodule PepeWeb.OverviewLive do
   end
 
   attr :label, :string, required: true
-  attr :value, :string, required: true
-  attr :sub, :string, default: nil
-  attr :accent, :boolean, default: false
-
-  defp stat(assigns) do
-    ~H"""
-    <div class={card()}>
-      <div class="text-sm text-zinc-500">{@label}</div>
-      <div class={["mt-1 text-2xl font-semibold", @accent && "text-orange-400"]}>{@value}</div>
-      <div :if={@sub} class="mt-0.5 text-xs text-zinc-600">{@sub}</div>
-    </div>
-    """
-  end
-
-  attr :label, :string, required: true
   # A count, or a formatted reading like "86.4 MB" / "2.1%" / "-".
   attr :value, :any, required: true
+  # Plain-language gloss for a reading whose label means nothing on its own (the raw BEAM
+  # process count). Rendered, not a `title=`: a tooltip is invisible on a touch screen.
+  attr :hint, :string, default: nil
 
   defp mini(assigns) do
     ~H"""
     <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
       <div class="text-lg font-semibold">{@value}</div>
       <div class="text-xs text-zinc-500">{@label}</div>
-    </div>
-    """
-  end
-
-  attr :title, :string, required: true
-  attr :currency, :string, required: true
-  attr :rows, :list, required: true
-
-  defp breakdown(assigns) do
-    ~H"""
-    <div>
-      <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
-      <div class="space-y-1 rounded-xl border border-zinc-800 p-2">
-        <div :for={r <- @rows} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-[15px] hover:bg-zinc-800/50">
-          <span class="min-w-0 truncate text-zinc-300">{r.key}</span>
-          <span class="flex shrink-0 items-center gap-3 text-sm">
-            <span class="text-zinc-500">{tokens(r.total)}</span>
-            <span class="w-20 text-right font-medium">{money(r.cost, @currency)}</span>
-          </span>
-        </div>
-        <p :if={@rows == []} class="px-2 py-3 text-center text-sm text-zinc-600">{gettext("Nothing yet")}</p>
-      </div>
+      <div :if={@hint} class="mt-0.5 text-[11px] leading-tight text-zinc-600">{@hint}</div>
     </div>
     """
   end
