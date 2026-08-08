@@ -28,6 +28,17 @@ defmodule Pepe.MCP.Transport do
 
   alias Pepe.MCP.Client
 
+  @choices ~w(auto streamable sse)
+
+  @doc """
+  Every value a remote spec's `transport` may hold, default first.
+
+  The set exists so a UI can offer it without keeping a second copy of it in sync:
+  `for_spec/1` below is the only place that turns one of these into a module.
+  """
+  @spec choices() :: [String.t()]
+  def choices, do: @choices
+
   @doc """
   The transport module a spec asks for, or `{:error, reason}` when it asks for nothing
   recognisable (neither a command to run nor a URL to reach).

@@ -146,6 +146,88 @@ defmodule PepeWeb.DbConnectionsLiveTest do
     assert cfg.tenant_binding == %{"mode" => "fixed", "value" => "acme-inc"}
   end
 
+  test "typing into the form does not fire the error banner before a save is attempted" do
+    {:ok, view, _html} = live(conn(), "/databases")
+    render_click(view, "conn_new", %{})
+
+    html = render_change(view, "conn_change", %{"conn" => %{"name" => "a"}})
+    refute html =~ "Please fix the errors below"
+  end
+
+  test "a malformed port is rejected instead of silently coerced" do
+    {:ok, view, _html} = live(conn(), "/databases")
+    render_click(view, "conn_new", %{})
+
+    html =
+      render_submit(view, "conn_save", %{
+        "conn" => %{"name" => "typo_port", "host" => "h", "port" => "54abc", "database" => "d", "user" => "u", "password" => "${PW}"}
+      })
+
+    assert html =~ "Please fix the errors below"
+    assert Config.db_connection("typo_port") == nil
+  end
+
+  test "an out-of-range port is rejected" do
+    {:ok, view, _html} = live(conn(), "/databases")
+    render_click(view, "conn_new", %{})
+
+    render_submit(view, "conn_save", %{
+      "conn" => %{"name" => "big_port", "host" => "h", "port" => "70000", "database" => "d", "user" => "u", "password" => "${PW}"}
+    })
+
+    assert Config.db_connection("big_port") == nil
+  end
+
+  test "editing loads the connection and a blank password keeps the stored one" do
+    Config.put_db_connection("editable", %{
+      "engine" => "postgres",
+      "host" => "old.host",
+      "port" => 5432,
+      "database" => "d",
+      "user" => "u",
+      "password" => "${PW}",
+      "project" => "acme"
+    })
+
+    {:ok, view, _html} = live(conn(), "/databases")
+    html = render_click(view, "conn_edit", %{"name" => "editable"})
+
+    assert html =~ "old.host"
+    refute html =~ "${PW}"
+
+    render_submit(view, "conn_save", %{
+      "conn" => %{"name" => "editable", "host" => "new.host", "port" => "6432", "database" => "d", "user" => "u", "password" => ""}
+    })
+
+    cfg = Config.db_connection("editable")
+    assert cfg.host == "new.host"
+    assert cfg.port == 6432
+    # Blank kept the saved secret, and a key the form never renders survived the edit.
+    assert Config.db_connections()["editable"]["password"] == "${PW}"
+    assert Config.db_connections()["editable"]["project"] == "acme"
+  end
+
+  test "renaming while editing moves the connection" do
+    Config.put_db_connection("old_name", %{
+      "engine" => "postgres",
+      "host" => "h",
+      "port" => 5432,
+      "database" => "d",
+      "user" => "u",
+      "password" => "${PW}"
+    })
+
+    {:ok, view, _html} = live(conn(), "/databases")
+    render_click(view, "conn_edit", %{"name" => "old_name"})
+
+    render_submit(view, "conn_save", %{
+      "conn" => %{"name" => "new_name", "host" => "h", "port" => "5432", "database" => "d", "user" => "u", "password" => ""}
+    })
+
+    assert Config.db_connection("old_name") == nil
+    assert Config.db_connection("new_name").host == "h"
+  end
+
   test "removing a connection deletes it" do
     Config.put_db_connection("gone", %{
       "engine" => "postgres",
