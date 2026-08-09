@@ -712,34 +712,7 @@ defmodule PepeWeb.AgentsLive do
   end
 
   defp save_agent(socket, params, name, existing) do
-    agent = %{
-      existing
-      | name: name,
-        system_prompt: blank(params["system_prompt"]) || Pepe.Config.Agent.default_prompt(),
-        model: blank(params["model"]),
-        tools: params["tools"] || [],
-        auto_approve: form_auto_approve(params),
-        hooks: params["hooks"] || [],
-        slots: parse_slots(params["slots"]),
-        max_iterations: parse_iterations(params["max_iterations"]),
-        tool_progress: blank(params["tool_progress"]),
-        # Chip-list state lives in `edit_agent` (LiveView state), not `params` -
-        # read from there so nil (inherit) vs [] (explicit none) survives.
-        fallbacks: socket.assigns.edit_agent[:fallbacks],
-        can_message: socket.assigns.edit_agent[:can_message] || [],
-        can_manage: build_manage(params["can_manage_mode"], socket.assigns.edit_agent[:manage_list] || []),
-        triage_model: blank(params["triage_model"]),
-        simple_model: blank(params["simple_model"]),
-        utility_model: blank(params["utility_model"]),
-        exempt_message_limit: params["exempt_message_limit"] == "true",
-        trust_untrusted_content: params["trust_untrusted_content"] == "true",
-        midrun_fold: params["midrun_fold"] == "true",
-        commitments: params["commitments"] == "true",
-        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
-        micro_compaction: params["micro_compaction"] == "true"
-    }
-
-    case Config.put_agent(agent) do
+    case Config.put_agent(agent_from_params(existing, params, name, socket.assigns.edit_agent)) do
       :ok ->
         {:noreply,
          socket
@@ -763,6 +736,52 @@ defmodule PepeWeb.AgentsLive do
          )}
     end
   end
+
+  defp agent_from_params(existing, params, name, edit_agent) do
+    %{
+      existing
+      | name: name,
+        system_prompt: system_prompt_param(params),
+        model: blank(params["model"]),
+        tools: Map.get(params, "tools", []),
+        auto_approve: form_auto_approve(params),
+        hooks: Map.get(params, "hooks", []),
+        slots: parse_slots(params["slots"]),
+        max_iterations: parse_iterations(params["max_iterations"]),
+        tool_progress: blank(params["tool_progress"]),
+        fallbacks: edit_agent[:fallbacks],
+        can_message: Map.get(edit_agent, :can_message, []),
+        can_manage: build_manage(params["can_manage_mode"], Map.get(edit_agent, :manage_list, []))
+    }
+    |> put_agent_model_prefs(params)
+    |> put_agent_switches(params)
+  end
+
+  defp system_prompt_param(params), do: blank(params["system_prompt"]) || Pepe.Config.Agent.default_prompt()
+
+  defp put_agent_model_prefs(agent, params) do
+    %{
+      agent
+      | triage_model: blank(params["triage_model"]),
+        simple_model: blank(params["simple_model"]),
+        utility_model: blank(params["utility_model"])
+    }
+  end
+
+  defp put_agent_switches(agent, params) do
+    %{
+      agent
+      | exempt_message_limit: params["exempt_message_limit"] == "true",
+        trust_untrusted_content: params["trust_untrusted_content"] == "true",
+        midrun_fold: params["midrun_fold"] == "true",
+        commitments: params["commitments"] == "true",
+        session_search_scope: session_search_scope_param(params),
+        micro_compaction: params["micro_compaction"] == "true"
+    }
+  end
+
+  defp session_search_scope_param(%{"session_search_project_wide" => "true"}), do: "project"
+  defp session_search_scope_param(_params), do: "self"
 
   # Keep what the user typed on screen and show the validation error under the field.
   defp reshow_invalid_agent(params, cs, socket) do

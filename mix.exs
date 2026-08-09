@@ -15,7 +15,12 @@ defmodule Pepe.MixProject do
       releases: releases(),
       listeners: [Phoenix.CodeReloader],
       test_coverage: [tool: ExCoveralls],
-      dialyzer: [plt_add_apps: [:mix, :ex_unit], plt_local_path: "priv/plts", plt_core_path: "priv/plts"]
+      dialyzer: [
+        plt_add_apps: [:mix, :ex_unit],
+        plt_local_path: "priv/plts",
+        plt_core_path: "priv/plts",
+        ignore_warnings: ".dialyzer_ignore.exs"
+      ]
     ]
   end
 

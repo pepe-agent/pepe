@@ -101,7 +101,7 @@ defmodule PepeWeb.ToolServersLive do
   end
 
   defp unparse_headers(headers) when is_map(headers) do
-    headers |> Enum.map(fn {key, value} -> "#{key}: #{value}" end) |> Enum.join("\n")
+    Enum.map_join(headers, "\n", fn {key, value} -> "#{key}: #{value}" end)
   end
 
   defp unparse_headers(_), do: ""
@@ -279,42 +279,9 @@ defmodule PepeWeb.ToolServersLive do
 
   def handle_event("mcp_save", %{"mcp" => p}, socket) do
     cs = mcp_changeset(p)
-    original = socket.assigns.edit_mcp[:original]
 
     if cs.valid? do
-      name = String.trim(Changeset.get_field(cs, :name))
-      # Whatever this form has no control over (a pinned OAuth client identity, a local
-      # server's env) survives an edit instead of being dropped by the rewrite.
-      previous = (original && socket.assigns.mcp[original]) || %{}
-
-      definition =
-        if Changeset.get_field(cs, :kind) == "remote" do
-          %{
-            "url" => String.trim(Changeset.get_field(cs, :url)),
-            "headers" => parse_headers(p["headers"]),
-            "transport" => transport_value(Changeset.get_field(cs, :transport))
-          }
-          |> put_kept(previous, "oauth")
-        else
-          %{
-            "command" => String.trim(Changeset.get_field(cs, :command)),
-            "args" => String.split(p["args"] || "", " ", trim: true),
-            "env" => previous["env"] || %{}
-          }
-        end
-
-      if original && original != name, do: Config.delete_mcp_server(original)
-      Config.put_mcp_server(name, definition)
-
-      # A client already connected under the old definition would keep serving it until
-      # something restarted it. Both names, so a rename doesn't strand the old one.
-      if original, do: Enum.each(Enum.uniq([original, name]), &Pepe.MCP.restart/1)
-
-      {:noreply,
-       socket
-       |> assign(mcp: Config.mcp_servers(), edit_mcp: nil, submitted?: false)
-       |> update(:mcp_tools, &Map.drop(&1, [original, name]))
-       |> put_flash(:info, gettext("MCP server %{name} saved. Validate it.", name: name))}
+      {:noreply, save_mcp_server(socket, cs, p)}
     else
       {:noreply, assign(socket, submitted?: true, form: to_form(%{cs | action: :validate}, as: :mcp))}
     end
@@ -401,6 +368,58 @@ defmodule PepeWeb.ToolServersLive do
       end
 
     {:noreply, update(socket, :mcp_tools, &Map.put(&1, name, value))}
+  end
+
+  defp save_mcp_server(socket, cs, params) do
+    original = socket.assigns.edit_mcp[:original]
+    name = String.trim(Changeset.get_field(cs, :name))
+    previous = previous_mcp_definition(socket, original)
+    definition = mcp_definition(cs, params, previous)
+
+    if original && original != name, do: Config.delete_mcp_server(original)
+    Config.put_mcp_server(name, definition)
+    restart_mcp_servers(original, name)
+
+    socket
+    |> assign(mcp: Config.mcp_servers(), edit_mcp: nil, submitted?: false)
+    |> update(:mcp_tools, &Map.drop(&1, [original, name]))
+    |> put_flash(:info, gettext("MCP server %{name} saved. Validate it.", name: name))
+  end
+
+  defp previous_mcp_definition(_socket, nil), do: %{}
+  defp previous_mcp_definition(socket, original), do: socket.assigns.mcp[original] || %{}
+
+  defp mcp_definition(cs, params, previous) do
+    if Changeset.get_field(cs, :kind) == "remote" do
+      remote_mcp_definition(cs, params, previous)
+    else
+      local_mcp_definition(cs, params, previous)
+    end
+  end
+
+  defp remote_mcp_definition(cs, params, previous) do
+    %{
+      "url" => String.trim(Changeset.get_field(cs, :url)),
+      "headers" => parse_headers(params["headers"]),
+      "transport" => transport_value(Changeset.get_field(cs, :transport))
+    }
+    |> put_kept(previous, "oauth")
+  end
+
+  defp local_mcp_definition(cs, params, previous) do
+    %{
+      "command" => String.trim(Changeset.get_field(cs, :command)),
+      "args" => String.split(params["args"] || "", " ", trim: true),
+      "env" => previous["env"] || %{}
+    }
+  end
+
+  defp restart_mcp_servers(nil, _name), do: :ok
+
+  defp restart_mcp_servers(original, name) do
+    # A client already connected under the old definition would keep serving it until
+    # something restarted it. Both names, so a rename doesn't strand the old one.
+    Enum.each(Enum.uniq([original, name]), &Pepe.MCP.restart/1)
   end
 
   defp complete_login(%{assigns: %{login: nil}} = socket, _code), do: socket
