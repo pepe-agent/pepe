@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-08-08
+
+### Fixed
+- **The CI `credo` and `dialyzer` jobs now pass for the dashboard/webhook release.** The MCP and agent save paths keep their behavior but are split enough to satisfy the existing complexity limit, header rendering uses `Enum.map_join/3`, and Dialyxir now has a narrow ignore for the Gettext plural-form warning emitted by generated backend code for the new webhook catalogs.
+
 ## [0.14.2] - 2026-08-08
 
 ### Added
@@ -728,7 +733,8 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.14.3...HEAD
+[0.14.3]: https://github.com/pepe-agent/pepe/compare/v0.14.2...v0.14.3
 [0.14.2]: https://github.com/pepe-agent/pepe/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/pepe-agent/pepe/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/pepe-agent/pepe/compare/v0.13.1...v0.14.0
