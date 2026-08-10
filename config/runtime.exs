@@ -20,6 +20,16 @@ if System.get_env("PHX_SERVER") do
   config :pepe, PepeWeb.Endpoint, server: true
 end
 
+# Loopback by default: a bare `mix pepe serve` (or the installed CLI's `serve`)
+# is a human running it directly on a host with no reverse proxy in front, so
+# binding wider than 127.0.0.1 out of the box would put it on the LAN/internet
+# before a password is ever set. `mix pepe serve --bind lan` opts in explicitly
+# (see `serve_bind/1` in Mix.Tasks.Pepe). Declared before the Docker block below
+# on purpose: repeated `config/3` calls for the same key deep-merge keyword
+# lists, last write wins per leaf - Docker's `ip:` override has to come after
+# this to actually apply, not before.
+config :pepe, PepeWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000")), ip: {127, 0, 0, 1}]
+
 # A plain OTP release (the Docker image) boots the app directly - there is no
 # `mix pepe serve` to flip the server surfaces on, and their defaults are off so a
 # CLI one-shot stays fast. `PEPE_SERVE=1` turns on exactly the set that `serve`
@@ -31,9 +41,16 @@ if System.get_env("PEPE_SERVE") do
     persist_sessions: true
 
   config :pepe, PepeWeb.Endpoint, server: true
-end
 
-config :pepe, PepeWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+  # This is the boot path the official Docker image uses. A container's own
+  # loopback is a private namespace a sibling container (a reverse proxy on the
+  # same Docker network, e.g. Traefik/Kamal-proxy) cannot reach, so it needs the
+  # app listening on every interface *inside its own network namespace* to be
+  # reachable at all - unlike `mix pepe serve` above, this is not "exposed to
+  # the LAN" by itself, the container boundary is the actual perimeter. Must
+  # come after the loopback default above to win the merge.
+  config :pepe, PepeWeb.Endpoint, http: [ip: {0, 0, 0, 0}]
+end
 
 if config_env() == :prod do
   # Pepe ships as a standalone CLI (escript / Burrito release) and keeps no

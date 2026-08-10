@@ -215,7 +215,12 @@ defmodule Pepe.ServiceInstall do
   # ---- shared --------------------------------------------------------------------------
 
   defp port_args(opts), do: opts |> port_flags() |> Enum.map(&"<string>#{&1}</string>")
-  defp port_flags(opts), do: if(opts[:port], do: ["--port", to_string(opts[:port])], else: [])
+
+  defp port_flags(opts) do
+    port = if(opts[:port], do: ["--port", to_string(opts[:port])], else: [])
+    bind = if(opts[:bind], do: ["--bind", to_string(opts[:bind])], else: [])
+    port ++ bind
+  end
 
   defp env_pairs do
     for {name, value} <- [{"PEPE_HOME", System.get_env("PEPE_HOME")}, {"PEPE_CONFIG", System.get_env("PEPE_CONFIG")}],

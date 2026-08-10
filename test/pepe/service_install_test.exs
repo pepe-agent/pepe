@@ -63,6 +63,17 @@ defmodule Pepe.ServiceInstallTest do
       refute xml =~ "--port"
     end
 
+    test "adds --bind args when given" do
+      xml = ServiceInstall.macos_plist("/usr/local/bin/pepe", bind: "lan")
+      assert xml =~ "<string>--bind</string>"
+      assert xml =~ "<string>lan</string>"
+    end
+
+    test "omits --bind args when not given" do
+      xml = ServiceInstall.macos_plist("/usr/local/bin/pepe", [])
+      refute xml =~ "--bind"
+    end
+
     test "escapes XML special characters in the binary path" do
       xml = ServiceInstall.macos_plist("/opt/a&b/pepe", [])
       assert xml =~ "/opt/a&amp;b/pepe"
@@ -87,6 +98,16 @@ defmodule Pepe.ServiceInstallTest do
     test "adds --port to ExecStart when given" do
       ini = ServiceInstall.linux_unit("/usr/local/bin/pepe", port: 5050)
       assert ini =~ "ExecStart=/usr/local/bin/pepe serve --port 5050"
+    end
+
+    test "adds --bind to ExecStart when given" do
+      ini = ServiceInstall.linux_unit("/usr/local/bin/pepe", bind: "lan")
+      assert ini =~ "ExecStart=/usr/local/bin/pepe serve --bind lan"
+    end
+
+    test "combines --port and --bind in ExecStart" do
+      ini = ServiceInstall.linux_unit("/usr/local/bin/pepe", port: 5050, bind: "lan")
+      assert ini =~ "ExecStart=/usr/local/bin/pepe serve --port 5050 --bind lan"
     end
 
     test "includes PEPE_HOME as an Environment= line when set", %{home: home} do

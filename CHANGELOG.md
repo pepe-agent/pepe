@@ -7,6 +7,10 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 - **Every agent now treats a message reaction as a standing learning signal, not just an event it happens to receive.** `Workspace.convention_note/0` (the scaffolding wrapped around every agent's own persona) gained a new "Reactions as feedback" section: on a channel with native reactions (Telegram today), a 👍 on the agent's last message makes it append what worked to its own memory, a 👎 makes it note what to avoid, and it never replies to the reaction itself. This is a change to the shared behavioral contract, so it applies to every existing agent immediately, with no opt-in and nothing in `config.json` to diff.
+- **`mix pepe serve --bind lan`** opts the HTTP endpoint into every network interface; the installed background service (`serve install --bind lan`) and the standalone binary support it too.
+
+### Changed
+- **`mix pepe serve` (and the installed background service) now bind to `127.0.0.1` by default instead of `0.0.0.0`.** A bare `serve` has no reverse proxy in front of it, and the `/v1` API is open with no auth until a token is configured, so the old default put an unauthenticated OpenAI-compatible endpoint on the LAN/internet out of the box. Pass `--bind lan` to opt into the old behavior. The official Docker image (`PEPE_SERVE=1`) is unaffected - it still binds every interface, which is what a container behind a reverse proxy actually needs.
 
 ## [0.14.3] - 2026-08-08
 

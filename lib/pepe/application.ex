@@ -293,7 +293,7 @@ defmodule Pepe.Application do
     # The endpoint must be in the tree at boot, so decide before starting it.
     endpoint_children =
       if serve? do
-        enable_endpoint_server()
+        enable_endpoint_server(argv)
         [PepeWeb.Endpoint]
       else
         []
@@ -319,9 +319,18 @@ defmodule Pepe.Application do
   defp gateways_command?(["gateway" | _]), do: true
   defp gateways_command?(_), do: false
 
-  defp enable_endpoint_server do
+  # Mirrors `serve_bind/1`/`serve_port/1` in Mix.Tasks.Pepe for the standalone binary,
+  # which never goes through Mix (a release strips it) so it can't call those directly.
+  # `:ip` already defaults to loopback via config/runtime.exs; `--bind lan` here is the
+  # only way this specific boot path (`pepe serve`, including the installed background
+  # service) widens it, since it runs after that config is read.
+  defp enable_endpoint_server(argv) do
+    {opts, _, _} = OptionParser.parse(argv, strict: [bind: :string])
+    ip = if opts[:bind] in ["lan", "all", "0.0.0.0"], do: {0, 0, 0, 0}, else: {127, 0, 0, 1}
+
     conf = Application.get_env(:pepe, PepeWeb.Endpoint, [])
-    Application.put_env(:pepe, PepeWeb.Endpoint, Keyword.put(conf, :server, true))
+    http = conf |> Keyword.get(:http, []) |> Keyword.put(:ip, ip)
+    Application.put_env(:pepe, PepeWeb.Endpoint, conf |> Keyword.put(:server, true) |> Keyword.put(:http, http))
   end
 
   # Tell Phoenix to update the endpoint configuration

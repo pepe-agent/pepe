@@ -308,7 +308,11 @@ defmodule Mix.Tasks.Pepe do
     do: with_config(fn -> serve_service_cmd(sub, rest) end)
 
   def dispatch(["serve" | rest]),
-    do: with_app([serve: true, gateways: true, port: serve_port(rest)], fn -> serve_cmd(rest) end)
+    do:
+      with_app(
+        [serve: true, gateways: true, port: serve_port(rest), bind: serve_bind(rest)],
+        fn -> serve_cmd(rest) end
+      )
 
   # Configuring a gateway only touches the config file - no app needed.
   def dispatch(["gateway", "telegram", "setup" | _]), do: with_config(&telegram_setup/0)
@@ -406,9 +410,16 @@ defmodule Mix.Tasks.Pepe do
 
     if serve? do
       # Phoenix only opens the HTTP listener when the endpoint is told to serve; set
-      # the port here (before boot) so `--port` / $PORT actually takes effect.
+      # the port and bind address here (before boot) so `--port`/$PORT and `--bind`
+      # actually take effect. `:ip` defaults to loopback already via
+      # config/runtime.exs; this just lets `--bind lan` override it per-invocation.
       conf = Application.get_env(:pepe, PepeWeb.Endpoint, [])
-      http = conf |> Keyword.get(:http, []) |> Keyword.put(:port, Keyword.get(opts, :port, 4000))
+
+      http =
+        conf
+        |> Keyword.get(:http, [])
+        |> Keyword.put(:port, Keyword.get(opts, :port, 4000))
+        |> Keyword.put(:ip, Keyword.get(opts, :bind, {127, 0, 0, 1}))
 
       Application.put_env(
         :pepe,
@@ -429,6 +440,20 @@ defmodule Mix.Tasks.Pepe do
       opts[:port] -> opts[:port]
       System.get_env("PORT") -> String.to_integer(System.get_env("PORT"))
       true -> 4000
+    end
+  end
+
+  # Resolve the serve bind address: `--bind lan`/`--bind all` opts into every
+  # interface, anything else (including no flag) stays loopback-only - the safe
+  # default `config/runtime.exs` already sets, kept here in sync in case this
+  # ever runs before that config applies. `mix pepe dashboard password` (or a
+  # tunnel) is the way to widen access safely instead.
+  defp serve_bind(rest) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [bind: :string])
+
+    case opts[:bind] do
+      v when v in ["lan", "all", "0.0.0.0"] -> {0, 0, 0, 0}
+      _ -> {127, 0, 0, 1}
     end
   end
 
@@ -3329,8 +3354,8 @@ defmodule Mix.Tasks.Pepe do
     info("""
     mix pepe serve - run the OpenAI-compatible HTTP API + WebSocket server
 
-      serve [--port 4000] [--tunnel]        run in the foreground
-      serve install [--port 4000]           install as a persistent background service
+      serve [--port 4000] [--bind lan] [--tunnel]   run in the foreground
+      serve install [--port 4000] [--bind lan]      install as a persistent background service
       serve uninstall                       stop and remove the service
       serve status                          is the service installed/running?
 
@@ -3344,8 +3369,10 @@ defmodule Mix.Tasks.Pepe do
       --hostname <HOST>        named tunnel on your own domain after a one-time
                                `cloudflared tunnel login` (no token needed)
 
-    Binds to 0.0.0.0 by default - set a dashboard password (mix pepe dashboard
-    password) before exposing it beyond localhost, or bind to 127.0.0.1 and tunnel in.
+    Binds to 127.0.0.1 (loopback) by default - only this machine can reach it.
+    --bind lan opts into every interface instead; set a dashboard password
+    (mix pepe dashboard password) before doing that, or use --tunnel to expose
+    it publicly without widening the bind at all.
 
     Also starts the messaging gateways (Telegram, ...) alongside the endpoint.
 
@@ -3357,7 +3384,7 @@ defmodule Mix.Tasks.Pepe do
     result =
       case sub do
         "install" ->
-          {opts, _} = OptionParser.parse!(rest, strict: [port: :integer])
+          {opts, _} = OptionParser.parse!(rest, strict: [port: :integer, bind: :string])
           Pepe.ServiceInstall.install(opts)
 
         "uninstall" ->
