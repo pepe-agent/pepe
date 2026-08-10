@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Every agent now treats a message reaction as a standing learning signal, not just an event it happens to receive.** `Workspace.convention_note/0` (the scaffolding wrapped around every agent's own persona) gained a new "Reactions as feedback" section: on a channel with native reactions (Telegram today), a 👍 on the agent's last message makes it append what worked to its own memory, a 👎 makes it note what to avoid, and it never replies to the reaction itself. This is a change to the shared behavioral contract, so it applies to every existing agent immediately, with no opt-in and nothing in `config.json` to diff.
+
 ## [0.14.3] - 2026-08-08
 
 ### Fixed

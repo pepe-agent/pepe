@@ -117,6 +117,15 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert prompt =~ "shared/"
   end
 
+  test "system_prompt teaches the reaction-as-feedback convention" do
+    agent = %{name: "zak", system_prompt: "seed"}
+    prompt = Workspace.system_prompt(agent)
+
+    assert prompt =~ "[reacted <emoji>]"
+    assert prompt =~ "append a short note to MEMORY.md"
+    assert prompt =~ "never answer it"
+  end
+
   test "IDENTITY.md is small enough to stay always-loaded" do
     agent = %{name: "zak", system_prompt: "seed"}
     File.mkdir_p!(Workspace.dir("zak"))

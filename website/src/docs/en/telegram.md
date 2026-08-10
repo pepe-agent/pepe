@@ -85,7 +85,11 @@ the same keys as the default one:
   bot talks to anyone.
 - `require_mention`: in a group, only reply when the bot is @mentioned.
 - `reactions`: which 👍/👎 on a message reach the agent as feedback: `own`
-  (default, only reactions on the bot's own messages), `all`, or `off`.
+  (default, only reactions on the bot's own messages), `all`, or `off`. Every
+  agent already knows what to do with one: on 👍 it notes what worked to its
+  memory, on 👎 what to avoid repeating, and it never replies to the reaction
+  itself. Reviewed like any other memory write, on the dashboard's Learning
+  page, before it sticks.
 - `quick_reactions`: off by default. When on, a message that's only a
   thank-you or a bare emoji ("thanks!", a lone ❤️) gets a native reaction back
   instead of a full reply, with no model call spent on it. Anything with real

@@ -86,7 +86,11 @@ deles aceita as mesmas chaves do bot predefinido:
   fora e o bot fala com qualquer um.
 - `require_mention`: num grupo, só responder quando o bot é @mencionado.
 - `reactions`: que 👍/👎 numa mensagem chegam ao agente como feedback: `own`
-  (padrão, só reações nas próprias mensagens do bot), `all` ou `off`.
+  (padrão, só reações nas próprias mensagens do bot), `all` ou `off`. Todo
+  agente já sabe o que fazer com isso: no 👍 regista na própria memória o
+  que resultou, no 👎 o que evitar repetir, e nunca responde à reação em si.
+  Passa pela mesma revisão de qualquer gravação de memória, na página
+  Learning do dashboard, antes de valer.
 - `quick_reactions`: desligado por padrão. Ligado, uma mensagem que é só um
   agradecimento ou um emoji solto ("obrigado!", um ❤️ sozinho) recebe uma
   reação nativa em vez de uma resposta completa, sem gastar chamada de

@@ -86,7 +86,10 @@ configuración, y cada uno acepta las mismas claves que el predeterminado:
 - `require_mention`: en un grupo, responder solo cuando se @menciona al bot.
 - `reactions`: qué 👍/👎 en un mensaje llegan al agente como feedback: `own`
   (por defecto, solo reacciones en los propios mensajes del bot), `all` u
-  `off`.
+  `off`. Todo agente ya sabe qué hacer con esto: con 👍 anota en su propia
+  memoria qué funcionó, con 👎 qué evitar repetir, y nunca responde a la
+  reacción en sí. Pasa por la misma revisión que cualquier escritura de
+  memoria, en la página Learning del panel, antes de quedar guardado.
 - `quick_reactions`: desactivado por defecto. Activado, un mensaje que es solo
   un agradecimiento o un emoji suelto ("¡gracias!", un ❤️ solo) recibe una
   reacción nativa en vez de una respuesta completa, sin gastar una llamada al
