@@ -11,12 +11,19 @@ defmodule Pepe.Agent do
 
   @doc """
   Run a single prompt against an agent with no persistent session.
-  `agent_name` may be nil to use the default agent.
+  `agent_name` may be nil to use the default agent. `opts[:model]`, when given,
+  overrides which model connection this one call uses - in memory only, nothing
+  is persisted or touches the agent's own config (see `Pepe.Eval`'s `--models`).
   """
   def oneshot(agent_name, prompt, opts \\ []) do
     case resolve(agent_name) do
-      {:ok, agent} -> converse_with_hooks(agent, prompt, opts)
-      error -> error
+      {:ok, agent} ->
+        {model, opts} = Keyword.pop(opts, :model)
+        agent = if model, do: %{agent | model: model}, else: agent
+        converse_with_hooks(agent, prompt, opts)
+
+      error ->
+        error
     end
   end
 

@@ -69,6 +69,29 @@ defmodule Pepe.EvalTest do
     assert [_] = fail.failures
   end
 
+  test "run_case's :model opt overrides the agent's own model for that one call, in memory only" do
+    {:ok, server2} = Bandit.start_link(plug: Pepe.Test.MockLLM, port: 0, scheme: :http)
+    {:ok, {_addr, port2}} = ThousandIsland.listener_info(server2)
+    on_exit(fn -> Process.exit(server2, :normal) end)
+
+    Config.put_model(%Model{name: "other", base_url: "http://localhost:#{port2}", api_key: "test", model: "other-model"})
+    # The agent's configured model doesn't resolve to anything - if the override
+    # didn't take effect, this call would error instead of quietly succeeding
+    # against the agent's own model.
+    Config.put_agent(%{Config.get_agent("assistant") | model: "nonexistent"})
+
+    result =
+      Eval.run_case(
+        %{"name" => "greets", "agent" => "assistant", "prompt" => "say hi", "expect" => %{"contains" => ["hello"]}},
+        model: "other"
+      )
+
+    assert result.passed
+    assert result.reply =~ "Hello from the mock!"
+    # Nothing about the agent's own config changed.
+    assert Config.get_agent("assistant").model == "nonexistent"
+  end
+
   test "run_suite loads and runs a suite file" do
     cases = [%{"name" => "greets", "agent" => "assistant", "prompt" => "say hi", "expect" => %{"matches" => "Hello"}}]
     File.write!(Path.join([Config.home(), "evals", "custom.json"]), Jason.encode!(cases))

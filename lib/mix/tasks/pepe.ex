@@ -290,7 +290,13 @@ defmodule Mix.Tasks.Pepe do
 
   def dispatch(["hooks" | rest]), do: with_config(fn -> hooks_cmd(rest) end)
   def dispatch(["media" | rest]), do: with_config(fn -> media_cmd(rest) end)
-  def dispatch(["eval" | rest]), do: with_app([], fn -> eval_cmd(rest) end)
+
+  def dispatch(["eval" | rest]) do
+    if "--models" in rest,
+      do: with_app([], fn -> eval_models_cmd(rest) end),
+      else: with_app([], fn -> eval_cmd(rest) end)
+  end
+
   def dispatch(["token" | rest]), do: with_config(fn -> token_cmd(rest) end)
   def dispatch(["watch" | rest]), do: with_config(fn -> watch_cmd(rest) end)
   def dispatch(["model" | rest]), do: with_config(fn -> model_cmd(rest) end)
@@ -2112,6 +2118,50 @@ defmodule Mix.Tasks.Pepe do
   defp eval_cmd([suite]), do: eval_report(run_and_print_suite(suite))
   defp eval_cmd(_), do: error("usage: mix pepe eval [SUITE | list | --seed]")
 
+  # Run the same suite(s) against several models side by side - the same cases, the
+  # same assertions, so a "which model should we switch to" question gets an actual
+  # answer instead of a guess from vibes. Doesn't touch any agent's own config: the
+  # override lives only in the single Pepe.Agent.oneshot/3 call each case makes.
+  defp eval_models_cmd(rest) do
+    {opts, args, _} = OptionParser.parse(rest, strict: [models: :string])
+    models = (opts[:models] || "") |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+
+    case {models, args} do
+      {[], _} ->
+        error("usage: mix pepe eval [SUITE] --models a,b,c")
+
+      {_, []} ->
+        eval_models_report(models, fn model ->
+          Enum.flat_map(Pepe.Eval.suites(), &run_and_print_suite(&1, model: model))
+        end)
+
+      {_, [suite]} ->
+        eval_models_report(models, fn model -> run_and_print_suite(suite, model: model) end)
+
+      _ ->
+        error("usage: mix pepe eval [SUITE] --models a,b,c")
+    end
+  end
+
+  defp eval_models_report(models, run_for_model) do
+    per_model =
+      Enum.map(models, fn model ->
+        info(bold("\n== #{model} =="))
+        {model, run_for_model.(model)}
+      end)
+
+    info(bold("\nsummary"))
+
+    Enum.each(per_model, fn {model, results} ->
+      passed = Enum.count(results, & &1.passed)
+      info("  #{String.pad_trailing(model, 20)} #{passed}/#{length(results)} passed")
+    end)
+
+    if Enum.any?(per_model, fn {_, results} -> Enum.any?(results, &(not &1.passed)) end) do
+      System.at_exit(fn _ -> exit({:shutdown, 1}) end)
+    end
+  end
+
   defp eval_add(id, opts) do
     suite = opts[:suite] || "recorded"
     contains = opts[:contains] |> to_string() |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
@@ -2137,11 +2187,13 @@ defmodule Mix.Tasks.Pepe do
     puts("""
     #{bold("mix pepe eval")} - replay prompts through an agent and assert on the result
 
-      eval                 run every suite (bundled + your own)
-      eval SUITE           run one suite by name
-      eval list            list available suites and their case counts
-      eval --seed          copy the bundled suites into #{Pepe.Eval.dir()} to edit
-      eval add TRACE_ID    turn a conversation that already happened into a case
+      eval                       run every suite (bundled + your own)
+      eval SUITE                 run one suite by name
+      eval [SUITE] --models a,b  run against several models side by side, same
+                                 cases and assertions, no config touched
+      eval list                  list available suites and their case counts
+      eval --seed                copy the bundled suites into #{Pepe.Eval.dir()} to edit
+      eval add TRACE_ID          turn a conversation that already happened into a case
 
     Suites are JSON under #{Pepe.Eval.dir()} (yours) or shipped with Pepe; a case asserts
     the reply (contains / not_contains / matches) and the tools it used (tool_called /
@@ -2161,8 +2213,8 @@ defmodule Mix.Tasks.Pepe do
     """)
   end
 
-  defp run_and_print_suite(suite) do
-    results = Pepe.Eval.run_suite(suite)
+  defp run_and_print_suite(suite, opts \\ []) do
+    results = Pepe.Eval.run_suite(suite, opts)
     info(bold("▸ #{suite}"))
 
     Enum.each(results, fn r ->
