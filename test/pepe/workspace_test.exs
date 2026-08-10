@@ -117,6 +117,59 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert prompt =~ "shared/"
   end
 
+  describe "langfuse_prompt" do
+    setup do
+      {:ok, server} = Bandit.start_link(plug: Pepe.Test.MockLangfuse, port: 0, scheme: :http)
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      prev = for k <- ~w(LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_BASE_URL), do: {k, System.get_env(k)}
+
+      on_exit(fn ->
+        Process.exit(server, :normal)
+
+        Enum.each(prev, fn
+          {k, nil} -> System.delete_env(k)
+          {k, v} -> System.put_env(k, v)
+        end)
+      end)
+
+      System.put_env("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+      System.put_env("LANGFUSE_SECRET_KEY", "sk-lf-test")
+      System.put_env("LANGFUSE_BASE_URL", "http://localhost:#{port}")
+      :ok
+    end
+
+    test "overrides both the seed and SOUL.md when set and reachable" do
+      name = "wp-#{System.unique_integer([:positive])}"
+      agent = %{name: "zak", system_prompt: "local seed", langfuse_prompt: name}
+      File.mkdir_p!(Workspace.dir("zak"))
+      File.write!(Path.join(Workspace.dir("zak"), "SOUL.md"), "local SOUL.md persona")
+
+      prompt = Workspace.system_prompt(agent)
+
+      assert prompt =~ "persona for #{name}"
+      refute prompt =~ "local seed"
+      refute prompt =~ "local SOUL.md persona"
+    end
+
+    test "falls back to the local resolution when Langfuse is unreachable" do
+      System.put_env("LANGFUSE_BASE_URL", "http://127.0.0.1:1")
+      agent = %{name: "zak", system_prompt: "local seed", langfuse_prompt: "whatever"}
+
+      assert Workspace.system_prompt(agent) =~ "local seed"
+    end
+
+    test "falls back to the local resolution when the prompt doesn't exist in Langfuse" do
+      agent = %{name: "zak", system_prompt: "local seed", langfuse_prompt: "missing-#{System.unique_integer([:positive])}"}
+
+      assert Workspace.system_prompt(agent) =~ "local seed"
+    end
+
+    test "is a no-op when unset (nil), same as before this feature existed" do
+      agent = %{name: "zak", system_prompt: "local seed", langfuse_prompt: nil}
+      assert Workspace.system_prompt(agent) =~ "local seed"
+    end
+  end
+
   test "system_prompt teaches the reaction-as-feedback convention" do
     agent = %{name: "zak", system_prompt: "seed"}
     prompt = Workspace.system_prompt(agent)

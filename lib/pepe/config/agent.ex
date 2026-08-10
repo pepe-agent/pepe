@@ -76,6 +76,14 @@ defmodule Pepe.Config.Agent do
             # deliberately stays on the agent's own model. nil = use the agent's own model.
             # See Pepe.Agent.Utility.
             utility_model: nil,
+            # nil (the default) = this agent's persona is whatever SOUL.md/config already
+            # resolve to, same as every agent before this existed. Set to a Langfuse prompt
+            # name to make THAT the persona instead - fetched (cached) at session start,
+            # taking priority over both SOUL.md and this agent's own `system_prompt`, since
+            # opting in here is an explicit "manage this one centrally" decision. Falls back
+            # to the local resolution untouched if Langfuse is unreachable or the fetch
+            # fails - this is never a hard dependency. See Pepe.Langfuse.
+            langfuse_prompt: nil,
             # Skip the project's monthly customer-message cap for this agent (see
             # Pepe.Config.project_message_limit/1) - an always-on agent (e.g. an
             # escalation/on-call agent) that must never be throttled by it. Doesn't
@@ -162,7 +170,8 @@ defmodule Pepe.Config.Agent do
       fallbacks: map["fallbacks"],
       triage_model: map["triage_model"],
       simple_model: map["simple_model"],
-      utility_model: map["utility_model"]
+      utility_model: map["utility_model"],
+      langfuse_prompt: map["langfuse_prompt"]
     }
     |> put_flags(map)
   end

@@ -2947,6 +2947,7 @@ defmodule Mix.Tasks.Pepe do
           triage_model: :string,
           simple_model: :string,
           utility_model: :string,
+          langfuse_prompt: :string,
           default: :boolean,
           exempt_message_limit: :boolean,
           trust_untrusted_content: :boolean,
@@ -3119,6 +3120,12 @@ defmodule Mix.Tasks.Pepe do
     train the rest through) - it does NOT skip the human-approval gate on risky tool
     calls, only widens which agents it's allowed to reach with manage_agent.
     Add --project CO to scope any of these to a project; without it, the root scope.
+
+    --langfuse-prompt NAME makes this agent's persona come from a Langfuse-managed
+    prompt of that name instead of its own --prompt/SOUL.md - edit it in Langfuse and
+    the change reaches Pepe within a few minutes, no redeploy. Requires
+    LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY; falls back to the local prompt untouched
+    if Langfuse is unreachable or the name doesn't resolve.
     """)
   end
 
@@ -3159,6 +3166,7 @@ defmodule Mix.Tasks.Pepe do
       triage_model: opts[:triage_model],
       simple_model: opts[:simple_model],
       utility_model: opts[:utility_model],
+      langfuse_prompt: opts[:langfuse_prompt],
       exempt_message_limit: opts[:exempt_message_limit] || false,
       trust_untrusted_content: opts[:trust_untrusted_content] || false,
       midrun_fold: opts[:midrun_fold] || false,

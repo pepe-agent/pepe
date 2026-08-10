@@ -109,6 +109,7 @@ toque uno fuera de ese alcance se rechaza con cortesía.
 | `description` | Una nota breve para humanos. Nunca se envía al modelo. | ninguno |
 | `model` | El nombre de una conexión de modelo. Déjalo sin definir para usar el modelo predeterminado del proyecto. | predeterminado del proyecto |
 | `system_prompt` | La personalidad y las instrucciones con las que se ejecuta el agente. | `Eres Pepe, un agente de IA útil.` (un prompt inicial) |
+| `langfuse_prompt` | Obtiene la persona del prompt con ese nombre en [Langfuse](#gestionar-una-persona-desde-langfuse) en lugar de `system_prompt`. | `null` (desactivado) |
 | `tools` | La lista de nombres de herramientas que este agente puede llamar. Solo estas se ofrecen al modelo. | todas las herramientas - un agente nuevo nace con todo habilitado; quitas lo que no quieras |
 | `auto_approve` | Herramientas que este agente puede ejecutar sin pedir permiso. `["*"]` significa todas. | `[]` |
 | `can_message` | Otros agentes a los que este puede enviar mensajes (una ruta dirigida). | `[]` |
@@ -540,6 +541,25 @@ de estado en `GET /health`.
 **Por un canal de mensajería.** Vincula un agente a una conexión de Telegram,
 WhatsApp, Slack, Discord, Microsoft Teams o Google Chat, o a un webhook entrante
 genérico, y responde allí con el mismo ciclo y las mismas herramientas.
+
+## Gestionar una persona desde Langfuse
+
+Define `langfuse_prompt` con el nombre de un prompt en [Langfuse](https://langfuse.com)
+y la persona de este agente pasa a venir de ahí en lugar de su propio
+`system_prompt`/`SOUL.md`: edita el prompt en Langfuse y el cambio llega a Pepe en
+pocos minutos, sin redeploy y sin tocar `config.json`.
+
+```bash
+pepe agent add support --langfuse-prompt support-persona
+```
+
+Requiere `LANGFUSE_PUBLIC_KEY` y `LANGFUSE_SECRET_KEY` (las mismas variables de
+entorno que lee cualquier SDK oficial de Langfuse; `LANGFUSE_BASE_URL` también, si no
+estás en `cloud.langfuse.com`). Es opt-in por agente: un agente sin `langfuse_prompt`
+definido queda totalmente sin cambios. Si Langfuse no está accesible, o el nombre no
+resuelve a ningún prompt, el agente usa su propia persona local exactamente como si
+esto nunca se hubiera configurado; nada bloquea la conversación por una caída de
+Langfuse.
 
 ## Ver exactamente lo que ve el modelo
 

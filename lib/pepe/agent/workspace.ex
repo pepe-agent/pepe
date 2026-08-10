@@ -124,8 +124,8 @@ defmodule Pepe.Agent.Workspace do
   `BOOT.md` is picked up fresh on every new conversation without costing anything
   on later turns.
   """
-  def system_prompt(%{name: name, system_prompt: seed}) do
-    persona = read(name, "SOUL.md") || persona_seed(seed)
+  def system_prompt(%{name: name, system_prompt: seed} = agent) do
+    persona = langfuse_persona(agent) || read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
     boot = read(name, "BOOT.md") |> labeled("BOOT.md")
 
@@ -174,6 +174,24 @@ defmodule Pepe.Agent.Workspace do
           "with the `docs` tool BEFORE configuring/operating Pepe (agents, channels, " <>
           "cron, MCP, permissions); don't guess.\n" <>
           Enum.map_join(docs, "\n", fn {name, title} -> "- #{name}: #{title}" end)
+    end
+  end
+
+  # Only when `langfuse_prompt` is set (opt-in), and only when the fetch actually
+  # succeeds - nil here just falls through to SOUL.md/the local seed exactly as if
+  # this feature didn't exist, whether that's because it isn't configured or because
+  # Langfuse didn't answer. See Pepe.Config.Agent's field doc for why this outranks
+  # SOUL.md rather than the other way around.
+  defp langfuse_persona(agent) do
+    case Map.get(agent, :langfuse_prompt) do
+      name when is_binary(name) and name != "" ->
+        case Pepe.Langfuse.fetch(name) do
+          {:ok, text} -> text
+          {:error, _} -> nil
+        end
+
+      _ ->
+        nil
     end
   end
 

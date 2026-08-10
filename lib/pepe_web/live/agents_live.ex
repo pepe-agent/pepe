@@ -168,6 +168,14 @@ defmodule PepeWeb.AgentsLive do
                 <label class={lbl()}>{gettext("Persona (system prompt)")}</label>
                 <textarea name="system_prompt" rows="3" phx-debounce="blur" placeholder={gettext("You are ...")} class={fld()}>{@edit_agent.system_prompt}</textarea>
               </div>
+
+              <div>
+                <label class={lbl()}>{gettext("Langfuse-managed prompt (optional)")}</label>
+                <input type="text" name="langfuse_prompt" value={@edit_agent[:langfuse_prompt]} placeholder={gettext("blank = use the persona above")} class={fld()} />
+                <p class={hlp()}>
+                  {gettext("If set, this agent's persona comes from this prompt's name in Langfuse instead of the persona above - editing it in Langfuse reaches Pepe within a few minutes, no redeploy. Falls back to the persona above if Langfuse is unreachable or the name doesn't resolve.")}
+                </p>
+              </div>
             </.form_section>
 
             <.form_section collapsible open title={gettext("Model & fallbacks")}>
@@ -576,6 +584,7 @@ defmodule PepeWeb.AgentsLive do
       triage_model: nil,
       simple_model: nil,
       utility_model: nil,
+      langfuse_prompt: nil,
       max_iterations: nil,
       tool_progress: nil,
       exempt_message_limit: false,
@@ -742,6 +751,7 @@ defmodule PepeWeb.AgentsLive do
       existing
       | name: name,
         system_prompt: system_prompt_param(params),
+        langfuse_prompt: blank(params["langfuse_prompt"]),
         model: blank(params["model"]),
         tools: Map.get(params, "tools", []),
         auto_approve: form_auto_approve(params),
@@ -798,6 +808,7 @@ defmodule PepeWeb.AgentsLive do
       edit
       | name: get_in(params, ["agent", "name"]) || edit.name,
         system_prompt: params["system_prompt"] || edit.system_prompt,
+        langfuse_prompt: blank(params["langfuse_prompt"]),
         model: blank(params["model"]),
         tools: params["tools"] || [],
         auto_approve: form_auto_approve(params),
