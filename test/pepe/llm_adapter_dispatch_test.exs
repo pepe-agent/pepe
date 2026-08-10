@@ -19,10 +19,14 @@ defmodule Pepe.LLMAdapterDispatchTest do
   end
 
   test "chat/3 dispatches to a plugin adapter matching model.api", %{home: home} do
+    suffix = System.unique_integer([:positive])
+    api = "dispatch-ok-#{suffix}"
+    mod = Module.concat(PepeLLMDispatchTest, :"Ok#{suffix}")
+
     File.write!(Path.join([home, "plugins", "dispatch_ok.exs"]), """
-    defmodule PepeLLMDispatchTest.Ok do
+    defmodule #{inspect(mod)} do
       @behaviour Pepe.LLM.Adapter
-      def api, do: "dispatch-ok"
+      def api, do: #{inspect(api)}
       def chat(_model, _messages, _opts), do: {:ok, %{content: "from the plugin", tool_calls: [], finish_reason: "stop", usage: nil}}
       def stream_chat(_model, _messages, on_delta, _opts) do
         on_delta.("from the plugin")
@@ -31,7 +35,7 @@ defmodule Pepe.LLMAdapterDispatchTest do
     end
     """)
 
-    model = %Model{name: "m", base_url: "https://unused", model: "x", api: "dispatch-ok"}
+    model = %Model{name: "m", base_url: "https://unused", model: "x", api: api}
     assert {:ok, %{content: "from the plugin"}} = Pepe.LLM.chat(model, [%{"role" => "user", "content" => "hi"}])
 
     parent = self()
@@ -41,17 +45,21 @@ defmodule Pepe.LLMAdapterDispatchTest do
   end
 
   test "a crashing plugin adapter surfaces as {:error, _}, not a raised exception", %{home: home} do
+    suffix = System.unique_integer([:positive])
+    api = "dispatch-boom-#{suffix}"
+    mod = Module.concat(PepeLLMDispatchTest, :"Boom#{suffix}")
+
     File.write!(Path.join([home, "plugins", "dispatch_boom.exs"]), """
-    defmodule PepeLLMDispatchTest.Boom do
+    defmodule #{inspect(mod)} do
       @behaviour Pepe.LLM.Adapter
-      def api, do: "dispatch-boom"
+      def api, do: #{inspect(api)}
       def chat(_model, _messages, _opts), do: raise("adapter boom")
       def stream_chat(_model, _messages, _on_delta, _opts), do: raise("adapter boom")
     end
     """)
 
-    model = %Model{name: "m", base_url: "https://unused", model: "x", api: "dispatch-boom"}
-    assert {:error, {:adapter_crashed, PepeLLMDispatchTest.Boom, _}} = Pepe.LLM.chat(model, [])
+    model = %Model{name: "m", base_url: "https://unused", model: "x", api: api}
+    assert {:error, {:adapter_crashed, ^mod, _}} = Pepe.LLM.chat(model, [])
   end
 
   test "an unregistered api falls through to plain openai-completions (an HTTP call, which fails here for lack of a real server)" do

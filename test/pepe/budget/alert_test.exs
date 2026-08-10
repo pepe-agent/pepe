@@ -13,6 +13,9 @@ defmodule Pepe.Budget.AlertTest do
   alias Pepe.Usage
 
   setup do
+    :mnesia.stop()
+    :persistent_term.erase({Pepe.Store, :ready})
+
     home = Path.join(System.tmp_dir!(), "pepe_budgetalert_#{System.unique_integer([:positive])}")
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
