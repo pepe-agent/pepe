@@ -46,4 +46,30 @@ proyecto guarda solo un número limitado de traces: a medida que llegan nuevos, 
 antiguos se borran, así que el archivo nunca crece sin límite. Los argumentos y los
 resultados de herramienta muy largos se acortan antes de guardarse.
 
+## Enviar traces a una herramienta de observabilidad
+
+Define `OTEL_EXPORTER_OTLP_ENDPOINT` y cada ejecución terminada también se
+envía como un trace OTLP, a Langfuse o cualquier otro backend que hable ese
+protocolo, desactivado hasta que lo definas, y un fallo en el envío nunca
+afecta a la ejecución que describe.
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de pk-lf-...:sk-lf-...>"
+```
+
+`OTEL_EXPORTER_OTLP_HEADERS` es una lista `clave=valor` separada por comas,
+enviada como cabeceras literales de la petición: el par de claves de
+autenticación de Langfuse va aquí, sin ninguna configuración específica de
+Langfuse en otro lugar. Tanto los atributos genéricos de OpenTelemetry
+(`gen_ai.*`) como los propios de Langfuse (`langfuse.*`) se definen en cada
+span, así que un endpoint Langfuse renderiza todo completo (sesiones
+agrupadas, paneles de entrada/salida, generaciones distinguidas de spans de
+herramienta normales), y cualquier otro backend OTLP igual recibe un trace
+completo.
+
+Dos variables más estándar de OTEL, si las necesitas: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
+apunta la señal de traces a otro lugar además de `<endpoint>/v1/traces`, y
+`OTEL_SERVICE_NAME` renombra el servicio exportado (por defecto `pepe`).
+
 <div class="note"><strong>Diagnóstico, no registro de facturación.</strong> Los traces existen para explicar una ejecución, y los antiguos o demasiado grandes se van recortando. Para recuentos de tokens que puedas facturar, usa el <a href="../billing/">libro de uso</a>, separado, que nunca pierde una entrada.</div>

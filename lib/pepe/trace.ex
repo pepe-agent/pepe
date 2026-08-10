@@ -144,6 +144,7 @@ defmodule Pepe.Trace do
         # it must not be lost to a failure in writing or trimming the (diagnostic) trace.
         Pepe.Usage.Runs.record(row)
         write(row)
+        Pepe.Otel.export(row)
         t.id
     end
   rescue

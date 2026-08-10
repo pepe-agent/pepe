@@ -43,4 +43,26 @@ limited number of traces: as new ones arrive, the oldest are deleted, so the fil
 never grows without limit. Very long tool arguments and results are shortened before
 being stored.
 
+## Sending traces to an observability tool
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` and every finished run is also sent as an OTLP
+trace, to Langfuse or any other backend that speaks it - off unless you set it,
+and a delivery failure never touches the run it's describing.
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 of pk-lf-...:sk-lf-...>"
+```
+
+`OTEL_EXPORTER_OTLP_HEADERS` is a comma-separated `key=value` list, sent as literal
+request headers - Langfuse's basic-auth key pair goes here, with no Langfuse-specific
+configuration anywhere else. Both generic OpenTelemetry attributes (`gen_ai.*`) and
+Langfuse's own (`langfuse.*`) are set on every span, so a Langfuse endpoint renders
+fully - sessions grouped, input/output panes, generations distinguished from plain
+tool spans - and any other OTLP backend still gets a complete trace either way.
+
+Two more standard OTEL variables, if you need them: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
+points the traces signal somewhere other than `<endpoint>/v1/traces`, and
+`OTEL_SERVICE_NAME` renames the exported service (default `pepe`).
+
 <div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and old or oversized ones get trimmed away. For token counts you can invoice on, use the separate <a href="../billing/">usage ledger</a>, which never drops an entry.</div>
