@@ -9,7 +9,7 @@ Um prompt te dá **um turno**. O agente responde, e aí *você* decide se ficou 
 
 Um **objetivo** te dá um **resultado**. Você diz o que significa "pronto", e o Pepe continua trabalhando até um revisor independente concordar que chegou lá, ou até acabarem as tentativas.
 
-A diferença está em **quem verifica**. Num turno normal é o próprio agente que decide que terminou, que é justamente a avaliação em que você não pode confiar. Num objetivo, uma **chamada separada ao modelo** julga o resultado contra o seu critério.
+A diferença está em **quem verifica**. Num turno normal é o próprio agente que decide que terminou, que é justamente a avaliação em que você não pode confiar. Num objetivo, uma **chamada separada ao modelo** julga o resultado contra o seu critério (o padrão criteria + evaluation steps, no formato LLM-as-a-Judge).
 
 ## Rodando um
 

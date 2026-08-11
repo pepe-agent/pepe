@@ -9,7 +9,7 @@ A prompt buys you **one turn**. The agent answers, and then *you* decide whether
 
 A **goal** buys you an **outcome**. You say what "done" means, and Pepe keeps working until an independent reviewer agrees it has been reached, or until it runs out of attempts.
 
-The difference is *who checks*. In a normal turn the agent decides for itself that it is finished, which is exactly the assessment you cannot trust. In a goal, a **separate model call** grades the result against your criterion.
+The difference is *who checks*. In a normal turn the agent decides for itself that it is finished, which is exactly the assessment you cannot trust. In a goal, a **separate model call** grades the result against your criterion (the criteria + evaluation steps pattern, in LLM-as-a-Judge form).
 
 ## Running one
 
