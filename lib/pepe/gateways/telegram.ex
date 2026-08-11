@@ -1873,7 +1873,7 @@ defmodule Pepe.Gateways.Telegram do
       json: %{
         chat_id: chat_id,
         message_id: message_id,
-        text: gettext("⌛ This request expired. Ask again if you still need it.")
+        text: gettext("⌛ This request expired. Ask again and a new one with buttons to tap will show up.")
       }
     )
   end

@@ -4159,11 +4159,6 @@ msgstr ""
 msgid "While the agent works"
 msgstr ""
 
-#: lib/pepe/gateways/telegram.ex:1876
-#, elixir-autogen, elixir-format
-msgid "⌛ This request expired. Ask again if you still need it."
-msgstr ""
-
 #: lib/pepe_web/live/traces_live.ex:515
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Error detail"
@@ -6539,4 +6534,9 @@ msgstr ""
 #: lib/pepe/permissions/prompt.ex:68
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Not allowed."
+msgstr ""
+
+#: lib/pepe/gateways/telegram.ex:1876
+#, elixir-autogen, elixir-format, fuzzy
+msgid "⌛ This request expired. Ask again and a new one with buttons to tap will show up."
 msgstr ""

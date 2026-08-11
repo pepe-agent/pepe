@@ -342,17 +342,32 @@ defmodule Pepe.Permissions do
     end
   end
 
-  @doc "The message handed back to the model when a tool call was refused."
+  @doc """
+  The message handed back to the model when a tool call was refused.
+
+  Spells out, every time, that authorization only ever happens by the user answering
+  the actual prompt - never by anything they type. Without that sentence, a model told
+  only "ask the user what to do instead" would invent its own text-based confirmation
+  ritual ("reply with 'I authorize this'") when a real answer never arrived in time,
+  which does nothing (no such channel exists) and leaves the human typing phrases at a
+  prompt that already expired. The fix is telling the model what a real retry actually
+  looks like: call the tool again once the user wants to proceed, which is what puts a
+  fresh, live prompt in front of them.
+  """
   def denied_message(name, reason \\ nil)
 
   def denied_message(name, nil) do
-    "Error: the user did not authorize running `#{name}`. Do not retry it - " <>
-      "consider a different approach or ask the user what to do instead."
+    "Error: the user did not authorize running `#{name}`. Do not retry immediately - " <>
+      "consider a different approach, or ask the user what to do instead. If they later " <>
+      "say to go ahead, call the tool again - that shows them a fresh prompt to answer. " <>
+      "Nothing they type grants permission by itself; only answering that prompt does."
   end
 
   def denied_message(name, reason) when is_binary(reason) do
-    "Error: the user did not authorize running `#{name}` (reason: #{reason}). Do not retry it - " <>
-      "consider a different approach or ask the user what to do instead."
+    "Error: the user did not authorize running `#{name}` (reason: #{reason}). Do not retry " <>
+      "immediately - consider a different approach, or ask the user what to do instead. If " <>
+      "they later say to go ahead, call the tool again - that shows them a fresh prompt to " <>
+      "answer. Nothing they type grants permission by itself; only answering that prompt does."
   end
 
   # A human is "on the line" exactly when there's a real authorize callback to answer to -

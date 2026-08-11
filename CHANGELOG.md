@@ -19,6 +19,9 @@ All notable changes to this project are documented here. Format follows
 - **The permission prompt (the "may I run this tool?" question, its decision buttons, risk warnings, and taint/policy notes) no longer carries emoji**, on Telegram, the dashboard, and the console alike - a plainer, more businesslike tone for something that is, functionally, a security decision.
 - **`mix pepe serve` (and the installed background service) now bind to `127.0.0.1` by default instead of `0.0.0.0`.** A bare `serve` has no reverse proxy in front of it, and the `/v1` API is open with no auth until a token is configured, so the old default put an unauthenticated OpenAI-compatible endpoint on the LAN/internet out of the box. Pass `--bind lan` to opt into the old behavior. The official Docker image (`PEPE_SERVE=1`) is unaffected - it still binds every interface, which is what a container behind a reverse proxy actually needs.
 
+### Fixed
+- **An agent no longer invents a fake "type this exact phrase to confirm" ritual after a permission prompt expires unanswered.** `Permissions.denied_message/2`'s text told the model only "do not retry, ask the user what to do instead," with no mention that authorization can only ever happen by answering the real prompt - so a model filled that gap by asking the user to type an invented confirmation phrase, which does nothing (no such channel exists), expires the same way, and repeats. The message now says explicitly: when the user later says to go ahead, call the tool again - that is what shows them a fresh prompt - and that nothing they type grants permission on its own. Telegram's own "this request expired" notice also now says a fresh prompt with buttons will show up on the next ask, instead of just "ask again."
+
 ## [0.14.3] - 2026-08-08
 
 ### Fixed

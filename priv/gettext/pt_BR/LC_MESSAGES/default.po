@@ -4300,11 +4300,6 @@ msgstr ""
 msgid "While the agent works"
 msgstr "Enquanto o agente trabalha"
 
-#: lib/pepe/gateways/telegram.ex:1876
-#, elixir-autogen, elixir-format
-msgid "⌛ This request expired. Ask again if you still need it."
-msgstr "⌛ Este pedido expirou. Peça de novo se ainda precisar."
-
 #: lib/pepe_web/live/traces_live.ex:515
 #, elixir-autogen, elixir-format
 msgid "Error detail"
@@ -6688,3 +6683,8 @@ msgstr "Não permitir"
 #, elixir-autogen, elixir-format
 msgid "Not allowed."
 msgstr "Não permitido."
+
+#: lib/pepe/gateways/telegram.ex:1876
+#, elixir-autogen, elixir-format
+msgid "⌛ This request expired. Ask again and a new one with buttons to tap will show up."
+msgstr "⌛ Este pedido expirou. Peça de novo e um novo pedido com botões vai aparecer."
