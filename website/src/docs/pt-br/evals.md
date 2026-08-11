@@ -101,11 +101,12 @@ persona que quebra alguma coisa não chega à produção em silêncio.
 ## Executando
 
 ```bash
-pepe eval               # roda todas as suítes (as nativas + as suas)
-pepe eval arithmetic    # roda uma suíte
-pepe eval list          # lista as suítes e a contagem de casos
-pepe eval add TRACE_ID  # guarda uma execução que deu certo (veja acima)
-pepe eval --seed        # copia as suítes nativas para ~/.pepe/evals, para editar
+pepe eval                              # roda todas as suítes (as nativas + as suas)
+pepe eval arithmetic                   # roda uma suíte
+pepe eval arithmetic --models a,b,c    # ...contra vários modelos, lado a lado
+pepe eval list                         # lista as suítes e a contagem de casos
+pepe eval add TRACE_ID                 # guarda uma execução que deu certo (veja acima)
+pepe eval --seed                       # copia as suítes nativas para ~/.pepe/evals, para editar
 pepe eval help
 ```
 
@@ -113,6 +114,12 @@ Cada caso roda um turno real contra um modelo real, então os evals precisam de 
 modelo configurado. Uma execução imprime um "V" ou um "X" por caso (com o motivo,
 em caso de falha) e um total. Uma execução que não passa sai com código diferente
 de zero, então ela se encaixa no CI.
+
+`--models a,b,c` roda a mesma suíte (ou todas, se você omitir o nome) contra cada
+uma dessas conexões de modelo e imprime a contagem de aprovados/reprovados por
+modelo - a forma de responder "devemos trocar de modelo" com casos reais em vez
+de achismo. A troca vale só pra essa chamada; o config de nenhum agente é
+alterado.
 
 ## Suítes que já vêm com o Pepe
 
@@ -136,6 +143,7 @@ ferramentas assumem que esse agente tem as ferramentas nativas correspondentes.
 | `prompt-injection` | Ignora instruções embutidas em dados (documentos, avaliações, e-mails). |
 | `grounding` | Responde a partir do texto fornecido e admite quando a resposta não está nele. |
 | `safety` | Não produz um payload nocivo e não inventa uma fonte falsa. |
+| `agent-boundaries` | Admite que não consegue fazer algo (mover dinheiro, alcançar um agente desconhecido) em vez de inventar sucesso. |
 
 Elas são **modelos**: codificam expectativas razoáveis, não verdade universal. Um
 modelo fraco ou um agente com outro conjunto de ferramentas vai reprovar em

@@ -93,6 +93,7 @@ pepe chat --agent assistant          # ...com um agente específico (ou: pepe ch
 pepe goal "publica as notas de versão" \
   --criteria "CHANGELOG tem uma seção datada" --max-attempts 5   # continua até estar pronto de verdade
 pepe serve --port 4000               # sobe a API, o dashboard e o WebSocket juntos
+pepe serve --port 4000 --bind lan     # ...acessível de outras máquinas, não só desta
 pepe serve install [--port 4000]     # mantém rodando em segundo plano pra sempre
 pepe serve status                    # está instalado e rodando?
 pepe serve uninstall                 # para e remove
@@ -105,7 +106,16 @@ verdade. Use `--judge MODELO` pra revisar com um modelo diferente. Veja
 
 `serve install` faz o Pepe ligar sozinho e continuar rodando em segundo plano, mesmo
 depois de logout, reinício, ou uma queda. Só funciona a partir do app `pepe`
-instalado, não de um checkout do código-fonte.
+instalado, não de um checkout do código-fonte. O `--bind` também vale pra ele
+(`serve install --bind lan`).
+
+`serve` escuta só em `127.0.0.1` por padrão: só esta máquina alcança ele, já que um
+`serve` puro não tem proxy reverso na frente e a API `/v1` fica aberta sem
+autenticação até você configurar um token. `--bind lan` abre pra todas as interfaces
+de rede; configure uma senha do dashboard primeiro (`pepe dashboard password`), ou
+use `--tunnel` pra expor publicamente sem alargar o bind. Esse padrão não vale pra
+imagem Docker oficial, que sempre escuta em todas as interfaces - veja
+[Publicando em um servidor](../deploy/) pro motivo.
 
 `chat` (também chamado de `tui`) abre uma conversa direto no seu terminal, que lembra o
 contexto conforme você usa. Digite `/help` dentro dele pra ver todos os atalhos (nova

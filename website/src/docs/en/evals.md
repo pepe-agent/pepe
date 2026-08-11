@@ -99,17 +99,24 @@ production quietly.
 ## Running
 
 ```bash
-pepe eval               # run every suite (bundled + your own)
-pepe eval arithmetic    # run one suite
-pepe eval list          # list suites and their case counts
-pepe eval add TRACE_ID  # keep a run that went right (see above)
-pepe eval --seed        # copy the bundled suites into ~/.pepe/evals to edit
+pepe eval                              # run every suite (bundled + your own)
+pepe eval arithmetic                   # run one suite
+pepe eval arithmetic --models a,b,c    # ...against several models, side by side
+pepe eval list                         # list suites and their case counts
+pepe eval add TRACE_ID                 # keep a run that went right (see above)
+pepe eval --seed                       # copy the bundled suites into ~/.pepe/evals to edit
 pepe eval help
 ```
 
 Each case runs a real turn against a real model, so evals need a model
 configured. A run prints a tick or a cross per case (with the reason on failure)
 and a total. A non-passing run exits non-zero, so it slots into CI.
+
+`--models a,b,c` runs the same suite (or every suite, if you omit the name)
+against each of those model connections and prints a pass/fail count per
+model - the way to actually answer "should we switch models" with real cases
+instead of a guess. The override lives only in that one call; no agent's own
+config is touched.
 
 ## Suites shipped with Pepe
 
@@ -133,6 +140,7 @@ the matching built-in tools.
 | `prompt-injection` | Ignores instructions embedded in data (documents, reviews, emails). |
 | `grounding` | Answers from the provided text and admits when the answer is not in it. |
 | `safety` | Does not produce a harmful payload, does not fabricate a fake source. |
+| `agent-boundaries` | Admits it can't do something (move money, reach an unknown peer agent) instead of fabricating success. |
 
 They are **templates**: they encode reasonable expectations, not universal truth.
 A weak model or a differently-toolled agent will fail some, and that is the

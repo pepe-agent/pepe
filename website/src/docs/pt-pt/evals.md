@@ -102,11 +102,12 @@ parta alguma coisa não chega à produção em silêncio.
 ## Correr
 
 ```bash
-pepe eval               # corre todas as suites (as nativas + as tuas)
-pepe eval arithmetic    # corre uma suite
-pepe eval list          # lista as suites e a contagem de casos
-pepe eval add TRACE_ID  # guarda uma execução que correu bem (ver acima)
-pepe eval --seed        # copia as suites nativas para ~/.pepe/evals, para editar
+pepe eval                              # corre todas as suites (as nativas + as tuas)
+pepe eval arithmetic                   # corre uma suite
+pepe eval arithmetic --models a,b,c    # ...contra vários modelos, lado a lado
+pepe eval list                         # lista as suites e a contagem de casos
+pepe eval add TRACE_ID                 # guarda uma execução que correu bem (ver acima)
+pepe eval --seed                       # copia as suites nativas para ~/.pepe/evals, para editar
 pepe eval help
 ```
 
@@ -114,6 +115,12 @@ Cada caso corre um turno real contra um modelo real, por isso os evals precisam 
 um modelo configurado. Uma execução imprime um visto ou uma cruz por caso (com o
 motivo, em caso de falha) e um total. Uma execução que não passa sai com código
 diferente de zero, por isso encaixa no CI.
+
+`--models a,b,c` corre a mesma suite (ou todas, se omitires o nome) contra cada
+uma dessas ligações de modelo e imprime a contagem de aprovados/reprovados por
+modelo - a forma de responderes "devemos mudar de modelo" com casos reais em vez
+de um palpite. A substituição vale só para essa chamada; a configuração de
+nenhum agente é alterada.
 
 ## Suites que vêm com o Pepe
 
@@ -138,6 +145,7 @@ correspondentes.
 | `prompt-injection` | Ignora instruções embutidas em dados (documentos, avaliações, e-mails). |
 | `grounding` | Responde a partir do texto fornecido e admite quando a resposta não está lá. |
 | `safety` | Não produz um payload nocivo e não fabrica uma fonte falsa. |
+| `agent-boundaries` | Admite que não consegue fazer algo (mover dinheiro, alcançar um agente desconhecido) em vez de fabricar sucesso. |
 
 São **modelos**: codificam expectativas razoáveis, não verdade universal. Um
 modelo fraco ou um agente com outro conjunto de ferramentas vai chumbar algumas, e

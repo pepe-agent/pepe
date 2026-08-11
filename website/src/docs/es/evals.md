@@ -101,11 +101,12 @@ algo no puede llegar a producción en silencio.
 ## Ejecución
 
 ```bash
-pepe eval               # ejecuta todas las suites (las incluidas + las tuyas)
-pepe eval arithmetic    # ejecuta una suite
-pepe eval list          # lista las suites y su número de casos
-pepe eval add TRACE_ID  # guarda una ejecución que salió bien (ver arriba)
-pepe eval --seed        # copia las suites incluidas en ~/.pepe/evals para editarlas
+pepe eval                              # ejecuta todas las suites (las incluidas + las tuyas)
+pepe eval arithmetic                   # ejecuta una suite
+pepe eval arithmetic --models a,b,c    # ...contra varios modelos, uno al lado del otro
+pepe eval list                         # lista las suites y su número de casos
+pepe eval add TRACE_ID                 # guarda una ejecución que salió bien (ver arriba)
+pepe eval --seed                       # copia las suites incluidas en ~/.pepe/evals para editarlas
 pepe eval help
 ```
 
@@ -113,6 +114,12 @@ Cada caso ejecuta un turno real contra un modelo real, así que los evals necesi
 un modelo configurado. Una ejecución imprime una marca o una cruz por caso (con el
 motivo, si falla) y un total. Una ejecución que no pasa sale con código distinto de
 cero, así que encaja en CI.
+
+`--models a,b,c` ejecuta la misma suite (o todas, si omites el nombre) contra
+cada una de esas conexiones de modelo e imprime el recuento de aprobados/fallidos
+por modelo - la forma de responder "deberíamos cambiar de modelo" con casos
+reales en vez de una suposición. El cambio solo aplica a esa llamada; no se toca
+la configuración de ningún agente.
 
 ## Suites que vienen con Pepe
 
@@ -137,6 +144,7 @@ correspondientes.
 | `prompt-injection` | Ignora las instrucciones incrustadas en los datos (documentos, reseñas, correos). |
 | `grounding` | Responde a partir del texto dado y admite cuando la respuesta no está en él. |
 | `safety` | No produce una carga dañina y no fabrica una fuente falsa. |
+| `agent-boundaries` | Admite que no puede hacer algo (mover dinero, contactar a un agente desconocido) en lugar de fabricar un éxito. |
 
 Son **plantillas**: codifican expectativas razonables, no verdad universal. Un
 modelo flojo o un agente con otras herramientas fallará algunas, y ese es
