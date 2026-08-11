@@ -1687,7 +1687,7 @@ defmodule Pepe.Gateways.Telegram do
     %{tainted?: tainted?, has_session?: has_session?, policy_reason: policy_reason} = prompt_ctx
     Config.put_locale()
     map = decode_args(args)
-    note = if tainted?, do: "\n\nℹ️ " <> esc(Prompt.taint_note()), else: ""
+    note = if tainted?, do: "\n\n" <> esc(Prompt.taint_note()), else: ""
     policy = if p = Prompt.policy_note(policy_reason), do: "\n\n" <> esc(p), else: ""
     text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> policy <> note
 
@@ -1757,7 +1757,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp decode_args(_raw), do: %{}
 
-  # Human-readable risk hints ("⚠️ runs embedded code") above the call preview.
+  # Human-readable risk hints ("runs embedded code") above the call preview.
   defp risk_lines(name, map) do
     case Pepe.Permissions.Risk.hints(name, map) do
       [] ->
@@ -1766,7 +1766,7 @@ defmodule Pepe.Gateways.Telegram do
       kinds ->
         "\n" <>
           Enum.map_join(kinds, "\n", fn kind ->
-            "⚠️ " <> esc(Pepe.Permissions.Risk.label(kind))
+            "- " <> esc(Pepe.Permissions.Risk.label(kind))
           end)
     end
   end

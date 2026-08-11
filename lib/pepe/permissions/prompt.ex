@@ -50,22 +50,22 @@ defmodule Pepe.Permissions.Prompt do
   """
   @spec label(Permissions.decision(), boolean()) :: String.t()
   def label(decision, tainted? \\ false)
-  def label(:this_run, true), do: gettext("🔁 Allow for the rest of this task (recommended)")
-  def label(:this_run, false), do: gettext("🔁 Allow for the rest of this task")
-  def label(:once, _tainted?), do: gettext("✅ Allow once")
-  def label(:session, _tainted?), do: gettext("💬 Allow for this session")
-  def label(:session_any, _tainted?), do: gettext("🔓 Allow with any parameters (this session)")
-  def label(:always, _tainted?), do: gettext("♾️ Always allow")
-  def label(:deny, _tainted?), do: gettext("🚫 Don't allow")
+  def label(:this_run, true), do: gettext("Allow for the rest of this task (recommended)")
+  def label(:this_run, false), do: gettext("Allow for the rest of this task")
+  def label(:once, _tainted?), do: gettext("Allow once")
+  def label(:session, _tainted?), do: gettext("Allow for this session")
+  def label(:session_any, _tainted?), do: gettext("Allow with any parameters (this session)")
+  def label(:always, _tainted?), do: gettext("Always allow")
+  def label(:deny, _tainted?), do: gettext("Don't allow")
 
   @doc "The confirmation shown after a decision is made (translated)."
   @spec outcome(Permissions.decision()) :: String.t()
-  def outcome(:once), do: gettext("✅ Allowed once.")
-  def outcome(:this_run), do: gettext("🔁 Allowed for the rest of this task.")
-  def outcome(:session), do: gettext("💬 Allowed for this session.")
-  def outcome(:session_any), do: gettext("🔓 Allowed with any parameters, for this session.")
-  def outcome(:always), do: gettext("♾️ Always allowed.")
-  def outcome(:deny), do: gettext("🚫 Not allowed.")
+  def outcome(:once), do: gettext("Allowed once.")
+  def outcome(:this_run), do: gettext("Allowed for the rest of this task.")
+  def outcome(:session), do: gettext("Allowed for this session.")
+  def outcome(:session_any), do: gettext("Allowed with any parameters, for this session.")
+  def outcome(:always), do: gettext("Always allowed.")
+  def outcome(:deny), do: gettext("Not allowed.")
 
   @doc "A short, stable, locale-independent token for a decision (for payloads)."
   @spec token(Permissions.decision()) :: String.t()
@@ -91,8 +91,8 @@ defmodule Pepe.Permissions.Prompt do
   @spec question(String.t()) :: String.t()
   def question(tool) do
     case Pepe.Tools.summary(tool) do
-      "" -> gettext("🔐 Allow me to run the %{tool} tool?", tool: "`#{tool}`")
-      desc -> gettext("🔐 Allow me to run the %{tool} tool — %{desc}?", tool: "`#{tool}`", desc: desc)
+      "" -> gettext("Allow me to run the %{tool} tool?", tool: "`#{tool}`")
+      desc -> gettext("Allow me to run the %{tool} tool — %{desc}?", tool: "`#{tool}`", desc: desc)
     end
   end
 
@@ -118,7 +118,7 @@ defmodule Pepe.Permissions.Prompt do
   """
   @spec policy_note(String.t() | nil) :: String.t() | nil
   def policy_note(nil), do: nil
-  def policy_note(reason), do: gettext("🛡️ %{reason}", reason: reason)
+  def policy_note(reason), do: reason
 
   @doc """
   What a "session" or "always" answer will actually cover, given the risks of the call being

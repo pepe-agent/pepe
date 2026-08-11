@@ -221,7 +221,7 @@ defmodule PepeWeb.ChatLive do
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-amber-600/60 bg-amber-950/30 p-3">
                 <.perm_question tool={@pending_perm.tool} />
-                <p :if={@pending_perm.tainted} class="mb-2 text-sm text-zinc-400">ℹ️ {Prompt.taint_note()}</p>
+                <p :if={@pending_perm.tainted} class="mb-2 text-sm text-zinc-400">{Prompt.taint_note()}</p>
                 <div class="flex flex-wrap gap-2">
                   <button
                     :for={d <- Prompt.options(@pending_perm.tainted)}
@@ -410,7 +410,7 @@ defmodule PepeWeb.ChatLive do
     assigns = assign(assigns, lead: lead, tail: tail)
 
     ~H"""
-    <div class="mb-2 text-[15px]">🔐 {@lead}<code class="text-amber-300">{@tool}</code>{@tail}</div>
+    <div class="mb-2 text-[15px]">{@lead}<code class="text-amber-300">{@tool}</code>{@tail}</div>
     """
   end
 

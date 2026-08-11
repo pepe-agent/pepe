@@ -133,7 +133,7 @@ defmodule Pepe.Gateways.TUI do
       tainted? = ctx[:tainted] == true
       has_session? = is_binary(ctx[:session_key])
 
-      note = if tainted?, do: "\n" <> dim("ℹ️ " <> Prompt.taint_note()), else: ""
+      note = if tainted?, do: "\n" <> dim(Prompt.taint_note()), else: ""
       policy = if p = Prompt.policy_note(ctx[:policy_reason]), do: "\n" <> dim(p), else: ""
 
       label =
@@ -180,7 +180,7 @@ defmodule Pepe.Gateways.TUI do
 
     case Pepe.Permissions.Risk.hints(name, map) do
       [] -> ""
-      kinds -> "\n" <> Enum.map_join(kinds, "\n", &("⚠️  " <> Pepe.Permissions.Risk.label(&1)))
+      kinds -> "\n" <> Enum.map_join(kinds, "\n", &("- " <> Pepe.Permissions.Risk.label(&1)))
     end
   end
 

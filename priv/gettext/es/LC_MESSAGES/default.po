@@ -163,41 +163,6 @@ msgstr "🧠 Nueva conversación iniciada."
 msgid "not allowed"
 msgstr "no permitido"
 
-#: lib/pepe/permissions/prompt.ex:58
-#, elixir-autogen, elixir-format
-msgid "♾️ Always allow"
-msgstr "♾️ Permitir siempre"
-
-#: lib/pepe/permissions/prompt.ex:67
-#, elixir-autogen, elixir-format
-msgid "♾️ Always allowed."
-msgstr "♾️ Permitido siempre."
-
-#: lib/pepe/permissions/prompt.ex:55
-#, elixir-autogen, elixir-format
-msgid "✅ Allow once"
-msgstr "✅ Permitir una vez"
-
-#: lib/pepe/permissions/prompt.ex:63
-#, elixir-autogen, elixir-format
-msgid "✅ Allowed once."
-msgstr "✅ Permitido una vez."
-
-#: lib/pepe/permissions/prompt.ex:94
-#, elixir-autogen, elixir-format
-msgid "🔐 Allow me to run the %{tool} tool?"
-msgstr "🔐 ¿Puedo ejecutar la herramienta %{tool}?"
-
-#: lib/pepe/permissions/prompt.ex:59
-#, elixir-autogen, elixir-format
-msgid "🚫 Don't allow"
-msgstr "🚫 No permitir"
-
-#: lib/pepe/permissions/prompt.ex:68
-#, elixir-autogen, elixir-format
-msgid "🚫 Not allowed."
-msgstr "🚫 No permitido."
-
 #: lib/pepe/gateways/telegram.ex:2466
 #, elixir-autogen, elixir-format
 msgid "Always allowed (clear with /approve clear <tool>):"
@@ -335,16 +300,6 @@ msgstr "No hay nada en ejecución ahora."
 #, elixir-autogen, elixir-format
 msgid "Stop the current run"
 msgstr "Detener la ejecución actual"
-
-#: lib/pepe/permissions/prompt.ex:56
-#, elixir-autogen, elixir-format
-msgid "💬 Allow for this session"
-msgstr "💬 Permitir en esta sesión"
-
-#: lib/pepe/permissions/prompt.ex:65
-#, elixir-autogen, elixir-format
-msgid "💬 Allowed for this session."
-msgstr "💬 Permitido en esta sesión."
 
 #: lib/pepe/gateways/telegram.ex:2053
 #, elixir-autogen, elixir-format
@@ -4360,11 +4315,6 @@ msgstr ""
 msgid "While the agent works"
 msgstr "Mientras el agente trabaja"
 
-#: lib/pepe/permissions/prompt.ex:95
-#, elixir-autogen, elixir-format
-msgid "🔐 Allow me to run the %{tool} tool — %{desc}?"
-msgstr "🔐 ¿Permito ejecutar la herramienta %{tool} — %{desc}?"
-
 #: lib/pepe/gateways/telegram.ex:1876
 #, elixir-autogen, elixir-format
 msgid "⌛ This request expired. Ask again if you still need it."
@@ -5040,16 +4990,6 @@ msgstr "Cualquiera de estas opciones cubre llamadas como esta, que no señalan n
 msgid "That file is too big for me to download here - Telegram bots can only fetch files up to 20MB this way. Could you send a smaller version, or share it another way?"
 msgstr "Ese archivo es demasiado grande para descargar aquí - los bots de Telegram solo pueden obtener archivos de hasta 20MB así. ¿Puedes enviar una versión más pequeña, o compartirlo de otra forma?"
 
-#: lib/pepe/permissions/prompt.ex:54
-#, elixir-autogen, elixir-format
-msgid "🔁 Allow for the rest of this task"
-msgstr "🔁 Permitir por el resto de esta tarea"
-
-#: lib/pepe/permissions/prompt.ex:64
-#, elixir-autogen, elixir-format
-msgid "🔁 Allowed for the rest of this task."
-msgstr "🔁 Permitido por el resto de esta tarea."
-
 #: lib/pepe_web/live/agents_live.ex:470
 #, elixir-autogen, elixir-format
 msgid "Assembled prompt"
@@ -5406,16 +5346,6 @@ msgstr "con ámbito de tenant en %{col}"
 #, elixir-autogen, elixir-format
 msgid "unscoped (no per-tenant isolation)"
 msgstr "sin ámbito (sin aislamiento por tenant)"
-
-#: lib/pepe/permissions/prompt.ex:53
-#, elixir-autogen, elixir-format
-msgid "🔁 Allow for the rest of this task (recommended)"
-msgstr "🔁 Permitir por el resto de esta tarea (recomendado)"
-
-#: lib/pepe/permissions/prompt.ex:121
-#, elixir-autogen, elixir-format
-msgid "🛡️ %{reason}"
-msgstr "🛡️ %{reason}"
 
 #: lib/pepe_web/live/agents_live.ex:541
 #, elixir-autogen, elixir-format
@@ -5783,6 +5713,7 @@ msgstr "Actividad (tokens, últimos 14 días)"
 msgid "Admin"
 msgstr "Admin"
 
+#: lib/pepe/permissions/prompt.ex:94
 #: lib/pepe_web/live/chat_live.ex:425
 #, elixir-autogen, elixir-format
 msgid "Allow me to run the %{tool} tool?"
@@ -6702,12 +6633,72 @@ msgstr "saldo: %{amount}"
 msgid "blank = use the persona above"
 msgstr "vacío = usa la persona de arriba"
 
+#: lib/pepe/permissions/prompt.ex:54
+#, elixir-autogen, elixir-format
+msgid "Allow for the rest of this task"
+msgstr "Permitir por el resto de esta tarea"
+
+#: lib/pepe/permissions/prompt.ex:53
+#, elixir-autogen, elixir-format
+msgid "Allow for the rest of this task (recommended)"
+msgstr "Permitir por el resto de esta tarea (recomendado)"
+
+#: lib/pepe/permissions/prompt.ex:56
+#, elixir-autogen, elixir-format
+msgid "Allow for this session"
+msgstr "Permitir en esta sesión"
+
+#: lib/pepe/permissions/prompt.ex:95
+#, elixir-autogen, elixir-format
+msgid "Allow me to run the %{tool} tool — %{desc}?"
+msgstr "¿Puedo ejecutar la herramienta %{tool} — %{desc}?"
+
+#: lib/pepe/permissions/prompt.ex:55
+#, elixir-autogen, elixir-format
+msgid "Allow once"
+msgstr "Permitir una vez"
+
 #: lib/pepe/permissions/prompt.ex:57
 #, elixir-autogen, elixir-format
-msgid "🔓 Allow with any parameters (this session)"
-msgstr "🔓 Permitir con cualquier parámetro (esta sesión)"
+msgid "Allow with any parameters (this session)"
+msgstr "Permitir con cualquier parámetro (esta sesión)"
+
+#: lib/pepe/permissions/prompt.ex:64
+#, elixir-autogen, elixir-format
+msgid "Allowed for the rest of this task."
+msgstr "Permitido por el resto de esta tarea."
+
+#: lib/pepe/permissions/prompt.ex:65
+#, elixir-autogen, elixir-format
+msgid "Allowed for this session."
+msgstr "Permitido en esta sesión."
+
+#: lib/pepe/permissions/prompt.ex:63
+#, elixir-autogen, elixir-format
+msgid "Allowed once."
+msgstr "Permitido una vez."
 
 #: lib/pepe/permissions/prompt.ex:66
 #, elixir-autogen, elixir-format
-msgid "🔓 Allowed with any parameters, for this session."
-msgstr "🔓 Permitido con cualquier parámetro, para esta sesión."
+msgid "Allowed with any parameters, for this session."
+msgstr "Permitido con cualquier parámetro, para esta sesión."
+
+#: lib/pepe/permissions/prompt.ex:58
+#, elixir-autogen, elixir-format
+msgid "Always allow"
+msgstr "Permitir siempre"
+
+#: lib/pepe/permissions/prompt.ex:67
+#, elixir-autogen, elixir-format
+msgid "Always allowed."
+msgstr "Permitido siempre."
+
+#: lib/pepe/permissions/prompt.ex:59
+#, elixir-autogen, elixir-format
+msgid "Don't allow"
+msgstr "No permitir"
+
+#: lib/pepe/permissions/prompt.ex:68
+#, elixir-autogen, elixir-format
+msgid "Not allowed."
+msgstr "No permitido."
