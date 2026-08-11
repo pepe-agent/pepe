@@ -192,12 +192,21 @@ defmodule Pepe.Agent.Runtime do
   defp do_run(%Agent{} = agent, messages, opts) do
     reset_run_state(opts)
 
-    # The failover chain: an explicit :model wins (single-entry chain); otherwise the
-    # agent's model followed by that model's `fallbacks`. Transient errors advance.
+    # The failover chain: an explicit :model wins (single-entry chain, bypasses the slot
+    # entirely - a caller pinning a model means exactly that model, not whatever policy a
+    # model_select occupant might apply); otherwise the model_select slot decides
+    # (Config.model_chain_for_agent/1 by default, unless a plugin occupies the slot - see
+    # Pepe.Slots). Transient errors advance down the chain.
     chain =
       case opts[:model] do
-        nil -> Config.model_chain_for_agent(agent)
-        model -> [model]
+        nil ->
+          case Pepe.Slots.Guard.call("model_select", :chain_for, [agent], agent) do
+            {:ok, chain} -> chain
+            {:error, _} -> Config.model_chain_for_agent(agent)
+          end
+
+        model ->
+          [model]
       end
 
     cond do

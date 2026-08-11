@@ -198,6 +198,26 @@ defmodule Pepe.Usage do
     end
   end
 
+  @type survival_tier :: :normal | :low_compute | :critical | :dead
+
+  @doc """
+  How much budget pressure `project` is under: `:normal` (below the alert band),
+  `:low_compute` (at/over the alert threshold, see `Config.project_budget_alert_at/1`),
+  `:critical` (at/over 95%), or `:dead` (at/over the cap - matches `over_budget?/1`
+  exactly). `:normal` when no budget is set. A shared vocabulary for anything that wants
+  to react to budget pressure (a `model_select`/`heartbeat_interval` slot occupant, say)
+  without re-deriving the ratio math itself.
+  """
+  @spec tier(String.t() | nil) :: survival_tier()
+  def tier(project) do
+    case budget_ratio(project) do
+      nil -> :normal
+      ratio when ratio >= 1.0 -> :dead
+      ratio when ratio >= 0.95 -> :critical
+      ratio -> if ratio >= Config.project_budget_alert_at(project), do: :low_compute, else: :normal
+    end
+  end
+
   @doc "Reset `project`'s budget counter early, before the natural month boundary."
   @spec reset_budget(String.t() | nil) :: :ok | {:error, :not_found}
   def reset_budget(project), do: Config.reset_project_budget(project)

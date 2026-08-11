@@ -113,6 +113,31 @@ defmodule Pepe.Slots do
       # real, non-idempotent action (sent a reply, run a tool) through its own means -
       # silently re-running the whole turn from scratch on the builtin loop risks doing
       # that work twice, the same reasoning "sandbox" uses.
+      # Which model chain a run uses - the builtin is today's static
+      # Config.model_chain_for_agent/1; a plugin can occupy this to swap in a cheaper
+      # chain under budget pressure (see Pepe.Usage.tier/1) or any other policy. Called
+      # once per do_run/3, not per tool call, so the Guard overhead is a non-issue.
+      "model_select" => %{
+        label: gettext("Model selection"),
+        desc: gettext("Which model chain a run uses."),
+        default: Pepe.LLM.ModelSelect,
+        funs: [{:name, 0}, {:slot, 0}, {:chain_for, 1}],
+        timeout: 2_000,
+        validate: &valid_chain?/1,
+        degrade: :fallback
+      },
+      # Whether a heartbeat pulse that's otherwise due is allowed to actually fire - one
+      # more veto a plugin can apply (e.g. skip while a project is in a low budget tier)
+      # on top of the gateway's own static minutes/hour schedule, which it never touches.
+      "heartbeat_interval" => %{
+        label: gettext("Heartbeat pacing"),
+        desc: gettext("Whether a due heartbeat pulse is allowed to fire right now."),
+        default: Pepe.Heartbeat.Interval,
+        funs: [{:name, 0}, {:slot, 0}, {:allowed?, 1}],
+        timeout: 1_000,
+        validate: &is_boolean/1,
+        degrade: :fallback
+      },
       "harness" => %{
         label: gettext("Reasoning loop"),
         desc: gettext("The whole think-and-act loop that drives one turn."),
@@ -128,6 +153,8 @@ defmodule Pepe.Slots do
   defp valid_cmd_result?({output, status}), do: is_binary(output) and is_integer(status)
   defp valid_cmd_result?(_), do: false
   defp valid_messages?(messages), do: is_list(messages) and Enum.all?(messages, &is_map/1)
+  # [] is a real, existing chain state ("no model configured"), not a malformed payload.
+  defp valid_chain?(chain), do: is_list(chain) and Enum.all?(chain, &match?(%Pepe.Config.Model{}, &1))
 
   @doc "The known slot names."
   @spec names() :: [String.t()]

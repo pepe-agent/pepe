@@ -500,7 +500,7 @@ defmodule Pepe.Gateways.Telegram do
   defp maybe_pulse_heartbeat(state, b, now) do
     case b["heartbeat_minutes"] do
       minutes when is_integer(minutes) and minutes > 0 ->
-        if now - state.heartbeat_last >= minutes * 60 and heartbeat_hour_ok?(b) do
+        if now - state.heartbeat_last >= minutes * 60 and heartbeat_hour_ok?(b) and heartbeat_allowed?() do
           pulse_sessions(b)
           %{state | heartbeat_last: now}
         else
@@ -509,6 +509,17 @@ defmodule Pepe.Gateways.Telegram do
 
       _ ->
         state
+    end
+  end
+
+  # One more veto on top of the static minutes/hour schedule above, which this never
+  # touches - a heartbeat_interval slot occupant can skip a pulse that's otherwise due
+  # (e.g. the project is in a low budget tier, see Pepe.Usage.tier/1). Always allows
+  # until a plugin is installed (Pepe.Heartbeat.Interval, the default occupant).
+  defp heartbeat_allowed? do
+    case Pepe.Slots.Guard.call("heartbeat_interval", :allowed?, [Project.of(agent_default())]) do
+      {:ok, allowed?} -> allowed?
+      {:error, _} -> true
     end
   end
 

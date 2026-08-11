@@ -23,6 +23,8 @@ quality of an answer, but it never breaks a conversation.
 | `memory` | Case-insensitive substring search over `MEMORY.md`/`USER.md`/`people.md` | The `memory_search` tool |
 | `web_search` | DuckDuckGo's Instant Answer API | The `web_search` tool |
 | `sandbox` | Runs directly, or through the configured wrapper script (see [Security](/docs/security)) | The `bash`/`run_script` tools: *where* a shell command actually runs |
+| `model_select` | `Pepe.Config.model_chain_for_agent/1`'s static chain | Which model chain a run uses |
+| `heartbeat_interval` | Always allows a due pulse | Whether a due Telegram heartbeat pulse is allowed to fire |
 | `compaction` | Summarizes the middle of a long conversation with the model itself | How a long conversation gets condensed to fit the context window |
 | `harness` | The agent's own conversation loop (`Pepe.Agent.Runtime`) | The *entire* turn: not one call, the whole reasoning loop |
 
@@ -122,6 +124,39 @@ true no matter which occupant answers. This is the one slot where `bash`'s own p
 `timeout_ms` (not the slot's own generous 5-minute ceiling) is the real deadline for the
 built-in; a plugin occupant should still return promptly, since the slot ceiling is a
 backstop, not a budget to use up.
+
+### Model selection
+
+```elixir
+@callback name() :: String.t()
+@callback slot() :: String.t()          # always "model_select"
+@callback chain_for(agent :: map()) :: {:ok, [Pepe.Config.Model.t()]} | {:error, term()}
+```
+
+Called once per turn (`Pepe.Agent.Runtime.do_run/3`), before the model chain is walked -
+never per tool call. Returning `[]` is a valid answer ("no model configured"), not a
+malformed one. An explicit `:model` passed by the caller (a pinned test, a harness)
+bypasses this slot entirely - it means exactly that model, not whatever policy an occupant
+would apply.
+
+A natural use: swap to a cheaper model once a project's spend gets close to its cap.
+`Pepe.Usage.tier/1` reports `:normal | :low_compute | :critical | :dead` from the same
+ratio the spend cap itself uses (see [Usage and billing](/docs/billing)), so an occupant
+doesn't have to re-derive it.
+
+### Heartbeat pacing
+
+```elixir
+@callback name() :: String.t()
+@callback slot() :: String.t()          # always "heartbeat_interval"
+@callback allowed?(project :: String.t() | nil) :: {:ok, boolean()} | {:error, term()}
+```
+
+One more veto on top of a Telegram bot's own static `heartbeat_minutes`/hour schedule,
+which this never touches: called only once that schedule already says a pulse is due,
+right before it actually fires. The built-in always allows. A plugin here can skip a pulse
+that's otherwise due - `Pepe.Usage.tier/1` is the obvious signal, e.g. skip while a
+project is `:critical` or `:dead`.
 
 ### Compaction
 

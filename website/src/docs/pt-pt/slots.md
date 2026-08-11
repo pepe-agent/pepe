@@ -22,6 +22,8 @@ comportar-se mal muda a qualidade da resposta; nunca quebra uma conversa.
 | `memory` | Pesquisa por substring, sem distinguir maiúsculas, em `MEMORY.md`/`USER.md`/`people.md` | A ferramenta `memory_search` |
 | `web_search` | A API Instant Answer do DuckDuckGo | A ferramenta `web_search` |
 | `sandbox` | Corre diretamente, ou através do script wrapper configurado (ver [Segurança](/docs/security)) | As ferramentas `bash`/`run_script` - *onde* um comando de shell corre de facto |
+| `model_select` | A chain estática de `Pepe.Config.model_chain_for_agent/1` | Que chain de modelo um turno usa |
+| `heartbeat_interval` | Permite sempre um pulso que já venceu | Se um pulso de heartbeat do Telegram que já venceu pode disparar |
 | `compaction` | Resume o meio de uma conversa longa com o próprio modelo | Como uma conversa longa é condensada para caber na janela de contexto |
 | `harness` | O próprio ciclo de conversa do agente (`Pepe.Agent.Runtime`) | O turno *inteiro* - não uma chamada, o ciclo de raciocínio completo |
 
@@ -119,6 +121,39 @@ válido para qualquer ocupante que responda. Este é o único slot onde o própr
 `timeout_ms` por chamada do `bash` (não o teto generoso de 5 minutos do slot) é o prazo
 real para o incorporado; um ocupante de plugin deve continuar a responder depressa, já
 que o teto do slot é uma rede de segurança, não um orçamento para gastar.
+
+### Seleção de modelo
+
+```elixir
+@callback name() :: String.t()
+@callback slot() :: String.t()          # sempre "model_select"
+@callback chain_for(agent :: map()) :: {:ok, [Pepe.Config.Model.t()]} | {:error, term()}
+```
+
+Chamado uma vez por turno (`Pepe.Agent.Runtime.do_run/3`), antes de a chain de modelo ser
+percorrida - nunca por tool call. Devolver `[]` é uma resposta válida ("nenhum modelo
+configurado"), não malformada. Um `:model` explícito passado pelo chamador (um teste
+fixado, um harness) ignora este slot por completo - significa exatamente aquele modelo, não
+o que uma política de ocupante aplicaria.
+
+Um uso natural: trocar para um modelo mais barato quando a despesa de um projeto se
+aproxima do teto. `Pepe.Usage.tier/1` devolve `:normal | :low_compute | :critical | :dead`
+a partir da mesma proporção que o próprio teto de despesa usa (ver [Utilização e faturação](/docs/billing)),
+para que um ocupante não precise de recalcular isso.
+
+### Ritmo do heartbeat
+
+```elixir
+@callback name() :: String.t()
+@callback slot() :: String.t()          # sempre "heartbeat_interval"
+@callback allowed?(project :: String.t() | nil) :: {:ok, boolean()} | {:error, term()}
+```
+
+Mais um veto em cima do próprio calendário estático de `heartbeat_minutes`/horário de um
+bot do Telegram, que este slot nunca toca: chamado só depois de esse calendário já ter dito
+que um pulso venceu, mesmo antes de disparar de facto. O incorporado permite sempre. Um
+plugin aqui pode saltar um pulso que já venceu - `Pepe.Usage.tier/1` é o sinal óbvio, por
+exemplo saltar enquanto um projeto está em `:critical` ou `:dead`.
 
 ### Compactação
 
