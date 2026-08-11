@@ -530,21 +530,18 @@ and it answers there with the same loop and the same tools.
 
 ## Managing a persona from Langfuse
 
-Set `langfuse_prompt` to a prompt name in [Langfuse](https://langfuse.com) and this
-agent's persona comes from there instead of its own `system_prompt`/`SOUL.md` -
-edit the prompt in Langfuse and the change reaches Pepe within a few minutes, no
+Set `langfuse_prompt` to a prompt name and this agent's persona comes from
+[Langfuse](../langfuse/) instead of its own `system_prompt`/`SOUL.md` - edit
+the prompt in Langfuse and the change reaches Pepe within a few minutes, no
 redeploy and no touching `config.json`.
 
 ```bash
 pepe agent add support --langfuse-prompt support-persona
 ```
 
-Requires `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` (the same env vars every
-official Langfuse SDK reads; `LANGFUSE_BASE_URL` too if you're not on
-`cloud.langfuse.com`). This is opt-in per agent - an agent with no `langfuse_prompt`
-set is completely unaffected. If Langfuse is unreachable, or the name doesn't
-resolve to a prompt, the agent's own local persona is used exactly as if this
-were never configured; nothing blocks the turn on a Langfuse outage.
+Opt-in per agent - one with no `langfuse_prompt` set is completely unaffected,
+and a fetch failure (unreachable, name doesn't resolve) falls straight back
+to the local persona. Setup and credentials: [Langfuse](../langfuse/).
 
 ## Seeing exactly what the model sees
 

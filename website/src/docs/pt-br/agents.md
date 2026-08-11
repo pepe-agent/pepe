@@ -533,22 +533,18 @@ e ele responde ali com o mesmo ciclo e as mesmas ferramentas.
 
 ## Gerenciando uma persona pelo Langfuse
 
-Defina `langfuse_prompt` com o nome de um prompt no [Langfuse](https://langfuse.com)
-e a persona desse agente passa a vir de lá em vez do próprio `system_prompt`/`SOUL.md`:
-edite o prompt no Langfuse e a mudança chega ao Pepe em poucos minutos, sem redeploy
-e sem mexer no `config.json`.
+Defina `langfuse_prompt` com o nome de um prompt e a persona desse agente
+passa a vir do [Langfuse](../langfuse/) em vez do próprio
+`system_prompt`/`SOUL.md`: edite o prompt no Langfuse e a mudança chega ao
+Pepe em poucos minutos, sem redeploy e sem mexer no `config.json`.
 
 ```bash
 pepe agent add support --langfuse-prompt support-persona
 ```
 
-Precisa de `LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` (as mesmas variáveis de
-ambiente que todo SDK oficial do Langfuse lê; `LANGFUSE_BASE_URL` também, se você não
-estiver no `cloud.langfuse.com`). É opt-in por agente: um agente sem `langfuse_prompt`
-definido fica totalmente inalterado. Se o Langfuse estiver inacessível, ou o nome não
-resolver pra nenhum prompt, o agente usa a própria persona local exatamente como se
-isso nunca tivesse sido configurado; nada trava a conversa por causa de uma
-indisponibilidade do Langfuse.
+Opt-in por agente: um agente sem `langfuse_prompt` definido fica totalmente
+inalterado, e um cuja busca falhe (inacessível, nome não resolve) cai direto
+pra persona local. Configuração e credenciais: [Langfuse](../langfuse/).
 
 ## Vendo exatamente o que o modelo vê
 

@@ -48,9 +48,9 @@ ferramenta muito longos são encurtados antes de serem salvos.
 ## Enviando traces para uma ferramenta de observabilidade
 
 Defina `OTEL_EXPORTER_OTLP_ENDPOINT` e toda execução concluída também é enviada
-como um trace OTLP, para o Langfuse ou qualquer outro backend que fale esse
-protocolo, desligado até você definir isso, e uma falha no envio nunca afeta a
-execução que ela está descrevendo.
+como um trace OTLP, para o [Langfuse](../langfuse/) ou qualquer outro backend
+que fale esse protocolo, desligado até você definir isso, e uma falha no envio
+nunca afeta a execução que ela está descrevendo.
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
@@ -58,16 +58,13 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de pk-lf-...:sk-l
 ```
 
 `OTEL_EXPORTER_OTLP_HEADERS` é uma lista `chave=valor` separada por vírgulas,
-enviada como cabeçalhos literais da requisição: o par de chaves de autenticação
-do Langfuse vai aqui, sem nenhuma configuração específica do Langfuse em outro
-lugar. Tanto os atributos genéricos do OpenTelemetry (`gen_ai.*`) quanto os
-próprios do Langfuse (`langfuse.*`) são definidos em cada span, então um
-endpoint Langfuse renderiza tudo completo (sessões agrupadas, painéis de
-entrada/saída, gerações distinguidas de spans de ferramenta comuns) e qualquer
-outro backend OTLP recebe um trace completo do mesmo jeito.
-
-Mais duas variáveis padrão do OTEL, se precisar: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
-aponta o sinal de traces pra outro lugar além de `<endpoint>/v1/traces`, e
-`OTEL_SERVICE_NAME` renomeia o serviço exportado (padrão `pepe`).
+enviada como cabeçalhos literais da requisição. Tanto os atributos genéricos
+do OpenTelemetry (`gen_ai.*`) quanto os próprios do Langfuse (`langfuse.*`)
+são definidos em cada span, então um endpoint Langfuse renderiza tudo
+completo e qualquer outro backend OTLP recebe um trace completo do mesmo
+jeito. Mais duas variáveis padrão do OTEL, se precisar:
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` aponta o sinal de traces pra outro lugar
+além de `<endpoint>/v1/traces`, e `OTEL_SERVICE_NAME` renomeia o serviço
+exportado (padrão `pepe`). Passo a passo completo: [Langfuse](../langfuse/).
 
 <div class="note"><strong>Diagnóstico, não registro de cobrança.</strong> Os traces existem para explicar uma execução, e os antigos ou grandes demais vão sendo cortados. Para contagens de tokens que você pode faturar, use o <a href="../billing/">livro-razão de uso</a>, separado, que nunca perde um lançamento.</div>

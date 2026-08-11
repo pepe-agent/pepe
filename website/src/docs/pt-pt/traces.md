@@ -48,9 +48,9 @@ resultados de ferramenta muito longos são encurtados antes de serem guardados.
 ## Enviar traces para uma ferramenta de observabilidade
 
 Define `OTEL_EXPORTER_OTLP_ENDPOINT` e cada execução concluída também é enviada
-como um trace OTLP, para o Langfuse ou qualquer outro backend que fale esse
-protocolo — desligado até definires isto, e uma falha no envio nunca afeta a
-execução que está a descrever.
+como um trace OTLP, para o [Langfuse](../langfuse/) ou qualquer outro backend
+que fale esse protocolo — desligado até definires isto, e uma falha no envio
+nunca afeta a execução que está a descrever.
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
@@ -58,16 +58,13 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de pk-lf-...:sk-l
 ```
 
 `OTEL_EXPORTER_OTLP_HEADERS` é uma lista `chave=valor` separada por vírgulas,
-enviada como cabeçalhos literais do pedido: o par de chaves de autenticação do
-Langfuse vai aqui, sem qualquer configuração específica do Langfuse noutro
-sítio. Tanto os atributos genéricos do OpenTelemetry (`gen_ai.*`) como os
-próprios do Langfuse (`langfuse.*`) são definidos em cada span, pelo que um
-endpoint Langfuse renderiza tudo por completo (sessões agrupadas, painéis de
-entrada/saída, gerações distinguidas de spans de ferramenta comuns), e
-qualquer outro backend OTLP recebe na mesma um trace completo.
-
+enviada como cabeçalhos literais do pedido. Tanto os atributos genéricos do
+OpenTelemetry (`gen_ai.*`) como os próprios do Langfuse (`langfuse.*`) são
+definidos em cada span, pelo que um endpoint Langfuse renderiza tudo por
+completo e qualquer outro backend OTLP recebe na mesma um trace completo.
 Mais duas variáveis padrão do OTEL, se precisares: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
 aponta o sinal de traces para outro sítio além de `<endpoint>/v1/traces`, e
-`OTEL_SERVICE_NAME` renomeia o serviço exportado (predefinição `pepe`).
+`OTEL_SERVICE_NAME` renomeia o serviço exportado (predefinição `pepe`). Passo
+a passo completo: [Langfuse](../langfuse/).
 
 <div class="note"><strong>Diagnóstico, não registo de faturação.</strong> Os traces existem para explicar uma execução, e os antigos ou demasiado grandes vão sendo cortados. Para contagens de tokens que possas faturar, usa o <a href="../billing/">livro-razão de utilização</a>, separado, que nunca perde um lançamento.</div>
