@@ -113,7 +113,19 @@ defmodule Pepe.Store do
 
   @doc "Create the schema/table and start Mnesia (idempotent, runs once)."
   def ensure_started do
-    if :persistent_term.get(@ready, false), do: :ok, else: bootstrap()
+    if ready?(), do: :ok, else: bootstrap()
+  end
+
+  # The flag alone is not proof: Mnesia can be stopped (or the table dropped) out from
+  # under a still-set flag - in production a node-level Mnesia restart, in the test suite
+  # a test that tears the store down (`:mnesia.stop()`) while a process from an earlier
+  # test still holds the flag's word. Every op would then abort `{:no_exists, ...}` and
+  # `safe/2` would quietly turn writes into no-ops until something cleared the flag. The
+  # `:ets.whereis/1` probe is a cheap liveness check (a loaded Mnesia table is backed by
+  # an ETS table of the same name): if the table is gone, re-bootstrap instead of
+  # trusting the flag.
+  defp ready? do
+    :persistent_term.get(@ready, false) and :ets.whereis(@table) != :undefined
   end
 
   # Serialize the bootstrap: two processes hitting the store for the first time at once would both
@@ -121,7 +133,7 @@ defmodule Pepe.Store do
   # other mid-write. A lock (with a second check inside it) makes exactly one process run it.
   defp bootstrap do
     :global.trans({{__MODULE__, :bootstrap}, self()}, fn ->
-      unless :persistent_term.get(@ready, false) do
+      unless ready?() do
         do_start()
         :persistent_term.put(@ready, true)
       end

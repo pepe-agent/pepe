@@ -2158,6 +2158,19 @@ defmodule Mix.Tasks.Pepe do
     end)
 
     if Enum.any?(per_model, fn {_, results} -> Enum.any?(results, &(not &1.passed)) end) do
+      arm_failure_exit()
+    end
+  end
+
+  # A failing eval must make `mix pepe eval` exit nonzero (that's what lets it gate a CI
+  # job), and `System.at_exit` is the only way a Mix task can set the VM's exit status.
+  # But that hook is VM-global and *silent*: registered from inside the test suite (the
+  # CLI tests drive `dispatch/1` in-process, and the eval tests deliberately exercise a
+  # failing eval), it stays armed after the suite ends and turns a fully green
+  # `mix test` into an unexplained `exit 1` at VM shutdown. Test config disables the
+  # arming; everything else about the failure path (output, summary) stays identical.
+  defp arm_failure_exit do
+    if Application.get_env(:pepe, :cli_arm_exit_status, true) do
       System.at_exit(fn _ -> exit({:shutdown, 1}) end)
     end
   end
@@ -2234,7 +2247,7 @@ defmodule Mix.Tasks.Pepe do
     passed = Enum.count(results, & &1.passed)
     info("")
     info(bold("total: #{passed}/#{length(results)} passed"))
-    if passed != length(results), do: System.at_exit(fn _ -> exit({:shutdown, 1}) end)
+    if passed != length(results), do: arm_failure_exit()
   end
 
   ###

@@ -22,6 +22,9 @@ All notable changes to this project are documented here. Format follows
 
 ### Fixed
 - **An agent no longer invents a fake "type this exact phrase to confirm" ritual after a permission prompt expires unanswered.** `Permissions.denied_message/2`'s text told the model only "do not retry, ask the user what to do instead," with no mention that authorization can only ever happen by answering the real prompt - so a model filled that gap by asking the user to type an invented confirmation phrase, which does nothing (no such channel exists), expires the same way, and repeats. The message now says explicitly: when the user later says to go ahead, call the tool again - that is what shows them a fresh prompt - and that nothing they type grants permission on its own. Telegram's own "this request expired" notice also now says a fresh prompt with buttons will show up on the next ask, instead of just "ask again."
+- **A failing `mix pepe eval` armed the VM's exit status through a silent `System.at_exit` hook** that, driven in-process by the CLI test suite, outlived the suite and made a fully green `mix test` exit 1 with no output at VM shutdown - this is what was actually blocking this release's own CI. The hook is now gated off in the test environment; the real CLI still exits nonzero on a failing eval, unchanged.
+- **Two processes resolving the same plugin file at once** (an agent's hooks looked up by the dashboard and its session simultaneously, say) could compile it twice concurrently; the losing compile's failure was cached, leaving the plugin silently unloaded until its file was next touched. Plugin loads are now serialized per file, and the second caller reuses the first one's result.
+- **`Pepe.Store` trusted its "already bootstrapped" flag** even after Mnesia had been stopped or the table dropped underneath it, silently turning every write into a no-op; it now probes the table's liveness and re-bootstraps instead.
 
 ## [0.14.3] - 2026-08-08
 

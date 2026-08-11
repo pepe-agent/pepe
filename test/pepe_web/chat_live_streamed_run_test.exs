@@ -27,8 +27,15 @@ defmodule PepeWeb.ChatLiveStreamedRunTest do
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
 
+    # A unique module name per test (same pattern as PepeLLMAdapterDispatchTest): every
+    # test in this file writes a marker.exs under its own PEPE_HOME, but module names are
+    # global to the VM - a hook resolution still in flight from the previous test compiling
+    # its copy while this test compiles this one would collide with "cannot define module
+    # because it is currently being defined", and the hook would silently not load.
+    mod = Module.concat(ChatLiveStreamedRunTest, :"Marker#{System.unique_integer([:positive])}")
+
     File.write!(Path.join([home, "plugins", "marker.exs"]), """
-    defmodule ChatLiveStreamedRunTest.Marker do
+    defmodule #{inspect(mod)} do
       @behaviour Pepe.Hooks.Hook
       def name, do: "marker"
       def stages, do: [:outbound]

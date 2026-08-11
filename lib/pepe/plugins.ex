@@ -306,12 +306,30 @@ defmodule Pepe.Plugins do
       {:ok, %{mtime: mtime}} ->
         case :persistent_term.get(key, nil) do
           {^mtime, mods} -> mods
-          _ -> cache(key, mtime, compile_with_timeout(path))
+          _ -> load_locked(key, mtime, path)
         end
 
       _ ->
         []
     end
+  end
+
+  # Two callers can miss the cache for the same file at once (a LiveView resolving an
+  # agent's hooks while the session's runtime resolves the same list, say). Unserialized,
+  # both would `Code.compile_file/1` the same module concurrently: one wins, the other
+  # dies with "cannot define module ... because it is currently being defined", is
+  # rescued into `[]`, and - since both then write the cache under the same mtime - can
+  # overwrite the winner's result, leaving the plugin *permanently* unloaded until its
+  # file is touched. A per-path lock (same `:global.trans` pattern as
+  # `Pepe.Store.bootstrap/0`) with a second cache check inside makes exactly one caller
+  # compile; everyone else waits briefly and reuses its result.
+  defp load_locked(key, mtime, path) do
+    :global.trans({key, self()}, fn ->
+      case :persistent_term.get(key, nil) do
+        {^mtime, mods} -> mods
+        _ -> cache(key, mtime, compile_with_timeout(path))
+      end
+    end)
   end
 
   defp cache(key, mtime, mods) do

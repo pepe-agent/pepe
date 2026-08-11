@@ -17,6 +17,12 @@ config :pepe, Pepe.Mailer, adapter: Swoosh.Adapters.Test
 # A low login rate-limit so the throttle test hits its ceiling quickly.
 config :pepe, login_max_attempts: 3
 
+# The CLI tests run `Mix.Tasks.Pepe.dispatch/1` in-process, and a failing `pepe eval`
+# arms a System.at_exit hook so the real CLI exits nonzero. Inside the test VM that
+# hook would outlive the suite and silently turn an all-green `mix test` into exit 1
+# at shutdown (which is exactly what it did in CI). Never arm it under test.
+config :pepe, cli_arm_exit_status: false
+
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false
 
