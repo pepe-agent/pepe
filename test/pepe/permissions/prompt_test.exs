@@ -10,16 +10,16 @@ defmodule Pepe.Permissions.PromptTest do
   alias Pepe.Permissions.Prompt
   alias Pepe.Permissions.Risk
 
-  test "options/0 offers exactly the four decisions, in display order, when not tainted" do
-    assert Prompt.options() == [:once, :session, :always, :deny]
-    assert Prompt.options(false) == [:once, :session, :always, :deny]
+  test "options/0 offers exactly the five decisions, in display order, when not tainted" do
+    assert Prompt.options() == [:once, :session, :session_any, :always, :deny]
+    assert Prompt.options(false) == [:once, :session, :session_any, :always, :deny]
   end
 
   test "options/1 with tainted: true inserts this_run, since a session/always tap does nothing until the next run" do
-    assert Prompt.options(true) == [:once, :this_run, :session, :always, :deny]
+    assert Prompt.options(true) == [:once, :this_run, :session, :session_any, :always, :deny]
   end
 
-  test "options/2 drops :session when there is no session to remember it against" do
+  test "options/2 drops :session and :session_any when there is no session to remember them against" do
     assert Prompt.options(false, false) == [:once, :always, :deny]
     assert Prompt.options(true, false) == [:once, :this_run, :always, :deny]
     # Default (has_session? unset) stays true, so an existing 1-arity caller is unaffected.
@@ -45,9 +45,15 @@ defmodule Pepe.Permissions.PromptTest do
   end
 
   test "no other decision's label changes with taint" do
-    for decision <- [:once, :session, :always, :deny] do
+    for decision <- [:once, :session, :session_any, :always, :deny] do
       assert Prompt.label(decision, true) == Prompt.label(decision, false)
     end
+  end
+
+  test "session_any's label and outcome are clearly distinct from session's" do
+    refute Prompt.label(:session_any) == Prompt.label(:session)
+    refute Prompt.outcome(:session_any) == Prompt.outcome(:session)
+    assert Prompt.label(:session_any) =~ "any parameters"
   end
 
   test "taint_note/0 names the exact button that actually stops the repeat prompts" do
@@ -64,6 +70,7 @@ defmodule Pepe.Permissions.PromptTest do
     assert Prompt.token(:once) == "once"
     assert Prompt.token(:this_run) == "this_run"
     assert Prompt.token(:session) == "session"
+    assert Prompt.token(:session_any) == "session_any"
     assert Prompt.token(:always) == "always"
     assert Prompt.token(:deny) == "deny"
   end
@@ -99,5 +106,10 @@ defmodule Pepe.Permissions.PromptTest do
     note = Prompt.scope_note([:deletes, :network])
     assert note =~ Risk.label(:deletes)
     assert note =~ Risk.label(:network)
+  end
+
+  test "scope_note/1 always points out that \"any parameters\" is a different, wider option" do
+    assert Prompt.scope_note([]) =~ "any parameters"
+    assert Prompt.scope_note([:deletes]) =~ "any parameters"
   end
 end

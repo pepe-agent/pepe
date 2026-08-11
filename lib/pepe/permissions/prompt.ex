@@ -14,8 +14,8 @@ defmodule Pepe.Permissions.Prompt do
 
   alias Pepe.Permissions
 
-  @options [:once, :session, :always, :deny]
-  @all_options [:once, :this_run, :session, :always, :deny]
+  @options [:once, :session, :session_any, :always, :deny]
+  @all_options [:once, :this_run, :session, :session_any, :always, :deny]
 
   @doc """
   The decisions offered to the user, in display order. `:this_run` only appears while the
@@ -37,7 +37,7 @@ defmodule Pepe.Permissions.Prompt do
   def options(false, has_session?), do: with_session(@options, has_session?)
 
   defp with_session(list, true), do: list
-  defp with_session(list, false), do: Enum.reject(list, &(&1 == :session))
+  defp with_session(list, false), do: Enum.reject(list, &(&1 in [:session, :session_any]))
 
   @doc """
   The button/menu label for a decision (translated, current locale).
@@ -54,6 +54,7 @@ defmodule Pepe.Permissions.Prompt do
   def label(:this_run, false), do: gettext("🔁 Allow for the rest of this task")
   def label(:once, _tainted?), do: gettext("✅ Allow once")
   def label(:session, _tainted?), do: gettext("💬 Allow for this session")
+  def label(:session_any, _tainted?), do: gettext("🔓 Allow with any parameters (this session)")
   def label(:always, _tainted?), do: gettext("♾️ Always allow")
   def label(:deny, _tainted?), do: gettext("🚫 Don't allow")
 
@@ -62,6 +63,7 @@ defmodule Pepe.Permissions.Prompt do
   def outcome(:once), do: gettext("✅ Allowed once.")
   def outcome(:this_run), do: gettext("🔁 Allowed for the rest of this task.")
   def outcome(:session), do: gettext("💬 Allowed for this session.")
+  def outcome(:session_any), do: gettext("🔓 Allowed with any parameters, for this session.")
   def outcome(:always), do: gettext("♾️ Always allowed.")
   def outcome(:deny), do: gettext("🚫 Not allowed.")
 
@@ -77,6 +79,7 @@ defmodule Pepe.Permissions.Prompt do
   def from_token("once"), do: :once
   def from_token("this_run"), do: :this_run
   def from_token("session"), do: :session
+  def from_token("session_any"), do: :session_any
   def from_token("always"), do: :always
   def from_token(_other), do: :deny
 
@@ -128,13 +131,20 @@ defmodule Pepe.Permissions.Prompt do
   """
   @spec scope_note([Pepe.Permissions.Risk.kind()]) :: String.t()
   def scope_note([]) do
-    gettext("Any of these covers calls like this one, which flag no risk. Anything riskier will ask again.")
+    gettext("Any of these covers calls like this one, which flag no risk. Anything riskier will ask again.") <>
+      " " <> any_params_note()
   end
 
   def scope_note(risks) do
     gettext("Any of these covers %{tool} calls that %{risks}. Anything else it does will ask again.",
       tool: gettext("this tool's"),
       risks: Enum.map_join(risks, ", ", &Pepe.Permissions.Risk.label/1)
+    ) <> " " <> any_params_note()
+  end
+
+  defp any_params_note do
+    gettext(
+      "\"Allow with any parameters\" is different: it stops checking parameters for this tool entirely, for the rest of this session."
     )
   end
 end

@@ -28,11 +28,12 @@ O `bash` e o `run_script` ganham mais uma dispensa, mais restrita do que essa li
 
 No caso do `run_script`, essa dispensa só se aplica quando a linguagem do próprio script é `bash`/`sh`. Os sinais de risco estão escritos para ler sintaxe de shell, por isso um one-liner em Python, Node ou Ruby que apague ficheiros ou abra um socket, de outro modo, pareceria isento de risco ao classificador e passaria sem ser perguntado; qualquer outra linguagem passa sempre pela barreira normal.
 
-Quando uma ferramenta arriscada não foi aprovada de antemão, o runtime pergunta a pessoa do outro lado. Cada superfície apresenta esse pedido à sua maneira nativa (botões incorporados num canal de conversa, um menu com as setas do teclado na CLI), mas a decisão é sempre uma de cinco:
+Quando uma ferramenta arriscada não foi aprovada de antemão, o runtime pergunta a pessoa do outro lado. Cada superfície apresenta esse pedido à sua maneira nativa (botões incorporados num canal de conversa, um menu com as setas do teclado na CLI), mas a decisão é sempre uma de seis:
 
 - `once`: permite apenas esta chamada, volta a perguntar da próxima vez.
 - `this_run`: permite durante o resto *desta execução* apenas - vê [Conteúdo de um estranho retira a pré-aprovação](#conteúdo-de-um-estranho-retira-a-pré-aprovação) abaixo para saber quando é que esta opção aparece de facto.
-- `session`: permite durante o resto desta conversa. Fica em memória e é esquecido quando inicias uma nova sessão ou reinicias. As restantes sessões continuam a perguntar.
+- `session`: permite durante o resto desta conversa, para chamadas que carregam os mesmos riscos que esta. Fica em memória e é esquecido quando inicias uma nova sessão ou reinicias. As restantes sessões continuam a perguntar.
+- `session_any` ("Permitir com quaisquer parâmetros"): também só vale para esta sessão, mas é um cheque em branco - toda chamada futura a essa ferramenta corre sem perguntar, seja qual for o risco que carregue, não só os que esta chamada em particular assinalou. Para quando decidiste deixar de ser perguntado sobre os *parâmetros* de uma ferramenta durante algum tempo, não só sobre o nome dela.
 - `always`: permite de agora em diante. Fica guardado no agente em `config.json`.
 - `deny`: recusa. Nunca é memorizado, por isso a mesma chamada volta a ser perguntada mais tarde.
 
@@ -60,7 +61,7 @@ As formas antigas, mais grosseiras, continuam a funcionar sem alteração:
 |---|---|
 | `"*"` | todas as ferramentas, todos os riscos (o agente do próprio proprietário) |
 | `"bash"` | um cheque em branco no bash, tal como escrito por um Pepe anterior a isto |
-| `"bash:any"` | o mesmo cheque em branco, escrito de forma consciente |
+| `"bash:any"` | o mesmo cheque em branco, escrito de forma consciente - é o que `session_any` concede, só que guardado em memória em vez de no `config.json` |
 
 <div class="note"><strong>Isto não é uma sandbox, e não pode ser lido como tal.</strong> A classificação lê o comando como texto, e texto mente: um comando pode ser montado em tempo de execução, descodificado de base64 ou escondido dentro de um script que o próprio agente escreveu um instante antes. Falha fechada, no sentido de que um risco não reconhecido nunca é coberto por uma concessão mais estreita. O que fecha é a distância entre aquilo para que uma pessoa olhou e aquilo que de facto assinou. Não transforma um contentor que corre shell escolhida por um LLM num sítio seguro, e esse contentor continua a ter de ser um que estejas disposto a perder.</div>
 

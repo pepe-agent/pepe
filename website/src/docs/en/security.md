@@ -28,11 +28,12 @@ The tools that never ask are the read-only ones: `read_file`, `list_dir`, `fetch
 
 For `run_script`, that free pass only applies when the script's own language is `bash`/`sh`. The risk hints are written to read shell syntax, so a Python, Node, or Ruby one-liner that deletes files or opens a socket would otherwise look risk-free to the classifier and slip through unasked; every other language always goes through the normal gate instead.
 
-When a risky tool has not been pre-approved, the runtime asks the person on the other end. Each surface renders that prompt in its own native way (inline buttons in a chat channel, an arrow-key menu in the CLI), but the decision is always one of five:
+When a risky tool has not been pre-approved, the runtime asks the person on the other end. Each surface renders that prompt in its own native way (inline buttons in a chat channel, an arrow-key menu in the CLI), but the decision is always one of six:
 
 - `once`: allow just this call, ask again next time.
 - `this_run`: allow for the rest of *this run* only. See [Content from a stranger withdraws pre-approval](#content-from-a-stranger-withdraws-pre-approval) below for when this option actually shows up.
-- `session`: allow for the rest of this conversation. Kept in memory, forgotten when you start a new session or restart. Other sessions still ask.
+- `session`: allow for the rest of this conversation, for calls that carry the same risks as this one. Kept in memory, forgotten when you start a new session or restart. Other sessions still ask.
+- `session_any` ("Allow with any parameters"): also scoped to this session only, but a blank cheque - every future call to this tool runs without asking, whatever risks it carries, not just the ones this particular call happened to flag. For when you have decided to stop being asked about a tool's *parameters* for a while, not just its name.
 - `always`: allow from now on. Persisted on the agent in `config.json`.
 - `deny`: refuse. Never remembered, so the same call is asked again later.
 
@@ -60,7 +61,7 @@ The coarser, older forms still work, unchanged:
 |---|---|
 | `"*"` | every tool, every risk (the owner's own agent) |
 | `"bash"` | a blank cheque on bash, as written by a Pepe from before this existed |
-| `"bash:any"` | the same blank cheque, written knowingly |
+| `"bash:any"` | the same blank cheque, written knowingly - this is what `session_any` grants, just kept in memory instead of `config.json` |
 
 <div class="note"><strong>This is not a sandbox, and must not be read as one.</strong> The classification reads the command as text, and text lies: a command can be assembled at runtime, base64-decoded, or hidden inside a script the agent wrote a moment earlier. It fails closed, in the sense that an unrecognised risk is never covered by a narrower grant. What it closes is the gap between what a human looked at and what they actually signed. It does not turn a container that runs LLM-chosen shell into a safe place, and that container still needs to be one you would be willing to lose.</div>
 

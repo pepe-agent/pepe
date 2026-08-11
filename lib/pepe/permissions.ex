@@ -19,13 +19,20 @@ defmodule Pepe.Permissions do
 
   A decision is one of:
 
-    * `:once`     - allow just this call; ask again next time.
-    * `:this_run` - allow for the rest of *this run only* (see below - the one decision that
-      still works while a run is tainted).
-    * `:session`  - allow for the rest of this session (kept in-memory; forgotten on
-      `/new` and on restart) - other sessions ask again.
-    * `:always`   - allow from now on; persisted on the agent in `config.json`.
-    * `:deny`     - refuse; never remembered, so it's asked again.
+    * `:once`        - allow just this call; ask again next time.
+    * `:this_run`    - allow for the rest of *this run only* (see below - the one decision
+      that still works while a run is tainted).
+    * `:session`     - allow for the rest of this session (kept in-memory; forgotten on
+      `/new` and on restart) - other sessions ask again, and only for calls whose risks
+      were already seen (see "A grant remembers what it was given for" below).
+    * `:session_any` - like `:session`, but a blank cheque: covers every call to this tool
+      for the rest of the session, whatever risks it carries, not just the ones this
+      particular call happened to flag. Exists for a human who has decided to stop being
+      asked about a tool's *parameters* for a while, not just its name - see
+      `Pepe.Permissions.Grant.for/2`'s `:any` clause. Never persisted; the same trust for
+      every future session still has to be granted explicitly with `:always`.
+    * `:always`      - allow from now on; persisted on the agent in `config.json`.
+    * `:deny`        - refuse; never remembered, so it's asked again.
 
   ## With nobody to ask, only what was pre-approved runs
 
@@ -101,7 +108,7 @@ defmodule Pepe.Permissions do
   # that.
   @ask_free_when_interactive ~w(bash run_script)
 
-  @type decision :: :once | :this_run | :session | :always | :deny | {:deny, String.t()}
+  @type decision :: :once | :this_run | :session | :session_any | :always | :deny | {:deny, String.t()}
 
   @doc "Whether a tool needs authorization before it can run."
   def requires_approval?(name), do: name not in @always_safe
@@ -429,6 +436,14 @@ defmodule Pepe.Permissions do
   defp remember(:session, name, risks, %{session_key: key}) when is_binary(key) do
     SessionStore.allow(key, Grant.for(name, risks))
     :session
+  end
+
+  # The blank-cheque session grant: stores "tool:any" instead of the current call's own
+  # risks, so `Grant.covers?/3` lets through every future call to this tool for the rest
+  # of the session, not just calls shaped like the one just approved.
+  defp remember(:session_any, name, _risks, %{session_key: key}) when is_binary(key) do
+    SessionStore.allow(key, Grant.for(name, :any))
+    :session_any
   end
 
   # `:this_run` only means anything while the run it was granted in is actually tainted -

@@ -22,8 +22,9 @@ without being dangerous.
      any plugin tool) needs **authorization** - the surface asks the user
      (Telegram buttons, console menu, dashboard prompt). Unknown tools default to
      risky (safe default).
-   - Decisions: allow once / for this session / always (persisted on the agent's
-     `auto_approve`) / deny.
+   - Decisions: allow once / for this session / for this session with any parameters
+     (skips the per-call risk check below, for the rest of the session) / always
+     (persisted on the agent's `auto_approve`) / deny.
    - A surface with no human to ask (the HTTP API, a webhook, a cron, a watch) refuses
      a gated tool outright instead of running it unwatched - see "No human, no
      surprises" below.

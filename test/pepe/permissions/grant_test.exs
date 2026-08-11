@@ -130,6 +130,7 @@ defmodule Pepe.Permissions.GrantTest do
     test "read like what they are" do
       assert Grant.for("bash", []) == "bash:none"
       assert Grant.for("bash", [:network, :deletes]) == "bash:deletes+network"
+      assert Grant.for("bash", :any) == "bash:any"
 
       assert Grant.describe("bash:none") =~ "no risk"
       assert Grant.describe("bash:any") =~ "anything"
@@ -145,6 +146,14 @@ defmodule Pepe.Permissions.GrantTest do
 
       # A grant for one tool says nothing about another.
       refute Grant.covers?(["bash:any"], "write_file", [])
+    end
+
+    test "Grant.for/2 with :any covers every risk a later call carries, not just the ones seen when it was granted" do
+      grant = Grant.for("bash", :any)
+      assert Grant.covers?([grant], "bash", [])
+      assert Grant.covers?([grant], "bash", [:deletes, :network, :elevated])
+      # Still says nothing about another tool.
+      refute Grant.covers?([grant], "write_file", [])
     end
   end
 

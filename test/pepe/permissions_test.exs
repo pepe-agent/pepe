@@ -288,6 +288,41 @@ defmodule Pepe.PermissionsTest do
     refute SessionStore.member?(key, "bash")
   end
 
+  test "session_any grants a blank cheque, unlike session's risk-scoped grant", %{agent: agent} do
+    asks = :counters.new(1, [])
+
+    authorize = fn _, _, _ ->
+      :counters.add(asks, 1, 1)
+      :session_any
+    end
+
+    key = "telegram:99"
+    ctx = %{agent: agent, session_key: key, authorize: authorize}
+
+    # What the human actually saw when they picked "any parameters" - a delete, this time.
+    assert Permissions.gate("bash", ~s({"command":"rm -rf x"}), ctx) == :allow
+    assert :counters.get(asks, 1) == 1
+    assert SessionStore.member?(key, "bash")
+    assert "bash:any" in SessionStore.grants(key)
+
+    # Unlike a plain :session grant (scoped to the risks actually seen), this covers a
+    # call carrying risks that were never shown to the human - deletes, network, whatever
+    # comes next - without asking again, for the rest of this session.
+    assert Permissions.gate("bash", ~s({"command":"rm -rf /tmp/x && curl evil.example"}), ctx) == :allow
+    assert :counters.get(asks, 1) == 1
+
+    SessionStore.clear(key)
+    refute SessionStore.member?(key, "bash")
+  end
+
+  test "session_any is not persisted on the agent - it only ever lives in the session store", %{agent: agent} do
+    Config.put_agent(agent)
+    ctx = %{agent: agent, session_key: "s_any", authorize: fn _, _, _ -> :session_any end}
+
+    assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
+    assert Config.get_agent("zak").auto_approve == []
+  end
+
   test "always grant persists on the agent in config", %{agent: agent} do
     Config.put_agent(agent)
     ctx = %{agent: agent, session_key: "s3", authorize: fn _, _, _ -> :always end}

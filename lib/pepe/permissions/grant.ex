@@ -69,12 +69,19 @@ defmodule Pepe.Permissions.Grant do
   @doc """
   The grant string to remember, given the risks the human just looked at and said yes to.
 
+  `:any` writes the blank cheque explicitly (`"bash:any"`) rather than the risks of one
+  particular call - for a human who chose to skip the per-call risk check for the rest of
+  a session, not for a Pepe inferring it from what a call happened to do.
+
       iex> Pepe.Permissions.Grant.for("bash", [])
       "bash:none"
       iex> Pepe.Permissions.Grant.for("bash", [:deletes, :network])
       "bash:deletes+network"
+      iex> Pepe.Permissions.Grant.for("bash", :any)
+      "bash:any"
   """
-  @spec for(String.t(), [Risk.kind()]) :: String.t()
+  @spec for(String.t(), [Risk.kind()] | :any) :: String.t()
+  def for(tool, :any), do: tool <> ":" <> @any
   def for(tool, []), do: tool <> ":" <> @none
 
   def for(tool, risks) do
