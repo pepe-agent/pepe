@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.15.0] - 2026-08-11
 
 ### Added
 - **Every agent now treats a message reaction as a standing learning signal, not just an event it happens to receive.** `Workspace.convention_note/0` (the scaffolding wrapped around every agent's own persona) gained a new "Reactions as feedback" section: on a channel with native reactions (Telegram today), a 👍 on the agent's last message makes it append what worked to its own memory, a 👎 makes it note what to avoid, and it never replies to the reaction itself. This is a change to the shared behavioral contract, so it applies to every existing agent immediately, with no opt-in and nothing in `config.json` to diff.
@@ -14,6 +14,7 @@ All notable changes to this project are documented here. Format follows
 - **An agent's persona can be managed from Langfuse instead of `config.json`.** Set an agent's new `langfuse_prompt` field (`mix pepe agent add NAME --langfuse-prompt PROMPT_NAME`, or the same field in the dashboard's agent editor) and Pepe fetches that agent's persona from a Langfuse-managed prompt (`Pepe.Langfuse`, cached 5 minutes) instead of its own `system_prompt`/`SOUL.md` - edit the prompt in Langfuse and the change reaches Pepe within a few minutes, no redeploy. Opt-in per agent; falls back to the local persona untouched if Langfuse is unreachable or the name doesn't resolve, so it's never a hard dependency.
 - **A project can now carry a prepaid balance** (`Pepe.Usage.Prepaid`), real funds credited rather than a cap that resets every month: `mix pepe project credit NAME AMOUNT` adds funds, `mix pepe project balance NAME` reads it, and a project's agents refuse new model calls once it hits zero until credited again - a genuine stop for running Pepe as a paid service, distinct from the existing monthly `--budget` throttle (a project can have either, both, or neither). A new generic, provider-agnostic webhook (`POST /webhooks/balance/:project`, bearer-token-guarded via `mix pepe project webhook-secret`) lets any payment processor credit a balance automatically once it has verified the payment on its own end. The Projects dashboard page shows a balance badge next to a project's spend-cap badge once one has ever been credited. Untouched for any project that has never been credited.
 - **A new permission decision, "Allow with any parameters" (`session_any`), lets you stop being asked about a tool's parameters for the rest of a session**, not just its name. The existing `session`/`always` grants only ever cover the specific risks a human actually looked at (approving `bash` while looking at `ls` never silently covered `rm`), which is deliberate but meant there was no way to say "stop asking me about this tool's arguments for a while" short of hand-editing `config.json` to a bare `"bash:any"` grant. The new option is available everywhere the permission prompt is (Telegram, the dashboard, the CLI), is session-only (never persisted, forgotten on `/new` or restart - the same lasting trust still requires `always`), and is labeled and confirmed distinctly from the ordinary session grant so its wider scope is never mistaken for the narrower one.
+- **Model selection and heartbeat pacing are now plugin slots.** Two new occupiable slots wire into `Pepe.Slots`: `model_select` (which model chain a run uses, defaulting to the existing static `Config.model_chain_for_agent/1`) and `heartbeat_interval` (whether a due Telegram pulse is allowed to fire, defaulting to always-allow). Also adds `Pepe.Usage.tier/1`, reporting `:normal`/`:low_compute`/`:critical`/`:dead` from the same budget ratio the spend cap already uses, so a plugin occupying either slot can react to budget pressure without re-deriving it itself.
 
 ### Changed
 - **The permission prompt (the "may I run this tool?" question, its decision buttons, risk warnings, and taint/policy notes) no longer carries emoji**, on Telegram, the dashboard, and the console alike - a plainer, more businesslike tone for something that is, functionally, a security decision.
@@ -750,7 +751,7 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
-[Unreleased]: https://github.com/pepe-agent/pepe/compare/v0.14.3...HEAD
+[0.15.0]: https://github.com/pepe-agent/pepe/compare/v0.14.3...v0.15.0
 [0.14.3]: https://github.com/pepe-agent/pepe/compare/v0.14.2...v0.14.3
 [0.14.2]: https://github.com/pepe-agent/pepe/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/pepe-agent/pepe/compare/v0.14.0...v0.14.1
