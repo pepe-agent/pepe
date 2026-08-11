@@ -191,24 +191,35 @@ defmodule Pepe.Agent.Runtime do
 
   defp do_run(%Agent{} = agent, messages, opts) do
     reset_run_state(opts)
+    chain = resolve_chain(agent, opts)
 
-    # The failover chain: an explicit :model wins (single-entry chain, bypasses the slot
-    # entirely - a caller pinning a model means exactly that model, not whatever policy a
-    # model_select occupant might apply); otherwise the model_select slot decides
-    # (Config.model_chain_for_agent/1 by default, unless a plugin occupies the slot - see
-    # Pepe.Slots). Transient errors advance down the chain.
-    chain =
-      case opts[:model] do
-        nil ->
-          case Pepe.Slots.Guard.call("model_select", :chain_for, [agent], agent) do
-            {:ok, chain} -> chain
-            {:error, _} -> Config.model_chain_for_agent(agent)
-          end
+    case preflight_gate(chain, agent) do
+      :ok -> run_chain(agent, chain, messages, opts)
+      {:error, _} = error -> error
+    end
+  end
 
-        model ->
-          [model]
-      end
+  # The failover chain: an explicit :model wins (single-entry chain, bypasses the slot
+  # entirely - a caller pinning a model means exactly that model, not whatever policy a
+  # model_select occupant might apply); otherwise the model_select slot decides
+  # (Config.model_chain_for_agent/1 by default, unless a plugin occupies the slot - see
+  # Pepe.Slots). Transient errors advance down the chain.
+  defp resolve_chain(agent, opts) do
+    case opts[:model] do
+      nil ->
+        case Pepe.Slots.Guard.call("model_select", :chain_for, [agent], agent) do
+          {:ok, chain} -> chain
+          {:error, _} -> Config.model_chain_for_agent(agent)
+        end
 
+      model ->
+        [model]
+    end
+  end
+
+  # Every reason a run must not even start: no model, a redaction requirement the agent
+  # can't meet, or a project-level spend gate already tripped.
+  defp preflight_gate(chain, agent) do
     cond do
       chain == [] ->
         {:error, :no_model_configured}
@@ -228,7 +239,7 @@ defmodule Pepe.Agent.Runtime do
         {:error, :balance_exhausted}
 
       true ->
-        run_chain(agent, chain, messages, opts)
+        :ok
     end
   end
 

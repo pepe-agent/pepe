@@ -2351,7 +2351,7 @@ defmodule Mix.Tasks.Pepe do
     if name == "root" or Config.project_exists?(name) do
       case Pepe.Usage.Prepaid.balance(scope_arg(name)) do
         nil -> info("#{name} has no prepaid balance (never credited) - only the monthly cap, if any, applies")
-        b -> ok("#{name}'s prepaid balance: #{Pepe.Usage.format_cost(b)}#{if b <= 0, do: " (exhausted - new calls are refused)", else: ""}")
+        b -> ok(balance_line(name, b))
       end
     else
       error("unknown project: #{name}")
@@ -2478,6 +2478,11 @@ defmodule Mix.Tasks.Pepe do
 
   defp project_cmd(other),
     do: error("unknown project command: #{Enum.join(other, " ")} (try: mix pepe project help)")
+
+  defp balance_line(name, balance) do
+    exhausted = if balance <= 0, do: " (exhausted - new calls are refused)", else: ""
+    "#{name}'s prepaid balance: #{Pepe.Usage.format_cost(balance)}#{exhausted}"
+  end
 
   defp print_project_summary(name) do
     count = length(Config.agents_in(name))
