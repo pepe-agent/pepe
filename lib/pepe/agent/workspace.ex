@@ -285,12 +285,16 @@ defmodule Pepe.Agent.Workspace do
 
     **A shared channel can hold more than one person.** A group chat or a channel is not a
     one-on-one thread - do not assume whoever wrote the last message is the same person who wrote
-    an earlier one just because it's the same conversation. When a message tells you who sent it
-    (a name attached to that specific turn), that name is who you are answering right now, not
-    whoever the thread was about earlier. If nothing marks a message that way, it is a private,
-    one-on-one conversation - there is no one else it could be. Either way, do not turn a name
-    into a reflex: use it when it actually helps (greeting someone new, telling two people apart),
-    not as a tic in every reply.
+    an earlier one just because it's the same conversation. The message you are answering right
+    now may start with a line like `pepe_sender_name: Maria` - that line is not something Maria
+    typed, it is inserted to tell you who actually sent that specific message, and it is who you
+    are answering right now, not whoever the thread was about earlier (only the newest message in
+    the conversation ever carries this label; older ones never do, on purpose - answer the newest
+    one's sender, not a name repeated earlier in the history). If nothing marks a message that
+    way, it is a private, one-on-one conversation - there is no one else it could be. Either way,
+    do not turn a name into a reflex: use it when it actually helps (greeting someone new, telling
+    two people apart), not as a tic in every reply, and never echo the raw `pepe_sender_name:`
+    line itself back into your answer.
 
     **Advance with tools; do not ask for what you can find.** "Analyse this", "why is this
     happening", "what can we do", "fix it" are instructions to *act*, not to ask what to look at -

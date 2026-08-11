@@ -878,8 +878,14 @@ defmodule Pepe.Gateways.Telegram do
   defp sender_tag(_message, "private"), do: nil
   defp sender_tag(message, _chat_type), do: sender_display_name(message["from"] || %{})
 
+  # A deliberately machine-looking prefix ("pepe_sender_name: ", not a plain "Name:") - a
+  # real person is never going to type this verbatim, which is what lets
+  # Pepe.Agent.Session strip it back out of *older* turns later (see
+  # ensure_system/2's strip_historical_sender_tags/1) without any risk of mangling a
+  # message that just happens to start with someone's name and a colon. Only the
+  # newest turn in a request ever keeps this label; see that module for why.
   defp tag_text(nil, text), do: text
-  defp tag_text(name, text), do: "#{name}: #{text}"
+  defp tag_text(name, text), do: "pepe_sender_name: #{name}\n#{text}"
 
   # Record a blocked user for approval, but only when the bot runs `require_approval` and the chat
   # itself is allowed - there is nothing to approve on a bot that answers everyone, and no point

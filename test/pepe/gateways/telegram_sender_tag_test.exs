@@ -33,10 +33,13 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
     end
 
     post "/chat/completions" do
-      [%{"content" => content} | _] =
-        conn.body_params["messages"] |> Enum.reverse() |> Enum.filter(&(&1["role"] == "user"))
+      user_contents =
+        conn.body_params["messages"]
+        |> Enum.filter(&(&1["role"] == "user"))
+        |> Enum.map(& &1["content"])
 
-      send(test_pid(), {:model_saw, content})
+      send(test_pid(), {:model_saw, List.last(user_contents)})
+      send(test_pid(), {:model_saw_all_user_turns, user_contents})
 
       json(conn, %{
         "choices" => [
@@ -125,7 +128,7 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
     queue_text(chat, "preciso do guia", chat_type: "supergroup", from: %{"id" => 42, "first_name" => "Salvador"})
 
     assert_receive {:model_saw, content}, 5_000
-    assert content == "Salvador: preciso do guia"
+    assert content == "pepe_sender_name: Salvador\npreciso do guia"
   end
 
   test "a private chat message is never tagged", %{chat: chat} do
@@ -141,6 +144,24 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
     queue_text(chat, "oi", chat_type: "group", from: %{"id" => 7, "username" => "svd"})
 
     assert_receive {:model_saw, content}, 5_000
-    assert content == "svd: oi"
+    assert content == "pepe_sender_name: svd\noi"
+  end
+
+  test "only the newest message in a request carries a sender label; earlier ones are stripped",
+       %{chat: chat} do
+    start_bot!()
+
+    queue_text(chat, "primeira mensagem", chat_type: "supergroup", from: %{"id" => 42, "first_name" => "Salvador"})
+    assert_receive {:model_saw, first}, 5_000
+    assert first == "pepe_sender_name: Salvador\nprimeira mensagem"
+
+    queue_text(chat, "segunda mensagem", chat_type: "supergroup", from: %{"id" => 99, "first_name" => "Jhonathas"})
+    assert_receive {:model_saw_all_user_turns, [first_seen_again, second]}, 5_000
+
+    # The current (second) turn is labeled; the first turn's label is gone from the
+    # history the model sees on this call, even though it's the exact same stored
+    # text that went out tagged on the previous call.
+    assert first_seen_again == "primeira mensagem"
+    assert second == "pepe_sender_name: Jhonathas\nsegunda mensagem"
   end
 end

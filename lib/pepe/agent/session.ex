@@ -1303,10 +1303,34 @@ defmodule Pepe.Agent.Session do
   end
 
   # A session started before any agent existed has no system message yet - seed one.
-  defp ensure_system([%{"role" => "system"} | _] = messages, _agent), do: messages
+  defp ensure_system([%{"role" => "system"} = sys | rest], _agent),
+    do: [sys | strip_historical_sender_tags(rest)]
 
   defp ensure_system(messages, agent),
-    do: [Message.system(Workspace.system_prompt(agent)) | messages]
+    do: [Message.system(Workspace.system_prompt(agent)) | strip_historical_sender_tags(messages)]
+
+  # Pepe.Gateways.Telegram tags a group message with who sent it ("pepe_sender_name:
+  # <name>\n<text>", see its tag_text/2) so a multi-person channel doesn't leave the
+  # model guessing. Every call site here always appends the CURRENT turn's own message
+  # after this function returns (never before), so `messages` here is only ever the
+  # history from *earlier* turns - never the one being answered right now. A long
+  # history could otherwise carry the same name on many stored turns in a row, and the
+  # model would sometimes keep addressing that name even once a different person sends
+  # the newest message (a real, observed misfire). Stripping the label from everything
+  # except what's actually the newest turn removes that repeated-name pull entirely:
+  # only one message in the whole request ever carries a sender label, so there is
+  # nothing left to anchor on but the truth.
+  @sender_tag_prefix ~r/\Apepe_sender_name: .*\n/
+
+  defp strip_historical_sender_tags(messages) do
+    Enum.map(messages, fn
+      %{"role" => "user", "content" => content} = m when is_binary(content) ->
+        %{m | "content" => String.replace(content, @sender_tag_prefix, "")}
+
+      m ->
+        m
+    end)
+  end
 
   # A `lang` opt (the widget's `data-lang`, threaded from the join payload) nudges the
   # agent to reply in the site's declared language from its very first turn, before

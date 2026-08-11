@@ -3,7 +3,10 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.16.0] - 2026-08-11
+## [Unreleased]
+
+### Changed
+- **In a Telegram group, only the newest message in a request now carries a "who sent this" label - not every message in the whole history.** A group message has always been tagged with the sender's name before reaching the model (`Salvador: ...`), but the tag was baked into every stored turn permanently, so a long conversation could carry the same name on many turns in a row - and the model would sometimes keep addressing that name even once a different person sent the newest message (a real, observed misfire: a follow-up from one person got answered as if it were still the earlier person). The tag format changed to an unambiguous marker (`pepe_sender_name: <name>` on its own line) specifically so it can be safely stripped back out of older turns without any risk of mangling a message that just happens to start with a name and a colon; only the current turn ever keeps it. **This is a change to `behavior_contract/0`** (the "a shared channel can hold more than one person" rule now explains the label format directly), so it applies to every existing agent immediately.
 
 ### Added
 - **A denied Telegram button tap is now logged** (`chat`, `user_id`, and the full Telegram `from` object), where nothing was recorded before. A denied tap on a permission/`ask_user`/model-picker button already fails silently client-side (Telegram itself tells the presser they're not authorized), but until now Pepe kept no record of who it was or what Telegram said about them - so a report like "this person can chat here, but their button tap gets refused" had no way to be diagnosed. Logging the full `from` object, not just the id, is deliberate: a "send as" identity (an anonymous group admin, or a channel linked to the group) can make a tap's `from.id` differ from the same person's own text messages in the same chat, which would explain that exact symptom without their allowlist entry being wrong at all.
