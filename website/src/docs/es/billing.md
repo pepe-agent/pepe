@@ -105,6 +105,53 @@ La página Projects del panel tiene los mismos dos botones junto al indicador de
 
 Un reinicio no borra nada; solo marca un punto de corte. El gasto o los mensajes registrados antes del reinicio siguen en el ledger; simplemente dejan de contar para el tope de ahí en adelante. Esto importa por un motivo concreto: **el indicador del tope de gasto y el botón de reinicio solo afectan al recuento operativo usado para bloquear nuevas llamadas al modelo.** El registro de facturación real del mes, lo que le facturarías a un cliente, vive en Usage y siempre refleja el total real, reiniciado o no. Si reinicias el tope de gasto de un proyecto a mitad de mes, el indicador de la página Projects mostrará un número menor que la página Usage para ese mismo mes; eso es lo esperado, no una inconsistencia, ya que responden a preguntas distintas ("¿se ha limitado este proyecto desde el último reinicio?" frente a "¿cuánto costó realmente este proyecto este mes?").
 
+## Saldo prepago (dinero real, no un tope mensual)
+
+El tope de gasto de arriba se reinicia solo cada mes: es un freno, no dinero. Un
+**saldo prepago** es distinto: fondos reales acreditados (un pago recibido, o
+añadido a mano), gastados según el consumo facturable real, rechazando nuevas
+llamadas de modelo en cuanto llega a cero y manteniéndose rechazado hasta que se
+recarga. Útil para operar Pepe como servicio de pago: el agente de un cliente
+funciona hasta que se agota lo que pagó, no hasta que cambia el mes en el
+calendario.
+
+Un proyecto que nunca se ha acreditado queda totalmente sin cambios: solo se le
+aplica el tope de gasto de arriba, exactamente como si esto no existiera. En el
+momento en que algo acredita un proyecto, pasa a existir un saldo para él y se
+aplican ambos frenos: tanto el tope de gasto como el saldo llegando a cero
+detienen nuevas llamadas.
+
+```bash
+pepe project credit acme 50          # añade $50 (o la moneda que hayas configurado)
+pepe project balance acme            # muestra el saldo actual
+```
+
+La página de Proyectos del panel muestra una insignia de saldo (azul, o roja
+cuando se agota) junto a la insignia del tope de gasto del proyecto, una vez que
+se le ha acreditado alguna vez.
+
+### Acreditarlo automáticamente desde un pago
+
+Un webhook genérico, sin atarse a un procesador concreto, acredita un saldo desde
+cualquier procesador de pagos: deliberadamente sin integrar el SDK o el esquema
+de firma de un procesador específico. Apunta el webhook de tu propio procesador
+de pagos hacia él (una función relay pequeña, un paso en Zapier/Make, o
+directamente si el procesador te deja poner un bearer token estático) una vez que
+ya haya verificado el pago por su lado:
+
+```bash
+pepe project webhook-secret TU_SECRETO
+
+curl -X POST https://TU_HOST/webhooks/balance/acme \
+  -H "Authorization: Bearer TU_SECRETO" \
+  -d '{"amount": 10}'
+```
+
+Un solo secreto para los endpoints de saldo de todos los proyectos: la idea es
+que se quede con tu propio relay/automatización, no que se entregue a terceros
+por cliente. El endpoint rechaza toda petición (404) hasta que se define un
+secreto; `pepe project webhook-secret --clear` lo vuelve a desactivar.
+
 ## Leer el consumo y exportar facturas
 
 ```bash

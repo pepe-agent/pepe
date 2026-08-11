@@ -3466,6 +3466,22 @@ defmodule Pepe.Config do
   @doc "Is the dashboard behind a password? (a dashboard password is configured)"
   def dashboard_auth_required?, do: not is_nil(dashboard_password())
 
+  @doc """
+  The shared secret for `POST /webhooks/balance/:project` (see
+  `PepeWeb.BalanceWebhookController`), or nil when unset - in which case that endpoint
+  refuses every request rather than accepting unauthenticated credits to a real prepaid
+  balance. Read from config `"balance_webhook_secret"` (`${ENV}`-interpolated) with a
+  fallback to the `PEPE_BALANCE_WEBHOOK_SECRET` env var. One secret for every project's
+  balance endpoint - it's meant to be held by your own payment-processor relay/
+  automation, not handed to a third party per project.
+  """
+  def balance_webhook_secret do
+    case interpolate(load()["balance_webhook_secret"]) do
+      s when is_binary(s) and s != "" -> s
+      _ -> blank_env("PEPE_BALANCE_WEBHOOK_SECRET")
+    end
+  end
+
   @bcrypt_hash ~r/^\$2[aby]\$\d{2}\$[A-Za-z0-9.\/]{53}$/
 
   @doc """

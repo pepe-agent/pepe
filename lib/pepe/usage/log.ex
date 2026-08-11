@@ -103,6 +103,32 @@ defmodule Pepe.Usage.Log do
     |> Enum.map(&to_map/1)
   end
 
+  @doc """
+  Entries for a scope with `after_id < id <= up_to_id` (or just `id > after_id` when
+  `up_to_id` is `nil`) - unambiguous even when several entries land in the same
+  wall-clock second (unlike `entries_between/3`'s `at`, which only has second
+  resolution). What `Pepe.Usage.Prepaid` settles a balance checkpoint against; the upper
+  bound lets it settle up to a snapshot it took first, so an entry written concurrently,
+  mid-settle, is simply deferred to the next settle instead of silently skipped (it
+  would otherwise never be billed: past the old checkpoint, but also past a new one
+  taken *after* it existed).
+  """
+  @spec entries_after_id(String.t() | nil, integer(), integer() | nil) :: [map()]
+  def entries_after_id(scope, after_id, up_to_id \\ nil) do
+    name = scope_name(scope)
+    query = from(e in Usage, where: e.project == ^name and e.id > ^after_id, order_by: e.id)
+    query = if up_to_id, do: from(e in query, where: e.id <= ^up_to_id), else: query
+
+    query |> Repo.all() |> Enum.map(&to_map/1)
+  end
+
+  @doc "The highest entry id recorded for a scope so far, or 0 if it has none yet."
+  @spec latest_id(String.t() | nil) :: integer()
+  def latest_id(scope) do
+    name = scope_name(scope)
+    from(e in Usage, where: e.project == ^name, select: max(e.id)) |> Repo.one() || 0
+  end
+
   defp to_map(%Usage{} = e) do
     base = %{
       "id" => e.id,

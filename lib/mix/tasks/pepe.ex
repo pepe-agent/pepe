@@ -2327,6 +2327,55 @@ defmodule Mix.Tasks.Pepe do
   defp project_cmd(["reset-budget" | _]),
     do: error("usage: mix pepe project reset-budget NAME|root")
 
+  # Real money credited toward a project's prepaid balance - separate from the monthly
+  # cap reset-budget touches (see Pepe.Usage.Prepaid). The first credit ever given to a
+  # project is what turns this gate on for it at all.
+  defp project_cmd(["credit", name, amount_str | _]) do
+    if name == "root" or Config.project_exists?(name) do
+      with {amount, ""} <- Float.parse(amount_str),
+           {:ok, new_balance} <- Pepe.Usage.Prepaid.credit(scope_arg(name), amount) do
+        ok("credited #{green(Pepe.Usage.format_cost(amount))} to #{green(name)} - new balance: #{Pepe.Usage.format_cost(new_balance)}")
+      else
+        :error -> error("not a number: #{amount_str}")
+        {:error, :invalid_amount} -> error("amount must be a positive number")
+      end
+    else
+      error("unknown project: #{name}")
+    end
+  end
+
+  defp project_cmd(["credit" | _]),
+    do: error("usage: mix pepe project credit NAME|root AMOUNT")
+
+  defp project_cmd(["balance", name | _]) do
+    if name == "root" or Config.project_exists?(name) do
+      case Pepe.Usage.Prepaid.balance(scope_arg(name)) do
+        nil -> info("#{name} has no prepaid balance (never credited) - only the monthly cap, if any, applies")
+        b -> ok("#{name}'s prepaid balance: #{Pepe.Usage.format_cost(b)}#{if b <= 0, do: " (exhausted - new calls are refused)", else: ""}")
+      end
+    else
+      error("unknown project: #{name}")
+    end
+  end
+
+  defp project_cmd(["balance" | _]),
+    do: error("usage: mix pepe project balance NAME|root")
+
+  # One secret, not per-project: it's meant to be held by your own payment-processor
+  # relay/automation (see PepeWeb.BalanceWebhookController), not handed out per client.
+  defp project_cmd(["webhook-secret", "--clear"]) do
+    Config.save(Map.delete(Config.load(), "balance_webhook_secret"))
+    ok("balance webhook secret cleared - POST /webhooks/balance/:project now refuses every request")
+  end
+
+  defp project_cmd(["webhook-secret", value | _]) do
+    Config.save(Map.put(Config.load(), "balance_webhook_secret", value))
+    ok("balance webhook secret set - POST /webhooks/balance/:project now accepts credits with this bearer token")
+  end
+
+  defp project_cmd(["webhook-secret"]),
+    do: error("usage: mix pepe project webhook-secret VALUE|--clear")
+
   defp project_cmd(["list" | _]) do
     case Config.project_slugs() do
       [] ->
@@ -2392,6 +2441,9 @@ defmodule Mix.Tasks.Pepe do
                                        update caps/markup/description (only the flags given change)
       reset-messages NAME|root        zero the message count early, before the month rolls over
       reset-budget NAME|root          zero the spend count early, before the month rolls over
+      credit NAME|root AMOUNT         add real funds to a prepaid balance
+      balance NAME|root               show a prepaid balance (and whether it's exhausted)
+      webhook-secret VALUE|--clear    set/clear the payment-webhook bearer token
       list                            list projects + how many agents each has
       rename OLD NEW                  rename a project (re-keys all its agents & bindings)
       remove NAME [--force]           delete a project (--force also drops its agents)
@@ -2407,6 +2459,16 @@ defmodule Mix.Tasks.Pepe do
     toggle it later on the dashboard's agent edit page (there's no CLI way to flip
     it on an existing agent without touching its other settings - `agent add` on an
     existing name replaces the whole agent, it doesn't patch one field).
+
+    `credit`/`balance` are a separate, opt-in gate from --budget: real money credited
+    (a payment, or added by hand), depleted by actual billable spend, refusing new
+    model calls at zero - unlike --budget, which resets on its own every month. A
+    scope with no credit ever given is unaffected; only --budget applies to it, same
+    as before this existed. `webhook-secret` sets the bearer token a payment
+    processor's own webhook relay uses to credit it automatically:
+
+      curl -X POST https://YOUR_HOST/webhooks/balance/acme \\
+        -H "Authorization: Bearer YOUR_SECRET" -d '{"amount": 10}'
 
     Without --project, every command uses the root scope. Add --project NAME to an
     agent/model command to act inside that project; its agents, workspaces,

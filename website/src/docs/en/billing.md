@@ -105,6 +105,49 @@ The Projects dashboard page has the same two buttons next to each cap's badge, w
 
 A reset does not delete anything; it just marks a cutoff. Spend or messages recorded before the reset stay in the ledger; they simply stop counting toward the cap going forward. This matters for one thing specifically: **the spend cap badge and the reset button only affect the operational count used to gate new model calls.** The actual month's billing record, what you'd invoice a client for, lives in Usage and always reflects the real total, reset or not. If you reset a project's spend cap mid-month, the Projects page badge will show a smaller number than the Usage page for that same month; that's expected, not a discrepancy, since they answer different questions ("has this project been throttled since I last reset it?" versus "what did this project actually cost this month?").
 
+## Prepaid balances (real money credited, not a monthly cap)
+
+The spend cap above resets on its own every month - it's a throttle, not money. A
+**prepaid balance** is different: real funds credited (a payment received, or added
+by hand), depleted by actual billable spend, refusing new model calls once it hits
+zero and staying refused until credited again. Useful for running Pepe as a paid
+service: a client's agent works until what they paid for runs out, not until the
+calendar rolls over.
+
+A project with no balance ever credited is completely unaffected - only the spend
+cap above applies to it, exactly as if this didn't exist. The moment something
+credits a project, a balance exists for it and both gates apply: either the spend
+cap or the balance hitting zero stops new calls.
+
+```bash
+pepe project credit acme 50          # add $50 (or whatever your currency is)
+pepe project balance acme            # see the current balance
+```
+
+The Projects dashboard page shows a balance badge (blue, or red once exhausted)
+next to a project's spend-cap badge, once one has ever been credited.
+
+### Crediting it automatically from a payment
+
+A generic, provider-agnostic webhook credits a balance from any payment processor -
+deliberately not tied to one specific processor's SDK or signature scheme. Point
+your own payment processor's webhook handler at it (a small relay function, a
+Zapier/Make step, or directly if the processor lets you set a static bearer token)
+once it has already verified the payment on its end:
+
+```bash
+pepe project webhook-secret YOUR_SECRET
+
+curl -X POST https://YOUR_HOST/webhooks/balance/acme \
+  -H "Authorization: Bearer YOUR_SECRET" \
+  -d '{"amount": 10}'
+```
+
+One secret for every project's balance endpoint - it's meant to be held by your own
+relay/automation, not handed to a third party per project. The endpoint refuses
+every request (404) until a secret is set; `pepe project webhook-secret --clear`
+turns it back off.
+
 ## Reading usage and exporting invoices
 
 ```bash

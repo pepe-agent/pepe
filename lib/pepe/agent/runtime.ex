@@ -221,6 +221,12 @@ defmodule Pepe.Agent.Runtime do
       Pepe.Usage.over_budget?(Pepe.Project.of(agent.name)) ->
         {:error, :budget_exceeded}
 
+      # A project with a prepaid balance (see Pepe.Usage.Prepaid) that's run out - a
+      # separate, opt-in gate from the monthly cap above, both checked because a
+      # project can have either, both, or neither.
+      Pepe.Usage.Prepaid.exhausted?(Pepe.Project.of(agent.name)) ->
+        {:error, :balance_exhausted}
+
       true ->
         run_chain(agent, chain, messages, opts)
     end

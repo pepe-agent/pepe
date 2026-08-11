@@ -105,6 +105,53 @@ A página Projetos do painel tem os mesmos dois botões junto ao badge de cada l
 
 Uma reposição não apaga nada: apenas marca um ponto de corte. Despesa ou mensagens registadas antes da reposição continuam no ledger; simplesmente deixam de contar para o limite daí em diante. Isto importa por um motivo específico: **o badge do limite de despesa e o botão de reposição só afetam a contagem operacional usada para bloquear novas chamadas ao modelo.** O registo de faturação real do mês, aquilo que faturarias a um cliente, vive em Usage e reflete sempre o total real, reposto ou não. Se repuseres o limite de despesa de um projeto a meio do mês, o badge da página Projetos vai mostrar um número menor do que a página Usage para o mesmo mês; isso é esperado, não uma inconsistência, já que respondem a perguntas diferentes ("este projeto foi limitado desde a última reposição?" contra "quanto é que este projeto custou realmente este mês?").
 
+## Saldo pré-pago (dinheiro real, não um teto mensal)
+
+O teto de gasto acima reinicia-se sozinho todos os meses — é um travão, não
+dinheiro. Um **saldo pré-pago** é diferente: fundos reais creditados (um
+pagamento recebido, ou adicionado à mão), gastos conforme o consumo faturável
+real, recusando novas chamadas de modelo assim que chega a zero e mantendo-se
+recusado até ser creditado de novo. Útil para correr o Pepe como serviço pago: o
+agente de um cliente trabalha até acabar o que pagou, não até o mês virar no
+calendário.
+
+Um projeto que nunca foi creditado fica completamente inalterado — só o teto de
+gasto acima se aplica a ele, exatamente como se isto não existisse. No momento em
+que algo credita um projeto, passa a existir um saldo para ele e os dois travões
+aplicam-se: tanto o teto de gasto como o saldo a chegar a zero param novas
+chamadas.
+
+```bash
+pepe project credit acme 50          # adiciona 50€ (ou a moeda que configuraste)
+pepe project balance acme            # mostra o saldo atual
+```
+
+A página de Projetos no dashboard mostra um selo de saldo (azul, ou vermelho
+quando esgotado) ao lado do selo do teto de gasto do projeto, uma vez que já
+tenha sido creditado.
+
+### Creditar automaticamente a partir de um pagamento
+
+Um webhook genérico, sem ligação a um processador específico, credita um saldo a
+partir de qualquer processador de pagamento — deliberadamente sem integrar o SDK
+ou o esquema de assinatura de um processador em concreto. Aponta o webhook do teu
+próprio processador de pagamento para ele (uma função relay pequena, um passo no
+Zapier/Make, ou diretamente se o processador te deixar definir um bearer token
+estático) depois de ele já ter verificado o pagamento do lado dele:
+
+```bash
+pepe project webhook-secret O_TEU_SEGREDO
+
+curl -X POST https://O_TEU_HOST/webhooks/balance/acme \
+  -H "Authorization: Bearer O_TEU_SEGREDO" \
+  -d '{"amount": 10}'
+```
+
+Um único segredo para os endpoints de saldo de todos os projetos — a ideia é que
+fique com o teu próprio relay/automação, não que sejas dado a terceiros por
+cliente. O endpoint recusa todos os pedidos (404) até um segredo ser definido;
+`pepe project webhook-secret --clear` desliga-o de novo.
+
 ## Ler o consumo e exportar faturas
 
 ```bash

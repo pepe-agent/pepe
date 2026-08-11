@@ -1600,6 +1600,9 @@ defmodule Pepe.Gateways.Telegram do
   defp friendly_error(:budget_exceeded),
     do: gettext("This workspace has hit its monthly spending limit. It resumes next month, or an admin can raise the cap.")
 
+  defp friendly_error(:balance_exhausted),
+    do: gettext("This workspace is out of prepaid balance. An admin needs to add funds before it can continue.")
+
   defp friendly_error(:message_limit_exceeded),
     do: gettext("This workspace has hit its monthly message limit. It resumes next month, or an admin can raise the cap.")
 

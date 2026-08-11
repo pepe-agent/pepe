@@ -164,6 +164,31 @@ defmodule Pepe.Usage do
   end
 
   @doc """
+  Billable spend for `project` recorded after ledger entry id `after_id`, with no month
+  boundary or `reset_budget/1` involved - the building block `Pepe.Usage.Prepaid` sums
+  from a balance's own checkpoint instead of a calendar month. An id, not a timestamp:
+  entries only carry second resolution, so two events in the same wall-clock second
+  (routine under real load) would be genuinely ambiguous to order by time - the
+  auto-increment id is the one thing that's never ambiguous. Same pricing pass as
+  `month_to_date/1` (billable = list price × the project's markup), just a different
+  window.
+
+  A caller that wants a stable read (e.g. settling a checkpoint) should pass `up_to_id`
+  - a snapshot taken *before* summing, so an entry written concurrently mid-call is
+  deferred to the next call rather than silently missed (see `Log.entries_after_id/3`).
+  """
+  @spec billable_after_id(String.t() | nil, integer(), integer() | nil) :: float()
+  def billable_after_id(project, after_id, up_to_id \\ nil) when is_integer(after_id) do
+    models = Map.new(Config.models(), &{&1.name, &1})
+    cache = Pricing.load_cache()
+    entries = Log.entries_after_id(project, after_id, up_to_id)
+
+    prices = price_lookup(entries, models, cache)
+    markups = markup_lookup(entries)
+    Enum.reduce(entries, 0.0, fn e, acc -> acc + price(e, prices, markups)["billable"] end)
+  end
+
+  @doc """
   Is `project` at or over its monthly spend cap? Always `false` when no cap is set
   (see `Pepe.Config.project_budget/1`). This is the runtime's pre-flight budget gate.
   """

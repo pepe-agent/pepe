@@ -54,6 +54,15 @@ defmodule PepeWeb.Router do
     post "/:project/:provider/:slug", WebhookController, :receive
   end
 
+  # A generic, provider-agnostic endpoint for crediting a project's prepaid balance -
+  # see PepeWeb.BalanceWebhookController. Separate from the channel-provider webhooks
+  # above (no agent, no session, no chat reply - just verify + credit + respond).
+  scope "/webhooks/balance", PepeWeb do
+    pipe_through :api
+
+    post "/:project", BalanceWebhookController, :credit
+  end
+
   # The chat widget's dashboard-managed appearance - must come before the generic
   # asset route below, or "config" would be looked up as a static file and 404.
   scope "/plugin-assets/pepe-widget", PepeWeb do

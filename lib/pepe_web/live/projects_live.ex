@@ -49,7 +49,10 @@ defmodule PepeWeb.ProjectsLive do
       budget_reset_at: Pepe.Usage.budget_reset_at(scope),
       over_message_limit: Pepe.Usage.over_message_limit?(scope),
       message_count: Pepe.Usage.message_count_month_to_date(scope),
-      messages_reset_at: Pepe.Usage.messages_reset_at(scope)
+      messages_reset_at: Pepe.Usage.messages_reset_at(scope),
+      # nil unless something has ever credited this scope (see Pepe.Usage.Prepaid) -
+      # most projects never touch this and the card below stays exactly as it was.
+      prepaid_balance: Pepe.Usage.Prepaid.balance(scope)
     }
   end
 
@@ -143,6 +146,17 @@ defmodule PepeWeb.ProjectsLive do
               >
                 {gettext("reset")}
               </button>
+              <span :if={@usage["root"].prepaid_balance} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
+              <span
+                :if={@usage["root"].prepaid_balance}
+                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above - add funds with mix pepe project credit.")}
+                class={[
+                  "rounded px-1.5",
+                  (@usage["root"].prepaid_balance <= 0 && "bg-red-800/60 text-red-200") || "bg-sky-900/40 text-sky-200"
+                ]}
+              >
+                {gettext("balance: %{amount}", amount: money(@usage["root"].prepaid_balance, Config.currency()))}
+              </span>
             </div>
           </div>
           <div :for={name <- @projects} class={card()}>
@@ -217,6 +231,17 @@ defmodule PepeWeb.ProjectsLive do
               >
                 {gettext("reset")}
               </button>
+              <span :if={@usage[name].prepaid_balance} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
+              <span
+                :if={@usage[name].prepaid_balance}
+                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above - add funds with mix pepe project credit.")}
+                class={[
+                  "rounded px-1.5",
+                  (@usage[name].prepaid_balance <= 0 && "bg-red-800/60 text-red-200") || "bg-sky-900/40 text-sky-200"
+                ]}
+              >
+                {gettext("balance: %{amount}", amount: money(@usage[name].prepaid_balance, Config.currency()))}
+              </span>
             </div>
           </div>
           <p :if={@projects == []} class="text-[15px] text-zinc-500">
