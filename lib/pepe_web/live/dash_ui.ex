@@ -391,6 +391,7 @@ defmodule PepeWeb.DashUI do
           {gettext("Sign out")}
         </.link>
         {gettext("Local dashboard · localhost")}
+        · v{Pepe.Update.current()}
       </div>
     </aside>
 

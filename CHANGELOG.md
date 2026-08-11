@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **A denied Telegram button tap is now logged** (`chat`, `user_id`, and the full Telegram `from` object), where nothing was recorded before. A denied tap on a permission/`ask_user`/model-picker button already fails silently client-side (Telegram itself tells the presser they're not authorized), but until now Pepe kept no record of who it was or what Telegram said about them - so a report like "this person can chat here, but their button tap gets refused" had no way to be diagnosed. Logging the full `from` object, not just the id, is deliberate: a "send as" identity (an anonymous group admin, or a channel linked to the group) can make a tap's `from.id` differ from the same person's own text messages in the same chat, which would explain that exact symptom without their allowlist entry being wrong at all.
+- **The dashboard sidebar now shows the running Pepe version** next to the "Local dashboard" label - there was previously no way to tell which version was running from the dashboard itself (only `mix pepe version`/`doctor` on the CLI).
+
 ## [0.15.0] - 2026-08-11
 
 ### Added

@@ -697,6 +697,8 @@ defmodule Pepe.Gateways.Telegram do
 
     if active?() and may_approve?(chat_id, user_id) do
       deliver_permission(data, cq)
+    else
+      log_denied_callback("perm", chat_id, user_id, cq)
     end
   end
 
@@ -710,6 +712,8 @@ defmodule Pepe.Gateways.Telegram do
 
     if active?() and allowed?(chat_id, user_id) do
       deliver_ask(data, cq)
+    else
+      log_denied_callback("ask", chat_id, user_id, cq)
     end
   end
 
@@ -739,6 +743,8 @@ defmodule Pepe.Gateways.Telegram do
       after
         put_thread(nil)
       end
+    else
+      log_denied_callback("model", chat_id, user_id, cq)
     end
   end
 
@@ -1897,6 +1903,20 @@ defmodule Pepe.Gateways.Telegram do
 
   defp answer_callback(callback_id) do
     Req.post(api_url(token(), "answerCallbackQuery"), json: %{callback_query_id: callback_id})
+  end
+
+  # A button tap the allowlist rejected. Telegram itself shows the presser a native "not
+  # authorized" dialog before we ever see this - nothing in our own denial path is silent
+  # here on purpose, unlike a denied text message (which the user can at least see was
+  # ignored). The one thing worth capturing is *who* Telegram said tapped it: a group
+  # member acting under a "send as" identity (an anonymous admin, or a channel linked to
+  # the group) taps as themselves but the callback's `from` can carry a different,
+  # pseudo-account id than the same person's own text messages do in the same chat - which
+  # would explain "this person can chat here, but their tap gets refused" without their
+  # allowlist entry being wrong at all. Log the full `from` object (not just the id) so a
+  # future occurrence shows whether that's what happened, rather than guessing again.
+  defp log_denied_callback(kind, chat_id, user_id, cq) do
+    Logger.info("[telegram] denied #{kind} callback: chat=#{chat_id} user_id=#{user_id} from=#{inspect(cq["from"])}")
   end
 
   ###
