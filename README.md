@@ -20,6 +20,17 @@
   <a href="https://pepe-agent.com/en/docs/quickstart/">Quickstart</a>
 </p>
 
+> **Where Pepe comes from.** Pepe was born out of solving real problems across
+> a range of companies I provided development services to: some needed a
+> simple way to run their marketing without expanding headcount; others
+> wanted to connect their ERP and database to an agent capable of answering
+> their team's questions, without compromising on security. The project
+> didn't start as open source: it was internal, proprietary tooling,
+> custom-built for each client. But the results proved consistent enough,
+> across different enough businesses, that I decided to give it a name, an
+> identity of its own, and release it as open source, for anyone to use and
+> contribute to.
+
 > **Why "Pepe"?** The name nods to Chespirito's comedy universe, loved across
 > Latin America generations grew up with. The character's whole thing? **He
 > did exactly what he was told.** No arguing, no improvising beyond the

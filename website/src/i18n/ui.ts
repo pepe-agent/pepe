@@ -163,6 +163,8 @@ export const ui = {
     "cta.sub": "Open source. Bring your model. Keep the runtime, keys, and data under your control.",
     "cta.start": "Quickstart",
     "cta.github": "Star on GitHub",
+    "origin.title": "Where Pepe comes from",
+    "origin.body": "Pepe was born out of solving real problems across a range of companies I provided development services to: some needed a simple way to run their marketing without expanding headcount; others wanted to connect their ERP and database to an agent capable of answering their team's questions, without compromising on security. The project didn't start as open source: it was internal, proprietary tooling, custom-built for each client. But the results proved consistent enough, across different enough businesses, that I decided to give it a name, an identity of its own, and release it as open source, for anyone to use and contribute to.",
     "why.title": "Why \"Pepe\"?",
     "why.body": "The name nods to Chespirito's comedy universe, loved across Latin America. Pepe's joke was simple: he did exactly what he was told. No debate, no freelancing. That is a pretty good brief for an agent runtime.",
 
@@ -334,6 +336,8 @@ export const ui = {
     "cta.sub": "Código abierto. Trae tu modelo. Mantén el runtime, las claves y los datos bajo tu control.",
     "cta.start": "Inicio rápido",
     "cta.github": "Dale una estrella en GitHub",
+    "origin.title": "De dónde viene Pepe",
+    "origin.body": "Pepe nació resolviendo problemas reales en una serie de empresas a las que prestaba servicios de desarrollo: algunas necesitaban una forma simple de llevar su marketing sin ampliar el equipo; otras buscaban conectar su ERP y su base de datos a un agente capaz de responder las preguntas de su equipo, sin comprometer la seguridad. El proyecto no nació abierto: era una herramienta interna, propietaria, desarrollada a medida para cada cliente. Pero los resultados fueron tan consistentes, en negocios tan distintos, que decidí darle un nombre, una identidad propia, y publicarlo como proyecto de código abierto, para que cualquier persona pueda usarlo y contribuir.",
     "why.title": "¿Por qué \"Pepe\"?",
     "why.body": "El nombre es un guiño al universo de Chespirito, querido en toda América Latina. El chiste de Pepe era simple: hacía exactamente lo que le pedían. Sin discutir ni improvisar. Una buena descripción para un runtime de agentes.",
 
@@ -505,6 +509,8 @@ export const ui = {
     "cta.sub": "Código aberto. Traga seu modelo. Mantenha o runtime, as chaves e os dados sob seu controle.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
+    "origin.title": "De onde o Pepe vem",
+    "origin.body": "Pepe nasceu resolvendo problemas reais em uma série de empresas às quais eu prestava serviços de desenvolvimento: algumas precisavam de uma forma simples de conduzir suas ações de marketing sem ampliar a equipe; outras buscavam conectar seu ERP e banco de dados a um agente capaz de responder às dúvidas do time, sem abrir mão de segurança. O projeto não nasceu aberto: era uma ferramenta interna, proprietária, desenvolvida sob medida para cada cliente. Mas os resultados foram tão consistentes, em negócios tão distintos, que decidi dar a ele um nome, uma identidade própria, e disponibilizá-lo como projeto open source, para que qualquer pessoa possa utilizá-lo e contribuir.",
     "why.title": "Por que \"Pepe\"?",
     "why.body": "O nome é uma referência ao universo do Chespirito, querido em toda a América Latina. A piada do Pepe era simples: ele fazia exatamente o que mandavam. Sem discutir, sem improvisar. Um bom resumo para um runtime de agentes.",
 
@@ -676,6 +682,8 @@ export const ui = {
     "cta.sub": "Código aberto. Traz o teu modelo. Mantém o runtime, as chaves e os dados sob o teu controlo.",
     "cta.start": "Início rápido",
     "cta.github": "Dar estrela no GitHub",
+    "origin.title": "De onde vem o Pepe",
+    "origin.body": "Pepe nasceu a resolver problemas reais numa série de empresas às quais eu prestava serviços de desenvolvimento: algumas precisavam de uma forma simples de conduzir o marketing sem aumentar a equipa; outras procuravam ligar o seu ERP e base de dados a um agente capaz de responder às dúvidas da equipa, sem comprometer a segurança. O projeto não nasceu aberto: era uma ferramenta interna, proprietária, desenvolvida à medida para cada cliente. Mas os resultados foram tão consistentes, em negócios tão distintos, que decidi dar-lhe um nome, uma identidade própria, e disponibilizá-lo como projeto de código aberto, para que qualquer pessoa o possa utilizar e contribuir.",
     "why.title": "Porquê \"Pepe\"?",
     "why.body": "O nome é uma referência ao universo de Chespirito, adorado em toda a América Latina. A piada do Pepe era simples: fazia exatamente o que lhe mandavam. Sem discutir, sem improvisar. Um bom resumo para um runtime de agentes.",
 

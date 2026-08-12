@@ -297,6 +297,12 @@ section[id] { scroll-margin-top: 86px; }
 }
 .flow-arrow { color: var(--dim); font-size: 22px; padding-top: 22px; flex-shrink: 0; align-self: flex-start; }
 
+/* ---- origin story ---- */
+.origin { border-top: 1px solid var(--border); }
+.origin .container { max-width: 760px; }
+.origin h2 { font-size: clamp(24px, 4vw, 34px); margin: 0 0 16px; letter-spacing: -0.02em; text-align: center; }
+.origin p { color: var(--muted); font-size: 17px; margin: 0; line-height: 1.7; }
+
 /* ---- why pepe ---- */
 .why { border-top: 1px solid var(--border); }
 .why-grid { display: grid; grid-template-columns: 220px 1fr; gap: 44px; align-items: center; }
