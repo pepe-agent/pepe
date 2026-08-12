@@ -359,7 +359,7 @@ defmodule PepeWeb.ChannelsLive do
                   <option value="ambient" selected={@edit_bot["tool_progress"] == "ambient"}>{gettext("Ambient")}</option>
                   <option value="off" selected={@edit_bot["tool_progress"] == "off"}>{gettext("Nothing")}</option>
                 </select>
-                <p class={hlp()}>{gettext("How much the bot says about what it is doing. Whichever you pick, the status updates in place and disappears when the answer arrives - only the reply stays in the chat.")}</p>
+                <p class={hlp()}>{gettext("How much the bot says about what it is doing. Whichever you pick, the status updates in place and disappears when the answer arrives; only the reply stays in the chat.")}</p>
                 <%!-- The per-option detail is a wall of text next to a select that already names all
                      four options, so it stays folded away until someone actually wants it. --%>
                 <details class="mt-2">

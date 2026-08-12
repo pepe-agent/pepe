@@ -149,7 +149,7 @@ defmodule PepeWeb.ProjectsLive do
               <span :if={@usage["root"].prepaid_balance} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
               <span
                 :if={@usage["root"].prepaid_balance}
-                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above - add funds with mix pepe project credit.")}
+                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above; add funds with mix pepe project credit.")}
                 class={[
                   "rounded px-1.5",
                   (@usage["root"].prepaid_balance <= 0 && "bg-red-800/60 text-red-200") || "bg-sky-900/40 text-sky-200"
@@ -234,7 +234,7 @@ defmodule PepeWeb.ProjectsLive do
               <span :if={@usage[name].prepaid_balance} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
               <span
                 :if={@usage[name].prepaid_balance}
-                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above - add funds with mix pepe project credit.")}
+                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above; add funds with mix pepe project credit.")}
                 class={[
                   "rounded px-1.5",
                   (@usage[name].prepaid_balance <= 0 && "bg-red-800/60 text-red-200") || "bg-sky-900/40 text-sky-200"

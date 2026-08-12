@@ -1188,12 +1188,12 @@ defmodule Pepe.Gateways.Telegram do
 
     if all_too_large?(failed) do
       gettext(
-        "%{n} of the %{total} files you sent were too big for me to download here (Telegram bots can only fetch files up to 20MB this way) - I only saved the rest.",
+        "%{n} of the %{total} files you sent were too big for me to download here (Telegram bots can only fetch files up to 20MB this way); I only saved the rest.",
         n: n,
         total: total
       )
     else
-      gettext("%{n} of the %{total} files you sent couldn't be downloaded - I only saved the rest.", n: n, total: total)
+      gettext("%{n} of the %{total} files you sent couldn't be downloaded; I only saved the rest.", n: n, total: total)
     end
   end
 
@@ -1557,7 +1557,7 @@ defmodule Pepe.Gateways.Telegram do
         {:error, :busy} ->
           send_message(
             chat_id,
-            gettext("I'm still on the previous message - send /stop to cancel it.")
+            gettext("I'm still on the previous message; send /stop to cancel it.")
           )
 
         {:error, reason} ->
@@ -2102,7 +2102,7 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "inline", "") do
-    send_message(chat_id, gettext("Usage: /inline <message> - feed it into the running turn."))
+    send_message(chat_id, gettext("Usage: /inline <message>, feeds it into the running turn."))
   end
 
   defp run_command(chat_id, "inline", text) do
@@ -2110,7 +2110,7 @@ defmodule Pepe.Gateways.Telegram do
 
     case Pepe.Agent.Session.inline(session_key(chat_id), text) do
       :ok -> send_message(chat_id, gettext("➕ Fed into the running turn."))
-      _ -> send_message(chat_id, gettext("Nothing is running - just send it as a normal message."))
+      _ -> send_message(chat_id, gettext("Nothing is running; just send it as a normal message."))
     end
   end
 
@@ -2484,7 +2484,7 @@ defmodule Pepe.Gateways.Telegram do
         send_message(chat_id, gettext("No agent is configured."))
 
       %{auto_approve: []} ->
-        send_message(chat_id, gettext("Nothing is pre-approved - I'll ask before risky tools."))
+        send_message(chat_id, gettext("Nothing is pre-approved: I'll ask before risky tools."))
 
       %{auto_approve: tools} ->
         send_message(
@@ -2690,7 +2690,8 @@ defmodule Pepe.Gateways.Telegram do
     |> Enum.each(&redeliver_row/1)
   end
 
-  defp recovered_marker, do: gettext("♻️ Recovered reply - I restarted while sending this, so it might be a duplicate:\n\n")
+  defp recovered_marker,
+    do: gettext("♻️ Recovered reply (I restarted while sending this, so it might be a duplicate):\n\n")
 
   defp redeliver_row(row) do
     content = if row.needs_marker, do: recovered_marker() <> row.content, else: row.content

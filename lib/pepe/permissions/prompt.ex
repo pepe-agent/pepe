@@ -92,7 +92,7 @@ defmodule Pepe.Permissions.Prompt do
   def question(tool) do
     case Pepe.Tools.summary(tool) do
       "" -> gettext("Allow me to run the %{tool} tool?", tool: "`#{tool}`")
-      desc -> gettext("Allow me to run the %{tool} tool — %{desc}?", tool: "`#{tool}`", desc: desc)
+      desc -> gettext("Allow me to run the %{tool} tool: %{desc}?", tool: "`#{tool}`", desc: desc)
     end
   end
 

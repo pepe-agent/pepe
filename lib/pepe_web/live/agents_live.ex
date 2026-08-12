@@ -173,7 +173,7 @@ defmodule PepeWeb.AgentsLive do
                 <label class={lbl()}>{gettext("Langfuse-managed prompt (optional)")}</label>
                 <input type="text" name="langfuse_prompt" value={@edit_agent[:langfuse_prompt]} placeholder={gettext("blank = use the persona above")} class={fld()} />
                 <p class={hlp()}>
-                  {gettext("If set, this agent's persona comes from this prompt's name in Langfuse instead of the persona above - editing it in Langfuse reaches Pepe within a few minutes, no redeploy. Falls back to the persona above if Langfuse is unreachable or the name doesn't resolve.")}
+                  {gettext("If set, this agent's persona comes from this prompt's name in Langfuse instead of the persona above. Editing it in Langfuse reaches Pepe within a few minutes, no redeploy. Falls back to the persona above if Langfuse is unreachable or the name doesn't resolve.")}
                 </p>
               </div>
             </.form_section>
