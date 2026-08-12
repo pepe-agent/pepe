@@ -1722,6 +1722,9 @@ defmodule Mix.Tasks.Pepe do
         info(Pepe.Skills.Sentinel.report(scan))
         info(dim("If you have reviewed it and trust the source, re-run with --force."))
 
+      {:error, {:wrong_kind, "skill"}} ->
+        error("#{src} is a skill on PepeHub, not a plugin - install it with: mix pepe skill install #{src}")
+
       {:error, reason} ->
         error("install failed: #{inspect(reason)}")
     end
@@ -1802,9 +1805,11 @@ defmodule Mix.Tasks.Pepe do
     #{bold("mix pepe plugin")} - install and manage user plugins
 
       plugin list                 list installed plugins and what they add
-      plugin install SRC [--force]  install from a .exs, a directory, a .tar.gz, or an
-                                  http(s) URL (incl. a GitHub repo). The code is scanned
-                                  first; a dangerous verdict is refused unless --force.
+      plugin install SRC [--force]  install from a .exs, a directory, a .tar.gz, an
+                                  http(s) URL (incl. a GitHub repo), or a PepeHub
+                                  reference (@handle/name, or its page URL - hub.
+                                  pepe-agent.com). The code is scanned first; a
+                                  dangerous verdict is refused unless --force.
       plugin scan SRC             security-scan a plugin without installing it
       plugin remove NAME          delete an installed plugin
       plugin route list           list plugins claiming their own HTTP route, and whether
@@ -1926,7 +1931,11 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp report_skill_install(name, {:error, :not_found}) do
-    error("no skill named #{name} in any tap or the bundled registry - pass --source URL to install directly")
+    if Pepe.PepeHub.reference?(name) do
+      error("#{name} isn't a published skill on PepeHub (or it's a plugin - try: mix pepe plugin install #{name})")
+    else
+      error("no skill named #{name} in any tap or the bundled registry - pass --source URL to install directly")
+    end
   end
 
   defp report_skill_install(_name, {:error, reason}), do: error("install failed: #{inspect(reason)}")
@@ -1966,7 +1975,9 @@ defmodule Mix.Tasks.Pepe do
 
       skill list                          list built-in/user skills and marketplace installs
       skill search QUERY                  search every tap plus the bundled registry
-      skill install NAME [--force]        install by name, resolved against taps/registry
+      skill install NAME [--force]        install by name, resolved against taps/registry,
+                                         or a PepeHub reference (@handle/name, or its
+                                         page URL - hub.pepe-agent.com)
       skill install NAME --source URL     install directly from a URL/path/GitHub repo
                                          (always "community" trust - nothing vouches for it)
       skill update [NAME]                 re-fetch from the exact source a skill was
@@ -1979,9 +1990,10 @@ defmodule Mix.Tasks.Pepe do
 
     Every install goes through the same Sentinel scan a hand-installed skill already gets;
     a dangerous verdict is refused unless --force. Trust is "official" only for the bundled,
-    in-repo registry (curated by the maintainers) - anything from a tap, or a direct
-    --source install, is "community": read via the skill tool, it's marked as untrusted
-    content the same way a fetched web page is, until you've reviewed it yourself.
+    in-repo registry (curated by the maintainers) or a PepeHub package PepeHub itself has
+    manually marked official - anything from a tap, an unmarked PepeHub package, or a
+    direct --source install, is "community": read via the skill tool, it's marked as
+    untrusted content the same way a fetched web page is, until you've reviewed it yourself.
     """)
   end
 

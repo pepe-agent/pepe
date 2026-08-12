@@ -463,20 +463,27 @@ why they install cleanly.
 
 ## Installing a plugin
 
-The source is a local file, a local directory, a `.tar.gz`, or a URL to any of
-those, and `install` unrolls whatever you give it into the plugins directory. A
-GitHub repo URL is fetched as its source archive and extracted, taking the
-default branch (`main`, then `master`) when no branch is given; add
-`/tree/<branch>` to the URL to take a different one. A `.tar.gz`, local or
-remote, is extracted and the package placed under the `name` from its manifest.
-A directory is copied in as it is, and a bare `.exs` file is copied straight
-across.
+The source is a local file, a local directory, a `.tar.gz`, a URL to any of
+those, or a [PepeHub](https://hub.pepe-agent.com) reference, and `install` unrolls whatever
+you give it into the plugins directory. A GitHub repo URL is fetched as its
+source archive and extracted, taking the default branch (`main`, then
+`master`) when no branch is given; add `/tree/<branch>` to the URL to take a
+different one. A `.tar.gz`, local or remote, is extracted and the package
+placed under the `name` from its manifest. A directory is copied in as it is,
+and a bare `.exs` file is copied straight across.
+
+A PepeHub reference is either the short `@handle/name` form or the package's
+own page URL copied straight from `hub.pepe-agent.com`: both resolve to the
+same package, so either one works. Pointing `plugin install` at a name that
+turns out to be a skill on PepeHub, not a plugin, fails with a clear message
+telling you to use `skill install` instead.
 
 **CLI:**
 
 ```bash
 pepe plugin install ./my_plugin.exs
 pepe plugin install https://github.com/you/pepe-myplugin
+pepe plugin install @jhonathas/backup-tool
 pepe plugin list
 pepe plugin remove google
 ```

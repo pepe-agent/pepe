@@ -184,16 +184,19 @@ defmodule Pepe.Plugins do
   end
 
   @doc """
-  Install a plugin from `src`: a local `.exs`, a local directory, a `.tar.gz`/`.tgz`, or
-  an `http(s)` URL to any of those (a GitHub repo URL is fetched as its source archive).
+  Install a plugin from `src`: a local `.exs`, a local directory, a `.tar.gz`/`.tgz`, an
+  `http(s)` URL to any of those (a GitHub repo URL is fetched as its source archive), or a
+  PepeHub reference (`@handle/name`, or the package's own page URL - see `Pepe.PepeHub`).
 
   The staged code is scanned with `Pepe.Skills.Sentinel` before it is placed. A `:danger`
   verdict blocks the install (`{:error, {:unsafe, scan}}`) unless `opts[:force]` is set.
   Returns `{:ok, name, scan}` on success (the scan may still carry cautions), or
-  `{:error, reason}`.
+  `{:error, reason}` - including `{:error, {:wrong_kind, "skill"}}` when a PepeHub reference
+  resolves to a skill, not a plugin (install that with `Pepe.Skills.Marketplace` instead).
   """
   def install(src, opts \\ []) do
-    with {:ok, staged, cleanup} <- stage(src) do
+    with {:ok, src} <- resolve_hub_ref(src),
+         {:ok, staged, cleanup} <- stage(src) do
       try do
         scan = scan_staged(staged)
 
@@ -260,6 +263,20 @@ defmodule Pepe.Plugins do
   # A package root is the dir holding manifest.json (or a .exs if there's no manifest) -
   # generalized in Pepe.Sourcing as a predicate over a candidate file's basename.
   defp stage(src), do: Pepe.Sourcing.stage(src, ".exs", &plugin_root_marker?/1)
+
+  # Not a PepeHub reference at all -> src passes straight through to stage/1 unchanged,
+  # exactly as it always has for a path/archive/URL.
+  defp resolve_hub_ref(src) do
+    if Pepe.PepeHub.reference?(src) do
+      case Pepe.PepeHub.resolve(src) do
+        {:ok, %{kind: "plugin", download_url: url}} -> {:ok, url}
+        {:ok, %{kind: other}} -> {:error, {:wrong_kind, other}}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      {:ok, src}
+    end
+  end
 
   defp plugin_root_marker?(@manifest), do: true
   defp plugin_root_marker?(name), do: String.ends_with?(name, ".exs")

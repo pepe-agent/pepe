@@ -135,4 +135,83 @@ defmodule Pepe.Skills.MarketplaceTest do
     assert [%{name: "greet", verdict: :safe}] = Marketplace.audit("greet")
     assert [%{name: "greet", verdict: :safe}] = Marketplace.audit(nil)
   end
+
+  describe "installing from a PepeHub reference" do
+    defmodule HubPlug do
+      @moduledoc false
+      import Plug.Conn
+
+      def init(opts), do: opts
+
+      def call(%{request_path: "/api/v1/packages/@jhonathas/google-workspace"} = conn, _opts) do
+        json(conn, %{
+          "name" => "@jhonathas/google-workspace",
+          "kind" => "skill",
+          "official" => Elixir.Agent.get(:mkt_hub_official, & &1),
+          "latestVersion" => "1.0.0"
+        })
+      end
+
+      def call(%{request_path: "/api/v1/packages/@jhonathas/google-workspace/versions/1.0.0/download"} = conn, _opts) do
+        send_resp(conn, 200, Elixir.Agent.get(:mkt_hub_artifact, & &1))
+      end
+
+      def call(conn, _opts), do: json(conn, %{"error" => "not_found"}, 404)
+
+      defp json(conn, body, status \\ 200) do
+        conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(body))
+      end
+    end
+
+    setup do
+      {:ok, _} = Elixir.Agent.start_link(fn -> false end, name: :mkt_hub_official)
+
+      zip_src = Path.join(System.tmp_dir!(), "mkt_hub_zip_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(zip_src)
+      File.write!(Path.join(zip_src, "google-workspace.md"), "Use for Google Workspace tasks.\n")
+      zip = Path.join(System.tmp_dir!(), "mkt_hub_#{System.unique_integer([:positive])}.zip")
+      {_, 0} = System.cmd("zip", ["-j", zip, Path.join(zip_src, "google-workspace.md")])
+      {:ok, _} = Elixir.Agent.start_link(fn -> File.read!(zip) end, name: :mkt_hub_artifact)
+
+      server = start_supervised!({Bandit, plug: HubPlug, port: 0, scheme: :http})
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      base = "http://localhost:#{port}"
+      prev_hub_base = Application.get_env(:pepe, :pepe_hub_base_url)
+      Application.put_env(:pepe, :pepe_hub_base_url, base)
+
+      on_exit(fn ->
+        File.rm_rf(zip_src)
+        File.rm(zip)
+
+        if prev_hub_base,
+          do: Application.put_env(:pepe, :pepe_hub_base_url, prev_hub_base),
+          else: Application.delete_env(:pepe, :pepe_hub_base_url)
+      end)
+
+      %{hub_base: base}
+    end
+
+    test "installs by @handle/name, placed under the bare package slug (no scope in the filename)", %{home: home} do
+      assert {:ok, "google-workspace", scan} = Marketplace.install("@jhonathas/google-workspace")
+      assert scan.verdict == :safe
+      assert File.read!(Path.join([home, "skills", "google-workspace.md"])) == "Use for Google Workspace tasks.\n"
+
+      # Registered under the bare slug too, not the full @handle/name reference.
+      assert Config.installed_skill("google-workspace")["trust_level"] == "community"
+    end
+
+    test "a package PepeHub has manually marked official installs with official trust" do
+      Elixir.Agent.update(:mkt_hub_official, fn _ -> true end)
+      assert {:ok, "google-workspace", _scan} = Marketplace.install("@jhonathas/google-workspace")
+      assert Config.installed_skill("google-workspace")["trust_level"] == "official"
+    end
+
+    test "installing by the package's own page URL works identically to the shorthand", %{hub_base: hub_base} do
+      assert {:ok, "google-workspace", _scan} = Marketplace.install("#{hub_base}/packages/@jhonathas/google-workspace")
+    end
+
+    test "a PepeHub reference that doesn't exist is reported the same as any other unresolved name" do
+      assert {:error, :not_found} = Marketplace.install("@jhonathas/nope-#{System.unique_integer([:positive])}")
+    end
+  end
 end

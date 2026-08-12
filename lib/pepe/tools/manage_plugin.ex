@@ -32,10 +32,13 @@ defmodule Pepe.Tools.ManagePlugin do
       """
       Install and manage community plugins (drop-in Elixir tools/channels, no rebuild). \
       Actions:
-      - install: fetch and install a plugin - needs `src` (a local path, a `.tar.gz`, or \
-        an http(s) URL - a GitHub repo URL is fetched automatically). Security-scanned \
-        before it's placed; a dangerous verdict is refused (the user can force it \
-        themselves via `mix pepe plugin install SRC --force` if they've reviewed it).
+      - install: fetch and install a plugin - needs `src` (a local path, a `.tar.gz`, an \
+        http(s) URL - a GitHub repo URL is fetched automatically - or a PepeHub \
+        reference: a name shaped `@handle/name`, or its page URL from hub.pepe-agent.com). \
+        Security-scanned before it's placed; a dangerous verdict is refused (the user can \
+        force it themselves via `mix pepe plugin install SRC --force` if they've reviewed \
+        it). A PepeHub reference that turns out to be a skill, not a plugin, fails with a \
+        message pointing at `manage_skill` instead.
       - scan: security-scan `src` without installing it - use this first to show the \
         user what a plugin does before installing.
       - list: show installed plugins.
@@ -55,7 +58,7 @@ defmodule Pepe.Tools.ManagePlugin do
           "action" => %{"type" => "string", "enum" => ~w(install scan list remove route_list)},
           "src" => %{
             "type" => "string",
-            "description" => "Local path, .tar.gz, or http(s)/GitHub URL (for install/scan)."
+            "description" => "Local path, .tar.gz, http(s)/GitHub URL, or PepeHub reference @handle/name (for install/scan)."
           },
           "name" => %{"type" => "string", "description" => "Installed plugin name (for remove)."}
         },

@@ -486,20 +486,27 @@ precisam de nada além do que já vem junto, e por isso instalam sem problema.
 
 ## Instalar um plugin
 
-A fonte é um arquivo local, um diretório local, um `.tar.gz`, ou uma URL para
-qualquer um desses, e o `install` desempacota o que você der na pasta de
-plugins. Uma URL de repositório do GitHub é baixada como seu pacote de
-código-fonte e extraída, pegando a branch padrão (`main`, depois `master`)
-quando nenhuma branch é indicada; acrescente `/tree/<branch>` à URL para pegar
-outra. Um `.tar.gz`, local ou remoto, é extraído e o pacote é colocado sob o
-`name` do manifesto dele. Um diretório é copiado como está, e um `.exs` solto é
-copiado direto.
+A fonte é um arquivo local, um diretório local, um `.tar.gz`, uma URL para
+qualquer um desses, ou uma referência do [PepeHub](https://hub.pepe-agent.com),
+e o `install` desempacota o que você der na pasta de plugins. Uma URL de
+repositório do GitHub é baixada como seu pacote de código-fonte e extraída,
+pegando a branch padrão (`main`, depois `master`) quando nenhuma branch é
+indicada; acrescente `/tree/<branch>` à URL para pegar outra. Um `.tar.gz`,
+local ou remoto, é extraído e o pacote é colocado sob o `name` do manifesto
+dele. Um diretório é copiado como está, e um `.exs` solto é copiado direto.
+
+Uma referência do PepeHub é a forma curta `@handle/nome` ou a própria URL da
+página do pacote copiada direto de `hub.pepe-agent.com`; as duas resolvem
+para o mesmo pacote. Apontar `plugin install` para um nome que na verdade é
+uma skill no PepeHub, não um plugin, falha com uma mensagem clara indicando
+usar `skill install` em vez disso.
 
 **CLI:**
 
 ```bash
 pepe plugin install ./my_plugin.exs
 pepe plugin install https://github.com/you/pepe-myplugin
+pepe plugin install @jhonathas/backup-tool
 pepe plugin list
 pepe plugin remove google
 ```

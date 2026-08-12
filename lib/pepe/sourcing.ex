@@ -1,10 +1,14 @@
 defmodule Pepe.Sourcing do
   @moduledoc """
-  Turn any source - a local path, a `.tar.gz`/`.tgz`, an `http(s)` URL, or a GitHub repo URL -
-  into a local, inspectable staging location. Shared by `Pepe.Plugins` and
+  Turn any source - a local path, a `.tar.gz`/`.tgz`/`.zip`, an `http(s)` URL, or a GitHub repo
+  URL - into a local, inspectable staging location. Shared by `Pepe.Plugins` and
   `Pepe.Skills.Marketplace`: both download + verify + install a third-party thing, and this is
   the "download + verify" half - extracted so the archive-handling code (a security-relevant
-  path: tar extraction, archive-type detection) has exactly one copy to keep correct.
+  path: tar/zip extraction, archive-type detection) has exactly one copy to keep correct.
+
+  A downloaded archive is identified by its actual bytes (`archive_format/1`), not by the
+  URL it came from: a registry download endpoint (`Pepe.PepeHub`, for one) has no file
+  extension in its path at all, so the only reliable signal is the file's own magic number.
 
   A caller parameterizes two things:
 
@@ -150,7 +154,7 @@ defmodule Pepe.Sourcing do
     tmp = Path.join(System.tmp_dir!(), "pepe_src_#{System.unique_integer([:positive])}")
     File.mkdir_p!(tmp)
 
-    case :erl_tar.extract(String.to_charlist(archive_path), [:compressed, {:cwd, String.to_charlist(tmp)}]) do
+    case extract(archive_path, tmp) do
       :ok ->
         {:ok, %{type: :dir, path: root(tmp, root_marker)},
          fn ->
@@ -166,5 +170,30 @@ defmodule Pepe.Sourcing do
     end
   end
 
-  defp archive?(path), do: String.ends_with?(path, ".tar.gz") or String.ends_with?(path, ".tgz")
+  defp extract(archive_path, dest) do
+    case archive_format(archive_path) do
+      :zip ->
+        case :zip.extract(String.to_charlist(archive_path), cwd: String.to_charlist(dest)) do
+          {:ok, _files} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      :tar ->
+        :erl_tar.extract(String.to_charlist(archive_path), [:compressed, {:cwd, String.to_charlist(dest)}])
+    end
+  end
+
+  # By content, not by name: a registry download endpoint has no file extension in its URL
+  # at all (see the moduledoc), so the archive's own magic number is the only signal
+  # available once it's already on disk. Anything that isn't a zip (`PK\x03\x04`) is handed
+  # to `:erl_tar`, which already fails closed with a clear `{:error, _}` on real garbage.
+  defp archive_format(path) do
+    case File.open(path, [:read, :binary], &IO.binread(&1, 4)) do
+      {:ok, <<0x50, 0x4B, 0x03, 0x04>>} -> :zip
+      _ -> :tar
+    end
+  end
+
+  defp archive?(path),
+    do: String.ends_with?(path, ".tar.gz") or String.ends_with?(path, ".tgz") or String.ends_with?(path, ".zip")
 end

@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **`mix pepe plugin install`/`skill install`, and their conversational equivalents (`manage_plugin`, and the new `manage_skill` tool), now accept a [PepeHub](https://hub.pepe-agent.com) reference**: the short `@handle/name` form, or the package's own page URL copied straight from the site, either works. PepeHub packages both plugins and skills under the same namespace; pointing `plugin install` at a name that turns out to be a skill (or `skill install` at one that turns out to be a plugin) fails with a message naming the right command instead. A skill installed this way is placed under its bare package slug, not the `@handle/name` it was resolved from, and carries `"official"` trust when PepeHub itself has manually marked the package official, and `"community"` otherwise: the same distinction the bundled registry and taps already made.
+- **`manage_skill`**: a new tool giving an agent conversational access to the same registry-aware skill install/search/update/remove/audit `mix pepe skill` already has, mirroring `manage_plugin`'s shape (same static Sentinel scan, no `--force` escape hatch from chat). The existing `install-skill` skill now defers to it for anything the marketplace or PepeHub can resolve, keeping its own manual `fetch_url` procedure only for a source with no registry entry at all.
+- **`Pepe.Sourcing` (the shared download/stage logic behind plugin and skill installs) now also extracts `.zip` archives**, identified by their actual bytes rather than a file extension: a registry download endpoint (PepeHub's included) has no extension in its URL at all, so content is the only reliable signal.
+
 ## [0.17.1] - 2026-08-12
 
 ### Changed

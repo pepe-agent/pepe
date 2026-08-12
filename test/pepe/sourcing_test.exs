@@ -81,5 +81,64 @@ defmodule Pepe.SourcingTest do
       cleanup.()
       refute File.dir?(root)
     end
+
+    test "a .zip is extracted the same way as a .tar.gz" do
+      src = Path.join(System.tmp_dir!(), "pepe_src_zip_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(src, "nested"))
+      File.write!(Path.join([src, "nested", "skill.md"]), "# a skill")
+      archive = Path.join(System.tmp_dir!(), "pepe_src_zip_#{System.unique_integer([:positive])}.zip")
+      {_, 0} = System.cmd("zip", ["-r", archive, "nested"], cd: src)
+
+      on_exit(fn ->
+        File.rm_rf(src)
+        File.rm(archive)
+      end)
+
+      assert {:ok, %{type: :dir, path: root}, cleanup} =
+               Sourcing.stage(archive, ".md", fn name -> String.ends_with?(name, ".md") end)
+
+      assert File.regular?(Path.join(root, "skill.md"))
+      cleanup.()
+      refute File.dir?(root)
+    end
+  end
+
+  describe "stage/3 with an http(s) URL that has no file extension at all (a registry download endpoint)" do
+    defmodule DownloadPlug do
+      @moduledoc false
+      import Plug.Conn
+
+      def init(opts), do: opts
+
+      def call(conn, _opts) do
+        body = Elixir.Agent.get(:sourcing_download_body, & &1)
+        send_resp(conn, 200, body)
+      end
+    end
+
+    test "a zip served at an extensionless URL is still recognized by its magic number, not the URL" do
+      src = Path.join(System.tmp_dir!(), "pepe_src_zip_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(src)
+      File.write!(Path.join(src, "skill.md"), "# a skill")
+      zip = Path.join(System.tmp_dir!(), "pepe_src_zip_#{System.unique_integer([:positive])}.zip")
+      {_, 0} = System.cmd("zip", ["-j", zip, Path.join(src, "skill.md")])
+
+      on_exit(fn ->
+        File.rm_rf(src)
+        File.rm(zip)
+      end)
+
+      {:ok, _} = Elixir.Agent.start_link(fn -> File.read!(zip) end, name: :sourcing_download_body)
+      server = start_supervised!({Bandit, plug: DownloadPlug, port: 0, scheme: :http})
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+
+      assert {:ok, %{type: :dir, path: root}, cleanup} =
+               Sourcing.stage("http://localhost:#{port}/versions/1.0.0/download", ".md", fn name ->
+                 String.ends_with?(name, ".md")
+               end)
+
+      assert File.regular?(Path.join(root, "skill.md"))
+      cleanup.()
+    end
   end
 end

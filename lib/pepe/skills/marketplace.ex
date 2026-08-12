@@ -52,9 +52,27 @@ defmodule Pepe.Skills.Marketplace do
     |> Enum.map(fn {name, entry, trust} -> %{name: name, source: entry["source"], trust_level: trust} end)
   end
 
-  @doc "Resolve `name` against the registries. `{:ok, source, trust_level}` or `:not_found`."
+  @doc """
+  Resolve `name` against the registries, or, when `name` is a PepeHub reference
+  (`@handle/name`, or the package's own page URL - see `Pepe.PepeHub`), against PepeHub
+  directly - checked first, since a scoped name is never something a bundled entry or a tap
+  would use. `{:ok, source, trust_level}` or `:not_found` (a PepeHub reference that resolves
+  to a plugin, not a skill, is also `:not_found` here - install that with `Pepe.Plugins`
+  instead).
+  """
   @spec resolve(String.t()) :: {:ok, String.t(), String.t()} | :not_found
   def resolve(name) do
+    if Pepe.PepeHub.reference?(name), do: resolve_from_hub(name), else: resolve_from_registries(name)
+  end
+
+  defp resolve_from_hub(name) do
+    case Pepe.PepeHub.resolve(name) do
+      {:ok, %{kind: "skill", download_url: url, trust: trust}} -> {:ok, url, trust}
+      _ -> :not_found
+    end
+  end
+
+  defp resolve_from_registries(name) do
     case Enum.find(all_entries(), fn {n, _e, _t} -> n == name end) do
       {_name, entry, trust} -> {:ok, entry["source"], trust}
       nil -> :not_found
@@ -66,18 +84,24 @@ defmodule Pepe.Skills.Marketplace do
   fetched directly from that source instead - always `"community"` trust, since bypassing the
   registries means nothing vouches for it. `force: true` installs past a `:danger` verdict.
   Returns `{:ok, name, scan}` or `{:error, reason}`.
+
+  A PepeHub reference is placed and registered under its bare package slug, not the
+  `@handle/name` it was resolved from (`Pepe.PepeHub.local_name/1`) - `resolve/1` still sees
+  the full reference, since that's what PepeHub itself needs to look it up.
   """
   @spec install(String.t(), keyword()) :: {:ok, String.t(), map()} | {:error, term()}
   def install(name, opts \\ []) do
+    local_name = Pepe.PepeHub.local_name(name)
+
     case opts[:source] do
       nil ->
         case resolve(name) do
-          {:ok, source, trust} -> do_install(name, source, trust, opts)
+          {:ok, source, trust} -> do_install(local_name, source, trust, opts)
           :not_found -> {:error, :not_found}
         end
 
       source when is_binary(source) ->
-        do_install(name, source, "community", opts)
+        do_install(local_name, source, "community", opts)
     end
   end
 

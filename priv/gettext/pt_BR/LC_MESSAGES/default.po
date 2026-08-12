@@ -3590,7 +3590,7 @@ msgstr "Digite os números que quer marcar (ex: 1 3) e tecle Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:4444
+#: lib/mix/tasks/pepe.ex:4456
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -3610,17 +3610,17 @@ msgstr "n = próxima página  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:4258
+#: lib/mix/tasks/pepe.ex:4270
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (pode usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:4259
+#: lib/mix/tasks/pepe.ex:4271
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:4267
+#: lib/mix/tasks/pepe.ex:4279
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""

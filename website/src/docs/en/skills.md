@@ -64,33 +64,49 @@ gets written down instead of being rediscovered every session.
 
 ### Installing one from elsewhere
 
-The `install-skill` skill teaches an agent to pull a skill from a URL, a gist, a
-repo, or another Pepe instance. Skill text from outside is untrusted input, so
-the agent security-scans it with the `scan_skill` tool before writing it to
-disk. The scan flags prompt injection, secret exfiltration, destructive
-commands, persistence and obfuscation. It is a second check rather than a
-substitute for reading the content, and it never installs anything itself.
+Two paths, depending on where it's coming from. An agent holding the
+`manage_skill` tool uses it for anything the marketplace can resolve: a name
+in the bundled registry or a tap, or a [PepeHub](https://hub.pepe-agent.com)
+reference (`@handle/name`, or its page URL), the same registry-aware install
+`mix pepe skill install` does, with trust and provenance tracked the same way.
+For a source with no registry entry at all (a bare URL, a gist, a one-off
+repo), the `install-skill` skill teaches an agent to fetch it by hand instead.
+Either way, skill text from outside is untrusted input: the agent
+security-scans it with the `scan_skill` tool before writing it to disk. The
+scan flags prompt injection, secret exfiltration, destructive commands,
+persistence and obfuscation. It is a second check, not a substitute for
+reading the content, and it never installs anything itself.
 
 ## Installing from a marketplace
 
-`install-skill` (above) is the conversational path: an agent pulls one skill from a link you
-give it. `mix pepe skill` is the operator path, with a registry to search and an update story:
+`manage_skill` (above) is the conversational path for anything the registries/PepeHub can
+resolve. `mix pepe skill` is the operator path to the exact same registries, with the same
+search and update story:
 
 ```bash
 pepe skill search release            # search every tap plus the bundled registry
 pepe skill install cut-a-release     # install by name
+pepe skill install @jhonathas/google-workspace   # or a PepeHub reference (see below)
 pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # or directly
 pepe skill update cut-a-release      # re-fetch from the exact source it was installed from
 pepe skill tap add https://github.com/your-team/pepe-skills   # add a registry beyond the bundled default
 ```
 
-Every install goes through the same static security scan `install-skill` uses; a dangerous
-verdict is refused unless you pass `--force`. Trust is `"official"` only for the bundled,
-in-repo registry (curated by Pepe's own maintainers, empty by default today: there is no
-hosted registry yet, only the mechanism). Anything resolved through a tap you added, or
-installed with `--source`, is `"community"`: when an agent reads it with the `skill` tool,
-its content is wrapped in the same untrusted-content marker a fetched web page carries, until
-you've reviewed it yourself.
+A name shaped `@handle/name` (or the package's own page URL, copied straight from
+[PepeHub](https://hub.pepe-agent.com)) resolves against PepeHub itself, Pepe's plugin/skill
+registry, instead of the bundled registry or a tap. It's checked first, since no bundled entry
+or tap uses that shape. It's installed under the bare package slug (`google-workspace`, not
+`@jhonathas/google-workspace`), the name every other skill command and the `skill` tool use.
+Pointing `skill install` at a name that turns out to be a plugin on PepeHub, not a skill, fails
+with a clear message telling you to use `plugin install` instead.
+
+Every install goes through the same static security scan `manage_skill`/`install-skill` use; a dangerous
+verdict is refused unless you pass `--force`. Trust is `"official"` for the bundled, in-repo
+registry (curated by Pepe's own maintainers) and for a PepeHub package PepeHub itself has
+manually marked official. Anything resolved through a tap you added, an unmarked PepeHub
+package, or installed with `--source`, is `"community"`: when an agent reads it with the
+`skill` tool, its content is wrapped in the same untrusted-content marker a fetched web page
+carries, until you've reviewed it yourself.
 
 `update` is pinned to the exact source a skill was installed from. If a tap's registry later
 points that name at a *different* source, `update` refuses rather than silently following it.

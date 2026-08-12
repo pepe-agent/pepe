@@ -65,35 +65,56 @@ resolvió una vez queda escrito, en lugar de redescubrirse en cada sesión.
 
 ### Instalar una de fuera
 
-La skill `install-skill` enseña al agente a traer una skill desde una URL, un
-gist, un repositorio u otra instancia de Pepe. El texto de una skill externa es
-entrada no confiable, así que el agente lo escanea con la herramienta
-`scan_skill` antes de escribirlo en disco. El escaneo señala inyección de prompt,
-exfiltración de secretos, comandos destructivos, persistencia y ofuscación. Es
-una segunda comprobación, no un sustituto de leer el contenido, y nunca instala
-nada por su cuenta.
+Dos vías, según de dónde venga. Un agente con la herramienta `manage_skill` la
+usa para todo lo que el marketplace pueda resolver: un nombre en el registro
+incluido o en un tap, o una referencia de [PepeHub](https://hub.pepe-agent.com)
+(`@handle/nombre`, o la URL de su propia página). Es la misma instalación
+consciente del registro que hace `mix pepe skill install`, con la confianza y
+la procedencia registradas de la misma forma. Para una fuente sin ninguna
+entrada en registro (una URL suelta, un gist, un repositorio aislado), la
+skill `install-skill` enseña al agente a traerla a mano. En ambos casos, el
+texto de una skill externa es entrada no confiable: el agente lo escanea con
+la herramienta `scan_skill` antes de escribirlo en disco. El escaneo señala
+inyección de prompt, exfiltración de secretos, comandos destructivos,
+persistencia y ofuscación: una segunda comprobación, no un sustituto de leer
+el contenido, y nunca instala nada por su cuenta.
 
 ## Instalar desde un marketplace
 
-`install-skill` (arriba) es la vía conversacional: un agente trae una skill desde un enlace
-que le das. `mix pepe skill` es la vía del operador, con un registro donde buscar y una
-historia de actualización:
+`manage_skill` (arriba) es la vía conversacional para todo lo que los
+registros/PepeHub puedan resolver. `mix pepe skill` es la vía del operador
+hacia los mismos registros, con la misma búsqueda e historia de actualización:
 
 ```bash
 pepe skill search release            # busca en cada tap más el registro incluido
 pepe skill install cut-a-release     # instala por nombre
+pepe skill install @jhonathas/google-workspace   # o una referencia de PepeHub (ver abajo)
 pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # o directamente
 pepe skill update cut-a-release      # vuelve a traerla desde la fuente exacta de la que se instaló
 pepe skill tap add https://github.com/tu-equipo/pepe-skills   # añade un registro más allá del incluido
 ```
 
-Cada instalación pasa por el mismo escaneo de seguridad estático que usa `install-skill`; un
-veredicto peligroso se rechaza a menos que pases `--force`. La confianza es `"official"` solo
-para el registro incluido en el propio repositorio (curado por quienes mantienen Pepe, vacío
-por defecto hoy —todavía no existe un registro alojado, solo el mecanismo). Todo lo resuelto
-a través de un tap que hayas añadido, o instalado con `--source`, es `"community"`: cuando un
-agente lo lee con la herramienta `skill`, su contenido se envuelve en el mismo marcador de
-contenido no confiable que lleva una página web obtenida, hasta que tú mismo la hayas revisado.
+Un nombre con la forma `@handle/nombre` (o la URL de la propia página del
+paquete, copiada directamente de [PepeHub](https://hub.pepe-agent.com))
+resuelve contra PepeHub directamente, el registro de plugins/skills de Pepe,
+en vez del registro incluido o de un tap: se comprueba primero, ya que
+ninguna entrada incluida o de tap usa esa forma. Se instala bajo el slug
+simple del paquete (`google-workspace`, no `@jhonathas/google-workspace`), el
+nombre que usan el resto de comandos de skill y la herramienta `skill`.
+Apuntar `skill install` a un nombre que en realidad es un plugin en PepeHub,
+no una skill, falla con un mensaje claro que indica usar `plugin install` en
+su lugar.
+
+Cada instalación pasa por el mismo escaneo de seguridad estático que usan
+`manage_skill`/`install-skill`; un veredicto peligroso se rechaza a menos que
+pases `--force`. La confianza es `"official"` para el registro incluido en el
+propio repositorio (curado por quienes mantienen Pepe) y para un paquete de
+PepeHub que el propio PepeHub haya marcado manualmente como oficial. Todo lo
+resuelto a través de un tap que hayas añadido, un paquete de PepeHub sin esa
+marca, o instalado con `--source`, es `"community"`: cuando un agente lo lee
+con la herramienta `skill`, su contenido se envuelve en el mismo marcador de
+contenido no confiable que lleva una página web obtenida, hasta que tú mismo
+la hayas revisado.
 
 `update` queda fijado a la fuente exacta desde la que se instaló una skill —si el registro de
 un tap más tarde apunta ese nombre a una fuente *distinta*, `update` se niega en vez de
