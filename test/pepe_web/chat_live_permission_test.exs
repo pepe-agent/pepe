@@ -1,10 +1,10 @@
 defmodule PepeWeb.ChatLivePermissionTest do
   @moduledoc """
   The dashboard's own rendering of a tool-permission prompt. A tainted run suspends
-  `:session`/`:always` grants (see `Pepe.Permissions`' moduledoc), so `:this_run` is the
-  only button that actually stops the prompt from reappearing on the next risky call -
-  this pins that the UI says so, rather than presenting five equal-looking buttons and
-  leaving the person to rediscover that the hard way, one prompt at a time.
+  `:session`/`:always` grants (see `Pepe.Permissions`' moduledoc), so `:this_run` (offered
+  unconditionally now, not just while tainted) is marked "(recommended)" specifically then -
+  this pins that the UI says so, rather than presenting equal-looking buttons and leaving
+  the person to rediscover that the hard way, one prompt at a time.
   """
   use ExUnit.Case, async: false
 
@@ -39,7 +39,7 @@ defmodule PepeWeb.ChatLivePermissionTest do
 
   defp conn, do: %{build_conn() | host: "localhost"}
 
-  test "an untainted request offers no this_run button and no taint note", %{key: key} do
+  test "an untainted request still offers this_run (unconditionally now), but no taint note", %{key: key} do
     {:ok, view, _html} = live(conn(), "/chat?chat=#{key}")
 
     parent = self()
@@ -47,11 +47,12 @@ defmodule PepeWeb.ChatLivePermissionTest do
 
     html = render(view)
     assert html =~ "bash"
-    refute html =~ "Allow for the rest of this task"
+    assert html =~ "Allow everything for this task"
+    refute html =~ "(recommended)"
     refute html =~ "read something from outside"
   end
 
-  test "a tainted request explains why, and marks this_run as the one that sticks", %{key: key} do
+  test "a tainted request explains why, and marks this_run as recommended", %{key: key} do
     {:ok, view, _html} = live(conn(), "/chat?chat=#{key}")
 
     parent = self()
@@ -59,7 +60,7 @@ defmodule PepeWeb.ChatLivePermissionTest do
 
     html = render(view)
     assert html =~ "read something from outside"
-    assert html =~ "Allow for the rest of this task (recommended)"
+    assert html =~ "Allow everything for this task (recommended)"
 
     view
     |> element(~s(button[phx-value-decision="this_run"]))

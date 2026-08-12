@@ -196,12 +196,79 @@ defmodule Pepe.PermissionsTest do
       assert_received :asked
     end
 
-    test "this_run is never offered (and irrelevant) outside a tainted run - session/always already cover that case" do
-      # Untainted: this_run simply isn't reachable through the gate's own logic, since
-      # preapproved?/2 (session/always) is checked first. Confirms it's purely additive.
-      agent = %Agent{name: "zak", auto_approve: ["bash:none"]}
-      ctx = %{agent: agent, authorize: fn _, _, _ -> flunk("should not ask") end}
+    test "this_run works even when granted before the run is ever tainted" do
+      agent = %Agent{name: "zak", auto_approve: []}
+      test = self()
+      ctx = %{agent: agent, authorize: fn _n, _a, _c -> send(test, :asked) && :this_run end}
+
+      # write_file always needs asking - no risk-free interactive pass like bash gets.
+      assert Permissions.gate("write_file", ~s({"path":"x","content":"y"}), ctx) == :allow
+      assert_received :asked
+
+      # The run then takes in outside content, which would normally suspend session/always -
+      # the this_run grant handed out beforehand still covers what comes next.
+      Permissions.taint()
+      assert Permissions.gate("bash", ~s({"command":"rm -rf build"}), ctx) == :allow
+      refute_received :asked
+    end
+
+    test "session_bypass is the one grant that is not suspended by taint" do
+      agent = %Agent{name: "zak", auto_approve: []}
+      key = "s-bypass-#{System.unique_integer([:positive])}"
+      test = self()
+      ctx = %{agent: agent, session_key: key, authorize: fn _n, _a, _c -> send(test, :asked) && :session_bypass end}
+
+      Permissions.taint()
       assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
+      assert_received :asked
+
+      # Still tainted, but the bypass covers a completely different, riskier tool without asking.
+      assert Permissions.gate("write_file", ~s({"path":"x","content":"y"}), ctx) == :allow
+      refute_received :asked
+    end
+  end
+
+  describe "session_bypass" do
+    setup do
+      key = "s-bypass-#{System.unique_integer([:positive])}"
+      on_exit(fn -> Pepe.Permissions.SessionStore.clear(key) end)
+      %{key: key}
+    end
+
+    test "covers every tool for the rest of the session, not just the one it was granted for", %{key: key} do
+      agent = %Agent{name: "zak", auto_approve: []}
+      test = self()
+      ctx = %{agent: agent, session_key: key, authorize: fn _n, _a, _c -> send(test, :asked) && :session_bypass end}
+
+      assert Permissions.gate("write_file", ~s({"path":"x","content":"y"}), ctx) == :allow
+      assert_received :asked
+
+      assert Permissions.gate("bash", ~s({"command":"rm -rf build"}), ctx) == :allow
+      refute_received :asked
+    end
+
+    test "does not leak into a different session", %{key: key} do
+      agent = %Agent{name: "zak", auto_approve: []}
+      ctx = %{agent: agent, session_key: key, authorize: fn _n, _a, _c -> :session_bypass end}
+      assert Permissions.gate("write_file", ~s({"path":"x","content":"y"}), ctx) == :allow
+
+      test = self()
+      other_ctx = %{ctx | session_key: "other-#{key}", authorize: fn _n, _a, _c -> send(test, :asked) && :deny end}
+      Permissions.gate("write_file", ~s({"path":"x","content":"y"}), other_ctx)
+      assert_received :asked
+    end
+
+    test "falls back to :once when there is no session to remember it against" do
+      agent = %Agent{name: "zak", auto_approve: []}
+      test = self()
+      ctx = %{agent: agent, authorize: fn _n, _a, _c -> send(test, :asked) && :session_bypass end}
+
+      assert Permissions.gate("write_file", ~s({"path":"x","content":"y"}), ctx) == :allow
+      assert_received :asked
+
+      # No session_key ever recorded anything, so the very next call asks again.
+      Permissions.gate("write_file", ~s({"path":"x","content":"y"}), ctx)
+      assert_received :asked
     end
   end
 

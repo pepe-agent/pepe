@@ -14,62 +14,70 @@ defmodule Pepe.Permissions.Prompt do
 
   alias Pepe.Permissions
 
-  @options [:once, :session, :session_any, :always, :deny]
-  @all_options [:once, :this_run, :session, :session_any, :always, :deny]
+  @options [:once, :this_run, :session, :session_any, :session_bypass, :always, :deny]
 
   @doc """
-  The decisions offered to the user, in display order. `:this_run` only appears while the
-  current run is tainted (pass the `:tainted` flag from the call's own `ctx`) - offering it
-  outside a tainted run would just be a confusing synonym for `:session`, since untainted
-  pre-approval already works normally. See `Pepe.Permissions`' moduledoc for why `:this_run`
-  exists at all.
+  The decisions offered to the user, in display order. `:this_run` and `:session_bypass`
+  are both blanket "everything, no more checks" grants - see `Pepe.Permissions`' moduledoc
+  for how they differ (bounded by the run vs. bounded by the session) - and both are
+  offered unconditionally now, tainted or not: `:this_run` used to appear only while the
+  run was tainted, but tying a button's very presence to an implementation detail nobody
+  can see turned out to be more confusing than helpful, not less.
+
+  `tainted?` is accepted for backward compatibility with existing callers and no longer
+  changes which decisions are offered; a surface still wants the flag separately, to
+  decide whether to render `taint_note/0` and to pick `label/2`'s "(recommended)" wording.
 
   `has_session?` (default `true`, so an existing caller passing only `tainted?` is
-  unaffected) drops `:session` when there is no `ctx.session_key` to remember it against -
-  a one-shot CLI call (`mix pepe run`, `oneshot/4`) has no session, and offering a button
-  that silently does nothing is worse than not offering it: the person picks it believing
-  it will stop the prompt from coming back, and it never does (that was a real bug - see
-  `Pepe.Permissions.gate/3`'s moduledoc).
+  unaffected) drops `:session`, `:session_any` and `:session_bypass` when there is no
+  `ctx.session_key` to remember them against - a one-shot CLI call (`mix pepe run`,
+  `oneshot/4`) has no session, and offering a button that silently does nothing is worse
+  than not offering it: the person picks it believing it will stop the prompt from coming
+  back, and it never does (that was a real bug - see `Pepe.Permissions.gate/3`'s moduledoc).
   """
   @spec options(boolean(), boolean()) :: [Permissions.decision()]
   def options(tainted? \\ false, has_session? \\ true)
-  def options(true, has_session?), do: with_session(@all_options, has_session?)
-  def options(false, has_session?), do: with_session(@options, has_session?)
+  def options(_tainted?, has_session?), do: with_session(@options, has_session?)
 
   defp with_session(list, true), do: list
-  defp with_session(list, false), do: Enum.reject(list, &(&1 in [:session, :session_any]))
+  defp with_session(list, false), do: Enum.reject(list, &(&1 in [:session, :session_any, :session_bypass]))
 
   @doc """
   The button/menu label for a decision (translated, current locale).
 
-  `:this_run` is marked "(recommended)" when `tainted?` is true: it's the one grant
-  that actually silences repeat prompts for the rest of a tainted run, since
-  `:session`/`:always` are suspended while tainted (see `Pepe.Permissions`' moduledoc) -
-  a person who taps the familiar "session"/"always" button here, out of habit, gets
-  asked again on the very next risky call and never finds out why.
+  `:this_run` is marked "(recommended)" when `tainted?` is true: while `:session`/`:always`
+  are suspended by a tainted run (see `Pepe.Permissions`' moduledoc), it's the cheapest grant
+  that still silences repeat prompts for the rest of that run - a person who taps the
+  familiar "session"/"always" button here, out of habit, gets asked again on the very next
+  risky call and never finds out why. `:session_bypass` carries a warning emoji in its label
+  itself rather than a conditional marker: unlike every other decision here, it is not
+  suspended by taint at all (see the moduledoc's "the one grant that skips the taint check"),
+  so that needs to be visible on the button, not just explained once nearby.
   """
   @spec label(Permissions.decision(), boolean()) :: String.t()
   def label(decision, tainted? \\ false)
-  def label(:this_run, true), do: gettext("Allow for the rest of this task (recommended)")
-  def label(:this_run, false), do: gettext("Allow for the rest of this task")
+  def label(:this_run, true), do: gettext("Allow everything for this task (recommended)")
+  def label(:this_run, false), do: gettext("Allow everything for this task")
   def label(:once, _tainted?), do: gettext("Allow once")
   def label(:session, _tainted?), do: gettext("Allow for this session")
   def label(:session_any, _tainted?), do: gettext("Allow with any parameters (this session)")
+  def label(:session_bypass, _tainted?), do: gettext("⚠️ Allow everything for this session")
   def label(:always, _tainted?), do: gettext("Always allow")
   def label(:deny, _tainted?), do: gettext("Don't allow")
 
   @doc "The confirmation shown after a decision is made (translated)."
   @spec outcome(Permissions.decision()) :: String.t()
   def outcome(:once), do: gettext("Allowed once.")
-  def outcome(:this_run), do: gettext("Allowed for the rest of this task.")
+  def outcome(:this_run), do: gettext("Allowed everything for this task.")
   def outcome(:session), do: gettext("Allowed for this session.")
   def outcome(:session_any), do: gettext("Allowed with any parameters, for this session.")
+  def outcome(:session_bypass), do: gettext("⚠️ Allowed everything for this session.")
   def outcome(:always), do: gettext("Always allowed.")
   def outcome(:deny), do: gettext("Not allowed.")
 
   @doc "A short, stable, locale-independent token for a decision (for payloads)."
   @spec token(Permissions.decision()) :: String.t()
-  def token(decision) when decision in @all_options, do: Atom.to_string(decision)
+  def token(decision) when decision in @options, do: Atom.to_string(decision)
 
   @doc """
   Parse a token back into a decision. Unknown tokens map to `:deny` - the safe
@@ -80,6 +88,7 @@ defmodule Pepe.Permissions.Prompt do
   def from_token("this_run"), do: :this_run
   def from_token("session"), do: :session
   def from_token("session_any"), do: :session_any
+  def from_token("session_bypass"), do: :session_bypass
   def from_token("always"), do: :always
   def from_token(_other), do: :deny
 
@@ -105,7 +114,7 @@ defmodule Pepe.Permissions.Prompt do
   @spec taint_note() :: String.t()
   def taint_note do
     gettext(
-      "This task read something from outside the conversation, so a standing \"session\"/\"always\" approval doesn't apply here. Pick \"Allow for the rest of this task\" to stop it asking again for the rest of this one."
+      "This task read something from outside the conversation, so a standing \"session\"/\"always\" approval doesn't apply here. Pick \"Allow everything for this task\" to stop it asking again for the rest of this one."
     )
   end
 
@@ -132,19 +141,25 @@ defmodule Pepe.Permissions.Prompt do
   @spec scope_note([Pepe.Permissions.Risk.kind()]) :: String.t()
   def scope_note([]) do
     gettext("Any of these covers calls like this one, which flag no risk. Anything riskier will ask again.") <>
-      " " <> any_params_note()
+      " " <> any_params_note() <> " " <> bypass_note()
   end
 
   def scope_note(risks) do
     gettext("Any of these covers %{tool} calls that %{risks}. Anything else it does will ask again.",
       tool: gettext("this tool's"),
       risks: Enum.map_join(risks, ", ", &Pepe.Permissions.Risk.label/1)
-    ) <> " " <> any_params_note()
+    ) <> " " <> any_params_note() <> " " <> bypass_note()
   end
 
   defp any_params_note do
     gettext(
       "\"Allow with any parameters\" is different: it stops checking parameters for this tool entirely, for the rest of this session."
+    )
+  end
+
+  defp bypass_note do
+    gettext(
+      "\"⚠️ Allow everything for this session\" is the broadest one: it stops asking about any tool at all, for the rest of the session, even during a task that reads something from outside the conversation. Use it only when you're comfortable not being asked again for a while."
     )
   end
 end

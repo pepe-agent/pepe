@@ -154,6 +154,26 @@ defmodule Pepe.Permissions.PolicyTest do
     refute_received :asked
   end
 
+  test "a policy's forced question still gets asked even with an active session_bypass", %{home: home, agent: agent} do
+    write_policy(
+      home,
+      "cautious",
+      "def check(\"bash\", _args, _ctx), do: {:ask, \"needs a look\"}\ndef check(_name, _args, _ctx), do: :allow"
+    )
+
+    test_pid = self()
+    key = "policy-bypass-#{System.unique_integer([:positive])}"
+    Permissions.SessionStore.allow(key, "*")
+    on_exit(fn -> Permissions.SessionStore.clear(key) end)
+
+    ctx = %{agent: agent, session_key: key, authorize: fn _n, _a, _c -> send(test_pid, :asked) && :deny end}
+
+    # session_bypass would ordinarily silence everything, but a policy's own question is the
+    # one thing no blank cheque answers on its behalf.
+    assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :deny
+    assert_received :asked
+  end
+
   test "a policy-forced ask on a call with NO ordinary grant also covers the tool's own future calls of that shape", %{
     home: home,
     agent: agent
