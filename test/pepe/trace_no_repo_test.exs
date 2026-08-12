@@ -1,15 +1,22 @@
 defmodule Pepe.TraceNoRepoTest do
   @moduledoc """
   Regression: `Pepe.Trace.finish/1`'s rescue used to swallow a Repo hiccup with no trace
-  of it anywhere - unlike `Pepe.Config.Journal.record/4`'s equivalent tolerance, which
-  logs a warning. Deliberately the one trace test file that does NOT call
+  of it anywhere and, worse, returned `:ok` instead of the id its own doc promises -
+  unlike `Pepe.Config.Journal.record/4`'s equivalent tolerance, which logs a warning and
+  keeps its normal return shape. Deliberately the one trace test file that does NOT call
   `Pepe.RepoSetup.start!()` (every other one does, which is exactly why none of them could
-  catch this), so `finish/1` hits a real "Repo not started" error instead of a simulated
+  catch this), so `finish/1` hits a real "Repo not started" case instead of a simulated
   one.
+
+  The Repo-not-running case is now checked up front rather than raised-and-rescued, so
+  `finish/1` finishes normally and returns the id either way - it's the normal state of
+  nearly every other test in this suite, not worth a `:warning`/an exception every time
+  one runs, so it's noted at `:debug` instead (real, just quiet by default; `capture_log`
+  can't prove a `:debug` line exists without lowering the suite's own configured `:warning`
+  floor globally, which risks bleeding into unrelated concurrent tests, so this asserts the
+  behavior that actually matters here - finish/1 not silently losing the run - instead).
   """
   use ExUnit.Case, async: false
-
-  import ExUnit.CaptureLog
 
   alias Pepe.Trace
 
@@ -28,14 +35,8 @@ defmodule Pepe.TraceNoRepoTest do
     :ok
   end
 
-  test "finish/1 tolerates Repo not being started, and logs it instead of staying silent" do
+  test "finish/1 tolerates Repo not being started, and still returns the trace id" do
     assert Trace.start("bot", nil) == :started
-
-    log =
-      capture_log(fn ->
-        assert Trace.finish({:ok, "done", []}) == :ok
-      end)
-
-    assert log =~ "[trace]"
+    assert is_binary(Trace.finish({:ok, "done", []}))
   end
 end

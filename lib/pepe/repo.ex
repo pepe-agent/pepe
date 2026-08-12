@@ -63,7 +63,35 @@ defmodule Pepe.Repo do
   """
   @spec migrate!(keyword()) :: :ok
   def migrate!(opts \\ []) do
-    Ecto.Migrator.run(__MODULE__, Application.app_dir(:pepe, "priv/repo/migrations"), :up, Keyword.put(opts, :all, true))
+    Ecto.Migrator.run(__MODULE__, migrations(), :up, Keyword.put(opts, :all, true))
     :ok
+  end
+
+  # Resolved once per node, not once per call - Ecto.Migrator.run/4 given a directory path
+  # recompiles every .exs file in it on every call. migrate!/1 can run more than once in
+  # the same running node (Pepe.Application's boot, ensure_started/0's lazy start for a
+  # with_config-only CLI command, and - in tests - once per Repo-touching test via
+  # Pepe.RepoSetup), and recompiling identical migration modules each time only ever
+  # redefines them, noisily (a compiler warning per module per call), for no benefit: the
+  # modules never change within one running node.
+  defp migrations do
+    :persistent_term.get({__MODULE__, :migrations}, nil) || compile_migrations()
+  end
+
+  defp compile_migrations do
+    migrations =
+      :pepe
+      |> Application.app_dir("priv/repo/migrations")
+      |> Path.join("*.exs")
+      |> Path.wildcard()
+      |> Enum.sort()
+      |> Enum.map(fn path ->
+        version = path |> Path.basename() |> String.split("_", parts: 2) |> hd() |> String.to_integer()
+        [{module, _binary}] = Code.compile_file(path)
+        {version, module}
+      end)
+
+    :persistent_term.put({__MODULE__, :migrations}, migrations)
+    migrations
   end
 end
