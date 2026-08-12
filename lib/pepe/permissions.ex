@@ -20,8 +20,8 @@ defmodule Pepe.Permissions do
   A decision is one of:
 
     * `:once`        - allow just this call; ask again next time.
-    * `:this_run`    - allow for the rest of *this run only* (see below - the one decision
-      that still works while a run is tainted).
+    * `:this_run`    - allow *every* tool call for the rest of *this run only* (see below -
+      the one decision that still works while a run is tainted).
     * `:session`     - allow for the rest of this session (kept in-memory; forgotten on
       `/new` and on restart) - other sessions ask again, and only for calls whose risks
       were already seen (see "A grant remembers what it was given for" below).
@@ -67,13 +67,27 @@ defmodule Pepe.Permissions do
   every single time, even for a call shaped exactly like one the human had just approved a
   moment earlier in that same run - tapping "Always allow" mid-run looked like it should quiet
   things down and silently did nothing until the *next* run. `:this_run` is the fix, not a
-  workaround: a human looking at the tainted content right now, in the moment, saying "this one,
-  and calls just like it, for the rest of this run" is not the stale-grant risk taint exists to
-  stop - that risk is a decision made *before* the stranger's content was ever in play, applied
-  after the fact without anyone looking. `:this_run` never does that: it is Grant-shaped exactly
-  like `:session`/`:always` (tool + only the risks the human actually saw), it only ever gets
-  checked while still inside the same tainted run that created it, and it is gone the moment
-  that run ends - `Pepe.Agent.Runtime.run/3` clears it in the same breath as `untaint/0`.
+  workaround: a human looking at the tainted content right now, in the moment, saying "trust me
+  for the rest of this run" is not the stale-grant risk taint exists to stop - that risk is a
+  decision made *before* the stranger's content was ever in play, applied after the fact without
+  anyone looking.
+
+  `:this_run` first shipped Grant-shaped exactly like `:session`/`:always` (tool + only the risks
+  the human actually saw), which sounded right by analogy but was wrong in practice: a single
+  tainted run routinely calls several different tools before it ends (read a file, then shell
+  out, then fetch a page), and a per-tool-per-risk grant just moved the "I said always and it
+  asked again" problem down one level - a human tapping it for `read_file` still got asked again
+  for `bash`, and again for `fetch_url`, for the same one investigative run. So `:this_run` is now
+  the wildcard (`"*"`, see `Pepe.Permissions.Grant`) for the remainder of the run: it covers every
+  tool, every risk, not just the shape of the call it answered. That is a wider blank cheque than
+  `:session`/`:always` are ever allowed to be - but it is bounded the way they are not: one human,
+  looking at the actual tainted content right now, deciding in the moment, for a window that ends
+  the instant the run does. `Pepe.Agent.Runtime.run/3` clears it in the same breath as `untaint/0`,
+  so it can never survive into a later run the way a stale `:always` grant could. A
+  `Pepe.Permissions.Policy`-forced ask is the one thing this wildcard does not silently answer
+  (see `policy_answered?/3`) - a policy asked a specific question because it wanted a human to
+  actually look, and a blanket run-wide "trust me" for something unrelated must not stand in for
+  that.
 
   ## A grant remembers what it was given for
 
@@ -229,12 +243,12 @@ defmodule Pepe.Permissions do
   end
 
   # Has a human already answered THIS policy's question - persisted, session-scoped, or granted
-  # for the rest of this tainted run? The wildcard is excluded from the first two on purpose
-  # (see the moduledoc): "every tool, every risk" must not silently stand in for a policy
-  # actually asking.
+  # for the rest of this tainted run? The wildcard is excluded from all three on purpose (see
+  # the moduledoc): "every tool, every risk" - whether from `auto_approve`, a session grant, or
+  # a run-wide `:this_run` - must not silently stand in for a policy actually asking.
   defp policy_answered?(policy_grant, risks, ctx) do
     policy_persistent?(policy_grant, risks, ctx) or policy_session?(policy_grant, risks, ctx) or
-      run_scoped?(policy_grant, risks)
+      policy_run?(policy_grant, risks)
   end
 
   defp policy_persistent?(name, risks, %{agent: %{auto_approve: list}}) when is_list(list),
@@ -247,12 +261,15 @@ defmodule Pepe.Permissions do
 
   defp policy_session?(_name, _risks, _ctx), do: false
 
+  defp policy_run?(name, risks), do: Grant.covers?(without_wildcard(run_grants()), name, risks)
+
   defp without_wildcard(grants), do: Enum.reject(grants, &Grant.wildcard?/1)
 
   @run_grants :pepe_run_grants
 
   @doc """
-  Grants collected via `:this_run` answers during the current run's taint window. Kept in the
+  Grants collected via `:this_run` answers during the current run's taint window - in practice
+  just the wildcard once any `:this_run` has been answered (see the moduledoc). Kept in the
   run's own process, exactly like `taint/0` - dies with the run, cannot leak into the next one.
   """
   @spec run_grants() :: [String.t()]
@@ -468,9 +485,18 @@ defmodule Pepe.Permissions do
   # trusting the surface: granted before taint, it would otherwise survive into the exact
   # post-taint window `:this_run` exists to NOT cover (see the moduledoc's "content from a
   # stranger suspends pre-approval"). Falls back to `:once` instead of silently doing nothing.
+  #
+  # Adds TWO entries, not one - see the moduledoc for why a single tap now covers every tool
+  # for the rest of this run, not just calls shaped like this one:
+  #   - the wildcard, so `run_scoped?/2` (the ordinary gate) lets every later call through.
+  #   - `Grant.for(name, risks)` under `name` exactly as before, so `policy_run?/2` (which
+  #     strips the wildcard on purpose) still only considers a policy's own question answered
+  #     when a human actually answered *that* question - a `:this_run` tap for something else
+  #     must not silently stand in for it.
   defp remember(:this_run, name, risks, ctx) do
     if tainted?(ctx) do
       add_run_grant(Grant.for(name, risks))
+      add_run_grant("*")
       :this_run
     else
       :once

@@ -158,18 +158,24 @@ defmodule Pepe.PermissionsTest do
       assert :counters.get(asks, 1) == 1
     end
 
-    test "this_run does not cover a genuinely riskier call than the one it was granted for" do
+    test "this_run covers every tool and risk for the rest of the run, not just the shape it was granted for" do
       agent = %Agent{name: "zak", auto_approve: []}
       Permissions.taint()
       test = self()
       ctx = %{agent: agent, authorize: fn _n, _a, _c -> send(test, :asked) && :this_run end}
 
+      # One tap while looking at a harmless `ls` ...
       assert Permissions.gate("bash", ~s({"command":"ls"}), ctx) == :allow
       assert_received :asked
 
-      # rm -rf flags a delete risk the human never saw when granting this_run for a plain `ls`.
+      # ... now also covers a genuinely riskier bash call the human never explicitly saw ...
       assert Permissions.gate("bash", ~s({"command":"rm -rf build"}), ctx) == :allow
-      assert_received :asked
+      refute_received :asked
+
+      # ... and a completely different tool, for the rest of this same tainted run - the
+      # scenario that used to ask again for every tool a multi-step investigation touched.
+      assert Permissions.gate("write_file", ~s({"path":"out.txt","content":"x"}), ctx) == :allow
+      refute_received :asked
     end
 
     test "this_run never survives past the run it was granted in" do
