@@ -64,11 +64,24 @@ defmodule Pepe.Config.Journal do
 
   # This is a diagnostic trail, not the write it's describing - `Config.save/1` above this
   # in `Writer.do_update/3` has already committed the real change to disk by the time this
-  # runs. A Repo hiccup here (most commonly: no Repo running at all, the normal state of a
-  # bare `ExUnit.Case` test that never touches operational data) must never turn an
-  # already-successful config write into a raised exception - same reasoning, and the same
-  # rescue-and-log shape, as `Pepe.Store`'s own tolerance for a Mnesia hiccup.
+  # runs. A Repo hiccup here must never turn an already-successful config write into a
+  # raised exception - same reasoning, and the same rescue-and-log shape, as `Pepe.Store`'s
+  # own tolerance for a Mnesia hiccup.
+  #
+  # The Repo simply not running at all is checked separately, before ever attempting the
+  # insert: the normal state of a bare `ExUnit.Case` test that never touches operational
+  # data, not a failure worth a warning every time one runs. An insert that fails for any
+  # other reason (Repo running, write itself broken) still gets the warning - that one is
+  # actually worth seeing.
   defp insert(%Entry{} = entry) do
+    if Process.whereis(Repo) do
+      do_insert(entry)
+    else
+      Logger.debug("[config journal] Pepe.Repo not running, skipping journal entry")
+    end
+  end
+
+  defp do_insert(%Entry{} = entry) do
     Repo.insert!(entry)
   rescue
     e -> Logger.warning("[config journal] #{Exception.message(e)}")

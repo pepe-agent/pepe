@@ -22,12 +22,9 @@ defmodule Pepe.RepoSetup do
     # single-writer SQLite file at once produces real, if usually-survivable,
     # "database is locked" contention. One connection is also all a single test needs.
     ExUnit.Callbacks.start_supervised!({Pepe.Repo, pool_size: 1, journal_mode: :wal, busy_timeout: 5_000})
-
-    Ecto.Migrator.run(Pepe.Repo, Application.app_dir(:pepe, "priv/repo/migrations"), :up,
-      all: true,
-      log: false
-    )
-
+    # Pepe.Repo.migrate!/1 memoizes the compiled migration modules itself, so calling
+    # it once per test here doesn't recompile them each time - see its own moduledoc.
+    Pepe.Repo.migrate!(log: false)
     :ok
   end
 end

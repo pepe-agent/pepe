@@ -41,11 +41,23 @@ defmodule Pepe.Usage.Prepaid do
   """
   @spec balance(String.t() | nil) :: float() | nil
   def balance(project) do
+    if Process.whereis(Repo) do
+      do_balance(project)
+    else
+      Logger.debug("[prepaid] Pepe.Repo not running, skipping balance lookup")
+      nil
+    end
+  end
+
+  defp do_balance(project) do
     case get(project) do
       nil -> nil
       row -> row.balance - Usage.billable_after_id(project, row.settled_through_id)
     end
   rescue
+    # The Repo-not-running case is checked before this ever runs (see balance/1); an
+    # error here means the Repo is up and something about the query itself is genuinely
+    # broken, worth this warning.
     e ->
       Logger.warning("[prepaid] #{Exception.message(e)}")
       nil

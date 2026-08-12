@@ -5,6 +5,8 @@ defmodule Pepe.Agent.SessionTitles do
   persisted next to the session files, kept out of the per-turn session JSON so the hot save
   path never touches it. Disposable: losing it only reverts a session to showing its key.
   """
+  require Logger
+
   alias Pepe.Agent.Utility
   alias Pepe.Config
   alias Pepe.LLM
@@ -168,11 +170,21 @@ defmodule Pepe.Agent.SessionTitles do
   @doc "Forget the label for `key` (e.g. when its session is deleted)."
   def delete(key), do: all() |> Map.delete(to_string(key)) |> write()
 
+  # Disposable, per the moduledoc: losing a write here only reverts a session to
+  # showing its key, so a failure (most often this runs in the background, after its
+  # own session/test has already torn down the directory it would write into) is
+  # logged, never raised.
   defp write(map) do
     path = path()
-    File.mkdir_p!(Path.dirname(path))
-    File.write(path, Jason.encode!(map))
-    :ok
+
+    with :ok <- File.mkdir_p(Path.dirname(path)),
+         :ok <- File.write(path, Jason.encode!(map)) do
+      :ok
+    else
+      {:error, reason} ->
+        Logger.warning("[session titles] could not write #{path}: #{:file.format_error(reason)}")
+        :ok
+    end
   end
 
   defp path, do: Path.join([Config.home(), "data", "session_titles.json"])

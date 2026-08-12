@@ -155,8 +155,16 @@ defmodule Pepe.Trace do
 
         # The run's billing-side row first: it holds no transcript and is never trimmed, so
         # it must not be lost to a failure in writing or trimming the (diagnostic) trace.
-        Pepe.Usage.Runs.record(row)
-        write(row)
+        # Skipped outright (not attempted-then-caught) when the Repo simply isn't running -
+        # the normal state of a bare `ExUnit.Case` test that never touches operational
+        # data, not a failure worth a warning every time one runs.
+        if Process.whereis(Repo) do
+          Pepe.Usage.Runs.record(row)
+          write(row)
+        else
+          Logger.debug("[trace] Pepe.Repo not running, skipping trace persistence")
+        end
+
         # `sender` never joins `row` itself - it isn't a DB column, and `write/1` inserts
         # via this schema's exact field list (Repo.insert_all), so an extra key there would
         # break every insert. Otel export is the only reader, so it gets its own map.
@@ -169,7 +177,9 @@ defmodule Pepe.Trace do
     # already-successful run into a crash. Silent was the wrong choice, though: unlike
     # `Pepe.Config.Journal.record/4`'s equivalent rescue, this one used to swallow the
     # error with no trace of it anywhere, which made a genuinely broken trace pipeline
-    # indistinguishable from one quietly working - logged now, same as the journal's.
+    # indistinguishable from one quietly working - logged now, same as the journal's. The
+    # Repo-not-running case never reaches here at all now (checked above); an insert that
+    # still fails with the Repo running is genuinely worth this warning.
     e -> Logger.warning("[trace] #{Exception.message(e)}")
   end
 
