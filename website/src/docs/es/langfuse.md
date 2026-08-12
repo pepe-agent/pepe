@@ -5,15 +5,15 @@ description: Envía las ejecuciones de los agentes a Langfuse para observabilida
 
 ## Langfuse
 
-[Langfuse](https://langfuse.com) es una conexión opcional, no un requisito -
-nada en Pepe asume que está ahí. Dos funciones independientes lo usan, y
-puedes activar una, las dos, o ninguna:
+[Langfuse](https://langfuse.com) es una conexión opcional, no un requisito:
+nada en Pepe asume que está ahí. Dos funciones lo usan:
 
 - **Exportación de traces**: cada ejecución terminada se envía a Langfuse
   como un trace OTLP, para que puedas explorar, depurar y evaluar
   ejecuciones ahí.
 - **Prompts gestionados**: la persona de un agente se obtiene de un prompt
-  que editas en Langfuse, en lugar de `system_prompt`/`SOUL.md`.
+  que editas en Langfuse, en lugar de `system_prompt`/`SOUL.md`. Opt-in por
+  agente, además de las credenciales de abajo, mediante `langfuse_prompt`.
 
 ### Credenciales
 
@@ -29,30 +29,46 @@ export LANGFUSE_BASE_URL=https://tu-langfuse-self-hosted.ejemplo.com
 ```
 
 Obtén el par de claves en la configuración de tu proyecto en Langfuse.
-Ninguna de las dos funciones hace nada hasta que sus propias credenciales
-estén definidas (ver abajo - la exportación de traces lee un par de
-variables distinto, el estándar de OTEL); una caída de Langfuse o una clave
-incorrecta solo hace que esa función en concreto caiga silenciosamente al
-comportamiento local, nunca bloquea una conversación ni una ejecución.
+Definirlo activa la exportación de traces de inmediato, para todos los
+agentes (mira abajo si además quieres prompts gestionados desde Langfuse, o
+traces yendo a otro sitio). Una caída de Langfuse o una clave incorrecta hace
+que la exportación de traces caiga silenciosamente a descartar el trace, y
+que una obtención de `langfuse_prompt` caiga a la persona local del agente;
+ninguna de las dos bloquea una conversación ni una ejecución.
+
+Ambas funciones leen estas variables directamente del proceso de Pepe en
+ejecución, no a través de la herramienta `bash` de un agente, algo que
+importa si alguna vez le pides a un agente que ayude a depurar la conexión.
+`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` tienen forma de secreto por su
+nombre, así que Pepe las elimina de la shell del propio agente por defecto,
+igual que cualquier otra credencial (ver [Secretos](../secrets/)). El agente
+puede añadir él mismo los dos nombres a `secrets.expose_env` si necesita
+comprobarlas directamente, solo ten en cuenta que una lectura de longitud 0
+ahí significa "eliminada de mi shell", no "sin definir en el servidor".
 
 ### Exportación de traces
 
+El par `LANGFUSE_*` de arriba ya basta por sí solo: la exportación de traces
+se activa en cuanto `LANGFUSE_PUBLIC_KEY` y `LANGFUSE_SECRET_KEY` están
+definidas, sin necesitar ninguna variable de OTEL aparte. Cada ejecución
+terminada se convierte en un trace OTLP: un span raíz para toda la ejecución,
+un span hijo por llamada a herramienta y por llamada a modelo, con atributos
+genéricos de OpenTelemetry y los propios de Langfuse definidos en cada uno,
+así que las sesiones se agrupan correctamente y las generaciones se
+distinguen de los spans de herramienta normales.
+
+Para enviar traces a otro sitio que no sea Langfuse (un colector
+self-hosted, Honeycomb, cualquier otro backend que hable OTLP), define las
+variables estándar de OTLP, y estas toman el control por completo (el par
+`LANGFUSE_*` pasa entonces a usarse solo para prompts gestionados, si
+también usas eso):
+
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de pk-lf-...:sk-lf-...>"
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://tu-colector.ejemplo.com
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de usuario:contraseña>"
 ```
 
-Estas son las variables estándar de OTLP/OTEL, no el par `LANGFUSE_*` de
-arriba - el endpoint OTLP de Langfuse autentica con una cabecera
-`Authorization` literal, base64 de `clave-pública:clave-secreta`. Cada
-ejecución terminada se convierte en un trace OTLP: un span raíz para toda la
-ejecución, un span hijo por llamada a herramienta y por llamada a modelo,
-con atributos genéricos de OpenTelemetry y los propios de Langfuse
-definidos en cada uno, así que las sesiones se agrupan correctamente y las
-generaciones se distinguen de los spans de herramienta normales.
-Desactivado a menos que definas `OTEL_EXPORTER_OTLP_ENDPOINT`; funciona
-también con cualquier otro backend que hable OTLP, no solo Langfuse. Detalle
-completo, incluyendo las dos variables extra de OTEL que rara vez
+Detalle completo, incluyendo las dos variables extra de OTEL que rara vez
 necesitas: [Traces](../traces/#enviar-traces-a-una-herramienta-de-observabilidad).
 
 ### Prompts gestionados

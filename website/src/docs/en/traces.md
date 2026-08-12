@@ -45,14 +45,17 @@ being stored.
 
 ## Sending traces to an observability tool
 
-Set `OTEL_EXPORTER_OTLP_ENDPOINT` and every finished run is also sent as an OTLP
-trace, to [Langfuse](../langfuse/) or any other backend that speaks it - off
-unless you set it, and a delivery failure never touches the run it's
-describing.
+Sending to [Langfuse](../langfuse/) needs nothing beyond the credentials most
+installs already have set for it (`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`):
+every finished run is sent as an OTLP trace the moment those are present,
+off otherwise, and a delivery failure never touches the run it's describing.
+
+For any other OTLP-speaking backend, set `OTEL_EXPORTER_OTLP_ENDPOINT`
+instead and it takes over completely:
 
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 of pk-lf-...:sk-lf-...>"
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://your-collector.example.com
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 of user:pass>"
 ```
 
 `OTEL_EXPORTER_OTLP_HEADERS` is a comma-separated `key=value` list, sent as

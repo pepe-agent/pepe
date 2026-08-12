@@ -5,12 +5,19 @@ defmodule Pepe.OtelTest do
 
   alias Pepe.Otel
 
+  @env_vars ~w(OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
+               LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_BASE_URL)
+
   setup do
     {:ok, server} = Bandit.start_link(plug: Pepe.Test.MockOtelCollector, port: 0, scheme: :http)
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
 
-    prev =
-      for k <- ~w(OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_TRACES_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS), do: {k, System.get_env(k)}
+    prev = for k <- @env_vars, do: {k, System.get_env(k)}
+    # A dev shell may have LANGFUSE_* set for the managed-prompts feature (see
+    # Pepe.Langfuse) or its own local Langfuse trace export - clear it here so every
+    # test starts from a deterministic "nothing configured" slate regardless of what's
+    # ambient, same reasoning as clearing the OTEL_* vars above.
+    Enum.each(@env_vars, &System.delete_env/1)
 
     on_exit(fn ->
       Process.exit(server, :normal)
@@ -125,6 +132,43 @@ defmodule Pepe.OtelTest do
 
     assert {"authorization", "Basic cGstbGY6c2stbGY="} in headers
     assert {"x-langfuse-ingestion-version", "4"} in headers
+  end
+
+  test "enabled?/0 is true from LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY alone, no OTEL_* vars needed" do
+    System.put_env("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    System.put_env("LANGFUSE_SECRET_KEY", "sk-lf-test")
+    assert Otel.enabled?()
+  end
+
+  test "enabled?/0 stays false with only one half of the Langfuse pair" do
+    System.put_env("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    refute Otel.enabled?()
+  end
+
+  test "export/1 derives the Langfuse OTLP endpoint and Basic-auth header from LANGFUSE_* alone", %{port: port} do
+    System.put_env("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    System.put_env("LANGFUSE_SECRET_KEY", "sk-lf-test")
+    System.put_env("LANGFUSE_BASE_URL", "http://localhost:#{port}")
+
+    Otel.export(sample_row())
+    assert_receive {:otel_request, headers, _body}, 2000
+
+    assert {"authorization", "Basic " <> Base.encode64("pk-lf-test:sk-lf-test")} in headers
+  end
+
+  test "an explicit OTEL_EXPORTER_OTLP_ENDPOINT wins over LANGFUSE_* when both are set", %{port: port} do
+    System.put_env("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
+    System.put_env("LANGFUSE_SECRET_KEY", "sk-lf-test")
+    System.put_env("LANGFUSE_BASE_URL", "http://localhost:1")
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    Otel.export(sample_row())
+    # Reaching the mock collector at all proves the explicit endpoint was used, not the
+    # unreachable Langfuse one derived from LANGFUSE_BASE_URL above.
+    assert_receive {:otel_request, headers, _body}, 2000
+    # No Authorization header either - the explicit (empty) OTEL_EXPORTER_OTLP_HEADERS
+    # path is used as-is, not silently backfilled from the Langfuse credentials.
+    refute Enum.any?(headers, fn {k, _v} -> String.downcase(k) == "authorization" end)
   end
 
   test "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is used as-is, with no /v1/traces appended", %{port: port} do

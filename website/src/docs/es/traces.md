@@ -48,14 +48,19 @@ resultados de herramienta muy largos se acortan antes de guardarse.
 
 ## Enviar traces a una herramienta de observabilidad
 
-Define `OTEL_EXPORTER_OTLP_ENDPOINT` y cada ejecución terminada también se
-envía como un trace OTLP, a [Langfuse](../langfuse/) o cualquier otro
-backend que hable ese protocolo, desactivado hasta que lo definas, y un
-fallo en el envío nunca afecta a la ejecución que describe.
+Enviar a [Langfuse](../langfuse/) no necesita nada más que las credenciales
+que la mayoría de las instalaciones ya tienen definidas para él
+(`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`): cada ejecución terminada se
+convierte en un trace OTLP en cuanto están presentes, desactivado en caso
+contrario, y un fallo en el envío nunca afecta a la ejecución que describe.
+
+Para cualquier otro backend que hable OTLP, define
+`OTEL_EXPORTER_OTLP_ENDPOINT` en su lugar, y este toma el control por
+completo:
 
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://cloud.langfuse.com/api/public/otel
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de pk-lf-...:sk-lf-...>"
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://tu-colector.ejemplo.com
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de usuario:contraseña>"
 ```
 
 `OTEL_EXPORTER_OTLP_HEADERS` es una lista `clave=valor` separada por comas,

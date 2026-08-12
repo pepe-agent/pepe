@@ -2,8 +2,14 @@ defmodule Pepe.Otel do
   @moduledoc """
   Opt-in OTLP/HTTP export of a finished `Pepe.Trace` row, for whoever wants their runs
   in an observability tool - Langfuse, Honeycomb, Datadog, anything that speaks OTLP.
-  Off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set; every other Pepe feature is unaffected
-  either way, and a delivery failure here never touches the run it's describing.
+  Off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set, **or** the same `LANGFUSE_PUBLIC_KEY`/
+  `LANGFUSE_SECRET_KEY` pair `Pepe.Langfuse` reads for managed prompts is - Langfuse's own
+  credentials are enough on their own to turn this on, no separate OTLP endpoint/header
+  wrangling required for the one backend most people reach for first. The generic
+  `OTEL_EXPORTER_OTLP_*` vars still take precedence when set, so pointing at a different
+  OTLP backend (a self-hosted collector, Honeycomb, ...) works exactly as before. Every
+  other Pepe feature is unaffected either way, and a delivery failure here never touches
+  the run it's describing.
 
   Deliberately a hand-built OTLP/HTTP+JSON payload over `Req` (already a dependency),
   not the `opentelemetry`/`opentelemetry_exporter` Erlang SDK: that SDK is built to
@@ -89,7 +95,25 @@ defmodule Pepe.Otel do
 
   # --- config --------------------------------------------------------------------
 
-  defp endpoint, do: System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT")
+  # The generic var wins when set - it's how a non-Langfuse OTLP backend is configured,
+  # and must not be second-guessed. Falls back to deriving Langfuse's own endpoint from
+  # its three credential vars, so setting those up for managed prompts (or nothing else
+  # at all) is enough to also turn trace export on.
+  defp endpoint do
+    case System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT") do
+      nil -> langfuse_endpoint()
+      "" -> langfuse_endpoint()
+      explicit -> explicit
+    end
+  end
+
+  defp langfuse_endpoint do
+    if langfuse_configured?() do
+      (System.get_env("LANGFUSE_BASE_URL") || "https://cloud.langfuse.com")
+      |> String.trim_trailing("/")
+      |> Kernel.<>("/api/public/otel")
+    end
+  end
 
   # The signal-specific var, when set, is used exactly as given (the OTEL spec's own
   # rule: it already points at the traces endpoint, nothing gets appended). The general
@@ -104,9 +128,24 @@ defmodule Pepe.Otel do
 
   # OTEL_EXPORTER_OTLP_HEADERS: "k1=v1,k2=v2" - the standard format every OTLP SDK
   # reads, so e.g. `Authorization=Basic <base64>` for Langfuse's basic auth works with
-  # no Langfuse-specific code here at all.
+  # no Langfuse-specific code here at all. Falls back to building that same Basic-auth
+  # header straight from LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY, but ONLY when the
+  # endpoint itself was also derived from Langfuse's vars (`explicit_endpoint?/0` is
+  # false) - an operator who pointed `OTEL_EXPORTER_OTLP_ENDPOINT` at a different
+  # backend must never have Langfuse credentials silently attached to that backend's
+  # requests just because they also happen to be set for the managed-prompts feature.
   defp header_pairs do
-    (System.get_env("OTEL_EXPORTER_OTLP_HEADERS") || "")
+    case System.get_env("OTEL_EXPORTER_OTLP_HEADERS") do
+      nil -> if explicit_endpoint?(), do: [], else: langfuse_header_pairs()
+      "" -> if explicit_endpoint?(), do: [], else: langfuse_header_pairs()
+      explicit -> parse_header_pairs(explicit)
+    end
+  end
+
+  defp explicit_endpoint?, do: System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT", "") != ""
+
+  defp parse_header_pairs(raw) do
+    raw
     |> String.split(",", trim: true)
     |> Enum.flat_map(fn pair ->
       case String.split(pair, "=", parts: 2) do
@@ -114,6 +153,18 @@ defmodule Pepe.Otel do
         _ -> []
       end
     end)
+  end
+
+  defp langfuse_header_pairs do
+    if langfuse_configured?() do
+      [{"Authorization", "Basic " <> Base.encode64("#{System.get_env("LANGFUSE_PUBLIC_KEY")}:#{System.get_env("LANGFUSE_SECRET_KEY")}")}]
+    else
+      []
+    end
+  end
+
+  defp langfuse_configured? do
+    System.get_env("LANGFUSE_PUBLIC_KEY", "") != "" and System.get_env("LANGFUSE_SECRET_KEY", "") != ""
   end
 
   defp service_name, do: System.get_env("OTEL_SERVICE_NAME") || "pepe"
