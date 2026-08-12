@@ -32,6 +32,34 @@ defmodule Pepe.SourcingTest do
     end
   end
 
+  describe "root/2" do
+    test "an exact match (rank 0) wins over an incidental same-extension file elsewhere in the tree" do
+      tmp = Path.join(System.tmp_dir!(), "pepe_root_rank_#{System.unique_integer([:positive])}")
+      # "AAA_reference" sorts (and, depth-first, is visited) before "SKILL.md" - exactly
+      # the ordering that broke when root/2 just took the first regular file a boolean
+      # predicate matched, with no way to prefer the real entry doc over an incidental one.
+      File.mkdir_p!(Path.join(tmp, "AAA_reference"))
+      File.write!(Path.join(tmp, "AAA_reference/notes.md"), "not the entry doc")
+      File.write!(Path.join(tmp, "SKILL.md"), "the real entry doc")
+      on_exit(fn -> File.rm_rf(tmp) end)
+
+      rank = fn
+        "SKILL.md" -> 0
+        name -> if String.ends_with?(name, ".md"), do: 1, else: false
+      end
+
+      assert Sourcing.root(tmp, rank) == tmp
+    end
+
+    test "falls back to the given directory when nothing matches" do
+      tmp = Path.join(System.tmp_dir!(), "pepe_root_rank_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+      on_exit(fn -> File.rm_rf(tmp) end)
+
+      assert Sourcing.root(tmp, fn _ -> false end) == tmp
+    end
+  end
+
   describe "stage/3 with a local path" do
     test "a missing path is reported" do
       assert {:error, :not_found} = Sourcing.stage("/no/such/path-#{System.unique_integer([:positive])}", ".exs", fn _ -> false end)

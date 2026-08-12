@@ -261,8 +261,8 @@ defmodule Pepe.Plugins do
   # --- staging: turn any source into a local path we can inspect -------------------
 
   # A package root is the dir holding manifest.json (or a .exs if there's no manifest) -
-  # generalized in Pepe.Sourcing as a predicate over a candidate file's basename.
-  defp stage(src), do: Pepe.Sourcing.stage(src, ".exs", &plugin_root_marker?/1)
+  # generalized in Pepe.Sourcing as a rank over a candidate file's basename.
+  defp stage(src), do: Pepe.Sourcing.stage(src, ".exs", &plugin_root_rank/1)
 
   # Not a PepeHub reference at all -> src passes straight through to stage/1 unchanged,
   # exactly as it always has for a path/archive/URL.
@@ -278,8 +278,8 @@ defmodule Pepe.Plugins do
     end
   end
 
-  defp plugin_root_marker?(@manifest), do: true
-  defp plugin_root_marker?(name), do: String.ends_with?(name, ".exs")
+  defp plugin_root_rank(@manifest), do: 0
+  defp plugin_root_rank(name), do: if(String.ends_with?(name, ".exs"), do: 1, else: false)
 
   # --- placement: copy the staged plugin into the plugins dir ----------------------
 

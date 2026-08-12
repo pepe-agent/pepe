@@ -14,9 +14,9 @@ defmodule Pepe.Sourcing do
 
     * `single_ext` - the file extension a source can be a bare single file of
       (`".exs"` for a plugin, `".md"` for a skill).
-    * `root_marker` - a 1-arg function deciding which directory inside an extracted archive
-      is the real package root (see `root/2`); a plugin looks for `manifest.json` or any
-      `.exs`, a skill looks for any `.md`.
+    * `root_marker` - a 1-arg function ranking which directory inside an extracted archive
+      is the real package root (see `root/2`); a plugin ranks `manifest.json` above any
+      other `.exs`, a skill ranks `SKILL.md` above any other `.md`.
   """
 
   @doc """
@@ -94,17 +94,33 @@ defmodule Pepe.Sourcing do
     end
   end
 
-  @doc "The directory inside `tmp` that satisfies `root_marker`, else `tmp` itself."
-  @spec root(String.t(), (String.t() -> boolean())) :: String.t()
+  @doc """
+  The directory inside `tmp` that best satisfies `root_marker`, else `tmp` itself.
+
+  `root_marker` ranks a basename: `false` for no match, a lower integer for a more
+  specific one - a plugin's exact `manifest.json` or a skill's exact `SKILL.md`
+  outranks any incidental same-extension file elsewhere in the tree (a package's own
+  reference docs, say). Picking merely the first regular file matching a boolean
+  predicate depended on `Path.wildcard/1`'s traversal order, which nothing guarantees,
+  and silently resolved to the wrong directory the first time a package shipped more
+  than one file the predicate could match.
+  """
+  @spec root(String.t(), (String.t() -> false | pos_integer())) :: String.t()
   def root(tmp, root_marker) do
     tmp
     |> Path.join("**")
     |> Path.wildcard()
     |> Enum.filter(&File.regular?/1)
-    |> Enum.find(&root_marker.(Path.basename(&1)))
+    |> Enum.flat_map(fn path ->
+      case root_marker.(Path.basename(path)) do
+        false -> []
+        rank -> [{rank, path}]
+      end
+    end)
+    |> Enum.min_by(&elem(&1, 0), fn -> nil end)
     |> case do
       nil -> tmp
-      match -> Path.dirname(match)
+      {_rank, match} -> Path.dirname(match)
     end
   end
 

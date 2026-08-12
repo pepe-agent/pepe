@@ -217,7 +217,7 @@ defmodule Pepe.Skills.Marketplace do
   # --- install pipeline --------------------------------------------------------------
 
   defp do_install(name, source, trust_level, opts) do
-    with {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", &String.ends_with?(&1, ".md")) do
+    with {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", &skill_root_rank/1) do
       try do
         case prepare(staged, name) do
           {:ok, placement, content, scan} ->
@@ -244,6 +244,13 @@ defmodule Pepe.Skills.Marketplace do
       end
     end
   end
+
+  # Ranks an exact SKILL.md above any other .md Pepe.Sourcing.root/2 finds while
+  # navigating an extracted archive - a package's own reference docs are `.md` too, and
+  # without this, which one Path.wildcard/1 happens to visit first (unspecified order)
+  # decided whether staging landed on the real package root or one of its subdirectories.
+  defp skill_root_rank("SKILL.md"), do: 0
+  defp skill_root_rank(name), do: if(String.ends_with?(name, ".md"), do: 1, else: false)
 
   defp prepare(%{type: :file, path: path}, _name) do
     with {:ok, content} <- File.read(path), do: {:ok, {:file, content}, content, Sentinel.scan(content)}
