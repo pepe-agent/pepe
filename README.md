@@ -224,8 +224,17 @@ mix deps.get
 mix test          # the whole suite, over real TCP - no DB, no keys
 ```
 
-Then fork, branch off `master`, make your change (match the style in `AGENTS.md`),
-run `mix precommit`, and open a PR against `master`. Adding a tool? Follow
+Then fork the repo on GitHub, clone your fork, branch off `master`, make your change
+(match the style in `AGENTS.md`), run `mix precommit`, and push:
+
+```bash
+git checkout -b my-fix
+# ... make your change ...
+git push -u origin my-fix
+```
+
+Open a PR against `pepe-agent/pepe:master` from your fork (GitHub shows a "Compare &
+pull request" button after the push). Adding a tool? Follow
 [Adding a tool](docs/adding-a-tool.md).
 
 **The single most useful thing you can do:** I run Pepe day-to-day on one setup
