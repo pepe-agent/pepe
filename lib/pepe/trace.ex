@@ -42,8 +42,13 @@ defmodule Pepe.Trace do
   Begin accumulating a trace for this process. Returns `:started` for the outermost run
   (the one that owns the trace and must call `finish/1`) or `:nested` for a sub-agent run
   sharing the same process, whose events fold into the outer trace.
+
+  `sender`, when the calling surface has one, is a display name for whoever actually sent
+  this message (e.g. Telegram's `sender_display_name/1`) - never persisted to the trace
+  table itself, only carried through to `Pepe.Otel.export/1` as a nicer `user.id` than the
+  session key alone. `nil` for every surface/call site that has no such name to give.
   """
-  def start(agent_name, session, prompt \\ nil, source \\ nil) do
+  def start(agent_name, session, prompt \\ nil, source \\ nil, sender \\ nil) do
     case Process.get(@key) do
       nil ->
         Process.put(@key, %{
@@ -53,6 +58,7 @@ defmodule Pepe.Trace do
           scope: Project.of(agent_name),
           session: session,
           source: source || source_from_session(session),
+          sender: sender,
           prompt: clip(prompt),
           t0: System.monotonic_time(:millisecond),
           events: []
@@ -107,12 +113,19 @@ defmodule Pepe.Trace do
     end
   end
 
-  @doc "Append one runtime lifecycle event to the in-progress trace (no-op if none)."
+  @doc """
+  Append one runtime lifecycle event to the in-progress trace (no-op if none). Stamped
+  with its real offset from the run's start (`"ms"`, monotonic milliseconds) - the
+  runtime emits each event synchronously as it happens (a tool_call right before the
+  tool runs, its tool_result right after), so consecutive offsets are the actual time
+  between them, not a guess. `Pepe.Otel` uses these to place child spans on their real
+  timeline instead of splitting the run's total duration evenly across events.
+  """
   def event(ev) do
     case {Process.get(@key), encode_event(ev)} do
       {nil, _} -> :ok
       {_, nil} -> :ok
-      {t, e} -> Process.put(@key, %{t | events: [e | t.events]})
+      {t, e} -> Process.put(@key, %{t | events: [Map.put(e, "ms", System.monotonic_time(:millisecond) - t.t0) | t.events]})
     end
 
     :ok
@@ -144,7 +157,10 @@ defmodule Pepe.Trace do
         # it must not be lost to a failure in writing or trimming the (diagnostic) trace.
         Pepe.Usage.Runs.record(row)
         write(row)
-        Pepe.Otel.export(row)
+        # `sender` never joins `row` itself - it isn't a DB column, and `write/1` inserts
+        # via this schema's exact field list (Repo.insert_all), so an extra key there would
+        # break every insert. Otel export is the only reader, so it gets its own map.
+        Pepe.Otel.export(Map.put(row, :sender, t.sender))
         t.id
     end
   rescue

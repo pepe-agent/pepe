@@ -86,13 +86,17 @@ defmodule Pepe.Webhooks.Discord do
     text = command_text(p["data"])
 
     if is_binary(text) and text != "" do
-      {:ok, [%{from: token, text: text, id: p["id"]}]}
+      {:ok, [%{from: token, text: text, id: p["id"], name: interaction_username(p)}]}
     else
       :ignore
     end
   end
 
   def parse(_payload), do: :ignore
+
+  # A guild interaction carries the invoking member under `member.user`; a DM (no guild)
+  # carries it straight under `user` instead - only one of the two is ever present.
+  defp interaction_username(p), do: get_in(p, ["member", "user", "username"]) || get_in(p, ["user", "username"])
 
   defp command_text(%{"options" => [%{"value" => value} | _]}) when is_binary(value), do: value
   defp command_text(%{"name" => name}) when is_binary(name), do: name

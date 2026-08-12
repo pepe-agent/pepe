@@ -240,6 +240,77 @@ defmodule Pepe.OtelTest do
     refute Enum.any?(root["attributes"], &(&1["key"] == "user.id"))
   end
 
+  test "child spans use each event's real recorded offset, not an even split of the run's total time", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    row = %{
+      sample_row()
+      | ms: 1000,
+        events: [
+          %{"t" => "tool_call", "name" => "web_search", "args" => "weather today", "ms" => 0},
+          # A slow tool: 900ms between its call and its result, out of the run's 1000ms total.
+          %{"t" => "tool_result", "name" => "web_search", "out" => "sunny, 22C", "ms" => 900},
+          %{"t" => "usage", "model" => "gpt-4o", "in" => 120, "out" => 40, "ms" => 950},
+          %{"t" => "assistant", "text" => "It's sunny and 22C.", "ms" => 1000}
+        ]
+    }
+
+    Otel.export(row)
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    tool_span = Enum.find(spans, &(&1["name"] == "web_search"))
+    gen_span = Enum.find(spans, &(&1["name"] == "gpt-4o"))
+
+    tool_ns = String.to_integer(tool_span["endTimeUnixNano"]) - String.to_integer(tool_span["startTimeUnixNano"])
+    gen_ns = String.to_integer(gen_span["endTimeUnixNano"]) - String.to_integer(gen_span["startTimeUnixNano"])
+
+    # 900ms vs 50ms - nowhere near the same, unlike an even split across 4 events (250ms each).
+    assert tool_ns == 900_000_000
+    assert gen_ns == 50_000_000
+  end
+
+  test "child spans fall back to an even split for a trace row recorded before events carried a timestamp", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    Otel.export(sample_row())
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    durations = for s <- spans, s["name"] != "pepe.run", do: String.to_integer(s["endTimeUnixNano"]) - String.to_integer(s["startTimeUnixNano"])
+
+    # sample_row's 4 events split the 1200ms run into 300ms windows each; only the
+    # tool_call and usage events produce their own span (tool_result/assistant don't).
+    assert [_, _] = durations
+    assert Enum.uniq(durations) == [300_000_000]
+  end
+
+  test "langfuse.user.id/user.id prefer the sender's display name over the session key when given", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    Otel.export(Map.put(sample_row(), :sender, "Maria"))
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    root = Enum.find(spans, &(&1["name"] == "pepe.run"))
+
+    assert attr_value(root, "langfuse.user.id") == "Maria"
+    assert attr_value(root, "user.id") == "Maria"
+    # The session id itself is untouched - it's still the real grouping key, not the name.
+    assert attr_value(root, "langfuse.session.id") == "telegram:555"
+  end
+
+  test "langfuse.user.id falls back to the session key when there is no sender name", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    Otel.export(sample_row())
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    root = Enum.find(spans, &(&1["name"] == "pepe.run"))
+    assert attr_value(root, "langfuse.user.id") == "telegram:555"
+  end
+
   test "a generation span reports cost only when the model has a known price", %{port: port} do
     Pepe.Config.put_model(%Pepe.Config.Model{name: "gpt-4o", model: "gpt-4o", input_price: 2.5, output_price: 10.0})
 

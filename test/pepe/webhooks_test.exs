@@ -119,6 +119,96 @@ defmodule Pepe.WebhooksTest do
       assert :ignore =
                WhatsApp.parse(%{"entry" => [%{"changes" => [%{"value" => %{"statuses" => []}}]}]})
     end
+
+    test "parse carries the sender's profile name from contacts, matched by wa_id" do
+      payload = %{
+        "entry" => [
+          %{
+            "changes" => [
+              %{
+                "value" => %{
+                  "contacts" => [%{"wa_id" => "5511999", "profile" => %{"name" => "Maria"}}],
+                  "messages" => [%{"from" => "5511999", "type" => "text", "text" => %{"body" => "oi"}, "id" => "m1"}]
+                }
+              }
+            ]
+          }
+        ]
+      }
+
+      assert {:ok, [%{name: "Maria"}]} = WhatsApp.parse(payload)
+    end
+
+    test "parse leaves name nil when the payload carries no contacts entry" do
+      payload = %{
+        "entry" => [
+          %{
+            "changes" => [
+              %{"value" => %{"messages" => [%{"from" => "5511999", "type" => "text", "text" => %{"body" => "oi"}, "id" => "m1"}]}}
+            ]
+          }
+        ]
+      }
+
+      assert {:ok, [%{name: nil}]} = WhatsApp.parse(payload)
+    end
+  end
+
+  describe "Google Chat provider" do
+    test "parse carries the sender's displayName" do
+      payload = %{
+        "type" => "MESSAGE",
+        "space" => %{"name" => "spaces/AAA"},
+        "message" => %{
+          "text" => "oi",
+          "name" => "spaces/AAA/messages/m1",
+          "sender" => %{"type" => "HUMAN", "displayName" => "Maria"}
+        }
+      }
+
+      assert {:ok, [%{from: "spaces/AAA", text: "oi", name: "Maria"}]} = Pepe.Webhooks.GoogleChat.parse(payload)
+    end
+  end
+
+  describe "MS Teams provider" do
+    test "parse carries the sender's name from the activity's from field" do
+      activity = %{
+        "type" => "message",
+        "text" => "oi",
+        "id" => "a1",
+        "serviceUrl" => "https://smba.example.com",
+        "conversation" => %{"id" => "c1"},
+        "from" => %{"id" => "29:abc", "name" => "Maria"}
+      }
+
+      assert {:ok, [%{text: "oi", name: "Maria"}]} = Pepe.Webhooks.MsTeams.parse(activity)
+    end
+  end
+
+  describe "Discord provider" do
+    test "parse carries the invoking member's username in a guild" do
+      payload = %{
+        "type" => 2,
+        "token" => "tok",
+        "id" => "i1",
+        "data" => %{"name" => "ask", "options" => [%{"value" => "oi"}]},
+        "member" => %{"user" => %{"username" => "maria"}}
+      }
+
+      assert {:ok, [%{text: "oi", name: "maria"}]} = Pepe.Webhooks.Discord.parse(payload)
+    end
+
+    test "parse falls back to the user field in a DM (no guild member)" do
+      payload = %{
+        "type" => 2,
+        "token" => "tok",
+        "id" => "i1",
+        "data" => %{"name" => "ask", "options" => [%{"value" => "oi"}]},
+        "user" => %{"username" => "maria"}
+      }
+
+      assert {:ok, [%{text: "oi", name: "maria"}]} = Pepe.Webhooks.Discord.parse(payload)
+    end
   end
 
   describe "config + resolution" do

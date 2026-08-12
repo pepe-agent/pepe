@@ -182,9 +182,9 @@ defmodule Pepe.Webhooks do
   defp session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
 
   # Run one inbound message through the bound agent, off the request process.
-  defp dispatch(entry, mod, %{from: from, text: text}) do
+  defp dispatch(entry, mod, %{from: from, text: text} = message) do
     if allowed?(entry, from) do
-      Task.start(fn -> converse(entry, mod, from, text) end)
+      Task.start(fn -> converse(entry, mod, from, text, Map.get(message, :name)) end)
     else
       Logger.info("[webhooks] #{entry["slug"]}: ignored message from disallowed #{from}")
     end
@@ -192,7 +192,7 @@ defmodule Pepe.Webhooks do
     :ok
   end
 
-  defp converse(entry, mod, from, text) do
+  defp converse(entry, mod, from, text, sender_name) do
     agent = entry["agent"]
     key = session_key(entry, from)
 
@@ -224,15 +224,15 @@ defmodule Pepe.Webhooks do
 
       :chat ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
-        run_chat(entry, mod, key, from, text)
+        run_chat(entry, mod, key, from, text, sender_name)
     end
   end
 
-  defp run_chat(entry, mod, key, from, text) do
+  defp run_chat(entry, mod, key, from, text, sender_name) do
     # A webhook sender is never the operator, the same "a stranger" content class every
     # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
     # was the one inbound surface that never withdrew auto_approve for it.
-    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil, untrusted: true) do
+    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil, untrusted: true, sender: sender_name) do
       {:ok, reply} ->
         mod.deliver(entry, from, reply)
 

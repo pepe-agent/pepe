@@ -70,6 +70,7 @@ defmodule Pepe.Agent.Runtime do
           cwd: String.t(),
           session_key: String.t() | nil,
           source: String.t() | nil,
+          sender: String.t() | nil,
           review: boolean(),
           untrusted: boolean(),
           images: [map()] | nil,
@@ -85,7 +86,7 @@ defmodule Pepe.Agent.Runtime do
           {:ok, String.t(), [map()]} | {:error, term()}
   def run(%Agent{} = agent, messages, opts \\ []) do
     own_trace? =
-      Pepe.Trace.start(agent.name, opts[:session_key], last_user_text(messages), opts[:source]) ==
+      Pepe.Trace.start(agent.name, opts[:session_key], last_user_text(messages), opts[:source], opts[:sender]) ==
         :started
 
     own_observers? = Pepe.Agent.RunObservers.attach(agent.name) == :started

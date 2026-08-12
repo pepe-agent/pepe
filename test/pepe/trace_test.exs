@@ -49,7 +49,7 @@ defmodule Pepe.TraceTest do
     id = Trace.finish({:ok, "done", []})
 
     full = Trace.get("acme", id)
-    denied = Enum.filter(full["events"], &(&1["t"] == "tool_denied"))
+    denied = full["events"] |> Enum.filter(&(&1["t"] == "tool_denied")) |> Enum.map(&Map.drop(&1, ["ms"]))
 
     assert %{"t" => "tool_denied", "name" => "bash", "reason" => "too risky"} in denied
     assert %{"t" => "tool_denied", "name" => "write_file", "reason" => nil} in denied

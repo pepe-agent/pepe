@@ -850,11 +850,12 @@ defmodule Pepe.Gateways.Telegram do
         stripped = strip_mention(said)
         quick = quick_reaction_emoji(b, stripped)
         tag = sender_tag(message, chat["type"])
+        name = sender_display_name(message["from"] || %{})
 
         Task.start(fn ->
           put_bot(b)
           put_thread(thread_id)
-          react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to, tag)
+          react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to, tag, name)
         end)
 
       true ->
@@ -862,13 +863,13 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp react_or_respond(quick, chat_id, _user_id, message_id, _stripped, _reply_to, _tag) when is_binary(quick),
+  defp react_or_respond(quick, chat_id, _user_id, message_id, _stripped, _reply_to, _tag, _name) when is_binary(quick),
     do: set_reaction(chat_id, message_id, quick)
 
-  defp react_or_respond(nil, chat_id, user_id, message_id, stripped, reply_to, tag) do
+  defp react_or_respond(nil, chat_id, user_id, message_id, stripped, reply_to, tag, name) do
     put_chat(chat_id)
     put_reply_to(reply_to)
-    respond(chat_id, user_id, message_id, stripped, tag)
+    respond(chat_id, user_id, message_id, stripped, tag, name)
   end
 
   # A DM has exactly one person on the other end, so tagging it would be pure noise; a group
@@ -1482,7 +1483,7 @@ defmodule Pepe.Gateways.Telegram do
   defp caption_line(""), do: ""
   defp caption_line(caption), do: "\n\nTheir caption: #{caption}"
 
-  defp respond(chat_id, user_id, msg_id, text, sender_tag \\ nil) do
+  defp respond(chat_id, user_id, msg_id, text, sender_tag \\ nil, sender_name \\ nil) do
     Config.put_locale()
     put_learn(learn_allowed?(user_id))
 
@@ -1490,7 +1491,7 @@ defmodule Pepe.Gateways.Telegram do
       # /whoami is the one command that needs the sender id.
       {:command, "whoami", _args} -> whoami(chat_id, user_id)
       {:command, name, args} -> dispatch(chat_id, name, args)
-      :chat -> chat_with_agent(chat_id, msg_id, text, sender_tag: sender_tag)
+      :chat -> chat_with_agent(chat_id, msg_id, text, sender_tag: sender_tag, sender: sender_name)
     end
   end
 
@@ -1545,6 +1546,11 @@ defmodule Pepe.Gateways.Telegram do
              untrusted: opts[:untrusted] == true,
              # Inbound images (a photo, for a vision model) ride this turn only - never persisted.
              images: opts[:images],
+             # Who actually sent this message, for the trace/Langfuse `user.id` - a display
+             # name, not a stable per-account id (see Pepe.Otel's moduledoc). nil for every
+             # call site that has no `message` to read a sender off of (approvals, media,
+             # skill triggers), which just leaves user.id on the session key, same as before.
+             sender: opts[:sender],
              on_event: activity_callback(chat_id)
            ) do
         {:ok, reply} ->

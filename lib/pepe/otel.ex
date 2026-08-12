@@ -33,16 +33,16 @@ defmodule Pepe.Otel do
       panes, generation vs. plain-span distinction, the Users view, cost figures)
       instead of a bare list of unlabeled spans.
 
-  `langfuse.user.id`/`user.id` is the run's session key, the same value already sent as
-  `session.id` - the only per-run identity Pepe actually has. On a channel where one
-  session is genuinely one person (a Telegram DM, the API with a per-caller session key),
-  that is a real per-user identity. On a shared channel (a Telegram group), it is
-  chat-level, not per-sender: everyone in the group shares the same session and the same
-  `user.id` here. Sending it anyway still makes Langfuse's per-user cost/volume views
-  usable for the common case, and is honestly labeled rather than invented finer-grained
-  identity Pepe does not have (see the sender-tag work in `Pepe.Gateways.Telegram` for
-  why a real per-sender id was never worth threading this far: it only ever reaches a
-  message as a display name baked into its text, not a structured field).
+  `langfuse.session.id`/`session.id` is always the run's session key - the one stable
+  grouping id every channel has. `langfuse.user.id`/`user.id` prefers a display name for
+  whoever actually sent the message (`Pepe.Trace.start/5`'s `sender`, e.g. Telegram's
+  `sender_display_name/1`, or a webhook provider's own contact/profile name), falling
+  back to the session key when a surface has no such name to give (the API, a WebSocket,
+  the TUI, or a webhook provider whose payload carries no name at all). This is still a
+  display name, not a stable per-account id - two different people who happen to share a
+  first name in the same group are indistinguishable in Langfuse's Users view - but on a
+  shared channel (a Telegram or webhook group) it is now attributed per message, to
+  whoever actually sent that one, rather than one shared id for the whole conversation.
 
   A generation span's cost (`gen_ai.usage.cost`, a single total in the operator's
   currency) is computed at export time with `Pepe.Usage.price_for/3` and
@@ -56,9 +56,12 @@ defmodule Pepe.Otel do
   output; nothing in a trace maps to a per-model-call prompt/completion (the trace
   model doesn't record one at that granularity), so a generation span carries usage and
   timing but no separate transcript - the root span's input/output already cover that
-  for the run as a whole. Child spans are laid out in event order across the parent's
-  own start/duration window (events carry no timestamp of their own to place them by),
-  so ordering in a waterfall view is correct even though exact per-event timing isn't.
+  for the run as a whole. Child spans are placed using each event's own recorded offset
+  (`Pepe.Trace.event/1`'s `"ms"`, stamped at the moment the runtime emits it), so a
+  waterfall view shows real per-step timing, e.g. a tool's actual execution time between
+  its `tool_call` and `tool_result` events, not just correct ordering. Only a trace row
+  recorded before events carried a timestamp falls back to splitting the run's total
+  duration evenly across its events.
   """
 
   require Logger
@@ -227,11 +230,7 @@ defmodule Pepe.Otel do
       attr("langfuse.observation.level", observation_level(outcome_kind))
     ]
 
-    session_attrs =
-      case row[:session] do
-        nil -> []
-        s -> [attr("langfuse.session.id", s), attr("session.id", s), attr("langfuse.user.id", s), attr("user.id", s)]
-      end
+    session_attrs = session_attrs(row)
 
     channel_attrs =
       case row[:source] do
@@ -261,12 +260,26 @@ defmodule Pepe.Otel do
     }
   end
 
+  defp session_attrs(row) do
+    case row[:session] do
+      nil ->
+        []
+
+      s ->
+        user_id = present(row[:sender]) || s
+        [attr("langfuse.session.id", s), attr("session.id", s), attr("langfuse.user.id", user_id), attr("user.id", user_id)]
+    end
+  end
+
   # Pepe's own outcome vocabulary is exactly these three (Pepe.Trace.outcome/1) -
   # "unknown" is a run Pepe itself couldn't classify, which warrants a look without
   # being a hard failure, so it lands on WARNING rather than ERROR.
   defp observation_level("ok"), do: "DEFAULT"
   defp observation_level("error"), do: "ERROR"
   defp observation_level(_other), do: "WARNING"
+
+  defp present(v) when is_binary(v) and v != "", do: v
+  defp present(_), do: nil
 
   defp final_reply(events) do
     events
@@ -279,18 +292,42 @@ defmodule Pepe.Otel do
 
   defp child_spans(row, trace_id, parent_id, start_ns, end_ns, pricing) do
     events = row[:events] || []
-    n = max(length(events), 1)
-    span_window_ns = max(div(end_ns - start_ns, n), 1)
-
     tool_results = for %{"t" => "tool_result"} = e <- events, do: e
+    windows = event_windows(events, start_ns, end_ns)
 
     events
     |> Enum.with_index()
-    |> Enum.flat_map(fn {event, i} ->
-      t0 = start_ns + i * span_window_ns
-      t1 = min(t0 + span_window_ns, end_ns)
+    |> Enum.zip(windows)
+    |> Enum.flat_map(fn {{event, i}, {t0, t1}} ->
       event_span(event, i, tool_results, trace_id, parent_id, t0, t1, pricing)
     end)
+  end
+
+  # Each event's real offset (Pepe.Trace.event/1's "ms") becomes its span's start; the next
+  # event's offset (or the run's own end, for the last one) becomes its end - so a span's
+  # width is the actual time until the next thing happened. A tool_call -> tool_result gap
+  # really is that tool's execution time, not the same fake average every span used to show.
+  # Falls back to an even split only for trace rows recorded before events carried a
+  # timestamp (older data still in the table at deploy time).
+  defp event_windows(events, start_ns, end_ns) do
+    offsets = Enum.map(events, & &1["ms"])
+
+    if offsets != [] and Enum.all?(offsets, &is_integer/1) do
+      (offsets ++ [nil])
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.map(&real_window(&1, start_ns, end_ns))
+    else
+      n = max(length(events), 1)
+      span_window_ns = max(div(end_ns - start_ns, n), 1)
+      Enum.map(0..(n - 1)//1, fn i -> {start_ns + i * span_window_ns, min(start_ns + (i + 1) * span_window_ns, end_ns)} end)
+    end
+  end
+
+  defp real_window([ms0, nil], start_ns, end_ns), do: {start_ns + ms0 * 1_000_000, max(end_ns, start_ns + ms0 * 1_000_000 + 1)}
+
+  defp real_window([ms0, ms1], start_ns, _end_ns) do
+    t0 = start_ns + ms0 * 1_000_000
+    {t0, max(t0 + (ms1 - ms0) * 1_000_000, t0 + 1)}
   end
 
   defp event_span(%{"t" => "tool_call", "name" => name, "args" => args}, i, tool_results, trace_id, parent_id, t0, t1, _pricing) do

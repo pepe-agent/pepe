@@ -9,8 +9,20 @@ defmodule Pepe.Webhooks.Provider do
   callback. Provider-specific credentials live under its `"config"` key.
   """
 
-  @typedoc "A normalized inbound message, provider-agnostic."
-  @type inbound :: %{from: String.t(), text: String.t(), id: String.t() | nil}
+  @typedoc """
+  A normalized inbound message, provider-agnostic. `name`, when the platform's payload
+  carries a sender display name at no extra cost (a WhatsApp contact profile, a Google
+  Chat sender, a Teams activity's `from`, a Discord interaction's invoking member/user),
+  is threaded through to the run's trace as a nicer `user.id` than `from` alone - `from`
+  itself is often a conversation/channel address, not a per-person one (see each
+  provider's own `parse/1`). `nil` for a provider whose payload has no such name.
+  """
+  @type inbound :: %{
+          required(:from) => String.t(),
+          required(:text) => String.t(),
+          required(:id) => String.t() | nil,
+          optional(:name) => String.t() | nil
+        }
 
   @doc """
   The provider's registry name, e.g. `\"whatsapp\"`. This is the `:provider` segment of

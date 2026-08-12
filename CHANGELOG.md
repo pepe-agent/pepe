@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- **Langfuse child spans (tool calls, model generations) showed a fake, identical duration for every step of a run.** They were an even split of the run's total time across every event, not real timing; a run with several tool calls and generations would show, say, 1.8s for every single one of them regardless of what actually happened. Each event is now stamped with its real offset from the run's start the moment it happens, so a tool's span width is the actual time between its call and its result, and a generation span's width is the actual time it took.
+
+### Changed
+- **Langfuse's `user.id`/`langfuse.user.id` now prefers the actual sender's display name over the session key, wherever a channel can supply one**: Telegram (private chats too, not just the group tag), WhatsApp (from the contact's profile name), Google Chat, Microsoft Teams, and Discord slash commands. On a shared session (a Telegram or webhook group), each run is now attributed to whoever actually sent that message rather than one shared id for the whole conversation. Falls back to the session key, as before, on a surface with no such name to give.
+
 ## [0.18.0] - 2026-08-12
 
 ### Added

@@ -107,7 +107,7 @@ defmodule Pepe.Webhooks.MsTeams do
     from_bot? = get_in(activity, ["from", "role"]) == "bot"
 
     if is_binary(text) and text != "" and is_binary(service_url) and is_binary(conv) and not from_bot? do
-      {:ok, [%{from: "#{service_url}|#{conv}", text: strip_mention(text), id: activity["id"]}]}
+      {:ok, [%{from: "#{service_url}|#{conv}", text: strip_mention(text), id: activity["id"], name: get_in(activity, ["from", "name"])}]}
     else
       :ignore
     end

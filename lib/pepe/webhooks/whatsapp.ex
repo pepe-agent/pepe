@@ -86,10 +86,20 @@ defmodule Pepe.Webhooks.WhatsApp do
       |> Map.get("entry", [])
       |> List.wrap()
       |> Enum.flat_map(fn e -> List.wrap(e["changes"]) end)
-      |> Enum.flat_map(fn c -> List.wrap(get_in(c, ["value", "messages"])) end)
-      |> Enum.flat_map(&normalize/1)
+      |> Enum.flat_map(fn c -> Enum.map(List.wrap(get_in(c, ["value", "messages"])), &{&1, contact_names(c)}) end)
+      |> Enum.flat_map(fn {m, names} -> normalize(m, names) end)
 
     if messages == [], do: :ignore, else: {:ok, messages}
+  end
+
+  # The Cloud API sends the sender's profile name alongside the message, in the same
+  # change's `value.contacts` (keyed by `wa_id`, the same value `messages[].from` carries)
+  # rather than on the message itself.
+  defp contact_names(change) do
+    change
+    |> get_in(["value", "contacts"])
+    |> List.wrap()
+    |> Map.new(fn contact -> {contact["wa_id"], get_in(contact, ["profile", "name"])} end)
   end
 
   @impl true
@@ -145,10 +155,10 @@ defmodule Pepe.Webhooks.WhatsApp do
 
   # Only text messages become a conversation turn; media/status/etc. are ignored
   # for now (the door is open to handle them like the Telegram media path later).
-  defp normalize(%{"from" => from, "type" => "text", "text" => %{"body" => body}} = m),
-    do: [%{from: from, text: body, id: m["id"]}]
+  defp normalize(%{"from" => from, "type" => "text", "text" => %{"body" => body}} = m, names),
+    do: [%{from: from, text: body, id: m["id"], name: names[from]}]
 
-  defp normalize(_), do: []
+  defp normalize(_, _names), do: []
 
   @impl true
   def deliver_file(config, to, path, caption) do

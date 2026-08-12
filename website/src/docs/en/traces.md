@@ -69,13 +69,19 @@ service (default `pepe`). Full walkthrough: [Langfuse](../langfuse/).
 
 Beyond the run's prompt/reply and per-tool-call input/output, each exported
 trace also carries: the channel it came from (Telegram, the API, ...) as
-trace metadata; the session key as both `session.id` and `user.id` (the
-closest thing to a per-user identity Pepe has: exact for a one-on-one
-channel, shared across everyone in a group chat); the running Pepe version
-(`langfuse.release`); a level (`DEFAULT`/`WARNING`/`ERROR`) derived from how
-the run actually finished; and, on each model-call span, the cost of that
-call in your configured currency, computed the same way the usage ledger
-computes it, and left off entirely rather than sent as a misleading zero
-when the model has no known price.
+trace metadata; the session key as `session.id`; `user.id`, set to the
+actual sender's display name whenever the channel can supply one (Telegram,
+including a private chat, not just its group tag; WhatsApp, from the
+contact's profile; Google Chat; Microsoft Teams; Discord), falling back to
+the session key on a surface with no such name to give, so a run in a
+shared session (a Telegram or webhook group) is attributed to whoever
+actually sent it rather than one shared id for the whole conversation; the
+running Pepe version (`langfuse.release`); a level
+(`DEFAULT`/`WARNING`/`ERROR`) derived from how the run actually finished;
+and, on each model-call span, the cost of that call in your configured
+currency, computed the same way the usage ledger computes it, and left off
+entirely rather than sent as a misleading zero when the model has no known
+price. A waterfall view's timing (a tool call, a model generation) reflects
+when each step actually happened, not an estimate.
 
 <div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and old or oversized ones get trimmed away. For token counts and cost you can invoice on, use the separate <a href="../billing/">usage ledger</a>, which never drops an entry.</div>

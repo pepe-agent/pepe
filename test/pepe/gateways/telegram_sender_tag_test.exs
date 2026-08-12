@@ -85,6 +85,9 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
     prev_base = Application.get_env(:pepe, :telegram_api_base)
     Application.put_env(:pepe, :telegram_api_base, base)
 
+    prev_otel_endpoint = System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT")
+    System.delete_env("OTEL_EXPORTER_OTLP_ENDPOINT")
+
     Config.put_model(%Model{name: "mock", base_url: base, api_key: "k", model: "m"})
     Config.put_agent(%AgentCfg{name: "assistant", model: "mock", system_prompt: "hi", tools: [], max_iterations: 2})
 
@@ -92,6 +95,10 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
       if prev_base,
         do: Application.put_env(:pepe, :telegram_api_base, prev_base),
         else: Application.delete_env(:pepe, :telegram_api_base)
+
+      if prev_otel_endpoint,
+        do: System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", prev_otel_endpoint),
+        else: System.delete_env("OTEL_EXPORTER_OTLP_ENDPOINT")
 
       if prev_home, do: System.put_env("PEPE_HOME", prev_home), else: System.delete_env("PEPE_HOME")
       File.rm_rf(home)
@@ -163,5 +170,30 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
     # text that went out tagged on the previous call.
     assert first_seen_again == "primeira mensagem"
     assert second == "pepe_sender_name: Jhonathas\nsegunda mensagem"
+  end
+
+  test "the sender's display name reaches the exported trace as user.id, tagged in text or not", %{chat: chat} do
+    {:ok, otel_server} = Bandit.start_link(plug: Pepe.Test.MockOtelCollector, port: 0, scheme: :http)
+    {:ok, {_addr, otel_port}} = ThousandIsland.listener_info(otel_server)
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:#{otel_port}")
+    Pepe.Test.MockOtelCollector.listen()
+
+    start_bot!()
+
+    # A private chat never tags the text itself (see the test above), but the trace's
+    # user.id should still carry the sender's name now, not just the chat-level session id.
+    queue_text(chat, "preciso do guia", chat_type: "private", from: %{"id" => 42, "first_name" => "Salvador"})
+    assert_receive {:otel_request, _headers, body}, 5_000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    root = Enum.find(spans, &(&1["name"] == "pepe.run"))
+
+    user_id =
+      Enum.find_value(root["attributes"], fn
+        %{"key" => "user.id", "value" => %{"stringValue" => v}} -> v
+        _ -> nil
+      end)
+
+    assert user_id == "Salvador"
   end
 end

@@ -75,14 +75,21 @@ exportado (por defecto `pepe`). Guía completa: [Langfuse](../langfuse/).
 
 Además de la pregunta/respuesta de la ejecución y la entrada/salida de cada
 llamada a herramienta, cada trace exportado también lleva: el canal del que
-vino (Telegram, la API...) como metadato del trace; la clave de sesión tanto
-como `session.id` como `user.id` (lo más cercano que tiene Pepe a una
-identidad por usuario: exacta en un canal individual, compartida entre todos
-en un grupo); la versión de Pepe en ejecución (`langfuse.release`); un nivel
-(`DEFAULT`/`WARNING`/`ERROR`) derivado de cómo terminó realmente la
-ejecución; y, en cada span de llamada a modelo, el coste de esa llamada en
-tu moneda configurada, calculado de la misma forma que lo calcula el libro
-de uso, y omitido por completo en vez de enviado como un cero engañoso
-cuando el modelo no tiene un precio conocido.
+vino (Telegram, la API...) como metadato del trace; la clave de sesión como
+`session.id`; el `user.id`, ajustado al nombre visible de quien realmente
+envió el mensaje siempre que el canal pueda darlo (Telegram, incluida una
+conversación privada, no solo su marca de grupo; WhatsApp, a partir del
+perfil del contacto; Google Chat; Microsoft Teams; Discord), volviendo a la
+clave de sesión en una superficie sin ese nombre disponible, de modo que una
+ejecución en una sesión compartida (un grupo de Telegram o de un webhook)
+queda atribuida a quien realmente la envió, en vez de un único id
+compartido para toda la conversación; la versión de Pepe en ejecución
+(`langfuse.release`); un nivel (`DEFAULT`/`WARNING`/`ERROR`) derivado de
+cómo terminó realmente la ejecución; y, en cada span de llamada a modelo, el
+coste de esa llamada en tu moneda configurada, calculado de la misma forma
+que lo calcula el libro de uso, y omitido por completo en vez de enviado
+como un cero engañoso cuando el modelo no tiene un precio conocido. El
+tiempo de cada paso en una vista en cascada (una llamada a herramienta, una
+generación de modelo) refleja cuándo ocurrió realmente, no una estimación.
 
 <div class="note"><strong>Diagnóstico, no registro de facturación.</strong> Los traces existen para explicar una ejecución, y los antiguos o demasiado grandes se van recortando. Para recuentos de tokens y coste que puedas facturar, usa el <a href="../billing/">libro de uso</a>, separado, que nunca pierde una entrada.</div>

@@ -1194,7 +1194,7 @@ defmodule Pepe.Agent.Session do
             # sees :nested and never finishes it, so this spawned task is now the
             # sole owner: finish is called unconditionally below, matching what
             # Runtime.run used to do for this exact call.
-            Pepe.Trace.start(agent.name, opts[:session_key], text, opts[:source])
+            Pepe.Trace.start(agent.name, opts[:session_key], text, opts[:source], opts[:sender])
 
             # Inbound hooks redact the user text (and grow the reversible map) before
             # the model - off the GenServer, so an LLM-backed redactor never blocks it.
