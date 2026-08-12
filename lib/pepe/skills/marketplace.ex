@@ -7,6 +7,15 @@ defmodule Pepe.Skills.Marketplace do
   Mirrors `Pepe.Plugins`' install shape (stage -> Sentinel scan -> refuse on `:danger` unless
   `--force` -> place), sharing `Pepe.Sourcing` for the download/stage half.
 
+  A staged source with a `SKILL.md` at its root is a **package**: the whole directory is
+  placed (`File.cp_r!`, the same as `Pepe.Plugins`' own `:dir` placement), not just its
+  doc, and every other file in it is deep-scanned with `Sentinel.scan_code/2` - the same
+  scan a plugin's `.exs` files get - merged with the doc's own `Sentinel.scan/1` into one
+  verdict. Anything staged without a `SKILL.md` installs exactly as before: only its
+  matching (or first) `*.md` is read and placed, everything else in that directory is
+  ignored - a deliberate, explicit trigger, so an ordinary tap/registry checkout that
+  happens to hold other files never silently bundles them in.
+
   **Trust is intrinsic to where a skill resolved from, not self-declared.** A skill resolved
   through the bundled, in-repo registry is `"official"`; anything resolved through a tap, or
   installed directly from a source URL with no registry entry at all, is `"community"` - a
@@ -136,14 +145,22 @@ defmodule Pepe.Skills.Marketplace do
   @doc "Remove an installed skill (the file and its marketplace provenance)."
   @spec remove(String.t()) :: {:ok, String.t()} | {:error, :not_found}
   def remove(name) do
-    path = Path.join(Skills.user_dir(), name <> ".md")
+    file = Path.join(Skills.user_dir(), name <> ".md")
+    dir = Path.join(Skills.user_dir(), name)
 
-    if File.regular?(path) do
-      File.rm!(path)
-      Config.remove_installed_skill(name)
-      {:ok, name}
-    else
-      {:error, :not_found}
+    cond do
+      File.regular?(file) ->
+        File.rm!(file)
+        Config.remove_installed_skill(name)
+        {:ok, name}
+
+      File.dir?(dir) ->
+        File.rm_rf!(dir)
+        Config.remove_installed_skill(name)
+        {:ok, name}
+
+      true ->
+        {:error, :not_found}
     end
   end
 
@@ -164,7 +181,15 @@ defmodule Pepe.Skills.Marketplace do
   def audit(nil), do: Config.installed_skills() |> Map.keys() |> Enum.map(&audit_one/1)
   def audit(name) when is_binary(name), do: [audit_one(name)]
 
+  # A package (a directory installed under its own name) gets every non-doc file
+  # re-scanned too, same as at install time - a script that was clean when it was
+  # installed is still worth catching if the Sentinel's patterns have improved since.
   defp audit_one(name) do
+    package_dir = Path.join(Skills.user_dir(), name)
+    if File.dir?(package_dir), do: audit_package(name, package_dir), else: audit_single(name)
+  end
+
+  defp audit_single(name) do
     case Skills.read(name) do
       {:ok, content} ->
         scan = Sentinel.scan(content)
@@ -175,19 +200,31 @@ defmodule Pepe.Skills.Marketplace do
     end
   end
 
+  defp audit_package(name, dir) do
+    case dir |> Skills.package_entry() |> read_doc() do
+      {:ok, content} ->
+        scan = package_scan(dir, content)
+        %{name: name, verdict: scan.verdict, findings: scan.findings}
+
+      _ ->
+        %{name: name, verdict: :not_found, findings: []}
+    end
+  end
+
+  defp read_doc(nil), do: {:error, :not_found}
+  defp read_doc(path), do: File.read(path)
+
   # --- install pipeline --------------------------------------------------------------
 
   defp do_install(name, source, trust_level, opts) do
     with {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", &String.ends_with?(&1, ".md")) do
       try do
-        case staged_content(staged, name) do
-          {:ok, content} ->
-            scan = Sentinel.scan(content)
-
+        case prepare(staged, name) do
+          {:ok, placement, content, scan} ->
             if scan.verdict == :danger and opts[:force] != true do
               {:error, {:unsafe, scan}}
             else
-              place(name, content)
+              place(placement, name)
 
               Config.put_installed_skill(name, %{
                 "source" => source,
@@ -208,24 +245,62 @@ defmodule Pepe.Skills.Marketplace do
     end
   end
 
-  defp staged_content(%{type: :file, path: path}, _name), do: File.read(path)
+  defp prepare(%{type: :file, path: path}, _name) do
+    with {:ok, content} <- File.read(path), do: {:ok, {:file, content}, content, Sentinel.scan(content)}
+  end
 
-  defp staged_content(%{type: :dir, path: path}, name) do
-    exact = Path.join(path, name <> ".md")
-
-    if File.regular?(exact) do
-      File.read(exact)
+  defp prepare(%{type: :dir, path: path}, name) do
+    if File.regular?(Path.join(path, "SKILL.md")) do
+      prepare_package(path)
     else
-      case Path.wildcard(Path.join(path, "*.md")) do
-        [file | _] -> File.read(file)
-        [] -> {:error, :no_skill_file}
-      end
+      prepare_single(path, name)
     end
   end
 
-  defp place(name, content) do
+  defp prepare_single(path, name) do
+    exact = Path.join(path, name <> ".md")
+    file = if File.regular?(exact), do: exact, else: Path.wildcard(Path.join(path, "*.md")) |> List.first()
+
+    case file && File.read(file) do
+      {:ok, content} -> {:ok, {:file, content}, content, Sentinel.scan(content)}
+      _ -> {:error, :no_skill_file}
+    end
+  end
+
+  defp prepare_package(dir) do
+    with {:ok, content} <- dir |> Skills.package_entry() |> read_doc() do
+      {:ok, {:package, dir}, content, package_scan(dir, content)}
+    end
+  end
+
+  # The doc gets the prose-oriented prompt-injection scan (Sentinel.scan/1); every other
+  # file gets the deep AST-plus-text scan (Sentinel.scan_code/2) - it degrades gracefully
+  # to just the text pass on anything that isn't Elixir (see Sentinel's own moduledoc),
+  # so a Python/JS/bash script still gets checked for the secrets-path/obfuscation
+  # patterns that scan applies, not skipped just because it isn't `.exs`.
+  defp package_scan(dir, doc_content) do
+    doc_path = Skills.package_entry(dir)
+    code_scans = dir |> package_files(doc_path) |> Enum.map(&scan_code_file(&1, dir))
+    Sentinel.merge([Sentinel.scan(doc_content) | code_scans])
+  end
+
+  defp package_files(dir, doc_path) do
+    Path.wildcard(Path.join(dir, "**/*"))
+    |> Enum.filter(&(File.regular?(&1) and &1 != doc_path))
+  end
+
+  defp scan_code_file(path, base_dir), do: Sentinel.scan_code(File.read!(path), Path.relative_to(path, base_dir))
+
+  defp place({:file, content}, name) do
     File.mkdir_p!(Skills.user_dir())
     File.write!(Path.join(Skills.user_dir(), name <> ".md"), content)
+  end
+
+  defp place({:package, dir}, name) do
+    dest = Path.join(Skills.user_dir(), name)
+    File.mkdir_p!(Skills.user_dir())
+    File.rm_rf!(dest)
+    File.cp_r!(dir, dest)
   end
 
   defp content_hash(content), do: "sha256:" <> (:crypto.hash(:sha256, content) |> Base.encode16(case: :lower))

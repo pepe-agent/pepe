@@ -63,6 +63,36 @@ forma de hacer algo y, guiado por `skill-creator`, escribe un nuevo
 Esto es lo que hace duradero el conocimiento del agente. El procedimiento que
 resolvió una vez queda escrito, en lugar de redescubrirse en cada sesión.
 
+### Empaquetar una skill con scripts
+
+Una skill también puede venir como un pequeño paquete en vez de un único
+archivo: una carpeta `<nombre>/` con `SKILL.md` (su doc de entrada, leído
+exactamente igual que un `<nombre>.md` suelto) junto a lo que más necesite,
+normalmente una carpeta `scripts/`.
+
+```bash
+~/.pepe/skills/publicar-release/
+  SKILL.md
+  scripts/etiquetar-y-publicar.sh
+```
+
+Los archivos empaquetados nunca se copian a otro sitio: el agente llega hasta
+ellos en su propio lugar, del mismo modo que ya llega al workspace
+compartido o a un plugin instalado, pasándole a `run_script` (o `read_file`)
+una ruta con la forma `skills/<nombre>/scripts/<archivo>`. Apunta las propias
+instrucciones de `SKILL.md` a esa ruta y el script se ejecuta tal cual fue
+empaquetado, en vez de que el agente lo reescriba desde cero en la primera
+solicitud, cada sesión.
+
+Una skill instalada mediante `manage_skill`/`mix pepe skill install` (abajo)
+trae el paquete entero automáticamente cuando la fuente tiene uno: un
+`SKILL.md` en la raíz de lo instalado es lo que lo marca como paquete;
+cualquier cosa sin eso sigue instalándose como un único `<nombre>.md`, igual
+que antes. Todo archivo de un paquete se escanea por seguridad antes de
+instalar, no solo el doc: `SKILL.md` recibe el escaneo de inyección de
+prompt de siempre, y cada script empaquetado recibe el mismo escaneo
+profundo que recibe el código de un plugin.
+
 ### Instalar una de fuera
 
 Dos vías, según de dónde venga. Un agente con la herramienta `manage_skill` la

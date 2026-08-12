@@ -62,6 +62,33 @@ shows up in its own list right away.
 This is what makes an agent's know-how durable. A procedure it worked out once
 gets written down instead of being rediscovered every session.
 
+### Packaging a skill with scripts
+
+A skill can also ship as a small package instead of a single file: a `<name>/`
+directory holding `SKILL.md` (its entry doc, read exactly like a loose
+`<name>.md`) alongside whatever else it needs, typically a `scripts/` folder.
+
+```bash
+~/.pepe/skills/cut-a-release/
+  SKILL.md
+  scripts/tag-and-push.sh
+```
+
+The bundled files are never copied anywhere: an agent reaches them in place,
+the same way it already reaches the shared workspace or an installed plugin,
+by giving `run_script` (or `read_file`) a path shaped
+`skills/<name>/scripts/<file>`. Point `SKILL.md`'s own instructions at that
+path and the script runs exactly as shipped, instead of the agent
+re-authoring it from scratch on the first request of every session.
+
+A skill installed through `manage_skill`/`mix pepe skill install` (below)
+brings its whole package along automatically when the source has one: a
+`SKILL.md` at the root of what's installed is what marks it as a package;
+anything without one still installs as a single `<name>.md`, exactly as
+before. Every file in a package is security-scanned before install, not just
+the doc: `SKILL.md` gets the usual prompt-injection scan, and each bundled
+script gets the same deep scan a plugin's code gets.
+
 ### Installing one from elsewhere
 
 Two paths, depending on where it's coming from. An agent holding the

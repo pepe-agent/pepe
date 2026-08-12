@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **A skill can now ship as a package, not just a single Markdown file**: a `<name>/` directory holding `SKILL.md` at its root plus whatever else it needs, typically a `scripts/` folder. `manage_skill`/`mix pepe skill install` installs the whole tree when the source has one (a `SKILL.md` at the root is what marks it as a package), and every bundled file gets security-scanned before install, not just the doc. A bundled script is never copied anywhere; an agent reaches it in place (`skills/<name>/scripts/...`) the same way it already reaches the shared workspace or an installed plugin, so `run_script` can run it exactly as shipped instead of the agent re-authoring it from scratch every session. A skill with no `SKILL.md` at its root still installs as a single loose file, exactly as before.
+
 ### Fixed
 - **Langfuse child spans (tool calls, model generations) showed a fake, identical duration for every step of a run.** They were an even split of the run's total time across every event, not real timing; a run with several tool calls and generations would show, say, 1.8s for every single one of them regardless of what actually happened. Each event is now stamped with its real offset from the run's start the moment it happens, so a tool's span width is the actual time between its call and its result, and a generation span's width is the actual time it took.
 

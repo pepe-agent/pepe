@@ -277,7 +277,9 @@ defmodule Pepe.OtelTest do
     assert_receive {:otel_request, _, body}, 2000
 
     [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
-    durations = for s <- spans, s["name"] != "pepe.run", do: String.to_integer(s["endTimeUnixNano"]) - String.to_integer(s["startTimeUnixNano"])
+
+    durations =
+      for s <- spans, s["name"] != "pepe.run", do: String.to_integer(s["endTimeUnixNano"]) - String.to_integer(s["startTimeUnixNano"])
 
     # sample_row's 4 events split the 1200ms run into 300ms windows each; only the
     # tool_call and usage events produce their own span (tool_result/assistant don't).

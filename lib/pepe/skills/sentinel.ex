@@ -142,7 +142,13 @@ defmodule Pepe.Skills.Sentinel do
   # --- AST analysis -----------------------------------------------------------------
 
   defp ast_findings(source, file) do
-    case Code.string_to_quoted(source, columns: false) do
+    # emit_warnings: false - a skill package's bundled script is only ever Elixir when
+    # it's genuinely a plugin-style .exs; a Python/JS/Ruby/bash script fed through here
+    # (Pepe.Skills.Marketplace scans every non-doc file in a package the same way,
+    # regardless of language) can still parse as syntactically-plausible-looking Elixir
+    # by coincidence (e.g. `print('hi')` reads as a call with a charlist argument) and
+    # would otherwise spam deprecation warnings for code nobody is actually compiling.
+    case Code.string_to_quoted(source, columns: false, emit_warnings: false) do
       {:ok, ast} ->
         {_ast, acc} = Macro.prewalk(ast, [], &collect_danger(&1, &2, file))
         Enum.reverse(acc)

