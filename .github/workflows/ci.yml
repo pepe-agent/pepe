@@ -26,9 +26,17 @@ name: ci
 #     git tag v0.3.0
 #     git push origin v0.3.0
 #
-# Running it by hand (workflow_dispatch) builds **only the image**, tagged `edge`, and
-# publishes no GitHub Release - the cheap path for testing changes to the image itself;
-# the Burrito matrix is the slow, expensive half of this file.
+# Every ordinary push to master (no tag) also builds and publishes just the image,
+# tagged `edge` - so `docker pull ghcr.io/pepe-agent/pepe:edge` always reflects master,
+# including whatever has landed in CHANGELOG's [Unreleased] but not been cut into a
+# version yet. No GitHub Release, no binaries - those stay tag-only. The repo is public,
+# so this costs nothing (GitHub Actions minutes and GHCR storage are free for public
+# repos); `concurrency` above cancels a still-running build the moment a newer push on
+# the same branch arrives, so a burst of commits only ever finishes the last one.
+#
+# workflow_dispatch still works the same way as a manual "build edge right now" - the
+# cheap path for testing changes to the image itself without waiting for a push; the
+# Burrito matrix is the slow, expensive half of this file and stays tag-only either way.
 
 on:
   push:
@@ -199,11 +207,11 @@ jobs:
 
       - run: mix dialyzer --format github
 
-  # Everything below only ever runs on a version tag (or workflow_dispatch, for the image
-  # alone) - `if:` on each job says so explicitly, since this file also runs on ordinary
-  # branch pushes and PRs now. `needs:` on the four jobs above is the actual release gate:
-  # a failed/skipped test, credo, website, or dialyzer job stops binaries/image from ever
-  # starting, the same way a required check blocks a merge.
+  # Everything below only ever runs on a version tag, an ordinary push to master (image/
+  # manifest alone - the `edge` build), or workflow_dispatch - `if:` on each job says so
+  # explicitly, since this file also runs on PRs now. `needs:` on the four jobs above is
+  # the actual release gate: a failed/skipped test, credo, website, or dialyzer job stops
+  # binaries/image from ever starting, the same way a required check blocks a merge.
 
   # The self-contained binaries. Tag pushes only - there is no release to attach
   # them to otherwise, and they are what makes this workflow expensive.
@@ -304,7 +312,7 @@ jobs:
   image:
     name: image (${{ matrix.arch }})
     needs: [test, credo, website, dialyzer]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push')
     runs-on: ${{ matrix.runner }}
     permissions:
       # A job-level `permissions:` block replaces the repo/org default entirely, not adds
@@ -361,7 +369,7 @@ jobs:
   # amd64 to a server, from one name.
   manifest:
     needs: image
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -398,7 +406,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push') }}
 
       - name: Create the multi-arch manifest
         working-directory: /tmp/digests

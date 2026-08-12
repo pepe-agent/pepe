@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **A rolling `edge` Docker image, built from every push to `master`**: `docker pull ghcr.io/pepe-agent/pepe:edge` now always reflects the latest `master`, including whatever has landed in this changelog's `[Unreleased]` section but hasn't been cut into a version yet. Separate from versioned releases: no GitHub Release, no binaries, doesn't touch `latest`. `gh workflow run ci.yml` (or the Actions UI) still builds it on demand too.
 - **A skill can now ship as a package, not just a single Markdown file**: a `<name>/` directory holding `SKILL.md` at its root plus whatever else it needs, typically a `scripts/` folder. `manage_skill`/`mix pepe skill install` installs the whole tree when the source has one (a `SKILL.md` at the root is what marks it as a package), and every bundled file gets security-scanned before install, not just the doc. A bundled script is never copied anywhere; an agent reaches it in place (`skills/<name>/scripts/...`) the same way it already reaches the shared workspace or an installed plugin, so `run_script` can run it exactly as shipped instead of the agent re-authoring it from scratch every session. A skill with no `SKILL.md` at its root still installs as a single loose file, exactly as before.
 
 ### Fixed
