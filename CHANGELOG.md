@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.17.0] - 2026-08-12
 
 ### Changed
 - **In a Telegram group, only the newest message in a request now carries a "who sent this" label - not every message in the whole history.** A group message has always been tagged with the sender's name before reaching the model (`Salvador: ...`), but the tag was baked into every stored turn permanently, so a long conversation could carry the same name on many turns in a row - and the model would sometimes keep addressing that name even once a different person sent the newest message (a real, observed misfire: a follow-up from one person got answered as if it were still the earlier person). The tag format changed to an unambiguous marker (`pepe_sender_name: <name>` on its own line) specifically so it can be safely stripped back out of older turns without any risk of mangling a message that just happens to start with a name and a colon; only the current turn ever keeps it. **This is a change to `behavior_contract/0`** (the "a shared channel can hold more than one person" rule now explains the label format directly), so it applies to every existing agent immediately.
@@ -12,6 +12,7 @@ All notable changes to this project are documented here. Format follows
 - **A new "⚠️ Allow everything for this session" option** is the session-wide counterpart: every tool, every risk, no more prompts until `/new` or a restart - and, unlike every other grant, not suspended when a run reads something from outside the conversation either. It exists for a human who wants that trade explicitly, the same one a coding agent's "bypass permissions" mode makes; the warning icon is in the button itself, not a separate note, and a `Pepe.Permissions.Policy`-forced question still isn't silently answered by it.
 - **An agent now knows a secret-shaped env var reading empty may just mean its own shell can't see it, not that the credential is missing.** `behavior_contract/0`'s guidance gained a rule to check with a real command (`echo ${#VAR}`) before ever telling someone a credential "is set," and to recognize that Pepe's own `bash` tool deliberately scrubs anything named like a secret out of the agent's shell unless the operator listed it in `secrets.expose_env`: a length of 0 there means "hidden from me," not "absent." **This is a change to `behavior_contract/0`**, so it applies to every existing agent immediately.
 - **Langfuse trace export now turns on from `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` alone**, the same pair already used for managed prompts, instead of requiring a separately hand-built `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_HEADERS` pair. The explicit `OTEL_EXPORTER_OTLP_*` variables still take precedence for any other OTLP backend, and Langfuse credentials are never attached to a request sent to one of those instead.
+- **Text formatting has been standardized across the dashboard, Telegram interface, and documentation:** spaced-hyphen and em-dash punctuation removed per project convention, and informal Brazilian Portuguese contractions formalized.
 
 ## [0.16.0] - 2026-08-11
 
@@ -770,6 +771,7 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
+[0.17.0]: https://github.com/pepe-agent/pepe/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/pepe-agent/pepe/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/pepe-agent/pepe/compare/v0.14.3...v0.15.0
 [0.14.3]: https://github.com/pepe-agent/pepe/compare/v0.14.2...v0.14.3
