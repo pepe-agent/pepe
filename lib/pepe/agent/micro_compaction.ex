@@ -14,7 +14,11 @@ defmodule Pepe.Agent.MicroCompaction do
   entries fine too: a session abandoned mid-conversation, or one whose process died without
   a clean `clear/1`, would otherwise sit in this table forever. Pruned on a periodic sweep
   (`prune/0`), same shape as the Telegram gateway's own `prune_sent/0` for its sent-message
-  cache - an entry not `put/3`-refreshed within `@ttl` is dropped.
+  cache - an entry not touched within `@ttl` is dropped. Both `get/1` and `put/3` count as a
+  touch: once every exchange is covered, later turns only call `get/1` to reuse the cached
+  summary (see `Pepe.Agent.Compaction`'s "once every exchange is covered" case) - if only
+  `put/3` refreshed the timestamp, a session that's fully compacted but still active every
+  day would still get swept after `@ttl`.
   """
 
   use GenServer
@@ -38,8 +42,12 @@ defmodule Pepe.Agent.MicroCompaction do
     ensure_table()
 
     case :ets.lookup(@table, session_key) do
-      [{_, summary, covered, _touched_at}] -> {summary, covered}
-      [] -> nil
+      [{_, summary, covered, _touched_at}] ->
+        :ets.update_element(@table, session_key, {4, System.system_time(:second)})
+        {summary, covered}
+
+      [] ->
+        nil
     end
   end
 
@@ -59,7 +67,7 @@ defmodule Pepe.Agent.MicroCompaction do
     :ok
   end
 
-  @doc "Drop entries not refreshed via `put/3` in the last #{@ttl} seconds. Exposed for tests."
+  @doc "Drop entries not touched via `get/1` or `put/3` in the last #{@ttl} seconds. Exposed for tests."
   @spec prune() :: :ok
   def prune do
     if :ets.whereis(@table) != :undefined do

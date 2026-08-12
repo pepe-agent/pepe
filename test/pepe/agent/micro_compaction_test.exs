@@ -186,6 +186,21 @@ defmodule Pepe.Agent.MicroCompactionTest do
 
       assert MicroCompaction.get(key) == {"summary", 1}
     end
+
+    test "get/1 counts as a touch too, so a fully-compacted but still-active session survives" do
+      key = "sess-#{System.unique_integer([:positive])}"
+      # Backdate straight in ETS, same as the "drops a stale entry" case above.
+      stale_touched_at = System.system_time(:second) - 8 * 24 * 60 * 60
+      :ets.insert(Pepe.Agent.MicroCompaction, {key, "summary", 2, stale_touched_at})
+
+      # Once every exchange is covered, Compaction only ever calls get/1 again (see the
+      # "reuses the summary with no new model call" test above) - never put/3.
+      assert MicroCompaction.get(key) == {"summary", 2}
+
+      MicroCompaction.prune()
+
+      assert MicroCompaction.get(key) == {"summary", 2}
+    end
   end
 
   describe "exchanges/1 boundary shape (via micro_compact's fold order)" do
