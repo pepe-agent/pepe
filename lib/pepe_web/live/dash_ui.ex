@@ -390,8 +390,7 @@ defmodule PepeWeb.DashUI do
         <.link :if={Pepe.Config.dashboard_auth_required?()} href="/logout" method="delete" class="mb-1 block text-zinc-500 transition hover:text-zinc-300">
           {gettext("Sign out")}
         </.link>
-        {gettext("Local dashboard · localhost")}
-        · v{Pepe.Update.current()}
+        {gettext("Pepe")} v{Pepe.Update.current()}
       </div>
     </aside>
 

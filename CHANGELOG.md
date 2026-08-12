@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- **The dashboard sidebar no longer labels itself "localhost."** That text was accurate only when the dashboard happened to be reached at `localhost`, which stopped being true the moment it was exposed on a LAN or behind a reverse proxy, and was confusing either way (a fixed word, unrelated to what was actually in the browser's address bar). It now just shows "Pepe" and the running version.
+
 ## [0.17.0] - 2026-08-12
 
 ### Changed

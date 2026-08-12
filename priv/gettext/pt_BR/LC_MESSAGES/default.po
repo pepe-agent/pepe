@@ -1245,11 +1245,6 @@ msgstr ""
 "Somente letras, dígitos, - e _. Vira o prefixo dos seus agentes (ex.: "
 "acme/sales)."
 
-#: lib/pepe_web/live/dash_ui.ex:393
-#, elixir-autogen, elixir-format
-msgid "Local dashboard · localhost"
-msgstr "Painel local · localhost"
-
 #: lib/pepe_web/live/chat_live.ex:107
 #: lib/pepe_web/live/chat_live.ex:283
 #, elixir-autogen, elixir-format
@@ -6703,3 +6698,8 @@ msgstr "⚠️ Permitir tudo nesta sessão"
 #, elixir-autogen, elixir-format
 msgid "⚠️ Allowed everything for this session."
 msgstr "⚠️ Permitido tudo nesta sessão."
+
+#: lib/pepe_web/live/dash_ui.ex:393
+#, elixir-autogen, elixir-format
+msgid "Pepe"
+msgstr "Pepe"
