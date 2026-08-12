@@ -73,4 +73,16 @@ completo. Dos variables más estándar de OTEL, si las necesitas:
 además de `<endpoint>/v1/traces`, y `OTEL_SERVICE_NAME` renombra el servicio
 exportado (por defecto `pepe`). Guía completa: [Langfuse](../langfuse/).
 
-<div class="note"><strong>Diagnóstico, no registro de facturación.</strong> Los traces existen para explicar una ejecución, y los antiguos o demasiado grandes se van recortando. Para recuentos de tokens que puedas facturar, usa el <a href="../billing/">libro de uso</a>, separado, que nunca pierde una entrada.</div>
+Además de la pregunta/respuesta de la ejecución y la entrada/salida de cada
+llamada a herramienta, cada trace exportado también lleva: el canal del que
+vino (Telegram, la API...) como metadato del trace; la clave de sesión tanto
+como `session.id` como `user.id` (lo más cercano que tiene Pepe a una
+identidad por usuario: exacta en un canal individual, compartida entre todos
+en un grupo); la versión de Pepe en ejecución (`langfuse.release`); un nivel
+(`DEFAULT`/`WARNING`/`ERROR`) derivado de cómo terminó realmente la
+ejecución; y, en cada span de llamada a modelo, el coste de esa llamada en
+tu moneda configurada, calculado de la misma forma que lo calcula el libro
+de uso, y omitido por completo en vez de enviado como un cero engañoso
+cuando el modelo no tiene un precio conocido.
+
+<div class="note"><strong>Diagnóstico, no registro de facturación.</strong> Los traces existen para explicar una ejecución, y los antiguos o demasiado grandes se van recortando. Para recuentos de tokens y coste que puedas facturar, usa el <a href="../billing/">libro de uso</a>, separado, que nunca pierde una entrada.</div>

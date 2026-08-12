@@ -26,11 +26,29 @@ defmodule Pepe.Otel do
 
     * Generic OpenTelemetry GenAI semantic conventions (`gen_ai.*`) - understood by any
       OTLP-speaking backend.
-    * Langfuse's own `langfuse.*` attributes (session, user, observation input/output/
-      type) - Langfuse's docs say these take precedence over the generic ones when both
-      are present, so setting both costs nothing and makes a Langfuse endpoint render
-      fully (session grouping, input/output panes, generation vs. plain-span
-      distinction) instead of a bare list of unlabeled spans.
+    * Langfuse's own `langfuse.*` attributes (session, user, release, observation
+      input/output/type/level, per-generation cost) - Langfuse's docs say these take
+      precedence over the generic ones when both are present, so setting both costs
+      nothing and makes a Langfuse endpoint render fully (session grouping, input/output
+      panes, generation vs. plain-span distinction, the Users view, cost figures)
+      instead of a bare list of unlabeled spans.
+
+  `langfuse.user.id`/`user.id` is the run's session key, the same value already sent as
+  `session.id` - the only per-run identity Pepe actually has. On a channel where one
+  session is genuinely one person (a Telegram DM, the API with a per-caller session key),
+  that is a real per-user identity. On a shared channel (a Telegram group), it is
+  chat-level, not per-sender: everyone in the group shares the same session and the same
+  `user.id` here. Sending it anyway still makes Langfuse's per-user cost/volume views
+  usable for the common case, and is honestly labeled rather than invented finer-grained
+  identity Pepe does not have (see the sender-tag work in `Pepe.Gateways.Telegram` for
+  why a real per-sender id was never worth threading this far: it only ever reaches a
+  message as a display name baked into its text, not a structured field).
+
+  A generation span's cost (`gen_ai.usage.cost`, a single total in the operator's
+  currency) is computed at export time with `Pepe.Usage.price_for/3` and
+  `Pepe.Pricing.cost/4` - the exact same pricing path the `usage`/billing pages use, not
+  a separate calculation - and omitted entirely when the model has no known price rather
+  than sent as a misleading `0`.
 
   One span per trace, one child span per tool call and per model call (a "usage" event
   in the trace - a run can hold more than one on failover/triage). A tool call's
@@ -175,8 +193,12 @@ defmodule Pepe.Otel do
     trace_id = trace_id(row)
     {start_ns, end_ns} = window(row)
     root_id = span_id()
+    pricing = load_pricing()
 
-    spans = [root_span(row, trace_id, root_id, start_ns, end_ns) | child_spans(row, trace_id, root_id, start_ns, end_ns)]
+    spans = [
+      root_span(row, trace_id, root_id, start_ns, end_ns)
+      | child_spans(row, trace_id, root_id, start_ns, end_ns, pricing)
+    ]
 
     %{
       "resourceSpans" => [
@@ -188,20 +210,33 @@ defmodule Pepe.Otel do
     }
   end
 
+  # Resolved once per trace, not once per usage event - a run can hold several model
+  # calls (failover, triage), and both the model list and the price cache are the same
+  # for all of them (same reasoning as Pepe.Usage.price_lookup/3, which this mirrors).
+  defp load_pricing, do: {Map.new(Pepe.Config.models(), &{&1.name, &1}), Pepe.Pricing.load_cache()}
+
   defp root_span(row, trace_id, span_id, start_ns, end_ns) do
     events = row[:events] || []
     reply = final_reply(events)
-    ok? = get_in(row, [:outcome, "kind"]) == "ok"
+    outcome_kind = get_in(row, [:outcome, "kind"])
 
     base_attrs = [
       attr("langfuse.trace.name", row[:agent] || "pepe"),
-      attr("gen_ai.system", "pepe")
+      attr("gen_ai.system", "pepe"),
+      attr("langfuse.release", Pepe.Update.current()),
+      attr("langfuse.observation.level", observation_level(outcome_kind))
     ]
 
     session_attrs =
       case row[:session] do
         nil -> []
-        s -> [attr("langfuse.session.id", s), attr("session.id", s)]
+        s -> [attr("langfuse.session.id", s), attr("session.id", s), attr("langfuse.user.id", s), attr("user.id", s)]
+      end
+
+    channel_attrs =
+      case row[:source] do
+        source when is_binary(source) and source != "" -> [attr("langfuse.trace.metadata.channel", source)]
+        _ -> []
       end
 
     io_attrs =
@@ -221,10 +256,17 @@ defmodule Pepe.Otel do
       "kind" => 1,
       "startTimeUnixNano" => to_string(start_ns),
       "endTimeUnixNano" => to_string(end_ns),
-      "attributes" => base_attrs ++ session_attrs ++ io_attrs,
-      "status" => %{"code" => if(ok?, do: 1, else: 2)}
+      "attributes" => base_attrs ++ session_attrs ++ channel_attrs ++ io_attrs,
+      "status" => %{"code" => if(outcome_kind == "ok", do: 1, else: 2)}
     }
   end
+
+  # Pepe's own outcome vocabulary is exactly these three (Pepe.Trace.outcome/1) -
+  # "unknown" is a run Pepe itself couldn't classify, which warrants a look without
+  # being a hard failure, so it lands on WARNING rather than ERROR.
+  defp observation_level("ok"), do: "DEFAULT"
+  defp observation_level("error"), do: "ERROR"
+  defp observation_level(_other), do: "WARNING"
 
   defp final_reply(events) do
     events
@@ -235,7 +277,7 @@ defmodule Pepe.Otel do
     end)
   end
 
-  defp child_spans(row, trace_id, parent_id, start_ns, end_ns) do
+  defp child_spans(row, trace_id, parent_id, start_ns, end_ns, pricing) do
     events = row[:events] || []
     n = max(length(events), 1)
     span_window_ns = max(div(end_ns - start_ns, n), 1)
@@ -247,11 +289,11 @@ defmodule Pepe.Otel do
     |> Enum.flat_map(fn {event, i} ->
       t0 = start_ns + i * span_window_ns
       t1 = min(t0 + span_window_ns, end_ns)
-      event_span(event, i, tool_results, trace_id, parent_id, t0, t1)
+      event_span(event, i, tool_results, trace_id, parent_id, t0, t1, pricing)
     end)
   end
 
-  defp event_span(%{"t" => "tool_call", "name" => name, "args" => args}, i, tool_results, trace_id, parent_id, t0, t1) do
+  defp event_span(%{"t" => "tool_call", "name" => name, "args" => args}, i, tool_results, trace_id, parent_id, t0, t1, _pricing) do
     out = tool_results |> Enum.at(0, %{}) |> Map.get("out")
 
     [
@@ -271,7 +313,16 @@ defmodule Pepe.Otel do
     ]
   end
 
-  defp event_span(%{"t" => "usage", "model" => model, "in" => in_tok, "out" => out_tok}, _i, _tool_results, trace_id, parent_id, t0, t1) do
+  defp event_span(
+         %{"t" => "usage", "model" => model, "in" => in_tok, "out" => out_tok},
+         _i,
+         _tool_results,
+         trace_id,
+         parent_id,
+         t0,
+         t1,
+         pricing
+       ) do
     [
       %{
         "traceId" => trace_id,
@@ -283,13 +334,13 @@ defmodule Pepe.Otel do
         "endTimeUnixNano" => to_string(t1),
         "attributes" =>
           [attr("langfuse.observation.type", "generation"), attr("gen_ai.system", "pepe")] ++
-            model_attrs(model) ++ token_attrs(in_tok, out_tok),
+            model_attrs(model) ++ token_attrs(in_tok, out_tok) ++ cost_attrs(model, in_tok, out_tok, pricing),
         "status" => %{"code" => 1}
       }
     ]
   end
 
-  defp event_span(_other, _i, _tool_results, _trace_id, _parent_id, _t0, _t1), do: []
+  defp event_span(_other, _i, _tool_results, _trace_id, _parent_id, _t0, _t1, _pricing), do: []
 
   defp model_attrs(nil), do: []
   defp model_attrs(model), do: [attr("gen_ai.request.model", model), attr("langfuse.observation.model.name", model)]
@@ -299,6 +350,21 @@ defmodule Pepe.Otel do
     |> Enum.filter(fn {_, v} -> is_integer(v) end)
     |> Enum.map(fn {k, v} -> attr(k, v) end)
   end
+
+  # Same pricing path the usage/billing pages use (Pepe.Usage.price_for/3 + Pepe.Pricing.
+  # cost/4), not a separate calculation - and omitted rather than sent as a misleading `0`
+  # when the model has no known price (an unrecognized model, or one with no price book
+  # entry and no manual price set).
+  defp cost_attrs(model, in_tok, out_tok, {models, cache}) when is_binary(model) and is_integer(in_tok) and is_integer(out_tok) do
+    {input_price, output_price, _cached_price} = Pepe.Usage.price_for(model, models, cache)
+
+    case Pepe.Pricing.cost(in_tok, out_tok, input_price, output_price) do
+      cost when cost > 0 -> [attr("gen_ai.usage.cost", cost)]
+      _ -> []
+    end
+  end
+
+  defp cost_attrs(_model, _in_tok, _out_tok, _pricing), do: []
 
   # A tool_call event is only paired with the tool_result at the SAME index in
   # practice (the runtime always emits them back to back), but events here are
@@ -314,6 +380,7 @@ defmodule Pepe.Otel do
   # sends the actually-correct form rather than leaning on that leniency.
   defp attr(key, value) when is_binary(value), do: %{"key" => key, "value" => %{"stringValue" => value}}
   defp attr(key, value) when is_integer(value), do: %{"key" => key, "value" => %{"intValue" => to_string(value)}}
+  defp attr(key, value) when is_float(value), do: %{"key" => key, "value" => %{"doubleValue" => value}}
   defp attr(key, value) when is_boolean(value), do: %{"key" => key, "value" => %{"boolValue" => value}}
   defp attr(key, value), do: %{"key" => key, "value" => %{"stringValue" => to_string(value)}}
 

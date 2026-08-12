@@ -9,6 +9,11 @@ defmodule Pepe.OtelTest do
                LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_BASE_URL)
 
   setup do
+    home = Path.join(System.tmp_dir!(), "pepe_otel_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(home)
+    prev_home = System.get_env("PEPE_HOME")
+    System.put_env("PEPE_HOME", home)
+
     {:ok, server} = Bandit.start_link(plug: Pepe.Test.MockOtelCollector, port: 0, scheme: :http)
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
 
@@ -21,6 +26,8 @@ defmodule Pepe.OtelTest do
 
     on_exit(fn ->
       Process.exit(server, :normal)
+      if prev_home, do: System.put_env("PEPE_HOME", prev_home), else: System.delete_env("PEPE_HOME")
+      File.rm_rf(home)
 
       Enum.each(prev, fn
         {k, nil} -> System.delete_env(k)
@@ -191,10 +198,78 @@ defmodule Pepe.OtelTest do
     refute Enum.any?(root["attributes"], &(&1["key"] == "langfuse.session.id"))
   end
 
+  test "a generation span carries user, release, channel and level attributes", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    Otel.export(sample_row())
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    root = Enum.find(spans, &(&1["name"] == "pepe.run"))
+
+    assert attr_value(root, "langfuse.user.id") == "telegram:555"
+    assert attr_value(root, "user.id") == "telegram:555"
+    assert attr_value(root, "langfuse.release") == Pepe.Update.current()
+    assert attr_value(root, "langfuse.trace.metadata.channel") == "telegram"
+    assert attr_value(root, "langfuse.observation.level") == "DEFAULT"
+  end
+
+  test "an errored run's root span is marked at ERROR level, an unclassified one at WARNING", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    Otel.export(%{sample_row() | outcome: %{"kind" => "error", "reason" => "boom"}})
+    assert_receive {:otel_request, _, body1}, 2000
+    [%{"scopeSpans" => [%{"spans" => spans1}]}] = body1["resourceSpans"]
+    assert attr_value(Enum.find(spans1, &(&1["name"] == "pepe.run")), "langfuse.observation.level") == "ERROR"
+
+    Otel.export(%{sample_row() | id: "trace124", outcome: %{"kind" => "unknown"}})
+    assert_receive {:otel_request, _, body2}, 2000
+    [%{"scopeSpans" => [%{"spans" => spans2}]}] = body2["resourceSpans"]
+    assert attr_value(Enum.find(spans2, &(&1["name"] == "pepe.run")), "langfuse.observation.level") == "WARNING"
+  end
+
+  test "a run with no session has no user attributes either", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+
+    row = %{id: "t2", agent: "assistant", session: nil, prompt: "hi", at: 1_700_000_000, ms: 5, outcome: %{"kind" => "ok"}, events: []}
+    Otel.export(row)
+
+    assert_receive {:otel_request, _, body}, 2000
+    [%{"scopeSpans" => [%{"spans" => [root]}]}] = body["resourceSpans"]
+    refute Enum.any?(root["attributes"], &(&1["key"] == "langfuse.user.id"))
+    refute Enum.any?(root["attributes"], &(&1["key"] == "user.id"))
+  end
+
+  test "a generation span reports cost only when the model has a known price", %{port: port} do
+    Pepe.Config.put_model(%Pepe.Config.Model{name: "gpt-4o", model: "gpt-4o", input_price: 2.5, output_price: 10.0})
+
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+    Otel.export(sample_row())
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    generation = Enum.find(spans, &(&1["name"] == "gpt-4o"))
+    # 120 input tokens @ $2.50/1M + 40 output tokens @ $10/1M
+    expected = 120 / 1_000_000 * 2.5 + 40 / 1_000_000 * 10.0
+    assert_in_delta attr_value(generation, "gen_ai.usage.cost"), expected, 0.0000001
+  end
+
+  test "no cost attribute at all for a model with no known price", %{port: port} do
+    System.put_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:#{port}")
+    row = put_in(sample_row(), [:events, Access.at(2), "model"], "totally-unknown-model-#{System.unique_integer([:positive])}")
+    Otel.export(row)
+    assert_receive {:otel_request, _, body}, 2000
+
+    [%{"scopeSpans" => [%{"spans" => spans}]}] = body["resourceSpans"]
+    generation = Enum.find(spans, &(&1["name"] =~ "unknown-model"))
+    refute Enum.any?(generation["attributes"], &(&1["key"] == "gen_ai.usage.cost"))
+  end
+
   defp attr_value(span, key) do
     Enum.find_value(span["attributes"], fn
       %{"key" => ^key, "value" => %{"stringValue" => v}} -> v
       %{"key" => ^key, "value" => %{"intValue" => v}} -> v
+      %{"key" => ^key, "value" => %{"doubleValue" => v}} -> v
       %{"key" => ^key, "value" => %{"boolValue" => v}} -> v
       _ -> nil
     end)

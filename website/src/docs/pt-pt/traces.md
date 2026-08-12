@@ -71,4 +71,16 @@ aponta o sinal de traces para outro sítio além de `<endpoint>/v1/traces`, e
 `OTEL_SERVICE_NAME` renomeia o serviço exportado (predefinição `pepe`). Passo
 a passo completo: [Langfuse](../langfuse/).
 
-<div class="note"><strong>Diagnóstico, não registo de faturação.</strong> Os traces existem para explicar uma execução, e os antigos ou demasiado grandes vão sendo cortados. Para contagens de tokens que possas faturar, usa o <a href="../billing/">livro-razão de utilização</a>, separado, que nunca perde um lançamento.</div>
+Além da pergunta/resposta da execução e da entrada/saída de cada chamada de
+ferramenta, cada trace exportado também traz: o canal de onde veio (Telegram,
+a API...) como metadado do trace; a chave da sessão tanto como `session.id`
+como `user.id` (o mais próximo que o Pepe tem de uma identidade por
+utilizador: exata num canal individual, partilhada entre todos num grupo); a
+versão do Pepe em execução (`langfuse.release`); um nível
+(`DEFAULT`/`WARNING`/`ERROR`) derivado de como a execução realmente terminou;
+e, em cada span de chamada de modelo, o custo dessa chamada na tua moeda
+configurada, calculado da mesma forma que o livro-razão de utilização
+calcula, e omitido por completo em vez de enviado como um zero enganador
+quando o modelo não tem preço conhecido.
+
+<div class="note"><strong>Diagnóstico, não registo de faturação.</strong> Os traces existem para explicar uma execução, e os antigos ou demasiado grandes vão sendo cortados. Para contagens de tokens e custo que possas faturar, usa o <a href="../billing/">livro-razão de utilização</a>, separado, que nunca perde um lançamento.</div>

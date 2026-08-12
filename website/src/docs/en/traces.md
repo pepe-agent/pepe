@@ -67,4 +67,15 @@ trace either way. Two more standard OTEL variables, if you need them:
 than `<endpoint>/v1/traces`, and `OTEL_SERVICE_NAME` renames the exported
 service (default `pepe`). Full walkthrough: [Langfuse](../langfuse/).
 
-<div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and old or oversized ones get trimmed away. For token counts you can invoice on, use the separate <a href="../billing/">usage ledger</a>, which never drops an entry.</div>
+Beyond the run's prompt/reply and per-tool-call input/output, each exported
+trace also carries: the channel it came from (Telegram, the API, ...) as
+trace metadata; the session key as both `session.id` and `user.id` (the
+closest thing to a per-user identity Pepe has: exact for a one-on-one
+channel, shared across everyone in a group chat); the running Pepe version
+(`langfuse.release`); a level (`DEFAULT`/`WARNING`/`ERROR`) derived from how
+the run actually finished; and, on each model-call span, the cost of that
+call in your configured currency, computed the same way the usage ledger
+computes it, and left off entirely rather than sent as a misleading zero
+when the model has no known price.
+
+<div class="note"><strong>Diagnostic, not a billing record.</strong> Traces exist to explain a run, and old or oversized ones get trimmed away. For token counts and cost you can invoice on, use the separate <a href="../billing/">usage ledger</a>, which never drops an entry.</div>
