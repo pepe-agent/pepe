@@ -56,9 +56,9 @@ Se uma chamada rodou numa assinatura é decidido **quando ela é registrada**, n
 
 Toda chamada de modelo é medida por projeto (veja Projetos para entender o que é um projeto e como criar um). Além dessa medição, um projeto pode opcionalmente carregar dois tetos mensais independentes, mais uma margem de cobrança:
 
-- **Teto de gasto** (`--budget`) - um limite rígido na sua moeda configurada. Assim que o total faturável do mês atinge esse valor, os agentes daquele projeto param de fazer novas chamadas de modelo até o teto resetar.
-- **Teto de mensagens** (`--message-limit`) - um limite rígido em mensagens vindas de clientes. Assim que atingido, os agentes daquele projeto param de responder novas mensagens até resetar.
-- **Margem** (`--markup`) - um multiplicador aplicado sobre o custo do provedor para chegar no valor cobrado do cliente (ex: `1.3` = custo do provedor +30%). Sem definir, você cobra exatamente o custo do provedor.
+- **Teto de gasto** (`--budget`): um limite rígido na sua moeda configurada. Assim que o total faturável do mês atinge esse valor, os agentes daquele projeto param de fazer novas chamadas de modelo até o teto resetar.
+- **Teto de mensagens** (`--message-limit`): um limite rígido em mensagens vindas de clientes. Assim que atingido, os agentes daquele projeto param de responder novas mensagens até resetar.
+- **Margem** (`--markup`): um multiplicador aplicado sobre o custo do provedor para chegar no valor cobrado do cliente (ex: `1.3` = custo do provedor +30%). Sem definir, você cobra exatamente o custo do provedor.
 
 Os três são opcionais e independentes: defina qualquer um deles, todos, ou nenhum. O projeto default é um projeto normal como qualquer outro, então pode carregar os mesmos tetos, definidos com `pepe project set default ...`. Ele aparece em `project list`, tem billing próprio, e não fica de fora dos limites de faturamento.
 
@@ -111,12 +111,12 @@ O teto de gasto acima reseta sozinho todo mês, é um freio, não dinheiro. Um
 **saldo pré-pago** é diferente: fundos reais creditados (um pagamento recebido, ou
 adicionado à mão), gastos conforme o consumo faturável de verdade, recusando novas
 chamadas de modelo quando chega a zero e continuando recusado até ser recarregado.
-Útil pra rodar o Pepe como serviço pago: o agente de um cliente funciona até acabar
+Útil para rodar o Pepe como serviço pago: o agente de um cliente funciona até acabar
 o que ele pagou, não até o mês virar no calendário.
 
-Um projeto que nunca foi creditado fica totalmente inalterado — só o teto de gasto
+Um projeto que nunca foi creditado fica totalmente inalterado: só o teto de gasto
 acima se aplica a ele, exatamente como se isso não existisse. No momento em que
-algo credita um projeto, um saldo passa a existir pra ele e os dois freios valem:
+algo credita um projeto, um saldo passa a existir para ele e os dois freios valem:
 tanto o teto de gasto quanto o saldo chegando a zero param novas chamadas.
 
 ```bash
@@ -131,9 +131,9 @@ sido creditado alguma vez.
 ### Creditando automaticamente a partir de um pagamento
 
 Um webhook genérico, sem amarração a um provedor específico, credita um saldo a
-partir de qualquer processador de pagamento — deliberadamente sem integrar o SDK
+partir de qualquer processador de pagamento, deliberadamente sem integrar o SDK
 ou esquema de assinatura de um processador específico. Aponte o próprio webhook do
-seu processador de pagamento pra ele (uma função relay pequena, um passo no
+seu processador de pagamento para ele (uma função relay pequena, um passo no
 Zapier/Make, ou direto se o processador deixar você definir um bearer token
 estático) depois que ele já tiver verificado o pagamento do lado dele:
 
@@ -145,7 +145,7 @@ curl -X POST https://SEU_HOST/webhooks/balance/acme \
   -d '{"amount": 10}'
 ```
 
-Um segredo só, pra todos os endpoints de saldo de todos os projetos — a ideia é
+Um segredo só para todos os endpoints de saldo de todos os projetos: a ideia é
 que ele fique com o seu próprio relay/automação, não entregue a terceiros por
 cliente. O endpoint recusa toda requisição (404) até um segredo ser definido;
 `pepe project webhook-secret --clear` desliga de novo.

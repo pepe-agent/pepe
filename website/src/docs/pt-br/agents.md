@@ -544,14 +544,14 @@ pepe agent add support --langfuse-prompt support-persona
 
 Opt-in por agente: um agente sem `langfuse_prompt` definido fica totalmente
 inalterado, e um cuja busca falhe (inacessível, nome não resolve) cai direto
-pra persona local. Configuração e credenciais: [Langfuse](../langfuse/).
+para a persona local. Configuração e credenciais: [Langfuse](../langfuse/).
 
 ## Vendo exatamente o que o modelo vê
 
-O campo `system_prompt` é só a semente. O que realmente vai pro modelo como mensagem
+O campo `system_prompt` é só a semente. O que realmente vai para o modelo como mensagem
 de sistema também inclui os arquivos de persona/identidade/boot do agente, se ele
 tiver, um contrato de comportamento curto, o horário atual e um índice dos docs e
-skills que ele conhece, nada disso aparece se você só ler o campo no disco. Pra ver
+skills que ele conhece, nada disso aparece se você só ler o campo no disco. Para ver
 a coisa toda, montada exatamente como uma conversa real enviaria:
 
 ```bash

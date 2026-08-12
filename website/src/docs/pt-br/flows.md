@@ -30,7 +30,7 @@ O Pepe confere se cada trace que você indicou realmente fez a mesma sequência 
   with the same arguments - flows only replay identical sequences
 ```
 
-Essa recusa é proposital. Inferir automaticamente "essa parte varia, essa não" a partir de alguns exemplos é a única parte dessa ideia que é genuinamente arriscada: errar nisso e um flow passa a fazer, em silêncio, algo que nenhum dos traces de origem jamais fez. Um flow continua sendo replay exato e só isso; escolher traces que realmente são idênticos é responsabilidade sua, a mesma revisão que uma pessoa faria antes de confiar um script pra rodar sem supervisão.
+Essa recusa é proposital. Inferir automaticamente "essa parte varia, essa não" a partir de alguns exemplos é a única parte dessa ideia que é genuinamente arriscada: errar nisso e um flow passa a fazer, em silêncio, algo que nenhum dos traces de origem jamais fez. Um flow continua sendo replay exato e só isso; escolher traces que realmente são idênticos é responsabilidade sua, a mesma revisão que uma pessoa faria antes de confiar um script para rodar sem supervisão.
 
 A promoção também recusa um trace que não seja genuinamente "comprovado", mesmo que a sequência bata: um que contenha uma chamada que a própria barreira de permissão do agente negou, um passo que de fato falhou, ou argumentos longos demais para terem sido registrados por completo (`Pepe.Trace` corta os muito longos para armazenamento). Nada disso é uma chamada que você de fato viu dar certo. Ela também recusa traces que não foram todos feitos pelo agente para o qual você está promovendo, já que os caminhos relativos de um passo reproduzido se resolvem dentro do workspace daquele agente específico.
 

@@ -117,8 +117,8 @@ de zero, então ela se encaixa no CI.
 
 `--models a,b,c` roda a mesma suíte (ou todas, se você omitir o nome) contra cada
 uma dessas conexões de modelo e imprime a contagem de aprovados/reprovados por
-modelo - a forma de responder "devemos trocar de modelo" com casos reais em vez
-de achismo. A troca vale só pra essa chamada; o config de nenhum agente é
+modelo: a forma de responder "devemos trocar de modelo" com casos reais em vez
+de achismo. A troca vale só para essa chamada; o config de nenhum agente é
 alterado.
 
 ## Suítes que já vêm com o Pepe

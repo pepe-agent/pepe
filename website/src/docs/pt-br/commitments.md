@@ -24,6 +24,6 @@ A tool `commitment` do agente tem três ações: `list` (o que está sendo acomp
 
 ### Fazendo pelo dashboard
 
-Abra a página **Compromissos** em `pepe serve` pra ver tudo que está sendo acompanhado, agrupado em aguardando confirmação, agendados e entregues. Confirme ou cancele direto por lá.
+Abra a página **Compromissos** em `pepe serve` para ver tudo que está sendo acompanhado, agrupado em aguardando confirmação, agendados e entregues. Confirme ou cancele direto por lá.
 
-<div class="note"><strong>Sem servidor pra rodar, só um arquivo local.</strong> Compromissos vivem num pequeno arquivo SQLite embutido, ao lado do <code>config.json</code>, não é um banco de dados que você precisa instalar ou administrar. São disparados pelo mesmo tipo de timer interno que já move watches e tarefas agendadas, que só roda enquanto uma superfície de longa duração (<code>pepe serve</code>, um gateway, ou uma sessão interativa) estiver de pé.</div>
+<div class="note"><strong>Sem servidor para rodar, só um arquivo local.</strong> Compromissos vivem num pequeno arquivo SQLite embutido, ao lado do <code>config.json</code>, não é um banco de dados que você precisa instalar ou administrar. São disparados pelo mesmo tipo de timer interno que já move watches e tarefas agendadas, que só roda enquanto uma superfície de longa duração (<code>pepe serve</code>, um gateway, ou uma sessão interativa) estiver de pé.</div>

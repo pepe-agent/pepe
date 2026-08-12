@@ -38,7 +38,7 @@ pepe model remove openrouter
 pepe model default openai
 ```
 
-Já paga o ChatGPT/Codex ou o Claude Pro/Max? Dá pra adicionar **fazendo login com essa
+Já paga o ChatGPT/Codex ou o Claude Pro/Max? Dá para adicionar **fazendo login com essa
 conta** em vez de colar uma chave de API: `pepe model add openai` -> "ChatGPT / Codex
 subscription" abre seu navegador, você entra na conta, e o Pepe cuida do resto. Veja
 [Modelos](../models/).
@@ -46,7 +46,7 @@ subscription" abre seu navegador, você entra na conta, e o Pepe cuida do resto.
 Se essa conexão parar de funcionar (o login expirou, ou você saiu da conta em outro
 lugar), `pepe model reconnect NOME` faz login de novo e conserta no lugar. Nada mais
 muda na conexão, então todo agente que já usava ela continua funcionando sem precisar
-mexer em nada. Não remova e adicione de novo pra resolver isso: isso recomeça do zero e
+mexer em nada. Não remova e adicione de novo para resolver isso: isso recomeça do zero e
 perde qualquer preço ou ajuste que você tinha configurado.
 
 ## Agentes
@@ -63,11 +63,11 @@ pepe agent remove helper
 pepe agent default assistant
 ```
 
-Veja [Agentes](../agents/) pra entender o que cada opção faz.
+Veja [Agentes](../agents/) para entender o que cada opção faz.
 
 ## Projetos (mais de um cliente ou time no mesmo Pepe)
 
-Se você roda o Pepe pra vários clientes ou times numa instalação só, cada um é um
+Se você roda o Pepe para vários clientes ou times numa instalação só, cada um é um
 **projeto**, com seus próprios agentes e dados, isolado dos outros. Sem `--project`,
 tudo usa o projeto padrão, exatamente como uma instalação de cliente único sempre
 funcionou. Veja [Projetos](../projects/).
@@ -101,24 +101,24 @@ pepe serve uninstall                 # para e remove
 
 `goal` não para na primeira tentativa: um revisor independente confere o resultado
 contra `--criteria` e o Pepe tenta de novo (até `--max-attempts` vezes) até dar certo de
-verdade. Use `--judge MODELO` pra revisar com um modelo diferente. Veja
+verdade. Use `--judge MODELO` para revisar com um modelo diferente. Veja
 [Metas](../goals/).
 
 `serve install` faz o Pepe ligar sozinho e continuar rodando em segundo plano, mesmo
 depois de logout, reinício, ou uma queda. Só funciona a partir do app `pepe`
-instalado, não de um checkout do código-fonte. O `--bind` também vale pra ele
+instalado, não de um checkout do código-fonte. O `--bind` também vale para ele
 (`serve install --bind lan`).
 
 `serve` escuta só em `127.0.0.1` por padrão: só esta máquina alcança ele, já que um
 `serve` puro não tem proxy reverso na frente e a API `/v1` fica aberta sem
-autenticação até você configurar um token. `--bind lan` abre pra todas as interfaces
+autenticação até você configurar um token. `--bind lan` abre para todas as interfaces
 de rede; configure uma senha do dashboard primeiro (`pepe dashboard password`), ou
-use `--tunnel` pra expor publicamente sem alargar o bind. Esse padrão não vale pra
-imagem Docker oficial, que sempre escuta em todas as interfaces - veja
-[Publicando em um servidor](../deploy/) pro motivo.
+use `--tunnel` para expor publicamente sem alargar o bind. Esse padrão não vale para a
+imagem Docker oficial, que sempre escuta em todas as interfaces. Veja
+[Publicando em um servidor](../deploy/) para o motivo.
 
 `chat` (também chamado de `tui`) abre uma conversa direto no seu terminal, que lembra o
-contexto conforme você usa. Digite `/help` dentro dele pra ver todos os atalhos (nova
+contexto conforme você usa. Digite `/help` dentro dele para ver todos os atalhos (nova
 conversa, desfazer, trocar de agente ou modelo, e mais).
 
 ## Gateway do Telegram
@@ -128,11 +128,11 @@ pepe gateway telegram setup      # interativo: token do bot, quem pode falar com
 pepe gateway telegram            # roda em primeiro plano
 ```
 
-Veja [Telegram](../telegram/) pra entender acesso e vários bots.
+Veja [Telegram](../telegram/) para entender acesso e vários bots.
 
 ## Tokens de acesso à API
 
-Chaves que outros apps usam pra falar com o Pepe por HTTP ou WebSocket. Sem nenhuma
+Chaves que outros apps usam para falar com o Pepe por HTTP ou WebSocket. Sem nenhuma
 criada, só pedidos vindos da própria máquina são aceitos; assim que você cria uma, todo
 pedido passa a precisar de um token válido. Um token pode ser limitado a um projeto
 (`--project`) ou a um agente (`--agent HANDLE`). Veja [API HTTP](../api/).
@@ -148,7 +148,7 @@ pepe token revoke <id>
 ```
 
 Escopo decide *de quem* são os dados que um token alcança; permissões decidem *o que*
-ele pode fazer com eles. Ou seja, dá pra dar a alguém um token que só lê relatório de
+ele pode fazer com eles. Ou seja, dá para dar a alguém um token que só lê relatório de
 cobrança, sem conseguir conversar com um agente. Veja [Uso e cobrança](../billing/).
 
 ```bash
@@ -187,7 +187,7 @@ pepe cron logs <id>
 
 Depois que um agente resolve algo do mesmo jeito umas duas vezes, transforme essa
 sequência num `flow` com nome, que repete direto da próxima vez, mais rápido e sem
-pedir pro modelo pensar tudo de novo do zero. Veja [Flows](../flows/).
+pedir para o modelo pensar tudo de novo do zero. Veja [Flows](../flows/).
 
 ```bash
 pepe flow list AGENTE
@@ -207,7 +207,7 @@ pepe learn auto [AGENTE] [--at CRON]    # faz isso automaticamente toda noite (-
 pepe learn status                       # quais agentes estão configurados pra isso
 ```
 
-Veja [Aprendizado](../learning/) pra entender o que de fato é lembrado.
+Veja [Aprendizado](../learning/) para entender o que de fato é lembrado.
 
 ## Uso, cobrança e traces
 
@@ -223,7 +223,7 @@ pepe traces [--project NOME] [--limit N]    # atividade recente, qualquer canal
 pepe traces <id>                            # reproduz uma execução passo a passo
 ```
 
-Os mesmos números dá pra pegar por HTTP com um token com escopo de uso. Veja [Uso e
+Os mesmos números dá para pegar por HTTP com um token com escopo de uso. Veja [Uso e
 cobrança](../billing/).
 
 ## Servidores de tool, plugins e hooks de privacidade

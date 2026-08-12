@@ -63,7 +63,7 @@ Rode `pepe serve` e abra a página **Board**. Escolha um board (ou crie um) para
 
 Um agente gerencia boards e cards com a ferramenta `board`, se ela estiver no seu conjunto de ferramentas:
 
-> Cria um board chamado "Escalonamentos de suporte" e coloca um card nele pro bug de login que a Sarah reportou, atribuído ao agente de plantão.
+> Cria um board chamado "Escalonamentos de suporte" e coloca um card nele para o bug de login que a Sarah reportou, atribuído ao agente de plantão.
 
 Quando um agente é despachado para trabalhar em um card (um board com `auto_dispatch` reivindicando e rodando seu responsável), ele não precisa passar o id do card para `complete`, `block` ou `comment`: o Pepe infere isso automaticamente a partir daquela sessão.
 

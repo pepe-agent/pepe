@@ -47,7 +47,7 @@ pepe media audio --command "whisper-cli -f {file}"   # mantém o áudio na máqu
 pepe media audio off                                 # volta pra detecção automática
 ```
 
-`--echo true` manda a transcrição de volta no chat, pra quem falou ver o que foi
+`--echo true` manda a transcrição de volta no chat, para quem falou ver o que foi
 entendido. As mesmas opções estão na página Config do painel, e no `pepe setup` em
 **Mídia**.
 
@@ -79,7 +79,7 @@ pepe media tts off
 ```
 
 A resposta em texto continua sendo o registro que fica salvo. O áudio é um extra, e tem
-um limite de tamanho pra uma resposta longa nunca virar um clipe de cinco minutos. Uma
+um limite de tamanho para uma resposta longa nunca virar um clipe de cinco minutos. Uma
 falha no TTS é silenciosa: a resposta em texto já foi enviada, então nada se perde, só não
 ganha voz naquele turno. As mesmas opções estão na página Config do painel, e no
 `pepe setup` em **Mídia**.

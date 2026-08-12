@@ -78,7 +78,7 @@ Ele usa exatamente a mesma lista `can_message` do `send_to_agent`: se um agente 
 enviar mensagem a um par, também pode passar a conversa para ele, sem precisar
 configurar uma rota separada. Diferente do `send_to_agent`, o `switch_agent`
 **passa** pela barreira de permissão normal por padrão: ele muda quem responde toda
-mensagem daqui pra frente, uma ação maior que passa despercebida com facilidade se
+mensagem daqui para frente, uma ação maior que passa despercebida com facilidade se
 liberada sem querer.
 
 ## Roteamento e a barreira de permissão

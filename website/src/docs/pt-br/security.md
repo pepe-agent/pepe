@@ -24,16 +24,16 @@ Toda chamada de ferramenta passa por uma barreira antes de rodar. Ferramentas so
 
 As ferramentas que nunca perguntam são as de somente leitura: `read_file`, `list_dir`, `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` e `send_to_agent`. Qualquer coisa fora dessa lista, incluindo qualquer ferramenta de plugin adicionada, é tratada como arriscada e exige aprovação. Esse é um padrão deliberadamente seguro: presume-se que uma ferramenta desconhecida seja perigosa.
 
-`bash` e `run_script` ganham mais uma liberação, mais restrita que essa lista: uma chamada que não aciona nenhum dos sinais de risco abaixo (sem apagar nada, sem rede, sem sudo, sem código embutido, sem escrita) também roda sem perguntar, **mas só quando há uma pessoa de verdade do outro lado para ter sido perguntada**. Um `ls`, `cat`, `git status` ou `pytest` comum deixa de interromper; um comando que o classificador de risco reconhece como mexendo na rede, apagando algo ou escrevendo um arquivo continua parando para perguntar, como sempre - é uma heurística de texto, não um parser de shell completo, então trate como o resto desta seção: uma ajuda real contra comando do dia a dia, não uma fronteira. Numa superfície sem ninguém para perguntar (a API HTTP, um webhook, um cron, um worker do `delegate`), essa liberação não vale - só roda o que estiver em `auto_approve`.
+`bash` e `run_script` ganham mais uma liberação, mais restrita que essa lista: uma chamada que não aciona nenhum dos sinais de risco abaixo (sem apagar nada, sem rede, sem sudo, sem código embutido, sem escrita) também roda sem perguntar, **mas só quando há uma pessoa de verdade do outro lado para ter sido perguntada**. Um `ls`, `cat`, `git status` ou `pytest` comum deixa de interromper; um comando que o classificador de risco reconhece como mexendo na rede, apagando algo ou escrevendo um arquivo continua parando para perguntar, como sempre: é uma heurística de texto, não um parser de shell completo, então trate como o resto desta seção: uma ajuda real contra comando do dia a dia, não uma fronteira. Numa superfície sem ninguém para perguntar (a API HTTP, um webhook, um cron, um worker do `delegate`), essa liberação não vale, só roda o que estiver em `auto_approve`.
 
 Para o `run_script`, essa liberação só vale quando a linguagem do próprio script é `bash`/`sh`. Os sinais de risco são escritos para ler sintaxe de shell, então um one-liner em Python, Node ou Ruby que apaga arquivos ou abre um socket, do contrário, pareceria livre de risco para o classificador e passaria sem perguntar; qualquer outra linguagem sempre passa pela barreira normal.
 
 Quando uma ferramenta arriscada não foi aprovada de antemão, o runtime pergunta à pessoa do outro lado. Cada superfície mostra esse pedido de autorização do seu jeito nativo (botões embutidos num canal de chat, um menu com as setas do teclado na CLI), mas a decisão é sempre uma de seis:
 
 - `once`: permite só esta chamada, pergunta de novo na próxima vez.
-- `this_run`: permite pelo resto *desta execução* apenas - veja [Conteúdo de um estranho retira a pré-aprovação](#conteúdo-de-um-estranho-retira-a-pré-aprovação) abaixo para saber quando essa opção realmente aparece.
+- `this_run`: permite pelo resto *desta execução* apenas; veja [Conteúdo de um estranho retira a pré-aprovação](#conteúdo-de-um-estranho-retira-a-pré-aprovação) abaixo para saber quando essa opção realmente aparece.
 - `session`: permite pelo resto desta conversa, para chamadas que carregam os mesmos riscos desta. Fica na memória e é esquecido quando você inicia uma nova sessão ou reinicia. As outras sessões continuam perguntando.
-- `session_any` ("Permitir com quaisquer parâmetros"): também vale só para esta sessão, mas é um cheque em branco - toda chamada futura a essa ferramenta roda sem perguntar, qualquer que seja o risco que carregue, não só os que essa chamada em particular sinalizou. Para quando você decidiu parar de ser perguntado sobre os *parâmetros* de uma ferramenta por um tempo, não só sobre o nome dela.
+- `session_any` ("Permitir com quaisquer parâmetros"): também vale só para esta sessão, mas é um cheque em branco: toda chamada futura a essa ferramenta roda sem perguntar, qualquer que seja o risco que carregue, não só os que essa chamada em particular sinalizou. Para quando você decidiu parar de ser perguntado sobre os *parâmetros* de uma ferramenta por um tempo, não só sobre o nome dela.
 - `always`: permite de agora em diante. Fica salvo no agente em `config.json`.
 - `deny`: recusa. Nunca é lembrado, então a mesma chamada é perguntada de novo mais tarde.
 
@@ -61,7 +61,7 @@ As formas antigas, mais grosseiras, continuam funcionando sem mudança:
 |---|---|
 | `"*"` | toda ferramenta, todo risco (o agente do próprio dono) |
 | `"bash"` | um cheque em branco no bash, como escrito por um Pepe anterior a isto tudo |
-| `"bash:any"` | o mesmo cheque em branco, escrito de forma consciente - é o que `session_any` concede, só que guardado na memória em vez de no `config.json` |
+| `"bash:any"` | o mesmo cheque em branco, escrito de forma consciente: é o que `session_any` concede, só que guardado na memória em vez de no `config.json` |
 
 <div class="note"><strong>Isto não é um sandbox, e não pode ser lido como um.</strong> A classificação lê o comando como texto, e texto mente: um comando pode ser montado em tempo de execução, decodificado de base64 ou escondido dentro de um script que o próprio agente escreveu um instante antes. Ela falha fechada, no sentido de que um risco não reconhecido nunca é coberto por uma concessão mais estreita. O que ela fecha é a distância entre o que uma pessoa olhou e o que ela de fato assinou. Ela não transforma um contêiner que roda shell escolhido por um LLM em um lugar seguro, e esse contêiner continua precisando ser um que você estaria disposto a perder.</div>
 
@@ -107,7 +107,7 @@ Um documento enviado num chat, uma página que um `fetch_url` trouxe, um resulta
 
 Então, assim que uma execução ingere conteúdo de fora, o `auto_approve` deixa de valer para ela pelo resto da execução. O agente mantém todas as capacidades que tinha; o que ele perde é o caminho silencioso. Uma ferramenta que rodaria sem perguntar agora pergunta, e a pessoa vê o comando de verdade antes de ele acontecer. Numa superfície sem ninguém a quem perguntar, as duas regras se encontram e a resposta é não: um documento injetado não consegue rodar nada.
 
-Enquanto uma execução está contaminada, `session` e `always` também deixam de valer imediatamente: aprovar uma chamada no meio da execução costumava parecer que funcionava e depois, em silêncio, não fazia nada até a *próxima* execução. `this_run` é a resposta que de fato funciona naquele momento: "esta chamada, e outras com a mesma cara, pelo resto da execução que estou vendo agora" - uma decisão tomada por uma pessoa olhando o conteúdo contaminado de verdade à sua frente, não uma concessão antiga sendo aplicada depois do fato a algo novo. Ela só existe enquanto aquela mesma execução continua contaminada, e desaparece no instante em que a execução termina.
+Enquanto uma execução está contaminada, `session` e `always` também deixam de valer imediatamente: aprovar uma chamada no meio da execução costumava parecer que funcionava e depois, em silêncio, não fazia nada até a *próxima* execução. `this_run` é a resposta que de fato funciona naquele momento: "esta chamada, e outras com a mesma cara, pelo resto da execução que estou vendo agora", uma decisão tomada por uma pessoa olhando o conteúdo contaminado de verdade à sua frente, não uma concessão antiga sendo aplicada depois do fato a algo novo. Ela só existe enquanto aquela mesma execução continua contaminada, e desaparece no instante em que a execução termina.
 
 Isto é uma barreira de verdade, não um apelo no prompt. E não é de propósito a resposta inteira, porque o conteúdo ingerido num turno permanece na conversa e um turno seguinte ainda o carrega. O que ela fecha é o ataque que não precisa de humano nenhum: um cliente anexando um PDF armadilhado a um bot de atendimento, e o bot rodando em silêncio um comando para o qual estava pré-aprovado.
 
@@ -174,7 +174,7 @@ Qualquer executável serve desde que rode seus argumentos (`program arg1 arg2 ..
 
 <div class="note"><strong>Não existe ambiente isolado de verdade que seja sem configuração e multiplataforma.</strong> Todo isolamento real precisa de um recurso do sistema operacional ou de uma ferramenta externa. Por isso o ambiente isolado é opcional e os padrões sempre ligados são a barreira mais as proteções. Quando os agentes rodam sem supervisão ou aprovam ferramentas automaticamente, trate o ambiente isolado como obrigatório, não opcional.</div>
 
-Um script wrapper é um caminho estático só, configurado uma vez, pra instalação inteira. Pra algo que um wrapper não consegue fazer - rodar um comando num host remoto via SSH, controlar um container runtime a partir de código de verdade em vez de shell, escolher um backend diferente por agente - um plugin pode assumir a execução por completo ocupando o slot `sandbox` ([slots](/docs/slots)), o mesmo mecanismo de ponto de extensão exclusivo que `memory` e `web_search` já usam. Veja [Plugins](/docs/plugins) pro formato do callback.
+Um script wrapper é um caminho estático só, configurado uma vez, para a instalação inteira. Para algo que um wrapper não consegue fazer (rodar um comando num host remoto via SSH, controlar um container runtime a partir de código de verdade em vez de shell, escolher um backend diferente por agente), um plugin pode assumir a execução por completo ocupando o slot `sandbox` ([slots](/docs/slots)), o mesmo mecanismo de ponto de extensão exclusivo que `memory` e `web_search` já usam. Veja [Plugins](/docs/plugins) para o formato do callback.
 
 ## Os segredos ficam como referências
 
@@ -243,7 +243,7 @@ Um agente que recebe as ferramentas somente leitura `config_get` e `doctor` cons
 
 A ferramenta `doctor` faz uma verificação de saúde de toda a configuração e sinaliza segredos `${ENV}` não definidos, agentes apontando para modelos ausentes, agendamentos inválidos e conexões inalcançáveis. Passe `live: true` para também sondar a rede.
 
-<div class="note"><strong>Ajustes sensíveis à segurança não são editáveis pela ferramenta geral de configuração.</strong> A ferramenta protegida `config_set` recusa por padrão (fail-closed): ela só mexe numa lista de permissão curta (o modelo e o agente padrão, o idioma, o fuso horário, algumas poucas opções do Telegram e `secrets.expose_env` — a lista de *nomes* de variáveis de ambiente que o shell do agente mantém depois da limpeza, para abrir um cofre para o qual tem um token). *Valores* de segredo, listas de ferramentas permitidas, tokens de bot, o invólucro do ambiente isolado e a senha do painel ficam de propósito fora dessa lista, então o `config_set` não consegue mudá-los. Você define esses por conta própria com a CLI ou o painel. Os tokens da API são a única coisa que um agente consegue gerar pela conversa, mas apenas pela ferramenta separada e protegida por barreira de permissão `manage_token`, nunca pelo `config_set`.</div>
+<div class="note"><strong>Ajustes sensíveis à segurança não são editáveis pela ferramenta geral de configuração.</strong> A ferramenta protegida `config_set` recusa por padrão (fail-closed): ela só mexe numa lista de permissão curta (o modelo e o agente padrão, o idioma, o fuso horário, algumas poucas opções do Telegram e `secrets.expose_env`, a lista de *nomes* de variáveis de ambiente que o shell do agente mantém depois da limpeza, para abrir um cofre para o qual tem um token). *Valores* de segredo, listas de ferramentas permitidas, tokens de bot, o invólucro do ambiente isolado e a senha do painel ficam de propósito fora dessa lista, então o `config_set` não consegue mudá-los. Você define esses por conta própria com a CLI ou o painel. Os tokens da API são a única coisa que um agente consegue gerar pela conversa, mas apenas pela ferramenta separada e protegida por barreira de permissão `manage_token`, nunca pelo `config_set`.</div>
 
 ## Hooks de censura (limpeza opcional de dados pessoais)
 
@@ -324,7 +324,7 @@ diferente de todo outro ponto de chamada de plugin, que o Pepe limita e isola nu
 supervisionada, uma rota deve ser dona do próprio ciclo de vida da requisição (transmitir
 uma resposta, manter um long-poll aberto), o que um prazo genérico quebraria. Combinado
 com a falta de autenticação, isso significa que um plugin de rota com um bug (nem
-precisa ser malicioso - uma chamada HTTP de saída travada sem timeout próprio, um
+precisa ser malicioso, uma chamada HTTP de saída travada sem timeout próprio, um
 `GenServer.call` para algo que já não existe) pode manter uma conexão aberta
 indefinidamente, e quem chama sem se autenticar pode abrir quantas quiser. Habilite uma
 rota só para um plugin cujo `call/2` você confia que vai lidar com isso de forma
