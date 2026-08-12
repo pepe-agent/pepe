@@ -18,6 +18,8 @@
   <a href="https://pepe-agent.com/en/docs/">Documentation</a>
   &nbsp;·&nbsp;
   <a href="https://pepe-agent.com/en/docs/quickstart/">Quickstart</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/sponsors/jhonathas">Sponsor</a>
 </p>
 
 > **Where Pepe comes from.** Pepe was born out of solving real problems across
@@ -37,8 +39,7 @@
 > order. Which, funnily enough, describes an AI agent runtime perfectly.
 > The project was once called *Cortex*; now it's **Pepe**. Same engine, better name. 🫡
 
-**Pepe is an Elixir/OTP AI agent runtime.** Define agents, connect to any model, and
-run a tool-calling loop. It leans on what Elixir is good at: a lightweight process per
+Under the hood, it leans on what Elixir is good at: a lightweight process per
 conversation (so many run side by side), supervision that isolates crashes (one
 conversation failing never takes the rest down), and a small streaming HTTP stack.
 
@@ -87,7 +88,7 @@ pepe run "summarize what this project does"
 
 # 5) or run it toward an outcome: it works, an independent reviewer checks the
 #    result against your criterion, and it retries until that criterion is met
-pepe goal "write a release note for v0.3" \
+pepe goal "write release notes for this version" \
   --criteria "mentions every change in CHANGELOG's Unreleased section, in one line each"
 ```
 
@@ -112,47 +113,19 @@ reviewer's last verdict as it runs.
 
 ### Talk to it out loud
 
-A voice note sent to a Telegram bot arrives as **text**. It is transcribed on the way in,
-before the agent runs, so the words are there in time for routing to read them: a slash
-command spoken out loud runs, and in a group that requires a mention the bot can be
-addressed by voice (a voice note carries no caption, so there was previously nothing to
-address it with).
-
-If you already have a model connection to OpenAI or Groq, this needs no configuration at
-all: Pepe reuses that credential and asks the provider for its transcription model
-(`whisper-1`, `whisper-large-v3-turbo`) rather than the chat model. To choose a connection
-yourself, or point at a local command instead:
+A voice note sent to a Telegram bot arrives as **text**: transcribed on the way in,
+before the agent runs, so slash commands and mention rules work by voice too. Needs no
+configuration if you already have a model connection to OpenAI or Groq, or point at a
+local command to keep audio on the machine:
 
 ```bash
-mix pepe media audio --model groq --language en --echo true
+mix pepe media audio --model groq --language en
 mix pepe media audio --command "whisper-cli -f {file}"   # keep audio on the machine
-mix pepe media audio off                                 # back to auto-detect
 ```
 
-`--model` names a model connection to transcribe with, and that connection's `fallbacks`
-chain applies here too. `--command` beats automatic detection, precisely so the audio
-never leaves the machine (`{file}` becomes the path). `--echo true` sends the transcript
-back to the chat so the speaker can see what was understood. With no route available, the
-old behavior remains as the safety net: the agent gets the file and works it out with its
-own tools. Same settings from the dashboard (Config page) or `mix pepe setup`. Full detail
-in the [Voice messages](https://pepe-agent.com/en/docs/voice/) docs.
-
-**Talk back, too.** Point `media.tts` at a model connection serving an OpenAI-compatible
-`/audio/speech` and a reply to a voice note comes back as a voice note, alongside the text
-(the lasting record):
-
-```bash
-mix pepe media tts --model openai --voice nova
-mix pepe media tts off
-```
-
-Off by default; same three surfaces (CLI, dashboard, `mix pepe setup`) as transcription.
-
-**Photos, too.** Send a picture and, on a vision-capable model (set `"vision": true` on the
-model connection), the agent sees the actual image rather than just a filename. Telegram's own
-pre-scaled sizes keep it lean (no image library), an album goes as several images at once, and
-`media.image` caps the size (`max_mb`) and count (`max_parts`). A text-only model falls back to
-the file-path prompt.
+Replies can come back as voice too (`media.tts`), and a photo goes to a vision-capable
+model as the actual image, not a filename. Full detail (flags, fallback chains, image
+caps) in the [Voice messages](https://pepe-agent.com/en/docs/voice/) docs.
 
 ### Docker
 
@@ -188,24 +161,15 @@ touches, which is what keeps the image at 408 MB rather than 945 MB. See the
 
 ### From source (development)
 
-Clone the repo and drive it with `mix` instead of the binary:
+Clone the repo and drive it with `mix` instead of the binary: same steps as above,
+with `mix pepe` in place of `pepe`.
 
 ```bash
 git clone https://github.com/pepe-agent/pepe.git && cd pepe
 mix deps.get
-
-# 1) scaffold ~/.pepe/config.json
 mix pepe setup
-
-# 2) add a model connection (any OpenAI-compatible provider; openrouter is a
-#    known provider, so its base URL is filled in automatically)
 mix pepe model add openrouter --api-key '${OPENROUTER_API_KEY}' --model openai/gpt-5-chat
-
-# 3) define an agent (defaults to all built-in tools; the first model/agent
-#    you add becomes the default automatically)
 mix pepe agent add assistant --prompt "You are Pepe, a helpful coding agent."
-
-# 4) run it
 export OPENROUTER_API_KEY=sk-...
 mix pepe run "list the files here and summarize the project"
 ```
@@ -219,7 +183,7 @@ Portuguese and Spanish. One topic per page; open just what you need.
 
 **Configure** &nbsp; [Models](https://pepe-agent.com/en/docs/models/) · [Agents](https://pepe-agent.com/en/docs/agents/) · [Configuration](https://pepe-agent.com/en/docs/config/) · [Secrets & vaults](https://pepe-agent.com/en/docs/secrets/) · [Usage & billing](https://pepe-agent.com/en/docs/billing/) · [Projects](https://pepe-agent.com/en/docs/projects/)
 
-**What an agent can do** &nbsp; [Skills](https://pepe-agent.com/en/docs/skills/) · [Learning](https://pepe-agent.com/en/docs/learning/) (memory search included) · [Agent-to-agent routing](https://pepe-agent.com/en/docs/routing/) · [Delegation](https://pepe-agent.com/en/docs/delegation/) · [Admin agents](https://pepe-agent.com/en/docs/admin-agents/) · [Session search](https://pepe-agent.com/en/docs/session-search/) · [Browser](https://pepe-agent.com/en/docs/browser/) · [Fetch URL](https://pepe-agent.com/en/docs/fetch-url/)
+**What an agent can do** &nbsp; [Skills](https://pepe-agent.com/en/docs/skills/) · [PepeHub](https://hub.pepe-agent.com) (skill/plugin marketplace) · [Learning](https://pepe-agent.com/en/docs/learning/) (memory search included) · [Agent-to-agent routing](https://pepe-agent.com/en/docs/routing/) · [Delegation](https://pepe-agent.com/en/docs/delegation/) · [Admin agents](https://pepe-agent.com/en/docs/admin-agents/) · [Session search](https://pepe-agent.com/en/docs/session-search/) · [Browser](https://pepe-agent.com/en/docs/browser/) · [Fetch URL](https://pepe-agent.com/en/docs/fetch-url/)
 
 **Talk to it** &nbsp; [Dashboard](https://pepe-agent.com/en/docs/dashboard/) · [HTTP API](https://pepe-agent.com/en/docs/api/) · [Usage API](https://pepe-agent.com/en/docs/usage-api/) · [WebSocket](https://pepe-agent.com/en/docs/websocket/) · [Telegram](https://pepe-agent.com/en/docs/telegram/) · [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/) · [Slack, Discord, Teams, Chat](https://pepe-agent.com/en/docs/channels/) · [Widget](https://pepe-agent.com/en/docs/widget/)
 
@@ -240,18 +204,17 @@ what they did while there were two copies.
 
 Pepe is meant to be embedded. A few common paths:
 
-- **Behind your web app / SaaS** - point any OpenAI SDK at the [HTTP API](https://pepe-agent.com/en/docs/api/), scope access with per-project [tokens](https://pepe-agent.com/en/docs/auth/), and keep tenants isolated with [Projects](https://pepe-agent.com/en/docs/projects/).
-- **Customer support on WhatsApp** - connect a number and bind it to a support agent; see [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/). Redact PII before it reaches any model with [Privacy hooks](https://pepe-agent.com/en/docs/privacy/).
-- **Bill your clients** - every model call is metered per project; export invoices from [Usage & billing](https://pepe-agent.com/en/docs/billing/), or let their own system read the figures over HTTP with a read-only token via the [Usage API](https://pepe-agent.com/en/docs/usage-api/).
-- **Automate** - recurring jobs with [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/), one-shot "notify me when X" with [Watches](https://pepe-agent.com/en/docs/watches/), durable multi-step handoffs with [Board](https://pepe-agent.com/en/docs/board/).
+- **Behind your web app / SaaS**: point any OpenAI SDK at the [HTTP API](https://pepe-agent.com/en/docs/api/), scope access with per-project [tokens](https://pepe-agent.com/en/docs/auth/), and keep tenants isolated with [Projects](https://pepe-agent.com/en/docs/projects/).
+- **Customer support on WhatsApp**: connect a number and bind it to a support agent; see [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/). Redact PII before it reaches any model with [Privacy hooks](https://pepe-agent.com/en/docs/privacy/).
+- **Bill your clients**: every model call is metered per project; export invoices from [Usage & billing](https://pepe-agent.com/en/docs/billing/), or let their own system read the figures over HTTP with a read-only token via the [Usage API](https://pepe-agent.com/en/docs/usage-api/).
+- **Automate**: recurring jobs with [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/), one-shot "notify me when X" with [Watches](https://pepe-agent.com/en/docs/watches/), durable multi-step handoffs with [Board](https://pepe-agent.com/en/docs/board/).
 
 ---
 
 ## Contributing: help wanted 🙌
 
-Pepe is young and **help is genuinely welcome**: bug reports, docs fixes, features,
-and especially **confirming providers work**. Small, focused PRs are the easiest to
-review and merge.
+**Help is genuinely welcome**: bug reports, docs fixes, features, and especially
+**confirming providers work**. Small, focused PRs are the easiest to review and merge.
 
 Get set up in a minute (no database, no API keys needed for the test suite):
 
@@ -273,3 +236,16 @@ issue saying whether **streaming** and **tool-calling** worked. That feedback is
 a lot.
 
 Full guide, including everything that needs testing: [Contributing & help wanted](docs/contributing.md).
+
+---
+
+## Support
+
+If Pepe is useful to you, [sponsoring](https://github.com/sponsors/jhonathas) helps
+cover the real cost of keeping it working across providers: verifying new models,
+testing streaming/tool-calling against paid APIs (OpenRouter, Groq, DeepSeek,
+Together, ...), and the time spent maintaining it.
+
+## License
+
+[MIT](LICENSE)
