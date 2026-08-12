@@ -80,3 +80,7 @@ arquivo_teste_aprovacao_*.txt
 /.claude/agent-memory/
 
 /undefined
+
+# Local overrides mise loads automatically alongside mise.toml (e.g. per-developer
+# credentials like LANGFUSE_*) - never committed, unlike mise.toml itself.
+/mise.local.toml
