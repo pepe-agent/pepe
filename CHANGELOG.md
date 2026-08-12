@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.18.0] - 2026-08-12
 
 ### Added
 - **`mix pepe plugin install`/`skill install`, and their conversational equivalents (`manage_plugin`, and the new `manage_skill` tool), now accept a [PepeHub](https://hub.pepe-agent.com) reference**: the short `@handle/name` form, or the package's own page URL copied straight from the site, either works. PepeHub packages both plugins and skills under the same namespace; pointing `plugin install` at a name that turns out to be a skill (or `skill install` at one that turns out to be a plugin) fails with a message naming the right command instead. A skill installed this way is placed under its bare package slug, not the `@handle/name` it was resolved from, and carries `"official"` trust when PepeHub itself has manually marked the package official, and `"community"` otherwise: the same distinction the bundled registry and taps already made.
@@ -784,6 +784,7 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
+[0.18.0]: https://github.com/pepe-agent/pepe/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/pepe-agent/pepe/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/pepe-agent/pepe/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/pepe-agent/pepe/compare/v0.15.0...v0.16.0
