@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.17.1] - 2026-08-12
 
 ### Changed
 - **The dashboard sidebar no longer labels itself "localhost."** That text was accurate only when the dashboard happened to be reached at `localhost`, which stopped being true the moment it was exposed on a LAN or behind a reverse proxy, and was confusing either way (a fixed word, unrelated to what was actually in the browser's address bar). It now just shows "Pepe" and the running version.
@@ -776,6 +776,7 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
+[0.17.1]: https://github.com/pepe-agent/pepe/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/pepe-agent/pepe/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/pepe-agent/pepe/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/pepe-agent/pepe/compare/v0.14.3...v0.15.0
