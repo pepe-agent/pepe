@@ -34,12 +34,20 @@ defmodule Pepe.TimezoneTest do
     assert DashData.local_datetime(ts, "%H:%M") == "12:00"
   end
 
-  test "the agent's system prompt grounds it in local time" do
+  test "the per-turn time reminder grounds the agent in local time" do
+    Config.set_default_timezone("America/Sao_Paulo")
+
+    assert [%{"role" => "user", "content" => content}] = Workspace.time_reminder()
+    assert content =~ "<system-reminder>"
+    assert content =~ "Current time"
+    assert content =~ "America/Sao_Paulo"
+    assert content =~ "Do not assume UTC"
+  end
+
+  test "the system prompt itself carries no timestamp - it is built once per session and replayed, so a baked-in time would freeze" do
     Config.set_default_timezone("America/Sao_Paulo")
     sp = Workspace.system_prompt(%{name: "bot", system_prompt: "hi"})
 
-    assert sp =~ "Current time"
-    assert sp =~ "America/Sao_Paulo"
-    assert sp =~ "Do not assume UTC"
+    refute sp =~ "Current time"
   end
 end

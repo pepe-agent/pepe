@@ -250,6 +250,11 @@ defmodule Pepe.Agent.Runtime do
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
       agent: agent,
+      # The primary model (same head-of-chain compact_for_send/4 sizes against), so a
+      # tool can size its output to the model's context window (read_file's page cap).
+      # Failover mid-run may answer with a later model in the chain; sizing against the
+      # head is the same approximation compaction already makes.
+      model: hd(chain),
       session_key: opts[:session_key],
       authorize: opts[:authorize],
       ask_user: opts[:ask_user],
@@ -269,7 +274,12 @@ defmodule Pepe.Agent.Runtime do
   """
   @spec converse(Agent.t(), String.t(), opts()) :: {:ok, String.t(), [map()]} | {:error, term()}
   def converse(%Agent{} = agent, prompt, opts \\ []) do
-    messages = [Message.system(Pepe.Agent.Workspace.system_prompt(agent)), Message.user(prompt)]
+    # The time rides along as an ephemeral note, not inside system_prompt/1 - see
+    # Pepe.Agent.Workspace.time_reminder/0.
+    messages =
+      [Message.system(Pepe.Agent.Workspace.system_prompt(agent))] ++
+        Pepe.Agent.Workspace.time_reminder() ++ [Message.user(prompt)]
+
     run(agent, messages, opts)
   end
 
@@ -364,18 +374,31 @@ defmodule Pepe.Agent.Runtime do
   defp provider_error_detail(%{content: c}) when is_binary(c) and c != "", do: c
   defp provider_error_detail(_), do: "provider signalled an error with no message"
 
-  # Pull every pending `{:steer, text}` off the run task's mailbox (non-blocking) and
-  # append each as a user message. Emits a lifecycle event so a live surface can show
-  # the injected line was picked up.
+  # Pull every pending `{:steer, text, sender}` off the run task's mailbox
+  # (non-blocking) and append each as a user message. Emits a lifecycle event so a
+  # live surface can show the injected line was picked up.
   defp drain_steer(messages, opts) do
     receive do
-      {:steer, text} ->
+      {:steer, text, sender} ->
         emit(opts, {:inline, text})
-        drain_steer(messages ++ [Message.user(text)], opts)
+        drain_steer(messages ++ [steer_message(text, sender)], opts)
     after
       0 -> messages
     end
   end
+
+  # A steer folded in by midrun_fold can come from a different person than the one who
+  # started the turn (a group chat) - and the turn's single ephemeral "Current sender"
+  # note (Session.sender_note/1) only names the original sender, so without its own
+  # label this message would read as theirs. The label is embedded in the message
+  # content permanently, but written exactly once, right here, and never rewritten
+  # afterward - nothing mutates stored history anymore - so it replays byte-identical
+  # across turns and doesn't recreate the old strip-and-retag cache-breaking pattern.
+  # No sender (`/inline`, a DM, a source with no sender concept) means no label.
+  defp steer_message(text, nil), do: Message.user(text)
+
+  defp steer_message(text, sender),
+    do: Message.user("<system-reminder>\nCurrent sender: #{sender}\n</system-reminder>\n#{text}")
 
   # Routed through the "compaction" slot (Pepe.Slots), not called directly - a plugin can
   # take over condensation the same way memory/web_search/sandbox already can. The builtin

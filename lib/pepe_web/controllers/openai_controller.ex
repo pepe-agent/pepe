@@ -295,7 +295,7 @@ defmodule PepeWeb.OpenAIController do
   defp run_with_hooks(agent, messages, opts) do
     text = last_user_text(messages)
     {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => []})
-    messages = replace_last_user_text(messages, redacted)
+    messages = messages |> replace_last_user_text(redacted) |> inject_time_reminder()
     Pepe.Hooks.start_map(entries)
 
     case Runtime.run(agent, messages, opts) do
@@ -325,6 +325,23 @@ defmodule PepeWeb.OpenAIController do
     |> case do
       nil -> nil
       {_m, i} -> i
+    end
+  end
+
+  # The stateless path replays whatever history the client sent, every request - the
+  # current time can't live in the (cache-stable) system prompt, so it rides along as an
+  # ephemeral note right before the newest user turn, same as a session turn gets (see
+  # Pepe.Agent.Workspace.time_reminder/0). Inserted before, not appended after, the last
+  # user message so nothing downstream that looks for "the last user message" finds the
+  # reminder instead.
+  defp inject_time_reminder(messages) do
+    case last_user_index(messages) do
+      nil ->
+        messages
+
+      idx ->
+        {before_user, from_user} = Enum.split(messages, idx)
+        before_user ++ Pepe.Agent.Workspace.time_reminder() ++ from_user
     end
   end
 
