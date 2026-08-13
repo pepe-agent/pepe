@@ -22,6 +22,12 @@ defmodule Pepe.Tools.ReadFile do
   # No model in ctx (direct `Pepe.Tools.execute/2`, tests): the old fixed cap.
   @fallback_bytes 30_000
 
+  # Held out of `max_bytes` up front so the continuation note appended in `window/4`
+  # (bounded well under this even at unrealistic 15-digit sizes) never pushes the
+  # total past `max_bytes`.
+  @continuation_note_reserve 256
+  @line_clip_note " ...(line clipped)"
+
   @impl true
   def name, do: "read_file"
 
@@ -99,7 +105,8 @@ defmodule Pepe.Tools.ReadFile do
     requested = Enum.drop(lines, start - 1)
     requested = if is_integer(limit) and limit > 0, do: Enum.take(requested, limit), else: requested
 
-    {kept, clipped?} = cap_bytes(requested, max_bytes)
+    budget = max(max_bytes - @continuation_note_reserve, 0)
+    {kept, clipped?} = cap_bytes(requested, budget)
     text = Enum.join(kept, "\n")
     full_read? = start == 1 and length(kept) == total and not clipped?
 
@@ -121,10 +128,22 @@ defmodule Pepe.Tools.ReadFile do
 
   defp cap_bytes([line | _] = lines, max_bytes) do
     if byte_size(line) > max_bytes do
-      {[binary_part(line, 0, max_bytes) <> " ...(line clipped)"], true}
+      slice_budget = max(max_bytes - byte_size(@line_clip_note), 0)
+      {[safe_truncate(line, slice_budget) <> @line_clip_note], true}
     else
       take_lines(lines, max_bytes)
     end
+  end
+
+  # Truncate to at most `max_bytes`, backing off a byte at a time until the slice
+  # lands on a UTF-8 codepoint boundary. A codepoint is at most 4 bytes, so this
+  # never backs off far.
+  defp safe_truncate(_binary, max_bytes) when max_bytes <= 0, do: ""
+
+  defp safe_truncate(binary, max_bytes) do
+    size = min(max_bytes, byte_size(binary))
+    <<slice::binary-size(^size), _::binary>> = binary
+    if String.valid?(slice), do: slice, else: safe_truncate(binary, size - 1)
   end
 
   defp take_lines(lines, budget) do
