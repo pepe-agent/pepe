@@ -134,7 +134,14 @@ defmodule Pepe.Config.Agent do
             # Off by default because the tradeoff is real, not just an upside: the running
             # summary changes every turn once active, which breaks a provider's prompt-cache
             # prefix stability turn over turn. See Pepe.Agent.Compaction.micro_compact/4.
-            micro_compaction: false
+            micro_compaction: false,
+            # Off by default. When on, Pepe.Agent.Workspace adds a system-prompt convention
+            # telling the agent it may add one short, natural mention of a related capability
+            # (Watches, Scheduled tasks, Goals, an installed skill) right after it successfully
+            # helps with something, when one genuinely fits - not a menu, not every turn.
+            # Discovery through use, not an onboarding blast. Off by default because an agent
+            # built to be terse/transactional should stay that way unless its owner opts in.
+            capability_nudge: false
 
   @type t :: %__MODULE__{}
 
@@ -186,7 +193,8 @@ defmodule Pepe.Config.Agent do
         midrun_fold: map["midrun_fold"] || false,
         commitments: map["commitments"] || false,
         session_search_scope: map["session_search_scope"] || "self",
-        micro_compaction: map["micro_compaction"] || false
+        micro_compaction: map["micro_compaction"] || false,
+        capability_nudge: map["capability_nudge"] || false
     }
   end
 end

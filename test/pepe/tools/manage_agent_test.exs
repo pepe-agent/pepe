@@ -12,8 +12,8 @@ defmodule Pepe.Tools.ManageAgentTest do
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
 
-    Config.put_agent(%Agent{name: "vendas", system_prompt: "x", tools: ["read_file"]})
-    Config.put_agent(%Agent{name: "rh", system_prompt: "x", tools: []})
+    Config.put_agent(%Agent{name: "sales", system_prompt: "x", tools: ["read_file"]})
+    Config.put_agent(%Agent{name: "hr", system_prompt: "x", tools: []})
 
     on_exit(fn ->
       if prev, do: System.put_env("PEPE_HOME", prev), else: System.delete_env("PEPE_HOME")
@@ -29,32 +29,32 @@ defmodule Pepe.Tools.ManageAgentTest do
     test "nil = itself only" do
       a = %Agent{name: "admin", can_manage: nil}
       assert Config.can_manage?(a, "admin")
-      refute Config.can_manage?(a, "vendas")
+      refute Config.can_manage?(a, "sales")
     end
 
     test "[] = nobody, not even itself" do
       a = %Agent{name: "admin", can_manage: []}
       refute Config.can_manage?(a, "admin")
-      refute Config.can_manage?(a, "vendas")
+      refute Config.can_manage?(a, "sales")
     end
 
     test "[names] = exactly those (self only if listed)" do
-      a = %Agent{name: "admin", can_manage: ["vendas"]}
-      assert Config.can_manage?(a, "vendas")
-      refute Config.can_manage?(a, "rh")
+      a = %Agent{name: "admin", can_manage: ["sales"]}
+      assert Config.can_manage?(a, "sales")
+      refute Config.can_manage?(a, "hr")
       refute Config.can_manage?(a, "admin")
     end
 
     test "[\"*\"] = everyone" do
       a = %Agent{name: "admin", can_manage: ["*"]}
-      assert Config.can_manage?(a, "vendas")
+      assert Config.can_manage?(a, "sales")
       assert Config.can_manage?(a, "anything")
     end
   end
 
   test "refuses to act on an agent outside the manager's scope" do
     assert {:error, msg} =
-             ManageAgent.run(%{"action" => "get", "target" => "vendas"}, ctx(["rh"]))
+             ManageAgent.run(%{"action" => "get", "target" => "sales"}, ctx(["hr"]))
 
     assert msg =~ "isn't available"
     refute msg =~ "not allowed"
@@ -63,26 +63,26 @@ defmodule Pepe.Tools.ManageAgentTest do
   test "grants and revokes a tool on a managed agent" do
     assert {:ok, _} =
              ManageAgent.run(
-               %{"action" => "add_tool", "target" => "vendas", "value" => "web_search"},
-               ctx(["vendas"])
+               %{"action" => "add_tool", "target" => "sales", "value" => "web_search"},
+               ctx(["sales"])
              )
 
-    assert "web_search" in Config.get_agent("vendas").tools
+    assert "web_search" in Config.get_agent("sales").tools
 
     assert {:ok, _} =
              ManageAgent.run(
-               %{"action" => "remove_tool", "target" => "vendas", "value" => "web_search"},
-               ctx(["vendas"])
+               %{"action" => "remove_tool", "target" => "sales", "value" => "web_search"},
+               ctx(["sales"])
              )
 
-    refute "web_search" in Config.get_agent("vendas").tools
+    refute "web_search" in Config.get_agent("sales").tools
   end
 
   test "rejects an unknown tool" do
     assert {:error, msg} =
              ManageAgent.run(
-               %{"action" => "add_tool", "target" => "vendas", "value" => "nope"},
-               ctx(["vendas"])
+               %{"action" => "add_tool", "target" => "sales", "value" => "nope"},
+               ctx(["sales"])
              )
 
     assert msg =~ "unknown tool"
@@ -93,41 +93,41 @@ defmodule Pepe.Tools.ManageAgentTest do
              ManageAgent.run(
                %{
                  "action" => "set_persona",
-                 "target" => "vendas",
+                 "target" => "sales",
                  "value" => "You are the sales rep."
                },
                ctx(["*"])
              )
 
-    assert File.read!(Path.join(Workspace.dir("vendas"), "SOUL.md")) =~ "sales rep"
+    assert File.read!(Path.join(Workspace.dir("sales"), "SOUL.md")) =~ "sales rep"
   end
 
   test "remember appends to the target's memory" do
     ManageAgent.run(
-      %{"action" => "remember", "target" => "vendas", "value" => "Client prefers email."},
+      %{"action" => "remember", "target" => "sales", "value" => "Client prefers email."},
       ctx(["*"])
     )
 
-    assert File.read!(Path.join(Workspace.dir("vendas"), "MEMORY.md")) =~ "prefers email"
+    assert File.read!(Path.join(Workspace.dir("sales"), "MEMORY.md")) =~ "prefers email"
   end
 
   test "a super-admin (*) can create a new agent" do
     assert {:ok, _} =
              ManageAgent.run(
-               %{"action" => "create", "target" => "suporte", "value" => "You are support."},
+               %{"action" => "create", "target" => "support", "value" => "You are support."},
                ctx(["*"])
              )
 
-    assert Config.get_agent("suporte")
+    assert Config.get_agent("support")
   end
 
   test "create is refused when the target is out of scope" do
     assert {:error, msg} =
-             ManageAgent.run(%{"action" => "create", "target" => "suporte"}, ctx(["vendas"]))
+             ManageAgent.run(%{"action" => "create", "target" => "support"}, ctx(["sales"]))
 
     assert msg =~ "isn't available"
     refute msg =~ "not allowed"
-    refute Config.get_agent("suporte")
+    refute Config.get_agent("support")
   end
 
   test "create reports the error (not a false success) when the handle is invalid" do
@@ -137,7 +137,7 @@ defmodule Pepe.Tools.ManageAgentTest do
     assert msg =~ "valid handle"
     refute Config.get_agent("bad/name/extra")
     # No agent was created: only the two the setup put there remain.
-    assert Enum.map(Config.agents(), & &1.name) |> Enum.sort() == ["default/rh", "default/vendas"]
+    assert Enum.map(Config.agents(), & &1.name) |> Enum.sort() == ["default/hr", "default/sales"]
   end
 
   describe "set_flag (enable or disable a switch on a managed agent)" do
@@ -149,30 +149,49 @@ defmodule Pepe.Tools.ManageAgentTest do
     test "an admin turns a target's switch on and off by chat" do
       assert {:ok, msg} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "exempt_message_limit", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "exempt_message_limit", "value" => "on"},
+                 ctx(["sales"])
                )
 
       assert msg =~ "on"
-      assert Config.get_agent("vendas").exempt_message_limit == true
+      assert Config.get_agent("sales").exempt_message_limit == true
 
       assert {:ok, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "exempt_message_limit", "value" => "off"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "exempt_message_limit", "value" => "off"},
+                 ctx(["sales"])
                )
 
-      assert Config.get_agent("vendas").exempt_message_limit == false
+      assert Config.get_agent("sales").exempt_message_limit == false
+    end
+
+    test "capability_nudge can be turned on and off by chat, same as any other simple switch" do
+      assert {:ok, msg} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "capability_nudge", "value" => "on"},
+                 ctx(["sales"])
+               )
+
+      assert msg =~ "on"
+      assert Config.get_agent("sales").capability_nudge == true
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "capability_nudge", "value" => "off"},
+                 ctx(["sales"])
+               )
+
+      assert Config.get_agent("sales").capability_nudge == false
     end
 
     test "trust_untrusted_content can be turned on from an ordinary conversation" do
       assert {:ok, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "trust_untrusted_content", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "trust_untrusted_content", "value" => "on"},
+                 ctx(["sales"])
                )
 
-      assert Config.get_agent("vendas").trust_untrusted_content == true
+      assert Config.get_agent("sales").trust_untrusted_content == true
     end
 
     test "but NOT from a run that has itself taken in a stranger's content" do
@@ -183,33 +202,33 @@ defmodule Pepe.Tools.ManageAgentTest do
 
       assert {:error, why} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "trust_untrusted_content", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "trust_untrusted_content", "value" => "on"},
+                 ctx(["sales"])
                )
 
       assert why =~ "outside"
-      assert Config.get_agent("vendas").trust_untrusted_content == false
+      assert Config.get_agent("sales").trust_untrusted_content == false
 
       # Turning it OFF from a tainted run is still fine: tightening never needs guarding.
-      Config.put_agent(%{Config.get_agent("vendas") | trust_untrusted_content: true})
+      Config.put_agent(%{Config.get_agent("sales") | trust_untrusted_content: true})
 
       assert {:ok, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "trust_untrusted_content", "value" => "off"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "trust_untrusted_content", "value" => "off"},
+                 ctx(["sales"])
                )
 
-      assert Config.get_agent("vendas").trust_untrusted_content == false
+      assert Config.get_agent("sales").trust_untrusted_content == false
     end
 
     test "session_search_project_wide can be turned on from an ordinary conversation" do
       assert {:ok, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "session_search_project_wide", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "session_search_project_wide", "value" => "on"},
+                 ctx(["sales"])
                )
 
-      assert Config.get_agent("vendas").session_search_scope == "project"
+      assert Config.get_agent("sales").session_search_scope == "project"
     end
 
     test "session_search_project_wide: but NOT from a run that has itself taken in a stranger's content" do
@@ -217,36 +236,36 @@ defmodule Pepe.Tools.ManageAgentTest do
 
       assert {:error, why} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "session_search_project_wide", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "session_search_project_wide", "value" => "on"},
+                 ctx(["sales"])
                )
 
       assert why =~ "outside"
-      assert Config.get_agent("vendas").session_search_scope == "self"
+      assert Config.get_agent("sales").session_search_scope == "self"
 
       # Turning it OFF from a tainted run is still fine: tightening never needs guarding.
-      Config.put_agent(%{Config.get_agent("vendas") | session_search_scope: "project"})
+      Config.put_agent(%{Config.get_agent("sales") | session_search_scope: "project"})
 
       assert {:ok, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "session_search_project_wide", "value" => "off"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "session_search_project_wide", "value" => "off"},
+                 ctx(["sales"])
                )
 
-      assert Config.get_agent("vendas").session_search_scope == "self"
+      assert Config.get_agent("sales").session_search_scope == "self"
     end
 
     test "an unknown flag or a bad value is refused" do
       assert {:error, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "make_it_fast", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "make_it_fast", "value" => "on"},
+                 ctx(["sales"])
                )
 
       assert {:error, why} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "vendas", "flag" => "exempt_message_limit", "value" => "maybe"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "exempt_message_limit", "value" => "maybe"},
+                 ctx(["sales"])
                )
 
       assert why =~ "on"
@@ -255,13 +274,13 @@ defmodule Pepe.Tools.ManageAgentTest do
     test "and only on an agent the admin may manage" do
       assert {:error, _} =
                ManageAgent.run(
-                 %{"action" => "set_flag", "target" => "rh", "flag" => "exempt_message_limit", "value" => "on"},
-                 ctx(["vendas"])
+                 %{"action" => "set_flag", "target" => "hr", "flag" => "exempt_message_limit", "value" => "on"},
+                 ctx(["sales"])
                )
     end
 
     test "get shows the current flags, so the admin can see what it is changing" do
-      assert {:ok, text} = ManageAgent.run(%{"action" => "get", "target" => "vendas"}, ctx(["vendas"]))
+      assert {:ok, text} = ManageAgent.run(%{"action" => "get", "target" => "sales"}, ctx(["sales"]))
       assert text =~ "trust_untrusted_content=off"
       assert text =~ "exempt_message_limit=off"
       assert text =~ "session_search_project_wide=off"

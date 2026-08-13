@@ -177,6 +177,24 @@ pepe agent add support --micro-compaction ...
 Or toggle it on an existing agent from the dashboard's agent editor, or by asking an agent
 with the `manage_agent` tool to set the `micro_compaction` flag on another agent.
 
+## Mentioning what else you can do
+
+People who already use an agent for one thing often never learn it can also watch
+something for changes, run a recurring job, or work toward a goal until it's actually
+done - nothing surfaces that beyond whatever the agent's own persona happens to mention.
+`capability_nudge`, off by default, lets an agent add one short, natural sentence pointing
+at a related capability right after it successfully helps with something, when one
+genuinely fits - not a menu, not every turn. Discovery through use, not an onboarding
+blast.
+
+```bash
+pepe agent add support --capability-nudge ...
+```
+
+Leave it off for an agent meant to stay terse and transactional; turn it on from the
+dashboard's agent editor, or by asking an agent with the `manage_agent` tool to set the
+`capability_nudge` flag on another agent.
+
 ## Tools and the permission gate
 
 A tool is a capability. An agent can only do what its `tools` list allows. Give an

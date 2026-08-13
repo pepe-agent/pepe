@@ -3047,6 +3047,7 @@ defmodule Mix.Tasks.Pepe do
           commitments: :boolean,
           session_search_project_wide: :boolean,
           micro_compaction: :boolean,
+          capability_nudge: :boolean,
           admin: :boolean
         ]
       )
@@ -3264,7 +3265,8 @@ defmodule Mix.Tasks.Pepe do
       midrun_fold: opts[:midrun_fold] || false,
       commitments: opts[:commitments] || false,
       session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
-      micro_compaction: opts[:micro_compaction] || false
+      micro_compaction: opts[:micro_compaction] || false,
+      capability_nudge: opts[:capability_nudge] || false
     }
   end
 
