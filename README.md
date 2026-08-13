@@ -19,7 +19,7 @@
   &nbsp;·&nbsp;
   <a href="https://pepe-agent.com/en/docs/quickstart/">Quickstart</a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/sponsors/jhonathas"><img src="https://img.shields.io/badge/%E2%99%A5_Sponsor-ea4aaa?style=flat" alt="Sponsor"></a>
+  <a href="https://github.com/sponsors/jhonathas">Sponsor</a>
 </p>
 
 > **Where Pepe comes from.** Pepe was born out of solving real problems across
@@ -260,10 +260,11 @@ Full guide, including everything that needs testing: [Contributing & help wanted
 
 ## Support
 
-If Pepe is useful to you, [sponsoring](https://github.com/sponsors/jhonathas) helps
-cover the real cost of keeping it working across providers: verifying new models,
-testing streaming/tool-calling against paid APIs (OpenRouter, Groq, DeepSeek,
-Together, ...), and the time spent maintaining it.
+If Pepe is useful to you, sponsoring helps cover the real cost of keeping it working
+across providers: verifying new models, testing streaming/tool-calling against paid
+APIs (OpenRouter, Groq, DeepSeek, Together, ...), and the time spent maintaining it.
+
+<a href="https://github.com/sponsors/jhonathas"><img src="https://img.shields.io/badge/%E2%99%A5_Sponsor-ea4aaa?style=flat" alt="Sponsor"></a>
 
 ## License
 
