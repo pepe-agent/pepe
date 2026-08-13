@@ -138,6 +138,7 @@ defmodule Pepe.Agent.Workspace do
       knowledge_index(name),
       docs_index(),
       skills_index(),
+      capability_nudge_note(agent),
       convention_note()
     ]
     |> Enum.reject(&(&1 in [nil, ""]))
@@ -220,6 +221,23 @@ defmodule Pepe.Agent.Workspace do
           Enum.map_join(skills, "\n", fn {name, summary} -> "- #{name}: #{summary}" end)
     end
   end
+
+  # Opt-in (`capability_nudge` on Pepe.Config.Agent, off by default): tells the agent it may
+  # surface a related capability after a successful turn, instead of leaving discovery to
+  # whatever the agent's own persona happens to mention. Deliberately not universal like
+  # `behavior_contract/0` - a terse/transactional agent should stay that way unless its
+  # owner turns this on.
+  defp capability_nudge_note(%{capability_nudge: true}) do
+    "## Mentioning what else you can do\n" <>
+      "After you help with something and it goes well, if a related capability would " <>
+      "genuinely help this person next time - Watches for tracking a change, Scheduled " <>
+      "tasks for something recurring, Goals for working toward an outcome until it's " <>
+      "actually done, an installed skill that fits what they just asked - add one short, " <>
+      "natural sentence offering it. Not every turn, not a menu: only when it clearly fits " <>
+      "what just happened. Skip it for a quick or purely transactional exchange."
+  end
+
+  defp capability_nudge_note(_agent), do: nil
 
   defp labeled(nil, _file), do: nil
   defp labeled(content, file), do: "## #{file}\n#{content}"
