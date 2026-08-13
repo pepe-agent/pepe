@@ -872,21 +872,13 @@ defmodule Pepe.Gateways.Telegram do
     respond(chat_id, user_id, message_id, stripped, tag, name)
   end
 
-  # A DM has exactly one person on the other end, so tagging it would be pure noise; a group
-  # or a forum topic can have several, and until now the bot just kept addressing whoever it
-  # saw first in the session - tag the text with who actually sent it so the model doesn't
-  # have to guess.
+  # A DM has exactly one person on the other end, so naming the sender would be pure noise;
+  # a group or a forum topic can have several, and the bot used to just keep addressing
+  # whoever it saw first in the session. Carried separately from the message text (as the
+  # `sender_tag` opt) so Pepe.Agent.Session can surface it as an ephemeral per-turn note
+  # instead of baking it into the stored message - see its sender_note/1.
   defp sender_tag(_message, "private"), do: nil
   defp sender_tag(message, _chat_type), do: sender_display_name(message["from"] || %{})
-
-  # A deliberately machine-looking prefix ("pepe_sender_name: ", not a plain "Name:") - a
-  # real person is never going to type this verbatim, which is what lets
-  # Pepe.Agent.Session strip it back out of *older* turns later (see
-  # ensure_system/2's strip_historical_sender_tags/1) without any risk of mangling a
-  # message that just happens to start with someone's name and a colon. Only the
-  # newest turn in a request ever keeps this label; see that module for why.
-  defp tag_text(nil, text), do: text
-  defp tag_text(name, text), do: "pepe_sender_name: #{name}\n#{text}"
 
   # Record a blocked user for approval, but only when the bot runs `require_approval` and the chat
   # itself is allowed - there is nothing to approve on a bot that answers everyone, and no point
@@ -1530,7 +1522,6 @@ defmodule Pepe.Gateways.Telegram do
 
   defp chat_with_agent(chat_id, msg_id, text, opts \\ []) do
     agent = bind_and_resolve_agent(chat_id)
-    text = tag_text(opts[:sender_tag], text)
 
     typing = keep_typing(chat_id)
     if progress_mode() == "reaction", do: set_reaction(chat_id, msg_id, @work_reaction)
@@ -1551,6 +1542,10 @@ defmodule Pepe.Gateways.Telegram do
              # call site that has no `message` to read a sender off of (approvals, media,
              # skill triggers), which just leaves user.id on the session key, same as before.
              sender: opts[:sender],
+             # Who sent this message when the chat is a group/topic (nil in a DM - see
+             # sender_tag/2). Never embedded in the message text: the session injects
+             # it as an ephemeral per-turn note so stored history stays label-free.
+             sender_tag: opts[:sender_tag],
              on_event: activity_callback(chat_id)
            ) do
         {:ok, reply} ->

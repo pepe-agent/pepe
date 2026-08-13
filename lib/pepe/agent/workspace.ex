@@ -134,7 +134,6 @@ defmodule Pepe.Agent.Workspace do
       identity,
       boot,
       behavior_contract(),
-      now_note(),
       knowledge_index(name),
       docs_index(),
       skills_index(),
@@ -145,20 +144,33 @@ defmodule Pepe.Agent.Workspace do
     |> Enum.join("\n\n")
   end
 
-  # Ground the agent in the operator's local time so "today"/"tomorrow" and any
-  # scheduling are computed in the configured timezone, never assumed to be UTC.
-  defp now_note do
+  @doc """
+  The current time in the operator's configured timezone, as an ephemeral
+  `<system-reminder>` user-turn message (a one-element list; empty when the timezone
+  can't be resolved). Appended fresh on every turn, *after* the stable
+  history - deliberately not part of `system_prompt/1`, which is built once per
+  session and replayed byte-identical afterwards (that stability is what lets a
+  provider's prompt cache keep matching): baking the time in there froze "now" at
+  whatever moment the session started, drifting further from reality every hour the
+  session lived. Grounds "today"/"tomorrow" and any scheduling in the configured
+  timezone, never assumed to be UTC.
+  """
+  def time_reminder do
     tz = Pepe.Config.default_timezone()
 
     case DateTime.now(tz) do
       {:ok, dt} ->
-        "## Current time\n" <>
-          Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S") <>
-          " (#{tz}). Treat this as \"now\" for anything time-relative - today, " <>
-          "tomorrow, scheduling. Do not assume UTC."
+        [
+          Pepe.LLM.Message.user(
+            "<system-reminder>\nCurrent time: " <>
+              Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S") <>
+              " (#{tz}). Treat this as \"now\" for anything time-relative - today, " <>
+              "tomorrow, scheduling. Do not assume UTC.\n</system-reminder>"
+          )
+        ]
 
       _ ->
-        nil
+        []
     end
   end
 
@@ -303,16 +315,17 @@ defmodule Pepe.Agent.Workspace do
 
     **A shared channel can hold more than one person.** A group chat or a channel is not a
     one-on-one thread - do not assume whoever wrote the last message is the same person who wrote
-    an earlier one just because it's the same conversation. The message you are answering right
-    now may start with a line like `pepe_sender_name: Maria` - that line is not something Maria
-    typed, it is inserted to tell you who actually sent that specific message, and it is who you
-    are answering right now, not whoever the thread was about earlier (only the newest message in
-    the conversation ever carries this label; older ones never do, on purpose - answer the newest
-    one's sender, not a name repeated earlier in the history). If nothing marks a message that
-    way, it is a private, one-on-one conversation - there is no one else it could be. Either way,
-    do not turn a name into a reflex: use it when it actually helps (greeting someone new, telling
-    two people apart), not as a tic in every reply, and never echo the raw `pepe_sender_name:`
-    line itself back into your answer.
+    an earlier one just because it's the same conversation. In such a channel, the message you
+    are answering right now is accompanied by a `<system-reminder>` note like
+    `Current sender: Maria` - that note is not something Maria typed, it is inserted to tell you
+    who actually sent the message you are answering, and it is who you are answering right now,
+    not whoever the thread was about earlier (only the current message ever gets this note; the
+    stored history never carries one, on purpose - answer the note's sender, not a name repeated
+    earlier in the history). If no such note accompanies a message, it is a private, one-on-one
+    conversation - there is no one else it could be. Either way, do not turn a name into a
+    reflex: use it when it actually helps (greeting someone new, telling two people apart), not
+    as a tic in every reply, and never echo the `Current sender:` note itself back into your
+    answer.
 
     **Advance with tools; do not ask for what you can find.** "Analyse this", "why is this
     happening", "what can we do", "fix it" are instructions to *act*, not to ask what to look at -

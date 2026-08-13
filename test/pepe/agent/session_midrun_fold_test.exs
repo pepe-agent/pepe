@@ -162,6 +162,42 @@ defmodule Pepe.Agent.SessionMidRunFoldTest do
     assert Enum.map(history, & &1["content"]) |> Enum.take(-2) == ["wait, make it 3pm", "final answer"]
   end
 
+  test "FOLD from a different sender: the folded message carries its own permanent Current sender label" do
+    classify = put_classify_model("FOLD")
+    put_agent(triage_model: classify)
+    key = new_key()
+    {:ok, _pid} = SessionSupervisor.ensure(key, "main")
+
+    # Two DIFFERENT people in the same group chat: Salvador starts the turn, Jhonathas
+    # corrects it mid-flight. The turn's ephemeral note only ever names Salvador, so
+    # the folded message must carry Jhonathas's name itself or it reads as Salvador's.
+    run1 = Task.async(fn -> Session.chat(key, "book 2pm", sender_tag: "Salvador") end)
+    assert_receive {:hit, :main}, 2_000
+
+    run2 = Task.async(fn -> Session.chat(key, "wait, make it 3pm", sender_tag: "Jhonathas") end)
+    assert_receive {:hit, :classify}, 2_000
+
+    assert {:ok, "final answer"} = Task.await(run1, 5_000)
+    assert {:ok, "final answer"} = Task.await(run2, 5_000)
+
+    assert tool_message_count(key) == 1
+    folded = "<system-reminder>\nCurrent sender: Jhonathas\n</system-reminder>\nwait, make it 3pm"
+    history = Session.history(key)
+    assert Enum.map(history, & &1["content"]) |> Enum.take(-2) == [folded, "final answer"]
+
+    # The FIRST sender's message stays stored plain: their name only ever rode the
+    # turn's ephemeral note (never persisted), so nothing in history says "Salvador".
+    assert Enum.any?(history, &(&1["content"] == "book 2pm"))
+    refute Enum.any?(history, &(is_binary(&1["content"]) and String.contains?(&1["content"], "Salvador")))
+
+    # A later turn must leave the embedded label byte-identical - it is written once at
+    # creation and never stripped or rewritten (the old strip-historical-tags mechanism
+    # that mutated stored messages is gone).
+    assert {:ok, "final answer"} = Session.chat(key, "next thing", sender_tag: "Salvador")
+    history_after = Session.history(key)
+    assert Enum.count(history_after, &(&1["content"] == folded)) == 1
+  end
+
   test "QUEUE: an unrelated second message runs as its own turn after, same as with no classifier" do
     classify = put_classify_model("QUEUE, unrelated topic")
     put_agent(triage_model: classify)

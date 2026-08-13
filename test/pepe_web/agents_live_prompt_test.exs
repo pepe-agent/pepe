@@ -42,7 +42,7 @@ defmodule PepeWeb.AgentsLivePromptTest do
     assert html =~ "You are a terse assistant."
     # Framework scaffolding this test never wrote itself - proof it is the assembled
     # prompt, not the raw persona field rendered twice.
-    assert html =~ "Current time"
+    assert html =~ "How you operate"
   end
 
   test "a brand-new, not-yet-saved agent has no assembled prompt to show yet" do

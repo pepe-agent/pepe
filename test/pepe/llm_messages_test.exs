@@ -121,7 +121,26 @@ defmodule Pepe.LLM.MessagesTest do
     assert Enum.map(user_results["content"], & &1["type"]) == ["tool_result", "tool_result"]
     assert Enum.map(user_results["content"], & &1["tool_use_id"]) == ["t1", "t2"]
 
+    # cache breakpoints: the LAST system block and the LAST block of the LAST message
+    # carry cache_control (and nothing else does), so the growing prefix is reused.
+    assert [%{"text" => _client_no_cc} = first_sys, %{"cache_control" => %{"type" => "ephemeral"}}] = body["system"]
+    refute Map.has_key?(first_sys, "cache_control")
+
+    last_msg = List.last(body["messages"])
+    assert [first_block, %{"cache_control" => %{"type" => "ephemeral"}}] = last_msg["content"]
+    refute Map.has_key?(first_block, "cache_control")
+
     assert body["max_tokens"] == 4096
+  end
+
+  test "a plain-string last message becomes a text block carrying the cache breakpoint", %{port: port} do
+    {:ok, _} = Messages.chat(oauth_model(port), [%{"role" => "user", "content" => "hi"}], [])
+
+    assert_received {:req, raw, _headers}
+    body = Jason.decode!(raw)
+
+    assert [%{"role" => "user", "content" => [block]}] = body["messages"]
+    assert block == %{"type" => "text", "text" => "hi", "cache_control" => %{"type" => "ephemeral"}}
   end
 
   test "opts[:max_tokens] reaches the request, so the output-cap retry can lower it", %{port: port} do
@@ -141,8 +160,8 @@ defmodule Pepe.LLM.MessagesTest do
 
     assert headers["x-api-key"] == "sk-ant-123"
     refute Map.has_key?(headers, "authorization")
-    # plain string system, no Claude Code spoof
-    assert body["system"] == "S"
+    # no Claude Code spoof; the string system becomes one block to carry the cache breakpoint
+    assert body["system"] == [%{"type" => "text", "text" => "S", "cache_control" => %{"type" => "ephemeral"}}]
   end
 
   defmodule ErrorPlug do
