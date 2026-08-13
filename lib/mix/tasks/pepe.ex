@@ -3259,14 +3259,23 @@ defmodule Mix.Tasks.Pepe do
       triage_model: opts[:triage_model],
       simple_model: opts[:simple_model],
       utility_model: opts[:utility_model],
-      langfuse_prompt: opts[:langfuse_prompt],
-      exempt_message_limit: opts[:exempt_message_limit] || false,
-      trust_untrusted_content: opts[:trust_untrusted_content] || false,
-      midrun_fold: opts[:midrun_fold] || false,
-      commitments: opts[:commitments] || false,
-      session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
-      micro_compaction: opts[:micro_compaction] || false,
-      capability_nudge: opts[:capability_nudge] || false
+      langfuse_prompt: opts[:langfuse_prompt]
+    }
+    |> put_new_agent_flags(opts)
+  end
+
+  # Split from new_agent_from_opts/2 to keep its cyclomatic complexity down - each `||`
+  # default below counts as a branch, same reasoning as Pepe.Config.Agent.put_flags/2.
+  defp put_new_agent_flags(agent, opts) do
+    %{
+      agent
+      | exempt_message_limit: opts[:exempt_message_limit] || false,
+        trust_untrusted_content: opts[:trust_untrusted_content] || false,
+        midrun_fold: opts[:midrun_fold] || false,
+        commitments: opts[:commitments] || false,
+        session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
+        micro_compaction: opts[:micro_compaction] || false,
+        capability_nudge: opts[:capability_nudge] || false
     }
   end
 
