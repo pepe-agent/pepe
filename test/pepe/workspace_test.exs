@@ -179,6 +179,27 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert prompt =~ "never answer it"
   end
 
+  describe "capability_nudge" do
+    test "off by default: no mention of it in the prompt, same as before this flag existed" do
+      agent = %{name: "zak", system_prompt: "seed"}
+      refute Workspace.system_prompt(agent) =~ "Mentioning what else you can do"
+    end
+
+    test "explicitly off behaves the same as absent" do
+      agent = %{name: "zak", system_prompt: "seed", capability_nudge: false}
+      refute Workspace.system_prompt(agent) =~ "Mentioning what else you can do"
+    end
+
+    test "on: teaches the agent it may nudge toward a related capability" do
+      agent = %{name: "zak", system_prompt: "seed", capability_nudge: true}
+      prompt = Workspace.system_prompt(agent)
+
+      assert prompt =~ "Mentioning what else you can do"
+      assert prompt =~ "Watches"
+      assert prompt =~ "Not every turn, not a menu"
+    end
+  end
+
   test "IDENTITY.md is small enough to stay always-loaded" do
     agent = %{name: "zak", system_prompt: "seed"}
     File.mkdir_p!(Workspace.dir("zak"))

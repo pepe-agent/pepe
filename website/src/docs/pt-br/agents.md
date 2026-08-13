@@ -169,6 +169,16 @@ pepe agent add support --micro-compaction ...
 
 Ou ligue num agente existente pelo editor de agentes do painel, ou pedindo a um agente com a tool `manage_agent` para ligar o interruptor `micro_compaction` em outro agente.
 
+## Mencionar o que mais ele sabe fazer
+
+Quem já usa um agente para uma coisa muitas vezes nunca descobre que ele também consegue vigiar algo por mudanças, rodar uma tarefa recorrente, ou trabalhar por um objetivo até ele realmente ser concluído - nada mostra isso além do que a própria persona do agente eventualmente mencionar. O `capability_nudge`, desligado por padrão, deixa o agente acrescentar uma frase curta e natural apontando uma funcionalidade relacionada logo depois de ajudar com algo, quando ela realmente se aplica - não é um menu, nem em todo turno. Descoberta pelo uso, não uma avalanche de onboarding.
+
+```bash
+pepe agent add support --capability-nudge ...
+```
+
+Deixe desligado num agente que deve continuar direto e transacional; ligue pelo editor de agentes do painel, ou pedindo a um agente com a tool `manage_agent` para ligar o interruptor `capability_nudge` em outro agente.
+
 ## Ferramentas e a barreira de permissão
 
 Uma ferramenta é uma capacidade. Um agente só pode fazer o que a sua lista `tools`

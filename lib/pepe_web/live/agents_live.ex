@@ -465,6 +465,14 @@ defmodule PepeWeb.AgentsLive do
                 </label>
                 <p class={[hlp(), check_indent()]}>{gettext("Once the context window fills, each turn folds only the oldest exchange into a running summary instead of resummarizing everything from scratch: a smaller, steadier cost instead of one big stall. Trade-off: while active, the summary changes every turn, which costs some of the model provider's prompt caching.")}</p>
               </div>
+
+              <div>
+                <label class="flex items-start gap-2.5 text-sm">
+                  <input type="checkbox" name="capability_nudge" value="true" checked={@edit_agent[:capability_nudge]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
+                  <span>{gettext("Mention other capabilities after a successful task")}</span>
+                </label>
+                <p class={[hlp(), check_indent()]}>{gettext("After helping with something, the agent may add one short, natural sentence pointing at a related capability (Watches, Scheduled tasks, Goals, an installed skill) when one genuinely fits. Not every turn, not a menu. Off is right for an agent meant to stay terse and transactional.")}</p>
+              </div>
             </.form_section>
 
             <.form_section :if={!@edit_agent.new?} collapsible title={gettext("Assembled prompt")}>
@@ -595,7 +603,8 @@ defmodule PepeWeb.AgentsLive do
       midrun_fold: false,
       commitments: false,
       session_search_scope: "self",
-      micro_compaction: false
+      micro_compaction: false,
+      capability_nudge: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -786,7 +795,8 @@ defmodule PepeWeb.AgentsLive do
         midrun_fold: params["midrun_fold"] == "true",
         commitments: params["commitments"] == "true",
         session_search_scope: session_search_scope_param(params),
-        micro_compaction: params["micro_compaction"] == "true"
+        micro_compaction: params["micro_compaction"] == "true",
+        capability_nudge: params["capability_nudge"] == "true"
     }
   end
 
@@ -825,7 +835,8 @@ defmodule PepeWeb.AgentsLive do
         midrun_fold: params["midrun_fold"] == "true",
         commitments: params["commitments"] == "true",
         session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
-        micro_compaction: params["micro_compaction"] == "true"
+        micro_compaction: params["micro_compaction"] == "true",
+        capability_nudge: params["capability_nudge"] == "true"
     }
   end
 

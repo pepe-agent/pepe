@@ -92,6 +92,11 @@ defmodule Pepe.Tools.ManageAgent do
             agent's compaction", "stop it from stalling on long conversations" - warn the
             operator this costs a bit of the model provider's prompt caching, since the
             summary changes every turn once active.
+          - capability_nudge: whether the target may mention a related capability (Watches,
+            Scheduled tasks, Goals, an installed skill) in one short sentence right after it
+            successfully helps with something, when one genuinely fits. Turn it ON for "let
+            it tell people what else it can do", "help people discover its other features".
+            Off is right for an agent meant to stay terse and transactional.
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -113,7 +118,8 @@ defmodule Pepe.Tools.ManageAgent do
           "flag" => %{
             "type" => "string",
             "description" => "For set_flag: which switch.",
-            "enum" => ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments session_search_project_wide micro_compaction)
+            "enum" =>
+              ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments session_search_project_wide micro_compaction capability_nudge)
           }
         },
         "required" => ["action"]
@@ -248,7 +254,8 @@ defmodule Pepe.Tools.ManageAgent do
     "midrun_fold" => :midrun_fold,
     "commitments" => :commitments,
     "session_search_project_wide" => :session_search_scope,
-    "micro_compaction" => :micro_compaction
+    "micro_compaction" => :micro_compaction,
+    "capability_nudge" => :capability_nudge
   }
 
   defp set_flag(target, flag_name, value, ctx) do
@@ -355,7 +362,7 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
-    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}, session_search_project_wide=#{on_off(a.session_search_scope == "project")}, micro_compaction=#{on_off(a.micro_compaction)}
+    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}, session_search_project_wide=#{on_off(a.session_search_scope == "project")}, micro_compaction=#{on_off(a.micro_compaction)}, capability_nudge=#{on_off(a.capability_nudge)}
     persona: #{persona_preview(a.name)}
     """
   end
