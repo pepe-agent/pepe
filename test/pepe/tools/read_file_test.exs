@@ -58,6 +58,19 @@ defmodule Pepe.Tools.ReadFileTest do
     assert out =~ "showing lines 1-1 of 1"
   end
 
+  test "clipping a huge multi-byte line never cuts mid-codepoint and stays under the cap" do
+    # A leading ASCII byte plus a 4-byte emoji repeated: the naive byte-count cut
+    # point almost never lands on a codepoint boundary, so this fails loudly on a
+    # plain binary_part/3 clip.
+    path = tmp_file("a" <> String.duplicate("🎉", 20_000))
+
+    {:ok, out} = ReadFile.run(%{"path" => path}, @ctx)
+
+    assert String.valid?(out)
+    assert byte_size(out) <= 30_000
+    assert out =~ "(line clipped)"
+  end
+
   test "a large context window gets a proportionally bigger page" do
     # ~60KB file: past the 30KB no-model fallback, but 10% of a 200K-token window at
     # ~4 bytes/token is an 80KB page, so the whole file comes back verbatim in one call.
