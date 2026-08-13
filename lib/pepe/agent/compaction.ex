@@ -31,8 +31,15 @@ defmodule Pepe.Agent.Compaction do
   alias Pepe.LLM.Message
 
   @default_window 128_000
-  # Compact once the estimate passes this fraction of the window...
-  @compact_at 0.75
+  # Compact once the estimate passes this fraction of the window. 0.60 (not higher): at the
+  # old 0.75 a default 128K window only compacted past ~96K tokens, so the common
+  # several-tool-round-trip turn re-sent its whole sub-96K history from scratch every
+  # iteration and every following turn. 0.60 fires at ~77K - meaningfully earlier - while
+  # still leaving 40% of the window as headroom. Not lower: each compaction costs a
+  # summarization call, can lose detail, and rewrites the prompt prefix (busting provider
+  # prompt caches, which the Anthropic adapter now relies on), so firing eagerly would
+  # spend more than it saves.
+  @compact_at 0.60
   # ...keeping roughly this fraction of the window as recent, verbatim tail.
   @keep_tail 0.30
   # Don't bother summarizing fewer than this many middle messages.

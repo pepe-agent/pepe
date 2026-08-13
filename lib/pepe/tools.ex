@@ -312,7 +312,8 @@ defmodule Pepe.Tools do
   # Keep huge tool output out of the context window: past the threshold, save the
   # full text to a file in the agent's workspace and hand the model a preview + the
   # path (it can `read_file` slices on demand). Protects the window from a single
-  # noisy command; `read_file` itself is exempt (reading a file back would loop).
+  # noisy command; `read_file` itself is exempt (reading a file back would loop) -
+  # it caps its own output instead, paged with its `offset`/`limit` arguments.
   # Runs on the already-redacted text, so a spilled file never carries raw PII either.
   @spill_threshold 16_000
   @spill_preview 2_000

@@ -52,7 +52,9 @@ defmodule Pepe.Tools.DelegateTest do
         |> Enum.sort()
         |> Enum.join(",")
 
-      task = req["messages"] |> Enum.find(&(&1["role"] == "user")) |> Map.get("content")
+      # The last user message is the worker's task - an ephemeral <system-reminder>
+      # note (the current time) may precede it in the same request.
+      task = req["messages"] |> Enum.filter(&(&1["role"] == "user")) |> List.last() |> Map.get("content")
 
       payload = %{
         "choices" => [

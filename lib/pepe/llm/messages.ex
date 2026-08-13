@@ -27,6 +27,16 @@ defmodule Pepe.LLM.Messages do
   @client_id "You are Claude Code, Anthropic's official CLI for Claude."
   @default_max_tokens 4096
 
+  # Anthropic caches nothing without explicit breakpoints (unlike OpenAI's automatic
+  # caching), so every tool-loop iteration would re-send the whole history at full
+  # price. Two of the four allowed breakpoints are spent here: one on the system
+  # prompt's last block (a breakpoint caches the whole prefix up through its block,
+  # so this one covers the tools that precede system in Anthropic's prefix order
+  # too - tools need no marker of their own), and one on the last content block of
+  # the last message, so turn over turn the previous request's prefix is reused and
+  # only the new tail is fresh.
+  @cache_control %{"type" => "ephemeral"}
+
   @impl true
   def api, do: "anthropic-messages"
 
@@ -42,7 +52,7 @@ defmodule Pepe.LLM.Messages do
       when is_function(on_delta, 1) do
     model = Pepe.OAuth.ensure_fresh(model)
     body = build_body(model, messages, opts)
-    init = %{buffer: "", content: "", blocks: %{}, order: [], finish: nil, in: 0, out: 0, cached: 0, raw: ""}
+    init = %{buffer: "", content: "", blocks: %{}, order: [], finish: nil, in: 0, out: 0, cached: 0, written: 0, raw: ""}
     on_frame = &handle_frame(&1, &2, on_delta)
 
     req =
@@ -119,12 +129,12 @@ defmodule Pepe.LLM.Messages do
       # `opts[:max_tokens]` first so the runtime's output-cap retry (which lowers the reservation
       # after a provider rejects an over-large one) actually reaches the request.
       "max_tokens" => opts[:max_tokens] || model.max_tokens || @default_max_tokens,
-      "messages" => to_messages(messages, opts[:images]),
+      "messages" => messages |> to_messages(opts[:images]) |> cache_last_message(),
       "stream" => true
     }
 
     base
-    |> put_some("system", system(model, messages))
+    |> put_some("system", cache_system(system(model, messages)))
     |> put_some("tools", if(tools == [], do: nil, else: tools))
     |> put_some("temperature", opts[:temperature] || model.temperature)
   end
@@ -155,6 +165,29 @@ defmodule Pepe.LLM.Messages do
         sys
     end
   end
+
+  # Cache breakpoint 1: the system prompt's last block. The plain-string shape a
+  # non-OAuth system arrives in has to become the block-array shape to carry the
+  # marker (Anthropic accepts both).
+  defp cache_system(nil), do: nil
+  defp cache_system(sys) when is_binary(sys), do: [%{"type" => "text", "text" => sys, "cache_control" => @cache_control}]
+  defp cache_system(blocks) when is_list(blocks), do: mark_last_block(blocks)
+
+  # Cache breakpoint 2: the last content block of the last message. A plain-string
+  # content becomes a one-block array to carry the marker; an empty string (nothing
+  # cacheable, and an empty text block would be rejected) is left alone.
+  defp cache_last_message([]), do: []
+  defp cache_last_message(messages), do: List.update_at(messages, -1, &mark_message/1)
+
+  defp mark_message(%{"content" => blocks} = m) when is_list(blocks) and blocks != [],
+    do: %{m | "content" => mark_last_block(blocks)}
+
+  defp mark_message(%{"content" => text} = m) when is_binary(text) and text != "",
+    do: %{m | "content" => [%{"type" => "text", "text" => text, "cache_control" => @cache_control}]}
+
+  defp mark_message(m), do: m
+
+  defp mark_last_block(blocks), do: List.update_at(blocks, -1, &Map.put(&1, "cache_control", @cache_control))
 
   # Chat messages -> Anthropic messages. Consecutive `tool` results merge into one user
   # turn (Anthropic requires tool results as user-role `tool_result` blocks).
@@ -276,7 +309,12 @@ defmodule Pepe.LLM.Messages do
   defp handle_frame(event, state, on_delta), do: handle_event(event["type"], event, state, on_delta)
 
   defp handle_event("message_start", %{"message" => msg}, state, _on_delta) do
-    %{state | in: input_tokens(msg["usage"]) || state.in, cached: cache_read(msg["usage"]) || state.cached}
+    %{
+      state
+      | in: input_tokens(msg["usage"]) || state.in,
+        cached: cache_read(msg["usage"]) || state.cached,
+        written: cache_write(msg["usage"]) || state.written
+    }
   end
 
   # A tool_use block opens: register it so its streamed JSON arguments accumulate.
@@ -333,6 +371,11 @@ defmodule Pepe.LLM.Messages do
   defp cache_read(%{"cache_read_input_tokens" => n}) when is_integer(n), do: n
   defp cache_read(_), do: nil
 
+  # Cache WRITES are also excluded from `input_tokens`; they are real input the request
+  # paid for (at the slightly higher cache-write rate), so they belong in the prompt total.
+  defp cache_write(%{"cache_creation_input_tokens" => n}) when is_integer(n), do: n
+  defp cache_write(_), do: nil
+
   defp output_tokens(%{"output_tokens" => n}) when is_integer(n), do: n
   defp output_tokens(_), do: nil
 
@@ -382,11 +425,11 @@ defmodule Pepe.LLM.Messages do
     }
   end
 
-  # `prompt_tokens` is TOTAL input (fresh + cache-read), so `cached_tokens` is a subset of it, as
-  # billing expects. `cached_tokens` is only added when non-zero, keeping the map identical for a
-  # call that hit no cache.
+  # `prompt_tokens` is TOTAL input (fresh + cache-read + cache-write), so `cached_tokens` is a
+  # subset of it, as billing expects. `cached_tokens` is only added when non-zero, keeping the
+  # map identical for a call that hit no cache.
   defp usage_map(state) do
-    prompt = state.in + state.cached
+    prompt = state.in + state.cached + state.written
 
     base = %{
       "prompt_tokens" => prompt,

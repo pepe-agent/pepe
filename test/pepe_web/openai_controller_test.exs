@@ -127,7 +127,7 @@ defmodule PepeWeb.OpenAIControllerTest do
     # ... but so is the framework scaffolding every other surface (Telegram, the console, a
     # WebSocket session) already gets around it - the same
     # Pepe.Agent.Workspace.system_prompt/1 they all go through, not the bare field alone.
-    assert system["content"] =~ "## Current time"
+    assert system["content"] =~ "## How you operate"
   end
 
   test "the standard OpenAI `user` field keys the session when no session_id is sent" do

@@ -81,6 +81,13 @@ defmodule Pepe.Agent.CompactionTest do
     assert Compaction.needs?(huge, model(8000))
   end
 
+  test "the threshold sits at 60% of the window, so multi-tool turns compact before ~75%" do
+    # 8000-token window -> fires past 4800 tokens. ~4000 tokens stays put; ~5000 compacts
+    # (would NOT have at the old 0.75 threshold, whose line was 6000).
+    refute Compaction.needs?([Message.user(String.duplicate("x", 16_000))], model(8000))
+    assert Compaction.needs?([Message.user(String.duplicate("x", 20_000))], model(8000))
+  end
+
   describe "split/2" do
     test "head is the leading system messages; tail keeps the most recent" do
       msgs = [

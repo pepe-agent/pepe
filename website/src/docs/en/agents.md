@@ -154,7 +154,7 @@ typing and tool activity as it happens rather than one blob at the end.</div>
 ## Long conversations: compaction
 
 A conversation doesn't grow forever inside the model's context window (the amount of
-conversation a model can see at once). Once the estimated size crosses about 75% of it,
+conversation a model can see at once). Once the estimated size crosses about 60% of it,
 Pepe replaces the **middle** of the history with a short summary the model writes of
 itself, keeping the system prompt and the most recent turns word for word. This is
 automatic and needs no configuration: the full transcript is still kept (see Traces),
