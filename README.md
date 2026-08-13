@@ -19,7 +19,7 @@
   &nbsp;·&nbsp;
   <a href="https://pepe-agent.com/en/docs/quickstart/">Quickstart</a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/sponsors/jhonathas">Sponsor</a>
+  <a href="https://github.com/sponsors/jhonathas"><img src="https://img.shields.io/badge/%E2%99%A5_Sponsor-ea4aaa?style=flat" alt="Sponsor"></a>
 </p>
 
 > **Where Pepe comes from.** Pepe was born out of solving real problems across
@@ -59,6 +59,10 @@ Everything talks to providers over the **OpenAI Chat Completions** protocol, so
 OpenAI, OpenRouter, Together, Groq, DeepSeek,
 Mistral, z.ai/GLM, Kimi/Moonshot, MiniMax, NovitaAI, Ollama, LM Studio, vLLM,
 llama.cpp and any other compatible endpoint work with zero code changes.
+
+<p align="center">
+  <img src="website/public/screenshots/dash-goal-en.png" alt="Pepe dashboard showing a goal-driven chat: the objective, success criterion, attempt count, and the reviewer's verdict" width="820">
+</p>
 
 ---
 
@@ -197,6 +201,12 @@ what they did while there were two copies.
 
 [Architecture](docs/architecture.md) · [CLI reference](docs/cli-reference.md) · [Adding a tool](docs/adding-a-tool.md) · [Tests](docs/tests.md) · [Migrating from another runtime](docs/migrating.md) · [Contributing & help wanted](docs/contributing.md)
 
+**More screenshots**
+
+| | |
+|---|---|
+| ![Channels: Telegram, WhatsApp, Slack, Discord, Teams, widget](website/public/screenshots/dash-channels-en.png) | ![Model connections: any OpenAI-compatible provider](website/public/screenshots/dash-models-en.png) |
+| ![Plugins: install channels and tools that load at runtime, scanned first](website/public/screenshots/dash-plugins-en.png) | ![Agent config: model routing and tool capabilities](website/public/screenshots/dash-agent-edit-en.png) |
 
 ---
 
