@@ -430,7 +430,10 @@ defmodule Pepe.Agent.Session do
   def handle_call(:stop, _from, state), do: {:reply, {:error, :not_running}, state}
 
   def handle_call({:inline, text}, _from, %{running: %{task: pid}} = state) do
-    send(pid, {:steer, text})
+    # `/inline` is an operator/API correction, not a channel message - there is no
+    # sender concept, so the steer carries `nil` and lands unlabeled (see
+    # Runtime.drain_steer/2 for the labeled counterpart, a midrun_fold from a group).
+    send(pid, {:steer, text, nil})
     {:reply, :ok, state}
   end
 
@@ -504,6 +507,7 @@ defmodule Pepe.Agent.Session do
 
         messages =
           ensure_system(state.messages, agent) ++
+            Workspace.time_reminder() ++
             goal_reminder(state.key) ++ [Message.user(resume_prompt(redacted))]
 
         opts = [session_key: state.key]
@@ -548,7 +552,7 @@ defmodule Pepe.Agent.Session do
 
       agent ->
         prompt = Pepe.Heartbeat.build_prompt(state.key, agent.name)
-        messages = ensure_system(state.messages, agent) ++ [Message.user(prompt)]
+        messages = ensure_system(state.messages, agent) ++ Workspace.time_reminder() ++ [Message.user(prompt)]
         opts = [session_key: state.key]
 
         # The pulse prompt itself is internal (never user text, so no inbound
@@ -586,7 +590,7 @@ defmodule Pepe.Agent.Session do
         # hook entries stranded in the process dictionary. It stays ephemeral: `state` (its
         # `pii_map` included) is left untouched, so the aside changes nothing about the session.
         {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => state.pii_map})
-        messages = ensure_system(state.messages, agent) ++ [Message.user(redacted)]
+        messages = ensure_system(state.messages, agent) ++ Workspace.time_reminder() ++ [Message.user(redacted)]
         opts = Keyword.put(opts, :session_key, state.key)
 
         Pepe.Hooks.start_map(state.pii_map ++ entries)
@@ -832,8 +836,11 @@ defmodule Pepe.Agent.Session do
   # caller is waiting on it specifically (`/inline` already replied :ok when it was
   # sent; a folded caller already got the turn's - stale, pre-correction - reply), so
   # it queues with `from: nil`; every reply site already tolerates that (see `reply/2`).
-  def handle_info({:queue_leftover, text}, state) do
-    {:noreply, run_next(%{state | queue: state.queue ++ [{nil, text, []}]})}
+  # A folded steer's sender tag rides along so the re-queued turn's own ephemeral
+  # "Current sender" note still names the right person (nil for `/inline`, as always).
+  def handle_info({:queue_leftover, text, sender_tag}, state) do
+    opts = if sender_tag, do: [sender_tag: sender_tag], else: []
+    {:noreply, run_next(%{state | queue: state.queue ++ [{nil, text, opts}]})}
   end
 
   # The midrun classification finished. :fold sends the message into the running turn
@@ -846,7 +853,13 @@ defmodule Pepe.Agent.Session do
 
     case {verdict, state.running} do
       {:fold, %{task: pid} = running} ->
-        send(pid, {:steer, c.text})
+        # The folded message can come from a DIFFERENT person than the one who started
+        # the turn (two people in a midrun_fold group chat) - and the turn's one
+        # ephemeral "Current sender" note only names the original sender. The second
+        # message's own sender tag (set by the gateway exactly like a normal turn's)
+        # rides with the steer so Runtime.drain_steer/2 can label it; nil (a DM, or a
+        # source with no sender concept) keeps the message unlabeled, same as /inline.
+        send(pid, {:steer, c.text, c.opts[:sender_tag]})
         folded = [c.from | Map.get(running, :folded_froms, [])]
         {:noreply, %{state | running: %{running | folded_froms: folded}}}
 
@@ -1228,10 +1241,13 @@ defmodule Pepe.Agent.Session do
                 agent
               end
 
-            # A goal/plan reminder is prepended to *this call only*, right before the
-            # user's turn - never persisted, so it always reflects the live state
-            # instead of freezing a snapshot into history (see Focus.context_line/1).
-            reminder = goal_reminder(key)
+            # Ephemeral per-turn context - the current time, who sent this message
+            # (a multi-person group chat), and the goal/plan reminder - goes into
+            # *this call only*, right before the user's turn. Never persisted, so
+            # each value is always live instead of a snapshot frozen into history,
+            # and the replayed history stays byte-identical for provider prompt
+            # caching (see Focus.context_line/1 and Workspace.time_reminder/0).
+            reminder = Workspace.time_reminder() ++ sender_note(opts[:sender_tag]) ++ goal_reminder(key)
             call_messages = base_messages ++ reminder ++ [Message.user(redacted)]
 
             # Seed the tool_result redaction accumulator with what's already known
@@ -1276,7 +1292,7 @@ defmodule Pepe.Agent.Session do
         # and a folded caller already got this turn's reply above) rather than silently
         # losing it.
         receive do
-          {:steer, leftover} -> send(parent, {:queue_leftover, leftover})
+          {:steer, leftover, sender_tag} -> send(parent, {:queue_leftover, leftover, sender_tag})
         after
           0 -> :ok
         end
@@ -1303,34 +1319,21 @@ defmodule Pepe.Agent.Session do
   end
 
   # A session started before any agent existed has no system message yet - seed one.
-  defp ensure_system([%{"role" => "system"} = sys | rest], _agent),
-    do: [sys | strip_historical_sender_tags(rest)]
+  defp ensure_system([%{"role" => "system"} | _] = messages, _agent), do: messages
 
   defp ensure_system(messages, agent),
-    do: [Message.system(Workspace.system_prompt(agent)) | strip_historical_sender_tags(messages)]
+    do: [Message.system(Workspace.system_prompt(agent)) | messages]
 
-  # Pepe.Gateways.Telegram tags a group message with who sent it ("pepe_sender_name:
-  # <name>\n<text>", see its tag_text/2) so a multi-person channel doesn't leave the
-  # model guessing. Every call site here always appends the CURRENT turn's own message
-  # after this function returns (never before), so `messages` here is only ever the
-  # history from *earlier* turns - never the one being answered right now. A long
-  # history could otherwise carry the same name on many stored turns in a row, and the
-  # model would sometimes keep addressing that name even once a different person sends
-  # the newest message (a real, observed misfire). Stripping the label from everything
-  # except what's actually the newest turn removes that repeated-name pull entirely:
-  # only one message in the whole request ever carries a sender label, so there is
-  # nothing left to anchor on but the truth.
-  @sender_tag_prefix ~r/\Apepe_sender_name: .*\n/
-
-  defp strip_historical_sender_tags(messages) do
-    Enum.map(messages, fn
-      %{"role" => "user", "content" => content} = m when is_binary(content) ->
-        %{m | "content" => String.replace(content, @sender_tag_prefix, "")}
-
-      m ->
-        m
-    end)
-  end
+  # Who sent the message being answered right now (a multi-person Telegram group chat;
+  # nil for DMs and every non-group source). Ephemeral like goal_reminder/1, and for
+  # the same two reasons: only the current turn ever carries a sender label, so the
+  # model can't anchor on a name repeated across stored turns (a real, observed misfire
+  # back when the label lived inside the message text); and the stored history stays
+  # byte-identical across turns - the old design stripped an embedded label out of
+  # every past message on every turn, mutating history and breaking provider
+  # prefix-cache matching in every group chat.
+  defp sender_note(nil), do: []
+  defp sender_note(name), do: [Message.user("<system-reminder>\nCurrent sender: #{name}\n</system-reminder>")]
 
   # A `lang` opt (the widget's `data-lang`, threaded from the join payload) nudges the
   # agent to reply in the site's declared language from its very first turn, before

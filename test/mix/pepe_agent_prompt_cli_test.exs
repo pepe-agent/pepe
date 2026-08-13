@@ -36,7 +36,7 @@ defmodule Mix.Tasks.PepeAgentPromptCliTest do
     assert out =~ "You are a terse assistant."
     # Framework-injected scaffolding no test agent config ever wrote itself - proof this is the
     # assembled prompt, not just the raw seed field.
-    assert out =~ "## Current time"
+    assert out =~ "## How you operate"
   end
 
   test "an unknown agent is a clean error, not a crash" do

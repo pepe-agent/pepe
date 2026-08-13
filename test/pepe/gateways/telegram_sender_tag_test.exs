@@ -1,9 +1,14 @@
 defmodule Pepe.Gateways.TelegramSenderTagTest do
   @moduledoc """
   A group or topic can have several different people talking to the same bot in the same
-  session - the text handed to the model must say who sent it, or the agent has no way to
+  session - each request must say who sent the newest message, or the agent has no way to
   tell them apart (and ends up addressing everyone by whichever name it saw first). A
-  private chat has exactly one person on the other end, so it must NOT be tagged.
+  private chat has exactly one person on the other end, so it gets no sender note.
+
+  The name travels as an ephemeral `<system-reminder>` user turn ("Current sender: ..."),
+  never embedded in the stored message text: the stored history stays byte-identical
+  across turns (provider prefix caching keeps matching), and only the current turn ever
+  carries a name for the model to anchor on.
   """
   use ExUnit.Case, async: false
 
@@ -130,46 +135,61 @@ defmodule Pepe.Gateways.TelegramSenderTagTest do
     Elixir.Agent.update(:tg_sender_tag_updates, &(&1 ++ [update]))
   end
 
-  test "a group message is tagged with the sender's name", %{chat: chat} do
+  defp sender_notes(user_contents) do
+    Enum.filter(user_contents, &String.contains?(&1, "Current sender:"))
+  end
+
+  test "a group message rides with a Current sender note; the text itself stays untouched", %{chat: chat} do
     start_bot!()
     queue_text(chat, "preciso do guia", chat_type: "supergroup", from: %{"id" => 42, "first_name" => "Salvador"})
 
     assert_receive {:model_saw, content}, 5_000
-    assert content == "pepe_sender_name: Salvador\npreciso do guia"
+    assert content == "preciso do guia"
+
+    assert_receive {:model_saw_all_user_turns, user_contents}, 5_000
+    assert ["<system-reminder>\nCurrent sender: Salvador\n</system-reminder>"] = sender_notes(user_contents)
   end
 
-  test "a private chat message is never tagged", %{chat: chat} do
+  test "a private chat message never gets a sender note", %{chat: chat} do
     start_bot!()
     queue_text(chat, "preciso do guia", chat_type: "private", from: %{"id" => 42, "first_name" => "Salvador"})
 
     assert_receive {:model_saw, content}, 5_000
     assert content == "preciso do guia"
+
+    assert_receive {:model_saw_all_user_turns, user_contents}, 5_000
+    assert sender_notes(user_contents) == []
   end
 
   test "a group sender with no name falls back to their @username", %{chat: chat} do
     start_bot!()
     queue_text(chat, "oi", chat_type: "group", from: %{"id" => 7, "username" => "svd"})
 
-    assert_receive {:model_saw, content}, 5_000
-    assert content == "pepe_sender_name: svd\noi"
+    assert_receive {:model_saw_all_user_turns, user_contents}, 5_000
+    assert ["<system-reminder>\nCurrent sender: svd\n</system-reminder>"] = sender_notes(user_contents)
   end
 
-  test "only the newest message in a request carries a sender label; earlier ones are stripped",
+  test "only the current message carries a sender note, and stored history stays byte-identical",
        %{chat: chat} do
     start_bot!()
 
     queue_text(chat, "primeira mensagem", chat_type: "supergroup", from: %{"id" => 42, "first_name" => "Salvador"})
-    assert_receive {:model_saw, first}, 5_000
-    assert first == "pepe_sender_name: Salvador\nprimeira mensagem"
+    assert_receive {:model_saw_all_user_turns, first_request}, 5_000
+    assert ["<system-reminder>\nCurrent sender: Salvador\n</system-reminder>"] = sender_notes(first_request)
 
     queue_text(chat, "segunda mensagem", chat_type: "supergroup", from: %{"id" => 99, "first_name" => "Jhonathas"})
-    assert_receive {:model_saw_all_user_turns, [first_seen_again, second]}, 5_000
+    assert_receive {:model_saw_all_user_turns, second_request}, 5_000
 
-    # The current (second) turn is labeled; the first turn's label is gone from the
-    # history the model sees on this call, even though it's the exact same stored
-    # text that went out tagged on the previous call.
-    assert first_seen_again == "primeira mensagem"
-    assert second == "pepe_sender_name: Jhonathas\nsegunda mensagem"
+    # Only the newest turn is named - the first turn's note was never stored, so
+    # nothing from Salvador lingers for the model to anchor on...
+    assert ["<system-reminder>\nCurrent sender: Jhonathas\n</system-reminder>"] = sender_notes(second_request)
+
+    # ...and the first message replays byte-identical to how it was first sent (the
+    # property that keeps a provider's prefix cache matching): stored as plain text,
+    # neither tagged on turn one nor rewritten on turn two.
+    assert "primeira mensagem" in second_request
+    assert List.last(second_request) == "segunda mensagem"
+    refute Enum.any?(second_request, &String.contains?(&1, "Salvador"))
   end
 
   test "the sender's display name reaches the exported trace as user.id, tagged in text or not", %{chat: chat} do
