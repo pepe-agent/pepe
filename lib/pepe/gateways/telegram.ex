@@ -1692,7 +1692,9 @@ defmodule Pepe.Gateways.Telegram do
         # Distinct from an explicit deny tap (same shape `Pepe.Permissions` already supports for any
         # denial with a reason): nobody answering must not read to the agent as "the user refused" -
         # see the ask_user :timeout precedent right below, which already makes this distinction.
-        {:deny, "nobody answered in time (the permission request expired after 5 minutes)"}
+        # Built by Permissions itself so denied_message/2 recognizes the shape and gives the model
+        # timeout-specific advice instead of the generic "the user did not authorize" wording.
+        {:deny, Pepe.Permissions.timeout_reason(perm_timeout_ms())}
     end
   end
 

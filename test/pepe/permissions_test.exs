@@ -329,6 +329,36 @@ defmodule Pepe.PermissionsTest do
     assert with_reason =~ "reason: credentials aren't ready yet"
   end
 
+  test "a never-asked refusal reads differently from a human's explicit no", %{agent: agent} do
+    # Unattended, and explicitly opted out of parking: the reason says nobody was asked,
+    # and the model-facing wrapper must NOT claim the user refused - the fix (retry where
+    # a human can see a prompt / pre-approve on the agent) is different advice from "the
+    # user said no". :no_pending_approval makes the never-asked path deterministic
+    # regardless of whether Pepe.Repo happens to be running in this test process.
+    ctx = %{agent: agent, no_pending_approval: true}
+    assert {:deny, why} = Permissions.gate("bash", ~s({"command":"ls"}), ctx)
+    assert why =~ "nobody was asked"
+
+    never_asked = Permissions.denied_message("bash", why)
+    assert never_asked =~ "never shown to a human"
+    assert never_asked =~ "did NOT refuse"
+    refute never_asked =~ "did not authorize"
+
+    # The explicit human "no" keeps its own wording (the test above), untouched.
+    assert Permissions.denied_message("bash", "not on my machine") =~ "did not authorize running `bash`"
+  end
+
+  test "a prompt that times out unanswered is neither consent nor a refusal" do
+    reason = Permissions.timeout_reason(300_000)
+    assert reason =~ "nobody answered in time"
+    assert reason =~ "5 minutes"
+
+    message = Permissions.denied_message("bash", reason)
+    assert message =~ "Silence is not consent"
+    assert message =~ "not a refusal either"
+    refute message =~ "did not authorize"
+  end
+
   test "once allows this call only, remembers nothing", %{agent: agent} do
     ctx = %{agent: agent, session_key: "s2", authorize: fn _, _, _ -> :once end}
     assert Permissions.gate("bash", ~s({"command":"rm -rf x"}), ctx) == :allow

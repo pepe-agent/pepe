@@ -116,6 +116,29 @@ defmodule Pepe.Agent.Workspace do
   end
 
   @doc """
+  Working directory for a tool `ctx` - the bound agent's workspace (created if
+  missing), else the caller-provided `cwd`, else the OS process cwd.
+
+  This is the command-running counterpart of `resolve_in_ctx/2`: `bash` and
+  `run_script` both resolve their working directory here, so a shell command's
+  relative paths land in the same place `read_file`/`write_file` resolve them
+  to. Keying off `ctx[:cwd]` alone was a bug - no gateway passes `:cwd`, so a
+  CLI one-shot ran commands wherever `mix pepe run` happened to be invoked
+  from instead of the agent's workspace.
+  """
+  def cwd_in_ctx(ctx) do
+    case ctx[:agent] do
+      %{name: name} when is_binary(name) ->
+        dir = dir(name)
+        File.mkdir_p!(dir)
+        dir
+
+      _ ->
+        ctx[:cwd] || File.cwd!()
+    end
+  end
+
+  @doc """
   Build an agent's system prompt. Only the small, session-start-scoped files are
   *loaded* (`SOUL.md` persona, `IDENTITY.md`, `BOOT.md`); the rest of the
   knowledge files are merely *listed by name* and read on demand - so a growing

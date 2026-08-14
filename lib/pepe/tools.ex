@@ -41,6 +41,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ReadFile
   alias Pepe.Tools.RenameAgent
   alias Pepe.Tools.Review
+  alias Pepe.Tools.RunCode
   alias Pepe.Tools.RunScript
   alias Pepe.Tools.ScanSkill
   alias Pepe.Tools.ScheduleTask
@@ -61,6 +62,7 @@ defmodule Pepe.Tools do
     AskUser,
     Bash,
     RunScript,
+    RunCode,
     ReadFile,
     WriteFile,
     EditFile,
