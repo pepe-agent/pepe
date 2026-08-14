@@ -370,6 +370,35 @@ defmodule Pepe.Tools.RunCodeTest do
     refute File.exists?(target), "the gated tool must never have actually run"
   end
 
+  test "pepe_call refuses a tool outside the agent's own tool list, even one that is always-safe" do
+    # A direct model tool_call is scoped to agent.tools implicitly - the provider only
+    # ever offers the model function schemas for that list, so it structurally can't
+    # emit a call for a name outside it. pepe_call is free-form string dispatch from
+    # inside a script the model wrote, with no such schema constraint, so without an
+    # explicit check here a script could reach any globally-registered tool regardless of
+    # what the operator scoped this agent to. fetch_url is @always_safe specifically to
+    # prove the point: unlike a tool that merely lacks auto_approve (which the ordinary
+    # unattended-refusal path already catches on its own), the gate lets fetch_url through
+    # with no prompt and no risk hint at all - only the scope check below stops it.
+    agent = %Agent{name: "scoped", tools: ["run_code"], auto_approve: []}
+
+    script =
+      ~s[local out, err = pepe_call("fetch_url", {url = "http://127.0.0.1:1/"}) if err then return "refused: " .. err end return "leaked: " .. out]
+
+    assert {:ok, out} = RunCode.run(%{"script" => script}, %{agent: agent})
+    assert out =~ "refused:"
+    assert out =~ "not one of this agent's tools"
+    refute out =~ "leaked:"
+  end
+
+  test "pepe_call allows a tool that is genuinely in the agent's tool list" do
+    agent = %Agent{name: "scoped", tools: ["run_code", "bash"], auto_approve: ["bash:none"]}
+    script = ~s[local out, err = pepe_call("bash", {command = "echo hi"}) if err then return "refused: " .. err end return out]
+
+    assert {:ok, out} = RunCode.run(%{"script" => script}, %{agent: agent})
+    assert out =~ "exit_status=0"
+  end
+
   test "the gate is per-call, not a static allowlist: a grant's risk scope still applies", %{home: home} do
     # `bash:none` covers only risk-free bash calls. A static tool-name allowlist computed
     # once up front would let both calls below through; the real gate, called fresh with

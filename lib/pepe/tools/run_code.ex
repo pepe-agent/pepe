@@ -122,10 +122,6 @@ defmodule Pepe.Tools.RunCode do
     ["debug"]
   ]
 
-  # Under review mode the runtime stages these instead of running them - a staging step
-  # the bridge cannot reproduce mid-script, so they must go through the direct path.
-  @stageable ~w(write_file edit_file move_file)
-
   @impl true
   def name, do: "run_code"
 
@@ -391,20 +387,40 @@ defmodule Pepe.Tools.RunCode do
   defp bridge_call("run_code", _args, _ctx),
     do: {:error, "run_code cannot call itself from inside a script"}
 
-  defp bridge_call(name, _args, %{review: true}) when name in @stageable do
-    {:error, "under review mode, #{name} must be staged for approval - call it directly, outside the script"}
-  end
-
   defp bridge_call(name, args, ctx) do
-    # A name no tool anywhere answers to is a typo, not a permission question - catch it
-    # before the gate and suggest the closest real name(s), so the model can correct the
-    # spelling instead of concluding the tool is forbidden.
-    if Tools.get(name) == nil and not Pepe.MCP.mcp_tool?(name) do
-      {:error, unknown_tool_error(name, ctx)}
-    else
-      gated_call(name, args, ctx)
+    cond do
+      # Under review mode the runtime stages a mutating write instead of running it - a
+      # staging step the bridge cannot reproduce mid-script, so it must go through the
+      # direct path instead. `Runtime.stageable?/1` is the single source of truth for
+      # this list (not a second copy here) so it can't silently drift from it.
+      ctx[:review] == true and Pepe.Agent.Runtime.stageable?(name) ->
+        {:error, "under review mode, #{name} must be staged for approval - call it directly, outside the script"}
+
+      # A name no tool anywhere answers to is a typo, not a permission question - catch
+      # it before the gate and suggest the closest real name(s), so the model can
+      # correct the spelling instead of concluding the tool is forbidden.
+      Tools.get(name) == nil and not Pepe.MCP.mcp_tool?(name) ->
+        {:error, unknown_tool_error(name, ctx)}
+
+      # A direct tool call is scoped to `agent.tools` implicitly, by the provider only
+      # ever offering the model function schemas for that list (`Tools.specs(agent.tools)`
+      # in Runtime) - the gate itself never checks it. `pepe_call` is free-form string
+      # dispatch from inside a script the model wrote, with no such schema constraint, so
+      # without this check a script could reach any globally-registered tool regardless
+      # of what the operator scoped this agent to, and for an `@always_safe` tool like
+      # `fetch_url` that runs with no prompt and no risk hint to catch it.
+      not tool_in_scope?(name, ctx) ->
+        {:error, "pepe_call: '#{name}' is not one of this agent's tools"}
+
+      true ->
+        gated_call(name, args, ctx)
     end
   end
+
+  defp tool_in_scope?(name, %{agent: %Pepe.Config.Agent{tools: tools}}) when is_list(tools) and tools != [],
+    do: name in tools
+
+  defp tool_in_scope?(_name, _ctx), do: true
 
   defp gated_call(name, args, ctx) do
     # The REAL gate, with this call's real name and args, at the moment the script attempts
