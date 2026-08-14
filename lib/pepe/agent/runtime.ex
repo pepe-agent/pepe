@@ -664,8 +664,16 @@ defmodule Pepe.Agent.Runtime do
   # this run's own auto_approve, which is the whole thing tainting is supposed to withdraw.
   @outside_content ~w(fetch_url web_search delegate db_query)
 
-  defp taint_if_outside(name) when name in @outside_content, do: Pepe.Permissions.taint()
-  defp taint_if_outside(name), do: if(Pepe.MCP.mcp_tool?(name), do: Pepe.Permissions.taint(), else: :ok)
+  # Public (but internal - @doc false) because `Pepe.Tools.RunCode`'s sandbox bridge runs
+  # tools outside this loop and must apply the exact same taint rule after each one, and
+  # `Pepe.Permissions.PendingApprovals` must know whether an approved call's result is
+  # outside content when it hands it back into the session; a second copy of
+  # @outside_content in either place would silently drift from this one.
+  @doc false
+  def outside_content?(name), do: name in @outside_content or Pepe.MCP.mcp_tool?(name)
+
+  @doc false
+  def taint_if_outside(name), do: if(outside_content?(name), do: Pepe.Permissions.taint(), else: :ok)
 
   # Mutating file tools whose autonomous use we stage for review rather than apply.
   @stageable ~w(write_file edit_file move_file)

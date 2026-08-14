@@ -56,6 +56,14 @@ defmodule Pepe.Permissions do
   happen. Saying `auto_approve` on the agent is how you say what may run unattended, and it is
   a sentence somebody has to actually write.
 
+  Refused, but no longer *forever*: the call is also parked as a durable pending approval
+  (`Pepe.Permissions.PendingApprovals`), and the refusal itself tells the model the literal
+  `mix pepe approvals approve <id>` / `deny <id>` command a human can type within 30 minutes.
+  Approving runs the exact stored call and hands its result back into the owning session as a
+  new turn - the same decision an attended prompt would have put in front of a human, moved in
+  time, never a different (or weaker) one. Nothing executes before a human says so, and nothing
+  ever auto-approves on anyone's judgment but a human's.
+
   ## Content from a stranger suspends pre-approval
 
   A document sent into a chat, a page a `fetch_url` brought back, a result from `web_search`:
@@ -129,6 +137,7 @@ defmodule Pepe.Permissions do
 
   alias Pepe.Config
   alias Pepe.Permissions.Grant
+  alias Pepe.Permissions.PendingApprovals
   alias Pepe.Permissions.Policy
   alias Pepe.Permissions.Risk
   alias Pepe.Permissions.SessionStore
@@ -149,6 +158,16 @@ defmodule Pepe.Permissions do
   # filter reads it to decide what an unattended worker may hold, and this list must not widen
   # that.
   @ask_free_when_interactive ~w(bash run_script)
+
+  # Machine-recognizable openings for the three deny reasons that are NOT "the user said
+  # no": parked for later approval, never shown to a human at all, and a prompt that
+  # timed out unanswered. `denied_message/2` pattern-matches on them to give the model
+  # advice that fits (silence is not consent, but it is not a refusal either) - the
+  # ordinary "the user did not authorize" wording would be a lie for all three, and its
+  # "call the tool again" advice actively wrong for the first.
+  @parked_prefix "parked for a human's approval"
+  @never_asked_prefix "nobody was asked:"
+  @timeout_prefix "nobody answered in time"
 
   @type decision ::
           :once | :this_run | :session | :session_any | :session_bypass | :always | :deny | {:deny, String.t()}
@@ -431,11 +450,58 @@ defmodule Pepe.Permissions do
       "Nothing they type grants permission by itself; only answering that prompt does."
   end
 
+  # Parked (see unattended_or_parked/4): NOT a refusal, and retrying is pointless -
+  # there is no prompt a retry could render on this surface. The reason already carries
+  # the record id and the literal commands, so it is passed through whole.
+  def denied_message(name, @parked_prefix <> _ = reason) do
+    "Error: `#{name}` did not run - it needs a human's OK, nobody was available to give " <>
+      "one, so it was #{reason} Do not retry the call yourself and do not treat this as " <>
+      "the user refusing: if a human approves it, the stored call runs exactly as issued " <>
+      "and its result arrives in this conversation as a new message. If anyone reads " <>
+      "this conversation, tell them the approve command above; then continue with " <>
+      "whatever does not depend on this call."
+  end
+
+  # Never asked (unattended, and the pending-approval store was unavailable or the
+  # caller opted out - e.g. a run_code script's in-script bridge): distinct from a
+  # human's "no", because the fix is different - retry the tool directly where a human
+  # can see a prompt, or pre-approve it on the agent for truly unattended surfaces.
+  def denied_message(name, @never_asked_prefix <> _ = reason) do
+    "Error: `#{name}` did not run, and the user did NOT refuse it - it was never shown " <>
+      "to a human (#{reason}). Do not treat this as a refusal. If a user is present, " <>
+      "calling the tool again directly (outside any script) shows them a real prompt to " <>
+      "answer; on a truly unattended surface, only tools pre-approved in the agent's " <>
+      "auto_approve run."
+  end
+
+  # A live prompt that expired unanswered: silence is not consent, but it is not a
+  # refusal either - the user never declined, they just weren't there in time.
+  def denied_message(name, @timeout_prefix <> _ = reason) do
+    "Error: the permission prompt for `#{name}` expired with no answer (#{reason}). " <>
+      "Silence is not consent, but it is not a refusal either - the user never saw or " <>
+      "never answered it in time. Do not assume they said no. Ask whether they want to " <>
+      "proceed, and call the tool again when they are around - that shows them a fresh " <>
+      "prompt to answer."
+  end
+
   def denied_message(name, reason) when is_binary(reason) do
     "Error: the user did not authorize running `#{name}` (reason: #{reason}). Do not retry " <>
       "immediately - consider a different approach, or ask the user what to do instead. If " <>
       "they later say to go ahead, call the tool again - that shows them a fresh prompt to " <>
       "answer. Nothing they type grants permission by itself; only answering that prompt does."
+  end
+
+  @doc """
+  The deny reason an attended surface should return when its live permission prompt
+  expires with no answer (e.g. the Telegram gateway's inline-button timeout). Built here
+  so `denied_message/2` recognizes it and gives the model timeout-specific advice -
+  "nobody answered" must never read to the agent as "the user refused" (silence is not
+  consent, but it is not a refusal either).
+  """
+  @spec timeout_reason(pos_integer()) :: String.t()
+  def timeout_reason(timeout_ms) do
+    minutes = timeout_ms |> div(60_000) |> max(1)
+    @timeout_prefix <> " (the permission request expired after #{minutes} minutes)"
   end
 
   # A human is "on the line" exactly when there's a real authorize callback to answer to -
@@ -489,18 +555,62 @@ defmodule Pepe.Permissions do
 
       _ ->
         # Nobody to ask. It is not pre-approved (or the run has taken in content from a
-        # stranger, which withdraws pre-approval), so it does not happen. Standing aside here
-        # is what made an API token a shell account.
-        {:deny, unattended_reason(ctx)}
+        # stranger, which withdraws pre-approval), so it does not happen NOW - standing
+        # aside here is what made an API token a shell account. But "does not happen now"
+        # no longer has to mean "fails closed forever": the call is parked as a durable
+        # pending approval a human can approve or deny later (`mix pepe approvals`), the
+        # same decision an attended prompt would have put in front of them, just moved in
+        # time. Callers with their own refusal semantics opt out via `:no_pending_approval`
+        # (run_code's in-script bridge, a flow replay), and a store that isn't reachable
+        # degrades to the plain refusal - never to letting the call through.
+        {:deny, unattended_or_parked(name, args, risks, ctx)}
+    end
+  end
+
+  defp unattended_or_parked(name, args, risks, ctx) do
+    if ctx[:no_pending_approval] do
+      unattended_reason(ctx)
+    else
+      case PendingApprovals.park(name, args, risks, ctx) do
+        {:ok, record} -> parked_reason(record, ctx)
+        :unavailable -> unattended_reason(ctx)
+      end
+    end
+  end
+
+  # The reason carried by a parked call's denial. Actionable on purpose - it names the
+  # record's id and the literal commands that resolve it, because "call the tool again"
+  # (denied_message/2's ordinary advice) is exactly wrong here: there is no prompt a
+  # retry could put in front of anyone on this surface.
+  defp parked_reason(record, ctx) do
+    minutes = max(div(record.expires_at - record.created_at, 60), 1)
+
+    @parked_prefix <>
+      " (id #{record.id}): there is no one to ask on this surface." <>
+      parked_taint_note(ctx) <>
+      " A human can run `mix pepe approvals approve #{record.id}` to execute this exact call " <>
+      "and deliver its result back into this conversation, or " <>
+      "`mix pepe approvals deny #{record.id} --reason \"...\"` to refuse it. " <>
+      "The request expires in #{minutes} minutes."
+  end
+
+  defp parked_taint_note(ctx) do
+    if tainted?(ctx) do
+      " Note: this run has taken in content from outside (a document, a fetched page), " <>
+        "so pre-approved tools are not trusted for it either."
+    else
+      ""
     end
   end
 
   defp unattended_reason(ctx) do
     if tainted?(ctx) do
-      "this run has taken in content from outside (a document, a fetched page), so " <>
+      @never_asked_prefix <>
+        " this run has taken in content from outside (a document, a fetched page), so " <>
         "pre-approved tools are not trusted for it, and there is no one here to ask"
     else
-      "there is no one to ask on this surface, and this tool is not in the agent's auto_approve"
+      @never_asked_prefix <>
+        " there is no one to ask on this surface, and this tool is not in the agent's auto_approve"
     end
   end
 

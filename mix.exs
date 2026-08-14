@@ -142,6 +142,10 @@ defmodule Pepe.MixProject do
       {:bcrypt_elixir, "~> 3.0"},
       # Renders chat message markdown on the dashboard (tables, lists, headers, ...).
       {:mdex, "~> 0.7"},
+      # The `run_code` tool: a pure-BEAM Lua 5.3 interpreter (no NIF, no external
+      # binary), so a runaway script is killed by an ordinary Task timeout and the
+      # sandbox only ever sees what we explicitly bind into it.
+      {:luerl, "~> 1.5"},
       # The `browser` tool: drives a real Chrome over CDP directly (Mint.WebSocket) - no
       # ChromeDriver, no Node.js driver process, unlike every Playwright/Puppeteer binding.
       {:cdp_ex, "~> 0.9"},

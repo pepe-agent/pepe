@@ -123,4 +123,27 @@ defmodule Pepe.SendFileTest do
     assert {:error, msg} = SendFile.run(%{"path" => "does-not-exist.xlsx"}, ctx)
     assert msg =~ "not found"
   end
+
+  test "a relative path resolves against the agent's workspace, not the process cwd, when an agent is bound" do
+    Config.put_telegram(%{"bot_token" => "T", "allowed_chats" => []})
+    agent = %Config.Agent{name: "reportbot", system_prompt: "hi"}
+    Config.put_agent(agent)
+
+    workspace = Pepe.Agent.Workspace.dir(agent.name)
+    File.mkdir_p!(workspace)
+    File.write!(Path.join(workspace, "leads.xlsx"), "fake-xlsx-bytes")
+
+    parent = self()
+
+    Mimic.stub(Req, :post, fn url, opts ->
+      send(parent, {:req, url, opts})
+      {:ok, %{status: 200}}
+    end)
+
+    # No `:cwd` at all - the process's own cwd (this test suite's directory) has no
+    # leads.xlsx, so a pass here proves resolution used the workspace, not File.cwd!().
+    ctx = %{session_key: "telegram:842064390", agent: agent}
+    assert {:ok, msg} = SendFile.run(%{"path" => "leads.xlsx"}, ctx)
+    assert msg =~ "leads.xlsx"
+  end
 end

@@ -206,7 +206,11 @@ defmodule Pepe.Flow do
     name = step["tool"]
     args = step["args"]
 
-    case Permissions.gate(name, args, ctx) do
+    # `:no_pending_approval`: a blocked step aborts the replay (a flow is an ordered
+    # script, and its remaining steps won't wait around), so parking the one call for
+    # later approval would run it out of sequence against a flow that already gave up -
+    # a flow's fix stays what it always was: pre-approve its tools on the agent.
+    case Permissions.gate(name, args, Map.put(ctx, :no_pending_approval, true)) do
       :allow -> run_step(name, args, ctx, acc)
       :deny -> deny_step(name, nil)
       {:deny, reason} -> deny_step(name, reason)
