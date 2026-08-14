@@ -28,7 +28,10 @@ defmodule Pepe.Tools.Bash do
 
   @impl true
   def run(%{"command" => command} = args, ctx) do
-    cwd = ctx[:cwd] || File.cwd!()
+    # The bound agent's workspace, same as read_file/write_file resolve relative
+    # paths - never the OS process cwd when an agent is in play (see
+    # Pepe.Agent.Workspace.cwd_in_ctx/1).
+    cwd = Pepe.Agent.Workspace.cwd_in_ctx(ctx)
     timeout = args["timeout_ms"] || 60_000
 
     case Pepe.Sandbox.guard(command) do
