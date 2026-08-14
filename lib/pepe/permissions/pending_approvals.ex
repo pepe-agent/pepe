@@ -312,7 +312,14 @@ defmodule Pepe.Permissions.PendingApprovals do
       result =
         Pepe.Tools.execute(call, %{
           agent: agent,
-          cwd: File.cwd!(),
+          # The agent's own workspace, not the resolving CLI operator's shell directory.
+          # Every current path-resolving tool (bash/run_script/send_file via
+          # Workspace.cwd_in_ctx/1, the file tools via resolve_in_ctx/2) prioritizes the
+          # bound `agent:` over this key, so it's not live-exploitable through any of
+          # them today - but `delegate` reads `ctx[:cwd]` directly and forwards it to a
+          # worker's own ctx, and a future tool doing the same should see the agent's
+          # workspace here, not whatever directory happened to be resolving the approval.
+          cwd: Pepe.Agent.Workspace.cwd_in_ctx(%{agent: agent}),
           session_key: record.session_key
         })
 
