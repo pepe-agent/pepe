@@ -146,17 +146,7 @@ defmodule Pepe.Tools.RunScript do
   defp script_args(args), do: args |> Map.get("args", []) |> List.wrap() |> Enum.map(&to_string/1)
 
   # Run in the agent's workspace so files the script reads/writes live with the agent.
-  defp cwd(ctx) do
-    case ctx[:agent] do
-      %{name: name} when is_binary(name) ->
-        dir = Workspace.dir(name)
-        File.mkdir_p!(dir)
-        dir
-
-      _ ->
-        ctx[:cwd] || File.cwd!()
-    end
-  end
+  defp cwd(ctx), do: Workspace.cwd_in_ctx(ctx)
 
   defp truncate(output) when byte_size(output) > @max_output,
     do: binary_part(output, 0, @max_output) <> "\n...(truncated)"

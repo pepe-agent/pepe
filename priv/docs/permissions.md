@@ -26,8 +26,8 @@ without being dangerous.
      (skips the per-call risk check below, for the rest of the session) / always
      (persisted on the agent's `auto_approve`) / deny.
    - A surface with no human to ask (the HTTP API, a webhook, a cron, a watch) refuses
-     a gated tool outright instead of running it unwatched - see "No human, no
-     surprises" below.
+     a gated tool instead of running it unwatched - and parks the call as a **pending
+     approval** a human can resolve later - see "No human, no surprises" below.
 3. **In-tool guards** - some tools add their own scoping (e.g. `manage_channel` never
    touches the protected default bot; `manage_agent` only touches agents in
    `can_manage`; secrets must be `${ENV}` refs).
@@ -61,6 +61,24 @@ that is not pre-approved stops and asks them. On a surface with nobody there (th
 webhook, a cron, a watch), there is no one to ask, so **only what the operator pre-approved on
 the agent runs, and everything else is refused.** Standing aside instead would make an API
 token a shell account. Say what may run unattended by putting it in the agent's `auto_approve`.
+
+Refused does not mean lost. The blocked call is parked as a durable **pending approval**, and
+the refusal you receive names its id and the exact commands that resolve it. Relay those to
+the operator when one is reachable:
+
+```
+mix pepe approvals list                  # what is waiting, with ids and expiry
+mix pepe approvals approve <id>          # runs the stored call; its result comes back to you as a new turn
+mix pepe approvals approve <id> --always # ...and persists the grant so this call shape stops asking
+mix pepe approvals deny <id> --reason "..."  # refuses it; the reason is relayed to you
+```
+
+Do not retry a parked call yourself - there is no prompt a retry could show anyone on that
+surface. If it is approved, the exact stored call runs and you receive its real result in a
+follow-up turn; carry on from there without repeating the call. A request expires after 30
+minutes; an expired one has to be asked again. A refusal that says **nobody was asked** or
+that a prompt **timed out** is not the user saying no - never report those as the user
+refusing.
 
 ## Content from a stranger withdraws pre-approval
 

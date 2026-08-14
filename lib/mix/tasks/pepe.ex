@@ -135,6 +135,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe slot list|set|clear ...          # which plugin (if any) owns an exclusive extension point
       mix pepe policy list|scope ...            # which agents/projects a Pepe.Permissions.Policy applies to
       mix pepe doctor [--offline]              # health-check the whole setup
+      mix pepe approvals list|approve|deny ...   # unattended risky tool calls parked for a human's OK
       mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
       mix pepe version                         # what's running, and which build
       mix pepe update                          # self-update the binary to the latest release
@@ -299,6 +300,12 @@ defmodule Mix.Tasks.Pepe do
 
   def dispatch(["token" | rest]), do: with_config(fn -> token_cmd(rest) end)
   def dispatch(["watch" | rest]), do: with_config(fn -> watch_cmd(rest) end)
+
+  # `approvals list` (and the bare help) only read the SQLite records; approve/deny run
+  # the stored tool call and/or resume the owning session, so they need the full app.
+  def dispatch(["approvals"]), do: with_config(fn -> approvals_cmd([]) end)
+  def dispatch(["approvals", "list" | rest]), do: with_config(fn -> approvals_cmd(["list" | rest]) end)
+  def dispatch(["approvals" | rest]), do: with_app([], fn -> approvals_cmd(rest) end)
   def dispatch(["model" | rest]), do: with_config(fn -> model_cmd(rest) end)
   def dispatch(["agent" | rest]), do: with_config(fn -> agent_cmd(rest) end)
 
@@ -2891,6 +2898,108 @@ defmodule Mix.Tasks.Pepe do
   ###
   ### watch commands (one-shot "notify me when X")
   ###
+
+  ###
+  ### approvals commands (unattended risky tool calls parked for a human's OK)
+  ###
+
+  defp approvals_cmd(["list" | _]) do
+    case Pepe.Permissions.PendingApprovals.list() do
+      [] ->
+        info("no approval requests. a risky tool call on a surface with nobody to ask parks one here.")
+
+      records ->
+        now = System.system_time(:second)
+        Enum.each(records, &print_approval(&1, now))
+    end
+  end
+
+  defp approvals_cmd(["approve", id | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [always: :boolean])
+
+    case Pepe.Permissions.PendingApprovals.approve(id, always: opts[:always] == true) do
+      {:ok, result, delivery} ->
+        ok("approval #{green(id)} approved - the stored call ran")
+        info(String.slice(result, 0, 600))
+        approvals_delivery_note(delivery)
+
+        if opts[:always],
+          do: info(dim("persisted an `always` grant on the agent - this call shape won't need approval again"))
+
+      {:error, error} ->
+        approvals_error(id, error)
+    end
+  end
+
+  defp approvals_cmd(["deny", id | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [reason: :string])
+
+    case Pepe.Permissions.PendingApprovals.deny(id, opts[:reason]) do
+      {:ok, _record, delivery} ->
+        ok("approval #{id} denied#{if opts[:reason], do: " (your reason was relayed to the agent)", else: ""}")
+        approvals_delivery_note(delivery)
+
+      {:error, error} ->
+        approvals_error(id, error)
+    end
+  end
+
+  defp approvals_cmd(_) do
+    puts("""
+    #{bold("mix pepe approvals")} - risky tool calls parked while nobody was around to authorize them
+
+      list                       show approval requests (pending ones with their expiry)
+      approve ID [--always]      run the stored call and deliver its result back into the session;
+                                 --always also persists the grant so this call shape stops asking
+      deny ID [--reason TEXT]    refuse it; the reason (if given) is relayed to the agent
+
+    When a risky tool call happens on a surface with no human attached (a cron, a webhook,
+    the HTTP API), the gate parks it here instead of failing it forever - nothing runs until
+    a human answers. Requests expire after 30 minutes; an expired one can no longer be
+    approved or denied, and the agent has to ask again.
+    """)
+  end
+
+  defp print_approval(r, now) do
+    state =
+      case r.status do
+        "pending" -> "pending · expires in #{max(div((r.expires_at || now) - now, 60), 0)}m"
+        other -> other
+      end
+
+    taint = if r.tainted, do: " · ⚠ tainted run", else: ""
+    where = r.session_key || "no session"
+    # Shown in full, never truncated: `approve` runs the FULL stored args, so the human
+    # must see all of them - a benign-looking prefix can hide the dangerous tail of a
+    # long command, and a parked call can originate from a tainted run.
+    args = Jason.encode!(r.args)
+
+    puts("#{bold(r.id)} [#{state}] #{r.tool} · #{r.agent || "?"} · #{where}#{taint}\n  #{dim(args)}")
+  end
+
+  defp approvals_error(id, :not_found), do: error("unknown approval: #{id}")
+
+  defp approvals_error(id, :expired),
+    do: error("approval #{id} expired before anyone answered - nothing was run; the agent has to ask again")
+
+  defp approvals_error(id, {:already, status}),
+    do: error("approval #{id} was already #{status} - nothing was run")
+
+  defp approvals_error(id, {:agent_missing, name}),
+    do:
+      error(
+        "the agent \"#{name}\" that approval #{id} was parked for no longer exists - nothing was run; " <>
+          "recreate the agent to approve it, or deny the request"
+      )
+
+  defp approvals_delivery_note(:delivered),
+    do: info(dim("the agent picked the outcome up and its reply was delivered to the conversation's channel"))
+
+  defp approvals_delivery_note(:no_session),
+    do: info(dim("no conversation to resume (the run had no session attached) - outcome shown above only"))
+
+  defp approvals_delivery_note({:undelivered, reason}),
+    do: info(yellow("the follow-up reply could not be delivered: #{inspect(reason)}"))
 
   defp watch_cmd(["add", description | rest]) do
     {opts, _} =

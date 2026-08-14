@@ -12,6 +12,7 @@ defmodule Pepe.Tools.SendFile do
 
   import Pepe.Tools.Tool, only: [function: 3]
 
+  alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.Webhooks
 
@@ -95,7 +96,7 @@ defmodule Pepe.Tools.SendFile do
   end
 
   defp resolve_path(path, ctx) do
-    full = if Path.type(path) == :absolute, do: path, else: Path.join(ctx[:cwd] || File.cwd!(), path)
+    full = if Path.type(path) == :absolute, do: path, else: Path.join(Workspace.cwd_in_ctx(ctx), path)
 
     cond do
       not File.exists?(full) -> {:error, "file not found: #{full}"}
