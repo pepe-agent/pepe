@@ -246,11 +246,10 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
   end
 
   test "approve hands the result back into the owning session as a new turn", %{agent: _agent} do
-    {:ok, server} =
-      Bandit.start_link(plug: {CapturePlug, pid: self(), reply: "the report is in, all done"}, port: 0, scheme: :http)
+    server =
+      start_supervised!({Bandit, plug: {CapturePlug, pid: self(), reply: "the report is in, all done"}, port: 0, scheme: :http})
 
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
-    on_exit(fn -> Process.exit(server, :normal) end)
 
     Config.put_model(%Model{name: "appr-mock", base_url: "http://localhost:#{port}", api_key: "x", model: "m"})
     Config.put_agent(%Agent{name: "zak", system_prompt: "x", model: "appr-mock", tools: ["bash"], auto_approve: []})

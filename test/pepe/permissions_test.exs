@@ -330,11 +330,13 @@ defmodule Pepe.PermissionsTest do
   end
 
   test "a never-asked refusal reads differently from a human's explicit no", %{agent: agent} do
-    # Unattended, and (with no Pepe.Repo running here) nothing parked either: the reason
-    # says nobody was asked, and the model-facing wrapper must NOT claim the user refused -
-    # the fix (retry where a human can see a prompt / pre-approve on the agent) is
-    # different advice from "the user said no".
-    assert {:deny, why} = Permissions.gate("bash", ~s({"command":"ls"}), %{agent: agent})
+    # Unattended, and explicitly opted out of parking: the reason says nobody was asked,
+    # and the model-facing wrapper must NOT claim the user refused - the fix (retry where
+    # a human can see a prompt / pre-approve on the agent) is different advice from "the
+    # user said no". :no_pending_approval makes the never-asked path deterministic
+    # regardless of whether Pepe.Repo happens to be running in this test process.
+    ctx = %{agent: agent, no_pending_approval: true}
+    assert {:deny, why} = Permissions.gate("bash", ~s({"command":"ls"}), ctx)
     assert why =~ "nobody was asked"
 
     never_asked = Permissions.denied_message("bash", why)

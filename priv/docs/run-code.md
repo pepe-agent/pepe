@@ -13,7 +13,8 @@ Write Lua 5.3. Call tools with the bridge:
 local out, err = pepe_call("read_file", {path = "notes/a.md"})
 if err then return "could not read a.md: " .. err end
 
-local other = pepe_call("read_file", {path = "notes/b.md"})
+local other, err2 = pepe_call("read_file", {path = "notes/b.md"})
+if err2 then return "could not read b.md: " .. err2 end
 print("a is " .. #out .. " bytes, b is " .. #other .. " bytes")
 return out .. "\n---\n" .. other
 ```

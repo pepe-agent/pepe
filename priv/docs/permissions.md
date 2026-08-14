@@ -66,7 +66,7 @@ Refused does not mean lost. The blocked call is parked as a durable **pending ap
 the refusal you receive names its id and the exact commands that resolve it. Relay those to
 the operator when one is reachable:
 
-```
+```shell
 mix pepe approvals list                  # what is waiting, with ids and expiry
 mix pepe approvals approve <id>          # runs the stored call; its result comes back to you as a new turn
 mix pepe approvals approve <id> --always # ...and persists the grant so this call shape stops asking

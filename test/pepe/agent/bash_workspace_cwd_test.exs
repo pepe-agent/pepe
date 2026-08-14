@@ -67,9 +67,8 @@ defmodule Pepe.Agent.BashWorkspaceCwdTest do
     end)
 
     {:ok, _} = Application.ensure_all_started(:req)
-    {:ok, server} = Bandit.start_link(plug: BashMock, port: 0, scheme: :http)
+    server = start_supervised!({Bandit, plug: BashMock, port: 0, scheme: :http})
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
-    on_exit(fn -> Process.exit(server, :normal) end)
 
     Pepe.Config.put_model(%Pepe.Config.Model{
       name: "mock",
