@@ -305,7 +305,7 @@ defmodule Mix.Tasks.Pepe do
   # the stored tool call and/or resume the owning session, so they need the full app.
   def dispatch(["approvals"]), do: with_config(fn -> approvals_cmd([]) end)
   def dispatch(["approvals", "list" | rest]), do: with_config(fn -> approvals_cmd(["list" | rest]) end)
-  def dispatch(["approvals" | rest]), do: with_app([], fn -> approvals_cmd(rest) end)
+  def dispatch(["approvals" | rest]), do: with_app([persist: true], fn -> approvals_cmd(rest) end)
   def dispatch(["model" | rest]), do: with_config(fn -> model_cmd(rest) end)
   def dispatch(["agent" | rest]), do: with_config(fn -> agent_cmd(rest) end)
 
