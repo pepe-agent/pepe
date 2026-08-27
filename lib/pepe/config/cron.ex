@@ -14,13 +14,20 @@ defmodule Pepe.Config.Cron do
             agent: nil,
             prompt: nil,
             # "prompt" (run the agent on `prompt`), "consolidate" (a memory-housekeeping pass
-            # over the agent's standing memory, ignoring `prompt`), or "flow" (replay a
+            # over the agent's standing memory, ignoring `prompt`), "flow" (replay a
             # Pepe.Flow promoted for this agent, named in `flow` below, calling no model at
-            # all - ignoring `prompt` the same way "consolidate" does).
+            # all - ignoring `prompt` the same way "consolidate" does), or "graph" (run a
+            # Pepe.Graph definition for this agent, named in `graph` below).
             kind: "prompt",
             # Only meaningful when kind == "flow": the Pepe.Flow's name (looked up under
             # this cron's own `agent`).
             flow: nil,
+            # Only meaningful when kind == "graph": the Pepe.Graph definition's name
+            # (looked up under this cron's own `agent`). A graph that pauses on a `human`
+            # node stays `waiting_human` until someone runs `mix pepe graph resume` - the
+            # cron firing again on its next schedule slot starts a brand new run, it does
+            # not resume the paused one.
+            graph: nil,
             # standard cron expression, e.g. "0 8 * * *"
             schedule: nil,
             timezone: "Etc/UTC",
@@ -51,6 +58,7 @@ defmodule Pepe.Config.Cron do
       prompt: map["prompt"],
       kind: map["kind"] || "prompt",
       flow: map["flow"],
+      graph: map["graph"],
       schedule: map["schedule"],
       timezone: map["timezone"] || "Etc/UTC",
       model: map["model"],

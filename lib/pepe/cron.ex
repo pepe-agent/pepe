@@ -179,6 +179,22 @@ defmodule Pepe.Cron do
     end
   end
 
+  defp run_job(%Cron{kind: "graph", agent: agent, graph: graph_name} = _cron) do
+    case Pepe.Graph.run(agent, graph_name, nil, source: "cron") do
+      {:ok, %{"status" => "waiting_human"} = run} ->
+        {:ok, "graph #{graph_name} paused at #{run["current_node"]} (run #{run["id"]}) - waiting on a human", []}
+
+      {:ok, %{"status" => "done"} = run} ->
+        {:ok, "graph #{graph_name} completed (run #{run["id"]})", []}
+
+      {:ok, %{"status" => "failed", "error" => error}} ->
+        {:error, error}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp run_job(%Cron{} = cron) do
     opts = [source: "cron"] ++ if(cron.model, do: [model: Config.get_model(cron.model)], else: [])
     Pepe.Agent.oneshot(cron.agent, cron.prompt, opts)
