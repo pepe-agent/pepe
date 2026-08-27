@@ -2918,13 +2918,21 @@ defmodule Mix.Tasks.Pepe do
     {opts, _} = OptionParser.parse!(rest, strict: [always: :boolean])
 
     case Pepe.Permissions.PendingApprovals.approve(id, always: opts[:always] == true) do
-      {:ok, result, delivery} ->
+      {:ok, result, delivery, persisted?} ->
         ok("approval #{green(id)} approved - the stored call ran")
         info(String.slice(result, 0, 600))
         approvals_delivery_note(delivery)
 
-        if opts[:always],
-          do: info(dim("persisted an `always` grant on the agent - this call shape won't need approval again"))
+        cond do
+          opts[:always] and persisted? ->
+            info(dim("persisted an `always` grant on the agent - this call shape won't need approval again"))
+
+          opts[:always] ->
+            error("could not persist the `always` grant (the agent no longer exists) - this call shape will still ask next time")
+
+          true ->
+            :ok
+        end
 
       {:error, error} ->
         approvals_error(id, error)

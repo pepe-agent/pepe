@@ -141,21 +141,33 @@ defmodule Pepe.Permissions.PendingApprovals do
   denied, or approved once the agent exists again.
   """
   @spec approve(String.t(), keyword()) ::
-          {:ok, String.t(), :delivered | :no_session | {:undelivered, term()}}
+          {:ok, String.t(), :delivered | :no_session | {:undelivered, term()}, boolean()}
           | {:error, :not_found | :expired | {:already, String.t()} | {:agent_missing, String.t()}}
   def approve(id, opts \\ []) do
     with {:ok, pending} <- resolvable(id),
          {:ok, agent} <- stored_agent(pending),
          {:ok, record} <- claim(id, "approved", nil) do
-      if opts[:always], do: persist_always(record)
-      result = run_stored_call(record, agent)
+      # `persisted?` is only meaningful when `--always` was requested at all - false
+      # otherwise. It can genuinely fail even after `stored_agent/1` above found the
+      # agent: another operator can delete or rename it in the gap between that check
+      # and this one. The caller needs the real outcome, not an optimistic guess -
+      # telling someone "this call shape won't need approval again" when it silently
+      # didn't persist means the next identical call surprises them by asking anyway.
+      persisted? = if opts[:always], do: persist_always(record), else: false
+      {result, tainted_during_replay?} = run_stored_call(record, agent)
       # An approved fetch_url/web_search/db_query/delegate/MCP call hands back content
       # from outside - the resumed turn must be born tainted (`:untrusted`), exactly as
       # the rest of an attended run would have been had the call run inline. Without
       # this, approving such a call would give the follow-up turn MORE privilege than
       # the inline path: stranger content in context with auto_approve still live.
-      untrusted? = Runtime.outside_content?(record.tool)
-      {:ok, result, hand_back(record, approved_note(record, result), untrusted: untrusted?)}
+      #
+      # A statically-named tool (fetch_url, web_search, ...) covers most of that; a
+      # `run_code` replay is opaque to a static name check (only the script itself
+      # knows what it touched), so `run_stored_call/2` also reports the LIVE taint
+      # state right after the replay ran - a script that called `fetch_url` mid-replay
+      # taints this the same way it would have inline.
+      untrusted? = Runtime.outside_content?(record.tool) or tainted_during_replay?
+      {:ok, result, hand_back(record, approved_note(record, result), untrusted: untrusted?), persisted?}
     end
   end
 
@@ -284,34 +296,58 @@ defmodule Pepe.Permissions.PendingApprovals do
   # those inner calls would enjoy the auto_approve the original attempt had already
   # lost, i.e. the replay would run with MORE privilege than what the human saw parked.
   # Snapshot/restore so the taint never leaks into the resolving process's later work.
+  #
+  # Returns `{result, tainted?}` - `tainted?` is this process's taint state read right
+  # after the call runs, before the `after` clause restores it. A `run_code` replay
+  # gates its own in-script calls (a mid-script `fetch_url` taints as it happens), and
+  # `RunCode.run/2` folds that back into this process before returning - so reading it
+  # here, before the restore erases it, is the only way `approve/2` can tell a script
+  # that stayed clean apart from one that reached outside content during the replay.
   defp run_stored_call(record, agent) do
     call = %{"function" => %{"name" => record.tool, "arguments" => record.args}}
     saved = Pepe.Permissions.snapshot()
     if record.tainted, do: Pepe.Permissions.taint()
 
     try do
-      Pepe.Tools.execute(call, %{
-        agent: agent,
-        cwd: File.cwd!(),
-        session_key: record.session_key
-      })
+      result =
+        Pepe.Tools.execute(call, %{
+          agent: agent,
+          # The agent's own workspace, not the resolving CLI operator's shell directory.
+          # Every current path-resolving tool (bash/run_script/send_file via
+          # Workspace.cwd_in_ctx/1, the file tools via resolve_in_ctx/2) prioritizes the
+          # bound `agent:` over this key, so it's not live-exploitable through any of
+          # them today - but `delegate` reads `ctx[:cwd]` directly and forwards it to a
+          # worker's own ctx, and a future tool doing the same should see the agent's
+          # workspace here, not whatever directory happened to be resolving the approval.
+          cwd: Pepe.Agent.Workspace.cwd_in_ctx(%{agent: agent}),
+          session_key: record.session_key
+        })
+
+      {result, Pepe.Permissions.tainted?(%{})}
     after
       Pepe.Permissions.restore(saved)
     end
   end
 
   defp persist_always(%PendingApproval{agent: agent} = record) when is_binary(agent) do
-    if Config.get_agent(agent) do
-      Config.allow_tool(agent, record.grant)
-      # A policy-forced ask whose underlying call had no grant of its own recorded a
-      # second key at park time - persist both, exactly as an attended `:always` does.
-      if record.also_grant, do: Config.allow_tool(agent, record.also_grant)
+    # `Config.allow_tool/2`'s own :ok/{:error, :unknown_agent} is the actual write result -
+    # checking `Config.get_agent/1` first and then ignoring what the write itself returned
+    # would still report success on a race (the agent vanishing between the two calls) or
+    # any other failure the write hits.
+    with :ok <- Config.allow_tool(agent, record.grant),
+         # A policy-forced ask whose underlying call had no grant of its own recorded a
+         # second key at park time - persist both, exactly as an attended `:always` does.
+         :ok <- persist_also_grant(agent, record.also_grant) do
+      true
+    else
+      _ -> false
     end
-
-    :ok
   end
 
-  defp persist_always(_record), do: :ok
+  defp persist_always(_record), do: false
+
+  defp persist_also_grant(_agent, nil), do: :ok
+  defp persist_also_grant(agent, also_grant), do: Config.allow_tool(agent, also_grant)
 
   # Deliver the outcome back into the owning conversation as a new turn - the same
   # mechanism Pepe.Commitments.Scheduler.fulfill/1 uses for an agent_promise: ensure the
