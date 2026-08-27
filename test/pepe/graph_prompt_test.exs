@@ -26,6 +26,16 @@ defmodule Pepe.Graph.PromptTest do
       assert Prompt.render("count: {{n}}", %{"n" => 3}, nil) == {:ok, "count: 3"}
     end
 
+    test "a boolean or nil state value is stringified without raising" do
+      assert Prompt.render("ok: {{flag}}", %{"flag" => true}, nil) == {:ok, "ok: true"}
+      assert Prompt.render("v: {{v}}", %{"v" => nil}, nil) == {:ok, "v: "}
+    end
+
+    test "a nested map/list state value (author-supplied initial state, not a node's own reply) is JSON-encoded rather than crashing to_string/1" do
+      assert Prompt.render("data: {{data}}", %{"data" => %{"a" => 1}}, nil) == {:ok, ~s(data: {"a":1})}
+      assert Prompt.render("items: {{items}}", %{"items" => [1, 2]}, nil) == {:ok, "items: [1,2]"}
+    end
+
     test "a required (non-`?`, no default) reference to a missing key fails the run" do
       assert Prompt.render("draft: {{missing}}", %{}, nil) == {:error, {:unbound_ref, "missing"}}
     end
@@ -69,6 +79,11 @@ defmodule Pepe.Graph.PromptTest do
     test "a template with no references returns an empty list" do
       assert Prompt.referenced_keys("no refs here") == []
     end
+
+    test "a non-string template (a shape import/2 is supposed to reject) returns no keys instead of raising" do
+      assert Prompt.referenced_keys(42) == []
+      assert Prompt.referenced_keys(%{"a" => 1}) == []
+    end
   end
 
   describe "verdict/2" do
@@ -96,6 +111,11 @@ defmodule Pepe.Graph.PromptTest do
 
     test "blank trailing lines are skipped when finding the last real line" do
       reply = "pass\n\n\n"
+      assert Prompt.verdict(reply, %{"pass" => "publish"}) == {:ok, "pass", "publish"}
+    end
+
+    test "a trailing line of pure whitespace is skipped too, not mistaken for the last real line" do
+      reply = "pass\n   \n"
       assert Prompt.verdict(reply, %{"pass" => "publish"}) == {:ok, "pass", "publish"}
     end
   end

@@ -95,6 +95,8 @@ defmodule Pepe.GraphTest do
     end
 
     test "a parallel node with tasks and a known agent is valid" do
+      Config.put_agent(%Agent{name: "writer", system_prompt: "x", tools: ["delegate"]})
+
       definition = %{
         "name" => "fanout",
         "agent" => "writer",
@@ -130,6 +132,18 @@ defmodule Pepe.GraphTest do
     test "no nodes at all" do
       assert {:error, {:invalid, errors}} = Graph.import(Map.put(linear_def(), "nodes", []))
       assert "a graph needs at least one node" in errors
+    end
+
+    test "a node that isn't a JSON object is refused instead of crashing on & &1[\"id\"]" do
+      definition = Map.put(linear_def(), "nodes", ["not a node object"])
+      assert {:error, {:invalid, errors}} = Graph.import(definition)
+      assert "every node must be a JSON object" in errors
+    end
+
+    test "a definition that isn't a JSON object is refused instead of crashing on definition[\"agent\"]" do
+      assert Graph.import("just a string") == {:error, {:invalid, ["the graph definition must be a JSON object"]}}
+      assert Graph.import(["a", "list"]) == {:error, {:invalid, ["the graph definition must be a JSON object"]}}
+      assert Graph.import(42) == {:error, {:invalid, ["the graph definition must be a JSON object"]}}
     end
 
     test "duplicate node ids" do
@@ -249,6 +263,21 @@ defmodule Pepe.GraphTest do
       assert Enum.any?(errors, &(&1 =~ "parallel needs a known agent"))
     end
 
+    test "a parallel node's tasks must all be strings" do
+      definition = Map.put(linear_def(), "nodes", [%{"id" => "draft", "type" => "parallel", "agent" => "writer", "tasks" => ["x", 5]}])
+      assert {:error, {:invalid, errors}} = Graph.import(definition)
+      assert Enum.any?(errors, &(&1 =~ "every task must be a string"))
+    end
+
+    test "a parallel node naming an agent never granted delegate is refused" do
+      # Nothing else on this path checks the resolved agent's tools allowlist before
+      # fanning out via `delegate` - a graph node names it directly, no model choosing
+      # from an offered list involved.
+      definition = Map.put(linear_def(), "nodes", [%{"id" => "draft", "type" => "parallel", "agent" => "writer", "tasks" => ["x"]}])
+      assert {:error, {:invalid, errors}} = Graph.import(definition)
+      assert Enum.any?(errors, &(&1 =~ "not allowed to use delegate"))
+    end
+
     test "a tool node naming a tool the executing agent was never granted is refused" do
       # `writer` (set up with `tools: []`) has no `read_file` - a graph node calls its
       # tool directly, with no model choosing from an offered list, so nothing else on
@@ -262,6 +291,16 @@ defmodule Pepe.GraphTest do
       definition = Map.put(linear_def(), "nodes", [%{"id" => "draft", "type" => "tool", "tool" => "not_a_real_tool"}])
       assert {:error, {:invalid, errors}} = Graph.import(definition)
       assert Enum.any?(errors, &(&1 =~ "unknown tool"))
+    end
+
+    test "a tool node's args must be a JSON object, not a crash waiting to happen at render time" do
+      Config.put_agent(%Agent{name: "writer", system_prompt: "x", tools: ["read_file"]})
+
+      definition =
+        Map.put(linear_def(), "nodes", [%{"id" => "draft", "type" => "tool", "tool" => "read_file", "args" => ["not", "a", "map"]}])
+
+      assert {:error, {:invalid, errors}} = Graph.import(definition)
+      assert Enum.any?(errors, &(&1 =~ "args must be a JSON object"))
     end
 
     test "a tool node cannot name run_code, delegate, or run_graph directly" do

@@ -381,6 +381,49 @@ defmodule Pepe.Graph.RunnerTest do
     end
   end
 
+  describe "parallel node is gated, not called unguarded" do
+    test "delegate must still be authorized (auto_approve) at run time, not just importable" do
+      # `delegate` requires approval like any other tool: having it in `tools` is enough to
+      # pass import, but the live `Permissions.gate/3` call this node makes still refuses
+      # without `auto_approve` covering it - proving `Tools.execute/2` is never reached
+      # unguarded.
+      put_writer("unused", %{tools: ["delegate"], auto_approve: []})
+
+      definition = %{
+        "name" => "fanout-denied",
+        "agent" => "writer",
+        "entry" => "research",
+        "nodes" => [%{"id" => "research", "type" => "parallel", "agent" => "writer", "tasks" => ["look things up"]}]
+      }
+
+      assert {:ok, _} = Graph.import(definition)
+      assert {:ok, run} = Graph.run("writer", "fanout-denied", nil)
+
+      assert run["status"] == "failed"
+      assert run["error"] =~ "not authorized"
+    end
+
+    test "an agent granted delegate fans out for real and the combined answer lands in state" do
+      model =
+        start_mock(fn _prompt -> "worker answer" end)
+
+      put_writer(model, %{tools: ["delegate"], auto_approve: ["delegate:none"]})
+
+      definition = %{
+        "name" => "fanout-allowed",
+        "agent" => "writer",
+        "entry" => "research",
+        "nodes" => [%{"id" => "research", "type" => "parallel", "agent" => "writer", "tasks" => ["look things up"]}]
+      }
+
+      assert {:ok, _} = Graph.import(definition)
+      assert {:ok, run} = Graph.run("writer", "fanout-allowed", nil)
+
+      assert run["status"] == "done"
+      assert run["state"]["research"] =~ "worker answer"
+    end
+  end
+
   describe "tool node" do
     test "an always-safe tool call inside the workspace runs and writes its result to state" do
       model = start_mock(fn _prompt -> flunk("no model call needed for a tool node") end)

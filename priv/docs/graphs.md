@@ -41,7 +41,7 @@ the placeholder.
 
 ## Defining one
 
-```
+```text
 manage_graph(action: "import", graph_name: "research-and-verify", entry: "draft", nodes: [
   {id: "draft", type: "agent", prompt: "Write about {{input}}. Critique: {{verify?}}", next: "verify"},
   {id: "verify", type: "verifier", prompt: "Review for unsourced claims:\n\n{{draft}}",
@@ -57,7 +57,7 @@ that agent in your own `can_message`; naming yourself needs nothing extra.
 
 ## Running one
 
-```
+```text
 run_graph(graph_name: "research-and-verify", input: "the Q3 numbers")
 ```
 

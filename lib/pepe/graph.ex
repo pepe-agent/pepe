@@ -96,7 +96,16 @@ defmodule Pepe.Graph do
   a list of every problem found, not just the first.
   """
   @spec import(map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def import(definition, opts \\ []) do
+  def import(definition, opts \\ [])
+
+  # `mix pepe graph import FILE.json` hands in whatever `Jason.decode/1` returned - valid
+  # JSON that isn't an object (a bare string, array, number...) would otherwise crash on
+  # `definition["agent"]` a few lines down instead of failing the import cleanly.
+  def import(definition, _opts) when not is_map(definition) do
+    {:error, {:invalid, ["the graph definition must be a JSON object"]}}
+  end
+
+  def import(definition, opts) do
     agent = Config.get_agent(definition["agent"])
 
     cond do
@@ -118,7 +127,7 @@ defmodule Pepe.Graph do
         errors = validate_nodes(definition["nodes"], definition["entry"], agent, state_keys)
 
         case errors do
-          [] -> save(agent.name, definition)
+          [] -> save(agent.name, definition, opts[:overwrite] == true)
           errors -> {:error, {:invalid, errors}}
         end
     end
@@ -130,7 +139,14 @@ defmodule Pepe.Graph do
   defp stringify_state(state) when is_map(state), do: state
   defp stringify_state(_state), do: %{}
 
-  defp save(agent_name, definition) do
+  # The `not is_nil(get(...)) and not overwrite? -> :already_exists` check in `import/2`
+  # is a plain read, not a lock - two concurrent imports of the same never-seen-before
+  # name can both read "doesn't exist yet" and both reach here. `on_conflict: :nothing`
+  # (rather than always `:replace`) makes the actual write the enforcement point for a
+  # non-overwrite import: the loser's insert becomes a no-op instead of silently replacing
+  # what the winner just saved, and its 0-rows-affected result is what turns into the
+  # `:already_exists` this caller expected all along.
+  defp save(agent_name, definition, overwrite?) do
     now = System.system_time(:second)
     existing = Repo.get_by(Definition, agent: agent_name, name: definition["name"])
 
@@ -146,12 +162,12 @@ defmodule Pepe.Graph do
       updated_at: now
     }
 
-    Repo.insert_all(Definition, [row],
-      on_conflict: {:replace, [:entry, :nodes, :state, :max_steps, :updated_at]},
-      conflict_target: [:agent, :name]
-    )
+    conflict = if overwrite?, do: {:replace, [:entry, :nodes, :state, :max_steps, :updated_at]}, else: :nothing
 
-    {:ok, get(agent_name, definition["name"])}
+    case Repo.insert_all(Definition, [row], on_conflict: conflict, conflict_target: [:agent, :name]) do
+      {0, _} when not overwrite? -> {:error, :already_exists}
+      _ -> {:ok, get(agent_name, definition["name"])}
+    end
   end
 
   ###
@@ -217,6 +233,19 @@ defmodule Pepe.Graph do
   ###
 
   defp validate_nodes(nodes, entry, owner, state_keys) when is_list(nodes) and nodes != [] do
+    # `nodes` is whatever JSON a file, a CLI arg, or a model's own `manage_graph` call
+    # handed in - a non-map entry (a bare string, a number...) must be caught here, before
+    # `& &1["id"]` below or anything else in this module ever touches it, or it crashes
+    # instead of failing the import cleanly.
+    case Enum.reject(nodes, &is_map/1) do
+      [] -> validate_map_nodes(nodes, entry, owner, state_keys)
+      _bad -> ["every node must be a JSON object"]
+    end
+  end
+
+  defp validate_nodes(_nodes, _entry, _owner, _state_keys), do: ["a graph needs at least one node"]
+
+  defp validate_map_nodes(nodes, entry, owner, state_keys) do
     ids = Enum.map(nodes, & &1["id"])
     # A {{ref}} may legitimately name either a node id (populated once that node runs) or
     # a key already present in the graph's own initial `state` defaults (populated from
@@ -230,8 +259,6 @@ defmodule Pepe.Graph do
     |> check(invalid_id_shapes(ids), &"node id #{inspect(&1)} must match ^[a-z0-9_-]+$")
     |> then(&Enum.reduce(nodes, &1, fn node, acc -> validate_node(node, ids, refable, owner, acc) end))
   end
-
-  defp validate_nodes(_nodes, _entry, _owner, _state_keys), do: ["a graph needs at least one node"]
 
   defp validate_node(node, ids, refable, owner, errors) do
     id = node["id"]
@@ -298,15 +325,27 @@ defmodule Pepe.Graph do
     |> check_bool(is_nil(node["verdicts"]), "node #{inspect(node["id"])}: a human node cannot have verdicts")
   end
 
+  # Same reason as the `tool` node check below: nothing on this path otherwise checks the
+  # executing agent's tools allowlist before fanning out via `delegate` - a graph would
+  # let an agent that was never given `delegate` reach it anyway just by using this node
+  # type. `Runner.run_node/4`'s `parallel` clause also gates this call live, the same way
+  # the `tool` node type already does, rather than calling `Tools.execute/2` unguarded.
   defp validate_node_type(errors, %{"type" => "parallel"} = node, _owner) do
+    resolved = is_binary(node["agent"]) && Config.get_agent(node["agent"])
+
     errors
     |> check_bool(
       is_list(node["tasks"]) and node["tasks"] != [],
       "node #{inspect(node["id"])}: a parallel node needs a non-empty tasks list"
     )
     |> check_bool(
-      is_binary(node["agent"]) and not is_nil(Config.get_agent(node["agent"])),
-      "node #{inspect(node["id"])}: parallel needs a known agent"
+      not is_list(node["tasks"]) or Enum.all?(node["tasks"], &is_binary/1),
+      "node #{inspect(node["id"])}: every task must be a string"
+    )
+    |> check_bool(is_binary(node["agent"]) and not is_nil(resolved), "node #{inspect(node["id"])}: parallel needs a known agent")
+    |> check_bool(
+      !resolved or "delegate" in (resolved.tools || []),
+      "node #{inspect(node["id"])}: #{node["agent"]} is not allowed to use delegate (not in its tools)"
     )
   end
 
@@ -329,6 +368,7 @@ defmodule Pepe.Graph do
       not known_tool? or is_nil(effective_agent) or tool in (effective_agent.tools || []),
       "node #{inspect(node["id"])}: #{effective_agent && effective_agent.name} is not allowed to use #{inspect(tool)} (not in its tools)"
     )
+    |> check_bool(is_nil(node["args"]) or is_map(node["args"]), "node #{inspect(node["id"])}: args must be a JSON object")
   end
 
   defp validate_node_type(errors, node, _owner), do: ["node #{inspect(node["id"])}: unknown type #{inspect(node["type"])}" | errors]
@@ -350,7 +390,7 @@ defmodule Pepe.Graph do
   defp dangling_targets(_node, _ids), do: []
 
   defp unbound_template_refs(node, ids) do
-    arg_values = (node["args"] || %{}) |> Map.values() |> Enum.filter(&is_binary/1)
+    arg_values = node["args"] |> as_map() |> Map.values() |> Enum.filter(&is_binary/1)
     templates = [node["prompt"], node["ask"]] ++ List.wrap(node["tasks"]) ++ arg_values
 
     templates
@@ -361,7 +401,10 @@ defmodule Pepe.Graph do
 
   defp duplicate_ids(ids), do: ids -- Enum.uniq(ids)
   defp reserved_ids(ids), do: Enum.filter(ids, &(&1 in @reserved_ids))
-  defp invalid_id_shapes(ids), do: Enum.reject(ids, &Regex.match?(@id_pattern, &1 || ""))
+  defp invalid_id_shapes(ids), do: Enum.reject(ids, &(is_binary(&1) and Regex.match?(@id_pattern, &1)))
+
+  defp as_map(m) when is_map(m), do: m
+  defp as_map(_not_a_map), do: %{}
 
   defp check(errors, [], _fmt), do: errors
   defp check(errors, problems, fmt), do: Enum.map(problems, fmt) ++ errors
