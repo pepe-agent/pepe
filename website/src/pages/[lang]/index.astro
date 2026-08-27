@@ -48,6 +48,9 @@ const ICONS = {
   warning: svg(`<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/>`),
   search: svg(`<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/>`),
   document: svg(`<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>`),
+  graph: svg(
+    `<circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8.1 6.9l2.6 8.6M15.9 6.9l-2.6 8.6M8.4 6h7.2"/>`,
+  ),
 } as const;
 
 const surfaces = [
@@ -72,6 +75,7 @@ const loops = [
 const features = [
   { ico: ICONS.chip, t: "f.model.t", d: "f.model.d", shot: "models" },
   { ico: ICONS.wrench, t: "f.tools.t", d: "f.tools.d", shot: "trace-detail" },
+  { ico: ICONS.graph, t: "f.orchestrate.t", d: "f.orchestrate.d", shot: null },
   { ico: ICONS.compass, t: "f.goal.t", d: "f.goal.d", shot: "goal" },
   { ico: ICONS.bolt, t: "f.routing.t", d: "f.routing.d", shot: "agent-edit" },
   { ico: ICONS.clock, t: "f.cron.t", d: "f.cron.d", shot: "cron" },
