@@ -76,7 +76,7 @@ export const ui = {
       "Built-in tools for shell, files, web, scripts, and file delivery. Add your own in minutes.",
     "f.orchestrate.t": "Branching, multi-step workflows",
     "f.orchestrate.d":
-      "One script can call several tools with real branching logic in a single pass, or fan a task out to parallel sub-agents that each answer on their own - a workflow graph, not just one long chat turn.",
+      "One script can call several tools with real branching logic in a single pass, or fan a task out to parallel sub-agents that each answer on their own. That's graph engineering in practice: a workflow shaped like a graph, not one long chat turn.",
     "f.channels.t": "Messaging channels",
     "f.channels.d":
       "Bind an agent to Telegram or webhook channels, with handoff, admin/support modes, and per-connection scope.",
@@ -252,7 +252,7 @@ export const ui = {
       "Herramientas integradas para shell, archivos, web, scripts y envío de archivos. Añade las tuyas en minutos.",
     "f.orchestrate.t": "Flujos de trabajo ramificados, en varios pasos",
     "f.orchestrate.d":
-      "Un mismo script puede llamar a varias herramientas con lógica condicional real en una sola pasada, o repartir una tarea entre subagentes en paralelo que responden por su cuenta: un flujo con forma de grafo, no solo un turno de chat.",
+      "Un mismo script puede llamar a varias herramientas con lógica condicional real en una sola pasada, o repartir una tarea entre subagentes en paralelo que responden por su cuenta. Eso es ingeniería de grafos en la práctica: un flujo con forma de grafo, no solo un turno de chat.",
     "f.channels.t": "Canales de mensajería",
     "f.channels.d":
       "Vincula un agente a Telegram o a canales por webhook, con traspaso, modos admin/soporte y alcance por conexión.",
@@ -428,7 +428,7 @@ export const ui = {
       "Ferramentas nativas para shell, arquivos, web, scripts e envio de arquivos. Adicione as suas em minutos.",
     "f.orchestrate.t": "Fluxos de trabalho em várias etapas, com ramificação",
     "f.orchestrate.d":
-      "Um mesmo script pode chamar várias ferramentas com lógica condicional real numa única passada, ou distribuir uma tarefa entre sub-agentes em paralelo que respondem por conta própria - um fluxo em formato de grafo, não só um turno de chat.",
+      "Um mesmo script pode chamar várias ferramentas com lógica condicional real numa única passada, ou distribuir uma tarefa entre sub-agentes em paralelo que respondem por conta própria. Isso é engenharia de grafos na prática: um fluxo em formato de grafo, não só um turno de chat.",
     "f.channels.t": "Canais de mensagem",
     "f.channels.d":
       "Vincule um agente ao Telegram ou a canais por webhook, com handoff, modos admin/suporte e escopo por conexão.",
@@ -604,7 +604,7 @@ export const ui = {
       "Ferramentas nativas para shell, ficheiros, web, scripts e envio de ficheiros. Adiciona as tuas em minutos.",
     "f.orchestrate.t": "Fluxos de trabalho em várias etapas, com ramificação",
     "f.orchestrate.d":
-      "Um mesmo script pode chamar várias ferramentas com lógica condicional real numa única passagem, ou distribuir uma tarefa entre subagentes em paralelo que respondem por conta própria - um fluxo em formato de grafo, não apenas um turno de chat.",
+      "Um mesmo script pode chamar várias ferramentas com lógica condicional real numa única passagem, ou distribuir uma tarefa entre subagentes em paralelo que respondem por conta própria. Isso é engenharia de grafos na prática: um fluxo em formato de grafo, não apenas um turno de chat.",
     "f.channels.t": "Canais de mensagens",
     "f.channels.d":
       "Liga um agente ao Telegram ou a canais por webhook, com transferência, modos admin/suporte e âmbito por ligação.",
