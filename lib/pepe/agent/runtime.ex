@@ -676,8 +676,12 @@ defmodule Pepe.Agent.Runtime do
   def taint_if_outside(name), do: if(outside_content?(name), do: Pepe.Permissions.taint(), else: :ok)
 
   # Mutating file tools whose autonomous use we stage for review rather than apply.
+  # Exposed via `stageable?/1` (not just the private guard below) so `RunCode`'s
+  # sandbox bridge can apply the exact same staging rule to a script-called tool
+  # instead of keeping a second copy of this list that could silently drift from it.
   @stageable ~w(write_file edit_file move_file)
-  defp stageable?(name), do: name in @stageable
+  @doc false
+  def stageable?(name), do: name in @stageable
 
   defp stage_for_review(name, call, ctx) do
     agent = (ctx[:agent] && ctx.agent.name) || "unknown"

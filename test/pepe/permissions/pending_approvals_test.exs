@@ -37,6 +37,40 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
     end
   end
 
+  # First reply: a tool call for `bash` (auto_approved on the test agent) - runs only if
+  # the resumed turn came back untainted. Second reply (once the tool result is in the
+  # transcript): a plain finish, so the turn ends in exactly two round trips either way.
+  defmodule TaintProbePlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, opts) do
+      {:ok, body, conn} = read_body(conn)
+      last = body |> Jason.decode!() |> Map.fetch!("messages") |> List.last()
+
+      {message, finish_reason} =
+        if last["role"] == "tool" do
+          {%{"role" => "assistant", "content" => "done"}, "stop"}
+        else
+          tool_call = %{
+            "id" => "call_1",
+            "type" => "function",
+            "function" => %{
+              "name" => "bash",
+              "arguments" => Jason.encode!(%{"command" => "touch #{Keyword.fetch!(opts, :marker)}"})
+            }
+          }
+
+          {%{"role" => "assistant", "content" => nil, "tool_calls" => [tool_call]}, "tool_calls"}
+        end
+
+      payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => finish_reason}]}
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+    end
+  end
+
   setup do
     {:ok, _} = Application.ensure_all_started(:pepe)
 
@@ -89,7 +123,7 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
     assert {:deny, _} = Permissions.gate("bash", ~s({"command":"echo approved-and-ran"}), %{agent: agent})
     assert [record] = PendingApprovals.list()
 
-    assert {:ok, result, :no_session} = PendingApprovals.approve(record.id)
+    assert {:ok, result, :no_session, false} = PendingApprovals.approve(record.id)
     assert result =~ "approved-and-ran"
     assert PendingApprovals.get(record.id).status == "approved"
 
@@ -115,7 +149,7 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
       |> Enum.map(fn _ -> Task.async(fn -> PendingApprovals.approve(record.id) end) end)
       |> Task.await_many(60_000)
 
-    assert Enum.count(results, &match?({:ok, _result, _delivery}, &1)) == 1
+    assert Enum.count(results, &match?({:ok, _result, _delivery, _persisted}, &1)) == 1
     assert Enum.count(results, &match?({:error, {:already, "approved"}}, &1)) == 7
     assert marker |> File.read!() |> String.split("\n", trim: true) |> length() == 1
     assert PendingApprovals.get(record.id).status == "approved"
@@ -193,12 +227,61 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
 
     # The operator's resolving process starts clean - the record's taint must ride the replay.
     Permissions.untaint()
-    assert {:ok, result, :no_session} = PendingApprovals.approve(record.id)
+    assert {:ok, result, :no_session, false} = PendingApprovals.approve(record.id)
     assert result =~ "refused:"
     assert result =~ "content from outside"
     refute File.exists?(marker), "the in-script call must not regain auto_approve on replay"
     # And the replay's re-imposed taint never leaks into the resolving process afterward.
     refute Permissions.tainted?(%{})
+  end
+
+  test "approving a run_code call whose script reaches outside content taints the resumed turn" do
+    # The record itself parks untainted (nothing about the call to run_code was tainted) -
+    # the taint only shows up mid-replay, when the script calls fetch_url (@always_safe,
+    # so the gate lets it through unconditionally, and it taints the replaying process the
+    # moment it runs regardless of whether the fetch itself succeeds). `run_code` is opaque
+    # to Runtime.outside_content?/1's static name check - only the script's own actions
+    # reveal what it touched - so before the fix `run_stored_call/2`'s `after` wiped that
+    # live-acquired taint before `approve/2` ever read it, and the resumed turn came back
+    # untainted: whatever the model asked for next (here, an auto_approved `bash`) would
+    # have just run, exactly the "more privilege than the inline path" this exists to stop.
+    marker = Path.join(System.tmp_dir!(), "pepe_appr_replay_taint_#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm(marker) end)
+
+    server = start_supervised!({Bandit, plug: {TaintProbePlug, marker: marker}, port: 0, scheme: :http})
+    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+
+    Config.put_model(%Model{name: "taint-mock", base_url: "http://localhost:#{port}", api_key: "x", model: "m"})
+
+    Config.put_agent(%Agent{
+      name: "zak",
+      system_prompt: "x",
+      model: "taint-mock",
+      tools: ["run_code", "fetch_url", "bash"],
+      auto_approve: ["bash:any"]
+    })
+
+    agent = Config.get_agent("zak")
+
+    key = "ws:taint-#{System.unique_integer([:positive])}"
+    origin = %{"channel" => "ws", "key" => key}
+    {:ok, _} = Registry.register(Pepe.Watch.Subscribers, Delivery.topic(origin), nil)
+    Phoenix.PubSub.subscribe(Pepe.PubSub, Delivery.topic(origin))
+
+    script = ~s[pepe_call("fetch_url", {url = "http://127.0.0.1:1/"}) return "reached out"]
+
+    assert {:deny, _} =
+             Permissions.gate("run_code", Jason.encode!(%{"script" => script}), %{agent: agent, session_key: key})
+
+    assert [record] = PendingApprovals.list()
+    refute record.tainted
+
+    assert {:ok, _result, _delivery, false} = PendingApprovals.approve(record.id)
+
+    # A live turn that started tainted refuses bash instead of running it - if the marker
+    # exists, the resumed turn ran auto_approved untainted, which is the bug.
+    assert_receive {:watch_message, ^origin, _reply}, 5_000
+    refute File.exists?(marker), "an auto-approved tool call in the resumed turn must not run untainted"
   end
 
   test "denying records the human's reason and refuses re-resolution", %{agent: agent} do
@@ -229,7 +312,7 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
     assert {:deny, _} = Permissions.gate("bash", ~s({"command":"echo hi"}), %{agent: agent})
     assert [record] = PendingApprovals.list()
 
-    assert {:ok, _result, :no_session} = PendingApprovals.approve(record.id, always: true)
+    assert {:ok, _result, :no_session, true} = PendingApprovals.approve(record.id, always: true)
 
     # The grant is the real Pepe.Permissions.Grant write, scoped to the risks the gate
     # saw (none here), on the agent in config.json.
@@ -265,7 +348,7 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
     assert record.session_key == key
     assert record.origin["channel"] == "ws"
 
-    assert {:ok, result, :delivered} = PendingApprovals.approve(record.id)
+    assert {:ok, result, :delivered, false} = PendingApprovals.approve(record.id)
     assert result =~ "handed-back"
 
     # The model saw the internal approval note carrying the real tool result - no retry
@@ -277,9 +360,8 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
   end
 
   test "deny relays the human's reason to the model in the resumed turn" do
-    {:ok, server} = Bandit.start_link(plug: {CapturePlug, pid: self(), reply: "understood"}, port: 0, scheme: :http)
+    server = start_supervised!({Bandit, plug: {CapturePlug, pid: self(), reply: "understood"}, port: 0, scheme: :http})
     {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
-    on_exit(fn -> Process.exit(server, :normal) end)
 
     Config.put_model(%Model{name: "deny-mock", base_url: "http://localhost:#{port}", api_key: "x", model: "m"})
     Config.put_agent(%Agent{name: "zak", system_prompt: "x", model: "deny-mock", tools: ["bash"], auto_approve: []})
