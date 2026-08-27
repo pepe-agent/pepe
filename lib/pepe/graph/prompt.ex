@@ -75,11 +75,20 @@ defmodule Pepe.Graph.Prompt do
 
   defp render_match(%{key: key} = match, state, _input) do
     cond do
-      Map.has_key?(state, key) -> to_string(Map.get(state, key))
+      Map.has_key?(state, key) -> stringify(Map.get(state, key))
       match.optional == "?" -> "(none yet)"
       true -> match.default || ""
     end
   end
+
+  # A node's own past reply is always a plain string, but a graph's initial `state`
+  # defaults are author-supplied JSON and can be anything - `to_string/1` raises on a
+  # map/list/tuple, so this is total instead of trusting every value to already be a
+  # scalar.
+  defp stringify(value) when is_binary(value), do: value
+  defp stringify(nil), do: ""
+  defp stringify(value) when is_number(value) or is_boolean(value), do: to_string(value)
+  defp stringify(value), do: Jason.encode!(value)
 
   @doc """
   Every `state` key a template references (via any of the three `{{...}}` forms),
@@ -98,6 +107,11 @@ defmodule Pepe.Graph.Prompt do
     |> Enum.uniq()
   end
 
+  # `Pepe.Graph.import/2` validates that a `prompt`/`ask`/task/arg value is a string before
+  # ever saving it, but this stays a pure function that never raises on a shape it wasn't
+  # given, rather than trusting every call site to have checked first.
+  def referenced_keys(_not_a_string), do: []
+
   @doc """
   Resolve a verifier's reply to `{:ok, verdict_word, target_node_or_"end"}`. The
   contract is a fixed final line, not a scan: only the last non-blank line, trimmed,
@@ -106,11 +120,16 @@ defmodule Pepe.Graph.Prompt do
   """
   @spec verdict(String.t(), map()) :: {:ok, String.t(), String.t()} | {:error, {:bad_verdict, String.t()}}
   def verdict(reply, verdicts) when is_binary(reply) and is_map(verdicts) do
+    # `String.split(reply, "\n", trim: true)` only drops segments that are the empty
+    # string outright - a trailing line of pure whitespace ("pass\n   \n") survives that
+    # and would wrongly become "the last line" instead of "pass". Trim every line first,
+    # then drop the ones that are blank only after trimming.
     last_line =
       reply
-      |> String.split("\n", trim: true)
+      |> String.split("\n")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
       |> List.last(reply)
-      |> String.trim()
       |> String.replace(~r/[.!?:;,]+$/, "")
       |> String.downcase()
 

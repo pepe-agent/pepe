@@ -1550,6 +1550,7 @@ defmodule Mix.Tasks.Pepe do
     else
       {:error, :enoent} -> error("no such file: #{file}")
       {:error, %Jason.DecodeError{} = e} -> error("#{file} isn't valid JSON: #{Exception.message(e)}")
+      {:error, reason} -> error("could not read #{file}: #{:file.format_error(reason)}")
     end
   end
 

@@ -153,26 +153,19 @@ defmodule Pepe.Graph.Runner do
 
   defp run_node(run, %{"type" => "parallel"} = node, opts, resumed?) do
     with {:ok, tasks} <- render_list(node["tasks"] || [], run.state, run.input),
-         %{} = node_agent <- resolve_agent(node, run) do
+         %{} = node_agent <- resolve_parallel_agent(node, run) do
       node_tainted? = node_tainted?(run, Enum.join(node["tasks"] || [], "\n"))
       cwd = Workspace.cwd_in_ctx(%{agent: node_agent})
       ctx = %{agent: node_agent, cwd: cwd, untrusted: node_tainted?, source: "graph", graph_run_id: run.id}
-      call = %{"function" => %{"name" => "delegate", "arguments" => %{"tasks" => tasks}}}
+      args = %{"tasks" => tasks}
 
-      {result, became_tainted?} =
-        with_taint_seed(node_tainted?, fn ->
-          result = Tools.execute(call, ctx)
-          # `delegate` is always in `Runtime.outside_content?/1`'s list (sub-agent workers may
-          # have read arbitrary web/file content) - but calling `Tools.execute/2` directly here
-          # skips Runtime's own turn loop, whose `finalize_tool/3` is the only place that
-          # normally marks this. Without it, a parallel node's own output key would never join
-          # `tainted_keys`, and a downstream node reading it would run trusted by mistake.
-          Runtime.taint_if_outside("delegate")
-          {result, elem(Permissions.snapshot(), 0)}
-        end)
-
-      next = node["next"] || "end"
-      run |> apply_step(node["id"], result, next, became_tainted?) |> continue(next, opts, resumed?)
+      # `delegate` requires approval like any other tool - gated live here for the same
+      # TOCTOU reason a `tool` node is: `agent.tools`/`auto_approve` can be revoked after
+      # this graph was saved, and calling `Tools.execute/2` directly (like `run_gated_tool`
+      # would without its own `Permissions.gate/3` call) would let a `parallel` node fan out
+      # via `delegate` regardless of whether the resolved agent was ever granted it.
+      outcome = with_taint_seed(node_tainted?, fn -> run_gated_delegate(args, ctx) end)
+      apply_tool_outcome(run, node, outcome, opts, resumed?)
     else
       {:error, {:unbound_ref, key}} -> finish(run, "failed", unbound_error(node, key), opts, resumed?)
       nil -> finish(run, "failed", unavailable_agent_error(node, run), opts, resumed?)
@@ -224,6 +217,27 @@ defmodule Pepe.Graph.Runner do
 
   defp apply_tool_outcome(run, node, {:error, message}, opts, resumed?) do
     finish(run, "failed", "node #{node["id"]}: #{message}", opts, resumed?)
+  end
+
+  defp run_gated_delegate(args, ctx) do
+    case Permissions.gate("delegate", args, ctx) do
+      :allow ->
+        call = %{"function" => %{"name" => "delegate", "arguments" => args}}
+        result = Tools.execute(call, ctx)
+        # `delegate` is always in `Runtime.outside_content?/1`'s list (sub-agent workers may
+        # have read arbitrary web/file content) - but calling `Tools.execute/2` directly here
+        # skips Runtime's own turn loop, whose `finalize_tool/3` is the only place that
+        # normally marks this. Without it, a parallel node's own output key would never join
+        # `tainted_keys`, and a downstream node reading it would run trusted by mistake.
+        Runtime.taint_if_outside("delegate")
+        {:ok, result, elem(Permissions.snapshot(), 0)}
+
+      :deny ->
+        {:error, "delegate was not authorized"}
+
+      {:deny, reason} ->
+        {:error, "delegate was not authorized (#{reason})"}
+    end
   end
 
   defp run_gated_tool(node, args, ctx) do
@@ -325,10 +339,17 @@ defmodule Pepe.Graph.Runner do
     %{run | history: history}
   end
 
+  # `String.slice/3`, not `binary_part/3`, on purpose: a fixed BYTE offset can land inside
+  # a multi-byte UTF-8 character (very plausible here - non-English content is the norm,
+  # not the exception, across the agents this runs), producing invalid UTF-8 that raises
+  # later, whenever this clipped text is next JSON-encoded (`graph inspect`, an Ecto `:map`
+  # column write). `String.slice/3` only ever cuts on a codepoint boundary.
   @clip 2_000
   defp clip(nil), do: nil
-  defp clip(text) when byte_size(text) > @clip, do: binary_part(text, 0, @clip) <> "... (clipped)"
-  defp clip(text), do: text
+
+  defp clip(text) do
+    if String.length(text) > @clip, do: String.slice(text, 0, @clip) <> "... (clipped)", else: text
+  end
 
   ###
   ### finishing, resuming, and hand-back
@@ -438,6 +459,15 @@ defmodule Pepe.Graph.Runner do
   defp resolve_tool_agent(node, run) do
     with %{} = agent <- resolve_agent(node, run),
          true <- node["tool"] in (agent.tools || []) do
+      agent
+    else
+      _ -> nil
+    end
+  end
+
+  defp resolve_parallel_agent(node, run) do
+    with %{} = agent <- resolve_agent(node, run),
+         true <- "delegate" in (agent.tools || []) do
       agent
     else
       _ -> nil

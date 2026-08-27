@@ -21,7 +21,7 @@ Não tem nenhuma linguagem nova para aprender além de uma única substituição
 
 ### Templates
 
-`{{input}}` é o que foi passado quando o grafo começou. `{{node_id}}` lê a resposta anterior daquele nó, e falha a execução se ele ainda não produziu nenhuma - isso quase sempre é um erro que vale a pena pegar em vez de mandar um prompt pela metade. `{{node_id?}}` lê do mesmo jeito mas cai num texto reserva em vez de falhar, que é exatamente o que um nó de loop-back precisa: na primeira vez que roda, ainda não existe nenhuma crítica. `{{node_id|default:"algum texto"}}` cai num literal seu em vez do texto reserva padrão.
+`{{input}}` é o que foi passado quando o grafo começou. `{{node_id}}` lê a resposta anterior daquele nó, e falha a execução se ele ainda não produziu nenhuma - isso quase sempre é um erro que vale a pena pegar em vez de mandar um prompt pela metade. `{{node_id?}}` lê do mesmo jeito, mas cai num texto reserva em vez de falhar, que é exatamente o que um nó de loop-back precisa: na primeira vez que roda, ainda não existe nenhuma crítica. `{{node_id|default:"algum texto"}}` cai num literal seu em vez do texto reserva padrão.
 
 ## Um exemplo
 
