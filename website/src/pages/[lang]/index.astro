@@ -60,13 +60,14 @@ const surfaces = [
   { ico: ICONS.message, t: "surf.ch.t", d: "surf.ch.d", shot: null },
 ] as const;
 
-// The three loops, from the tightest to the longest-running: one answer, one
-// outcome, forever. The middle one is the argument - it's what a reviewer, not
-// the user, closes.
+// From the tightest to the longest-running: one answer, one outcome, forever -
+// plus the structural one (branching/fan-out), which cuts across all three
+// rather than sitting on that same duration axis.
 const loops = [
   { ico: ICONS.bolt, t: "loop.turn.t", d: "loop.turn.d" },
   { ico: ICONS.compass, t: "loop.goal.t", d: "loop.goal.d" },
   { ico: ICONS.clock, t: "loop.time.t", d: "loop.time.d" },
+  { ico: ICONS.graph, t: "loop.graph.t", d: "loop.graph.d" },
 ] as const;
 
 // Ordered as a story, simplest capability to most advanced: connect a model →
@@ -75,7 +76,6 @@ const loops = [
 const features = [
   { ico: ICONS.chip, t: "f.model.t", d: "f.model.d", shot: "models" },
   { ico: ICONS.wrench, t: "f.tools.t", d: "f.tools.d", shot: "trace-detail" },
-  { ico: ICONS.graph, t: "f.orchestrate.t", d: "f.orchestrate.d", shot: null },
   { ico: ICONS.compass, t: "f.goal.t", d: "f.goal.d", shot: "goal" },
   { ico: ICONS.bolt, t: "f.routing.t", d: "f.routing.d", shot: "agent-edit" },
   { ico: ICONS.clock, t: "f.cron.t", d: "f.cron.d", shot: "cron" },

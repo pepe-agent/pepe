@@ -74,8 +74,8 @@ export const ui = {
     "f.tools.t": "Real tool-calling loop",
     "f.tools.d":
       "Built-in tools for shell, files, web, scripts, and file delivery. Add your own in minutes.",
-    "f.orchestrate.t": "Branching, multi-step workflows",
-    "f.orchestrate.d":
+    "loop.graph.t": "Branching, multi-step workflows",
+    "loop.graph.d":
       "One script can call several tools with real branching logic in a single pass, or fan a task out to parallel sub-agents that each answer on their own. That's graph engineering in practice: a workflow shaped like a graph, not one long chat turn.",
     "f.channels.t": "Messaging channels",
     "f.channels.d":
@@ -250,8 +250,8 @@ export const ui = {
     "f.tools.t": "Bucle real de herramientas",
     "f.tools.d":
       "Herramientas integradas para shell, archivos, web, scripts y envío de archivos. Añade las tuyas en minutos.",
-    "f.orchestrate.t": "Flujos de trabajo ramificados, en varios pasos",
-    "f.orchestrate.d":
+    "loop.graph.t": "Flujos de trabajo ramificados, en varios pasos",
+    "loop.graph.d":
       "Un mismo script puede llamar a varias herramientas con lógica condicional real en una sola pasada, o repartir una tarea entre subagentes en paralelo que responden por su cuenta. Eso es ingeniería de grafos en la práctica: un flujo con forma de grafo, no solo un turno de chat.",
     "f.channels.t": "Canales de mensajería",
     "f.channels.d":
@@ -426,8 +426,8 @@ export const ui = {
     "f.tools.t": "Loop real de ferramentas",
     "f.tools.d":
       "Ferramentas nativas para shell, arquivos, web, scripts e envio de arquivos. Adicione as suas em minutos.",
-    "f.orchestrate.t": "Fluxos de trabalho em várias etapas, com ramificação",
-    "f.orchestrate.d":
+    "loop.graph.t": "Fluxos de trabalho em várias etapas, com ramificação",
+    "loop.graph.d":
       "Um mesmo script pode chamar várias ferramentas com lógica condicional real numa única passada, ou distribuir uma tarefa entre sub-agentes em paralelo que respondem por conta própria. Isso é engenharia de grafos na prática: um fluxo em formato de grafo, não só um turno de chat.",
     "f.channels.t": "Canais de mensagem",
     "f.channels.d":
@@ -602,8 +602,8 @@ export const ui = {
     "f.tools.t": "Ciclo real de ferramentas",
     "f.tools.d":
       "Ferramentas nativas para shell, ficheiros, web, scripts e envio de ficheiros. Adiciona as tuas em minutos.",
-    "f.orchestrate.t": "Fluxos de trabalho em várias etapas, com ramificação",
-    "f.orchestrate.d":
+    "loop.graph.t": "Fluxos de trabalho em várias etapas, com ramificação",
+    "loop.graph.d":
       "Um mesmo script pode chamar várias ferramentas com lógica condicional real numa única passagem, ou distribuir uma tarefa entre subagentes em paralelo que respondem por conta própria. Isso é engenharia de grafos na prática: um fluxo em formato de grafo, não apenas um turno de chat.",
     "f.channels.t": "Canais de mensagens",
     "f.channels.d":
