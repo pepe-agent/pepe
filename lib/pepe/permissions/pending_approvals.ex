@@ -330,18 +330,24 @@ defmodule Pepe.Permissions.PendingApprovals do
   end
 
   defp persist_always(%PendingApproval{agent: agent} = record) when is_binary(agent) do
-    if Config.get_agent(agent) do
-      Config.allow_tool(agent, record.grant)
-      # A policy-forced ask whose underlying call had no grant of its own recorded a
-      # second key at park time - persist both, exactly as an attended `:always` does.
-      if record.also_grant, do: Config.allow_tool(agent, record.also_grant)
+    # `Config.allow_tool/2`'s own :ok/{:error, :unknown_agent} is the actual write result -
+    # checking `Config.get_agent/1` first and then ignoring what the write itself returned
+    # would still report success on a race (the agent vanishing between the two calls) or
+    # any other failure the write hits.
+    with :ok <- Config.allow_tool(agent, record.grant),
+         # A policy-forced ask whose underlying call had no grant of its own recorded a
+         # second key at park time - persist both, exactly as an attended `:always` does.
+         :ok <- persist_also_grant(agent, record.also_grant) do
       true
     else
-      false
+      _ -> false
     end
   end
 
   defp persist_always(_record), do: false
+
+  defp persist_also_grant(_agent, nil), do: :ok
+  defp persist_also_grant(agent, also_grant), do: Config.allow_tool(agent, also_grant)
 
   # Deliver the outcome back into the owning conversation as a new turn - the same
   # mechanism Pepe.Commitments.Scheduler.fulfill/1 uses for an agent_promise: ensure the
