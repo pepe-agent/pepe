@@ -75,7 +75,8 @@ defmodule Pepe.Agent.Runtime do
           untrusted: boolean(),
           images: [map()] | nil,
           agent_chain: [String.t()] | nil,
-          authorize: (String.t(), term(), map() -> Pepe.Permissions.decision()) | nil
+          authorize: (String.t(), term(), map() -> Pepe.Permissions.decision()) | nil,
+          graph_run_id: String.t() | nil
         ]
 
   @doc """
@@ -262,7 +263,14 @@ defmodule Pepe.Agent.Runtime do
       # instead of applied - see Pepe.Approval.
       review: opts[:review] == true,
       # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
-      agent_chain: opts[:agent_chain]
+      agent_chain: opts[:agent_chain],
+      # Set only while a Pepe.Graph.Runner node is executing - `run_graph`'s tool reads
+      # this from ctx (never Process.get) to refuse graph-calls-graph, because a
+      # non-concurrent tool call still runs inside a spawned Task.async_stream worker
+      # whenever the model's response batches it alongside another non-concurrent call
+      # (see run_step/2 below), and a process dictionary set in the parent doesn't cross
+      # into that worker.
+      graph_run_id: opts[:graph_run_id]
     }
 
     loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations || @max_iterations_backstop)
@@ -662,7 +670,13 @@ defmodule Pepe.Agent.Runtime do
   # worker reading a hostile page can steer what comes back, which then reaches this run's
   # context looking like an ordinary tool result. Untainted, that content would still enjoy
   # this run's own auto_approve, which is the whole thing tainting is supposed to withdraw.
-  @outside_content ~w(fetch_url web_search delegate db_query)
+  #
+  # `run_graph` taints for the same reason as `delegate`: a graph's own nodes can fetch,
+  # search, or otherwise read outside content just like any other agent turn, and its final
+  # output is a proxy for whatever a tainted node inside it produced - see
+  # `Pepe.Graph.Runner`'s per-key `tainted_keys`, which this mirrors at the tool-result
+  # boundary the same blunt, name-based way every other entry here does.
+  @outside_content ~w(fetch_url web_search delegate db_query run_graph)
 
   # Public (but internal - @doc false) because `Pepe.Tools.RunCode`'s sandbox bridge runs
   # tools outside this loop and must apply the exact same taint rule after each one, and

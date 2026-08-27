@@ -25,11 +25,13 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.EndSession
   alias Pepe.Tools.FetchUrl
   alias Pepe.Tools.Goal
+  alias Pepe.Tools.InspectGraphRun
   alias Pepe.Tools.Invoice
   alias Pepe.Tools.ListDir
   alias Pepe.Tools.ManageAgent
   alias Pepe.Tools.ManageChannel
   alias Pepe.Tools.ManageDb
+  alias Pepe.Tools.ManageGraph
   alias Pepe.Tools.ManageMcp
   alias Pepe.Tools.ManagePepe
   alias Pepe.Tools.ManagePlugin
@@ -42,6 +44,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.RenameAgent
   alias Pepe.Tools.Review
   alias Pepe.Tools.RunCode
+  alias Pepe.Tools.RunGraph
   alias Pepe.Tools.RunScript
   alias Pepe.Tools.ScanSkill
   alias Pepe.Tools.ScheduleTask
@@ -84,6 +87,9 @@ defmodule Pepe.Tools do
     SendToAgent,
     SwitchAgent,
     Delegate,
+    ManageGraph,
+    RunGraph,
+    InspectGraphRun,
     ScheduleTask,
     Board,
     ManageChannel,

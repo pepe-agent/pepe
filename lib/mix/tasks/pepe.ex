@@ -125,6 +125,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
       mix pepe traces [--project CO] [ID]        # inspect/replay recent agent runs
       mix pepe flow list|promote|show|remove|run ... # promote a proven trace sequence into a script
+      mix pepe graph list|import|run|resume|inspect ... # nodes/edges, shared state, a verifier that can loop back
       mix pepe browser install                  # host-level help for the `browser` agent tool
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
       mix pepe skill list|search|install|update ... # skill marketplace: taps + the bundled registry
@@ -197,6 +198,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "extract" | _]), do: extract_help()
   def dispatch(["help", "restore" | _]), do: restore_help()
   def dispatch(["help", "flow" | _]), do: flow_cmd(["help"])
+  def dispatch(["help", "graph" | _]), do: graph_cmd(["help"])
   def dispatch(["help", "browser" | _]), do: browser_cmd(["help"])
 
   def dispatch(["setup" | _]), do: with_config(&setup/0)
@@ -236,6 +238,13 @@ defmodule Mix.Tasks.Pepe do
   # with_config already starts.
   def dispatch(["flow", "run" | rest]), do: with_app([], fn -> flow_cmd(["run" | rest]) end)
   def dispatch(["flow" | rest]), do: with_config(fn -> flow_cmd(rest) end)
+
+  # `graph run`/`graph resume` call the model and may hand a result back into a live
+  # session; every other subcommand only touches Pepe.Repo (with_config's fast boot).
+  def dispatch(["graph", sub | rest]) when sub in ["run", "resume"],
+    do: with_app([persist: true], fn -> graph_cmd([sub | rest]) end)
+
+  def dispatch(["graph" | rest]), do: with_config(fn -> graph_cmd(rest) end)
   # Pure host detection (package manager on PATH, current uid) - no config/app needed at all.
   def dispatch(["browser" | rest]), do: browser_cmd(rest)
   def dispatch(["doctor" | rest]), do: with_app([], fn -> doctor_cmd(rest) end)
@@ -1500,6 +1509,216 @@ defmodule Mix.Tasks.Pepe do
 
     A flow only replays a step whose tool is already in the agent's own auto_approve -
     there is nobody watching a flow run to ask, same as any other unattended surface.
+    """)
+  end
+
+  ### graph (Pepe.Graph - see its moduledoc for the node/edge shape)
+
+  defp graph_cmd(["help"]), do: graph_help()
+
+  defp graph_cmd(["list" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [agent: :string])
+
+    case opts[:agent] do
+      nil ->
+        error("usage: mix pepe graph list --agent NAME")
+
+      agent ->
+        case Pepe.Graph.for_agent(agent) do
+          [] -> info("no graphs for #{agent} yet. mix pepe graph import FILE.json")
+          graphs -> Enum.each(graphs, &print_graph_line/1)
+        end
+    end
+  end
+
+  defp graph_cmd(["import", file | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [overwrite: :boolean])
+
+    with {:ok, raw} <- File.read(file),
+         {:ok, definition} <- Jason.decode(raw) do
+      case Pepe.Graph.import(definition, overwrite: opts[:overwrite] == true) do
+        {:ok, saved} ->
+          ok("saved #{green(saved["name"])} for #{saved["agent"]}: #{length(saved["nodes"])} node(s), entry #{saved["entry"]}")
+
+        {:error, :already_exists} ->
+          error("#{definition["name"]} already exists for #{definition["agent"]} - pass --overwrite to replace it")
+
+        {:error, {:invalid, problems}} ->
+          error("invalid graph:")
+          Enum.each(problems, &error("  - #{&1}"))
+      end
+    else
+      {:error, :enoent} -> error("no such file: #{file}")
+      {:error, %Jason.DecodeError{} = e} -> error("#{file} isn't valid JSON: #{Exception.message(e)}")
+      {:error, reason} -> error("could not read #{file}: #{:file.format_error(reason)}")
+    end
+  end
+
+  defp graph_cmd(["show", agent, name | _]) do
+    case Pepe.Graph.get(agent, name) do
+      nil ->
+        error("no graph #{name} for #{agent}")
+
+      graph ->
+        puts("#{bold(graph["name"])}  #{dim(graph["agent"])}  entry: #{graph["entry"]}  max_steps: #{graph["max_steps"]}")
+        puts("")
+        Enum.each(graph["nodes"], &print_graph_node/1)
+    end
+  end
+
+  defp graph_cmd(["remove", agent, name | _]) do
+    case Pepe.Graph.delete(agent, name) do
+      :ok -> ok("removed #{name} for #{agent}")
+      {:error, :not_found} -> error("no graph #{name} for #{agent}")
+    end
+  end
+
+  defp graph_cmd(["run", agent, name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [input: :string])
+
+    case Pepe.Graph.run(agent, name, opts[:input], source: "cli") do
+      {:ok, run} -> print_graph_run_outcome(run)
+      {:error, :not_found} -> error("no graph #{name} for #{agent}")
+    end
+  end
+
+  defp graph_cmd(["resume", run_id, reply | _]) do
+    case Pepe.Graph.resume(run_id, reply) do
+      {:ok, run} -> print_graph_run_outcome(run)
+      {:error, :not_found} -> error("no run #{run_id}")
+      {:error, {:already, status}} -> error("run #{run_id} is already #{status}, not waiting_human")
+    end
+  end
+
+  defp graph_cmd(["runs" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [agent: :string, limit: :integer])
+
+    case Pepe.Graph.runs(agent: opts[:agent], limit: opts[:limit] || 20) do
+      [] -> info("no graph runs yet.")
+      runs -> Enum.each(runs, &print_graph_run_line/1)
+    end
+  end
+
+  defp graph_cmd(["inspect", run_id | _]) do
+    case Pepe.Graph.get_run(run_id) do
+      nil ->
+        error("no run #{run_id}")
+
+      run ->
+        puts("#{bold(run["id"])}  #{run["graph_name"]}  #{status_label(run)}")
+        puts(dim("current node: #{run["current_node"]}  steps: #{run["steps_taken"]}/#{run["max_steps"]}"))
+        if run["error"], do: error(run["error"])
+        puts("")
+        Enum.each(run["history"], &print_graph_history_line/1)
+        puts("")
+        puts(dim("state: #{Jason.encode!(run["state"])}"))
+    end
+  end
+
+  defp graph_cmd(["schedule", agent, name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [schedule: :string, timezone: :string, deliver: :string])
+
+    with {:ok, graph} <- graph_or_error(agent, name),
+         {:ok, schedule} <- require_opt(opts, :schedule),
+         {:ok, _} <- Pepe.Cron.parse(schedule) do
+      cron = %Pepe.Config.Cron{
+        id: cron_id(name),
+        name: name,
+        agent: agent,
+        kind: "graph",
+        graph: graph["name"],
+        schedule: schedule,
+        timezone: opts[:timezone] || Config.default_timezone(),
+        deliver: opts[:deliver] || "none",
+        enabled: true
+      }
+
+      Config.put_cron(cron)
+      ok("scheduled graph #{green(name)} for #{agent}: #{green(cron.id)} (#{schedule})")
+    else
+      {:error, :missing, key} -> error("graph schedule needs --#{key}")
+      {:error, :no_such_graph} -> error("no graph #{name} for #{agent} - import it first")
+      {:error, msg} -> error("invalid --schedule: #{msg}")
+    end
+  end
+
+  defp graph_cmd(_), do: graph_help()
+
+  defp graph_or_error(agent, name) do
+    case Pepe.Graph.get(agent, name) do
+      nil -> {:error, :no_such_graph}
+      graph -> {:ok, graph}
+    end
+  end
+
+  defp print_graph_line(g), do: puts("#{bold(g["name"])}  #{dim(g["agent"])}  entry: #{g["entry"]}  #{length(g["nodes"])} node(s)")
+
+  defp print_graph_node(node) do
+    target =
+      cond do
+        node["verdicts"] -> inspect(node["verdicts"])
+        node["next"] -> node["next"]
+        true -> "(terminal)"
+      end
+
+    puts("  #{node["id"]} (#{node["type"]}) → #{target}")
+  end
+
+  defp status_label(%{"status" => "waiting_human"}), do: yellow("waiting_human")
+  defp status_label(%{"status" => "done"}), do: green("done")
+  defp status_label(%{"status" => "failed"}), do: red("failed")
+  defp status_label(%{"status" => status}), do: status
+
+  defp print_graph_run_line(r) do
+    stale = if Pepe.Graph.stale?(r), do: dim(" (stale)"), else: ""
+    puts("#{r["id"]}  #{r["graph_name"]}  #{status_label(r)}#{stale}  #{r["steps_taken"]}/#{r["max_steps"]} steps")
+  end
+
+  defp print_graph_history_line(h) do
+    verdict = if h["verdict"], do: " [#{h["verdict"]}]", else: ""
+    puts("  #{h["node"]} (visit #{h["visit"]}) → #{h["next"] || "(pending)"}#{verdict}")
+  end
+
+  defp print_graph_run_outcome(%{"status" => "waiting_human"} = run) do
+    asked = run["history"] |> List.last() |> Map.get("asked", "")
+    ok("run #{green(run["id"])} is waiting_human at #{run["current_node"]}")
+    puts(asked)
+    puts(dim("resolve with: mix pepe graph resume #{run["id"]} \"...\""))
+  end
+
+  defp print_graph_run_outcome(%{"status" => "done"} = run) do
+    ok("run #{green(run["id"])} done")
+    puts(String.slice(to_string(Map.get(run["state"], run["current_node"], "")), 0, 600))
+  end
+
+  defp print_graph_run_outcome(%{"status" => "failed"} = run) do
+    error("run #{run["id"]} failed: #{run["error"]}")
+  end
+
+  defp graph_help do
+    info("""
+    mix pepe graph - nodes and edges with shared state across separate model calls, a
+    verifier that can send the flow back to an earlier node, and a node that pauses for
+    a human. See lib/pepe/graph.ex's moduledoc for the node/edge JSON shape.
+
+      list --agent AGENT                        list an agent's graphs
+      import FILE.json [--overwrite]            validate and save a graph definition
+      show AGENT NAME                           its nodes and edges
+      remove AGENT NAME                         (past runs of it are kept)
+      run AGENT NAME [--input TEXT]             start a run
+      resume RUN_ID "reply"                     answer a run paused at a human node
+      runs [--agent AGENT] [--limit N]          recent runs and their status
+      inspect RUN_ID                            one run's per-node history and state
+      schedule AGENT NAME --schedule "..." [--timezone TZ] [--deliver ...]
+                                                   run it on a schedule (a cron of kind "graph")
+
+    A graph node runs through the same real permission gate a normal turn does. On an
+    unattended surface, a risky "tool" node step is still parked as a pending approval
+    for the record (mix pepe approvals list) - but the run itself does not wait for it:
+    it fails right there as soon as the gate refuses, since nothing keeps a run paused
+    for a later answer the way a "human" node does. Approving that parked request later
+    replays the one tool call in isolation; it does not resume the graph run, which has
+    already finished.
     """)
   end
 
