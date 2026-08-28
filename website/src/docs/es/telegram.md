@@ -5,10 +5,7 @@ description: Crea y gestiona bots de Telegram conectados a agentes de Pepe.
 
 ## Telegram
 
-Telegram es el canal más rápido de poner en marcha porque no necesita ninguna
-URL pública. Crea un bot con @BotFather, copia su token y regístralo. El propio
-Pepe va a Telegram a buscar los mensajes nuevos, así que nada en tu máquina
-tiene que quedar expuesto a internet.
+De todos los canales, Telegram es el que menos esfuerzo pide para arrancar: no hace falta ninguna URL pública. Basta con crear un bot con @BotFather, copiar su token y registrarlo. Es Pepe quien va a buscar los mensajes nuevos a Telegram, así que no necesitas exponer nada de tu máquina a internet.
 
 Configura el bot predeterminado de forma interactiva:
 
@@ -16,345 +13,192 @@ Configura el bot predeterminado de forma interactiva:
 pepe gateway telegram setup
 ```
 
-Esto pide el token (puedes pegar un token literal o una referencia
-`${ENV_VAR}`), un agente opcional para vincular y una lista opcional de ids de
-chat autorizados a hablar con él.
+El asistente pide el token (puedes pegarlo literal o como referencia `${ENV_VAR}`), un agente opcional al que vincularlo, y una lista opcional de ids de chat con permiso para hablarle.
 
-Puedes ejecutar más de un bot, cada uno vinculado a un agente distinto:
+También puedes tener varios bots corriendo a la vez, cada uno atado a un agente distinto:
 
 ```bash
 pepe gateway telegram add support --token "${SUPPORT_BOT_TOKEN}" --agent helpdesk --trainers none
 pepe gateway telegram add ops --token "${OPS_BOT_TOKEN}" --agent operator --heartbeat-minutes 30 --heartbeat-hours 8-22
 ```
 
-Las opciones de `telegram add`:
+Opciones de `telegram add`:
 
 - `--token` (obligatorio): el token del bot, literal o `${ENV_VAR}`.
-- `--agent`: qué agente responde. Omítelo para usar tu agente predeterminado.
-- `--trainers`: de quién puede aprender este bot hacia su memoria, y quién puede
-  ejecutar sus comandos de operador. Omítelo para todos, `none` para nadie, o una
-  lista separada por comas de ids de usuario para solo esos.
-- `--heartbeat-minutes` y `--heartbeat-hours`: una ventana periódica opcional de
-  activación (para agentes que revisan cosas según un horario). Las horas son
-  una ventana local como `8-22`. Ver "Heartbeat" más abajo.
-- `--progress`: cómo señala el bot que está trabajando mientras una ejecución
-  está en curso. Uno de `reaction`, `ambient`, `off` o `verbose`. Ver "Mostrar
-  que está trabajando" más abajo.
+- `--agent`: el agente que responde. Si lo omites, se usa tu agente predeterminado.
+- `--trainers`: quién puede alimentar la memoria de este bot y ejecutar sus comandos de operador. Omítelo para que sea cualquiera, pon `none` para que no sea nadie, o dale una lista de ids de usuario separados por comas.
+- `--heartbeat-minutes` y `--heartbeat-hours`: activan una ventana periódica de despertar, pensada para agentes que revisan algo con cierta cadencia. Las horas se dan como una ventana local, tipo `8-22`. Más sobre esto en "Heartbeat" más abajo.
+- `--progress`: cómo le hace saber el bot al usuario que está trabajando mientras corre una ejecución. Acepta `reaction`, `ambient`, `off` o `verbose`; ver "Mostrar que está trabajando" más abajo.
 
-Listar y eliminar bots:
+Listar y quitar bots:
 
 ```bash
 pepe gateway telegram list
 pepe gateway telegram remove support
 ```
 
-Ejecuta el poller en primer plano (un poller por bot):
+Ejecutar el poller en primer plano (un poller por bot):
 
 ```bash
 pepe gateway telegram
 ```
 
-Cada bot tiene su propio poller, su propio token, su propio agente vinculado, sus
-propias listas de autorizados y su propio espacio de nombres de sesión. Dos bots
-que resuelven al mismo token se deduplican, porque dos pollers sobre un solo token
-entrarían en conflicto entre sí.
+Cada bot corre con su propio poller, su propio token, su propio agente, sus propias listas de acceso y su propio espacio de sesiones. Si dos bots terminan apuntando al mismo token se deduplican automáticamente, porque dos pollers sobre un único token chocarían entre sí.
 
-Normalmente no necesitas ejecutar eso por separado. `pepe serve` arranca los
-bots de Telegram configurados junto con la API HTTP, así que un único servidor
-en ejecución cubre todos los canales a la vez.
+En la práctica casi nunca hace falta correr ese comando aparte: `pepe serve` ya arranca los bots de Telegram configurados junto con la API HTTP, así que con un solo servidor en marcha cubres todos los canales de una vez.
 
-Dentro de un solo bot todavía puedes cambiar de agente por chat con
-`/agent <nombre>` (ver [Enrutamiento](../routing/)). Un bot dedicado es para
-cuando un canal entero debe *ser* un agente.
+Dentro de un mismo bot todavía puedes cambiar de agente chat por chat con `/agent <nombre>` (ver [Enrutamiento](../routing/)). Un bot dedicado tiene sentido cuando quieres que un canal entero *sea* un único agente.
 
-<div class="note"><strong>Panel.</strong> La sección Channels del panel lista
-tus bots con una insignia en vivo de activo/inactivo, te permite añadir un bot,
-editar con qué agente habla y eliminarlo. Escribe la misma configuración que la
-línea de comandos, y los pollers en ejecución se reconcilian sin reiniciar.</div>
+<div class="note"><strong>Panel.</strong> La sección Channels del panel lista tus bots con una insignia en vivo de activo o inactivo, te deja añadir un bot, cambiar con qué agente habla y eliminarlo. Escribe la misma configuración que la línea de comandos, y los pollers en ejecución se ajustan solos, sin reiniciar nada.</div>
 
 ### Dónde vive la configuración
 
-El bot predeterminado vive bajo `"telegram"` en `~/.pepe/config.json`. Los bots
-con nombre adicionales viven bajo `"telegrams"`, un mapa de nombre a
-configuración, y cada uno acepta las mismas claves que el predeterminado:
+El bot predeterminado se guarda bajo `"telegram"` en `~/.pepe/config.json`. Los bots con nombre propio van bajo `"telegrams"`, un mapa de nombre a configuración, y cada uno admite las mismas claves que el predeterminado:
 
 - `bot_token`: el token, literal o `${ENV_VAR}`.
-- `enabled`: si arranca el poller de este bot.
-- `agent`: qué agente responde.
-- `allowed_chats` y `allowed_users`: las listas de ids autorizados. Déjalas fuera
-  y el bot habla con cualquiera.
+- `enabled`: si el poller de este bot arranca o no.
+- `agent`: el agente que responde.
+- `allowed_chats` y `allowed_users`: las listas de ids con acceso. Si las dejas vacías, el bot le habla a cualquiera.
 - `require_mention`: en un grupo, responder solo cuando se @menciona al bot.
-- `reactions`: qué 👍/👎 en un mensaje llegan al agente como feedback: `own`
-  (por defecto, solo reacciones en los propios mensajes del bot), `all` u
-  `off`. Todo agente ya sabe qué hacer con esto: con 👍 anota en su propia
-  memoria qué funcionó, con 👎 qué evitar repetir, y nunca responde a la
-  reacción en sí. Pasa por la misma revisión que cualquier escritura de
-  memoria, en la página Learning del panel, antes de quedar guardado.
-- `quick_reactions`: desactivado por defecto. Activado, un mensaje que es solo
-  un agradecimiento o un emoji suelto ("¡gracias!", un ❤️ solo) recibe una
-  reacción nativa en vez de una respuesta completa, sin gastar una llamada al
-  modelo. Todo lo que tenga contenido real sigue recibiendo respuesta normal.
-- `trainers`: de quién aprende el bot, y quién puede ejecutar sus comandos de
-  operador.
+- `reactions`: qué 👍/👎 sobre un mensaje llegan al agente como feedback: `own` (por defecto, solo reacciones sobre los propios mensajes del bot), `all`, u `off`. Todo agente ya sabe qué hacer con esto: con un 👍 anota en su memoria qué funcionó, con un 👎 qué evitar la próxima vez, y nunca responde a la reacción como tal. Pasa por la misma revisión que cualquier otra escritura de memoria, en la página Learning del panel, antes de quedar guardado.
+- `quick_reactions`: apagado por defecto. Si lo enciendes, un mensaje que sea solo un agradecimiento o un emoji suelto ("¡gracias!", un ❤️ solo) recibe una reacción nativa en lugar de una respuesta completa, sin gastar ninguna llamada al modelo. Cualquier cosa con contenido real sigue recibiendo respuesta normal.
+- `trainers`: de quién aprende el bot y quién puede correr sus comandos de operador.
 
-`/whoami` en un chat es la manera fácil de encontrar los ids para esas listas.
-Imprime tu id de usuario y el id del chat.
+`/whoami`, escrito en un chat, es la forma más rápida de conseguir los ids para esas listas: devuelve tu id de usuario y el id del chat.
 
-Las sesiones tienen espacio de nombres por bot. El bot predeterminado indexa sus
-conversaciones como `telegram:<chat_id>`, mientras que un bot con nombre usa
-`telegram:<name>:<chat_id>`. Dos bots, por tanto, nunca chocan, ni en sus
-conversaciones ni en la entrega de tareas programadas.
+Las sesiones tienen espacio de nombres por bot. El predeterminado guarda sus conversaciones como `telegram:<chat_id>`, mientras que un bot con nombre usa `telegram:<name>:<chat_id>`. Así, dos bots nunca se pisan, ni en sus conversaciones ni en la entrega de tareas programadas.
 
 ### Comandos de barra
 
-Cada chat es una sesión persistente, conducida con comandos de barra. También
-aparecen en el menú "/" de Telegram, en el idioma que configuraste.
+Cada chat funciona como una sesión persistente que se maneja con comandos de barra. Estos también aparecen en el menú "/" de Telegram, en el idioma que hayas configurado.
 
 | Comando | Qué hace |
 |---|---|
 | `/new` | Empieza una conversación nueva |
 | `/undo` | Deshace tu último mensaje |
-| `/retry` | Rehace la última respuesta |
+| `/retry` | Repite la última respuesta |
 | `/compact` | Resume el historial para liberar contexto |
-| `/stop` | Detiene la ejecución actual |
-| `/inline <texto>` | Inyecta un mensaje en la ejecución ya en curso |
-| `/btw <pregunta>` | Hace una pregunta aparte que no se guarda en la conversación |
-| `/mention on\|off` | En un grupo, exigir o no una @mención |
-| `/model [nombre] [session\|global]` | Muestra el modelo actual, o lo fija |
-| `/learn` | Guarda lo que el agente aprendió en memoria y skills |
-| `/whoami` | Muestra tus ids de usuario y de chat de Telegram |
-| `/help` | Lista los comandos que puedes ejecutar |
+| `/stop` | Detiene la ejecución en curso |
+| `/inline <texto>` | Mete un mensaje dentro de la ejecución que ya está en marcha |
+| `/btw <pregunta>` | Hace una pregunta al margen, que no queda guardada en la conversación |
+| `/mention on\|off` | En un grupo, exige o no una @mención |
+| `/model [nombre] [session\|global]` | Muestra el modelo actual, o lo cambia |
+| `/learn` | Guarda lo aprendido en memoria y skills |
+| `/whoami` | Muestra tu id de usuario y el del chat en Telegram |
+| `/help` | Lista los comandos disponibles para ti |
 
-Y los comandos de operador, que solo pueden ejecutar los entrenadores del bot:
+Y los comandos de operador, reservados a los entrenadores del bot:
 
 | Comando | Qué hace |
 |---|---|
 | `/agent <nombre>` | Cambia el agente que responde en este chat |
 | `/status` | Muestra información de la sesión |
-| `/models` | Elige un modelo de una lista de botones |
-| `/tools` | Lista las herramientas de runtime disponibles |
+| `/models` | Elige un modelo desde una lista de botones |
+| `/tools` | Lista las herramientas disponibles en el runtime |
 | `/skill [nombre]` | Lista las skills, o ejecuta una por su nombre |
-| `/approve` | Gestiona los permisos de herramienta guardados |
-| `/usage` | Muestra el gasto y el recuento de mensajes del mes |
+| `/approve` | Administra los permisos de herramientas guardados |
+| `/usage` | Muestra el gasto y la cantidad de mensajes del mes |
 
-Las skills instaladas se convierten también en comandos de barra propios, así que
-una skill llamada `weather` responde a `/weather` además de a `/skill weather`, y
-se descubre desde el menú "/". Un comando de skill cuenta como comando de
-operador, porque una skill ejecuta instrucciones arbitrarias a través del agente.
+Cada skill instalada se convierte también en su propio comando de barra: una skill llamada `weather` responde tanto a `/weather` como a `/skill weather`, y aparece en el menú "/". Un comando de skill cuenta como comando de operador, porque una skill ejecuta instrucciones arbitrarias a través del agente.
 
 #### Los comandos de operador son solo para entrenadores
 
-Los comandos de la segunda tabla exponen la superficie de operador: tu
-configuración, tus permisos, tu gasto y el inventario interno de modelos,
-herramientas y skills. Están restringidos a la lista `trainers` del bot, y la
-barrera está en el único punto donde se despacha cada comando, así que un comando
-al que se puede llegar por dos nombres no puede esquivarla.
+Los comandos de la segunda tabla dejan ver la parte de operador: tu configuración, tus permisos, tu gasto y el inventario interno de modelos, herramientas y skills. Están restringidos a la lista `trainers` del bot, y ese control vive en el único punto por donde se despachan todos los comandos, así que ni siquiera un comando accesible por dos nombres distintos puede esquivarlo.
 
-- Un bot **sin lista `trainers`** confía en todos aquellos con quienes habla. Es
-  el bot personal, y para él no cambia nada: tienes todos los comandos, skills
-  incluidas.
-- Un bot **con lista `trainers`** es de cara al cliente. Un cliente que hable con
-  él no puede alcanzar `/approve`, `/agent`, `/status`, `/models`, `/tools`,
-  `/skill` ni `/usage`, ni ningún comando de skill. Tampoco se le anuncian:
-  `/help` lista solo los comandos que quien llama puede ejecutar de verdad, y el
-  menú "/" del bot se construye para la persona menos confiable que puede verlo,
-  así que los comandos de operador quedan fuera del popup por completo. Quien no
-  es entrenador y escribe uno de todos modos recibe un aviso de que el comando no
-  está disponible ahí, y nunca ve las tripas de operador.
+- Un bot **sin lista `trainers`** confía en cualquiera con quien hable. Es el caso del bot personal, y para él no cambia nada: tienes todos los comandos disponibles, skills incluidas.
+- Un bot **con lista `trainers`** está pensado de cara al cliente. Alguien que le hable sin ser entrenador no puede llegar a `/approve`, `/agent`, `/status`, `/models`, `/tools`, `/skill` ni `/usage`, ni a ningún comando de skill. Tampoco se los muestra: `/help` lista solo lo que quien pregunta puede ejecutar de verdad, y el menú "/" del bot se arma pensando en la persona menos confiable que pueda verlo, así que los comandos de operador quedan fuera del todo. Si alguien sin ese rol escribe uno igual, se le avisa que el comando no está disponible ahí, sin dejar ver nada del funcionamiento interno.
 
-`/model` es, a propósito, mitad y mitad. Leerlo (`/model` sin argumentos) revela
-qué modelo hay detrás del bot, que es infraestructura, así que ese camino es solo
-para entrenadores. Cambiarlo no lo es: un cliente puede elegir un modelo para su
-propia conversación, salvo que lo bloquees. Ver "Cambia de modelo en medio de una
-conversación" abajo.
+`/model` está, a propósito, partido en dos. Leerlo (`/model` sin argumentos) revela qué modelo hay detrás del bot, y eso es información de infraestructura, así que esa lectura es solo para entrenadores. Cambiarlo es otra historia: cualquier cliente puede elegir un modelo para su propia conversación, a menos que lo bloquees tú. Ver "Cambiar de modelo en plena conversación" más abajo.
 
 ### En grupos
 
-En un chat 1:1 el bot siempre responde. Añadido a un grupo, por defecto solo
-responde cuando lo @mencionan o le das un `/comando`; si no, respondería a
-cada mensaje en un grupo activo. Desactiva ese requisito por completo para un
-bot (en todos los grupos en los que está) con `require_mention: false` durante
-`pepe gateway telegram setup`.
+En un chat 1 a 1 el bot siempre contesta. Metido en un grupo, por defecto solo responde si lo @mencionan o si recibe un `/comando`, porque de otro modo terminaría contestando cada mensaje de un grupo activo. Puedes quitar ese requisito por completo para un bot (en todos los grupos donde participe) con `require_mention: false` durante `pepe gateway telegram setup`.
 
-Para un solo grupo, sin tocar el ajuste propio del bot, ejecuta:
+Para un grupo puntual, sin tocar el ajuste general del bot, corre esto dentro de ese grupo:
 
 ```text
-/mention off   # solo este grupo, hasta /new - no hace falta @mencionarlo para que responda
+/mention off   # solo en este grupo, hasta /new - no hace falta @mencionarlo para que responda
 /mention on    # vuelve a exigir una @mención
 /mention       # muestra el ajuste actual
 ```
 
-La dispensa vive en la conversación de ese grupo, no en el bot, así que nunca
-se filtra a ningún otro grupo en el que esté el mismo bot, y una conversación
-nueva (`/new`) la olvida.
+Esa excepción queda guardada en la conversación de ese grupo puntual, no en el bot, así que jamás se cuela en otro grupo donde esté el mismo bot, y una conversación nueva (`/new`) la olvida.
 
-Una conversación de grupo es una sola sesión compartida entre todos los que
-están en ella. Cada mensaje entrante viene etiquetado con el nombre de quien
-lo envió (`Alice: ¿cómo va el estado?`), así el modelo sabe a quién le está
-respondiendo en cada turno, en vez de asumir que quien escribió último es la
-misma persona de la que se hablaba antes; una conversación privada nunca
-viene etiquetada así, ya que no hay nadie más que pudiera ser. El bot también
-es ciego a
-lo que no se le dirige: un mensaje que no lo @menciona (y no está dispensado
-con `/mention off`) nunca llega al agente, ni siquiera como contexto
-silencioso, así que no puede "ponerse al día" con lo que se habló antes de
-que lo trajeran a la conversación.
+Una conversación de grupo es una única sesión compartida por todos los que participan en ella. Cada mensaje entrante lleva el nombre de quien lo escribió (`Alice: ¿cómo va?`), de modo que el modelo sabe a quién le responde en cada turno, en vez de asumir que quien escribió al final es la misma persona de la que se hablaba antes; una conversación privada nunca lleva esa etiqueta, porque ahí no hay nadie más a quien pudiera referirse. El bot también es ciego a lo que no se le dirige: un mensaje que no lo @menciona (y que no está exceptuado con `/mention off`) jamás llega al agente, ni siquiera como contexto silencioso, así que no hay forma de que "se ponga al día" con algo que se habló antes de que lo trajeran a la conversación.
 
 ### Temas de foro
 
-En un grupo con **temas** activados, cada tema es su propia conversación, y la
-respuesta vuelve al tema del que vino. Puedes darle a un tema **su propio
-agente**: ejecuta `/agent <nombre>` dentro del tema (o simplemente **pídele** al
-agente que conecte este tema a otro, y lo hace por ti) y queda vinculado a ese
-agente, conservado a través de `/new` y de reinicios. Los nombres se emparejan sin
-distinguir mayúsculas, así que `/agent engenheiro` encuentra un agente llamado
-`Engenheiro`. Así un grupo puede tener un
-tema de "soporte" atendido por el agente de soporte y uno de "ingeniería" por el
-ingeniero, lado a lado. El agente de un mensaje es el agente vinculado al tema, si
-lo hay; si no, el `agent` del bot; si no, el predeterminado global. Un tema
-vinculado sigue la regla de mención del grupo: pon `require_mention: false` (o
-`/mention off` en ese tema) si quieres que responda sin @mención.
+En un grupo con **temas** activados, cada tema funciona como su propia conversación, y la respuesta vuelve al tema de donde salió. Puedes asignarle a un tema **su propio agente**: corre `/agent <nombre>` dentro del tema (o directamente **pídele** al agente que conecte ese tema con otro y lo hace por ti), y queda vinculado a ese agente de forma persistente, incluso a través de `/new` y de reinicios. Los nombres se comparan sin distinguir mayúsculas, así que `/agent engenheiro` encuentra igual a un agente llamado `Engenheiro`. De esta manera, un mismo grupo puede tener un tema de "soporte" atendido por el agente de soporte y uno de "ingeniería" por el de ingeniería, cada uno funcionando por su cuenta. El agente que responde un mensaje es el que está vinculado al tema si lo hay; si no, el `agent` del bot; y si tampoco, el predeterminado global. Un tema vinculado sigue respetando la regla de mención del grupo: pon `require_mention: false` (o `/mention off` dentro de ese tema) si quieres que conteste sin necesidad de @mención.
 
-### Cambia de modelo en medio de una conversación
+### Cambiar de modelo en plena conversación
 
-`/model` muestra el modelo activo en este chat, con un botón **Browse
-models** para elegir otro; `/models` va directo a ese selector. El selector está
-acotado a tu proyecto y pone una marca en el modelo en uso, así que tocas uno para
-cambiar. Esas dos lecturas son solo para entrenadores, ya que revelan qué modelos
-hay detrás del bot. Uso escrito:
+`/model` muestra el modelo activo en ese chat, con un botón **Browse models** para elegir otro; `/models` va directo a ese selector. El selector está acotado a tu proyecto y marca con un check el modelo en uso, así que basta con tocar uno para cambiar. Ambas lecturas son solo para entrenadores, porque revelan qué modelos hay detrás del bot. Escrito a mano:
 
 ```text
 /model openrouter               # pregunta si cambiar solo este chat o todos
-/model openrouter session       # cambia solo para esta conversación
-/model openrouter global        # cambia para todos con los que habla este bot
+/model openrouter session       # cambia solo esta conversación
+/model openrouter global        # cambia para todas las conversaciones de este bot
 ```
 
-Cualquiera en una conversación permitida puede cambiar su propia sesión;
-cambiarlo **globalmente** (para todas las conversaciones de este bot) está
-reservado para **entrenadores**, la misma lista que rige `/learn` y la
-memoria, así que un miembro cualquiera del chat no puede reapuntar en
-silencio todo el bot a otro modelo. Es al entrenador a quien se le pregunta cuál
-de las dos opciones quiso decir; cualquier otra persona simplemente cambia su
-propia conversación, sin nada que contestar. Pon `model_switch_locked: true` en el
-bot para desactivar el cambio de modelo por completo para quien no sea entrenador.
-Un cambio de sesión vive solo en memoria, se reinicia con `/new` o al reiniciar el
-servidor, volviendo a lo que diga la configuración propia del agente.
+Cualquiera en una conversación permitida puede cambiar su propia sesión; cambiarlo **globalmente** (para todas las conversaciones que atiende este bot) queda reservado a los **entrenadores**, la misma lista que controla `/learn` y la memoria, de modo que nadie del grupo puede reapuntar en silencio todo el bot hacia otro modelo. Al entrenador se le pregunta cuál de las dos opciones quiso decir; cualquier otra persona simplemente cambia su propia conversación, sin que se le pregunte nada más. Pon `model_switch_locked: true` en el bot si quieres apagar por completo el cambio de modelo para quien no sea entrenador. Un cambio hecho a nivel de sesión vive solo en memoria: se pierde con `/new` o con un reinicio del servidor, y vuelve a lo que diga la configuración propia del agente.
 
 ### Mostrar que está trabajando
 
-Mientras una ejecución está en curso, el bot muestra que está ocupado. Es a
-propósito una señal ambiental, no un informe de estado que debas leer. El
-indicador nativo de "escribiendo..." de Telegram sigue vivo en todos los modos.
-Encima de él, `tool_progress` (la opción `--progress`) elige uno de cuatro:
+Mientras una ejecución está en marcha, el bot deja ver que está ocupado. Es, a propósito, una señal ambiental y no un reporte que debas leer con atención. El indicador nativo de "escribiendo..." de Telegram sigue activo en todos los modos. Por encima de eso, `tool_progress` (la opción `--progress`) elige entre cuatro:
 
-- `reaction`, el predeterminado: una reacción 👀 en tu propio mensaje mientras el
-  agente trabaja, retirada cuando llega la respuesta. No añade ningún mensaje al
-  chat, y es el más silencioso de los cuatro.
-- `ambient`: una única línea vaga ("buscando cosas...", "ejecutando algo...")
-  editada en el sitio y borrada cuando llega la respuesta. Sin nombres de
-  herramienta, sin argumentos, sin registro.
+- `reaction`, el modo por defecto: una reacción 👀 sobre tu propio mensaje mientras el agente trabaja, que desaparece cuando llega la respuesta. No agrega ningún mensaje al chat, y es el más discreto de los cuatro.
+- `ambient`: una única línea vaga ("buscando información...", "ejecutando algo...") que se edita en el sitio y se borra al llegar la respuesta. Sin nombres de herramientas, sin argumentos, sin bitácora.
 - `off`: nada más que el indicador nativo de escritura.
-- `verbose`: el registro completo, para quien quiera seguir la ejecución. Cada
-  llamada a una herramienta según ocurre y, encima de ella, la frase que el
-  modelo dijo antes de recurrir a esa herramienta. El registro cuenta *qué* hizo;
-  la frase cuenta *por qué*, que es lo que permite ver al agente yendo hacia el
-  sitio equivocado antes de que llegue. Sigue siendo un solo mensaje, editado en
-  el sitio, borrado cuando llega la respuesta.
+- `verbose`: la bitácora completa, para quien quiera seguir la ejecución paso a paso. Cada llamada a herramienta a medida que ocurre, y arriba de ella la frase que el modelo pensó antes de recurrir a esa herramienta. La bitácora cuenta *qué* hizo; la frase cuenta *por qué*, y eso es justo lo que te permite notar que algo va mal antes de que termine de salir mal. Sigue siendo un solo mensaje, editado en el sitio, que se borra cuando llega la respuesta.
 
-Fíjalo de tres formas: desde la línea de comandos con `--progress`; desde un chat
-con la herramienta `manage_channel` (`set_progress`); o en el **panel**, en
-Canales → tu bot → *Editar* → "Mientras el agente trabaja", donde se explica cada modo.
+Puedes fijarlo de tres formas: desde la línea de comandos con `--progress`; desde un chat, con la herramienta `manage_channel` (`set_progress`); o en el **panel**, en Channels → tu bot → *Edit* → "While the agent works", donde cada modo aparece explicado.
 
-### Heartbeat: avisos proactivos
+### Heartbeat: avisos por iniciativa propia
 
-Un bot puede darle periódicamente la palabra a su agente para que diga algo **por
-iniciativa propia** ("el deploy terminó", "me pediste que vigilara X") y, tan
-importante como eso, el derecho a **no decir nada** la mayor parte del tiempo.
-Viene desactivado, y lo activas por bot:
+Un bot puede darle periódicamente la palabra a su agente para que diga algo **por su cuenta** ("terminó el deploy", "me pediste que vigilara X") y, tan importante como eso, para que la mayoría de las veces decida **no decir nada**. Viene apagado, y lo activas bot por bot:
 
 ```bash
 pepe gateway telegram add ops --token "${OPS_BOT_TOKEN}" --agent operator --heartbeat-minutes 30 --heartbeat-hours 8-22
 ```
 
-Un agente que tenga la herramienta `manage_channel` también puede configurar esto
-por su cuenta, desde un chat:
+Un agente que tenga la herramienta `manage_channel` también puede configurar esto solo, desde el chat:
 
 ```text
 manage_channel set_heartbeat name: "sales" heartbeat_minutes: 30 heartbeat_hours: "8-22"
 ```
 
-Cada pulso ejecuta el agente sobre el contexto vivo de su sesión, con un prompt
-que dice que esta es una comprobación automática y que responda exactamente
-`HEARTBEAT_OK` si no hay nada que valga la pena decir. Ese es el caso común, y
-solo un mensaje genuino llega a enviarse al chat. Lo alimentas con dos cosas:
+Cada pulso corre al agente sobre el contexto vivo de su sesión, con un prompt que le aclara que es una comprobación automática y que debe responder exactamente `HEARTBEAT_OK` si no hay nada digno de mencionar. Ese es el caso más común, y solo un mensaje genuino termina llegando al chat. Lo alimentas de dos maneras:
 
-- Un `HEARTBEAT.md` opcional en el workspace del agente, que es donde escribes qué
-  hay que vigilar.
-- **Eventos de sistema**, que cualquier parte de Pepe puede encolar para una sesión
-  (`Pepe.Heartbeat.Events.push/2`), y que el siguiente pulso recoge solo.
+- Con un `HEARTBEAT.md` opcional en el workspace del agente, donde anotas qué hay que vigilar.
+- Con **eventos de sistema**, que cualquier parte de Pepe puede encolar para una sesión (`Pepe.Heartbeat.Events.push/2`), y que el siguiente pulso recoge automáticamente.
 
-Un bucle proactivo desbocado es imposible por construcción. Una barrera de
-enfriamiento impone un mínimo de 30 segundos entre pulsos, y un cortacircuitos de
-avalancha salta a los 5 disparos en 60 segundos. `heartbeat_hours` (una ventana
-local como `8-22`) mantiene al bot callado fuera de las horas en que estás
-despierto.
+Un bucle proactivo descontrolado es imposible por diseño: hay una barrera de enfriamiento que exige al menos 30 segundos entre pulsos, y un disyuntor que corta si se disparan 5 en 60 segundos. `heartbeat_hours` (una ventana local como `8-22`) mantiene al bot en silencio fuera de las horas en que puede molestar.
 
-### Los chats muertos se curan solos
+### Los chats muertos se recuperan solos
 
-Si un envío vuelve con fallo permanente, porque bloquearon al bot o porque el chat
-o el usuario ya no existen, ese chat se salta en todos los envíos siguientes. No
-hay llamadas de API desperdiciadas ni ruido en el registro. En el momento en que un
-envío a ese chat vuelve a funcionar, por ejemplo porque la persona desbloqueó al
-bot, la marca se retira automáticamente. No hay nada que reiniciar a mano.
+Cuando un envío vuelve con un fallo permanente, porque el bot fue bloqueado o el chat o el usuario ya no existen, ese chat queda excluido de los siguientes envíos. No se desperdician llamadas a la API ni se llena el log de ruido. En cuanto un envío a ese chat vuelve a funcionar, por ejemplo porque desbloquearon al bot, la marca se retira sola. No hay nada que reiniciar a mano.
 
 ### Una respuesta sobrevive a un reinicio a mitad de envío
 
-Si Pepe se reinicia (un despliegue, una caída) justo en el momento en que estaba
-enviando la respuesta de un turno, esa respuesta no se pierde: se reenvía en cuanto el
-bot vuelve a estar en línea, antes de que empiece a atender nada nuevo. Cuando el
-reinicio ocurrió mientras el envío estaba genuinamente en curso (así que no hay certeza
-de si el mensaje ya llegó), la copia reenviada lleva el prefijo "♻️ Recovered reply",
-para que un posible duplicado quede siempre señalado en vez de repetirse en silencio.
-Una respuesta que nunca llegó a enviarse sale limpia, sin prefijo. No necesita ninguna
-configuración y no hay nada que reiniciar a mano.
+Si Pepe se reinicia (un deploy, una caída) justo cuando estaba enviando la respuesta de un turno, esa respuesta no se pierde: se reenvía apenas el bot vuelve a estar en línea, antes de ocuparse de cualquier cosa nueva. Cuando el reinicio ocurrió mientras el envío estaba realmente en curso (así que no hay certeza de si el mensaje llegó o no), la copia reenviada lleva el prefijo "♻️ Recovered reply", para que un posible duplicado quede siempre marcado en lugar de repetirse en silencio. Una respuesta que nunca alcanzó a enviarse sale limpia, sin prefijo. No requiere ninguna configuración y no hay nada que reiniciar a mano.
 
 ### Idioma y errores
 
-Los mensajes fijos del propio Pepe (respuestas de comando, botones, negativas)
-siguen el `locale` que configuraste. Las respuestas del agente siguen el idioma en
-que escribe la persona, sea cual sea. Los errores internos en crudo nunca se
-filtran al chat.
+Los mensajes fijos del propio Pepe (respuestas de comandos, botones, negativas) siguen el `locale` que configuraste. Las respuestas del agente siguen el idioma en el que te escriban, sea cual sea. Los errores internos nunca se filtran al chat en crudo.
 
 ### Hazlo por chat
 
-Un agente que tenga la herramienta `manage_channel` puede crear y revincular
-bots de Telegram desde una conversación. Como edita la configuración, cada
-llamada pasa por la barrera de permisos: el agente propone el cambio y tú
-confirmas antes de que se aplique.
+Un agente con la herramienta `manage_channel` puede crear y revincular bots de Telegram desde una conversación. Como esto modifica configuración, cada llamada pasa por la barrera de permisos: el agente propone el cambio y tú lo confirmas antes de que se aplique.
 
-Dirías:
+Podrías decir:
 
-> Añade un bot de Telegram llamado sales que hable con el agente de ventas. El
-> token está en la variable de entorno SALES_BOT_TOKEN.
+> Agrega un bot de Telegram llamado sales que hable con el agente de ventas. El token está en la variable de entorno SALES_BOT_TOKEN.
 
-El agente llama a `manage_channel` con `action: "add"`, `name: "sales"`,
-`token_env: "SALES_BOT_TOKEN"` y `agent: "sales"`. Aquí importan dos
-salvaguardas:
+El agente llama a `manage_channel` con `action: "add"`, `name: "sales"`, `token_env: "SALES_BOT_TOKEN"` y `agent: "sales"`. Aquí importan dos resguardos:
 
-- **Los secretos nunca pasan por el chat.** Das el *nombre* de una variable de
-  entorno que contiene el token, nunca el token en sí. Se almacena como
-  `${SALES_BOT_TOKEN}` y se resuelve al momento de leerlo, así que el secreto en
-  crudo nunca llega al modelo ni a los registros. Un token en crudo (que
-  contiene dos puntos) es rechazado. Esa variable de entorno la defines tú.
-- **El bot predeterminado protegido está vedado.** La herramienta solo toca bots
-  con nombre, nunca el `default`, y no toca nada más de tu configuración.
+- **Los secretos nunca pasan por el chat.** Le das el *nombre* de una variable de entorno que contiene el token, nunca el token en sí. Queda guardado como `${SALES_BOT_TOKEN}` y se resuelve al leerlo, así que el secreto en crudo jamás llega al modelo ni a los logs. Si pegas un token en crudo (que contiene dos puntos), se rechaza. Esa variable de entorno la defines tú mismo.
+- **El bot predeterminado protegido queda fuera de alcance.** La herramienta solo toca bots con nombre propio, nunca el `default`, y no toca nada más de tu configuración.
 
-Otras acciones de `manage_channel` son `list`, `set_agent` (revincular un bot a
-otro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`,
-`disable` y `remove`. Tras cualquier cambio reconcilia los pollers en
-ejecución, así que un bot arranca o se detiene en vivo sin reiniciar.
+Las demás acciones de `manage_channel` son `list`, `set_agent` (revincular un bot a otro agente), `set_trainers`, `set_heartbeat`, `set_progress`, `enable`, `disable` y `remove`. Después de cualquier cambio, ajusta los pollers en ejecución, así que un bot arranca o se detiene en vivo, sin reiniciar nada.
 
-<div class="note"><strong>Solo Telegram.</strong> La herramienta de chat
-gestiona bots de Telegram. Las conexiones por webhook (WhatsApp, Slack y las
-demás) se crean desde la línea de comandos, el panel o <code>pepe setup</code>,
-no por chat.</div>
+<div class="note"><strong>Solo Telegram.</strong> Esta herramienta de chat gestiona bots de Telegram. Las conexiones por webhook (WhatsApp, Slack y el resto) se crean desde la línea de comandos, el panel o <code>pepe setup</code>, no por chat.</div>

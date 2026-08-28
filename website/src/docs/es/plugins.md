@@ -1,19 +1,13 @@
 ---
 title: Plugins
-description: Extiende Pepe con herramientas y canales propios instalando plugins con su propia configuración.
+description: Extiende Pepe con tus propias herramientas y canales instalando plugins con su propia configuración.
 ---
 
-Un plugin añade una **herramienta** que el modelo puede invocar, un
-**proveedor de canal** (una nueva plataforma de mensajería basada en
-webhook), un **canal de conexión persistente** (uno que necesita un websocket
-de larga duración, no solo un webhook - ver [Slots](/docs/slots)), un
-**adaptador de protocolo de modelo**, un **observador de ejecución** (observa
-el bucle de llamadas a herramientas de un agente desde fuera, de solo
-lectura), o ocupa un [**slot**](/docs/slots) (búsqueda de memoria, búsqueda
-web) - todo Elixir compilado en tiempo de ejecución desde `~/.pepe/plugins/`,
-sin rebuild. Un módulo se compara con la(s) forma(s) que implementa; esta
-página cubre en profundidad las dos primeras, con diferencia las más comunes,
-más un vistazo más breve al observador de ejecución más abajo.
+Un plugin es un archivo que instalas para enseñarle algo nuevo a Pepe, sin recompilar y sin reiniciar: lo sueltas ahí y funciona. La mayoría de los plugins hacen una de dos cosas: agregan una **herramienta** que el modelo puede invocar, o agregan un **proveedor de canal** (una plataforma de mensajería nueva basada en webhook). Esta página cubre esas dos formas en profundidad, con diferencia las más comunes, y más abajo repasa el resto con menos detalle.
+
+Un plugin también puede tomar otras formas: un **canal de conexión persistente** (uno que necesita un websocket de larga duración en vez de un simple webhook, ver [Slots](/docs/slots)), una **ruta HTTP propia** (un callback de redirección OAuth, un endpoint a medida, ver más abajo), un **proveedor de audio en tiempo real** (voz dúplex, ver más abajo), un **adaptador de protocolo de modelo**, un **hook** (reescribe de verdad el contenido de la conversación, encadenable e insertado en línea, ver más abajo), una **policy** (veta una llamada a herramienta, o toda una ejecución, antes de que ocurra; una comprobación que no pudo correr cuenta como un rechazo, así que falla cerrado) o un **observador de ejecución** (mira el bucle desde afuera, de solo lectura, la única forma que no puede afectar nada). Un plugin también puede ocupar un [**slot**](/docs/slots): búsqueda de memoria, búsqueda web, el sandbox donde corre un comando de shell, la compactación de la conversación, o el bucle de razonamiento entero.
+
+Por debajo, todo plugin es Elixir compilado en tiempo de ejecución desde `~/.pepe/plugins/`, y un módulo se empareja con la forma o formas que implementa.
 
 ## El behaviour Tool
 
@@ -26,15 +20,13 @@ más un vistazo más breve al observador de ejecución más abajo.
 
 | Callback | Propósito |
 |---|---|
-| `name/0` | El nombre de función que invoca el modelo, por ejemplo `"read_file"`. Debe ser único entre todas las herramientas: en caso de conflicto de nombre, la herramienta integrada siempre prevalece. |
+| `name/0` | El nombre de función que invoca el modelo, por ejemplo `"read_file"`. Debe ser único entre todas las herramientas; un plugin nunca gana un choque de nombre contra una herramienta integrada. |
 | `spec/0` | La especificación de función al estilo OpenAI: nombre, descripción en lenguaje llano y un JSON Schema para los parámetros. Es lo que el modelo lee para decidir cuándo y cómo invocar la herramienta. |
-| `run/2` | Ejecuta la llamada. `args` son los argumentos decodificados (un mapa con claves de tipo cadena); `ctx` lleva el contexto de la ejecución actual (abajo). Devuelve `{:ok, text}` o `{:error, message}`: en cualquier caso se convierte en cadena y vuelve al modelo, así que escríbelo para que el modelo lo lea. |
+| `run/2` | Ejecuta la llamada. `args` son los argumentos ya decodificados (un mapa con claves de tipo cadena); `ctx` lleva el contexto de la ejecución actual (más abajo). Devuelve `{:ok, text}` o `{:error, message}`; en ambos casos el resultado se convierte en cadena y vuelve al modelo, así que redáctalo pensando en que el modelo lo va a leer. |
 
-`Pepe.Tools.Tool.function/3` construye el sobre de la especificación por ti,
-así que solo rellenas el nombre, la descripción y los parámetros.
+`Pepe.Tools.Tool.function/3` te arma el sobre de la especificación, así que solo tienes que aportar el nombre, la descripción y los parámetros.
 
-Una herramienta completa y funcional: guárdala como un `.exs` e instálala
-(ver abajo):
+Una herramienta completa y funcional, guardada como `.exs` e instalada (ver más abajo):
 
 ```elixir
 defmodule MyPlugin.Reverse do
@@ -65,25 +57,13 @@ defmodule MyPlugin.Reverse do
 end
 ```
 
-La segunda cláusula de `run/2` es buena práctica: si el modelo omite un
-argumento obligatorio, devuelve un error claro en vez de fallar (un fallo
-también se captura, pero un mensaje a medida ayuda al modelo a recuperarse en
-la siguiente vuelta).
+La segunda cláusula de `run/2` es buena práctica: si el modelo se olvida de un argumento obligatorio, conviene devolver un error claro en vez de dejar que reviente (un fallo también se captura, pero un mensaje pensado a propósito ayuda al modelo a corregirse en la próxima vuelta).
 
-**`ctx`**, el segundo argumento de `run/2`, lleva la ejecución actual:
-`ctx[:agent]` (el agente en ejecución, por ejemplo `%{name: "assistant"}`),
-`ctx[:session_key]` (la conversación en vivo, ausente en ejecuciones de un
-solo turno), `ctx[:cwd]` (el directorio de trabajo). Trata cada clave como
-opcional. Las herramientas que leen/escriben archivos resuelven rutas con
-`Pepe.Agent.Workspace`; las que llaman a una API externa suelen ignorar `ctx`
-por completo y usar directamente el cliente HTTP `Req` ya incluido, sin
-dependencia extra.
+**`ctx`**, el segundo argumento de `run/2`, lleva la ejecución actual consigo: `ctx[:agent]` (el agente que está corriendo, por ejemplo `%{name: "assistant"}`), `ctx[:session_key]` (la conversación en vivo, ausente en ejecuciones de un solo turno) y `ctx[:cwd]` (el directorio de trabajo). Trata cada clave como opcional. Las herramientas que leen o escriben archivos resuelven las rutas a través de `Pepe.Agent.Workspace`; las que llaman a una API externa por lo general ignoran `ctx` por completo y usan directamente el cliente HTTP `Req` que ya viene incluido, sin necesitar ninguna dependencia extra.
 
 ## El behaviour Channel provider
 
-Un proveedor de canal le enseña a Pepe a hablar una nueva plataforma de
-mensajería sobre el webhook de entrada genérico ya existente: ninguna ruta
-nueva, solo un módulo nuevo en el registro.
+Un proveedor de canal le enseña a Pepe a hablar una plataforma de mensajería nueva sobre el webhook de entrada genérico que ya existe: ninguna ruta nueva, solo un módulo más en el registro.
 
 ```elixir
 @callback name() :: String.t()
@@ -95,23 +75,21 @@ nueva, solo un módulo nuevo en el registro.
 
 | Callback | ¿Obligatorio? | Propósito |
 |---|---|---|
-| `name/0` | sí | Clave de registro y el segmento `:provider` de la URL del webhook, ej. `"whatsapp"`. |
-| `verify/2` | sí | Responde el handshake `GET` de la plataforma cuando registras la URL del webhook. `{:ok, challenge}` o `:error` si el proveedor no tiene uno. |
-| `authenticate/3` | sí | Comprueba la firma de un `POST` entrante contra el secreto de la conexión. `:ok` para aceptar, `:error` para descartarlo. |
-| `parse/1` | sí | Normaliza un payload decodificado en cero o más mensajes `%{from, text, id}`, o `:ignore` para lo que no tiene nada que hacer (recibos, actualizaciones de estado). |
-| `deliver/3` | sí | Envía una respuesta de texto a `to` (una dirección del proveedor: número de teléfono, id de canal, ...). |
-| `label/0` | no | Etiqueta humana para el panel (usa `name/0` por defecto). |
-| `config_schema/0` | no | Campos que el panel renderiza para configurar una conexión: la misma forma que el array `config` de un manifiesto de plugin (abajo). |
-| `respond/3` | no | Una respuesta HTTP **síncrona** al `POST` sin procesar, para protocolos que necesitan una antes de cualquier trabajo del agente (el desafío de verificación de URL de Slack, el `PING` de Discord). `{:reply, status, content_type, body}` o `:cont` para caer en `parse/1`. |
-| `deliver_file/4` | no | Envía un archivo como adjunto. Omítelo y `send_file` simplemente reporta que el canal no recibe archivos. |
-| `addressed?/2` | no | ¿Este payload se dirige al bot, así que debería recibir respuesta? Permite que un proveedor honre `require_mention` en grupos (por defecto cuando se omite: siempre dirigido). |
-| `deliver_blocks/3` | no | Renderiza contenido estructurado (ver [Bloques de presentación](#bloques-de-presentacion) abajo) en la UI nativa de la plataforma. Omítelo y la tool `send_presentation` igual entrega - aplanado a texto simple vía `deliver/3`. |
+| `name/0` | sí | Clave de registro y el segmento `:provider` de la URL del webhook, por ejemplo `"whatsapp"`. |
+| `verify/2` | sí | Responde al handshake `GET` de la plataforma cuando registras la URL del webhook. `{:ok, challenge}`, o `:error` si el proveedor no maneja eso. |
+| `authenticate/3` | sí | Verifica la firma de un `POST` entrante contra el secreto de la conexión. `:ok` para aceptarlo, `:error` para descartarlo. |
+| `parse/1` | sí | Normaliza un payload ya decodificado en cero o más mensajes `%{from, text, id}`, o devuelve `:ignore` cuando no hay nada que hacer con eso (recibos, actualizaciones de estado). |
+| `deliver/3` | sí | Envía una respuesta de texto a `to` (una dirección propia del proveedor: número de teléfono, id de canal, etc.). |
+| `label/0` | no | Etiqueta legible para el panel (usa `name/0` si se omite). |
+| `config_schema/0` | no | Los campos que el panel renderiza para configurar una conexión, con la misma forma que el array `config` de un manifiesto de plugin (ver más abajo). |
+| `respond/3` | no | Una respuesta HTTP **síncrona** al `POST` sin procesar, para protocolos que necesitan una antes de que el agente haga nada (el desafío de verificación de URL de Slack, el `PING` de Discord). Devuelve `{:reply, status, content_type, body}`, o `:cont` para dejar que siga a `parse/1`. |
+| `deliver_file/4` | no | Envía un archivo como adjunto. Si lo omites, `send_file` simplemente informa que el canal no puede recibir archivos. |
+| `addressed?/2` | no | ¿Este payload va dirigido al bot y merece respuesta? Permite que un proveedor respete `require_mention` en chats grupales (si se omite, el valor por defecto es que siempre va dirigido al bot). |
+| `deliver_blocks/3` | no | Renderiza contenido estructurado (ver [Bloques de presentación](#bloques-de-presentación) más abajo) en la interfaz nativa de la plataforma. Si lo omites, la herramienta `send_presentation` igual entrega el contenido, aplanado a texto simple a través de `deliver/3`. |
 
 ### Bloques de presentación
 
-Una tool puede enviar contenido más rico que texto simple - una tabla, una fila de
-botones - a través de la tool `send_presentation` y el schema de bloque compartido
-`Pepe.Presentation`:
+Una herramienta puede enviar contenido más rico que texto simple (una tabla, una fila de botones) a través de la herramienta `send_presentation` y el esquema de bloques compartido `Pepe.Presentation`:
 
 ```
 %{"type" => "text", "text" => "..."}
@@ -119,32 +97,20 @@ botones - a través de la tool `send_presentation` y el schema de bloque compart
 %{"type" => "buttons", "buttons" => [%{"label" => "...", "value" => "..."}]}
 ```
 
-Slack renderiza esto como Block Kit real hoy (una `section` por bloque de texto/tabla,
-un bloque `actions` con botones reales). Un proveedor que aún no añadió
-`deliver_blocks/3` sigue recibiendo el contenido - `Pepe.Presentation.to_text/1` lo
-aplana a texto simple legible, enviado por el `deliver/3` normal del proveedor - así que
-una tool que envía bloques funciona en cada canal de inmediato, de forma rica solo donde
-un proveedor se tomó el trabajo de renderizarlos.
+Hoy Slack renderiza esto como Block Kit de verdad (una `section` por cada bloque de texto o tabla, un bloque `actions` con botones reales). Un proveedor que todavía no agregó `deliver_blocks/3` igual recibe el contenido: `Pepe.Presentation.to_text/1` lo aplana a texto simple legible y lo manda por el `deliver/3` normal del proveedor. Así, una herramienta que envía bloques funciona de inmediato en todos los canales, y solo se ve enriquecida donde algún proveedor se tomó el trabajo de renderizarlos.
 
-## El behaviour PluginRoute - la ruta HTTP propia de un plugin
+## El behaviour PluginRoute: la ruta HTTP propia de un plugin
 
-El contrato de eventos entrantes de `Pepe.Webhooks.Provider` es fijo - una sola forma,
-para plataformas de chat. `Pepe.PluginRoute` es para lo que necesita la suya propia: un
-callback de redirección OAuth que debe caer en el dominio público del propio Pepe, un
-endpoint REST/RPC a medida.
+El contrato de eventos entrantes de `Pepe.Webhooks.Provider` es fijo, una sola forma pensada para plataformas de chat. `Pepe.PluginRoute` existe para lo que necesita algo distinto: un callback de redirección OAuth que tiene que caer sobre el dominio público del propio Pepe, un endpoint REST o RPC hecho a medida.
 
 ```elixir
 @callback route_prefix() :: String.t()
 @callback call(conn :: Plug.Conn.t(), path :: [String.t()]) :: Plug.Conn.t()
 ```
 
-`call/2` recibe el `Plug.Conn` sin procesar (ya pasado el parseo de body del propio
-endpoint) y los segmentos de ruta después de tu propio prefijo - control total, igual que
-cualquier Plug escrito a mano, ya que Pepe no puede anticipar cada forma que necesite el
-propio protocolo de un plugin. Un `call/2` que falla responde `500`, nunca se lleva por
-delante el proceso de la petición (ni ninguna otra cosa).
+`call/2` recibe el `Plug.Conn` sin procesar (ya pasado por el parseo de body del propio endpoint) y los segmentos de ruta que vienen después de tu propio prefijo: control total, igual que cualquier Plug escrito a mano, porque Pepe no puede anticipar todas las formas que el protocolo propio de un plugin pueda necesitar. Si `call/2` revienta, responde `500`, pero nunca se lleva por delante el proceso de la petición ni ninguna otra cosa.
 
-**Construir uno, paso a paso:**
+**Cómo construir uno, paso a paso:**
 
 1. Escribe un módulo que implemente `route_prefix/0` y `call/2`:
 
@@ -165,10 +131,7 @@ delante el proceso de la petición (ni ninguna otra cosa).
 
 2. Guárdalo como `~/.pepe/plugins/weather_oauth.exs` e instálalo:
    `pepe plugin install ~/.pepe/plugins/weather_oauth.exs`.
-3. **Activa la ruta explícitamente** - reclamar un prefijo en código no expone nada por
-   sí solo, se requiere un **segundo opt-in, deliberado**, porque una ruta (a diferencia
-   de una herramienta) responde a cualquier petición entrante, no solo a la que decidió
-   hacer el propio modelo del agente:
+3. **Activa la ruta explícitamente.** Reclamar un prefijo en el código no expone nada por sí solo; hace falta un **segundo opt-in, deliberado**, porque una ruta (a diferencia de una herramienta) responde a cualquier petición entrante, no solo a la que el propio modelo del agente decidió hacer:
 
    ```bash
    pepe plugin route list                 # cada plugin instalado que reclama ruta, activo o no
@@ -176,18 +139,11 @@ delante el proceso de la petición (ni ninguna otra cosa).
    pepe plugin route disable weather_oauth
    ```
 
-4. Apunta lo que necesite llegar a ella (la URL de redirección de una app OAuth, un
-   emisor de webhooks) a `https://tu-dominio/plugin-routes/weather_oauth/...` - los
-   segmentos de ruta después del prefijo llegan como segundo argumento de `call/2`.
+4. Apunta lo que necesite llegar a ella (la URL de redirección de una app OAuth, quien envía un webhook) a `https://tu-dominio/plugin-routes/weather_oauth/...`. Los segmentos de ruta que vienen después del prefijo llegan como segundo argumento de `call/2`.
 
-## El behaviour Realtime provider - audio dúplex
+## El behaviour Realtime provider: audio dúplex
 
-Ningún otro punto de extensión de Pepe sostiene un flujo continuo y bidireccional - una
-llamada a herramienta, un webhook, un ocupante de slot son todos de petición/respuesta o
-de una sola vez. `Pepe.Realtime.Provider` es esa primitiva: un plugin controla por
-completo cómo el audio entrante se convierte en una respuesta saliente (un modelo de
-tiempo real alojado, una tubería de STT en streaming seguido de TTS), y un canal
-WebSocket nuevo lleva los bytes.
+Ningún otro punto de extensión de Pepe sostiene un flujo continuo y bidireccional: una llamada a herramienta, un webhook o un ocupante de slot son siempre de petición y respuesta, o de una sola vez. `Pepe.Realtime.Provider` es esa pieza que faltaba: un plugin controla por completo cómo el audio entrante se convierte en una respuesta saliente (un modelo en tiempo real alojado en la nube, una tubería de STT en streaming seguida de TTS), y un canal WebSocket nuevo transporta los bytes.
 
 ```elixir
 @callback name() :: String.t()
@@ -197,23 +153,11 @@ WebSocket nuevo lleva los bytes.
 @callback stop(session :: term()) :: :ok
 ```
 
-Un cliente se une a `realtime:<agent_name>` (`realtime:default` para el agente
-predeterminado) con `{"provider": "your_provider_name"}` en el payload de unión, y luego
-envía fragmentos binarios en el evento `"audio"`. El `sink` de `start/3` es el pid al que
-enviar eventos de vuelta durante toda la vida de la sesión: `{:realtime_audio, chunk}`,
-`{:realtime_text, text}`, o `{:realtime_stopped, reason}` si el proveedor termina la
-sesión por su cuenta. Es aditivo, no un slot - se pueden instalar varios proveedores, y un
-cliente elige uno por nombre por conexión; nada necesita habilitarse de forma global como
-sí ocurre con un `Pepe.PluginRoute`. Pepe no incluye ningún proveedor realtime propio -
-este es el punto de extensión que un plugin rellena.
+Un cliente se une a `realtime:<agent_name>` (`realtime:default` para el agente predeterminado) con `{"provider": "your_provider_name"}` en el payload de la unión, y después envía fragmentos binarios en el evento `"audio"`. El `sink` que recibe `start/3` es el pid al que se le mandan los eventos de vuelta durante toda la vida de la sesión: `{:realtime_audio, chunk}`, `{:realtime_text, text}`, o `{:realtime_stopped, reason}` si el proveedor termina la sesión por su cuenta. Es aditivo, no un slot: se pueden instalar varios proveedores a la vez, y cada cliente elige uno por nombre en cada conexión; nada necesita habilitarse de forma global como sí ocurre con un `Pepe.PluginRoute`. Pepe no trae ningún proveedor realtime propio: este es justamente el punto de extensión que un plugin viene a llenar.
 
-**Construir uno, paso a paso:**
+**Cómo construir uno, paso a paso:**
 
-1. Escribe un módulo que implemente `name/0`, `start/3`, `push_audio/2`, `stop/1`, y
-   opcionalmente `push_text/2`. El ejemplo de abajo es un proveedor de eco - devuelve
-   cualquier audio que reciba, más un subtítulo por cada fragmento. Suficiente para
-   desarrollar un cliente contra él antes de que exista un backend real de STT/TTS o de
-   modelo alojado:
+1. Escribe un módulo que implemente `name/0`, `start/3`, `push_audio/2`, `stop/1` y, si quieres, `push_text/2`. El ejemplo de abajo es un proveedor de eco: devuelve el mismo audio que recibe, más un subtítulo por cada fragmento. Alcanza para desarrollar un cliente contra él antes de tener un backend real de STT/TTS o de un modelo alojado:
 
    ```elixir
    defmodule EchoRealtime do
@@ -246,18 +190,10 @@ este es el punto de extensión que un plugin rellena.
    end
    ```
 
-   El propio argumento `sink` de `start/3` funciona aquí también como el término de
-   sesión, ya que este proveedor no tiene una conexión/proceso real propio que rastrear -
-   un proveedor que hable con un upstream de verdad (un modelo alojado, una tubería local
-   de STT/TTS) devolvería algo que identifique *eso*, y usaría `sink` solo para enviar
-   eventos de vuelta.
+   Aquí el propio argumento `sink` de `start/3` funciona también como el término de sesión, porque este proveedor no tiene ninguna conexión o proceso real propio que rastrear; un proveedor que hable con un backend de verdad (un modelo alojado, una tubería local de STT/TTS) devolvería algo que identifique *eso*, y usaría `sink` únicamente para mandar eventos de vuelta.
 
-2. Guárdalo como `~/.pepe/plugins/echo_realtime.exs` e instálalo:
-   `pepe plugin install ~/.pepe/plugins/echo_realtime.exs`. No hay nada más que activar -
-   un proveedor realtime no tiene slot que fijar ni ruta que activar; queda vivo en el
-   momento en que se instala, esperando a que un cliente lo pida por su nombre.
-3. Desde un cliente, únete a `realtime:<agent_name>` en el WebSocket ya existente
-   (`/socket/websocket`) nombrándolo en el payload:
+2. Guárdalo como `~/.pepe/plugins/echo_realtime.exs` e instálalo: `pepe plugin install ~/.pepe/plugins/echo_realtime.exs`. No hay nada más que activar: un proveedor realtime no tiene slot que fijar ni ruta que habilitar, queda vivo apenas se instala, esperando a que un cliente lo pida por su nombre.
+3. Desde un cliente, únete a `realtime:<agent_name>` en el WebSocket ya existente (`/socket/websocket`) indicándolo en el payload:
 
    ```js
    let ws = new WebSocket("ws://localhost:4000/socket/websocket");
@@ -270,16 +206,11 @@ este es el punto de extensión que un plugin rellena.
    };
    ```
 
-4. Envía fragmentos binarios en el evento `"audio"` una vez conectado; los eventos
-   `{:realtime_audio, ...}`/`{:realtime_text, ...}` vuelven de la misma manera que
-   cualquier otro push de canal.
+4. Una vez conectado, envía fragmentos binarios en el evento `"audio"`; los eventos `{:realtime_audio, ...}` y `{:realtime_text, ...}` vuelven de la misma manera que cualquier otro push del canal.
 
-## El behaviour Hook - mutación real de contenido
+## El behaviour Hook: mutación real de contenido
 
-Un hook reescribe de verdad el contenido de la conversación, en línea, en el mismo
-camino síncrono en el que ya corren `pii_redact`/`llm_redact`/`http_redact`/`presidio`.
-Así es como un plugin de compactación de contexto o redacción de contenido hace trabajo
-real - no confundir con un run observer (abajo), que solo puede observar.
+Un hook reescribe de verdad el contenido de la conversación, en línea, en el mismo camino síncrono en el que ya corren `pii_redact`, `llm_redact`, `http_redact` y `presidio`. Así es como un plugin de compactación de contexto o de censura de contenido hace trabajo real, algo que no debe confundirse con un observador de ejecución (más abajo), que solo puede mirar.
 
 ```elixir
 @callback name() :: String.t()
@@ -288,29 +219,15 @@ real - no confundir con un run observer (abajo), que solo puede observar.
             {:ok, String.t()} | {:ok, String.t(), [%{"fake" => String.t(), "real" => String.t()}]}
 ```
 
-`:inbound` corre sobre el texto del usuario antes de que el modelo lo vea; `:outbound`
-sobre la respuesta antes de enviarla de vuelta; `:tool_result` sobre la salida cruda de
-una tool antes de que se una a la conversación. Un agente se suscribe a hooks por nombre
-(`mix pepe agent add NOMBRE --hooks tu_hook,pii_redact`) - un hook de plugin es aditivo
-junto a los cuatro integrados, y uno integrado siempre gana un choque de nombre, así que
-elige un nombre distinto de `pii_redact`/`llm_redact`/`http_redact`/`presidio`.
+`:inbound` corre sobre el texto del usuario antes de que el modelo lo vea; `:outbound` sobre la respuesta antes de que se mande de vuelta; `:tool_result` sobre la salida cruda de una herramienta antes de que se sume a la conversación. Un agente se suscribe a hooks por nombre (`mix pepe agent add NOMBRE --hooks tu_hook,pii_redact`). Un hook de plugin se suma a los cuatro integrados sin reemplazarlos, y uno integrado siempre gana un choque de nombre, así que elige un nombre distinto de `pii_redact`, `llm_redact`, `http_redact` y `presidio`.
 
-Los hooks se encadenan: con `--hooks bracket,exclaim`, `exclaim` ve el texto ya mutado
-por `bracket`, en orden - secuencial, cada uno viendo la salida del anterior, no un
-fan-out. Devuelve el texto (posiblemente sin cambios) y, opcionalmente, una lista de
-entradas de mapa reversible (`fake` un token, `real` el valor que reemplazó) si quieres
-que se restauren a la salida.
+Los hooks se encadenan: con `--hooks bracket,exclaim`, `exclaim` recibe el texto ya mutado por `bracket`, en orden. Es secuencial, cada uno viendo la salida del anterior, nunca un reparto en paralelo. Devuelve el texto (sin cambios si no hiciste ninguno) y, si quieres, una lista de entradas de mapa reversible (`fake` para el token, `real` para el valor que reemplazó) para que se restauren a la salida.
 
-**Fail-open, a propósito**: un hook que lanza una excepción cae de vuelta al texto de
-entrada en lugar de romper el turno. Un hook muta o redacta - nunca bloquea. Para vetar
-una llamada por completo, mira `Pepe.Permissions.Policy` abajo, un mecanismo
-deliberadamente distinto y más estrecho.
+**Falla abierto, y a propósito**: un hook que lanza una excepción cae de vuelta al texto de entrada en lugar de romper el turno. Un hook muta o censura, pero nunca bloquea. Para vetar una llamada por completo está `Pepe.Permissions.Policy`, más abajo, un mecanismo deliberadamente distinto y más acotado.
 
-## El behaviour Policy - vetar una llamada a una tool
+## El behaviour Policy: vetar una llamada a herramienta
 
-Un plugin de policy puede rechazar una llamada a una tool antes de que corra, por una
-razón que solo tu plugin conoce (una regla de la empresa, un servicio de allowlist
-externo, un limitador de tasa).
+Un plugin de policy puede rechazar una llamada a herramienta antes de que corra, por una razón que solo tu plugin conoce (una regla interna de la empresa, un servicio externo de lista de permitidos, un limitador de tasa).
 
 ```elixir
 @callback name() :: String.t()
@@ -318,20 +235,19 @@ externo, un limitador de tasa).
             :allow | :ask | {:ask, String.t()} | :deny | {:deny, String.t()}
 ```
 
-Cada policy instalada se consulta en **cada** llamada de gate, para cada agente - no es
-opt-in como un hook, ya que instalar una solo añade restricción. Se comprueba antes de
-la propia lógica de pre-aprobación de Pepe, así que una policy puede vetar incluso una
-llamada que el operador ya marcó como aprobada con `:always`. Sin llegar a un rechazo
-total, `:ask`/`{:ask, reason}` obliga a un humano a mirar una llamada que de otro modo
-habría sido pre-aprobada en silencio - el motivo aparece junto al prompt. Gana lo más
-restrictivo entre todas las policies instaladas: `:deny` vence a `:ask` vence a `:allow`.
+Cada policy instalada se consulta en **cada** llamada a la barrera de permisos, para todos los agentes a los que aplica. No es algo opcional como un hook, ya que instalar una policy solo puede sumar restricciones, nunca quitarlas. Se comprueba antes que la propia lógica de preaprobación de Pepe, así que una policy puede vetar incluso una llamada que el operador ya marcó como aprobada de forma permanente (`:always`). Sin llegar a un rechazo total, `:ask` o `{:ask, reason}` obliga a que un humano revise una llamada que de otro modo se habría preaprobado en silencio (el motivo aparece junto al aviso). Entre todas las policies instaladas gana siempre la más restrictiva: `:deny` le gana a `:ask`, y `:ask` le gana a `:allow`.
 
-**Fail-closed - la única excepción deliberada en todo este sistema de plugins.** Cualquier
-otra superficie de plugin en Pepe degrada a "como si no estuviera instalado" ante un
-fallo o timeout. Un plugin de policy es lo contrario: un `check/3` que lanza una
-excepción, se queda colgado más allá de su timeout, o devuelve algo distinto de un
-`:allow` explícito **deniega la llamada**. Una comprobación de seguridad que no pudo
-correr no es lo mismo que una que pasó.
+El alcance de "a los que aplica" todavía se puede acotar, pero solo por el operador, nunca por el propio agente, porque eso anularía el sentido de la policy:
+
+```bash
+pepe policy list                                      # cada policy instalada + su alcance
+pepe policy scope no_bash_policy --agents support --projects acme
+pepe policy scope no_bash_policy --clear              # vuelve a aplicarse en todas partes
+```
+
+o directamente en `config.json` (bajo `"policy_scope"`, por nombre de policy). Si no hay entrada para el nombre de una policy, se entiende que no tiene alcance restringido: aplica a todos los agentes, el comportamiento original y por defecto. Un agente nunca puede excluirse a sí mismo de una policy; solo quien configura el alcance decide dónde se llega a consultar.
+
+**Falla cerrado: la única excepción deliberada en todo este sistema de plugins.** Cualquier otra superficie de plugin en Pepe, ante un fallo o un timeout, se degrada a "como si no estuviera instalada". Un plugin de policy hace justo lo contrario: si `check/3` lanza una excepción, se cuelga más allá de su timeout, o devuelve cualquier cosa que no sea un `:allow` explícito, **la llamada queda denegada**. Una comprobación de seguridad que no pudo correr no es lo mismo que una que sí pasó.
 
 ```elixir
 defmodule MyPlugin.NoBashPolicy do
@@ -346,38 +262,16 @@ defmodule MyPlugin.NoBashPolicy do
 end
 ```
 
-Añade un `check_run/3` opcional para vetar toda una ejecución, antes de cualquier llamada
-a herramienta y antes de la primera llamada al modelo - la única forma de decir "no
-proceses este mensaje en absoluto" (un remitente vetado, un límite de tasa a nivel de
-mensaje), ya que `check/3` nunca se dispara para un turno que jamás llama a una
-herramienta:
+Agrega un `check_run/3` opcional para vetar una ejecución completa, antes de cualquier llamada a herramienta y antes de la primera llamada al modelo. Es la única forma de decir "no proceses este mensaje en absoluto" (un remitente vetado, un límite de tasa a nivel de mensaje), ya que `check/3` nunca se dispara en un turno que jamás llega a invocar una herramienta:
 
 ```elixir
 @callback check_run(agent :: map(), first_message :: String.t(), ctx :: map()) ::
             :allow | :ask | {:ask, String.t()} | :deny | {:deny, String.t()}
 ```
 
-"Se aplica a" todavía puede acotarse - por el operador, nunca por el propio agente, lo
-que anularía el propósito:
-
-```bash
-pepe policy list                                      # cada policy instalada + su alcance
-pepe policy scope no_bash_policy --agents support --projects acme
-pepe policy scope no_bash_policy --clear              # vuelve a aplicarse en todas partes
-```
-
-o directamente en `config.json` (`"policy_scope"`, por el nombre de la policy). Ninguna
-entrada para el nombre de una policy significa sin alcance - todos los agentes, el
-predeterminado y el comportamiento original. Un agente nunca puede excluirse a sí mismo;
-solo quien configura el alcance decide dónde se consulta una policy.
-
 ## El behaviour RunObserver
 
-Un observador de ejecución observa el turno de un agente desde fuera - útil para
-logging, métricas o alertas sobre lo que hace un agente, sin tocar lo que hace. Es
-estrictamente de solo observación: nunca ve el historial de mensajes de la
-conversación, no puede bloquear un turno y no puede cambiar nada de él, solo enterarse
-de lo que ya pasó, después del hecho.
+Un observador de ejecución mira el turno de un agente desde afuera, útil para registrar logs, métricas o alertas sobre lo que hace un agente, sin tocar nada de lo que hace. Es estrictamente de solo observación: nunca ve el historial de mensajes de la conversación, no puede bloquear un turno y no puede cambiar nada en él; solo se entera de lo que ya pasó, después de que pasó.
 
 ```elixir
 @callback name() :: String.t()
@@ -385,14 +279,7 @@ de lo que ya pasó, después del hecho.
 @callback handle_event(event :: atom(), payload :: term(), meta :: map()) :: any()
 ```
 
-`subscriptions/0` nombra qué tipos de evento quieres - cualquiera de `:run_start`,
-`:tool_call`, `:tool_denied`, `:tool_result`, `:assistant`, `:assistant_delta`,
-`:failover`, `:output_cap`, `:usage`, `:inline`, `:done`, `:error`, `:run_end`.
-`handle_event/3` se llama una vez por cada evento al que te suscribiste, en el orden
-en que el turno los produjo. `payload` es la propia tupla del evento (p. ej.
-`{:tool_result, "web_search", "..."}`) - con una excepción: `:tool_call` llega como
-`{:tool_call, name}`, sin sus argumentos, porque esos todavía no han pasado por la
-redacción y pueden llevar secretos.
+`subscriptions/0` indica qué tipos de evento te interesan, cualquier combinación de `:run_start`, `:tool_call`, `:tool_denied`, `:tool_result`, `:assistant`, `:assistant_delta`, `:failover`, `:output_cap`, `:usage`, `:inline`, `:done`, `:error` y `:run_end`. `handle_event/3` se llama una vez por cada evento al que te suscribiste, en el mismo orden en que el turno los fue produciendo. `payload` es la tupla del evento tal cual (por ejemplo `{:tool_result, "web_search", "..."}`), con una excepción: `:tool_call` llega como `{:tool_call, name}`, sin sus argumentos, porque esos todavía no pasaron por la censura y podrían llevar secretos.
 
 Un ejemplo mínimo que registra cada llamada a herramienta y la respuesta final:
 
@@ -413,89 +300,45 @@ defmodule MyPlugin.ToolLogger do
 end
 ```
 
-El despacho es asíncrono y está aislado: un observador colgado o que falla nunca
-ralentiza ni rompe la conversación que observa. Uno que falla 3 veces seguidas queda
-deshabilitado - en todas las ejecuciones futuras, no solo en la que lo disparó -
-para que un observador roto nunca siga pagando su propio costo de detección para
-siempre, ni sature tus logs con el mismo fallo. No hay nada que conceder a un agente
-para esto: instalado es habilitado.
+El despacho es asíncrono y está aislado: un observador colgado o que falla nunca frena ni rompe la conversación que está observando. Uno que falla 3 veces seguidas queda deshabilitado, y no solo en esa ejecución sino en todas las futuras, para que un observador roto no siga pagando su propio costo de detección para siempre ni te llene los logs con el mismo fallo una y otra vez. Acá no hay nada que concederle a un agente: instalado ya significa habilitado.
 
 ## El registro
 
-`Pepe.Tools.all/0` devuelve las herramientas integradas seguidas de cada
-herramienta de plugin cargada; `Pepe.Webhooks` hace lo mismo con los
-proveedores de canal. Las integradas y los plugins se unen en un único
-registro, y las dos formas resuelven un conflicto de nombre de maneras
-opuestas. En las herramientas, la integrada siempre prevalece, así que elige un
-nombre de herramienta distinto de `read_file`, `web_search` y el resto de `pepe
-tools`. En los proveedores de canal, prevalece el plugin con el mismo nombre, y
-así es como reemplazas un proveedor ya incluido por tu propia versión de él.
+`Pepe.Tools.all/0` devuelve las herramientas integradas seguidas de cada herramienta de plugin cargada; `Pepe.Webhooks` hace lo mismo con los proveedores de canal. Las integradas y los plugins se combinan en un único registro, y las dos formas resuelven un choque de nombres de manera opuesta. Con las herramientas, siempre gana la integrada, así que elige un nombre distinto de `read_file`, `web_search` y el resto de `pepe tools`. Con los proveedores de canal, en cambio, gana el plugin del mismo nombre, que es justamente cómo reemplazas un proveedor incluido de fábrica por tu propia versión.
 
 ### Conceder una herramienta a un agente
 
-Instalar un plugin no entrega sus herramientas a todos los agentes: solo las
-herramientas listadas en un agente quedan expuestas a él, con el mismo
-control que una integrada.
+Instalar un plugin no le entrega sus herramientas a todos los agentes: solo quedan expuestas las que estén explícitamente listadas en cada agente, con el mismo control de permisos que una integrada.
 
 **CLI:** `pepe agent add assistant --tools reverse_text,web_search,read_file`
 
-**Panel:** abre el agente en Agentes y marca la herramienta. Las
-herramientas de plugin aparecen junto a las integradas.
+**Panel:** abre el agente en Agentes y marca la herramienta; las herramientas de plugin aparecen junto a las integradas.
 
-**Por chat:** un agente con `enable_tool` puede activar una herramienta para
-sí mismo:
+**Por chat:** un agente con `enable_tool` puede activar una herramienta para sí mismo:
 
 > Tú: activa la herramienta reverse_text
 >
 > Agente: reverse_text activada; ya puedes usarla desde tu próximo mensaje
 
-Para conceder una herramienta a un agente *distinto*, la acción `add_tool` de
-`manage_agent` lo hace (limitada a los agentes que quien pide tiene permiso
-de gestionar, y confirma contigo antes):
+Para conceder una herramienta a *otro* agente, la acción `add_tool` de `manage_agent` se encarga (limitada a los agentes que quien la pide tiene permiso de gestionar, y siempre confirma contigo antes):
 
 > Tú: dale al agente de soporte la herramienta gmail_search
 >
-> Agente: Voy a añadir gmail_search al agente "support". ¿Confirmas?
+> Agente: voy a añadir gmail_search al agente "support". ¿Confirmas?
 
 ## Dónde viven los plugins y cómo se cargan
 
-Los plugins viven en `~/.pepe/plugins/` (sigue `PEPE_HOME`). Pepe recorre esa
-carpeta de forma recursiva buscando archivos `.exs`, compila cada uno una vez
-y solo recompila cuando cambia su fecha de modificación: suelta un archivo y
-funciona sin reiniciar; edítalo y el cambio se aplica en la siguiente llamada
-a herramienta. Un archivo puede definir varios módulos (el ejemplo de Google
-de abajo trae cuatro).
+Los plugins viven en `~/.pepe/plugins/` (respeta `PEPE_HOME`). Pepe recorre esa carpeta de forma recursiva buscando archivos `.exs`, compila cada uno una sola vez, y solo vuelve a compilarlo cuando cambia en disco. Sueltas un archivo ahí y funciona sin reiniciar nada; lo editas, y el cambio se aplica en la siguiente llamada a una herramienta. Un mismo archivo puede definir varios módulos (el ejemplo de Google de más abajo trae cuatro).
 
-Un plugin tiene una de dos formas: un archivo `.exs` suelto, o un
-**paquete**: un directorio con un `manifest.json` y uno o más archivos
-`.exs`.
+Un plugin toma una de dos formas: un archivo `.exs` suelto, o un **paquete** (un directorio con un `manifest.json` y uno o más archivos `.exs`).
 
-Compilar en tiempo de ejecución trae un límite honesto: **un plugin no puede
-traer consigo una dependencia externa nueva.** Elixir resuelve y compila las
-dependencias en tiempo de build, así que un plugin solo puede usar las
-bibliotecas que Pepe ya incluye (`Req`, `Jason`, la biblioteca estándar y el
-resto de sus dependencias). Un plugin que necesita una biblioteca inédita no es
-un drop-in; exigiría recompilar Pepe. En la práctica rara vez estorba, porque
-una herramienta que llama a una API HTTP y un proveedor de canal como Chatwoot
-no necesitan nada más allá de lo que ya viene incluido, y por eso se instalan
-sin problema.
+Compilar en tiempo de ejecución trae consigo una limitación honesta: **un plugin no puede traer una dependencia externa nueva**. Elixir resuelve y compila las dependencias en tiempo de compilación del proyecto, así que un plugin solo puede usar las bibliotecas que Pepe ya trae de fábrica (`Req`, `Jason`, la biblioteca estándar y el resto de sus dependencias). Un plugin que necesita una biblioteca completamente nueva no se puede simplemente soltar ahí; implicaría recompilar Pepe entero. En la práctica esto casi nunca es un problema, porque una herramienta que llama a una API HTTP, o un proveedor de canal como Chatwoot, no necesitan nada más allá de lo que ya viene incluido, y por eso se instalan sin fricción.
 
 ## Instalar un plugin
 
-La fuente es un archivo local, un directorio local, un `.tar.gz`, una URL a
-cualquiera de esos, o una referencia de [PepeHub](https://hub.pepe-agent.com),
-y `install` desempaqueta lo que le des en la carpeta de plugins. Una URL de
-repositorio de GitHub se descarga como su archivo fuente y se extrae, tomando
-la rama por defecto (`main`, luego `master`) cuando no se indica ninguna;
-añade `/tree/<branch>` a la URL para tomar otra. Un `.tar.gz`, local o remoto,
-se extrae y el paquete se coloca bajo el `name` de su manifiesto. Un
-directorio se copia tal cual, y un `.exs` suelto se copia directamente.
+La fuente puede ser un archivo local, un directorio local, un `.tar.gz`, una URL a cualquiera de esos, o una referencia de [PepeHub](https://hub.pepe-agent.com), y `install` desempaqueta lo que le des en la carpeta de plugins. Una URL de repositorio de GitHub se descarga como su archivo fuente y se extrae, tomando la rama por defecto (`main`, y si no existe, `master`) cuando no indicas ninguna; agrega `/tree/<branch>` a la URL para elegir otra. Un `.tar.gz`, local o remoto, se extrae y el paquete queda ubicado bajo el `name` de su manifiesto. Un directorio se copia tal cual, y un `.exs` suelto se copia directo.
 
-Una referencia de PepeHub es la forma corta `@handle/nombre` o la propia URL
-de la página del paquete, copiada directamente de `hub.pepe-agent.com`: ambas
-resuelven al mismo paquete. Apuntar `plugin install` a un nombre que en
-realidad es una skill en PepeHub, no un plugin, falla con un mensaje claro
-que indica usar `skill install` en su lugar.
+Una referencia de PepeHub puede ser la forma corta `@handle/nombre` o la propia URL de la página del paquete, copiada tal cual desde `hub.pepe-agent.com`: las dos apuntan al mismo paquete, así que cualquiera de las dos sirve. Si apuntas `plugin install` a un nombre que en realidad es una skill de PepeHub y no un plugin, falla con un mensaje claro que te dice que uses `skill install` en su lugar.
 
 **CLI:**
 
@@ -507,61 +350,40 @@ pepe plugin list
 pepe plugin remove google
 ```
 
-**Panel:** la página de Plugins acepta una URL de GitHub, una URL `.tar.gz` o
-una ruta local; marcas una casilla confirmando que confías en la fuente y
-pulsas Instalar. Los plugins instalados se listan con un botón Eliminar y,
-cuando el plugin declara ajustes, un botón Configurar.
+**Panel:** la página de Plugins acepta una URL de GitHub, una URL `.tar.gz` o una ruta local; marcas una casilla confirmando que confías en la fuente y le das a Instalar. Los plugins instalados aparecen listados con un botón Eliminar, y cuando el plugin declara ajustes propios, también un botón Configurar.
 
-**Por chat, con `manage_plugin`:** un agente con esta herramienta puede
-instalar en tu nombre: haz `scan` de una fuente primero para ver qué hace,
-luego `install`, `list`, `remove`. Pasa por el mismo escaneo de seguridad que
-la CLI, pero sin la salida de emergencia `--force`: un veredicto peligroso
-siempre se rechaza desde el chat, y el agente te dirá que revises el código y
-ejecutes `--force` tú mismo en una terminal si aun así lo quieres.
+**Desde el chat, con `manage_plugin`:** un agente que tenga esta herramienta puede instalar en tu nombre: primero corre `scan` sobre una fuente para ver qué hace, y después `install`, `list` o `remove`. Pasa por el mismo escaneo de seguridad que la CLI, pero sin la vía de escape `--force`: un veredicto peligroso siempre se rechaza desde el chat, y el agente te va a decir que revises el código y corras `--force` vos mismo en una terminal si aun así quieres instalarlo.
 
 ## El escaneo de seguridad
 
-Un plugin es Elixir corriente con acceso total a la aplicación en ejecución:
-instalar uno es una decisión de confianza, igual que añadir cualquier
-dependencia. Instala solo desde una fuente en la que confíes, y prefiere fijar
-una versión o un commit concreto.
+Un plugin es Elixir corriente, con acceso total a la aplicación en ejecución; instalar uno es una decisión de confianza, igual que instalar cualquier otro programa en tu máquina. Instala solo desde una fuente en la que confíes, y de preferencia fija una versión o un commit concretos.
 
-Antes de colocarlo en disco, `Pepe.Skills.Sentinel` lo escanea de forma
-estática. Recorre el **árbol sintáctico** en vez del texto en bruto, así que
-señala las llamadas peligrosas con precisión:
+Antes de dejarlo en disco, `Pepe.Skills.Sentinel` escanea el código. Lee la **estructura** del código (su árbol de sintaxis), no solo el texto en bruto, así que marca con precisión las llamadas peligrosas:
 
-- lanzar shells (`System.cmd`, `:os.cmd`),
-- eval dinámico (`Code.eval_string`),
+- ejecutar comandos de shell (`System.cmd`, `:os.cmd`),
+- evaluación dinámica (`Code.eval_string`),
 - deserialización insegura (`:erlang.binary_to_term`),
 - llamadas destructivas al sistema de archivos (`File.rm_rf`),
 - agotamiento de átomos (`String.to_atom`),
-- lectura del entorno o de rutas con secretos (`~/.ssh`, la configuración de
-  Pepe),
-- acceso a red.
+- lectura del entorno o de rutas con secretos (`~/.ssh`, la configuración de Pepe),
+- acceso a la red.
 
-Como lee el AST, también atrapa las formas con alias y las formas Erlang de esas
-llamadas, y no tropieza con esas mismas palabras cuando aparecen en un
-comentario o en una cadena. Nunca ejecuta el código, y devuelve uno de tres
-veredictos:
+Como analiza la estructura en vez de las palabras, también detecta las formas con alias y las variantes en Erlang de esas mismas llamadas, y no se confunde cuando esas mismas palabras aparecen dentro de un comentario o una cadena de texto. Nunca ejecuta el código, y siempre devuelve uno de tres veredictos:
 
 - **limpio**: sin hallazgos.
-- **precaución**: señalado pero a menudo legítimo (un plugin de canal
-  *debería* hacer llamadas de red); se muestra, no bloquea.
-- **peligro**: ninguna buena razón para estar ahí; bloquea la instalación.
+- **precaución**: algo se marcó, pero suele ser legítimo (un plugin de canal *debería* hacer llamadas de red); se muestra, pero no bloquea nada.
+- **peligro**: no hay ninguna buena razón para que esto esté ahí; bloquea la instalación.
 
 ```bash
 pepe plugin scan ./my_plugin.exs        # escanea sin instalar
-pepe plugin install ./risky.exs --force # continúa de todos modos, tras revisarlo
+pepe plugin install ./risky.exs --force # sigue adelante de todos modos, después de revisarlo
 ```
 
-<div class="note"><strong>Un plugin se ejecuta con acceso total.</strong> El
-escaneo es una red de seguridad, no un sustituto de leer el código tú
-mismo.</div>
+<div class="note"><strong>Un plugin corre con acceso total.</strong> El escaneo es una red de seguridad, no un sustituto de leer el código con tus propios ojos.</div>
 
 ## El manifiesto y el diálogo de Configurar
 
-El `manifest.json` de un paquete lo nombra, lo describe y (lo más útil)
-declara los ajustes que necesita. Del ejemplo de Google incluido:
+El `manifest.json` de un paquete lo identifica, lo describe y, lo más útil de todo, declara los ajustes que necesita. Tomado del ejemplo de Google incluido de fábrica:
 
 ```json
 {
@@ -579,32 +401,20 @@ declara los ajustes que necesita. Del ejemplo de Google incluido:
 }
 ```
 
-Cada entrada de `config` es un campo: `key` (el nombre que lee tu código),
-`label` (mostrado en el formulario), `type` (`"text"`, `"secret"` para una
-entrada enmascarada, o `"select"` con una lista `"options"`), y un `hint`
-opcional. El panel lee este array y renderiza el diálogo de Configurar. Un
-plugin nuevo no necesita pantalla nueva. Un valor puede ser una referencia
-`${ENV_VAR}`, guardada tal cual y resuelta desde el entorno solo al leerla,
-así que los secretos nunca quedan expandidos en el archivo de configuración.
+Cada entrada de `config` describe un campo: `key` (el nombre que lee tu código), `label` (lo que se muestra en el formulario), `type` (`"text"`, `"secret"` para una entrada enmascarada, o `"select"` con una lista de `"options"`), y un `hint` opcional. El panel lee este array y renderiza el diálogo de Configurar solo a partir de eso; un plugin nuevo no necesita ninguna pantalla propia. Un valor puede ser una referencia `${ENV_VAR}`, que se guarda tal cual y se resuelve desde el entorno recién al leerla, así que los secretos nunca quedan expandidos dentro del archivo de configuración.
 
-Lee un ajuste guardado desde el código de tu plugin con
-`Pepe.Plugins.config/3` (el nombre es el nombre del paquete en el manifiesto;
-el tercer argumento es un valor por defecto):
+Lee un ajuste guardado desde el código de tu propio plugin con `Pepe.Plugins.config/3` (el nombre es el del paquete en el manifiesto; el tercer argumento es un valor por defecto):
 
 ```elixir
 token = Pepe.Plugins.config("google", "access_token")
 region = Pepe.Plugins.config("myplugin", "region", "us-east-1")
 ```
 
-Un patrón común: prefiere el valor del panel, recurre a una variable de
-entorno, para que el plugin funcione tanto si el operador rellena el
-formulario como si exporta una variable (el ejemplo de Google de abajo hace
-exactamente eso).
+Un patrón habitual: preferir el valor guardado en el panel, y si no está, recurrir a una variable de entorno, para que el plugin funcione tanto si el operador llena el formulario como si prefiere exportar una variable (el ejemplo de Google de más abajo hace exactamente eso).
 
-## Ejemplo: el plugin de herramientas Google Workspace
+## Ejemplo: el plugin de herramientas de Google Workspace
 
-`examples/plugins/google/google.exs` trae cuatro herramientas en un solo
-archivo:
+`examples/plugins/google/google.exs` trae cuatro herramientas en un solo archivo:
 
 | Herramienta | Qué hace |
 |------|--------------|
@@ -618,16 +428,13 @@ pepe plugin install ./examples/plugins/google
 pepe agent add assistant --tools gcal_upcoming,gcal_create_event,gmail_search,gmail_send
 ```
 
-Se autentica con un token bearer OAuth2 resuelto en el momento de la llamada:
-nada sensible embebido en el código. Exporta un token de acceso listo (más
-rápido, expira en ~1h):
+Se autentica con un token bearer de OAuth2 resuelto en el momento de cada llamada; nada sensible queda embebido en el código. Puedes exportar un token de acceso ya generado (lo más rápido, pero expira en aproximadamente una hora):
 
 ```bash
 export GOOGLE_ACCESS_TOKEN=ya29....
 ```
 
-o un refresh token (sobrevive a la expiración; el plugin genera un token de
-acceso por llamada):
+o usar un refresh token (sobrevive a la expiración, porque el plugin genera un token de acceso nuevo en cada llamada):
 
 ```bash
 export GOOGLE_CLIENT_ID=...apps.googleusercontent.com
@@ -635,14 +442,9 @@ export GOOGLE_CLIENT_SECRET=...
 export GOOGLE_REFRESH_TOKEN=...
 ```
 
-Consigue estos valores creando un cliente OAuth (tipo "Desktop app") en un
-proyecto de Google Cloud, con las API de Calendar y Gmail habilitadas, tras
-ejecutar el flujo de consentimiento una vez para los ámbitos que uses. O
-rellena los mismos campos en el diálogo de Configurar del plugin, guardando
-los secretos como referencias `${ENV_VAR}`.
+Consigue estos valores creando un cliente OAuth (tipo "Desktop app") dentro de un proyecto de Google Cloud, con las API de Calendar y Gmail habilitadas, después de correr una vez el flujo de consentimiento para los permisos que vayas a usar. O completa los mismos campos en el diálogo de Configurar del plugin, guardando los secretos como referencias `${ENV_VAR}`.
 
-El código completo de una de las herramientas, mostrando el patrón de
-principio a fin:
+El código completo de una de las herramientas, para ver el patrón de principio a fin:
 
 ```elixir
 defmodule Pepe.Plugins.GCalUpcoming do
@@ -682,69 +484,39 @@ defmodule Pepe.Plugins.GCalUpcoming do
 end
 ```
 
-> Tú: ¿Qué tengo mañana en el calendario? Envía un resumen por correo a sam@example.com
+> Tú: ¿qué tengo mañana en el calendario? Envíale un resumen por correo a sam@example.com
 >
-> Agente: (invoca gcal_upcoming, luego gmail_send) Tienes 3 eventos mañana. Envié el resumen por correo a sam@example.com.
+> Agente: (invoca gcal_upcoming, y después gmail_send) Tienes 3 eventos mañana. Envié el resumen por correo a sam@example.com.
 
 ## Ejemplo: el plugin de canal Chatwoot
 
-`examples/plugins/chatwoot/` muestra la otra forma: un **canal**, no una
-herramienta. Registra un proveedor `chatwoot` para que Pepe se siente detrás
-de una bandeja de [Chatwoot](https://www.chatwoot.com) como el agente de IA,
-en todos los canales que Chatwoot ya cubre (WhatsApp, widget web, Instagram,
-...).
+`examples/plugins/chatwoot/` muestra la otra forma posible: un **canal**, no una herramienta. Registra un proveedor `chatwoot` para que Pepe pueda sentarse detrás de una bandeja de [Chatwoot](https://www.chatwoot.com) como el agente de IA, en todos los canales que Chatwoot ya cubre (WhatsApp, widget web, Instagram, y demás).
 
 ```bash
 pepe plugin install ./examples/plugins/chatwoot
 ```
 
-**Traspaso nativo a un humano, sin pegamento extra.** Chatwoot lleva la señal
-de traspaso en cada webhook: el `status` de la conversación. El plugin
-implementa `parse/1` para responder solo conversaciones marcadas `pending`
-(propiedad del bot); en el momento en que un agente humano la toma (`open`),
-Pepe se calla, y retoma cuando vuelve a `pending`.
+**Traspaso nativo a una persona, sin pegamento adicional.** Chatwoot lleva la señal de traspaso en cada webhook: el `status` de la conversación. El plugin implementa `parse/1` para responder solo a las conversaciones marcadas `pending` (propiedad del bot); en el momento en que un agente humano la toma (`open`), Pepe se queda callado, y retoma en cuanto vuelve a `pending`.
 
-**Configuración, en Chatwoot:** crea un AgentBot, apunta su webhook saliente
-a `https://TU_HOST/webhooks/<project>/chatwoot/<slug>`. La conexión guarda
-`base_url`, `account_id` y un `api_token` (como `${ENV_VAR}`) vía
-`config_schema/0`, rellenados desde el panel, el mismo patrón de Configurar
-que cualquier plugin.
+**Configuración, del lado de Chatwoot:** crea un AgentBot y apunta su webhook saliente a `https://TU_HOST/webhooks/<project>/chatwoot/<slug>`. La conexión guarda `base_url`, `account_id` y un `api_token` (como `${ENV_VAR}`) a través de `config_schema/0`, completados desde el panel con el mismo patrón de Configurar que cualquier otro plugin.
 
-> Esta es una de dos formas mutuamente excluyentes de operar WhatsApp:
-> **o bien** WhatsApp directo en Pepe (el proveedor integrado `whatsapp`)
-> **o bien** WhatsApp en Chatwoot con Pepe detrás (este plugin). Nunca
-> conectes el mismo número a ambos.
+> Esta es una de dos formas mutuamente excluyentes de usar WhatsApp: **o bien** WhatsApp directo dentro de Pepe (el proveedor `whatsapp` integrado), **o bien** WhatsApp sobre Chatwoot con Pepe detrás (este plugin). Nunca conectes el mismo número a las dos a la vez.
 
 ## Entregar un archivo, no solo texto
 
-El `run/2` de una herramienta solo devuelve texto. Para entregar un archivo
-real (una hoja de cálculo, un PDF) a la persona en la conversación, no
-reinventes la entrega: invoca la herramienta integrada `send_file` con una
-ruta; Pepe resuelve el canal a partir de la sesión y lo entrega ahí. Concede
-`send_file` a un agente y simplemente funciona desde el chat, en cualquier
-canal cuyo proveedor implemente `deliver_file/4`.
+El `run/2` de una herramienta solo puede devolver texto. Para entregarle a la persona de la conversación un archivo de verdad (una hoja de cálculo, un PDF), no reinventes la entrega: invoca la herramienta integrada `send_file` con una ruta, y Pepe resuelve el canal a partir de la sesión y lo entrega ahí mismo. Concédele `send_file` a un agente y ya funciona desde el chat, en cualquier canal cuyo proveedor implemente `deliver_file/4`.
 
 ## Checklist
 
 **Escribir una herramienta:**
 
-1. Implementa `name/0`, `spec/0`, `run/2`; dale un nombre distinto de toda
-   integrada.
-2. Devuelve `{:ok, text}` / `{:error, message}` desde `run/2`, escrito para
-   que el modelo lo lea.
-3. ¿Necesita credenciales u opciones? Incluye un `manifest.json` con un array
-   `config`, léelas con `Pepe.Plugins.config/3`.
+1. Implementa `name/0`, `spec/0` y `run/2`; ponle un nombre distinto de cualquier herramienta integrada.
+2. Devuelve `{:ok, text}` o `{:error, message}` desde `run/2`, redactado pensando en que el modelo lo va a leer.
+3. ¿Necesita credenciales u opciones? Incluye un `manifest.json` con un array `config`, y léelas con `Pepe.Plugins.config/3`.
 
 **Escribir un canal:**
 
-1. Implementa `name/0`, `verify/2`, `authenticate/3`, `parse/1`, `deliver/3`;
-   añade `config_schema/0` si necesita credenciales configuradas desde el
-   panel.
-2. Añade `respond/3` solo si el protocolo de la plataforma exige una
-   respuesta síncrona antes de cualquier trabajo del agente; `deliver_file/4`
-   solo si puede recibir adjuntos.
+1. Implementa `name/0`, `verify/2`, `authenticate/3`, `parse/1` y `deliver/3`; agrega `config_schema/0` si necesita credenciales configuradas desde el panel.
+2. Agrega `respond/3` solo si el protocolo de la plataforma exige una respuesta síncrona antes de cualquier trabajo del agente; `deliver_file/4` solo si puede recibir adjuntos.
 
-**En cualquier caso:** escanéalo (`pepe plugin scan SRC` o `manage_plugin
-scan`), instálalo, revisa lo que encontró el escaneo, y luego concede la
-herramienta a un agente (CLI, panel, o `enable_tool`/`manage_agent` desde el
-chat). Un canal no necesita concesión, queda activo en cuanto se instala.
+**En cualquiera de los dos casos:** escanéalo (`pepe plugin scan SRC` o `manage_plugin scan`), instálalo, revisa lo que encontró el escaneo, y después concédele la herramienta a un agente (por CLI, panel, o `enable_tool`/`manage_agent` desde el chat). Un canal no necesita ninguna concesión: queda activo apenas se instala.

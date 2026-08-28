@@ -1,10 +1,9 @@
 ---
 title: Inicio rápido
-description: Instala Pepe, crea un agente y ejecuta la primera conversación.
+description: Instala Pepe, crea un agente y arranca la primera conversación.
 ---
 
-En pocos comandos instalas Pepe, creas un agente y hablas con él. `pepe setup`
-toma el camino corto: modelo, clave, primer agente y canal opcional.
+Con pocos comandos instalas Pepe, creas un agente y empiezas a hablar con él. `pepe setup` toma el camino más corto: modelo, clave, primer agente y, si quieres, un canal.
 
 ## 1. Instala
 
@@ -19,44 +18,41 @@ pepe help
 pepe setup
 ```
 
-El asistente escribe `~/.pepe/config.json`. Cuando pida una clave, prefiere una
-referencia como `${OPENROUTER_API_KEY}` para que el secreto no quede en el archivo.
+El asistente guiado escribe `~/.pepe/config.json`. Cuando te pida una clave, dale preferencia a una referencia como `${OPENROUTER_API_KEY}` para que el secreto nunca quede escrito en el archivo.
 
 ## 3. Habla
 
 ```bash
-pepe run assistant "¿Qué archivos hay en este directorio?"
+pepe run assistant "¿qué archivos hay en este directorio?"
 ```
 
-Si marcaste un agente como predeterminado, omite el nombre:
+Si ya marcaste un agente como predeterminado, puedes omitir el nombre:
 
 ```bash
 pepe run "resume el README en tres puntos"
 ```
 
-Para una conversación continua:
+Para una conversación que se mantiene en el tiempo:
 
 ```bash
 pepe chat assistant
 ```
 
-`pepe run` responde una vez y olvida: nada pasa a la siguiente ejecución. Para
-retomar una conversación en la terminal más tarde, dale un nombre a la sesión:
+`pepe run` responde una vez y se olvida de todo: nada pasa a la siguiente ejecución. Si quieres retomar una conversación más tarde en la terminal, dale un nombre a la sesión:
 
 ```bash
 pepe chat assistant --session mi-sesion
 ```
 
-Cuando una herramienta quiera actuar sobre tu máquina, como ejecutar un comando o
-escribir un archivo, Pepe pide tu aprobación antes.
+Cuando una herramienta necesita actuar sobre tu máquina, como ejecutar un comando o escribir un archivo, Pepe primero te pide aprobación.
 
-## 4. Sirve la API y el panel
+## 4. Levanta la API y el panel
 
 ```bash
 pepe serve --port 4000
 ```
 
-El mismo agente queda ahora accesible en tres lugares:
+El mismo agente queda ahora accesible en tres frentes:
 
 - Panel local: `http://localhost:4000`
 - API compatible con OpenAI: `POST /v1/chat/completions`
@@ -70,19 +66,18 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"assistant","messages":[{"role":"user","content":"hola"}]}'
 ```
 
-<div class="note"><strong>La API empieza local.</strong> Hasta que crees un token, solo esta máquina puede llamar a <code>/v1</code>: nadie de fuera llega a tu agente. Crea uno con <code>pepe token add</code> antes de exponer el servidor.</div>
+<div class="note"><strong>La API arranca local.</strong> Hasta que crees un token, solo esta máquina puede llamar a <code>/v1</code>: nadie más llega a tu agente. Crea uno con <code>pepe token add</code> antes de exponer el servidor.</div>
 
 ## 5. Conecta un canal
 
-Telegram es la prueba más rápida porque no necesita una URL pública:
+Telegram es la prueba más rápida porque no exige una URL pública:
 
 ```bash
 pepe gateway telegram setup
 pepe gateway telegram
 ```
 
-Después, quien escriba al bot habla con el mismo agente. WhatsApp, Slack, Discord,
-Teams y Google Chat están en [Canales](../channels/).
+A partir de ahí, cualquiera que le escriba al bot habla con ese mismo agente. WhatsApp, Slack, Discord, Teams y Google Chat están cubiertos en [Canales](../channels/).
 
 ## 6. Automatiza
 
@@ -91,8 +86,7 @@ pepe cron add
 pepe watch add "site up" --probe "curl -sf https://example.com" --every 120
 ```
 
-Usa tareas programadas para lo que se repite, y vigilancias para que te avisen una
-sola vez cuando algo que te importa cambie.
+Usa tareas programadas para lo que se repite, y vigilancias para que te avisen una sola vez cuando algo que te importa cambie.
 
 ## Siguientes pasos
 

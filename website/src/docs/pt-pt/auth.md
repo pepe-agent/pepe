@@ -106,7 +106,7 @@ Podes gerar, listar e revogar tokens de três formas: a CLI, o painel ou por con
 A partir da CLI:
 
 ```bash
-pepe token add [--project PROJ] [--agent HANDLE] [--label "..."]
+pepe token add [--project PROJECT] [--agent HANDLE] [--label "..."]
 pepe token list
 pepe token revoke ID
 ```
@@ -128,7 +128,7 @@ Um agente ao qual seja concedida a ferramenta protegida `manage_token` pode gera
 Envia-o de qualquer uma das duas formas que um cliente ao estilo OpenAI usaria:
 
 ```bash
-# OpenAI standard: Authorization: Bearer
+# Padrão OpenAI: cabeçalho Authorization: Bearer
 curl http://localhost:4000/v1/chat/completions \
   -H 'authorization: Bearer pepe_your_token_here' \
   -H 'content-type: application/json' \
@@ -136,7 +136,7 @@ curl http://localhost:4000/v1/chat/completions \
 ```
 
 ```bash
-# Azure OpenAI style: api-key header (accepted as a fallback)
+# Estilo Azure OpenAI: cabeçalho api-key (aceite como alternativa)
 curl http://localhost:4000/v1/chat/completions \
   -H 'api-key: pepe_your_token_here' \
   -H 'content-type: application/json' \
@@ -150,8 +150,8 @@ Qualquer SDK da OpenAI envia a forma `Authorization: Bearer` quando define a res
 Um token transporta um âmbito que decide a que agentes consegue chegar. Do mais estreito ao mais amplo:
 
 * **Fixado num agente** (`--agent HANDLE`): executa sempre exatamente esse agente. O campo `model` do pedido é ignorado. Entrega isto a quem só deve alcançar um agente específico.
-* **Projeto** (`--project PROJ`): qualquer agente dentro desse projeto. Um nome de `model` puro qualifica-se dentro desse projeto automaticamente, e um pedido por um agente que pertence a outro projeto é recusado com `403`.
-* **Nenhum**: o projeto default. É sobre o que cada comando opera quando não lhe dás âmbito. Consegue alcançar os agentes do default (aqueles com nome puro, sem espaço de nomes) e, de forma única, recorrer a ligações de modelo puras pelo nome.
+* **Projeto** (`--project PROJECT`): qualquer agente dentro desse projeto. Um nome de `model` puro qualifica-se dentro desse projeto automaticamente, e um pedido por um agente que pertence a outro projeto é recusado com `403`.
+* **Nenhum**: o projeto default. É nele que qualquer comando atua quando não lhe indicas outro âmbito. Consegue alcançar os agentes do projeto default (os de nome puro, sem espaço de nomes) e, de forma única, recorrer também a ligações de modelo puras pelo nome.
 
 `GET /v1/models` respeita o âmbito: um token de projeto ou de agente vê apenas os seus próprios agentes, nunca os de outro projeto, e nunca as ligações de modelo puras.
 
@@ -173,7 +173,7 @@ pepe token add --project acme --no-chat --usage --prices billable
 pepe token permissions abc123 --prices list    # altera no sítio, sem mexer no segredo
 ```
 
-As duas metades são independentes de propósito. Sem elas, dar ao cliente visibilidade do próprio gasto significava dar-lhe também uma credencial capaz de executar agentes na tua conta. Veja a [API de consumo](../usage-api/) para o que essas leituras devolvem.
+As duas metades são independentes de propósito: sem essa separação, dar a um cliente visibilidade sobre o próprio gasto significaria dar-lhe também uma credencial capaz de executar agentes na tua conta. Consulta a [API de consumo](../usage-api/) para veres o que essas leituras devolvem.
 
 ## Encaminhamento multi-tenant: dá ao projeto X o seu próprio acesso
 
@@ -181,7 +181,7 @@ Os âmbitos são a forma de distribuir acesso à API por projeto. Para dar a um 
 
 ```bash
 pepe token add --project acme --label "Acme production"
-# prints: pepe_9f2a... (copy it now, shown once)
+# imprime: pepe_9f2a... (copia-o agora, só é mostrado uma vez)
 ```
 
 Quem detém esse token:
@@ -192,13 +192,13 @@ Quem detém esse token:
 * vê apenas os agentes de `acme` a partir de `GET /v1/models`.
 
 ```bash
-# Allowed: an agent inside acme.
+# Permitido: um agente dentro de acme.
 curl http://localhost:4000/v1/chat/completions \
   -H 'authorization: Bearer pepe_9f2a...' \
   -H 'content-type: application/json' \
   -d '{ "model": "support", "messages": [{"role":"user","content":"olá"}] }'
 
-# Refused with 403: an agent outside acme.
+# Recusado com 403: um agente fora de acme.
 curl http://localhost:4000/v1/chat/completions \
   -H 'authorization: Bearer pepe_9f2a...' \
   -H 'content-type: application/json' \

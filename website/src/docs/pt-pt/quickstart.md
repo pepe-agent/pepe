@@ -1,10 +1,9 @@
 ---
 title: Início rápido
-description: Instala o Pepe, cria um agente e corre a primeira conversa.
+description: Instala o Pepe, cria um agente e corre a tua primeira conversa com ele.
 ---
 
-Em poucos comandos instalas o Pepe, crias um agente e falas com ele. `pepe setup`
-segue o caminho curto: modelo, chave, primeiro agente e canal opcional.
+Bastam poucos comandos para instalares o Pepe, criares um agente e começares a falar com ele. O `pepe setup` segue sempre o caminho mais curto: modelo, chave, primeiro agente e, se quiseres, um canal.
 
 ## 1. Instala
 
@@ -19,36 +18,33 @@ pepe help
 pepe setup
 ```
 
-O assistente escreve `~/.pepe/config.json`. Quando pedir uma chave, prefere uma
-referência como `${OPENROUTER_API_KEY}` para manter o segredo fora do ficheiro.
+O assistente guiado trata de escrever `~/.pepe/config.json`. Quando te pedir uma chave, prefere sempre uma referência como `${OPENROUTER_API_KEY}`, para o segredo em si nunca chegar a entrar no ficheiro.
 
-## 3. Fala
+## 3. Fala com ele
 
 ```bash
 pepe run assistant "que ficheiros existem neste diretório?"
 ```
 
-Se definiste um agente predefinido, omite o nome:
+Se já tiveres um agente predefinido, podes dispensar o nome:
 
 ```bash
 pepe run "resume o README em três pontos"
 ```
 
-Para uma conversa contínua:
+E para uma conversa que se prolongue:
 
 ```bash
 pepe chat assistant
 ```
 
-`pepe run` responde uma vez e esquece: nada passa para a execução seguinte. Para
-retomares uma conversa no terminal mais tarde, dá um nome à sessão:
+O `pepe run` responde uma vez e esquece logo tudo: nada fica guardado para a próxima execução. Se quiseres voltar a uma conversa mais tarde, no terminal, dá um nome à sessão:
 
 ```bash
 pepe chat assistant --session minha-sessao
 ```
 
-Quando uma ferramenta quiser agir na tua máquina, como correr um comando ou
-escrever um ficheiro, o Pepe pede a tua aprovação antes.
+Sempre que uma ferramenta quiser agir na tua máquina, seja correr um comando ou escrever um ficheiro, o Pepe pede primeiro a tua aprovação.
 
 ## 4. Serve a API e o painel
 
@@ -56,13 +52,13 @@ escrever um ficheiro, o Pepe pede a tua aprovação antes.
 pepe serve --port 4000
 ```
 
-O mesmo agente fica agora acessível em três lugares:
+O mesmo agente passa agora a estar acessível de três formas:
 
 - Painel local: `http://localhost:4000`
-- API compatível com OpenAI: `POST /v1/chat/completions`
+- API compatível com a OpenAI: `POST /v1/chat/completions`
 - WebSocket: `ws://localhost:4000/socket/websocket`
 
-Testa a API:
+Para testares a API:
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
@@ -70,19 +66,18 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"assistant","messages":[{"role":"user","content":"olá"}]}'
 ```
 
-<div class="note"><strong>A API começa local.</strong> Enquanto não criares um token, só esta máquina consegue chamar <code>/v1</code>: ninguém de fora chega ao teu agente. Cria um com <code>pepe token add</code> antes de expores o servidor.</div>
+<div class="note"><strong>A API nasce local.</strong> Enquanto não criares um token, só esta máquina consegue chamar <code>/v1</code>, o que significa que mais ninguém chega ao teu agente. Cria um token com <code>pepe token add</code> antes de expores o servidor lá para fora.</div>
 
 ## 5. Liga um canal
 
-Telegram é o teste mais rápido porque não exige URL público:
+O Telegram é o teste mais rápido de todos, porque não exige nenhum URL público:
 
 ```bash
 pepe gateway telegram setup
 pepe gateway telegram
 ```
 
-Depois disso, quem falar com o bot conversa com o mesmo agente. WhatsApp, Slack,
-Discord, Teams e Google Chat estão em [Canais](../channels/).
+A partir daí, qualquer pessoa que escreva ao bot está a falar com o mesmo agente. WhatsApp, Slack, Discord, Teams e Google Chat têm cada um a sua página em [Canais](../channels/).
 
 ## 6. Automatiza
 
@@ -91,8 +86,7 @@ pepe cron add
 pepe watch add "site up" --probe "curl -sf https://example.com" --every 120
 ```
 
-Usa tarefas agendadas para o que se repete, e vigilâncias para seres avisado uma
-única vez quando algo que te importa mudar.
+Usa tarefas agendadas para o que se repete ao longo do tempo, e vigilâncias para seres avisado uma única vez, no momento em que algo que te interessa mudar.
 
 ## Próximos passos
 

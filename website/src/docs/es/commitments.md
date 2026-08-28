@@ -5,25 +5,25 @@ description: Si alguien dice "recuérdamelo el viernes", o tu agente dice "lo re
 
 ## Compromisos
 
-Un compromiso es distinto de cualquier otra automatización de Pepe: no es algo que configuras. Se detecta solo, después de un turno, a partir de lo que realmente se dijo: el usuario pidiendo que le recuerden algo, o el propio agente prometiendo verificar algo y volver con la respuesta. Actívalo por agente (`commitments`, apagado por defecto) y dale a ese agente un `utility_model`; sin ambos, no se extrae nada, y una promesa se queda solo en palabras.
+A diferencia de cualquier otra automatización de Pepe, un compromiso no lo configuras tú: aparece solo, al terminar un turno, a partir de lo que de verdad se dijo, ya sea que el usuario pida que le recuerden algo o que el propio agente prometa revisar algo y volver con la respuesta. Hace falta activarlo por agente (la opción `commitments`, apagada por defecto) y asignarle un `utility_model` a ese agente; si falta cualquiera de los dos, no se extrae nada y la promesa se queda en pura palabrería.
 
-### Dos tipos de seguimiento, entregados de dos formas distintas
+### Dos formas de dar seguimiento, dos maneras distintas de resolverlas
 
-Este es el detalle que vale la pena entender antes de activarlo, porque los dos casos no se tratan igual:
+Conviene entender esto antes de activar la función, porque Pepe no trata ambos casos de la misma manera:
 
-- **El recordatorio del propio usuario** ("recuérdame enviar el informe el viernes") se resuelve con un mensaje en el momento adecuado, lo mismo que ya hace un [watch](../watches/). Si tu agente tiene la tool `watch`, sigue valiendo la pena que la use directamente en ese momento; los compromisos existen como red de seguridad para cuando no lo hace.
-- **La promesa del propio agente** ("déjame revisar el deploy y te aviso mañana") *no* se resuelve con un recordatorio que diga que se hizo la promesa. Cuando llega la hora, Pepe vuelve a ejecutar esa sesión con una instrucción: hacer de verdad lo que se prometió, y solo entonces responder con lo que encontró. El mensaje que se envía es una respuesta real, no una plantilla fija, y así una promesa nunca se convierte silenciosamente en un "recordatorio: dije que iba a revisar eso".
+- **Cuando el usuario pide que le recuerden algo** ("recuérdame mandar el informe el viernes"), basta un mensaje en el momento justo, exactamente lo que ya resuelve un [watch](../watches/). Si el agente cuenta con la tool `watch`, sigue siendo mejor que la use ahí mismo; los compromisos funcionan como la red que atrapa los casos en que no lo hizo.
+- **Cuando es el agente el que promete algo** ("déjame revisar el deploy y mañana te cuento"), un simple recordatorio de que hizo esa promesa no sirve. Al llegar la hora, Pepe retoma esa misma sesión con una única instrucción: cumplir de verdad lo prometido y recién ahí contestar con el resultado. Lo que llega es una respuesta hecha y derecha, no una plantilla, para que ninguna promesa termine disolviéndose en un silencioso "recordatorio: dije que iba a revisar eso".
 
 ### Confianza, y qué pasa cuando no está claro
 
-Una llamada barata a un modelo lee el último intercambio y decide si hay un compromiso genuino, con una puntuación de confianza. Si es lo bastante alta, y el plazo se resolvió, el compromiso queda programado directamente: sin paso extra, en línea con "detectarlo sin que se lo pidan dos veces". Por debajo de eso, o cuando el plazo no se pudo resolver a partir de lo dicho (un vago "en algún momento" no es una fecha), queda **esperando tu confirmación**: se te pregunta directamente, una vez, en vez de rastrear en silencio algo que nadie pidió de verdad.
+Un modelo económico lee el último intercambio y, con un puntaje de confianza, decide si hay ahí un compromiso real. Cuando ese puntaje es alto y además la fecha quedó clara, el compromiso se programa de una vez, sin pasos intermedios, tal como corresponde a algo que se detecta sin que nadie tenga que pedirlo dos veces. Si la confianza no alcanza, o si el plazo no se pudo deducir de lo dicho (un "en algún momento" no cuenta como fecha), el compromiso queda **esperando tu confirmación**: se te pregunta una sola vez, en vez de hacerle seguimiento en silencio a algo que en realidad nadie pidió.
 
 ### Gestionarlos desde el chat
 
-La tool `commitment` del agente tiene tres acciones: `list` (lo que se está siguiendo ahora), `confirm id: <id>` (promueve uno que está esperando; pasa también `due_when` si la fecha nunca se resolvió), y `cancel id: <id>`.
+El agente cuenta con la tool `commitment`, con tres acciones: `list` muestra lo que hay en seguimiento ahora mismo, `confirm id: <id>` confirma uno que está esperando (agrega también `due_when` si la fecha nunca se resolvió sola), y `cancel id: <id>` lo da de baja.
 
 ### Hacerlo desde el panel
 
-Abre la página **Compromisos** en `pepe serve` para ver todo lo que se está siguiendo, agrupado en esperando confirmación, programados y entregados. Confirma o cancela directamente desde ahí.
+En `pepe serve`, la página **Compromisos** agrupa todo lo que hay en seguimiento en tres columnas (esperando confirmación, programados y entregados), y desde ahí mismo puedes confirmar o cancelar cualquiera.
 
-<div class="note"><strong>Sin servidor que ejecutar, solo un archivo local.</strong> Los compromisos viven en un pequeño archivo SQLite embebido, junto al <code>config.json</code>, no es una base de datos que tengas que instalar o administrar. Se disparan por el mismo tipo de temporizador interno que ya mueve los watches y las tareas programadas, que solo funciona mientras una superficie de larga duración (<code>pepe serve</code>, un gateway, o una sesión interactiva) esté activa.</div>
+<div class="note"><strong>No hay servidor que levantar, es solo un archivo local.</strong> Los compromisos se guardan en un pequeño SQLite embebido al lado de <code>config.json</code>, nada que tengas que instalar ni administrar aparte. Se disparan con el mismo temporizador interno que ya usan los watches y las tareas programadas, y ese temporizador solo corre mientras hay alguna superficie de larga duración activa (<code>pepe serve</code>, un gateway o una sesión interactiva).</div>

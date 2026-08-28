@@ -1,12 +1,12 @@
 ---
 title: Referência da CLI
-description: Todos os comandos do pepe, agrupados pelo que gerenciam, conexões de modelo, agentes, projetos, tokens, o dashboard, e mais.
+description: Todos os comandos do pepe, organizados pelo que cada um gerencia, conexões de modelo, agentes, projetos, tokens, o dashboard, e mais.
 ---
 
-Tudo no Pepe é alcançável pela linha de comando, agrupado aqui do jeito que você
-realmente vai procurar: pelo que você está tentando fazer, não em ordem alfabética.
-Todo exemplo usa o binário `pepe` instalado; a partir de um checkout do código-fonte,
-use `mix pepe` no lugar, os dois aceitam os mesmos subcomandos.
+Tudo o que o Pepe faz está acessível pela linha de comando, e a organização aqui segue a
+lógica de uso, não a ordem alfabética: primeiro o que você quer fazer, depois o comando.
+Os exemplos usam o binário `pepe` já instalado; rodando a partir de um checkout do
+código-fonte, troque por `mix pepe` no lugar, os subcomandos são idênticos nos dois casos.
 
 ```bash
 pepe help              # a lista completa de comandos
@@ -16,8 +16,8 @@ pepe help <grupo>       # ex.: pepe help agent
 ## Configuração inicial
 
 ```bash
-pepe setup   # primeira vez: assistente guiado (idioma -> modelo -> agente -> Telegram)
-              # próximas vezes: um menu pra adicionar ou reconfigurar qualquer parte
+pepe setup   # na primeira execução: assistente guiado (idioma -> modelo -> agente -> Telegram)
+              # nas seguintes: um menu para adicionar ou reconfigurar qualquer parte
 ```
 
 ## Conexões de modelo
@@ -32,22 +32,22 @@ pepe model add openrouter \
 pepe model providers             # lista provedores conhecidos (OpenAI, Anthropic, Gemini, ...)
 pepe model models --base-url https://api.openai.com/v1 --api-key '${OPENAI_API_KEY}'
 pepe model list                  # lista as conexões salvas
-pepe model test [NOME]           # testa uma conexão pra confirmar que ela funciona
-pepe model reconnect openai      # faz login de novo pra consertar uma conexão quebrada, sem mexer no resto
+pepe model test [NOME]           # testa uma conexão pra confirmar que a chave e o endpoint funcionam
+pepe model reconnect openai      # refaz o login pra consertar uma conexão quebrada, sem tocar no resto
 pepe model remove openrouter
 pepe model default openai
 ```
 
-Já paga o ChatGPT/Codex ou o Claude Pro/Max? Dá para adicionar **fazendo login com essa
-conta** em vez de colar uma chave de API: `pepe model add openai` -> "ChatGPT / Codex
-subscription" abre seu navegador, você entra na conta, e o Pepe cuida do resto. Veja
+Já assina o ChatGPT/Codex ou o Claude Pro/Max? Em vez de colar uma chave de API, dá pra
+adicionar **entrando com essa conta**: `pepe model add openai` -> "ChatGPT / Codex
+subscription" abre o navegador, você faz login, e o Pepe assume dali pra frente. Veja
 [Modelos](../models/).
 
-Se essa conexão parar de funcionar (o login expirou, ou você saiu da conta em outro
-lugar), `pepe model reconnect NOME` faz login de novo e conserta no lugar. Nada mais
-muda na conexão, então todo agente que já usava ela continua funcionando sem precisar
-mexer em nada. Não remova e adicione de novo para resolver isso: isso recomeça do zero e
-perde qualquer preço ou ajuste que você tinha configurado.
+Quando uma conexão dessas para de funcionar (um login que expirou, ou uma saída de conta
+em outro lugar), `pepe model reconnect NOME` refaz o login e conserta no lugar, sem mudar
+mais nada: todo agente que já usava essa conexão segue funcionando sem precisar de ajuste
+nenhum. Remover e recriar não é a solução aqui, isso recomeça do zero e joga fora qualquer
+preço ou configuração personalizada que você tinha guardado.
 
 ## Agentes
 
@@ -63,14 +63,14 @@ pepe agent remove helper
 pepe agent default assistant
 ```
 
-Veja [Agentes](../agents/) para entender o que cada opção faz.
+Veja [Agentes](../agents/) para o que cada opção faz.
 
-## Projetos (mais de um cliente ou time no mesmo Pepe)
+## Projetos (rodando mais de um cliente ou time)
 
-Se você roda o Pepe para vários clientes ou times numa instalação só, cada um é um
-**projeto**, com seus próprios agentes e dados, isolado dos outros. Sem `--project`,
-tudo usa o projeto padrão, exatamente como uma instalação de cliente único sempre
-funcionou. Veja [Projetos](../projects/).
+Quem roda o Pepe para vários clientes ou times numa mesma instalação separa cada um em um
+**projeto**, com agentes e dados próprios, isolados dos demais. Sem `--project`, tudo cai
+no projeto padrão, exatamente como sempre funcionou uma instalação de cliente único. Veja
+[Projetos](../projects/).
 
 ```bash
 pepe project add acme --description "Acme Inc"     # cria um novo cliente/projeto
@@ -83,43 +83,42 @@ pepe run acme/sales "olá"                          # roda pelo handle dele
 pepe project remove acme --force                   # apaga o projeto + os agentes dele
 ```
 
-## Rodando
+## Executando
 
 ```bash
 pepe run "liste os arquivos aqui e resuma o projeto"   # one-shot, transmite pro stdout
-pepe run assistant "olá"                                # escolhe um agente explicitamente
-pepe chat                            # conversa interativa, lembra o que foi dito
+pepe run assistant "olá"                                # escolhendo um agente específico
+pepe chat                            # conversa interativa, lembra o que foi dito antes
 pepe chat --agent assistant          # ...com um agente específico (ou: pepe chat assistant)
 pepe goal "publica as notas de versão" \
-  --criteria "CHANGELOG tem uma seção datada" --max-attempts 5   # continua até estar pronto de verdade
-pepe serve --port 4000               # sobe a API, o dashboard e o WebSocket juntos
+  --criteria "CHANGELOG tem uma seção datada" --max-attempts 5   # insiste até dar certo de verdade
+pepe serve --port 4000               # sobe API, dashboard e WebSocket juntos
 pepe serve --port 4000 --bind lan     # ...acessível de outras máquinas, não só desta
-pepe serve install [--port 4000]     # mantém rodando em segundo plano pra sempre
+pepe serve install [--port 4000]     # deixa rodando em segundo plano pra sempre
 pepe serve status                    # está instalado e rodando?
 pepe serve uninstall                 # para e remove
 ```
 
-`goal` não para na primeira tentativa: um revisor independente confere o resultado
-contra `--criteria` e o Pepe tenta de novo (até `--max-attempts` vezes) até dar certo de
-verdade. Use `--judge MODELO` para revisar com um modelo diferente. Veja
+`goal` não se dá por satisfeito na primeira tentativa: um revisor independente confere o
+resultado contra `--criteria`, e o Pepe tenta de novo (até `--max-attempts` vezes) enquanto
+não passar de verdade. Para revisar com outro modelo, use `--judge MODELO`. Veja
 [Metas](../goals/).
 
-`serve install` faz o Pepe ligar sozinho e continuar rodando em segundo plano, mesmo
-depois de logout, reinício, ou uma queda. Só funciona a partir do app `pepe`
-instalado, não de um checkout do código-fonte. O `--bind` também vale para ele
-(`serve install --bind lan`).
+`serve install` faz o Pepe subir sozinho no boot e continuar rodando em segundo plano por
+logout, reinício ou queda. Só funciona a partir do app `pepe` instalado, não de um checkout
+do código-fonte, e o `--bind` também se aplica a ele (`serve install --bind lan`).
 
-`serve` escuta só em `127.0.0.1` por padrão: só esta máquina alcança ele, já que um
-`serve` puro não tem proxy reverso na frente e a API `/v1` fica aberta sem
-autenticação até você configurar um token. `--bind lan` abre para todas as interfaces
-de rede; configure uma senha do dashboard primeiro (`pepe dashboard password`), ou
-use `--tunnel` para expor publicamente sem alargar o bind. Esse padrão não vale para a
-imagem Docker oficial, que sempre escuta em todas as interfaces. Veja
-[Publicando em um servidor](../deploy/) para o motivo.
+Por padrão, `serve` escuta só em `127.0.0.1`: só esta máquina consegue chegar até ele, já
+que um `serve` puro não tem proxy reverso na frente, e a API `/v1` fica aberta sem
+autenticação enquanto nenhum token for configurado. `--bind lan` abre para todas as
+interfaces de rede; antes disso, configure uma senha do dashboard (`pepe dashboard
+password`), ou use `--tunnel` para expor publicamente sem alargar o bind. Esse padrão não
+vale para a imagem Docker oficial, que sempre escuta em todas as interfaces, veja
+[Publicando em um servidor](../deploy/) para entender o motivo.
 
-`chat` (também chamado de `tui`) abre uma conversa direto no seu terminal, que lembra o
-contexto conforme você usa. Digite `/help` dentro dele para ver todos os atalhos (nova
-conversa, desfazer, trocar de agente ou modelo, e mais).
+`chat` (também chamado de `tui`) abre uma conversa direto no terminal, mantendo o contexto
+conforme você segue usando. Digite `/help` lá dentro para ver todos os atalhos disponíveis:
+nova conversa, desfazer, trocar de agente ou modelo, entre outros.
 
 ## Gateway do Telegram
 
@@ -128,14 +127,14 @@ pepe gateway telegram setup      # interativo: token do bot, quem pode falar com
 pepe gateway telegram            # roda em primeiro plano
 ```
 
-Veja [Telegram](../telegram/) para entender acesso e vários bots.
+Veja [Telegram](../telegram/) para como funcionam o acesso e vários bots ao mesmo tempo.
 
 ## Tokens de acesso à API
 
-Chaves que outros apps usam para falar com o Pepe por HTTP ou WebSocket. Sem nenhuma
-criada, só pedidos vindos da própria máquina são aceitos; assim que você cria uma, todo
-pedido passa a precisar de um token válido. Um token pode ser limitado a um projeto
-(`--project`) ou a um agente (`--agent HANDLE`). Veja [API HTTP](../api/).
+São as chaves que outros apps usam para falar com o Pepe por HTTP ou WebSocket. Sem
+nenhuma criada, só pedidos vindos da própria máquina são aceitos; assim que a primeira
+existe, todo pedido passa a exigir um token válido. Um token pode ficar limitado a um
+projeto (`--project`) ou a um agente (`--agent HANDLE`). Veja [API HTTP](../api/).
 
 ```bash
 pepe token add --project acme --label "app mobile da acme"   # mostra a chave uma vez só, guarde agora
@@ -147,13 +146,13 @@ pepe token update <id> --greeting "Oi! Como posso ajudar?"
 pepe token revoke <id>
 ```
 
-Escopo decide *de quem* são os dados que um token alcança; permissões decidem *o que*
-ele pode fazer com eles. Ou seja, dá para dar a alguém um token que só lê relatório de
-cobrança, sem conseguir conversar com um agente. Veja [Uso e cobrança](../billing/).
+O escopo decide *de quem* são os dados que o token alcança; as permissões decidem *o que*
+ele pode fazer com eles. Por isso dá pra entregar a alguém um token que só lê relatório de
+cobrança, sem que ele consiga conversar com nenhum agente. Veja [Uso e cobrança](../billing/).
 
 ```bash
-# um token só de cobrança: lê /v1/usage, não roda agente, e vê só o que
-# o cliente paga de verdade (--prices list esconde sua margem; --prices all mostra ela também)
+# um token só de cobrança: lê /v1/usage, não roda agente, e vê só o que o cliente
+# realmente paga (--prices list esconde sua margem; --prices all mostra ela também)
 pepe token add --project acme --no-chat --usage --prices billable
 
 pepe token permissions <id> --prices list   # muda no lugar, a chave continua a mesma
@@ -162,8 +161,8 @@ pepe token permissions <id> --no-usage
 
 ## Watches ("me avisa quando X acontecer")
 
-Verifica algo periodicamente e avisa **uma vez**, assim que acontecer, depois para
-sozinho. Veja [Watches](../watches/).
+Confere alguma coisa periodicamente e avisa **uma única vez**, no momento em que aquilo
+acontecer, e depois para sozinho. Veja [Watches](../watches/).
 
 ```bash
 pepe watch add "site no ar" --probe "curl -sf https://x" --every 120
@@ -173,21 +172,22 @@ pepe watch pause <id> | resume <id> | cancel <id>
 
 ## Tarefas agendadas
 
-Tarefas de agente que repetem numa agenda, tipo um cron. Veja [Tarefas
+Tarefas de agente que se repetem numa agenda, como um cron. Veja [Tarefas
 agendadas](../scheduled/).
 
 ```bash
 pepe cron list
 pepe cron add --name "resumo diário" --prompt "..." --schedule "0 8 * * *"
-pepe cron run <id>          # dispara agora, fora do horário
+pepe cron run <id>          # dispara agora, fora do horário programado
 pepe cron logs <id>
 ```
 
-## Flows (repetir algo que já deu certo, sem pensar de novo)
+## Flows (repetir algo que já deu certo, sem repensar)
 
-Depois que um agente resolve algo do mesmo jeito umas duas vezes, transforme essa
-sequência num `flow` com nome, que repete direto da próxima vez, mais rápido e sem
-pedir para o modelo pensar tudo de novo do zero. Veja [Flows](../flows/).
+Depois que um agente resolve a mesma coisa do mesmo jeito algumas vezes, vale transformar
+essa sequência num `flow` batizado com um nome: da próxima vez ele reproduz tudo direto,
+mais rápido e sem pedir ao modelo pra reconstruir o raciocínio do zero. Veja
+[Flows](../flows/).
 
 ```bash
 pepe flow list AGENTE
@@ -201,13 +201,13 @@ pepe flow schedule AGENTE NOME --schedule "..." [--timezone TZ] [--deliver ...]
 ## Aprendizado
 
 ```bash
-pepe timelearn [AGENTE]                 # o que o agente aprendeu, ao longo do tempo
-pepe learn consolidate [AGENTE]         # organiza isso agora
-pepe learn auto [AGENTE] [--at CRON]    # faz isso automaticamente toda noite (--off pra desligar)
+pepe timelearn [AGENTE]                 # o que o agente foi aprendendo, ao longo do tempo
+pepe learn consolidate [AGENTE]         # organiza isso agora mesmo
+pepe learn auto [AGENTE] [--at CRON]    # faz isso automaticamente toda noite (--off desliga)
 pepe learn status                       # quais agentes estão configurados pra isso
 ```
 
-Veja [Aprendizado](../learning/) para entender o que de fato é lembrado.
+Veja [Aprendizado](../learning/) para saber o que de fato fica registrado.
 
 ## Uso, cobrança e traces
 
@@ -219,14 +219,14 @@ pepe usage runs [--project acme] [--source telegram] [--agent H] [--limit N]
 pepe usage runs <id>                        # aquela conversa, passo a passo
 pepe usage export --project acme            # uma fatura de cliente (Markdown, ou --format csv)
 pepe usage prices [--refresh]               # vê ou atualiza os preços atuais de modelo
-pepe traces [--project NOME] [--limit N]    # atividade recente, qualquer canal
+pepe traces [--project NOME] [--limit N]    # atividade recente, de qualquer canal
 pepe traces <id>                            # reproduz uma execução passo a passo
 ```
 
-Os mesmos números dá para pegar por HTTP com um token com escopo de uso. Veja [Uso e
+Esses mesmos números também saem por HTTP, com um token com escopo de uso. Veja [Uso e
 cobrança](../billing/).
 
-## Servidores de tool, plugins e hooks de privacidade
+## Servidores de tools, plugins e hooks de privacidade
 
 ```bash
 pepe mcp add NOME --command npx --args "..."       # um servidor de tools local
@@ -241,7 +241,7 @@ pepe slot list | set | clear             # qual plugin cuida de uma capacidade e
 pepe policy list                         # regras de permissão instaladas e onde valem
 pepe policy scope NOME --agents a,b [--projects x,y] | --clear   # limita onde uma regra vale
 pepe hooks list                          # hooks de privacidade disponíveis
-pepe hooks generate "oculta CPFs" [--model NOME] [--save]   # deixa a IA escrever um pra você
+pepe hooks generate "oculta CPFs" [--model NOME] [--save]   # a IA escreve um pra você
 ```
 
 Veja [MCP](../mcp/), [Plugins](../plugins/), [Skills](../skills/), [Banco de
@@ -251,12 +251,12 @@ dados](../database/) e [Privacidade e hooks](../privacy/).
 
 ```bash
 pepe eval [SUITE]                # roda um conjunto de prompts de teste num agente
-pepe doctor [--offline]          # confere se está tudo configurado certo
+pepe doctor [--offline]          # confere se está tudo certo na configuração
 pepe review [approve|reject ID]  # aprova ou rejeita mudanças que um agente fez sozinho
 pepe backup [--output ARQUIVO.tgz]  # salva tudo (config, agentes, conversas, banco)
 pepe backup verify ARQUIVO.tgz      # confere se um backup está íntegro
 pepe restore ARQUIVO.tgz [--force]  # traz um backup de volta
-pepe migrate ORIGEM [--dry-run]  # traz modelos/agentes de outra ferramenta
+pepe migrate ORIGEM [--dry-run]  # importa modelos/agentes de outra ferramenta
 pepe update                      # atualiza pra última versão
 pepe browser install             # prepara o navegador que um agente pode usar
 ```
@@ -265,15 +265,14 @@ Veja [Avaliações](../evals/), [Backup](../backup/) e [Navegador](../browser/).
 
 ## Dashboard
 
-Uma senha é opcional. Sem ela, o dashboard só abre na mesma máquina onde está rodando;
-quem tentar de outro lugar é bloqueado. Veja [Autenticação](../auth/) e
-[Dashboard](../dashboard/).
+A senha é opcional. Sem ela, o dashboard só abre na máquina onde está rodando; qualquer
+tentativa de fora é bloqueada. Veja [Autenticação](../auth/) e [Dashboard](../dashboard/).
 
 ```bash
-pepe dashboard                            # vê as configurações atuais
-pepe dashboard password                   # define uma, digita escondido, nada aparece na tela
-pepe dashboard hosts app.example.com      # permite acessar por um domínio (--clear reseta)
-pepe dashboard trusted-proxies 10.0.0.0/8 # necessário se estiver atrás de um proxy reverso
+pepe dashboard                            # mostra as configurações atuais
+pepe dashboard password                   # define uma, digitada escondida, nada aparece na tela
+pepe dashboard hosts app.example.com      # libera o acesso por um domínio (--clear reseta)
+pepe dashboard trusted-proxies 10.0.0.0/8 # necessário atrás de um proxy reverso
 ```
 
 ## Diversos

@@ -1,31 +1,33 @@
 ---
 title: Sessões
-description: Usa memória de conversa no servidor por HTTP e WebSocket.
+description: Memória de conversa guardada no servidor, disponível por HTTP e por WebSocket.
 ---
 
 ## Sessões: com estado vs sem estado
 
-Por predefinição, a API é **sem estado**: cada pedido tem de levar o histórico
-completo de mensagens, exatamente como na OpenAI. Envias tudo, o Pepe responde e
-nada fica lembrado.
+Por predefinição a API é **sem estado**: cada pedido tem de trazer o histórico
+completo de mensagens, exatamente como na OpenAI. Envias tudo, o Pepe responde, e não
+fica nada guardado.
 
-O Pepe também oferece um modo **com estado**. Anexa um id de sessão e o servidor
-guarda a conversa por ti. Nas chamadas seguintes envias apenas a mensagem nova; o
-Pepe junta-a ao histórico guardado, executa o agente e lembra-se do resultado.
+Mas o Pepe também oferece um modo **com estado**, que a maioria dos servidores da
+OpenAI não tem. Basta anexar um id de sessão para o servidor passar a guardar a
+conversa por ti: nas chamadas seguintes envias só a mensagem mais recente, o Pepe
+junta-a ao histórico já guardado, corre o agente, e fica com o resultado memorizado.
 
 ## CLI vs API
 
-`pepe run` é sempre avulso: não aceita `session_id` e não se lembra do comando
-anterior. Para manter contexto no terminal, usa a consola:
+O `pepe run` é sempre avulso: não aceita `session_id` e não se lembra do comando
+anterior. Para manter contexto dentro do terminal, usa a consola:
 
 ```bash
 pepe chat assistant --session minha-sessao
 ```
 
-A API HTTP monta a chave de sessão a partir de **dois campos, e eles combinam-se**.
+Já a API HTTP monta a chave de sessão a partir de **dois campos, que se combinam
+entre si**.
 
-- **`user`** identifica *quem* está a falar. É o campo padrão da OpenAI, por isso qualquer SDK oficial obtém memória no servidor sem sair do formato padrão. É por aqui que deves começar.
-- **`session_id`**, no corpo JSON ou num cabeçalho `x-session-id`, identifica *qual conversa* dessa pessoa. Usa-o quando a mesma pessoa pode ter várias conversas separadas.
+- **`user`** identifica *quem* está a falar. É o campo padrão da OpenAI, por isso qualquer SDK oficial já ganha memória no servidor sem sair do formato habitual; é por aqui que deves começar.
+- **`session_id`**, no corpo JSON ou num cabeçalho `x-session-id`, identifica *qual* conversa dessa pessoa. Usa-o quando a mesma pessoa consegue ter várias conversas separadas.
 
 Como se combinam:
 
@@ -34,13 +36,14 @@ Como se combinam:
 | só `user` | `user` |
 | só `session_id` | `session_id` |
 | os dois | `user:session_id` (conversas independentes por pessoa) |
-| os dois, mesmo valor | fica apenas uma |
+| os dois, mesmo valor | fica só uma |
 | nenhum (ou vazio) | sem estado |
 
-Assim, no WhatsApp passa `user` = o telemóvel e `session_id` = um id de conversa, e cada conversa de cada contacto é independente, isolada das restantes.
+Assim, no WhatsApp podes passar `user` como o número de telemóvel e `session_id` como
+um id de conversa, e cada conversa de cada contacto fica isolada das restantes.
 
 ```bash
-# Turno 1: só a mensagem nova é necessária; o servidor guarda o histórico.
+# Turno 1: só a mensagem nova é precisa; o servidor guarda o histórico.
 curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
@@ -49,7 +52,7 @@ curl http://localhost:4000/v1/chat/completions \
     "messages": [{"role": "user", "content": "O meu nome é Ada."}]
   }'
 
-# Turno 2: mesmo id de sessão, só a pergunta nova. O agente lembra-se de "Ada".
+# Turno 2: mesmo id de sessão, só a pergunta seguinte. O agente lembra-se de "Ada".
 curl http://localhost:4000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{
@@ -59,20 +62,22 @@ curl http://localhost:4000/v1/chat/completions \
   }'
 ```
 
-No modo com estado, a resposta inclui o `session_id` usado para poderes devolvê-lo
-na próxima chamada. Sessões com estado também funcionam com streaming; basta
-adicionar `"stream": true`.
+No modo com estado a resposta traz de volta o `session_id` usado, para o devolveres na
+chamada seguinte. Sessões com estado também funcionam com streaming, basta acrescentar
+`"stream": true`.
 
-### Recuperação depois de um reinício
+### Recuperar depois de um reinício
 
-Se o Pepe cair a meio de um turno (um deploy, uma falha) com a persistência de
-sessões ativada, a conversa interrompida não fica simplesmente perdida. No
-arranque seguinte, o Pepe deteta qualquer sessão cujo último turno não terminou,
-reproduz-o como um seguimento interno e entrega a resposta onde a conversa
-estava a decorrer (Telegram, o painel, seja qual for o canal). A mensagem
-interrompida ainda recebe resposta em vez de desaparecer em silêncio.
-Isto só se aplica a sessões persistidas (`serve`/`gateway`), não a chamadas
-avulsas de `pepe run`.
+Se o Pepe cair a meio de um turno (um deploy, uma falha) com a persistência de sessões
+ligada, a conversa interrompida não fica simplesmente perdida. No arranque seguinte, o
+Pepe repara em qualquer sessão cujo último turno nunca chegou a terminar, reproduz-o
+como um seguimento interno, e entrega a resposta onde a conversa estava mesmo a
+decorrer, Telegram, o painel, ou seja qual for o canal de onde veio. A mensagem
+interrompida acaba por receber resposta, em vez de desaparecer em silêncio. Isto só se
+aplica a sessões persistidas (`serve`/`gateway`), nunca a chamadas avulsas de `pepe
+run`.
 
-Para voltar ao modo sem estado, omite as três fontes de id e envia o array
-completo de `messages`.
+<div class="note"><strong>Isolamento entre inquilinos.</strong> As chaves de sessão ficam internamente organizadas por projeto. O mesmo id de sessão usado sob dois tokens diferentes (dois projetos diferentes) nunca chega à mesma conversa, por isso um inquilino nunca consegue ler a sessão de outro.</div>
+
+Para voltar ao modo sem estado, basta omitir as três fontes de id e enviar tu mesmo o
+array completo de `messages`.

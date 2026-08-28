@@ -1,34 +1,35 @@
 ---
 title: Gestionar por conversación
-description: Permite que agentes confiables configuren Pepe desde conversaciones en lenguaje natural.
+description: Da a un agente de confianza las herramientas para que ajuste Pepe con solo pedírselo, en una conversación normal.
 ---
 
-Puedes reconfigurar Pepe simplemente pidiéndoselo a un agente, una vez que concedes a un agente confiable las herramientas de gestión correspondientes. Estas acciones están protegidas: cambian cómo funciona Pepe o reparten acceso, así que siempre piden tu aprobación primero.
+Basta con pedírselo a un agente para reconfigurar Pepe, siempre que antes le hayas dado las herramientas de gestión que corresponden. Como estas acciones tocan cómo funciona Pepe o reparten acceso, van todas protegidas: primero te piden aprobación, y solo después se ejecutan.
 
-Pepe está hecho para que un agente pueda resolver una petición sobre el propio Pepe, del tipo "añade un bot", "programa esto", "conecta Sentry" o "cambia la zona horaria", sin trato especial para cada caso y sin ser nunca peligroso. Lo consigue leyendo su propia documentación, descubriendo qué tiene permiso para cambiar, usando un puñado de herramientas protegidas para los caminos más comunes y verificando después su propio trabajo.
+Pepe está pensado para que un agente resuelva por su cuenta pedidos sobre el propio Pepe ("añade un bot", "programa esto", "conecta Sentry", "cambia la zona horaria") sin necesitar código especial para cada caso, y sin que eso abra ninguna puerta peligrosa. Lo logra apoyándose en cuatro cosas: lee su propia documentación, averigua qué le está permitido tocar, recurre a un puñado de herramientas protegidas para los caminos habituales, y al final comprueba que lo que hizo quedó bien.
 
 ## Lee su propia documentación
 
-Las guías prácticas vienen con Pepe, en `priv/docs/`, y cubren agentes, canales, cron, MCP, plugins, permisos y configuración. El prompt de sistema de cada agente las lista como la fuente autoritativa, y la herramienta de solo lectura `docs` carga la guía adecuada cuando hace falta. Una petición nueva o imprevista se resuelve leyendo, no adivinando. Pon guías adicionales en `~/.pepe/docs/` para ampliar o sustituir las que vienen de fábrica.
+Pepe trae de fábrica sus propias guías prácticas, guardadas en `priv/docs/`, y ahí cubre agentes, canales, cron, MCP, plugins, permisos y configuración. El system prompt de cada agente las señala como la fuente que manda, y la herramienta de solo lectura `docs` carga la que corresponda en el momento en que hace falta. Ante un pedido nuevo o que no estaba previsto, el agente lee antes de adivinar. Si quieres ampliar esas guías o reemplazar alguna, pon las tuyas en `~/.pepe/docs/`.
 
-## Descubre qué es editable
+## Descubre qué puede tocar
 
-Llama a `config_set` sin ningún argumento y devuelve su propio esquema: los ajustes que puede editar, sus valores actuales y los valores que acepta. El conjunto editable es una lista corta y fija: `default_model`, `default_agent`, `language`, `timezone`, `telegram.require_mention` / `telegram.enabled` y `secrets.expose_env` (los *nombres* de variables de entorno que el shell del agente puede conservar después de que Pepe borre el resto, para abrir una bóveda de la que tiene un token; solo nombres, nunca un valor secreto). Cualquier cosa fuera de la lista se rechaza, con una indicación de la herramienta protegida adecuada para el trabajo: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task` o `manage_token`. Los valores secretos nunca son editables por chat.
+Llamar a `config_set` sin argumentos devuelve su propio esquema: qué ajustes puede tocar, cuánto valen hoy, y qué valores acepta cada uno. La lista de lo editable es corta y fija: `default_model`, `default_agent`, `language`, `timezone`, `telegram.require_mention` / `telegram.enabled`, y `secrets.expose_env` (los *nombres* de las variables de entorno que el shell del agente puede conservar después de que Pepe borre el resto, pensado para abrir una bóveda de la que ya tiene un token; nombres nada más, nunca un valor secreto). Cualquier otra cosa se rechaza, señalando la herramienta protegida que corresponde: `manage_agent`, `manage_channel`, `manage_mcp`, `manage_plugin`, `schedule_task` o `manage_token`. Los valores de los secretos, esos nunca se editan por chat.
 
 ## Administrar agentes
 
-`can_manage` controla qué agentes puede administrar un agente (crear, editar,
-reconfigurar, entrenar) mediante la herramienta `manage_agent`. Está cerrado por
-defecto y su significado es preciso:
+`can_manage` decide a qué agentes puede administrar otro agente (crearlos,
+editarlos, reconfigurarlos, entrenarlos) a través de la herramienta
+`manage_agent`. Por defecto viene cerrado, y su significado no deja lugar a
+dudas:
 
-- Sin definir (`null`): el agente solo puede administrarse a sí mismo.
-- Vacío (`[]`, definido con `--can-manage none`): no puede administrar a nadie, ni
-  siquiera a sí mismo. Un hijo bloqueado, por ejemplo un agente de cara al cliente
-  que no debe alterarse a sí mismo.
-- Una lista de nombres: exactamente esos agentes, y ningún otro. Incluye su propio
-  nombre para dejar que también se administre a sí mismo.
-- `["*"]` (definido con `--can-manage "*"`): todos los agentes. Un superadministrador
-  explícito.
+- Sin definir (`null`): solo puede administrarse a sí mismo.
+- Vacío (`[]`, con `--can-manage none`): no administra a nadie, ni siquiera a
+  sí mismo. Útil para un agente hijo bloqueado, por ejemplo uno de cara al
+  cliente que no debe poder cambiarse solo.
+- Una lista de nombres: exactamente esos agentes, ninguno más. Si quieres que
+  también se administre a sí mismo, incluye su propio nombre en la lista.
+- `["*"]` (con `--can-manage "*"`): todos los agentes. Un superadministrador
+  declarado sin rodeos.
 
 Concede autoridad de gestión directamente:
 
@@ -38,44 +39,44 @@ pepe agent manage supervisor "*"
 
 ### Hazlo por chat
 
-Un agente administrador usa `manage_agent` para dar forma a los agentes de su
-alcance. Sus acciones son `list`, `get`, `create`, `set_persona`, `set_model`,
-`add_tool`, `remove_tool` y `remember` (añade un hecho duradero a la memoria del
-destino). Por ejemplo:
+Un agente con permisos de administrador usa `manage_agent` para darle forma a
+los agentes bajo su alcance, con las acciones `list`, `get`, `create`,
+`set_persona`, `set_model`, `add_tool`, `remove_tool` y `remember` (agrega un
+dato permanente a la memoria del agente destino). Por ejemplo:
 
 ```text
-Dale al agente de soporte la herramienta send_file y registra en su memoria que
-los reembolsos superiores a 200 necesitan una persona.
+Dale al agente de soporte la herramienta send_file y anota en su memoria que
+los reembolsos de más de 200 necesitan que intervenga una persona.
 ```
 
-El agente llama a `manage_agent` con `action: "add_tool"` y luego con
-`action: "remember"`. Cada una de estas acciones pasa por la barrera de permisos: el
-agente propone el cambio, tú lo autorizas y solo entonces se aplica. Un agente
-también puede renombrarse a sí mismo con la herramienta aparte `rename_agent` ("De
-ahora en adelante, llámate scout"), que mueve su directorio de espacio de trabajo y
-surte efecto en el siguiente mensaje.
+Ahí el agente llama primero a `manage_agent` con `action: "add_tool"`, y
+después con `action: "remember"`. Ninguna de estas acciones pasa de largo: el
+agente propone el cambio, tú das el visto bueno, y solo entonces se aplica.
+Con la herramienta aparte `rename_agent` ("De ahora en adelante, llámate
+scout"), un agente también puede ponerse otro nombre a sí mismo, lo que mueve
+su carpeta de trabajo y entra en vigor desde el siguiente mensaje.
 
 ## Instalar plugins de la comunidad
 
-La herramienta protegida `manage_plugin` instala, escanea, lista y elimina herramientas y canales `.exs` sueltos desde el chat. Acepta una ruta local, un `.tar.gz` o una URL de GitHub, y cada instalación pasa por el mismo escaneo estático que usa la CLI.
+Desde el chat, la herramienta protegida `manage_plugin` instala, escanea, lista y quita herramientas y canales `.exs` sueltos. Recibe una ruta local, un `.tar.gz` o una URL de GitHub, y cada instalación pasa por el mismo escaneo estático que corre la CLI.
 
-A diferencia de la CLI, esta herramienta no tiene `--force`. Un veredicto `danger` del escaneo siempre se rechaza desde el chat. Saltarse un veredicto peligroso es una decisión de operador, tomada de forma deliberada en la terminal, y nunca una decisión a la que se pueda convencer a un agente en mitad de una conversación.
+A diferencia de la CLI, aquí no existe el `--force`. Si el escaneo devuelve un veredicto `danger`, el chat lo rechaza siempre. Pasar por encima de un veredicto peligroso es una decisión que le toca al operador, tomada a propósito desde la terminal, y a la que jamás se puede convencer a un agente en plena conversación.
 
 ## Repartir acceso a la API
 
-La herramienta protegida `manage_token` genera, lista y revoca tokens de portador de `/v1` desde el chat, acotados a un proyecto o a un solo agente. Así un agente puede darle acceso a una integración sin que tú tengas que bajar a una terminal. Como las demás herramientas de gestión, no es de solo lectura, así que pasa antes por la barrera de permisos.
+La herramienta protegida `manage_token` crea, lista y revoca tokens de portador de `/v1` desde el chat, limitados a un proyecto o a un único agente. Gracias a esto, un agente puede darle acceso a una integración sin que tengas que abrir una terminal. Igual que las demás herramientas de gestión, no es de solo lectura, así que primero pasa por la barrera de permisos.
 
-## El propietario puede ejecutar la CLI entera
+## El propietario puede correr toda la CLI
 
-Para un agente propietario en el que confíes plenamente, `manage_pepe` ejecuta desde el chat cualquier comando `pepe` no interactivo, a través del mismo despachador que usa la CLI. Los comandos interactivos y bloqueantes (`setup`, `chat`, `serve` y las pasarelas en primer plano) se rechazan, y la herramienta sigue detrás de la barrera de permisos. Concédesela solo a un agente propietario de confianza, nunca a uno expuesto a entradas no confiables. Mira [Seguridad y entorno aislado](../security/) para los detalles.
+Si tienes un agente propietario en quien confías del todo, `manage_pepe` le permite correr desde el chat cualquier comando `pepe` no interactivo, usando el mismo despachador que la CLI. Los comandos interactivos o bloqueantes (`setup`, `chat`, `serve` y las pasarelas en primer plano) quedan fuera, rechazados, y la herramienta sigue detrás de la barrera de permisos. Dásela únicamente a un agente propietario de confianza, nunca a uno que reciba entradas de las que no puedes fiarte. Los detalles están en [Seguridad y entorno aislado](../security/).
 
-## Verifica su propio trabajo
+## Comprueba su propio trabajo
 
-Después de cambiar algo, el agente (o tú) ejecuta el doctor. Hace comprobaciones sin conexión, confirmando que cada referencia `${ENV}` se resuelve, que los agentes apuntan a modelos reales y a herramientas conocidas, y que las programaciones, zonas horarias y agentes del cron son válidos. También lanza sondeos en vivo: un `getMe` de Telegram por bot, un ping por conexión de modelo, y un arranque de MCP más el listado de herramientas por servidor.
+Tras cambiar algo, el agente (o tú mismo) corre el doctor. Sin salir a la red, comprueba que cada referencia `${ENV}` resuelve bien, que los agentes apuntan a modelos reales y herramientas que existen, y que las programaciones de cron, las zonas horarias y los agentes son válidos. Además hace sondeos en vivo: un `getMe` de Telegram por cada bot, un ping por cada conexión de modelo, y un arranque de MCP con listado de herramientas por cada servidor.
 
 ```bash
 pepe doctor              # sondeos en vivo (Telegram, modelos, MCP)
-pepe doctor --offline    # solo la consistencia de la configuración, sin red
+pepe doctor --offline    # solo consistencia de configuración, sin red
 ```
 
-El ciclo es hacer, verificar, corregir: herramientas protegidas y estructuradas para los caminos más comunes, herramientas genéricas más la documentación para todo lo demás, y el doctor para confirmar que funcionó.
+El ciclo completo es hacer, verificar y corregir: herramientas protegidas y estructuradas para los caminos frecuentes, herramientas genéricas más la documentación para todo lo demás, y el doctor al final para confirmar que salió bien.

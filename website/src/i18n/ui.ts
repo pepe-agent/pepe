@@ -240,7 +240,7 @@ export const ui = {
     "features.enlarge": "Ampliar imagen",
     "f.model.t": "Cualquier modelo, con failover",
     "f.model.d":
-      "Conecta cualquier endpoint compatible con OpenAI. Define una cadena de fallback que avanza ante errores transitorios.",
+      "Conecta cualquier endpoint compatible con OpenAI. Define una cadena de respaldo que pasa sola al siguiente modelo cuando el error es pasajero.",
     "f.routing.t": "Enrutamiento por complejidad",
     "f.routing.d":
       "Una llamada de clasificación barata evalúa cada conversación nueva. Las preguntas simples bajan de forma automática a un modelo más ligero; toda la potencia queda para lo que de verdad la necesita.",
@@ -416,10 +416,10 @@ export const ui = {
     "features.enlarge": "Ampliar imagem",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
-      "Conecte qualquer endpoint compatível com OpenAI. Defina uma cadeia de fallback que avança em erros transitórios.",
+      "Conecte qualquer endpoint compatível com OpenAI. Defina uma cadeia de fallback que passa para o próximo modelo sozinha quando o erro é passageiro.",
     "f.routing.t": "Roteamento por complexidade",
     "f.routing.d":
-      "Uma chamada de classificação barata avalia cada conversa nova. Perguntas simples caem sozinhas para um modelo mais leve; a força total fica reservada para o que realmente precisa dela.",
+      "Uma chamada de classificação barata avalia cada conversa nova. Pergunta simples vai direto para um modelo mais leve; a força total fica reservada para o que realmente precisa dela.",
     "f.goal.t": "Objetivos, não só prompts",
     "f.goal.d":
       "Defina um objetivo e o que conta como pronto. Um revisor independente decide se foi atingido, e o agente tenta de novo com esse retorno até passar ou atingir o seu limite de tentativas.",
@@ -504,7 +504,7 @@ export const ui = {
 
     "how.title": "Por dentro de um turno",
     "how.sub":
-      "Um zoom no loop de turno: o Pepe chama o modelo, executa as ferramentas que ele pedir, devolve os resultados e para quando a resposta está pronta.",
+      "Um close no loop de turno: o Pepe chama o modelo, executa as ferramentas que ele pedir, devolve os resultados e para quando a resposta está pronta.",
     "how.1.t": "Chamar o modelo",
     "how.1.d": "Envia a conversa e as ferramentas do agente ao modelo (com failover).",
     "how.2.t": "Rodar ferramentas",
@@ -592,10 +592,10 @@ export const ui = {
     "features.enlarge": "Ampliar imagem",
     "f.model.t": "Qualquer modelo, com failover",
     "f.model.d":
-      "Liga qualquer endpoint compatível com OpenAI. Define uma cadeia de fallback que avança em erros transitórios.",
+      "Liga qualquer endpoint compatível com OpenAI. Define uma cadeia de fallback que passa para o modelo seguinte sozinha quando o erro é passageiro.",
     "f.routing.t": "Encaminhamento por complexidade",
     "f.routing.d":
-      "Uma chamada de classificação barata avalia cada conversa nova. Perguntas simples descem sozinhas para um modelo mais leve; a força toda fica reservada para o que precisa mesmo dela.",
+      "Uma chamada de classificação barata avalia cada conversa nova. As perguntas simples vão logo para um modelo mais leve; a força toda fica reservada para o que precisa mesmo dela.",
     "f.goal.t": "Objetivos, não apenas prompts",
     "f.goal.d":
       "Define um objetivo e o que conta como concluído. Um revisor independente decide se foi cumprido, e o agente tenta de novo com esse retorno até passar ou atingir o teu limite de tentativas.",

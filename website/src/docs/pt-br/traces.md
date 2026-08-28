@@ -1,32 +1,32 @@
 ---
 title: Traces
-description: Cada execução do agente deixa um registro que você pode reproduzir depois para ver exatamente o que ela fez.
+description: Toda execução de um agente deixa um registro que dá para reproduzir depois, mostrando exatamente o que aconteceu.
 ---
 
-Toda execução de um agente deixa um **trace**: um registro duradouro do que o
-agente de fato fez, que você pode reproduzir passo a passo, não importa de onde
-a execução partiu (a CLI, a API HTTP, um WebSocket, uma mensagem do Telegram ou
-do WhatsApp, ou uma tarefa agendada). Um trace responde "por que o agente fez
-aquilo?" muito depois de a execução ter terminado.
+Toda execução de agente deixa um **trace** para trás: um registro duradouro
+do que aconteceu de verdade, reproduzível passo a passo, não importa se a
+execução partiu da CLI, da API HTTP, de um WebSocket, de uma mensagem no
+Telegram ou no WhatsApp, ou de uma tarefa agendada. É o trace que responde
+"por que o agente fez aquilo?" muito depois de tudo já ter terminado.
 
 ## O que um trace guarda
 
 - O prompt que disparou a execução e como ela terminou (`ok`, ou um erro com o motivo).
-- Quanto tempo levou e o consumo de tokens do modelo.
-- O fluxo ordenado de passos: cada chamada de ferramenta **com os argumentos**, cada resultado de ferramenta, cada negação de permissão e cada troca de modelo por failover.
+- Quanto tempo levou e quantos tokens de modelo foram consumidos.
+- A sequência ordenada de passos: cada chamada de ferramenta **com seus argumentos**, o resultado de cada uma, toda negação de permissão e toda troca de modelo por failover.
 - A resposta final.
 
-Execuções aninhadas de subagentes (um agente chamando outro por `send_to_agent`)
-se dobram no mesmo trace, então um único registro mostra a árvore inteira de
+Quando um agente chama outro por `send_to_agent`, essa subexecução entra no
+mesmo trace do pai, então um único registro já mostra a árvore inteira de
 trabalho.
 
 ## No painel
 
-Abra **Traces** na barra lateral. A lista mostra as execuções mais recentes do
-escopo do workspace atual, com o desfecho, a duração e as ferramentas que cada
-uma usou. Clique em **Replay** em qualquer execução para percorrê-la passo a
-passo: o prompt no topo e, em seguida, uma linha do tempo com cada chamada de
-ferramenta, resultado, failover, contagem de tokens e a resposta final.
+Abra **Traces** na barra lateral e você verá as execuções mais recentes do
+workspace atual, com desfecho, duração e as ferramentas usadas em cada uma.
+Clicar em **Replay** numa execução abre uma linha do tempo passo a passo: o
+prompt no topo, depois cada chamada de ferramenta, resultado, failover,
+contagem de tokens, até chegar na resposta final.
 
 ## Pela CLI
 
@@ -37,57 +37,60 @@ pepe traces --limit 10            # limita o tamanho da lista
 pepe traces 1720000000123456      # reproduz uma execução por id, passo a passo
 ```
 
-## Onde os traces ficam
+## Onde os traces ficam guardados
 
-Os traces ficam guardados no mesmo pequeno arquivo SQLite embutido dos compromissos e
-das vigias, agrupados por projeto (o projeto default usa `default`). Cada projeto
-guarda só uma quantidade limitada de traces: conforme novos chegam, os mais antigos
-são apagados, então o arquivo nunca cresce sem limite. Argumentos e resultados de
-ferramenta muito longos são encurtados antes de serem salvos.
+Traces vivem no mesmo pequeno arquivo SQLite embutido que guarda
+compromissos e vigias, agrupados por projeto (o projeto default usa a chave
+`default`). Cada projeto mantém só uma quantidade limitada deles: à medida
+que traces novos chegam, os mais velhos vão sendo apagados, e o arquivo
+nunca cresce indefinidamente. Argumentos e resultados de ferramenta longos
+demais são encurtados antes de ir para o disco.
 
 ## Enviando traces para uma ferramenta de observabilidade
 
-Enviar para o [Langfuse](../langfuse/) não precisa de nada além das
-credenciais que a maioria das instalações já tem definidas para ele
-(`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`): toda execução concluída vira
-um trace OTLP assim que elas estão presentes, desligado caso contrário, e uma
-falha no envio nunca afeta a execução que ela está descrevendo.
+Mandar dados para o [Langfuse](../langfuse/) não pede nada além das
+credenciais que a maioria das instalações já tem configurada
+(`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`): assim que elas existem, toda
+execução concluída sai como um trace OTLP; sem elas, nada é enviado. E uma
+falha nesse envio jamais afeta a execução que estava sendo descrita.
 
-Para qualquer outro backend que fale OTLP, defina `OTEL_EXPORTER_OTLP_ENDPOINT`
-em vez disso, e ele assume completamente:
+Para qualquer outro backend que fale OTLP, use `OTEL_EXPORTER_OTLP_ENDPOINT`
+no lugar, e ele assume o processo por completo:
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://seu-coletor.exemplo.com
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de usuario:senha>"
 ```
 
-`OTEL_EXPORTER_OTLP_HEADERS` é uma lista `chave=valor` separada por vírgulas,
-enviada como cabeçalhos literais da requisição. Tanto os atributos genéricos
-do OpenTelemetry (`gen_ai.*`) quanto os próprios do Langfuse (`langfuse.*`)
-são definidos em cada span, então um endpoint Langfuse renderiza tudo
-completo e qualquer outro backend OTLP recebe um trace completo do mesmo
-jeito. Mais duas variáveis padrão do OTEL, se precisar:
-`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` aponta o sinal de traces pra outro lugar
-além de `<endpoint>/v1/traces`, e `OTEL_SERVICE_NAME` renomeia o serviço
-exportado (padrão `pepe`). Passo a passo completo: [Langfuse](../langfuse/).
+`OTEL_EXPORTER_OTLP_HEADERS` recebe uma lista `chave=valor` separada por
+vírgulas, enviada como cabeçalhos literais na requisição. Cada span carrega
+tanto os atributos genéricos do OpenTelemetry (`gen_ai.*`) quanto os
+próprios do Langfuse (`langfuse.*`), então um endpoint Langfuse exibe tudo
+por completo e qualquer outro backend OTLP também recebe o trace inteiro.
+Há ainda duas variáveis padrão do OTEL que podem ser úteis:
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` redireciona o sinal de traces para um
+caminho diferente de `<endpoint>/v1/traces`, e `OTEL_SERVICE_NAME` renomeia
+o serviço exportado (o padrão é `pepe`). O passo a passo completo está em
+[Langfuse](../langfuse/).
 
-Além da pergunta/resposta da execução e da entrada/saída de cada chamada de
-ferramenta, cada trace exportado também traz: o canal de onde veio (Telegram,
-a API...) como metadado do trace; a chave da sessão como `session.id`; o
-`user.id`, ajustado para o nome de exibição de quem realmente enviou a
-mensagem sempre que o canal consegue fornecer um (Telegram, inclusive numa
-conversa privada, não só na marcação de grupo; WhatsApp, a partir do perfil
-do contato; Google Chat; Microsoft Teams; Discord), voltando para a chave da
-sessão numa superfície sem esse nome disponível, de modo que uma execução
-numa sessão compartilhada (um grupo do Telegram ou de um webhook) fica
-atribuída a quem realmente a enviou, em vez de um único id compartilhado
-para a conversa inteira; a versão do Pepe em execução (`langfuse.release`);
-um nível (`DEFAULT`/`WARNING`/`ERROR`) derivado de como a execução realmente
-terminou; e, em cada span de chamada de modelo, o custo dessa chamada na sua
-moeda configurada, calculado da mesma forma que o livro-razão de uso
-calcula, e omitido por completo em vez de enviado como um zero enganoso
-quando o modelo não tem preço conhecido. O tempo de cada etapa numa
-visualização em cascata (uma chamada de ferramenta, uma geração de modelo)
-reflete quando ela realmente aconteceu, não uma estimativa.
+Além do prompt/resposta da execução e da entrada/saída de cada chamada de
+ferramenta, todo trace exportado carrega também: o canal de origem
+(Telegram, a API...) como metadado do trace; a chave da sessão como
+`session.id`; um `user.id` que assume o nome de exibição de quem realmente
+mandou a mensagem sempre que o canal consegue fornecer esse dado (Telegram,
+mesmo numa conversa privada e não só na marcação de grupo; WhatsApp, a
+partir do perfil do contato; Google Chat; Microsoft Teams; Discord),
+caindo de volta para a chave da sessão quando o canal não tem esse nome
+disponível, de forma que uma execução dentro de uma sessão compartilhada
+(um grupo do Telegram, ou de um webhook) é atribuída a quem de fato a
+enviou, e não a um id genérico cobrindo a conversa toda; a versão do Pepe
+rodando naquele momento (`langfuse.release`); um nível
+(`DEFAULT`/`WARNING`/`ERROR`) derivado de como a execução realmente
+terminou; e, em cada span de chamada de modelo, o custo daquela chamada na
+moeda configurada, calculado do mesmo jeito que o livro-razão de uso
+calcula, e simplesmente omitido em vez de aparecer como um zero enganoso
+quando o modelo não tem preço conhecido. Numa visualização em cascata, o
+tempo de cada etapa (uma chamada de ferramenta, uma geração de modelo)
+reflete o momento em que ela de fato aconteceu, não uma estimativa.
 
-<div class="note"><strong>Diagnóstico, não registro de cobrança.</strong> Os traces existem para explicar uma execução, e os antigos ou grandes demais vão sendo cortados. Para contagens de tokens e custo que você pode faturar, use o <a href="../billing/">livro-razão de uso</a>, separado, que nunca perde um lançamento.</div>
+<div class="note"><strong>É diagnóstico, não registro de cobrança.</strong> Traces existem para explicar uma execução, e por isso os mais antigos ou grandes demais acabam sendo cortados. Para contagens de tokens e custos que você vai efetivamente faturar, use o <a href="../billing/">livro-razão de uso</a>, que é separado e nunca descarta um lançamento.</div>

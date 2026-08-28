@@ -1,21 +1,21 @@
 ---
 title: API HTTP
-description: Chama o Pepe pela API Chat Completions compatível com OpenAI.
+description: Fala com o Pepe através da API Chat Completions, compatível com a OpenAI.
 ---
 
-O Pepe disponibiliza os seus agentes através de uma API HTTP que fala o protocolo Chat Completions da OpenAI. Qualquer ferramenta ou SDK capaz de comunicar com a OpenAI consegue comunicar com o Pepe sem alterar uma linha de código: aponta o respetivo `base_url` para o teu servidor Pepe e utiliza o nome de um agente onde normalmente colocarias um id de modelo. Também podes chamar o endpoint com pedidos HTTP diretos a partir dos teus próprios projetos, sites, backends, jobs ou integrações; usar um SDK de LLM é conveniente, mas não obrigatório. Existe também um WebSocket para streaming em direto, token a token, com visibilidade das chamadas de ferramenta.
+O Pepe expõe os teus agentes através de uma API HTTP que fala o protocolo Chat Completions da OpenAI. Qualquer ferramenta ou SDK que já saiba falar com a OpenAI sabe falar com o Pepe sem mudares nada no código: basta apontar o `base_url` para o teu servidor Pepe e usar o nome de um agente onde normalmente colocarias o id de um modelo. Também podes chamar o endpoint com pedidos HTTP simples a partir dos teus próprios projetos, sites, backends, jobs ou integrações; um SDK de LLM é conveniente, mas nunca obrigatório. Há também um WebSocket para streaming ao vivo, token a token, com visibilidade sobre as chamadas de ferramenta.
 
-As duas superfícies cobrem duas necessidades. A API HTTP é a escolha por omissão para trabalho de pedido/resposta e de servidor a servidor. O WebSocket destina-se a interfaces interativas em que o utilizador quer renderizar as chamadas de ferramenta e o texto em streaming à medida que acontecem.
+Estas duas superfícies servem propósitos diferentes. A API HTTP é a escolha natural para trabalho de pedido/resposta e de servidor para servidor. O WebSocket serve interfaces interativas, onde queres desenhar as chamadas de ferramenta e o texto em streaming à medida que vão acontecendo.
 
-## Uma primeira requisição
+## Um primeiro pedido
 
-Inicia o servidor e depois envia uma chat completion. Isto funciona de imediato, sem autenticação (consulta [Autenticação](../auth/#autenticação-e-tokens) para o trancar):
+Arranca o servidor e envia uma chat completion. Isto funciona logo de início, sem qualquer autenticação (consulta [Autenticação](../auth/#autenticação-e-tokens) para o fechar):
 
 ```bash
 pepe serve --port 4000
 ```
 
-Estás a correr o Pepe a partir do código-fonte em vez do binário instalado? O `PHX_SERVER=true mix phx.server` serve exatamente o mesmo endpoint.
+Se estiveres a correr o Pepe a partir do código-fonte em vez do binário instalado, `PHX_SERVER=true mix phx.server` serve exatamente o mesmo endpoint.
 
 **curl**
 
@@ -93,7 +93,7 @@ Req.post!("http://localhost:4000/v1/chat/completions",
 |> IO.puts()
 ```
 
-A resposta é um objeto padrão de chat completion da OpenAI:
+A resposta é um objeto de chat completion no formato padrão da OpenAI:
 
 ```json
 {
@@ -111,36 +111,36 @@ A resposta é um objeto padrão de chat completion da OpenAI:
 }
 ```
 
-O `pepe serve` corre em primeiro plano. Para um deploy a sério, vê [Painel](../dashboard/#manter-em-execução) para o instalar como serviço persistente em segundo plano.
+O `pepe serve` corre em primeiro plano. Para um deploy a sério, consulta [Painel](../dashboard/#manter-em-execução) e vê como o instalar como serviço persistente em segundo plano.
 
 ## Endpoints
 
-São dois:
+São só dois:
 
 ```http
 POST /v1/chat/completions   # non-streaming or streaming (Server-Sent Events)
 GET  /v1/models             # lists your agents (and, in the open/default-project scope, raw model connections)
 ```
 
-Ambos ficam sob `/v1`, pelo que um cliente configurado com `base_url = http://HOST:PORT/v1` encontra-os exatamente onde um cliente da OpenAI espera.
+Ambos vivem debaixo de `/v1`, por isso um cliente configurado com `base_url = http://HOST:PORT/v1` encontra-os exatamente onde um cliente da OpenAI espera encontrá-los.
 
-## O campo "model" seleciona um agente
+## O campo "model" escolhe um agente
 
-Esta é a ideia que faz todo o resto encaixar. O campo `model` de um pedido de chat não nomeia um modelo de linguagem puro. Nomeia um **agente** do Pepe. Quando o utilizador envia `"model": "assistant"`, o Pepe executa o agente chamado `assistant`, com o prompt de sistema desse agente e o próprio conjunto de ferramentas dele. O agente executa o ciclo completo de chamadas de ferramenta internamente (chama o modelo, executa as chamadas de ferramenta, devolve os resultados, repete) e retorna uma única resposta final no formato habitual de uma completion.
+Esta é a única ideia que faz todo o resto encaixar. No pedido de chat, o campo `model` não nomeia um modelo de linguagem puro e simples: nomeia um **agente** do Pepe. Ao enviares `"model": "assistant"`, é o agente chamado `assistant` que corre, com o prompt de sistema e o conjunto de ferramentas próprios dele. O agente trata internamente de todo o ciclo de chamada de ferramentas (chama o modelo, executa as chamadas pedidas, devolve os resultados, repete) e o que te chega de volta é uma única resposta final, no formato habitual de uma completion.
 
 O Pepe resolve o campo `model` por esta ordem:
 
-1. Se o nome corresponder a um agente, esse agente é executado.
-2. Se nenhum agente corresponder mas o nome corresponder a uma ligação de modelo pura, o Pepe embrulha-a num agente mínimo de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Esta alternativa só está disponível no âmbito aberto ou raiz (consulta [Âmbitos de token](../auth/#âmbitos-de-token)).
-3. Se nenhum corresponder, o agente por omissão é executado.
+1. Se o nome corresponder a um agente, é esse agente que corre.
+2. Se nenhum agente corresponder mas o nome coincidir com uma ligação de modelo pura, o Pepe embrulha-a num agente mínimo, de passagem direta (sem ferramentas, um único turno) e chama esse modelo diretamente. Esta alternativa só existe no âmbito aberto ou no do projeto default (consulta [Âmbitos de token](../auth/#âmbitos-de-token)).
+3. Se nada corresponder, é o agente predefinido que corre.
 
-<div class="note"><strong>Conclusão prática.</strong> O conjunto de "modelos" que um cliente pode escolher é o teu conjunto de agentes. Dá a um agente um nome descritivo, liga as ferramentas dele uma vez e todos os clientes compatíveis com OpenAI passam a vê-lo como um modelo selecionável.</div>
+<div class="note"><strong>Na prática.</strong> O conjunto de "modelos" entre os quais um cliente pode escolher é, no fundo, o teu conjunto de agentes. Dá a um agente um nome descritivo, liga-lhe as ferramentas uma única vez, e qualquer cliente compatível com a OpenAI passa a mostrá-lo como um modelo selecionável.</div>
 
 ## Chat completions
 
 ### Sem streaming
 
-Envia `messages` no formato da OpenAI. Podes incluir uma mensagem `system`; se a omitires, o próprio prompt de sistema do agente é utilizado automaticamente.
+Envia `messages` no formato da OpenAI. Podes incluir uma mensagem `system`; se a omitires, entra automaticamente o próprio prompt de sistema do agente.
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
@@ -155,7 +155,7 @@ curl http://localhost:4000/v1/chat/completions \
 
 ### Streaming (Server-Sent Events)
 
-Define `"stream": true` para receber a resposta à medida que é gerada. O formato no fio é idêntico ao streaming da OpenAI: uma sequência de linhas `data:`, cada uma transportando um objeto `chat.completion.chunk`, terminada por `data: [DONE]`.
+Define `"stream": true` para receberes a resposta à medida que vai sendo gerada. O formato no fio é idêntico ao streaming da OpenAI: uma sequência de linhas `data:`, cada uma carregando um objeto `chat.completion.chunk`, terminada por `data: [DONE]`.
 
 ```bash
 curl -N http://localhost:4000/v1/chat/completions \
@@ -167,7 +167,7 @@ curl -N http://localhost:4000/v1/chat/completions \
   }'
 ```
 
-Cada fragmento tem este aspeto, com o texto incremental em `choices[0].delta.content`:
+Cada fragmento tem este aspeto, com o texto incremental dentro de `choices[0].delta.content`:
 
 ```json
 {
@@ -179,49 +179,49 @@ Cada fragmento tem este aspeto, com o texto incremental em `choices[0].delta.con
 }
 ```
 
-O fragmento final transporta um delta vazio e `"finish_reason": "stop"`, seguido da linha sentinela `data: [DONE]`. Como isto coincide com a OpenAI byte a byte, qualquer cliente de streaming da OpenAI o interpreta sem alterações.
+O último fragmento traz um delta vazio e `"finish_reason": "stop"`, seguido da linha sentinela `data: [DONE]`. Como isto reproduz a OpenAI byte a byte, qualquer cliente de streaming feito para a OpenAI consegue lê-lo sem qualquer alteração.
 
 ## Sessões com estado
 
-Por predefinição o endpoint é sem estado: envias o array `messages` completo em cada chamada, exatamente como farias à OpenAI. Em alternativa, passa um id de sessão e o servidor guarda a conversa inteira por ti, para que cada chamada seguinte só tenha de transportar a nova mensagem do utilizador.
+Por omissão o endpoint não guarda estado nenhum: envias o array `messages` completo em cada chamada, tal como farias contra a OpenAI. Se preferires, passa um id de sessão e o servidor guarda a conversa inteira por ti, de forma que cada chamada seguinte só precisa de trazer a mensagem mais recente do utilizador.
 
-Dois campos alimentam a chave da sessão, e compõem-se entre si:
+Dois campos alimentam a chave da sessão, e combinam-se entre si:
 
-* `"user": "abc"` diz **quem** está a falar. É o campo padrão da OpenAI, por isso um SDK comum da OpenAI mantém uma conversa sem qualquer campo específico do Pepe.
-* `"session_id": "xyz"`, no corpo JSON ou como cabeçalho `X-Session-Id`, diz **qual** conversa dessa pessoa.
+* `"user": "abc"` identifica **quem** está a falar. É o campo padrão da OpenAI, por isso um SDK comum da OpenAI mantém uma conversa sem precisar de nenhum campo específico do Pepe.
+* `"session_id": "xyz"`, quer no corpo JSON quer como cabeçalho `X-Session-Id`, identifica **qual** das conversas dessa pessoa.
 
 | Enviado | Chave da sessão |
 | --- | --- |
 | só `user` | `abc` |
 | só `session_id` | `xyz` |
 | ambos | `abc:xyz` (threads independentes por pessoa) |
-| ambos, com o mesmo valor | reduzido a um só |
+| ambos, com o mesmo valor | reduzidos a um só |
 | nenhum, ou em branco | sem estado |
 
-Assim, no WhatsApp podes passar o `user` como o número de telefone e o `session_id` como um id de thread, e cada thread de cada contacto torna-se a sua própria conversa. Uma cadeia vazia (`""`) em qualquer um dos campos é tratada como sem estado.
+No WhatsApp, por exemplo, podes passar o número de telefone em `user` e um id de thread em `session_id`, e cada thread de cada contacto passa a ser a sua própria conversa. Uma cadeia vazia (`""`) em qualquer um dos dois campos é tratada como se não houvesse estado nenhum.
 
 ```bash
 # Turno 1.
 curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
   -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"o meu nome é John Doe"}]}'
 
-# Turno 2, mesmo "user". O servidor lembra-se do turno 1.
+# Turno 2, mesmo "user". O servidor já se lembra do turno 1.
 curl http://localhost:4000/v1/chat/completions -H 'content-type: application/json' \
   -d '{"model":"assistant","user":"u-42","messages":[{"role":"user","content":"qual é o meu nome?"}]}'
 ```
 
-Cada sessão é o seu próprio processo supervisionado, com a chave `api:<id>`. O streaming também funciona com sessões. O WebSocket e o Telegram têm estado por natureza, por ligação e por id de conversa respetivamente, por isso não precisam de nada disto. Vê [Sessões](../sessions/) para o quadro completo, incluindo o que acontece a um turno inacabado quando o Pepe reinicia.
+Cada sessão corre no seu próprio processo supervisionado, identificado por `api:<id>`. O streaming também funciona dentro de sessões. O WebSocket e o Telegram já têm estado por natureza (por ligação, e por id de conversa respetivamente), por isso não precisam de nada disto. Consulta [Sessões](../sessions/) para o quadro completo, incluindo o que acontece a um turno por terminar quando o Pepe reinicia.
 
 ## Erros
 
-Os erros regressam no formato de erro da OpenAI (um objeto `error` de nível superior com uma `message`), pelo que o tratamento de erros existente funciona. Os códigos de estado:
+Os erros voltam no formato da OpenAI (um objeto `error` no nível de topo, com uma `message`), o que significa que o tratamento de erros que já tens continua a funcionar. Os códigos de estado usados são:
 
-* `401` quando um token é exigido mas está ausente ou inválido.
-* `403` quando nomeias um agente que existe mas está fora do âmbito do teu token.
-* `400` quando o campo `model` não resolve para nenhum agente nem nenhum modelo.
-* `502` quando o agente ou uma sessão com estado falha durante a execução.
+* `401` quando é preciso um token e ele falta, ou é inválido.
+* `403` quando nomeias um agente que existe, mas está fora do âmbito do teu token.
+* `400` quando o campo `model` não resolve nem para um agente nem para um modelo.
+* `502` quando o agente, ou uma sessão com estado, falha durante a execução.
 
-O `401` da camada de autenticação transporta o código `invalid_api_key` da OpenAI:
+O `401` vindo da camada de autenticação transporta o código `invalid_api_key` da própria OpenAI:
 
 ```json
 {
@@ -233,7 +233,7 @@ O `401` da camada de autenticação transporta o código `invalid_api_key` da Op
 }
 ```
 
-Os erros de âmbito e resolução (`400`, `403`, `502`) usam um tipo `pepe_error`:
+Já os erros de âmbito e de resolução (`400`, `403`, `502`) usam um tipo próprio, `pepe_error`:
 
 ```json
 {
@@ -244,7 +244,23 @@ Os erros de âmbito e resolução (`400`, `403`, `502`) usam um tipo `pepe_error
 }
 ```
 
+## Verificação de saúde
+
+`GET /health` (também disponível em `/healthz`) é uma sonda de vida e prontidão sem autenticação, pensada para balanceadores de carga e verificações de disponibilidade. É deliberadamente mínima e nunca lista agentes nem modelos, por isso não expõe nenhum dado de nenhum inquilino:
+
+```bash
+curl http://localhost:4000/health
+```
+
+```json
+{ "status": "ok", "service": "pepe", "ready": true }
+```
+
+`ready` passa a `true` assim que existir pelo menos uma ligação de modelo e um agente, ou seja, assim que o serviço tiver mesmo condições para responder. Para descobrires a que agentes e modelos um chamador em concreto consegue chegar, usa antes o `GET /v1/models` abaixo, que exige autenticação e respeita o âmbito.
+
 ## Listar modelos
+
+`GET /v1/models` devolve os agentes (e, no âmbito aberto ou no do projeto default, também as ligações de modelo puras) a que quem está a chamar tem acesso, no formato de modelos da OpenAI. É esta a forma correta e limitada por projeto de descobrir o que está disponível: com um token de projeto, a lista mostra só os agentes desse projeto, nunca os de outro inquilino, e nunca as ligações de modelo puras.
 
 ```bash
 curl http://localhost:4000/v1/models \
@@ -261,4 +277,4 @@ curl http://localhost:4000/v1/models \
 }
 ```
 
-Os agentes são etiquetados como `pepe:agent`. No âmbito aberto ou raiz, as ligações de modelo puras também aparecem, etiquetadas como `pepe:model`. Como isto é uma lista de modelos padrão, as ferramentas da OpenAI que oferecem um seletor de modelo preenchem-no com os teus agentes.
+Os agentes vêm etiquetados como `pepe:agent`. No âmbito aberto ou no do projeto default, aparecem também as ligações de modelo puras, etiquetadas como `pepe:model`. Como isto é uma lista de modelos absolutamente padrão, qualquer ferramenta da OpenAI que ofereça um seletor de modelo acaba por preenchê-lo com os teus agentes.

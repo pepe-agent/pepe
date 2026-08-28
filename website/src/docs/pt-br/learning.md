@@ -1,90 +1,65 @@
 ---
 title: Aprendizado
-description: Como um agente transforma conversas confiáveis em memória e habilidades duradouras, como ver o que ele aprendeu, e como manter esse conhecimento organizado.
+description: Como um agente transforma conversas confiáveis em memória e habilidades que duram, como enxergar o que ele já aprendeu, e como manter esse conhecimento arrumado.
 ---
 
-## Transformando conversas em conhecimento
+## Transformando conversa em conhecimento
 
-Um agente consegue transformar conversas em conhecimento duradouro por conta própria,
-através do ciclo de "reflexão". Ele aprende apenas com conversas **confiáveis**, então o
-papo de um cliente com um bot de atendimento nunca vira memória.
+Um agente aprende sozinho, através de um ciclo de "reflexão" que transforma conversas em conhecimento duradouro por conta própria. Só que ele só aprende com conversas **confiáveis**, então a conversa de um cliente com um bot de atendimento jamais vira memória.
 
-## Com quem um agente aprende
+## Quem conta como confiável
 
-Quem conta como confiável é definido por uma lista de permissões `trainers`, uma por bot:
+Isso é definido por uma lista de permissões chamada `trainers`, uma para cada bot:
 
 | `trainers` | O que significa |
 |------------|-----------------|
 | `["*"]` | Aprende com todo mundo. |
-| `[]` | Não aprende com ninguém. É isso que um bot voltado ao cliente quer. |
-| `[id1, id2]` | Aprende apenas com esses ids de usuário, que são os seus ids, os treinadores. |
-| omitido ou `null` | O padrão, que é todo mundo. |
+| `[]` | Não aprende com ninguém, exatamente o que um bot voltado ao cliente precisa. |
+| `[id1, id2]` | Aprende só com esses ids de usuário, os seus, os treinadores. |
+| omitido ou `null` | O padrão: todo mundo. |
 
-A convenção de listas de permissão é a mesma em todo o Pepe: `["*"]` é todos, `[]` é
-ninguém, `[itens]` é exatamente aqueles, e omitido ou `null` é o padrão daquele campo.
+É a mesma convenção de lista de permissões usada em todo o Pepe: `["*"]` é todos, `[]` é ninguém, `[itens]` é exatamente aqueles, e deixar o campo de fora (ou usar `null`) volta ao padrão dele.
 
 ```bash
 pepe gateway telegram add support --token $T --agent helper --trainers none
-# um bot voltado ao cliente que nunca aprende; o seu bot de DM (sem --trainers) continua aprendendo
+# um bot de cliente que nunca aprende; seu bot pessoal de DM (sem --trainers) continua aprendendo normalmente
 ```
 
-Essa mesma lista é a que controla o comando `/learn` e a troca de modelo por canal. Veja
-[Canais](../channels/) para saber onde `trainers` é configurado em cada conexão.
+É essa mesma lista que controla quem pode usar `/learn` e trocar de modelo por canal. Veja [Canais](../channels/) para saber onde `trainers` é configurado em cada conexão.
 
-## Memória e habilidades, separadas
+## Memória e habilidades não se misturam
 
-Depois de uma sessão confiável, o agente revisa a conversa e atualiza duas coisas, mantidas
-separadas de propósito:
+Depois de uma sessão confiável, o agente relê a conversa e atualiza duas coisas mantidas separadas de propósito:
 
-- **Memória** é sobre *você*, e vive em `USER.md`, `MEMORY.md` e `people.md`. Ela é mantida
-  enxuta, então o agente consolida em vez de ir empilhando.
-- **Habilidades** são sobre *técnica*. O revisor prefere atualizar uma habilidade existente e
-  rica a criar uma nova e estreita.
+- **Memória** é sobre *você*: mora em `USER.md`, `MEMORY.md` e `people.md`, e fica enxuta porque o agente prefere consolidar a ir empilhando.
+- **Habilidades** são sobre *técnica*: o revisor prefere enriquecer uma habilidade já existente a criar uma nova e estreita.
 
-Pra achar uma coisa específica sem ler o arquivo inteiro, o agente tem a ferramenta
-`memory_search`: uma busca simples, sem diferenciar maiúsculas/minúsculas, nas
-próprias entradas de `MEMORY.md`/`USER.md`/`people.md`, cada resultado marcado com o
-arquivo de onde veio. Ela procura pelas palavras em si, não pelo significado delas, e
-não faz nenhuma chamada a modelo nem a API, então não adiciona custo nem demora: o
-encaixe certo para uma memória mantida pequena de propósito.
+Para achar algo pontual sem precisar ler o arquivo inteiro, o agente conta com a ferramenta `memory_search`: uma busca simples, sem diferenciar maiúsculas de minúsculas, nas próprias entradas de `MEMORY.md`, `USER.md` e `people.md`, cada resultado já indicando de qual arquivo veio. Ela procura as palavras em si, não o sentido delas, sem fazer nenhuma chamada a modelo ou a API, então não custa nada nem atrasa nada: o encaixe certo para uma memória mantida pequena de propósito.
 
-A revisão é uma execução em segundo plano com as ferramentas restritas à gestão de arquivos e
-habilidades. Ela não tem shell nem rede, então pode atualizar o workspace e nada além disso, e
-a sessão ao vivo fica intocada. Ela dispara no `/compact`, na ociosidade (uns 90 segundos
-depois do último turno) e sob demanda com **`/learn`** (Telegram e console).
+Essa revisão roda em segundo plano, com acesso restrito só à gestão de arquivos e habilidades, sem shell e sem rede: ela mexe no workspace e em mais nada, deixando a sessão ativa completamente intocada. Ela dispara em três momentos: no `/compact`, na ociosidade (uns 90 segundos depois do último turno), e sob demanda com **`/learn`** (no Telegram e no console).
 
-## Vendo o que ele aprendeu: TimeLearn
+## Enxergando o que foi aprendido: o TimeLearn
 
-O TimeLearn mostra o que um agente aprendeu, numa linha do tempo: habilidades (🧠) e entradas
-de memória (📝), das mais novas para as mais antigas, com origem e data.
+O TimeLearn põe numa linha do tempo tudo o que um agente aprendeu, habilidades (🧠) e entradas de memória (📝), das mais recentes para as mais antigas, cada uma com sua origem e data.
 
 ```bash
 pepe timelearn assistant         # no terminal
 ```
 
-A mesma linha do tempo é a aba **Learning** do painel, com um seletor de agente. A divisão de
-trabalho é simples: o gerador (a reflexão) produz, e o TimeLearn exibe.
+Essa mesma linha do tempo aparece na aba **Learning** do painel, com um seletor de agente. A divisão de trabalho é simples: quem produz é a reflexão, quem exibe é o TimeLearn.
 
 ## Consolidação
 
-A revisão por conversa mantém a memória enxuta no dia a dia, mas cada execução só enxerga a
-própria sessão. Ao longo de muitas conversas, a memória de um agente ainda pode acumular
-sobreposição.
+A revisão de cada conversa já mantém a memória enxuta no dia a dia, mas cada execução só enxerga a própria sessão. Depois de muitas conversas, ainda dá para acumular sobreposição na memória de um agente.
 
-**Consolidação** é uma passada de arrumação independente. O agente relê *toda* a sua memória
-permanente e as suas habilidades, sem nenhuma conversa pela frente, e organiza tudo. Ele funde
-duplicatas, descarta linhas obsoletas ou contraditas, e combina habilidades que se sobrepõem,
-sem perder nenhum fato duradouro. Usa o mesmo revisor restrito, limitado a arquivos.
+Por isso existe a **consolidação**, uma faxina independente: sem nenhuma conversa pela frente, o agente relê *toda* a sua memória e habilidades permanentes e organiza tudo, fundindo duplicatas, descartando linhas obsoletas ou contraditórias e combinando habilidades que se sobrepõem, sem perder nenhum fato duradouro pelo caminho. Usa esse mesmo revisor restrito a arquivos.
 
 ```bash
 pepe learn consolidate assistant              # roda uma passada agora
 pepe learn auto assistant                     # agenda para toda noite (padrão 0 3 * * *)
-pepe learn auto assistant --at "0 */12 * * *" # ou um agendamento personalizado
+pepe learn auto assistant --at "0 */12 * * *" # ou um horário personalizado
 pepe learn auto assistant --off               # desliga o agendamento
 pepe learn status                             # quais agentes consolidam por agendamento
 ```
 
-No painel, a aba **Learning** tem um botão **Consolidate now** e um interruptor **Nightly**. O
-agendamento noturno é uma entrada gerenciada na página de [Tarefas agendadas](../scheduled/) (um
-job `consolidate`), e cada passada é registrada como qualquer outra execução, então você pode
-reproduzi-la nos Traces do painel. Veja [Painel](../dashboard/).
+No painel, a aba **Learning** traz um botão **Consolidate now** e um interruptor **Nightly**. O agendamento noturno vira uma entrada gerenciada na página de [Tarefas agendadas](../scheduled/) (um job `consolidate`), e cada passada fica registrada como qualquer outra execução, disponível para reprodução nos Traces do painel. Veja [Painel](../dashboard/).

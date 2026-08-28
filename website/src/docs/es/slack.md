@@ -1,57 +1,58 @@
 ---
 title: Slack
-description: Pon un agente de Pepe en tu espacio de Slack para que la gente hable con él en canales y mensajes directos.
+description: Suma un agente de Pepe a tu espacio de Slack para que la gente pueda hablarle desde canales y mensajes directos.
 ---
 
 ## Slack
 
-Conectar Slack permite que la gente hable con el agente dentro del propio
-espacio de trabajo. Slack entrega los mensajes a Pepe mediante su Events API;
-configura la conexión mediante la configuración guiada (o el panel), que pide
-exactamente los campos que necesita e imprime la URL de retorno para
-registrar:
+Al conectar Slack, cualquiera dentro de tu espacio de trabajo puede hablar directamente
+con el agente. Slack le entrega los mensajes a Pepe a través de su Events API; configura
+la conexión desde el asistente guiado (o desde el panel), que pide exactamente los
+campos necesarios e imprime la URL de callback que hay que registrar:
 
 ```bash
 pepe setup
 ```
 
-Elige la opción de canal, escoge Slack y el agente, e ingresa las credenciales
-(se acepta una referencia `${ENV_VAR}` para cualquier secreto). El `config` de
-una conexión contiene:
+Elige la opción de canal, selecciona Slack y el agente correspondiente, e ingresa las
+credenciales (cualquier secreto acepta una referencia `${ENV_VAR}`). El `config` de una
+conexión guarda:
 
-- `bot_token`: el token OAuth del usuario bot (`xoxb-...`), usado como bearer
-  para las respuestas.
-- `signing_secret`: verifica el `X-Slack-Signature` en las peticiones entrantes.
+- `bot_token`: el token OAuth del usuario bot (`xoxb-...`), que se usa como bearer al
+  responder.
+- `signing_secret`: sirve para verificar el `X-Slack-Signature` de las solicitudes
+  entrantes.
 
-En la app de Slack, define la URL de petición de Event Subscriptions con la URL
-de la conexión y suscríbete a `message.channels` y `app_mention`. El primer
-guardado dispara un handshake `url_verification`, que Pepe responde de inmediato.
-Las respuestas se publican con `chat.postMessage`. Forma de la URL de retorno:
+Dentro de la app de Slack, configura la URL de solicitud de Event Subscriptions con la
+URL de esta conexión, y suscríbete a `message.channels` y `app_mention`. Al guardar por
+primera vez se dispara un handshake de `url_verification`, que Pepe responde al
+instante. Las respuestas se publican mediante `chat.postMessage`. La URL de callback
+tiene esta forma:
 
 ```
 https://YOUR_HOST/webhooks/default/slack/<slug>
 ```
 
-Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
-(`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y
-cómo funciona la ruta genérica por dentro.
+Revisa [Webhooks](../webhooks/) para conocer los campos que comparte toda conexión
+(`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y cómo
+funciona por dentro la ruta genérica.
 
 ### Cambiar de modelo
 
-Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
-responde. Solo funcionan en una conexión en modo `admin` con `commands`
-habilitado; en `support`, se tratan como texto normal. `/models` lista los
-modelos disponibles para el proyecto de esta conexión; `/model` muestra el
+Con los comandos `/model` y `/models`, cualquiera puede consultar o cambiar qué modelo de
+IA le está respondiendo. Ambos solo funcionan en una conexión con modo `admin` y
+`commands` habilitado; en modo `support` se tratan como texto normal, sin más. `/models`
+lista los modelos disponibles para el proyecto de esa conexión; `/model` muestra el
 actual, o lo cambia:
 
 ```text
 /model openrouter               # pregunta si cambiar solo este chat o todos
-/model openrouter session       # cambia solo para esta conversación
-/model openrouter global        # cambia para todos con los que habla esta conexión
+/model openrouter session       # cambia el modelo solo para esta conversación
+/model openrouter global        # cambia el modelo para todos los que hablan por esta conexión
 ```
 
-Cualquiera en una conversación permitida puede cambiar el modelo de su propia
-conversación. Cambiarlo **globalmente**, para todos con los que habla esta
-conexión, está reservado a los **entrenadores**, la misma lista de confianza
-que rige la memoria. Pon `model_switch_locked: true` en la conexión para
-desactivar el cambio de modelo por completo para quien no sea entrenador.
+Cualquier persona dentro de una conversación permitida puede cambiar el modelo de su
+propia conversación. Cambiarlo de forma **global**, para todos los que hablan a través de
+esa conexión, queda reservado a los **entrenadores**, la misma lista de confianza que
+controla la memoria. Define `model_switch_locked: true` en la conexión si quieres
+desactivar por completo el cambio de modelo para quien no sea entrenador.

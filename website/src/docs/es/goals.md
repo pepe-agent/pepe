@@ -1,15 +1,15 @@
 ---
 title: Objetivos
-description: Ejecuta un agente hacia un resultado, verificado por un revisor independiente, hasta que esté realmente hecho.
+description: Lleva a un agente hacia un resultado concreto, verificado por un revisor independiente, hasta que el trabajo esté realmente terminado.
 ---
 
 ## Dar un prompt vs. perseguir un objetivo
 
-Un prompt te da **un turno**. El agente responde y luego *tú* decides si está bien, pides un ajuste y repites. Eso te mete dentro del bucle como aprobador e inspector de calidad a la vez, y el trabajo solo avanza mientras estás frente al teclado.
+Un prompt suelto solo te da **un turno**: el agente responde y después eres *tú* quien decide si está bien, pide un ajuste y vuelve a intentarlo. Con eso terminas haciendo doble papel, apruebas y controlas la calidad a la vez, y el trabajo avanza solo mientras sigues frente al teclado.
 
-Un **objetivo** te da un **resultado**. Dices qué significa "terminado", y Pepe sigue trabajando hasta que un revisor independiente confirme que se ha alcanzado, o hasta que se agoten los intentos.
+Un **objetivo**, en cambio, te da un **resultado**: defines qué significa "terminado" y Pepe sigue trabajando hasta que un revisor independiente confirma que se llegó ahí, o hasta agotar los intentos disponibles.
 
-La diferencia está en **quién verifica**. En un turno normal es el propio agente quien decide que terminó, que es justamente la evaluación en la que no puedes confiar. En un objetivo, una **llamada separada al modelo** califica el resultado frente a tu criterio (el patrón criteria + evaluation steps, en formato LLM-as-a-Judge).
+La diferencia real está en *quién juzga*. En un turno normal, el propio agente decide cuándo terminó, y esa es justo la evaluación en la que no puedes confiar. Con un objetivo, en cambio, una **llamada al modelo completamente aparte** califica el resultado contra tu criterio, el patrón de criterios más pasos de evaluación, en la variante conocida como LLM-as-a-Judge.
 
 ## Ejecutar uno
 
@@ -26,7 +26,7 @@ pepe goal "limpiar la lista de clientes en ~/datos/clientes.csv" \
   --max-attempts 4
 ```
 
-Pepe va imprimiendo cada intento y el veredicto del revisor:
+A medida que avanza, Pepe va mostrando cada intento junto con el veredicto del revisor:
 
 ```
 ── attempt 1/4 ──
@@ -42,69 +42,69 @@ Pepe va imprimiendo cada intento y el veredicto del revisor:
 ✅ Goal met after 2 attempt(s).
 ```
 
-En el panel, lánzalo desde cualquier chat:
+Desde el panel, puedes lanzarlo desde cualquier chat:
 
 ```
 /goal limpiar la lista de clientes | sin correos duplicados, cada fila con un teléfono válido
 ```
 
-El panel sobre la conversación muestra entonces el criterio, el número de intento y el último veredicto del revisor mientras trabaja.
+Mientras trabaja, el panel que aparece sobre la conversación muestra el criterio, cuántos intentos lleva y el último veredicto del revisor.
 
 ## Cómo se mantiene independiente el revisor
 
-El revisor es una llamada nueva, con **contexto limpio**. Nunca ve la conversación de trabajo, solo dos cosas: tu criterio y el resultado final. Así califica el artefacto, no el razonamiento que lo produjo, y no puede ser convencido de aprobar por un agente que está seguro y equivocado.
+El revisor parte de una llamada nueva, con **contexto limpio**: no ve en ningún momento la conversación de trabajo, solo tu criterio y el resultado final. Por eso evalúa el producto terminado, no el razonamiento que lo generó, y ningún agente convencido de tener razón, aunque esté equivocado, puede convencerlo a él.
 
-Por defecto el revisor usa la conexión de modelo del propio agente. Pasa `--judge` para darle un modelo **distinto**, que es la configuración más fuerte: un revisor independiente es más independiente cuando no es el mismo modelo corrigiendo su propio examen.
+Por defecto, el revisor usa la misma conexión de modelo que el agente. Si le pasas `--judge`, puedes darle un modelo **distinto**, lo cual es la opción más sólida: un revisor es más independiente de verdad cuando no es el mismo modelo el que corrige su propia tarea.
 
 ```bash
 pepe goal "..." --criteria "..." --judge gpt-5-review
 ```
 
-Si la respuesta del revisor llega ilegible, Pepe la cuenta como **no cumplida**. Dejar pasar un veredicto ilegible liberaría un mal resultado, que es justo lo que este bucle existe para evitar.
+Si la respuesta del revisor llega en un formato ilegible, Pepe la trata directamente como **no cumplida**. Dejar pasar un veredicto que no se puede interpretar equivaldría a dejar colar un mal resultado, y evitar justamente eso es la razón de ser de este bucle.
 
 ## El límite de intentos
 
-El límite es **obligatorio** (3 por defecto, 10 como máximo). Un criterio que el agente nunca podrá satisfacer debe costar un número acotado de intentos, no prolongarse indefinidamente. Al alcanzar el límite, Pepe se detiene, marca el objetivo como `blocked` y te dice qué faltaba:
+Este límite es **obligatorio** (3 intentos por defecto, 10 como máximo). Si el agente jamás va a lograr cumplir un criterio, eso debe costar una cantidad acotada de intentos, no una ejecución infinita. Al llegar al límite, Pepe se detiene, marca el objetivo como `blocked` y te explica qué faltaba:
 
 ```
 🛑 Gave up at the attempt cap. Still missing: 3 filas siguen con la columna de teléfono vacía
 ```
 
-Ese mensaje ya vale por sí solo: normalmente es o un criterio imposible, o un obstáculo real que merece tu atención.
+Ese mensaje ya aporta valor por sí solo: casi siempre revela un criterio imposible de cumplir, o un obstáculo real que merece que le eches un vistazo tú mismo.
 
 ## Escribir un criterio que funcione
 
-El criterio lo es todo. Uno vago convierte al revisor en un cara o cruz, y el bucle nunca converge.
+El criterio es, en el fondo, toda la funcionalidad. Uno vago convierte al revisor en una moneda al aire, y el bucle nunca llega a converger.
 
 - **Bueno:** "sin correos duplicados, y cada fila con un teléfono con formato `+NN NNN NNN NNN`"
 - **Malo:** "la lista está limpia"
 
-Pregúntate: *un desconocido, viendo solo mi criterio y el resultado, ¿podría decidir sí o no sin preguntarme nada?* Si no, el revisor tampoco puede. Prefiere criterios que nombren una propiedad verificable (un conteo, un formato, un archivo que debe existir, una prueba que debe pasar) antes que criterios que describen una sensación de calidad.
+Hazte esta pregunta: *si un desconocido solo tuviera mi criterio y el resultado delante, ¿podría decidir sí o no sin tener que preguntarme nada más?* Si la respuesta es no, el revisor tampoco va a poder. Elige siempre criterios que apunten a una propiedad verificable (una cantidad, un formato, un archivo que debe existir, una prueba que debe pasar) en vez de criterios que solo describen una sensación de calidad.
 
 ## Objetivos y herramientas
 
-Un objetivo no es un modo especial: envuelve un turno normal. El agente conserva todas sus herramientas, así que puede leer archivos, consultar una base de datos o llamar a una API mientras trabaja hacia el objetivo. Solo la **respuesta final** de cada intento va al revisor.
+Un objetivo no es un modo especial de funcionamiento, simplemente envuelve un turno normal. El agente conserva todas sus herramientas y puede seguir leyendo archivos, consultando una base de datos o llamando a una API mientras avanza hacia la meta. Lo único que llega al revisor es la **respuesta final** de cada intento.
 
 ## Estado de trabajo dentro de la conversación
 
-`pepe goal` dirige una ejecución entera desde fuera. Dos herramientas aparte le dan al agente un estado de trabajo **por dentro**, para que se mantenga coherente a lo largo de muchos turnos en lugar de reaccionar mensaje a mensaje. Ambas son por conversación: pertenecen a la sesión y desaparecen con ella, y cada llamada y su resultado aparecen en el chat y en las [Trazas](/es/docs/traces/). Ambas son herramientas como cualquier otra, presentes por defecto; quita `goal` y `update_plan` de la lista de herramientas de un agente si no quieres que siga un objetivo o plan a lo largo de los turnos.
+`pepe goal` dirige toda una ejecución desde afuera. Hay, además, dos herramientas separadas que le dan al agente un estado de trabajo **desde dentro**, de modo que se mantenga coherente a lo largo de muchos turnos en vez de ir reaccionando mensaje por mensaje. Las dos viven a nivel de conversación: pertenecen a la sesión y desaparecen junto con ella, y cada llamada, con su resultado, queda registrada en el chat y en las [Trazas](/es/docs/traces/). Son herramientas normales, activas por defecto; si no quieres que un agente le dé seguimiento a un objetivo o un plan entre turnos, simplemente quita `goal` y `update_plan` de su lista de herramientas.
 
 ### `goal`: la estrella polar
 
-Un objetivo aquí es una meta persistente más un estado. El agente fija uno al empezar una tarea no trivial, lo relee para mantenerse orientado, y lo marca como terminado (o bloqueado) al final. La herramienta acepta cuatro acciones:
+Aquí, un objetivo es una meta persistente junto con un estado. El agente la fija al comenzar una tarea que no sea trivial, la vuelve a leer para no perder el rumbo, y la marca como terminada (o bloqueada) al final. La herramienta admite cuatro acciones:
 
-- `set`: un `objective` (lo que intenta lograr), más una meta opcional y meramente orientativa de `budget_tokens` para mantener el esfuerzo proporcionado.
-- `status`: marca el objetivo como `active`, `paused`, `blocked` o `complete`, con una `note` opcional. `blocked` es como el agente avisa de que está atascado y te necesita; `complete` significa que la meta se cumplió.
-- `show`: devuelve el objetivo actual.
-- `clear`: lo descarta.
+- `set`: define el `objective` (qué está tratando de lograr), más un `budget_tokens` opcional, meramente orientativo, para mantener el esfuerzo dentro de lo razonable.
+- `status`: marca el objetivo como `active`, `paused`, `blocked` o `complete`, con una `note` opcional. `blocked` es la forma en que el agente avisa que está atascado y necesita ayuda; `complete` indica que la meta se cumplió.
+- `show`: devuelve el objetivo vigente.
+- `clear`: lo elimina.
 
-La meta y el estado sobreviven entre turnos y a un reinicio, así que una ejecución larga o autónoma no se desvía de aquello que se propuso.
+Tanto el objetivo como el estado sobreviven entre turnos e incluso a un reinicio, para que una ejecución larga o autónoma no termine desviándose de lo que se propuso originalmente.
 
-<div class="note"><strong><code>budget_tokens</code> es una meta orientativa, no un tope duro.</strong> Se le comunica al agente para que mantenga el esfuerzo proporcionado, y nada lo obliga a respetarla. Los límites duros de gasto son el tope mensual por proyecto descrito en <a href="/es/docs/billing/">Uso y facturación</a>.</div>
+<div class="note"><strong><code>budget_tokens</code> es una referencia orientativa, no un tope estricto.</strong> Se le informa al agente para que dosifique el esfuerzo, pero nada lo obliga a respetarlo. El límite duro de gasto es el tope mensual por proyecto que se explica en <a href="/es/docs/billing/">Uso y facturación</a>.</div>
 
 ### `update_plan`: la lista de tareas viva
 
-`update_plan` mantiene una lista ordenada de pasos, cada uno `pending`, `in_progress` o `done`. Cada llamada pasa la lista **entera** y reemplaza la anterior, así que siempre hay exactamente un plan coherente. La lista renderizada vuelve en cada actualización:
+`update_plan` mantiene una lista ordenada de pasos, cada uno en estado `pending`, `in_progress` o `done`. Cada llamada envía la lista **completa** y sustituye a la anterior, de forma que siempre existe un único plan coherente. Tras cada actualización, se devuelve la lista ya renderizada:
 
 ```
 Plan (1/3 done):
@@ -113,7 +113,7 @@ Plan (1/3 done):
 [ ] write the fix
 ```
 
-El agente mantiene un paso `in_progress` a la vez y revisa la lista según avanza el trabajo. Una lista `steps` vacía borra el plan. Úsalo para trabajo de varios pasos, donde el progreso tiene que quedar visible, y sáltatelo en una petición trivial de un solo paso.
+El agente mantiene un solo paso en `in_progress` a la vez, y va ajustando la lista según avanza el trabajo. Pasar una lista `steps` vacía borra el plan. Consérvalo para tareas de varios pasos donde el avance necesita quedar visible, y omítelo en una petición trivial de un solo paso.
 
 ### Cómo habilitarlas
 
@@ -121,15 +121,15 @@ El agente mantiene un paso `in_progress` a la vez y revisa la lista según avanz
 pepe agent add worker --prompt "..." --tools bash,read_file,edit_file,goal,update_plan
 ```
 
-También puedes añadirlas a la lista de herramientas de un agente existente desde el panel, en la pestaña Agents. Una vez habilitadas, ambas aparecen en `pepe tools`.
+También puedes agregarlas a la lista de herramientas de un agente ya existente desde el panel, en la pestaña Agents. Una vez habilitadas, ambas aparecen en `pepe tools`.
 
 ### Ver el objetivo y el plan actuales
 
-En el panel, la pestaña Chat muestra un **panel de foco** estrecho bajo el encabezado de la conversación seleccionada: el objetivo, con su meta y una insignia de estado, y la lista del plan, ambos actualizados mientras el agente trabaja. También quedan visibles en el propio flujo, porque cada llamada a `goal` y a `update_plan` y su resultado aparecen en la conversación y en las [Trazas](/es/docs/traces/).
+En el panel, la pestaña Chat muestra un **panel de foco** delgado justo debajo del encabezado de la conversación seleccionada: ahí aparecen el objetivo (su meta más una insignia de estado) y la lista del plan, ambos actualizándose mientras el agente trabaja. También son visibles dentro del propio flujo de la conversación, porque cada llamada a `goal` y a `update_plan`, junto con su resultado, queda registrada en el chat y en las [Trazas](/es/docs/traces/).
 
 ## Lo que el bucle de objetivo no es
 
-- **No** es un planificador. Para ejecutar algo de forma recurrente, mira [Tareas programadas](/es/docs/scheduled/).
-- **No** es una vigilancia. Para que te avise cuando una condición se cumpla, mira [Watches](/es/docs/watches/).
+- **No** es un programador de tareas: para ejecutar algo de forma recurrente, mira [Tareas programadas](/es/docs/scheduled/).
+- **No** es un vigilante: para que te avisen cuando se cumpla una condición, mira [Watches](/es/docs/watches/).
 
-Un objetivo termina. O llega, o se rinde, y ya está.
+Un objetivo tiene un final: llega a la meta o se rinde, y en cualquiera de los dos casos, ahí termina.

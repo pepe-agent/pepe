@@ -1,27 +1,45 @@
 ---
-title: Busca de sessões
-description: Seu agente consegue procurar e ler conversas passadas sozinho, usando os mesmos traces que você já pode inspecionar.
+title: Busca em sessões
+description: Seu agente consegue procurar e reler conversas passadas por conta própria, usando os mesmos traces que já dá para inspecionar.
 ---
 
-A memória de trabalho de um agente sobre uma conversa só dura enquanto essa conversa está rodando: quando a sessão termina ou a aplicação reinicia, ela se vai. O que sobrevive é o [trace](../traces/) de cada turno, um registro durável guardado no SQLite, esteja ou não a sessão que o criou ainda rodando.
+A memória de trabalho de um agente sobre uma conversa dura só enquanto ela está
+rolando: assim que a sessão termina, ou a aplicação reinicia, essa memória some. O que
+fica registrado é o [trace](../traces/) de cada turno, um histórico durável, guardado
+em SQLite, esteja a sessão que o gerou ainda viva ou não.
 
-A ferramenta `session_search` deixa o agente buscar e ler esse histórico sozinho, então você nunca precisa colar o contexto antigo de volta. Ela é sempre segura (sem pedido de permissão, a mesma postura de `read_file`) e só enxerga o projeto do próprio agente que a chamou: as conversas de um projeto nunca podem ser buscadas a partir de outro.
+A ferramenta `session_search` deixa o próprio agente buscar e ler esse histórico
+sozinho, sem que você precise colar contexto antigo de volta na conversa. Ela é
+sempre segura para rodar (não pede permissão, no mesmo nível de `read_file`) e enxerga
+apenas o projeto do agente que a chamou: conversas de um projeto jamais aparecem numa
+busca feita a partir de outro.
 
-**Dentro desse projeto, até onde uma chamada realmente enxerga depende do `session_search_scope` do agente.** O padrão, `"self"`, significa que toda ação alcança apenas o histórico da própria conversa que está chamando. Essa é a configuração segura para um agente que atende vários clientes finais diferentes: um cliente pedindo "busca minhas conversas antigas" nunca pode conseguir ler as de outro cliente. Amplie para `"project"` (uma caixa de seleção na página de edição do agente, ou a flag `session_search_project_wide` do `manage_agent`) só para um agente com um único operador ou equipe do outro lado, uma ferramenta interna onde não existe conversa de mais ninguém no mesmo projeto para vazar.
+**Dentro desse mesmo projeto, o alcance de cada chamada ainda depende do
+`session_search_scope` configurado no agente.** No padrão, `"self"`, toda busca só
+enxerga o histórico da própria conversa que está chamando. É a configuração segura
+para um agente que atende vários clientes diferentes: quando um cliente pede "busca
+minhas conversas antigas", ele nunca pode acabar lendo as de outro cliente. Só amplie
+para `"project"` (uma caixa de marcar na página de edição do agente, ou a flag
+`session_search_project_wide` do `manage_agent`) num agente que atende um único
+operador ou uma única equipe, uma ferramenta interna onde não existe conversa alheia
+no mesmo projeto correndo o risco de vazar.
 
-## O que ela faz
+## O que dá para fazer
 
-- **`list_sessions`**: quais conversas aconteceram nesse projeto, as mais recentemente ativas primeiro, cada uma com sua contagem de turnos.
-- **`search`**: encontra conversas cujo prompt ou atividade de ferramenta menciona uma palavra ou frase.
-- **`session_history`**: todo turno registrado para uma chave de sessão, em ordem. A linha do tempo de uma conversa.
-- **`show`**: a transcrição completa de um turno, com cada chamada de ferramenta, resultado e a resposta final.
+- **`list_sessions`**: lista as conversas já acontecidas nesse projeto, da mais recente para trás, cada uma com sua contagem de turnos.
+- **`search`**: acha conversas em que o prompt ou a atividade de alguma ferramenta menciona uma palavra ou frase.
+- **`session_history`**: devolve, em ordem, todos os turnos registrados numa chave de sessão específica, a linha do tempo inteira daquela conversa.
+- **`show`**: traz a transcrição completa de um turno só, com cada chamada de ferramenta, o resultado dela e a resposta final.
 
 ```
 Você: A gente já não tinha resolvido aquele problema da fatura da Acme umas semanas atrás?
 
 Agente: [session_search search: "fatura Acme"]
-Sim - no dia 3 de julho eu encontrei a fatura de maio deles com a alíquota de
-imposto errada e corrigi. Quer que eu confira se aconteceu de novo esse mês?
+Sim, no dia 3 de julho encontrei a fatura de maio deles com a alíquota de imposto
+errada e já corrigi na hora. Quer que eu confira se aconteceu de novo este mês?
 ```
 
-Isso é busca, não memória: o agente só age sobre o que ele lê de volta na conversa atual. Nada encontrado desse jeito é assumido em silêncio; volta como texto que o agente lê e pode citar, igual a qualquer outro resultado de ferramenta.
+Isso é busca, não memória automática: o agente só age sobre o que efetivamente lê de
+volta na conversa atual. Nenhuma informação encontrada dessa forma é dada como certa
+em silêncio; tudo volta como texto que o agente lê e pode citar, exatamente como
+qualquer outro resultado de ferramenta.

@@ -5,10 +5,12 @@ description: Entiende dónde guarda Pepe la configuración, los secretos y el es
 
 ## Dónde vive tu configuración
 
-Todo lo que hiciste arriba está ahora en `~/.pepe/config.json`: la conexión al
-modelo, el agente y cualquier canal. Sin base de datos, sin migraciones. Para mover
-una configuración a otra máquina, copia ese archivo y define las mismas variables
-de entorno a las que apuntan tus referencias `${VAR}`.
+Todo lo que configuraste en los pasos anteriores queda guardado en
+`~/.pepe/config.json`: la conexión al modelo, el agente y cualquier canal que
+hayas activado. No hay base de datos ni migraciones de por medio, así que para
+llevar una configuración a otra máquina te basta con copiar ese archivo y
+definir en el entorno las mismas variables a las que apuntan tus referencias
+`${VAR}`.
 
 ```bash
 pepe config
@@ -105,7 +107,7 @@ export TELEGRAM_BOT_TOKEN=123456:AA...
 pepe serve --port 4000
 ```
 
-Un marcador de cadena completa que se resuelve en nada (la variable no está definida) se trata como "sin definir" en lugar de una cadena vacía, así que un secreto ausente aparece como un claro "no configurado" en vez de un blanco silencioso.
+Cuando un marcador así no resuelve a nada porque la variable no existe, Pepe lo trata como "sin definir", no como una cadena vacía. Por eso un secreto ausente se ve claramente como "no configurado" en vez de colarse como un valor en blanco que nadie nota.
 
 ### Hazlo por chat
 
@@ -115,9 +117,9 @@ Un agente al que se le otorgan las herramientas de solo lectura `config_get` y `
 >
 > Agente: (ejecuta `doctor`) Encontré un problema: la conexión de modelo "openrouter" referencia `${OPENROUTER_API_KEY}`, pero esa variable no está definida en el entorno. Expórtala antes de servir.
 
-La herramienta `doctor` hace un comprobación de salud de toda la configuración y marca secretos `${ENV}` sin definir, agentes que apuntan a modelos ausentes, programaciones inválidas y conexiones inalcanzables. Pasa `live: true` para también sondear la red.
+La herramienta `doctor` revisa la salud de toda la configuración y señala secretos `${ENV}` sin definir, agentes que apuntan a modelos inexistentes, programaciones inválidas y conexiones inalcanzables. Pásale `live: true` para que además sondee la red.
 
-<div class="note"><strong>Los ajustes sensibles a la seguridad no se pueden editar por chat.</strong> La herramienta protegida `config_set` está cerrada por defecto: solo toca una lista blanca corta (el modelo y el agente por defecto, el idioma, la zona horaria, un par de opciones de Telegram y `secrets.expose_env` — la lista de *nombres* de variables de entorno que el shell del agente conserva tras el borrado, para abrir una bóveda de la que tiene un token). Los *valores* secretos, las listas de herramientas permitidas, los tokens de bot, el envoltorio del entorno aislado y la contraseña del panel quedan a propósito fuera de esa lista, así que `config_set` no puede cambiarlos. Esos los defines tú con la CLI o el panel. Los tokens de la API son lo único que un agente puede generar por chat, pero solo a través de la herramienta separada y protegida por la barrera de permisos `manage_token`, nunca mediante `config_set`.</div>
+<div class="note"><strong>Los ajustes sensibles a la seguridad no se pueden editar por chat.</strong> La herramienta protegida `config_set` viene cerrada por defecto: solo toca una lista corta de campos permitidos (el modelo y el agente predeterminados, el idioma, la zona horaria, un par de opciones de Telegram, y `secrets.expose_env`, que es la lista de *nombres* de variables de entorno que el shell del agente conserva después del borrado, pensada para que pueda abrir una bóveda de la que ya tiene un token). Los *valores* de los secretos, las listas de herramientas permitidas, los tokens de bot, el envoltorio del entorno aislado y la contraseña del panel quedan a propósito fuera de esa lista, así que `config_set` no puede tocarlos: esos los defines tú, desde la CLI o el panel. Los tokens de la API sí son algo que un agente puede generar por chat, pero solo mediante la herramienta separada y protegida por la barrera de permisos `manage_token`, nunca a través de `config_set`.</div>
 
 ## Almacenamiento y copias de seguridad: son todo archivos, sin base de datos
 

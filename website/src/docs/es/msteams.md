@@ -1,54 +1,37 @@
 ---
 title: Microsoft Teams
-description: Pon un agente de Pepe en Microsoft Teams para que tu equipo converse con él allí.
+description: Pon un agente de Pepe en Microsoft Teams para que tu equipo pueda hablar con él ahí mismo.
 ---
 
 ## Microsoft Teams
 
-Conectar Teams permite que tu equipo converse con el agente donde ya trabaja.
-Teams habla con los bots mediante el Bot Framework de Microsoft; configura la
-conexión mediante la configuración guiada (o el panel):
+Al conectar Teams, tu equipo puede chatear con el agente sin salir de donde ya trabaja. Teams se comunica con los bots a través del Bot Framework de Microsoft; configura la conexión desde el asistente guiado (o desde el panel):
 
 ```bash
 pepe setup
 ```
 
-El `config` de una conexión contiene:
+El `config` de una conexión guarda:
 
-- `app_id`: el id de la app (cliente) de Microsoft del bot.
+- `app_id`: el id de app (cliente) del bot en Microsoft.
 - `app_password`: el secreto de cliente. Guárdalo como `${ENV_VAR}`.
-- `tenant_id`: el id de empresa de Azure (o `botframework.com`).
+- `tenant_id`: el id del tenant de Azure (o `botframework.com`).
 
-Las actividades entrantes llegan como `POST`s. Las respuestas vuelven a la URL de
-servicio de la actividad con un token de acceso de app generado a partir de las
-credenciales de cliente. La mención al bot se quita del texto entrante antes de
-que el agente lo vea. Forma de la URL de retorno:
+Las actividades entrantes llegan como `POST`. Las respuestas vuelven a la URL de servicio de la actividad con un token de acceso de app generado a partir de las credenciales de cliente. La mención al bot se elimina del texto entrante antes de que el agente lo vea. Así queda la URL de retorno:
 
 ```
 https://YOUR_HOST/webhooks/default/msteams/<slug>
 ```
 
-### Autenticación de entrada
+### Autenticación de las solicitudes entrantes
 
-Pepe comprueba que cada solicitud entrante viene de verdad de Microsoft antes
-de que el agente vea nada: cada solicitud lleva un token del Bot Framework en
-`Authorization: Bearer`, y Pepe lo valida (firma contra las claves públicas
-de Microsoft, emisor y una audiencia igual al `app_id` del bot). Así el
-endpoint acepta `POST`s directamente desde Microsoft, sin necesidad de un
-proxy que valide. Si tu proxy ya realiza esa comprobación, define
-`trust_proxy: true` en la conexión para omitir la de Pepe.
+Pepe comprueba que cada solicitud entrante viene realmente de Microsoft antes de que el agente vea nada: cada solicitud trae un token del Bot Framework en `Authorization: Bearer`, y Pepe lo valida contra las claves públicas de Microsoft (firma, emisor y una audiencia que debe coincidir con el `app_id` del bot). Gracias a eso, el endpoint acepta `POST` directamente desde Microsoft sin necesitar ningún proxy que valide por su cuenta. Si tu proxy ya hace esa comprobación, define `trust_proxy: true` en la conexión para saltarte la de Pepe.
 
-Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
-(`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y
-cómo funciona la ruta genérica por dentro.
+Consulta [Webhooks](../webhooks/) para ver los campos que comparten todas las conexiones (`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y cómo funciona la ruta genérica por dentro.
 
 ### Cambiar de modelo
 
-Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
-responde. Solo funcionan en una conexión en modo `admin` con `commands`
-habilitado; en `support`, se tratan como texto normal. `/models` lista los
-modelos disponibles para el proyecto de esta conexión; `/model` muestra el
-actual, o lo cambia:
+Los comandos `/model` y `/models` permiten consultar o cambiar qué modelo de IA responde. Solo funcionan en una conexión en modo `admin` con `commands` habilitado; en modo `support` se tratan como texto normal. `/models` lista los modelos disponibles para el proyecto de esa conexión; `/model` muestra cuál está activo, o lo cambia:
 
 ```text
 /model openrouter               # pregunta si cambiar solo este chat o todos
@@ -56,8 +39,4 @@ actual, o lo cambia:
 /model openrouter global        # cambia para todos con los que habla esta conexión
 ```
 
-Cualquiera en una conversación permitida puede cambiar el modelo de su propia
-conversación. Cambiarlo **globalmente**, para todos con los que habla esta
-conexión, está reservado a los **entrenadores**, la misma lista de confianza
-que rige la memoria. Pon `model_switch_locked: true` en la conexión para
-desactivar el cambio de modelo por completo para quien no sea entrenador.
+Cualquiera dentro de una conversación permitida puede cambiar el modelo de su propia conversación. Cambiarlo de forma **global**, para todos con los que habla esa conexión, queda reservado a los **entrenadores**, la misma lista de confianza que controla la memoria. Define `model_switch_locked: true` en la conexión para desactivar por completo el cambio de modelo a cualquiera que no sea entrenador.

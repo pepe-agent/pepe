@@ -1,9 +1,13 @@
 ---
 title: Fetch URL
-description: La herramienta fetch_url de un agente lee el contenido real de una página por defecto, no el HTML crudo alrededor.
+description: La herramienta fetch_url de un agente lee, por defecto, el contenido real de una página, no el HTML crudo que la rodea.
 ---
 
-`fetch_url` es un simple GET por HTTP, pero una respuesta HTML no se devuelve tal cual: por defecto se reduce primero al texto legible real de la página. Las barras de navegación, avisos de cookies, pies de página y marcado publicitario consumen contexto sin nunca ser la respuesta a lo que el agente fue a buscar.
+`fetch_url` no es más que un GET por HTTP, pero cuando la respuesta es HTML
+no se entrega tal cual: por defecto, primero se reduce al texto legible real
+de la página. Barras de navegación, avisos de cookies, pies de página y
+marcado publicitario solo ocuparían espacio en la conversación sin aportar
+nada a lo que el agente en realidad fue a buscar.
 
 ```
 Tú: ¿Qué dice esta entrada del blog sobre el nuevo lanzamiento?
@@ -13,14 +17,25 @@ Agente: [lee el texto real del artículo, sin la navegación/pie de página del 
 La entrada cubre tres cambios: ...
 ```
 
-## Cuando quieres el marcado sin procesar
+## Si prefieres el marcado sin procesar
 
-Pasa `raw: true` para saltar la extracción y obtener el cuerpo de la respuesta exactamente como lo envió el servidor - útil para una respuesta de API, código fuente, o una página de la que necesitas el HTML literal (atributos, estructura, datos incrustados), no su prosa.
+Si pasas `raw: true`, te saltas la extracción y recibes el cuerpo de la
+respuesta exactamente como lo mandó el servidor. Esto sirve para una
+respuesta de API, código fuente, o cualquier página donde lo que necesitas es
+el HTML literal (atributos, estructura, datos incrustados) y no su prosa.
 
 ```
 fetch_url url: "https://example.com/product/123" raw: true
 ```
 
-La extracción solo se aplica a una respuesta `text/html` en primer lugar - un fetch de JSON o texto plano nunca se toca. Y se degrada con gracia: una página sin nada extraíble (una lista de enlaces, una página que es mayormente navegación, un documento muy grande) cae de vuelta al cuerpo sin procesar automáticamente, lo mismo que `raw: true` te habría dado, en vez de devolver algo engañosamente vacío.
+La extracción, para empezar, solo se aplica a una respuesta `text/html`; un
+fetch de JSON o de texto plano queda intacto siempre. Y cuando no hay nada
+que extraer (una página que es solo una lista de enlaces, casi puro menú de
+navegación, o un documento enorme) el sistema no falla de forma confusa: cae
+automáticamente al cuerpo sin procesar, el mismo resultado que habrías
+obtenido con `raw: true`, en vez de devolverte algo vacío que induzca a
+error.
 
-Esto es procesamiento de texto léxico, no una llamada a un LLM - sin latencia extra, sin costo extra, y funciona igual sin importar qué modelo esté usando el propio agente.
+Toda esta limpieza es procesamiento de texto plano, no una llamada al
+modelo: no suma ni retraso ni costo, y funciona exactamente igual sin
+importar qué modelo esté usando el agente.

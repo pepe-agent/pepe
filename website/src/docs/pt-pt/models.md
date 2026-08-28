@@ -1,13 +1,11 @@
 ---
 title: Modelos
-description: Liga fornecedores compatíveis com OpenAI e define modelos predefinidos e de fallback.
+description: Liga o Pepe a qualquer fornecedor compatível com a OpenAI, escolhe um predefinido e acrescenta alternativas de recurso para quando um fornecedor tiver um mau momento.
 ---
 
 ## 3. Ligar um modelo
 
-Aponta o Pepe para qualquer endpoint compatível com a OpenAI. Guarda a chave como
-uma referência de ambiente para que o segredo em bruto nunca vá parar ao ficheiro de
-configuração.
+O Pepe funciona com qualquer fornecedor que fale o protocolo da OpenAI. Passa-lhe a tua chave como o nome de uma variável de ambiente, para que a chave em si nunca chegue a ser escrita no ficheiro de configuração.
 
 ```bash
 export OPENROUTER_API_KEY=sk-...
@@ -18,24 +16,19 @@ pepe model add openrouter \
   --default
 ```
 
-Vais ver uma confirmação como está:
+Vais ver uma confirmação parecida com esta:
 
 ```bash
 ✓ model connection openrouter saved -> https://openrouter.ai/api/v1 (openai/gpt-5-chat)
 ```
 
-Algumas coisas que vale a pena saber:
+Vale a pena reter algumas coisas:
 
-- Nomes que coincidem com um fornecedor incorporado, como `openrouter`, usam o
-  endpoint predefinido desse fornecedor. Usa `--base-url` só para endpoints
-  personalizados.
-- Executa `pepe model add NAME` com um nome que não pareça fornecedor para abrir
-  o seletor guiado. Escolhe um fornecedor do catálogo, como te autenticar e depois
-  um modelo da lista em direto do fornecedor.
-- `pepe model providers` lista os fornecedores que o Pepe conhece de origem.
-- `pepe model list` mostra cada ligação guardada e assinala a predefinida.
-- `pepe model test` envia um pedido real mínimo para confirmar que a ligação
-  funciona.
+- Um nome que coincida com um fornecedor já incorporado, como `openrouter`, usa o endpoint predefinido desse fornecedor; reserva `--base-url` só para endpoints personalizados.
+- Se correres `pepe model add NOME` com um nome que não corresponda a nenhum fornecedor conhecido, abre-se um seletor guiado: escolhes um fornecedor do catálogo, decides como te autenticar e depois escolhes um modelo da lista em direto desse fornecedor.
+- `pepe model providers` lista os fornecedores que o Pepe já conhece de fábrica.
+- `pepe model list` mostra cada ligação guardada e assinala qual é a predefinida.
+- `pepe model test` manda um pedido real, mínimo, só para confirmar que a ligação está a funcionar.
 
 ```bash
 pepe model test openrouter
@@ -46,56 +39,36 @@ pinging openrouter (openai/gpt-5-chat)...
 ✓ openrouter works - reply: pong
 ```
 
-O painel também consegue fazer tudo isto, no teu separador Modelos, se preferires um
-formulário à linha de comandos.
+O painel também faz tudo isto, no separador Modelos, caso prefiras um formulário à linha de comandos.
 
-### Renomeia uma ligação
+### Renomear uma ligação
 
 ```bash
 pepe model rename openrouter OR-trabalho
 ```
 
-Todo agente, cron e valor predefinido que aponte para a ligação continua a
-funcionar: renomear só muda o nome apresentado, não o id estável a que cada
-referência está realmente amarrada, por isso não há nada para corrigir depois.
+Todo o agente, cron e predefinição que apontem para essa ligação continuam a funcionar sem qualquer sobressalto: renomear só muda o nome apresentado, nunca o id estável a que cada referência está de facto amarrada, por isso não fica nada por corrigir depois.
 
-### Muda de modelo a meio de uma conversa
+### Trocar de modelo a meio de uma conversa
 
-`/model` e `/models` funcionam da mesma forma no Telegram, na consola
-(`pepe chat`) e no próprio chat do painel; consulta [Telegram](../telegram/)
-para a referência completa de comandos. Qualquer pessoa numa conversa
-permitida pode trocar o modelo só para a sua sessão; um formador (a mesma
-lista que rege o `/learn`) também pode trocá-lo para todos.
+`/model` e `/models` funcionam da mesma maneira no Telegram, na consola (`pepe chat`) e no próprio chat do painel; a referência completa de comandos está em [Telegram](../telegram/). Qualquer pessoa numa conversa permitida pode trocar o modelo só para a sua própria sessão; um formador (a mesma lista de confiança que rege o `/learn`) pode também trocá-lo para todos ao mesmo tempo.
 
 ## A ligação de modelo
 
-`model` nomeia uma ligação que definiste com `pepe model add`. Deixá-la por definir
-significa que o agente usa o modelo predefinido do seu âmbito, por isso podes apontar
-um conjunto inteiro de agentes para um fornecedor e trocá-los todos ao mudar uma
-única predefinição.
+O campo `model` nomeia uma ligação que definiste com `pepe model add`. Deixá-lo por preencher faz o agente cair no modelo predefinido do seu projeto, o que te permite apontar um conjunto inteiro de agentes para um só fornecedor e trocá-los todos de uma vez, mudando apenas essa predefinição.
 
-Uma ligação de modelo pode transportar uma cadeia de fallback. Quando o modelo
-primário do agente falha com um erro transitório (um limite de taxa, um tempo
-esgotado, uma quebra de rede ou um 5xx), o runtime desce pela cadeia e volta a tentar
-no modelo seguinte, emitindo um evento `failover` enquanto o faz. Um erro grave como
-uma chave de API errada ou um pedido mal formado falha de imediato, já que outro
-endpoint não o resolveria.
+Uma ligação de modelo pode ainda transportar uma cadeia de recurso: quando o modelo principal do agente falha com um erro passageiro (um limite de taxa, um tempo esgotado, uma falha de rede ou um 5xx), o Pepe desce pela cadeia e tenta o modelo seguinte, emitindo um evento `failover` nesse momento. Já um erro grave, como uma chave de API errada ou um pedido mal formado, falha logo de imediato, porque nenhum outro endpoint resolveria o problema.
 
-O Pepe fala com os fornecedores através do protocolo Chat Completions da OpenAI, por
-isso qualquer endpoint compatível com OpenAI funciona sem alteração de código.
+Como o Pepe fala com os fornecedores pelo protocolo Chat Completions da OpenAI, qualquer endpoint compatível funciona sem alterar uma linha de código.
 
-Uma sessão também se pode fazer descer sozinha para um modelo mais barato
-automaticamente, no seu próprio primeiro turno, quando uma chamada de triagem
-rápida julga a conversa simples o suficiente; vê [Encaminhamento de modelo por complexidade](../agents/#encaminhamento-de-modelo-por-complexidade).
+Uma sessão também se pode fazer descer sozinha para um modelo mais barato, logo no seu primeiro turno, quando uma chamada rápida de triagem concluir que a conversa é simples o suficiente para o justificar; ver [Encaminhamento de modelo por complexidade](../agents/#encaminhamento-de-modelo-por-complexidade).
 
-### Fá-lo pela conversa
+### Fazer isto pela conversa
 
-Um agente com a ferramenta `manage_agent` pode reapontar um modelo que administra:
+Um agente com a ferramenta `manage_agent` consegue reapontar um modelo que administra:
 
 ```text
 Point the researcher agent at the groq-fast model.
 ```
 
-O agente chama `manage_agent` com `action: "set_model"`. O modelo de destino tem de
-ser uma ligação configurada, e a alteração passa pela barreira de permissão como
-qualquer outra edição de configuração.
+O agente chama `manage_agent` com `action: "set_model"`. O modelo de destino tem de ser uma ligação já configurada, e a mudança passa pela barreira de permissão, como qualquer outra edição de configuração.

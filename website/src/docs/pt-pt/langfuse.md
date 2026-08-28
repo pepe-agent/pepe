@@ -1,73 +1,42 @@
 ---
 title: Langfuse
-description: Envia as execuções dos agentes para o Langfuse para observabilidade, e gere a persona de um agente a partir de um prompt do Langfuse em vez do config.json.
+description: Envia as execuções dos agentes para o Langfuse para efeitos de observabilidade, e gere a persona de um agente a partir de um prompt do Langfuse, em vez do config.json.
 ---
 
 ## Langfuse
 
-O [Langfuse](https://langfuse.com) é uma ligação opcional, não um requisito:
-nada no Pepe assume que ele está lá. Duas funcionalidades usam-no:
+O [Langfuse](https://langfuse.com) é uma ligação opcional, nunca um requisito: o Pepe não assume em lado nenhum que ela existe. Há duas funcionalidades que a usam:
 
-- **Exportação de traces**: cada execução concluída é enviada ao Langfuse
-  como um trace OTLP, para navegares, depurares e avaliares execuções lá.
-- **Prompts geridos**: a persona de um agente é obtida a partir de um prompt
-  que editas no Langfuse, em vez de `system_prompt`/`SOUL.md`. Opt-in por
-  agente, além das credenciais abaixo, através de `langfuse_prompt`.
+- **Exportação de traces**: toda a execução terminada segue para o Langfuse como um trace OTLP, o que te dá navegação, depuração e avaliação de execuções diretamente lá.
+- **Prompts geridos**: em vez de `system_prompt`/`SOUL.md`, a persona de um agente passa a vir de um prompt que editas no Langfuse. É opt-in, agente a agente, por cima das credenciais abaixo, através de `langfuse_prompt`.
 
 ### Credenciais
 
-Ambas as funcionalidades leem as mesmas variáveis de ambiente que qualquer
-SDK oficial do Langfuse usa, pelo que credenciais já configuradas para outra
-ferramenta funcionam aqui também:
+As duas funcionalidades partilham as mesmas variáveis de ambiente de qualquer SDK oficial do Langfuse, por isso credenciais que já tenhas configurado para outra ferramenta servem aqui sem mais trabalho:
 
 ```bash
 export LANGFUSE_PUBLIC_KEY=pk-lf-...
 export LANGFUSE_SECRET_KEY=sk-lf-...
-# Só se não estiveres no cloud.langfuse.com:
+# Só é preciso se não estiveres no cloud.langfuse.com:
 export LANGFUSE_BASE_URL=https://o-teu-langfuse-self-hosted.exemplo.com
 ```
 
-Obtém o par de chaves nas definições do teu projeto no Langfuse. Defini-lo já
-liga a exportação de traces de imediato, para todos os agentes (vê abaixo
-se também queres prompts geridos pelo Langfuse, ou traces a irem para outro
-sítio). Uma indisponibilidade do Langfuse ou uma chave errada faz a
-exportação de traces cair silenciosamente para descartar o trace, e uma
-obtenção de `langfuse_prompt` cair para a persona local do agente; nenhum
-dos dois bloqueia uma conversa ou uma execução.
+O par de chaves está nas definições do teu projeto no Langfuse. Assim que o defines, a exportação de traces liga-se de imediato para todos os agentes (mais abaixo explica-se como ter também os prompts geridos pelo Langfuse, ou enviar os traces para outro destino qualquer). Uma falha do Langfuse ou uma chave errada não trava nada: a exportação de traces limita-se a descartar o trace em silêncio, e uma obtenção de `langfuse_prompt` recua para a persona local do agente. Nenhum dos dois casos chega a bloquear uma conversa ou uma execução.
 
-Ambas as funcionalidades leem estas variáveis diretamente do processo do
-Pepe em execução, não pela ferramenta `bash` de um agente, o que importa
-se algum dia pedires a um agente para ajudar a depurar a ligação.
-`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` têm formato de segredo pelo
-nome, pelo que o Pepe os remove da shell do próprio agente por predefinição,
-tal como qualquer outra credencial (ver [Segredos](../secrets/)). O agente
-ainda pode adicionar os dois nomes ao `secrets.expose_env` se precisar de os
-verificar diretamente, só não esquecer que uma leitura de comprimento 0 ali
-significa "removido da minha shell", não "não definido no servidor".
+Estas variáveis são lidas diretamente do processo do Pepe em execução, nunca através da ferramenta `bash` de um agente, algo que importa saber se alguma vez pedires a um agente para te ajudar a depurar a ligação. Como `LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` têm nome de segredo, o Pepe remove-as por predefinição da shell do próprio agente, tal como faz com qualquer outra credencial (ver [Segredos](../secrets/)). Se precisar mesmo de as confirmar, o agente pode adicionar os dois nomes a `secrets.expose_env`; só tem de saber que uma leitura de comprimento zero nesse caso quer dizer "removida da minha shell", e não "por definir no servidor".
 
 ### Exportação de traces
 
-O par `LANGFUSE_*` acima já chega sozinho: a exportação de traces liga assim
-que `LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` estão definidas, sem
-precisares de nenhuma variável do OTEL em separado. Cada execução concluída
-torna-se um trace OTLP: um span raiz para a execução inteira, um span filho
-por chamada de ferramenta e por chamada de modelo, com atributos genéricos do
-OpenTelemetry e os próprios do Langfuse definidos em cada um, pelo que as
-sessões são agrupadas corretamente e as gerações são distinguidas de spans
-de ferramenta comuns.
+Basta o par `LANGFUSE_*` acima: a exportação de traces liga-se no instante em que `LANGFUSE_PUBLIC_KEY` e `LANGFUSE_SECRET_KEY` estão ambas definidas, sem qualquer variável do OTEL à parte. Cada execução terminada vira um único trace OTLP, com um span raiz para a execução inteira e um span filho por cada chamada de ferramenta e por cada chamada de modelo. Cada span leva atributos genéricos de OpenTelemetry e os atributos próprios do Langfuse, o que faz as sessões agruparem-se corretamente e distingue as gerações dos spans de ferramenta comuns.
 
-Para enviares traces para outro sítio que não o Langfuse (um coletor
-self-hosted, o Honeycomb, qualquer outro backend que fale OTLP), define as
-variáveis padrão do OTLP, e essas assumem por completo (o par `LANGFUSE_*`
-passa a servir só para prompts geridos, se também usares isso):
+Se preferires mandar os traces para outro lado que não o Langfuse (um coletor self-hosted, o Honeycomb, qualquer backend que fale OTLP), define antes as variáveis padrão do OTLP: elas assumem por completo o controlo (o par `LANGFUSE_*` fica então só a servir os prompts geridos, caso também os uses):
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://o-teu-coletor.exemplo.com
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64 de utilizador:senha>"
 ```
 
-Detalhe completo, incluindo as duas variáveis extra do OTEL que raramente
-precisas: [Traces](../traces/#enviar-traces-para-uma-ferramenta-de-observabilidade).
+O detalhe completo, incluindo as duas variáveis extra do OTEL de que raramente vais precisar, está em [Traces](../traces/#enviar-traces-para-uma-ferramenta-de-observabilidade).
 
 ### Prompts geridos
 
@@ -75,12 +44,4 @@ precisas: [Traces](../traces/#enviar-traces-para-uma-ferramenta-de-observabilida
 pepe agent add support --langfuse-prompt support-persona
 ```
 
-Define o `langfuse_prompt` de um agente (a flag do CLI acima, ou o mesmo
-campo no editor de agente do dashboard) com o nome de um prompt no Langfuse,
-e a persona desse agente passa a ser obtida de lá: edita o prompt no
-Langfuse e a alteração chega ao Pepe dentro de poucos minutos, sem redeploy.
-É opt-in por agente; um agente sem `langfuse_prompt` definido fica
-completamente inalterado, e um cuja obtenção falhe (inacessível, o nome não
-resolve) usa simplesmente a persona local, exatamente como se isto nunca
-tivesse sido configurado. Lê o par `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`
-acima. Detalhe completo: [Agentes](../agents/#gerir-uma-persona-a-partir-do-langfuse).
+Define o `langfuse_prompt` de um agente com o nome de um prompt no Langfuse, seja pela flag do CLI acima ou pelo mesmo campo no editor de agentes do painel, e a persona desse agente passa a vir de lá. Editas o prompt no Langfuse e a mudança chega ao Pepe dentro de poucos minutos, sem qualquer redeploy. Continua a ser opt-in por agente: um agente sem `langfuse_prompt` fica totalmente por afetar, e um cujo pedido falhe (servidor inacessível, nome que não resolve) usa a persona local sem mais, como se isto nunca tivesse sido ligado. Lê o mesmo par `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` de cima. Detalhe completo em [Agentes](../agents/#gerir-uma-persona-a-partir-do-langfuse).

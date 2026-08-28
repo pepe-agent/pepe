@@ -1,49 +1,51 @@
 ---
 title: Discord
-description: Responde comandos de barra en tu servidor de Discord con un agente de Pepe.
+description: Contesta comandos de barra en tu servidor de Discord usando un agente de Pepe.
 ---
 
 ## Discord
 
-En Discord, la gente habla con el agente mediante un comando de barra (por
-ejemplo, `/ask`). Discord entrega esos comandos por su punto de acceso de
-Interactions, que encaja en la pasarela de webhook de Pepe y no en una
-conexión persistente. Configúralo mediante la configuración guiada (o el
-panel):
+En Discord la gente le habla al agente a través de un comando de barra, por
+ejemplo `/ask`. Discord entrega esos comandos por su endpoint de
+Interactions, que calza con la pasarela de webhooks de Pepe en vez de con una
+conexión persistente. Configúralo desde el asistente guiado o desde el
+panel:
 
 ```bash
 pepe setup
 ```
 
-El `config` de una conexión contiene:
+El `config` de cada conexión guarda dos cosas:
 
-- `public_key`: la clave pública de la app (hex), para la verificación de firma
-  Ed25519 requerida.
-- `application_id`: se usa para publicar la respuesta de seguimiento.
+- `public_key`: la clave pública de la app, en hex, que Discord exige para
+  verificar la firma Ed25519.
+- `application_id`: con esto se publica la respuesta de seguimiento.
 
-En la app de Discord, apunta "Interactions Endpoint URL" a la URL de la conexión
-y añade un comando de barra con una opción de texto (por ejemplo
-`/ask prompt:...`). Discord exige un acuse en tres segundos, así que Pepe
-responde con una respuesta diferida y publica la respuesta real como seguimiento
-una vez que el agente termina. Forma de la URL de retorno:
+Dentro de la app de Discord, apunta "Interactions Endpoint URL" a la URL de
+tu conexión y crea un comando de barra con una opción de texto, por ejemplo
+`/ask prompt:...`. Como Discord exige una confirmación dentro de tres
+segundos, Pepe responde de inmediato con un acuse diferido y, cuando el
+agente termina, publica la respuesta real como mensaje de seguimiento. La
+URL de retorno tiene esta forma:
 
 ```
 https://YOUR_HOST/webhooks/default/discord/<slug>
 ```
 
-Ver [Webhooks](../webhooks/) para los campos que comparte toda conexión
-(`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y
-cómo funciona la ruta genérica por dentro.
+Los campos que comparten todas las conexiones (`agent`, `mode`, `trainers`,
+`session_ttl_min`, `ephemeral`, `commands`) y el funcionamiento interno de la
+ruta genérica están en [Webhooks](../webhooks/).
 
 ### Cambiar de modelo
 
-Los comandos `/model` y `/models` permiten ver o cambiar el modelo de IA que
-responde. En Discord llegan a Pepe a través del comando que registraste
-(`/ask` arriba): lo que escribas en su opción `prompt:` es el mensaje que
-Pepe ve. Solo funcionan en una conexión en modo `admin` con `commands`
-habilitado; en `support`, se tratan como texto normal. `/models` lista los
-modelos disponibles para el proyecto de esta conexión; `/model` muestra el
-actual, o lo cambia:
+Con los comandos `/model` y `/models` cualquiera puede consultar o cambiar
+el modelo de IA que le responde. En Discord estos llegan a Pepe a través del
+comando que ya registraste (el `/ask` de arriba): todo lo que se escriba en
+su opción `prompt:` es lo que Pepe termina leyendo. Solo funcionan si la
+conexión está en modo `admin` con `commands` habilitado; en modo `support`
+se procesan como texto normal, sin efecto especial. `/models` lista los
+modelos disponibles para el proyecto de esa conexión, y `/model` muestra
+cuál está activo o lo cambia:
 
 ```text
 /model openrouter               # pregunta si cambiar solo este chat o todos
@@ -51,8 +53,9 @@ actual, o lo cambia:
 /model openrouter global        # cambia para todos con los que habla esta conexión
 ```
 
-Cualquiera en una conversación permitida puede cambiar el modelo de su propia
-conversación. Cambiarlo **globalmente**, para todos con los que habla esta
-conexión, está reservado a los **entrenadores**, la misma lista de confianza
-que rige la memoria. Pon `model_switch_locked: true` en la conexión para
-desactivar el cambio de modelo por completo para quien no sea entrenador.
+Cualquier persona autorizada a conversar puede cambiar el modelo de su
+propia charla, pero hacerlo **de forma global**, para todos con quienes
+habla esa conexión, queda reservado a los **entrenadores**: la misma lista
+de confianza que controla la memoria. Si quieres bloquear por completo el
+cambio de modelo para quien no sea entrenador, activa
+`model_switch_locked: true` en la conexión.

@@ -1,31 +1,71 @@
 ---
 title: Grafos
-description: Nós, arestas e estado partilhado que sobrevive a chamadas de modelo separadas, com um verificador que pode devolver o fluxo a um passo anterior para uma revisão a sério.
+description: Nós, arestas e estado partilhado que sobrevive entre chamadas de modelo distintas, com um verificador capaz de devolver o fluxo a um passo anterior para uma revisão a sério.
 ---
 
 ## Porque é que isto existe
 
-Uma conversa normal é um agente, um ciclo, a decidir o que fazer chamada a chamada. Isso cobre quase tudo. Deixa de chegar assim que um trabalho tem uma *estrutura* real: um rascunho que uma segunda passagem devia poder rejeitar a sério e devolver, não só tentar de novo às cegas; um passo que tem de esperar por uma pessoa antes de continuar; algumas coisas que vale a pena verificar ao mesmo tempo antes de decidir o que se segue.
+Uma conversa normal é um agente, um ciclo, a decidir o que fazer chamada a
+chamada, e isso já cobre quase tudo. Deixa de chegar no momento em que um
+trabalho passa a ter **estrutura** a sério: um rascunho que uma segunda
+passagem devia poder rejeitar de facto e devolver, em vez de tentar outra
+vez às cegas; um passo que precisa de esperar por uma pessoa antes de
+continuar; várias coisas que valem a pena confirmar ao mesmo tempo antes de
+decidir o próximo passo.
 
-Um **grafo** é um fluxo de trabalho com nome, feito de nós e arestas, com estado que sobrevive a chamadas de modelo separadas, algo que nenhuma outra automação do Pepe cobre. Um [flow](../flows/) repete uma sequência exata e já comprovada de chamadas a ferramentas sem nenhuma chamada ao modelo: é para um trabalho que já fizeste da mesma forma vezes suficientes para já não ser preciso decidir. A [delegação](../delegation/) reparte uma tarefa por trabalhadores só de leitura que não partilham estado entre si e não podem agir. Um grafo é para o trabalho intermédio: genuinamente de vários passos, com ramificação que depende do que uma revisão a sério encontrou, a chamar o modelo em cada passo.
+Um **grafo** é um fluxo de trabalho com nome, composto por nós e arestas,
+com estado que sobrevive entre chamadas de modelo distintas, algo que
+nenhuma outra automação do Pepe oferece. Um [flow](../flows/) reproduz uma
+sequência exata e já comprovada de chamadas a ferramentas, sem qualquer
+chamada ao modelo: serve para um trabalho já repetido vezes suficientes
+para deixar de precisar de decisão. A [delegação](../delegation/) reparte
+uma tarefa por trabalhadores só de leitura, que não partilham estado entre
+si e não conseguem agir. O grafo fica algures no meio: trabalho genuinamente
+feito de vários passos, com ramificações que dependem do que uma revisão a
+sério encontrou, chamando o modelo em cada um deles.
 
 ## Tipos de nó
 
-Não há nenhuma linguagem nova a aprender além de uma única substituição `{{key}}` no texto de um nó. Um grafo tem cinco tipos de nó:
+Não há linguagem nova nenhuma para aprender, além de uma única substituição
+`{{chave}}` dentro do texto de um nó. Um grafo conhece cinco tipos:
 
-- **agent** - chama um modelo com um prompt já renderizado. A resposta fica disponível para qualquer nó seguinte como `{{id}}`. `next` nomeia o próximo nó; sem ele, o grafo termina ali.
-- **verifier** - a mesma chamada, mas a resposta tem de terminar numa linha que contenha exatamente uma palavra de um conjunto fixo de veredictos (`{"pass": "publish", "fail": "draft"}`, por exemplo). Essa palavra decide para onde o fluxo vai a seguir, e o destino pode ser um nó *anterior*, que é a revisão a sério para a qual isto existe: o nó anterior vê a crítica do verificador da próxima vez que correr, via `{{esse_verifier_id}}`.
-- **human** - nenhuma chamada ao modelo. A execução pausa e espera; a resposta de alguém, quando chegar, passa a ser o valor desse nó para tudo o que vem a seguir.
-- **parallel** - reparte uma lista de tarefas por trabalhadores só de leitura, as mesmas restrições da [delegação](../delegation/): podem procurar informação, não agir. A resposta combinada passa a ser o valor do nó.
-- **tool** - chama uma ferramenta específica diretamente, com a mesma barreira de permissão de qualquer chamada a ferramenta, e só uma ferramenta que o próprio agente do grafo já tem.
+- **agent**: chama um modelo com um prompt já preenchido. A resposta fica
+  disponível para qualquer nó posterior através de `{{id}}`. O campo `next`
+  indica o nó seguinte; deixa-o de fora e o grafo termina ali mesmo.
+- **verifier**: faz o mesmo tipo de chamada, mas a resposta tem
+  obrigatoriamente de terminar numa linha com exatamente uma palavra de um
+  conjunto fixo de veredictos (por exemplo, `{"pass": "publish", "fail":
+  "draft"}`). É essa palavra que decide para onde o fluxo segue a seguir, e
+  o destino pode muito bem ser um nó *anterior*, que é exatamente a revisão
+  a sério para a qual isto tudo existe: da próxima vez que correr, esse nó
+  anterior vê a crítica do verificador através de `{{id_do_verificador}}`.
+- **human**: não faz chamada nenhuma ao modelo. A execução pausa e espera;
+  assim que alguém responde, essa resposta passa a ser o valor do nó para
+  tudo o que vem depois.
+- **parallel**: reparte uma lista de tarefas por trabalhadores só de
+  leitura, com as mesmas restrições da [delegação](../delegation/): podem
+  procurar informação, não podem agir. O valor do nó é a resposta
+  combinada de todos.
+- **tool**: chama diretamente uma ferramenta específica, sujeita à mesma
+  barreira de permissão de qualquer outra chamada a ferramenta, e só pode
+  ser uma que o próprio agente do grafo já tenha.
 
 ### Templates
 
-`{{input}}` é o que foi passado quando o grafo começou. `{{node_id}}` lê a resposta anterior desse nó, e falha a execução se ele ainda não produziu nenhuma - isso é quase sempre um erro que vale a pena apanhar em vez de enviar um prompt a meio. `{{node_id?}}` lê da mesma forma mas cai num texto de reserva em vez de falhar, que é exatamente o que um nó de retorno precisa: da primeira vez que corre, ainda não existe nenhuma crítica. `{{node_id|default:"algum texto"}}` cai num literal teu em vez do texto de reserva incorporado.
+`{{input}}` corresponde a tudo o que foi passado no arranque do grafo.
+`{{id_do_no}}` lê a saída anterior desse nó, e faz falhar a execução se ele
+ainda não tiver produzido nenhuma, o que quase sempre é um erro que vale a
+pena apanhar em vez de disparar um prompt pela metade. `{{id_do_no?}}` lê da
+mesma forma, mas em vez de falhar recorre a um texto de reserva, exatamente
+o que um nó de retorno precisa: à primeira vez que corre, ainda não existe
+crítica nenhuma para mostrar. Já `{{id_do_no|default:"algum texto"}}`
+recorre a um literal escolhido por ti, em vez do texto de reserva
+incorporado.
 
 ## Um exemplo
 
-Um rascunho que um revisor pode rejeitar a sério, uma aprovação humana antes de publicar, e uma última passagem de formatação:
+Um rascunho que um revisor consegue mesmo rejeitar, seguido de uma
+aprovação humana antes de publicar, e por fim uma passagem de formatação:
 
 ```json
 {
@@ -48,11 +88,16 @@ Um rascunho que um revisor pode rejeitar a sério, uma aprovação humana antes 
 }
 ```
 
-Se `verify` disser "fail", o fluxo volta para `draft`, que agora vê a crítica através de `{{verify?}}`, em vez de simplesmente voltar a tentar às cegas. Se disser "pass", uma pessoa dá o aval antes sequer de `publish` correr.
+Se `verify` responder "fail", o fluxo volta para `draft`, que desta vez já
+vê a crítica através de `{{verify?}}`, em vez de simplesmente tentar de
+novo às cegas. Se responder "pass", uma pessoa dá o aval antes de `publish`
+sequer chegar a correr.
 
 ## Definir, correr e inspecionar
 
-Um agente define e corre os seus próprios grafos pela conversa (`manage_graph`, `run_graph`, `inspect_graph_run`), ou podes fazê-lo diretamente:
+Um agente consegue definir e correr os seus próprios grafos diretamente
+pela conversa (`manage_graph`, `run_graph`, `inspect_graph_run`), ou fazes
+tu isso diretamente:
 
 ```bash
 pepe graph import research.json                      # o ficheiro indica o próprio agente
@@ -62,15 +107,21 @@ pepe graph runs --agent assistant                     # todas as execuções, in
 pepe graph inspect grun_a1b2c3d4                       # histórico completo de uma execução
 ```
 
-Importar confirma toda a estrutura de uma vez, destinos desconhecidos, um nó que não tem permissão para nomear um determinado agente, uma ferramenta a que um nó tenta chegar mas que o agente não tem de facto, e reporta todos os problemas encontrados, não só o primeiro.
+A importação confirma a estrutura toda de uma vez: destinos desconhecidos,
+um nó sem permissão para nomear determinado agente, uma ferramenta a que
+um nó tenta chegar mas que o agente não tem de facto. Todos os problemas
+encontrados são reportados de uma vez, não só o primeiro.
 
-Uma execução que chega a um nó `human` volta como `waiting_human`, com exatamente o que foi perguntado. Resolve-a quando a resposta estiver pronta:
+Uma execução que chega a um nó `human` volta com o estado `waiting_human` e
+exatamente aquilo que foi perguntado. Resolve-a assim que a resposta
+estiver pronta:
 
 ```bash
 pepe graph resume grun_a1b2c3d4 "sim, publica"
 ```
 
-Nada da execução se perde enquanto espera: fica parada exatamente onde parou, o tempo que for preciso.
+Nada da execução se perde enquanto ela espera: fica parada exatamente onde
+ficou, o tempo que for preciso.
 
 ## Correr numa agenda
 
@@ -78,6 +129,9 @@ Nada da execução se perde enquanto espera: fica parada exatamente onde parou, 
 pepe graph schedule assistant research-and-verify --schedule "0 8 * * 1" --deliver "telegram:123456789"
 ```
 
-O mesmo mecanismo de um prompt ou flow [agendado](../scheduled/), só que com outro tipo de trabalho por baixo. Um grafo agendado que pausa num nó `human` continua à espera de uma pessoa: um temporizador disparar a execução não faz com que haja alguém disponível para responder mais cedo.
+É o mesmo mecanismo de um prompt ou de um flow [agendado](../scheduled/),
+só que com outro tipo de trabalho por baixo. Um grafo agendado que pausa
+num nó `human` continua à espera de uma pessoa: disparar a execução por um
+temporizador não faz aparecer ninguém disponível para responder mais cedo.
 
-<div class="note"><strong>Um verificador que nunca concorda não pode girar para sempre.</strong> Todo o grafo tem um orçamento de passos, 25 por omissão, e dá para subir até 100, por isso um ciclo de revisão que nunca converge falha de forma limpa assim que se esgota, em vez de correr para sempre. E a confiança não se espalha por toda a execução: um nó só começa sem confiança se de facto ler algo que veio de conteúdo externo (uma página descarregada, um documento carregado), e só essa chamada perde as suas ferramentas pré-aprovadas, um nó que só lê estado limpo corre com total confiança mesmo numa execução em que outro ramo tocou em algo externo.</div>
+<div class="note"><strong>Um verificador que nunca concorda não gira para sempre.</strong> Todo o grafo tem um orçamento de passos, 25 por omissão e até 100 se subires o limite, de modo que um ciclo de revisão que nunca converge falha de forma limpa assim que esgota esse orçamento, em vez de correr indefinidamente. E a confiança não se espalha pela execução inteira: um nó só passa a não confiável se realmente ler algo vindo de fora (uma página descarregada, um documento carregado), e é só essa chamada que perde as ferramentas pré-aprovadas. Um nó que lê apenas estado limpo corre com total confiança, mesmo numa execução em que outro ramo tenha tocado em algo externo.</div>

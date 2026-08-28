@@ -1,34 +1,34 @@
 ---
 title: Hooks de privacidade (censura de dados pessoais)
-description: Transformações opcionais ligadas ao fluxo de mensagens, para o agente censurar dados pessoais antes de chegarem a um modelo externo e restaurá-los na resposta.
+description: Faz um agente retirar dados pessoais das mensagens antes de estas chegarem a um modelo externo, e repõe os valores reais na resposta. Desligado por predefinição, ativa-se agente a agente.
 ---
 
-Os hooks de privacidade são transformações opcionais ligadas ao fluxo de mensagens, para que um agente possa censurar dados pessoais antes de eles chegarem a um modelo externo, e restaurá-los na resposta. Um agente sem hooks corre em cru, exatamente como antes.
+Os hooks de privacidade deixam um agente limpar dados pessoais (nomes, emails, números de documento) do fluxo de mensagens antes de qualquer coisa chegar a um modelo externo, repondo depois os valores reais na resposta. São opt-in: um agente sem hooks continua a correr em cru, exatamente como antes desta funcionalidade existir.
 
-Ativa-os por agente (com `--hooks`, ou pelo formulário de Agentes no painel), podes herdar uma predefinição do projeto (`default_hooks`), e configuras cada hook uma vez em `"hooks"` na configuração.
+Ativam-se agente a agente (com `--hooks`, ou pelo formulário de Agentes no painel), podes herdar uma predefinição do projeto (`default_hooks`), e cada hook configura-se uma única vez em `"hooks"`, na configuração.
 
-## Quatro hooks, um contrato
+## Quatro hooks, um único contrato
 
-Compõem-se, porque cada um alimenta o mesmo mapa reversível:
+Podes combiná-los à vontade, porque todos alimentam o mesmo mapa reversível: o registo do que foi substituído por o quê, usado depois para repor os valores reais na saída.
 
-- **`pii_redact`**: regex offline. Reconhecedores (email, cartão via Luhn, CPF/CNPJ com dígitos de controlo, CEP, telefones) agrupados em pacotes (`intl`, `br`, `us`), mais os teus próprios em `custom` `{name, pattern, replace}`. Tokeniza os dados pessoais estruturados e restaura-os à saída.
-- **`llm_redact`**: um modelo configurado ou local substitui os dados pessoais por pseudónimos realistas e devolve um mapa `falso -> real`, mantido coerente ao longo dos turnos. Dá conta de nomes e de texto livre que a regex não apanha, em qualquer língua, e mantém os dados longe do modelo principal.
-- **`http_redact`**: quem decide é o teu próprio endpoint. O Pepe faz POST de `{stage, text, session, map}`; tu devolves `{text, map}`. A autenticação é via `basic_auth` ou `headers` arbitrários (todos `${ENV}`).
-- **`presidio`**: o Analyzer e o Anonymizer do Microsoft Presidio por HTTP (alojados por ti).
+- **`pii_redact`**: correspondência de padrões (regex) que corre inteiramente na tua máquina, sem nada a sair para fora. Reúne reconhecedores (email, cartão via Luhn, CPF/CNPJ com dígitos de controlo, código postal, telefones) agrupados em pacotes (`intl`, `br`, `us`), além dos teus próprios padrões `custom` no formato `{name, pattern, replace}`. Substitui os dados pessoais estruturados por tokens e repõe-nos depois na saída.
+- **`llm_redact`**: um modelo, configurado ou local, substitui os dados pessoais por pseudónimos plausíveis e devolve um mapa `falso -> real`, mantido coerente ao longo dos turnos seguintes. Dá conta de nomes e de texto livre que a regex não apanha, em qualquer língua, e mantém esses dados longe do modelo principal.
+- **`http_redact`**: quem decide é o teu próprio endpoint. O Pepe envia um POST com `{stage, text, session, map}`, e tu devolves `{text, map}`. A autenticação faz-se por `basic_auth` ou por `headers` arbitrários (sempre como `${ENV}`).
+- **`presidio`**: o Analyzer e o Anonymizer do Microsoft Presidio, por HTTP, alojados por ti.
 
-## Utilização
+## Como se usam
 
 ```bash
 pepe agent add support --hooks pii_redact,llm_redact --project acme --prompt "..."
 pepe hooks list
-# deixa um modelo montar uma configuração validada de pii_redact a partir de linguagem natural:
+# deixa um modelo montar uma configuração de pii_redact já validada, a partir de linguagem corrente:
 pepe hooks generate "cpf, cnpj e os nossos números de apólice APOL-12345678" --model local --save
 ```
 
-## Uma garantia forte
+## Uma garantia sem margem para falhas
 
-Marca uma ligação de modelo como **require_redaction** e o runtime recusa-se a enviar para ela a não ser que o agente corra um hook de censura, por isso uma configuração de agente esquecida nunca consegue deixar fugir dados pessoais em cru para esse fornecedor.
+Marca uma ligação de modelo como **require_redaction** e o runtime recusa-se a enviar-lhe fosse o que fosse enquanto o agente não correr um hook de censura, o que impede uma configuração de agente esquecida de deixar escapar dados pessoais em cru para esse fornecedor.
 
-<div class="note"><strong>A censura corre fora do processo.</strong> Um hook apoiado num LLM nunca bloqueia a sessão. O mapa reversível vive apenas em memória, e é limpo no reset, no <code>end_session</code> e na expiração por TTL.</div>
+<div class="note"><strong>A censura nunca trava a conversa.</strong> Um hook apoiado num modelo corre ao lado da sessão, fora do processo principal, e por isso nunca bloqueia uma resposta. O mapa reversível existe só em memória, e é limpo no reset, no <code>end_session</code> e na expiração por TTL.</div>
 
-O quadro mais amplo, incluindo em que pontos do fluxo a censura acontece e como se articula com a barreira de permissão, está na página [Segurança](../security/).
+O panorama mais alargado, incluindo em que ponto exato do fluxo a censura acontece e como se articula com a barreira de permissão, fica na página [Segurança](../security/).

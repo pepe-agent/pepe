@@ -1,13 +1,11 @@
 ---
 title: Modelos
-description: Conecta proveedores compatibles con OpenAI y define modelos predeterminados y de respaldo.
+description: Conecta Pepe a cualquier proveedor de modelos compatible con OpenAI, elige uno por defecto y agrega respaldos que entren en acción cuando un proveedor tenga un mal momento.
 ---
 
 ## 3. Conectar un modelo
 
-Apunta Pepe a cualquier endpoint compatible con OpenAI. Guarda la clave como una
-referencia de entorno para que el secreto en crudo nunca acabe en el archivo de
-configuración.
+Pepe funciona con cualquier proveedor que hable el protocolo de OpenAI. Dale tu clave como el nombre de una variable de entorno, para que la clave en sí nunca quede escrita en el archivo de configuración.
 
 ```bash
 export OPENROUTER_API_KEY=sk-...
@@ -24,17 +22,13 @@ Verás una confirmación como esta:
 ✓ model connection openrouter saved -> https://openrouter.ai/api/v1 (openai/gpt-5-chat)
 ```
 
-Algunas cosas que conviene saber:
+Algunas cosas que conviene tener presentes:
 
-- Los nombres que coinciden con un proveedor integrado, como `openrouter`, usan
-  su endpoint por defecto. Usa `--base-url` solo para endpoints personalizados.
-- Ejecuta `pepe model add NAME` con un nombre que no parezca proveedor para abrir
-  el selector guiado. Elige un proveedor del catálogo, cómo autenticarte y luego
-  elige un modelo de la lista en vivo del proveedor.
-- `pepe model providers` lista los proveedores que Pepe conoce de fábrica.
-- `pepe model list` muestra cada conexión guardada y marca la predeterminada.
-- `pepe model test` envía una petición real mínima para confirmar que la conexión
-  funciona.
+- Un nombre que coincide con un proveedor integrado, como `openrouter`, usa el endpoint por defecto de ese proveedor. Usa `--base-url` solo para endpoints personalizados.
+- Ejecuta `pepe model add NOMBRE` con un nombre que no sea el de un proveedor conocido para abrir el selector guiado: elige un proveedor del catálogo, cómo autenticarte, y luego un modelo de la lista en vivo de ese proveedor.
+- `pepe model providers` lista los proveedores que Pepe reconoce de fábrica.
+- `pepe model list` muestra cada conexión guardada y marca cuál es la predeterminada.
+- `pepe model test` manda una petición real mínima para confirmar que la conexión funciona.
 
 ```bash
 pepe model test openrouter
@@ -45,8 +39,7 @@ pinging openrouter (openai/gpt-5-chat)...
 ✓ openrouter works - reply: pong
 ```
 
-El panel también puede hacer todo esto, en su pestaña Modelos, si prefieres un
-formulario a la línea de comandos.
+El panel puede hacer todo esto también, en su pestaña Modelos, si prefieres un formulario a la línea de comandos.
 
 ### Renombrar una conexión
 
@@ -54,39 +47,21 @@ formulario a la línea de comandos.
 pepe model rename openrouter OR-trabajo
 ```
 
-Cada agente, cron y valor predeterminado que apunte a la conexión sigue
-funcionando. Renombrar solo cambia el nombre visible, no el id estable con
-el que cada referencia se guarda de verdad, así que no hay nada que arreglar
-después.
+Cada agente, cron o valor predeterminado que apunte a esa conexión sigue funcionando sin problema: renombrar solo cambia el nombre visible, no el id estable contra el que en realidad se guarda cada referencia, así que no queda nada por arreglar después.
 
-### Cambiar de modelo en medio de una conversación
+### Cambiar de modelo en plena conversación
 
-`/model` y `/models` funcionan igual en Telegram, la consola (`pepe chat`) y
-el propio chat del panel. Consulta [Telegram](../telegram/) para la
-referencia completa de comandos. Cualquiera en una conversación permitida
-puede cambiar el modelo solo para su sesión; un entrenador (la misma lista
-que rige `/learn`) también puede cambiarlo para todos.
+`/model` y `/models` funcionan igual en Telegram, en la consola (`pepe chat`) y en el propio chat del panel; consulta [Telegram](../telegram/) para la referencia completa de comandos. Cualquiera dentro de una conversación permitida puede cambiar el modelo solo para su propia sesión; un entrenador (la misma lista de confianza que rige `/learn`) también puede cambiarlo para todos.
 
 ## La conexión de modelo
 
-`model` nombra una conexión que definiste con `pepe model add`. Dejarlo sin definir
-significa que el agente usa el modelo predeterminado de su alcance, así que puedes
-apuntar todo un conjunto de agentes a un proveedor y cambiarlos todos modificando un
-solo predeterminado.
+`model` nombra una conexión que definiste con `pepe model add`. Dejarlo sin definir hace que el agente use el modelo predeterminado de su proyecto, así que puedes apuntar todo un grupo de agentes a un mismo proveedor y cambiarlos a todos de una vez modificando un único valor por defecto.
 
-Una conexión de modelo puede llevar una cadena de respaldo. Cuando el modelo
-primario del agente falla con un error transitorio (un límite de tasa, un tiempo de
-espera agotado, un corte de red o un 5xx), el runtime baja por la cadena y reintenta
-con el siguiente modelo, emitiendo un evento `failover` mientras lo hace. Un error
-grave como una clave de API incorrecta o una petición mal formada falla de inmediato,
-ya que otro endpoint no lo arreglaría.
+Una conexión de modelo puede llevar una cadena de respaldo. Cuando el modelo principal del agente falla con un error pasajero (un límite de tasa, un tiempo de espera agotado, un corte de red o un 5xx), Pepe baja por la cadena y reintenta con el siguiente modelo, emitiendo un evento `failover` en el proceso. Un error grave, como una clave de API incorrecta o una petición mal formada, falla de inmediato en lugar de reintentar, porque cambiar de endpoint no lo arreglaría de todos modos.
 
-Pepe habla con los proveedores mediante el protocolo Chat Completions de OpenAI, así
-que cualquier endpoint compatible con OpenAI funciona sin cambiar código.
+Pepe habla con los proveedores mediante el protocolo Chat Completions de OpenAI, así que cualquier endpoint compatible con OpenAI funciona sin tocar una línea de código.
 
-Una sesión también puede bajar sola a un modelo más barato automáticamente, en su
-propio primer turno, cuando una llamada de triaje rápida juzga que la
-conversación es lo bastante simple. Mira [Enrutamiento de modelo por complejidad](../agents/#enrutamiento-de-modelo-por-complejidad).
+Una sesión también puede bajarse sola a un modelo más barato de forma automática, en su primer turno, cuando una llamada rápida de triaje juzga que la conversación es lo bastante simple como para justificarlo. Mira [Enrutamiento de modelo por complejidad](../agents/#enrutamiento-de-modelo-por-complejidad).
 
 ### Hazlo por chat
 
@@ -96,6 +71,4 @@ Un agente con la herramienta `manage_agent` puede reapuntar un modelo que admini
 Point the researcher agent at the groq-fast model.
 ```
 
-El agente llama a `manage_agent` con `action: "set_model"`. El modelo destino debe
-ser una conexión configurada, y el cambio pasa por la barrera de permisos como
-cualquier otra edición de configuración.
+El agente llama a `manage_agent` con `action: "set_model"`. El modelo de destino debe ser una conexión ya configurada, y el cambio pasa por la barrera de permisos como cualquier otra edición de configuración.

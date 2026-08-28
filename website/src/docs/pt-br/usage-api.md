@@ -1,11 +1,15 @@
 ---
 title: API de consumo
-description: Leia por HTTP o que foi gasto, com um token com escopo, por mensagem, por chamada de modelo, com ou sem o seu markup.
+description: Leia por HTTP quanto foi gasto, com um token de escopo restrito, por mensagem, por chamada de modelo, com ou sem o seu markup aplicado.
 ---
 
-O `/v1/usage` é sobre o que você constrói uma integração de cobrança: ele lê o que foi gasto, por HTTP, com um token que enxerga os números mas não roda nada. Ele responde a pergunta que a cobrança realmente faz, que não é "quanto custou este mês", e sim "quanto custou *aquela mensagem*, e por quê".
+É em cima do `/v1/usage` que você constrói uma integração de cobrança: ele
+lê o que já foi gasto, via HTTP, com um token que enxerga os números mas não
+roda nada. A pergunta que a cobrança realmente faz não é "quanto custou
+esse mês", e sim "quanto custou *aquela mensagem ali*, e por quê"; é essa
+que o endpoint responde.
 
-Quatro endpoints, quatro níveis de zoom sobre o mesmo ledger:
+São quatro endpoints, quatro níveis de zoom sobre o mesmo livro-razão:
 
 | Endpoint | Uma linha por |
 | --- | --- |
@@ -14,17 +18,25 @@ Quatro endpoints, quatro níveis de zoom sobre o mesmo ledger:
 | `GET /v1/usage/runs` | mensagem recebida |
 | `GET /v1/usage/runs/:id` | aquela mensagem, chamada por chamada |
 
-Eles usam o mesmo cabeçalho `Authorization: Bearer pepe_...` do resto da [API HTTP](../api/), e só respondem sobre os projetos que o token alcança. Veja [Cobrança e limites](../billing/) para entender como os números são calculados.
+Todos usam o mesmo cabeçalho `Authorization: Bearer pepe_...` do resto da
+[API HTTP](../api/), e só devolvem dados dos projetos que o token consegue
+alcançar. Para entender como os números por trás disso são calculados, veja
+[Cobrança e limites](../billing/).
 
 ## Um token que só lê
 
-Um token pode rodar agentes e **não** pode ler consumo, a menos que você diga o contrário, então nada do que você já criou muda. Crie um token de cobrança somente leitura assim:
+Por padrão, um token pode rodar agentes mas **não** consegue ler consumo, a
+menos que você libere isso explicitamente, então nada do que já foi emitido
+muda de comportamento. Um token de cobrança somente leitura se cria assim:
 
 ```bash
 pepe token add --project acme --no-chat --usage --prices billable --label "cobrança acme"
 ```
 
-Esse token chama o `/v1/usage`, não chama o `/v1/chat/completions`, enxerga só o projeto `acme` e enxerga só o que o cliente paga. Entregue-o ao sistema financeiro do cliente sem dar junto uma credencial capaz de gastar o seu orçamento de modelo.
+Com ele dá para chamar `/v1/usage`, mas não `/v1/chat/completions`; ele
+enxerga só o projeto `acme`, e só o valor que o cliente efetivamente paga.
+Dá para entregar isso ao financeiro de um cliente sem junto entregar uma
+credencial capaz de gastar o seu orçamento de modelo.
 
 As quatro permissões:
 
@@ -32,29 +44,44 @@ As quatro permissões:
 | --- | --- | --- |
 | `--chat` / `--no-chat` | ligado | rodar agentes (`/v1/chat/completions`, o WebSocket) |
 | `--usage` | desligado | ler o `/v1/usage` |
-| `--prices` | `billable` | quanto dos valores uma leitura mostra |
-| `--content` | desligado | o detalhe de uma execução pode incluir o prompt e os argumentos e a saída das ferramentas |
+| `--prices` | `billable` | quanto dos valores uma leitura revela |
+| `--content` | desligado | o detalhe de uma execução pode trazer junto o prompt e os argumentos/saída das ferramentas |
 
-Mude depois sem rotacionar o segredo, para que a integração do cliente continue funcionando enquanto o que ela pode ver muda:
+Dá para mudar isso depois sem rotacionar o segredo, então a integração do
+cliente continua funcionando o tempo todo, mesmo enquanto o que ela enxerga
+muda:
 
 ```bash
 pepe token permissions abc123 --prices list
 pepe token permissions abc123 --no-usage
 ```
 
-Os mesmos campos estão nos cards de token do dashboard, em **Tokens**, e um agente de confiança com a ferramenta `manage_token` consegue criar um pela conversa. Um token de **widget** nunca pode ler consumo: ele fica no código-fonte público da página.
+Esses mesmos campos aparecem nos cards de token do painel, em **Tokens**, e
+um agente de confiança com a ferramenta `manage_token` também consegue criar
+um direto pela conversa. Um token de **widget**, por outro lado, nunca lê
+consumo: ele fica exposto no código-fonte público de uma página.
 
-## Quanto ele enxerga dos valores
+## Quanto ele consegue ver dos valores
 
-Toda chamada medida tem três números, e o `--prices` escolhe qual deles uma leitura devolve:
+Toda chamada medida guarda três números, e é o `--prices` que decide qual
+deles uma leitura devolve:
 
-* **`billable`**: preço de tabela × o markup do projeto. O que o cliente paga. O padrão, e o único que o token de um cliente deveria ter.
-* **`list`**: os mesmos tokens ao preço do modelo, sem markup aplicado.
-* **`all`**: os dois, mais `cost` (o que você pagou de fato) e `margin`. A sua própria visão.
+* **`billable`**: preço de tabela multiplicado pelo markup do projeto. É o
+  que o cliente paga, é o padrão, e é o único valor que o token de um
+  cliente deveria ter acesso.
+* **`list`**: os mesmos tokens, mas ao preço puro do modelo, sem nenhum
+  markup em cima.
+* **`all`**: os dois juntos, mais `cost` (o que você de fato pagou) e
+  `margin`. Essa é a sua própria visão, interna.
 
-`billable` e `list` são exclusivos, não cumulativos. Mostrar os dois revelaria a razão entre eles, e essa razão é o seu markup, a sua margem. Um token com `list` está vendo preços de tabela *no lugar*, não além.
+`billable` e `list` se excluem, não se somam: mostrar os dois ao mesmo tempo
+revelaria a razão entre eles, e essa razão é justamente o seu markup, a sua
+margem. Um token com permissão `list` vê preço de tabela *no lugar* do
+billable, nunca os dois.
 
-Quem decide isso é o token, nunca a requisição. Um cliente que chama `?prices=all` recebe de volta a visão do próprio token, não a que pediu.
+Quem decide qual desses três aparece é o token, nunca a requisição: um
+cliente que chama `?prices=all` recebe de volta a visão que o próprio token
+tem, e não a que pediu na URL.
 
 ## Agregados
 
@@ -78,9 +105,16 @@ curl -H "Authorization: Bearer $TOKEN" \
 }
 ```
 
-`granularity` é `hour`, `day`, `week`, `month` ou `year`, e `limit` limita quantos intervalos voltam (60 por padrão).
+`granularity` aceita `hour`, `day`, `week`, `month` ou `year`, e `limit`
+define quantos intervalos voltam na resposta (60 por padrão).
 
-Um agregado precisa ler cada entrada da janela para somá-la, então, sem `from`, este endpoint assume os **últimos 90 dias** em vez do histórico inteiro. A janela usada volta em `period`, para que um relatório nunca cubra menos do que você imagina, em silêncio. Peça mais sempre que precisar: `from=0` é tudo. Um token `all` recebe ainda `subscriptions` e `margin` no topo, e um `markup` em cada entrada de `by_project`.
+Somar um agregado exige ler cada entrada da janela inteira, então, sem um
+`from` explícito, o endpoint assume os **últimos 90 dias** em vez do
+histórico completo. A janela realmente usada volta no campo `period`, então
+nenhum relatório acaba cobrindo, em silêncio, menos período do que você
+imagina. Peça mais quando precisar: `from=0` traz tudo. Um token com
+permissão `all` ganha ainda `subscriptions` e `margin` no nível raiz, além
+de um `markup` em cada entrada de `by_project`.
 
 ## Uma linha por chamada de modelo
 
@@ -114,11 +148,19 @@ curl -H "Authorization: Bearer $TOKEN" \
 }
 ```
 
-Devolva o `next_cursor` como `cursor` para pedir a próxima página. A paginação usa um id opaco de linha em vez do timestamp, porque `at` tem granularidade de um segundo e uma virada de página caindo dentro de um segundo movimentado perderia linhas ou repetiria linhas.
+Para a próxima página, devolva o `next_cursor` recebido como `cursor` na
+próxima chamada. A paginação roda sobre um id opaco de linha em vez do
+timestamp porque `at` só tem granularidade de um segundo, e uma virada de
+página caindo bem dentro de um segundo movimentado acabaria perdendo linhas
+ou repetindo elas.
 
 ## Uma linha por mensagem
 
-É o endpoint que a maioria das integrações quer. Uma única mensagem recebida costuma custar várias chamadas de modelo: o agente responde, chama uma ferramenta, recebe o resultado, chama outra e responde de novo. O `/v1/usage/runs` reagrupa essas chamadas na mensagem que as causou.
+Esse é o endpoint que a maioria das integrações realmente quer. Uma única
+mensagem recebida costuma gerar várias chamadas de modelo: o agente
+responde, chama uma ferramenta, recebe o resultado dela, chama outra, e só
+então responde de novo. O `/v1/usage/runs` reúne todas essas chamadas de
+volta na mensagem que as originou.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "https://pepe.exemplo.com/v1/usage/runs?limit=50"
@@ -151,9 +193,15 @@ curl -H "Authorization: Bearer $TOKEN" "https://pepe.exemplo.com/v1/usage/runs?l
 }
 ```
 
-`source` é o que disparou a execução (`telegram`, `api`, `cron`, `flow` e assim por diante), `outcome` é `ok` ou `error`, e `ms` é quanto a mensagem inteira demorou.
+`source` indica o que disparou a execução (`telegram`, `api`, `cron`,
+`flow`, e por aí vai), `outcome` é `ok` ou `error`, e `ms` mostra quanto
+tempo a mensagem inteira levou.
 
-Repare no que `calls: 4` e `tool_calls: 3` dizem juntos. Uma ferramenta não custa tokens por si; o que encarece uma mensagem é o número de chamadas de modelo, porque cada iteração reenvia um contexto que o resultado da ferramenta anterior acabou de aumentar. É por isso que a execução, e não a ferramenta, é a unidade que vale a pena ler.
+Vale reparar no que `calls: 4` e `tool_calls: 3` dizem juntos: uma ferramenta
+em si não custa tokens; o que encarece uma mensagem é o número de chamadas
+de modelo, já que cada nova iteração reenvia um contexto que o resultado da
+ferramenta anterior acabou de deixar maior. É exatamente por isso que a
+execução, e não a ferramenta isolada, é a unidade que vale a pena olhar.
 
 ## Uma mensagem, chamada por chamada
 
@@ -162,17 +210,26 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://pepe.exemplo.com/v1/usage/runs/1785312000123456"
 ```
 
-Devolve os mesmos campos da linha da lista, mais `breakdown`: cada chamada de modelo daquela execução, em ordem, com os próprios tokens, acertos de cache e valores. É a resposta para "por que essa mensagem custou tanto".
+Devolve os mesmos campos da linha de lista, mais um `breakdown`: cada
+chamada de modelo daquela execução, na ordem em que aconteceu, com tokens,
+acertos de cache e valores próprios. É essa a resposta para "por que essa
+mensagem custou o que custou".
 
-Um token criado com `--content` recebe também um objeto `content` com o prompt e os argumentos e a saída de cada ferramenta. Sem ele não existe nem a chave `content`. Desligado por padrão de propósito: um relatório de consumo é uma fatura, e uma fatura não é uma transcrição. O conteúdo também vem do [trace](../traces/) da execução, que é podado por projeto, então uma execução antiga o bastante devolve `content: null` em vez de fingir que nunca teve conteúdo.
+Um token criado com `--content` recebe também um objeto `content`, trazendo
+o prompt e os argumentos/saída de cada ferramenta usada. Sem essa flag, a
+chave `content` nem aparece. Isso vem desligado por padrão de propósito: um
+relatório de consumo é uma fatura, não uma transcrição da conversa. Esse
+conteúdo vem do [trace](../traces/) da execução, que é podado por projeto ao
+longo do tempo, então uma execução velha o bastante devolve `content: null`
+em vez de fingir que nunca teve conteúdo algum.
 
 ## Filtros
 
-Cada endpoint aceita os que fazem sentido para ele:
+Cada endpoint aceita os filtros que fazem sentido para ele:
 
 | Parâmetro | Onde | Significado |
 | --- | --- | --- |
-| `project` | todos | um projeto, e apenas um que o token já alcança |
+| `project` | todos | um projeto, e só um que o token já alcança |
 | `agent` | todos | o gasto de um agente |
 | `model` | resumo, eventos | uma conexão de modelo |
 | `source` | todos | `telegram`, `api`, `cron`, `flow`, … |
@@ -183,15 +240,24 @@ Cada endpoint aceita os que fazem sentido para ele:
 | `cursor` | eventos, execuções | o `next_cursor` da página anterior |
 | `granularity` | resumo | `hour`, `day`, `week`, `month`, `year` |
 
-Um filtro só consegue estreitar o que o token já alcança. Nomear um projeto fora do escopo dele é **403**, não um resultado vazio, e um token travado em um agente continua nesse agente, diga o que disser o `agent=`. `model=` e `run_id=` no `/runs` são **400**: uma execução não tem um único modelo, um id de execução é para o `/runs/:id`, e um filtro que silenciosamente não faz nada devolve um relatório que você acreditaria ser mais estreito do que é.
+Um filtro só consegue estreitar o que o token já alcançava, nunca ampliar.
+Nomear um projeto fora do escopo dele resulta em **403**, não num resultado
+vazio, e um token travado a um único agente continua restrito a ele
+independente do que `agent=` disser na URL. Já `model=` e `run_id=` em
+`/runs` dão **400**: uma execução não tem um único modelo associado, e um id
+de execução específico é papel do `/runs/:id`; um filtro que simplesmente
+não faz nada devolveria um relatório que você acreditaria mais restrito do
+que realmente é.
 
 ## Erros
 
 | Status | Quando |
 | --- | --- |
 | 401 | token ausente ou desconhecido |
-| 403 | o token não pode ler consumo, ou pediu um projeto que não alcança |
+| 403 | o token não tem permissão de leitura de consumo, ou pediu um projeto fora do seu alcance |
 | 404 | não existe essa execução dentro do escopo do token |
 | 400 | um parâmetro inutilizável |
 
-Uma execução de outro projeto responde **404** em vez de 403, para que o endpoint nunca confirme que um id existe em algum lugar que você não pode ver.
+Uma execução pertencente a outro projeto responde **404**, não 403, para
+que o endpoint nunca confirme que um id existe em algum lugar que você não
+tem como enxergar.

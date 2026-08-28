@@ -1,71 +1,73 @@
 ---
 title: Skills
-description: Instale instruções reutilizáveis que ensinam fluxos repetíveis aos agentes.
+description: Instruções reutilizáveis, instaláveis, que ensinam fluxos de trabalho repetíveis a um agente.
 ---
 
-Uma skill é um documento de instruções sob demanda: um arquivo Markdown que
-ensina ao agente um *procedimento*, como instalar uma ferramenta ou lidar com
-uma mensagem de áudio. É assim que um agente aprende algo novo sem que uma linha
-de código mude.
+Uma skill é um documento de instruções sob demanda: um arquivo Markdown que ensina um
+*procedimento* ao agente, como instalar uma ferramenta ou como lidar com uma mensagem
+de áudio. É assim, sem uma única linha de código mudar, que um agente aprende a fazer
+algo novo.
 
-## Listadas, não carregadas
+## Fica listada, não carregada
 
-Uma skill nunca é colada por inteiro no prompt do sistema. Só o nome e um resumo
-de uma linha aparecem no contexto do agente. Quando o assunto surge, o agente
-chama a ferramenta `skill` com esse nome, lê o documento completo e o segue.
+Uma skill nunca é colada por inteiro dentro do system prompt. No contexto do agente
+aparecem só o nome dela e um resumo de uma linha; quando o assunto surge de fato, é aí
+que o agente chama a ferramenta `skill` com esse nome, lê o documento inteiro e passa
+a seguir o que está escrito.
 
-É isso que mantém as skills baratas. Um agente pode conhecer dezenas de
-procedimentos sem que eles pesem na conversa, porque cada um custa uma única
-linha até o momento em que o trabalho realmente pede por ele. O resumo é
-simplesmente a primeira linha não vazia do arquivo, então essa linha de
-abertura deve dizer quando a skill se aplica.
+É justamente esse mecanismo que mantém as skills baratas: um agente consegue conhecer
+dezenas de procedimentos sem que isso pese na conversa, porque cada um custa uma única
+linha até o exato momento em que o trabalho pede por ele. O resumo, aliás, não é nada
+além da primeira linha não vazia do arquivo, então vale escrever essa abertura já
+dizendo quando aquela skill se aplica.
 
-<div class="note"><strong>A ferramenta skill.</strong> O agente precisa da ferramenta <code>skill</code> na sua lista de ferramentas para ler skills. Sem ela, as skills ficam listadas no contexto mas nunca são abertas.</div>
+<div class="note"><strong>A ferramenta skill.</strong> Só um agente com <code>skill</code> na própria lista de ferramentas consegue ler skills de verdade. Sem ela, elas continuam listadas no contexto, mas nunca chegam a ser abertas.</div>
 
 ## Skills nativas
 
-Estas já vêm com o Pepe, em `priv/skills/`:
+Já vêm junto com o Pepe, dentro de `priv/skills/`:
 
-- **`skill-creator`**: como criar, editar, auditar e melhorar skills (a meta-skill).
-- **`install-tool`**: escrever uma ferramenta em plugin e habilitá-la pela conversa.
-- **`write-a-script`**: resolver tarefas complexas escrevendo e salvando um programa para rodar.
-- **`manage-routing`**: alterar rotas entre agentes com `set_route`.
-- **`handle-media`**: entender uma entrada de voz, áudio, imagem ou arquivo (transcrever, ler), instalando o que for preciso.
-- **`install-skill`**: instalar uma skill a partir de uma URL, um gist, um repositório ou outro Pepe.
-- **`create-watch`**: criar um watch durável do tipo "verifique X e me avise quando acontecer".
+- **`skill-creator`**: como criar, editar, auditar e melhorar skills, a meta-skill.
+- **`install-tool`**: escrever uma ferramenta como plugin e habilitá-la pela conversa.
+- **`write-a-script`**: resolver tarefas complexas escrevendo um programa e salvando-o para rodar depois.
+- **`manage-routing`**: mudar rotas entre agentes usando `set_route`.
+- **`handle-media`**: entender uma entrada de voz, áudio, imagem ou arquivo (transcrever, ler), instalando o que faltar para isso.
+- **`install-skill`**: instalar uma skill a partir de uma URL, um gist, um repositório, ou outro Pepe.
+- **`create-watch`**: montar um watch durável do tipo "verifica X e me avisa quando acontecer".
 
-## Escrevendo as suas
+## Escrevendo as suas próprias
 
-As skills do usuário ficam em `~/.pepe/skills/*.md`. Uma skill do usuário
-sobrepõe a nativa de mesmo nome, então escrever o seu próprio `handle-media.md`
-substitui a que vem com o Pepe. A primeira linha não vazia é o resumo; todo o
-resto é o procedimento, em Markdown puro, escrito para o agente ler e seguir.
+Skills de usuário ficam em `~/.pepe/skills/*.md`. Uma dessas sempre sobrepõe a nativa
+de mesmo nome, então escrever seu próprio `handle-media.md` já substitui o que vem de
+fábrica com o Pepe. A primeira linha não vazia do arquivo vira o resumo; tudo depois
+dela é o procedimento em si, escrito em Markdown puro, pensado para o agente ler e
+seguir.
 
 ```bash
 ~/.pepe/skills/publicar-release.md
 ```
 
-Não há passo de registro nem reinício. Basta colocar o arquivo lá e a skill
-aparece na lista do agente já na mensagem seguinte.
+Não existe passo de registro, nem precisa reiniciar nada: basta colocar o arquivo no
+lugar, e a skill já aparece na lista do agente a partir da próxima mensagem.
 
-### Deixe o agente escrever
+### Deixando o próprio agente escrever
 
-Um agente pode escrever as próprias skills. Peça que ele guarde como skill o
-jeito de fazer alguma coisa e, guiado pelo `skill-creator`, ele grava um novo
-`skills/<nome>.md` que já aparece na sua própria lista.
+Um agente consegue escrever as próprias skills. Peça para ele guardar, como skill, o
+jeito de fazer alguma coisa, e ele grava um novo `skills/<nome>.md`, guiado pela
+`skill-creator`, que já entra na lista dele na hora.
 
 > Você: funcionou. guarde como skill o processo de publicar uma release
 >
 > Agente: salvei skills/publicar-release.md. Vou segui-lo na próxima vez que você pedir uma release.
 
-É isso que torna durável o conhecimento do agente. O procedimento que ele
-descobriu uma vez fica escrito, em vez de ser redescoberto a cada sessão.
+Isso é o que dá durabilidade ao conhecimento do agente: em vez de redescobrir o mesmo
+procedimento a cada sessão, ele fica registrado assim que descoberto uma primeira vez.
 
 ### Empacotando uma skill com scripts
 
-Uma skill também pode vir como um pequeno pacote em vez de um arquivo único:
-uma pasta `<nome>/` com `SKILL.md` (o doc de entrada, lido exatamente como um
-`<nome>.md` solto) ao lado do que mais ela precisar, tipicamente uma pasta
+Em vez de um único arquivo, uma skill também pode vir como um pequeno pacote: uma
+pasta `<nome>/` contendo um `SKILL.md` (o documento de entrada, lido exatamente como
+um `<nome>.md` solto seria) junto de tudo mais que ela precisar, geralmente uma pasta
 `scripts/`.
 
 ```bash
@@ -74,95 +76,96 @@ uma pasta `<nome>/` com `SKILL.md` (o doc de entrada, lido exatamente como um
   scripts/marcar-e-publicar.sh
 ```
 
-Os arquivos empacotados nunca são copiados para outro lugar: o agente chega
-até eles no próprio lugar, do mesmo jeito que já chega ao workspace
-compartilhado ou a um plugin instalado, passando pro `run_script` (ou
-`read_file`) um caminho no formato `skills/<nome>/scripts/<arquivo>`. Aponte
-as instruções do próprio `SKILL.md` pra esse caminho e o script roda
-exatamente como foi empacotado, em vez do agente reescrevê-lo do zero na
-primeira vez, toda sessão.
+Nada desses arquivos empacotados é copiado para outro lugar: o agente acessa tudo no
+próprio local onde já está, do mesmo jeito que já acessa o workspace compartilhado ou
+um plugin instalado, passando ao `run_script` (ou ao `read_file`) um caminho no
+formato `skills/<nome>/scripts/<arquivo>`. Basta as instruções do `SKILL.md` apontarem
+para esse caminho, e o script roda exatamente como foi empacotado, sem o agente
+precisar reescrevê-lo do zero toda vez que uma nova sessão começa.
 
-Uma skill instalada pelo `manage_skill`/`mix pepe skill install` (abaixo) traz
-o pacote inteiro junto automaticamente quando a fonte tem um: um `SKILL.md`
-na raiz do que foi instalado é o que marca como pacote; qualquer coisa sem
-isso continua instalando como um único `<nome>.md`, exatamente como antes.
-Todo arquivo de um pacote é escaneado por segurança antes de instalar, não só
-o doc: o `SKILL.md` recebe o escaneamento de injeção de prompt de sempre, e
-cada script empacotado recebe o mesmo escaneamento profundo que o código de
-um plugin recebe.
+Quando instalada via `manage_skill`/`mix pepe skill install` (mais abaixo), uma skill
+já traz o pacote inteiro automaticamente, desde que a fonte tenha um: o que marca algo
+como pacote é justamente ter um `SKILL.md` na raiz do que está sendo instalado; sem
+isso, continua instalando normalmente como um único `<nome>.md`, do jeito de sempre.
+Todo arquivo de um pacote passa por varredura de segurança antes de instalar, e não só
+o documento principal: o `SKILL.md` recebe a checagem de injeção de prompt de sempre, e
+cada script empacotado recebe a mesma varredura profunda aplicada ao código de um
+plugin.
 
-### Instalando uma de fora
+### Instalando uma skill de fora
 
-Dois caminhos, dependendo de onde ela vem. Um agente com a ferramenta
-`manage_skill` a usa para qualquer coisa que o marketplace consiga resolver: um
-nome no registro embutido ou em um tap, ou uma referência do
-[PepeHub](https://hub.pepe-agent.com) (`@handle/nome`, ou a URL da própria
-página). É a mesma instalação com registro que o `mix pepe skill install` faz,
-com confiança e proveniência rastreadas do mesmo jeito. Para uma fonte sem
-nenhuma entrada em registro (uma URL solta, um gist, um repositório avulso), a
-skill `install-skill` ensina o agente a buscá-la manualmente. Nos dois casos,
-texto de skill vindo de fora é entrada não confiável: o agente o escaneia com a
-ferramenta `scan_skill` antes de gravá-lo em disco. A varredura sinaliza
-injeção de prompt, exfiltração de segredos, comandos destrutivos, persistência
-e ofuscação: uma segunda checagem, não um substituto para ler o conteúdo, e
-nunca instala nada por conta própria.
+Existem dois caminhos possíveis, dependendo de onde ela vem. Um agente que tem a
+ferramenta `manage_skill` usa isso para tudo que o marketplace conseguir resolver: um
+nome no registro embutido, num tap, ou uma referência do
+[PepeHub](https://hub.pepe-agent.com) (`@handle/nome`, ou até a própria URL da
+página). É a mesma instalação com registro que `mix pepe skill install` faz, com
+confiança e proveniência rastreadas exatamente da mesma forma. Já para uma fonte sem
+nenhuma entrada em registro (uma URL avulsa, um gist, um repositório qualquer), é a
+skill `install-skill` que ensina o agente a buscá-la manualmente. Em qualquer um dos
+casos, texto de skill vindo de fora conta como entrada não confiável, então o agente
+passa esse conteúdo pela ferramenta `scan_skill` antes de gravá-lo em disco. Essa
+varredura sinaliza injeção de prompt, exfiltração de segredos, comandos destrutivos,
+persistência e ofuscação; é uma segunda checagem, não um substituto para você mesmo
+ler o conteúdo, e ela nunca instala nada por conta própria.
 
-## Instalando de um marketplace
+## Instalando a partir de um marketplace
 
-`manage_skill` (acima) é o caminho conversacional para qualquer coisa que os
-registros/PepeHub consigam resolver. `mix pepe skill` é o caminho do operador
-para os mesmos registros, com a mesma busca e história de atualização:
+`manage_skill`, já visto acima, é o caminho pela conversa para tudo que os registros
+ou o PepeHub conseguem resolver. `mix pepe skill` é o caminho equivalente pelo lado do
+operador, usando os mesmos registros, a mesma busca e a mesma lógica de atualização:
 
 ```bash
 pepe skill search release            # busca em cada tap mais o registro embutido
 pepe skill install cut-a-release     # instala pelo nome
 pepe skill install @jhonathas/google-workspace   # ou uma referência do PepeHub (veja abaixo)
 pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # ou diretamente
-pepe skill update cut-a-release      # busca de novo da fonte exata de onde foi instalada
+pepe skill update cut-a-release      # busca de novo, na fonte exata de onde foi instalada
 pepe skill tap add https://github.com/seu-time/pepe-skills   # adiciona um registro além do embutido
 ```
 
-Um nome no formato `@handle/nome` (ou a própria URL da página do pacote, copiada
-direto do [PepeHub](https://hub.pepe-agent.com)) resolve contra o PepeHub em
-si, o registro de plugins/skills do Pepe, em vez do registro embutido ou de um
-tap: verificado primeiro, já que nenhuma entrada embutida ou de tap usa esse
-formato. É instalada sob o slug puro do pacote (`google-workspace`, não
-`@jhonathas/google-workspace`), o nome que todo outro comando de skill e a
-ferramenta `skill` usam. Apontar `skill install` para um nome que na verdade é
-um plugin no PepeHub, não uma skill, falha com uma mensagem clara indicando
-usar `plugin install` em vez disso.
+Um nome no formato `@handle/nome` (ou até a própria URL da página do pacote, copiada
+direto do [PepeHub](https://hub.pepe-agent.com)) é resolvido contra o PepeHub em si,
+que é o registro de plugins e skills do próprio Pepe, em vez do registro embutido ou
+de um tap. Ele é checado primeiro, já que nenhuma entrada embutida ou de tap usa esse
+formato de nome. A instalação acontece sob o slug puro do pacote (`google-workspace`,
+e não `@jhonathas/google-workspace`), que é o nome usado depois por todo comando de
+skill e pela própria ferramenta `skill`. Se você apontar `skill install` para um nome
+que na verdade é um plugin no PepeHub, e não uma skill, a instalação falha com uma
+mensagem clara indicando para usar `plugin install` em vez disso.
 
-Toda instalação passa pela mesma varredura de segurança estática que
-`manage_skill`/`install-skill` usam; um veredito perigoso é recusado a menos
-que você passe `--force`. A confiança é `"official"` para o registro embutido
-no próprio repositório (curado por quem mantém o Pepe) e para um pacote do
-PepeHub que o próprio PepeHub marcou manualmente como oficial. Tudo o que é
-resolvido por um tap que você adicionou, um pacote do PepeHub sem essa marca,
-ou instalado com `--source`, é `"community"`: quando um agente lê pela
-ferramenta `skill`, o conteúdo vem embrulhado no mesmo marcador de conteúdo não
-confiável que uma página web buscada já carrega, até você mesmo ter revisado.
+Toda instalação passa pela mesma varredura de segurança estática usada por
+`manage_skill`/`install-skill`, e um veredito perigoso é recusado a menos que você
+force com `--force`. O nível de confiança é `"official"` tanto para o registro
+embutido no próprio repositório, curado pela equipe que mantém o Pepe, quanto para um
+pacote do PepeHub que o próprio PepeHub marcou manualmente como oficial. Já tudo que
+vem de um tap que você mesmo adicionou, de um pacote do PepeHub sem essa marca, ou
+instalado via `--source`, entra como `"community"`: quando um agente lê esse conteúdo
+pela ferramenta `skill`, ele chega embrulhado no mesmo marcador de conteúdo não
+confiável usado numa página web buscada, e assim permanece até você revisar por conta
+própria.
 
-`update` fica fixado na fonte exata de onde a skill foi instalada. Se o registro de um tap
-depois apontar aquele nome para uma fonte *diferente*, `update` se recusa em vez de seguir em
-silêncio. Uma skill com o mesmo nome vinda de outro lugar só pode substituir uma já instalada
-por um `install --force` explícito, nunca por uma atualização de rotina.
+O comando `update` fica preso à fonte exata de onde a skill foi instalada. Se o
+registro de um tap passar a apontar aquele mesmo nome para uma fonte *diferente*,
+`update` se recusa a seguir em vez de trocar de fonte em silêncio. Uma skill de mesmo
+nome vinda de outro lugar só consegue substituir a já instalada através de um
+`install --force` explícito, nunca por uma atualização de rotina.
 
 ## Skills, plugins e scripts
 
-Skills, plugins e scripts trabalham juntos, e é essa combinação que permite
-pedir a um agente, em linguagem natural, algo que ele ainda não sabe fazer.
+Skills, plugins e scripts trabalham em conjunto, e é essa combinação que permite pedir
+a um agente, em linguagem natural, algo que ele ainda não sabe fazer.
 
-Combinado com [plugins](../plugins/) e o `enable_tool`, dá para pedir pela
-conversa que o agente instale uma ferramenta que faça X. Ele lê a skill
-`install-tool`, escreve o plugin em `plugins/<nome>.exs`, habilita a ferramenta
-em si mesmo e passa a usá-la, sem reiniciar.
+Junte isso a [plugins](../plugins/) e ao `enable_tool`, e dá para simplesmente pedir
+pela conversa que o agente instale uma ferramenta capaz de fazer X. Ele lê a skill
+`install-tool`, escreve o plugin em `plugins/<nome>.exs`, habilita a ferramenta nele
+mesmo, e já passa a usá-la, sem precisar reiniciar nada.
 
-Para trabalho complexo ou de várias etapas, o agente não faz tudo na mão. A
-ferramenta `run_script` deixa que ele escreva um programa curto (Python, Node,
-Ruby, Bash ou Elixir, sendo que Elixir está sempre disponível) e o execute,
-recebendo de volta stdout, stderr e o código de saída para iterar sobre os
-erros. Os scripts que valem a pena são salvos em `scripts/` e reexecutados
-depois, passando ao `run_script` uma referência `file:`. Quando o agente
-descobre *como* fazer uma tarefa recorrente, ler um PDF ou processar uma
-planilha, ele escreve para si uma skill em `skills/<nome>.md`. A skill
-`write-a-script` ensina todo esse ciclo.
+Para trabalho complexo ou com várias etapas, o agente não insiste em fazer tudo na
+mão. A ferramenta `run_script` permite escrever um programa curto (Python, Node, Ruby,
+Bash ou Elixir, sendo que Elixir está sempre disponível) e rodá-lo, recebendo de volta
+stdout, stderr e o código de saída para conseguir iterar em cima dos erros. Um script
+que compensa manter é salvo em `scripts/` e reaproveitado depois, bastando passar ao
+`run_script` uma referência `file:`. E quando o agente descobre *como* resolver uma
+tarefa recorrente, seja ler um PDF ou processar uma planilha, ele mesmo escreve uma
+skill para si em `skills/<nome>.md`. É justamente esse ciclo completo que a skill
+`write-a-script` ensina.

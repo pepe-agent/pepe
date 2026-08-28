@@ -1,11 +1,16 @@
 ---
 title: Delegação (fan-out)
-description: A ferramenta delegate divide um trabalho amplo em workers paralelos descartáveis, cada um com a própria janela de contexto nova, então o todo demora o tempo da parte mais lenta, e não a soma.
+description: A tool delegate quebra um trabalho amplo em workers paralelos e descartáveis, cada um com sua própria janela de contexto nova, então o conjunto demora o tempo da parte mais lenta, não a soma de todas.
 ---
 
-"Compare estes oito concorrentes" não é uma tarefa, são oito, e fazer isso em uma única conversa custa o dobro. Demora oito vezes mais. E cada página buscada para o concorrente um continua ocupando a janela de contexto enquanto o modelo lê sobre o concorrente oito, então a janela enche de material que ninguém vai olhar de novo, e a resposta final piora junto.
+"Compare estes oito concorrentes" não é uma tarefa só, são oito, e resolver isso numa
+única conversa custa caro de dois jeitos: demora oito vezes mais, e cada página lida sobre
+o concorrente um segue ocupando a janela de contexto enquanto o modelo já está lendo sobre
+o concorrente oito. A janela enche de material que ninguém vai revisitar, e a resposta
+final piora à medida que isso acontece.
 
-A ferramenta `delegate` entrega as partes a workers descartáveis, todas de uma vez:
+A tool `delegate` resolve isso entregando as partes a workers descartáveis, todos de uma
+vez:
 
 ```
 você › compare as páginas de preços da stripe, da adyen e da mollie
@@ -17,25 +22,39 @@ agente › delegate(tasks: [
          ])
 ```
 
-Cada worker é uma execução nova, com a própria janela de contexto e o próprio trace. Ele lê o que precisa, responde à pergunta que recebeu e desaparece. O pai recebe três respostas e nunca vê as três transcrições, então o trabalho cabe numa janela em que antes não caberia. E, como os workers esperam a rede ao mesmo tempo, o conjunto demora o tempo do mais lento, não a soma.
+Cada worker roda numa execução própria, com sua janela de contexto e seu trace. Ele lê o
+que precisa, responde à pergunta que recebeu, e some. Quem chamou recebe três respostas e
+nunca vê as três transcrições completas, então o trabalho passa a caber numa janela onde
+antes não caberia. E como os workers ficam esperando a rede ao mesmo tempo, o conjunto
+inteiro demora só o tempo do mais lento entre eles, não a soma de todos.
 
-## Dando a ferramenta a um agente
+## Dando a tool a um agente
 
-Você concede o `delegate` do jeito de sempre, na lista de ferramentas:
+Concede-se o `delegate` do jeito de sempre, dentro da lista de tools:
 
 ```bash
 pepe agent add lead --model openrouter --tools fetch_url,read_file,delegate
 ```
 
-## Um worker pode ler; não pode agir
+## Um worker lê, mas não age
 
-Um worker herda apenas as ferramentas que não pedem permissão: `read_file`, `list_dir`, `fetch_url`, `web_search` e afins. Tudo o que escreve, executa, instala ou apaga é retirado antes de o worker começar, e um worker não pode delegar de novo.
+Um worker herda só as tools que não pedem permissão nenhuma: `read_file`, `list_dir`,
+`fetch_url`, `web_search` e afins. Tudo que escreve, executa, instala ou apaga é retirado
+antes mesmo de ele começar, e um worker não pode, por sua vez, delegar mais nada.
 
-Isso não é uma limitação esperando para ser removida. Três workers rodando ao mesmo tempo são três workers que iam querer fazer três perguntas a você ao mesmo tempo, e *posso rodar isto?* não é uma pergunta para se fazer em triplicata. Mais importante: o fan-out serve para **descobrir**, e descobrir é seguro de fazer em paralelo. **Agir** não é, e continua onde deve ficar, na única conversa que você está de fato acompanhando. Um worker que descobre que algo precisa ser feito diz isso, e o pai o faz, na barreira de permissão, na sua frente.
+Isso não é uma limitação de passagem, esperando para ser removida algum dia. Três workers
+rodando ao mesmo tempo seriam três workers querendo fazer três perguntas de permissão ao
+mesmo tempo, e *posso rodar isso?* não é pergunta para se repetir em triplicata. Mais que
+isso: o fan-out serve para **descobrir** coisas, e descobrir é seguro de fazer em
+paralelo. **Agir** já não é, e continua acontecendo onde deveria, dentro da única conversa
+que você realmente está acompanhando. Um worker que percebe que algo precisa ser feito
+avisa sobre isso, e quem faz de fato é o agente principal, passando pela barreira de
+permissão, na sua frente.
 
-A outra proteção é aritmética. Sem o "um worker não pode delegar", uma tarefa vira oito, vira sessenta e quatro, e a conta chega antes da resposta.
+Há também uma proteção puramente aritmética: sem a regra de "um worker não delega", uma
+tarefa vira oito, depois vira sessenta e quatro, e a conta chega antes da resposta.
 
-<div class="note"><strong>Um teto rígido de oito tarefas por chamada.</strong> O modelo é avisado do teto, então ele divide o trabalho em vez de ser surpreendido por ele.</div>
+<div class="note"><strong>Um teto fixo de oito tarefas por chamada.</strong> O modelo sabe desse limite de antemão, então ele mesmo divide o trabalho em vez de ser pego de surpresa por ele.</div>
 
 ## Delegando como outro agente
 
@@ -43,18 +62,34 @@ A outra proteção é aritmética. Sem o "um worker não pode delegar", uma tare
 delegate(tasks: [...], agent: "researcher")
 ```
 
-Isso roda os workers como um agente diferente, com a persona e as ferramentas desse agente, ainda sem nada que aja. Vale a mesma lista de permissão dirigida do `send_to_agent`: um agente só pode tomar emprestada a identidade de outro se já tinha permissão para mandar mensagem para ele. Uma autoridade para o ato, não uma segunda e mais fraca. As rotas estão explicadas na página [Agentes](../agents/).
+Assim, os workers rodam como um agente diferente, com a persona e as tools desse agente,
+ainda sem nada que permita agir. Vale a mesma lista de permissão dirigida do
+`send_to_agent`: um agente só pode assumir a identidade de outro se já tivesse autorização
+para mandar mensagem a ele. Uma única autoridade cobre o ato, não existe uma segunda porta
+mais fraca. As rotas estão explicadas na página [Agentes](../agents/).
 
-## Sem esperar a resposta
+## Sem esperar pela resposta
 
 ```
 delegate(tasks: [...], background: true)
 ```
 
-A mesma divisão de trabalho, mas sem esperar: a chamada volta na hora com uma confirmação, então o agente pode continuar trabalhando ou avisar que já está cuidando disso, e os resultados chegam depois como uma mensagem de acompanhamento normal na mesma conversa assim que todos os workers terminam. Vale a pena usar quando a divisão é realmente lenta (várias páginas para ler, um worker com raciocínio de verdade pela frente); esperar alguns segundos ainda é mais simples e não precisa de explicação para o usuário. Só funciona dentro de uma conversa de verdade: uma execução única não tem sessão para entregar os resultados depois.
+O mesmo fan-out, mas disparado sem espera: a chamada retorna na hora, com uma confirmação
+de recebimento, o agente segue trabalhando ou já avisa que está cuidando disso, e os
+resultados chegam depois como uma mensagem comum de acompanhamento, na mesma conversa,
+assim que todos os workers terminarem. Vale a pena usar quando o fan-out é realmente
+demorado (várias páginas para ler, um worker com raciocínio pesado pela frente). Esperar
+alguns segundos ainda é mais simples e dispensa qualquer explicação ao usuário. Isso só
+funciona dentro de uma conversa de verdade, uma execução one-shot não tem sessão para
+receber os resultados depois.
 
-## Quanto custa
+## O custo disso
 
-Cada worker é uma chamada de modelo de verdade, medida e cobrada como qualquer outra, no mesmo projeto. Oito workers são oito turnos. É essa a troca: você está comprando de volta tempo de relógio e espaço na janela de contexto, e pagando por isso em tokens. Para uma tarefa que não caberia em uma única janela, nem chega a ser uma troca.
+Cada worker é uma chamada de modelo de verdade, medida e cobrada como qualquer outra, no
+mesmo projeto. Oito workers equivalem a oito turnos. É essa a troca: você recupera tempo
+de relógio e espaço na janela de contexto, e paga por isso em tokens. Para uma tarefa que
+nunca caberia numa única janela, isso nem chega a ser uma troca de verdade.
 
-Cada worker ganha o próprio trace, então **Traces** no [painel](../dashboard/) mostra o que cada um realmente fez, não só o que o pai disse a respeito.
+Cada worker ganha seu próprio trace, então a aba **Traces** do [dashboard](../dashboard/)
+mostra o que cada um efetivamente fez, e não apenas o resumo que o agente principal deu
+sobre isso.

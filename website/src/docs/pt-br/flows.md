@@ -1,38 +1,38 @@
 ---
 title: Flows
-description: Quando um agente já fez o mesmo trabalho do mesmo jeito algumas vezes, transforme isso num script que repete exatamente os mesmos passos, sem nenhuma chamada ao modelo.
+description: Depois que um agente já resolveu o mesmo trabalho do mesmo jeito algumas vezes, transforme isso num script que reproduz exatamente aqueles passos, sem nenhuma chamada ao modelo.
 ---
 
 ## Por que isso existe
 
-Um agente decide tudo do zero, todo turno, mesmo numa tarefa que já fez exatamente da mesma forma três vezes seguidas. Vale a pena pagar por isso nas primeiras vezes, enquanto o agente está descobrindo o que fazer. Deixa de valer a pena assim que a sequência já é confiável: a chamada ao modelo vira puro custo nesse ponto, e é mais um lugar onde uma execução pode sair diferente da anterior sem motivo.
+Todo turno, o agente refaz cada decisão do zero, mesmo numa tarefa idêntica a outras três que ele já resolveu do mesmíssimo jeito antes. Vale a pena pagar esse preço nas primeiras vezes, enquanto ele ainda está descobrindo o que fazer. Deixa de valer a partir do momento em que a sequência já se mostrou confiável: nesse ponto, a chamada ao modelo é puro custo extra, e ainda por cima é mais um lugar onde a execução pode sair diferente da anterior sem nenhum motivo real.
 
-Um **flow** é um [trace](../traces/) comprovado (ou vários) promovido a um script fixo: as chamadas de ferramenta exatas, na ordem certa, com os argumentos exatos, executadas de novo sem nenhuma chamada ao modelo. Ele só repete o que já aconteceu, argumento por argumento: não gera código novo, e não tenta adivinhar quais partes de uma chamada são "a mesma" e quais variam.
+Um **flow** nasce de um ou mais [traces](../traces/) já comprovados, promovidos a um script fixo: as mesmas chamadas de ferramenta, na mesma ordem, com os mesmos argumentos, reproduzidas sem nenhuma chamada ao modelo. Ele repete exatamente o que já aconteceu, argumento por argumento. Não gera código novo, nem tenta adivinhar o que é "igual" e o que varia entre uma chamada e outra.
 
 ## Promovendo um flow
 
-Olhe algumas execuções recentes que fizeram a mesma coisa da mesma forma:
+Comece olhando para execuções recentes que resolveram a mesma coisa do mesmo jeito:
 
 ```bash
 pepe traces --project acme
 ```
 
-Escolha duas ou mais que fizeram as chamadas de ferramenta idênticas, na mesma ordem, com os mesmos argumentos, e promova:
+Escolha duas ou mais que tenham feito chamadas de ferramenta idênticas, na mesma ordem e com os mesmos argumentos, e promova-as:
 
 ```bash
 pepe flow promote weekly-digest --agent assistant --from 1784591017504516,1784591109332811
 ```
 
-O Pepe confere se cada trace que você indicou realmente fez a mesma sequência exata antes de salvar qualquer coisa. Se não baterem (um argumento diferente, uma ordem diferente, um passo a mais em uma delas), a promoção é recusada, com uma mensagem explicando o motivo, em vez de tentar adivinhar o que você quis dizer:
+Antes de salvar qualquer coisa, o Pepe confere se todos os traces indicados realmente fizeram a sequência exata. Se algo não bater (um argumento diferente, uma ordem diferente, um passo a mais em algum deles), a promoção é recusada e vem com uma mensagem explicando o motivo, em vez de tentar adivinhar o que você quis dizer:
 
 ```
 ✗ could not promote: those traces didn't make the exact same tool calls, in the same order,
   with the same arguments - flows only replay identical sequences
 ```
 
-Essa recusa é proposital. Inferir automaticamente "essa parte varia, essa não" a partir de alguns exemplos é a única parte dessa ideia que é genuinamente arriscada: errar nisso e um flow passa a fazer, em silêncio, algo que nenhum dos traces de origem jamais fez. Um flow continua sendo replay exato e só isso; escolher traces que realmente são idênticos é responsabilidade sua, a mesma revisão que uma pessoa faria antes de confiar um script para rodar sem supervisão.
+Essa recusa é proposital. Inferir sozinho, a partir de alguns exemplos, o que "varia" e o que "não varia" seria a parte genuinamente arriscada dessa ideia: erre nisso, e o flow passa a fazer, em silêncio, algo que nenhum dos traces de origem jamais fez. Por isso um flow só reproduz o que é idêntico; cabe a você escolher traces realmente iguais, a mesma checagem que qualquer pessoa faria antes de confiar um script para rodar sozinho, sem supervisão.
 
-A promoção também recusa um trace que não seja genuinamente "comprovado", mesmo que a sequência bata: um que contenha uma chamada que a própria barreira de permissão do agente negou, um passo que de fato falhou, ou argumentos longos demais para terem sido registrados por completo (`Pepe.Trace` corta os muito longos para armazenamento). Nada disso é uma chamada que você de fato viu dar certo. Ela também recusa traces que não foram todos feitos pelo agente para o qual você está promovendo, já que os caminhos relativos de um passo reproduzido se resolvem dentro do workspace daquele agente específico.
+A promoção também recusa um trace que não seja genuinamente "comprovado", ainda que a sequência bata: um que traga uma chamada barrada pela própria barreira de permissão do agente, um passo que de fato falhou, ou argumentos longos demais para terem sido registrados por completo (`Pepe.Trace` corta os que passam de um certo tamanho). Nenhum desses casos é uma chamada que você realmente viu dar certo. E recusa também traces que não foram todos gerados pelo agente para o qual você está promovendo, já que os caminhos relativos de um passo reproduzido são resolvidos dentro do workspace daquele agente específico.
 
 ## Gerenciando flows
 
@@ -43,18 +43,18 @@ pepe flow run assistant weekly-digest             # roda agora
 pepe flow remove assistant weekly-digest
 ```
 
-Promover de novo com o mesmo nome recusa a menos que você passe `--overwrite`, então uma promoção nova nunca substitui um flow existente em silêncio.
+Promover de novo com o mesmo nome é recusado a menos que você passe `--overwrite`: assim, uma nova promoção nunca substitui, em silêncio, um flow que já existia.
 
 ## Rodando numa agenda
 
-Um flow vira uma tarefa recorrente do mesmo jeito que um prompt vira, pelo cron, só que sem prompt e sem chamada ao modelo:
+Um flow vira uma tarefa recorrente do mesmo jeito que um prompt: pelo cron, só que sem prompt algum e sem chamada ao modelo:
 
 ```bash
 pepe flow schedule assistant weekly-digest --schedule "0 8 * * 1" --deliver "telegram:123456789"
 ```
 
-Isso cria uma tarefa agendada (veja [Tarefas agendadas](../scheduled/)) do tipo `"flow"` em vez de `"prompt"`. Tudo sobre como ela dispara, o que acontece se a execução anterior ainda estiver rodando, e onde o histórico de execuções fica é o mesmo de qualquer outra tarefa agendada.
+Isso cria uma tarefa agendada (veja [Tarefas agendadas](../scheduled/)) do tipo `"flow"`, em vez de `"prompt"`. No mais, tudo funciona como em qualquer outra tarefa agendada: como ela dispara, o que acontece se a execução anterior ainda estiver rodando, e onde fica o histórico.
 
-<div class="note"><strong>Ninguém está observando a execução de um flow.</strong> Um flow é disparado por um timer, não por uma conversa, então não há ninguém ali para aprovar um passo arriscado no momento. Um flow só executa um passo cuja ferramenta já está no <code>auto_approve</code> do próprio agente, a mesma regra que já governa qualquer outra superfície sem supervisão (um webhook, um token de API). Um passo que não está pré-aprovado, ou um passo que de fato falha ao ser reproduzido (um arquivo faltando, um soluço de rede, argumentos errados), interrompe o flow inteiro ali mesmo em vez de pulá-lo ou seguir em frente; o histórico da execução diz exatamente qual passo e por quê.</div>
+<div class="note"><strong>Ninguém acompanha a execução de um flow em tempo real.</strong> Um flow dispara por um timer, não por uma conversa, então não há ninguém ali para aprovar um passo arriscado na hora. Por isso ele só executa um passo cuja ferramenta já esteja no <code>auto_approve</code> do próprio agente, a mesma regra que já vale para qualquer outra superfície sem supervisão direta, como um webhook ou um token de API. Um passo sem aprovação prévia, ou um passo que realmente falha ao ser reproduzido (um arquivo que sumiu, uma falha de rede, argumentos errados), interrompe o flow inteiro ali mesmo, em vez de pular esse passo ou seguir em frente de qualquer jeito. O histórico da execução mostra exatamente qual passo foi e por quê.</div>
 
-Toda execução de flow ainda grava um [trace](../traces/) normal, então o histórico de um flow agendado é inspecionável do mesmo jeito que o de qualquer outra execução.
+Toda execução de flow também grava um [trace](../traces/) normal, então o histórico de um flow agendado pode ser inspecionado do mesmo jeito que o de qualquer outra execução.

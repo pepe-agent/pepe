@@ -1,77 +1,113 @@
 ---
 title: WebSocket
-description: Transmita eventos de agentes ao vivo por uma conexão WebSocket.
+description: Receba eventos de um agente em tempo real por uma conexão WebSocket.
 ---
 
 ## WebSocket: streaming ao vivo
 
-O WebSocket serve para construir interfaces interativas que mostram um agente trabalhando em tempo real. Ele transmite a resposta conforme ela é gerada, revela cada chamada de ferramenta e cada resultado de ferramenta conforme acontece, e consegue empurrar uma notificação de vigilância disparada de volta para a mesma conexão. Para streaming simples de servidor a servidor, o stream SSE da [API HTTP](../api/) costuma bastar, e é mais simples de consumir.
+O WebSocket é para quem está construindo uma interface interativa que
+mostra o agente trabalhando em tempo real: ele transmite a resposta
+conforme ela é gerada, revela cada chamada de ferramenta e cada resultado
+assim que acontecem, e ainda consegue empurrar de volta, pela mesma
+conexão, a notificação de uma vigia que acabou de disparar. Para um
+streaming mais simples, de servidor para servidor, o stream SSE da [API
+HTTP](../api/) já costuma bastar, e é bem mais direto de consumir.
 
-### Conectar
+### Conectando
 
-Conecte em `ws://HOST:PORT/socket/websocket` (use `wss://` sobre TLS). A autenticação espelha a API HTTP: quando tokens são exigidos, passe o token como parâmetro de consulta, porque os navegadores não conseguem definir cabeçalhos em um WebSocket:
+A conexão se faz em `ws://HOST:PORT/socket/websocket` (use `wss://` sobre
+TLS). A autenticação segue o mesmo padrão da API HTTP, só que passando o
+token como parâmetro de consulta em vez de cabeçalho, já que o navegador
+não tem como definir cabeçalhos num WebSocket:
 
 ```
 ws://localhost:4000/socket/websocket?token=pepe_your_token_here
 ```
 
-Se a sua API estiver aberta, remova o parâmetro `token`.
+Se a sua API estiver aberta, simplesmente não inclua o parâmetro `token`.
 
 ### O protocolo de frames
 
-O socket fala um protocolo simples de frames JSON. Cada mensagem, nas duas direções, é um array JSON de cinco elementos:
+O socket fala um protocolo simples de frames em JSON. Toda mensagem, indo
+ou vindo, é um array JSON com cinco elementos:
 
 ```
 [join_ref, ref, topic, event, payload]
 ```
 
-`join_ref` e `ref` são strings que você escolhe para correlacionar respostas com requisições. `topic` nomeia com o que você está conversando. O ciclo de vida é: entrar em um tópico, enviar prompts, opcionalmente reiniciar, e enviar um heartbeat a cada 30 segundos, mais ou menos, para manter a conexão viva.
+`join_ref` e `ref` são strings escolhidas por você para correlacionar
+requisições com suas respectivas respostas, e `topic` diz com quem você
+está falando. O ciclo de vida da conexão é simples: entrar num tópico,
+mandar prompts, opcionalmente reiniciar a conversa, e mandar um heartbeat a
+cada 30 segundos ou perto disso, para manter a conexão viva.
 
 ```json
-// 1. Join a topic. "agent:<name>", or "agent:default" for the default agent.
-//    The join payload may carry a stable session to keep the same
-//    notification channel across reconnects.
+// 1. Entra num tópico. "agent:<nome>", ou "agent:default" para o agente padrão.
+//    O payload de entrada pode carregar uma sessão estável, para manter o
+//    mesmo canal de notificações entre reconexões.
 ["1", "1", "agent:default", "phx_join", {}]
 
-// 2. Send a prompt. The reply streams back as separate frames.
+// 2. Manda um prompt. A resposta volta em streaming, como frames separados.
 ["1", "2", "agent:default", "prompt", { "text": "olá" }]
 
 // 3. Reinicia o histórico da conversa deste tópico.
 ["1", "3", "agent:default", "reset", {}]
 
-// 4. Heartbeat, every ~30s, so the connection is not dropped.
+// 4. Heartbeat, a cada ~30s, para a conexão não cair.
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Entrar em `agent:<name>` seleciona e autoriza aquele agente contra o escopo do seu token, exatamente como o campo `model` por HTTP. O escopo é aplicado no `join`, então um tópico que o seu token não permite é recusado ali mesmo. `agent:default` resolve para o agente padrão do escopo do seu token. Um nome simples é qualificado dentro do projeto do seu token, então um token com escopo `acme` que entra em `agent:sales` chega em `acme/sales`, e um token de projeto que tenta entrar no agente de outro projeto é recusado. Passe `{"session": "some-stable-id"}` no payload de entrada para manter o mesmo canal de vigilância/notificação entre reconexões; caso contrário, um id novo por conexão é usado. Passe também `{"lang": "pt-BR"}` e isso inclina a primeira resposta do agente para esse idioma (uma dica de sistema única, no primeiro turno da sessão). É assim que o atributo `data-lang` do [widget incorporável](../widget/) chega ao agente.
+Entrar em `agent:<nome>` seleciona e autoriza aquele agente específico
+dentro do escopo do seu token, do mesmo jeito que o campo `model` faz por
+HTTP. Essa checagem de escopo acontece no próprio `join`, então um tópico
+fora do alcance do seu token já é recusado ali mesmo, sem chegar a lugar
+nenhum. `agent:default` sempre resolve para o agente padrão do escopo do
+seu token, e um nome simples é automaticamente qualificado dentro do
+projeto desse token: um token com escopo `acme` que entra em `agent:sales`
+chega, na prática, em `acme/sales`, e um token de projeto que tenta entrar
+no agente de outro projeto é recusado. Passando `{"session":
+"some-stable-id"}` no payload de entrada, o mesmo canal de
+vigias/notificações é mantido entre reconexões; sem isso, um id novo é
+gerado a cada conexão. Passar `{"lang": "pt-BR"}` também tem efeito: isso
+inclina a primeiríssima resposta do agente para esse idioma, como uma dica
+de sistema única, só no primeiro turno da sessão. É exatamente assim que o
+atributo `data-lang` do [widget incorporável](../widget/) chega até o
+agente.
 
 ### Eventos
 
-Você **envia** dois eventos de entrada:
+Você **envia** dois eventos, de entrada:
 
-* `prompt` com `{ "text": "..." }`: envia uma mensagem e transmite a resposta.
+* `prompt` com `{ "text": "..." }`: manda uma mensagem e recebe a resposta
+  em streaming.
 * `reset` com `{}`: limpa o histórico da conversa.
 
-Você **recebe** estes eventos de saída, cada um chegando como um frame cujo payload é mostrado:
+E **recebe** estes eventos de saída, cada um chegando como um frame com o
+payload indicado:
 
 * `delta` `{ "text": "..." }`: um fragmento em streaming da resposta.
-* `tool_call` `{ "name": "...", "arguments": {...} }`: o agente está invocando uma ferramenta.
-* `tool_result` `{ "name": "...", "output": "..." }`: a saída daquela ferramenta.
-* `done` `{ "content": "..." }`: a resposta final; o turno está completo.
-* `session_ended` `{}`: o agente chamou `end_session`; a resposta de fechamento já
-  chegou pelo `done` acima, e o *próximo* prompt começa com contexto novo.
-* `watch` `{ "text": "..." }`: uma vigilância criada a partir desta conexão foi disparada.
-* `error` `{ "reason": "..." }`: algo deu errado neste turno.
+* `tool_call` `{ "name": "...", "arguments": {...} }`: o agente está
+  chamando uma ferramenta.
+* `tool_result` `{ "name": "...", "output": "..." }`: a saída daquela
+  ferramenta.
+* `done` `{ "content": "..." }`: a resposta final; o turno terminou.
+* `session_ended` `{}`: o agente chamou `end_session`; a resposta de
+  encerramento já chegou pelo `done` acima, e o *próximo* prompt começa com
+  um contexto todo novo.
+* `watch` `{ "text": "..." }`: uma vigia criada a partir dessa conexão
+  acabou de disparar.
+* `error` `{ "reason": "..." }`: algo deu errado nesse turno.
 
 ### JavaScript (o cliente phoenix)
 
-Em JavaScript a forma ergonômica de consumir isso é o pacote npm `phoenix`, que cuida dos frames, dos refs e dos heartbeats para você:
+Em JavaScript, o jeito mais prático de consumir tudo isso é o pacote npm
+`phoenix`, que já cuida sozinho de frames, refs e heartbeats:
 
 ```javascript
 import { Socket } from "phoenix";
 
 const socket = new Socket("ws://localhost:4000/socket", {
-  params: { token: "pepe_your_token_here" }, // omit if your API is open
+  params: { token: "pepe_your_token_here" }, // omita se sua API estiver aberta
 });
 socket.connect();
 
@@ -93,9 +129,13 @@ channel.on("error", ({ reason }) => console.error("[error]", reason));
 channel.push("prompt", { text: "Quais arquivos existem no diretório atual?" });
 ```
 
-### Frames crus (qualquer linguagem)
+### Frames crus (em qualquer linguagem)
 
-Sem o pacote `phoenix`, fale o protocolo de frames diretamente sobre qualquer cliente WebSocket. Este exemplo em Python entra, envia um prompt, imprime os deltas em streaming e para quando `done` chega. Repare no heartbeat que você deve enviar periodicamente em uma conexão de longa duração.
+Sem o pacote `phoenix`, dá para falar o protocolo de frames diretamente com
+qualquer cliente WebSocket. O exemplo em Python abaixo entra no tópico,
+manda um prompt, imprime os deltas conforme chegam em streaming e para
+assim que o `done` aparece. Repare no heartbeat que precisa ser mandado de
+tempos em tempos numa conexão de longa duração.
 
 ```python
 import json
@@ -105,10 +145,10 @@ ws = websocket.create_connection(
     "ws://localhost:4000/socket/websocket?token=pepe_your_token_here"
 )
 
-# Join the default agent's topic.
+# Entra no tópico do agente padrão.
 ws.send(json.dumps(["1", "1", "agent:default", "phx_join", {}]))
 
-# Send a prompt.
+# Manda um prompt.
 ws.send(json.dumps(["1", "2", "agent:default", "prompt", {"text": "olá"}]))
 
 while True:
@@ -127,4 +167,6 @@ while True:
 ws.close()
 ```
 
-Envie um frame de heartbeat, `[null, "h", "phoenix", "heartbeat", {}]`, mais ou menos a cada 30 segundos para manter aberta uma conexão de longa duração.
+Mande um frame de heartbeat, `[null, "h", "phoenix", "heartbeat", {}]`,
+mais ou menos a cada 30 segundos, para manter uma conexão de longa duração
+aberta.

@@ -1,44 +1,71 @@
 ---
 title: Painel
-description: Usa a interface web local para inspecionar e gerir agentes, modelos, canais e execuções.
+description: A interface web local para inspecionar e gerir agentes, modelos, canais e execuções.
 ---
 
-O painel é a interface web local iniciada por `pepe serve`. Usa-o para conversar com agentes, inspecionar traces, gerir ligações de modelo, configurar canais, rever tarefas agendadas e gerar tokens de API sem editar JSON à mão.
+O painel é a interface web local que o `pepe serve` arranca. Serve para conversar com
+agentes, inspecionar traces, gerir ligações de modelo, configurar canais, rever tarefas
+agendadas e gerar tokens de API sem teres de editar JSON à mão.
 
 ```bash
-pepe serve          # API, painel e gateways, tudo num só processo
+pepe serve          # API, painel e gateways, tudo no mesmo processo
 # depois abre http://localhost:4000
 ```
 
-A partir de um clone do código-fonte, gera os assets uma vez com `mix assets.build` antes de correr `mix pepe serve`.
+A partir de um checkout do código-fonte, gera os assets uma vez com `mix assets.build`
+antes de correres `mix pepe serve`.
 
 ## Sessões e conversa
 
-O painel abre com uma lista viva de sessões à esquerda e um painel de conversa com streaming à direita. Escolhe uma sessão para ler o histórico dela e falar com o agente dela, e a resposta chega token a token. O `New chat` inicia uma sessão nova, e cada sessão mostra o agente, o modelo e a contagem de turnos; uma sessão a correr um turno neste momento ganha um indicador em direto, com um botão `Stop` ali mesmo na lista para interromper uma que ficou presa, sem teres de a abrir primeiro.
+O painel abre já com uma lista de sessões ao vivo à esquerda, e um painel de conversa
+com streaming à direita. Escolhe uma sessão para ler o histórico e falar com o agente
+dela: a resposta vai chegando token a token. O botão "New chat" arranca uma sessão nova,
+e cada sessão mostra o seu agente, o seu modelo e quantos turnos já teve; uma que esteja a
+correr um turno neste preciso momento ganha um pequeno indicador ao vivo, com um botão
+"Stop" logo ali na lista para interromperes uma que tenha ficado presa sem precisares de
+a abrir primeiro.
 
-As sessões vivem dentro do processo em execução, por isso corre tudo a partir do único processo `pepe serve`. Assim o painel vê todas as sessões, incluindo as que chegaram pelo Telegram.
+As sessões vivem dentro do processo em execução, por isso corre tudo a partir do mesmo
+`pepe serve`; assim o painel vê todas as sessões, incluindo as que chegaram pelo
+Telegram.
 
-As ferramentas arriscadas também são autorizadas ali mesmo. A execução pára e mostra um pedido de permitir/recusar, que é a versão web dos botões que um utilizador do Telegram recebe, a menos que o agente já tenha essa ferramenta pré-aprovada. O agente proprietário omnipotente nunca pergunta. Vê [Segurança e ambiente isolado](../security/) para perceber como a barreira decide.
+As ferramentas arriscadas também se autorizam por aqui: a execução pára e mostra um
+pedido de permitir ou recusar, a versão web dos botões que um utilizador do Telegram já
+recebe, a menos que o agente já tenha essa ferramenta pré-aprovada. O agente
+proprietário, esse omnipotente, nunca pergunta nada. Como a barreira decide isto está em
+[Segurança e sandbox](../security/).
 
-## O que a barra lateral tem
+## O que a barra lateral traz
 
-A barra lateral espelha a CLI, por isso quase tudo o que fazes com o comando `pepe` também podes fazer aqui:
+A barra lateral espelha a CLI: praticamente tudo o que dá para fazer com o comando `pepe`
+também dá para fazer por aqui.
 
 - **Chat**: conversar com uma sessão.
-- **Projetos**: criar, editar e eliminar projetos e a margem de faturação de cada um. Vê [Projetos](../projects/).
-- **Agents**: criar, editar e eliminar agentes, com persona, modelo, ferramentas, rotas, âmbito de administração e qual deles é o predefinido.
-- **Models**: acrescentar, remover e editar ligações de modelo, definir um preço por modelo e escolher o predefinido.
-- **Usage and billing**: utilização de tokens e custo por ciclo, por projeto. Vê [Utilização e faturação](../billing/).
-- **Learning**: a linha temporal do TimeLearn. Vê [Aprendizagem](../learning/).
-- **Scheduled**: criar, executar e gerir tarefas agendadas. Vê [Tarefas agendadas](../scheduled/).
-- **Watches**: o "avisa-me quando X" de uma só vez. Vê [Watches](../watches/).
-- **Channels**: acrescentar, remover e editar bots do Telegram, aplicado em direto. Vê [Telegram](../telegram/).
-- **MCP**: servidores de ferramentas externas. Vê [Servidores MCP](../mcp/).
-- **Config file**: editar o `~/.pepe/config.json` ali mesmo, com validação ao guardar.
+- **Projetos**: criar, editar e apagar âmbitos de cliente e a respetiva margem de
+  faturação. Ver [Projetos](../projects/).
+- **Agents**: criar, editar e apagar agentes, incluindo a sua persona, modelo,
+  ferramentas, rotas, âmbito de administração, e qual deles é o predefinido.
+- **Models**: acrescentar, remover e editar ligações de modelo, definir um preço por
+  modelo, e escolher qual é a predefinida.
+- **Usage and billing**: utilização de tokens e custo por ciclo, por projeto. Ver
+  [Utilização e faturação](../billing/).
+- **Learning**: a linha temporal do TimeLearn. Ver [Aprendizagem](../learning/).
+- **Scheduled**: criar, correr e gerir tarefas agendadas. Ver [Tarefas
+  agendadas](../scheduled/).
+- **Watches**: o "avisa-me quando X" que dispara uma única vez. Ver
+  [Watches](../watches/).
+- **Channels**: acrescentar, remover e editar bots do Telegram, com efeito imediato. Ver
+  [Telegram](../telegram/).
+- **MCP**: os servidores de ferramentas externas. Ver [Servidores MCP](../mcp/).
+- **Config file**: editar o `~/.pepe/config.json` diretamente ali, com validação ao
+  gravar.
 
 ## Manter em execução
 
-O `pepe serve` corre em primeiro plano: fechar o terminal ou terminar sessão pára o processo, e o painel com ele. Para um deploy a sério, instala-o como serviço persistente em segundo plano: launchd no macOS, systemd `--user` no Linux. Sobrevive a logout/reboot e reinicia-se sozinho se cair.
+O `pepe serve` corre em primeiro plano: fechar o terminal, ou terminar sessão, pára o
+processo e o painel junto com ele. Para um deployment a sério, o certo é instalá-lo
+como serviço persistente em segundo plano, launchd no macOS, systemd `--user` no Linux.
+Assim sobrevive a um logout ou reinício, e volta a arrancar sozinho se cair.
 
 ```bash
 pepe serve install [--port 4000]
@@ -46,52 +73,83 @@ pepe serve status
 pepe serve uninstall
 ```
 
-Só funciona a partir do binário `pepe` instalado, não em `mix pepe serve install`. Se as tuas ligações de modelo referenciam segredos `${ENV_VAR}`, o `install` lista-os: o serviço arranca com um ambiente mínimo, por isso precisam de ser adicionados à mão no ficheiro gerado.
+Isto só funciona a partir do binário `pepe` já instalado, nunca com
+`mix pepe serve install`. Se alguma das tuas ligações de modelo referenciar segredos
+`${ENV_VAR}`, o `install` lista-os, porque o serviço arranca com um ambiente mínimo e
+essas variáveis têm de ser acrescentadas à mão no unit/plist gerado.
 
 ## Acesso ao painel
 
-O painel web fica aberto em localhost por predefinição, o que é cómodo para o desenvolvimento local. No momento em que o expões para além da tua máquina, coloca-o atrás de uma palavra-passe:
+Por predefinição, o painel está aberto em localhost, o que é prático para
+desenvolvimento local. No instante em que o expões para lá da tua própria máquina,
+coloca-o atrás de uma palavra-passe:
 
 ```bash
 pepe dashboard password '${PEPE_DASHBOARD_PASSWORD}'
 ```
 
-Podes passar uma palavra-passe literal ou uma referência `${ENV_VAR}` para que o segredo fique fora do ficheiro. Uma palavra-passe literal é sujeita a hash antes de ser gravada na configuração, pelo que nunca é legível a partir do ficheiro (ou de uma cópia de segurança dele) depois de definida. Uma referência `${ENV_VAR}` não tem nada para hashear, já que o segredo verdadeiro já vive fora do ficheiro. Uma vez definida a palavra-passe, o painel exige iniciar sessão em `/login`. Limpa-a com `pepe dashboard password --clear`.
+Dá para passar uma palavra-passe literal ou uma referência `${ENV_VAR}`, para o segredo
+ficar fora do ficheiro. Uma palavra-passe literal passa por hash antes de ser gravada na
+configuração, por isso deixa de ser legível a partir do ficheiro (ou de uma cópia de
+segurança dele) assim que é definida. Já uma referência `${ENV_VAR}` não tem nada para
+fazer hash, porque o segredo verdadeiro já vive fora do ficheiro à partida. Depois de
+definida a palavra-passe, o painel passa a exigir login em `/login`. Para a remover,
+usa `pepe dashboard password --clear`.
 
-Executa `pepe dashboard password` sem valor nenhum e é-te pedida interativamente, com a introdução escondida, útil para a palavra-passe nunca ficar no histórico da shell nem numa listagem de `ps`:
+Corre `pepe dashboard password` sem valor nenhum e é-te pedida de forma interativa, com o
+que escreves escondido no ecrã, útil para a palavra-passe nunca aparecer no histórico da
+shell nem numa listagem de `ps`:
 
 ```bash
 pepe dashboard password
 ```
 
-A palavra-passe é lida de `dashboard.password` na configuração (interpolada), com recurso a variável de ambiente `PEPE_DASHBOARD_PASSWORD`. Duas definições relacionadas reforçam um painel servido atrás de um domínio:
+A palavra-passe é lida de `dashboard.password` na configuração (já interpolada), com a
+variável de ambiente `PEPE_DASHBOARD_PASSWORD` como alternativa. Há duas definições
+relacionadas que reforçam um painel servido atrás de um domínio:
 
-- `pepe dashboard hosts app.example.com,dash.example.com` define os valores adicionais do cabeçalho `Host` que o painel aceita. Isto serve também de lista de permissões contra DNS rebinding.
-- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista os proxies inversos cujo cabeçalho `X-Forwarded-For` pode ser considerado fidedigno. Vazio por predefinição, o que significa que nenhum cabeçalho de encaminhamento é considerado fidedigno.
+- `pepe dashboard hosts app.example.com,dash.example.com` define os valores extra do
+  cabeçalho `Host` que o painel aceita, servindo ao mesmo tempo de lista branca contra
+  DNS rebinding.
+- `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista os proxies inversos cujo
+  cabeçalho `X-Forwarded-For` pode ser considerado de confiança. Por predefinição está
+  vazia, o que significa que nenhum cabeçalho de encaminhamento é confiado.
 
-Vinculado a uma interface pública sem palavra-passe, o painel fecha por predefinição e bloqueia os clientes remotos até definires uma.
+Se ficar acessível a partir de fora da tua máquina sem nenhuma palavra-passe definida, o
+painel bloqueia por predefinição todos os clientes remotos até definires uma: só a
+própria máquina consegue abri-lo, e uma VM, um proxy, ou a rede do escritório contam como
+"fora" (falha fechado, não aberto).
 
 ## Acesso remoto
 
-Para aceder ao painel ou à API a partir de fora da tua máquina sem abrir uma porta nem montar um proxy inverso, o `pepe serve` pode abrir um túnel da [Cloudflare](https://www.cloudflare.com/) (precisa do `cloudflared` instalado):
+Para chegar ao painel ou à API vindo de fora da tua máquina sem abrir uma porta nem
+montar um proxy inverso, o `pepe serve` consegue abrir um túnel da
+[Cloudflare](https://www.cloudflare.com/) (precisa do `cloudflared` instalado):
 
 ```bash
 pepe serve --tunnel
 ```
 
-É um **túnel rápido**: imprime um URL aleatório `https://<algo>.trycloudflare.com` que só dura enquanto o processo corre e muda de cada vez. Não é preciso conta na Cloudflare.
+Isto é um **túnel rápido**: mostra um URL aleatório `https://<algo>.trycloudflare.com`
+que só dura enquanto o processo estiver a correr, e muda sempre que arrancas de novo. Não
+precisa de conta na Cloudflare.
 
-Para um **URL fixo que tu escolhes** no teu próprio domínio, usa um túnel nomeado. Duas formas:
+Para um **URL estável, escolhido por ti**, no teu próprio domínio, usa antes um túnel
+nomeado. Há duas formas:
 
 ```bash
-# Sem navegador (ideal num servidor): cria o túnel e o hostname público no
-# painel do Cloudflare Zero Trust, aponta o serviço dele para http://localhost:4000,
-# copia o token do conector e depois:
+# Sem interface (ideal num servidor): cria o túnel e o seu hostname público no
+# dashboard do Cloudflare Zero Trust, aponta o serviço dele para http://localhost:4000,
+# copia o token do conector, e depois:
 pepe serve --tunnel --token '${CLOUDFLARE_TUNNEL_TOKEN}' --hostname pepe.example.com
 
-# Ou com um início de sessão único no navegador (guarda um cert.pem), sem token:
+# Ou com um login único pelo browser (fica guardado um cert.pem), sem token nenhum:
 cloudflared tunnel login
 pepe serve --tunnel --hostname pepe.example.com
 ```
 
-Com `--token`, o hostname e o mapeamento de serviço ficam no painel da Cloudflare; aí o `--hostname` é opcional, só para imprimir o URL no arranque. O token é um segredo, por isso passa-o como referência `${ENV_VAR}`. Um pedido pelo túnel é sempre tratado como público, por isso define uma palavra-passe do painel antes de depender de qualquer um destes modos.
+Com `--token`, o hostname e o mapeamento do serviço ficam definidos no dashboard da
+Cloudflare, e por isso o `--hostname` passa a ser opcional, servindo só para mostrar o
+URL no arranque. O token é um segredo, por isso passa-o sempre como referência
+`${ENV_VAR}`. Um pedido que passe pelo túnel é sempre tratado como público, por isso
+define uma palavra-passe do painel antes de confiares em qualquer uma destas opções.

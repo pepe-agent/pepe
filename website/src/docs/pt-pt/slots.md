@@ -1,49 +1,58 @@
 ---
 title: Slots
-description: Deixe um plugin instalado assumir um ponto de extensão exclusivo - como a pesquisa de memória ou a pesquisa web - em vez do predefinido, com recuperação automática se se comportar mal.
+description: Deixa um plugin instalado assumir um ponto de extensão exclusivo, como a pesquisa de memória ou a pesquisa web, no lugar do predefinido, com recuperação automática caso se comporte mal.
 ---
 
-Um **slot** é um ponto de extensão com exatamente um ocupante de cada vez - ao contrário de
-uma ferramenta ou canal de [plugin](/docs/plugins), onde vários coexistem. A pesquisa de
-memória é um slot: ou responde a pesquisa lexical incorporada, ou um plugin instalado que
-nomeou assume - nunca os dois, e nunca uma acumulação silenciosa de vários plugins a
-responder à mesma pergunta.
+Há trabalhos no Pepe que só podem ter um dono de cada vez: algo tem de ser *a* coisa
+que responde a uma pesquisa de memória, ou *o* sítio onde um comando de shell corre.
+Um **slot** é exatamente esse tipo de ponto de extensão, com um único ocupante de cada
+vez, ao contrário de uma ferramenta ou canal de [plugin](/docs/plugins), onde vários
+conseguem coexistir sem problema. A pesquisa de memória é um slot: ou responde a
+pesquisa nativa, ou assume um plugin instalado que tenhas nomeado para isso. Nunca os
+dois ao mesmo tempo, e nunca uma acumulação silenciosa de vários plugins a responder à
+mesma pergunta.
 
-O ocupante incorporado não é código especial; é apenas o predefinido quando nada está
-configurado. Trocar o ocupante de um slot é reconfiguração, nunca uma alteração de código -
-e se o ocupante configurado falhar, demorar demasiado, ou devolver algo malformado, o Pepe
-volta ao incorporado para essa chamada específica e regista-o. Um ocupante de plugin a
-comportar-se mal muda a qualidade da resposta; nunca quebra uma conversa.
+O ocupante nativo não tem código especial nenhum: é só o que fica ativo quando nada
+foi configurado. Trocar o ocupante de um slot é sempre uma mudança de configuração,
+jamais de código. E se o ocupante configurado falhar, demorar demais, ou devolver
+algo malformado, o Pepe recua para o nativo só naquela chamada e regista o que
+aconteceu: um ocupante de plugin mal comportado pode baixar a qualidade de uma
+resposta, mas nunca chega a partir uma conversa.
 
-## Os slots hoje
+## Os slots que existem hoje
 
-| Slot | Ocupante incorporado | O que responde |
+| Slot | Ocupante nativo | O que responde |
 |---|---|---|
 | `memory` | Pesquisa por substring, sem distinguir maiúsculas, em `MEMORY.md`/`USER.md`/`people.md` | A ferramenta `memory_search` |
 | `web_search` | A API Instant Answer do DuckDuckGo | A ferramenta `web_search` |
-| `sandbox` | Corre diretamente, ou através do script wrapper configurado (ver [Segurança](/docs/security)) | As ferramentas `bash`/`run_script` - *onde* um comando de shell corre de facto |
-| `model_select` | A chain estática de `Pepe.Config.model_chain_for_agent/1` | Que chain de modelo um turno usa |
-| `heartbeat_interval` | Permite sempre um pulso que já venceu | Se um pulso de heartbeat do Telegram que já venceu pode disparar |
+| `sandbox` | Corre diretamente, ou através do script de invólucro configurado (ver [Segurança](/docs/security)) | As ferramentas `bash`/`run_script`: *onde* um comando de shell corre de facto |
+| `model_select` | A cadeia estática de `Pepe.Config.model_chain_for_agent/1` | Que cadeia de modelo um turno usa |
+| `heartbeat_interval` | Deixa sempre passar um pulso já vencido | Se um pulso de heartbeat do Telegram já vencido tem luz verde para disparar |
 | `compaction` | Resume o meio de uma conversa longa com o próprio modelo | Como uma conversa longa é condensada para caber na janela de contexto |
-| `harness` | O próprio ciclo de conversa do agente (`Pepe.Agent.Runtime`) | O turno *inteiro* - não uma chamada, o ciclo de raciocínio completo |
+| `harness` | O próprio ciclo de conversa do agente (`Pepe.Agent.Runtime`) | O turno *inteiro*, não uma chamada isolada, o ciclo de raciocínio completo |
+
+Vale destacar um slot antes de fixares seja o que for nele: o `harness`. Um plugin
+fixado ali assume a condução da tarefa toda, e age com as próprias permissões da
+conversa, por isso só instala um vindo de uma fonte em que confies mesmo. Os detalhes
+ficam na secção Harness, mais abaixo.
 
 ## Gerir slots
 
 ```bash
 pepe slot list                 # cada slot, o seu ocupante atual e o seu predefinido
-pepe slot set memory NOME      # fixa um slot a um plugin instalado, pelo seu próprio nome
-pepe slot clear memory         # reverte para o incorporado
+pepe slot set memory NOME      # fixa um slot ao próprio nome de um plugin instalado
+pepe slot clear memory         # volta ao nativo
 ```
 
-`pepe slot list` assinala um ocupante configurado que não está a resolver-se de momento
-(removido, renomeado, ou que nunca chegou a reivindicar o slot) como "a usar o predefinido
-em vez disso" - o mesmo que o `pepe doctor` verifica, para que um slot preso a algo
-obsoleto não passe despercebido.
+O `pepe slot list` assinala como "a usar o predefinido" um ocupante configurado que já
+não consegue mesmo responder (foi removido, mudou de nome, ou nunca chegou a
+reivindicar o slot). O `pepe doctor` verifica exatamente a mesma coisa, para que uma
+definição de slot já obsoleta não passe despercebida.
 
-## Delimitar um slot a um agente ou projeto
+## Delimitar um slot a um agente ou a um projeto
 
-O `pepe slot set` acima fixa um slot para a instalação inteira - todo o agente recebe o
-mesmo ocupante. Um agente pode sobrepor isso para si próprio:
+O `pepe slot set` visto acima fixa um slot para a instalação inteira: todo o agente
+recebe o mesmo ocupante. Um agente consegue sobrepor isso só para si:
 
 ```bash
 pepe agent add support --slots memory:example_memory
@@ -59,8 +68,8 @@ ou diretamente no `config.json`:
 }
 ```
 
-Um projeto pode ter o seu próprio predefinido para todo o agente nele, no mesmo formato
-que o `default_hooks` já usa:
+Um projeto também pode definir o seu próprio predefinido para todos os agentes que
+tem, no mesmo formato que o `default_hooks` já usa:
 
 ```json
 {
@@ -70,16 +79,16 @@ que o `default_hooks` já usa:
 }
 ```
 
-A resolução é: sobreposição do agente → predefinido do projeto → configuração da
-instalação inteira → o incorporado. Um agente dentro de um projeto pode correr um backend
-de memória diferente de todo o outro agente e projeto, sem uma mudança global que mais
-ninguém pediu.
+A ordem de resolução é: sobreposição do agente → predefinido do projeto →
+configuração de toda a instalação → o nativo. Um agente dentro de um projeto consegue
+assim correr um backend de memória diferente de qualquer outro agente ou projeto, sem
+forçar uma mudança global que mais ninguém pediu.
 
 ## Escrever um plugin de slot
 
-Um plugin reivindica um slot exportando o conjunto de funções do slot **mais** `slot/0`,
-devolvendo o nome exato do slot - esse é o desambiguador, tal como o `name/0` de uma
-ferramenta evita que seja confundida com outra.
+Um plugin reivindica um slot exportando o conjunto de funções desse slot **mais** um
+`slot/0`, que devolve o nome exato do slot; é esse o desambiguador, tal como o
+`name/0` de uma ferramenta evita que ela seja confundida com outra.
 
 ### Memória
 
@@ -91,10 +100,10 @@ ferramenta evita que seja confundida com outra.
             {:error, term()}
 ```
 
-`opts` pode transportar `:limit` e uma dica `:mode` (`:keyword | :vector | :hybrid`) - o
-incorporado ignora `:mode`; um backend mais rico (um vector store) é livre de a usar.
-`index/1` é opcional, para um backend que mantém o próprio armazenamento e precisa de o
-reconstruir.
+`opts` pode trazer `:limit` e uma dica `:mode` (`:keyword | :vector | :hybrid`); o
+nativo ignora `:mode`, mas um backend mais elaborado (um armazém vetorial) fica livre
+para a usar. O `index/1` é opcional, pensado para um backend que mantém o seu próprio
+armazenamento e precisa de o reconstruir.
 
 ### Pesquisa web
 
@@ -115,12 +124,13 @@ reconstruir.
             {:ok, {output :: String.t(), exit_status :: non_neg_integer()}} | {:error, term()}
 ```
 
-`opts` já chega com o `:env` limpo de todo segredo que o Pepe guarda quando isto corre
-(vê em [Segurança](/docs/security) "o shell do agente não herda os segredos do Pepe") -
-válido para qualquer ocupante que responda. Este é o único slot onde o próprio
-`timeout_ms` por chamada do `bash` (não o teto generoso de 5 minutos do slot) é o prazo
-real para o incorporado; um ocupante de plugin deve continuar a responder depressa, já
-que o teto do slot é uma rede de segurança, não um orçamento para gastar.
+O `opts` já chega aqui com o `:env` limpo de todo o segredo que o Pepe guarda (vê em
+[Segurança](/docs/security) a parte sobre "a shell do agente não herda os segredos do
+Pepe"); isto vale seja qual for o ocupante que responder. Este é o único slot em que o
+próprio `timeout_ms` por chamada do `bash` (e não o teto generoso de 5 minutos do
+slot) é o prazo real para o nativo; um ocupante de plugin deve continuar a responder
+depressa mesmo assim, já que o teto do slot é uma rede de segurança, não um orçamento
+para gastar até ao fim.
 
 ### Seleção de modelo
 
@@ -130,16 +140,18 @@ que o teto do slot é uma rede de segurança, não um orçamento para gastar.
 @callback chain_for(agent :: map()) :: {:ok, [Pepe.Config.Model.t()]} | {:error, term()}
 ```
 
-Chamado uma vez por turno (`Pepe.Agent.Runtime.do_run/3`), antes de a chain de modelo ser
-percorrida - nunca por tool call. Devolver `[]` é uma resposta válida ("nenhum modelo
-configurado"), não malformada. Um `:model` explícito passado pelo chamador (um teste
-fixado, um harness) ignora este slot por completo - significa exatamente aquele modelo, não
-o que uma política de ocupante aplicaria.
+É chamado uma vez por turno (`Pepe.Agent.Runtime.do_run/3`), antes de a cadeia de
+modelo ser percorrida, nunca por cada chamada de ferramenta. Devolver `[]` é uma
+resposta válida ("nenhum modelo configurado"), não um erro. Um `:model` explícito
+passado por quem chamou (um teste fixado, um harness) ignora este slot por completo:
+significa exatamente aquele modelo, e não o que uma política de ocupante decidiria
+aplicar.
 
 Um uso natural: trocar para um modelo mais barato quando a despesa de um projeto se
-aproxima do teto. `Pepe.Usage.tier/1` devolve `:normal | :low_compute | :critical | :dead`
-a partir da mesma proporção que o próprio teto de despesa usa (ver [Utilização e faturação](/docs/billing)),
-para que um ocupante não precise de recalcular isso.
+aproxima do teto. O `Pepe.Usage.tier/1` devolve `:normal | :low_compute | :critical |
+:dead` a partir da mesma proporção que o próprio teto de despesa usa (vê [Utilização e
+faturação](/docs/billing)), poupando o ocupante de ter de recalcular isso por conta
+própria.
 
 ### Ritmo do heartbeat
 
@@ -149,11 +161,12 @@ para que um ocupante não precise de recalcular isso.
 @callback allowed?(project :: String.t() | nil) :: {:ok, boolean()} | {:error, term()}
 ```
 
-Mais um veto em cima do próprio calendário estático de `heartbeat_minutes`/horário de um
-bot do Telegram, que este slot nunca toca: chamado só depois de esse calendário já ter dito
-que um pulso venceu, mesmo antes de disparar de facto. O incorporado permite sempre. Um
-plugin aqui pode saltar um pulso que já venceu - `Pepe.Usage.tier/1` é o sinal óbvio, por
-exemplo saltar enquanto um projeto está em `:critical` ou `:dead`.
+Funciona como mais um veto por cima do calendário estático de `heartbeat_minutes`/hora
+de um bot do Telegram, que este slot nunca chega a tocar: só é chamado depois de esse
+calendário já ter decidido que um pulso venceu, mesmo antes de ele disparar de facto.
+O nativo deixa sempre passar. Um plugin aqui consegue saltar um pulso que já venceu, e
+o `Pepe.Usage.tier/1` é o sinal óbvio para isso, por exemplo saltando enquanto um
+projeto está em `:critical` ou `:dead`.
 
 ### Compactação
 
@@ -165,18 +178,19 @@ exemplo saltar enquanto um projeto está em `:critical` ou `:dead`.
 ```
 
 Um plugin aqui decide como uma conversa longa é condensada para caber na janela de
-contexto do modelo - uma estratégia de sumarização diferente, uma heurística sem LLM, o
-que quiser. Deve devolver sempre `{:ok, messages}`, mesmo quando decide não condensar
-nada (o incorporado nunca falha de forma definitiva; uma falha ou demora excessiva
-continua a degradar-se para o incorporado nessa chamada).
+contexto do modelo, seja uma estratégia de resumo diferente, uma heurística sem LLM
+nenhum, o que fizer sentido. Deve devolver sempre `{:ok, messages}`, até quando decide
+não condensar nada (o nativo nunca falha de vez; uma falha ou demora excessiva continua
+a recuar para o nativo nessa chamada específica).
 
 **Construir um, passo a passo:**
 
 1. Escreve um módulo que implemente `name/0`, `slot/0` (devolvendo `"compaction"`), e
-   `compact/4`. Abaixo está uma estratégia simples sem LLM: quando a conversa ultrapassa
-   uma determinada contagem de mensagens, descarta tudo exceto o prompt de sistema e as
-   trocas mais recentes, com um marcador de uma linha em vez de um resumo a sério - mais
-   barato e instantâneo, ao custo de esquecer mesmo o meio em vez de o condensar.
+   `compact/4`. O exemplo abaixo é uma estratégia simples, sem LLM: assim que a
+   conversa ultrapassa uma certa contagem de mensagens, descarta tudo menos o prompt
+   de sistema e as trocas mais recentes, deixando um marcador de uma linha em vez de
+   um resumo a sério. Sai mais barato e é instantâneo, ao custo de esquecer mesmo o
+   meio da conversa em vez de o condensar.
 
    ```elixir
    defmodule TailOnlyCompaction do
@@ -202,16 +216,16 @@ continua a degradar-se para o incorporado nessa chamada).
 
 2. Guarda-o como `~/.pepe/plugins/tail_only_compaction.exs` (ou instala-o de onde
    estiver: `pepe plugin install ./tail_only_compaction.exs`).
-3. Aponta o slot `compaction` para ele - para toda a instalação, ou só para um
-   agente/projeto:
+3. Aponta o slot `compaction` para ele, para toda a instalação, ou só para um
+   agente ou projeto:
 
    ```bash
    pepe slot set compaction tail_only_compaction   # todo agente
    pepe agent add support --slots compaction:tail_only_compaction  # só este
    ```
 
-4. Confirma que está ativo: `pepe slot list` mostra o ocupante; uma falha ou demora
-   excessiva volta ao incorporado para essa chamada, e isso também fica visível ali.
+4. Confirma que ficou ativo: o `pepe slot list` mostra o ocupante; uma falha ou demora
+   excessiva recua para o nativo nessa chamada, e isso também fica visível ali.
 
 ### Harness
 
@@ -222,28 +236,29 @@ continua a degradar-se para o incorporado nessa chamada).
             {:ok, final_content :: String.t(), all_messages :: [map()]} | {:error, term()}
 ```
 
-Este é o único slot que não recebe o isolamento que todos os outros têm: um ocupante de
-harness corre no próprio processo do turno, não numa `Task` supervisionada, porque
-precisa de chamar de volta o gate de permissões do Pepe e a execução de ferramentas
-exatamente como o ciclo incorporado faz - esses leem o estado do turno (se a execução já
-recebeu conteúdo externo, o que já foi aprovado) a partir desse processo, algo que uma
-`Task` isolada deliberadamente não consegue ver. Fixar um plugin aqui entrega-lhe o turno
-*inteiro*: o gate de permissões, o loop-guard e a compactação de contexto são toda a
-maquinaria do próprio ciclo incorporado, e nada disso se aplica automaticamente a um
-turno que um plugin de harness esteja a conduzir - um bem-comportado invoca ele próprio
-`opts[:on_event]` para que uma superfície de chat em direto continue a fazer streaming, e
-pode invocar `Pepe.Trace.event/1`/`Pepe.Agent.RunObservers.notify/1` para fidelidade
-completa de trace/observador se quiser. Um harness que falhe ou exceda o tempo limite
-devolve um erro em vez de voltar a correr o turno silenciosamente no ciclo incorporado -
-um harness que já tenha tomado uma ação real (enviado uma resposta, corrido uma
-ferramenta) pelos seus próprios meios não deve arriscar fazê-lo duas vezes.
+Este é o único slot que fica sem o isolamento que todos os outros têm: um ocupante de
+harness corre no próprio processo do turno, e não numa `Task` supervisionada, porque
+precisa de chamar de volta o gate de permissões do Pepe e a execução de ferramentas,
+exatamente como o ciclo nativo faz. Esses mecanismos leem o estado do turno (se a
+execução já recebeu conteúdo externo, o que já foi aprovado) a partir desse mesmo
+processo, algo que uma `Task` isolada, de propósito, não consegue ver. Fixar um
+plugin aqui entrega-lhe o turno *inteiro*: o gate de permissões, o loop-guard e a
+compactação de contexto são toda a maquinaria do próprio ciclo nativo, e nada disso se
+aplica sozinho a um turno que um plugin de harness esteja a conduzir. Um harness
+bem-comportado chama ele próprio o `opts[:on_event]`, para que uma superfície de chat
+ao vivo continue a fazer streaming, e pode chamar
+`Pepe.Trace.event/1`/`Pepe.Agent.RunObservers.notify/1` para ter fidelidade completa
+de trace e de observador, se quiser. Um harness que falhe ou exceda o tempo devolve um
+erro em vez de voltar a correr o turno silenciosamente no ciclo nativo: um harness que
+já tenha tomado uma ação real (enviado uma resposta, corrido uma ferramenta) pelos
+seus próprios meios não deve arriscar repeti-la.
 
 **Construir um, passo a passo:**
 
 1. Escreve um módulo que implemente `name/0`, `slot/0` (devolvendo `"harness"`), e
-   `run/3`. O exemplo abaixo invoca um comando externo e devolve a sua saída como a
-   resposta inteira - o harness real mais pequeno possível, representando "delegar
-   para uma CLI de agente diferente":
+   `run/3`. O exemplo abaixo chama um comando externo e devolve a sua saída como a
+   resposta inteira, o harness real mais pequeno possível, e serve de suporte para a
+   ideia de "delegar a uma CLI de agente diferente":
 
    ```elixir
    defmodule ExternalCliHarness do
@@ -272,16 +287,16 @@ ferramenta) pelos seus próprios meios não deve arriscar fazê-lo duas vezes.
    end
    ```
 
-   Invocar `opts[:on_event]` com `{:assistant_delta, content}` é o que faz uma
-   superfície em direto (a CLI, o chat do painel) mostrar de facto a resposta à
-   medida que chega - vê a nota do moduledoc acima. Omite-o e a resposta continua a
-   ser devolvida corretamente, só não é apresentada em direto numa superfície com
+   Chamar `opts[:on_event]` com `{:assistant_delta, content}` é o que faz uma
+   superfície ao vivo (a CLI, o chat do painel) mostrar a resposta de facto à medida
+   que ela chega, vê a nota do moduledoc acima. Se saltares esse passo, a resposta
+   continua a ser devolvida corretamente, só não aparece em direto numa superfície com
    streaming.
 
 2. Guarda-o como `~/.pepe/plugins/external_cli_harness.exs` e instala-o:
    `pepe plugin install ~/.pepe/plugins/external_cli_harness.exs`.
-3. Fixa o slot `harness` a ele - é uma decisão maior do que a maioria dos slots, já
-   que entrega ao plugin o turno inteiro (vê acima), por isso delimitá-lo a um agente
+3. Fixa o slot `harness` a ele. É uma decisão maior do que a maioria dos slots, já
+   que entrega ao plugin o turno inteiro (vê acima), por isso limitá-lo a um agente
    enquanto testas costuma ser o primeiro passo certo:
 
    ```bash
@@ -289,10 +304,11 @@ ferramenta) pelos seus próprios meios não deve arriscar fazê-lo duas vezes.
    pepe slot set harness external_cli_harness                      # todo agente
    ```
 
-4. Experimenta: `pepe run cli-backed "hello"` nunca chega sequer ao modelo - a
-   resposta vem diretamente de `external_cli_harness`.
+4. Experimenta: `pepe run cli-backed "hello"` nunca chega sequer ao modelo, a resposta
+   vem diretamente do `external_cli_harness`.
 
-Um exemplo mínimo, guardado como `~/.pepe/plugins/example_memory.exs`:
+Um exemplo mínimo de plugin de slot, guardado como
+`~/.pepe/plugins/example_memory.exs`:
 
 ```elixir
 defmodule ExampleMemory do
@@ -310,31 +326,32 @@ pepe plugin install ~/.pepe/plugins/example_memory.exs
 pepe slot set memory example_memory
 ```
 
-A própria marcação de conteúdo não confiável da ferramenta `web_search` (veja
-[Segurança](/docs/security)) fica na ferramenta, independentemente do backend que ocupe o
-slot - um backend de slot devolve resultados estruturados simples, não texto; a fronteira
-de confiança é traçada uma única vez, no núcleo.
+O próprio envolvimento de conteúdo não fiável que a ferramenta `web_search` já faz
+(vê [Segurança](/docs/security)) continua a residir na ferramenta, seja qual for o
+backend a ocupar o slot: um backend de slot devolve resultados estruturados simples,
+não texto; a fronteira de confiança fica traçada uma única vez, no núcleo.
 
 ## O que não é um slot
 
-Dois outros pontos de extensão parecem-se, mas são aditivos, não exclusivos, porque mais
-de um ocupante precisa mesmo de coexistir:
+Há outros dois pontos de extensão parecidos, mas que são aditivos, e não exclusivos,
+porque ali faz mesmo sentido ter mais do que um ocupante ao mesmo tempo:
 
-- **Um adaptador de protocolo de modelo** (um plugin que implementa `Pepe.LLM.Adapter` para
-  um fornecedor cujo protocolo de chat não é compatível com OpenAI - o mesmo papel que os
-  adaptadores incorporados Responses/Messages já desempenham) regista-se sob o seu próprio
-  valor de `api`; vários protocolos funcionam ao mesmo tempo, um por ligação de modelo. Um
-  plugin nunca consegue substituir `"openai-responses"` nem `"anthropic-messages"`.
+- **Um adaptador de protocolo de modelo** (um plugin que implementa `Pepe.LLM.Adapter`
+  para um fornecedor cujo protocolo de chat não é compatível com o da OpenAI, o mesmo
+  papel que já cumprem os adaptadores nativos Responses/Messages) regista-se sob o seu
+  próprio valor de `api`; vários protocolos funcionam ao mesmo tempo, um por cada
+  ligação de modelo. Um plugin nunca consegue substituir `"openai-responses"` nem
+  `"anthropic-messages"`.
 - **Um canal de chat de ligação persistente** (um plugin que implementa
-  `Pepe.Gateways.Channel` - para uma plataforma como Discord ou Matrix que precisa de um
-  websocket de longa duração, não apenas um webhook de entrada) funciona a par de qualquer
-  outro canal, incluindo o Telegram, no seu próprio domínio de falhas supervisionado, para
-  que um que se comporte mal não consiga arrastar os outros consigo. Veja
-  [Plugins](/docs/plugins) para o formato baseado em webhook `Pepe.Webhooks.Provider`, ao
-  qual a maioria dos plugins de canal deve recorrer primeiro - um canal persistente é para
-  as plataformas que um webhook genuinamente não consegue cobrir.
+  `Pepe.Gateways.Channel`, pensado para uma plataforma como Discord ou Matrix que
+  precisa de um websocket de longa duração, e não só de um webhook de entrada) corre a
+  par de qualquer outro canal, incluindo o Telegram, no seu próprio domínio de falhas
+  supervisionado, para que um que se comporte mal não arraste os outros consigo. Vê
+  [Plugins](/docs/plugins) para o formato baseado em webhook `Pepe.Webhooks.Provider`,
+  que a maioria dos plugins de canal deve preferir à partida; um canal persistente é
+  para as plataformas que um webhook genuinamente não consegue cobrir.
 - **Um fornecedor de áudio em tempo real** (`Pepe.Realtime.Provider`) e **a rota HTTP
-  própria de um plugin** (`Pepe.PluginRoute`) são também ambos aditivos, e ambos cobertos em
-  [Plugins](/docs/plugins) - vários de qualquer um podem estar instalados ao mesmo tempo, e
-  um cliente (ou o operador, no caso de uma rota) escolhe qual pelo nome, ao contrário do
-  ocupante único de um slot.
+  própria de um plugin** (`Pepe.PluginRoute`) também são ambos aditivos, e ambos ficam
+  cobertos em [Plugins](/docs/plugins): dá para instalar vários de qualquer um ao
+  mesmo tempo, e é um cliente (ou o operador, no caso de uma rota) quem escolhe qual,
+  pelo nome, ao contrário do ocupante único de um slot.

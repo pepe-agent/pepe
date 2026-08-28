@@ -38,9 +38,9 @@ Os canais distinguem-se apenas na forma como uma mensagem chega ao Pepe:
   associa-o a um agente, executa o gateway.
 - **Canais por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google Chat
   e uma rota de entrada genérica) recebem mensagens que a plataforma entrega
-  num endereço no teu servidor, por isso o Pepe precisa de estar acessível pela
-  internet. O Pepe expõe um URL por ligação. Regista-o uma única vez junto do
-  fornecedor.
+  num endereço no teu servidor, por isso o Pepe precisa de estar acessível a
+  partir da internet. O Pepe expõe um URL por ligação. Regista-o uma única vez
+  junto do fornecedor.
 
 Todos os canais por webhook, qualquer que seja a plataforma, são servidos pelo
 mesmo endpoint de entrada:
@@ -153,7 +153,7 @@ válido por ti.
 
 Um agente pode entregar um ficheiro a quem está a conversar. Produz o ficheiro da
 forma que preferir (por exemplo um passo `bash` que consulta uma base de dados e
-escreve um `.xlsx`), e depois invoca a ferramenta `send_file` com o caminho:
+escreve um `.xlsx`), e depois chama a ferramenta `send_file` com o caminho:
 
 ```json
 {
@@ -176,7 +176,7 @@ com a ferramenta `send_file` fá-lo no momento em que pedes. Dirias:
 
 > Vai buscar os registos da semana passada e envia-me a folha de cálculo.
 
-O agente executa o passo que constrói o ficheiro, e depois invoca `send_file` com
+O agente executa o passo que constrói o ficheiro, e depois chama `send_file` com
 o caminho resultante. Não há uma barreira de confirmação separada no `send_file`;
 ele só entrega ao próprio canal da conversa atual, resolvido a partir da sessão,
 por isso não consegue divulgar um ficheiro a mais ninguém.
@@ -189,7 +189,7 @@ ferramenta `end_session` fá-lo pela conversa:
 
 > Obrigado, era tudo.
 
-O agente envia primeiro a resposta final, e depois invoca `end_session`, que limpa
+O agente envia primeiro a resposta final, e depois chama `end_session`, que limpa
 o contexto do fio ao vivo. O conhecimento aprendido fica intacto. Apenas a conversa
 atual é reiniciada. Isto é útil num canal em modo `support` onde cada troca deve
 ser independente.
@@ -204,7 +204,7 @@ permissão: confirma a alteração antes de ela ter efeito. Dirias:
 
 > Deixa o agente de triagem passar para o agente de faturação.
 
-O agente invoca `set_route` com `to: "billing"` (e `from` assume por predefinição
+O agente chama `set_route` com `to: "billing"` (e `from` assume por predefinição
 aquele com quem está a falar), ou `action: "deny"` para remover uma rota. Na linha
 de comandos, o mesmo é `pepe agent route triage billing`.
 

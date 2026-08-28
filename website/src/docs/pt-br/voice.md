@@ -1,45 +1,52 @@
 ---
 title: Mensagens de voz
-description: Um áudio chega como texto. A transcrição acontece na entrada, antes de o agente rodar.
+description: Um áudio chega como texto para o agente. A transcrição acontece na entrada, antes de qualquer execução começar.
 ---
 
 ## Mensagens de voz
 
-Mande um áudio para o seu bot do Telegram e o agente recebe **texto**. O áudio é
-transcrito na chegada, antes de existir uma sessão e antes de qualquer decisão de
-roteamento, então o que chega ao agente é uma mensagem comum.
+Manda um áudio para o seu bot do Telegram, e o que o agente recebe é
+**texto**. A transcrição acontece na chegada, antes mesmo de existir uma
+sessão e antes de qualquer decisão de roteamento, então o agente sempre vê
+uma mensagem comum, como qualquer outra.
 
-Nem sempre foi assim. O gateway salvava o arquivo no workspace do agente e entregava o
-caminho, deixando o agente descobrir sozinho como escutar: achar um transcritor, instalar,
-rodar, ler a saída. Cada áudio virava um pequeno projeto de pesquisa. Era lento, saía
-diferente a cada vez, e gastava uma barreira de permissão só para ler a mensagem que
-acabara de chegar.
+Nem sempre foi assim. Antes, o gateway apenas salvava o arquivo no
+workspace do agente e passava o caminho adiante, deixando por conta dele
+descobrir como "escutar" aquilo: achar um transcritor, instalar, rodar, ler
+a saída. Cada áudio recebido virava um pequeno projeto de pesquisa, lento,
+inconsistente de uma vez para outra, e que ainda gastava uma barreira de
+permissão só para ler uma mensagem que tinha acabado de chegar.
 
-### Nada para configurar
+### Não há nada para configurar
 
-Se você já tem uma conexão de modelo com a OpenAI ou com a Groq, a transcrição já
-funciona. O Pepe reaproveita essa credencial e pede ao provedor o modelo de transcrição
-dele (`whisper-1` na OpenAI, `whisper-large-v3-turbo` na Groq) em vez do modelo de chat com
-que a conexão foi configurada. Mande um áudio e ele é respondido. Não há nada a ajustar.
+Se você já tem uma conexão de modelo com a OpenAI ou com a Groq, a
+transcrição simplesmente já funciona: o Pepe reaproveita essa mesma
+credencial e pede ao provedor o modelo de transcrição dele (`whisper-1` na
+OpenAI, `whisper-large-v3-turbo` na Groq), em vez do modelo de chat com o
+qual a conexão foi configurada. Basta mandar o áudio que ele já vem
+respondido, sem nenhum ajuste prévio.
 
 ### Como a rota é escolhida
 
-O Pepe tenta estas rotas nesta ordem, e qualquer uma delas pode estar ausente:
+O Pepe segue esta ordem de tentativas, e é normal faltar algum dos passos:
 
-1. **`media.audio.model`**: uma conexão de modelo, referenciada pelo nome. A cadeia de
-   `fallbacks` daquela conexão vale aqui também, então o failover não custa nada a mais.
-2. **`media.audio.command`**: um comando local, por exemplo `whisper-cli -f {file}`. O
-   `{file}` é substituído pelo caminho do áudio. Isso vem *antes* da detecção automática, e
-   é de propósito: quem configurou um transcritor local fez isso para o áudio não sair da
-   máquina, e passar por cima disso para chamar um provedor anularia o propósito.
-3. **Detecção automática**: a rota sem configuração descrita acima.
-4. **Nada disponível**: o arquivo vai para o agente, que se vira com as ferramentas que
-   tem. Esse caminho continua existindo como rede de segurança; ele não é a porta de
-   entrada.
+1. **`media.audio.model`**: uma conexão de modelo, referenciada pelo nome.
+   A cadeia de `fallbacks` daquela conexão também vale aqui, então o
+   failover sai de graça.
+2. **`media.audio.command`**: um comando local, por exemplo `whisper-cli -f
+   {file}`, onde `{file}` é trocado pelo caminho do áudio. Esse comando é
+   tentado *antes* da detecção automática, de propósito: quem configura um
+   transcritor local o faz justamente para manter o áudio fora da rede, e
+   pular essa etapa para chamar um provedor externo anularia a ideia toda.
+3. **Detecção automática**: a rota sem nenhuma configuração, descrita acima.
+4. **Nada disponível**: o arquivo cai no colo do agente, que se vira com as
+   próprias ferramentas. Esse caminho continua existindo como rede de
+   segurança, mas não é a porta de entrada normal.
 
-### Configurando isso
+### Configurando
 
-Aponte a transcrição para uma conexão de modelo específica, ou um comando local, pela CLI:
+Dá para apontar a transcrição para uma conexão de modelo específica, ou para
+um comando local, pela CLI:
 
 ```bash
 pepe media audio --model groq --language pt --echo true
@@ -47,53 +54,63 @@ pepe media audio --command "whisper-cli -f {file}"   # mantém o áudio na máqu
 pepe media audio off                                 # volta pra detecção automática
 ```
 
-`--echo true` manda a transcrição de volta no chat, para quem falou ver o que foi
-entendido. As mesmas opções estão na página Config do painel, e no `pepe setup` em
-**Mídia**.
+`--echo true` devolve a transcrição para o próprio chat, assim quem falou
+consegue conferir se foi bem entendido. As mesmas opções aparecem na página
+Config do painel, e no `pepe setup` dentro de **Mídia**.
 
-### Por que transcrever antes muda tudo
+### Por que transcrever primeiro faz diferença
 
-Como as palavras existem antes de o roteamento rodar, o roteamento consegue lê-las. Daí
-saem duas consequências, nenhuma delas possível enquanto a transcrição só aparecia dentro
-do turno do agente:
+Como o texto já existe antes de o roteamento entrar em ação, o roteamento
+consegue ler esse texto normalmente. Disso saem duas consequências, nenhuma
+das duas possível enquanto a transcrição só surgia dentro do turno do
+próprio agente:
 
-- **Um comando de barra falado funciona.** Fale `/help` ou `/stop` num áudio e o comando é
-  executado, exatamente como se você tivesse digitado, em vez de virar um turno do agente
-  sobre um arquivo largado num diretório.
-- **Um bot em grupo pode ser chamado por voz.** Num grupo que exige menção, a barreira lê
-  as **palavras** em vez da legenda. Um áudio não tem legenda, então antes disso não havia
-  nada para a barreira ler, e era impossível endereçar o bot falando.
+- **Um comando de barra falado funciona de verdade.** Diga "/help" ou
+  "/stop" dentro de um áudio, e o comando roda exatamente como se tivesse
+  sido digitado, em vez de virar um turno inteiro do agente só para
+  interpretar um arquivo perdido num diretório.
+- **Um bot em grupo pode ser chamado só de voz.** Num grupo que exige
+  menção, a barreira de entrada lê as **palavras** ditas, não uma legenda.
+  Um áudio não carrega legenda nenhuma, então antes disso simplesmente não
+  havia nada para essa barreira ler, e chamar o bot só falando era
+  impossível.
 
-<div class="note"><strong>Áudio vira texto; foto vira visão.</strong> A fala é transcrita na
-porta de entrada. Uma foto é enviada ao modelo como uma imagem que ele consegue de fato ver
-(num modelo com visão, veja abaixo). Um documento é extraído para texto.</div>
+<div class="note"><strong>Áudio vira texto; foto vira visão.</strong> A fala
+é transcrita já na porta de entrada. Já uma foto é enviada ao modelo como
+uma imagem que ele realmente enxerga (num modelo com suporte a visão, veja
+mais abaixo). Um documento, por sua vez, é extraído direto para texto.</div>
 
-## Respondendo de volta
+## Respondendo de volta com voz
 
-Responda a um áudio com outro áudio. Desligado por padrão; aponte `media.tts` para uma
-conexão de modelo que sirva um `/audio/speech` compatível com OpenAI e liga:
+Dá para responder a um áudio com outro áudio. Isso vem desligado por
+padrão; para ligar, basta apontar `media.tts` para uma conexão de modelo
+que sirva um `/audio/speech` compatível com OpenAI:
 
 ```bash
 pepe media tts --model openai --voice nova
 pepe media tts off
 ```
 
-A resposta em texto continua sendo o registro que fica salvo. O áudio é um extra, e tem
-um limite de tamanho para uma resposta longa nunca virar um clipe de cinco minutos. Uma
-falha no TTS é silenciosa: a resposta em texto já foi enviada, então nada se perde, só não
-ganha voz naquele turno. As mesmas opções estão na página Config do painel, e no
-`pepe setup` em **Mídia**.
+O registro que fica salvo continua sendo a resposta em texto; o áudio é só
+um extra, com um teto de duração para que uma resposta longa nunca vire um
+clipe de cinco minutos. Se o TTS falhar, a falha é silenciosa: a resposta em
+texto já saiu de qualquer forma, então nada se perde, ela só fica sem voz
+naquele turno específico. As mesmas configurações estão na página Config do
+painel, e no `pepe setup` em **Mídia**.
 
 ## Fotos
 
-Envie uma foto ao seu bot do Telegram e, num **modelo com visão**, o agente vê a imagem de
-verdade, não um nome de arquivo. Antes ele recebia só uma linha de texto ("o usuário enviou
-uma foto, salva em `…`") enquanto a imagem em si nunca chegava ao modelo, então o agente
-ficava adivinhando, ou inventando, o que havia nela. Agora a imagem vai junto com a mensagem.
+Envie uma foto para o seu bot do Telegram e, com um **modelo que suporte
+visão**, o agente enxerga a imagem de verdade, não apenas um nome de
+arquivo. Antes disso, ele só recebia uma linha de texto do tipo "o usuário
+enviou uma foto, salva em `…`", enquanto a imagem em si nunca chegava ao
+modelo, deixando o agente adivinhando, ou pior, inventando o que havia
+nela. Agora a imagem viaja junto com a própria mensagem.
 
-Fica desligado a menos que você diga que o modelo enxerga. Nem todo endpoint compatível com a
-OpenAI aceita uma imagem, e enviar uma para um modelo só de texto é um erro, então a visão é
-opcional por conexão:
+Isso fica desligado até você avisar explicitamente que o modelo enxerga
+imagens. Nem todo endpoint compatível com OpenAI aceita uma imagem, e mandar
+uma para um modelo só de texto vira erro na hora, então a visão é algo que
+se liga conexão por conexão:
 
 ```json
 {
@@ -108,22 +125,27 @@ opcional por conexão:
 }
 ```
 
-Com `vision` ativo, uma foto (com ou sem legenda) chega ao modelo como imagem no turno em que
-é recebida. Funciona igual em conexões compatíveis com a OpenAI, Anthropic e Responses/Codex.
-A imagem acompanha apenas aquele turno: como uma transcrição, o registro que fica é a resposta
-do agente sobre ela, não os bytes, então nunca incha a sessão nem é reenviada a cada turno. Um
-modelo sem `vision` volta ao comportamento antigo (o caminho do arquivo no prompt, para o
-agente abrir com as próprias ferramentas).
+Com `vision` ativado, uma foto (com ou sem legenda) chega ao modelo como
+imagem já no turno em que foi enviada. Isso funciona do mesmo jeito em
+conexões compatíveis com OpenAI, Anthropic e Responses/Codex. A imagem
+acompanha só aquele turno específico: assim como acontece com uma
+transcrição, o que fica registrado de fato é a resposta do agente sobre a
+imagem, não os bytes dela, então a sessão nunca incha nem reenvia a mesma
+imagem a cada novo turno. Um modelo sem `vision` simplesmente cai de volta
+para o comportamento antigo: o caminho do arquivo entra no prompt, e cabe
+ao agente abri-lo com as próprias ferramentas.
 
-O Telegram já envia cada foto em vários tamanhos pré-redimensionados, então o Pepe escolhe o
-maior que cabe no teto de bytes, sem nenhuma biblioteca de processamento de imagem para
-instalar. Um álbum de fotos é enviado como várias imagens juntas. Os limites ficam em
-`media.image` e ambos têm padrões:
+O Telegram já manda cada foto em vários tamanhos pré-redimensionados, então
+o Pepe escolhe o maior que ainda cabe dentro do teto de bytes, sem precisar
+de nenhuma biblioteca de processamento de imagem instalada. Um álbum inteiro
+de fotos chega como várias imagens juntas. Os dois limites que controlam
+isso ficam em `media.image`, ambos com valor padrão:
 
-- `max_mb`: a maior imagem aceita, em megabytes. Padrão `5`. Uma foto grande demais (ou de um
-  tipo não suportado) volta ao prompt com o caminho do arquivo.
-- `max_parts`: quantas imagens um turno pode carregar, para álbuns. Padrão `4`. O que passar
-  disso é entregue como caminho de arquivo.
+- `max_mb`: o tamanho máximo aceito por imagem, em megabytes. O padrão é
+  `5`. Uma foto grande demais, ou de um tipo não suportado, cai de volta
+  para o prompt com o caminho do arquivo.
+- `max_parts`: quantas imagens um único turno pode carregar, para álbuns. O
+  padrão é `4`. O que passar disso é entregue como caminho de arquivo.
 
 ```json
 {
@@ -135,15 +157,18 @@ instalar. Um álbum de fotos é enviado como várias imagens juntas. Os limites 
 
 ### Configuração
 
-Todas as chaves são opcionais e ficam em `media.audio`, no `~/.pepe/config.json`:
+Todas as chaves abaixo são opcionais e ficam sob `media.audio`, no
+`~/.pepe/config.json`:
 
-- `model`: o nome de uma conexão de modelo com a qual transcrever.
-- `command`: um transcritor local. O `{file}` é substituído pelo caminho do áudio.
-- `language`: uma dica de idioma passada ao provider.
-- `max_mb`: limite de tamanho para o arquivo recebido. O padrão é `20`.
-- `timeout`: quanto tempo uma transcrição pode levar, em segundos. O padrão é `60`.
-- `echo`: devolve a transcrição ao chat como `📝 ...`, para quem falou conferir o que foi
-  entendido.
+- `model`: o nome de uma conexão de modelo para transcrever com ela.
+- `command`: um transcritor local, onde `{file}` é substituído pelo caminho
+  do áudio.
+- `language`: uma dica de idioma repassada ao provedor.
+- `max_mb`: limite de tamanho para um arquivo recebido. O padrão é `20`.
+- `timeout`: quanto tempo uma transcrição pode levar, em segundos. O padrão
+  é `60`.
+- `echo`: devolve a transcrição para o chat como `📝 ...`, para quem falou
+  poder conferir o que foi entendido.
 
 ```json
 {
@@ -159,7 +184,8 @@ Todas as chaves são opcionais e ficam em `media.audio`, no `~/.pepe/config.json
 }
 ```
 
-Para manter o áudio na máquina, use um comando em vez de uma conexão:
+Para manter o áudio dentro da própria máquina, use um comando em vez de uma
+conexão de modelo:
 
 ```json
 {
@@ -172,15 +198,17 @@ Para manter o áudio na máquina, use um comando em vez de uma conexão:
 }
 ```
 
-### Guardas
+### Proteções
 
-- **Um arquivo abaixo de 1 KB é recusado antes de qualquer requisição.** Nesse tamanho ele
-  está vazio ou truncado, não silencioso, e nenhum transcritor diria nada de útil sobre
-  ele. Recusar não custa nada; enviar custa uma requisição.
-- **Um arquivo acima do `max_mb` é recusado do mesmo jeito**, antes de custar uma
-  requisição.
-- **Um comando travado é abandonado no `timeout`**, em vez de travar a conversa que está
-  atrás dele.
-- **Um áudio sem fala nenhuma recebe uma resposta curta**, não um turno do agente. O
-  arquivo foi lido, só não havia nada dentro dele, e responder a uma mensagem vazia só
-  produziria uma resposta confusa.
+- **Um arquivo com menos de 1 KB é recusado antes de qualquer requisição.**
+  Nesse tamanho, ele está vazio ou truncado, não apenas silencioso, e
+  nenhum transcritor teria nada de útil a dizer sobre ele. Recusar não
+  custa nada; enviar custaria uma requisição inteira.
+- **Um arquivo acima de `max_mb` é recusado do mesmo jeito**, também antes
+  de gastar uma requisição.
+- **Um comando travado é abandonado ao bater o `timeout`**, em vez de
+  prender a conversa inteira atrás dele.
+- **Um áudio sem nenhuma fala recebe uma resposta curta**, não um turno
+  completo do agente. O arquivo foi lido normalmente, só não havia nada
+  dentro dele, e tratar isso como uma mensagem de verdade só geraria uma
+  resposta sem sentido.

@@ -1,60 +1,63 @@
 ---
 title: Canais
-description: Coloque seus agentes no Telegram, no WhatsApp, no Slack e em outros lugares. Como os canais funcionam, quem pode falar com eles e como arquivos e repasses são entregues.
+description: Coloque seus agentes no Telegram, no WhatsApp, no Slack e em outros lugares assim. Como os canais funcionam, quem pode falar com eles, e como arquivos e repasses são entregues.
 ---
 
-Um canal conecta um dos seus agentes a um lugar onde as pessoas já conversam.
-Alguém envia uma mensagem, o Pepe executa o agente vinculado (chamando
-ferramentas e lendo a resposta de volta), e a resposta é entregue no mesmo
-canal. Você não escreve nenhum código de ligação. Você adiciona uma conexão,
-aponte-a para um agente e pronto, funciona.
+Um canal conecta um dos seus agentes a um lugar onde as pessoas já se falam.
+Alguém manda uma mensagem, o Pepe roda o agente vinculado (chamando
+ferramentas, lendo a resposta de volta), e a resposta é entregue naquele mesmo
+canal. Você não escreve nenhum código de ligação: basta adicionar uma conexão,
+apontá-la para um agente, e já funciona.
 
-Tudo nesta página pressupõe que você já tem pelo menos um agente definido. Se
-ainda não tem, veja primeiro o guia de agentes.
+Tudo nesta página parte do princípio de que você já tem pelo menos um agente
+definido. Se ainda não tem, veja primeiro o guia de agentes.
 
-## Três maneiras de configurar
+## Três jeitos de configurar
 
-Como o resto do Pepe, os canais podem ser gerenciados de três maneiras, e esta
-página mostra cada uma onde ela se aplica:
+Como o resto do Pepe, os canais podem ser gerenciados de três formas, e esta
+página mostra cada uma delas onde se aplica:
 
 1. A linha de comando `pepe`.
-2. O painel web (a seção "Channels" lista seus bots e conexões, e te guia na
-   hora de adicionar um).
-3. Por chat. Um agente que tem a ferramenta de gerenciamento certa pode criar e
-   revincular bots do Telegram, entregar arquivos e encerrar uma conversa, tudo
-   em linguagem comum. Essas ações são protegidas, então leia as notas "Faça por
-   chat" mais abaixo para saber o passo exato de confirmação.
+2. O painel web, cuja seção "Channels" lista seus bots e conexões, e guia
+   você na hora de adicionar um.
+3. Pela conversa. Um agente com a ferramenta de gerenciamento certa consegue
+   criar e revincular bots do Telegram, entregar arquivos e encerrar uma
+   conversa, tudo em linguagem comum. Essas ações vêm protegidas, então
+   confira as notas "Faça pela conversa" mais abaixo para saber o passo exato
+   de confirmação.
 
-Se você está vindo de outro runtime de agentes, o `pepe migrate` importa os
-canais que já existem lá, em vez de você adicionar cada um na mão.
+Vindo de outro runtime de agentes? O `pepe migrate` importa os canais que já
+existem lá, em vez de você ter que recriar cada um na mão.
 
 ## Duas formas de canal
 
-Os canais diferem apenas em como uma mensagem chega até o Pepe:
+Os canais diferem só em como a mensagem chega até o Pepe:
 
-- **Telegram** é um bot de que o próprio Pepe busca as mensagens, então nada do
-  seu lado precisa ficar acessível na internet. Adicione um token, vincule a um
-  agente, execute o gateway.
-- **Canais por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google Chat
-  e uma rota de entrada genérica) recebem mensagens que a plataforma entrega em
-  um endereço no seu servidor, então o Pepe precisa estar acessível pela
-  internet. O Pepe expõe uma URL por conexão. Você a registra uma única vez com
-  o provedor.
+- **Telegram** é um bot do qual o próprio Pepe vai buscar as mensagens, então
+  nada do seu lado precisa estar acessível pela internet. Basta adicionar um
+  token, vincular a um agente e rodar o gateway.
+- **Canais por webhook** (WhatsApp, Slack, Discord, Microsoft Teams, Google
+  Chat e uma rota de entrada genérica) recebem mensagens que a própria
+  plataforma entrega num endereço do seu servidor, então aí sim o Pepe precisa
+  estar acessível pela internet. O Pepe expõe uma URL por conexão, e você a
+  registra uma única vez junto ao provedor.
 
-Todo canal por webhook, qualquer que seja a plataforma, é servido pelo mesmo
+Todo canal por webhook, seja qual for a plataforma, é servido pelo mesmo
 endpoint de entrada:
 
 ```
 /webhooks/:project/:provider/:slug
 ```
 
-`:project` é o projeto ao qual a conexão pertence, e é `default` quando você não cria projetos adicionais.
-`:provider` é o nome da plataforma, e `:slug` é o nome que você deu à conexão.
-Adicionar um provedor nunca adiciona um endpoint novo.
+`:project` é o projeto ao qual a conexão pertence, e vale `default` quando
+você não criou nenhum projeto adicional. `:provider` é o nome da plataforma, e
+`:slug` é o nome que você deu à conexão. Adicionar um provedor novo nunca cria
+um endpoint novo.
 
-Estes são os canais por webhook que já vêm com o Pepe, e o que cada um precisa:
+Estes são os canais por webhook que já vêm com o Pepe, e o que cada um
+precisa:
 
-| Canal | Como se conecta | Configuração que precisa |
+| Canal | Como se conecta | Configuração necessária |
 |---|---|---|
 | **WhatsApp** | Webhook da Meta Cloud API | `phone_number_id`, `access_token`, `app_secret`, `verify_token` |
 | **Slack** | Webhook da Events API | `bot_token` (`xoxb-`), `signing_secret` |
@@ -62,41 +65,42 @@ Estes são os canais por webhook que já vêm com o Pepe, e o que cada um precis
 | **Microsoft Teams** | Webhook do Bot Framework | `app_id`, `app_password`, `tenant_id` |
 | **Google Chat** | Webhook da Chat API | `access_token` (OAuth para a Chat API) |
 
-O Chatwoot também está disponível, como um [plugin](../plugins/) de canal em vez
-de uma conexão nativa. Ele fica na frente do WhatsApp, do widget web e de outros,
-e traz repasse nativo para um humano. Os plugins de canal são configurados na aba
-**Integrations** do painel, e não na **Channels**.
+O Chatwoot também está disponível, mas como um [plugin](../plugins/) de
+canal, não como uma conexão nativa. Ele fica na frente do WhatsApp, do widget
+web e de outros canais, e traz repasse nativo para um humano. Plugins de
+canal se configuram na aba **Integrations** do painel, não na **Channels**.
 
 ## Notas de configuração por canal
 
-- **Slack.** Crie um app, adicione um escopo de bot token, ative as Event
-  Subscriptions e aponte a request URL para a URL da conexão. O Pepe responde
-  sozinho ao desafio `url_verification`. Adicione os eventos `message.channels` e
-  `app_mention`. O signing secret verifica cada requisição. Veja
-  [Slack](../slack/).
-- **Discord.** Isso usa o endpoint de Interactions, e não um bot de gateway,
-  então ele responde a **comandos de barra**. Adicione um comando com uma opção
-  de texto e depois aponte a "Interactions Endpoint URL" do app para a URL da
-  conexão. A public key do app verifica a assinatura Ed25519. O comando é
-  confirmado na hora e a resposta chega como follow-up. Veja
-  [Discord](../discord/).
+- **Slack.** Crie um app, adicione um escopo de bot token, ative os Event
+  Subscriptions e aponte a request URL para a URL da sua conexão. O próprio
+  Pepe responde ao desafio `url_verification`. Adicione os eventos
+  `message.channels` e `app_mention`. O signing secret é quem verifica cada
+  requisição. Veja [Slack](../slack/).
+- **Discord.** Aqui o canal usa o endpoint de Interactions, não um bot de
+  gateway, então ele responde a **comandos de barra**. Adicione um comando com
+  uma opção de texto e depois aponte a "Interactions Endpoint URL" do app para
+  a URL da conexão. A public key do app é quem verifica a assinatura Ed25519.
+  O comando é confirmado na hora, e a resposta chega em seguida como
+  follow-up. Veja [Discord](../discord/).
 - **Microsoft Teams.** Registre um bot no Azure e aponte o messaging endpoint
-  dele para a URL da conexão. O Pepe responde ao `serviceUrl` da activity com um
-  token gerado a partir das credenciais do app. O JWT do Bot Framework que
-  chega é validado, então o endpoint aceita POSTs vindos diretamente da
-  Microsoft. Veja [Microsoft Teams](../msteams/).
+  dele para a URL da conexão. O Pepe responde ao `serviceUrl` da activity com
+  um token gerado a partir das credenciais do app. O JWT do Bot Framework que
+  chega é validado, então o endpoint aceita POSTs vindos direto da Microsoft.
+  Veja [Microsoft Teams](../msteams/).
 - **Google Chat.** Configure o endpoint de webhook (HTTP) do app para a URL da
-  conexão e forneça um `access_token` OAuth da Chat API. As respostas são
-  publicadas de volta no espaço. Mantenha o endpoint atrás de um proxy. Veja
+  conexão, e forneça um `access_token` OAuth da Chat API. As respostas voltam
+  publicadas no próprio espaço. Mantenha o endpoint atrás de um proxy. Veja
   [Google Chat](../googlechat/).
 
 ## Vinculação, sessões e os dois modos
 
-Cada conexão (e cada bot do Telegram) nomeia um `agent`. Essa é a vinculação.
-Cada remetente distinto ganha a própria conversa, então o contexto é mantido por
-pessoa sem que você gerencie nada.
+Cada conexão (e cada bot do Telegram) nomeia um `agent`, e essa é a
+vinculação. Cada remetente distinto ganha a própria conversa, então o contexto
+é mantido por pessoa sem que você precise gerenciar nada.
 
-Uma conexão por webhook também tem um `mode` que muda como o runtime se comporta:
+Uma conexão por webhook também tem um `mode`, que muda como o runtime se
+comporta:
 
 | | Suporte | Admin |
 |--|---------|-------|
@@ -105,30 +109,31 @@ Uma conexão por webhook também tem um `mode` que muda como o runtime se compor
 | Memória | Nunca aprende | Conversas podem virar memória |
 | Comandos de barra | Tratados como texto puro | Habilitados (por exemplo `/new` reinicia, `/model` troca de modelo) |
 
-Suporte é o padrão seguro para qualquer coisa que o público possa alcançar.
-Combine com um agente restrito (só ferramentas seguras, já que não há uma pessoa
-do seu lado para aprovar uma ação arriscada) e, se quiser, um tempo limite de
-sessão ociosa. Admin é para um canal que só você usa, onde os comandos de barra
-e a memória são úteis.
+Suporte é o padrão seguro para qualquer coisa que o público em geral consiga
+alcançar. Combine com um agente restrito (só com ferramentas seguras, já que
+não há ninguém do seu lado para aprovar uma ação arriscada) e, se quiser, um
+tempo limite de sessão ociosa. Admin é para um canal que só você usa, onde os
+comandos de barra e a memória fazem sentido.
 
 Alguns campos ajustam isso por conexão:
 
 - `agent`: o agente ao qual esta conexão está vinculada.
 - `mode`: `support` ou `admin`.
-- `trainers`: quem pode transformar uma conversa em memória. `["*"]` é todos,
-  `[]` é ninguém, uma lista são apenas aqueles remetentes, ausente é o padrão
-  (todos).
-- `session_ttl_min`: minutos de inatividade antes de a conversa ser descartada.
+- `trainers`: quem pode transformar uma conversa em memória. `["*"]` é todo
+  mundo, `[]` é ninguém, uma lista restringe a esses remetentes, e ausente
+  significa o padrão (todos).
+- `session_ttl_min`: minutos de inatividade antes de a conversa ser
+  descartada.
 - `ephemeral`: quando verdadeiro, o histórico não é levado entre mensagens.
-- `commands`: se os comandos de barra são atendidos (ligados por padrão no
-  admin).
+- `commands`: se os comandos de barra são atendidos (ligado por padrão no
+  modo admin).
 
 ## Como uma conexão aparece na configuração
 
-Não há banco de dados. As conexões vivem em `~/.pepe/config.json` sob
-`webhooks`, indexadas por slug. Os segredos são escritos como `${ENV_VAR}` e
-lidos em tempo de execução, nunca expandidos em disco. Uma conexão de suporte do
-Slack aparece assim:
+Não existe banco de dados aqui. As conexões vivem em `~/.pepe/config.json`,
+dentro de `webhooks`, indexadas por slug. Os segredos são escritos como
+`${ENV_VAR}` e lidos em tempo de execução, nunca expandidos em disco. Uma
+conexão de suporte do Slack tem esta cara:
 
 ```json
 {
@@ -146,15 +151,15 @@ Slack aparece assim:
 }
 ```
 
-Você pode editar esse arquivo à mão, mas a linha de comando e o painel o mantêm
-válido para você.
+Dá para editar esse arquivo à mão, mas tanto a linha de comando quanto o
+painel já cuidam de mantê-lo válido para você.
 
 ## Enviar arquivos
 
-Um agente pode entregar um arquivo para quem está conversando. Ele produz o
-arquivo do jeito que preferir (por exemplo um passo `bash` que consulta um banco
-de dados e escreve um `.xlsx`), e então chama a ferramenta `send_file` com o
-caminho:
+Um agente pode entregar um arquivo direto para quem está do outro lado da
+conversa. Ele produz esse arquivo do jeito que preferir (por exemplo, um passo
+de `bash` que consulta um banco de dados e escreve um `.xlsx`), e então chama
+a ferramenta `send_file` com o caminho:
 
 ```json
 {
@@ -163,68 +168,71 @@ caminho:
 }
 ```
 
-O Pepe descobre em qual canal a conversa está e entrega o arquivo ali. O agente
-nunca precisa de ids de chat nem de tokens. O Telegram envia como documento. O
-WhatsApp, o Slack e o Discord sobem como mídia nas APIs deles. Se o canal atual
-não puder receber anexos (o Microsoft Teams e o Google Chat enviam só texto), a
-ferramenta informa isso de volta ao agente em vez de falhar em silêncio.
+O Pepe descobre sozinho em qual canal a conversa está e entrega o arquivo ali
+mesmo. O agente nunca precisa saber ids de chat nem tokens. O Telegram manda
+como documento; o WhatsApp, o Slack e o Discord sobem como mídia pelas
+próprias APIs deles. Se o canal atual não conseguir receber anexos (o
+Microsoft Teams e o Google Chat só mandam texto), a ferramenta avisa isso de
+volta ao agente, em vez de falhar em silêncio.
 
 ### Faça pela conversa
 
-A entrega de arquivos é, ela mesma, uma capacidade pela conversa. Qualquer agente com
-a ferramenta `send_file` faz isso no momento em que você pede. Você diria:
+Entregar arquivo é, ele mesmo, uma capacidade que já funciona pela conversa.
+Qualquer agente com a ferramenta `send_file` faz isso assim que você pede.
+Você diria algo como:
 
 > Puxe os cadastros da semana passada e me mande a planilha.
 
-O agente roda o passo que monta o arquivo, e então chama `send_file` com o
-caminho resultante. Não há uma barreira de confirmação separada no `send_file`; ele
-só entrega no próprio canal da conversa atual, resolvido a partir da sessão,
-então ele não consegue vazar um arquivo para mais ninguém.
+O agente roda o passo que monta o arquivo e então chama `send_file` com o
+caminho resultante. Não existe uma barreira de confirmação separada no
+`send_file`: ele só entrega no canal da própria conversa atual, resolvido a
+partir da sessão, então não tem como vazar um arquivo para mais ninguém.
 
 ## Encerrar uma conversa
 
-Um agente de suporte pode fechar a própria conversa depois que uma troca termina,
-para que a próxima mensagem daquela pessoa comece do zero. Um agente com a
-ferramenta `end_session` faz isso pela conversa:
+Um agente de suporte pode fechar a própria conversa assim que uma troca
+termina, para que a próxima mensagem daquela pessoa comece do zero. Um agente
+com a ferramenta `end_session` faz isso pela conversa:
 
 > Obrigado, era só isso.
 
-O agente envia primeiro a resposta final, e então chama `end_session`, que limpa
-o contexto da conversa em andamento. O conhecimento aprendido dele fica intacto. Só a
-conversa atual é reiniciada. Isso é útil em um canal em modo `support` onde cada
-troca deveria ser independente.
+O agente manda a resposta final primeiro, e só depois chama `end_session`, que
+limpa o contexto da conversa em andamento. O que ele já aprendeu fica
+intacto: só a conversa atual é reiniciada. Isso é útil num canal em modo
+`support`, onde cada troca deveria ser independente da anterior.
 
 ## Roteamento entre agentes
 
-Além de vincular um canal a um agente, um agente que tem a ferramenta
-`set_route` pode mudar quais agentes podem mandar mensagem para quais, pela conversa.
-O roteamento é direcionado, então permitir que o agente A escreva para o agente B
-não permite que B escreva para A. Como ela edita a configuração, passa pela trava
-de permissão: você confirma a mudança antes de ela valer. Você diria:
+Além de vincular um canal a um agente, um agente com a ferramenta
+`set_route` pode mudar, pela conversa, quais agentes podem mandar mensagem
+para quais. O roteamento é direcionado, então permitir que o agente A escreva
+para o agente B não permite o contrário. Como isso edita a configuração,
+passa pela barreira de permissão: você confirma a mudança antes de ela valer.
+Você diria:
 
 > Deixe o agente de triagem repassar para o agente de faturamento.
 
-O agente chama `set_route` com `to: "billing"` (e `from` assume por padrão aquele
-com quem você está falando), ou `action: "deny"` para remover uma rota. Na linha
-de comando, a mesma coisa é `pepe agent route triage billing`.
+O agente chama `set_route` com `to: "billing"` (e `from` assume por padrão
+aquele com quem você está falando), ou `action: "deny"` para remover uma rota.
+Na linha de comando, a mesma coisa é `pepe agent route triage billing`.
 
 ## O que não vem embutido
 
-Signal, IRC e iMessage precisam de uma conexão persistente ou de uma ponte
-específica da plataforma, que não cabe no modelo de webhook, então por enquanto
-estão fora de escopo. Um canal novo sempre pode ser acrescentado como um
+Signal, IRC e iMessage exigem uma conexão persistente ou uma ponte específica
+da plataforma, algo que não cabe no modelo de webhook, então ficam fora de
+escopo por enquanto. Um canal novo sempre pode ser adicionado como um
 [plugin](../plugins/) de canal.
 
-## Servir tudo
+## Servir tudo de uma vez
 
-Um único comando serve a API HTTP compatível com OpenAI, o WebSocket, o painel, a
-rota de webhook e cada bot do Telegram configurado:
+Um único comando serve a API HTTP compatível com OpenAI, o WebSocket, o
+painel, a rota de webhook e cada bot do Telegram configurado:
 
 ```bash
 pepe serve --port 4000
 ```
 
 A porta também é lida da variável de ambiente `PORT`. Adicione `--tunnel` para
-abrir um túnel público e testar canais por webhook sem seu próprio proxy reverso.
-Defina `PEPE_PUBLIC_URL` para que as URLs de retorno que você registra com cada
-provedor apontem para seu host real.
+abrir um túnel público e testar canais por webhook sem precisar do seu
+próprio proxy reverso. Defina `PEPE_PUBLIC_URL` para que as URLs de retorno
+que você registra em cada provedor apontem para o seu host de verdade.

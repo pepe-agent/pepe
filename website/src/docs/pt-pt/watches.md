@@ -1,30 +1,30 @@
 ---
 title: Vigilâncias
-description: Diz ao Pepe para ficar de olho em algo e avisar-te no momento em que acontecer. Verifica sozinho, sobrevive a reinícios e avisa exatamente uma vez.
+description: Pede ao Pepe para ficar de olho em algo e avisar-te assim que acontecer. Ele verifica sozinho, aguenta reinícios, e avisa exatamente uma vez.
 ---
 
 ## Vigilâncias
 
-Uma vigilância responde a uma pergunta diferente: não "faz isto num horário", mas "fica de olho em algo e avisa-me no momento em que acontecer". Uma vigilância volta a verificar uma condição periodicamente e avisa-te **uma vez** quando ela se torna verdadeira, e depois pára. É durável: sobrevive a um reinício e ao fecho da sessão que a criou, e responde sempre no canal em que foi criada.
+Uma vigilância responde a uma pergunta bem diferente de um cron: não "faz isto a uma hora certa", mas sim "fica de olho nisto e avisa-me assim que acontecer". Volta a verificar uma condição a cada intervalo e, no momento em que ela se torna verdadeira, avisa-te **uma vez** e pára. É durável: sobrevive a um reinício e ao fecho da própria sessão que a criou, e a resposta chega sempre pelo canal onde foi criada.
 
-### Gatilhos por sonda versus por agente
+### Gatilho por sonda ou por agente
 
-A parte barata de uma vigilância é o **gatilho**, que corre a cada intervalo. Só quando o gatilho dispara é que a notificação (possivelmente cara) corre, uma vez. Há dois tipos de gatilho:
+A parte barata de uma vigilância é o **gatilho**, que corre a cada intervalo; só quando ele dispara é que a notificação, essa sim potencialmente cara, chega a correr, e só uma vez. Há dois tipos:
 
-- Uma **sonda** corre um comando de shell e não custa tokens por verificação. O sucesso é o código de saída 0 por predefinição, ou podes exigir que uma string apareça na saída do comando. Usa uma sonda sempre que a condição for scriptável (um URL está acessível, uma tarefa escreveu um ficheiro, um log contém uma linha).
-- Um gatilho de **agente** volta a perguntar ao agente uma pergunta de sim/não a cada intervalo, uma chamada ao modelo por verificação. Usa-o só quando decidir se a condição foi cumprida exigir juízo a sério.
+- Uma **sonda** corre um comando de shell e não gasta um único token por verificação. Por predefinição, sucesso é código de saída 0, mas também podes exigir que uma string apareça na saída do comando. Usa uma sonda sempre que a condição for scriptável, como um URL estar acessível, uma tarefa ter escrito um ficheiro, ou um log conter determinada linha.
+- Um gatilho de **agente** volta a fazer ao agente uma pergunta de sim/não a cada intervalo, com uma chamada ao modelo por verificação. Só faz sentido usá-lo quando decidir se a condição se cumpriu exige mesmo juízo.
 
-Como as verificações de agente custam tokens, o intervalo mínimo delas é maior: 300 segundos para gatilhos de agente, 30 segundos para sondas. O intervalo predefinido é de 120 segundos.
+Como as verificações de agente custam tokens, o intervalo mínimo delas é bem maior, 300 segundos, contra os 30 segundos de uma sonda. O intervalo predefinido, de qualquer forma, é de 120 segundos.
 
 ### O que envia quando dispara
 
-Quando o gatilho finalmente passa, uma vigilância entrega uma mensagem. Essa mensagem é ou um **modelo** fixo (um texto que defines à partida, sem chamada ao modelo) ou é **composta pelo agente** no momento do disparo (uma chamada ao modelo, uma vez), para poder incluir detalhe fresco, como um resumo do que de facto aconteceu.
+Assim que o gatilho passa, a vigilância entrega uma mensagem, que pode ser um **modelo** fixo de texto, definido logo de início e sem qualquer chamada ao modelo, ou pode ser **composta pelo próprio agente** no momento do disparo, com uma única chamada, para conseguir incluir detalhe fresco, como um resumo do que realmente aconteceu.
 
-A combinação que vale a pena conhecer é uma sonda gratuita a controlar uma mensagem composta pelo agente. A sondagem com `curl` não custa nada, e o modelo só é chamado para escrever o resumo no momento em que a condição passa.
+Vale a pena conhecer a combinação de uma sonda gratuita a controlar uma mensagem composta pelo agente: a sondagem com `curl` não custa nada, e o modelo só entra em ação para escrever o resumo no instante exato em que a condição se cumpre.
 
 ### Cria uma vigilância pela CLI
 
-A CLI cria vigilâncias por sonda. Vigilâncias julgadas por agente são criadas pela conversa, onde o modelo já está no ciclo.
+A CLI só cria vigilâncias por sonda; as que são julgadas por um agente nascem sempre da conversa, onde o modelo já está a acompanhar tudo.
 
 ```bash
 pepe watch add "api-up" \
@@ -34,14 +34,14 @@ pepe watch add "api-up" \
   --deliver "telegram:123456789"
 ```
 
-- A descrição (`"api-up"`) torna-se o id da vigilância.
-- `--probe` é o comando de shell a sondar. Sem `--contains`, sucesso significa que o comando sai com 0.
-- `--contains STR` em vez disso faz o sucesso significar que `STR` aparece na saída do comando.
-- `--message` é o texto a enviar quando dispara. Omite-o para uma confirmação predefinida.
-- `--every` é o intervalo de sondagem em segundos (mínimo 30).
-- `--deliver telegram:<chat>` envia a notificação para essa conversa. Omite-o e a notificação vai para o log da aplicação.
+- A descrição (`"api-up"`) passa a ser o id da vigilância.
+- `--probe` é o comando de shell a sondar; sem `--contains`, sucesso significa apenas que o comando termina com código 0.
+- `--contains STR`, em alternativa, faz o sucesso depender de `STR` aparecer na saída do comando.
+- `--message` é o texto a enviar quando dispara; omite-o e recebes uma confirmação predefinida.
+- `--every` é o intervalo de sondagem em segundos, com mínimo de 30.
+- `--deliver telegram:<chat>` envia a notificação para essa conversa; sem isto, a notificação vai parar ao log da aplicação.
 
-A gerir vigilâncias:
+Para gerir vigilâncias:
 
 ```bash
 pepe watch list                 # todas as vigilâncias, com estado e contagem de verificações
@@ -52,27 +52,27 @@ pepe watch cancel api-up
 
 ### Fá-lo a partir do painel
 
-Abre a página **Watches** sob `pepe serve` para ver cada vigilância com o seu estado, gatilho, intervalo, e quantas verificações já usou do seu orçamento. A partir daí podes pausar, retomar e cancelar uma vigilância. Vigilâncias novas são criadas pela CLI ou pela conversa, onde o gatilho e o destino de entrega são configurados.
+A página **Watches**, sob `pepe serve`, mostra todas as vigilâncias com o seu estado, gatilho, intervalo e quantas verificações já gastou do seu orçamento; a partir dali dá para pausar, retomar e cancelar. As vigilâncias novas, essas, nascem sempre da CLI ou da conversa, que é onde se define o gatilho e o destino de entrega.
 
 ### Fá-lo pela conversa
 
-Pede em linguagem simples e o agente cria a vigilância através da sua ferramenta `watch`. Tal como `schedule_task`, a ferramenta `watch` já vem ativada por predefinição (retira-a das ferramentas do agente se ele nunca dever criar uma) e continua a passar pelo mesmo pedido de permissão em cada criação.
+Basta pedir em linguagem simples, e o agente cria a vigilância através da sua ferramenta `watch`. Tal como acontece com `schedule_task`, a ferramenta `watch` já vem ativada por predefinição (tira-a das ferramentas do agente se ele nunca dever criar uma), e cada criação continua a passar pelo mesmo pedido de permissão de sempre.
 
 > Avisa-me quando o deploy terminar. Verifica a cada poucos minutos.
 
-Para uma verificação scriptável o agente configura uma sonda. Para algo que precisa de juízo, configura um gatilho de agente, formulando uma pergunta de sim/não que responde a cada intervalo. Também pode escolher compor a mensagem de disparo com o modelo em vez de um modelo fixo, para que a notificação leve um resumo real em vez de uma linha enlatada. As ações da ferramenta `watch` são `create`, `list`, `pause`, `resume` e `cancel`.
+Para uma verificação scriptável, o agente configura uma sonda; para algo que exige juízo, configura um gatilho de agente, formulando ele próprio a pergunta de sim/não que responde a cada intervalo. Também pode optar por compor a mensagem de disparo com o modelo em vez de usar um texto fixo, de forma a que a notificação leve um resumo verdadeiro em vez de uma linha genérica. As ações da ferramenta `watch` são `create`, `list`, `pause`, `resume` e `cancel`.
 
-Para manter as coisas limitadas, podem estar ativas no máximo 50 vigilâncias ao mesmo tempo, e o Pepe recusa uma vigilância nova cuja condição seja idêntica a uma já em execução, por isso não empilhas duplicados sem querer. Uma vigilância também tem um número máximo de verificações; se a condição nunca se tornar verdadeira dentro desse orçamento, a vigilância expira em silêncio em vez de sondar para sempre.
+Para manter tudo dentro de limites, no máximo 50 vigilâncias podem estar ativas ao mesmo tempo, e o Pepe recusa criar uma nova cuja condição seja idêntica a uma já em curso, evitando que se empilhem duplicados sem querer. Cada vigilância tem também um número máximo de verificações; se a condição nunca se tornar verdadeira dentro desse orçamento, a vigilância expira em silêncio, em vez de continuar a sondar para sempre.
 
 ### Entrega no canal de origem
 
-Uma vigilância regista a sua **origem**, o canal e a conversa a partir dos quais foi criada, no momento da criação. Quando dispara, entrega ali de volta, mesmo depois de um reinício, seja uma conversa do Telegram (um envio direto), uma sessão de terminal ou WebSocket ligada, ou o log da aplicação. No WebSocket a notificação chega como um evento `"watch"` no canal; passa um `session` estável quando entras e recebe-la mesmo depois de reconectares, em vez de apenas no socket que por acaso criou a vigilância. No `pepe chat` é impressa diretamente na consola. Se a vigilância foi criada através da API HTTP sem estado (que não tem conversa para responder), recorre ao log.
+No momento em que é criada, cada vigilância regista a sua **origem**: o canal e a conversa de onde nasceu. Quando dispara, é aí que entrega a resposta, mesmo depois de um reinício, seja numa conversa do Telegram (um envio direto), numa sessão de terminal ou WebSocket ligada, ou no log da aplicação. Num WebSocket, a notificação chega como um evento `"watch"` no canal; se passares um `session` estável ao entrares, continuas a recebê-la mesmo depois de reconectares, em vez de a receberes só no socket que por acaso criou a vigilância. No `pepe chat`, aparece impressa diretamente na consola. Já uma vigilância criada pela API HTTP sem estado, que não tem conversa nenhuma para responder, cai de volta para o log.
 
 Duas garantias tornam isto fiável:
 
-- **No máximo uma vez.** O novo estado da vigilância (normalmente "done") é guardado em disco *antes* de a entrega ser tentada. Se o processo falhar entre o disparo e a entrega, não volta a verificar nem a disparar uma segunda vez. Só a entrega é repetida.
-- **Entrega quando alcançável.** Se uma vigilância dispara enquanto o seu canal está offline (uma sessão de terminal que se desligou, por exemplo), a mensagem fica retida e é reenviada a cada ciclo até chegar. Recebes a notificação quando voltas, sem a vigilância voltar a verificar.
+- **No máximo uma vez.** O novo estado da vigilância (normalmente "done") é gravado em disco *antes* de sequer se tentar a entrega. Se o processo falhar entre o disparo e a entrega, não volta a verificar nem a disparar segunda vez; só a entrega em si é repetida.
+- **Entrega assim que der para alcançar.** Se uma vigilância dispara com o canal offline, por exemplo uma sessão de terminal já desligada, a mensagem fica retida e volta a ser tentada a cada ciclo até conseguir chegar. Recebes a notificação assim que voltares, sem que a vigilância tenha de voltar a verificar seja o que for.
 
-Uma vigilância passa por um pequeno conjunto de estados ao longo da sua vida: `pending` (ainda a vigiar), `paused`, `done` (disparada e entregue), `expired` (esgotou o seu orçamento de verificações) ou `cancelled`.
+Ao longo da sua vida, uma vigilância passa por um pequeno conjunto de estados: `pending` (ainda em vigilância), `paused`, `done` (disparou e foi entregue), `expired` (esgotou o seu orçamento de verificações), ou `cancelled`.
 
-<div class="note"><strong>Sem base de dados para instalar, sem crontab.</strong> As tarefas agendadas continuam a ser registos simples em <code>~/.pepe/config.json</code> (sob <code>"crons"</code>), com um ficheiro JSONL de histórico de execuções por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. As vigilâncias vivem no mesmo pequeno ficheiro SQLite embutido dos compromissos, não é algo que precises de instalar ou gerir. De qualquer forma, não há mais nada para manter em execução: todo o agendador é um temporizador dentro do processo, que corre em qualquer superfície de vida longa que esteja de pé: <code>pepe serve</code>, uma gateway ou um <code>pepe chat</code> interativo, e pára quando páras a superfície. Corre só uma delas de cada vez sobre a mesma configuração: duas iriam disparar ambas, e uma vigilância avisaria duas vezes.</div>
+<div class="note"><strong>Sem base de dados para instalar, sem crontab.</strong> As tarefas agendadas continuam a ser simples registos em <code>~/.pepe/config.json</code> (sob <code>"crons"</code>), com um ficheiro JSONL de histórico por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. Já as vigilâncias vivem no mesmo pequeno ficheiro SQLite embutido dos compromissos, algo que não precisas de instalar nem de gerir. De um modo ou de outro, não há mais nada a manter em execução: o agendador inteiro é um temporizador dentro do próprio processo, que corre em qualquer superfície de vida longa que estiver de pé, seja o <code>pepe serve</code>, uma gateway, ou um <code>pepe chat</code> interativo, e pára quando paras essa superfície. Corre só uma de cada vez sobre a mesma configuração: com duas ao mesmo tempo, ambas disparariam, e uma vigilância acabaria por avisar-te duas vezes.</div>

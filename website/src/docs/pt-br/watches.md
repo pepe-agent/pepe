@@ -1,30 +1,57 @@
 ---
 title: Vigias
-description: Diga ao Pepe para ficar de olho em algo e te avisar no momento em que acontecer. Ele checa sozinho, sobrevive a reinícios e avisa exatamente uma vez.
+description: Peça ao Pepe para ficar de olho em algo e te avisar assim que acontecer. Ele mesmo faz a checagem, sobrevive a reinícios e avisa uma única vez.
 ---
 
 ## Vigias
 
-Uma vigia responde a uma pergunta diferente: não "faça isso pelo relógio", mas "fique de olho em algo e me avise no momento em que acontecer". Uma vigia recheca uma condição em um cronômetro e te notifica **uma vez** quando ela se torna verdadeira, e então para. Ela é durável: sobrevive a um reinício e ao fechamento da sessão que a criou, e sempre responde no canal em que foi criada.
+Uma vigia responde a uma pergunta bem diferente das tarefas agendadas: não
+"faça isso num horário fixo", mas "fica de olho nisso aqui e me avisa
+quando acontecer". Ela recheca uma condição periodicamente e, assim que
+essa condição se torna verdadeira, notifica você **uma única vez** e para
+por ali. É durável: continua funcionando depois de um reinício ou do
+encerramento da sessão que a criou, e sempre entrega a resposta no mesmo
+canal onde nasceu.
 
-### Gatilhos por sonda e por agente
+### Sonda ou agente: dois jeitos de disparar
 
-A parte barata de uma vigia é o **gatilho**, que roda a cada intervalo. Só quando o gatilho dispara é que a notificação (possivelmente cara) roda, uma vez. Há dois tipos de gatilho:
+A parte barata de uma vigia é o **gatilho**, que roda a cada intervalo
+configurado. Só quando esse gatilho dispara é que a notificação, essa sim
+potencialmente cara, entra em ação, e só uma vez. Existem dois tipos de
+gatilho:
 
-- Uma **sonda** roda um comando de shell e não custa tokens por checagem. Sucesso é código de saída 0 por padrão, ou você pode exigir que uma string apareça na saída do comando. Use uma sonda sempre que a condição for scriptável (uma URL está acessível, um trabalho escreveu um arquivo, um log contém uma linha).
-- Um gatilho de **agente** repergunta ao agente uma pergunta de sim/não a cada intervalo, uma chamada ao modelo por checagem. Use só quando decidir se a condição foi atingida exigir julgamento de verdade.
+- Uma **sonda** roda um comando de shell e não gasta token nenhum a cada
+  checagem. Por padrão, sucesso é o comando sair com código 0, mas dá para
+  exigir que uma string específica apareça na saída dele. Use sonda sempre
+  que a condição puder ser resolvida por script: uma URL respondendo, um
+  job que gravou um arquivo, uma linha específica aparecendo num log.
+- Um gatilho de **agente** faz o agente responder de novo uma pergunta de
+  sim ou não a cada intervalo, com uma chamada de modelo por checagem.
+  Reserve isso para quando decidir se a condição foi atingida realmente
+  exige julgamento.
 
-Como checagens de agente custam tokens, o intervalo mínimo delas é maior: 300 segundos para gatilhos de agente, 30 segundos para sondas. O intervalo padrão é de 120 segundos.
+Como cada checagem de agente custa tokens, o intervalo mínimo dela é maior:
+300 segundos contra apenas 30 segundos de uma sonda. O intervalo padrão, de
+qualquer forma, é 120 segundos.
 
-### O que ela envia quando dispara
+### O que ela manda quando dispara
 
-Quando o gatilho enfim passa, uma vigia entrega uma mensagem. Essa mensagem é ou um **texto fixo** (que você define de antemão, sem chamada ao modelo), ou é **composta pelo agente** na hora do disparo (uma chamada ao modelo, uma vez), para que possa incluir detalhe fresco, como um resumo do que de fato aconteceu.
+Quando o gatilho finalmente passa, a vigia entrega uma mensagem, que pode
+ser um **texto fixo** definido de antemão (sem gastar chamada de modelo
+nenhuma), ou algo **composto pelo próprio agente** no momento do disparo
+(uma única chamada de modelo), o que permite incluir detalhes frescos, como
+um resumo real do que acabou de acontecer.
 
-A combinação que vale a pena conhecer é uma sonda gratuita controlando uma mensagem composta pelo agente. A sondagem com `curl` não custa nada, e o modelo só é chamado para escrever o resumo no momento em que a condição passa.
+A combinação que vale a pena conhecer é uma sonda gratuita controlando uma
+mensagem composta pelo agente: o `curl` de sondagem não custa nada, e o
+modelo só entra em cena, uma única vez, para escrever o resumo bem na hora
+em que a condição se confirma.
 
-### Criar uma vigia pela CLI
+### Criando uma vigia pela CLI
 
-A CLI cria vigias por sonda. Vigias julgadas por agente são criadas pela conversa, onde o modelo já está no loop.
+A CLI cria vigias baseadas em sonda. Vigias que dependem de julgamento do
+agente nascem pela conversa, onde o modelo já está no circuito de qualquer
+forma.
 
 ```bash
 pepe watch add "api-up" \
@@ -34,45 +61,88 @@ pepe watch add "api-up" \
   --deliver "telegram:123456789"
 ```
 
-- A descrição (`"api-up"`) vira o id da vigia.
-- `--probe` é o comando de shell a sondar. Sem `--contains`, sucesso significa que o comando sai com 0.
-- `--contains STR` em vez disso faz o sucesso significar que `STR` aparece na saída do comando.
-- `--message` é o texto a enviar quando dispara. Omita para uma confirmação padrão.
-- `--every` é o intervalo de sondagem em segundos (mínimo 30).
-- `--deliver telegram:<chat>` envia a notificação para aquele chat. Omita e a notificação vai para o log da aplicação.
+- A descrição informada (`"api-up"`) vira o id da vigia.
+- `--probe` define o comando de shell sondado. Sem `--contains`, sucesso é
+  o comando sair com código 0.
+- `--contains STR` muda essa definição: sucesso passa a ser `STR` aparecer
+  na saída do comando.
+- `--message` é o texto enviado quando a vigia dispara. Se omitido, entra
+  uma confirmação padrão.
+- `--every` define o intervalo de sondagem em segundos (mínimo de 30).
+- `--deliver telegram:<chat>` manda a notificação para aquele chat
+  específico. Sem essa flag, a notificação cai no log da aplicação.
 
-Gerenciando vigias:
+Gerenciando vigias já criadas:
 
 ```bash
-pepe watch list                 # all watches, with state and check count
+pepe watch list                 # todas as vigias, com estado e contagem de checagens
 pepe watch pause api-up
 pepe watch resume api-up
 pepe watch cancel api-up
 ```
 
-### Faça pelo painel
+### Fazendo pelo painel
 
-Abra a página **Watches** sob `pepe serve` para ver cada vigia com o estado, o gatilho, o intervalo e quantas checagens ela já usou do orçamento dela. Dali você pode pausar, retomar e cancelar uma vigia. Vigias novas são criadas pela CLI ou pela conversa, onde o gatilho e o destino de entrega são configurados.
+A página **Watches**, disponível enquanto o `pepe serve` está no ar, lista
+cada vigia com seu estado, gatilho, intervalo e quantas checagens já
+consumiu do orçamento total. É dali que dá para pausar, retomar ou cancelar
+qualquer uma delas. Vigias novas, porém, ainda nascem pela CLI ou pela
+conversa, que é onde o gatilho e o destino de entrega são de fato
+configurados.
 
-### Faça pela conversa
+### Fazendo pela conversa
 
-Peça em linguagem natural e o agente cria a vigia pela ferramenta `watch` dele. Assim como `schedule_task`, a ferramenta `watch` já vem habilitada por padrão (remova-a das ferramentas do agente se ele nunca dever criar uma) e ainda passa pelo mesmo pedido de permissão a cada criação.
+Basta pedir em linguagem natural, e o agente cria a vigia usando a própria
+ferramenta `watch`. Assim como `schedule_task`, essa ferramenta já vem
+habilitada por padrão (tire-a das ferramentas de um agente se ele nunca
+deve criar vigias sozinho), e cada criação continua passando pelo mesmo
+pedido de permissão de sempre.
 
-> Me avise quando o deploy terminar. Cheque a cada poucos minutos.
+> Me avisa quando o deploy terminar. Confere a cada poucos minutos.
 
-Para uma checagem scriptável o agente configura uma sonda. Para algo que precisa de julgamento ele configura um gatilho de agente, formulando uma pergunta de sim/não que responde a cada intervalo. Ele também pode escolher compor a mensagem de disparo com o modelo em vez de usar um texto fixo, para que a notificação carregue um resumo real em vez de uma linha enlatada. As ações da ferramenta `watch` são `create`, `list`, `pause`, `resume` e `cancel`.
+Quando a checagem é algo scriptável, o agente monta uma sonda; quando o
+caso exige julgamento, ele monta um gatilho de agente, formulando sozinho a
+pergunta de sim ou não que vai responder a cada intervalo. Ele também pode
+optar por compor a mensagem final com o modelo em vez de usar um texto
+fixo, deixando a notificação com um resumo real em vez de uma frase
+genérica. As ações disponíveis na ferramenta `watch` são `create`, `list`,
+`pause`, `resume` e `cancel`.
 
-Para manter as coisas limitadas, pode haver no máximo 50 vigias ativas ao mesmo tempo, e o Pepe recusa uma vigia nova cuja condição seja idêntica a uma já em execução, então você não empilha duplicatas sem querer. Uma vigia também tem um número máximo de checagens; se a condição nunca se tornar verdadeira dentro desse orçamento, a vigia expira em silêncio em vez de sondar para sempre.
+Para não deixar isso crescer sem controle, no máximo 50 vigias podem estar
+ativas ao mesmo tempo, e o Pepe recusa criar uma vigia nova cuja condição
+seja idêntica à de outra já em execução, evitando duplicatas acidentais.
+Toda vigia também tem um teto de checagens: se a condição nunca se
+confirmar dentro desse orçamento, ela simplesmente expira em silêncio, em
+vez de continuar sondando para sempre.
 
-### Entrega no canal de origem
+### Entrega sempre no canal de origem
 
-Uma vigia registra a **origem**, o canal e a conversa em que foi criada, no momento da criação. Quando dispara, ela entrega de volta ali, mesmo após um reinício, seja um chat do Telegram (um envio direto), uma sessão de terminal ou WebSocket conectada, ou o log da aplicação. No WebSocket a notificação chega como um evento `"watch"` no canal; passe um `session` estável ao entrar e você a recebe mesmo depois de reconectar, em vez de só no socket que por acaso criou a vigia. No `pepe chat` ela é impressa direto no console. Se a vigia foi criada pela API HTTP sem estado (que não tem conversa para responder), ela recorre ao log.
+No momento em que é criada, uma vigia registra sua **origem**: o canal e a
+conversa de onde partiu. Quando dispara, ela entrega ali mesmo, mesmo que
+tenha havido um reinício pelo meio, seja um chat do Telegram (envio
+direto), uma sessão de terminal ou WebSocket conectada, ou o log da
+aplicação. Num WebSocket, a notificação chega como um evento `"watch"` no
+canal; passando um `session` estável ao entrar, você continua recebendo
+essas notificações mesmo depois de reconectar, em vez de depender do
+mesmo socket que criou a vigia originalmente. No `pepe chat`, ela aparece
+direto impressa no console. Já uma vigia criada pela API HTTP, que não tem
+sessão de conversa nenhuma para responder de volta, cai automaticamente no
+log.
 
-Duas garantias tornam isso confiável:
+Duas garantias sustentam essa confiabilidade:
 
-- **No máximo uma vez.** O novo estado da vigia (normalmente "done") é salvo em disco *antes* de a entrega ser tentada. Se o processo quebrar entre o disparo e a entrega, ela não vai rechecar nem disparar uma segunda vez. Só a entrega é retentada.
-- **Entregar quando alcançável.** Se uma vigia dispara enquanto o canal dela está offline (uma sessão de terminal que desconectou, por exemplo), a mensagem é retida e reenviada a cada disparo até chegar. Você recebe a notificação quando volta, sem a vigia rechecar.
+- **No máximo uma entrega.** O novo estado da vigia (geralmente "done") é
+  salvo em disco *antes* de qualquer tentativa de entrega. Se o processo
+  cair bem entre o disparo e a entrega, a vigia não vai rechecar nem
+  disparar uma segunda vez, apenas a entrega em si é tentada de novo.
+- **Entrega assim que possível.** Se uma vigia dispara com o canal de
+  destino offline, uma sessão de terminal desconectada, por exemplo, a
+  mensagem fica retida e é reenviada a cada novo ciclo até conseguir
+  chegar. Você recebe a notificação assim que volta, sem que a vigia tenha
+  precisado rechecar nada.
 
-Uma vigia passa por um pequeno conjunto de estados ao longo da vida: `pending` (ainda vigiando), `paused`, `done` (disparada e entregue), `expired` (esgotou o orçamento de checagens) ou `cancelled`.
+Ao longo da vida, uma vigia passa por um conjunto pequeno de estados:
+`pending` (ainda observando), `paused`, `done` (já disparou e entregou),
+`expired` (esgotou o orçamento de checagens) ou `cancelled`.
 
-<div class="note"><strong>Sem banco de dados para instalar, sem crontab.</strong> As tarefas agendadas continuam sendo registros simples no <code>~/.pepe/config.json</code> (sob <code>"crons"</code>), com um arquivo JSONL de histórico de execuções por tarefa sob <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. As vigias vivem no mesmo pequeno arquivo SQLite embutido dos compromissos, não é algo que você precise instalar ou administrar. De qualquer forma, não há mais nada para manter rodando: todo o agendador é um cronômetro dentro do processo, que roda em qualquer superfície de vida longa que estiver de pé: <code>pepe serve</code>, um gateway ou um <code>pepe chat</code> interativo, e para quando você para a superfície. Rode só uma delas por vez sobre a mesma configuração: duas iriam disparar as duas, e uma vigia avisaria duas vezes.</div>
+<div class="note"><strong>Sem banco de dados para instalar, sem crontab.</strong> Tarefas agendadas continuam sendo registros simples dentro do <code>~/.pepe/config.json</code> (na chave <code>"crons"</code>), com um arquivo JSONL de histórico por tarefa em <code>&lt;PEPE_HOME&gt;/data/cron_logs/</code>. Vigias vivem no mesmo pequeno arquivo SQLite embutido que guarda os compromissos, sem nada para você instalar ou administrar à parte. De um jeito ou de outro, não existe nenhum processo extra para manter no ar: o agendador inteiro é só um cronômetro rodando dentro do próprio processo, seja ele o <code>pepe serve</code>, um gateway, ou um <code>pepe chat</code> interativo, e para assim que essa superfície para. Rode só uma dessas por vez sobre a mesma configuração: duas rodando juntas disparariam ao mesmo tempo, e uma vigia acabaria avisando duas vezes.</div>

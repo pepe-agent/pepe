@@ -1,29 +1,53 @@
 ---
 title: Compromissos
-description: Se alguém diz "me lembra sexta", ou seu agente diz "vou verificar e te aviso", o Pepe percebe sozinho e cumpre.
+description: Se alguém pede "me lembra sexta", ou o próprio agente diz "vou verificar e te aviso", o Pepe percebe isso sozinho e garante que aconteça.
 ---
 
 ## Compromissos
 
-Um compromisso é diferente de toda outra automação do Pepe: não é algo que você configura. Ele é percebido sozinho, depois de um turno, a partir do que foi realmente dito: o usuário pedindo para ser lembrado de algo, ou o próprio agente prometendo verificar algo e voltar com a resposta. Ative por agente (`commitments`, desligado por padrão) e dê a esse agente um `utility_model`; sem os dois, nada é extraído, e uma promessa continua sendo só palavras.
+Um compromisso é diferente de toda outra automação do Pepe porque você não configura ele:
+ele nasce sozinho, ao final de um turno, a partir do que foi realmente dito ali, seja o
+usuário pedindo para ser lembrado de algo, seja o próprio agente prometendo checar algo e
+voltar com a resposta. Ligue isso por agente (`commitments`, desligado por padrão) e dê a
+esse agente um `utility_model`; falta um dos dois e nada é extraído, a promessa vira só
+palavra.
 
-### Dois tipos de retorno, entregues de duas formas diferentes
+### Dois tipos de retorno, dois jeitos de entregar
 
-Esse é o detalhe que vale entender antes de ligar, porque os dois casos não são tratados da mesma forma:
+Vale entender essa diferença antes de ligar a funcionalidade, porque os dois casos não são
+tratados do mesmo jeito:
 
-- **O lembrete do próprio usuário** ("me lembra de mandar o relatório sexta") é resolvido com uma mensagem na hora certa, a mesma coisa que um [watch](../watches/) já faz. Se seu agente tem a tool `watch`, ainda vale a pena que ele use isso diretamente no momento; compromissos existem como a rede de segurança para quando ele não usa.
-- **A promessa do próprio agente** ("deixa eu verificar o deploy e te aviso amanhã") *não* é resolvida com um lembrete dizendo que a promessa foi feita. Quando chega a hora, o Pepe reexecuta essa sessão com uma instrução: fazer de verdade o que foi prometido, e só então responder com o que encontrou. A mensagem que sai é uma resposta real, não um modelo fixo, e assim uma promessa nunca vira silenciosamente um "lembrete: eu disse que ia verificar isso".
+- **Um lembrete pedido pelo usuário** ("me lembra de mandar o relatório sexta") se resolve
+  com uma mensagem na hora certa, exatamente o que um [watch](../watches/) já faz. Se o seu
+  agente tem a tool `watch`, o ideal ainda é que ele recorra a ela diretamente, na hora;
+  compromissos funcionam como a rede de segurança para quando isso não acontece.
+- **Uma promessa feita pelo próprio agente** ("deixa eu checar o deploy e te falo amanhã")
+  não pode ser resolvida com um lembrete avisando que a promessa existiu. Quando o prazo
+  chega, o Pepe reexecuta aquela sessão com uma instrução simples: fazer de fato o que foi
+  prometido, e só depois responder com o que encontrou. A mensagem que chega é uma resposta
+  de verdade, não um texto pronto, então uma promessa nunca vira, em silêncio, um "lembrete:
+  eu disse que ia checar isso".
 
-### Confiança, e o que acontece quando não está claro
+### Confiança, e o que acontece na dúvida
 
-Uma chamada barata a um modelo lê a última troca de mensagens e decide se existe um compromisso de verdade, com uma pontuação de confiança. Se ela for alta o suficiente, e o prazo tiver sido resolvido, o compromisso já entra agendado: sem passo extra, batendo com "perceber sem precisar pedir duas vezes". Abaixo disso, ou quando o prazo não pôde ser resolvido a partir do que foi dito (um vago "em breve" não é uma data), ele entra **aguardando sua confirmação**: você é perguntado diretamente, uma vez, em vez de ficar rastreando silenciosamente algo que ninguém pediu de verdade.
+Uma chamada barata a um modelo lê a última troca de mensagens e decide, com uma pontuação
+de confiança, se há de fato um compromisso ali. Quando essa confiança é alta e o prazo dá
+pra resolver, o compromisso já sai agendado, sem nenhum passo extra: é exatamente "perceber
+sozinho, sem precisar pedir duas vezes". Abaixo disso, ou quando o prazo não dá pra
+extrair do que foi dito (um "em breve" vago não é uma data), ele fica **aguardando sua
+confirmação**: você é perguntado uma vez, direto, em vez de o sistema ficar rastreando
+silenciosamente algo que ninguém pediu de fato.
 
 ### Gerenciando pelo chat
 
-A tool `commitment` do agente tem três ações: `list` (o que está sendo acompanhado agora), `confirm id: <id>` (promove um que está aguardando; passe `due_when` também se a data nunca foi resolvida), e `cancel id: <id>`.
+A tool `commitment` do agente tem três ações: `list` (o que está sendo acompanhado agora),
+`confirm id: <id>` (promove um compromisso que estava aguardando; inclua `due_when` também
+se a data nunca tiver sido resolvida) e `cancel id: <id>`.
 
-### Fazendo pelo dashboard
+### Ou pelo dashboard
 
-Abra a página **Compromissos** em `pepe serve` para ver tudo que está sendo acompanhado, agrupado em aguardando confirmação, agendados e entregues. Confirme ou cancele direto por lá.
+Abra a página **Compromissos** dentro de `pepe serve` para ver tudo que está sendo
+acompanhado, agrupado em aguardando confirmação, agendados e já entregues. Confirmar ou
+cancelar é feito direto ali.
 
-<div class="note"><strong>Sem servidor para rodar, só um arquivo local.</strong> Compromissos vivem num pequeno arquivo SQLite embutido, ao lado do <code>config.json</code>, não é um banco de dados que você precisa instalar ou administrar. São disparados pelo mesmo tipo de timer interno que já move watches e tarefas agendadas, que só roda enquanto uma superfície de longa duração (<code>pepe serve</code>, um gateway, ou uma sessão interativa) estiver de pé.</div>
+<div class="note"><strong>Nenhum servidor pra rodar, só um arquivo local.</strong> Compromissos moram num pequeno arquivo SQLite embutido, ao lado do <code>config.json</code>, e não num banco de dados que você precisa instalar ou administrar. O disparo usa o mesmo tipo de timer interno que já move watches e tarefas agendadas, e esse timer só roda enquanto alguma superfície de longa duração estiver de pé (<code>pepe serve</code>, um gateway, ou uma sessão interativa).</div>

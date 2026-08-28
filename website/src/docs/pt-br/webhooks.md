@@ -5,7 +5,7 @@ description: Configure Slack, Discord, Microsoft Teams, Google Chat e canais por
 
 ## Como funciona um canal por webhook
 
-Todo canal por webhook, seja qual for a plataforma, é acessível em uma única
+Não importa a plataforma, todo canal por webhook fica acessível numa única
 rota:
 
 ```
@@ -13,77 +13,82 @@ https://YOUR_HOST/webhooks/<project>/<provider>/<slug>
 ```
 
 - `<project>` é o projeto ao qual a conexão pertence. Use `default` para o
-  projeto default, ou o slug de outro projeto para manter a conexão isolada
-  naquele projeto.
+  projeto padrão, ou o slug de outro projeto para manter essa conexão
+  isolada só nele.
 - `<provider>` é o nome da plataforma: `whatsapp`, `slack`, `discord`,
   `msteams` ou `googlechat`.
-- `<slug>` é o nome único que você deu à conexão.
+- `<slug>` é o nome único que você escolheu para a conexão.
 
-Um `GET` para essa URL responde ao handshake de verificação do provedor (o
-Pepe devolve o desafio que a plataforma envia quando você registra a URL pela
-primeira vez). Um `POST` é um evento de entrada. Em um `POST`, o Pepe resolve a
-conexão, verifica a assinatura da requisição contra o segredo que você
-configurou, extrai a mensagem, executa o agente vinculado e entrega a resposta
-pela própria API do provedor. O trabalho do agente roda em segundo plano para
-que a plataforma receba o retorno na hora (provedores como a Meta repetem um
-webhook lento).
+Um `GET` nessa URL responde ao handshake de verificação do provedor (o
+Pepe simplesmente devolve o desafio que a plataforma manda na primeira vez
+que você registra a URL). Um `POST`, por outro lado, é um evento chegando:
+o Pepe resolve a conexão correspondente, confere a assinatura da requisição
+contra o segredo configurado, extrai a mensagem, roda o agente vinculado e
+entrega a resposta pela própria API do provedor. Todo esse trabalho do
+agente roda em segundo plano, para a plataforma já receber a confirmação na
+hora (provedores como a Meta tentam de novo um webhook que demora demais
+para responder).
 
-Há uma única rota genérica. Adicionar um novo provedor nunca adiciona um novo
-endpoint.
+Existe uma única rota genérica para tudo isso. Adicionar um provedor novo
+nunca implica em criar um endpoint novo.
 
-<div class="note"><strong>Host público.</strong> Canais por webhook precisam de
-uma URL que a plataforma consiga alcançar. Exponha sua instância do Pepe atrás
-de um proxy reverso ou de um túnel, e defina <code>PEPE_PUBLIC_URL</code> para
-que as URLs de retorno que a linha de comando imprime fiquem completas. Para um
-túnel rápido durante os testes, rode <code>pepe serve --tunnel</code>.</div>
+<div class="note"><strong>Host público.</strong> Um canal por webhook
+precisa de uma URL que a plataforma consiga alcançar de fato. Exponha sua
+instância do Pepe atrás de um proxy reverso ou de um túnel, e configure
+<code>PEPE_PUBLIC_URL</code> para que as URLs de retorno impressas pela
+linha de comando já saiam completas. Para um túnel rápido enquanto você
+testa, rode <code>pepe serve --tunnel</code>.</div>
 
 ## Slack, Discord, Microsoft Teams, Google Chat
 
-Esses provedores são configurados pela configuração guiada (ou pelo painel), que
-pede exatamente os campos de que cada um precisa e imprime a URL de retorno para
-registrar:
+Esses provedores se configuram pela configuração guiada (ou pelo painel),
+que pergunta exatamente os campos que cada um precisa e já imprime a URL de
+retorno para você registrar na plataforma:
 
 ```bash
 pepe setup
 ```
 
 Escolha a opção de canal, escolha o provedor e o agente, e informe as
-credenciais (uma referência `${ENV_VAR}` é aceita para qualquer segredo). Cada
-um tem sua própria página com os campos e passos de configuração específicos:
-[Slack](../slack/), [Discord](../discord/), [Microsoft Teams](../msteams/),
-[Google Chat](../googlechat/). Esta página cobre o que é compartilhado por
-todos eles (e pelo WhatsApp).
+credenciais pedidas (para qualquer segredo, uma referência `${ENV_VAR}`
+também é aceita). Cada provedor tem sua própria página, com os campos e
+passos específicos dele: [Slack](../slack/), [Discord](../discord/),
+[Microsoft Teams](../msteams/), [Google Chat](../googlechat/). O que está
+aqui nesta página é justamente o que todos eles têm em comum, e que também
+vale para o WhatsApp.
 
-## @Menções em grupos
+## @Menções em grupo
 
-Slack, Microsoft Teams e Google Chat suportam conversas em grupo/canal, onde
-por padrão a conexão só responde quando é @mencionada (uma mensagem direta
-sempre chega ao agente, independente da configuração). Coloque
-`require_mention: false` na conexão para ela responder a toda mensagem em todo
-canal em que estiver. Ou, sem mexer nessa configuração da conexão inteira,
-dispense isso para um único canal de dentro desse canal:
+Slack, Microsoft Teams e Google Chat suportam conversas em grupo ou canal,
+onde, por padrão, a conexão só responde quando é @mencionada (uma mensagem
+direta, essa sim, sempre chega ao agente, independente dessa
+configuração). Para responder a toda mensagem em qualquer canal onde
+estiver, defina `require_mention: false` na conexão. Ou, sem tocar nessa
+configuração geral, dá para dispensar a exigência só num canal específico,
+de dentro dele mesmo:
 
 ```text
-/mention off   # só nesse canal, até o /new: não precisa @mencionar para ele responder
+/mention off   # só nesse canal, até o /new - não precisa @mencionar para ele responder
 /mention on    # volta a exigir @menção
 /mention       # mostra a configuração atual
 ```
 
-Como um comando de canal ainda precisa estar endereçado ao bot para rodar, o
-*primeiro* `/mention off` precisa de uma @menção de verdade
-(`@bot /mention off`); depois disso, o canal não precisa mais até o `/new`.
-A dispensa vive na conversa daquele canal, não na conexão, então nunca vaza
-para nenhum outro canal. WhatsApp e Discord não filtram por menção hoje
-(sempre respondem), então `/mention` não faz nada neles.
+Como um comando de canal precisa, antes de tudo, ser endereçado ao bot para
+rodar, o *primeiro* `/mention off` ainda exige uma @menção de verdade
+(`@bot /mention off`); depois dele, o canal fica dispensado até o próximo
+`/new`. Essa dispensa vive na conversa daquele canal específico, não na
+conexão como um todo, então não vaza para nenhum outro canal. WhatsApp e
+Discord, por sua vez, não filtram por menção hoje (sempre respondem a
+tudo), então `/mention` simplesmente não tem efeito nenhum ali.
 
 ## Trocando de modelo
 
-Os comandos `/model` e `/models` deixam as pessoas ver ou trocar qual modelo
-de IA responde a elas. Eles só funcionam numa conexão em modo `admin` com
-`commands` habilitado (veja a comparação de modos em
-[Channels](../channels/)); no `support`, são tratados como texto comum.
-`/models` lista os modelos disponíveis para o projeto da conexão; `/model`
-mostra o atual, ou troca:
+Os comandos `/model` e `/models` deixam qualquer pessoa consultar ou trocar
+qual modelo de IA está respondendo. Eles só funcionam numa conexão em modo
+`admin` com `commands` habilitado (veja a comparação de modos em
+[Canais](../channels/)); no modo `support`, viram apenas texto comum sem
+efeito nenhum. `/models` lista os modelos disponíveis para o projeto
+daquela conexão; `/model` mostra o modelo atual, ou troca para outro:
 
 ```text
 /model openrouter               # pergunta se troca só esse chat ou todos
@@ -91,32 +96,41 @@ mostra o atual, ou troca:
 /model openrouter global        # troca para todos com quem essa conexão fala
 ```
 
-Trocar **globalmente**, para todos com quem a conexão fala, é reservado aos
-**treinadores** (a mesma lista de confiança que controla a memória); qualquer
-outra pessoa numa conversa permitida só pode trocar a própria conversa.
-Defina `model_switch_locked: true` na conexão para desativar isso totalmente
-para quem não é treinador. É o mesmo mecanismo que o WhatsApp usa; a versão
-do Telegram acrescenta um seletor com botões em vez de comandos digitados.
+Trocar **globalmente**, valendo para todo mundo que fala com aquela
+conexão, é reservado aos **treinadores**, a mesma lista de confiança que
+controla a memória; qualquer outra pessoa numa conversa liberada só
+consegue trocar o modelo da própria conversa. Para desligar isso
+completamente para quem não é treinador, defina `model_switch_locked: true`
+na conexão. É exatamente o mesmo mecanismo usado pelo WhatsApp; já a versão
+do Telegram acrescenta um seletor por botões, em vez de depender só de
+comandos digitados.
 
 ## Por baixo dos panos: o contrato do provedor
 
-Cada canal por webhook é um pequeno módulo que implementa o mesmo contrato, então
-todos se comportam de forma coerente e uma nova plataforma é um novo módulo em
-vez de uma nova rota. Os callbacks são:
+Cada canal por webhook nada mais é do que um módulo pequeno implementando o
+mesmo contrato, o que garante um comportamento coerente entre todos eles e
+faz com que uma plataforma nova signifique um módulo novo, nunca uma rota
+nova. Os callbacks desse contrato são:
 
-- `name` e `label`: o segmento de URL do provedor e o nome legível para humanos.
-- `config_schema`: os campos que o painel mostra para configurar uma conexão.
-- `verify`: responder ao handshake de verificação do `GET`.
-- `authenticate`: verificar a assinatura em um `POST` de entrada contra o segredo
-  da conexão e o corpo cru da requisição. Uma requisição que falha é descartada.
-- `parse`: normalizar o payload da plataforma em zero ou mais mensagens simples.
-  Atualizações de estado e recibos de entrega são ignorados.
-- `respond` (opcional): produzir uma resposta síncrona quando o protocolo exige
-  uma antes de qualquer trabalho do agente, como o desafio `url_verification` do
-  Slack ou o ping e o retorno adiado do Discord.
-- `deliver`: enviar uma resposta de texto de volta ao remetente.
-- `deliver_file` (opcional): enviar um arquivo como anexo.
+- `name` e `label`: o segmento de URL do provedor e o nome legível para
+  humanos.
+- `config_schema`: os campos que o painel renderiza para configurar uma
+  conexão.
+- `verify`: responde ao handshake de verificação feito via `GET`.
+- `authenticate`: confere a assinatura de um `POST` recebido contra o
+  segredo da conexão e o corpo cru da requisição. Uma requisição que falha
+  nessa checagem é descartada sem mais.
+- `parse`: normaliza o payload da plataforma em zero ou mais mensagens
+  simples, descartando pelo caminho atualizações de status e recibos de
+  entrega.
+- `respond` (opcional): produz uma resposta síncrona quando o protocolo
+  exige isso antes de qualquer trabalho do agente, como o desafio
+  `url_verification` do Slack, ou o ping seguido de confirmação adiada do
+  Discord.
+- `deliver`: envia uma resposta em texto de volta para quem mandou a
+  mensagem.
+- `deliver_file` (opcional): envia um arquivo como anexo.
 
-Se você escrever um plugin que implementa esse contrato, ele se registra como um
-novo provedor sob o próprio `name`, acessível na mesma rota `/webhooks/...` sem
-fiação extra.
+Um plugin que implemente esse contrato se registra sozinho como um novo
+provedor, sob o próprio `name`, e já fica acessível na mesma rota
+`/webhooks/...`, sem exigir nenhuma fiação extra.

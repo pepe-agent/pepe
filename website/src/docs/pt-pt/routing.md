@@ -1,22 +1,23 @@
 ---
 title: Encaminhamento entre agentes
-description: Deixa um agente passar trabalho a outro com a ferramenta send_to_agent, sob uma lista de rotas permitidas dirigida que diz exatamente quem pode chamar quem.
+description: A ferramenta send_to_agent deixa um agente entregar trabalho a outro, sob uma lista de rotas que tu controlas, sentido a sentido.
 ---
 
-Os agentes podem falar uns com os outros através da ferramenta `send_to_agent`. Quem
-pode chamar quem é definido por uma **lista de rotas permitidas dirigida**: o campo
-`can_message` de cada agente indica os agentes a quem *ele* pode enviar mensagens. Uma
-rota de `triage` para `billing` não implica uma rota de `billing` de volta para
-`triage`.
+Os agentes conseguem falar uns com os outros através da ferramenta `send_to_agent`.
+Quem pode chamar quem fica definido numa **lista de rotas dirigida**: o campo
+`can_message` de cada agente guarda os nomes a quem *esse* agente tem permissão para
+escrever. Ter uma rota de `triage` para `billing` não abre automaticamente o sentido
+inverso, de `billing` para `triage`.
 
-Quando um agente encaminha uma mensagem, o agente chamado responde numa execução nova, e
-a resposta chega a quem chamou como resultado da ferramenta. Um limite de saltos e uma
-verificação de ciclos impedem que as cadeias de chamadas entrem em ciclo infinito.
+Quando um agente encaminha uma mensagem, quem recebe responde numa execução própria e
+nova, e essa resposta volta para quem chamou como resultado da ferramenta. Existe um
+limite de saltos e uma verificação de ciclos, para que uma cadeia de chamadas
+encaminhadas nunca fique presa a repetir-se para sempre.
 
-O `send_to_agent` nunca muda quem está de facto a falar com o utilizador: é uma
-consulta pontual, e quem chamou continua a ser o agente que responde à conversa. Passar
-a conversa **inteira** a outro agente a partir de agora é o `switch_agent`, uma
-ferramenta diferente, abordada mais abaixo.
+Note-se que o `send_to_agent` não troca quem está de facto a falar com o utilizador:
+é só uma consulta pontual, e continua a ser o agente que chamou a responder na
+conversa. Passar a conversa **toda** para outro agente, a partir daí em diante, é
+trabalho do `switch_agent`, uma ferramenta diferente que vemos mais abaixo.
 
 ## Criar uma rota
 
@@ -29,12 +30,12 @@ pepe agent route billing refunds
 # revogar uma rota
 pepe agent route triage billing --remove
 
-# ou definir logo na criação do agente
+# ou já definir isto na criação do agente
 pepe agent add triage --model mock --can-message billing,refunds
 ```
 
-As rotas ficam guardadas em `~/.pepe/config.json`, na lista `can_message` de cada
-agente:
+As rotas ficam guardadas em `~/.pepe/config.json`, dentro da lista `can_message` de
+cada agente:
 
 ```jsonc
 "agents": {
@@ -44,72 +45,76 @@ agente:
 }
 ```
 
-O `refunds` tem um `can_message` vazio, por isso responde quando é chamado, mas não pode
-chamar ninguém de volta. Como a lista é dirigida, conceder a rota de `billing` para
-`refunds` não concede nada no sentido inverso.
+Repara que `refunds` tem um `can_message` vazio: responde quando é chamado, mas não
+tem para onde ligar de volta. E como a lista tem sentido único, dar a `billing` uma
+rota para `refunds` não abre nada no sentido contrário.
 
-O agente também precisa de ter `send_to_agent` na sua lista de `tools` para conseguir
-encaminhar seja o que for. A lista de rotas permitidas decide a quem ele pode ligar, e a
-ferramenta é o que lhe permite fazer a chamada.
+Também não basta constar da lista: o agente precisa de ter `send_to_agent` entre as
+suas `tools` para conseguir encaminhar seja o que for. Uma coisa diz a quem ele pode
+ligar, a outra é o que lhe permite discar.
 
-<div class="note"><strong>Fronteiras de projeto.</strong> As rotas nunca atravessam a
-fronteira de um projeto. Os nomes simples em <code>--can-message</code> são resolvidos
-dentro do próprio projeto do agente, e a CLI recusa uma rota entre dois agentes que
-estejam em projetos diferentes.</div>
+<div class="note"><strong>Fronteiras de projeto.</strong> Uma rota nunca atravessa a
+fronteira entre projetos. Um nome simples em <code>--can-message</code> resolve-se
+sempre dentro do projeto do próprio agente, e a CLI recusa ligar dois agentes que
+vivam em projetos diferentes.</div>
 
-## Passar a conversa inteira a outro agente (`switch_agent`)
+## Passar a conversa toda a outro agente (`switch_agent`)
 
-O `send_to_agent` é uma consulta pontual; o `switch_agent` é outra coisa: o agente que
-está a responder agora passa o **resto da conversa** a outro agente. É o mesmo efeito
-de o utilizador digitar `/agent NOME` por si próprio, só que acessível por um pedido
-comum ("liga-me ao billing", "quero falar diretamente com o suporte") em vez do
-comando de barra.
+Se o `send_to_agent` serve para uma consulta pontual, o `switch_agent` resolve outro
+problema: o agente que está a responder agora entrega o **resto da conversa** a um
+colega. O efeito final é o mesmo que o utilizador escrever `/agent NOME` com as
+próprias mãos, só que fica acessível a partir de um pedido comum, do tipo "liga-me ao
+billing" ou "quero falar com o suporte diretamente", sem precisar do comando de barra.
 
 ```text
 Liga-me diretamente ao agente billing.
 ```
 
-O agente chama `switch_agent` com `target: "billing"`. A resposta dele a *este* turno
-continua a sair do agente que já está a responder ("certo, a ligar-te agora"); a
-troca só entra em vigor a partir da mensagem seguinte, o mesmo comportamento que o
-`/agent` já tem. O novo agente começa com um contexto limpo; não herda o histórico
+O agente chama `switch_agent` com `target: "billing"`. A resposta a *este* turno em
+concreto ainda sai de quem já estava a falar ("certo, a ligar-te agora"); só a partir
+da mensagem seguinte é que a troca entra em vigor, tal como já acontece hoje com
+`/agent`. O agente novo arranca com um contexto limpo, sem herdar nada do histórico
 desta conversa.
 
-Usa exatamente a mesma lista `can_message` do `send_to_agent`: se um agente pode
-enviar mensagens a um par, também pode passar-lhe a conversa, sem precisar de
-configurar uma rota separada. Ao contrário do `send_to_agent`, o `switch_agent`
-**passa** pela barreira de permissão normal por omissão: muda quem responde a cada
-mensagem a partir daqui, uma ação maior que passa despercebida com facilidade.
+A lista usada é exatamente a mesma `can_message` do `send_to_agent`: se um agente já
+pode escrever a um colega, também já pode passar-lhe a conversa, sem precisar de
+configurar nada a mais para isso. A diferença fica noutro sítio: ao contrário do
+`send_to_agent`, o `switch_agent` **passa** pela barreira de permissão normal por
+predefinição, porque decide quem responde a cada mensagem daí para a frente. Ou seja,
+é uma ação com peso suficiente para um humano deixar passar sem reparar, se ninguém
+lha mostrar primeiro.
 
-## Encaminhamento e a barreira de permissão
+## O encaminhamento e a barreira de permissão
 
-A lista de rotas permitidas *é* a autorização da chamada do `send_to_agent`. O operador
-já decidiu, na configuração, que este agente pode enviar mensagens àquele agente, por
-isso a própria chamada não passa pela barreira de permissão humana. Simplesmente
-executa.
+A própria lista de rotas *é* a autorização para a chamada do `send_to_agent`. Já foi
+o operador quem decidiu, na configuração, que este agente pode escrever àquele, e por
+isso a chamada em si não precisa de passar pela barreira humana: corre sem mais.
 
-É precisamente por isso que a lista é dirigida e fechada por omissão, em vez de simétrica
-e aberta. A concessão é estreita e explícita, um sentido de cada vez, e é isso que torna
-seguro permitir uma chamada sem barreira. Uma lista simétrica entregaria em silêncio ao
-agente chamado uma rota de regresso a quem o chamou, sem que ninguém a tivesse pedido.
+É exatamente por essa razão que a lista tem sentido único e começa fechada, em vez de
+ser simétrica e aberta. Uma concessão estreita e explícita, um sentido de cada vez, é
+o que torna seguro dispensar a barreira nesse caso concreto. Se fosse simétrica,
+entregaria em silêncio a quem foi chamado uma rota de volta para quem o chamou, coisa
+que ninguém pediu.
 
-As ferramentas de risco do agente chamado são outra questão, e continuam com barreira.
-Quando o `billing` executa `bash` ou `write_file`, essa chamada passa pela barreira de
-permissão tal como passaria se tivesses falado diretamente com o `billing`. O
-encaminhamento deixa um agente alcançar outro, mas nunca branqueia as permissões desse
-outro agente.
+As ferramentas de risco do agente chamado são outra história à parte, e continuam
+sujeitas a barreira. Quando o `billing` corre `bash` ou `write_file`, essa chamada
+passa pela permissão exatamente como passaria se fosses tu a falar com o `billing`
+diretamente. O encaminhamento só abre o caminho entre dois agentes; nunca lava as
+permissões de quem está do outro lado.
 
 ## Alterar rotas pela conversa
 
-Dá a um agente a ferramenta `set_route` e ele passa a acrescentar ou remover rotas pela
-conversa, guiado pela skill nativa `manage-routing`. A ferramenta recebe
-`{from, to, action}`, e o `from` assume por omissão o próprio agente que a chamou.
+Dando a um agente a ferramenta `set_route`, ele passa a conseguir acrescentar ou
+remover rotas em conversa normal, guiado pela skill nativa `manage-routing`. A
+ferramenta recebe `{from, to, action}`, e o `from` assume por omissão o próprio
+agente que a está a chamar.
 
 ```text
 Autoriza-te a ti próprio a enviar mensagens ao agente billing.
 ```
 
-O agente chama `set_route` com `action: "allow"` e `to: "billing"`. Como isto edita a
-configuração, o `set_route` passa mesmo pela barreira de permissão: autorizas a nova rota
-antes de ela ser escrita no disco. O encaminhamento continua dirigido, por isso autorizar
-esta rota não permite que o `billing` responda por iniciativa própria.
+O agente chama `set_route` com `action: "allow"` e `to: "billing"`. Como isto altera
+configuração, o `set_route` passa mesmo pela barreira de permissão: tens de autorizar
+a rota nova antes de ela ficar escrita em disco. E o encaminhamento continua com
+sentido único, por isso autorizar este caminho não abre nenhum de volta para o
+`billing` responder por conta própria.

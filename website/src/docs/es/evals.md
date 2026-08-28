@@ -1,61 +1,69 @@
 ---
 title: Evals
-description: Reproduce prompts conocidos en un agente y comprueba la respuesta y las herramientas que usó.
+description: Vuelve a correr prompts que en su momento salieron bien y confirma que el agente sigue respondiendo y usando sus herramientas igual.
 ---
 
-Un **eval** reproduce un prompt conocido en un agente y hace aserciones sobre la
-respuesta y sobre las herramientas que el agente usó. Es tu red de regresión para
-el comportamiento: cambias un prompt, un modelo o un conjunto de herramientas,
-ejecutas los evals y ves al instante si se rompió algo que te importaba.
+Un **eval** vuelve a pasar un prompt ya conocido por un agente, y revisa
+tanto la respuesta como las herramientas que usó. Es tu red de seguridad
+frente a cambios de comportamiento: modificas un prompt, un modelo o el
+conjunto de herramientas, corres los evals, y ves al instante si se rompió
+algo que te importaba.
 
-Esto importa porque los agentes no son deterministas, así que un test de cadena
-exacta es inútil. Un eval comprueba lo que de verdad importa. ¿Llamó a la
-herramienta correcta? ¿Mencionó la respuesta? ¿Evitó afirmar que no tiene acceso?
+Esto importa porque un agente jamás contesta dos veces con las mismas
+palabras exactas, así que una prueba que espere una cadena idéntica no sirve
+de nada. Un eval, en cambio, comprueba lo que de verdad importa: ¿llamó a la
+herramienta correcta?, ¿mencionó la respuesta?, ¿evitó decir que no tenía
+acceso cuando sí lo tenía?
 
-## Tus traces ya son los datos de prueba que tienes
+## Tus traces ya son los datos de prueba que necesitas
 
-La parte difícil de una suite de evals no es ejecutarla, es *escribirla*, y nadie
-encuentra nunca la tarde para hacerlo. Así que no escribas ninguna. Cuando el
-agente resuelva algo bien, guarda esa ejecución:
+Lo difícil de una suite de evals nunca es correrla, es *escribirla*, y esa
+tarde libre para sentarse a hacerlo nunca aparece. Así que mejor no la
+escribas: cuando el agente resuelva algo bien, simplemente guarda esa
+ejecución:
 
 ```bash
 pepe eval add a1b2c3                                   # un id de trace
 pepe eval add a1b2c3 --suite support --contains "refund,5 business days"
 ```
 
-En el panel es un botón sobre el trace: **✓ Esto salió bien**.
+En el panel, basta con un botón sobre el trace: **✓ Esto salió bien**.
 
 ### Qué comprueba el caso en realidad
 
-El caso guarda el prompt y el agente tal cual, y comprueba **las herramientas que
-el agente usó**. Esa es la aserción que vale la pena tener. Sobrevive a las
-actualizaciones de modelo y a las reformulaciones, y es exactamente lo que cambia
-cuando una edición sale mal: el agente deja de consultar las cosas y empieza a
-inventarlas, o recurre a la shell donde antes leía un archivo. Un modelo que
-responde a la misma pregunta con las mismas herramientas es un modelo que sigue
-funcionando como decidiste que debía funcionar.
+El caso conserva el prompt y el agente tal cual, y hace una aserción sobre
+**las herramientas que usó**. Esa es la comprobación que realmente vale la
+pena, porque aguanta actualizaciones de modelo y cambios de redacción, y es
+justo lo primero que cambia cuando algo sale mal: el agente deja de
+consultar la información y empieza a inventarla, o recurre a una shell donde
+antes se limitaba a leer un archivo. Si un modelo sigue respondiendo la
+misma pregunta con las mismas herramientas, sigue funcionando como decidiste
+que debía funcionar.
 
-Deliberadamente **no** exige la misma frase de vuelta. Dos ejecuciones del mismo
-prompt nunca producen una frase idéntica, y un test que insiste en eso queda
-silenciado en una semana y, a partir de ahí, no protege nada. La respuesta que
-estaba bien se guarda en el caso, bajo `recorded`, para quien lea un fallo. Si
-algunas palabras de esa respuesta *eran* el punto, dilo con `--contains` y también
-se comprueban.
+A propósito, **no** exige recibir la misma frase de vuelta. Dos ejecuciones
+del mismo prompt jamás producen exactamente la misma frase, y una prueba que
+insista en eso termina silenciada en menos de una semana, sin proteger nada
+a partir de entonces. La respuesta que en su momento estuvo bien queda
+guardada en el caso bajo `recorded`, para que quien lea un fallo la tenga a
+mano. Y si alguna de esas palabras sí era importante, indícalo con
+`--contains` y también quedará comprobada.
 
-Las ejecuciones fallidas se rechazan. Promover una congelaría el fallo como
-expectativa y te entregaría una suite en verde precisamente para él.
+Las ejecuciones fallidas se rechazan sin excepción: promoverlas congelaría
+el fallo como si fuera lo esperado, y te dejaría con una suite en verde para
+algo que en realidad estaba mal.
 
-## Cómo va esto en la práctica, de principio a fin
+## Cómo funciona esto en la práctica, de principio a fin
 
-Nunca has escrito un eval y no vas a empezar hoy. Bien. Haz esto en su lugar.
+Nunca escribiste un eval y hoy tampoco vas a empezar. Está bien. Haz esto en
+su lugar.
 
-**1. Usa Pepe con normalidad.** Habla con tu agente, deja que tus clientes hablen
-con él. Cada ejecución ya se está registrando, así que no tienes que hacer nada
-para que eso ocurra.
+**1. Usa Pepe con normalidad.** Habla con tu agente, deja que tus clientes le
+hablen. Cada ejecución ya queda registrada sola, sin que tengas que hacer
+nada especial.
 
-**2. Cuando algo salga bien, dilo.** Abre el panel, ve a [Traces](../traces/),
-pulsa en la ejecución y pulsa **✓ Esto salió bien**. Esa es toda la ceremonia.
-Desde el terminal es lo mismo:
+**2. Cuando algo salga bien, dilo.** Abre el panel, entra a
+[Traces](../traces/), haz clic en la ejecución y pulsa **✓ Esto salió
+bien**. Con eso ya está. Desde la terminal es igual de simple:
 
 ```bash
 pepe traces                       # las ejecuciones recientes, con sus ids
@@ -66,11 +74,12 @@ pepe eval add a1b2c3              # guarda esa
 #   run it with: pepe eval recorded
 ```
 
-Hazlo cuatro o cinco veces a lo largo de una semana, siempre que notes que el
-agente hace lo correcto. Ya tienes una suite que describe a tu agente, escrita por
-tu agente, sobre las cosas que tus clientes preguntan de verdad.
+Repite esto cuatro o cinco veces a lo largo de una semana, cada vez que
+notes que el agente hizo lo correcto. Al final tendrás una suite que
+describe a tu agente, escrita por tu propio agente, sobre las cosas que tus
+clientes de verdad preguntan.
 
-**3. Antes de cambiar nada, ejecútala.**
+**3. Antes de cambiar cualquier cosa, corre la suite.**
 
 ```bash
 pepe eval recorded
@@ -85,18 +94,19 @@ pepe eval recorded
   2/3 passed
 ```
 
-Esa cruz es todo el sentido de la funcionalidad. El agente siguió respondiendo. La
-respuesta seguía leyéndose bien. Simplemente dejó de abrir el archivo y empezó a
-recitar de memoria y, el mes que viene, cuando cambie el precio, habría seguido
-citando con toda confianza el precio antiguo. No se lanzó ninguna excepción, no se
-escribió ninguna línea de log y, sin esta suite, te habrías enterado por un
-cliente.
+Esa cruz es exactamente para lo que existe la funcionalidad. El agente
+siguió respondiendo, y la respuesta hasta sonaba bien, solo que dejó de
+abrir el archivo y empezó a recitar de memoria. El mes siguiente, cuando
+cambiara el precio, habría seguido citando con total confianza el precio
+viejo. No saltó ninguna excepción, no quedó ninguna línea de log, y sin esta
+suite te habrías enterado por un cliente.
 
-**4. Ponla en CI.** Una ejecución que no pasa sale con código distinto de cero, así
-que entra directamente junto a tus tests. Ahora una edición de persona que rompe
-algo no puede llegar a producción en silencio.
+**4. Súmala a tu CI.** Una ejecución que no pasa sale con un código distinto
+de cero, así que se integra sin fricción junto a tus tests. A partir de ahí,
+ningún cambio de persona que rompa algo puede colarse en producción sin que
+nadie se entere.
 
-<div class="note"><strong>Cuando un caso está mal, bórralo.</strong> Son archivos JSON bajo <code>~/.pepe/evals/</code>. Un caso que ya no refleja lo que quieres es un caso que hay que quitar, no con el que discutir. La suite es un registro de decisiones, y las decisiones cambian.</div>
+<div class="note"><strong>Si un caso ya no tiene sentido, bórralo.</strong> Son simples archivos JSON bajo <code>~/.pepe/evals/</code>. Un caso que ya no refleja lo que quieres no es algo con lo que discutir, es algo que se elimina. La suite es, al final, un registro de decisiones, y las decisiones cambian.</div>
 
 ## Ejecución
 
@@ -110,22 +120,24 @@ pepe eval --seed                       # copia las suites incluidas en ~/.pepe/e
 pepe eval help
 ```
 
-Cada caso ejecuta un turno real contra un modelo real, así que los evals necesitan
-un modelo configurado. Una ejecución imprime una marca o una cruz por caso (con el
-motivo, si falla) y un total. Una ejecución que no pasa sale con código distinto de
-cero, así que encaja en CI.
+Cada caso ejecuta un turno real contra un modelo real, así que los evals
+necesitan tener un modelo configurado. Cada ejecución imprime una marca o
+una cruz por caso (con el motivo, si falla) y un total al final. Como una
+ejecución que no pasa sale con código distinto de cero, encaja sin más en tu
+CI.
 
-`--models a,b,c` ejecuta la misma suite (o todas, si omites el nombre) contra
-cada una de esas conexiones de modelo e imprime el recuento de aprobados/fallidos
-por modelo - la forma de responder "deberíamos cambiar de modelo" con casos
-reales en vez de una suposición. El cambio solo aplica a esa llamada; no se toca
-la configuración de ningún agente.
+`--models a,b,c` corre la misma suite (o todas, si omites el nombre) contra
+cada una de esas conexiones de modelo, e imprime cuántos casos pasaron y
+cuántos fallaron por modelo. Es la manera real de responder si conviene
+cambiar de modelo, con casos concretos en vez de una corazonada. Ese cambio
+de modelo solo aplica a esa llamada puntual; la configuración de ningún
+agente se toca.
 
-## Suites que vienen con Pepe
+## Suites incluidas en Pepe
 
-Estas se ejecutan contra tu **agente por defecto**, ya que los casos omiten
-`agent`, es decir, contra aquel al que apunta `pepe agent default`. Las suites de
-herramientas dan por hecho que ese agente tiene las herramientas nativas
+Todas corren contra tu **agente por defecto**, porque sus casos omiten
+`agent`, es decir, contra el que señale `pepe agent default`. Las suites de
+herramientas asumen que ese agente cuenta con las herramientas nativas
 correspondientes.
 
 | Suite | Qué comprueba |
@@ -146,16 +158,17 @@ correspondientes.
 | `safety` | No produce una carga dañina y no fabrica una fuente falsa. |
 | `agent-boundaries` | Admite que no puede hacer algo (mover dinero, contactar a un agente desconocido) en lugar de fabricar un éxito. |
 
-Son **plantillas**: codifican expectativas razonables, no verdad universal. Un
-modelo flojo o un agente con otras herramientas fallará algunas, y ese es
-precisamente el punto. Ejecuta `pepe eval --seed` para copiarlas en
-`~/.pepe/evals` y ajustar los prompts y las aserciones a tus propios agentes.
+Son **plantillas**: recogen expectativas razonables, no una verdad
+universal. Un modelo flojo, o un agente con otro conjunto de herramientas,
+va a fallar algunas, y ese es justamente el punto. Corre `pepe eval --seed`
+para copiarlas a `~/.pepe/evals` y ajustar ahí los prompts y las
+aserciones a tus propios agentes.
 
 ## Escribir las tuyas
 
-Una suite es un archivo JSON: una lista de casos. Pon las tuyas en
-`~/.pepe/evals/<nombre>.json`. Un archivo ahí **eclipsa** a una suite incluida con
-el mismo nombre.
+Una suite no es más que un archivo JSON con una lista de casos. Pon las
+tuyas en `~/.pepe/evals/<nombre>.json`; un archivo ahí **eclipsa** a
+cualquier suite incluida que tenga el mismo nombre.
 
 ```json
 [
@@ -174,8 +187,8 @@ el mismo nombre.
 ]
 ```
 
-Todas las claves de `expect` son opcionales, y un caso pasa cuando se cumplen
-todas las aserciones presentes:
+Todas las claves de `expect` son opcionales, y un caso pasa cuando se
+cumplen todas las aserciones presentes:
 
 | Clave | Pasa cuando |
 |---|---|
@@ -185,5 +198,5 @@ todas las aserciones presentes:
 | `tool_called` | Estas herramientas se ejecutaron durante el turno. |
 | `tool_not_called` | Estas herramientas no se ejecutaron durante el turno. |
 
-Omite `agent` para ejecutar el caso contra el agente por defecto, o nombra uno
-para fijar el caso a él.
+Si omites `agent`, el caso corre contra el agente por defecto; si nombras
+uno, el caso queda fijado a él.

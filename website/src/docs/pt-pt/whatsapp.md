@@ -1,32 +1,21 @@
 ---
 title: WhatsApp
-description: Põe um agente do Pepe atrás do teu número de WhatsApp, usando a Cloud API da Meta.
+description: Coloca um agente do Pepe atrás do teu número de WhatsApp, através da Cloud API da Meta.
 ---
 
 ## WhatsApp
 
-O WhatsApp usa a Cloud API da Meta. Ao contrário do Telegram, em que é o
-próprio Pepe que vai buscar as mensagens, o WhatsApp **entrega** cada mensagem
-recebida num endereço no teu servidor, por isso o Pepe precisa de estar
-acessível pela internet. Cada ligação recebe o seu próprio URL na rota de
-entrada do Pepe:
+O WhatsApp assenta na Cloud API da Meta. Ao contrário do Telegram, onde é o próprio Pepe que vai buscar as mensagens, no WhatsApp é a plataforma que **entrega** cada mensagem recebida a um endereço no teu servidor, por isso o Pepe precisa mesmo de estar acessível pela internet. Cada ligação ganha o seu próprio URL na rota de entrada do Pepe:
 
 ```
 /webhooks/:project/:provider/:slug        ex.:  /webhooks/acme/whatsapp/support
 ```
 
-O segmento `:project` é `default` quando não crias outros projetos. O próprio
-Pepe responde ao aperto de mão de verificação da Meta nesse URL, e cada
-mensagem recebida tem a assinatura `X-Hub-Signature-256` verificada contra o
-app secret antes de o agente correr, por isso um pedido forjado nunca chega ao
-agente. A resposta volta pela Graph API. O `pepe serve` serve esta rota, por
-isso não há qualquer processo extra a executar.
+O segmento `:project` é `default` quando não usas outros projetos. O próprio Pepe trata do aperto de mão de verificação da Meta nesse URL, e toda a mensagem recebida tem a sua assinatura `X-Hub-Signature-256` verificada contra o app secret antes de o agente sequer correr, por isso um pedido forjado nunca chega a alcançá-lo. A resposta segue de volta pela Graph API, e como é o próprio `pepe serve` que serve esta rota, não há nenhum processo extra a manter.
 
-Podes manter tantas ligações quantas quiseres, cada uma associada ao seu próprio
-agente. É a mesma ideia de executar vários bots do Telegram.
+Podes correr quantas ligações quiseres, cada uma associada ao seu próprio agente, tal como acontece com vários bots do Telegram.
 
-O WhatsApp tem uma linha de comandos dedicada por ser o canal por webhook mais
-comum. Adiciona uma ligação:
+O WhatsApp tem uma linha de comandos própria por ser, de longe, o canal por webhook mais usado. Para adicionar uma ligação:
 
 ```bash
 pepe gateway whatsapp add support \
@@ -38,27 +27,20 @@ pepe gateway whatsapp add support \
   --verify-token my-verify-string
 ```
 
-As credenciais da ligação (guardadas dentro do respetivo `config`):
+As credenciais da ligação, guardadas dentro do seu `config`:
 
-- `phone_number_id`: o id do ponto de envio, proveniente da aplicação da Meta.
-- `access_token`: o token bearer da Graph API. Guarda-o como `${ENV_VAR}`.
-- `app_secret`: verifica o `X-Hub-Signature-256` de entrada. Guarda-o como
-  `${ENV_VAR}`.
-- `verify_token`: qualquer texto que escolheres. A Meta devolve-o durante o aperto
-  de mão de subscrição. Se omitires a opção, é usado o slug.
+- `phone_number_id`: o id do ponto de envio, tal como consta na aplicação da Meta.
+- `access_token`: o token bearer da Graph API, a guardar como `${ENV_VAR}`.
+- `app_secret`: usado para verificar o `X-Hub-Signature-256` de entrada, também a guardar como `${ENV_VAR}`.
+- `verify_token`: qualquer texto à tua escolha, que a Meta devolve durante o aperto de mão de subscrição; se omitires a opção, usa-se o próprio slug.
 
-Se deixares de fora `--access-token` ou `--app-secret`, a linha de comandos grava
-uma referência de marcador derivada do slug (por exemplo `${WA_TOKEN_SUPPORT}` e
-`${WA_APP_SECRET_SUPPORT}`), para que preenchas o valor real no teu ambiente mais
-tarde. O comando imprime o URL de retorno e o token de verificação. Cola ambos na
-configuração de webhook da aplicação da Meta e subscreve o campo `messages`, para
-que a Meta entregue de facto as mensagens de entrada:
+Se deixares de fora `--access-token` ou `--app-secret`, a linha de comandos escreve uma referência provisória derivada do slug (por exemplo, `${WA_TOKEN_SUPPORT}` e `${WA_APP_SECRET_SUPPORT}`), para depois preencheres o valor real no teu ambiente. O comando termina por imprimir o URL de retorno e o token de verificação; cola os dois na configuração de webhook da aplicação da Meta, e subscreve o campo `messages`, ou a Meta nunca chega a entregar-te as mensagens de entrada.
 
 ```
 https://YOUR_HOST/webhooks/default/whatsapp/support
 ```
 
-Gerir ligações:
+Para gerir ligações:
 
 ```bash
 pepe gateway whatsapp list
@@ -66,61 +48,44 @@ pepe gateway whatsapp set-agent support billing
 pepe gateway whatsapp remove support
 ```
 
-O `whatsapp list` imprime cada ligação com o respetivo URL de retorno. As outras
-opções do `whatsapp add` são `--project`, `--trainers`, `--ttl-min`,
-`--ephemeral` e `--commands`, que correspondem aos campos por ligação descritos
-acima. O painel adiciona e edita ligações do WhatsApp pela mesma secção Channels.
+O `whatsapp list` imprime cada ligação com o respetivo URL de retorno. As restantes opções do `whatsapp add`, `--project`, `--trainers`, `--ttl-min`, `--ephemeral` e `--commands`, correspondem aos campos por ligação descritos acima, e o painel adiciona e edita ligações do WhatsApp na mesma secção Channels.
 
 ### Do lado da Meta
 
-Uma vez por número, na tua aplicação da Meta:
+Isto faz-se uma vez por número, dentro da tua aplicação da Meta:
 
 1. Cria uma aplicação e adiciona-lhe o produto WhatsApp.
-2. Toma nota do `phone_number_id` do número que estás a ligar.
-3. Gera um token de acesso permanente e coloca-o no teu ambiente como
-   `${WA_TOKEN_<SLUG>}`.
-4. Copia o App Secret e coloca-o no teu ambiente como `${WA_APP_SECRET_<SLUG>}`.
-5. Aponta a Callback URL para o slug da tua ligação, indica o token de verificação
-   e subscreve o campo `messages`.
+2. Anota o `phone_number_id` do número que estás a ligar.
+3. Gera um token de acesso permanente e guarda-o no teu ambiente como `${WA_TOKEN_<SLUG>}`.
+4. Copia o App Secret e guarda-o também no teu ambiente, como `${WA_APP_SECRET_<SLUG>}`.
+5. Aponta a Callback URL para o slug da tua ligação, introduz o token de verificação, e subscreve o campo `messages`.
 
 ### Os dois modos
 
-O `--mode` da ligação decide quanto do Pepe é exposto. A comparação completa está
-em [Canais](../channels/); para um número de WhatsApp, resume-se a isto:
+O `--mode` de uma ligação decide quanto do Pepe fica exposto. A comparação completa está em [Canais](../channels/); para um número de WhatsApp, resume-se a isto:
 
-| | **admin** (o teu) | **support** (virado para o cliente) |
+| | **admin** (o teu) | **support** (voltado para o cliente) |
 |---|---|---|
 | Comandos de barra | Ligados (`/new` reinicia) | Desligados, tratados como texto simples |
 | Quem pode falar | `allowed_numbers`, o teu próprio número | Qualquer pessoa |
 | Aprende? (`trainers`) | Tu és formador | `[]`, por isso nunca aprende com um cliente |
-| Ferramentas do agente | Completas | Mantém-nas restringidas: só ferramentas seguras, já que não há um humano para aprovar uma ação arriscada |
-| Sessão | Mantida | Efémera, mais um TTL de inatividade |
+| Ferramentas do agente | Completas | Mantém-nas restritas: só ferramentas seguras, já que não há ninguém ali para aprovar uma ação arriscada |
+| Sessão | Mantida | Efémera, com um TTL de inatividade |
 
 ### A sessão
 
-A sessão é indexada como `whatsapp:<agent>:<phone>`. É a conversa do agente com
-aquele cliente em concreto, isolada por projeto através do handle do agente. Duas
-coisas põem-lhe fim:
+A sessão fica indexada como `whatsapp:<agent>:<phone>`, a conversa do agente com aquele cliente em concreto, isolada por projeto através do handle do agente. Duas coisas lhe põem fim:
 
-- O agente invoca a ferramenta **`end_session`** quando a troca termina, o que
-  limpa o contexto para que a mensagem seguinte do cliente comece do zero.
-- O **TTL de inatividade** (`--ttl-min`, ausente significa nunca) despeja uma
-  conversa que ficou parada.
+- O agente invoca a ferramenta **`end_session`** quando a troca termina, limpando o contexto para que a próxima mensagem do cliente comece do zero.
+- O **TTL de inatividade** (`--ttl-min`, que por omissão nunca expira) despeja uma conversa que ficou muda.
 
-Passar uma conversa a um especialista não precisa de maquinaria extra: o agente
-limita-se a invocar `send_to_agent`. Vê [Encaminhamento](../routing/).
+Passar uma conversa a um especialista não exige nenhuma maquinaria extra: basta ao agente chamar `send_to_agent` (vê [Encaminhamento](../routing/)).
 
-<div class="note"><strong>Regra das 24 horas.</strong> A Meta só permite respostas
-em formato livre dentro de 24 horas da última mensagem do utilizador. O suporte
-reativo encaixa-se nisto de forma natural. As mensagens proativas fora da janela
-precisam de modelos pré-aprovados, que este canal não envia.</div>
+<div class="note"><strong>Regra das 24 horas.</strong> A Meta só permite respostas em formato livre dentro das 24 horas seguintes à última mensagem do utilizador. O suporte reativo encaixa nisto sem esforço; já mensagens proativas fora dessa janela exigem modelos pré-aprovados, que este canal não envia.</div>
 
 ### Mudar de modelo
 
-`/model` e `/models` só disparam numa ligação em modo `admin` (vê a comparação de
-modos acima); no `support`, são texto simples como qualquer outro comando de
-barra. `/models` lista os modelos disponíveis para o projeto dessa ligação;
-`/model` mostra o que está ativo, ou muda-o:
+`/model` e `/models` só disparam numa ligação em modo `admin` (vê a comparação acima); em `support`, tornam-se texto simples como qualquer outro comando de barra. O `/models` lista os modelos disponíveis para o projeto dessa ligação; o `/model` mostra o que está ativo, ou muda-o:
 
 ```text
 /model openrouter               # pergunta se muda só este chat ou todos
@@ -128,8 +93,4 @@ barra. `/models` lista os modelos disponíveis para o projeto dessa ligação;
 /model openrouter global        # muda para todos com quem esta ligação fala
 ```
 
-Qualquer pessoa numa conversa permitida pode mudar a sua própria sessão;
-mudá-lo **globalmente** está reservado a **formadores**, a mesma lista que
-rege a memória. Define `model_switch_locked: true` na ligação para desativar
-por completo a mudança de modelo para quem não é formador. O WhatsApp não tem
-um seletor com botões como o do Telegram; aqui é só escrito.
+Qualquer pessoa numa conversa permitida pode mudar a sua própria sessão; mudá-lo **globalmente** fica reservado aos **formadores**, a mesma lista que controla a memória. Define `model_switch_locked: true` na ligação para desligar por completo a troca de modelo para quem não é formador. O WhatsApp não tem um seletor com botões como o do Telegram; aqui é sempre por comando escrito.

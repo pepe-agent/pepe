@@ -1,11 +1,11 @@
 ---
 title: Ejemplos de clientes
-description: Llama a Pepe desde JavaScript, Python, Ruby, PHP, Java, Elixir y WebSocket directo.
+description: Cómo llamar a Pepe desde JavaScript, Python, Ruby, PHP, Java, Elixir o WebSocket puro.
 ---
 
-## Ejemplos de cliente
+## Ejemplos de clientes
 
-Puntos de partida listos para copiar y pegar y llamar a la API HTTP de Pepe desde tu lenguaje. Cada ejemplo apunta al servidor local. Donde se muestre un token, quítalo si tu API está abierta.
+Aquí tienes puntos de partida para copiar, pegar y llamar a la API HTTP de Pepe desde tu lenguaje preferido. Todos los ejemplos apuntan al servidor local, y si tu API no exige token puedes simplemente quitar esa línea de cada uno.
 
 **curl**
 

@@ -1,33 +1,33 @@
 ---
 title: Documentos
-description: Um arquivo enviado no chat chega como texto, lido na porta, junto com o que foi dito sobre ele.
+description: Um arquivo enviado no chat chega como texto, já lido na porta, junto com o que foi dito sobre ele.
 ---
 
-## Um documento é uma mensagem, não uma pesquisa
+## Um documento é uma mensagem, não uma tarefa de pesquisa
 
-Mande um PDF com a legenda "resume isso" e aquilo deveria ser lido como uma mensagem só. E é. O arquivo é lido quando chega, antes do roteamento, então o modelo recebe a instrução e o material juntos e responde sobre o conteúdo em vez de primeiro ter que ir atrás dele.
+Alguém manda um PDF com a legenda "resume isso", e é assim mesmo que deveria funcionar: como uma mensagem só. E funciona. O arquivo é lido assim que chega, antes até do roteamento, então o modelo recebe junto a instrução e o material, e já responde sobre o conteúdo em vez de primeiro precisar ir atrás dele.
 
-O agente *consegue* fazer isso sozinho, e até agora tinha que fazer: identificar o arquivo, escolher uma biblioteca, instalar, escrever um script, rodar. Funciona, e custa vários turnos, sai diferente a cada vez, e exige que o agente tenha `bash`, coisa que um agente que atende cliente nunca deve ter. Esse caminho continua existindo, como rede de segurança. Ele deixou de ser a porta de entrada.
+O agente até *consegue* fazer isso sozinho, e até pouco tempo atrás era obrigado: identificar o arquivo, escolher uma biblioteca, instalar, escrever um script, rodar. Funciona, só que consome vários turnos, sai diferente a cada vez, e exige que o agente tenha `bash` à disposição, coisa que um agente na linha de frente com clientes nunca deveria ter. Esse caminho continua existindo como rede de segurança. Só deixou de ser a porta de entrada.
 
-## O que é lido, e quanto custa
+## O que é lido, e o que isso custa
 
 | | |
 |---|---|
-| **Texto** (`.txt`, `.md`, `.csv`, `.json`, `.log`, `.xml` e afins) | Nada. É só ler o arquivo. |
-| **`.docx`, `.xlsx`, `.pptx`** | Nada também. O Pepe lê esses formatos sozinho, sem nada extra para instalar. |
-| **`.pdf`** | `pdftotext`, onde a máquina o tiver. Onde não tiver, o agente cai para se virar e instalar o que precisa, uma vez. |
-| **Qualquer outra coisa** | Cai para o agente, que é o que acontecia com tudo antes. |
+| **Texto** (`.txt`, `.md`, `.csv`, `.json`, `.log`, `.xml` e parecidos) | Nada. É só ler o arquivo. |
+| **`.docx`, `.xlsx`, `.pptx`** | Também nada. O Pepe lê esses formatos sozinho, sem precisar instalar nada a mais. |
+| **`.pdf`** | `pdftotext`, quando a máquina já o tem. Quando não tem, o agente se vira e instala o que precisa, uma vez só. |
+| **Qualquer outra coisa** | Cai para o agente resolver, do jeito que acontecia com tudo antes. |
 
-A planilha é o caso que merece explicação. Tirar as tags de um `.xlsx` produz algo que *parece* uma resposta: um monte das palavras que estavam lá, com os números sumidos e as linhas coladas umas nas outras. O Excel guarda os textos repetidos uma vez só, numa tabela compartilhada, e a célula guarda um **índice** para ela. Uma leitura ingênua entrega ao modelo uma lista de índices se passando por dados. Ele responderia com toda a confiança, errado, e ninguém saberia. Então as células são de fato lidas, e a planilha chega como linhas e colunas.
+A planilha é o caso que merece uma explicação à parte. Tirar as tags de um `.xlsx` na marra produz algo que até *parece* uma resposta: um amontoado das palavras que estavam lá, com os números sumidos e as linhas grudadas umas nas outras. É que o Excel guarda os textos repetidos uma única vez, numa tabela compartilhada, e cada célula guarda apenas um índice para essa tabela. Uma leitura ingênua entrega ao modelo uma lista de índices se passando por dado de verdade, e ele responderia com toda a confiança, errado, sem que ninguém percebesse. Por isso as células são de fato lidas, e a planilha chega inteira, em linhas e colunas.
 
 ## Documentos longos
 
-Só a primeira parte de um documento longo é entregue, para que um anexo não coma a janela de contexto. O arquivo inteiro fica no workspace do agente, e o agente é informado de onde, então quando precisar do resto ele lê o resto.
+Só o começo de um documento longo é entregue de uma vez, para que um único anexo não devore a janela de contexto inteira. O arquivo completo continua salvo no workspace do agente, e ele sabe onde procurar, então basta ler o resto quando precisar do resto.
 
-## Arquivos compactados não são abertos
+## Arquivo compactado não é aberto sozinho
 
-Um `.zip` ou um `.tar.gz` é uma caixa, não um documento. Não existe "o texto" dele, e descompactar automaticamente o que um estranho manda é perigoso: um arquivo pode ser montado para lotar seu disco ao ser aberto, ou para soltar arquivos fora da própria pasta. Ele cai para o agente, que o abre deliberadamente, com o portão de permissão na frente, e olha o que tem dentro antes de agir.
+Um `.zip`, um `.tar.gz`, é uma caixa, não um documento. Não existe "o texto" desse tipo de arquivo, e descompactar de cara qualquer coisa que um estranho manda é perigoso: dá para montar um arquivo desses de propósito, seja para lotar seu disco ao ser aberto, seja para jogar arquivos fora da própria pasta. Por isso ele cai para o agente, que abre deliberadamente, passando pelo portão de permissão, e só então olha o que tem lá dentro antes de fazer qualquer coisa com o conteúdo.
 
-Os formatos do Office são seguros justamente porque **não** são genéricos: uma entrada é lida, pelo nome, na memória, e nada nunca é escrito em disco.
+Os formatos do Office são seguros justamente por **não** serem genéricos: uma entrada é lida pelo nome, direto na memória, sem nada ser gravado em disco em nenhum momento.
 
-<div class="note"><strong>Mandar um é outra história.</strong> Pedir para o agente zipar uma pasta e te enviar funciona hoje: ele cria o arquivo com <code>bash</code> e entrega com <code>send_file</code>, no canal em que a conversa está. Criar o que você pediu não é a mesma coisa que abrir o que um estranho mandou.</div>
+<div class="note"><strong>Mandar um arquivo é outra história.</strong> Pedir para o agente compactar uma pasta e te devolver funciona hoje sem problema: ele monta o arquivo com <code>bash</code> e entrega pelo <code>send_file</code>, no mesmo canal em que a conversa está rolando. Criar o que você pediu não é o mesmo que abrir o que um estranho te mandou.</div>

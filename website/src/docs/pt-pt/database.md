@@ -1,95 +1,107 @@
 ---
 title: Base de dados
-description: Deixa um agente ler de uma base de dados Postgres externa, com a multi-tenência do próprio cliente aplicada pela base de dados, não pelo modelo.
+description: Como deixar um agente responder a partir da tua própria base de dados Postgres, só de leitura, com os dados de cada cliente isolados pela própria base de dados, não pelo modelo.
 ---
 
-A tool `db_query` deixa um agente correr uma consulta SQL só-de-leitura contra uma base de
-dados Postgres externa configurada pelo operador - dados do próprio cliente, não o
-armazenamento interno do Pepe. **Só Postgres.** Se essa base de dados tem a própria
-multi-tenência (uma coluna ao estilo `company_id` a separar os próprios clientes desse
-cliente), o Pepe amarra o valor de tenant de confiança à ligação e nunca deixa o modelo vê-lo
-ou defini-lo - o isolamento real é aplicado pelo próprio Postgres, via Row-Level Security,
-não por algo que o código do Pepe decida em tempo de execução.
+A tool `db_query` permite que um agente responda diretamente a partir dos teus próprios
+dados: corre consultas SQL só de leitura contra uma base de dados Postgres externa que o
+operador configura (os dados de um cliente concreto, não o armazenamento interno do
+Pepe). **Só funciona com Postgres.** Se essa base de dados guardar as linhas de vários
+clientes nas mesmas tabelas, através de uma coluna ao estilo `company_id` que separa os
+clientes de cada um, o Pepe fixa o valor de confiança do tenant na própria ligação e
+nunca deixa o modelo vê-lo nem alterá-lo. O isolamento real fica a cargo do próprio
+Postgres, através de Row-Level Security, e não de nenhuma decisão tomada em tempo de
+execução pelo código do Pepe.
 
 ## Porque é que o modelo nunca vê o valor do tenant
 
-Um argumento de tool que o modelo preenche pode sair errado - por engano, ou porque uma
-página ou documento que o agente leu lhe disse para usar um valor diferente. Isso não é uma
-falha de redação, é uma fuga real de dados entre clientes. Por isso o esquema da tool
-`db_query` não tem nenhum parâmetro de tenant/`company_id`: o modelo só fornece `connection`
-(um nome) e `query` (SQL só-de-leitura). O valor do tenant vem da configuração que o operador
-definiu, resolvido do lado do servidor, e aplicado a cada consulta dessa ligação
-automaticamente.
+Um argumento de tool que o modelo preenche sozinho pode sair errado, seja por engano,
+seja porque uma página ou um documento que o agente leu o levou a usar um valor
+diferente do esperado. Isso já não é uma simples falha de redação de texto, é uma fuga
+real de dados entre clientes: um cliente a ver as linhas de outro. Por essa razão, a
+especificação da tool `db_query` não tem nenhum parâmetro de tenant nem de
+`company_id`: o modelo só fornece `connection` (um nome) e `query` (SQL só de leitura). O
+valor do tenant vem da configuração definida pelo operador, é resolvido do lado do
+servidor, e aplica-se automaticamente a todas as consultas feitas nessa ligação.
 
-## Configurar Row-Level Security (faz isto primeiro)
+## Configurar o Row-Level Security primeiro
 
 Esta é a parte que o Pepe não consegue fazer por ti: a própria base de dados do operador
-precisa de um role dedicado e sem privilégios, e de uma política. Corre algo assim uma vez, à
-mão, na base de dados alvo:
+precisa de um role dedicado, sem privilégios, e de uma política associada. Corre algo
+assim uma única vez, à mão, na base de dados de destino:
 
 ```sql
 CREATE ROLE pepe_ro LOGIN PASSWORD '...' NOBYPASSRLS;
-GRANT SELECT ON orders, invoices TO pepe_ro; -- as tabelas que o agente deva ler
+GRANT SELECT ON orders, invoices TO pepe_ro; -- as tabelas que o agente deve poder ler
 
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON orders
   USING (company_id = current_setting('app.pepe_tenant_id', true)::text);
 ```
 
-Duas coisas importam aqui:
+Duas coisas importam particularmente aqui:
 
-- **`NOBYPASSRLS`, e nunca o dono da tabela.** Superutilizadores e donos de tabela ignoram
-  RLS por defeito, mesmo com a política definida. O role com que o Pepe se liga tem de ser um
-  role comum, sem privilégios, para a política significar alguma coisa.
-- **`current_setting('app.pepe_tenant_id', true)`** - este nome exato de GUC é a convenção
-  fixa do Pepe, não é configurável por ligação. O `true` como segundo argumento significa
-  "devolve `NULL` se não estiver definido, não dês erro" - e `company_id = NULL` nunca é
-  verdadeiro em SQL, por isso uma ligação que de alguma forma corra sem o valor definido fica
-  sem acesso a nada, não com acesso a tudo. Falha fechada, por construção.
+- **`NOBYPASSRLS`, nunca o dono da tabela.** Por predefinição, superutilizadores e donos
+  de tabela ignoram o RLS mesmo com a política já criada. O role com que o Pepe se liga
+  tem de ser um role comum e sem privilégios, ou a política não vale nada.
+- **`current_setting('app.pepe_tenant_id', true)`.** Este nome exato é a convenção fixa
+  do Pepe, não é algo configurável ligação a ligação. O `true` como segundo argumento diz
+  para devolver `NULL` quando o valor não está definido, em vez de dar erro, e como
+  `company_id = NULL` nunca é verdadeiro em SQL, uma ligação que por algum motivo corra
+  sem esse valor definido fica sem acesso a nada, nunca com acesso a tudo. Falha fechada,
+  por construção.
 
-**Uma tabela sem política de RLS não está protegida por esta funcionalidade de forma
-alguma.** O `db_query` corre da mesma forma contra cada tabela de uma ligação; se uma tabela
-em concreto está de facto isolada depende inteiramente de se *essa tabela* tem uma política
-que funcione. Isto é deliberado, não uma brecha para tapar no Pepe: tentar aplicar
-isolamento de tenant a reescrever ou a validar SQL arbitrário escrito pelo agente no código
-da aplicação não se consegue tornar fiável (uma cláusula `WITH`, um `JOIN`, um agregado podem
-contrabandear uma leitura para lá de uma verificação ao nível do texto). Row-Level Security é
-o único mecanismo que de facto se sustenta independentemente de como a consulta está escrita,
-porque atua dentro do próprio motor da base de dados, não sobre o texto da consulta.
+**Uma tabela sem política de RLS não fica protegida por esta funcionalidade, ponto
+final.** O `db_query` corre exatamente da mesma forma contra qualquer tabela de uma
+ligação; se uma tabela em particular está mesmo isolada depende inteiramente de ela ter
+uma política que funcione. Isto é deliberado, não é uma lacuna que o Pepe devesse tapar:
+tentar impor isolamento de tenant reescrevendo ou validando SQL arbitrário escrito por um
+agente, dentro do código da aplicação, nunca se consegue tornar fiável, porque uma
+cláusula `WITH`, um `JOIN` ou um agregado conseguem sempre disfarçar uma leitura e passar
+por uma verificação feita ao nível do texto. O Row-Level Security é o único mecanismo que
+de facto se sustenta independentemente de como a consulta foi escrita, precisamente
+porque atua dentro do próprio motor da base de dados, e não sobre o texto da consulta.
 
 ## Adicionar uma ligação
 
-A página **Bases de dados** do painel lista as ligações, mostra se cada uma tem âmbito de
-tenant, e tem um formulário para adicionar ou remover uma - o campo da palavra-passe nunca vem
-preenchido nem é reexibido depois de guardado. O mesmo pelo CLI:
+A página **Bases de dados** do painel lista as ligações existentes, mostra se cada
+uma tem âmbito de tenant definido, e traz um formulário para adicionar ou remover uma; o
+campo da palavra-passe nunca vem preenchido, nem volta a aparecer depois de gravado. O
+mesmo pela CLI:
 
 ```bash
 pepe db add clientes_prod --host db.internal --port 5432 --database billing \
   --user pepe_ro --password ${DB_CLIENTES_PROD_PASSWORD} \
   --tenant-column company_id --tenant-mode fixed --tenant-value acme-inc
+```
 
+```bash
 pepe db list
 pepe db remove clientes_prod
 ```
 
-Uma ligação sem `--tenant-column` (ou com o campo "Coluna de tenant" vazio no painel) não tem
-âmbito - está bem para uma base de dados de um só cliente, sem nada para isolar. Uma com
-coluna de tenant também precisa de um modo:
+Uma ligação sem `--tenant-column` definido (ou com o campo "Coluna de tenant" vazio no
+painel) fica sem âmbito nenhum, o que é perfeitamente normal para uma base de dados
+que só guarda dados de um único cliente, sem nada para isolar. Já uma ligação com coluna
+de tenant precisa também de um modo:
 
-- **`fixed`** - o valor é um literal, p. ex. uma ligação por cliente
-  (`clientes_prod` acima é sempre `acme-inc`, seja quem for a perguntar).
-- **`agent_field`** - o valor é `"project"` ou `"bare"`, resolvido a partir do
-  próprio projeto ou nome do *agente que chama* no momento da consulta - útil quando uma só
-  instalação do Pepe serve vários clientes, cada um mapeado para o seu próprio agente/projeto.
+- **`fixed`**: o valor é um literal fixo, por exemplo uma ligação por cliente (a
+  `clientes_prod` do exemplo acima é sempre `acme-inc`, seja quem for a perguntar).
+- **`agent_field`**: o valor passa a ser `"project"` ou `"bare"`, resolvido a partir do
+  próprio projeto ou do handle do *agente que está a chamar*, no momento da consulta.
+  Útil quando uma única instalação do Pepe serve vários clientes, cada um mapeado ao seu
+  próprio agente ou projeto.
 
-Um agente também pode gerir ligações a partir de uma conversa com a tool `manage_db` (as
-mesmas ações add/list/remove), e consultar com `db_query` assim que tiver as duas tools.
-Ambas são tools de risco - não estão no conjunto sempre-seguro, e passam pelo aviso de
-permissão habitual como qualquer outra tool que alcança para fora.
+Um agente também consegue gerir ligações pela própria conversa, com a tool `manage_db`
+(as mesmas ações de adicionar, listar e remover), e consultar dados com `db_query` assim
+que tiver as duas tools disponíveis. Ambas contam como tools de risco: não fazem parte do
+conjunto sempre seguro, e por isso passam pelo aviso de permissão normal, como qualquer
+outra tool que alcança recursos fora do Pepe.
 
 ## O que o agente vê
 
-Um resultado de `db_query` volta envolto no mesmo marcador de conteúdo não fiável que um
-resultado de `fetch_url` carrega - é conteúdo de fora da conversa, tratado da mesma forma. A
-tool em si é só para Postgres; não há equivalente para MySQL, SQLite ou qualquer outro motor,
-já que Row-Level Security (e a garantia de falha fechada acima) é específica do Postgres.
+Um resultado de `db_query` chega envolvido no mesmo marcador de conteúdo não confiável
+que já acompanha um resultado de `fetch_url`: é conteúdo vindo de fora da conversa, e é
+tratado exatamente da mesma forma. A própria tool só serve para Postgres; não existe
+equivalente para MySQL, SQLite ou qualquer outro motor, já que o Row-Level Security (e a
+garantia de falha fechada descrita acima) é uma característica específica do Postgres.

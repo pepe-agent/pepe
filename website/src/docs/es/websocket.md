@@ -1,31 +1,31 @@
 ---
 title: WebSocket
-description: Transmite eventos de agente en vivo mediante una conexión WebSocket.
+description: Transmite eventos de agente en vivo a través de una conexión WebSocket.
 ---
 
 ## WebSocket: streaming en vivo
 
-El WebSocket sirve para construir interfaces interactivas que muestran a un agente trabajando en tiempo real. Transmite la respuesta a medida que se genera, revela cada llamada a herramienta y cada resultado de herramienta a medida que ocurre, y puede empujar una notificación de vigilancia disparada de vuelta a la misma conexión. Para streaming simple de servidor a servidor, el stream SSE de la [API HTTP](../api/) suele bastar, y es más simple de consumir.
+El WebSocket sirve para construir interfaces interactivas que muestren a un agente trabajando en tiempo real: transmite la respuesta a medida que se va generando, deja ver cada llamada a herramienta y su resultado en el momento en que ocurren, y puede empujar hacia esa misma conexión la notificación de una vigilancia que se disparó. Para un streaming simple entre servidores, el stream SSE de la [API HTTP](../api/) suele bastar, y además es más fácil de consumir.
 
-### Conectar
+### Conectarse
 
-Conéctate en `ws://HOST:PORT/socket/websocket` (usa `wss://` sobre TLS). La autenticación refleja la API HTTP: cuando se requieren tokens, pasa el token como parámetro de consulta, porque los navegadores no pueden fijar cabeceras en un WebSocket:
+Conéctate a `ws://HOST:PORT/socket/websocket` (usa `wss://` si va sobre TLS). La autenticación funciona igual que en la API HTTP: cuando se exige token, pásalo como parámetro de consulta, porque un navegador no puede fijar cabeceras al abrir un WebSocket:
 
 ```
 ws://localhost:4000/socket/websocket?token=pepe_your_token_here
 ```
 
-Si tu API está abierta, quita el parámetro `token`.
+Si tu API está abierta, simplemente omite el parámetro `token`.
 
 ### El protocolo de tramas
 
-El socket habla un protocolo de tramas JSON simple. Cada mensaje, en ambas direcciones, es un arreglo JSON de cinco elementos:
+El socket habla un protocolo de tramas en JSON bastante simple. Cada mensaje, en cualquiera de las dos direcciones, es un arreglo JSON de cinco elementos:
 
 ```
 [join_ref, ref, topic, event, payload]
 ```
 
-`join_ref` y `ref` son cadenas que eliges para correlacionar respuestas con peticiones. `topic` nombra con qué estás hablando. El ciclo de vida es: unirte a un tópico, enviar prompts, opcionalmente reiniciar, y enviar un latido cada 30 segundos aproximadamente para mantener la conexión viva.
+`join_ref` y `ref` son cadenas que tú eliges, para poder relacionar cada respuesta con su petición. `topic` indica con quién estás hablando. El ciclo de vida es: unirte a un tópico, mandar prompts, opcionalmente reiniciar, y mandar un latido cada 30 segundos más o menos para que la conexión siga viva.
 
 ```json
 // 1. Join a topic. "agent:<name>", or "agent:default" for the default agent.
@@ -36,36 +36,36 @@ El socket habla un protocolo de tramas JSON simple. Cada mensaje, en ambas direc
 // 2. Send a prompt. The reply streams back as separate frames.
 ["1", "2", "agent:default", "prompt", { "text": "hola" }]
 
-// 3. Reinicia el historial de conversación de este tema.
+// 3. Reset the conversation history for this topic.
 ["1", "3", "agent:default", "reset", {}]
 
 // 4. Heartbeat, every ~30s, so the connection is not dropped.
 [null, "h", "phoenix", "heartbeat", {}]
 ```
 
-Unirse a `agent:<name>` selecciona y autoriza ese agente contra el ámbito de tu token, exactamente como el campo `model` por HTTP. El ámbito se aplica en el `join`, así que un tópico que tu token no permite se rechaza ahí mismo. `agent:default` resuelve al agente predeterminado del ámbito de tu token. Un nombre simple se cualifica dentro del proyecto de tu token, así que un token con ámbito `acme` que se une a `agent:sales` llega a `acme/sales`, y un token de proyecto que intente unirse al agente de otro proyecto se rechaza. Pasa `{"session": "some-stable-id"}` en el payload de unión para mantener el mismo canal de vigilancia/notificación entre reconexiones; de lo contrario se usa un id nuevo por conexión. Pasa también `{"lang": "pt-BR"}` y eso empuja la primera respuesta del agente hacia ese idioma (un aviso de sistema único en el primer turno de la sesión), así es como el atributo `data-lang` del [widget incrustable](../widget/) llega al agente.
+Unirte a `agent:<name>` selecciona y autoriza ese agente dentro del alcance de tu token, exactamente igual que el campo `model` en la API HTTP. Ese alcance se verifica justo al hacer el `join`, así que un tópico que tu token no tiene permitido se rechaza ahí mismo. `agent:default` resuelve al agente predeterminado dentro del alcance de tu token. Un nombre suelto se completa con el proyecto de tu token, de modo que un token con alcance `acme` que se une a `agent:sales` termina llegando a `acme/sales`, y un token de proyecto que intente unirse al agente de otro proyecto se rechaza. Pasa `{"session": "some-stable-id"}` en el payload del join si quieres conservar el mismo canal de vigilancias/notificaciones a través de reconexiones; si no, se usa un id nuevo en cada conexión. También puedes pasar `{"lang": "pt-BR"}`, y eso empuja la primera respuesta del agente hacia ese idioma (es un aviso de sistema que se manda una sola vez, en el primer turno de la sesión). Así es, justamente, como el atributo `data-lang` del [widget incrustable](../widget/) le llega al agente.
 
 ### Eventos
 
-**Envías** dos eventos entrantes:
+**Mandas** dos eventos de entrada:
 
 * `prompt` con `{ "text": "..." }`: envía un mensaje y transmite la respuesta.
-* `reset` con `{}`: limpia el historial de la conversación.
+* `reset` con `{}`: borra el historial de la conversación.
 
-**Recibes** estos eventos salientes, cada uno llegando como una trama cuyo payload se muestra:
+**Recibes** estos eventos de salida, cada uno como una trama con el payload que se indica:
 
-* `delta` `{ "text": "..." }`: un fragmento en streaming de la respuesta.
+* `delta` `{ "text": "..." }`: un fragmento de la respuesta, en streaming.
 * `tool_call` `{ "name": "...", "arguments": {...} }`: el agente está invocando una herramienta.
 * `tool_result` `{ "name": "...", "output": "..." }`: la salida de esa herramienta.
-* `done` `{ "content": "..." }`: la respuesta final; el turno está completo.
-* `session_ended` `{}`: el agente llamó a `end_session`. Su respuesta de cierre ya
-  llegó por el `done` anterior, y el *siguiente* prompt empieza con contexto nuevo.
-* `watch` `{ "text": "..." }`: una vigilancia creada desde esta conexión se ha disparado.
-* `error` `{ "reason": "..." }`: algo salió mal en este turno.
+* `done` `{ "content": "..." }`: la respuesta final; el turno terminó.
+* `session_ended` `{}`: el agente llamó a `end_session`. Su respuesta de cierre ya llegó en el
+  `done` anterior, y el prompt *siguiente* arranca con un contexto en blanco.
+* `watch` `{ "text": "..." }`: se disparó una vigilancia creada desde esta conexión.
+* `error` `{ "reason": "..." }`: algo falló en este turno.
 
 ### JavaScript (el cliente phoenix)
 
-En JavaScript la forma ergonómica de consumir esto es el paquete npm `phoenix`, que se encarga de las tramas, los refs y los latidos por ti:
+En JavaScript, la manera más cómoda de consumir esto es el paquete npm `phoenix`, que se ocupa por ti de las tramas, los refs y los latidos:
 
 ```javascript
 import { Socket } from "phoenix";
@@ -90,12 +90,12 @@ channel.on("session_ended", () => console.log("[sesión terminada]"));
 channel.on("watch", ({ text }) => console.log("[watch]", text));
 channel.on("error", ({ reason }) => console.error("[error]", reason));
 
-channel.push("prompt", { text: "¿Qué archivos hay en el directorio actual?" });
+channel.push("prompt", { text: "What files are in the current directory?" });
 ```
 
-### Tramas crudas (cualquier lenguaje)
+### Tramas crudas (en cualquier lenguaje)
 
-Sin el paquete `phoenix`, habla el protocolo de tramas directamente sobre cualquier cliente WebSocket. Este ejemplo en Python se une, envía un prompt, imprime los deltas en streaming y se detiene cuando llega `done`. Fíjate en el latido que debes enviar periódicamente en una conexión de larga duración.
+Sin el paquete `phoenix`, puedes hablar el protocolo de tramas directamente desde cualquier cliente WebSocket. Este ejemplo en Python se une, manda un prompt, imprime los fragmentos que van llegando y se detiene al recibir `done`. Nota el latido que conviene mandar cada tanto en una conexión de larga duración.
 
 ```python
 import json
@@ -127,4 +127,4 @@ while True:
 ws.close()
 ```
 
-Envía una trama de latido, `[null, "h", "phoenix", "heartbeat", {}]`, aproximadamente cada 30 segundos para mantener abierta una conexión de larga duración.
+Manda una trama de latido, `[null, "h", "phoenix", "heartbeat", {}]`, más o menos cada 30 segundos, para mantener abierta una conexión de larga duración.

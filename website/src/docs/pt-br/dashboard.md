@@ -69,7 +69,7 @@ A senha é lida de `dashboard.password` na configuração (interpolada), com fal
 - `pepe dashboard hosts app.example.com,dash.example.com` define os valores extras do cabeçalho `Host` que o painel aceita. Isso serve também como a lista de permissão contra DNS rebinding.
 - `pepe dashboard trusted-proxies 127.0.0.1,10.0.0.0/8` lista os proxies reversos cujo cabeçalho `X-Forwarded-For` pode ser considerado confiável. Vazio por padrão, o que significa que nenhum cabeçalho de encaminhamento é confiável.
 
-Vinculado a uma interface pública sem senha, o painel se fecha por padrão e bloqueia clientes remotos até que você defina uma.
+Sem senha definida, o painel bloqueia todo cliente remoto assim que fica alcançável de fora da sua máquina: só a própria máquina consegue abri-lo, e uma VM, um proxy ou até a rede do seu escritório contam como "de fora" para essa regra (a falha é sempre fechar o acesso, nunca abri-lo).
 
 ## Acesso remoto
 

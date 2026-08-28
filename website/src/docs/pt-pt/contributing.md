@@ -1,30 +1,32 @@
 ---
 title: Como ajudar
-description: Ajuda com issues, revisão de texto, traduções, testes de modelos e pull requests.
+description: Formas de ajudar o Pepe a crescer, de issues e revisão de texto a traduções, testes de modelos e pull requests.
 ---
 
-O Pepe é um projeto novo. Ajuda pequena e focada já faz diferença: abrir uma issue
-clara, responder a dúvidas, rever textos, testar fornecedores, melhorar traduções
-ou enviar um PR.
+O Pepe ainda é um projeto novo, por isso qualquer ajuda pequena e bem focada já faz
+diferença: abrir uma issue clara, responder a dúvidas de outras pessoas, rever textos,
+testar fornecedores, melhorar traduções, ou simplesmente enviar um PR.
 
 ## Formas úteis de ajudar
 
-- **Abrir boas issues.** Diz o que tentaste, o que esperavas, o que aconteceu e
-  inclui comandos ou logs relevantes.
-- **Responder a issues.** Reproduz bugs, pede detalhes em falta e confirma se uma
-  correção funciona.
-- **Melhorar textos.** Corta explicações longas, troca traduções literais por
-  frases naturais e ajusta exemplos artificiais.
-- **Traduzir.** Mantém inglês, espanhol, pt-BR e pt-PT alinhados. Traduz texto
-  para leitores; preserva comandos, nomes de ferramentas, payloads e APIs.
-- **Testar modelos.** Confirma streaming e tool calling em OpenAI, OpenRouter,
-  Groq, DeepSeek, Together, Mistral, Ollama, LM Studio, vLLM e outros fornecedores.
-- **Enviar PRs pequenos.** Um bug, uma página, uma tradução ou uma melhoria por PR
-  é mais fácil de rever.
+- **Abre boas issues.** Conta o que tentaste, o que esperavas, o que aconteceu de facto,
+  e junta os comandos ou logs relevantes.
+- **Responde a issues.** Reproduz o bug, pede os detalhes que faltam, confirma se uma
+  correção resolveu mesmo o problema.
+- **Melhora os textos.** Corta explicações longas, troca traduções literais por
+  frases que soem naturais, e corrige exemplos que pareçam artificiais.
+- **Traduz.** Mantém o inglês, o espanhol, o pt-BR e o pt-PT alinhados entre si. A parte
+  a traduzir é o texto que o leitor vê; comandos, nomes de ferramentas, payloads e APIs
+  ficam sempre como estão.
+- **Testa modelos.** Confirma que o streaming e as chamadas de ferramenta funcionam na
+  OpenAI, OpenRouter, Groq, DeepSeek, Together, Mistral, Ollama, LM Studio, vLLM e
+  outros fornecedores.
+- **Envia PRs pequenos.** Um bug, uma página, uma tradução ou uma melhoria por PR é
+  sempre mais fácil de rever do que tudo junto.
 
 ## Do fork ao PR
 
-1. Faz um fork no GitHub.
+1. Faz um fork do repositório no GitHub.
 2. Clona o teu fork:
 
 ```bash
@@ -39,20 +41,20 @@ git remote add upstream https://github.com/pepe-agent/pepe.git
 git fetch upstream
 ```
 
-4. Cria uma branch a partir de master:
+4. Cria uma branch a partir da master:
 
 ```bash
 git checkout -b docs-melhora-quickstart upstream/master
 ```
 
-5. Instala dependências e corre os testes:
+5. Instala as dependências e corre os testes:
 
 ```bash
 mix deps.get
 mix test
 ```
 
-6. Se fores alterar o website:
+6. Se a alteração for no website:
 
 ```bash
 cd website
@@ -60,10 +62,10 @@ npm install
 npm run dev
 ```
 
-7. Faz a alteração. Para docs e textos, revê também os outros idiomas quando a
-mesma página existir neles.
+7. Faz a alteração propriamente dita. Em documentação e textos, aproveita para rever
+   também os outros idiomas sempre que a mesma página já exista neles.
 
-8. Corre a verificação final na raiz do projeto:
+8. Corre a verificação final a partir da raiz do projeto:
 
 ```bash
 mix precommit
@@ -77,25 +79,24 @@ git commit -m "Improve quickstart copy"
 git push origin docs-melhora-quickstart
 ```
 
-10. Abre um pull request contra `pepe-agent/pepe:master`. Explica o que mudou, por
-que mudou e liga a issue, se houver.
+10. Abre um pull request contra `pepe-agent/pepe:master`, explicando o que mudou e
+    porquê, com link para a issue correspondente se existir uma.
 
-## Bons PRs
+## O que faz um bom PR
 
-Um bom PR é pequeno, tem âmbito claro e facilita a revisão. Para código, inclui
-um teste quando muda comportamento. Para documentação, prefere frases curtas,
-exemplos reais e links para páginas mais detalhadas em vez de repetir tudo.
+Um bom PR é pequeno, tem um âmbito bem definido e é fácil de rever. Em código, junta
+sempre um teste quando o comportamento muda. Em documentação, prefere frases curtas,
+exemplos reais e links para páginas mais completas, em vez de repetir tudo outra vez.
 
-## Ajuda com modelos
+## Ajudar com modelos
 
-Relatórios de fornecedores são muito úteis. O relatório ideal inclui:
+Relatórios sobre fornecedores são particularmente úteis. O relatório ideal inclui:
 
-- fornecedor e modelo testado;
-- comando usado para configurar;
-- resultado de `pepe model test`;
+- o fornecedor e o modelo testado;
+- o comando usado para o configurar;
+- o resultado de `pepe model test`;
 - um prompt simples que respondeu em streaming;
-- um prompt que exigiu uma ferramenta, como ler ficheiros ou pesquisar na web.
+- um prompt que precisou de uma ferramenta, como ler um ficheiro ou pesquisar na web.
 
-Se algo falhar, abre uma issue com esse contexto. Mesmo um “testei e funciona”
-ajuda a saber que integrações estão saudáveis.
-
+Se alguma coisa falhar, abre uma issue com esse contexto todo. E mesmo um simples "testei
+e funciona" já ajuda a saber quais integrações estão de facto saudáveis.
