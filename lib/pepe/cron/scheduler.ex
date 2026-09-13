@@ -36,6 +36,7 @@ defmodule Pepe.Cron.Scheduler do
 
   alias Pepe.Config
   alias Pepe.Cron
+  alias Pepe.Scheduler.Guard
 
   # Sub-minute so we never miss a minute even with drift; the per-job guard dedupes.
   @tick_ms 30_000
@@ -46,14 +47,14 @@ defmodule Pepe.Cron.Scheduler do
   def init(_opts) do
     Pepe.Config.Journal.put_source("cron")
     schedule_tick()
-    {:ok, %{fired: %{}, price_check: 0, budget_check: 0, running: %{}, refs: %{}}}
+    {:ok, %{fired: %{}, price_check: 0, budget_check: 0, guard: Guard.new()}}
   end
 
   @doc "The crons that have a run in flight right now (used by the dashboard and by tests)."
   def running, do: GenServer.call(__MODULE__, :running)
 
   @impl true
-  def handle_call(:running, _from, state), do: {:reply, Map.keys(state.running), state}
+  def handle_call(:running, _from, state), do: {:reply, Guard.running_ids(state.guard), state}
 
   @impl true
   def handle_info(:tick, state) do
@@ -73,9 +74,9 @@ defmodule Pepe.Cron.Scheduler do
   # hangs and is killed, or is drained at shutdown still gets here, and a job whose claim is
   # never released is a job that silently never fires again.
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
-    case Map.pop(state.refs, ref) do
-      {nil, _} -> {:noreply, state}
-      {id, refs} -> {:noreply, %{state | refs: refs, running: Map.delete(state.running, id)}}
+    case Guard.down(state.guard, ref) do
+      :not_found -> {:noreply, state}
+      {_id, _payload, guard} -> {:noreply, %{state | guard: guard}}
     end
   end
 
@@ -138,7 +139,7 @@ defmodule Pepe.Cron.Scheduler do
     state = %{state | fired: Map.put(state.fired, cron.id, key)}
 
     cond do
-      not Map.has_key?(state.running, cron.id) -> start(cron, state)
+      not Guard.busy?(state.guard, cron.id) -> start(cron, state)
       cron.overlap -> start(cron, state)
       true -> skip(cron, state)
     end
@@ -155,23 +156,10 @@ defmodule Pepe.Cron.Scheduler do
 
   # Supervised (not a bare Task.start) so a graceful shutdown can see and drain
   # in-flight jobs instead of just killing them with the VM - see
-  # Pepe.Application.prep_stop/1. Monitored so the in-flight claim is released by the run
-  # ending, whatever ending it gets.
+  # Pepe.Application.prep_stop/1.
   defp start(cron, state) do
-    case Task.Supervisor.start_child(Pepe.Cron.TaskSupervisor, fn -> Cron.run(cron, :scheduler) end) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-
-        %{
-          state
-          | running: Map.put(state.running, cron.id, ref),
-            refs: Map.put(state.refs, ref, cron.id)
-        }
-
-      _ ->
-        Logger.warning("cron #{cron.id}: could not start the run")
-        state
-    end
+    guard = Guard.start(state.guard, Pepe.Cron.TaskSupervisor, cron.id, fn -> Cron.run(cron, :scheduler) end, "cron")
+    %{state | guard: guard}
   end
 
   defp catch_up_key(cron, fired) do

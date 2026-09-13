@@ -14,14 +14,16 @@ defmodule Pepe.Watch.Scheduler do
       its message in `pending_delivery`; every tick re-attempts delivery (without
       re-checking) until it lands.
 
-  An in-flight guard skips a watch already being checked, so a slow check (a probe or
-  an agent turn) never overlaps itself.
+  The in-flight guard (`Pepe.Scheduler.Guard`, shared with every other in-app
+  scheduler) skips a watch already being checked, so a slow check (a probe or an
+  agent turn) never overlaps itself.
   """
 
   use GenServer
   require Logger
 
   alias Pepe.Config
+  alias Pepe.Scheduler.Guard
   alias Pepe.Watch
   alias Pepe.Watch.Delivery
 
@@ -33,7 +35,7 @@ defmodule Pepe.Watch.Scheduler do
   def init(_opts) do
     Pepe.Config.Journal.put_source("watch")
     schedule_tick()
-    {:ok, %{busy: MapSet.new(), refs: %{}}}
+    {:ok, %{guard: Guard.new()}}
   end
 
   @impl true
@@ -50,15 +52,15 @@ defmodule Pepe.Watch.Scheduler do
   # process being killed on shutdown - still releases its watch instead of leaving it
   # stuck "in flight" forever, the same fix already applied to Pepe.Cron.Scheduler.
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
-    case Map.pop(state.refs, ref) do
-      {nil, _} -> {:noreply, state}
-      {id, refs} -> {:noreply, %{state | refs: refs, busy: MapSet.delete(state.busy, id)}}
+    case Guard.down(state.guard, ref) do
+      :not_found -> {:noreply, state}
+      {_id, _payload, guard} -> {:noreply, %{state | guard: guard}}
     end
   end
 
   defp maybe_run(watch, state, now) do
     cond do
-      MapSet.member?(state.busy, watch.id) ->
+      Guard.busy?(state.guard, watch.id) ->
         state
 
       Watch.due?(watch, now) ->
@@ -75,17 +77,9 @@ defmodule Pepe.Watch.Scheduler do
 
   # Supervised (not a bare Task.start) so a graceful shutdown can see and drain in-flight
   # checks/deliveries instead of the VM just killing them - see Pepe.Application.prep_stop/1.
-  # Monitored so the in-flight guard is released by the run ending, whatever ending it gets.
   defp start(watch, state, fun) do
-    case Task.Supervisor.start_child(Pepe.Watch.TaskSupervisor, fn -> fun.(watch) end) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-        %{state | busy: MapSet.put(state.busy, watch.id), refs: Map.put(state.refs, ref, watch.id)}
-
-      _ ->
-        Logger.warning("watch #{watch.id}: could not start the run")
-        state
-    end
+    guard = Guard.start(state.guard, Pepe.Watch.TaskSupervisor, watch.id, fn -> fun.(watch) end, "watch")
+    %{state | guard: guard}
   end
 
   defp run_check(watch) do

@@ -86,7 +86,7 @@ defmodule Pepe.Commitments.SchedulerTest do
     end
   end
 
-  defp busy?(id), do: MapSet.member?(:sys.get_state(Scheduler).busy, id)
+  defp busy?(id), do: Pepe.Scheduler.Guard.busy?(:sys.get_state(Scheduler).guard, id)
 
   defp wait_for_child do
     wait_until(fn -> Task.Supervisor.children(Pepe.Commitments.TaskSupervisor) != [] end)

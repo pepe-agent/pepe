@@ -27,6 +27,7 @@ defmodule Pepe.Commitments.Scheduler do
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
+  alias Pepe.Scheduler.Guard
   alias Pepe.Watch.Delivery
 
   @tick_ms 30_000
@@ -36,7 +37,7 @@ defmodule Pepe.Commitments.Scheduler do
   @impl true
   def init(_opts) do
     schedule_tick()
-    {:ok, %{busy: MapSet.new(), refs: %{}}}
+    {:ok, %{guard: Guard.new()}}
   end
 
   @impl true
@@ -52,18 +53,18 @@ defmodule Pepe.Commitments.Scheduler do
   # `{:done, id}`) so a task that dies partway through - an agent_promise's own session
   # crashing, the process being killed on shutdown - still releases its commitment
   # instead of leaving it stuck "in flight" forever, the same fix already applied to
-  # Pepe.Cron.Scheduler. Note this only ever clears `busy`, never re-fires anything: a
+  # Pepe.Cron.Scheduler. Note this only ever clears the guard, never re-fires anything: a
   # commitment already past "scheduled" (into "firing") stays there - see run_fire/1.
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
-    case Map.pop(state.refs, ref) do
-      {nil, _} -> {:noreply, state}
-      {id, refs} -> {:noreply, %{state | refs: refs, busy: MapSet.delete(state.busy, id)}}
+    case Guard.down(state.guard, ref) do
+      :not_found -> {:noreply, state}
+      {_id, _payload, guard} -> {:noreply, %{state | guard: guard}}
     end
   end
 
   defp maybe_run(c, state, now) do
     cond do
-      MapSet.member?(state.busy, c.id) ->
+      Guard.busy?(state.guard, c.id) ->
         state
 
       c.state == "scheduled" and is_integer(c.due_at) and now >= c.due_at ->
@@ -81,17 +82,9 @@ defmodule Pepe.Commitments.Scheduler do
 
   # Supervised (not a bare Task.start) so a graceful shutdown can see and drain in-flight
   # fires/deliveries instead of the VM just killing them - see Pepe.Application.prep_stop/1.
-  # Monitored so the in-flight guard is released by the run ending, whatever ending it gets.
   defp start(c, state, fun) do
-    case Task.Supervisor.start_child(Pepe.Commitments.TaskSupervisor, fn -> fun.(c) end) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-        %{state | busy: MapSet.put(state.busy, c.id), refs: Map.put(state.refs, ref, c.id)}
-
-      _ ->
-        Logger.warning("commitment #{c.id}: could not start the run")
-        state
-    end
+    guard = Guard.start(state.guard, Pepe.Commitments.TaskSupervisor, c.id, fn -> fun.(c) end, "commitment")
+    %{state | guard: guard}
   end
 
   defp run_fire(c) do

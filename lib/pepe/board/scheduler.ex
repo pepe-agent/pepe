@@ -20,11 +20,11 @@ defmodule Pepe.Board.Scheduler do
   """
 
   use GenServer
-  require Logger
 
   alias Pepe.Agent.Session
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
+  alias Pepe.Scheduler.Guard
 
   @tick_ms 30_000
 
@@ -34,14 +34,14 @@ defmodule Pepe.Board.Scheduler do
   def init(_opts) do
     Pepe.Config.Journal.put_source("board")
     schedule_tick()
-    {:ok, %{running: %{}, refs: %{}}}
+    {:ok, %{guard: Guard.new()}}
   end
 
   @doc "Card ids with a dispatched run in flight right now (used by the dashboard and by tests)."
   def running, do: GenServer.call(__MODULE__, :running)
 
   @impl true
-  def handle_call(:running, _from, state), do: {:reply, Map.keys(state.running), state}
+  def handle_call(:running, _from, state), do: {:reply, Guard.running_ids(state.guard), state}
 
   @impl true
   def handle_info(:tick, state) do
@@ -54,13 +54,13 @@ defmodule Pepe.Board.Scheduler do
   # called `complete`/`block`. Either way, re-check the card: if still `running`, that is a
   # protocol violation (see the moduledoc) and it gets blocked, never silently re-dispatched.
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
-    case Map.pop(state.refs, ref) do
-      {nil, _} ->
+    case Guard.down(state.guard, ref) do
+      :not_found ->
         {:noreply, state}
 
-      {{card_id, claimed_by, claimed_at}, refs} ->
+      {card_id, {claimed_by, claimed_at}, guard} ->
         Pepe.Board.block_if_still_running(card_id, claimed_by, claimed_at)
-        {:noreply, %{state | refs: refs, running: Map.delete(state.running, card_id)}}
+        {:noreply, %{state | guard: guard}}
     end
   end
 
@@ -88,7 +88,7 @@ defmodule Pepe.Board.Scheduler do
   # between the query and here can): `claim/2`'s own CAS is what actually prevents a double
   # dispatch; this is just a cheap skip for the case it already lost that race.
   defp dispatch_card(card, state) do
-    if Map.has_key?(state.running, card.id) do
+    if Guard.busy?(state.guard, card.id) do
       state
     else
       case Pepe.Board.claim(card.id, card.assignee) do
@@ -100,20 +100,11 @@ defmodule Pepe.Board.Scheduler do
 
   # Supervised (not a bare Task.start), same reason as `Pepe.Cron.Scheduler`: so a graceful
   # shutdown can see and drain in-flight card runs instead of the VM just killing them.
-  # Monitored so the claim is released by the run ending, whatever ending it gets.
   defp start(card, state) do
     key = session_key(card)
-
-    case Task.Supervisor.start_child(Pepe.Board.TaskSupervisor, fn -> dispatch(card, key) end) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-        claim = {card.id, card.claimed_by, card.claimed_at}
-        %{state | running: Map.put(state.running, card.id, ref), refs: Map.put(state.refs, ref, claim)}
-
-      _ ->
-        Logger.warning("board card #{card.id}: could not start the run")
-        state
-    end
+    claim = {card.claimed_by, card.claimed_at}
+    guard = Guard.start(state.guard, Pepe.Board.TaskSupervisor, card.id, claim, fn -> dispatch(card, key) end, "board card")
+    %{state | guard: guard}
   end
 
   # `ephemeral: true` deliberately: a card session never enters `persist_sessions`/
