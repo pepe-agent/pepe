@@ -25,6 +25,8 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.EndSession
   alias Pepe.Tools.FetchUrl
   alias Pepe.Tools.Goal
+  alias Pepe.Tools.Insight
+  alias Pepe.Tools.InsightPredict
   alias Pepe.Tools.InspectGraphRun
   alias Pepe.Tools.Invoice
   alias Pepe.Tools.ListDir
@@ -95,6 +97,8 @@ defmodule Pepe.Tools do
     ManageChannel,
     ManageAgent,
     ManageDb,
+    Insight,
+    InsightPredict,
     ManageMcp,
     ManagePepe,
     ManagePlugin,

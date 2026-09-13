@@ -96,8 +96,21 @@ defmodule Pepe.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      ## Web
+      ## What is it: the HTTP/WebSocket surface - the OpenAI-compatible API, the
+      ## dashboard, and the asset pipeline that builds them.
       {:phoenix, "~> 1.8.8"},
       {:phoenix_ecto, "~> 4.5"},
+      {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:bandit, "~> 1.5"},
+      {:dns_cluster, "~> 0.2.0"},
+      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:heroicons, github: "tailwindlabs/heroicons", tag: "v2.2.0", sparse: "optimized", app: false, compile: false, depth: 1},
+
+      ## Data & persistence
+      ## What is it: Pepe's own operational store (Pepe.Repo, SQLite) and the driver
+      ## behind db_query's connections to an operator's own external Postgres database.
       {:ecto_sql, "~> 3.13"},
       # Operational data that grows with usage (commitments, and more to come) - not
       # config.json, which stays a plain file for definitions. Ships its own SQLite via
@@ -108,30 +121,43 @@ defmodule Pepe.MixProject do
       # Ecto.Repo, since these are dynamic, runtime-configured, possibly-many connections
       # rather than one static schema known at compile time.
       {:postgrex, "~> 0.19"},
-      {:phoenix_live_dashboard, "~> 0.8.3"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
-      {:heroicons, github: "tailwindlabs/heroicons", tag: "v2.2.0", sparse: "optimized", app: false, compile: false, depth: 1},
-      {:swoosh, "~> 1.16"},
+
+      ## HTTP & content
+      ## What is it: talking to the outside world (model providers, fetch_url, email)
+      ## and turning what comes back into something an agent or the dashboard can use.
       {:req, "~> 0.5"},
+      {:swoosh, "~> 1.16"},
       # HTML parsing for `fetch_url`'s readable-text extraction (Pepe.Readable) - the
       # actual "readability" hex package pulls in httpoison/hackney (for a URL-fetching
       # convenience function this never calls) which conflicts with the idna version
       # already locked here, so this builds the extraction directly on Floki instead.
       {:floki, "~> 0.36"},
+      # Renders chat message markdown on the dashboard (tables, lists, headers, ...).
+      {:mdex, "~> 0.7"},
+
+      ## Observability
+      ## What is it: telemetry plumbing for the dashboard's own live metrics.
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 1.0"},
+
+      ## Core plumbing
+      ## What is it: general-purpose libraries most of the app reaches for directly -
+      ## JSON, i18n, YAML config.
       {:jason, "~> 1.2"},
+      {:gettext, "~> 1.0"},
       {:yaml_elixir, "~> 2.9"},
-      {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"},
-      {:burrito, "~> 1.0"},
-      {:owl, "~> 0.13"},
+
+      ## Scheduling
+      ## What is it: cron-expression parsing and a pure-Elixir timezone database for
+      ## Scheduled tasks and Watches.
       # Scheduled tasks: cron-expression parsing + a pure-Elixir timezone database
       # (`tz` builds the zone data at compile time - no hackney/runtime download).
       {:crontab, "~> 1.1"},
       {:tz, "~> 0.28"},
+
+      ## Security
+      ## What is it: rate limiting and password hashing for the parts of Pepe exposed
+      ## before a human is already authenticated.
       # Rate limiting (the widget's public, unauthenticated-by-design endpoint).
       {:hammer, "~> 7.0"},
       # Hashes a literal dashboard password before it's written to config.json.
@@ -140,8 +166,10 @@ defmodule Pepe.MixProject do
       # via `pepe dashboard password '...'` used to be stored as plain text, readable
       # from the live file or any backup/.bak of it.
       {:bcrypt_elixir, "~> 3.0"},
-      # Renders chat message markdown on the dashboard (tables, lists, headers, ...).
-      {:mdex, "~> 0.7"},
+
+      ## Tool sandboxes
+      ## What is it: the runtimes behind specific builtin tools that need more than a
+      ## plain Elixir function - a scripting language, a browser protocol.
       # The `run_code` tool: a pure-BEAM Lua 5.3 interpreter (no NIF, no external
       # binary), so a runaway script is killed by an ordinary Task timeout and the
       # sandbox only ever sees what we explicitly bind into it.
@@ -149,9 +177,55 @@ defmodule Pepe.MixProject do
       # The `browser` tool: drives a real Chrome over CDP directly (Mint.WebSocket) - no
       # ChromeDriver, no Node.js driver process, unlike every Playwright/Puppeteer binding.
       {:cdp_ex, "~> 0.9"},
+
+      ## Machine learning (Pepe.Insight)
+      ## What is it: the three algorithm families Pepe.Insight.Trainer picks between
+      ## automatically by data volume - small (Scholar), mid-size tabular (EXGBoost),
+      ## large-scale (Axon, JIT-compiled via EXLA where available). All build on `:nx`,
+      ## pulled in transitively.
+      # Classical ML (logistic/linear regression) - the small-data tier: fast, robust, no
+      # overfitting risk, a model that just works instantly for a few hundred to a couple
+      # thousand rows.
+      {:scholar, "~> 0.3"},
+      # Gradient-boosted trees - the mid-size tabular tier, generally the strongest
+      # baseline for business data at the row counts most operators actually have.
+      # Pinned to 0.4.x deliberately: 0.5.x added an httpoison/ex_json_schema dependency
+      # chain that collides with decimal ~> 3.0 (ecto_sqlite3) and the idna version this
+      # project's HTTP stack already needs (the exact hackney/idna clash `fetch_url`'s
+      # Floki-based extraction already avoids elsewhere in this file, for the same
+      # reason) - 0.4.x has neither dependency.
+      {:exgboost, "~> 0.4.0"},
+      # A small fixed-architecture neural net - the large-scale tier, reserved for an
+      # operator with hundreds of millions of rows (patient events, ad records), where
+      # that complexity actually pays for itself.
+      {:axon, "~> 0.7"},
+      # JIT-compiled Nx.Defn backend for the neural tier above - without it, Axon trains/
+      # predicts on the plain interpreted Nx backend, unbounded in wall-clock time at real
+      # data volumes. Scoped to just Pepe.Insight.Neural's own Axon calls
+      # (`Neural.defn_options/0`, see its moduledoc) - never Nx's process-wide default
+      # backend, so Scholar/EXGBoost above are untouched. A required dependency that only
+      # ships a precompiled XLA binary for Linux/macOS: it compiles, but the neural tier
+      # only ever runs uncompiled (correct, just unbounded-slow) on a machine where the
+      # binary fails to load at runtime - a native Windows build (no WSL) fails to compile
+      # at all, since there is no binary for it to even attempt to fetch. Gate this
+      # dependency out of a native Windows build's mix.exs if that target ever needs one.
+      {:exla, "~> 0.13"},
+
+      ## Packaging & ops
+      ## What is it: how Pepe becomes a runnable thing - the standalone binary and the
+      ## CLI's own terminal output.
+      {:burrito, "~> 1.0"},
+      {:owl, "~> 0.13"},
+
+      ## Test only
+      ## What is it: never shipped, only loaded for `mix test`.
       {:mimic, "~> 1.11", only: :test},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:excoveralls, "~> 0.18", only: :test},
+
+      ## Dev/test static analysis
+      ## What is it: `mix predeploy`'s two gates (type checking, linting) - never in a
+      ## production release.
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false}

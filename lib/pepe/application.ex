@@ -51,6 +51,7 @@ defmodule Pepe.Application do
     drain_tasks(Pepe.Board.TaskSupervisor, "board card")
     drain_tasks(Pepe.Watch.TaskSupervisor, "watch")
     drain_tasks(Pepe.Commitments.TaskSupervisor, "commitment")
+    drain_tasks(Pepe.Insight.TaskSupervisor, "insight retrain")
     state
   end
 
@@ -244,7 +245,8 @@ defmodule Pepe.Application do
     maybe_children(server?, [{Task.Supervisor, name: Pepe.Cron.TaskSupervisor}, Pepe.Cron.Scheduler]) ++
       maybe_children(server?, [{Task.Supervisor, name: Pepe.Board.TaskSupervisor}, Pepe.Board.Scheduler]) ++
       maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Watch.TaskSupervisor}, Pepe.Watch.Scheduler]) ++
-      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Commitments.TaskSupervisor}, Pepe.Commitments.Scheduler])
+      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Commitments.TaskSupervisor}, Pepe.Commitments.Scheduler]) ++
+      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Insight.TaskSupervisor}, Pepe.Insight.Scheduler])
   end
 
   defp maybe_children(true, children), do: children

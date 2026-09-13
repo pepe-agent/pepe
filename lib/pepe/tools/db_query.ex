@@ -46,7 +46,7 @@ defmodule Pepe.Tools.DbQuery do
   def run(%{"connection" => connection, "query" => sql}, ctx) when is_binary(connection) and is_binary(sql) do
     case Pepe.DB.Query.run(connection, sql, ctx) do
       {:ok, result} -> {:ok, format(connection, result)}
-      {:error, reason} -> {:error, error_message(reason)}
+      {:error, reason} -> {:error, Pepe.DB.Query.format_error(reason)}
     end
   end
 
@@ -67,13 +67,4 @@ defmodule Pepe.Tools.DbQuery do
   defp truncate(text) do
     if byte_size(text) > @max_result_bytes, do: binary_part(text, 0, @max_result_bytes) <> "\n...(truncated)", else: text
   end
-
-  defp error_message(:write_not_allowed), do: "refused: only read-only (SELECT) queries are allowed"
-  defp error_message({:unknown_connection, name}), do: "no database connection named #{name} (see mix pepe db list)"
-
-  defp error_message(:bad_tenant_binding),
-    do: "this connection is misconfigured (tenant_binding) - fix it with mix pepe db add before retrying"
-
-  defp error_message(%Postgrex.Error{} = e), do: "query failed: #{Exception.message(e)}"
-  defp error_message(reason), do: "query failed: #{inspect(reason)}"
 end

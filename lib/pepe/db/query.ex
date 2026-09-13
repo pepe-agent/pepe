@@ -102,4 +102,20 @@ defmodule Pepe.DB.Query do
       cfg -> {:ok, cfg}
     end
   end
+
+  @doc """
+  A human-readable message for any error `run/3` can return - shared by every caller
+  (`db_query`, `Pepe.Insight.SchemaInspector`'s `propose_targets`, ...) so the same failure
+  reads the same way regardless of which tool surfaced it, instead of each caller growing
+  its own partial, drifting copy of this mapping.
+  """
+  @spec format_error(term()) :: String.t()
+  def format_error(:write_not_allowed), do: "refused: only read-only (SELECT) queries are allowed"
+  def format_error({:unknown_connection, name}), do: "no database connection named #{name} (see mix pepe db list)"
+
+  def format_error(:bad_tenant_binding),
+    do: "this connection is misconfigured (tenant_binding) - fix it with mix pepe db add before retrying"
+
+  def format_error(%Postgrex.Error{} = e), do: "query failed: #{Exception.message(e)}"
+  def format_error(reason), do: "query failed: #{inspect(reason)}"
 end
