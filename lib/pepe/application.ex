@@ -176,41 +176,48 @@ defmodule Pepe.Application do
         ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Pepe.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
 
-    with {:ok, pid} <- Supervisor.start_link(children, opts) do
-      migrate_repo()
+  # Pepe.Repo (SQLite, operational data - see its moduledoc) is unconditional in every
+  # real boot: even a bare one-shot `mix pepe run` needs to write, e.g. a commitment
+  # CommitmentExtract notices after the turn. Never auto-started under :test, though -
+  # if it were, the first test file that boots the whole app would register it
+  # permanently (an Ecto Repo is a named process, one per BEAM), and every later test's
+  # own `start_supervised!(Pepe.Repo, ...)` (see Pepe.RepoSetup, pointed at that test's
+  # own PEPE_HOME) would collide with `{:already_started, _}`.
+  #
+  # `start_repo/0`, not the bare `Pepe.Repo` module, so schema migrations run as part of
+  # THIS child's own start - before `Supervisor.start_link/2` moves on to the next child
+  # in `children`. `Pepe.Repo` is listed first among the ones that touch it, and
+  # `Supervisor.start_link/2` starts children strictly in list order, waiting for each
+  # child's `start_link` to return before starting the next - so every later child
+  # (`Pepe.Insight.Scheduler` among them, which queries its own table in `init/1`) is
+  # guaranteed to see a fully-migrated schema this way, not just usually. Migrating only
+  # after the whole tree had already started (this code's previous shape) raced a
+  # just-added scheduler's `init/1` against the migration that creates the table it
+  # queries - found via a real crash loop on an upgrade whose schema was genuinely behind:
+  # `Pepe.Insight.Scheduler.init/1` failed instantly on `no such table: insight_specs`,
+  # `Application.start/2` returned an error before `migrate_repo/0` ever ran, and Docker's
+  # restart policy repeated exactly the same failure forever, never once reaching the
+  # migration that would have fixed it. The one-time *data* migration (existing
+  # config.json entries into a new table) stays a separate, explicit `mix pepe migrate
+  # ...` command an operator runs deliberately - only the schema migrations run
+  # automatically here.
+  defp repo_children do
+    if Application.get_env(:pepe, :env) == :test, do: [], else: [%{id: Pepe.Repo, start: {__MODULE__, :start_repo, []}}]
+  end
+
+  @doc false
+  def start_repo do
+    with {:ok, pid} <- Pepe.Repo.start_link() do
+      # log: false - Ecto.Migrator has its own logging switch, separate from Pepe.Repo's
+      # query log (see config/config.exs) - left unset it prints "Migrations already up"
+      # at :info on every single boot, forever, since there's essentially never anything
+      # to migrate after the first run.
+      Pepe.Repo.migrate!(log: false)
       {:ok, pid}
     end
-  end
-
-  # Synchronous, not a supervised Task: everything that touches Pepe.Repo (starting
-  # with the very first commitment a fresh install ever writes) needs the schema to
-  # already exist, and nothing guarantees a background Task finishes before
-  # Application.start/2 returns control to its caller. Cheap and versioned (Ecto skips
-  # what's already applied), so paying this once per boot is not a real cost.
-  defp migrate_repo do
-    if Application.get_env(:pepe, :env) != :test do
-      # log: false - Ecto.Migrator has its own logging switch, separate from
-      # Pepe.Repo's query log (see config/config.exs) - left unset it prints
-      # "Migrations already up" at :info on every single boot, forever, since
-      # there's essentially never anything to migrate after the first run.
-      Pepe.Repo.migrate!(log: false)
-    end
-  end
-
-  # Pepe.Repo (SQLite, operational data - see its moduledoc) is unconditional in
-  # every real boot: even a bare one-shot `mix pepe run` needs to write, e.g. a
-  # commitment CommitmentExtract notices after the turn. Never auto-started under
-  # :test, though - if it were, the first test file that boots the whole app would
-  # register it permanently (an Ecto Repo is a named process, one per BEAM), and
-  # every later test's own `start_supervised!(Pepe.Repo, ...)` (see Pepe.RepoSetup,
-  # pointed at that test's own PEPE_HOME) would collide with `{:already_started,
-  # _}`. Schema migrations run synchronously right after the tree starts (see
-  # migrate_repo/0), not here - the one-time *data* migration (existing config.json
-  # entries into a new table) is instead an explicit `mix pepe migrate ...` command
-  # an operator runs deliberately, never automatic.
-  defp repo_children do
-    if Application.get_env(:pepe, :env) == :test, do: [], else: [Pepe.Repo]
   end
 
   # When session persistence is on, re-spawn the saved sessions on boot (off the
