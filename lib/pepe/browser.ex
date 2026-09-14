@@ -16,7 +16,14 @@ defmodule Pepe.Browser do
 
   @doc "Navigate to `url`, starting the session's browser if none is running yet."
   def open(key, url) do
-    with {:ok, pid} <- ensure_started(key), do: safe_call(fn -> Session.open(pid, url) end)
+    # Validated here, before ever starting a session, so a scheme/host/internal-address
+    # rejection never pays for launching a real Chrome process (and CDPEx.launch/1's own
+    # ~30s timeout) just to be told no - Session.open/2 still re-validates on its own
+    # call path, so calling it directly (bypassing this facade) stays just as safe.
+    with :ok <- Session.validate_url(url),
+         {:ok, pid} <- ensure_started(key) do
+      safe_call(fn -> Session.open(pid, url) end)
+    end
   end
 
   @doc "Re-describe the current page: title, visible text, and its interactive elements."
