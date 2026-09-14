@@ -165,34 +165,13 @@ defmodule Pepe.Tools.ManageAgent do
     if Config.get_agent(target) do
       {:error, "agent #{target} already exists"}
     else
-      # The first agent in a brand-new project is the one that will go on to create the
-      # rest of that project's agents (the same "admin agent" role this very tool serves
-      # for) - it's born permissive (every tool, auto-approved, super-admin) rather than
-      # the contained default (no tools) every agent after it gets, the same treatment
-      # `mix pepe setup`/`mix pepe agent add` already give a project's first agent.
       primary? = Config.first_agent_of_project?(Project.of(target))
-
-      agent = %Agent{
-        name: target,
-        system_prompt: blank(args["value"]) || Agent.default_prompt(),
-        tools: if(primary?, do: Pepe.Tools.names(), else: []),
-        auto_approve: if(primary?, do: ["*"], else: []),
-        can_manage: if(primary?, do: ["*"])
-      }
+      agent = new_agent(target, args, primary?)
 
       case Config.put_agent(agent) do
-        :ok when primary? ->
-          {:ok,
-           "Created agent #{target} - first in its project, so it starts with full access (every tool, auto-approved, super-admin). Set its persona and model next."}
-
-        :ok ->
-          {:ok, "Created agent #{target}. Set its persona, model and tools next."}
-
-        {:error, :invalid_name} ->
-          {:error, "#{target} isn't a valid handle: use letters, digits, - or _ (optionally project/name)"}
-
-        {:error, :name_collision} ->
-          {:error, "an agent named #{target} already exists (different capitalization)"}
+        :ok -> {:ok, create_success_message(target, primary?)}
+        {:error, :invalid_name} -> {:error, "#{target} isn't a valid handle: use letters, digits, - or _ (optionally project/name)"}
+        {:error, :name_collision} -> {:error, "an agent named #{target} already exists (different capitalization)"}
       end
     end
   end
@@ -261,6 +240,27 @@ defmodule Pepe.Tools.ManageAgent do
   end
 
   defp dispatch(other, _target, _args), do: {:error, "unknown or incomplete action: #{other}"}
+
+  # The first agent in a brand-new project is the one that will go on to create the rest
+  # of that project's agents (the same "admin agent" role this very tool serves for) - it's
+  # born permissive (every tool, auto-approved, super-admin) rather than the contained
+  # default (no tools) every agent after it gets, the same treatment `mix pepe
+  # setup`/`mix pepe agent add` already give a project's first agent.
+  defp new_agent(target, args, primary?) do
+    %Agent{
+      name: target,
+      system_prompt: blank(args["value"]) || Agent.default_prompt(),
+      tools: if(primary?, do: Pepe.Tools.names(), else: []),
+      auto_approve: if(primary?, do: ["*"], else: []),
+      can_manage: if(primary?, do: ["*"])
+    }
+  end
+
+  defp create_success_message(target, true),
+    do:
+      "Created agent #{target} - first in its project, so it starts with full access (every tool, auto-approved, super-admin). Set its persona and model next."
+
+  defp create_success_message(target, false), do: "Created agent #{target}. Set its persona, model and tools next."
 
   @flags %{
     "trust_untrusted_content" => :trust_untrusted_content,

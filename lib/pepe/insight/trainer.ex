@@ -163,10 +163,9 @@ defmodule Pepe.Insight.Trainer do
   defp resolve_classes(rows, %Spec{task_type: "classification", target_column: col}) do
     classes = rows |> Enum.map(&to_label(Map.get(&1, col))) |> Enum.uniq() |> Enum.sort()
 
-    if length(classes) < 2 do
-      {:error, "target column #{inspect(col)} needs at least 2 distinct classes to train a classifier"}
-    else
-      {:ok, classes}
+    case classes do
+      [_, _ | _] -> {:ok, classes}
+      _ -> {:error, "target column #{inspect(col)} needs at least 2 distinct classes to train a classifier"}
     end
   end
 
@@ -221,11 +220,13 @@ defmodule Pepe.Insight.Trainer do
     labels = Enum.map(rows, &to_label(Map.get(&1, col)))
     classes = labels |> Enum.uniq() |> Enum.sort()
 
-    if length(classes) < 2 do
-      {:error, "target column #{inspect(col)} needs at least 2 distinct classes to train a classifier"}
-    else
-      index = classes |> Enum.with_index() |> Map.new()
-      {:ok, Nx.tensor(Enum.map(labels, &Map.fetch!(index, &1)), type: {:s, 64}), classes}
+    case classes do
+      [_, _ | _] ->
+        index = classes |> Enum.with_index() |> Map.new()
+        {:ok, Nx.tensor(Enum.map(labels, &Map.fetch!(index, &1)), type: {:s, 64}), classes}
+
+      _ ->
+        {:error, "target column #{inspect(col)} needs at least 2 distinct classes to train a classifier"}
     end
   end
 
@@ -401,12 +402,14 @@ defmodule Pepe.Insight.Trainer do
   end
 
   defp forecast_feature_matrix(rows, spec, epoch) do
-    try_map(rows, fn row ->
-      with {:ok, dt} <- time_or_error(row, spec.time_column),
-           {:ok, extra} <- try_map(spec.feature_columns, fn col -> numeric_or_error(row, col, "feature") end) do
-        {:ok, TimeFeatures.features(dt, epoch) ++ extra}
-      end
-    end)
+    try_map(rows, &forecast_feature_row(&1, spec, epoch))
+  end
+
+  defp forecast_feature_row(row, spec, epoch) do
+    with {:ok, dt} <- time_or_error(row, spec.time_column),
+         {:ok, extra} <- try_map(spec.feature_columns, fn col -> numeric_or_error(row, col, "feature") end) do
+      {:ok, TimeFeatures.features(dt, epoch) ++ extra}
+    end
   end
 
   defp time_or_error(row, time_column) do
@@ -524,15 +527,17 @@ defmodule Pepe.Insight.Trainer do
 
   defp feature_means(rows, feature_columns) do
     Map.new(feature_columns, fn col ->
-      values =
-        Enum.flat_map(rows, fn row ->
-          case Numeric.to_number(Map.get(row, col)) do
-            {:ok, n} -> [n]
-            :error -> []
-          end
-        end)
-
+      values = column_values(rows, col)
       {col, if(values == [], do: nil, else: Float.round(Enum.sum(values) / length(values), 4))}
+    end)
+  end
+
+  defp column_values(rows, col) do
+    Enum.flat_map(rows, fn row ->
+      case Numeric.to_number(Map.get(row, col)) do
+        {:ok, n} -> [n]
+        :error -> []
+      end
     end)
   end
 

@@ -107,7 +107,7 @@ defmodule Pepe.Insight.SchemaInspectorTest do
     rows = for i <- 1..30, do: [if(rem(i, 2) == 0, do: "paid", else: "pending"), i * 1.5, i]
 
     candidates = SchemaInspector.score_rows("orders", columns, rows)
-    assert length(candidates) == 2
+    assert match?([_, _], candidates)
     assert Enum.any?(candidates, &(&1.column == "status" and &1.task_type == "classification"))
     assert Enum.any?(candidates, &(&1.column == "amount" and &1.task_type == "regression"))
   end

@@ -385,7 +385,7 @@ defmodule Pepe.InsightTest do
       [model] = described["models"]
       assert model["algorithm"] == "kmeans"
       assert is_list(model["clusters"])
-      assert length(model["clusters"]) >= 2
+      assert match?([_, _ | _], model["clusters"])
       assert Enum.all?(model["clusters"], &(&1["size"] > 0))
     end
 

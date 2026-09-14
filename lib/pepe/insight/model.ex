@@ -12,6 +12,8 @@ defmodule Pepe.Insight.Model do
 
   use Ecto.Schema
 
+  @type t :: %__MODULE__{}
+
   @primary_key {:id, :string, autogenerate: false}
   schema "insight_models" do
     field :spec_id, :string

@@ -77,9 +77,6 @@ defmodule Pepe.Tools.InsightPredict do
 
       {:error, reason} when is_binary(reason) ->
         {:error, reason}
-
-      {:error, reason} ->
-        {:error, inspect(reason)}
     end
   end
 

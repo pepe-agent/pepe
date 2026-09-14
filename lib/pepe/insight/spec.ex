@@ -8,6 +8,8 @@ defmodule Pepe.Insight.Spec do
 
   use Ecto.Schema
 
+  @type t :: %__MODULE__{}
+
   @primary_key {:id, :string, autogenerate: false}
   schema "insight_specs" do
     field :agent, :string

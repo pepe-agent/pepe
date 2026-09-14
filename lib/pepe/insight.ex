@@ -411,78 +411,100 @@ defmodule Pepe.Insight do
   ### persistence helpers
   ###
 
+  @spec_replace_on_conflict [
+    :source_kind,
+    :connection,
+    :table,
+    :target_column,
+    :time_column,
+    :feature_columns,
+    :task_type,
+    :family,
+    :mode,
+    :retrain_interval_s,
+    :min_new_rows,
+    :row_count_at_last_train,
+    :status,
+    :last_error,
+    :updated_at
+  ]
+
   defp save(agent_name, attrs) do
-    now = System.system_time(:second)
     existing = Repo.get_by(Spec, agent: agent_name, name: attrs["name"])
     source = attrs["source"] || %{}
+    shape = spec_shape(attrs, source)
+    reshaped? = reshaped?(existing, shape)
+    row = build_row(agent_name, attrs, source, shape, existing, reshaped?)
 
-    # Forced to nil rather than trusting attrs directly: validate/1 only requires the
-    # right column for the right task_type, it doesn't reject the WRONG one being present
-    # too - a "clustering" spec saved with a stray target_column would otherwise make
-    # every import_rows batch fail for demanding a column the spec doesn't actually use.
-    target_column = target_column_for(attrs)
-    time_column = time_column_for(attrs)
-    feature_columns = attrs["feature_columns"] || []
-    task_type = task_type(attrs)
-    source_kind = source["kind"]
-    family = family_for_attrs(attrs)
+    Repo.insert_all(Spec, [row], on_conflict: {:replace, @spec_replace_on_conflict}, conflict_target: [:agent, :name])
+    get_spec(agent_name, attrs["name"])
+  end
 
-    # Any trained model was fit against the OLD target/features/task_type/source - if any of
-    # those change, that model no longer means what its metadata claims (predict/3 would
-    # otherwise keep answering silently from a stale, now-incompatible model). Reset back to
-    # "pending" so the spec has to retrain under its new shape before predict serves it again.
-    reshaped? =
-      existing != nil and
-        (existing.task_type != task_type or existing.feature_columns != feature_columns or
-           existing.target_column != target_column or existing.time_column != time_column or
-           existing.source_kind != source_kind)
+  # Forced to nil rather than trusting attrs directly: validate/1 only requires the right
+  # column for the right task_type, it doesn't reject the WRONG one being present too - a
+  # "clustering" spec saved with a stray target_column would otherwise make every
+  # import_rows batch fail for demanding a column the spec doesn't actually use.
+  defp spec_shape(attrs, source) do
+    %{
+      target_column: target_column_for(attrs),
+      time_column: time_column_for(attrs),
+      feature_columns: attrs["feature_columns"] || [],
+      task_type: task_type(attrs),
+      source_kind: source["kind"]
+    }
+  end
 
-    row = %{
-      id: (existing && existing.id) || new_spec_id(),
+  defp reshaped?(nil, _shape), do: false
+
+  # Any trained model was fit against the OLD target/features/task_type/source - if any of
+  # those change, that model no longer means what its metadata claims (predict/3 would
+  # otherwise keep answering silently from a stale, now-incompatible model). Reset back to
+  # "pending" so the spec has to retrain under its new shape before predict serves it again.
+  defp reshaped?(existing, shape) do
+    existing.task_type != shape.task_type or existing.feature_columns != shape.feature_columns or
+      existing.target_column != shape.target_column or existing.time_column != shape.time_column or
+      existing.source_kind != shape.source_kind
+  end
+
+  defp build_row(agent_name, attrs, source, shape, existing, reshaped?) do
+    %{
       agent: agent_name,
       name: attrs["name"],
-      source_kind: source_kind,
+      source_kind: shape.source_kind,
       connection: source["connection"],
       table: source["table"],
-      target_column: target_column,
-      time_column: time_column,
-      feature_columns: feature_columns,
-      task_type: task_type,
-      family: family,
+      target_column: shape.target_column,
+      time_column: shape.time_column,
+      feature_columns: shape.feature_columns,
+      task_type: shape.task_type,
+      family: family_for_attrs(attrs),
       mode: attrs["mode"] || "manual",
       retrain_interval_s: attrs["retrain_interval_s"],
-      min_new_rows: attrs["min_new_rows"] || 50,
-      row_count_at_last_train: if(reshaped?, do: 0, else: (existing && existing.row_count_at_last_train) || 0),
-      status: if(reshaped?, do: "pending", else: (existing && existing.status) || "pending"),
+      min_new_rows: attrs["min_new_rows"] || 50
+    }
+    |> Map.merge(existing_derived_fields(existing, reshaped?))
+  end
+
+  # The row_count_at_last_train/status/last_error fields tied to the old model's validity
+  # never carry forward on a reshaped spec - see reshaped?/2's own note.
+  defp existing_derived_fields(existing, reshaped?) do
+    now = System.system_time(:second)
+
+    %{
+      id: (existing && existing.id) || new_spec_id(),
+      row_count_at_last_train: carry_over(reshaped?, existing, :row_count_at_last_train, 0),
+      status: carry_over(reshaped?, existing, :status, "pending"),
       last_error: if(reshaped?, do: nil, else: existing && existing.last_error),
       last_trained_at: existing && existing.last_trained_at,
       created_at: (existing && existing.created_at) || now,
       updated_at: now
     }
-
-    conflict =
-      {:replace,
-       [
-         :source_kind,
-         :connection,
-         :table,
-         :target_column,
-         :time_column,
-         :feature_columns,
-         :task_type,
-         :family,
-         :mode,
-         :retrain_interval_s,
-         :min_new_rows,
-         :row_count_at_last_train,
-         :status,
-         :last_error,
-         :updated_at
-       ]}
-
-    Repo.insert_all(Spec, [row], on_conflict: conflict, conflict_target: [:agent, :name])
-    get_spec(agent_name, attrs["name"])
   end
+
+  # A reshaped spec never carries a stale reading of a field tied to the old model's
+  # validity (row_count_at_last_train, status) forward - see reshaped?/2's own note.
+  defp carry_over(true, _existing, _field, reset_value), do: reset_value
+  defp carry_over(false, existing, field, default), do: (existing && Map.fetch!(existing, field)) || default
 
   defp target_column_for(%{"task_type" => "clustering"}), do: nil
   defp target_column_for(attrs), do: attrs["target_column"]

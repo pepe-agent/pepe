@@ -182,25 +182,20 @@ defmodule Pepe.Tools.Insight do
     rows = args["rows"]
     opts = if args["replace"] == true, do: [replace: true], else: []
 
-    cond do
-      not is_list(rows) or rows == [] ->
-        {:error, "import_rows needs a non-empty `rows` array"}
+    if not is_list(rows) or rows == [] do
+      {:error, "import_rows needs a non-empty `rows` array"}
+    else
+      case Insight.import_rows(agent.name, name, rows, opts) do
+        {:ok, result} ->
+          {:ok,
+           "Imported #{result["inserted"]} row(s). #{result["total_examples"]} total (needs #{result["min_new_rows"]} new for the next auto-retrain)."}
 
-      true ->
-        case Insight.import_rows(agent.name, name, rows, opts) do
-          {:ok, result} ->
-            {:ok,
-             "Imported #{result["inserted"]} row(s). #{result["total_examples"]} total (needs #{result["min_new_rows"]} new for the next auto-retrain)."}
+        {:error, :not_found} ->
+          {:error, "no spec named #{name}"}
 
-          {:error, :not_found} ->
-            {:error, "no spec named #{name}"}
-
-          {:error, reason} when is_binary(reason) ->
-            {:error, reason}
-
-          {:error, reason} ->
-            {:error, inspect(reason)}
-        end
+        {:error, reason} when is_binary(reason) ->
+          {:error, reason}
+      end
     end
   end
 

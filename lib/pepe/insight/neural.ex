@@ -27,7 +27,7 @@ defmodule Pepe.Insight.Neural do
   choice `Pepe.Insight.NeuralTrainer.run/4` makes at train time, and for the same reason
   (no precompiled XLA binary on some platforms - see `defn_options/0`).
   """
-  @spec predict(Axon.t(), Axon.ModelState.t(), Nx.Tensor.t()) :: Nx.Tensor.t()
+  @spec predict(Axon.t(), struct(), Nx.Tensor.t()) :: Nx.Tensor.t()
   def predict(graph, model_state, tensor), do: Axon.predict(graph, model_state, tensor, defn_options())
 
   @doc """

@@ -29,7 +29,7 @@ defmodule Pepe.Insight.NeuralTrainer do
   @batch_size 256
   @learning_rate 0.01
 
-  @spec fit_classifier(Nx.Tensor.t(), Nx.Tensor.t(), pos_integer()) :: Axon.ModelState.t()
+  @spec fit_classifier(Nx.Tensor.t(), Nx.Tensor.t(), pos_integer()) :: struct()
   def fit_classifier(x, y, num_classes) do
     model = Neural.build(Nx.axis_size(x, 1), num_classes)
 
@@ -40,7 +40,7 @@ defmodule Pepe.Insight.NeuralTrainer do
     run(model, loss_fn, x, y)
   end
 
-  @spec fit_regressor(Nx.Tensor.t(), Nx.Tensor.t()) :: Axon.ModelState.t()
+  @spec fit_regressor(Nx.Tensor.t(), Nx.Tensor.t()) :: struct()
   def fit_regressor(x, y) do
     model = Neural.build(Nx.axis_size(x, 1), 1)
     y2d = Nx.reshape(y, {Nx.axis_size(y, 0), 1})

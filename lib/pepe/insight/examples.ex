@@ -63,29 +63,34 @@ defmodule Pepe.Insight.Examples do
           %{id: new_id(), spec_id: spec.id, agent: spec.agent, features: features, target: target, batch_id: batch_id, inserted_at: now}
         end)
 
-      {:ok, inserted} =
-        Repo.transaction(fn ->
-          if opts[:replace] do
-            from(e in __MODULE__, where: e.spec_id == ^spec.id) |> Repo.delete_all()
-          end
-
-          # A single Repo.insert_all/2 over @max_per_call rows would exceed SQLite's
-          # bind-parameter ceiling - see @insert_chunk_size. Chunked inserts plus the
-          # delete/prune above sharing one transaction also makes the whole batch
-          # all-or-nothing, instead of a delete or a later chunk failing and leaving a
-          # partially-replaced example set.
-          entries
-          |> Enum.chunk_every(@insert_chunk_size)
-          |> Enum.reduce(0, fn chunk, acc ->
-            {n, _} = Repo.insert_all(__MODULE__, chunk)
-            acc + n
-          end)
-          |> tap(fn _ -> prune(spec.id) end)
-        end)
+      {:ok, inserted} = Repo.transaction(fn -> replace_and_insert(spec, entries, opts) end)
 
       total = count(spec.id)
       {:ok, %{"inserted" => inserted, "total_examples" => total, "min_new_rows" => spec.min_new_rows}}
     end
+  end
+
+  # A single Repo.insert_all/2 over @max_per_call rows would exceed SQLite's bind-parameter
+  # ceiling - see @insert_chunk_size. Chunked inserts plus the delete/prune above sharing
+  # one transaction also makes the whole batch all-or-nothing, instead of a delete or a
+  # later chunk failing and leaving a partially-replaced example set.
+  defp replace_and_insert(spec, entries, opts) do
+    if opts[:replace] do
+      from(e in __MODULE__, where: e.spec_id == ^spec.id) |> Repo.delete_all()
+    end
+
+    entries
+    |> insert_in_chunks()
+    |> tap(fn _ -> prune(spec.id) end)
+  end
+
+  defp insert_in_chunks(entries) do
+    entries
+    |> Enum.chunk_every(@insert_chunk_size)
+    |> Enum.reduce(0, fn chunk, acc ->
+      {n, _} = Repo.insert_all(__MODULE__, chunk)
+      acc + n
+    end)
   end
 
   @doc """
