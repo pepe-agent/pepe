@@ -30,18 +30,15 @@ livre.
   segmentos aparecem num ano inteiro de encomendas? Que transações destoam de tudo o
   resto?*
 
-Nada disto é específico de saúde, é só o exemplo que volta sempre porque é concreto. Uma
-equipa de suporte a perguntar se um pedido vai escalar e uma clínica a perguntar sobre o
-risco de readmissão correm exatamente o mesmo processo de classificação, só apontado a
-colunas diferentes. A pergunta que importa é mais simples: estás a classificar algo numa
-categoria, a prever um número, a prever esse número ao longo do tempo, ou a olhar para um
-monte de linhas sem ainda fazeres ideia de que grupos ali existem?
+Nenhum destes tipos é exclusivo de saúde: o mesmo processo de classificação serve para
+uma equipa de suporte a prever se um pedido vai escalar ou para uma clínica a prever risco
+de readmissão. O que muda entre os dois é só a coluna-alvo e as colunas usadas para
+prever, não o tipo de modelo.
 
-No vocabulário habitual de ML: classificação, regressão e previsão de tendência são todas
-aprendizagem supervisionada, porque o modelo só aprende a partir de exemplos onde a
-resposta já é conhecida, vinte clientes passados de quem já sabes se cancelaram ou não. O
-agrupamento é o único tipo não supervisionado aqui. Sem resposta conhecida, sem exemplo
-rotulado: o modelo limita-se a olhar para as linhas e a descobrir os grupos sozinho.
+Em termos de ML: classificação, regressão e previsão de tendência são aprendizagem
+supervisionada, porque o modelo aprende a partir de exemplos onde a resposta já é
+conhecida. O agrupamento é o único tipo não supervisionado aqui: não há resposta
+conhecida nem exemplo rotulado, o modelo encontra os grupos sozinho a partir dos dados.
 
 O agrupamento resolve deteção de anomalias de graça: uma linha muito longe do padrão
 habitual do seu grupo volta marcada, usando o mesmo modelo que fez o agrupamento. Um

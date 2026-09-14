@@ -28,18 +28,15 @@ partir de um dado que você já tem, uma capacidade real e limitada, não descob
   Quais segmentos aparecem num ano inteiro de pedidos? Quais transações destoam de todo o
   resto?*
 
-Nada disso é específico de saúde, esse só é o exemplo que sempre volta porque é concreto.
-Um time de suporte perguntando se um chamado vai escalar e uma clínica perguntando sobre
-risco de reinternação rodam exatamente o mesmo pipeline de classificação, só apontado para
-colunas diferentes. A pergunta que importa é mais simples: você está classificando algo
-numa categoria, prevendo um número, prevendo esse número ao longo do tempo, ou olhando para
-uma pilha de registros sem fazer ideia ainda de quais grupos existem aí dentro?
+Nenhum desses tipos é exclusivo de saúde: o mesmo pipeline de classificação serve para um
+time de suporte prevendo se um chamado vai escalar, ou para uma clínica prevendo risco de
+reinternação. O que muda entre os dois é só a coluna-alvo e as colunas usadas para
+prever, não o tipo de modelo.
 
-No vocabulário usual de ML: classificação, regressão e previsão de tendência são todas
-aprendizado supervisionado, porque o modelo só aprende a partir de exemplos onde a
-resposta já é conhecida, vinte clientes passados que você já sabe se cancelaram ou não.
-Agrupamento é o único tipo não supervisionado aqui. Sem resposta conhecida, sem exemplo
-rotulado: o modelo só olha pros registros e descobre os grupos sozinho.
+Em termos de ML: classificação, regressão e previsão de tendência são aprendizado
+supervisionado, porque o modelo aprende a partir de exemplos onde a resposta já é
+conhecida. Agrupamento é o único tipo não supervisionado aqui: não há resposta conhecida
+nem exemplo rotulado, o modelo encontra os grupos sozinho a partir dos dados.
 
 O agrupamento já resolve detecção de anomalia de graça: um registro muito longe do padrão
 do grupo dele volta marcado, usando o mesmo modelo que fez o agrupamento. Um paciente cujos

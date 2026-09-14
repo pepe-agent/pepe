@@ -31,19 +31,15 @@ libre.
   ¿Qué segmentos aparecen en un año entero de pedidos? ¿Qué transacciones no se parecen
   en nada al resto?*
 
-Nada de esto es exclusivo de salud, es solo el ejemplo que aparece siempre porque es
-concreto. Un equipo de soporte preguntando si un ticket va a escalar y una clínica
-preguntando por el riesgo de reingreso corren exactamente el mismo pipeline de
-clasificación, solo que apuntado a columnas distintas. La pregunta que importa es más
-simple: ¿estás clasificando algo en una categoría, prediciendo un número, prediciendo ese
-número a lo largo del tiempo, o mirando un montón de filas sin tener aún idea de qué
-grupos hay ahí?
+Ninguno de estos tipos es exclusivo de salud: el mismo pipeline de clasificación sirve
+para un equipo de soporte que predice si un ticket va a escalar o para una clínica que
+predice riesgo de reingreso. Lo que cambia entre los dos es la columna objetivo y las
+columnas usadas para predecirla, no el tipo de modelo.
 
-En el vocabulario habitual de ML: clasificación, regresión y pronóstico de tendencia son
-todas aprendizaje supervisado, porque el modelo solo aprende a partir de ejemplos donde la
-respuesta ya se conoce, veinte clientes pasados de los que ya sabes si cancelaron o no. El
-agrupamiento es el único tipo no supervisado aquí. Sin respuesta conocida, sin ejemplo
-etiquetado: el modelo solo mira las filas y descubre los grupos por su cuenta.
+En términos de ML: clasificación, regresión y pronóstico de tendencia son aprendizaje
+supervisado, porque el modelo aprende a partir de ejemplos donde la respuesta ya se
+conoce. El agrupamiento es el único tipo no supervisado aquí: no hay respuesta conocida
+ni ejemplo etiquetado, el modelo encuentra los grupos por su cuenta a partir de los datos.
 
 El agrupamiento resuelve detección de anomalías de regalo: una fila muy alejada del patrón
 habitual de su grupo vuelve marcada, con el mismo modelo que hizo el agrupamiento. Un

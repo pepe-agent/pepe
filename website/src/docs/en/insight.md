@@ -27,18 +27,15 @@ data you already have: a real, bounded capability, not open-ended discovery.
   profiles exist in this data, and which patient doesn't fit any of them? What segments
   show up in a year of orders? Which transactions look nothing like the rest?*
 
-None of this is specific to healthcare, that's just the example that keeps coming up
-because it's concrete. A support team asking whether a ticket will escalate and a clinic
-asking about readmission risk run the exact same classification pipeline, pointed at
-different columns. The question that matters is simpler: are you sorting something into a
-category, predicting a number, predicting that number over time, or looking at a pile of
-rows with no idea yet what groups are even in there?
+None of these types are specific to healthcare: the same classification pipeline works
+for a support team predicting whether a ticket will escalate or a clinic predicting
+readmission risk. What changes between the two is the target column and the columns used
+to predict it, not the kind of model.
 
-In the usual ML vocabulary: classification, regression, and forecast all count as
-supervised learning, since the model only ever learns from examples where the answer is
-already known, twenty past customers you already know cancelled or didn't. Clustering is
-the one unsupervised type here. No known answers, no labeled examples: the model just
-looks at the rows and works out the groups on its own.
+In ML terms: classification, regression, and forecast are supervised learning, because
+the model learns from examples where the answer is already known. Clustering is the one
+unsupervised type here: there are no known answers or labeled examples, the model finds
+the groups on its own from the data.
 
 Clustering doubles as anomaly detection for free: a row far from every group's usual
 spread comes back flagged, the same model that did the grouping. A patient whose vitals
