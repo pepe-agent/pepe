@@ -35,7 +35,11 @@ defmodule Pepe.Insight.SchedulerTest do
 
   defp tick, do: send(Scheduler, :tick)
 
-  defp wait_until(fun, tries \\ 100) do
+  # 100 tries (2s) was tight enough to flake on a loaded CI runner - the first fit in a
+  # test run pays Scholar/Nx's numerical-code compilation overhead, not just the actual
+  # 20-row logistic regression, which can occasionally run past 2s on a busy shared
+  # runner even though it's near-instant on a warm/idle machine.
+  defp wait_until(fun, tries \\ 500) do
     cond do
       fun.() -> :ok
       tries <= 0 -> flunk("condition not met in time")
