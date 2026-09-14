@@ -327,8 +327,8 @@ Un script de envoltorio es una ruta estática única, configurada una sola vez p
 instalación. Para algo que un envoltorio no puede resolver (correr un comando en un host
 remoto por SSH, manejar un runtime de contenedores desde código real en vez de shell,
 elegir un backend distinto según el agente), un plugin puede tomar el control completo de
-la ejecución ocupando el [slot](/docs/slots) `sandbox`, el mismo mecanismo de punto de
-extensión exclusivo que ya usan `memory` y `web_search`. Consulta [Plugins](/docs/plugins)
+la ejecución ocupando el [slot](/es/docs/slots/) `sandbox`, el mismo mecanismo de punto de
+extensión exclusivo que ya usan `memory` y `web_search`. Consulta [Plugins](/es/docs/plugins/)
 para ver la forma exacta del callback.
 
 ## Los secretos se guardan como referencias
@@ -554,7 +554,7 @@ de la API en el panel, o por chat con un agente que tenga la herramienta protegi
 ## La ruta HTTP propia de un plugin
 
 Un plugin puede reclamar su propia ruta (`/plugin-routes/:plugin/*path`, ver
-[Plugins](/docs/plugins)) para cosas que el contrato fijo de un webhook no puede cubrir,
+[Plugins](/es/docs/plugins/)) para cosas que el contrato fijo de un webhook no puede cubrir,
 como un callback de OAuth. Hay que tener claro qué implica activar una: cualquiera que
 llegue al servidor puede llamar a esa ruta, porque, a diferencia de los tokens de API de
 arriba, Pepe no antepone ninguna autenticación propia. El plugin recibe la solicitud tal

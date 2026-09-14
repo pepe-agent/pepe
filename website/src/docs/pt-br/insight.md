@@ -15,13 +15,25 @@ partir de um dado que você já tem, uma capacidade real e limitada, não descob
 
 ## Quatro tipos de pergunta
 
-- **Classificação**: prever uma categoria. *Esse paciente vai reinternar em até 30 dias?*
+- **Classificação**: prever uma categoria. *Esse paciente vai reinternar em até 30 dias?
+  Esse chamado de suporte vai escalar pra um gerente? Essa transação é uma fraude?*
 - **Regressão**: prever um número. *Quantos dias esse paciente provavelmente vai ficar
-  internado?*
+  internado? Quanto esse cliente vai gastar mês que vem? Quantas unidades desse produto
+  vão vender essa semana?*
 - **Previsão de tendência**: prever um número **ao longo do tempo**. *Quantas internações
-  semana que vem, baseado na tendência até agora?*
+  semana que vem, baseado na tendência até agora? Como fica a receita do mês que vem?
+  Quantos chamados de suporte esperar na segunda de manhã?*
 - **Agrupamento**: juntar registros parecidos entre si, sem nenhum alvo definido. *Quais
-  perfis de paciente existem nesse dado, e qual paciente não se encaixa em nenhum deles?*
+  perfis de paciente existem nesse dado, e qual paciente não se encaixa em nenhum deles?
+  Quais segmentos aparecem num ano inteiro de pedidos? Quais transações destoam de todo o
+  resto?*
+
+Nada disso é específico de saúde, esse só é o exemplo que sempre volta porque é concreto.
+Um time de suporte perguntando se um chamado vai escalar e uma clínica perguntando sobre
+risco de reinternação rodam exatamente o mesmo pipeline de classificação, só apontado pra
+colunas diferentes. A pergunta que importa é mais simples: você está classificando algo
+numa categoria, prevendo um número, prevendo esse número ao longo do tempo, ou olhando pra
+uma pilha de registros sem fazer ideia ainda de quais grupos existem aí dentro?
 
 O agrupamento já resolve detecção de anomalia de graça: um registro muito longe do padrão
 do grupo dele volta marcado, usando o mesmo modelo que fez o agrupamento. Um paciente cujos
@@ -34,10 +46,10 @@ Duas fontes, escolhidas na hora de definir o que prever:
 
 - **Uma conexão de banco já cadastrada** (as mesmas que `db_query`/`manage_db` já usam,
   Postgres, isolada por tenant via Row-Level Security quando configurado, veja [Banco de
-  dados](/docs/database)).
+  dados](/pt-br/docs/database/)).
 - **Linhas importadas**: entregue as linhas direto com `import_rows`. É o caminho pra
   qualquer fonte que o Pepe não tem conector nativo: um agente lê um arquivo, consulta outro
-  motor de banco via `bash` (veja [Banco de dados](/docs/database) sobre o RLS, que só vale
+  motor de banco via `bash` (veja [Banco de dados](/pt-br/docs/database/) sobre o RLS, que só vale
   pra Postgres), ou puxa de uma API, e entrega as linhas resultantes. As duas fontes
   treinam pelo mesmo pipeline, exatamente igual; o algoritmo nunca sabe de qual delas veio
   o dado.
@@ -74,7 +86,7 @@ poder de redefinir ou retreinar o que está sendo previsto.
 
 Por padrão, nunca é escolha manual: o modelo é escolhido pelo volume real de dado
 verificado que existe, a mesma filosofia de "descobrir sozinho" por trás do [roteamento
-por complexidade](/docs/routing):
+por complexidade](/pt-br/docs/routing/):
 
 - **De algumas centenas a poucos milhares de linhas**: regressão simples. Rápida, robusta,
   sem risco de decorar o dado à toa. Uma clínica com algumas centenas de registros de alta já

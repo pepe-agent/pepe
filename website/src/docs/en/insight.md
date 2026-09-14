@@ -15,13 +15,24 @@ data you already have: a real, bounded capability, not open-ended discovery.
 ## Four kinds of question
 
 - **Classification**: predict a category. *Will this patient be readmitted within 30
-  days?*
+  days? Will this support ticket get escalated to a manager? Is this transaction
+  fraudulent?*
 - **Regression**: predict a number. *How many days will this patient likely stay
-  admitted?*
+  admitted? How much will this customer spend next month? How many units of this SKU
+  will sell this week?*
 - **Forecast**: predict a number **over time**. *How many admissions next week, based on
-  the trend so far?*
+  the trend so far? What does next month's revenue look like? How many support tickets
+  should we staff for on Monday morning?*
 - **Clustering**: group similar rows together, with no target at all. *What patient
-  profiles exist in this data, and which patient doesn't fit any of them?*
+  profiles exist in this data, and which patient doesn't fit any of them? What segments
+  show up in a year of orders? Which transactions look nothing like the rest?*
+
+None of this is specific to healthcare, that's just the example that keeps coming up
+because it's concrete. A support team asking whether a ticket will escalate and a clinic
+asking about readmission risk run the exact same classification pipeline, pointed at
+different columns. The question that matters is simpler: are you sorting something into a
+category, predicting a number, predicting that number over time, or looking at a pile of
+rows with no idea yet what groups are even in there?
 
 Clustering doubles as anomaly detection for free: a row far from every group's usual
 spread comes back flagged, the same model that did the grouping. A patient whose vitals
@@ -33,10 +44,10 @@ look before it becomes an emergency.
 Two sources, chosen when you define what to predict:
 
 - **A registered database connection**: the same ones `db_query`/`manage_db` already use,
-  Postgres, tenant-isolated by Row-Level Security if configured. See [Database](/docs/database).
+  Postgres, tenant-isolated by Row-Level Security if configured. See [Database](/en/docs/database/).
 - **Imported rows**: hand rows in directly with `import_rows`. This is the path for
   anything Pepe has no native connector for. An agent reads a file, queries a different
-  database engine via `bash` (see [Database](/docs/database) for the RLS caveat, which
+  database engine via `bash` (see [Database](/en/docs/database/) for the RLS caveat, which
   doesn't apply outside Postgres), or pulls from an API, and feeds the resulting rows in.
   Both sources train through the exact same pipeline; the algorithm never knows which one
   a given spec uses.
@@ -73,7 +84,7 @@ redefine or retrain what it's predicting from.
 
 By default, never a manual choice: the model is picked from how much verified data
 actually exists, the same "figure it out" philosophy behind [complexity-based
-routing](/docs/routing):
+routing](/en/docs/routing/):
 
 - **A few hundred to a couple thousand rows**: simple regression. Fast, robust, no
   overfitting risk on small data. A clinic with a few hundred discharge records gets a

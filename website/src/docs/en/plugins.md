@@ -10,14 +10,14 @@ platform). This page covers those two shapes in depth, the most common by far, p
 shorter looks at the rest below.
 
 A plugin can also take other shapes: a **persistent-connection channel** (one that
-needs a long-lived websocket, not just a webhook, see [Slots](/docs/slots)), an
+needs a long-lived websocket, not just a webhook, see [Slots](/en/docs/slots/)), an
 **HTTP route of its own** (an OAuth callback, a custom endpoint, see below), a
 **realtime audio provider** (duplex voice, see below), a **model protocol adapter**,
 a **hook** (rewrites conversation content for real, chained and inline, see below),
 a **policy** (vetoes a tool call, or a whole run, before it happens; a check that
 couldn't run counts as a refusal, so it fails closed), or a **run observer** (watches
 the loop from outside, read-only, the one shape that can't affect anything). A plugin
-can also occupy a [**slot**](/docs/slots): memory search, web search, the sandbox a
+can also occupy a [**slot**](/en/docs/slots/): memory search, web search, the sandbox a
 shell command runs in, conversation compaction, or the entire reasoning loop.
 
 Under the hood, every plugin is Elixir compiled at runtime from `~/.pepe/plugins/`,

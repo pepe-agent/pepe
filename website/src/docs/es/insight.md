@@ -17,13 +17,27 @@ libre.
 ## Cuatro tipos de pregunta
 
 - **Clasificación**: predecir una categoría. *¿Este paciente va a reingresar en los
-  próximos 30 días?*
+  próximos 30 días? ¿Este ticket de soporte va a escalar a un gerente? ¿Esta transacción
+  es fraude?*
 - **Regresión**: predecir un número. *¿Cuántos días probablemente va a estar internado
-  este paciente?*
+  este paciente? ¿Cuánto va a gastar este cliente el próximo mes? ¿Cuántas unidades de
+  este producto se van a vender esta semana?*
 - **Pronóstico de tendencia**: predecir un número **a lo largo del tiempo**. *¿Cuántos
-  ingresos la semana que viene, según la tendencia hasta ahora?*
+  ingresos la semana que viene, según la tendencia hasta ahora? ¿Cómo se ve la
+  facturación del próximo mes? ¿Cuántos tickets de soporte hay que esperar el lunes por
+  la mañana?*
 - **Agrupamiento**: juntar filas parecidas entre sí, sin ningún objetivo definido. *¿Qué
-  perfiles de paciente hay en estos datos, y cuál paciente no encaja en ninguno de ellos?*
+  perfiles de paciente hay en estos datos, y cuál paciente no encaja en ninguno de ellos?
+  ¿Qué segmentos aparecen en un año entero de pedidos? ¿Qué transacciones no se parecen
+  en nada al resto?*
+
+Nada de esto es exclusivo de salud, es solo el ejemplo que aparece siempre porque es
+concreto. Un equipo de soporte preguntando si un ticket va a escalar y una clínica
+preguntando por el riesgo de reingreso corren exactamente el mismo pipeline de
+clasificación, solo que apuntado a columnas distintas. La pregunta que importa es más
+simple: ¿estás clasificando algo en una categoría, prediciendo un número, prediciendo ese
+número a lo largo del tiempo, o mirando un montón de filas sin tener aún idea de qué
+grupos hay ahí?
 
 El agrupamiento resuelve detección de anomalías de regalo: una fila muy alejada del patrón
 habitual de su grupo vuelve marcada, con el mismo modelo que hizo el agrupamiento. Un
@@ -37,10 +51,10 @@ Dos fuentes, elegidas al definir qué predecir:
 
 - **Una conexión de base de datos ya configurada** (las mismas que ya usan
   `db_query`/`manage_db`, Postgres, aislada por tenant mediante Row-Level Security cuando
-  está configurado, ve [Base de datos](/docs/database)).
+  está configurado, ve [Base de datos](/es/docs/database/)).
 - **Filas importadas**: entrega las filas directamente con `import_rows`. Es el camino
   para cualquier fuente que Pepe no tenga conector nativo: un agente lee un archivo,
-  consulta otro motor de base de datos vía `bash` (ve [Base de datos](/docs/database)
+  consulta otro motor de base de datos vía `bash` (ve [Base de datos](/es/docs/database/)
   sobre el RLS, que solo aplica a Postgres), o trae datos de una API, y entrega las filas
   resultantes. Las dos fuentes entrenan por el mismo proceso; el algoritmo nunca sabe de
   cuál de las dos vinieron los datos.
@@ -78,7 +92,7 @@ prediciendo.
 
 Por defecto, nunca es una elección manual: el modelo se elige según cuántos datos
 verificados existan de verdad, la misma filosofía de "que lo resuelva solo" detrás del
-[enrutamiento por complejidad](/docs/routing):
+[enrutamiento por complejidad](/es/docs/routing/):
 
 - **De unos cientos a un par de miles de filas**: regresión simple. Rápida, robusta, sin
   riesgo de memorizar los datos de más. Una clínica con unos cientos de registros de alta

@@ -5,7 +5,7 @@ description: Let one installed plugin take over an exclusive extension point, li
 
 Some jobs in Pepe can only have one owner at a time: something has to be *the* thing that
 answers a memory search, or *the* place a shell command runs. A **slot** is that kind of
-extension point, with exactly one occupant at a time, unlike a [plugin](/docs/plugins) tool
+extension point, with exactly one occupant at a time, unlike a [plugin](/en/docs/plugins/) tool
 or channel, where many can coexist. Memory search is a slot: either the built-in search
 answers, or one installed plugin you named takes over. Never both, and never a silent
 pile-up of several plugins answering the same question.
@@ -22,7 +22,7 @@ quality of an answer, but it never breaks a conversation.
 |---|---|---|
 | `memory` | Case-insensitive substring search over `MEMORY.md`/`USER.md`/`people.md` | The `memory_search` tool |
 | `web_search` | DuckDuckGo's Instant Answer API | The `web_search` tool |
-| `sandbox` | Runs directly, or through the configured wrapper script (see [Security](/docs/security)) | The `bash`/`run_script` tools: *where* a shell command actually runs |
+| `sandbox` | Runs directly, or through the configured wrapper script (see [Security](/en/docs/security/)) | The `bash`/`run_script` tools: *where* a shell command actually runs |
 | `model_select` | `Pepe.Config.model_chain_for_agent/1`'s static chain | Which model chain a run uses |
 | `heartbeat_interval` | Always allows a due pulse | Whether a due Telegram heartbeat pulse is allowed to fire |
 | `compaction` | Summarizes the middle of a long conversation with the model itself | How a long conversation gets condensed to fit the context window |
@@ -119,7 +119,7 @@ is optional, for a backend that maintains its own store and needs to rebuild it.
 ```
 
 `opts` already has its `:env` stripped of every secret Pepe holds by the time this runs
-(see [Security](/docs/security)'s "the agent's shell does not inherit Pepe's secrets") -
+(see [Security](/en/docs/security/)'s "the agent's shell does not inherit Pepe's secrets") -
 true no matter which occupant answers. This is the one slot where `bash`'s own per-call
 `timeout_ms` (not the slot's own generous 5-minute ceiling) is the real deadline for the
 built-in; a plugin occupant should still return promptly, since the slot ceiling is a
@@ -141,7 +141,7 @@ would apply.
 
 A natural use: swap to a cheaper model once a project's spend gets close to its cap.
 `Pepe.Usage.tier/1` reports `:normal | :low_compute | :critical | :dead` from the same
-ratio the spend cap itself uses (see [Usage and billing](/docs/billing)), so an occupant
+ratio the spend cap itself uses (see [Usage and billing](/en/docs/billing/)), so an occupant
 doesn't have to re-derive it.
 
 ### Heartbeat pacing
@@ -308,7 +308,7 @@ pepe plugin install ~/.pepe/plugins/example_memory.exs
 pepe slot set memory example_memory
 ```
 
-The `web_search` tool's own untrusted-content wrapping (see [Security](/docs/security))
+The `web_search` tool's own untrusted-content wrapping (see [Security](/en/docs/security/))
 stays in the tool no matter which backend occupies the slot - a slot backend returns plain
 structured results, not text; the trust boundary is drawn once, in core.
 
@@ -326,10 +326,10 @@ than one occupant genuinely needs to coexist:
   - for a platform like Discord or Matrix that needs a long-lived websocket, not just an
   inbound webhook) runs alongside every other channel, including Telegram, in its own
   supervised crash domain so a misbehaving one can't take the others down with it. See
-  [Plugins](/docs/plugins) for the webhook-based `Pepe.Webhooks.Provider` shape most
+  [Plugins](/en/docs/plugins/) for the webhook-based `Pepe.Webhooks.Provider` shape most
   channel plugins should reach for first - a persistent channel is for the platforms a
   webhook genuinely can't cover.
 - **A realtime audio provider** (`Pepe.Realtime.Provider`) and **a plugin's own HTTP
   route** (`Pepe.PluginRoute`) are both additive too, and both covered in
-  [Plugins](/docs/plugins) - several of either can be installed at once, and a client (or
+  [Plugins](/en/docs/plugins/) - several of either can be installed at once, and a client (or
   the operator, for a route) picks which one by name, unlike a slot's single occupant.

@@ -17,13 +17,25 @@ livre.
 ## Quatro tipos de pergunta
 
 - **Classificação**: prever uma categoria. *Este doente vai ser readmitido nos próximos
-  30 dias?*
+  30 dias? Este pedido de suporte vai ser escalado para um gestor? Esta transação é
+  fraudulenta?*
 - **Regressão**: prever um número. *Quantos dias este doente provavelmente vai ficar
-  internado?*
+  internado? Quanto é que este cliente vai gastar no próximo mês? Quantas unidades deste
+  produto se vão vender esta semana?*
 - **Previsão de tendência**: prever um número **ao longo do tempo**. *Quantos
-  internamentos para a semana que vem, com base na tendência até agora?*
+  internamentos para a semana que vem, com base na tendência até agora? Como fica a
+  receita do próximo mês? Quantos pedidos de suporte esperar na segunda de manhã?*
 - **Agrupamento**: juntar linhas parecidas entre si, sem qualquer alvo definido. *Que
-  perfis de doente existem nestes dados, e qual doente não encaixa em nenhum deles?*
+  perfis de doente existem nestes dados, e qual doente não encaixa em nenhum deles? Que
+  segmentos aparecem num ano inteiro de encomendas? Que transações destoam de tudo o
+  resto?*
+
+Nada disto é específico de saúde, é só o exemplo que volta sempre porque é concreto. Uma
+equipa de suporte a perguntar se um pedido vai escalar e uma clínica a perguntar sobre o
+risco de readmissão correm exatamente o mesmo processo de classificação, só apontado a
+colunas diferentes. A pergunta que importa é mais simples: estás a classificar algo numa
+categoria, a prever um número, a prever esse número ao longo do tempo, ou a olhar para um
+monte de linhas sem ainda fazeres ideia de que grupos ali existem?
 
 O agrupamento resolve deteção de anomalias de graça: uma linha muito longe do padrão
 habitual do seu grupo volta marcada, usando o mesmo modelo que fez o agrupamento. Um
@@ -36,10 +48,10 @@ Duas fontes, escolhidas na altura de definir o que prever:
 
 - **Uma ligação a uma base de dados já configurada** (as mesmas que `db_query`/`manage_db`
   já usam, Postgres, isolada por tenant via Row-Level Security quando configurado, vê
-  [Base de dados](/docs/database)).
+  [Base de dados](/pt-pt/docs/database/)).
 - **Linhas importadas**: entrega as linhas diretamente com `import_rows`. É o caminho para
   qualquer fonte para a qual o Pepe não tem conetor nativo: um agente lê um ficheiro,
-  consulta outro motor de base de dados via `bash` (vê [Base de dados](/docs/database)
+  consulta outro motor de base de dados via `bash` (vê [Base de dados](/pt-pt/docs/database/)
   sobre o RLS, que só se aplica ao Postgres), ou vai buscar dados a uma API, e entrega as
   linhas resultantes. As duas fontes treinam pelo mesmo processo; o algoritmo nunca sabe de
   qual delas vieram os dados.
@@ -76,7 +88,7 @@ dar a ela poder de redefinir ou retreinar o que está a ser previsto.
 
 Por omissão, nunca é uma escolha manual: o modelo é escolhido pelo volume real de dados
 verificados que existe, a mesma filosofia de "descobrir sozinho" por trás do
-[encaminhamento por complexidade](/docs/routing):
+[encaminhamento por complexidade](/pt-pt/docs/routing/):
 
 - **De algumas centenas a poucos milhares de linhas**: regressão simples. Rápida, robusta,
   sem risco de decorar os dados à toa. Uma clínica com algumas centenas de registos de alta

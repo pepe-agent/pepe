@@ -6,7 +6,7 @@ description: Deixa um plugin instalado assumir um ponto de extensão exclusivo, 
 Há trabalhos no Pepe que só podem ter um dono de cada vez: algo tem de ser *a* coisa
 que responde a uma pesquisa de memória, ou *o* sítio onde um comando de shell corre.
 Um **slot** é exatamente esse tipo de ponto de extensão, com um único ocupante de cada
-vez, ao contrário de uma ferramenta ou canal de [plugin](/docs/plugins), onde vários
+vez, ao contrário de uma ferramenta ou canal de [plugin](/pt-pt/docs/plugins/), onde vários
 conseguem coexistir sem problema. A pesquisa de memória é um slot: ou responde a
 pesquisa nativa, ou assume um plugin instalado que tenhas nomeado para isso. Nunca os
 dois ao mesmo tempo, e nunca uma acumulação silenciosa de vários plugins a responder à
@@ -25,7 +25,7 @@ resposta, mas nunca chega a partir uma conversa.
 |---|---|---|
 | `memory` | Pesquisa por substring, sem distinguir maiúsculas, em `MEMORY.md`/`USER.md`/`people.md` | A ferramenta `memory_search` |
 | `web_search` | A API Instant Answer do DuckDuckGo | A ferramenta `web_search` |
-| `sandbox` | Corre diretamente, ou através do script de invólucro configurado (ver [Segurança](/docs/security)) | As ferramentas `bash`/`run_script`: *onde* um comando de shell corre de facto |
+| `sandbox` | Corre diretamente, ou através do script de invólucro configurado (ver [Segurança](/pt-pt/docs/security/)) | As ferramentas `bash`/`run_script`: *onde* um comando de shell corre de facto |
 | `model_select` | A cadeia estática de `Pepe.Config.model_chain_for_agent/1` | Que cadeia de modelo um turno usa |
 | `heartbeat_interval` | Deixa sempre passar um pulso já vencido | Se um pulso de heartbeat do Telegram já vencido tem luz verde para disparar |
 | `compaction` | Resume o meio de uma conversa longa com o próprio modelo | Como uma conversa longa é condensada para caber na janela de contexto |
@@ -125,7 +125,7 @@ armazenamento e precisa de o reconstruir.
 ```
 
 O `opts` já chega aqui com o `:env` limpo de todo o segredo que o Pepe guarda (vê em
-[Segurança](/docs/security) a parte sobre "a shell do agente não herda os segredos do
+[Segurança](/pt-pt/docs/security/) a parte sobre "a shell do agente não herda os segredos do
 Pepe"); isto vale seja qual for o ocupante que responder. Este é o único slot em que o
 próprio `timeout_ms` por chamada do `bash` (e não o teto generoso de 5 minutos do
 slot) é o prazo real para o nativo; um ocupante de plugin deve continuar a responder
@@ -150,7 +150,7 @@ aplicar.
 Um uso natural: trocar para um modelo mais barato quando a despesa de um projeto se
 aproxima do teto. O `Pepe.Usage.tier/1` devolve `:normal | :low_compute | :critical |
 :dead` a partir da mesma proporção que o próprio teto de despesa usa (vê [Utilização e
-faturação](/docs/billing)), poupando o ocupante de ter de recalcular isso por conta
+faturação](/pt-pt/docs/billing/)), poupando o ocupante de ter de recalcular isso por conta
 própria.
 
 ### Ritmo do heartbeat
@@ -327,7 +327,7 @@ pepe slot set memory example_memory
 ```
 
 O próprio envolvimento de conteúdo não fiável que a ferramenta `web_search` já faz
-(vê [Segurança](/docs/security)) continua a residir na ferramenta, seja qual for o
+(vê [Segurança](/pt-pt/docs/security/)) continua a residir na ferramenta, seja qual for o
 backend a ocupar o slot: um backend de slot devolve resultados estruturados simples,
 não texto; a fronteira de confiança fica traçada uma única vez, no núcleo.
 
@@ -347,11 +347,11 @@ porque ali faz mesmo sentido ter mais do que um ocupante ao mesmo tempo:
   precisa de um websocket de longa duração, e não só de um webhook de entrada) corre a
   par de qualquer outro canal, incluindo o Telegram, no seu próprio domínio de falhas
   supervisionado, para que um que se comporte mal não arraste os outros consigo. Vê
-  [Plugins](/docs/plugins) para o formato baseado em webhook `Pepe.Webhooks.Provider`,
+  [Plugins](/pt-pt/docs/plugins/) para o formato baseado em webhook `Pepe.Webhooks.Provider`,
   que a maioria dos plugins de canal deve preferir à partida; um canal persistente é
   para as plataformas que um webhook genuinamente não consegue cobrir.
 - **Um fornecedor de áudio em tempo real** (`Pepe.Realtime.Provider`) e **a rota HTTP
   própria de um plugin** (`Pepe.PluginRoute`) também são ambos aditivos, e ambos ficam
-  cobertos em [Plugins](/docs/plugins): dá para instalar vários de qualquer um ao
+  cobertos em [Plugins](/pt-pt/docs/plugins/): dá para instalar vários de qualquer um ao
   mesmo tempo, e é um cliente (ou o operador, no caso de uma rota) quem escolhe qual,
   pelo nome, ao contrário do ocupante único de um slot.

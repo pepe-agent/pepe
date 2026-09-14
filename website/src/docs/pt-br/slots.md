@@ -6,7 +6,7 @@ description: Deixe um plugin instalado assumir um ponto de extensão exclusivo, 
 Existem trabalhos no Pepe que só admitem um dono por vez: algo precisa ser *o*
 responsável por responder uma busca de memória, ou *o* lugar onde um comando de shell
 roda. Um **slot** é justamente esse tipo de ponto de extensão, com exatamente um
-ocupante de cada vez, ao contrário de uma tool ou canal de [plugin](/docs/plugins),
+ocupante de cada vez, ao contrário de uma tool ou canal de [plugin](/pt-br/docs/plugins/),
 onde vários convivem sem problema. A busca de memória é um slot: ou responde a busca
 embutida, ou assume um plugin instalado que você indicou. Nunca os dois juntos, e
 nunca um empilhamento silencioso de vários plugins tentando responder a mesma
@@ -25,7 +25,7 @@ resposta pontual, mas nunca chega a quebrar uma conversa inteira.
 |---|---|---|
 | `memory` | Busca por substring, sem diferenciar maiúsculas, em `MEMORY.md`/`USER.md`/`people.md` | A tool `memory_search` |
 | `web_search` | API Instant Answer do DuckDuckGo | A tool `web_search` |
-| `sandbox` | Roda direto, ou pelo script wrapper configurado (veja [Segurança](/docs/security)) | As tools `bash`/`run_script`: *onde* um comando shell de fato roda |
+| `sandbox` | Roda direto, ou pelo script wrapper configurado (veja [Segurança](/pt-br/docs/security/)) | As tools `bash`/`run_script`: *onde* um comando shell de fato roda |
 | `model_select` | A chain estática de `Pepe.Config.model_chain_for_agent/1` | Qual chain de modelo um turno usa |
 | `heartbeat_interval` | Sempre permite um pulso já vencido | Se um pulso de heartbeat do Telegram já vencido pode disparar |
 | `compaction` | Resume o meio de uma conversa longa usando o próprio modelo | Como uma conversa longa é condensada para caber na janela de contexto |
@@ -125,7 +125,7 @@ que mantém o próprio armazenamento e precisa reconstruí-lo de tempos em tempo
 ```
 
 Quando isso roda, `opts` já chega com o `:env` limpo de todo segredo que o Pepe
-guarda (veja em [Segurança](/docs/security) o trecho sobre "o shell do agente não
+guarda (veja em [Segurança](/pt-br/docs/security/) o trecho sobre "o shell do agente não
 herda os segredos do Pepe"); isso vale para qualquer ocupante que assuma o slot. Este
 é o único slot em que o próprio `timeout_ms` por chamada do `bash` (e não o teto
 generoso de 5 minutos do slot) funciona como o prazo real para o embutido; um
@@ -150,7 +150,7 @@ decidiria aplicar.
 Um uso natural para isso: trocar para um modelo mais barato assim que o gasto de um
 projeto se aproxima do teto. `Pepe.Usage.tier/1` já informa `:normal | :low_compute |
 :critical | :dead`, a partir da mesma proporção usada pelo próprio teto de gasto (veja
-[Uso e cobrança](/docs/billing)), então um ocupante não precisa recalcular nada disso
+[Uso e cobrança](/pt-br/docs/billing/)), então um ocupante não precisa recalcular nada disso
 por conta própria.
 
 ### Ritmo do heartbeat
@@ -330,7 +330,7 @@ pepe slot set memory example_memory
 ```
 
 A própria marcação de conteúdo não confiável da tool `web_search` (veja
-[Segurança](/docs/security)) continua residindo na tool, não importa qual backend
+[Segurança](/pt-br/docs/security/)) continua residindo na tool, não importa qual backend
 esteja ocupando o slot: um backend de slot devolve resultados estruturados simples,
 não texto pronto, então a fronteira de confiança é traçada uma única vez, no core.
 
@@ -341,5 +341,5 @@ forma aditiva, não exclusiva, justamente porque mais de um ocupante precisa mes
 conviver ao mesmo tempo:
 
 - **Um adaptador de protocolo de modelo** (um plugin que implementa `Pepe.LLM.Adapter` para um provedor cujo protocolo de chat não é compatível com OpenAI, cumprindo o mesmo papel que os adaptadores embutidos Responses/Messages já cumprem) se registra sob seu próprio valor de `api`, e vários protocolos rodam ao mesmo tempo, um por conexão de modelo. Um plugin nunca consegue substituir `"openai-responses"` nem `"anthropic-messages"`.
-- **Um canal de chat com conexão persistente** (um plugin que implementa `Pepe.Gateways.Channel`, pensado para uma plataforma como Discord ou Matrix, que precisa de um websocket de longa duração em vez de um simples webhook de entrada) roda junto de qualquer outro canal, incluindo o Telegram, dentro do próprio domínio de falha supervisionado, de modo que um canal com problema não derruba os demais junto. Veja [Plugins](/docs/plugins) para o formato baseado em webhook, `Pepe.Webhooks.Provider`, que deveria ser a primeira opção da maioria dos plugins de canal; um canal persistente serve para as plataformas que um webhook realmente não consegue cobrir.
-- **Um provedor de áudio em tempo real** (`Pepe.Realtime.Provider`) e **uma rota HTTP própria de um plugin** (`Pepe.PluginRoute`) também são aditivos, e ambos estão detalhados em [Plugins](/docs/plugins): dá para ter vários de qualquer um dos dois instalados ao mesmo tempo, e quem escolhe qual usar, pelo nome, é o próprio cliente (ou o operador, no caso de uma rota), diferente do ocupante único e exclusivo de um slot.
+- **Um canal de chat com conexão persistente** (um plugin que implementa `Pepe.Gateways.Channel`, pensado para uma plataforma como Discord ou Matrix, que precisa de um websocket de longa duração em vez de um simples webhook de entrada) roda junto de qualquer outro canal, incluindo o Telegram, dentro do próprio domínio de falha supervisionado, de modo que um canal com problema não derruba os demais junto. Veja [Plugins](/pt-br/docs/plugins/) para o formato baseado em webhook, `Pepe.Webhooks.Provider`, que deveria ser a primeira opção da maioria dos plugins de canal; um canal persistente serve para as plataformas que um webhook realmente não consegue cobrir.
+- **Um provedor de áudio em tempo real** (`Pepe.Realtime.Provider`) e **uma rota HTTP própria de um plugin** (`Pepe.PluginRoute`) também são aditivos, e ambos estão detalhados em [Plugins](/pt-br/docs/plugins/): dá para ter vários de qualquer um dos dois instalados ao mesmo tempo, e quem escolhe qual usar, pelo nome, é o próprio cliente (ou o operador, no caso de uma rota), diferente do ocupante único e exclusivo de um slot.

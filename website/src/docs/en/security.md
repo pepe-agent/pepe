@@ -174,7 +174,7 @@ Any executable works as long as it runs its arguments (`program arg1 arg2 ...`) 
 
 <div class="note"><strong>There is no zero-config, cross-platform true sandbox.</strong> Every real one needs an operating system feature or an external tool. That is why the sandbox is opt-in and the always-on defaults are the gate plus the guardrails. When agents run unattended or auto-approve tools, treat the sandbox as required, not optional.</div>
 
-A wrapper script is one static path, configured once, for the whole installation. For something a wrapper can't do (run a command on a remote host over SSH, drive a container runtime from real code instead of shell, pick a different backend per agent), a plugin can take over execution entirely by occupying the `sandbox` [slot](/docs/slots), the same exclusive-extension-point mechanism `memory` and `web_search` already use. See [Plugins](/docs/plugins) for the callback shape.
+A wrapper script is one static path, configured once, for the whole installation. For something a wrapper can't do (run a command on a remote host over SSH, drive a container runtime from real code instead of shell, pick a different backend per agent), a plugin can take over execution entirely by occupying the `sandbox` [slot](/en/docs/slots/), the same exclusive-extension-point mechanism `memory` and `web_search` already use. See [Plugins](/en/docs/plugins/) for the callback shape.
 
 ## Secrets stay as references
 
@@ -310,7 +310,7 @@ The raw token is shown once and only its SHA-256 hash is stored, never the token
 ## A plugin's own HTTP route
 
 A plugin can claim its own route (`/plugin-routes/:plugin/*path`, see
-[Plugins](/docs/plugins)) for things a webhook's fixed contract can't carry, like an
+[Plugins](/en/docs/plugins/)) for things a webhook's fixed contract can't carry, like an
 OAuth callback. Know what enabling one means: anyone who can reach the server can call
 that route, because unlike the API tokens above, Pepe puts no authentication of its own
 in front of it. The plugin gets the raw request and is responsible for whatever

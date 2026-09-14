@@ -313,8 +313,8 @@ Um script de invólucro é um caminho estático, configurado uma vez para a inst
 inteira. Para o que um invólucro não dá conta (rodar um comando num host remoto via
 SSH, controlar um runtime de contêiner a partir de código real em vez de shell,
 escolher um backend diferente por agente), um plugin pode assumir a execução por
-completo, ocupando o [slot](/docs/slots) `sandbox`, o mesmo mecanismo de ponto de
-extensão exclusivo que `memory` e `web_search` já usam. Veja [Plugins](/docs/plugins)
+completo, ocupando o [slot](/pt-br/docs/slots/) `sandbox`, o mesmo mecanismo de ponto de
+extensão exclusivo que `memory` e `web_search` já usam. Veja [Plugins](/pt-br/docs/plugins/)
 para o formato exato do callback.
 
 ## Segredos ficam como referência
@@ -531,7 +531,7 @@ veja a [página da API HTTP](../api/).
 ## A rota HTTP própria de um plugin
 
 Um plugin pode reivindicar a própria rota (`/plugin-routes/:plugin/*path`, veja
-[Plugins](/docs/plugins)) para cobrir o que o contrato fixo de um webhook não dá
+[Plugins](/pt-br/docs/plugins/)) para cobrir o que o contrato fixo de um webhook não dá
 conta, como um callback de OAuth. É importante saber o que isso implica: qualquer um
 capaz de alcançar o servidor consegue chamar essa rota, porque, diferente dos tokens
 de API descritos acima, o Pepe não coloca autenticação própria nenhuma na frente dela.
