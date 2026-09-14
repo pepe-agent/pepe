@@ -21,11 +21,14 @@ defmodule Pepe.Webhooks.GoogleChatJwt do
     * `aud` equals the operator's configured project number, and
     * the token is inside its `exp` window (with a small clock-skew tolerance).
 
-  No JWT dependency is pulled in - RS256 is verified with `:crypto` directly, same as
-  `Pepe.Webhooks.MsTeamsJwt` and the Discord provider's Ed25519 signatures.
+  A thin provider config over `Pepe.Webhooks.JwtVerifier`'s shared parse/verify-signature/
+  check-claims/cache-the-keys engine - the only Chat-specific piece is the single JWK
+  endpoint the keys come from (see `fetch_keys/0`). A configured project number typed as an
+  integer is coerced to a string by the caller (`Pepe.Webhooks.GoogleChat`), before it ever
+  reaches `verify/2` here - `audience_match?/2` is a plain string equality.
   """
 
-  require Logger
+  alias Pepe.Webhooks.JwtVerifier
 
   # Google publishes this service account's signing keys as a JWK set - the same n/e shape
   # Pepe.Webhooks.MsTeamsJwt already consumes, so no X.509/PEM decoding is needed. (Google's docs
@@ -34,15 +37,6 @@ defmodule Pepe.Webhooks.GoogleChatJwt do
   @jwk_url "https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com"
   @issuer "chat@system.gserviceaccount.com"
 
-  # Allow a little clock drift between Google and this host.
-  @skew_seconds 300
-
-  # Google rotates these keys roughly every two weeks; re-fetch at most once a day in the
-  # ordinary case, but a token whose `kid` isn't cached forces an out-of-band refresh regardless,
-  # so a rotation is picked up immediately rather than waiting out the TTL.
-  @cache_ttl_ms 24 * 60 * 60 * 1000
-  @cache_key {__MODULE__, :jwks}
-
   @doc """
   Verify an inbound Google Chat token for the app registered under `project_number`. Returns
   `:ok` when the token is authentic and addressed to this project, `{:error, reason}` otherwise.
@@ -50,119 +44,28 @@ defmodule Pepe.Webhooks.GoogleChatJwt do
   @spec verify(String.t(), String.t()) :: :ok | {:error, term()}
   def verify(token, project_number)
       when is_binary(token) and is_binary(project_number) and project_number != "" do
-    with {:ok, header, payload, signing_input, sig} <- parse(token),
-         {:ok, kid} <- signing_kid(header),
-         {:ok, jwk} <- signing_key(kid),
-         :ok <- check_signature(signing_input, sig, jwk) do
-      check_claims(payload, project_number)
-    end
+    JwtVerifier.verify(token, project_number, config())
   end
 
   def verify(_token, _project_number), do: {:error, :missing_token_or_audience}
 
-  # --- token parsing ---------------------------------------------------------
-
-  defp parse(token) do
-    with [h, p, s] <- String.split(token, "."),
-         {:ok, header_bin} <- Base.url_decode64(h, padding: false),
-         {:ok, header} <- Jason.decode(header_bin),
-         {:ok, payload_bin} <- Base.url_decode64(p, padding: false),
-         {:ok, payload} <- Jason.decode(payload_bin),
-         {:ok, sig} <- Base.url_decode64(s, padding: false) do
-      {:ok, header, payload, h <> "." <> p, sig}
-    else
-      _ -> {:error, :malformed_token}
-    end
-  end
-
-  defp signing_kid(%{"alg" => "RS256", "kid" => kid}) when is_binary(kid), do: {:ok, kid}
-  defp signing_kid(_header), do: {:error, :unsupported_alg}
-
-  # --- signature -------------------------------------------------------------
-
-  defp check_signature(signing_input, sig, %{"kty" => "RSA", "n" => n64, "e" => e64}) do
-    with {:ok, n} <- Base.url_decode64(n64, padding: false),
-         {:ok, e} <- Base.url_decode64(e64, padding: false),
-         true <- :crypto.verify(:rsa, :sha256, signing_input, sig, [e, n]) do
-      :ok
-    else
-      _ -> {:error, :bad_signature}
-    end
-  end
-
-  defp check_signature(_signing_input, _sig, _jwk), do: {:error, :unsupported_key}
-
-  # --- claims ----------------------------------------------------------------
-
-  defp check_claims(payload, project_number) do
-    now = System.system_time(:second)
-
-    cond do
-      payload["iss"] != @issuer -> {:error, :bad_issuer}
-      not audience_match?(payload["aud"], project_number) -> {:error, :bad_audience}
-      expired?(payload["exp"], now) -> {:error, :expired}
-      not_yet_valid?(payload["nbf"], now) -> {:error, :not_yet_valid}
-      true -> :ok
-    end
-  end
-
-  # A pasted project number in config may already be a string; the claim itself is always a
-  # string too, but compare loosely on either side so an operator-entered integer still matches.
-  defp audience_match?(aud, project_number) when is_binary(aud), do: aud == to_string(project_number)
-  defp audience_match?(_aud, _project_number), do: false
-
-  defp expired?(exp, now) when is_integer(exp), do: now > exp + @skew_seconds
-  defp expired?(_exp, _now), do: true
-
-  defp not_yet_valid?(nbf, now) when is_integer(nbf), do: now + @skew_seconds < nbf
-  defp not_yet_valid?(_nbf, _now), do: false
-
-  # --- JWK cache ---------------------------------------------------------------
-
-  defp signing_key(kid) do
-    case cached_key(kid) do
-      {:ok, jwk} -> {:ok, jwk}
-      :miss -> refresh_and_fetch(kid)
-    end
-  end
-
-  defp refresh_and_fetch(kid) do
-    with {:ok, keys} <- refresh(), do: fetch_key(keys, kid)
-  end
-
-  defp fetch_key(keys, kid) do
-    case Map.fetch(keys, kid) do
-      {:ok, jwk} -> {:ok, jwk}
-      :error -> {:error, :unknown_kid}
-    end
-  end
-
-  defp cached_key(kid) do
-    case :persistent_term.get(@cache_key, nil) do
-      %{at: at, keys: keys} ->
-        if fresh?(at) and Map.has_key?(keys, kid), do: {:ok, keys[kid]}, else: :miss
-
-      _ ->
-        :miss
-    end
-  end
-
-  defp fresh?(at), do: System.monotonic_time(:millisecond) - at < @cache_ttl_ms
-
-  defp refresh do
-    case Req.get(@jwk_url, receive_timeout: 10_000) do
-      {:ok, %{status: 200, body: %{"keys" => keys}}} when is_list(keys) ->
-        by_kid = for %{"kid" => kid} = key <- keys, into: %{}, do: {kid, key}
-        :persistent_term.put(@cache_key, %{at: System.monotonic_time(:millisecond), keys: by_kid})
-        {:ok, by_kid}
-
-      other ->
-        Logger.error("[googlechat] could not fetch Chat signing keys: #{inspect(other)}")
-        {:error, :jwks_fetch_failed}
-    end
-  end
-
   @doc false
-  # Test hook: drop the cached signing keys so a fresh fetch is forced.
-  def reset_cache, do: :persistent_term.erase(@cache_key)
+  def reset_cache, do: JwtVerifier.reset_cache(:googlechat)
+
+  defp config do
+    %{name: :googlechat, issuer: @issuer, fetch_keys: &fetch_keys/0, audience_match: &audience_match?/2}
+  end
+
+  defp fetch_keys do
+    case Req.get(@jwk_url, receive_timeout: 10_000) do
+      {:ok, %{status: 200, body: %{"keys" => keys}}} when is_list(keys) -> {:ok, keys}
+      other -> {:error, other}
+    end
+  end
+
+  # project_number arrives already coerced to a string by verify/2's own is_binary guard (and,
+  # a level up, by googlechat.ex's own to_string/1 on a possibly-integer config value) - a
+  # plain equality is enough, nothing here ever sees a non-string on either side.
+  defp audience_match?(aud, project_number) when is_binary(aud), do: aud == project_number
+  defp audience_match?(_aud, _project_number), do: false
 end
