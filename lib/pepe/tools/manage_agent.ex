@@ -29,7 +29,6 @@ defmodule Pepe.Tools.ManageAgent do
   alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.Config.Agent
-  alias Pepe.Project
 
   @impl true
   def name, do: "manage_agent"
@@ -165,11 +164,8 @@ defmodule Pepe.Tools.ManageAgent do
     if Config.get_agent(target) do
       {:error, "agent #{target} already exists"}
     else
-      primary? = Config.first_agent_of_project?(Project.of(target))
-      agent = new_agent(target, args, primary?)
-
-      case Config.put_agent(agent) do
-        :ok -> {:ok, create_success_message(target, primary?)}
+      case Config.put_new_agent(new_agent(target, args), primary_overrides()) do
+        :ok -> {:ok, create_success_message(target)}
         {:error, :invalid_name} -> {:error, "#{target} isn't a valid handle: use letters, digits, - or _ (optionally project/name)"}
         {:error, :name_collision} -> {:error, "an agent named #{target} already exists (different capitalization)"}
       end
@@ -241,26 +237,39 @@ defmodule Pepe.Tools.ManageAgent do
 
   defp dispatch(other, _target, _args), do: {:error, "unknown or incomplete action: #{other}"}
 
-  # The first agent in a brand-new project is the one that will go on to create the rest
-  # of that project's agents (the same "admin agent" role this very tool serves for) - it's
-  # born permissive (every tool, auto-approved, super-admin) rather than the contained
-  # default (no tools) every agent after it gets, the same treatment `mix pepe
-  # setup`/`mix pepe agent add` already give a project's first agent.
-  defp new_agent(target, args, primary?) do
+  # Contained defaults - what a non-first agent gets. Whether this turns out to be its
+  # project's first agent, and therefore gets primary_overrides/0 applied instead, is
+  # decided atomically at write time by Config.put_new_agent/2 - never here, see its doc
+  # for why a plain pre-check would be a TOCTOU race (and, worse, exploitable by any admin
+  # agent just by spelling an existing project's name with different case or by its id).
+  defp new_agent(target, args) do
     %Agent{
       name: target,
       system_prompt: blank(args["value"]) || Agent.default_prompt(),
-      tools: if(primary?, do: Pepe.Tools.names(), else: []),
-      auto_approve: if(primary?, do: ["*"], else: []),
-      can_manage: if(primary?, do: ["*"])
+      tools: [],
+      auto_approve: [],
+      can_manage: nil
     }
   end
 
-  defp create_success_message(target, true),
-    do:
-      "Created agent #{target} - first in its project, so it starts with full access (every tool, auto-approved, super-admin). Set its persona and model next."
+  # A function, not a module attribute: Pepe.Tools.names() is dynamic (built-ins plus
+  # whatever plugins/skills are installed at the time), so this has to be read fresh on
+  # every call - baking it in at compile time would freeze a project's first agent to
+  # whatever tools existed when this module was last compiled, silently missing anything
+  # installed since.
+  defp primary_overrides, do: %{tools: Pepe.Tools.names(), auto_approve: ["*"], can_manage: ["*"]}
 
-  defp create_success_message(target, false), do: "Created agent #{target}. Set its persona, model and tools next."
+  # Re-fetches rather than trusting a pre-write guess: whether the primary overrides
+  # actually applied was only decided inside Config.put_new_agent/2's CAS closure.
+  defp create_success_message(target) do
+    case Config.get_agent(target) do
+      %{auto_approve: ["*"]} ->
+        "Created agent #{target} - first in its project, so it starts with full access (every tool, auto-approved, super-admin). Set its persona and model next."
+
+      _ ->
+        "Created agent #{target}. Set its persona, model and tools next."
+    end
+  end
 
   @flags %{
     "trust_untrusted_content" => :trust_untrusted_content,

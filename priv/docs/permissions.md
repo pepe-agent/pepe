@@ -22,9 +22,12 @@ without being dangerous.
      any plugin tool) needs **authorization** - the surface asks the user
      (Telegram buttons, console menu, dashboard prompt). Unknown tools default to
      risky (safe default).
-   - Decisions: allow once / for this session / for this session with any parameters
-     (skips the per-call risk check below, for the rest of the session) / always
-     (persisted on the agent's `auto_approve`) / deny.
+   - Decisions: allow once / for the rest of this run / for this session (skips the
+     per-call risk check above for every future call to that tool, for the rest of the
+     session) / everything for this session (the broadest grant there is - every tool,
+     every risk, and the one decision that is NOT suspended by "content from a stranger
+     withdraws pre-approval" below) / always (persisted on the agent's `auto_approve`) /
+     deny.
    - A surface with no human to ask (the HTTP API, a webhook, a cron, a watch) refuses
      a gated tool instead of running it unwatched - and parks the call as a **pending
      approval** a human can resolve later - see "No human, no surprises" below.
@@ -41,12 +44,14 @@ nobody there, the call fails outright with a clear error instead of hanging fore
 waiting for a button nobody can press. Prefer an ordinary reply for an open-ended
 question - `ask_user` is for a genuine pick among a short list of options.
 
-## The owner's primary agent
+## A project's first agent
 
-The first agent created at setup is born **omnipotent**: all tools, super-admin over
-all agents (`can_manage: ["*"]`), and a `"*"` auto-approve grant so it never prompts.
-Agents you add later are scoped normally - grant them only the tools and admin scope
-they need.
+The first agent created in a project (the root install included) is born **omnipotent**:
+all tools, super-admin over every agent in that project (`can_manage: ["*"]`), and a
+`"*"` auto-approve grant so it never prompts - it exists to go on and create the rest of
+that project's agents, so it needs to be able to reach whatever it might grant them.
+Every agent created after it in the same project is scoped normally by default (no
+tools, nothing auto-approved) - grant them only the tools and admin scope they need.
 
 ## The rule of thumb
 

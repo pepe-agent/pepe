@@ -134,6 +134,69 @@ defmodule Pepe.ConfigTest do
     end
   end
 
+  describe "put_new_agent/2" do
+    @overrides %{tools: ["a", "b"], auto_approve: ["*"], can_manage: ["*"]}
+
+    test "applies the overrides to the first agent of a fresh project" do
+      :ok = Config.add_project("acme")
+      :ok = Config.put_new_agent(%Config.Agent{name: "acme/first", tools: []}, @overrides)
+
+      agent = Config.get_agent("acme/first")
+      assert agent.tools == ["a", "b"]
+      assert agent.auto_approve == ["*"]
+      assert agent.can_manage == ["*"]
+    end
+
+    test "leaves a second agent in the same project contained" do
+      :ok = Config.add_project("acme")
+      :ok = Config.put_new_agent(%Config.Agent{name: "acme/first", tools: []}, @overrides)
+      :ok = Config.put_new_agent(%Config.Agent{name: "acme/second", tools: []}, @overrides)
+
+      agent = Config.get_agent("acme/second")
+      assert agent.tools == []
+      assert agent.auto_approve == []
+      assert agent.can_manage == nil
+    end
+
+    test "a project spelled with different case is recognized as already having agents, not a fresh empty one" do
+      :ok = Config.add_project("acme")
+      :ok = Config.put_new_agent(%Config.Agent{name: "acme/first", tools: []}, @overrides)
+
+      :ok = Config.put_new_agent(%Config.Agent{name: "ACME/sneaky", tools: []}, @overrides)
+
+      sneaky = Config.get_agent("acme/sneaky")
+      assert sneaky.tools == []
+      assert sneaky.auto_approve == []
+      assert sneaky.can_manage == nil
+    end
+
+    test "a project spelled by its id is recognized as already having agents, not a fresh empty one" do
+      :ok = Config.add_project("acme")
+      :ok = Config.put_new_agent(%Config.Agent{name: "acme/first", tools: []}, @overrides)
+      pid = Config.get_project("acme")["id"]
+
+      :ok = Config.put_new_agent(%Config.Agent{name: "#{pid}/sneaky", tools: []}, @overrides)
+
+      sneaky = Config.get_agent("acme/sneaky")
+      assert sneaky.tools == []
+      assert sneaky.auto_approve == []
+      assert sneaky.can_manage == nil
+    end
+
+    test "only one of several concurrent first-agent creates in a fresh project gets the overrides" do
+      :ok = Config.add_project("fresh")
+
+      1..10
+      |> Enum.map(fn i ->
+        Task.async(fn -> Config.put_new_agent(%Config.Agent{name: "fresh/agent#{i}", tools: []}, @overrides) end)
+      end)
+      |> Task.await_many(10_000)
+
+      primaries = for i <- 1..10, Config.get_agent("fresh/agent#{i}").auto_approve == ["*"], do: i
+      assert match?([_], primaries), "expected exactly one primary agent, got #{inspect(primaries)}"
+    end
+  end
+
   describe "get_project slug matching" do
     test "resolves a project by slug case-insensitively, exact match preferred" do
       :ok = Config.add_project("Acme")

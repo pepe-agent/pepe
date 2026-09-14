@@ -702,9 +702,29 @@ defmodule Pepe.Config do
     end
   end
 
-  @doc "Resolve an optional scope to a concrete slug: `nil` becomes the default project's slug."
+  @doc """
+  Resolve an optional scope to a concrete, canonical slug: `nil` becomes the default
+  project's slug; an existing project's id or a case-variant of its slug (`ACME`,
+  `p_02d2378d`) resolves to that project's own stored slug (`acme`) via `get_project/1`,
+  which already matches on id or case-insensitive slug - the same leeway `--project`
+  already gives an operator elsewhere. This is deliberate, not just cosmetic: any code
+  comparing `Project.of(agent.name) == resolve_scope(input)` (`agents_in/1`, the
+  first-agent-of-project checks in `put_new_agent/2` below, `same_scope?/2`-style guards)
+  needs both sides on the exact same string, or a project that already has agents reads as
+  empty to a caller who spelled its name differently - which used to let a case/id variant
+  of an existing project's name be mistaken for a brand-new, empty one. A slug that matches
+  no project (not yet created, or genuinely invalid) passes through unchanged, same as
+  before - callers that rely on resolving to a not-yet-existing slug (e.g. validating a
+  `--project` before creating it) are unaffected.
+  """
   def resolve_scope(nil), do: default_project_slug()
-  def resolve_scope(slug) when is_binary(slug), do: slug
+
+  def resolve_scope(slug) when is_binary(slug) do
+    case get_project(slug) do
+      %{"slug" => canonical} -> canonical
+      nil -> slug
+    end
+  end
 
   @doc """
   Qualify a bare handle into the default project (`assistant` -> `default/assistant`); an
@@ -1550,27 +1570,6 @@ defmodule Pepe.Config do
     |> Enum.map(fn {id, m} -> build_agent(config, id, m) end)
   end
 
-  @doc """
-  Would the next agent created in `project` (`nil` for the default project) be the first
-  one there? Every caller that creates an agent (the setup wizard, `mix pepe agent add`,
-  the conversational `manage_agent` tool) uses this the same way: a project's first agent
-  is the one that will go on to create the rest, so it's born permissive (every tool,
-  auto-approved) rather than the contained default every agent after it gets.
-
-  `project` goes through `resolve_scope/1` first: EVERY agent is stored under a
-  fully-qualified `project/name` handle, even one created with no `--project` at all - it
-  lands in the *default* project (a real project like any other, not a bare/unscoped
-  handle), so `nil` has to mean "the default project's slug" here, not "no project" - see
-  `resolve_scope/1`'s and `resolve_handle/1`'s docs. Comparing against a raw `nil` instead
-  would never match any stored agent's project, making every agent look like a project's
-  first one forever.
-  """
-  @spec first_agent_of_project?(String.t() | nil) :: boolean()
-  def first_agent_of_project?(project) do
-    target = resolve_scope(project)
-    not Enum.any?(agents(), &(Project.of(&1.name) == target))
-  end
-
   # Build the Agent struct from a stored (id-keyed) map: fill the stable `id`, owning `project`
   # id and bare label, and the derived display handle in `name` (`<project-slug>/<bare>`), so
   # callers keep seeing a handle in `.name`.
@@ -1744,6 +1743,37 @@ defmodule Pepe.Config do
     (is_nil(slug) or Project.valid_name?(slug)) and Project.valid_name?(Project.name_of(handle))
   end
 
+  @doc """
+  Create a new agent, applying `primary_overrides` (a map of fields, e.g. `%{tools: ...,
+  auto_approve: ..., can_manage: ...}`) on top of it if and only if it turns out to be the
+  FIRST agent in its project - the one that will go on to create the rest, so it's born
+  permissive rather than the contained default every agent after it gets. `agent` should
+  already carry the contained (non-primary) defaults for whichever fields
+  `primary_overrides` names.
+
+  The "am I first?" check happens INSIDE the same `update_cas/1` retry that resolves the
+  project's canonical id and writes the agent - not before, as a separate read - for two
+  reasons that both used to be real, reproducible bugs: (1) two concurrent creates
+  targeting the same still-empty project could both see "yes, I'm first" and both write a
+  permissive agent (the exact TOCTOU class `do_put_agent/2`'s own note below warns about);
+  (2) a caller spelling a project by a different case or by its id (`--project ACME` or
+  `--project p_02d2378d` for a project stored as `acme`) would see it as a *different,
+  empty* project and mint a second permissive agent into one that already has agents -
+  deciding against the canonical `pid` `ensure_project/2` resolves, rather than the raw
+  scope string a caller passed in, closes that regardless of how the project was spelled.
+  """
+  @spec put_new_agent(Agent.t(), map()) :: :ok | {:error, :invalid_name} | {:error, :name_collision}
+  def put_new_agent(%Agent{name: name} = agent, primary_overrides) when is_map(primary_overrides) do
+    if valid_handle?(name) do
+      case update_cas(&do_put_agent(&1, agent, primary_overrides)) do
+        {:ok, _config} -> :ok
+        {:error, _} = err -> err
+      end
+    else
+      {:error, :invalid_name}
+    end
+  end
+
   # Runs inside `update_cas/1`: the collision check and the write share the same freshly
   # loaded config, so two concurrent creates of case-variant names can't both pass the
   # check and then both write: one wins the CAS, the other sees the loser's write reflected
@@ -1753,12 +1783,17 @@ defmodule Pepe.Config do
   # (do_put_agent resolving `id` through the same case-insensitive fallback, and quietly
   # overwriting the differently-cased agent already there) is the bug this whole guard exists
   # to close; reintroducing it via a check-then-write race would defeat the point.
-  defp do_put_agent(config, %Agent{name: name, id: agent_id} = agent) do
+  #
+  # `primary_overrides` (nil from plain `put_agent/1`) gets the identical treatment: decided
+  # against this same freshly loaded `config` and the canonical `pid`, never a stale read
+  # from before the CAS retry - see `put_new_agent/2`'s own doc for why that matters.
+  defp do_put_agent(config, %Agent{name: name, id: agent_id} = agent, primary_overrides \\ nil) do
     if is_nil(agent_id) and agent_case_collision?(config, name) do
       {:error, :name_collision}
     else
       {slug, bare} = handle_parts(config, name)
       {config, pid} = ensure_project(config, slug)
+      agent = apply_primary_overrides(agent, primary_overrides, config, pid)
       id = agent_id || agent_id_for(config, name) || generate_agent_id()
       stored = store_agent(config, agent, bare, pid)
 
@@ -1769,6 +1804,20 @@ defmodule Pepe.Config do
 
       {:ok, new_config}
     end
+  end
+
+  defp apply_primary_overrides(agent, nil, _config, _pid), do: agent
+
+  defp apply_primary_overrides(agent, overrides, config, pid) do
+    if first_agent_of_pid?(config, pid), do: struct(agent, overrides), else: agent
+  end
+
+  # Whether `pid` (a project's canonical id, as resolved by `ensure_project/2` for the
+  # exact config snapshot this write is happening against) owns no agent yet. Checked
+  # directly against the raw `config["agents"]` map already in hand - never a fresh
+  # `agents()`/`load()` call, which would read past this CAS attempt's own snapshot.
+  defp first_agent_of_pid?(config, pid) do
+    config |> Map.get("agents", %{}) |> Enum.all?(fn {_id, m} -> m["project"] != pid end)
   end
 
   # True when `name` doesn't exactly match any existing agent (in its own scope), but does

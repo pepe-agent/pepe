@@ -228,4 +228,37 @@ defmodule Mix.Tasks.PepeProjectCliTest do
     assert Config.get_agent("first").tools == ["read_file"]
     assert out =~ "read_file"
   end
+
+  test "agent add --can-manage none on the first agent of a project keeps it genuinely contained" do
+    pepe(["agent", "add", "first", "--can-manage", "none"])
+    agent = Config.get_agent("first")
+    assert agent.can_manage == []
+    assert agent.tools == []
+    assert agent.auto_approve == []
+  end
+
+  test "agent add --project ACME on a project already known as acme does not mint a second permissive agent" do
+    pepe(["project", "add", "acme"])
+    pepe(["agent", "add", "boss", "--project", "acme"])
+
+    pepe(["agent", "add", "sneaky", "--project", "ACME"])
+
+    sneaky = Config.get_agent("acme/sneaky")
+    assert sneaky.tools == []
+    assert sneaky.auto_approve == []
+    assert sneaky.can_manage == nil
+  end
+
+  test "agent add --project <id> on a project already known by its slug does not mint a second permissive agent" do
+    pepe(["project", "add", "acme"])
+    pepe(["agent", "add", "boss", "--project", "acme"])
+    pid = Config.get_project("acme")["id"]
+
+    pepe(["agent", "add", "sneaky", "--project", pid])
+
+    sneaky = Config.get_agent("acme/sneaky")
+    assert sneaky.tools == []
+    assert sneaky.auto_approve == []
+    assert sneaky.can_manage == nil
+  end
 end

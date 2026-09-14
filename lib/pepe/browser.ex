@@ -14,15 +14,34 @@ defmodule Pepe.Browser do
   @registry Pepe.Browser.Registry
   @sup Pepe.Browser.DynSup
 
+  # validate_url/1 can do real DNS resolution for a hostname target - bounded here so a
+  # slow/hanging resolver can't stall the caller's turn indefinitely; see
+  # validate_url_bounded/1's own note for why this needs its own timeout now.
+  @validate_timeout_ms 5_000
+
   @doc "Navigate to `url`, starting the session's browser if none is running yet."
   def open(key, url) do
     # Validated here, before ever starting a session, so a scheme/host/internal-address
     # rejection never pays for launching a real Chrome process (and CDPEx.launch/1's own
     # ~30s timeout) just to be told no - Session.open/2 still re-validates on its own
     # call path, so calling it directly (bypassing this facade) stays just as safe.
-    with :ok <- Session.validate_url(url),
+    with :ok <- validate_url_bounded(url),
          {:ok, pid} <- ensure_started(key) do
       safe_call(fn -> Session.open(pid, url) end)
+    end
+  end
+
+  # Session.validate_url/1's DNS lookup used to be bounded by GenServer.call's own
+  # timeout, back when it only ever ran inside the Session process; now that open/2 calls
+  # it directly in the CALLING process (to avoid starting a session at all for a doomed
+  # URL - see open/2's own comment), nothing bounded it anymore. A Task with an explicit
+  # timeout restores that same ceiling here instead.
+  defp validate_url_bounded(url) do
+    task = Task.async(fn -> Session.validate_url(url) end)
+
+    case Task.yield(task, @validate_timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> result
+      nil -> {:error, "timed out checking the URL (DNS lookup took too long)"}
     end
   end
 

@@ -64,8 +64,8 @@ destas seis opções:
 
 - `once`: libera só esta chamada; na próxima, pergunta de novo.
 - `this_run`: libera pelo resto *desta execução específica*. Veja mais abaixo, em [Conteúdo vindo de um estranho retira a pré-aprovação](#conteúdo-vindo-de-um-estranho-retira-a-pré-aprovação), quando essa opção de fato aparece.
-- `session`: libera pelo resto desta conversa, para chamadas com os mesmos riscos desta aqui. Fica só na memória e é esquecida ao abrir uma sessão nova ou reiniciar; outras sessões continuam perguntando normalmente.
-- `session_any` ("Permitir com quaisquer parâmetros"): também vale só para esta sessão, mas é um cheque em branco de verdade: toda chamada futura àquela ferramenta passa direto, não importa qual risco carregue, e não só os que essa chamada específica sinalizou. Serve para quando você já decidiu parar de ser questionado sobre os *parâmetros* de uma ferramenta por um tempo, não só sobre o nome dela.
+- `session_any` ("Permitir nesta sessão"): um cheque em branco pelo resto desta conversa: toda chamada futura àquela ferramenta passa direto, não importa qual risco carregue, e não só os que essa chamada específica sinalizou. Fica só na memória e é esquecida ao abrir uma sessão nova ou reiniciar; outras sessões continuam perguntando normalmente. (Existe internamente uma versão mais estreita, restrita ao formato exato desta chamada, mas ela não aparece como botão próprio - pra quem está decidindo na hora, as duas soam como a mesma escolha.)
+- `session_bypass` (⚠️ "Permitir tudo nesta sessão"): a liberação de sessão mais ampla que existe - toda ferramenta, todo risco, pelo resto da sessão. Diferente de todas as outras opções aqui, ela continua valendo mesmo quando a execução leu algo vindo de um estranho (veja mais abaixo) - use só numa sessão em que você já confia totalmente.
 - `always`: libera dali em diante, ficando gravado no agente dentro de `config.json`.
 - `deny`: recusa, e não fica guardado em lugar nenhum, então a mesma chamada volta a ser perguntada depois.
 
@@ -178,14 +178,16 @@ verdade antes de ele acontecer. Numa superfície sem ninguém para perguntar, as
 regras se cruzam e a resposta vira não: um documento com conteúdo injetado não
 consegue rodar absolutamente nada.
 
-Enquanto uma execução está contaminada, `session` e `always` também param de valer na
+Enquanto uma execução está contaminada, `session_any` e `always` também param de valer na
 hora: aprovar uma chamada no meio da execução costumava dar a impressão de ter
 funcionado e, na prática, não fazia efeito nenhum até a *próxima* execução. `this_run`
 é a resposta que realmente funciona naquele instante: "esta chamada, e outras com essa
 mesma cara, pelo resto da execução que estou olhando agora". É uma decisão tomada por
 alguém encarando o conteúdo contaminado de verdade, na sua frente, não uma concessão
 antiga sendo reaproveitada depois, para algo novo. Ela existe só enquanto aquela
-execução continuar contaminada, e desaparece assim que ela termina.
+execução continuar contaminada, e desaparece assim que ela termina. `session_bypass` é a
+única exceção: continua valendo mesmo em meio à contaminação, e é exatamente por isso que
+é o botão que carrega um aviso.
 
 Essa é uma fronteira de verdade, não um apelo escrito dentro do prompt, e de propósito
 não é a resposta inteira: conteúdo absorvido num turno continua na conversa, e um

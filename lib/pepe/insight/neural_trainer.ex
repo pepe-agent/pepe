@@ -29,6 +29,9 @@ defmodule Pepe.Insight.NeuralTrainer do
   @batch_size 256
   @learning_rate 0.01
 
+  # `struct()`, not the more precise `%Axon.ModelState{}` - see Neural.predict/3's own
+  # comment: Axon declares no Axon.ModelState.t/0 for dialyzer, and credo's SpecWithStruct
+  # check rejects the bare struct literal the other way. struct() is what satisfies both.
   @spec fit_classifier(Nx.Tensor.t(), Nx.Tensor.t(), pos_integer()) :: struct()
   def fit_classifier(x, y, num_classes) do
     model = Neural.build(Nx.axis_size(x, 1), num_classes)

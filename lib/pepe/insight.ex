@@ -112,7 +112,10 @@ defmodule Pepe.Insight do
   end
 
   @doc "Import rows into an `\"import\"` spec. See `Pepe.Insight.Examples.import/3`."
-  @spec import_rows(String.t(), String.t(), [map()], keyword()) :: {:ok, map()} | {:error, term()}
+  # Narrower than {:error, term()}: every branch below (and Examples.import/3's own spec)
+  # only ever returns :not_found or a message string - dialyzer then defends that
+  # invariant going forward, rather than only having observed it once against today's code.
+  @spec import_rows(String.t(), String.t(), [map()], keyword()) :: {:ok, map()} | {:error, :not_found | String.t()}
   def import_rows(agent_ref, name, rows, opts \\ []) do
     case fetch_struct(agent_ref, name) do
       nil -> {:error, :not_found}
@@ -135,7 +138,9 @@ defmodule Pepe.Insight do
   end
 
   @doc "Predict from `name`'s current *ready* model. `input` maps feature column -> value."
-  @spec predict(String.t(), String.t(), map()) :: {:ok, term()} | {:error, term()}
+  # Narrower than {:error, term()} for the same reason as import_rows/4 above -
+  # Predictor.predict/2's own spec only ever returns a message string past :not_found.
+  @spec predict(String.t(), String.t(), map()) :: {:ok, term()} | {:error, :not_found | String.t()}
   def predict(agent_ref, name, input) do
     case fetch_struct(agent_ref, name) do
       nil ->

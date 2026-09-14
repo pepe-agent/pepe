@@ -3543,8 +3543,12 @@ defmodule Mix.Tasks.Pepe do
       default NAME [--project CO]                           set the (scope) default agent
 
     Capabilities are controlled by an agent's --tools (a capability = having its
-    tool - omit --tools to grant every tool to a project's first agent, or none to
-    any agent after it); learning is controlled per-conversation
+    tool - omit --tools to grant every tool, auto-approved, to a project's first agent;
+    any agent after it gets none unless you say otherwise. Passing --can-manage
+    (including --can-manage none) on that first agent also keeps --tools/auto-approve at
+    their contained defaults - explicitly scoping what it may administer is a deliberate
+    call about its authority, and it shouldn't come bundled with unrelated full tool
+    access); learning is controlled per-conversation
     by a bot's `trainers` list. --admin is shorthand for --can-manage "*" (this agent
     can administer/train every other agent, e.g. the one bootstrap "boss" agent you
     train the rest through) - it does NOT skip the human-approval gate on risky tool
@@ -3565,12 +3569,12 @@ defmodule Mix.Tasks.Pepe do
   defp save_new_agent(name, opts) do
     handle = Project.handle(opts[:project], name)
     agent = new_agent_from_opts(handle, opts)
+    overrides = primary_overrides_for(opts)
 
-    case Config.put_agent(agent) do
+    case Config.put_new_agent(agent, overrides) do
       :ok ->
         if opts[:default], do: Config.set_default_agent_for(opts[:project], name)
-        admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
-        ok("agent #{green(handle)} saved (tools: #{Enum.join(agent.tools, ", ")})#{admin_note}")
+        report_saved_agent(handle, opts)
 
       {:error, :name_collision} ->
         error("an agent named #{handle} already exists (different capitalization)")
@@ -3580,24 +3584,35 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
-  # An agent created with no --tools, as the first one in its target project, is born the
-  # same way mix pepe setup's own wizard already bootstraps a fresh install: every tool,
-  # auto-approved, super-admin over the (so far empty) project - it's the one that will go
-  # on to create the project's other agents, so it needs to be able to reach every
-  # capability those agents might need to be granted, not just a safe starting subset. An
-  # explicit --tools always wins outright, whether this is the first agent or the fifth.
-  defp new_agent_from_opts(handle, opts) do
-    primary? = is_nil(opts[:tools]) and Config.first_agent_of_project?(opts[:project])
+  # Re-fetches rather than trusting the pre-write agent struct: whether the primary
+  # overrides actually applied was only decided inside Config.put_new_agent/2's CAS
+  # closure (see its doc), so this is the only way to report what was really stored.
+  defp report_saved_agent(handle, opts) do
+    saved = Config.get_agent(handle)
+    admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
 
+    primary_note =
+      if saved.auto_approve == ["*"],
+        do: " · first agent in its project: born fully permissive, no approval prompts",
+        else: ""
+
+    ok("agent #{green(handle)} saved (tools: #{Enum.join(saved.tools, ", ")})#{admin_note}#{primary_note}")
+  end
+
+  # Every field below is the CONTAINED default - what a non-first agent gets. Whether this
+  # turns out to be its project's first agent, and therefore gets primary_overrides_for/1's
+  # overrides applied instead, is decided atomically at write time by
+  # Config.put_new_agent/2 - never here, see that function's doc for why.
+  defp new_agent_from_opts(handle, opts) do
     %Agent{
       name: handle,
       description: opts[:description],
       model: opts[:model],
       system_prompt: opts[:prompt] || "You are Pepe, a helpful AI agent.",
-      tools: if(primary?, do: Pepe.Tools.names(), else: parse_tools_opt(opts[:tools])),
-      auto_approve: if(primary?, do: ["*"], else: []),
+      tools: parse_tools_opt(opts[:tools]),
+      auto_approve: [],
       can_message: parse_can_message_opt(opts[:can_message], handle),
-      can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle) || if(primary?, do: ["*"]),
+      can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle),
       hooks: parse_hooks_opt(opts[:hooks]),
       slots: parse_slots_opt(opts[:slots]),
       max_iterations: opts[:max_iterations] || 12,
@@ -3609,6 +3624,28 @@ defmodule Mix.Tasks.Pepe do
     }
     |> put_new_agent_flags(opts)
   end
+
+  # What a project's first agent gets on top of new_agent_from_opts/1's contained
+  # defaults - every tool, auto-approved, super-admin over the (so far empty) project, so
+  # it can reach every capability the project's other agents might need to be granted, not
+  # just a safe starting subset. Each field only overrides when the operator didn't already
+  # make an explicit choice that should win outright:
+  #   - an explicit --tools always keeps tools/auto_approve at their contained defaults.
+  #   - an explicit --can-manage (including "none") also keeps tools/auto_approve
+  #     contained: an operator who explicitly scoped what this agent may administer is
+  #     making a deliberate call about its authority, and "you said manage nothing, here's
+  #     every tool auto-approved anyway" would contradict that - so --can-manage none on a
+  #     project's first agent stays genuinely contained, not just admin-less.
+  #   - can_manage's own override only withholds for an explicit --can-manage; --admin
+  #     alone (asking for MORE authority, not less) doesn't suppress it.
+  defp primary_overrides_for(opts) do
+    %{}
+    |> put_if(is_nil(opts[:tools]) and is_nil(opts[:can_manage]), tools: Pepe.Tools.names(), auto_approve: ["*"])
+    |> put_if(is_nil(opts[:admin]) and is_nil(opts[:can_manage]), can_manage: ["*"])
+  end
+
+  defp put_if(overrides, true, fields), do: Enum.into(fields, overrides)
+  defp put_if(overrides, false, _fields), do: overrides
 
   # Split from new_agent_from_opts/2 to keep its cyclomatic complexity down - each `||`
   # default below counts as a branch, same reasoning as Pepe.Config.Agent.put_flags/2.
@@ -4909,10 +4946,13 @@ defmodule Mix.Tasks.Pepe do
     # The very first agent of the root project is always the primary (omnipotent) one,
     # whatever path created it - both callers of add_agent/1 (first-run setup, and the
     # interactive "add agent" menu) only ever operate in the root scope, never inside a
-    # named project, so first_agent_of_project?(nil) is exactly the right check here (not
+    # named project, so agents_in(nil) == [] is exactly the right check here (not
     # agent_names() == [], which would wrongly stay false forever once ANY project anywhere
-    # has an agent, even one that has nothing to do with root).
-    primary? = primary? or Config.first_agent_of_project?(nil)
+    # has an agent, even one that has nothing to do with root). This is a plain read, not the
+    # atomic Config.put_new_agent/2 the CLI/manage_agent entry points need - safe here only
+    # because this wizard is a single interactive human in one local process, never driven
+    # concurrently or with an operator-controlled project argument the way those two are.
+    primary? = primary? or Config.agents_in(nil) == []
 
     agent_name =
       Pepe.TUI.input(label: "Agent name:", optional: true)

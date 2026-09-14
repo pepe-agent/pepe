@@ -11,6 +11,7 @@ defmodule Pepe.Tools.ManageAgentTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_agent(%Agent{name: "sales", system_prompt: "x", tools: ["read_file"]})
     Config.put_agent(%Agent{name: "hr", system_prompt: "x", tools: []})
@@ -138,6 +139,60 @@ defmodule Pepe.Tools.ManageAgentTest do
     refute Config.get_agent("bad/name/extra")
     # No agent was created: only the two the setup put there remain.
     assert Enum.map(Config.agents(), & &1.name) |> Enum.sort() == ["default/hr", "default/sales"]
+  end
+
+  describe "create's primary-agent (project's first agent) treatment" do
+    test "the first agent created in a genuinely new project is born fully permissive" do
+      Config.add_project("acme")
+
+      assert {:ok, msg} =
+               ManageAgent.run(%{"action" => "create", "target" => "acme/boss"}, ctx(["*"]))
+
+      assert msg =~ "first in its project"
+      agent = Config.get_agent("acme/boss")
+      assert agent.tools == Pepe.Tools.names()
+      assert agent.auto_approve == ["*"]
+      assert agent.can_manage == ["*"]
+    end
+
+    test "a second agent created in that same project stays contained" do
+      Config.add_project("acme")
+      ManageAgent.run(%{"action" => "create", "target" => "acme/boss"}, ctx(["*"]))
+
+      assert {:ok, msg} =
+               ManageAgent.run(%{"action" => "create", "target" => "acme/rep"}, ctx(["*"]))
+
+      refute msg =~ "first in its project"
+      agent = Config.get_agent("acme/rep")
+      assert agent.tools == []
+      assert agent.auto_approve == []
+      assert agent.can_manage == nil
+    end
+
+    test "spelling an already-populated project in a different case does not mint a second super-admin" do
+      Config.add_project("acme")
+      ManageAgent.run(%{"action" => "create", "target" => "acme/boss"}, ctx(["*"]))
+
+      assert {:ok, _} = ManageAgent.run(%{"action" => "create", "target" => "ACME/sneaky"}, ctx(["*"]))
+
+      sneaky = Config.get_agent("acme/sneaky")
+      assert sneaky.tools == []
+      assert sneaky.auto_approve == []
+      assert sneaky.can_manage == nil
+    end
+
+    test "spelling an already-populated project by its id does not mint a second super-admin" do
+      Config.add_project("acme")
+      ManageAgent.run(%{"action" => "create", "target" => "acme/boss"}, ctx(["*"]))
+      pid = Config.get_project("acme")["id"]
+
+      assert {:ok, _} = ManageAgent.run(%{"action" => "create", "target" => "#{pid}/sneaky"}, ctx(["*"]))
+
+      sneaky = Config.get_agent("acme/sneaky")
+      assert sneaky.tools == []
+      assert sneaky.auto_approve == []
+      assert sneaky.can_manage == nil
+    end
   end
 
   describe "set_flag (enable or disable a switch on a managed agent)" do
