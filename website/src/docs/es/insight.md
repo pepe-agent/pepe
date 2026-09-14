@@ -39,6 +39,12 @@ simple: ¿estás clasificando algo en una categoría, prediciendo un número, pr
 número a lo largo del tiempo, o mirando un montón de filas sin tener aún idea de qué
 grupos hay ahí?
 
+En el vocabulario habitual de ML: clasificación, regresión y pronóstico de tendencia son
+todas aprendizaje supervisado, porque el modelo solo aprende a partir de ejemplos donde la
+respuesta ya se conoce, veinte clientes pasados de los que ya sabes si cancelaron o no. El
+agrupamiento es el único tipo no supervisado aquí. Sin respuesta conocida, sin ejemplo
+etiquetado: el modelo solo mira las filas y descubre los grupos por su cuenta.
+
 El agrupamiento resuelve detección de anomalías de regalo: una fila muy alejada del patrón
 habitual de su grupo vuelve marcada, con el mismo modelo que hizo el agrupamiento. Un
 paciente cuyos signos vitales lo ubican lejos del grupo al que normalmente pertenecería es

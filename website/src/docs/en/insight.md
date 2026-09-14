@@ -34,6 +34,12 @@ different columns. The question that matters is simpler: are you sorting somethi
 category, predicting a number, predicting that number over time, or looking at a pile of
 rows with no idea yet what groups are even in there?
 
+In the usual ML vocabulary: classification, regression, and forecast all count as
+supervised learning, since the model only ever learns from examples where the answer is
+already known, twenty past customers you already know cancelled or didn't. Clustering is
+the one unsupervised type here. No known answers, no labeled examples: the model just
+looks at the rows and works out the groups on its own.
+
 Clustering doubles as anomaly detection for free: a row far from every group's usual
 spread comes back flagged, the same model that did the grouping. A patient whose vitals
 put them nowhere near their usual peer group is exactly that kind of anomaly, worth a

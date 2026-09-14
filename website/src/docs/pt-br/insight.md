@@ -35,6 +35,12 @@ colunas diferentes. A pergunta que importa é mais simples: você está classifi
 numa categoria, prevendo um número, prevendo esse número ao longo do tempo, ou olhando pra
 uma pilha de registros sem fazer ideia ainda de quais grupos existem aí dentro?
 
+No vocabulário usual de ML: classificação, regressão e previsão de tendência são todas
+aprendizado supervisionado, porque o modelo só aprende a partir de exemplos onde a
+resposta já é conhecida, vinte clientes passados que você já sabe se cancelaram ou não.
+Agrupamento é o único tipo não supervisionado aqui. Sem resposta conhecida, sem exemplo
+rotulado: o modelo só olha pros registros e descobre os grupos sozinho.
+
 O agrupamento já resolve detecção de anomalia de graça: um registro muito longe do padrão
 do grupo dele volta marcado, usando o mesmo modelo que fez o agrupamento. Um paciente cujos
 sinais vitais o colocam bem longe do grupo em que ele normalmente estaria é exatamente esse
