@@ -10,9 +10,14 @@ defmodule Pepe.Permissions.PromptTest do
   alias Pepe.Permissions.Prompt
   alias Pepe.Permissions.Risk
 
-  test "options/0 offers exactly the seven decisions, in display order" do
-    assert Prompt.options() ==
-             [:once, :this_run, :session, :session_any, :session_bypass, :always, :deny]
+  test "options/0 offers exactly six decisions, in display order - :session is not one of them" do
+    # :session (a plain per-call-shape session grant) reads as the same button as
+    # :session_any (a blank-cheque-per-tool session grant) to a human deciding in the
+    # moment, so only :session_any is offered, under the friendlier "Allow for this
+    # session" label - see Prompt's @options comment. :session itself is still a real,
+    # fully-functional decision (token/1, from_token/1, label/2 all still handle it).
+    assert Prompt.options() == [:once, :this_run, :session_any, :session_bypass, :always, :deny]
+    refute :session in Prompt.options()
   end
 
   test "options/1 is unaffected by the tainted? flag - this_run and session_bypass are always offered" do
@@ -20,7 +25,7 @@ defmodule Pepe.Permissions.PromptTest do
     assert Prompt.options(true) == Prompt.options()
   end
 
-  test "options/2 drops :session, :session_any and :session_bypass when there is no session to remember them against" do
+  test "options/2 drops :session_any and :session_bypass when there is no session to remember them against" do
     assert Prompt.options(false, false) == [:once, :this_run, :always, :deny]
     assert Prompt.options(true, false) == [:once, :this_run, :always, :deny]
     # Default (has_session? unset) stays true, so an existing 1-arity caller is unaffected.
@@ -51,10 +56,11 @@ defmodule Pepe.Permissions.PromptTest do
     end
   end
 
-  test "session_any's label and outcome are clearly distinct from session's" do
+  test "session_any's label is the plain, friendly \"this session\" text - :session's own label is the one that now calls out the narrower scope" do
     refute Prompt.label(:session_any) == Prompt.label(:session)
     refute Prompt.outcome(:session_any) == Prompt.outcome(:session)
-    assert Prompt.label(:session_any) =~ "any parameters"
+    assert Prompt.label(:session_any) == "Allow for this session"
+    assert Prompt.label(:session) =~ "this call shape only"
   end
 
   test "session_bypass carries a warning marker in both its label and outcome" do
@@ -115,9 +121,9 @@ defmodule Pepe.Permissions.PromptTest do
     assert note =~ Risk.label(:network)
   end
 
-  test "scope_note/1 always points out that \"any parameters\" is a different, wider option" do
-    assert Prompt.scope_note([]) =~ "any parameters"
-    assert Prompt.scope_note([:deletes]) =~ "any parameters"
+  test "scope_note/1 always points out that the session grant is broader than the permanent one" do
+    assert Prompt.scope_note([]) =~ "broader than"
+    assert Prompt.scope_note([:deletes]) =~ "broader than"
   end
 
   test "scope_note/1 always points out the session-wide bypass as the broadest option" do

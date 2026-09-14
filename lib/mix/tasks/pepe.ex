@@ -3543,7 +3543,8 @@ defmodule Mix.Tasks.Pepe do
       default NAME [--project CO]                           set the (scope) default agent
 
     Capabilities are controlled by an agent's --tools (a capability = having its
-    tool - omit --tools to grant every tool); learning is controlled per-conversation
+    tool - omit --tools to grant every tool to a project's first agent, or none to
+    any agent after it); learning is controlled per-conversation
     by a bot's `trainers` list. --admin is shorthand for --can-manage "*" (this agent
     can administer/train every other agent, e.g. the one bootstrap "boss" agent you
     train the rest through) - it does NOT skip the human-approval gate on risky tool
@@ -3579,15 +3580,24 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # An agent created with no --tools, as the first one in its target project, is born the
+  # same way mix pepe setup's own wizard already bootstraps a fresh install: every tool,
+  # auto-approved, super-admin over the (so far empty) project - it's the one that will go
+  # on to create the project's other agents, so it needs to be able to reach every
+  # capability those agents might need to be granted, not just a safe starting subset. An
+  # explicit --tools always wins outright, whether this is the first agent or the fifth.
   defp new_agent_from_opts(handle, opts) do
+    primary? = is_nil(opts[:tools]) and Config.first_agent_of_project?(opts[:project])
+
     %Agent{
       name: handle,
       description: opts[:description],
       model: opts[:model],
       system_prompt: opts[:prompt] || "You are Pepe, a helpful AI agent.",
-      tools: parse_tools_opt(opts[:tools]),
+      tools: if(primary?, do: Pepe.Tools.names(), else: parse_tools_opt(opts[:tools])),
+      auto_approve: if(primary?, do: ["*"], else: []),
       can_message: parse_can_message_opt(opts[:can_message], handle),
-      can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle),
+      can_manage: parse_can_manage_opt(opts[:admin], opts[:can_manage], handle) || if(primary?, do: ["*"]),
       hooks: parse_hooks_opt(opts[:hooks]),
       slots: parse_slots_opt(opts[:slots]),
       max_iterations: opts[:max_iterations] || 12,
@@ -3623,7 +3633,10 @@ defmodule Mix.Tasks.Pepe do
     puts("#{bold(a.name)}#{mark}\n  model: #{a.model || "(default)"}\n  tools: #{Enum.join(a.tools, ", ")}#{routes}#{manages}")
   end
 
-  defp parse_tools_opt(nil), do: Pepe.Tools.names()
+  # Omitted --tools on a non-primary agent means "born contained" (see new_agent_from_opts/2,
+  # which handles the primary-agent "omitted --tools -> every tool" case before ever calling
+  # this).
+  defp parse_tools_opt(nil), do: []
   defp parse_tools_opt(""), do: []
   defp parse_tools_opt(str), do: str |> String.split(",") |> Enum.map(&String.trim/1)
 
@@ -4893,9 +4906,13 @@ defmodule Mix.Tasks.Pepe do
   # omnipotent: every tool, super-admin over all agents, and auto-approval of all
   # tools (no permission prompts), so it can do anything via chat from the start.
   defp add_agent(primary? \\ false) do
-    # The very first agent is always the primary (omnipotent) one, whatever path
-    # created it.
-    primary? = primary? or agent_names() == []
+    # The very first agent of the root project is always the primary (omnipotent) one,
+    # whatever path created it - both callers of add_agent/1 (first-run setup, and the
+    # interactive "add agent" menu) only ever operate in the root scope, never inside a
+    # named project, so first_agent_of_project?(nil) is exactly the right check here (not
+    # agent_names() == [], which would wrongly stay false forever once ANY project anywhere
+    # has an agent, even one that has nothing to do with root).
+    primary? = primary? or Config.first_agent_of_project?(nil)
 
     agent_name =
       Pepe.TUI.input(label: "Agent name:", optional: true)

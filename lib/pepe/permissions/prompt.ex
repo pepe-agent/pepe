@@ -14,7 +14,14 @@ defmodule Pepe.Permissions.Prompt do
 
   alias Pepe.Permissions
 
-  @options [:once, :this_run, :session, :session_any, :session_bypass, :always, :deny]
+  # :session is deliberately NOT offered here - a plain per-args session grant and
+  # :session_any's blank-cheque-per-tool grant read as the same button to a human deciding
+  # in the moment ("allow for this session"), so only the broader :session_any is offered,
+  # under that friendlier label (see label/2). :session itself is still a real decision
+  # Pepe.Permissions understands - nothing about the gate/grant system changed - it's just
+  # not a choice offered from this list anymore, to keep the prompt to 6 buttons instead of
+  # 7 over a distinction that rarely matters to the person answering it.
+  @options [:once, :this_run, :session_any, :session_bypass, :always, :deny]
 
   @doc """
   The decisions offered to the user, in display order. `:this_run` and `:session_bypass`
@@ -29,7 +36,7 @@ defmodule Pepe.Permissions.Prompt do
   decide whether to render `taint_note/0` and to pick `label/2`'s "(recommended)" wording.
 
   `has_session?` (default `true`, so an existing caller passing only `tainted?` is
-  unaffected) drops `:session`, `:session_any` and `:session_bypass` when there is no
+  unaffected) drops `:session_any` and `:session_bypass` when there is no
   `ctx.session_key` to remember them against - a one-shot CLI call (`mix pepe run`,
   `oneshot/4`) has no session, and offering a button that silently does nothing is worse
   than not offering it: the person picks it believing it will stop the prompt from coming
@@ -40,7 +47,7 @@ defmodule Pepe.Permissions.Prompt do
   def options(_tainted?, has_session?), do: with_session(@options, has_session?)
 
   defp with_session(list, true), do: list
-  defp with_session(list, false), do: Enum.reject(list, &(&1 in [:session, :session_any, :session_bypass]))
+  defp with_session(list, false), do: Enum.reject(list, &(&1 in [:session_any, :session_bypass]))
 
   @doc """
   The button/menu label for a decision (translated, current locale).
@@ -59,8 +66,8 @@ defmodule Pepe.Permissions.Prompt do
   def label(:this_run, true), do: gettext("Allow everything for this task (recommended)")
   def label(:this_run, false), do: gettext("Allow everything for this task")
   def label(:once, _tainted?), do: gettext("Allow once")
-  def label(:session, _tainted?), do: gettext("Allow for this session")
-  def label(:session_any, _tainted?), do: gettext("Allow with any parameters (this session)")
+  def label(:session, _tainted?), do: gettext("Allow for this session (this call shape only)")
+  def label(:session_any, _tainted?), do: gettext("Allow for this session")
   def label(:session_bypass, _tainted?), do: gettext("⚠️ Allow everything for this session")
   def label(:always, _tainted?), do: gettext("Always allow")
   def label(:deny, _tainted?), do: gettext("Don't allow")
@@ -69,15 +76,21 @@ defmodule Pepe.Permissions.Prompt do
   @spec outcome(Permissions.decision()) :: String.t()
   def outcome(:once), do: gettext("Allowed once.")
   def outcome(:this_run), do: gettext("Allowed everything for this task.")
-  def outcome(:session), do: gettext("Allowed for this session.")
-  def outcome(:session_any), do: gettext("Allowed with any parameters, for this session.")
+  def outcome(:session), do: gettext("Allowed for this session (this call shape only).")
+  def outcome(:session_any), do: gettext("Allowed for this session.")
   def outcome(:session_bypass), do: gettext("⚠️ Allowed everything for this session.")
   def outcome(:always), do: gettext("Always allowed.")
   def outcome(:deny), do: gettext("Not allowed.")
 
+  # Every decision Pepe.Permissions actually understands - deliberately wider than
+  # @options (what's currently offered as a button): :session is real and still handled
+  # by the gate/grant system, just not offered as its own button anymore (see @options'
+  # own comment) - token/1 and from_token/1 still round-trip it correctly regardless.
+  @all_decisions [:once, :this_run, :session, :session_any, :session_bypass, :always, :deny]
+
   @doc "A short, stable, locale-independent token for a decision (for payloads)."
   @spec token(Permissions.decision()) :: String.t()
-  def token(decision) when decision in @options, do: Atom.to_string(decision)
+  def token(decision) when decision in @all_decisions, do: Atom.to_string(decision)
 
   @doc """
   Parse a token back into a decision. Unknown tokens map to `:deny` - the safe
@@ -153,7 +166,7 @@ defmodule Pepe.Permissions.Prompt do
 
   defp any_params_note do
     gettext(
-      "\"Allow with any parameters\" is different: it stops checking parameters for this tool entirely, for the rest of this session."
+      "\"Allow for this session\" is broader than \"Always allow\": it covers every call to this tool for the rest of the session, not just calls shaped like this one - \"Always allow\" only covers this shape, permanently."
     )
   end
 

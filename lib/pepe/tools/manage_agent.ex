@@ -29,6 +29,7 @@ defmodule Pepe.Tools.ManageAgent do
   alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.Config.Agent
+  alias Pepe.Project
 
   @impl true
   def name, do: "manage_agent"
@@ -164,13 +165,26 @@ defmodule Pepe.Tools.ManageAgent do
     if Config.get_agent(target) do
       {:error, "agent #{target} already exists"}
     else
+      # The first agent in a brand-new project is the one that will go on to create the
+      # rest of that project's agents (the same "admin agent" role this very tool serves
+      # for) - it's born permissive (every tool, auto-approved, super-admin) rather than
+      # the contained default (no tools) every agent after it gets, the same treatment
+      # `mix pepe setup`/`mix pepe agent add` already give a project's first agent.
+      primary? = Config.first_agent_of_project?(Project.of(target))
+
       agent = %Agent{
         name: target,
         system_prompt: blank(args["value"]) || Agent.default_prompt(),
-        tools: []
+        tools: if(primary?, do: Pepe.Tools.names(), else: []),
+        auto_approve: if(primary?, do: ["*"], else: []),
+        can_manage: if(primary?, do: ["*"])
       }
 
       case Config.put_agent(agent) do
+        :ok when primary? ->
+          {:ok,
+           "Created agent #{target} - first in its project, so it starts with full access (every tool, auto-approved, super-admin). Set its persona and model next."}
+
         :ok ->
           {:ok, "Created agent #{target}. Set its persona, model and tools next."}
 

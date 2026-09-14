@@ -418,6 +418,10 @@ defmodule Pepe.CLITest do
     end
 
     test "manage grants administration over one agent or over all of them" do
+      # Not the project's first agent - a first agent is born with can_manage already ["*"]
+      # (see the primary-agent tests in pepe_project_cli_test.exs), which would confound
+      # this test's assertion that a plain "agent manage" grant sets can_manage on its own.
+      run(["agent", "add", "first", "--prompt", "z"])
       run(["agent", "add", "boss", "--prompt", "a"])
       run(["agent", "add", "support", "--prompt", "b"])
 

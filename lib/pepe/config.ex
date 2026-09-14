@@ -1550,6 +1550,27 @@ defmodule Pepe.Config do
     |> Enum.map(fn {id, m} -> build_agent(config, id, m) end)
   end
 
+  @doc """
+  Would the next agent created in `project` (`nil` for the default project) be the first
+  one there? Every caller that creates an agent (the setup wizard, `mix pepe agent add`,
+  the conversational `manage_agent` tool) uses this the same way: a project's first agent
+  is the one that will go on to create the rest, so it's born permissive (every tool,
+  auto-approved) rather than the contained default every agent after it gets.
+
+  `project` goes through `resolve_scope/1` first: EVERY agent is stored under a
+  fully-qualified `project/name` handle, even one created with no `--project` at all - it
+  lands in the *default* project (a real project like any other, not a bare/unscoped
+  handle), so `nil` has to mean "the default project's slug" here, not "no project" - see
+  `resolve_scope/1`'s and `resolve_handle/1`'s docs. Comparing against a raw `nil` instead
+  would never match any stored agent's project, making every agent look like a project's
+  first one forever.
+  """
+  @spec first_agent_of_project?(String.t() | nil) :: boolean()
+  def first_agent_of_project?(project) do
+    target = resolve_scope(project)
+    not Enum.any?(agents(), &(Project.of(&1.name) == target))
+  end
+
   # Build the Agent struct from a stored (id-keyed) map: fill the stable `id`, owning `project`
   # id and bare label, and the derived display handle in `name` (`<project-slug>/<bare>`), so
   # callers keep seeing a handle in `.name`.

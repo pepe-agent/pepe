@@ -175,24 +175,57 @@ defmodule Mix.Tasks.PepeProjectCliTest do
   end
 
   test "agent add --admin grants can_manage \"*\" without touching auto_approve" do
+    # Not the project's first agent - "first" already gets a wildcard auto_approve of its
+    # own (see the primary-agent tests below), which would confound what this test is
+    # actually checking: that --admin alone doesn't also imply auto_approve.
+    pepe(["agent", "add", "first"])
     out = pepe(["agent", "add", "boss", "--admin"])
     assert out =~ "can administer every agent"
     assert Config.get_agent("boss").can_manage == ["*"]
     assert Config.get_agent("boss").auto_approve == []
   end
 
-  test "agent add without --tools grants every tool, admin or not" do
+  test "agent add without --tools grants every tool only to the project's first agent, --admin does not change that" do
+    pepe(["agent", "add", "first"])
+    assert Config.get_agent("first").tools == Pepe.Tools.names()
+
     pepe(["agent", "add", "boss", "--admin"])
-    assert Config.get_agent("boss").tools == Pepe.Tools.names()
+    assert Config.get_agent("boss").tools == []
   end
 
   test "agent add --admin wins over an explicit --can-manage" do
+    pepe(["agent", "add", "first"])
     pepe(["agent", "add", "boss", "--admin", "--can-manage", "none"])
     assert Config.get_agent("boss").can_manage == ["*"]
   end
 
   test "agent add without --admin defaults can_manage to nil (itself only)" do
+    # Not the project's first agent - see the note on the --admin/auto_approve test above.
+    pepe(["agent", "add", "first"])
     pepe(["agent", "add", "bot"])
     assert Config.get_agent("bot").can_manage == nil
+  end
+
+  test "agent add with no --tools is the first agent of its project, so it's born fully permissive" do
+    out = pepe(["agent", "add", "first"])
+    agent = Config.get_agent("first")
+    assert agent.tools == Pepe.Tools.names()
+    assert agent.auto_approve == ["*"]
+    assert agent.can_manage == ["*"]
+    assert out =~ "first"
+  end
+
+  test "agent add with no --tools, NOT the first agent of its project, is born contained" do
+    pepe(["agent", "add", "first"])
+    pepe(["agent", "add", "second"])
+    agent = Config.get_agent("second")
+    assert agent.tools == []
+    assert agent.auto_approve == []
+  end
+
+  test "agent add with an explicit --tools always wins, first agent or not" do
+    out = pepe(["agent", "add", "first", "--tools", "read_file"])
+    assert Config.get_agent("first").tools == ["read_file"]
+    assert out =~ "read_file"
   end
 end
