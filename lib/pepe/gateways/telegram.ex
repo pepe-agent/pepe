@@ -85,6 +85,20 @@ defmodule Pepe.Gateways.Telegram do
   # the real default.
   defp perm_timeout_ms, do: Application.get_env(:pepe, :telegram_perm_timeout_ms, 300_000)
 
+  # chat_id => {request_id, prompt message_id}, for the ONE most recently opened permission
+  # prompt in that chat - lets a plain text reply ("permitir"/"negar") resolve it the same
+  # way a button tap does. Telegram requires a user to have an established relationship with
+  # a bot (typically: having started it privately at least once) before it will route an
+  # inline button tap from them at all, but never for an ordinary text message in a chat the
+  # bot already receives - a customer-facing bot whose users only ever talk to it inside a
+  # group/forum topic can have members who can never press its buttons, full stop, with
+  # nothing Pepe's own code can do about that restriction. Text is the fallback that works
+  # regardless. Only the newest prompt per chat is tracked on purpose: several concurrent
+  # asks in the same chat are rare, and a bare "permitir" replying to a specific one of
+  # several would be ambiguous anyway - the buttons remain the precise way to answer any
+  # prompt that isn't the newest.
+  @pending_by_chat :pepe_tg_pending_by_chat
+
   # Prompts already answered this turn (chat_id => message_id) - permission asks and
   # ask_user picks alike - so they can be deleted once the turn ends: each has already
   # served its purpose (confirming the tap), and leaving it in the transcript afterward
@@ -381,6 +395,7 @@ defmodule Pepe.Gateways.Telegram do
     # Fresh start: forget any cached bot username (the token may be a new bot).
     :persistent_term.erase({__MODULE__, :username, bot_name()})
     if :ets.whereis(@pending) == :undefined, do: :ets.new(@pending, [:set, :public, :named_table])
+    if :ets.whereis(@pending_by_chat) == :undefined, do: :ets.new(@pending_by_chat, [:set, :public, :named_table])
     if :ets.whereis(@prompt_log) == :undefined, do: :ets.new(@prompt_log, [:bag, :public, :named_table])
     if :ets.whereis(@albums) == :undefined, do: :ets.new(@albums, [:set, :public, :named_table])
     if :ets.whereis(@sent) == :undefined, do: :ets.new(@sent, [:set, :public, :named_table])
@@ -834,6 +849,9 @@ defmodule Pepe.Gateways.Telegram do
     said = with_reply_context(message, text)
 
     cond do
+      handle_pending_decision_reply(chat_id, user_id, text) ->
+        :ok
+
       not active?() ->
         :ok
 
@@ -843,24 +861,28 @@ defmodule Pepe.Gateways.Telegram do
         maybe_queue_pending(message, chat_id, user_id)
 
       addressed?(text, chat["type"], chat_id, message) and Pepe.Gateways.Telegram.Throttle.allow?(chat_id) ->
-        b = bot()
-        # In a group, tie the reply to the question so it's clear what's being answered; in a DM
-        # there's only one thread, so a quote would just be clutter (nil = no reply target).
-        reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
-        stripped = strip_mention(said)
-        quick = quick_reaction_emoji(b, stripped)
-        tag = sender_tag(message, chat["type"])
-        name = sender_display_name(message["from"] || %{})
-
-        Task.start(fn ->
-          put_bot(b)
-          put_thread(thread_id)
-          react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to, tag, name)
-        end)
+        start_reply_task(message, chat, chat_id, user_id, thread_id, said)
 
       true ->
         :ok
     end
+  end
+
+  defp start_reply_task(message, chat, chat_id, user_id, thread_id, said) do
+    b = bot()
+    # In a group, tie the reply to the question so it's clear what's being answered; in a DM
+    # there's only one thread, so a quote would just be clutter (nil = no reply target).
+    reply_to = if chat["type"] == "private", do: nil, else: message["message_id"]
+    stripped = strip_mention(said)
+    quick = quick_reaction_emoji(b, stripped)
+    tag = sender_tag(message, chat["type"])
+    name = sender_display_name(message["from"] || %{})
+
+    Task.start(fn ->
+      put_bot(b)
+      put_thread(thread_id)
+      react_or_respond(quick, chat_id, user_id, message["message_id"], stripped, reply_to, tag, name)
+    end)
   end
 
   defp react_or_respond(quick, chat_id, _user_id, message_id, _stripped, _reply_to, _tag, _name) when is_binary(quick),
@@ -1676,16 +1698,101 @@ defmodule Pepe.Gateways.Telegram do
       end
   end
 
+  # A short, fixed, multi-language vocabulary a plain text reply is matched against
+  # (trimmed, case/accent-folded, exact match only - never a substring inside a longer
+  # message) to resolve a pending permission prompt without tapping a button. Deliberately
+  # not translated through Gettext: these are meant to be quickly typeable regardless of
+  # the bot's configured locale or what language the person actually types in, the same way
+  # many chat bots accept "sim"/"não"/"yes"/"no" interchangeably. `permission_text_hint/0`
+  # advertises only the most common ones (see its own note); the rest still work for anyone
+  # who already knows them or copies a button's own label.
+  @text_decision_keywords %{
+    once: ["permitir", "permitir uma vez", "permitir una vez", "allow", "allow once"],
+    this_run: ["permitir tudo", "permitir agora", "permitir todo", "allow all", "allow everything"],
+    session_any: ["permitir sessao", "permitir esta sessao", "allow session", "allow this session"],
+    session_bypass: ["permitir tudo sessao", "permitir tudo a sessao", "allow everything session"],
+    always: ["sempre", "always", "siempre"],
+    deny: ["negar", "nao", "no", "deny", "denegar"]
+  }
+
+  # NFD-decompose then drop combining marks (Unicode category Mn) - "sessão" -> "sessao" -
+  # so "permitir sessão"/"permitir sessao" match the same keyword regardless of whether the
+  # sender's keyboard/autocorrect put the accent back in.
+  defp normalize_reply(text) do
+    text
+    |> to_string()
+    |> String.trim()
+    |> String.downcase()
+    |> String.normalize(:nfd)
+    |> String.replace(~r/\p{Mn}/u, "")
+  end
+
+  defp decision_from_text(text) do
+    normalized = normalize_reply(text)
+    Enum.find_value(@text_decision_keywords, fn {decision, words} -> if normalized in words, do: decision end)
+  end
+
+  # The line appended to every permission prompt, so someone whose Telegram account has no
+  # established relationship with this bot (see @pending_by_chat's own note - Telegram
+  # requires that before it will route a button tap, but never for an ordinary text message)
+  # has a way to answer at all. Only the 3 most reached-for decisions are advertised, to keep
+  # the prompt short; @text_decision_keywords recognizes the rest too for whoever already
+  # knows them.
+  defp permission_text_hint do
+    gettext("Buttons not working? Reply with text instead: allow / allow all / deny")
+  end
+
+  # A plain-text reply to whichever permission prompt is newest in this chat (see
+  # @pending_by_chat) - mirrors a button tap closely: resolved only on an exact keyword
+  # match (never as a side effect of an unrelated message), and gated by the exact same
+  # may_approve?/2 check a button goes through, so this can never approve more than the
+  # buttons already could. Returns true when it consumed the message (resolved OR
+  # explicitly refused it), so the caller knows not to also treat the text as an ordinary
+  # chat message; false when there was nothing to consume, so it falls through as usual.
+  defp handle_pending_decision_reply(chat_id, user_id, text) do
+    with decision when not is_nil(decision) <- decision_from_text(text),
+         [{^chat_id, id, message_id}] <- :ets.lookup(@pending_by_chat, chat_id) do
+      resolve_pending_decision(chat_id, user_id, id, message_id, decision)
+      true
+    else
+      _ -> false
+    end
+  end
+
+  defp resolve_pending_decision(chat_id, user_id, id, message_id, decision) do
+    if may_approve?(chat_id, user_id) do
+      case :ets.take(@pending, id) do
+        [{^id, pid}] ->
+          :ets.delete(@pending_by_chat, chat_id)
+          close_prompt(chat_id, message_id, decision)
+          send(pid, {:perm_reply, id, decision})
+
+        _ ->
+          # Already resolved (a concurrent button tap won the race) or timed out - say so
+          # instead of silently swallowing the reply.
+          edit_expired(chat_id, message_id)
+      end
+    else
+      # Mirrors log_denied_callback/4's shape for a button tap Telegram itself never even
+      # let through - this path IS reachable server-side (a text message carries no such
+      # restriction), so it is the one place a genuinely unauthorized approval attempt via
+      # text actually gets logged.
+      Logger.info("[telegram] denied perm text reply: chat=#{chat_id} user_id=#{user_id} decision=#{decision}")
+    end
+  end
+
   defp request_authorization(chat_id, name, args, prompt_ctx) do
     id = System.unique_integer([:positive])
     :ets.insert(@pending, {id, self()})
     message_id = send_permission_prompt(chat_id, id, name, args, prompt_ctx)
+    :ets.insert(@pending_by_chat, {chat_id, id, message_id})
 
     receive do
       {:perm_reply, ^id, decision} -> decision
     after
       perm_timeout_ms() ->
         :ets.delete(@pending, id)
+        forget_pending_by_chat(chat_id, id)
         # Tell the user the prompt expired instead of leaving stale, dead-on-click buttons (which is
         # what happens with two concurrent prompts and a slow answer - a real "I can't click it").
         edit_expired(chat_id, message_id)
@@ -1698,13 +1805,24 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
+  # Clears the chat's tracked prompt only if it still points at THIS request - a newer
+  # prompt that has since replaced it (another risky call in the same chat) must not be
+  # torn down by an older one finishing.
+  defp forget_pending_by_chat(chat_id, id) do
+    case :ets.lookup(@pending_by_chat, chat_id) do
+      [{^chat_id, ^id, _message_id}] -> :ets.delete(@pending_by_chat, chat_id)
+      _ -> :ok
+    end
+  end
+
   defp send_permission_prompt(chat_id, id, name, args, prompt_ctx) do
     %{tainted?: tainted?, has_session?: has_session?, policy_reason: policy_reason} = prompt_ctx
     Config.put_locale()
     map = decode_args(args)
     note = if tainted?, do: "\n\n" <> esc(Prompt.taint_note()), else: ""
     policy = if p = Prompt.policy_note(policy_reason), do: "\n\n" <> esc(p), else: ""
-    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> policy <> note
+    hint = "\n\n" <> esc(permission_text_hint())
+    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> policy <> note <> hint
 
     # One button per shared decision, rendered as Telegram's inline keyboard.
     buttons =
@@ -1822,11 +1940,14 @@ defmodule Pepe.Gateways.Telegram do
 
         case :ets.take(@pending, id) do
           [{^id, pid}] ->
-            # close_prompt/2 inserts into @prompt_log before send/2 wakes the
+            chat_id = get_in(cq, ["message", "chat", "id"])
+            message_id = get_in(cq, ["message", "message_id"])
+            forget_pending_by_chat(chat_id, id)
+            # close_prompt/3 inserts into @prompt_log before send/2 wakes the
             # waiting session - if send ran first, a turn that finishes fast
             # enough could run cleanup_prompts/1 before the insert lands,
             # missing this round's cleanup (self-heals next turn, but avoid it).
-            close_prompt(cq, decision)
+            close_prompt(chat_id, message_id, decision)
             send(pid, {:perm_reply, id, decision})
 
           _ ->
@@ -1894,10 +2015,8 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Replace the prompt's buttons with the shared outcome text so the chat stays tidy.
-  defp close_prompt(cq, decision) do
+  defp close_prompt(chat_id, message_id, decision) do
     Config.put_locale()
-    chat_id = get_in(cq, ["message", "chat", "id"])
-    message_id = get_in(cq, ["message", "message_id"])
 
     if chat_id && message_id do
       :ets.insert(@prompt_log, {chat_id, message_id})

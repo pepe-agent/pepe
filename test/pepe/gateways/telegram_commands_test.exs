@@ -868,6 +868,89 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     end
   end
 
+  describe "answering the permission prompt by text (Telegram's own bot-relationship requirement means a button tap isn't always reachable)" do
+    test "the prompt advertises the text fallback", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+
+      assert_receive {:sent, ^chat, prompt, [_ | _]}, 5_000
+      assert prompt =~ "allow / allow all / deny"
+    end
+
+    test "a plain text reply resolves the prompt exactly like a button tap", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _]}, 5_000
+
+      say(chat, "permitir")
+
+      assert_receive {:edited, ^chat, outcome}, 5_000
+      assert outcome =~ "Allowed once"
+      assert await_reply(chat) =~ "ran it"
+    end
+
+    test "matching is case/accent-insensitive and trimmed", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _]}, 5_000
+
+      say(chat, "  NÃO  ")
+
+      assert_receive {:edited, ^chat, outcome}, 5_000
+      assert outcome =~ "Not allowed"
+    end
+
+    test "a text reply from outside the allowlist does not resolve the prompt", %{chat: chat} do
+      start_bot!(%{"allowed_users" => [@user]})
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _]}, 5_000
+
+      say(chat, "permitir", user: @outsider)
+
+      refute_receive {:edited, ^chat, _text}, 500
+      refute_receive {:sent, ^chat, _text, _buttons}, 300
+    end
+
+    test "text that matches no keyword falls through to the ordinary chat reply", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _]}, 5_000
+
+      say(chat, "what does that mean?")
+
+      assert_receive {:llm, ^chat, _prompt}, 5_000
+      refute_receive {:edited, ^chat, _text}, 300
+    end
+
+    test "a keyword typed after the prompt already resolved is ordinary chat text, not a stale re-answer", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _]}, 5_000
+
+      say(chat, "permitir")
+      assert_receive {:edited, ^chat, first_outcome}, 5_000
+      assert first_outcome =~ "Allowed once"
+      await_reply(chat)
+
+      # Resolving cleared the pending entry - nothing left to match against, so a later
+      # "permitir" is just a normal message reaching the agent, not a second answer attempt.
+      say(chat, "permitir")
+      assert_receive {:llm, ^chat, _prompt}, 5_000
+    end
+  end
+
   describe "the native ask_user prompt" do
     setup %{chat: chat} do
       Config.put_agent(%Pepe.Config.Agent{
