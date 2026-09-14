@@ -3000,7 +3000,20 @@ defmodule Pepe.Gateways.Telegram do
   # collapses into one edit that shows all of it, rather than ten that show none of it. The
   # note stays live: any event arriving after the window redraws it with whatever the state is
   # by then, so it self-corrects rather than going stale.
-  @edit_every_ms 700
+  #
+  # 700ms (~1.43 edits/s to the same chat) was already over Telegram's documented ~1 edit/s
+  # per-chat guidance, not under it - a single burst just gets a 429 (handled above), but
+  # sustained over many concurrent conversations on the same bot token, it is the kind of
+  # standing violation that can get a bot placed under a harsher, longer-lived restriction
+  # from Telegram's own anti-abuse system (suspected cause of widespread "the bot owner has
+  # restricted access" errors reported on the permission-prompt buttons specifically - those
+  # fire right as this same status note is mid-stream). Widened well past the 1/s guidance
+  # (not just under it) while this is still a hypothesis under live investigation - the
+  # trade is a less granular live progress note (most turns now show only the first note,
+  # not the intermediate tool-call-by-tool-call updates), not a functional loss: the first
+  # note still draws immediately, and a note that arrives after this window still
+  # self-corrects to the real state rather than going stale.
+  @edit_every_ms 10_000
 
   # One status message per turn: send it the first time (with the real text, no
   # placeholder flash), then edit it in place. Id stored in the run task's dict.
