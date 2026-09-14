@@ -41,7 +41,7 @@ você realmente confia. Os detalhes vêm na seção Harness, mais abaixo.
 ```bash
 pepe slot list                 # todo slot, seu ocupante atual e seu padrão
 pepe slot set memory NOME      # fixa um slot num plugin instalado, pelo próprio nome dele
-pepe slot clear memory         # volta pro embutido
+pepe slot clear memory         # volta para o embutido
 ```
 
 Quando um ocupante configurado não consegue mais responder de verdade (foi removido,

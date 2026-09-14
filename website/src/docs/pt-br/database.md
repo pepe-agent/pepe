@@ -43,7 +43,7 @@ Dois pontos merecem atenção aqui:
   ignoram o RLS mesmo com a política ativa. Para a política valer alguma coisa, o role
   usado pelo Pepe precisa ser um role comum, sem privilégio nenhum.
 - **`current_setting('app.pepe_tenant_id', true)`**: esse nome de GUC é fixo, faz parte da
-  convenção do Pepe e não muda de conexão pra conexão. O `true` como segundo argumento
+  convenção do Pepe e não muda de conexão para conexão. O `true` como segundo argumento
   significa "devolve `NULL` se não estiver definido, sem gerar erro", e como
   `company_id = NULL` nunca é verdadeiro em SQL, uma conexão que por algum motivo rode sem
   esse valor definido fica sem acesso a nada, e não com acesso a tudo. É uma falha fechada

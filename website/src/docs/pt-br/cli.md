@@ -32,15 +32,15 @@ pepe model add openrouter \
 pepe model providers             # lista provedores conhecidos (OpenAI, Anthropic, Gemini, ...)
 pepe model models --base-url https://api.openai.com/v1 --api-key '${OPENAI_API_KEY}'
 pepe model list                  # lista as conexões salvas
-pepe model test [NOME]           # testa uma conexão pra confirmar que a chave e o endpoint funcionam
-pepe model reconnect openai      # refaz o login pra consertar uma conexão quebrada, sem tocar no resto
+pepe model test [NOME]           # testa uma conexão para confirmar que a chave e o endpoint funcionam
+pepe model reconnect openai      # refaz o login para consertar uma conexão quebrada, sem tocar no resto
 pepe model remove openrouter
 pepe model default openai
 ```
 
-Já assina o ChatGPT/Codex ou o Claude Pro/Max? Em vez de colar uma chave de API, dá pra
+Já assina o ChatGPT/Codex ou o Claude Pro/Max? Em vez de colar uma chave de API, dá para
 adicionar **entrando com essa conta**: `pepe model add openai` -> "ChatGPT / Codex
-subscription" abre o navegador, você faz login, e o Pepe assume dali pra frente. Veja
+subscription" abre o navegador, você faz login, e o Pepe assume dali para frente. Veja
 [Modelos](../models/).
 
 Quando uma conexão dessas para de funcionar (um login que expirou, ou uma saída de conta
@@ -56,7 +56,7 @@ pepe agent add assistant \
   --prompt "Você é um agente de programação útil." \
   --tools bash,read_file,write_file,edit_file,list_dir,fetch_url,web_search --default
 pepe agent list
-pepe agent route assistant helper    # deixa o assistant mandar mensagem pro helper (ver Rotas)
+pepe agent route assistant helper    # deixa o assistant mandar mensagem para o helper (ver Rotas)
 pepe agent manage boss assistant     # deixa o boss administrar o assistant ("*" = todos)
 pepe agent rename assistant helper   # renomeia + move a pasta de trabalho dele
 pepe agent remove helper
@@ -86,7 +86,7 @@ pepe project remove acme --force                   # apaga o projeto + os agente
 ## Executando
 
 ```bash
-pepe run "liste os arquivos aqui e resuma o projeto"   # one-shot, transmite pro stdout
+pepe run "liste os arquivos aqui e resuma o projeto"   # one-shot, transmite para o stdout
 pepe run assistant "olá"                                # escolhendo um agente específico
 pepe chat                            # conversa interativa, lembra o que foi dito antes
 pepe chat --agent assistant          # ...com um agente específico (ou: pepe chat assistant)
@@ -94,7 +94,7 @@ pepe goal "publica as notas de versão" \
   --criteria "CHANGELOG tem uma seção datada" --max-attempts 5   # insiste até dar certo de verdade
 pepe serve --port 4000               # sobe API, dashboard e WebSocket juntos
 pepe serve --port 4000 --bind lan     # ...acessível de outras máquinas, não só desta
-pepe serve install [--port 4000]     # deixa rodando em segundo plano pra sempre
+pepe serve install [--port 4000]     # deixa rodando em segundo plano para sempre
 pepe serve status                    # está instalado e rodando?
 pepe serve uninstall                 # para e remove
 ```
@@ -140,14 +140,14 @@ projeto (`--project`) ou a um agente (`--agent HANDLE`). Veja [API HTTP](../api/
 pepe token add --project acme --label "app mobile da acme"   # mostra a chave uma vez só, guarde agora
 pepe token add --agent acme/sales --label "uma integração"
 pepe token add --agent acme/sales --widget \
-  --allowed-origin https://example.com     # seguro pra colocar no código público de uma página
+  --allowed-origin https://example.com     # seguro para colocar no código público de uma página
 pepe token list                        # id, escopo, permissões, label
 pepe token update <id> --greeting "Oi! Como posso ajudar?"
 pepe token revoke <id>
 ```
 
 O escopo decide *de quem* são os dados que o token alcança; as permissões decidem *o que*
-ele pode fazer com eles. Por isso dá pra entregar a alguém um token que só lê relatório de
+ele pode fazer com eles. Por isso dá para entregar a alguém um token que só lê relatório de
 cobrança, sem que ele consiga conversar com nenhum agente. Veja [Uso e cobrança](../billing/).
 
 ```bash
@@ -186,7 +186,7 @@ pepe cron logs <id>
 
 Depois que um agente resolve a mesma coisa do mesmo jeito algumas vezes, vale transformar
 essa sequência num `flow` batizado com um nome: da próxima vez ele reproduz tudo direto,
-mais rápido e sem pedir ao modelo pra reconstruir o raciocínio do zero. Veja
+mais rápido e sem pedir ao modelo para reconstruir o raciocínio do zero. Veja
 [Flows](../flows/).
 
 ```bash
@@ -204,7 +204,7 @@ pepe flow schedule AGENTE NOME --schedule "..." [--timezone TZ] [--deliver ...]
 pepe timelearn [AGENTE]                 # o que o agente foi aprendendo, ao longo do tempo
 pepe learn consolidate [AGENTE]         # organiza isso agora mesmo
 pepe learn auto [AGENTE] [--at CRON]    # faz isso automaticamente toda noite (--off desliga)
-pepe learn status                       # quais agentes estão configurados pra isso
+pepe learn status                       # quais agentes estão configurados para isso
 ```
 
 Veja [Aprendizado](../learning/) para saber o que de fato fica registrado.
@@ -241,7 +241,7 @@ pepe slot list | set | clear             # qual plugin cuida de uma capacidade e
 pepe policy list                         # regras de permissão instaladas e onde valem
 pepe policy scope NOME --agents a,b [--projects x,y] | --clear   # limita onde uma regra vale
 pepe hooks list                          # hooks de privacidade disponíveis
-pepe hooks generate "oculta CPFs" [--model NOME] [--save]   # a IA escreve um pra você
+pepe hooks generate "oculta CPFs" [--model NOME] [--save]   # a IA escreve um para você
 ```
 
 Veja [MCP](../mcp/), [Plugins](../plugins/), [Skills](../skills/), [Banco de
@@ -257,7 +257,7 @@ pepe backup [--output ARQUIVO.tgz]  # salva tudo (config, agentes, conversas, ba
 pepe backup verify ARQUIVO.tgz      # confere se um backup está íntegro
 pepe restore ARQUIVO.tgz [--force]  # traz um backup de volta
 pepe migrate ORIGEM [--dry-run]  # importa modelos/agentes de outra ferramenta
-pepe update                      # atualiza pra última versão
+pepe update                      # atualiza para última versão
 pepe browser install             # prepara o navegador que um agente pode usar
 ```
 

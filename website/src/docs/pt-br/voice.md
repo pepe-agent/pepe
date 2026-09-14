@@ -51,7 +51,7 @@ um comando local, pela CLI:
 ```bash
 pepe media audio --model groq --language pt --echo true
 pepe media audio --command "whisper-cli -f {file}"   # mantém o áudio na máquina
-pepe media audio off                                 # volta pra detecção automática
+pepe media audio off                                 # volta para detecção automática
 ```
 
 `--echo true` devolve a transcrição para o próprio chat, assim quem falou

@@ -32,8 +32,8 @@ tratados do mesmo jeito:
 
 Uma chamada barata a um modelo lê a última troca de mensagens e decide, com uma pontuação
 de confiança, se há de fato um compromisso ali. Quando essa confiança é alta e o prazo dá
-pra resolver, o compromisso já sai agendado, sem nenhum passo extra: é exatamente "perceber
-sozinho, sem precisar pedir duas vezes". Abaixo disso, ou quando o prazo não dá pra
+para resolver, o compromisso já sai agendado, sem nenhum passo extra: é exatamente "perceber
+sozinho, sem precisar pedir duas vezes". Abaixo disso, ou quando o prazo não dá para
 extrair do que foi dito (um "em breve" vago não é uma data), ele fica **aguardando sua
 confirmação**: você é perguntado uma vez, direto, em vez de o sistema ficar rastreando
 silenciosamente algo que ninguém pediu de fato.
@@ -50,4 +50,4 @@ Abra a página **Compromissos** dentro de `pepe serve` para ver tudo que está s
 acompanhado, agrupado em aguardando confirmação, agendados e já entregues. Confirmar ou
 cancelar é feito direto ali.
 
-<div class="note"><strong>Nenhum servidor pra rodar, só um arquivo local.</strong> Compromissos moram num pequeno arquivo SQLite embutido, ao lado do <code>config.json</code>, e não num banco de dados que você precisa instalar ou administrar. O disparo usa o mesmo tipo de timer interno que já move watches e tarefas agendadas, e esse timer só roda enquanto alguma superfície de longa duração estiver de pé (<code>pepe serve</code>, um gateway, ou uma sessão interativa).</div>
+<div class="note"><strong>Nenhum servidor para rodar, só um arquivo local.</strong> Compromissos moram num pequeno arquivo SQLite embutido, ao lado do <code>config.json</code>, e não num banco de dados que você precisa instalar ou administrar. O disparo usa o mesmo tipo de timer interno que já move watches e tarefas agendadas, e esse timer só roda enquanto alguma superfície de longa duração estiver de pé (<code>pepe serve</code>, um gateway, ou uma sessão interativa).</div>

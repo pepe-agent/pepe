@@ -60,7 +60,7 @@ de projetos diferentes.</div>
 
 Se `send_to_agent` serve para uma consulta pontual, `switch_agent` faz o oposto: o
 agente que está respondendo agora entrega o **resto da conversa** para outro agente. O
-efeito é idêntico ao de o próprio usuário digitar `/agent NOME`, só que dá pra chegar
+efeito é idêntico ao de o próprio usuário digitar `/agent NOME`, só que dá para chegar
 lá com um pedido natural ("me conecta com o billing", "quero falar direto com o
 suporte"), sem precisar do comando de barra.
 

@@ -7,8 +7,8 @@ A tool `insight` deixa um agente transformar dado já verificado em um modelo pe
 treinado e guardado por ele mesmo, para que uma pergunta específica e repetida ("esse
 paciente vai piorar", "esse lead vai converter", "quantas internações semana que vem")
 seja respondida na hora, sem chamada de modelo nenhuma, assim que houver histórico
-suficiente pra aprender. O Pepe escolhe o algoritmo sozinho, de acordo com o volume real de
-dado disponível; não há nada pra configurar ou ajustar.
+suficiente para aprender. O Pepe escolhe o algoritmo sozinho, de acordo com o volume real de
+dado disponível; não há nada para configurar ou ajustar.
 
 Isso não é pesquisa de machine learning em aberto. É responder uma pergunta bem definida, a
 partir de um dado que você já tem, uma capacidade real e limitada, não descoberta livre.
@@ -16,7 +16,7 @@ partir de um dado que você já tem, uma capacidade real e limitada, não descob
 ## Quatro tipos de pergunta
 
 - **Classificação**: prever uma categoria. *Esse paciente vai reinternar em até 30 dias?
-  Esse chamado de suporte vai escalar pra um gerente? Essa transação é uma fraude?*
+  Esse chamado de suporte vai escalar para um gerente? Essa transação é uma fraude?*
 - **Regressão**: prever um número. *Quantos dias esse paciente provavelmente vai ficar
   internado? Quanto esse cliente vai gastar mês que vem? Quantas unidades desse produto
   vão vender essa semana?*
@@ -30,9 +30,9 @@ partir de um dado que você já tem, uma capacidade real e limitada, não descob
 
 Nada disso é específico de saúde, esse só é o exemplo que sempre volta porque é concreto.
 Um time de suporte perguntando se um chamado vai escalar e uma clínica perguntando sobre
-risco de reinternação rodam exatamente o mesmo pipeline de classificação, só apontado pra
+risco de reinternação rodam exatamente o mesmo pipeline de classificação, só apontado para
 colunas diferentes. A pergunta que importa é mais simples: você está classificando algo
-numa categoria, prevendo um número, prevendo esse número ao longo do tempo, ou olhando pra
+numa categoria, prevendo um número, prevendo esse número ao longo do tempo, ou olhando para
 uma pilha de registros sem fazer ideia ainda de quais grupos existem aí dentro?
 
 No vocabulário usual de ML: classificação, regressão e previsão de tendência são todas
@@ -53,39 +53,39 @@ Duas fontes, escolhidas na hora de definir o que prever:
 - **Uma conexão de banco já cadastrada** (as mesmas que `db_query`/`manage_db` já usam,
   Postgres, isolada por tenant via Row-Level Security quando configurado, veja [Banco de
   dados](/pt-br/docs/database/)).
-- **Linhas importadas**: entregue as linhas direto com `import_rows`. É o caminho pra
+- **Linhas importadas**: entregue as linhas direto com `import_rows`. É o caminho para
   qualquer fonte que o Pepe não tem conector nativo: um agente lê um arquivo, consulta outro
   motor de banco via `bash` (veja [Banco de dados](/pt-br/docs/database/) sobre o RLS, que só vale
-  pra Postgres), ou puxa de uma API, e entrega as linhas resultantes. As duas fontes
+  para Postgres), ou puxa de uma API, e entrega as linhas resultantes. As duas fontes
   treinam pelo mesmo pipeline, exatamente igual; o algoritmo nunca sabe de qual delas veio
   o dado.
 
 ## Ainda não sabe o que prever?
 
-Peça pra "analisar meus dados em busca de insights" e, pra uma conexão de banco, o
+Peça para "analisar meus dados em busca de insights" e, para uma conexão de banco, o
 `insight propose_targets` amostra linhas reais e sugere colunas-alvo candidatas: uma
-coluna de baixa cardinalidade é uma categoria plausível pra classificar, uma coluna
-numérica com variação real é algo pra prever por regressão, um nome tipo `status`/`risk`/
+coluna de baixa cardinalidade é uma categoria plausível para classificar, uma coluna
+numérica com variação real é algo para prever por regressão, um nome tipo `status`/`risk`/
 `churn` pesa a favor. É uma heurística, não uma garantia, e não define nada sozinha - é um
-ponto de partida pra confirmar, não uma spec pronta.
+ponto de partida para confirmar, não uma spec pronta.
 
 ## Definindo o que prever
 
-Não existe uma sintaxe separada pra aprender: descreva o que você quer na conversa, e o
-agente preenche a chamada real de `insight define`. Pra uma spec de classificação ou
-regressão, diga o alvo e quais colunas usar pra prever: "prever se um paciente reinterna
+Não existe uma sintaxe separada para aprender: descreva o que você quer na conversa, e o
+agente preenche a chamada real de `insight define`. Para uma spec de classificação ou
+regressão, diga o alvo e quais colunas usar para prever: "prever se um paciente reinterna
 em até 30 dias, usando idade, dias internado e internações prévias, a partir da tabela
 `altas` em `pacientes_prod`". Uma previsão de tendência aponta uma coluna de tempo em vez
 de (ou além de) outras colunas: "prever o total de internações por dia, sobre a coluna
 `dia`". Um agrupamento não aponta alvo nenhum, só o que agrupar: "agrupar pacientes por
 idade, número de comorbidades e internações prévias".
 
-Depois, `insight import_rows` (pra uma spec importada) ou `insight train_now` (pra
-qualquer uma das duas) assim que houver histórico suficiente, e `insight_predict` pra ter
+Depois, `insight import_rows` (para uma spec importada) ou `insight train_now` (para
+qualquer uma das duas) assim que houver histórico suficiente, e `insight_predict` para ter
 uma resposta, ver o que está definido e o histórico de cada modelo. É uma tool separada de
 propósito: `insight` (define/import_rows/train_now/delete) é a que muda alguma coisa;
 `insight_predict` (predict/list/describe) só lê. Essa separação deixa um operador liberar
-previsão pra uma superfície sem humano no loop (um cron, um webhook) sem também dar a ela
+previsão para uma superfície sem humano no loop (um cron, um webhook) sem também dar a ela
 poder de redefinir ou retreinar o que está sendo previsto.
 
 ## Como o Pepe escolhe o algoritmo
@@ -98,25 +98,25 @@ por complexidade](/pt-br/docs/routing/):
   sem risco de decorar o dado à toa. Uma clínica com algumas centenas de registros de alta já
   sai com um modelo funcionando na hora.
 - **De poucos milhares a dezenas de milhares de linhas**: árvores com gradient boosting
-  (XGBoost), o padrão mais forte pra esse tipo de dado no volume que a maioria dos
+  (XGBoost), o padrão mais forte para esse tipo de dado no volume que a maioria dos
   operadores realmente tem.
-- **Dezenas de milhares de linhas pra cima**: uma rede neural pequena (compilada via EXLA
-  quando disponível), reservada pra quem tem histórico realmente grande (centenas de
-  milhões de eventos de paciente, por exemplo), dado suficiente pra essa complexidade
+- **Dezenas de milhares de linhas para cima**: uma rede neural pequena (compilada via EXLA
+  quando disponível), reservada para quem tem histórico realmente grande (centenas de
+  milhões de eventos de paciente, por exemplo), dado suficiente para essa complexidade
   valer a pena.
 
 Uma previsão de tendência é uma regressão por baixo dos panos, com o horário virando
 atributos de tempo decorrido e dia da semana/mês automaticamente, as mesmas três faixas se
 aplicam. Um modelo nesse porte nunca treina em cima de todas as linhas de uma tabela
 gigante: o treino usa uma amostra aleatória representativa (`TABLESAMPLE` do Postgres, não
-"as primeiras N linhas", que puxaria viés pra como a tabela está ordenada), limitada a
+"as primeiras N linhas", que puxaria viés para como a tabela está ordenada), limitada a
 200 mil linhas, depois de um certo ponto, mais linha não melhora o modelo de forma
 relevante.
 
 Um operador que já sabe qual algoritmo quer pode indicar explicitamente com o `family` do
 `define` ("linear", "gbm" ou "neural"), em vez de deixar automático - útil se ele já
 comparou os próprios dados, ou só prefere o que já conhece. Deixe sem definir a menos que
-peçam; automático é o padrão certo pra quase todo mundo.
+peçam; automático é o padrão certo para quase todo mundo.
 
 ## Retreino
 
