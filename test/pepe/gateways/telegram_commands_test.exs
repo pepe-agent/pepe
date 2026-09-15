@@ -932,6 +932,27 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       refute_receive {:edited, ^chat, _text}, 300
     end
 
+    test "a bare 'sempre'/'always' does not grant a standing approval - only the '!'-marked form does", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _]}, 5_000
+
+      # Typed without the marker: not recognized as a decision at all, falls through to the
+      # agent like any other unrelated message - the original prompt is still open. Switched
+      # to a plain-reply model first so that fallthrough doesn't itself spawn a second tool
+      # call (and a second, unrelated, pending prompt) muddying what this asserts.
+      model_answers(:reply)
+      say(chat, "sempre")
+      assert_receive {:llm, ^chat, _prompt}, 5_000
+      refute_receive {:edited, ^chat, _text}, 300
+
+      say(chat, "!sempre")
+      assert_receive {:edited, ^chat, outcome}, 5_000
+      assert outcome =~ "Always allowed"
+    end
+
     test "a keyword typed after the prompt already resolved is ordinary chat text, not a stale re-answer", %{chat: chat} do
       start_bot!()
       model_answers(:tool)

@@ -204,8 +204,18 @@ defmodule Pepe.Application do
   # config.json entries into a new table) stays a separate, explicit `mix pepe migrate
   # ...` command an operator runs deliberately - only the schema migrations run
   # automatically here.
+  # Built from Pepe.Repo.child_spec/1 itself (Ecto's own, via `use Ecto.Repo`), overriding
+  # only `:start` - a hand-written map here previously dropped Ecto's `type: :supervisor`
+  # (Pepe.Repo.start_link/0 actually boots an Ecto.Repo.Supervisor, a connection-pool
+  # supervisor, not a plain worker), silently defaulting OTP's own `type: :worker` +
+  # `shutdown: 5_000` instead. Under that wrong shape, a slow shutdown (in-flight writes
+  # draining) gets killed at the 5s mark instead of given the time an actual supervisor
+  # child is meant to have - the same class of risk as the WAL-corruption incident this
+  # repo's SQLite migration already hit once.
   defp repo_children do
-    if Application.get_env(:pepe, :env) == :test, do: [], else: [%{id: Pepe.Repo, start: {__MODULE__, :start_repo, []}}]
+    if Application.get_env(:pepe, :env) == :test,
+      do: [],
+      else: [Supervisor.child_spec(Pepe.Repo, start: {__MODULE__, :start_repo, []})]
   end
 
   @doc false

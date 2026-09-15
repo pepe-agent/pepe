@@ -849,7 +849,7 @@ defmodule Pepe.Gateways.Telegram do
     said = with_reply_context(message, text)
 
     cond do
-      handle_pending_decision_reply(chat_id, user_id, text) ->
+      handle_pending_decision_reply(chat_id, thread_id, user_id, text) ->
         :ok
 
       not active?() ->
@@ -1711,9 +1711,16 @@ defmodule Pepe.Gateways.Telegram do
     this_run: ["permitir tudo", "permitir agora", "permitir todo", "allow all", "allow everything"],
     session_any: ["permitir sessao", "permitir esta sessao", "allow session", "allow this session"],
     session_bypass: ["permitir tudo sessao", "permitir tudo a sessao", "allow everything session"],
-    always: ["sempre", "always", "siempre"],
     deny: ["negar", "nao", "no", "deny", "denegar"]
   }
+
+  # Kept out of @text_decision_keywords on purpose - "always" leaves auto_approve on for the
+  # rest of the session, the single most consequential thing a text reply can do here, and a
+  # typo/autocorrect ("always" instead of "allow") landing on it by accident would fail toward
+  # the worse outcome (an unintended standing grant) instead of the safer one (asking again).
+  # Requiring a leading "!" (e.g. "!sempre"/"!always"/"!siempre") makes it something nobody
+  # types without meaning to, while the button still grants it in one tap for anyone who does.
+  @always_keywords ["sempre", "always", "siempre"]
 
   # NFD-decompose then drop combining marks (Unicode category Mn) - "sessão" -> "sessao" -
   # so "permitir sessão"/"permitir sessao" match the same keyword regardless of whether the
@@ -1729,6 +1736,14 @@ defmodule Pepe.Gateways.Telegram do
 
   defp decision_from_text(text) do
     normalized = normalize_reply(text)
+    if marked_always?(normalized), do: :always, else: keyword_decision(normalized)
+  end
+
+  defp marked_always?(normalized) do
+    String.starts_with?(normalized, "!") and String.trim_leading(normalized, "!") in @always_keywords
+  end
+
+  defp keyword_decision(normalized) do
     Enum.find_value(@text_decision_keywords, fn {decision, words} -> if normalized in words, do: decision end)
   end
 
@@ -1749,50 +1764,67 @@ defmodule Pepe.Gateways.Telegram do
   # buttons already could. Returns true when it consumed the message (resolved OR
   # explicitly refused it), so the caller knows not to also treat the text as an ordinary
   # chat message; false when there was nothing to consume, so it falls through as usual.
-  defp handle_pending_decision_reply(chat_id, user_id, text) do
-    with decision when not is_nil(decision) <- decision_from_text(text),
-         [{^chat_id, id, message_id}] <- :ets.lookup(@pending_by_chat, chat_id) do
-      resolve_pending_decision(chat_id, user_id, id, message_id, decision)
-      true
+  defp handle_pending_decision_reply(chat_id, thread_id, user_id, text) do
+    with true <- active?(),
+         decision when not is_nil(decision) <- decision_from_text(text),
+         key = pending_key(chat_id, thread_id),
+         [{^key, id, message_id}] <- :ets.lookup(@pending_by_chat, key) do
+      resolve_pending_decision(chat_id, thread_id, user_id, id, message_id, decision)
     else
       _ -> false
     end
   end
 
-  defp resolve_pending_decision(chat_id, user_id, id, message_id, decision) do
+  # Same composite key request_authorization/4 wrote under - bot name (several bots can share
+  # one Telegram chat_id) plus forum thread_id (a forum bot runs one conversation per topic;
+  # without the thread in the key, a reply in topic B could resolve topic A's still-open
+  # prompt).
+  defp pending_key(chat_id, thread_id), do: {bot_name(), chat_id, thread_id}
+
+  # Returns true when the reply resolved or was explicitly refused (an unauthorized user's
+  # attempt), false when it must fall through to ordinary chat handling instead of being
+  # silently swallowed.
+  defp resolve_pending_decision(chat_id, thread_id, user_id, id, message_id, decision) do
     if may_approve?(chat_id, user_id) do
       case :ets.take(@pending, id) do
         [{^id, pid}] ->
-          :ets.delete(@pending_by_chat, chat_id)
+          forget_pending_by_chat(chat_id, thread_id, id)
           close_prompt(chat_id, message_id, decision)
           send(pid, {:perm_reply, id, decision})
+          true
 
         _ ->
           # Already resolved (a concurrent button tap won the race) or timed out - say so
-          # instead of silently swallowing the reply.
+          # instead of silently swallowing the reply. edit_expired/2 itself no-ops when
+          # close_prompt/3 already wrote the real outcome for this message, so the race's
+          # winner is never overwritten by its loser.
           edit_expired(chat_id, message_id)
+          true
       end
     else
       # Mirrors log_denied_callback/4's shape for a button tap Telegram itself never even
       # let through - this path IS reachable server-side (a text message carries no such
       # restriction), so it is the one place a genuinely unauthorized approval attempt via
-      # text actually gets logged.
+      # text actually gets logged. Not consumed: an unrelated message from someone who isn't
+      # a trainer must still reach ordinary chat handling instead of vanishing.
       Logger.info("[telegram] denied perm text reply: chat=#{chat_id} user_id=#{user_id} decision=#{decision}")
+      false
     end
   end
 
   defp request_authorization(chat_id, name, args, prompt_ctx) do
     id = System.unique_integer([:positive])
+    thread_id = thread()
     :ets.insert(@pending, {id, self()})
     message_id = send_permission_prompt(chat_id, id, name, args, prompt_ctx)
-    :ets.insert(@pending_by_chat, {chat_id, id, message_id})
+    :ets.insert(@pending_by_chat, {pending_key(chat_id, thread_id), id, message_id})
 
     receive do
       {:perm_reply, ^id, decision} -> decision
     after
       perm_timeout_ms() ->
         :ets.delete(@pending, id)
-        forget_pending_by_chat(chat_id, id)
+        forget_pending_by_chat(chat_id, thread_id, id)
         # Tell the user the prompt expired instead of leaving stale, dead-on-click buttons (which is
         # what happens with two concurrent prompts and a slow answer - a real "I can't click it").
         edit_expired(chat_id, message_id)
@@ -1806,11 +1838,13 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Clears the chat's tracked prompt only if it still points at THIS request - a newer
-  # prompt that has since replaced it (another risky call in the same chat) must not be
-  # torn down by an older one finishing.
-  defp forget_pending_by_chat(chat_id, id) do
-    case :ets.lookup(@pending_by_chat, chat_id) do
-      [{^chat_id, ^id, _message_id}] -> :ets.delete(@pending_by_chat, chat_id)
+  # prompt that has since replaced it (another risky call in the same chat/thread) must not
+  # be torn down by an older one finishing.
+  defp forget_pending_by_chat(chat_id, thread_id, id) do
+    key = pending_key(chat_id, thread_id)
+
+    case :ets.lookup(@pending_by_chat, key) do
+      [{^key, ^id, _message_id}] -> :ets.delete(@pending_by_chat, key)
       _ -> :ok
     end
   end
@@ -1942,7 +1976,8 @@ defmodule Pepe.Gateways.Telegram do
           [{^id, pid}] ->
             chat_id = get_in(cq, ["message", "chat", "id"])
             message_id = get_in(cq, ["message", "message_id"])
-            forget_pending_by_chat(chat_id, id)
+            thread_id = topic_thread_id(cq["message"])
+            forget_pending_by_chat(chat_id, thread_id, id)
             # close_prompt/3 inserts into @prompt_log before send/2 wakes the
             # waiting session - if send ran first, a turn that finishes fast
             # enough could run cleanup_prompts/1 before the insert lands,
@@ -2003,15 +2038,33 @@ defmodule Pepe.Gateways.Telegram do
   defp edit_expired(_chat_id, nil), do: :ok
 
   defp edit_expired(chat_id, message_id) do
-    Config.put_locale()
+    if closed_already?(chat_id, message_id) do
+      # A button tap and a text reply can both race to resolve the same prompt; the loser
+      # lands here after the winner already wrote the real outcome (close_prompt/3 logs into
+      # @prompt_log right before its own editMessageText). Leave that message alone instead of
+      # stomping "Allowed"/"Denied" with a misleading "this expired".
+      :ok
+    else
+      Config.put_locale()
 
-    Req.post(api_url(token(), "editMessageText"),
-      json: %{
-        chat_id: chat_id,
-        message_id: message_id,
-        text: gettext("⌛ This request expired. Ask again and a new one with buttons to tap will show up.")
-      }
-    )
+      Req.post(api_url(token(), "editMessageText"),
+        json: %{
+          chat_id: chat_id,
+          message_id: message_id,
+          text: gettext("⌛ This request expired. Ask again and a new one with buttons to tap will show up.")
+        }
+      )
+    end
+  end
+
+  defp closed_already?(chat_id, message_id) do
+    :ets.whereis(@prompt_log) != :undefined and
+      @prompt_log
+      |> :ets.lookup(chat_id)
+      |> Enum.any?(fn
+        {^chat_id, ^message_id} -> true
+        _ -> false
+      end)
   end
 
   # Replace the prompt's buttons with the shared outcome text so the chat stays tidy.
@@ -3012,9 +3065,12 @@ defmodule Pepe.Gateways.Telegram do
   defp ambient_tool(chat_id, name) do
     phrase = ambient_phrase(name)
 
-    if Process.get(:tg_act_phrase) != phrase do
+    # Only marked "seen" once render_activity/2 actually redrew the message - not merely
+    # attempted. Marking it on attempt alone let a phrase change that landed inside
+    # @edit_every_ms's debounce window get treated as shown when the chat still displayed
+    # the previous one, leaving the note stuck on a stale phrase for the rest of the turn.
+    if Process.get(:tg_act_phrase) != phrase and render_activity(chat_id, phrase) do
       Process.put(:tg_act_phrase, phrase)
-      render_activity(chat_id, phrase)
     end
 
     :ok
@@ -3136,6 +3192,9 @@ defmodule Pepe.Gateways.Telegram do
 
   # One status message per turn: send it the first time (with the real text, no
   # placeholder flash), then edit it in place. Id stored in the run task's dict.
+  # Returns whether the chat message was actually redrawn (sent or edited) just now, as
+  # opposed to a no-op swallowed by the debounce window below - callers that track "has this
+  # been shown yet" state (ambient_tool/2) need that distinction, not a blanket :ok.
   defp render_activity(chat_id, text) do
     case Process.get(:tg_act_id) do
       nil ->
@@ -3144,16 +3203,20 @@ defmodule Pepe.Gateways.Telegram do
         if id = send_status(chat_id, text) do
           Process.put(:tg_act_id, id)
           Process.put(:tg_act_drawn, now_ms())
+          true
+        else
+          false
         end
 
       id ->
         if now_ms() - Process.get(:tg_act_drawn, 0) >= @edit_every_ms do
           edit_status(chat_id, id, text)
           Process.put(:tg_act_drawn, now_ms())
+          true
+        else
+          false
         end
     end
-
-    :ok
   end
 
   defp now_ms, do: System.monotonic_time(:millisecond)
