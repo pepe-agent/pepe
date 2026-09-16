@@ -55,6 +55,20 @@ Two sources, chosen when you define what to predict:
   Both sources train through the exact same pipeline; the algorithm never knows which one
   a given spec uses.
 
+## Where it lives
+
+A database connection's rows are never copied anywhere: every training run and every row
+count queries the connection fresh, the same way `db_query` itself does. Only what to
+predict (target, feature columns, table name) is saved, not the data.
+
+Imported rows are different: `import_rows` does persist them, in Pepe's own local
+operational store (the same SQLite database commitments, watches, and traces already live
+in), capped at 50,000 rows per spec, oldest ones dropped first past that.
+
+A trained model itself is a small binary (kilobytes, not megabytes) saved in that same
+local store, whichever source trained it. Losing that file just means the next prediction
+retrains from scratch; it holds nothing a human reads directly.
+
 ## Not sure what to predict yet?
 
 Ask to "analyze my data for insights" and, for a database connection, `insight

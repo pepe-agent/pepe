@@ -61,6 +61,23 @@ Dos fuentes, elegidas al definir qué predecir:
   resultantes. Las dos fuentes entrenan por el mismo proceso; el algoritmo nunca sabe de
   cuál de las dos vinieron los datos.
 
+## Dónde queda guardado
+
+Las filas de una conexión de base de datos nunca se copian a ningún lado: cada
+entrenamiento y cada conteo de filas consulta la conexión en el momento, igual que ya hace
+`db_query`. Solo queda guardado qué predecir (objetivo, columnas usadas, nombre de la
+tabla), no el dato en sí.
+
+Las filas importadas son distintas: `import_rows` sí las guarda, en el propio
+almacenamiento operativo de Pepe (la misma SQLite donde ya viven los commitments, los
+watches y los traces), con un tope de 50 mil filas por modelo, descartando las más
+antiguas una vez que se pasa de ahí.
+
+El modelo entrenado en sí es un binario pequeño (pocos kilobytes, no megabytes) guardado en
+ese mismo almacenamiento, sin importar de qué fuente vino el entrenamiento. Perder ese
+archivo solo significa que la próxima predicción entrena de nuevo desde cero; no guarda
+nada que una persona lea directamente.
+
 ## ¿Todavía no sabes qué predecir?
 
 Pide "analiza mis datos en busca de insights" y, para una conexión de base de datos,

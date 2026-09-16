@@ -59,6 +59,22 @@ Duas fontes, escolhidas na altura de definir o que prever:
   linhas resultantes. As duas fontes treinam pelo mesmo processo; o algoritmo nunca sabe de
   qual delas vieram os dados.
 
+## Onde fica guardado
+
+As linhas de uma ligação a uma base de dados nunca são copiadas para lado nenhum: cada
+treino e cada contagem de linhas consulta a ligação na hora, tal como o `db_query` já faz.
+Só fica guardado o que prever (alvo, colunas usadas, nome da tabela), não o dado em si.
+
+As linhas importadas são diferentes: o `import_rows` guarda-as mesmo, no próprio
+armazenamento operacional do Pepe (a mesma SQLite onde já vivem os commitments, os watches
+e os traces), com um teto de 50 mil linhas por modelo, descartando as mais antigas assim
+que passa disso.
+
+O modelo treinado em si é um binário pequeno (poucos kilobytes, não megabytes) guardado
+nesse mesmo armazenamento, seja qual for a fonte que o treinou. Perder esse ficheiro só
+significa que a próxima previsão vai treinar de novo do zero; não guarda nada que uma
+pessoa leia diretamente.
+
 ## Ainda não sabe o que prever?
 
 Peça para "analisar os meus dados em busca de insights" e, para uma ligação de base de
