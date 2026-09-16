@@ -137,6 +137,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe policy list|scope ...            # which agents/projects a Pepe.Permissions.Policy applies to
       mix pepe doctor [--offline]              # health-check the whole setup
       mix pepe approvals list|approve|deny ...   # unattended risky tool calls parked for a human's OK
+      mix pepe grants list|revoke ...           # standing "always allow" permission grants, and undoing one
       mix pepe review [approve|reject ID]      # approve/reject autonomous writes staged for review
       mix pepe version                         # what's running, and which build
       mix pepe update                          # self-update the binary to the latest release
@@ -315,6 +316,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["approvals"]), do: with_config(fn -> approvals_cmd([]) end)
   def dispatch(["approvals", "list" | rest]), do: with_config(fn -> approvals_cmd(["list" | rest]) end)
   def dispatch(["approvals" | rest]), do: with_app([persist: true], fn -> approvals_cmd(rest) end)
+  def dispatch(["grants" | rest]), do: with_config(fn -> grants_cmd(rest) end)
   def dispatch(["model" | rest]), do: with_config(fn -> model_cmd(rest) end)
   def dispatch(["agent" | rest]), do: with_config(fn -> agent_cmd(rest) end)
 
@@ -3227,6 +3229,75 @@ defmodule Mix.Tasks.Pepe do
 
   defp approvals_delivery_note({:undelivered, reason}),
     do: info(yellow("the follow-up reply could not be delivered: #{inspect(reason)}"))
+
+  ###
+  ### grants commands (the audit trail behind every standing "always allow" grant)
+  ###
+
+  defp grants_cmd(["list" | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [agent: :string, all: :boolean])
+    records = if opts[:agent], do: Pepe.Permissions.Grants.list(opts[:agent]), else: Pepe.Permissions.Grants.list()
+    records = if opts[:all], do: records, else: Enum.filter(records, &is_nil(&1.revoked_at))
+
+    case records do
+      [] ->
+        info("no standing grants recorded" <> if(opts[:all], do: ".", else: " (pass --all to include revoked ones)."))
+
+      records ->
+        Enum.each(records, &print_grant/1)
+    end
+  end
+
+  defp grants_cmd(["revoke", id | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [by: :string])
+
+    case Pepe.Permissions.Grants.revoke(id, opts[:by] || "cli") do
+      {:ok, [_ | _] = revoked} ->
+        ok("revoked #{green(id)} - #{Enum.count(revoked)} ledger row(s) for that grant marked revoked")
+        info(dim("the agent's auto_approve entry for that tool was removed; it will ask again next time"))
+
+      {:error, :not_found} ->
+        error("unknown grant: #{id}")
+
+      {:error, :already_revoked} ->
+        error("grant #{id} was already revoked")
+
+      {:error, :unknown_agent} ->
+        error("the agent this grant was recorded for no longer exists - nothing was changed, the ledger row still shows it as active")
+
+      {:error, :wildcard_grant} ->
+        error(
+          "this agent's auto_approve is the bare wildcard \"*\" (every tool, every risk) - revoking one tool would " <>
+            "do nothing while it still covers everything, or dropping \"*\" itself would strip trust from every " <>
+            "other tool nobody asked to touch. Nothing was changed - edit auto_approve by hand to replace \"*\" " <>
+            "with the specific grants this agent actually needs."
+        )
+    end
+  end
+
+  defp grants_cmd(_) do
+    puts("""
+    #{bold("mix pepe grants")} - the audit trail behind every standing "always allow" grant
+
+      list [--agent NAME] [--all]   active grants (add --all to include revoked ones)
+      revoke ID [--by WHO]          undo it: strips the tool's auto_approve entry on the
+                                    agent, and marks every ledger row for that agent+tool
+                                    as revoked (not just this one - see below)
+
+    Every time a human says "always" (a button tap, a "!always" text reply, `approvals
+    approve --always`), it's recorded here: which agent, which tool/risks, who/where it
+    came from, and when. auto_approve itself is per-tool, not per-grant-event - two
+    grants for the same tool fold into one wider entry - so revoking undoes the tool's
+    whole current grant, not just the one event you picked.
+    """)
+  end
+
+  defp print_grant(g) do
+    state = if g.revoked_at, do: "revoked", else: "active"
+    where = g.granted_by || "?"
+    reason = if g.reason, do: " · #{g.reason}", else: ""
+    puts("#{bold(g.id)} [#{state}] #{Pepe.Permissions.Grant.describe(g.grant)} · #{g.agent} · via #{g.source} (#{where})#{reason}")
+  end
 
   defp watch_cmd(["add", description | rest]) do
     {opts, _} =

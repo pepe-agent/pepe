@@ -31,7 +31,10 @@ defmodule Pepe.Agent.AutoTitleTest do
 
       content =
         if naming?(req),
-          do: Elixir.Agent.get(:at_title, & &1),
+          # A plain string answers every naming call the same way (most tests); wrapping it
+          # in {:seq, [...]} instead pops one answer per call, so a test can pin a PENDING-
+          # then-real-title retry sequence without needing a second mock.
+          do: Elixir.Agent.get_and_update(:at_title, &next_title/1),
           else: "sure, here is an answer"
 
       payload = %{
@@ -47,6 +50,10 @@ defmodule Pepe.Agent.AutoTitleTest do
     def naming?(%{"messages" => msgs}) do
       Enum.any?(msgs, &(&1["role"] == "system" and &1["content"] =~ "Name this conversation"))
     end
+
+    defp next_title({:seq, [next | rest]}), do: {next, {:seq, rest}}
+    defp next_title({:seq, []}), do: {"", {:seq, []}}
+    defp next_title(plain), do: {plain, plain}
   end
 
   setup do
@@ -112,10 +119,63 @@ defmodule Pepe.Agent.AutoTitleTest do
 
     assert await_title(k) == "Deploying with Docker"
 
-    # On the cheap connection, not the agent's own, and shown only the opening message.
+    # On the cheap connection, not the agent's own, and shown both the opening message and
+    # the reply it got - naming from the exchange, not a guess from one line.
     assert [call] = namings()
     assert call["model"] == "small"
     assert Enum.any?(call["messages"], &(&1["content"] =~ "docker"))
+    assert Enum.any?(call["messages"], &(&1["content"] =~ "sure, here is an answer"))
+  end
+
+  test "a PENDING verdict defers naming - a bare greeting doesn't get named from its own reply either" do
+    Elixir.Agent.update(:at_title, fn _ -> {:seq, ["PENDING", "Docker deploy help"]} end)
+    agent = agent!(utility_model: "cheap")
+    k = key()
+
+    {:ok, _} = chat(k, "oi", agent)
+    Process.sleep(150)
+    assert SessionTitles.get(k) == nil
+    assert [_] = namings()
+
+    {:ok, _} = chat(k, "preciso configurar o docker", agent)
+    assert await_title(k) == "Docker deploy help"
+    assert [_, _] = namings()
+  end
+
+  test "once the retry budget is spent, a session is named anyway instead of staying blank forever" do
+    Elixir.Agent.update(:at_title, fn _ -> {:seq, ["PENDING", "PENDING", "PENDING"]} end)
+    agent = agent!(utility_model: "cheap")
+    k = key()
+
+    {:ok, _} = chat(k, "oi", agent)
+    Process.sleep(120)
+    {:ok, _} = chat(k, "tudo bem?", agent)
+    Process.sleep(120)
+    {:ok, _} = chat(k, "e você?", agent)
+    Process.sleep(150)
+
+    # Exactly 3 attempts: the 4th turn wouldn't even try (Session.@max_naming_tries).
+    assert [_, _, _] = namings()
+    title = SessionTitles.get(k)
+    refute title == nil
+    refute title == "PENDING"
+  end
+
+  test "a naming attempt already in flight blocks a second one from firing concurrently" do
+    agent = agent!(utility_model: "cheap")
+    k = key()
+
+    # Simulates the real race this guards: a previous turn's fire-and-forget naming Task
+    # (up to ~20s on LLM.chat's own receive_timeout) still running when a later turn's
+    # maybe_title/1 checks in - without the lock, SessionTitles.get(k) is nil for both and
+    # a second naming call fires right alongside the first.
+    Pepe.Store.put(:naming_in_flight, k, true, ttl: 30)
+
+    {:ok, _} = chat(k, "oi", agent)
+    Process.sleep(150)
+
+    assert namings() == []
+    assert SessionTitles.get(k) == nil
   end
 
   test "it names the conversation once, not on every turn" do
@@ -163,10 +223,14 @@ defmodule Pepe.Agent.AutoTitleTest do
     agent = agent!(utility_model: "typo")
     k = key()
 
-    {:ok, _} = chat(k, "a question about billing", agent)
+    # Five words, same length as TitlePlug's fixed reply ("sure, here is an answer") - the
+    # trim fallback picks whichever of opening/reply has MORE words (see SessionTitles.trimmed/2),
+    # so a tie keeps the opening, pinning this test to the message actually sent rather than
+    # the mock's fixed reply text.
+    {:ok, _} = chat(k, "a question about my billing", agent)
     Process.sleep(150)
 
-    assert SessionTitles.get(k) == "a question about billing"
+    assert SessionTitles.get(k) == "a question about my billing"
     assert namings() == []
   end
 
@@ -180,20 +244,41 @@ defmodule Pepe.Agent.AutoTitleTest do
     agent = agent!(utility_model: "cheap")
     k = key()
 
-    {:ok, _} = chat(k, "resetting my password", agent)
+    {:ok, _} = chat(k, "resetting my forgotten password now", agent)
     Process.sleep(150)
 
-    assert SessionTitles.get(k) == "resetting my password"
+    assert SessionTitles.get(k) == "resetting my forgotten password now"
   end
 
   test "a short opening message is not marked as cut" do
     agent = agent!(utility_model: nil)
     k = key()
 
-    {:ok, _} = chat(k, "docker", agent)
+    {:ok, _} = chat(k, "docker compose build image now", agent)
     Process.sleep(150)
 
-    assert SessionTitles.get(k) == "docker"
+    assert SessionTitles.get(k) == "docker compose build image now"
+  end
+
+  test "a bare greeting defers naming instead of becoming the title - even the reply doesn't stand in for it" do
+    # The exact complaint this fixes: a sidebar full of chats all named "oi"/"hey" because
+    # the first message was the label. An earlier version of this fix picked whichever of
+    # the message/reply had more words, which is itself wrong - the mock's fixed reply
+    # ("sure, here is an answer") is not a real topic either, and must not become the title
+    # any more than "oi" would.
+    agent = agent!(utility_model: nil)
+    k = key()
+
+    {:ok, _} = chat(k, "oi", agent)
+    Process.sleep(150)
+
+    refute SessionTitles.get(k) == "oi"
+    refute SessionTitles.get(k) == "sure, here is an answer"
+    assert SessionTitles.get(k) == nil
+
+    # Turn 2: an actually substantive message is what gets used, once it arrives.
+    {:ok, _} = chat(k, "preciso configurar o servidor de producao", agent)
+    assert await_title(k) == "preciso configurar o servidor de producao"
   end
 
   test "a title in quotes is unwrapped" do

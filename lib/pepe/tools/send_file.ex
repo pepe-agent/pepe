@@ -16,6 +16,12 @@ defmodule Pepe.Tools.SendFile do
   alias Pepe.Config
   alias Pepe.Webhooks
 
+  # How long a dashboard download link stays valid. Long enough that a chat left open
+  # overnight can still fetch the file the next morning; short enough that a workspace
+  # cleanup or an agent overwriting the same filename later doesn't quietly serve stale
+  # bytes under an old link that outlived its usefulness.
+  @download_ttl_s 24 * 60 * 60
+
   @impl true
   def name, do: "send_file"
 
@@ -56,6 +62,27 @@ defmodule Pepe.Tools.SendFile do
   # session key with the leading "telegram:" stripped.
   defp deliver("telegram:" <> rest, path, caption) do
     normalize(Pepe.Gateways.Telegram.deliver_file(rest, path, caption))
+  end
+
+  # The dashboard has no bot API to push a document through - a "web:<id>" session key is a
+  # ChatLive process, not a channel with its own delivery mechanism. Every other channel gets
+  # the file in hand; without this clause the dashboard fell through to the generic "can't
+  # receive files yet" error below, and the agent's only way to answer was to read the raw
+  # server filesystem path back to a human with no shell access to it - useless. Instead:
+  # register the file for a time-boxed download (Pepe.Store, the disposable tier - never
+  # the config source of truth for something this transient) under a token nobody could
+  # guess, then tell the live chat process to render a download link. Reusable for the
+  # full TTL, not one-time - re-downloading the same link twice is a feature, not a leak,
+  # since it's already behind the dashboard's own auth gate. The file itself is never
+  # copied or re-encoded; the controller streams it straight off disk.
+  defp deliver("web:" <> _ = key, path, caption) do
+    token = Base.url_encode64(:crypto.strong_rand_bytes(18), padding: false)
+    filename = Path.basename(path)
+    Pepe.Store.put(:dashboard_download, token, %{path: path, filename: filename}, ttl: @download_ttl_s)
+
+    Phoenix.PubSub.broadcast(Pepe.PubSub, "session:" <> key, {:session_event, key, {:file_ready, token, filename, caption}})
+
+    :ok
   end
 
   defp deliver(session, path, caption) do

@@ -119,6 +119,14 @@ perguntar, `/approve clear` apaga todas as concessões salvas de uma vez, e
 `/approve clear <tool>` derruba só uma delas. São comandos restritos a operador,
 então só um usuário de confiança consegue rodá-los.
 
+`mix pepe grants list` mostra as mesmas concessões pelo terminal, com um histórico
+que o `/approve` não tem: de qual agente, qual ferramenta e riscos, e de onde veio
+(um chat do Telegram, o dashboard, uma aprovação de solicitação sem ninguém por
+perto). `mix pepe grants revoke <id>` desfaz uma: como duas concessões na mesma
+ferramenta se juntam numa única entrada mais ampla, revogar qualquer uma das duas
+limpa a aprovação inteira daquela ferramenta, não só os riscos que aquela
+concessão específica cobria, e o agente volta a perguntar.
+
 ### Aprovação automática e o agente dono
 
 Escolher `always` no momento do pedido grava aquela ferramenta na lista

@@ -117,6 +117,14 @@ de chat como o Telegram, `/approve` lista o que o agente já pode correr sem per
 só uma. São comandos de operador, por isso só um utilizador de confiança os consegue
 executar.
 
+`mix pepe grants list` mostra as mesmas concessões a partir do terminal, com um
+histórico que o `/approve` não tem: de que agente, que ferramenta e riscos, e de
+onde veio (um chat do Telegram, o dashboard, um pedido aprovado sem ninguém por
+perto). `mix pepe grants revoke <id>` desfaz uma: como duas concessões na mesma
+ferramenta se juntam numa única entrada mais larga, revogar qualquer uma das duas
+limpa a aprovação inteira dessa ferramenta, não só os riscos que essa concessão em
+concreto cobria, e o agente volta a perguntar.
+
 ### Aprovação automática e o agente proprietário
 
 Escolher `always` no pedido regista essa ferramenta na lista `auto_approve` do agente,

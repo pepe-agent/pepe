@@ -41,6 +41,7 @@ defmodule Pepe.Permissions.PendingApprovals do
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Config
   alias Pepe.Permissions.Grant
+  alias Pepe.Permissions.Grants
   alias Pepe.Permissions.PendingApproval
   alias Pepe.Repo
   alias Pepe.Watch.Delivery
@@ -330,14 +331,14 @@ defmodule Pepe.Permissions.PendingApprovals do
   end
 
   defp persist_always(%PendingApproval{agent: agent} = record) when is_binary(agent) do
-    # `Config.allow_tool/2`'s own :ok/{:error, :unknown_agent} is the actual write result -
-    # checking `Config.get_agent/1` first and then ignoring what the write itself returned
-    # would still report success on a race (the agent vanishing between the two calls) or
-    # any other failure the write hits.
-    with :ok <- Config.allow_tool(agent, record.grant),
+    # `Grants.grant/5`'s own :ok/{:error, :unknown_agent} (from the Config.allow_tool/2 it
+    # wraps) is the actual write result - checking `Config.get_agent/1` first and then
+    # ignoring what the write itself returned would still report success on a race (the
+    # agent vanishing between the two calls) or any other failure the write hits.
+    with :ok <- Grants.grant(agent, record.grant, "approvals", record.session_key, "approved id #{record.id}"),
          # A policy-forced ask whose underlying call had no grant of its own recorded a
          # second key at park time - persist both, exactly as an attended `:always` does.
-         :ok <- persist_also_grant(agent, record.also_grant) do
+         :ok <- persist_also_grant(record) do
       true
     else
       _ -> false
@@ -346,8 +347,10 @@ defmodule Pepe.Permissions.PendingApprovals do
 
   defp persist_always(_record), do: false
 
-  defp persist_also_grant(_agent, nil), do: :ok
-  defp persist_also_grant(agent, also_grant), do: Config.allow_tool(agent, also_grant)
+  defp persist_also_grant(%PendingApproval{also_grant: nil}), do: :ok
+
+  defp persist_also_grant(%PendingApproval{agent: agent, also_grant: also_grant, session_key: key, id: id}),
+    do: Grants.grant(agent, also_grant, "approvals", key, "approved id #{id}")
 
   # Deliver the outcome back into the owning conversation as a new turn - the same
   # mechanism Pepe.Commitments.Scheduler.fulfill/1 uses for an agent_promise: ensure the

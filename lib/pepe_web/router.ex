@@ -38,6 +38,12 @@ defmodule PepeWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  # PepeWeb.Auth's dashboard-password gate, for an ordinary controller route (a LiveView
+  # gates itself with the same module's on_mount instead - see live_session :dashboard below).
+  pipeline :dashboard_auth do
+    plug PepeWeb.Auth
+  end
+
   scope "/", PepeWeb do
     pipe_through :api
 
@@ -98,6 +104,12 @@ defmodule PepeWeb.Router do
     get "/login", LoginController, :new
     post "/login", LoginController, :create
     delete "/logout", LoginController, :delete
+  end
+
+  scope "/", PepeWeb do
+    pipe_through [:browser, :dashboard_auth]
+
+    get "/dashboard/files/:token", DashboardFileController, :show
 
     # Two on_mount hooks: apply the configured locale, and gate on the dashboard
     # password (a no-op when none is set).

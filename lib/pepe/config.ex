@@ -1890,6 +1890,19 @@ defmodule Pepe.Config do
     end)
   end
 
+  @doc """
+  Remove `agent_name`'s whole `auto_approve` entry for `tool`, the write half of revoking a
+  standing grant (see `Pepe.Permissions.Grants.revoke/2`). Strips the tool's entry entirely,
+  not just the risk set one particular grant event recorded - `auto_approve` is tool-granular
+  (two grants for the same tool merge into one widened entry, see `Grant.merge/2`), so there
+  is no narrower thing to undo once several grants for the same tool have folded together.
+  """
+  def revoke_tool(agent_name, tool) do
+    update_agent(agent_name, fn agent ->
+      %{agent | auto_approve: Enum.reject(agent.auto_approve, &(elem(Pepe.Permissions.Grant.parse(&1), 0) == tool))}
+    end)
+  end
+
   # Canonicalize a route/authority target relative to `from`'s scope: a bare `to` qualifies into
   # `from`'s project, then resolves to the target agent's canonical handle - so add/remove match
   # the resolved `can_message`/`can_manage` lists and the id-based storage lines up. `"*"` (the

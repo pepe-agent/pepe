@@ -69,6 +69,8 @@ The coarser, older forms still work, unchanged:
 
 The persistent grants stay yours to inspect and revoke. From a chat channel such as Telegram, `/approve` lists what the agent may currently run without asking, `/approve clear` drops every saved grant, and `/approve clear <tool>` drops a single one. They are operator commands, so only a trusted user can run them.
 
+`mix pepe grants list` shows the same grants from the terminal, but with an audit trail `/approve` doesn't have: which agent, which tool and risks, and who or where it came from (a Telegram chat, the dashboard, an approved unattended request). `mix pepe grants revoke <id>` undoes one. Two grants on the same tool fold into a single wider entry, so revoking either one clears the tool's whole standing approval, not just the risks that one grant covered, and the agent goes back to asking for it.
+
 ### Auto-approval and the owner agent
 
 Choosing `always` at the prompt records that tool in the agent's `auto_approve` list, so it never asks again for that agent. There is no separate flag to set this up front from `pepe agent add`. You grant trust either by answering `always` once when the prompt appears, or by editing the agent in `config.json`:

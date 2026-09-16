@@ -1029,32 +1029,77 @@ defmodule Pepe.Agent.Session do
 
   # A run's `:on_event` is optional, and a listener that crashes on an event it doesn't
   # know must not take the session down with it.
-  # Name the conversation once, from its opening message, on the agent's utility model.
+
+  # Retried on each of the first few turns, not just the very first: a bare "oi" followed by
+  # the agent's own "how can I help you today?" is still nothing to name a conversation
+  # from, and SessionTitles.generate/5's PENDING verdict (on the model path) or thin-trim
+  # defer (on the no-model path) says so rather than forcing a name out of small talk. Capped
+  # so a conversation that stays small talk forever still ends up named eventually
+  # (`force?`, true on the last allowed try) instead of sitting unnamed in the sidebar
+  # indefinitely.
+  @max_naming_tries 3
+
+  # Name the conversation from the current turn's own message and reply, on the agent's
+  # utility model.
   #
-  # After the first exchange and not before: a session named from the first message alone
-  # would be named from "hi". After the first *answer* the conversation has a subject.
+  # Waits for an answer before ever calling in: a session named from a bare message alone
+  # would be named from "hi". After an answer the conversation usually has a subject - and
+  # now actually carries one into SessionTitles.generate/5, not just the timing of the call;
+  # `PENDING`/a too-thin trim means it still doesn't, so this defers to a later turn - and,
+  # crucially, that later turn passes whatever was *actually just said*, not the same first
+  # message replayed forever, so a conversation that opens with small talk and only turns
+  # substantive on turn 2 or 3 gets named from the part that's actually about something.
   #
   # In a task, because this process has queued turns waiting on it and a title is worth
   # nothing next to the next reply. Fire and forget: nothing reads a title but a human, so a
   # title that never arrives costs nothing. With a `utility_model` a cheap model writes the
-  # name; with none, the opening message is trimmed into one, for free (Pepe.Agent.Utility).
+  # name from both turns; with none, one of them is trimmed into one, for free
+  # (Pepe.Agent.Utility).
+  # The naming Task below is fire-and-forget and can take up to ~20s (SessionTitles'
+  # LLM.chat receive_timeout) - long enough that, with retries now spanning several turns,
+  # a second turn can finish and call maybe_title/1 again before the first turn's naming
+  # Task has stored anything, and SessionTitles.get(key) is still nil for both. Without this
+  # flag that raced two overlapping naming calls for the same session (double LLM spend,
+  # and a last-write-wins clobber where whichever call happens to finish last wins
+  # regardless of which one actually had the better title). TTL is a safety net for a Task
+  # that crashes before its own `after` clears the flag, not the primary mechanism.
+  @naming_lock_ns :naming_in_flight
+  @naming_lock_ttl_s 30
+
   defp maybe_title(%{key: key, agent_name: agent_name, messages: messages}) do
-    with 1 <- Enum.count(messages, &(&1["role"] == "user")),
+    tries = Enum.count(messages, &(&1["role"] == "user"))
+
+    with true <- tries in 1..@max_naming_tries,
          nil <- SessionTitles.get(key),
+         nil <- Pepe.Store.get(@naming_lock_ns, key),
          %{} = agent <- Config.get_agent(agent_name),
-         %{"content" => first} when is_binary(first) <-
-           Enum.find(messages, &(&1["role"] == "user")) do
-      Task.start(fn -> title_now(key, agent, first) end)
+         # The CURRENT turn's own message, not always the very first one - a retry on turn 2
+         # or 3 passes what was just said, which is the whole point of retrying at all.
+         %{"content" => message} when is_binary(message) <-
+           messages |> Enum.filter(&(&1["role"] == "user")) |> List.last() do
+      # The turn always ends on the assistant's own final answer (tool-call round trips in
+      # between, if any, are earlier entries) - same assumption ChatLive's ensure_reply/2
+      # already makes reading this same shape.
+      reply =
+        case List.last(messages) do
+          %{"role" => "assistant", "content" => content} when is_binary(content) -> content
+          _ -> ""
+        end
+
+      Pepe.Store.put(@naming_lock_ns, key, true, ttl: @naming_lock_ttl_s)
+      Task.start(fn -> title_now(key, agent, message, reply, tries >= @max_naming_tries) end)
     end
 
     :ok
   end
 
-  defp title_now(key, agent, first) do
-    case SessionTitles.generate(key, agent, first) do
+  defp title_now(key, agent, message, reply, force?) do
+    case SessionTitles.generate(key, agent, message, reply, force?) do
       {:ok, title} -> Phoenix.PubSub.broadcast(Pepe.PubSub, "session:" <> key, {:titled, key, title})
       :skip -> :ok
     end
+  after
+    Pepe.Store.delete(@naming_lock_ns, key)
   end
 
   defp emit(fun, event) when is_function(fun, 1) do

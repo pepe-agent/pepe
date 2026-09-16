@@ -45,6 +45,25 @@ defmodule Pepe.Permissions.SessionStore do
     :ok
   end
 
+  @doc """
+  Forget only the grants for `tool` under `session_key` - the per-tool undo of `allow/2`.
+  Used when a persisted (`:always`) grant for that tool is revoked
+  (`Pepe.Permissions.Grants.revoke/2`): `remember/4` writes the same grant into both places
+  at once, so revoking only the persisted half would leave the in-memory copy silently
+  covering the tool for the rest of that live session. `clear/1` is deliberately not reused
+  here - it would also drop unrelated `:session` grants on other tools.
+  """
+  def disallow(session_key, tool) do
+    ensure_table()
+
+    session_key
+    |> grants()
+    |> Enum.filter(&(Pepe.Permissions.Grant.parse(&1) |> elem(0) == tool))
+    |> Enum.each(&:ets.delete(@table, {session_key, &1}))
+
+    :ok
+  end
+
   @impl true
   def init(:ok) do
     ensure_table()

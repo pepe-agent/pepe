@@ -135,8 +135,8 @@ defmodule Pepe.Permissions do
   `Pepe.Permissions.Grant`, including what this deliberately is not: a sandbox.
   """
 
-  alias Pepe.Config
   alias Pepe.Permissions.Grant
+  alias Pepe.Permissions.Grants
   alias Pepe.Permissions.PendingApprovals
   alias Pepe.Permissions.Policy
   alias Pepe.Permissions.Risk
@@ -621,8 +621,9 @@ defmodule Pepe.Permissions do
   # the persisted grant would only actually take effect on the *next* turn.
   defp remember(:always, name, risks, %{agent: %{name: agent_name}} = ctx) when is_binary(agent_name) do
     grant = Grant.for(name, risks)
-    Config.allow_tool(agent_name, grant)
-    if key = ctx[:session_key], do: SessionStore.allow(key, grant)
+    session_key = ctx[:session_key]
+    Grants.grant(agent_name, grant, grant_source(session_key), session_key)
+    if session_key, do: SessionStore.allow(session_key, grant)
     :always
   end
 
@@ -663,6 +664,19 @@ defmodule Pepe.Permissions do
   end
 
   defp remember(decision, _name, _risks, _ctx), do: decision
+
+  # The surface label a standing grant's ledger row (Pepe.Permissions.Grants) is filed
+  # under - just the session key's own prefix ("telegram", "web", "slack", ...), not a
+  # full per-channel parse like Pepe.Watch.Delivery.origin_from_ctx/1 needs: this only
+  # ever renders in an audit list, it never has to route anything back anywhere.
+  defp grant_source(nil), do: "unknown"
+
+  defp grant_source(session_key) when is_binary(session_key) do
+    case String.split(session_key, ":", parts: 2) do
+      [provider | _] when provider != "" -> provider
+      _ -> "unknown"
+    end
+  end
 
   defp to_allow(:deny), do: :deny
   defp to_allow({:deny, reason}) when is_binary(reason), do: {:deny, reason}

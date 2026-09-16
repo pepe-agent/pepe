@@ -133,6 +133,14 @@ canal como Telegram, `/approve` lista lo que el agente puede correr sin pregunta
 `/approve clear` borra todos los permisos guardados, y `/approve clear <tool>` borra uno
 solo. Son comandos de operador, así que solo puede ejecutarlos un usuario de confianza.
 
+`mix pepe grants list` muestra los mismos permisos desde la terminal, con un historial
+que `/approve` no tiene: de qué agente, qué herramienta y riesgos, y de dónde vino (un
+chat de Telegram, el dashboard, una solicitud aprobada sin nadie presente). `mix pepe
+grants revoke <id>` deshace uno: como dos permisos sobre la misma herramienta se
+funden en una sola entrada más amplia, revocar cualquiera de los dos limpia toda la
+aprobación de esa herramienta, no solo los riesgos que cubría ese permiso en
+particular, y el agente vuelve a preguntar.
+
 ### La aprobación automática y el agente propietario
 
 Elegir `always` en el aviso deja esa herramienta anotada en el `auto_approve` de ese

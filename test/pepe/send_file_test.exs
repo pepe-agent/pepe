@@ -118,6 +118,18 @@ defmodule Pepe.SendFileTest do
     assert opts[:form_multipart][:channels] == "C42"
   end
 
+  test "send_file on a dashboard session registers a download token and tells the chat about it", %{xlsx: file} do
+    key = "web:#{System.unique_integer([:positive])}"
+    Phoenix.PubSub.subscribe(Pepe.PubSub, "session:" <> key)
+
+    ctx = %{session_key: key, cwd: Path.dirname(file)}
+    assert {:ok, msg} = SendFile.run(%{"path" => "leads.xlsx", "caption" => "here you go"}, ctx)
+    assert msg =~ "leads.xlsx"
+
+    assert_received {:session_event, ^key, {:file_ready, token, "leads.xlsx", "here you go"}}
+    assert %{path: ^file, filename: "leads.xlsx"} = Pepe.Store.get(:dashboard_download, token)
+  end
+
   test "send_file reports a clear error when the file is missing" do
     ctx = %{session_key: "telegram:1", cwd: System.tmp_dir!()}
     assert {:error, msg} = SendFile.run(%{"path" => "does-not-exist.xlsx"}, ctx)

@@ -296,7 +296,7 @@ defmodule Pepe.Agent.Runtime do
   # summarize whatever it found/did instead of leaving the user with nothing.
   defp loop(agent, chain, messages, _specs, ctx, opts, 0) do
     nudge = Message.user(@out_of_turns_nudge)
-    chat_opts = [temperature: agent.temperature]
+    chat_opts = [temperature: agent.temperature, images: opts[:images]]
     to_send = compact_for_send(agent, chain, messages, ctx)
 
     case chat_with_failover(chain, to_send ++ [nudge], chat_opts, ctx, opts) do
@@ -319,7 +319,14 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp loop(agent, chain, messages, specs, ctx, opts, iterations_left) do
-    chat_opts = [tools: specs, temperature: agent.temperature]
+    # `opts[:images]` (a caller-supplied per-turn attachment, never persisted - see
+    # Pepe.LLM.with_images/2) has to ride along on every one of this turn's model calls, not
+    # just the first: `to_send` is recompacted each iteration, and with_images/2 attaches to
+    # whichever message ends up last in that list at send time. Dropping it here meant an
+    # attached image was silently never sent to the model at all - found via review, no
+    # working vision path (Telegram's own photo handling included) actually exercised this
+    # past the gateway that builds `opts`.
+    chat_opts = [tools: specs, temperature: agent.temperature, images: opts[:images]]
 
     # Fold any /inline messages the caller injected mid-turn (`Session.inline/2`) into
     # the history as user turns before this iteration's model call, so the agent reacts
