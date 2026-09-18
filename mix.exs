@@ -82,6 +82,15 @@ defmodule Pepe.MixProject do
             # since gcc 10 those collide as duplicate symbols at link time. `-fcommon` merges
             # them the way the code assumes, instead of telling the linker to pick one.
             #
+            # Overriding LDFLAGS on make's command line has a catch worth spelling out:
+            # make exports command-line variables to every recipe, so it also lands in the
+            # environment of the CMake run that builds XGBoost itself, where CMake folds
+            # $LDFLAGS into CMAKE_{EXE,SHARED,MODULE}_LINKER_FLAGS and then tries to link its
+            # "can the compiler produce a binary" probe against an -lxgboost that does not
+            # exist yet. Setting those three cache entries empty on the CMake command line
+            # wins over the environment-derived defaults and puts that build back exactly
+            # where it was before the override existed.
+            #
             # `-Wno-error=int-conversion` is the last of it: exg_get_binary_from_address in
             # c/exgboost/src/utils.c memcpys straight from an ErlNifUInt64 address handed
             # over from Elixir, which is deliberate and correct on a 64-bit target but which
@@ -99,7 +108,8 @@ defmodule Pepe.MixProject do
               nif_cflags: "-D_LARGEFILE64_SOURCE -fcommon -Wno-error=int-conversion",
               nif_cxxflags: "-D_LARGEFILE64_SOURCE",
               nif_make_args: [
-                "CMAKE_FLAGS=-DUSE_OPENMP=OFF",
+                "CMAKE_FLAGS=-DUSE_OPENMP=OFF -DCMAKE_EXE_LINKER_FLAGS= " <>
+                  "-DCMAKE_SHARED_LINKER_FLAGS= -DCMAKE_MODULE_LINKER_FLAGS=",
                 "LDFLAGS=-Lcache/lib -lxgboost -Wl,-rpath,'$$ORIGIN/lib'"
               ]
             ],
@@ -109,7 +119,8 @@ defmodule Pepe.MixProject do
               nif_cflags: "-D_LARGEFILE64_SOURCE -fcommon -Wno-error=int-conversion",
               nif_cxxflags: "-D_LARGEFILE64_SOURCE",
               nif_make_args: [
-                "CMAKE_FLAGS=-DUSE_OPENMP=OFF",
+                "CMAKE_FLAGS=-DUSE_OPENMP=OFF -DCMAKE_EXE_LINKER_FLAGS= " <>
+                  "-DCMAKE_SHARED_LINKER_FLAGS= -DCMAKE_MODULE_LINKER_FLAGS=",
                 "LDFLAGS=-Lcache/lib -lxgboost -Wl,-rpath,'$$ORIGIN/lib'"
               ]
             ],
