@@ -271,11 +271,14 @@ defmodule Pepe.Skills.Marketplace do
       dir = path |> Path.dirname() |> Path.basename()
 
       case Path.basename(path) do
-        "SKILL.md" -> if dir == name, do: 0, else: 1
+        "SKILL.md" -> skill_md_rank(dir, name)
         base -> md_rank(base, name)
       end
     end
   end
+
+  defp skill_md_rank(dir, name) when dir == name, do: 0
+  defp skill_md_rank(_dir, _name), do: 1
 
   defp md_rank(base, name) do
     cond do
