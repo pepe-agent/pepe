@@ -68,28 +68,15 @@ defmodule Pepe.MixProject do
             # fix rather than forcing `-target x86_64-linux-gnu`: a glibc NIF would not load
             # into that musl BEAM in the first place.
             #
-            # Their LDFLAGS get replaced outright for a third reason. exgboost's Makefile
-            # appends `-Wl,--allow-multiple-definition` on anything that isn't Darwin, and
-            # zig's linker refuses the flag ("unsupported linker arg") rather than ignoring
-            # it - as it does `-z muldefs`, the usual stand-in. The override keeps the rest
-            # of that branch verbatim and drops only that flag; `$$ORIGIN` survives make's
-            # expansion as a literal `$ORIGIN` and stays single-quoted for the shell, so the
-            # NIF still finds the libxgboost.so copied in beside it. What that flag was
-            # papering over comes back as `-fcommon`, which is the real fix: exgboost
-            # declares `ErlNifResourceType *DMatrix_RESOURCE_TYPE;` (and the Booster one) at
-            # file scope in c/exgboost/include/utils.h, so every .c that includes it emits a
+            # `-fcommon` is for a duplicate-symbol collision of exgboost's own making:
+            # c/exgboost/include/utils.h declares `ErlNifResourceType *DMatrix_RESOURCE_TYPE;`
+            # (and the Booster one) at file scope, so every .c that includes it emits a
             # tentative definition, and under the `-fno-common` that has been the default
-            # since gcc 10 those collide as duplicate symbols at link time. `-fcommon` merges
-            # them the way the code assumes, instead of telling the linker to pick one.
-            #
-            # Overriding LDFLAGS on make's command line has a catch worth spelling out:
-            # make exports command-line variables to every recipe, so it also lands in the
-            # environment of the CMake run that builds XGBoost itself, where CMake folds
-            # $LDFLAGS into CMAKE_{EXE,SHARED,MODULE}_LINKER_FLAGS and then tries to link its
-            # "can the compiler produce a binary" probe against an -lxgboost that does not
-            # exist yet. Setting those three cache entries empty on the CMake command line
-            # wins over the environment-derived defaults and puts that build back exactly
-            # where it was before the override existed.
+            # since gcc 10 those collide at link time. Upstream papers over it with
+            # `-Wl,--allow-multiple-definition`, which zig's linker refuses outright rather
+            # than ignoring - see strip_exgboost_link_workaround/1 below, which takes that
+            # flag back out. `-fcommon` merges the tentative definitions the way the code
+            # assumes, which is what the linker flag was standing in for.
             #
             # `-Wno-error=int-conversion` is the last of it: exg_get_binary_from_address in
             # c/exgboost/src/utils.c memcpys straight from an ErlNifUInt64 address handed
@@ -107,22 +94,14 @@ defmodule Pepe.MixProject do
               cpu: :aarch64,
               nif_cflags: "-D_LARGEFILE64_SOURCE -fcommon -Wno-error=int-conversion",
               nif_cxxflags: "-D_LARGEFILE64_SOURCE",
-              nif_make_args: [
-                "CMAKE_FLAGS=-DUSE_OPENMP=OFF -DCMAKE_EXE_LINKER_FLAGS= " <>
-                  "-DCMAKE_SHARED_LINKER_FLAGS= -DCMAKE_MODULE_LINKER_FLAGS=",
-                "LDFLAGS=-Lcache/lib -lxgboost -Wl,-rpath,'$$ORIGIN/lib'"
-              ]
+              nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]
             ],
             linux_x86: [
               os: :linux,
               cpu: :x86_64,
               nif_cflags: "-D_LARGEFILE64_SOURCE -fcommon -Wno-error=int-conversion",
               nif_cxxflags: "-D_LARGEFILE64_SOURCE",
-              nif_make_args: [
-                "CMAKE_FLAGS=-DUSE_OPENMP=OFF -DCMAKE_EXE_LINKER_FLAGS= " <>
-                  "-DCMAKE_SHARED_LINKER_FLAGS= -DCMAKE_MODULE_LINKER_FLAGS=",
-                "LDFLAGS=-Lcache/lib -lxgboost -Wl,-rpath,'$$ORIGIN/lib'"
-              ]
+              nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]
             ],
             windows: [os: :windows, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]]
           ]
@@ -138,7 +117,38 @@ defmodule Pepe.MixProject do
   defp release_steps do
     if System.get_env("PEPE_PLAIN_RELEASE"),
       do: [:assemble],
-      else: [:assemble, &Burrito.wrap/1]
+      else: [:assemble, &strip_exgboost_link_workaround/1]
+  end
+
+  # Runs Burrito with one line taken out of exgboost's Makefile, and put back afterwards.
+  #
+  # That Makefile appends `-Wl,--allow-multiple-definition` to LDFLAGS on anything that
+  # isn't Darwin, to paper over the tentative definitions in its own utils.h (see the
+  # `-fcommon` note up in releases/0, which fixes that properly). zig's linker rejects the
+  # flag - "unsupported linker arg" - instead of ignoring it, and rejects `-z muldefs` the
+  # same way, so the flag has to be gone before Burrito's NIF recompile runs.
+  #
+  # Editing the Makefile is what makes this exgboost-only. Burrito's knobs - nif_make_args,
+  # nif_env, nif_cflags - are per *target*, not per dependency: overriding LDFLAGS through
+  # them reaches every NIF recompiled for that target, and exqlite (which has LDFLAGS of its
+  # own and no idea what libxgboost is) fails to link the moment it inherits exgboost's.
+  #
+  # The original is restored on the way out, including when the build fails, so a checkout
+  # that has run `mix release` is not left quietly different from one that hasn't - it would
+  # otherwise fail to build exgboost from source natively under any modern gcc or clang.
+  defp strip_exgboost_link_workaround(release) do
+    dep_path = Mix.Project.deps_paths()[:exgboost]
+    makefile = dep_path && Path.join(dep_path, "Makefile")
+    original = if makefile && File.regular?(makefile), do: File.read!(makefile)
+    patched = original && Regex.replace(~r/^.*--allow-multiple-definition.*\R/m, original, "")
+
+    if patched && patched != original, do: File.write!(makefile, patched)
+
+    try do
+      Burrito.wrap(release)
+    after
+      if patched && patched != original, do: File.write!(makefile, original)
+    end
   end
 
   # Configuration for the OTP application.
