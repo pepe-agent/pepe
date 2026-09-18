@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-09-18
+
 ### Fixed
 - **There is a Windows binary again, and `Pepe.Insight` works on it - every task type, on its smaller algorithm families.** The whole Windows build had been failing, on two separate dependencies that each need a native artifact their upstream publishes for Linux and macOS and not for native Windows: EXLA (which JIT-compiles the neural tier) has no XLA archive for `x86_64-windows-cpu`, and EXGBoost (gradient-boosted trees) has no precompiled NIF for `x86_64-windows-msvc`, falling back to a from-source XGBoost build its Makefile cannot do there. Nothing on our side to fix, nothing upstream to wait for. That one build now leaves all three out (`PEPE_SKIP_GBM=1` and `PEPE_SKIP_NEURAL=1`, set for the Windows target alone in CI and kept as separate flags so either can come back on its own; every other build - source installs, Docker, the Linux/macOS binaries - is exactly what it always was). All four things Insight does still work there: classification, regression, forecasting and clustering, fit with logistic/linear regression and k-means. What's missing is the two larger algorithm families, on the largest datasets, and Pepe knows it rather than finding out mid-fit: the automatic choice steps down to the biggest family actually present in the build, and naming a missing one explicitly (`family: "gbm"` or `"neural"`) comes back with a plain "isn't available in this build" message instead of a crash.
 
@@ -839,6 +841,7 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
+[0.19.1]: https://github.com/pepe-agent/pepe/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/pepe-agent/pepe/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/pepe-agent/pepe/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/pepe-agent/pepe/compare/v0.17.0...v0.17.1
