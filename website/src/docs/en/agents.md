@@ -195,6 +195,25 @@ Leave it off for an agent meant to stay terse and transactional; turn it on from
 dashboard's agent editor, or by asking an agent with the `manage_agent` tool to set the
 `capability_nudge` flag on another agent.
 
+## Learning from what it does
+
+An agent that works a procedure out from scratch usually throws it away again: nobody
+stops mid task to ask for it to be saved. `skill_learning`, off by default, lets the agent
+raise it instead. After a task that took real work (at least four successful tool calls
+across at least two tools, with no existing skill consulted) it may offer, in one
+sentence, to save that procedure as a skill so the next time is direct. And when it
+follows a skill that then leads it wrong, it may offer to correct that skill with what the
+failure taught it, as an edit to the one that already exists.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+The offer is the whole feature: no skill file is written or changed without an explicit
+yes. Unlike `capability_nudge`, it costs nothing on an ordinary turn, because there is no
+extra paragraph in the system prompt, only a short note on the turns that cross the bar.
+See [Skills](../skills/) for what the agent then writes.
+
 ## Tools and the permission gate
 
 A tool is a capability. An agent can only do what its `tools` list allows. Give an

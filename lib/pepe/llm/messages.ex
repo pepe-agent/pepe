@@ -20,6 +20,7 @@ defmodule Pepe.LLM.Messages do
   @behaviour Pepe.LLM.Adapter
 
   alias Pepe.Config.Model
+  alias Pepe.LLM.Message
   alias Pepe.LLM.SSE
 
   @version "2023-06-01"
@@ -204,7 +205,7 @@ defmodule Pepe.LLM.Messages do
   defp attach_images_to_last_user(messages, images) when images in [nil, []], do: messages
 
   defp attach_images_to_last_user(messages, images) do
-    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> m["role"] == "user" end) |> List.last() do
+    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> Message.person_turn?(m) end) |> List.last() do
       {_m, idx} -> List.update_at(messages, idx, &Map.put(&1, "content", image_blocks(&1["content"], images)))
       nil -> messages
     end

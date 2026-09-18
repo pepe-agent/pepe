@@ -59,6 +59,21 @@ restart. Read the built-in **`skill-creator`** skill first; it's the guide for
 creating, editing, auditing, and improving a skill. The user can also just say
 "remember how to do X as a skill" and you author one, guided by `skill-creator`.
 
+## When a note asks you about a skill
+
+Some turns end with a `<system-reminder>` about skills. It appears only on a turn that
+earned it: either you worked a procedure out from scratch (several successful tool calls,
+no skill consulted), or you read a skill and something after it failed. Two rules when you
+see one:
+
+- It invites you to **offer**, in one sentence at the end of your reply. It is not an
+  instruction to write anything. If what you just did isn't actually reusable, say nothing
+  about it at all, and never offer twice in the same conversation.
+- Write or change a skill file only after the user says yes, and then follow
+  `skill-creator`: a new `skills/<name>.md` when the procedure is new, an **edit** to the
+  existing skill (trigger line intact) when a skill you followed turned out to be wrong.
+  Never answer the second case by creating a near-duplicate under a new name.
+
 ## Skills from the marketplace
 
 An operator can also install a skill with `mix pepe skill install NAME` (resolved against

@@ -64,6 +64,34 @@ shows up in its own list right away.
 This is what makes an agent's know-how durable. A procedure it worked out once
 gets written down instead of being rediscovered every session.
 
+### Learning without being asked
+
+Asking for a skill is something that occurs to nobody in the middle of the task they
+actually wanted done, so most procedures never get written down at all. The
+`skill_learning` flag, off by default, closes that gap from the other side: Pepe watches
+what a turn really did, and on the turns that earned it the agent may raise the subject
+itself.
+
+* **A procedure worth keeping.** The task took at least four successful tool calls across
+  at least two different tools, and no existing skill was consulted. The agent may end its
+  reply with one sentence offering to save what it just worked out.
+* **A skill that turned out to be wrong.** The agent read a skill and something after it
+  failed. Its instructions led somewhere that did not work, so the agent may offer to
+  correct that skill with what the failure taught it: an edit to the skill that already
+  exists, never a second one under a new name.
+
+Offering is all it does. Nothing is written or changed until you say yes, and a quick
+lookup, a retry loop on a single tool, or a task an existing skill already covered goes by
+in silence.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+Turn it on for an agent whose know-how should accumulate, and leave it off when the skill
+library is curated by hand. The same switch is in the dashboard's agent editor, and an
+agent with the `manage_agent` tool can set `skill_learning` on another.
+
 ### Packaging a skill with scripts
 
 A skill can also ship as a small package instead of a single file: a `<name>/`

@@ -14,6 +14,24 @@ defmodule Pepe.LLM.Message do
     }
   end
 
+  @doc """
+  Whether a message is a real person's turn, as opposed to one of Pepe's own
+  `<system-reminder>` notes riding along in the user role (the current time, who sent this
+  message, the skill-learning note - see `Pepe.Agent.Workspace.time_reminder/0` and
+  `Pepe.Agent.SkillLearning`).
+
+  Used by every adapter to decide which message an inbound image attaches to: the photo
+  belongs on the message the person actually wrote. It only started to matter once a
+  reminder could land *after* the user's turn rather than before it, at which point the
+  plain "last message with role user" rule picks Pepe's own chrome.
+  """
+  def person_turn?(msg) when is_map(msg) do
+    msg["role"] == "user" and
+      not (is_binary(msg["content"]) and String.starts_with?(msg["content"], "<system-reminder>"))
+  end
+
+  def person_turn?(_msg), do: false
+
   @doc "A tool result, replying to a specific tool_call id."
   def tool_result(tool_call_id, name, content) do
     %{

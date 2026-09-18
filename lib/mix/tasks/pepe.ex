@@ -3455,6 +3455,7 @@ defmodule Mix.Tasks.Pepe do
           session_search_project_wide: :boolean,
           micro_compaction: :boolean,
           capability_nudge: :boolean,
+          skill_learning: :boolean,
           admin: :boolean
         ]
       )
@@ -3729,7 +3730,8 @@ defmodule Mix.Tasks.Pepe do
         commitments: opts[:commitments] || false,
         session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
         micro_compaction: opts[:micro_compaction] || false,
-        capability_nudge: opts[:capability_nudge] || false
+        capability_nudge: opts[:capability_nudge] || false,
+        skill_learning: opts[:skill_learning] || false
     }
   end
 

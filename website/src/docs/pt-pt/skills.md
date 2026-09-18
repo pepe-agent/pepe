@@ -65,6 +65,34 @@ maneira de fazer alguma coisa e, guiado pelo `skill-creator`, ele grava um
 É isto que torna durável o conhecimento acumulado por um agente: um procedimento
 descoberto uma vez fica escrito, em vez de precisar de ser reinventado a cada sessão.
 
+### Aprender sem ninguém pedir
+
+A meio da tarefa que a pessoa queria mesmo ver resolvida, ninguém se lembra de pedir uma
+skill, e por isso quase nenhum procedimento chega a ficar escrito. O `skill_learning`,
+desligado por omissão, fecha essa falha pelo outro lado: o Pepe repara no que o turno fez
+de facto e, nos turnos que o justificam, é o próprio agente a levantar o assunto.
+
+* **Um procedimento que vale a pena guardar.** A tarefa exigiu pelo menos quatro chamadas
+  de ferramenta bem-sucedidas, em pelo menos duas ferramentas diferentes, e não houve
+  nenhuma skill existente consultada. O agente pode terminar a resposta com uma frase a
+  propor guardar aquilo que acabou de descobrir.
+* **Uma skill que afinal estava errada.** O agente leu uma skill e algo a seguir falhou.
+  As instruções dela levaram a um sítio que não funciona, por isso o agente pode propor
+  corrigi-la com o que a falha lhe ensinou: uma edição à skill que já existe, nunca uma
+  segunda com outro nome.
+
+Propor é tudo o que ele faz. Nada é escrito nem alterado antes do teu sim, e uma consulta
+rápida, um ciclo de tentativas na mesma ferramenta ou uma tarefa que já tinha skill passam
+sem uma palavra.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+Liga-o num agente cujo conhecimento deve ir acumulando e deixa-o desligado quando a
+biblioteca de skills é tratada à mão. O mesmo interruptor está no editor de agentes do
+painel, e um agente com a ferramenta `manage_agent` pode ligar o `skill_learning` noutro.
+
 ### Empacotar uma skill com scripts
 
 Uma skill também pode chegar como um pequeno pacote em vez de um ficheiro solto: uma

@@ -70,6 +70,35 @@ Esto es justamente lo que le da permanencia al conocimiento de un agente: un
 procedimiento que resolvió una vez queda por escrito, en lugar de tener que
 redescubrirlo en cada sesión nueva.
 
+### Aprender sin que nadie se lo pida
+
+En medio de la tarea que de verdad querías resolver, a nadie se le ocurre pedir una skill,
+así que casi ningún procedimiento termina por escrito. El flag `skill_learning`,
+desactivado por defecto, cierra ese hueco por el otro lado: Pepe mira lo que el turno hizo
+realmente y, en los turnos que lo merecen, es el propio agente quien saca el tema.
+
+* **Un procedimiento que vale la pena guardar.** La tarea llevó al menos cuatro llamadas a
+  herramientas con éxito, repartidas en al menos dos herramientas distintas, y no se
+  consultó ninguna skill existente. El agente puede cerrar su respuesta con una frase
+  ofreciéndose a guardar lo que acaba de resolver.
+* **Una skill que resultó estar equivocada.** El agente leyó una skill y algo después de
+  ella falló. Sus instrucciones llevaron a un sitio que no funciona, así que el agente
+  puede ofrecerse a corregirla con lo que le enseñó el fallo: una edición a la skill que ya
+  existe, nunca una segunda con otro nombre.
+
+Ofrecer es todo lo que hace. Nada se escribe ni se cambia antes de tu sí, y una consulta
+rápida, un bucle de reintentos sobre una sola herramienta o una tarea que ya tenía skill
+pasan en silencio.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+Actívalo en un agente cuyo conocimiento deba ir acumulándose y déjalo apagado cuando la
+biblioteca de skills se cura a mano. El mismo interruptor está en el editor de agentes del
+panel, y un agente con la herramienta `manage_agent` puede activar `skill_learning` en
+otro.
+
 ### Empaquetar una skill junto con scripts
 
 Una skill también puede llegar como un pequeño paquete en vez de un solo archivo: una

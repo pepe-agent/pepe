@@ -210,6 +210,26 @@ Deixe desligado num agente que precisa continuar direto e transacional; ligue
 pelo editor de agentes do painel, ou pedindo a um agente com a ferramenta
 `manage_agent` que ligue o interruptor `capability_nudge` em outro.
 
+## Aprender com o que ele faz
+
+Um agente que descobre um procedimento do zero costuma jogar a descoberta fora: ninguém
+para no meio da tarefa para pedir que ela seja guardada. O `skill_learning`, desligado por
+padrão, deixa que o próprio agente levante o assunto. Depois de uma tarefa que deu
+trabalho de verdade (pelo menos quatro chamadas de ferramenta bem-sucedidas, em pelo menos
+duas ferramentas, sem nenhuma skill existente consultada), ele pode oferecer, em uma
+frase, guardar aquele caminho como skill, para que da próxima vez seja direto. E quando
+ele segue uma skill que o leva para o lugar errado, pode oferecer corrigir essa skill com
+o que a falha ensinou, como uma edição na que já existe.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+A oferta é a funcionalidade inteira: nenhum arquivo de skill é escrito ou alterado sem um
+sim explícito. Diferente do `capability_nudge`, isso não custa nada num turno comum,
+porque não há parágrafo extra no prompt de sistema, só uma nota curta nos turnos que
+cruzam a régua. Veja [Skills](../skills/) para o que o agente escreve depois.
+
 ## Ferramentas e a barreira de permissão
 
 Uma ferramenta é uma capacidade. Um agente só consegue fazer o que a lista
