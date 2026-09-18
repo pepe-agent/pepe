@@ -95,6 +95,7 @@ mix pepe chat --agent assistant          # ...with a specific agent (or: mix pep
 mix pepe goal "ship the release notes" \
   --criteria "CHANGELOG has a dated section" --max-attempts 5   # work until a reviewer approves
 mix pepe serve --port 4000               # OpenAI-compatible HTTP API + WebSocket
+pepe acp [AGENT]                         # Agent Client Protocol on stdin/stdout (code editors)
 pepe serve install [--port 4000]         # install as a persistent background service
 pepe serve status                        # is the service installed/running?
 pepe serve uninstall                     # stop and remove it
@@ -110,6 +111,18 @@ works from the installed `pepe` binary, not `mix pepe serve install` (it needs
 a stable path to point the service at). `${ENV_VAR}` secrets referenced in your
 config aren't inherited by the service's environment automatically; `install`
 lists them so you can add them to the generated unit/plist by hand.
+
+`acp` is not run by hand: an editor starts it as a child process and speaks the
+[Agent Client Protocol](https://agentclientprotocol.com) to it over stdin/stdout
+(JSON-RPC, one message per line). Agent selection matches `chat` (positional,
+`--agent`, `--project`), and an unknown name is a hard error rather than being
+folded into a prompt, since an editor's settings file gets no second try. **Nothing
+but protocol messages may reach stdout**, which is why `run/1` sets a quiet Mix shell
+and `Pepe.ACP.Stdio` moves the Logger's default handler to stderr; from a source
+checkout use `MIX_QUIET=1 mix pepe acp`, because Mix prints its "Compiling..." line
+before this task's code is loaded at all. The compiled binary (`Pepe.CLI`) never goes
+through Mix and needs nothing. Only the protocol's core subset is implemented, and
+the `initialize` handshake reports exactly which parts - see `Pepe.ACP.Protocol`.
 
 `chat` (alias: `tui`) opens a session-backed console: it keeps context across
 turns and prints a summary box (agent · model · session) on open. The same slash

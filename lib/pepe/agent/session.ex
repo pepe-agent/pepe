@@ -23,7 +23,11 @@ defmodule Pepe.Agent.Session do
   # messaging it - never counted or blocked by Pepe.Config.project_message_limit/1.
   # Everything else (telegram, a webhook provider, widget:...) counts by default,
   # so a newly added channel is covered without having to list it here.
-  @internal_sources ~w(tui web api)
+  #
+  # `acp` belongs with `tui` for the same reason it is here at all: it is a person at
+  # their own keyboard, in their own editor, driving their own agent (see Pepe.ACP) -
+  # not somebody being served by it.
+  @internal_sources ~w(tui web api acp)
 
   ###
   ### client API
