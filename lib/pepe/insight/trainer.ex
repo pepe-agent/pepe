@@ -8,10 +8,12 @@ defmodule Pepe.Insight.Trainer do
   automatic is the default *because* nobody has to think about this, not because the
   choice is hidden from whoever wants to make it themselves.
 
-  `"neural"` is the one family a build can be missing (`Pepe.Insight.Neural.available?/0` -
-  the native Windows binary is built without it, since EXLA has no precompiled XLA archive
-  for that platform). There, asking for it explicitly is refused with a plain message, and
-  the automatic choice tops out at `"gbm"` instead of reaching for a tier that isn't there.
+  `"gbm"` and `"neural"` are the two families a build can be missing
+  (`Pepe.Insight.GBMTrainer.available?/0`, `Pepe.Insight.Neural.available?/0` - the native
+  Windows binary is built without either, since neither EXGBoost nor EXLA publishes the
+  native artifact it needs for that platform). There, asking for one explicitly is refused
+  with a plain message, and the automatic choice steps down to the largest tier that is
+  actually in the build instead of reaching for one that isn't.
 
   For `"classification"`/`"regression"` specs left on automatic, the algorithm is picked by
   how much data actually exists, three tiers:
@@ -208,25 +210,37 @@ defmodule Pepe.Insight.Trainer do
   # Pepe to decide. Asking for a family this build doesn't have is the one override that
   # gets refused, with a plain message rather than an UndefinedFunctionError at fit time.
   defp family_for(_population, "linear"), do: {:ok, :linear}
-  defp family_for(_population, "gbm"), do: {:ok, :gbm}
+
+  defp family_for(_population, "gbm") do
+    if GBMTrainer.available?(),
+      do: {:ok, :gbm},
+      else: {:error, "the gbm family isn't available in this build - use \"linear\" or leave family unset"}
+  end
 
   defp family_for(_population, "neural") do
     if Neural.available?(),
       do: {:ok, :neural},
-      else: {:error, "the neural family isn't available in this build - use \"gbm\" or leave family unset"}
+      else: {:error, "the neural family isn't available in this build - leave family unset to let Pepe pick"}
   end
 
   defp family_for(population, _override), do: {:ok, auto_family_for(population)}
 
-  # A build without the neural tier (PEPE_SKIP_NEURAL=1, see mix.exs) tops out at GBM: the
-  # automatic choice is Pepe's to make and must always land on something that actually
-  # runs, so the largest tier degrades to the next one down rather than erroring. Gradient
-  # boosting is a competitive model at this volume anyway - it's the tier the neural net
-  # has to beat, not a consolation prize.
-  defp auto_family_for(population) when population >= @large_data_threshold,
-    do: if(Neural.available?(), do: :neural, else: :gbm)
+  # The automatic choice is Pepe's to make and must always land on something that actually
+  # runs, so a tier missing from this build (PEPE_SKIP_GBM/PEPE_SKIP_NEURAL, see mix.exs)
+  # steps down to the next one instead of erroring. No consolation prize either way:
+  # gradient boosting is the tier the neural net has to beat to begin with, and a linear
+  # model on a big, clean table is a real answer, not a placeholder.
+  defp auto_family_for(population) when population >= @large_data_threshold do
+    cond do
+      Neural.available?() -> :neural
+      GBMTrainer.available?() -> :gbm
+      true -> :linear
+    end
+  end
 
-  defp auto_family_for(population) when population >= @small_data_threshold, do: :gbm
+  defp auto_family_for(population) when population >= @small_data_threshold,
+    do: if(GBMTrainer.available?(), do: :gbm, else: :linear)
+
   defp auto_family_for(_population), do: :linear
 
   defp check_row_count(rows) do

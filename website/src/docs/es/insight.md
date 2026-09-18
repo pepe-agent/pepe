@@ -132,11 +132,13 @@ verificados existan de verdad, la misma filosofía de "que lo resuelva solo" det
   (cientos de millones de eventos de paciente, por ejemplo), suficientes datos para que
   esa complejidad valga la pena.
 
-Una excepción: el binario de Windows viene sin ese tercer nivel. La biblioteca que compila
-esa parte no publica versión para Windows, y no hay nada que arreglar de nuestro lado.
-Todo lo demás de esta página funciona ahí igual; Pepe se queda en los árboles con gradient
-boosting, y pedir "neural" a mano lo dice con todas las letras, en vez de romperse a mitad
-del entrenamiento.
+Una excepción: el binario de Windows trae solo el primer nivel. Las bibliotecas detrás de
+los otros dos no publican versión para Windows, y no hay nada que arreglar de nuestro
+lado. Todo lo que hace Insight sigue funcionando ahí, un modelo para cada uno de los
+cuatro tipos de pregunta, entrenado y respondido igual; Pepe simplemente usa regresión
+simple sea cual sea el volumen, y pedir a mano un nivel que ahí no existe lo dice con
+todas las letras, en vez de romperse a mitad del entrenamiento. En cualquier otra
+plataforma los tres niveles están, tal como se describe arriba.
 
 Un pronóstico de tendencia es, por debajo, una regresión, con la fecha convertida
 automáticamente en tiempo transcurrido y atributos de día de la semana/mes, se aplican las

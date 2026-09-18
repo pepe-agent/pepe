@@ -121,11 +121,12 @@ routing](/en/docs/routing/):
   millions of patient events, for instance), enough data for that complexity to earn its
   keep.
 
-One exception: the Windows binary ships without that third tier. The library that compiles
-it publishes nothing for Windows, and there is nothing to fix on our side. Everything else
-on this page works there exactly as it does anywhere else; Pepe simply stops at
-gradient-boosted trees, and asking for "neural" by hand says so plainly instead of failing
-halfway through training.
+One exception: the Windows binary ships with the first tier only. The libraries behind the
+other two publish nothing for Windows, and there is nothing to fix on our side. Everything
+Insight does still works there - a model for each of the four kinds of question, trained
+and answered the same way - Pepe just fits it with simple regression whatever the row
+count, and naming a missing family by hand says so plainly instead of failing halfway
+through training. On every other platform all three tiers are there as described.
 
 A forecast is a regression underneath, with the timestamp turned into elapsed-time and
 day-of-week/month features automatically; the same three tiers apply. A model this large

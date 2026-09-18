@@ -125,11 +125,13 @@ por complexidade](/pt-br/docs/routing/):
   milhões de eventos de paciente, por exemplo), dado suficiente para essa complexidade
   valer a pena.
 
-Uma exceção: o binário de Windows vem sem essa terceira faixa. A biblioteca que compila
-essa parte não publica versão para Windows, e não há o que corrigir do nosso lado. Todo o
-resto desta página funciona lá igualzinho; o Pepe simplesmente para nas árvores com
-gradient boosting, e pedir "neural" na mão avisa isso com todas as letras, em vez de
-quebrar no meio do treino.
+Uma exceção: o binário de Windows vem só com a primeira faixa. As bibliotecas por trás das
+outras duas não publicam versão para Windows, e não há o que corrigir do nosso lado. Tudo
+o que o Insight faz continua funcionando lá, um modelo para cada um dos quatro tipos de
+pergunta, treinado e respondido do mesmo jeito; o Pepe só vai usar regressão simples
+independente do volume, e pedir na mão uma faixa que não existe ali avisa isso com todas
+as letras, em vez de quebrar no meio do treino. Em qualquer outra plataforma as três
+faixas estão lá, como descrito acima.
 
 Uma previsão de tendência é uma regressão por baixo dos panos, com o horário virando
 atributos de tempo decorrido e dia da semana/mês automaticamente, as mesmas três faixas se

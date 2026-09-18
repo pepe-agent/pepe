@@ -265,16 +265,8 @@ defmodule Pepe.MixProject do
       # overfitting risk, a model that just works instantly for a few hundred to a couple
       # thousand rows.
       {:scholar, "~> 0.3"},
-      # Gradient-boosted trees - the mid-size tabular tier, generally the strongest
-      # baseline for business data at the row counts most operators actually have.
-      # Pinned to 0.4.x deliberately: 0.5.x added an httpoison/ex_json_schema dependency
-      # chain that collides with decimal ~> 3.0 (ecto_sqlite3) and the idna version this
-      # project's HTTP stack already needs (the exact hackney/idna clash `fetch_url`'s
-      # Floki-based extraction already avoids elsewhere in this file, for the same
-      # reason) - 0.4.x has neither dependency.
-      {:exgboost, "~> 0.4.0"},
-      # The large-scale tier's own two deps (Axon + EXLA) are not listed here - they are
-      # conditional, see neural_deps/0 below.
+      # The mid-size (EXGBoost) and large-scale (Axon + EXLA) tiers are not listed here -
+      # they are conditional, see gbm_deps/0 and neural_deps/0 below.
 
       ## Packaging & ops
       ## What is it: how Pepe becomes a runnable thing - the standalone binary and the
@@ -294,26 +286,51 @@ defmodule Pepe.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false}
-    ] ++ neural_deps()
+    ] ++ gbm_deps() ++ neural_deps()
   end
 
-  # Pepe.Insight's large-scale (neural) tier and nothing else. Split out of deps/0 because
-  # EXLA is the one dependency in this project that cannot be built everywhere: it needs a
-  # precompiled XLA archive from Google, and there is none for native Windows (no WSL), so
-  # compiling it there dies on "no precompiled XLA archive available for this target:
-  # x86_64-windows-cpu" and takes the whole build down with it. That is upstream and not
-  # fixable here.
+  # Pepe.Insight's two upper tiers are conditional for one shared reason: each rests on a
+  # native artifact that upstream publishes for Linux and macOS and not for native Windows
+  # (no WSL), and neither gap is ours to close.
   #
-  # PEPE_SKIP_NEURAL=1 drops both, which is how the Windows binary gets built (see the
-  # `binaries` job in .github/workflows/ci.yml - it is set for that one target and no
-  # other). Everything else in Pepe.Insight - classification, regression, forecasting,
-  # clustering, on Scholar and EXGBoost - is unaffected and works identically; only the
-  # 50,000-rows-and-up neural tier is missing, and `Pepe.Insight.Neural.available?/0` is
-  # what the trainer consults so that tier is never *selected* in such a build (it falls
-  # back to GBM instead of failing at fit time).
+  #   * EXLA fetches a precompiled XLA archive from Google. There is none for
+  #     x86_64-windows-cpu, so compiling :exla there dies outright.
+  #   * EXGBoost downloads a precompiled NIF; its releases cover apple-darwin, linux-gnu
+  #     and riscv64 and stop there, so on Windows it falls back to building XGBoost from
+  #     source, which its POSIX-shaped Makefile cannot do on that runner.
   #
-  # Anything other than "1" (including unset) keeps both, so every other build - source
-  # installs, Docker, the Linux/macOS binaries - is exactly what it has always been.
+  # Either build fails the *whole* Windows release, so `PEPE_SKIP_GBM=1` and
+  # `PEPE_SKIP_NEURAL=1` drop them independently. That is how the Windows binary gets built
+  # (see the `binaries` job in .github/workflows/ci.yml - both are set for that one target
+  # and no other), and they stay separate knobs so that if EXGBoost ever ships a Windows
+  # NIF, only one has to come back.
+  #
+  # What survives such a build is still real: `Pepe.Insight`'s four task types -
+  # classification, regression, forecasting, clustering - all work, on Scholar's
+  # logistic/linear regression and k-means. Only the two larger algorithm families are
+  # absent, and `Pepe.Insight.Trainer` consults `GBMTrainer.available?/0`/
+  # `Neural.available?/0` so a missing tier is never *selected* (it steps down to the next
+  # one that is actually in the build) rather than failing at fit time.
+  #
+  # Anything other than "1" (including unset) keeps everything, so every other build -
+  # source installs, Docker, the Linux/macOS binaries - is exactly what it has always been.
+  defp gbm_deps do
+    if System.get_env("PEPE_SKIP_GBM") == "1" do
+      []
+    else
+      [
+        # Gradient-boosted trees - the mid-size tabular tier, generally the strongest
+        # baseline for business data at the row counts most operators actually have.
+        # Pinned to 0.4.x deliberately: 0.5.x added an httpoison/ex_json_schema dependency
+        # chain that collides with decimal ~> 3.0 (ecto_sqlite3) and the idna version this
+        # project's HTTP stack already needs (the exact hackney/idna clash `fetch_url`'s
+        # Floki-based extraction already avoids elsewhere in this file, for the same
+        # reason) - 0.4.x has neither dependency.
+        {:exgboost, "~> 0.4.0"}
+      ]
+    end
+  end
+
   defp neural_deps do
     if System.get_env("PEPE_SKIP_NEURAL") == "1" do
       []

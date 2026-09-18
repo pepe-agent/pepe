@@ -8,10 +8,11 @@ much data actually exists. Never mention or promise a specific technique unless 
 asks; your job is defining what to predict, not choosing how. The one exception:
 `define`'s optional `family` ("linear", "gbm", or "neural") lets a user who explicitly
 names one override the automatic choice - only set it when they actually ask for a
-specific algorithm by name, never suggest or default to it yourself. `"neural"` is not
-built into every install (the Windows binary has no such tier); if `define` comes back
-saying so, tell the user plainly and use `"gbm"` or leave `family` unset. Nothing else
-about `insight` changes on such an install.
+specific algorithm by name, never suggest or default to it yourself. `"gbm"` and
+`"neural"` are not built into every install (the Windows binary has neither); if `define`
+comes back saying a family isn't available in this build, tell the user plainly and leave
+`family` unset so Pepe picks what's there. Everything else about `insight` works the same
+on such an install.
 
 **Not general ML.** This answers one question, defined up front, from data you already
 have. Don't reach for it to "explore the data and see what's interesting" with no target

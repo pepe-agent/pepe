@@ -127,11 +127,13 @@ verificados que existe, a mesma filosofia de "descobrir sozinho" por trás do
   milhões de eventos de doentes, por exemplo), dados suficientes para essa complexidade
   valer a pena.
 
-Uma exceção: o binário de Windows vem sem essa terceira faixa. A biblioteca que compila
-essa parte não publica versão para Windows e não há nada a corrigir do nosso lado. Tudo o
-resto desta página funciona lá tal e qual; o Pepe fica-se pelas árvores com gradient
-boosting, e pedir "neural" à mão di-lo com todas as letras, em vez de rebentar a meio do
-treino.
+Uma exceção: o binário de Windows traz apenas a primeira faixa. As bibliotecas por trás
+das outras duas não publicam versão para Windows e não há nada a corrigir do nosso lado.
+Tudo o que o Insight faz continua a funcionar lá, um modelo para cada um dos quatro tipos
+de pergunta, treinado e respondido da mesma maneira; o Pepe limita-se a usar regressão
+simples seja qual for o volume, e pedir à mão uma faixa que ali não existe di-lo com todas
+as letras, em vez de rebentar a meio do treino. Em qualquer outra plataforma as três
+faixas estão lá, tal como descrito acima.
 
 Uma previsão de tendência é, no fundo, uma regressão, com a data/hora a transformar-se
 automaticamente em atributos de tempo decorrido e dia da semana/mês, aplicam-se as mesmas

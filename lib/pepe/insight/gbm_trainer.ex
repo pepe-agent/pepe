@@ -14,6 +14,16 @@ defmodule Pepe.Insight.GBMTrainer do
 
   @rounds 100
 
+  @doc """
+  Whether this build has the GBM tier at all. EXGBoost publishes a precompiled NIF for
+  Linux/macOS only, so the native Windows binary is built without it (`PEPE_SKIP_GBM=1`,
+  see `gbm_deps/0` in mix.exs) and `Pepe.Insight.Trainer` must never select this tier
+  there: it drops to Scholar's linear/logistic regression instead of reaching an undefined
+  `EXGBoost` function.
+  """
+  @spec available?() :: boolean()
+  def available?, do: Code.ensure_loaded?(EXGBoost)
+
   @spec fit_classifier(Nx.Tensor.t(), Nx.Tensor.t(), pos_integer()) :: EXGBoost.Booster.t()
   def fit_classifier(x, y, num_classes) do
     EXGBoost.train(x, y, objective: :multi_softmax, num_class: num_classes, num_boost_rounds: @rounds)
