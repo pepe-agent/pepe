@@ -91,7 +91,7 @@ defmodule Pepe.WebhooksTest do
       assert :error = WhatsApp.authenticate(e, body, %{})
     end
 
-    test "parse extracts text messages and ignores the rest" do
+    test "parse extracts text and media messages, and ignores the rest" do
       payload = %{
         "entry" => [
           %{
@@ -105,7 +105,8 @@ defmodule Pepe.WebhooksTest do
                       "text" => %{"body" => "oi"},
                       "id" => "m1"
                     },
-                    %{"from" => "5511999", "type" => "image", "image" => %{"id" => "x"}}
+                    %{"from" => "5511999", "type" => "image", "image" => %{"id" => "x"}},
+                    %{"from" => "5511999", "type" => "reaction", "reaction" => %{"emoji" => "👍"}}
                   ]
                 }
               }
@@ -114,7 +115,11 @@ defmodule Pepe.WebhooksTest do
         ]
       }
 
-      assert {:ok, [%{from: "5511999", text: "oi", id: "m1"}]} = WhatsApp.parse(payload)
+      # The image is a message too - described here, fetched later (see
+      # test/pepe/webhooks/media_test.exs). A reaction still isn't one.
+      assert {:ok, [text, image]} = WhatsApp.parse(payload)
+      assert %{from: "5511999", text: "oi", id: "m1"} = text
+      assert %{text: "", media: %{kind: "image", ref: "x"}} = image
 
       assert :ignore =
                WhatsApp.parse(%{"entry" => [%{"changes" => [%{"value" => %{"statuses" => []}}]}]})

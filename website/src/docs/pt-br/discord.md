@@ -34,6 +34,12 @@ Veja [Webhooks](../webhooks/) para conhecer os campos que toda conexão comparti
 (`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) e entender como a
 rota genérica funciona por trás disso.
 
+### Arquivos em um comando
+
+Dê ao seu comando de barra uma **opção de anexo** e as pessoas podem mandar um arquivo junto: `/ask prompt:o que ele fala? file:<áudio>`. Um áudio é transcrito antes de o agente rodar, um documento chega com o texto já lido, e uma imagem chega como imagem a um modelo com visão. O anexo sozinho já basta, então `/ask file:<áudio>` sem nada digitado também funciona.
+
+Esse é o único caminho que um arquivo tem por aqui. Um endpoint de interações enxerga comandos de barra e mais nada, então um áudio ou um anexo postado direto no canal nunca chega ao Pepe. Vale o limite de upload do próprio Discord (10 MB num servidor sem boost). Veja [Mensagens de voz](../voice/) e [Documentos](../documents/).
+
 ### Trocando de modelo
 
 Com os comandos `/model` e `/models`, qualquer pessoa consegue ver ou trocar qual modelo

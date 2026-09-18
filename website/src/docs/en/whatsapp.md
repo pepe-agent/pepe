@@ -115,6 +115,12 @@ replies within 24 hours of the user's last message. Reactive support fits this
 naturally. Proactive messages outside the window need pre-approved templates,
 which this channel does not send.</div>
 
+### Voice notes, photos and files
+
+A voice note arrives as **text**: it is transcribed on the way in, before the agent runs, so a customer who speaks their question gets an answer to the question rather than a note about an audio file. A PDF or a spreadsheet arrives with its contents already read, next to whatever was said about it. A photo reaches the model as an image when the agent's model has vision.
+
+None of this needs extra credentials. Meta hands over a media id and Pepe resolves it on the Graph API with the same access token the connection already uses. Inbound media is capped at 16 MB by Meta. If transcription is not configured anywhere and cannot be worked out, the file is saved to the agent's workspace and the agent is told where it is. See [Voice messages](../voice/) and [Documents](../documents/).
+
 ### Switching models
 
 `/model` and `/models` only fire on an `admin`-mode connection (see the mode

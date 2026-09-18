@@ -5,13 +5,24 @@ description: Uma mensagem de voz chega ao agente já como texto, transcrita à e
 
 ## Mensagens de voz
 
-Envia uma mensagem de voz ao teu bot do Telegram e o agente recebe **texto**. O áudio é transcrito logo à chegada, antes de existir sessão e antes de qualquer decisão de encaminhamento, por isso o que chega ao agente não é diferente de uma mensagem normal.
+Envia uma mensagem de voz no Telegram, no WhatsApp ou no Discord e o agente recebe **texto**. O áudio é transcrito logo à chegada, antes de existir sessão e antes de qualquer decisão de encaminhamento, por isso o que chega ao agente não é diferente de uma mensagem normal.
 
 Isto não foi sempre assim. Antes, o gateway limitava-se a gravar o ficheiro na área de trabalho do agente e a entregar-lhe o caminho, deixando-o a ele descobrir como escutar aquilo: procurar um transcritor, instalá-lo, correr-lho, ler o resultado. Cada mensagem de voz virava um pequeno projeto de investigação, lento e inconsistente de cada vez que acontecia, e ainda por cima gastava uma barreira de permissão só para ler uma mensagem que tinha acabado de chegar.
 
 ### Não há nada para configurar
 
 Se já tens uma ligação de modelo à OpenAI ou à Groq, a transcrição já funciona sozinha. O Pepe reaproveita essa mesma credencial, mas pede ao fornecedor o modelo de transcrição (`whisper-1` na OpenAI, `whisper-large-v3-turbo` na Groq) em vez do modelo de chat com que a ligação foi configurada. Basta enviar a mensagem de voz para ela ser respondida; não há nada a preparar antes.
+
+### Em que canais funciona
+
+**Telegram, WhatsApp e Discord** fazem passar um anexo pela mesma porta: áudio dá uma transcrição, um documento dá texto, e uma imagem segue para um modelo com visão como imagem. As definições desta página são partilhadas pelos três, pelo que configurar a transcrição uma vez chega para todos.
+
+Há dois pormenores a reter:
+
+- No **WhatsApp** o que chega é um id de média, não o ficheiro. O Pepe resolve esse id na Graph API com o mesmo token de acesso que a ligação já usa, sem configuração adicional. A Meta limita a média recebida a 16 MB.
+- No **Discord** só chegam ficheiros anexados a um **comando de barra**, porque a ligação é um endpoint de interações e não um bot de gateway. Dá ao teu comando uma opção de anexo e `/ask file:<clip>` funciona, com ou sem texto escrito ao lado. Uma mensagem de voz gravada no próprio canal do Discord nunca chega ao endpoint, pelo que não há forma de a transcrever.
+
+Slack, Microsoft Teams e Google Chat continuam a receber apenas texto.
 
 ### Como a rota é escolhida
 
@@ -56,7 +67,7 @@ O registo que fica a valer continua a ser a resposta em texto; o áudio é apena
 
 ## Fotografias
 
-Envia uma fotografia ao teu bot do Telegram e, com um **modelo com visão**, o agente vê mesmo a imagem, não um nome de ficheiro qualquer. Até há pouco tempo recebia apenas uma linha de texto a dizer que "o utilizador enviou uma fotografia, guardada em `…`", sem a imagem em si alguma vez chegar ao modelo, o que deixava o agente a adivinhar, ou a inventar, o que lá estava. Agora a imagem segue junto com a mensagem.
+Envia uma fotografia no Telegram, no WhatsApp ou no Discord e, com um **modelo com visão**, o agente vê mesmo a imagem, não um nome de ficheiro qualquer. Até há pouco tempo recebia apenas uma linha de texto a dizer que "o utilizador enviou uma fotografia, guardada em `…`", sem a imagem em si alguma vez chegar ao modelo, o que deixava o agente a adivinhar, ou a inventar, o que lá estava. Agora a imagem segue junto com a mensagem.
 
 Isto fica desligado a não ser que digas explicitamente que o modelo consegue ver. Nem todos os endpoints compatíveis com a OpenAI aceitam imagens, e mandar uma para um modelo só de texto dá erro, por isso a visão é opcional, ligação a ligação:
 

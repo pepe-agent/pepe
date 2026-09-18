@@ -182,9 +182,14 @@ defmodule Pepe.Webhooks do
   defp session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
 
   # Run one inbound message through the bound agent, off the request process.
-  defp dispatch(entry, mod, %{from: from, text: text} = message) do
+  #
+  # An attachment is resolved to text first (Pepe.Webhooks.Media), inside the task rather
+  # than in parse/1: it costs a download and a transcription, neither of which belongs on
+  # the request the provider is waiting on. It happens *before* command/3 so a `/new` said
+  # out loud still reads as a command - the whole point of resolving media at the door.
+  defp dispatch(entry, mod, %{from: from} = message) do
     if allowed?(entry, from) do
-      Task.start(fn -> converse(entry, mod, from, text, Map.get(message, :name)) end)
+      Task.start(fn -> resolve_and_converse(entry, mod, message) end)
     else
       Logger.info("[webhooks] #{entry["slug"]}: ignored message from disallowed #{from}")
     end
@@ -192,7 +197,15 @@ defmodule Pepe.Webhooks do
     :ok
   end
 
-  defp converse(entry, mod, from, text, sender_name) do
+  defp resolve_and_converse(entry, mod, %{from: from} = message) do
+    case Pepe.Webhooks.Media.resolve(mod, entry, message) do
+      {:ok, text, opts} -> converse(entry, mod, from, text, Map.get(message, :name), opts)
+      # Nothing to answer, and the sender has already been told why.
+      :ignore -> :ok
+    end
+  end
+
+  defp converse(entry, mod, from, text, sender_name, opts) do
     agent = entry["agent"]
     key = session_key(entry, from)
 
@@ -224,15 +237,22 @@ defmodule Pepe.Webhooks do
 
       :chat ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
-        run_chat(entry, mod, key, from, text, sender_name)
+        run_chat(entry, mod, key, from, text, sender_name, opts)
     end
   end
 
-  defp run_chat(entry, mod, key, from, text, sender_name) do
+  defp run_chat(entry, mod, key, from, text, sender_name, opts) do
     # A webhook sender is never the operator, the same "a stranger" content class every
     # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
     # was the one inbound surface that never withdrew auto_approve for it.
-    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil, untrusted: true, sender: sender_name) do
+    case Session.chat(key, text,
+           learn: learn?(entry, from),
+           authorize: nil,
+           untrusted: true,
+           sender: sender_name,
+           # An inbound image, for a vision model: rides this turn only, never persisted.
+           images: opts[:images]
+         ) do
       {:ok, reply} ->
         mod.deliver(entry, from, reply)
 

@@ -21,7 +21,8 @@ defmodule Pepe.Webhooks.Provider do
           required(:from) => String.t(),
           required(:text) => String.t(),
           required(:id) => String.t() | nil,
-          optional(:name) => String.t() | nil
+          optional(:name) => String.t() | nil,
+          optional(:media) => Pepe.Webhooks.Media.t() | nil
         }
 
   @doc """
@@ -80,6 +81,11 @@ defmodule Pepe.Webhooks.Provider do
   @doc """
   Normalize a decoded payload into zero or more inbound messages. `:ignore` for
   payloads with nothing to act on (delivery receipts, status updates, ...).
+
+  A message carrying an attachment sets `:media` (see `Pepe.Webhooks.Media`) and puts
+  the caption, if any, in `:text`. `parse/1` stays pure: it only *describes* the
+  attachment, and the bytes are fetched later, off the request process, through
+  `fetch_media/2`.
   """
   @callback parse(payload :: map()) :: {:ok, [inbound()]} | :ignore
 
@@ -129,5 +135,29 @@ defmodule Pepe.Webhooks.Provider do
   @callback deliver_blocks(config :: map(), to :: String.t(), blocks :: [Pepe.Presentation.block()]) ::
               :ok | {:error, term()}
 
-  @optional_callbacks label: 0, config_schema: 0, respond: 3, deliver_file: 4, addressed?: 2, deliver_blocks: 3
+  @doc """
+  Optional: fetch the bytes of an attachment its own `parse/1` described (see
+  `Pepe.Webhooks.Media`). Called off the request process, once, for a media message that
+  reached the agent's door - never during `parse/1`, which stays pure.
+
+  The `:ref` is whatever that provider put there: a media id to resolve against the
+  platform's API first (WhatsApp), a signed CDN url to `GET` (Discord). A provider whose
+  platform can't hand over inbound files, or that hasn't added support yet, omits this
+  entirely - the sender is then told the channel doesn't take attachments, rather than
+  having the file silently dropped.
+
+  The caller enforces `Pepe.Webhooks.Media.max_bytes/0` on whatever comes back, but a
+  provider that can learn the size *before* downloading should check it first (with
+  `Pepe.Webhooks.Media.within_cap/1`) and save the transfer.
+  """
+  @callback fetch_media(config :: map(), media :: Pepe.Webhooks.Media.t()) ::
+              {:ok, binary()} | {:error, term()}
+
+  @optional_callbacks label: 0,
+                      config_schema: 0,
+                      respond: 3,
+                      deliver_file: 4,
+                      addressed?: 2,
+                      deliver_blocks: 3,
+                      fetch_media: 2
 end

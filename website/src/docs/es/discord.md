@@ -36,6 +36,12 @@ Los campos que comparten todas las conexiones (`agent`, `mode`, `trainers`,
 `session_ttl_min`, `ephemeral`, `commands`) y el funcionamiento interno de la
 ruta genérica están en [Webhooks](../webhooks/).
 
+### Archivos en un comando
+
+Dale a tu comando de barra una **opción de adjunto** y la gente puede mandarle un archivo: `/ask prompt:¿qué dice? file:<clip>`. Un clip de voz se transcribe antes de que el agente corra, un documento llega con su texto ya leído, y una imagen llega como imagen a un modelo con visión. El adjunto alcanza por sí solo, así que `/ask file:<clip>` sin nada escrito también funciona.
+
+Es el único camino que tiene un archivo por acá. Un endpoint de interacciones ve comandos de barra y nada más, así que una nota de voz o un adjunto publicado en el canal nunca le llega a Pepe. Aplica el límite de subida del propio Discord (10 MB en un servidor sin boost). Ver [Mensajes de voz](../voice/) y [Documentos](../documents/).
+
 ### Cambiar de modelo
 
 Con los comandos `/model` y `/models` cualquiera puede consultar o cambiar

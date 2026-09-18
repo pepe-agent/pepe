@@ -34,6 +34,12 @@ See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
 `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) and how the
 generic route works under the hood.
 
+### Files on a command
+
+Give a slash command an **attachment option** and people can send Pepe a file with it: `/ask prompt:what does he say? file:<clip>`. A voice clip is transcribed before the agent runs, a document arrives with its text, and an image reaches a vision model as an image. The attachment is enough on its own, so `/ask file:<clip>` with nothing typed still works.
+
+This is the only route a file has here. An interactions endpoint sees slash commands and nothing else, so a voice message or an attachment posted straight into a channel never reaches Pepe. Discord's own upload limit applies (10 MB on an unboosted server). See [Voice messages](../voice/) and [Documents](../documents/).
+
 ### Switching models
 
 The `/model` and `/models` commands let people check or change which AI model

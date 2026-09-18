@@ -124,6 +124,12 @@ usuário. Suporte reativo se encaixa nessa regra naturalmente; já mensagens
 proativas fora dessa janela exigem templates pré-aprovados, algo que esse
 canal não envia.</div>
 
+### Áudios, fotos e arquivos
+
+Um áudio chega como **texto**: a transcrição acontece na entrada, antes de o agente rodar, então quem mandou a pergunta falando recebe resposta à pergunta, e não um comentário sobre um arquivo de áudio. Um PDF ou uma planilha chegam já com o conteúdo lido, junto do que foi dito sobre eles. Uma foto chega ao modelo como imagem, quando o modelo do agente enxerga.
+
+Nada disso exige credencial nova. A Meta entrega um id de mídia e o Pepe resolve esse id na Graph API com o mesmo token de acesso que a conexão já usa. A Meta limita a mídia recebida a 16 MB. Se não houver nenhuma rota de transcrição configurada nem detectável, o arquivo fica no workspace do agente e ele é avisado de onde está. Veja [Mensagens de voz](../voice/) e [Documentos](../documents/).
+
 ### Trocando de modelo
 
 `/model` e `/models` só funcionam mesmo numa conexão em modo `admin` (veja
