@@ -42,11 +42,22 @@ defmodule Pepe.MixProject do
         steps: release_steps(),
         burrito: [
           targets: [
-            macos_arm: [os: :darwin, cpu: :aarch64],
-            macos_x86: [os: :darwin, cpu: :x86_64],
-            linux_arm: [os: :linux, cpu: :aarch64],
+            # exgboost's Makefile shells out to XGBoost's own CMake build, which looks for
+            # an OpenMP runtime for whichever OS/arch it's targeting - there isn't one to
+            # find when cross-compiling from this runner's plain Linux toolchain to a
+            # different OS (CMake's `find_package(OpenMP)` fails outright, aborting the
+            # whole NIF recompile). `linux_x86` is the one target that matches this
+            # runner's own OS/arch exactly, so it never goes through Burrito's cross-build
+            # NIF recompile step at all (see Burrito.Steps.Patch.RecompileNIFs) and needs
+            # no override; every other target gets XGBoost's own `-DUSE_OPENMP=OFF` switch
+            # via nif_make_args (a `make` command-line variable, which overrides the
+            # Makefile's own CMAKE_FLAGS), trading multi-threaded training for actually
+            # being buildable at all on a platform nobody is cross-compiling FROM.
+            macos_arm: [os: :darwin, cpu: :aarch64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
+            macos_x86: [os: :darwin, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
+            linux_arm: [os: :linux, cpu: :aarch64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
             linux_x86: [os: :linux, cpu: :x86_64],
-            windows: [os: :windows, cpu: :x86_64]
+            windows: [os: :windows, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]]
           ]
         ]
       ]

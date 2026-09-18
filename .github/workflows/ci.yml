@@ -296,7 +296,13 @@ jobs:
           failed=""
           for target in macos_arm macos_x86 linux_arm linux_x86 windows; do
             echo "::group::Building $target"
-            if BURRITO_TARGET="$target" mix release; then
+            # --overwrite: every target after the first reassembles the same release
+            # name/version (`pepe-0.19.0`), which mix release otherwise pauses on with an
+            # interactive "already exists, overwrite?" prompt - fine at a terminal, but
+            # with no TTY here it silently declines and skips straight past Burrito's own
+            # wrap step, so nothing actually lands in burrito_out for that target even
+            # though the command exits 0.
+            if BURRITO_TARGET="$target" mix release --overwrite; then
               echo "built $target"
             else
               echo "FAILED to build $target - skipping it, other targets continue"
