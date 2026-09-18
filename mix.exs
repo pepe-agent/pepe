@@ -67,21 +67,51 @@ defmodule Pepe.MixProject do
             # alias-only change on musl, no ABI or off_t width shift, and it is the right
             # fix rather than forcing `-target x86_64-linux-gnu`: a glibc NIF would not load
             # into that musl BEAM in the first place.
+            #
+            # Their LDFLAGS get replaced outright for a third reason. exgboost's Makefile
+            # appends `-Wl,--allow-multiple-definition` on anything that isn't Darwin, and
+            # zig's linker refuses the flag ("unsupported linker arg") rather than ignoring
+            # it - as it does `-z muldefs`, the usual stand-in. The override keeps the rest
+            # of that branch verbatim and drops only that flag; `$$ORIGIN` survives make's
+            # expansion as a literal `$ORIGIN` and stays single-quoted for the shell, so the
+            # NIF still finds the libxgboost.so copied in beside it. What that flag was
+            # papering over comes back as `-fcommon`, which is the real fix: exgboost
+            # declares `ErlNifResourceType *DMatrix_RESOURCE_TYPE;` (and the Booster one) at
+            # file scope in c/exgboost/include/utils.h, so every .c that includes it emits a
+            # tentative definition, and under the `-fno-common` that has been the default
+            # since gcc 10 those collide as duplicate symbols at link time. `-fcommon` merges
+            # them the way the code assumes, instead of telling the linker to pick one.
+            #
+            # `-Wno-error=int-conversion` is the last of it: exg_get_binary_from_address in
+            # c/exgboost/src/utils.c memcpys straight from an ErlNifUInt64 address handed
+            # over from Elixir, which is deliberate and correct on a 64-bit target but which
+            # clang 16 and up reject by default rather than warn about. None of this ever
+            # showed up on the macOS targets because Burrito only recompiles NIFs for a
+            # cross build (Burrito.Builder.Target.is_cross_build?/1), and a macOS runner
+            # building a macOS target is not one - it keeps the host-compiled NIFs. Linux is
+            # hardcoded as always-cross there, so these two targets are the only ones that
+            # put exgboost through zig at all.
             macos_arm: [os: :darwin, cpu: :aarch64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
             macos_x86: [os: :darwin, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
             linux_arm: [
               os: :linux,
               cpu: :aarch64,
-              nif_cflags: "-D_LARGEFILE64_SOURCE",
+              nif_cflags: "-D_LARGEFILE64_SOURCE -fcommon -Wno-error=int-conversion",
               nif_cxxflags: "-D_LARGEFILE64_SOURCE",
-              nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]
+              nif_make_args: [
+                "CMAKE_FLAGS=-DUSE_OPENMP=OFF",
+                "LDFLAGS=-Lcache/lib -lxgboost -Wl,-rpath,'$$ORIGIN/lib'"
+              ]
             ],
             linux_x86: [
               os: :linux,
               cpu: :x86_64,
-              nif_cflags: "-D_LARGEFILE64_SOURCE",
+              nif_cflags: "-D_LARGEFILE64_SOURCE -fcommon -Wno-error=int-conversion",
               nif_cxxflags: "-D_LARGEFILE64_SOURCE",
-              nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]
+              nif_make_args: [
+                "CMAKE_FLAGS=-DUSE_OPENMP=OFF",
+                "LDFLAGS=-Lcache/lib -lxgboost -Wl,-rpath,'$$ORIGIN/lib'"
+              ]
             ],
             windows: [os: :windows, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]]
           ]
