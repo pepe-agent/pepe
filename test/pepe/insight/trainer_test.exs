@@ -70,4 +70,22 @@ defmodule Pepe.Insight.TrainerTest do
       assert msg =~ "target column"
     end
   end
+
+  describe "encode/4 - categorical features" do
+    test "one-hot encodes a categorical column alongside a numeric one" do
+      spec = %Spec{task_type: "classification", target_column: "outcome", feature_columns: ["a", "b"]}
+      rows = [%{"a" => 1, "b" => "red", "outcome" => "yes"}, %{"a" => 2, "b" => "blue", "outcome" => "no"}]
+      categories = %{"b" => ["blue", "red"]}
+
+      assert {:ok, encoded} = Trainer.encode(rows, spec, nil, categories)
+      # "a" (1 dim) + "b" one-hot over 2 categories (2 dims) = 3 columns.
+      assert Nx.shape(encoded.x) == {2, 3}
+    end
+
+    test "an empty categories map behaves exactly like encode/3 (no categorical columns)" do
+      spec = %Spec{task_type: "regression", target_column: "amount", feature_columns: ["a"]}
+      rows = [%{"a" => 1, "amount" => 2.0}]
+      assert Trainer.encode(rows, spec, nil, %{}) == Trainer.encode(rows, spec, nil)
+    end
+  end
 end

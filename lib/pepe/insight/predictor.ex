@@ -5,10 +5,20 @@ defmodule Pepe.Insight.Predictor do
   matching algorithm's `predict` - `Scholar.Linear.*` directly for the small-data tier,
   `EXGBoost.predict/2` (its own native model format, not `Nx.serialize`) for the mid-size
   tier, or `Pepe.Insight.Neural`'s architecture rebuilt from the model's own recorded
-  dimensions (`feature_columns` count, `params["classes"]` count) for the large-data tier -
+  dimensions (`params["input_width"]`, `params["classes"]` count) for the large-data tier -
   Axon models are graph + weights, and only the weights (`Axon.ModelState`) get serialized
   via `Nx.serialize/1`; the graph is cheap and deterministic to rebuild from the same two
-  numbers every time.
+  numbers every time. `input_width` is the *encoded* tensor width, not
+  `length(feature_columns)`: a one-hot categorical column (see `Pepe.Insight.Categorical`)
+  contributes more than one dimension per feature column, so the two can differ. A model
+  trained before `input_width` existed has none stored - `length(feature_columns)` is still
+  correct for that older model (it predates categorical features entirely), so it's the
+  fallback, not a hard requirement.
+
+  A feature column's raw value is turned into one or more tensor dimensions by
+  `Pepe.Insight.Categorical.feature_vector/3` - the same function `Trainer` uses to encode
+  rows at training time, given the same `feature_columns` and the same `params["categories"]`
+  vocabulary this model was trained with, so the two can never encode a value differently.
 
   A `"kmeans"` model answers a different shape of question - not a single value, but which
   cluster a new point falls into and how far it sits from that cluster's usual spread
@@ -26,9 +36,9 @@ defmodule Pepe.Insight.Predictor do
   `params["epoch"]` reference point so the two never drift apart.
   """
 
+  alias Pepe.Insight.Categorical
   alias Pepe.Insight.Model
   alias Pepe.Insight.Neural
-  alias Pepe.Insight.Numeric
   alias Pepe.Insight.Scaling
   alias Pepe.Insight.TimeFeatures
 
@@ -42,12 +52,14 @@ defmodule Pepe.Insight.Predictor do
   end
 
   def predict(%Model{} = model, input) when is_map(input) do
-    with {:ok, values} <- feature_row(model.feature_columns, input) do
+    with {:ok, values} <- feature_row(model.feature_columns, input, categories(model)) do
       artifact = deserialize(model.algorithm, model.artifact)
       tensor = values |> build_tensor() |> scale_tensor(model)
       {:ok, run_predict(model, artifact, tensor)}
     end
   end
+
+  defp categories(%Model{params: params}), do: params["categories"] || %{}
 
   defp build_tensor(values), do: Nx.tensor([values], type: :f32)
 
@@ -67,7 +79,7 @@ defmodule Pepe.Insight.Predictor do
 
     with {:ok, epoch} <- parse_epoch(model.params["epoch"]),
          {:ok, dt} <- fetch_time(input, time_column),
-         {:ok, extra} <- feature_row(real_columns, input) do
+         {:ok, extra} <- feature_row(real_columns, input, categories(model)) do
       {:ok, TimeFeatures.features(dt, epoch) ++ extra}
     end
   end
@@ -106,13 +118,13 @@ defmodule Pepe.Insight.Predictor do
 
   defp run_predict(%Model{algorithm: "neural_classifier"} = model, artifact, tensor) do
     classes = model.params["classes"] || []
-    graph = Neural.build(length(model.feature_columns), length(classes))
+    graph = Neural.build(input_width(model), length(classes))
     [idx] = graph |> Neural.predict(artifact, tensor) |> Nx.argmax(axis: -1) |> Nx.to_flat_list()
     decode_class(model, idx)
   end
 
   defp run_predict(%Model{algorithm: "neural_regressor"} = model, artifact, tensor) do
-    graph = Neural.build(length(model.feature_columns), 1)
+    graph = Neural.build(input_width(model), 1)
     [value] = graph |> Neural.predict(artifact, tensor) |> Nx.to_flat_list()
     value
   end
@@ -144,22 +156,13 @@ defmodule Pepe.Insight.Predictor do
     }
   end
 
+  defp input_width(%Model{params: %{"input_width" => width}}), do: width
+  defp input_width(%Model{feature_columns: cols}), do: length(cols)
+
   defp decode_class(model, idx) do
     classes = model.params["classes"] || []
     Enum.at(classes, idx, idx)
   end
 
-  defp feature_row(feature_columns, input) do
-    feature_columns
-    |> Enum.reduce_while({:ok, []}, fn col, {:ok, acc} ->
-      case Numeric.to_number(Map.get(input, col)) do
-        {:ok, n} -> {:cont, {:ok, [n | acc]}}
-        :error -> {:halt, {:error, "missing or non-numeric value for feature #{inspect(col)}"}}
-      end
-    end)
-    |> case do
-      {:ok, acc} -> {:ok, Enum.reverse(acc)}
-      error -> error
-    end
-  end
+  defp feature_row(feature_columns, input, categories), do: Categorical.feature_vector(input, feature_columns, categories)
 end

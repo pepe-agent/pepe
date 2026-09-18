@@ -24,22 +24,36 @@ defmodule Pepe.Insight.Trainer do
       boosting is usually competitive here too, but this tier exists for whoever has more
       data than GBM can fully exploit.
 
-  Scored on a holdout split, never the training rows: scoring on the training rows would
-  always overstate accuracy, and the whole "gets more accurate as more data accumulates"
-  premise this feature exists to deliver depends on that number being honest.
+  Scored by `@cv_folds` (`@cv_folds_neural` for the neural tier)-fold cross-validation, never
+  the training rows: each fold fits on its own share and scores on the rest, and the reported
+  `metric_value` is the average across every fold - a single random 80/20 split can report a
+  misleadingly optimistic or pessimistic number purely from how the shuffle happened to fall,
+  and cross-validation is the standard fix. The model actually persisted and served by
+  `predict` is a *separate*, final fit on every available row (never just one fold's share) -
+  cross-validation exists to produce an honest metric, not to decide which 80% of the data the
+  production model gets to learn from.
 
   Every feature column is standardized (`Pepe.Insight.Scaling`, zero mean/unit variance)
-  before any of the above sees it, fit once from the training split and reused unchanged
-  for holdout scoring and every later `predict`. Without this, a raw column's native units
-  (age in the 0-100s next to revenue in the millions) silently dominate both k-means
-  distance and logistic regression's gradient descent - "nothing to tune" has to include
-  not needing to know this exists, not just not being asked to set it.
+  before any of the above sees it - fit fresh per fold (on that fold's training share only,
+  never its validation share) for scoring, and fit once more on every row for the final
+  model. Without this, a raw column's native units (age in the 0-100s next to revenue in the
+  millions) silently dominate both k-means distance and logistic regression's gradient
+  descent - "nothing to tune" has to include not needing to know this exists, not just not
+  being asked to set it.
+
+  A feature column doesn't have to be numeric: `Pepe.Insight.Categorical` one-hot encodes any
+  column that isn't (`"plan_tier"`, `"region"`, ...), resolved once from every fetched row
+  before any split - the same pre-split timing `resolve_classes/2` already uses for a
+  classification target, and for the same reason: a rare category landing entirely in one
+  fold by chance must not change what the vocabulary is. Scoped to
+  classification/regression/forecast; `"clustering"` still requires all-numeric features (see
+  `fit_clustering/2`'s own note).
 
   For `"clustering"` specs (no target column - there's nothing to hold out or predict),
   `Scholar.Cluster.KMeans` fits every candidate cluster count from 2 to `@max_clusters` and
   keeps whichever scores best on `Scholar.Metrics.Clustering.silhouette_score/3` - picking
   `k` on the fit data is the standard way to choose it for k-means, unlike a supervised
-  accuracy number, so this does not need a holdout split to stay honest. The same fitted
+  accuracy number, so this does not need cross-validation to stay honest. The same fitted
   model also answers "how anomalous is this point": each training point's distance to its
   own cluster's centroid becomes a mean/stddev baseline (`Predictor` turns a new point's
   distance into a z-score against that baseline) - one model serves both capabilities
@@ -47,21 +61,22 @@ defmodule Pepe.Insight.Trainer do
   `@clustering_max_rows` rows, a random subsample when the source hands back more.
 
   For `"forecast"` specs (a `target_column` plus a `time_column`, no target/time leakage
-  concern beyond the usual holdout split), `Pepe.Insight.TimeFeatures` turns each row's
+  concern beyond the usual cross-validation), `Pepe.Insight.TimeFeatures` turns each row's
   timestamp into 5 numeric features (elapsed time since the training set's earliest
   timestamp, plus cyclical day-of-week/month encodings) prepended to any real
-  `feature_columns`, and the result is fit through the exact same three-tier family
-  selection as `"regression"` - a forecast is just a regression whose features happen to be
-  derived from a clock instead of typed in. `fit_forecast/3` reuses `fit_and_score/5`
-  directly (passing it a spec relabeled `"regression"` for that one call) rather than
-  duplicating the tier-selection logic.
+  `feature_columns` (numeric or categorical, same as above), and the result is fit through
+  the exact same three-tier family selection as `"regression"` - a forecast is just a
+  regression whose features happen to be derived from a clock instead of typed in.
+  `fit_forecast/3` reuses `cross_validate_and_fit/5` directly (passing it a spec relabeled
+  `"regression"` for that one call) rather than duplicating the tier-selection/CV logic.
 
-  Everything from `encode/3`/`feature_matrix/2` down takes plain Elixir rows and needs no
+  Everything from `encode/4`/`feature_matrix/3` down takes plain Elixir rows and needs no
   live connection, so it's unit-testable with fixtures; only `Source.fetch/3`'s `"db"`
   branch needs a real Postgres to exercise (same gap `test/pepe/tools/db_query_test.exs`
   already documents and defers to manual verification).
   """
 
+  alias Pepe.Insight.Categorical
   alias Pepe.Insight.GBMTrainer
   alias Pepe.Insight.Neural
   alias Pepe.Insight.NeuralTrainer
@@ -86,6 +101,12 @@ defmodule Pepe.Insight.Trainer do
   # multi-gigabyte f32 matrix per k. A random subsample keeps clustering usable at any
   # underlying data size instead of OOMing or hanging on real-sized tables.
   @clustering_max_rows 1_500
+  # Cross-validation fold count. Lower for :neural (already the most expensive tier to fit,
+  # at NeuralTrainer's @epochs 10 per fit) so the added cost of scoring stays bounded - 5
+  # folds + 1 final fit there would be 6x today's per-training cost for the tier that can
+  # least afford it, versus 4x for the cheaper tiers.
+  @cv_folds 5
+  @cv_folds_neural 3
 
   @spec train(Spec.t(), map()) :: {:ok, map()} | {:error, term()}
   def train(%Spec{task_type: "clustering"} = spec, ctx) do
@@ -100,68 +121,74 @@ defmodule Pepe.Insight.Trainer do
   def train(%Spec{task_type: "forecast"} = spec, ctx) do
     with {:ok, population} <- Source.row_count(spec, ctx),
          {:ok, rows} <- Source.fetch(spec, ctx, population),
-         {:ok, clean_rows, _dropped} <- drop_incomplete_rows(rows, [spec.target_column | spec.feature_columns]),
+         {:ok, clean_rows, _dropped} <- drop_incomplete_rows(rows, [spec.target_column], spec.feature_columns),
          :ok <- check_row_count(clean_rows) do
       fit_forecast(spec, clean_rows, population)
     end
   end
 
   def train(%Spec{} = spec, ctx) do
-    numeric_columns = if spec.task_type == "regression", do: [spec.target_column | spec.feature_columns], else: spec.feature_columns
+    numeric_columns = if spec.task_type == "regression", do: [spec.target_column], else: []
 
     with {:ok, population} <- Source.row_count(spec, ctx),
          {:ok, fetched} <- Source.fetch(spec, ctx, population),
-         {:ok, rows, _dropped} <- drop_incomplete_rows(fetched, numeric_columns),
+         {:ok, rows, _dropped} <- drop_incomplete_rows(fetched, numeric_columns, spec.feature_columns),
          :ok <- check_row_count(rows),
-         # Classes are resolved from every fetched row, before the split - not from the
-         # train partition alone. A rare class can land entirely in the holdout by chance,
-         # and deriving classes from train_rows only would then reject a genuinely valid
-         # 2-class dataset just because of how the shuffle happened to fall.
-         {:ok, classes} <- resolve_classes(rows, spec) do
+         # Classes/categories are resolved from every fetched row, before any split - not
+         # from one fold's training share alone. A rare class/category can land entirely in
+         # one fold by chance, and deriving either from a fold's rows only would then reject
+         # (or silently reshape) a genuinely valid dataset just because of how the shuffle
+         # happened to fall.
+         {:ok, classes} <- resolve_classes(rows, spec),
+         {:ok, categories} <- Categorical.resolve(rows, spec.feature_columns) do
       family = family_for(population, spec.family)
-      {train_rows, holdout_rows} = split(rows)
+      encode_fn = fn subset -> encode(subset, spec, classes, categories) end
 
-      with {:ok, encoded} <- encode(train_rows, spec, classes),
-           {:ok, holdout} <- encode(holdout_rows, spec, classes) do
-        # Fit the scale on the training split only, never the holdout - fitting on both
-        # would leak holdout distribution info into what's supposed to be an honest score.
-        scale = Scaling.fit(encoded.x)
-        scaled_train = %{encoded | x: Scaling.apply(encoded.x, scale)}
-        scaled_holdout = %{holdout | x: Scaling.apply(holdout.x, scale)}
-        {:ok, result} = fit_and_score(spec, family, scaled_train, scaled_holdout, length(rows))
-        {:ok, result |> with_scale(scale) |> Map.put(:population, population)}
+      with {:ok, result} <- cross_validate_and_fit(spec, family, rows, encode_fn, length(rows)) do
+        {:ok, result |> with_categories(categories) |> Map.put(:population, population)}
       end
     end
   end
 
-  # A missing/non-numeric value in a checked column drops just that row instead of aborting
-  # the whole fit - up to @max_dropped_ratio of the batch, past which something is wrong
-  # enough (bad column, bad table) that failing loudly beats training on a small remainder.
-  defp drop_incomplete_rows(rows, numeric_columns) do
+  # A missing value in a checked column drops just that row instead of aborting the whole
+  # fit - up to @max_dropped_ratio of the batch, past which something is wrong enough (bad
+  # column, bad table) that failing loudly beats training on a small remainder.
+  # `numeric_columns` must parse as a number (a target/time column); `presence_columns` just
+  # can't be missing/blank - whether one of those is numeric or categorical is decided later,
+  # by `Categorical.resolve/2`, once the row set is already clean.
+  defp drop_incomplete_rows(rows, numeric_columns, presence_columns \\ []) do
     total = length(rows)
-    clean = Enum.filter(rows, &Enum.all?(numeric_columns, fn col -> numeric?(Map.get(&1, col)) end))
+
+    clean =
+      Enum.filter(rows, fn row ->
+        Enum.all?(numeric_columns, fn col -> numeric?(Map.get(row, col)) end) and
+          Enum.all?(presence_columns, fn col -> present?(Map.get(row, col)) end)
+      end)
+
     dropped = total - length(clean)
 
     if total > 0 and dropped / total > @max_dropped_ratio do
-      {:error, "too many rows (#{dropped}/#{total}) have a missing or non-numeric value in #{inspect(numeric_columns)}"}
+      {:error, "too many rows (#{dropped}/#{total}) have a missing value in #{inspect(numeric_columns ++ presence_columns)}"}
     else
       {:ok, clean, dropped}
     end
   end
 
   defp numeric?(value), do: match?({:ok, _}, Numeric.to_number(value))
+  defp present?(nil), do: false
+  defp present?(""), do: false
+  defp present?(_value), do: true
 
-  # Every fit_and_score/5 result gets the same training-time scale attached, regardless of
-  # algorithm - Predictor applies it to a new row before calling any of them, so a raw
-  # column (age in the 0-100s, revenue in the millions) never silently dominates a distance
-  # or gradient computation just because of its native units.
-  defp with_scale(result, scale) do
-    extra = Map.put(Map.get(result, :extra_params, %{}), "scale", Scaling.to_params(scale))
+  defp with_extra(result, extra_params) do
+    extra = Map.merge(Map.get(result, :extra_params, %{}), extra_params)
     Map.put(result, :extra_params, extra)
   end
 
+  defp with_categories(result, categories) when map_size(categories) == 0, do: result
+  defp with_categories(result, categories), do: with_extra(result, %{"categories" => categories})
+
   defp resolve_classes(rows, %Spec{task_type: "classification", target_column: col}) do
-    classes = rows |> Enum.map(&to_label(Map.get(&1, col))) |> Enum.uniq() |> Enum.sort()
+    classes = rows |> Enum.map(&Categorical.to_label(Map.get(&1, col))) |> Enum.uniq() |> Enum.sort()
 
     case classes do
       [_, _ | _] -> {:ok, classes}
@@ -189,24 +216,107 @@ defmodule Pepe.Insight.Trainer do
       else: {:error, "needs at least #{@min_rows} example rows to train (found #{length(rows)})"}
   end
 
-  defp split(rows) do
-    shuffled = Enum.shuffle(rows)
-    holdout_n = max(1, div(length(shuffled), 5))
-    {holdout, train} = Enum.split(shuffled, holdout_n)
-    {train, holdout}
+  # Deals rows into `k` roughly-equal, disjoint folds and yields each `{train, val}` split in
+  # turn (val = one fold, train = every other fold) - one shuffle shared across every fold,
+  # so no row can land in more than one fold's validation share.
+  defp k_fold_split(rows, k) do
+    chunks =
+      rows
+      |> Enum.shuffle()
+      |> Enum.with_index()
+      |> Enum.group_by(fn {_row, i} -> rem(i, k) end, fn {row, _i} -> row end)
+      |> Map.values()
+
+    for i <- 0..(k - 1) do
+      val = Enum.at(chunks, i, [])
+      train = chunks |> List.delete_at(i) |> List.flatten()
+      {train, val}
+    end
+  end
+
+  defp fold_count(family, n) do
+    base = if family == :neural, do: @cv_folds_neural, else: @cv_folds
+    max(2, min(base, div(n, 4)))
+  end
+
+  # Cross-validates `family` over `rows` (via `encode_fn`, already closed over the
+  # pre-resolved classes/categories/epoch it needs) for an honest `metric_value`, then fits
+  # one final model on every row - the model actually persisted and served, never just one
+  # fold's share. `encode_fn` lets this one function serve both the plain
+  # classification/regression path (`encode/4`) and the forecast path (`forecast_encode/4`)
+  # without either duplicating the fold/scale/fit machinery.
+  defp cross_validate_and_fit(spec, family, rows, encode_fn, total_n) do
+    k = fold_count(family, length(rows))
+    folds = k_fold_split(rows, k)
+
+    with {:ok, scored} <- score_folds(spec, family, folds, encode_fn),
+         {:ok, encoded} <- encode_fn.(rows) do
+      [{metric_name, _value} | _] = scored
+      {avg, stddev} = scored |> Enum.map(fn {_name, value} -> value end) |> mean_stddev()
+
+      scale = Scaling.fit(encoded.x)
+      scaled = %{encoded | x: Scaling.apply(encoded.x, scale)}
+      {model, algorithm} = fit_by_family(spec, family, scaled)
+
+      result = %{
+        algorithm: algorithm,
+        task_type: spec.task_type,
+        metric_name: metric_name,
+        metric_value: avg,
+        model: model,
+        classes: encoded.classes,
+        sample_count: total_n
+      }
+
+      extra = %{
+        "scale" => Scaling.to_params(scale),
+        "cv_folds" => k,
+        "metric_stddev" => stddev,
+        "input_width" => Nx.axis_size(scaled.x, 1)
+      }
+
+      {:ok, with_extra(result, extra)}
+    end
+  end
+
+  defp score_folds(spec, family, folds, encode_fn) do
+    folds
+    |> Enum.reduce_while({:ok, []}, fn {train_rows, val_rows}, {:ok, acc} ->
+      case fold_score(spec, family, train_rows, val_rows, encode_fn) do
+        {:ok, value} -> {:cont, {:ok, [value | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      error -> error
+    end
+  end
+
+  defp fold_score(spec, family, train_rows, val_rows, encode_fn) do
+    with {:ok, train_enc} <- encode_fn.(train_rows),
+         {:ok, val_enc} <- encode_fn.(val_rows) do
+      # Fit the scale on this fold's training share only, never its validation share -
+      # fitting on both would leak that fold's validation distribution into its own score.
+      scale = Scaling.fit(train_enc.x)
+      scaled_train = %{train_enc | x: Scaling.apply(train_enc.x, scale)}
+      scaled_val = %{val_enc | x: Scaling.apply(val_enc.x, scale)}
+      {model, _algorithm} = fit_by_family(spec, family, scaled_train)
+      {:ok, score(spec, family, model, scaled_train, scaled_val)}
+    end
   end
 
   @doc false
-  @spec encode([map()], Spec.t(), [String.t()] | nil) :: {:ok, map()} | {:error, String.t()}
-  def encode(rows, %Spec{} = spec, classes) do
-    with {:ok, x} <- feature_matrix(rows, spec.feature_columns),
+  @spec encode([map()], Spec.t(), [String.t()] | nil, map()) :: {:ok, map()} | {:error, String.t()}
+  def encode(rows, %Spec{} = spec, classes, categories \\ %{}) do
+    with {:ok, x} <- feature_matrix(rows, spec.feature_columns, categories),
          {:ok, y, out_classes} <- target_vector(rows, spec, classes) do
       {:ok, %{x: Nx.tensor(x, type: :f32), y: y, classes: out_classes}}
     end
   end
 
-  defp feature_matrix(rows, feature_columns) do
-    try_map(rows, fn row -> try_map(feature_columns, fn col -> numeric_or_error(row, col, "feature") end) end)
+  defp feature_matrix(rows, feature_columns, categories) do
+    try_map(rows, &Categorical.feature_vector(&1, feature_columns, categories))
   end
 
   defp target_vector(rows, %Spec{task_type: "regression", target_column: col}, _classes) do
@@ -217,7 +327,7 @@ defmodule Pepe.Insight.Trainer do
   end
 
   defp target_vector(rows, %Spec{task_type: "classification", target_column: col}, nil) do
-    labels = Enum.map(rows, &to_label(Map.get(&1, col)))
+    labels = Enum.map(rows, &Categorical.to_label(Map.get(&1, col)))
     classes = labels |> Enum.uniq() |> Enum.sort()
 
     case classes do
@@ -232,138 +342,87 @@ defmodule Pepe.Insight.Trainer do
 
   defp target_vector(rows, %Spec{task_type: "classification", target_column: col}, classes) do
     index = classes |> Enum.with_index() |> Map.new()
-    labels = Enum.map(rows, &to_label(Map.get(&1, col)))
+    labels = Enum.map(rows, &Categorical.to_label(Map.get(&1, col)))
     {:ok, Nx.tensor(Enum.map(labels, &Map.get(index, &1, -1)), type: {:s, 64}), classes}
   end
 
-  defp to_label(nil), do: ""
-  defp to_label(v) when is_binary(v), do: v
-  defp to_label(%Decimal{} = d), do: Decimal.to_string(d)
-  defp to_label(v), do: to_string(v)
-
-  defp fit_and_score(%Spec{task_type: "classification"}, :linear, encoded, holdout, total_n) do
+  defp fit_by_family(%Spec{task_type: "classification"}, :linear, encoded) do
     num_classes = length(encoded.classes)
     model = Scholar.Linear.LogisticRegression.fit(encoded.x, encoded.y, num_classes: num_classes)
+    {model, "logistic_regression"}
+  end
+
+  defp fit_by_family(%Spec{task_type: "regression"}, :linear, encoded) do
+    {Scholar.Linear.LinearRegression.fit(encoded.x, encoded.y), "linear_regression"}
+  end
+
+  defp fit_by_family(%Spec{task_type: "classification"}, :gbm, encoded) do
+    num_classes = length(encoded.classes)
+    {GBMTrainer.fit_classifier(encoded.x, encoded.y, num_classes), "gbm_classifier"}
+  end
+
+  defp fit_by_family(%Spec{task_type: "regression"}, :gbm, encoded) do
+    {GBMTrainer.fit_regressor(encoded.x, encoded.y), "gbm_regressor"}
+  end
+
+  defp fit_by_family(%Spec{task_type: "classification"}, :neural, encoded) do
+    num_classes = length(encoded.classes)
+    {NeuralTrainer.fit_classifier(encoded.x, encoded.y, num_classes), "neural_classifier"}
+  end
+
+  defp fit_by_family(%Spec{task_type: "regression"}, :neural, encoded) do
+    {NeuralTrainer.fit_regressor(encoded.x, encoded.y), "neural_regressor"}
+  end
+
+  defp score(%Spec{task_type: "classification"}, :linear, model, _encoded, holdout) do
     preds = Scholar.Linear.LogisticRegression.predict(model, holdout.x)
-    metric = holdout.y |> Scholar.Metrics.Classification.accuracy(preds) |> Nx.to_number()
-
-    {:ok,
-     %{
-       algorithm: "logistic_regression",
-       task_type: "classification",
-       metric_name: "accuracy",
-       metric_value: metric,
-       model: model,
-       classes: encoded.classes,
-       sample_count: total_n
-     }}
+    {"accuracy", accuracy(holdout.y, preds)}
   end
 
-  defp fit_and_score(%Spec{task_type: "regression"}, :linear, encoded, holdout, total_n) do
-    model = Scholar.Linear.LinearRegression.fit(encoded.x, encoded.y)
-    preds = Scholar.Linear.LinearRegression.predict(model, holdout.x)
-    mse = holdout.y |> Scholar.Metrics.Regression.mean_square_error(preds) |> Nx.to_number()
-
-    {:ok,
-     %{
-       algorithm: "linear_regression",
-       task_type: "regression",
-       metric_name: "rmse",
-       metric_value: :math.sqrt(max(mse, 0.0)),
-       model: model,
-       classes: nil,
-       sample_count: total_n
-     }}
+  defp score(%Spec{task_type: "regression"}, :linear, model, _encoded, holdout) do
+    {"rmse", rmse(holdout.y, Scholar.Linear.LinearRegression.predict(model, holdout.x))}
   end
 
-  defp fit_and_score(%Spec{task_type: "classification"}, :gbm, encoded, holdout, total_n) do
+  defp score(%Spec{task_type: "classification"}, :gbm, model, _encoded, holdout) do
+    {"accuracy", accuracy(holdout.y, EXGBoost.predict(model, holdout.x))}
+  end
+
+  defp score(%Spec{task_type: "regression"}, :gbm, model, _encoded, holdout) do
+    {"rmse", rmse(holdout.y, EXGBoost.predict(model, holdout.x))}
+  end
+
+  defp score(%Spec{task_type: "classification"}, :neural, model, encoded, holdout) do
     num_classes = length(encoded.classes)
-    model = GBMTrainer.fit_classifier(encoded.x, encoded.y, num_classes)
-    preds = EXGBoost.predict(model, holdout.x)
-    metric = holdout.y |> Scholar.Metrics.Classification.accuracy(preds) |> Nx.to_number()
-
-    {:ok,
-     %{
-       algorithm: "gbm_classifier",
-       task_type: "classification",
-       metric_name: "accuracy",
-       metric_value: metric,
-       model: model,
-       classes: encoded.classes,
-       sample_count: total_n
-     }}
+    graph = Neural.build(Nx.axis_size(holdout.x, 1), num_classes)
+    preds = graph |> Neural.predict(model, holdout.x) |> Nx.argmax(axis: -1)
+    {"accuracy", accuracy(holdout.y, preds)}
   end
 
-  defp fit_and_score(%Spec{task_type: "regression"}, :gbm, encoded, holdout, total_n) do
-    model = GBMTrainer.fit_regressor(encoded.x, encoded.y)
-    preds = EXGBoost.predict(model, holdout.x)
-    mse = holdout.y |> Scholar.Metrics.Regression.mean_square_error(preds) |> Nx.to_number()
-
-    {:ok,
-     %{
-       algorithm: "gbm_regressor",
-       task_type: "regression",
-       metric_name: "rmse",
-       metric_value: :math.sqrt(max(mse, 0.0)),
-       model: model,
-       classes: nil,
-       sample_count: total_n
-     }}
+  defp score(%Spec{task_type: "regression"}, :neural, model, _encoded, holdout) do
+    graph = Neural.build(Nx.axis_size(holdout.x, 1), 1)
+    preds = graph |> Neural.predict(model, holdout.x) |> Nx.squeeze(axes: [1])
+    {"rmse", rmse(holdout.y, preds)}
   end
 
-  defp fit_and_score(%Spec{task_type: "classification"}, :neural, encoded, holdout, total_n) do
-    num_classes = length(encoded.classes)
-    model_state = NeuralTrainer.fit_classifier(encoded.x, encoded.y, num_classes)
-    graph = Neural.build(Nx.axis_size(encoded.x, 1), num_classes)
-    preds = graph |> Neural.predict(model_state, holdout.x) |> Nx.argmax(axis: -1)
-    metric = holdout.y |> Scholar.Metrics.Classification.accuracy(preds) |> Nx.to_number()
+  defp accuracy(y_true, y_pred), do: y_true |> Scholar.Metrics.Classification.accuracy(y_pred) |> Nx.to_number()
 
-    {:ok,
-     %{
-       algorithm: "neural_classifier",
-       task_type: "classification",
-       metric_name: "accuracy",
-       metric_value: metric,
-       model: model_state,
-       classes: encoded.classes,
-       sample_count: total_n
-     }}
-  end
-
-  defp fit_and_score(%Spec{task_type: "regression"}, :neural, encoded, holdout, total_n) do
-    model_state = NeuralTrainer.fit_regressor(encoded.x, encoded.y)
-    graph = Neural.build(Nx.axis_size(encoded.x, 1), 1)
-    preds = graph |> Neural.predict(model_state, holdout.x) |> Nx.squeeze(axes: [1])
-    mse = holdout.y |> Scholar.Metrics.Regression.mean_square_error(preds) |> Nx.to_number()
-
-    {:ok,
-     %{
-       algorithm: "neural_regressor",
-       task_type: "regression",
-       metric_name: "rmse",
-       metric_value: :math.sqrt(max(mse, 0.0)),
-       model: model_state,
-       classes: nil,
-       sample_count: total_n
-     }}
+  defp rmse(y_true, y_pred) do
+    mse = y_true |> Scholar.Metrics.Regression.mean_square_error(y_pred) |> Nx.to_number()
+    :math.sqrt(max(mse, 0.0))
   end
 
   defp fit_forecast(%Spec{} = spec, rows, population) do
-    with {:ok, epoch} <- resolve_epoch(rows, spec.time_column) do
+    with {:ok, epoch} <- resolve_epoch(rows, spec.time_column),
+         {:ok, categories} <- Categorical.resolve(rows, spec.feature_columns) do
       family = family_for(population, spec.family)
-      {train_rows, holdout_rows} = split(rows)
+      encode_fn = fn subset -> forecast_encode(subset, spec, epoch, categories) end
 
-      with {:ok, train_enc} <- forecast_encode(train_rows, spec, epoch),
-           {:ok, holdout_enc} <- forecast_encode(holdout_rows, spec, epoch) do
-        scale = Scaling.fit(train_enc.x)
-        scaled_train = %{train_enc | x: Scaling.apply(train_enc.x, scale)}
-        scaled_holdout = %{holdout_enc | x: Scaling.apply(holdout_enc.x, scale)}
-
-        # Reuses fit_and_score/5's existing "regression" clauses unchanged (a forecast IS a
-        # regression, just with time-derived features) - relabeling only for this one call,
-        # never persisted, so the tier-selection logic isn't duplicated for a third time_type.
-        {:ok, result} = fit_and_score(%Spec{spec | task_type: "regression"}, family, scaled_train, scaled_holdout, length(rows))
-        {:ok, result |> with_scale(scale) |> forecast_result(spec, epoch) |> Map.put(:population, population)}
+      # Reuses cross_validate_and_fit/5's existing "regression" clauses unchanged (a forecast
+      # IS a regression, just with time-derived features) - relabeling only for this one
+      # call, never persisted, so the tier-selection/CV logic isn't duplicated for a third
+      # time_type.
+      with {:ok, result} <- cross_validate_and_fit(%Spec{spec | task_type: "regression"}, family, rows, encode_fn, length(rows)) do
+        {:ok, result |> with_categories(categories) |> forecast_result(spec, epoch) |> Map.put(:population, population)}
       end
     end
   end
@@ -394,20 +453,20 @@ defmodule Pepe.Insight.Trainer do
     end)
   end
 
-  defp forecast_encode(rows, spec, epoch) do
-    with {:ok, x} <- forecast_feature_matrix(rows, spec, epoch),
+  defp forecast_encode(rows, spec, epoch, categories) do
+    with {:ok, x} <- forecast_feature_matrix(rows, spec, epoch, categories),
          {:ok, y} <- numeric_target_vector(rows, spec.target_column) do
       {:ok, %{x: Nx.tensor(x, type: :f32), y: y, classes: nil}}
     end
   end
 
-  defp forecast_feature_matrix(rows, spec, epoch) do
-    try_map(rows, &forecast_feature_row(&1, spec, epoch))
+  defp forecast_feature_matrix(rows, spec, epoch, categories) do
+    try_map(rows, &forecast_feature_row(&1, spec, epoch, categories))
   end
 
-  defp forecast_feature_row(row, spec, epoch) do
+  defp forecast_feature_row(row, spec, epoch, categories) do
     with {:ok, dt} <- time_or_error(row, spec.time_column),
-         {:ok, extra} <- try_map(spec.feature_columns, fn col -> numeric_or_error(row, col, "feature") end) do
+         {:ok, extra} <- Categorical.feature_vector(row, spec.feature_columns, categories) do
       {:ok, TimeFeatures.features(dt, epoch) ++ extra}
     end
   end
@@ -436,7 +495,7 @@ defmodule Pepe.Insight.Trainer do
   defp fit_clustering(spec, rows, population) do
     rows = maybe_subsample(rows, @clustering_max_rows)
 
-    with {:ok, x} <- feature_matrix(rows, spec.feature_columns) do
+    with {:ok, x} <- feature_matrix(rows, spec.feature_columns, %{}) do
       raw = Nx.tensor(x, type: :f32)
       scale = Scaling.fit(raw)
       tensor = Scaling.apply(raw, scale)
@@ -473,7 +532,7 @@ defmodule Pepe.Insight.Trainer do
 
   # Picking k by which score is best ON THE FIT DATA is standard practice for k-means
   # (there's no held-out "ground truth" for an unsupervised split to protect against) -
-  # unlike the supervised holdout split above, this isn't cutting a corner.
+  # unlike the supervised cross-validation above, this isn't cutting a corner.
   #
   # A candidate k that leaves an empty cluster (duplicate-heavy or low-cardinality data)
   # scores :nan, not a float - Nx.to_number's own return for a NaN result. Left in the

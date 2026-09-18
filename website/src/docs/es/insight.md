@@ -81,11 +81,19 @@ nada que una persona lea directamente.
 ## ¿Todavía no sabes qué predecir?
 
 Pide "analiza mis datos en busca de insights" y, para una conexión de base de datos,
-`insight propose_targets` toma una muestra de filas reales y sugiere columnas candidatas:
-una columna de baja cardinalidad es una categoría plausible para clasificar, una columna
-numérica con variación real es algo para predecir por regresión, un nombre como
-`status`/`risk`/`churn` suma a favor. Es una heurística, no una garantía, y no define nada
-por sí sola - es un punto de partida para confirmar, no una spec terminada.
+`insight propose_targets` toma una muestra de filas reales y sugiere algo para cada tipo
+de pregunta que Insight sabe responder, no solo clasificación o regresión: una columna de
+baja cardinalidad es una categoría plausible para clasificar, una columna numérica con
+variación real es algo para predecir por regresión, un nombre como `status`/`risk`/`churn`
+suma a favor. Cuando una tabla también tiene una columna que parece fecha u hora, la junta
+con una columna numérica y sugiere una previsión de tendencia ("seguir esto a lo largo del
+tiempo"). Y cuando la tabla tiene varias columnas numéricas con variación real, las junta
+en una sugerencia de agrupamiento ("agrupar las filas por estas columnas y ver qué grupos
+y valores fuera de lo común aparecen"), incluso sin ninguna columna objetivo a la vista. Es
+una heurística, no una garantía, y no define nada por sí sola - es un punto de partida
+para confirmar, no una spec terminada. Esto sirve justo para cuando alguien no tiene ni
+idea de por dónde empezar: pregunta, y Pepe señala candidatas reales en vez de dejarte
+mirando una hoja en blanco.
 
 ## Definir qué predecir
 
@@ -137,6 +145,12 @@ Un operador que ya sabe qué algoritmo quiere puede indicarlo explícitamente co
 ya comparó sus propios datos, o simplemente prefiere el que ya conoce. Déjalo sin definir
 salvo que lo pidan; automático es la opción correcta para casi todos.
 
+El número de acierto o error que muestra Pepe sale de probar el modelo contra varios
+recortes distintos de los datos, no solo uno, un número más estable y confiable que probar
+contra un único recorte al azar, y más parecido a lo que el modelo realmente va a hacer con
+datos que nunca vio. El modelo que después responde las predicciones se entrena de nuevo
+sobre todo lo que hay disponible, no solo sobre el recorte que se usó para probarlo.
+
 ## Reentrenamiento
 
 Define `retrain_interval_s` en una spec y Pepe la reentrena solo en cuanto lleguen
@@ -144,11 +158,23 @@ suficientes filas nuevas (`min_new_rows`, por defecto 50), un modelo de riesgo d
 se vuelve más preciso a medida que se registran más altas, sin que nadie tenga que correr
 nada a mano. `insight train_now` reentrena al instante, sin importar eso.
 
+Reentrenar, con cualquier frecuencia, no cuesta nada en uso de modelo: es un temporizador
+interno que revisa si ya es momento y si llegaron filas nuevas suficientes y, si es así,
+ajusta el modelo, cómputo simple de principio a fin, igual que el propio `train_now`. Un
+modelo solo cuesta algo en dos momentos separados: una vez, en conversación, cuando alguien
+describe por primera vez qué predecir, y después, solo si se arma algo para convertir una
+predicción en un resumen escrito para que alguien lo lea (un aviso programado, por ejemplo),
+la predicción en sí, sin importar con qué frecuencia se reentrena o se consulta, nunca
+necesita uno.
+
 ## Lo que esto no hace
 
 Cada modelo responde una sola pregunta, definida de antemano, a partir de datos
-estructurados con columnas numéricas. No lee texto libre (un resumen de alta, un PDF de
-historia clínica), esos datos tienen que convertirse en columnas antes de que Insight
+estructurados. Un número entra directo, y una columna con una cantidad razonable de valores
+distintos (hasta 20, como un plan o una región) ya queda como algo que el modelo puede usar
+solo, sin ninguna configuración. Una columna con muchos más valores distintos que eso, como
+un ID de cliente, todavía no se puede usar así. No lee texto libre (un resumen de alta, un
+PDF de historia clínica), esos datos tienen que convertirse en columnas antes de que Insight
 pueda usarlos. No hace series de tiempo más allá de tendencia y estacionalidad
 semanal/anual, y no hace imagen ni audio. Si la pregunta necesita criterio en vez de un
 patrón en datos pasados, de eso se encarga el propio agente, razonando turno a turno, no

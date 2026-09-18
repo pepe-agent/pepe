@@ -72,11 +72,18 @@ retrains from scratch; it holds nothing a human reads directly.
 ## Not sure what to predict yet?
 
 Ask to "analyze my data for insights" and, for a database connection, `insight
-propose_targets` samples real rows and suggests candidate target columns: a low-cardinality
-column is a plausible category to classify, a numeric column with real spread is something
-to regress on, a name like `status`/`risk`/`churn` counts in its favor. It's a heuristic,
-not a guarantee, and it never defines anything on its own - it's a starting point to
-confirm, not a finished spec.
+propose_targets` samples real rows and suggests something for every kind of question
+Insight can answer, not just classification or regression: a low-cardinality column is a
+plausible category to classify, a numeric column with real spread is something to regress
+on, a name like `status`/`risk`/`churn` counts in its favor. When a table also has a
+column that looks like a date or timestamp, it pairs that with a numeric column to suggest
+a forecast ("track this over time"). And when a table has several numeric columns with
+real variation, it bundles them into a clustering suggestion ("group rows by these and see
+what natural clusters and outliers show up"), even with no target column in sight. It's a
+heuristic, not a guarantee, and it never defines anything on its own - it's a starting
+point to confirm, not a finished spec. This is meant for exactly the situation where
+someone has no idea what "predictable" even looks like in their own data: ask, and let
+Pepe point at real candidates instead of staring at a blank slate.
 
 ## Defining what to predict
 
@@ -126,6 +133,12 @@ An operator who already knows which algorithm they want can name it explicitly w
 useful if they've already benchmarked their own data, or just want the one they're used
 to. Leave it unset unless asked; automatic is the right default for almost everyone.
 
+The accuracy or error number Pepe reports for a model comes from testing it against
+several different slices of the data, not just one - a steadier, more trustworthy number
+than checking against a single random slice would give, and closer to what the model will
+actually do on data it hasn't seen yet. The model that actually answers predictions
+afterward is then trained fresh on everything available, not just the slice used to test it.
+
 ## Retraining
 
 Set `retrain_interval_s` on a spec and Pepe retrains it on its own once enough new rows
@@ -133,11 +146,22 @@ have arrived (`min_new_rows`, default 50). A patient-risk model gets sharper as 
 discharges are recorded, without anyone re-running anything by hand. `insight train_now`
 retrains immediately regardless.
 
+Retraining, on any schedule, costs nothing in model usage: it's an internal timer checking
+whether it's time and whether enough new rows arrived, and if so, fitting the model, plain
+computation from start to finish, the same as `train_now` itself. A model only costs
+anything at two separate moments: once, in conversation, when a person first describes what
+to predict, and later, only if something is built to turn a prediction into a written
+summary for a person to read (a scheduled check-in message, say) - the prediction itself,
+however often it retrains or gets queried, never needs one.
+
 ## What it doesn't do
 
-Every model answers one question, defined up front, from structured data with numeric
-columns. It does not read free text (a discharge summary, a PDF chart); that data has to
-be turned into columns before Insight can use it. It doesn't do time series with anything
+Every model answers one question, defined up front, from structured data. A number works
+directly, and a column with a modest number of different values (up to 20, like a plan
+tier or a region) is turned into something the model can use automatically, no setup
+needed. A column with far more distinct values than that, like a customer ID, still can't
+be used this way. It does not read free text (a discharge summary, a PDF chart); that data
+has to be turned into columns before Insight can use it. It doesn't do time series with anything
 beyond a trend and weekly/yearly seasonality, and it doesn't do image or audio. If a
 question needs judgment rather than a pattern in past data, that's what the agent itself,
 reasoning turn by turn, is for.

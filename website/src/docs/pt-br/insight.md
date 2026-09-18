@@ -76,11 +76,18 @@ pessoa leia diretamente.
 ## Ainda não sabe o que prever?
 
 Peça para "analisar meus dados em busca de insights" e, para uma conexão de banco, o
-`insight propose_targets` amostra linhas reais e sugere colunas-alvo candidatas: uma
-coluna de baixa cardinalidade é uma categoria plausível para classificar, uma coluna
-numérica com variação real é algo para prever por regressão, um nome tipo `status`/`risk`/
-`churn` pesa a favor. É uma heurística, não uma garantia, e não define nada sozinha - é um
-ponto de partida para confirmar, não uma spec pronta.
+`insight propose_targets` amostra linhas reais e sugere algo pra cada tipo de pergunta que
+o Insight sabe responder, não só classificação ou regressão: uma coluna de baixa
+cardinalidade é uma categoria plausível para classificar, uma coluna numérica com variação
+real é algo para prever por regressão, um nome tipo `status`/`risk`/`churn` pesa a favor.
+Quando uma tabela também tem uma coluna que parece data ou horário, ele junta isso com uma
+coluna numérica e sugere uma previsão de tendência ("acompanhar isso ao longo do tempo").
+E quando a tabela tem várias colunas numéricas com variação real, ele junta elas numa
+sugestão de agrupamento ("agrupar as linhas por essas colunas e ver que grupos e valores
+fora do padrão aparecem"), mesmo sem nenhuma coluna-alvo à vista. É uma heurística, não uma
+garantia, e não define nada sozinha - é um ponto de partida para confirmar, não uma spec
+pronta. Isso serve justamente pra quem não tem a menor ideia de por onde começar: pergunta,
+e o Pepe aponta candidatas reais em vez de você ficar olhando pra uma tela em branco.
 
 ## Definindo o que prever
 
@@ -131,6 +138,12 @@ Um operador que já sabe qual algoritmo quer pode indicar explicitamente com o `
 comparou os próprios dados, ou só prefere o que já conhece. Deixe sem definir a menos que
 peçam; automático é o padrão certo para quase todo mundo.
 
+O número de acerto ou erro que o Pepe mostra vem de testar o modelo contra vários pedaços
+diferentes do dado, não só um - um número mais estável e mais confiável do que testar contra
+um único recorte aleatório daria, e mais próximo do que o modelo realmente vai fazer com dado
+que nunca viu. O modelo que efetivamente responde as previsões depois é treinado de novo em
+cima de tudo que existe, não só no pedaço usado pra testar.
+
 ## Retreino
 
 Defina `retrain_interval_s` numa spec e o Pepe retreina sozinho assim que houver linhas
@@ -138,10 +151,22 @@ novas suficientes (`min_new_rows`, padrão 50), um modelo de risco de paciente f
 preciso conforme mais altas são registradas, sem ninguém rodar nada manualmente. O
 `insight train_now` retreina na hora, independente disso.
 
+Retreinar, em qualquer frequência, não custa nada em uso de modelo: é um temporizador
+interno conferindo se já é hora e se chegou linha nova suficiente e, se sim, ajustando o
+modelo, computação simples do início ao fim, igual ao próprio `train_now`. Um modelo só
+custa alguma coisa em dois momentos separados: uma vez, em conversa, quando alguém descreve
+pela primeira vez o que prever, e depois, só se algo for montado pra transformar uma
+previsão num resumo escrito pra uma pessoa ler (um aviso programado, por exemplo), a
+previsão em si, não importa com que frequência retreina ou é consultada, nunca precisa de
+um.
+
 ## O que isso não faz
 
-Todo modelo responde uma pergunta só, definida de antemão, a partir de dado estruturado com
-colunas numéricas. Não lê texto livre (um resumo de alta, um PDF de prontuário), esse dado
+Todo modelo responde uma pergunta só, definida de antemão, a partir de dado estruturado. Um
+número entra direto, e uma coluna com um número razoável de valores diferentes (até 20, tipo
+um plano ou uma região) já vira algo que o modelo consegue usar sozinho, sem configurar nada.
+Uma coluna com muito mais valores distintos do que isso, tipo um ID de cliente, ainda não dá
+pra usar assim. Não lê texto livre (um resumo de alta, um PDF de prontuário), esse dado
 precisa virar coluna antes do Insight conseguir usar. Não faz série temporal além de
 tendência e sazonalidade semanal/anual, e não faz imagem nem áudio. Se a pergunta precisa
 de julgamento em vez de um padrão no dado passado, aí é trabalho do próprio agente,

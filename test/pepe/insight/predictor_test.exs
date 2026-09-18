@@ -113,6 +113,61 @@ defmodule Pepe.Insight.PredictorTest do
     end
   end
 
+  describe "predict/2 - categorical features" do
+    test "one-hot encodes a categorical feature the same way Trainer would" do
+      # 3 encoded columns: numeric "n" + one-hot("color") over ["blue", "red"].
+      x = Nx.tensor([[0.0, 1.0, 0.0], [1.0, 0.0, 1.0], [2.0, 1.0, 0.0], [3.0, 0.0, 1.0]])
+      y = Nx.tensor([0, 1, 0, 1])
+      fitted = Scholar.Linear.LogisticRegression.fit(x, y, num_classes: 2)
+
+      model = %Model{
+        algorithm: "logistic_regression",
+        feature_columns: ["n", "color"],
+        params: %{"classes" => ["no", "yes"], "categories" => %{"color" => ["blue", "red"]}},
+        artifact: Nx.serialize(fitted)
+      }
+
+      assert {:ok, label} = Predictor.predict(model, %{"n" => 1.0, "color" => "red"})
+      assert label in ["no", "yes"]
+    end
+
+    test "an unseen category value doesn't crash prediction" do
+      x = Nx.tensor([[0.0, 1.0, 0.0], [1.0, 0.0, 1.0]])
+      y = Nx.tensor([0, 1])
+      fitted = Scholar.Linear.LogisticRegression.fit(x, y, num_classes: 2)
+
+      model = %Model{
+        algorithm: "logistic_regression",
+        feature_columns: ["n", "color"],
+        params: %{"classes" => ["no", "yes"], "categories" => %{"color" => ["blue", "red"]}},
+        artifact: Nx.serialize(fitted)
+      }
+
+      assert {:ok, label} = Predictor.predict(model, %{"n" => 1.0, "color" => "unseen"})
+      assert label in ["no", "yes"]
+    end
+
+    test "a neural model rebuilds its graph from the stored input_width, not feature_columns count" do
+      # feature_columns has 2 entries ("n", "color") but "color" one-hot-expands to 2 dims,
+      # so the real encoded width (3) differs from length(feature_columns) (2) - the fitted
+      # artifact below was trained on width 3, so only the input_width fallback fix makes
+      # this round-trip instead of crashing on a graph/tensor shape mismatch.
+      x = Nx.tensor(for _ <- 1..20, do: [:rand.uniform(), Enum.random([0.0, 1.0]), Enum.random([0.0, 1.0])])
+      y = Nx.tensor(for _ <- 1..20, do: Enum.random([0, 1]))
+      state = NeuralTrainer.fit_classifier(x, y, 2)
+
+      model = %Model{
+        algorithm: "neural_classifier",
+        feature_columns: ["n", "color"],
+        params: %{"classes" => ["low", "high"], "categories" => %{"color" => ["blue", "red"]}, "input_width" => 3},
+        artifact: Nx.serialize(state)
+      }
+
+      assert {:ok, label} = Predictor.predict(model, %{"n" => 0.5, "color" => "red"})
+      assert label in ["low", "high"]
+    end
+  end
+
   describe "predict/2 - kmeans" do
     test "assigns a nearby point to its cluster without flagging it anomalous" do
       x = Nx.tensor(for _ <- 1..15, do: [0.0 + :rand.uniform() * 0.1, 0.0 + :rand.uniform() * 0.1])

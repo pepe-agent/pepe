@@ -47,18 +47,25 @@ defmodule Pepe.Tools.Insight do
       Define, import data into, train, and delete local predictive models over your own \
       data. Use `insight_predict` to query an already-trained spec (predict/list/describe) \
       - this tool never answers a prediction itself. actions:
-      - propose_targets: heuristic target-column suggestions for a "db" connection - needs \
+      - propose_targets: heuristic suggestions for a "db" connection, across every \
+        task_type - classification/regression target columns, a forecast pairing (a \
+        numeric column plus a detected date/timestamp column), and a clustering bundle \
+        (several numeric columns to group by) when the data supports one. Needs \
         `connection`, optional `table` (every table gets scanned, capped at 10, if \
-        omitted). Read-only, defines nothing. A HEURISTIC, NOT A GUARANTEE: always show \
-        the candidates to the user and confirm which one (if any) before calling define - \
-        never define off a suggestion on your own.
+        omitted). Read-only, defines nothing. Use this whenever someone doesn't already \
+        know what to predict, not just when they ask by name - "what can I do with my \
+        data" or "suggest something useful" is exactly this action's job. A HEURISTIC, \
+        NOT A GUARANTEE: always show the candidates to the user and confirm which one (if \
+        any) before calling define - never define off a suggestion on your own.
       - define: register what to predict - needs `name`, `source_kind` ("db" or "import"). \
         For "db", also give `connection` (a db_query connection name) and `table`. \
         `target_column` is required for "classification"/"regression"/"forecast", and \
         must be OMITTED for "clustering" (it has no target). `time_column` (a date/\
         timestamp column) is required for "forecast" only. `feature_columns` (array of \
-        other column names, numeric only in v1) is required for every task_type except \
-        "forecast", where it's optional (a pure time-based forecast needs none). Optional \
+        other column names - numbers or low-cardinality categories, e.g. up to 20 distinct \
+        values, for "classification"/"regression"/"forecast"; numeric only for \
+        "clustering") is required for every task_type except "forecast", where it's \
+        optional (a pure time-based forecast needs none). Optional \
         `task_type` ("classification" (default), "regression", "clustering", or \
         "forecast"), `retrain_interval_s` (auto-retrain this often once enough new rows \
         arrive), `min_new_rows` (default 50). Optional `family` ("linear", "gbm", or \
@@ -142,6 +149,12 @@ defmodule Pepe.Tools.Insight do
       "\n"
     )
   end
+
+  defp candidate_line({%{task_type: "forecast"} = c, i}),
+    do: "#{i}. [forecast] #{c.table}.#{c.column} over time column #{c.time_column} (score #{c.score}): #{c.reason}"
+
+  defp candidate_line({%{task_type: "clustering"} = c, i}),
+    do: "#{i}. [clustering] #{c.table} grouped by #{Enum.join(c.feature_columns, ", ")} (score #{c.score}): #{c.reason}"
 
   defp candidate_line({c, i}), do: "#{i}. [#{c.task_type}] #{c.table}.#{c.column} (score #{c.score}): #{c.reason}"
 

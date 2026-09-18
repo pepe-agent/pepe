@@ -111,4 +111,79 @@ defmodule Pepe.Insight.SchemaInspectorTest do
     assert Enum.any?(candidates, &(&1.column == "status" and &1.task_type == "classification"))
     assert Enum.any?(candidates, &(&1.column == "amount" and &1.task_type == "regression"))
   end
+
+  describe "forecast candidates" do
+    test "pairs a real date/timestamp column with the best regression target" do
+      columns = ["created_at", "amount"]
+
+      rows =
+        for i <- 1..30 do
+          [DateTime.add(~U[2026-01-01 00:00:00Z], i, :day), i * 3.7]
+        end
+
+      candidates = SchemaInspector.score_rows("orders", columns, rows)
+      assert forecast = Enum.find(candidates, &(&1.task_type == "forecast"))
+      assert forecast.column == "amount"
+      assert forecast.time_column == "created_at"
+      assert forecast.reason =~ "created_at"
+    end
+
+    test "a date-shaped string column also counts as a time column" do
+      columns = ["day", "revenue"]
+      rows = for i <- 1..30, do: [Date.to_iso8601(Date.add(~D[2026-01-01], i)), i * 2.1]
+
+      candidates = SchemaInspector.score_rows("orders", columns, rows)
+      assert Enum.any?(candidates, &(&1.task_type == "forecast" and &1.time_column == "day"))
+    end
+
+    test "a bare integer column is never treated as a time column (would false-positive as a 1970s Unix timestamp)" do
+      columns = ["rating", "amount"]
+      rows = for i <- 1..30, do: [rem(i, 5) + 1, i * 2.1]
+
+      candidates = SchemaInspector.score_rows("orders", columns, rows)
+      refute Enum.any?(candidates, &(&1.task_type == "forecast"))
+    end
+
+    test "no forecast candidate without a regression-shaped numeric column to predict" do
+      columns = ["created_at", "status"]
+
+      rows =
+        for i <- 1..30 do
+          status = if rem(i, 2) == 0, do: "paid", else: "pending"
+          [DateTime.add(~U[2026-01-01 00:00:00Z], i, :day), status]
+        end
+
+      candidates = SchemaInspector.score_rows("orders", columns, rows)
+      refute Enum.any?(candidates, &(&1.task_type == "forecast"))
+    end
+  end
+
+  describe "clustering candidates" do
+    test "bundles numeric columns with real variation as a feature-column set" do
+      columns = ["age", "spend", "visits"]
+      rows = for i <- 1..30, do: [20 + rem(i, 40), i * 12.5, rem(i, 10)]
+
+      candidates = SchemaInspector.score_rows("customers", columns, rows)
+      assert cluster = Enum.find(candidates, &(&1.task_type == "clustering"))
+      assert cluster.feature_columns == ["age", "spend", "visits"]
+      assert cluster.table == "customers"
+    end
+
+    test "no clustering candidate with fewer than 2 qualifying numeric columns" do
+      columns = ["spend", "status"]
+      rows = for i <- 1..30, do: [i * 12.5, if(rem(i, 2) == 0, do: "paid", else: "pending")]
+
+      candidates = SchemaInspector.score_rows("customers", columns, rows)
+      refute Enum.any?(candidates, &(&1.task_type == "clustering"))
+    end
+
+    test "caps the feature-column bundle at 5 columns" do
+      columns = for i <- 1..8, do: "num#{i}"
+      rows = for i <- 1..30, do: Enum.map(1..8, fn n -> i * n * 1.1 end)
+
+      candidates = SchemaInspector.score_rows("wide", columns, rows)
+      assert cluster = Enum.find(candidates, &(&1.task_type == "clustering"))
+      assert [_, _, _, _, _] = cluster.feature_columns
+    end
+  end
 end

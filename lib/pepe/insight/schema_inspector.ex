@@ -1,14 +1,39 @@
 defmodule Pepe.Insight.SchemaInspector do
   @moduledoc """
-  Heuristic target-column candidates for `insight`'s `propose_targets` action - read-only,
-  never trains or persists anything. Inspects a `"db"` connection's tables (via the exact
-  same tenant-scoped `Pepe.DB.Query.run/3` path `db_query` and `Pepe.Insight.Source` both
-  use, so RLS applies here too) plus a small sample of rows, and scores candidates by
-  cheap, explainable signals: a low-cardinality column (2-20 distinct values in the
-  sample, not every row unique) is a classification candidate; a numeric column with real
-  spread is a regression candidate; either gets a small boost if its name suggests an
-  outcome (`status`, `risk`, `churn`, ...). A column that looks like an id (name ending in
-  `id`/`uuid`/`guid`) is never a candidate.
+  Heuristic candidates for `insight`'s `propose_targets` action, across every `task_type`
+  Insight supports, not just classification/regression - the whole point is that someone
+  with no ML background can ask "what can I predict here" and get concrete, confirmable
+  suggestions back instead of needing to already know what a target column or a forecast
+  or a clustering spec even is. Read-only, never trains or persists anything. Inspects a
+  `"db"` connection's tables (via the exact same tenant-scoped `Pepe.DB.Query.run/3` path
+  `db_query` and `Pepe.Insight.Source` both use, so RLS applies here too) plus a small
+  sample of rows. A column that looks like an id (name ending in `id`/`uuid`/`guid`) is
+  never a candidate for anything, in any of the four passes below.
+
+  Four scoring passes, all cheap and explainable rather than a model call:
+
+    * **classification** - a low-cardinality column (2-20 distinct values in the sample,
+      not every row unique) is a plausible category to predict.
+    * **regression** - a numeric column with real spread (nonzero standard deviation) is
+      something to predict a number for.
+    * **forecast** - only proposed when a table has *both* a plausible time column (every
+      sampled value parses as a date/timestamp - a real `Date`/`NaiveDateTime`/`DateTime`
+      value, or a string in one of those shapes; a bare integer is deliberately never
+      treated as time-like here, since a small rating-style number would otherwise parse
+      as a valid-but-nonsensical 1970s Unix timestamp) and a regression-shaped numeric
+      column to predict over it - the same target scored by the regression pass, paired
+      with the best time column found.
+    * **clustering** - proposed whenever a table has at least two numeric columns with
+      real variation, bundled together as candidate `feature_columns` - clustering has no
+      single target column, so this pass produces a column *set* to group by instead of a
+      single column name, and doubles as an anomaly-detection pitch (grouping any table's
+      numeric columns also flags whichever rows sit furthest from their peers).
+
+  Any of the four gets a small score boost if a column's name suggests an outcome
+  (`status`, `risk`, `churn`, ...); classification/regression/forecast scores share one
+  comparable 0-10ish range on purpose, so `propose/3`'s single top-5 cut-off across every
+  task_type never systematically favors one type just because its scoring formula happens
+  to run higher.
 
   `information_schema.tables` itself is not RLS-filtered, so on a connection shared across
   tenants every tenant sees the same table names (not the data in them) - the same
@@ -21,6 +46,7 @@ defmodule Pepe.Insight.SchemaInspector do
 
   alias Pepe.DB.Query
   alias Pepe.Insight.Numeric
+  alias Pepe.Insight.TimeFeatures
 
   @max_tables 10
   @sample_rows 200
@@ -31,9 +57,9 @@ defmodule Pepe.Insight.SchemaInspector do
   @keywords ~w(status outcome result risk score category type label flag churn convert deteriorat cancel)
 
   @doc """
-  Top 5 heuristic target-column candidates, across `table` (or up to #{@max_tables}
-  auto-discovered tables, if `table` is `nil`) in `connection`. `ctx` is the same tenant
-  context `Pepe.DB.Query.run/3` takes everywhere else.
+  Top 5 heuristic candidates (classification/regression/forecast/clustering combined),
+  across `table` (or up to #{@max_tables} auto-discovered tables, if `table` is `nil`) in
+  `connection`. `ctx` is the same tenant context `Pepe.DB.Query.run/3` takes everywhere else.
   """
   @spec propose(String.t(), String.t() | nil, map()) :: {:ok, [map()]} | {:error, term()}
   def propose(connection, table, ctx) do
@@ -93,7 +119,12 @@ defmodule Pepe.Insight.SchemaInspector do
   @spec score_rows(String.t(), [String.t()], [[term()]]) :: [map()]
   def score_rows(table, columns, rows) do
     maps = Enum.map(rows, fn row -> columns |> Enum.zip(row) |> Map.new() end)
-    columns |> Enum.reject(&id_like?/1) |> Enum.flat_map(&score_column(table, &1, maps))
+    candidate_columns = Enum.reject(columns, &id_like?/1)
+    column_candidates = Enum.flat_map(candidate_columns, &score_column(table, &1, maps))
+
+    column_candidates ++
+      forecast_candidate(table, candidate_columns, maps, column_candidates) ++
+      clustering_candidate(table, candidate_columns, maps)
   end
 
   defp id_like?(name), do: Regex.match?(@id_pattern, name)
@@ -178,4 +209,90 @@ defmodule Pepe.Insight.SchemaInspector do
   defp keyword_bonus(column), do: if(keyword_match?(column), do: 5.0, else: 0.0)
   defp keyword_note(column), do: if(keyword_match?(column), do: ", and its name suggests an outcome/label", else: "")
   defp keyword_match?(column), do: Enum.any?(@keywords, &String.contains?(String.downcase(column), &1))
+
+  # A forecast needs both a time column and a numeric target to predict over it - proposed
+  # only when a table actually has both, paired with the best regression candidate already
+  # scored above (never a fresh, separately-tuned score, so a forecast candidate is exactly
+  # as competitive against classification/regression candidates as its underlying target
+  # already was).
+  defp forecast_candidate(table, columns, rows, column_candidates) do
+    with time_column when not is_nil(time_column) <- best_time_column(columns, rows),
+         target when not is_nil(target) <- best_regression_candidate(column_candidates, time_column) do
+      [
+        %{
+          table: table,
+          column: target.column,
+          time_column: time_column,
+          task_type: "forecast",
+          score: target.score,
+          reason: "#{target.reason}, and #{time_column} looks like a date/timestamp column to forecast it over"
+        }
+      ]
+    else
+      _ -> []
+    end
+  end
+
+  defp best_regression_candidate(column_candidates, time_column) do
+    column_candidates
+    |> Enum.filter(fn c -> c.task_type == "regression" and c.column != time_column end)
+    |> Enum.max_by(& &1.score, fn -> nil end)
+  end
+
+  defp best_time_column(columns, rows) do
+    Enum.find(columns, fn column ->
+      values = rows |> Enum.map(&Map.get(&1, column)) |> Enum.reject(&is_nil/1)
+      length(values) >= @min_sample and Enum.all?(values, &time_like?/1)
+    end)
+  end
+
+  # Deliberately narrower than Pepe.Insight.TimeFeatures.parse/1: that function accepts a
+  # bare integer as a Unix timestamp (needed at training/predict time, where a genuine
+  # timestamp column really can arrive as one), which would make every small-integer rating
+  # or count column here look like a plausible "time" column too - a false positive this
+  # heuristic can't afford. A real Date/NaiveDateTime/DateTime value (what Postgrex already
+  # hands back for an actual date/timestamp column) or a date-shaped string is unambiguous;
+  # a bare number never is.
+  defp time_like?(%Date{}), do: true
+  defp time_like?(%NaiveDateTime{}), do: true
+  defp time_like?(%DateTime{}), do: true
+  defp time_like?(value) when is_binary(value), do: match?({:ok, _}, TimeFeatures.parse(value))
+  defp time_like?(_value), do: false
+
+  # Clustering has no single target column - the candidate is a *set* of numeric feature
+  # columns to group by, bundled whenever a table has at least two with real variation.
+  # Capped at 5 columns (the same shape a k-means spec would actually be defined with) so
+  # a wide table doesn't propose grouping by dozens of columns at once.
+  @max_cluster_features 5
+
+  defp clustering_candidate(table, columns, rows) do
+    columns
+    |> Enum.filter(&numeric_with_spread?(&1, rows))
+    |> Enum.take(@max_cluster_features)
+    |> build_clustering_candidate(table)
+  end
+
+  defp build_clustering_candidate([_, _ | _] = features, table) do
+    count = length(features)
+
+    [
+      %{
+        table: table,
+        feature_columns: features,
+        task_type: "clustering",
+        score: count * 1.0,
+        reason:
+          "#{count} numeric columns with real variation (#{Enum.join(features, ", ")}) - could reveal natural groupings, and flag whichever rows sit furthest from their peers as anomalies"
+      }
+    ]
+  end
+
+  defp build_clustering_candidate(_features, _table), do: []
+
+  defp numeric_with_spread?(column, rows) do
+    values = rows |> Enum.map(&Map.get(&1, column)) |> Enum.reject(&is_nil/1)
+
+    length(values) >= @min_sample and numeric_column?(values) and
+      values |> Enum.map(&elem(Numeric.to_number(&1), 1)) |> Enum.uniq() |> length() > 1
+  end
 end

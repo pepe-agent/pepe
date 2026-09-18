@@ -293,7 +293,7 @@ defmodule Pepe.InsightTest do
 
       {:ok, _} = Insight.import_rows("clinic", "risk", clean ++ nulled)
       assert {:error, msg} = Insight.train_now("clinic", "risk")
-      assert msg =~ "missing or non-numeric value"
+      assert msg =~ "missing value"
     end
 
     test "delete removes the spec, its models, and imported examples" do
@@ -328,6 +328,127 @@ defmodule Pepe.InsightTest do
       reconciled = Insight.get_spec("clinic", "risk")
       assert reconciled["status"] == "failed"
       assert reconciled["last_error"] =~ "interrupted"
+    end
+  end
+
+  describe "categorical feature columns" do
+    test "one-hot encodes a non-numeric feature column and persists its vocabulary" do
+      attrs = %{
+        "agent" => "clinic",
+        "name" => "plan",
+        "target_column" => "churned",
+        "feature_columns" => ["tenure_months", "plan_tier"],
+        "source" => %{"kind" => "import"}
+      }
+
+      {:ok, _} = Insight.define_spec(attrs)
+
+      rows =
+        for i <- 1..40 do
+          tier = Enum.at(["free", "pro", "enterprise"], rem(i, 3))
+          %{"tenure_months" => i, "plan_tier" => tier, "churned" => if(tier == "free", do: "yes", else: "no")}
+        end
+
+      {:ok, _} = Insight.import_rows("clinic", "plan", rows)
+      assert {:ok, trained} = Insight.train_now("clinic", "plan")
+      assert is_float(trained["metric_value"])
+
+      spec = Insight.get_spec("clinic", "plan")
+      model = Insight.latest_model(spec["id"])
+      assert model.params["categories"]["plan_tier"] == ["enterprise", "free", "pro"]
+
+      assert {:ok, label} = Insight.predict("clinic", "plan", %{"tenure_months" => 5, "plan_tier" => "free"})
+      assert label in ["yes", "no"]
+    end
+
+    test "an unseen category at predict time falls back gracefully instead of crashing" do
+      attrs = %{
+        "agent" => "clinic",
+        "name" => "plan",
+        "target_column" => "churned",
+        "feature_columns" => ["tenure_months", "plan_tier"],
+        "source" => %{"kind" => "import"}
+      }
+
+      {:ok, _} = Insight.define_spec(attrs)
+
+      rows =
+        for i <- 1..40 do
+          tier = Enum.at(["free", "pro"], rem(i, 2))
+          %{"tenure_months" => i, "plan_tier" => tier, "churned" => if(tier == "free", do: "yes", else: "no")}
+        end
+
+      {:ok, _} = Insight.import_rows("clinic", "plan", rows)
+      {:ok, _} = Insight.train_now("clinic", "plan")
+
+      assert {:ok, label} = Insight.predict("clinic", "plan", %{"tenure_months" => 5, "plan_tier" => "never_seen_before"})
+      assert label in ["yes", "no"]
+    end
+
+    test "a categorical column with too many distinct values fails training with a clear message" do
+      attrs = %{
+        "agent" => "clinic",
+        "name" => "wide",
+        "target_column" => "y",
+        "feature_columns" => ["id_like"],
+        "source" => %{"kind" => "import"}
+      }
+
+      {:ok, _} = Insight.define_spec(attrs)
+      rows = for i <- 1..30, do: %{"id_like" => "user_#{i}", "y" => if(rem(i, 2) == 0, do: "a", else: "b")}
+      {:ok, _} = Insight.import_rows("clinic", "wide", rows)
+
+      assert {:error, msg} = Insight.train_now("clinic", "wide")
+      assert msg =~ "too many"
+    end
+
+    test "regression also supports a categorical feature column" do
+      attrs = %{
+        "agent" => "clinic",
+        "name" => "spend",
+        "target_column" => "amount",
+        "task_type" => "regression",
+        "feature_columns" => ["region"],
+        "source" => %{"kind" => "import"}
+      }
+
+      {:ok, _} = Insight.define_spec(attrs)
+
+      rows =
+        for i <- 1..40 do
+          region = Enum.at(["north", "south"], rem(i, 2))
+          amount = if region == "north", do: 100.0 + i, else: 10.0 + i
+          %{"region" => region, "amount" => amount}
+        end
+
+      {:ok, _} = Insight.import_rows("clinic", "spend", rows)
+      assert {:ok, trained} = Insight.train_now("clinic", "spend")
+      assert trained["metric_name"] == "rmse"
+    end
+  end
+
+  describe "cross-validation" do
+    test "reports a cross-validated metric and refits the final model on every row, not just 80%" do
+      attrs = %{
+        "agent" => "clinic",
+        "name" => "cv",
+        "target_column" => "outcome",
+        "feature_columns" => ["a"],
+        "source" => %{"kind" => "import"}
+      }
+
+      {:ok, _} = Insight.define_spec(attrs)
+      rows = for i <- 1..40, do: %{"a" => i, "outcome" => if(rem(i, 2) == 0, do: "yes", else: "no")}
+      {:ok, _} = Insight.import_rows("clinic", "cv", rows)
+
+      assert {:ok, trained} = Insight.train_now("clinic", "cv")
+      assert is_float(trained["metric_value"])
+
+      spec = Insight.get_spec("clinic", "cv")
+      model = Insight.latest_model(spec["id"])
+      assert model.params["cv_folds"] == 5
+      assert is_float(model.params["metric_stddev"])
+      assert model.sample_count == 40
     end
   end
 
