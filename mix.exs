@@ -52,10 +52,37 @@ defmodule Pepe.MixProject do
             # gets XGBoost's own `-DUSE_OPENMP=OFF` switch via nif_make_args (a `make`
             # command-line variable, which overrides the Makefile's own CMAKE_FLAGS),
             # trading multi-threaded GBM training for the build actually completing at all.
+            #
+            # The two Linux targets need a second switch. Burrito's Linux binaries bundle a
+            # musl-linked BEAM (Burrito.Steps.Fetch.FetchMusl ships a musl 1.2.5 runtime
+            # next to the ERTS), so the NIFs loaded into it have to be musl too - and they
+            # are: zig resolves the bare `-target x86_64-linux` triplet Burrito hands it
+            # (Burrito.Builder.Target.make_triplet/1) to `x86_64-unknown-linux-musl`, musl
+            # being zig's default ABI when the triplet names no ABI at all. XGBoost's
+            # src/common/io.cc then calls `mmap64` behind a plain `#if defined(__linux__)`,
+            # and musl - which has had a 64-bit off_t since forever and so needs no separate
+            # entry point - only spells that name under `_LARGEFILE64_SOURCE`, where its
+            # sys/mman.h aliases it straight back to `mmap`. Without the define the NIF
+            # recompile dies on `use of undeclared identifier 'mmap64'`. Defining it is an
+            # alias-only change on musl, no ABI or off_t width shift, and it is the right
+            # fix rather than forcing `-target x86_64-linux-gnu`: a glibc NIF would not load
+            # into that musl BEAM in the first place.
             macos_arm: [os: :darwin, cpu: :aarch64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
             macos_x86: [os: :darwin, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
-            linux_arm: [os: :linux, cpu: :aarch64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
-            linux_x86: [os: :linux, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]],
+            linux_arm: [
+              os: :linux,
+              cpu: :aarch64,
+              nif_cflags: "-D_LARGEFILE64_SOURCE",
+              nif_cxxflags: "-D_LARGEFILE64_SOURCE",
+              nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]
+            ],
+            linux_x86: [
+              os: :linux,
+              cpu: :x86_64,
+              nif_cflags: "-D_LARGEFILE64_SOURCE",
+              nif_cxxflags: "-D_LARGEFILE64_SOURCE",
+              nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]
+            ],
             windows: [os: :windows, cpu: :x86_64, nif_make_args: ["CMAKE_FLAGS=-DUSE_OPENMP=OFF"]]
           ]
         ]
