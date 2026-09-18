@@ -13,6 +13,18 @@ defmodule Pepe.Insight.Neural do
 
   require Logger
 
+  @doc """
+  Whether this build has the neural tier at all. Distinct from `defn_options/0`'s question:
+  that one asks whether EXLA can *accelerate* the tier (and falls back to the plain `Nx`
+  backend when it can't), this one asks whether Axon is even in the release. A build made
+  with `PEPE_SKIP_NEURAL=1` (see `neural_deps/0` in mix.exs - the native Windows binary,
+  where no precompiled XLA archive exists to build EXLA against) has no Axon, so
+  `Pepe.Insight.Trainer` must never select this tier there: it drops to gradient-boosted
+  trees instead of reaching `Pepe.Insight.NeuralTrainer` and dying on an undefined function.
+  """
+  @spec available?() :: boolean()
+  def available?, do: Code.ensure_loaded?(Axon)
+
   @spec build(pos_integer(), pos_integer()) :: Axon.t()
   def build(input_dim, output_dim) do
     Axon.input("input", shape: {nil, input_dim})

@@ -121,6 +121,12 @@ routing](/en/docs/routing/):
   millions of patient events, for instance), enough data for that complexity to earn its
   keep.
 
+One exception: the Windows binary ships without that third tier. The library that compiles
+it publishes nothing for Windows, and there is nothing to fix on our side. Everything else
+on this page works there exactly as it does anywhere else; Pepe simply stops at
+gradient-boosted trees, and asking for "neural" by hand says so plainly instead of failing
+halfway through training.
+
 A forecast is a regression underneath, with the timestamp turned into elapsed-time and
 day-of-week/month features automatically; the same three tiers apply. A model this large
 never trains on every row of a huge table: training uses a representative random sample

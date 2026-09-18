@@ -132,6 +132,12 @@ verificados existan de verdad, la misma filosofía de "que lo resuelva solo" det
   (cientos de millones de eventos de paciente, por ejemplo), suficientes datos para que
   esa complejidad valga la pena.
 
+Una excepción: el binario de Windows viene sin ese tercer nivel. La biblioteca que compila
+esa parte no publica versión para Windows, y no hay nada que arreglar de nuestro lado.
+Todo lo demás de esta página funciona ahí igual; Pepe se queda en los árboles con gradient
+boosting, y pedir "neural" a mano lo dice con todas las letras, en vez de romperse a mitad
+del entrenamiento.
+
 Un pronóstico de tendencia es, por debajo, una regresión, con la fecha convertida
 automáticamente en tiempo transcurrido y atributos de día de la semana/mes, se aplican las
 mismas tres franjas. Un modelo de esta escala nunca entrena con todas las filas de una

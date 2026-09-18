@@ -232,21 +232,8 @@ defmodule Pepe.MixProject do
       # Floki-based extraction already avoids elsewhere in this file, for the same
       # reason) - 0.4.x has neither dependency.
       {:exgboost, "~> 0.4.0"},
-      # A small fixed-architecture neural net - the large-scale tier, reserved for an
-      # operator with hundreds of millions of rows (patient events, ad records), where
-      # that complexity actually pays for itself.
-      {:axon, "~> 0.7"},
-      # JIT-compiled Nx.Defn backend for the neural tier above - without it, Axon trains/
-      # predicts on the plain interpreted Nx backend, unbounded in wall-clock time at real
-      # data volumes. Scoped to just Pepe.Insight.Neural's own Axon calls
-      # (`Neural.defn_options/0`, see its moduledoc) - never Nx's process-wide default
-      # backend, so Scholar/EXGBoost above are untouched. A required dependency that only
-      # ships a precompiled XLA binary for Linux/macOS: it compiles, but the neural tier
-      # only ever runs uncompiled (correct, just unbounded-slow) on a machine where the
-      # binary fails to load at runtime - a native Windows build (no WSL) fails to compile
-      # at all, since there is no binary for it to even attempt to fetch. Gate this
-      # dependency out of a native Windows build's mix.exs if that target ever needs one.
-      {:exla, "~> 0.13"},
+      # The large-scale tier's own two deps (Axon + EXLA) are not listed here - they are
+      # conditional, see neural_deps/0 below.
 
       ## Packaging & ops
       ## What is it: how Pepe becomes a runnable thing - the standalone binary and the
@@ -266,7 +253,45 @@ defmodule Pepe.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false}
-    ]
+    ] ++ neural_deps()
+  end
+
+  # Pepe.Insight's large-scale (neural) tier and nothing else. Split out of deps/0 because
+  # EXLA is the one dependency in this project that cannot be built everywhere: it needs a
+  # precompiled XLA archive from Google, and there is none for native Windows (no WSL), so
+  # compiling it there dies on "no precompiled XLA archive available for this target:
+  # x86_64-windows-cpu" and takes the whole build down with it. That is upstream and not
+  # fixable here.
+  #
+  # PEPE_SKIP_NEURAL=1 drops both, which is how the Windows binary gets built (see the
+  # `binaries` job in .github/workflows/ci.yml - it is set for that one target and no
+  # other). Everything else in Pepe.Insight - classification, regression, forecasting,
+  # clustering, on Scholar and EXGBoost - is unaffected and works identically; only the
+  # 50,000-rows-and-up neural tier is missing, and `Pepe.Insight.Neural.available?/0` is
+  # what the trainer consults so that tier is never *selected* in such a build (it falls
+  # back to GBM instead of failing at fit time).
+  #
+  # Anything other than "1" (including unset) keeps both, so every other build - source
+  # installs, Docker, the Linux/macOS binaries - is exactly what it has always been.
+  defp neural_deps do
+    if System.get_env("PEPE_SKIP_NEURAL") == "1" do
+      []
+    else
+      [
+        # A small fixed-architecture neural net - the large-scale tier, reserved for an
+        # operator with hundreds of millions of rows (patient events, ad records), where
+        # that complexity actually pays for itself.
+        {:axon, "~> 0.7"},
+        # JIT-compiled Nx.Defn backend for the neural tier above - without it, Axon trains/
+        # predicts on the plain interpreted Nx backend, unbounded in wall-clock time at real
+        # data volumes. Scoped to just Pepe.Insight.Neural's own Axon calls
+        # (`Neural.defn_options/0`, see its moduledoc) - never Nx's process-wide default
+        # backend, so Scholar/EXGBoost are untouched. Ships a precompiled XLA binary for
+        # Linux/macOS only: the neural tier runs uncompiled (correct, just unbounded-slow)
+        # on a machine where that binary fails to load at runtime.
+        {:exla, "~> 0.13"}
+      ]
+    end
   end
 
   # Aliases are shortcuts or tasks specific to the current project.

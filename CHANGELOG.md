@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **There is a Windows binary again, and it carries all of `Pepe.Insight` except the largest (neural) tier.** The Windows build had been failing outright: `Pepe.Insight`'s neural tier is JIT-compiled by EXLA, EXLA needs a precompiled XLA archive published by Google, and there is none for native Windows (`no precompiled XLA archive available for this target: x86_64-windows-cpu`) - an upstream limitation with nothing to fix on our side and nothing to wait for. That one build now drops Axon and EXLA instead (`PEPE_SKIP_NEURAL=1`, set for the Windows target alone in CI; every other build, including source installs, Docker, and the Linux/macOS binaries, is byte-for-byte what it always was). Everything an operator actually uses Insight for - classification, regression, forecasting, clustering, on simple regression and gradient-boosted trees - works there exactly as it does everywhere else. Only the tier reserved for 50,000 rows and up is missing, and Pepe now knows it: the automatic choice tops out at gradient-boosted trees on such a build rather than picking a tier that isn't there, and asking for `family: "neural"` explicitly comes back with a plain "the neural family isn't available in this build" instead of a crash mid-training.
+
 ## [0.19.0] - 2026-09-18
 
 ### Added

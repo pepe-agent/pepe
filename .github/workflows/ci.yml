@@ -238,6 +238,20 @@ jobs:
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+    # Windows, and only Windows, builds without Pepe.Insight's neural tier (mix.exs'
+    # neural_deps/0 drops :axon and :exla when this is exactly "1"). EXLA needs a
+    # precompiled XLA archive from Google and there is none for x86_64-windows-cpu, so
+    # compiling :exla on that runner dies outright ("no precompiled XLA archive available
+    # for this target: x86_64-windows-cpu"), taking the whole Windows build with it - not
+    # a bug on our side and nothing upstream to wait for. Everything else in Insight
+    # (classification, regression, forecasting, clustering, via Scholar and EXGBoost) is
+    # untouched and identical on every platform; only the 50,000-rows-and-up tier is
+    # absent, and the trainer knows not to pick it there. Set at the job level, not on one
+    # step: mix.exs' deps/0 is re-evaluated by every mix invocation, so `mix compile` and
+    # `mix release` have to agree with `mix deps.get` about which deps exist. Every other
+    # target gets "" here, which is not "1", so they build exactly as before.
+    env:
+      PEPE_SKIP_NEURAL: ${{ matrix.os == 'windows' && '1' || '' }}
     strategy:
       fail-fast: false
       matrix:

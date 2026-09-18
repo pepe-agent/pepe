@@ -8,6 +8,11 @@ defmodule Pepe.Insight.Trainer do
   automatic is the default *because* nobody has to think about this, not because the
   choice is hidden from whoever wants to make it themselves.
 
+  `"neural"` is the one family a build can be missing (`Pepe.Insight.Neural.available?/0` -
+  the native Windows binary is built without it, since EXLA has no precompiled XLA archive
+  for that platform). There, asking for it explicitly is refused with a plain message, and
+  the automatic choice tops out at `"gbm"` instead of reaching for a tier that isn't there.
+
   For `"classification"`/`"regression"` specs left on automatic, the algorithm is picked by
   how much data actually exists, three tiers:
 
@@ -140,8 +145,8 @@ defmodule Pepe.Insight.Trainer do
          # (or silently reshape) a genuinely valid dataset just because of how the shuffle
          # happened to fall.
          {:ok, classes} <- resolve_classes(rows, spec),
-         {:ok, categories} <- Categorical.resolve(rows, spec.feature_columns) do
-      family = family_for(population, spec.family)
+         {:ok, categories} <- Categorical.resolve(rows, spec.feature_columns),
+         {:ok, family} <- family_for(population, spec.family) do
       encode_fn = fn subset -> encode(subset, spec, classes, categories) end
 
       with {:ok, result} <- cross_validate_and_fit(spec, family, rows, encode_fn, length(rows)) do
@@ -200,13 +205,27 @@ defmodule Pepe.Insight.Trainer do
 
   # An explicit spec.family override (an operator who knows exactly which family they want)
   # always wins over the automatic, volume-based choice - nil (the default) is what leaves
-  # Pepe to decide.
-  defp family_for(_population, "linear"), do: :linear
-  defp family_for(_population, "gbm"), do: :gbm
-  defp family_for(_population, "neural"), do: :neural
-  defp family_for(population, _override), do: auto_family_for(population)
+  # Pepe to decide. Asking for a family this build doesn't have is the one override that
+  # gets refused, with a plain message rather than an UndefinedFunctionError at fit time.
+  defp family_for(_population, "linear"), do: {:ok, :linear}
+  defp family_for(_population, "gbm"), do: {:ok, :gbm}
 
-  defp auto_family_for(population) when population >= @large_data_threshold, do: :neural
+  defp family_for(_population, "neural") do
+    if Neural.available?(),
+      do: {:ok, :neural},
+      else: {:error, "the neural family isn't available in this build - use \"gbm\" or leave family unset"}
+  end
+
+  defp family_for(population, _override), do: {:ok, auto_family_for(population)}
+
+  # A build without the neural tier (PEPE_SKIP_NEURAL=1, see mix.exs) tops out at GBM: the
+  # automatic choice is Pepe's to make and must always land on something that actually
+  # runs, so the largest tier degrades to the next one down rather than erroring. Gradient
+  # boosting is a competitive model at this volume anyway - it's the tier the neural net
+  # has to beat, not a consolation prize.
+  defp auto_family_for(population) when population >= @large_data_threshold,
+    do: if(Neural.available?(), do: :neural, else: :gbm)
+
   defp auto_family_for(population) when population >= @small_data_threshold, do: :gbm
   defp auto_family_for(_population), do: :linear
 
@@ -413,8 +432,8 @@ defmodule Pepe.Insight.Trainer do
 
   defp fit_forecast(%Spec{} = spec, rows, population) do
     with {:ok, epoch} <- resolve_epoch(rows, spec.time_column),
-         {:ok, categories} <- Categorical.resolve(rows, spec.feature_columns) do
-      family = family_for(population, spec.family)
+         {:ok, categories} <- Categorical.resolve(rows, spec.feature_columns),
+         {:ok, family} <- family_for(population, spec.family) do
       encode_fn = fn subset -> forecast_encode(subset, spec, epoch, categories) end
 
       # Reuses cross_validate_and_fit/5's existing "regression" clauses unchanged (a forecast

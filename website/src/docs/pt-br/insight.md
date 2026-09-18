@@ -125,6 +125,12 @@ por complexidade](/pt-br/docs/routing/):
   milhões de eventos de paciente, por exemplo), dado suficiente para essa complexidade
   valer a pena.
 
+Uma exceção: o binário de Windows vem sem essa terceira faixa. A biblioteca que compila
+essa parte não publica versão para Windows, e não há o que corrigir do nosso lado. Todo o
+resto desta página funciona lá igualzinho; o Pepe simplesmente para nas árvores com
+gradient boosting, e pedir "neural" na mão avisa isso com todas as letras, em vez de
+quebrar no meio do treino.
+
 Uma previsão de tendência é uma regressão por baixo dos panos, com o horário virando
 atributos de tempo decorrido e dia da semana/mês automaticamente, as mesmas três faixas se
 aplicam. Um modelo nesse porte nunca treina em cima de todas as linhas de uma tabela

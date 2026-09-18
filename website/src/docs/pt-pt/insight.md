@@ -127,6 +127,12 @@ verificados que existe, a mesma filosofia de "descobrir sozinho" por trás do
   milhões de eventos de doentes, por exemplo), dados suficientes para essa complexidade
   valer a pena.
 
+Uma exceção: o binário de Windows vem sem essa terceira faixa. A biblioteca que compila
+essa parte não publica versão para Windows e não há nada a corrigir do nosso lado. Tudo o
+resto desta página funciona lá tal e qual; o Pepe fica-se pelas árvores com gradient
+boosting, e pedir "neural" à mão di-lo com todas as letras, em vez de rebentar a meio do
+treino.
+
 Uma previsão de tendência é, no fundo, uma regressão, com a data/hora a transformar-se
 automaticamente em atributos de tempo decorrido e dia da semana/mês, aplicam-se as mesmas
 três faixas. Um modelo desta escala nunca treina em cima de todas as linhas de uma tabela
