@@ -278,8 +278,12 @@ defmodule Pepe.Plugins do
     end
   end
 
-  defp plugin_root_rank(@manifest), do: 0
-  defp plugin_root_rank(name), do: if(String.ends_with?(name, ".exs"), do: 1, else: false)
+  # `Pepe.Sourcing.root/2` hands the marker a path relative to the staging root; a plugin
+  # only cares about the file's own name.
+  defp plugin_root_rank(path), do: path |> Path.basename() |> plugin_basename_rank()
+
+  defp plugin_basename_rank(@manifest), do: 0
+  defp plugin_basename_rank(name), do: if(String.ends_with?(name, ".exs"), do: 1, else: false)
 
   # --- placement: copy the staged plugin into the plugins dir ----------------------
 

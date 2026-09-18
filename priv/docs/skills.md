@@ -29,6 +29,28 @@ says.
   **override a built-in of the same name**. The first non-empty line is the summary;
   the rest is the procedure.
 
+## Two ways a skill states its summary
+
+Both are equally valid, and you never have to care which one a skill used - the summary
+you see in your skills list is already resolved either way:
+
+- **First non-empty line.** The simple form, and what you should write by default.
+- **A metadata header**, the portable form other agent tools publish in: the file opens
+  with a `---` fenced YAML block carrying `name` and `description`, and the `description`
+  is the summary. Write this form when a skill is meant to be shared outside this Pepe.
+
+```
+---
+name: read-pdf
+description: Extracts text and tables from PDFs. Use when the user sends a PDF.
+---
+
+Run `scripts/extract.py` with the path.
+```
+
+A skill written for any compatible tool works here as-is: drop the file (or the whole
+directory, `SKILL.md` and all) into `skills/` and it appears in your list.
+
 ## Authoring a new skill
 
 You can write your own skills. When you work out *how* to do a recurring task, save it

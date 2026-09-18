@@ -16,6 +16,12 @@ defmodule Pepe.Skills.Marketplace do
   ignored - a deliberate, explicit trigger, so an ordinary tap/registry checkout that
   happens to hold other files never silently bundles them in.
 
+  A source may also be a **catalog**: one repository publishing many skills side by side,
+  each in its own directory with its own `SKILL.md`. Installing by name picks the directory
+  whose name matches (see `skill_root_rank/1`), so installing `read-pdf` from a catalog
+  installs that one skill, not whichever entry doc the filesystem happened to hand over
+  first.
+
   **Trust is intrinsic to where a skill resolved from, not self-declared.** A skill resolved
   through the bundled, in-repo registry is `"official"`; anything resolved through a tap, or
   installed directly from a source URL with no registry entry at all, is `"community"` - a
@@ -217,7 +223,7 @@ defmodule Pepe.Skills.Marketplace do
   # --- install pipeline --------------------------------------------------------------
 
   defp do_install(name, source, trust_level, opts) do
-    with {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", &skill_root_rank/1) do
+    with {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", skill_root_rank(name)) do
       try do
         case prepare(staged, name) do
           {:ok, placement, content, scan} ->
@@ -245,12 +251,39 @@ defmodule Pepe.Skills.Marketplace do
     end
   end
 
-  # Ranks an exact SKILL.md above any other .md Pepe.Sourcing.root/2 finds while
-  # navigating an extracted archive - a package's own reference docs are `.md` too, and
-  # without this, which one Path.wildcard/1 happens to visit first (unspecified order)
-  # decided whether staging landed on the real package root or one of its subdirectories.
-  defp skill_root_rank("SKILL.md"), do: 0
-  defp skill_root_rank(name), do: if(String.ends_with?(name, ".md"), do: 1, else: false)
+  # Ranks the entry doc of the skill actually being installed above any other .md
+  # Pepe.Sourcing.root/2 finds while navigating an extracted archive, in this order:
+  #
+  #   0  <name>/SKILL.md   the requested skill inside a catalog
+  #   1  SKILL.md          some skill's entry doc
+  #   2  <name>.md         a loose doc named for the requested skill
+  #   3  any other .md     a reference doc, a README, ...
+  #
+  # Ranks 1 and 3 are why this function exists at all: a package's own reference docs are
+  # `.md` too, and without a ranking, which one Path.wildcard/1 happens to visit first
+  # (unspecified order) decided whether staging landed on the real package root or one of
+  # its subdirectories. Rank 0 is why it takes the name: a repository that publishes many
+  # skills side by side has an equally exact `SKILL.md` per skill, so the basename alone
+  # cannot say which was asked for, and picking by traversal order installs an arbitrary
+  # one of them under the requested name.
+  defp skill_root_rank(name) do
+    fn path ->
+      dir = path |> Path.dirname() |> Path.basename()
+
+      case Path.basename(path) do
+        "SKILL.md" -> if dir == name, do: 0, else: 1
+        base -> md_rank(base, name)
+      end
+    end
+  end
+
+  defp md_rank(base, name) do
+    cond do
+      base == name <> ".md" -> 2
+      String.ends_with?(base, ".md") -> 3
+      true -> false
+    end
+  end
 
   defp prepare(%{type: :file, path: path}, _name) do
     with {:ok, content} <- File.read(path), do: {:ok, {:file, content}, content, Sentinel.scan(content)}

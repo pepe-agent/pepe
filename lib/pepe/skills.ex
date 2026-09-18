@@ -16,9 +16,37 @@ defmodule Pepe.Skills do
   or the shared workspace already are, via the `skills/<name>/...` path
   `Pepe.Agent.Workspace.resolve/2` understands (so `run_script`'s own `file` argument,
   which resolves through the exact same function, can point straight at it).
+
+  ## Portable metadata header
+
+  An entry doc may open with a YAML metadata header (`---` fenced), the interchange
+  form the wider agent-skill ecosystem publishes in:
+
+      ---
+      name: read-pdf
+      description: Extract text and tables from PDFs. Use when the user sends a PDF.
+      ---
+
+      Step one...
+
+  When a header is present its `description` is the skill's summary, and the body below
+  it is the instructions. Without one, nothing changes: the **first non-empty line** is
+  the summary, as it always was. Both shapes are first-class, so a skill written for any
+  compatible tool drops into `<PEPE_HOME>/skills/` and works, and a skill written here
+  is readable by them. Unknown header keys (`license`, `metadata`, `compatibility`, ...)
+  are preserved verbatim in the doc and otherwise ignored, which is what the interchange
+  format asks of a reader.
   """
 
   alias Pepe.Config
+
+  # A `description` is a purpose-written trigger: the "what it does" half runs first and
+  # the "when to use it" half - the half that decides whether the agent opens the skill at
+  # all - runs last, so cutting it as short as a prose opening line would defeat it. The
+  # cap is still well under the interchange format's own 1024, so one verbose skill cannot
+  # crowd out the rest of the index.
+  @description_limit 500
+  @first_line_limit 120
 
   @doc "User skills directory."
   def user_dir, do: Path.join(Config.home(), "skills")
@@ -56,6 +84,47 @@ defmodule Pepe.Skills do
       File.regular?(named) -> named
       true -> Path.wildcard(Path.join(dir, "*.md")) |> List.first()
     end
+  end
+
+  @doc """
+  Split a skill doc into its YAML metadata header and the body below it, as
+  `{metadata, body}`.
+
+  `{%{}, content}` when there is no header at all, and also when what looks like one does
+  not parse as a YAML map: a doc that merely opens with a horizontal rule is still just a
+  doc, and is returned byte-for-byte rather than half-eaten.
+  """
+  @spec header(String.t()) :: {map(), String.t()}
+  def header("---\n" <> rest = content), do: split_header(rest, content)
+  def header("---\r\n" <> rest = content), do: split_header(rest, content)
+  def header(content) when is_binary(content), do: {%{}, content}
+
+  defp split_header(rest, original) do
+    case Regex.split(~r/^---[ \t]*\r?$/m, rest, parts: 2) do
+      [yaml, body] -> parse_header(yaml, body, original)
+      _ -> {%{}, original}
+    end
+  end
+
+  defp parse_header(yaml, body, original) do
+    case yaml_map(yaml) do
+      {:ok, map} -> {map, body |> String.replace_prefix("\r\n", "") |> String.replace_prefix("\n", "")}
+      :error -> {%{}, original}
+    end
+  end
+
+  # The YAML parser raises (rather than returning an error tuple) on some malformed
+  # input, and a third-party skill's header is exactly the place to expect malformed
+  # input - a bad header must degrade to "no header", never take down the skills index.
+  defp yaml_map(yaml) do
+    case YamlElixir.read_from_string(yaml) do
+      {:ok, map} when is_map(map) -> {:ok, map}
+      _ -> :error
+    end
+  rescue
+    _ -> :error
+  catch
+    _, _ -> :error
   end
 
   defp read_from(dir, name) do
@@ -101,14 +170,36 @@ defmodule Pepe.Skills do
     end
   end
 
-  # The first non-empty line is the skill's "use-when" summary.
+  # A metadata header's `description` is the skill's "use-when" summary; without one, the
+  # first non-empty line of the body is.
   defp summary(path) do
-    with {:ok, content} <- File.read(path),
-         line when is_binary(line) <-
-           content |> String.split("\n") |> Enum.find(&(String.trim(&1) != "")) do
-      line |> String.replace_prefix("# ", "") |> String.trim() |> String.slice(0, 120)
-    else
+    case File.read(path) do
+      {:ok, content} -> summarize(content)
       _ -> ""
     end
   end
+
+  defp summarize(content) do
+    {meta, body} = header(content)
+
+    case meta["description"] do
+      description when is_binary(description) -> one_line(description, @description_limit)
+      _ -> first_line(body)
+    end
+  end
+
+  # A bare `---` is never a summary in either shape - it is a horizontal rule, or the fence
+  # of a header that did not parse. Skipping it is what keeps an unreadable header from
+  # putting the literal fence in the skills index, where it tells the agent nothing at all
+  # about when to open the skill.
+  defp first_line(body) do
+    case body |> String.split("\n") |> Enum.find(&(String.trim(&1) not in ["", "---"])) do
+      nil -> ""
+      line -> line |> String.replace_prefix("# ", "") |> one_line(@first_line_limit)
+    end
+  end
+
+  # The index is one line per skill, and YAML folded/literal scalars carry real newlines -
+  # left in, a single description would break the listing into bogus entries.
+  defp one_line(text, limit), do: text |> String.replace(~r/\s+/, " ") |> String.trim() |> String.slice(0, limit)
 end
