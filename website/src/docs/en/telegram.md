@@ -113,6 +113,7 @@ in Telegram's "/" menu, in your configured language.
 |---|---|
 | `/new` | Start a fresh conversation |
 | `/undo` | Undo your last message |
+| `/rewind N` | Go back N exchanges and carry on from there |
 | `/retry` | Redo the last answer |
 | `/compact` | Summarize the history to free up context |
 | `/stop` | Stop the current run |
@@ -123,6 +124,23 @@ in Telegram's "/" menu, in your configured language.
 | `/learn` | Save what the agent learned into memory and skills |
 | `/whoami` | Show your Telegram user and chat ids |
 | `/help` | List the commands you can run |
+
+#### Going back a few exchanges
+
+When an agent takes a wrong turn and the next three answers are built on it,
+`/rewind 3` takes those three exchanges off the conversation and picks up from
+before them. Nothing else changes: same chat, same agent, same everything it knew
+earlier. It counts exchanges the way you would in your own scrollback, so there is
+no message number to look up anywhere.
+
+Ask for more than the conversation has and it rewinds everything it can and tells
+you how many that was, rather than refusing until you guess a smaller number. What
+goes is gone, with no way back, so when you want to try a different direction while
+keeping the current one, branch the conversation instead (the dashboard's `/fork`).
+
+If the history has already been summarized to save context, the summary stays put.
+It stands for exchanges that were condensed away long before, which no rewind can
+bring back, and it never describes anything the rewind removed.
 
 And the operator commands, which only the bot's trainers can run:
 

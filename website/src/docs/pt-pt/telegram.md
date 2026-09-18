@@ -76,6 +76,7 @@ Cada conversa funciona como uma sessão persistente, conduzida por comandos de b
 |---|---|
 | `/new` | Começa uma conversa nova |
 | `/undo` | Anula a tua última mensagem |
+| `/rewind N` | Recua N trocas e continua a conversa a partir daí |
 | `/retry` | Refaz a última resposta |
 | `/compact` | Resume o histórico para libertar contexto |
 | `/stop` | Para a execução atual |
@@ -86,6 +87,23 @@ Cada conversa funciona como uma sessão persistente, conduzida por comandos de b
 | `/learn` | Guarda na memória e nas skills o que o agente aprendeu |
 | `/whoami` | Mostra os teus ids de utilizador e de conversa do Telegram |
 | `/help` | Lista os comandos disponíveis |
+
+#### Recuar algumas trocas
+
+Quando o agente enfia por um caminho errado e as três respostas seguintes já
+assentam nele, `/rewind 3` retira essas três trocas da conversa e retoma de
+antes delas. Nada mais muda: a mesma conversa, o mesmo agente, tudo o que ele já
+sabia antes disso continua lá. A contagem é de trocas, tal como as vês no teu
+próprio ecrã, por isso não há número de mensagem nenhum para ires procurar.
+
+Se pedires mais do que a conversa tem, recua o que houver e diz-te quantas
+trocas foram, em vez de recusar e deixar-te adivinhar um número mais pequeno. O
+que sai não volta, por isso, para experimentares outro caminho sem perderes o
+atual, ramifica a conversa (o `/fork` do painel).
+
+Se o histórico já tiver sido resumido para poupar contexto, o resumo fica. Ele
+cobre trocas condensadas muito antes, que nenhum rewind recupera, e nunca fala
+do que o rewind acabou de retirar.
 
 E os comandos de operador, reservados aos formadores do bot:
 

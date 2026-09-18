@@ -126,6 +126,7 @@ defmodule Pepe.Gateways.Telegram do
     [
       {"new", gettext("Start a fresh conversation")},
       {"undo", gettext("Undo your last message")},
+      {"rewind", gettext("Go back several turns at once: /rewind N")},
       {"mention", gettext("In a group, require an @mention or not - /mention on|off")},
       {"compact", gettext("Summarize history to free up context")},
       {"agent", gettext("Switch agent - /agent <name>")},
@@ -2108,11 +2109,11 @@ defmodule Pepe.Gateways.Telegram do
   # place. Do not gate inside a `run_command/3` clause: a command can be reached by
   # more than one name (a skill answers both to `/skill <name>` and to `/<name>`),
   # and a gate on one clause leaves the other open.
-  # Commands that reach into the shared session's in-flight turn (stop/undo/inline). In a group
+  # Commands that reach into the shared session's in-flight turn (stop/undo/rewind/inline). In a group
   # the session is shared by chat id, so without a gate any allowed member could interrupt another
   # member's running turn. They are trainer-gated in groups (like the risky-tool approval button);
   # in a DM it's your own session, and a bot with no trainers makes no distinction, both unchanged.
-  @turn_control ~w(stop undo inline)
+  @turn_control ~w(stop undo rewind inline)
 
   defp dispatch(chat_id, cmd, args) do
     cond do
@@ -2143,6 +2144,28 @@ defmodule Pepe.Gateways.Telegram do
     case Pepe.Agent.Session.undo(session_key(chat_id)) do
       :ok -> send_message(chat_id, gettext("↩️ Undid your last message."))
       {:error, :busy} -> :ok
+    end
+  end
+
+  # `/rewind N` - drop the last N exchanges and carry on from before them. Irreversible
+  # by design (see Pepe.Agent.Session.rewind/2), so it answers with how many turns it
+  # actually took off, which is also how a person finds out they hit the start of the
+  # conversation instead of getting a refusal they have to translate into a smaller N.
+  defp run_command(chat_id, "rewind", args) do
+    ensure_session(chat_id)
+
+    case Pepe.Agent.Session.parse_rewind_count(args) do
+      {:ok, count} ->
+        # Silent mid-run, same as /undo: a rewind is refused while a turn is in flight.
+        case Pepe.Agent.Session.rewind(session_key(chat_id), count) do
+          {:ok, 0} -> send_message(chat_id, gettext("Nothing to rewind yet."))
+          {:ok, dropped} when dropped < count -> send_message(chat_id, rewind_partial_text(dropped))
+          {:ok, dropped} -> send_message(chat_id, rewind_text(dropped))
+          {:error, :busy} -> :ok
+        end
+
+      :error ->
+        send_message(chat_id, gettext("Usage: /rewind N, where N is how many turns to go back."))
     end
   end
 
@@ -2706,6 +2729,19 @@ defmodule Pepe.Gateways.Telegram do
   # The default bot keeps the legacy `telegram:<chat_id>` key so existing sessions
   # and bindings survive; named bots are namespaced to avoid collisions and to let
   # cron delivery route back to the right bot.
+  defp rewind_text(dropped),
+    do: "⏪ " <> ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
+
+  defp rewind_partial_text(dropped) do
+    "⏪ " <>
+      ngettext(
+        "Rewound %{count} turn. That was the whole conversation.",
+        "Rewound %{count} turns. That was the whole conversation.",
+        dropped,
+        count: dropped
+      )
+  end
+
   # The text of the most recent user message in a session, or nil (used by /retry).
   defp last_user_text(key) do
     key

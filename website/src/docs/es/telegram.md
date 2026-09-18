@@ -76,6 +76,7 @@ Cada chat funciona como una sesión persistente que se maneja con comandos de ba
 |---|---|
 | `/new` | Empieza una conversación nueva |
 | `/undo` | Deshace tu último mensaje |
+| `/rewind N` | Retrocede N intercambios y sigue la conversación desde ahí |
 | `/retry` | Repite la última respuesta |
 | `/compact` | Resume el historial para liberar contexto |
 | `/stop` | Detiene la ejecución en curso |
@@ -86,6 +87,23 @@ Cada chat funciona como una sesión persistente que se maneja con comandos de ba
 | `/learn` | Guarda lo aprendido en memoria y skills |
 | `/whoami` | Muestra tu id de usuario y el del chat en Telegram |
 | `/help` | Lista los comandos disponibles para ti |
+
+#### Retroceder unos cuantos intercambios
+
+Cuando el agente coge un camino equivocado y las tres respuestas siguientes ya se
+apoyan en él, `/rewind 3` quita esos tres intercambios de la conversación y
+retoma desde antes. No cambia nada más: el mismo chat, el mismo agente, y todo lo
+que ya sabía de antes sigue ahí. Cuenta intercambios tal como los ves en tu
+propia pantalla, así que no hay ningún número de mensaje que ir a buscar.
+
+Si pides más de lo que tiene la conversación, retrocede todo lo que puede y te
+dice cuántos intercambios fueron, en vez de negarse y dejarte adivinar un número
+más pequeño. Lo que sale no vuelve, así que, para probar otro camino sin perder
+el actual, ramifica la conversación (el `/fork` del panel).
+
+Si el historial ya se resumió para ahorrar contexto, el resumen se queda. Cubre
+intercambios condensados mucho antes, que ningún rewind recupera, y nunca habla
+de lo que el rewind acaba de quitar.
 
 Y los comandos de operador, reservados a los entrenadores del bot:
 
