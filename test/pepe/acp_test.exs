@@ -197,8 +197,15 @@ defmodule Pepe.ACPTest do
       assert result["agentInfo"]["name"] == "pepe"
 
       # Absent capabilities are the point: a client that reads these never sends
-      # `session/load` or an image block, so there is no half-working path.
-      assert result["agentCapabilities"]["loadSession"] == false
+      # an image block, so there is no half-working path.
+      assert result["agentCapabilities"]["loadSession"] == true
+
+      assert result["agentCapabilities"]["sessionCapabilities"] == %{
+               "list" => %{},
+               "resume" => %{},
+               "fork" => %{}
+             }
+
       # This agent's mock model has no vision and no transcription route is configured, so
       # image and audio are not promised; embedded context is text and always works. See
       # test/pepe/acp/prompt_blocks_test.exs for the vision and audio cases.
@@ -215,11 +222,11 @@ defmodule Pepe.ACPTest do
 
     test "an unimplemented method is reported as such, not silently ignored", %{server: server} do
       initialize(server)
-      request(server, 8, "session/load", %{"sessionId" => "nope", "cwd" => "/tmp", "mcpServers" => []})
+      request(server, 8, "fs/read_text_file", %{"sessionId" => "nope", "path" => "/tmp/x"})
 
       error = await_response(8)["error"]
       assert error["code"] == -32_601
-      assert error["message"] =~ "session/load"
+      assert error["message"] =~ "fs/read_text_file"
     end
 
     test "a line that is not JSON gets a parse error, and the connection survives", %{server: server} do

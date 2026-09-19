@@ -267,7 +267,7 @@ defmodule Pepe.Agent.Session do
     default_agent = Keyword.get(opts, :agent_name) || Config.default_agent_name()
 
     state =
-      case persist?() && SessionPersistence.load(key) do
+      case persist?(Keyword.get(opts, :persist, false)) && SessionPersistence.load(key) do
         {:ok, name, messages, pii_map, pending} ->
           # A crash mid-tool-call can persist an assistant turn whose tool calls were
           # never answered; replaying it as-is makes the model loop. Repair it first.
@@ -330,6 +330,7 @@ defmodule Pepe.Agent.Session do
       |> Map.merge(%{
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
+        persist: Keyword.get(opts, :persist, false),
         reset_pending: false,
         switch_pending: nil,
         ttl_ref: nil
@@ -344,11 +345,18 @@ defmodule Pepe.Agent.Session do
   # true (a stray `with_app(serve: true, ...)` call, a race on the shared
   # Application env between concurrent test files, ...) must never be able to
   # write into a real ~/.pepe.
-  defp persist?,
-    do: Application.get_env(:pepe, :env) != :test and Application.get_env(:pepe, :persist_sessions, false)
+  #
+  # A session can also opt in on its own (`persist: true` to `SessionSupervisor.ensure/3`):
+  # a surface that owns a whole family of sessions but is not itself a long-running
+  # server (the ACP editor adapter) needs its conversations on disk without switching on
+  # the global flag, which would also start the schedulers and re-spawn every other
+  # surface's sessions in that process. The caller decides; the :env backstop above
+  # guards only the global flag, the accident it was written for.
+  defp persist?(explicit?),
+    do: explicit? == true or (Application.get_env(:pepe, :env) != :test and Application.get_env(:pepe, :persist_sessions, false))
 
   defp persist(state) do
-    if persist?() and not Map.get(state, :ephemeral, false),
+    if persist?(Map.get(state, :persist, false)) and not Map.get(state, :ephemeral, false),
       do: SessionPersistence.save(state.key, state.agent_name, state.messages, Map.get(state, :pii_map, []))
 
     state
@@ -381,14 +389,17 @@ defmodule Pepe.Agent.Session do
   # durable trace `Pepe.Agent.SessionSupervisor.restore/0` can pick up on the next
   # boot. Same persist?/ephemeral guard as `persist/1`.
   defp mark_pending(state, text) do
-    if persist?() and not Map.get(state, :ephemeral, false), do: SessionPersistence.mark_pending(state.key, text)
+    if persist?(Map.get(state, :persist, false)) and not Map.get(state, :ephemeral, false),
+      do: SessionPersistence.mark_pending(state.key, text)
   end
 
   # A run ended without going through the normal `persist/1` path (stopped, crashed,
   # or errored) - clear the pending marker on disk too, so it isn't mistaken for an
   # interrupted turn on the next boot.
   defp clear_pending(state) do
-    if persist?() and not Map.get(state, :ephemeral, false), do: SessionPersistence.clear_pending(state.key)
+    if persist?(Map.get(state, :persist, false)) and not Map.get(state, :ephemeral, false),
+      do: SessionPersistence.clear_pending(state.key)
+
     %{state | pending_resume: nil}
   end
 
@@ -1043,7 +1054,7 @@ defmodule Pepe.Agent.Session do
   defp cancel_ttl(state), do: state
 
   defp maybe_clear(%{ephemeral: true, key: key} = state) do
-    if persist?(), do: SessionPersistence.delete(key)
+    if persist?(Map.get(state, :persist, false)), do: SessionPersistence.delete(key)
     state
   end
 
