@@ -186,20 +186,24 @@ defmodule Pepe.Tools do
   Build the list of OpenAI tool specs for a list of tool names. Unknown names
   are skipped. An empty list yields nil (so callers omit the `tools` field).
   """
-  def specs(names) when is_list(names) do
+  def specs(names, opts \\ [])
+
+  def specs(names, opts) when is_list(names) do
     builtin =
       names
       |> Enum.map(&get/1)
       |> Enum.reject(&is_nil/1)
       |> Enum.map(& &1.spec())
 
-    case builtin ++ Pepe.MCP.specs_for(names) do
+    # `:mcp_scope` names the session whose editor-supplied MCP servers (Pepe.ACP.Mcp) this
+    # turn may also use. Nothing for any other caller, and never anything from another scope.
+    case builtin ++ Pepe.MCP.specs_for(names) ++ Pepe.ACP.Mcp.specs(opts[:mcp_scope]) do
       [] -> nil
       specs -> specs
     end
   end
 
-  def specs(_), do: nil
+  def specs(_names, _opts), do: nil
 
   @doc """
   May this tool run alongside the others the model asked for in the same turn?
@@ -249,7 +253,7 @@ defmodule Pepe.Tools do
   @spec run_only(map(), map()) :: String.t()
   def run_only(%{"function" => %{"name" => name, "arguments" => raw_args}}, ctx \\ %{}) do
     if Pepe.MCP.mcp_tool?(name) do
-      execute_mcp(name, raw_args)
+      execute_mcp(name, raw_args, ctx)
     else
       execute_builtin(name, raw_args, ctx)
     end
@@ -356,9 +360,9 @@ defmodule Pepe.Tools do
 
   defp spill_dir(_), do: nil
 
-  defp execute_mcp(name, raw_args) do
+  defp execute_mcp(name, raw_args, ctx) do
     with {:ok, args} <- decode_args(raw_args),
-         {:ok, out} <- Pepe.MCP.call(name, args) do
+         {:ok, out} <- call_mcp(name, args, ctx) do
       # An MCP server is a third party like fetch_url/web_search - its result is content from
       # outside the conversation, wrapped the same way (Pepe.Permissions.taint_if_outside/1
       # already treats every MCP tool as "outside" for the taint boundary; this is the sibling
@@ -366,6 +370,17 @@ defmodule Pepe.Tools do
       Pepe.Security.ExternalContent.mark_untrusted("mcp:#{name}", to_string(out))
     else
       {:error, reason} -> annotate_error("Error: #{name} failed: #{inspect(reason)}")
+    end
+  end
+
+  # A tool an editor handed this session's turn is resolved against that session's own
+  # servers only (ctx[:mcp_scope], set by the surface that owns the session) - never
+  # through `Pepe.MCP`, whose namespace is the operator's configured servers.
+  defp call_mcp(name, args, ctx) do
+    if Pepe.ACP.Mcp.scoped_name?(name) do
+      Pepe.ACP.Mcp.call(ctx[:mcp_scope], name, args)
+    else
+      Pepe.MCP.call(name, args)
     end
   end
 

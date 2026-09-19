@@ -249,16 +249,8 @@ defmodule Pepe.ACPTest do
       assert await_response(3)["error"]["code"] == -32_602
     end
 
-    test "refuses client-supplied MCP servers rather than pretending to connect", %{server: server} do
-      initialize(server)
-
-      request(server, 3, "session/new", %{
-        "cwd" => System.tmp_dir!(),
-        "mcpServers" => [%{"name" => "x", "command" => "x", "args" => []}]
-      })
-
-      assert await_response(3)["error"]["message"] =~ "pepe mcp add"
-    end
+    # Client-supplied MCP servers are accepted now (they used to be refused here); that
+    # behavior is pinned in test/pepe/acp/mcp_session_test.exs.
 
     test "hands back a session id", %{server: server} do
       assert "sess_" <> _ = open_session(server)

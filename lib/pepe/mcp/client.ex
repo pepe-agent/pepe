@@ -158,29 +158,36 @@ defmodule Pepe.MCP.Client do
   defp executable(_), do: {:error, :no_command}
 
   defp open_port(exe, spec) do
-    args = spec |> Map.get(:args, []) |> Enum.map(&Protocol.interp/1)
-    env = spec |> Map.get(:env, %{}) |> env_list()
+    args = spec |> Map.get(:args, []) |> Enum.map(&Protocol.interp(&1, spec))
+    env = spec |> Map.get(:env, %{}) |> env_list(spec)
 
     port =
-      Port.open({:spawn_executable, exe}, [
-        :binary,
-        :exit_status,
-        {:args, args},
-        {:env, env}
-      ])
+      Port.open(
+        {:spawn_executable, exe},
+        [:binary, :exit_status, {:args, args}, {:env, env}] ++ working_dir(spec)
+      )
 
     {:ok, port}
   rescue
     e -> {:error, e}
   end
 
-  defp env_list(env) when is_map(env) do
+  defp env_list(env, spec) when is_map(env) do
     Enum.map(env, fn {k, v} ->
-      {String.to_charlist(to_string(k)), String.to_charlist(Protocol.interp(to_string(v)))}
+      {String.to_charlist(to_string(k)), String.to_charlist(Protocol.interp(to_string(v), spec))}
     end)
   end
 
-  defp env_list(_), do: []
+  defp env_list(_env, _spec), do: []
+
+  # A spec may name the directory the server starts in (an editor's open project, for one).
+  # Only an existing directory is honored: a stale path must not turn a working server into
+  # a failed spawn.
+  defp working_dir(%{cwd: dir}) when is_binary(dir) do
+    if File.dir?(dir), do: [{:cd, String.to_charlist(dir)}], else: []
+  end
+
+  defp working_dir(_spec), do: []
 
   defp send_rpc(port, id, method, params) do
     line = Jason.encode!(Protocol.request(id, method, params))

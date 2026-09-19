@@ -261,7 +261,7 @@ defmodule Pepe.MCP.Client.Sse do
   defp configured_headers(spec) do
     spec
     |> Map.get(:headers, %{})
-    |> Enum.into(%{}, fn {k, v} -> {String.downcase(to_string(k)), Protocol.interp(to_string(v))} end)
+    |> Enum.into(%{}, fn {k, v} -> {String.downcase(to_string(k)), Protocol.interp(to_string(v), spec)} end)
     |> Enum.reject(fn {_k, v} -> v == "" end)
     |> Enum.into(%{})
   end

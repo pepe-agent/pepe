@@ -75,7 +75,9 @@ defmodule Pepe.ACP.Protocol do
         "loadSession" => true,
         # An empty object per capability is the whole declaration: presence means "supported".
         "sessionCapabilities" => %{"list" => %{}, "resume" => %{}, "fork" => %{}},
-        "promptCapabilities" => prompt_capabilities
+        "promptCapabilities" => prompt_capabilities,
+        # Editor-supplied MCP servers: the remote transports that work (Pepe.ACP.Mcp).
+        "mcpCapabilities" => Pepe.ACP.Mcp.capabilities()
       },
       "authMethods" => []
     }
