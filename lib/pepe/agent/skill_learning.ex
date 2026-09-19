@@ -167,10 +167,13 @@ defmodule Pepe.Agent.SkillLearning do
   # *was* followed by a failure. A later skill read must not erase an earlier failure
   # just because it was read too - only a later skill that ALSO fails takes over as the
   # one to blame (see refine_target/1's own doc on why the most recent failure wins).
+  # A failed "skill" call itself (asking for a name that doesn't exist) is never that
+  # evidence either - it isn't following the open skill's instructions, it's a second,
+  # unrelated lookup, so it must not blame the skill that's still open.
   defp advance(msg, {open, failed}, args) do
     case skill_read(msg, args) do
       {:ok, skill} -> {skill, failed}
-      :none -> if open && error_result?(msg), do: {nil, open}, else: {open, failed}
+      :none -> if open && msg["name"] != "skill" && error_result?(msg), do: {nil, open}, else: {open, failed}
     end
   end
 

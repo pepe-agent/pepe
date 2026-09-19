@@ -203,5 +203,18 @@ defmodule Pepe.Agent.SkillLearningTest do
       assert text =~ "You read the `unrelated-topic` skill"
       refute text =~ "cut-a-release"
     end
+
+    test "a later failed lookup of a DIFFERENT, nonexistent skill does not blame the one still open" do
+      turn = [
+        asked([{"s1", "skill", %{"name" => "cut-a-release"}}]),
+        result("s1", "skill"),
+        asked([{"s2", "skill", %{"name" => "does-not-exist"}}]),
+        result("s2", "skill", "Error: no skill named does-not-exist"),
+        asked([{"1", "bash", %{}}]),
+        result("1", "bash")
+      ]
+
+      assert note(@agent, [Message.user("cut a release")] ++ turn) == nil
+    end
   end
 end
