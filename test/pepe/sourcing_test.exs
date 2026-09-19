@@ -122,6 +122,24 @@ defmodule Pepe.SourcingTest do
       assert cleanup.() == :ok
     end
 
+    test "a local directory that is itself a catalog resolves into the entry the marker asks for" do
+      dir = Path.join(System.tmp_dir!(), "pepe_src_catalog_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(dir, "aaa-first"))
+      File.mkdir_p!(Path.join(dir, "read-pdf"))
+      File.write!(Path.join([dir, "aaa-first", "SKILL.md"]), "wrong")
+      File.write!(Path.join([dir, "read-pdf", "SKILL.md"]), "right")
+      on_exit(fn -> File.rm_rf(dir) end)
+
+      rank = fn
+        "read-pdf/SKILL.md" -> 0
+        "SKILL.md" -> 1
+        _ -> false
+      end
+
+      assert {:ok, %{type: :dir, path: resolved}, _cleanup} = Sourcing.stage(dir, ".md", rank)
+      assert resolved == Path.join(dir, "read-pdf")
+    end
+
     test "a bare file matching single_ext stages as :file" do
       file = Path.join(System.tmp_dir!(), "pepe_src_file_#{System.unique_integer([:positive])}.exs")
       File.write!(file, "# hi")

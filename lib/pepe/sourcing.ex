@@ -40,10 +40,24 @@ defmodule Pepe.Sourcing do
   def stage(path, single_ext, root_marker) do
     cond do
       not (File.exists?(path) or File.dir?(path)) -> {:error, :not_found}
-      File.dir?(path) -> {:ok, %{type: :dir, path: path}, fn -> :ok end}
+      File.dir?(path) -> stage_directory(path, root_marker)
       archive?(path) -> stage_archive(path, fn -> :ok end, root_marker)
       String.ends_with?(path, single_ext) -> {:ok, %{type: :file, path: path}, fn -> :ok end}
       true -> {:error, :unsupported_source}
+    end
+  end
+
+  # A local directory gets the exact same root selection an archive's extracted
+  # contents get - a directory handed in by path can be a catalog (many packages
+  # side by side) just as easily as a downloaded one can, and skipping root/2 here
+  # meant a nested `<name>/SKILL.md` inside a local catalog directory was never
+  # found at all, only ever a package whose own top level already held the entry
+  # file. A single-package directory resolves to itself unchanged, exactly as
+  # before, since root/2 finds that same top-level match either way.
+  defp stage_directory(path, root_marker) do
+    case root(path, root_marker) do
+      {:ok, resolved} -> {:ok, %{type: :dir, path: resolved}, fn -> :ok end}
+      {:error, reason} -> {:error, reason}
     end
   end
 

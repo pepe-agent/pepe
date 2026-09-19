@@ -225,6 +225,21 @@ defmodule Pepe.Skills.MarketplaceTest do
       assert {"read-pdf", "Reads PDFs. Use for PDFs."} in Pepe.Skills.list()
     end
 
+    test "installing from a LOCAL DIRECTORY catalog also picks the requested skill, not whichever came first", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "catalog_dir_#{System.unique_integer([:positive])}")
+
+      write_package(Path.join(src, "aaa-first"), %{"SKILL.md" => "---\nname: aaa-first\ndescription: Wrong.\n---\n\nWrong.\n"})
+      write_package(Path.join(src, "read-pdf"), %{"SKILL.md" => "---\nname: read-pdf\ndescription: Right.\n---\n\nRight.\n"})
+
+      on_exit(fn -> File.rm_rf(src) end)
+
+      assert {:ok, "read-pdf", _scan} = Marketplace.install("read-pdf", source: src)
+
+      installed = Path.join([home, "skills", "read-pdf"])
+      assert File.read!(Path.join(installed, "SKILL.md")) =~ "Right."
+      refute File.exists?(Path.join([home, "skills", "aaa-first"]))
+    end
+
     test "installing a name that matches no skill in a multi-skill catalog refuses rather than guessing" do
       src = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}")
 
