@@ -110,23 +110,43 @@ defmodule Pepe.Sourcing do
   cannot disambiguate a *catalog* - a repository shipping many packages side by side,
   each with an entry doc of the identical name. Only the enclosing directory says which
   one was asked for.
+
+  When two or more candidates tie for the best (lowest) rank in *different* directories,
+  there is no principled way to pick one - the requested name matched nothing exactly, and
+  guessing would silently install whichever entry the filesystem happened to list first
+  under the name the caller asked for. That case is `{:error, :ambiguous}` rather than a
+  guess. A tie inside the *same* directory (two same-ranked files sitting next to each
+  other) is not ambiguous at this level - `root/2` only ever returns the directory, and
+  every candidate in it resolves to the same answer.
   """
-  @spec root(String.t(), (String.t() -> false | non_neg_integer())) :: String.t()
+  @spec root(String.t(), (String.t() -> false | non_neg_integer())) ::
+          {:ok, String.t()} | {:error, :ambiguous}
   def root(tmp, root_marker) do
-    tmp
-    |> Path.join("**")
-    |> Path.wildcard()
-    |> Enum.filter(&File.regular?/1)
-    |> Enum.flat_map(fn path ->
-      case root_marker.(Path.relative_to(path, tmp)) do
-        false -> []
-        rank -> [{rank, path}]
-      end
-    end)
-    |> Enum.min_by(&elem(&1, 0), fn -> nil end)
-    |> case do
-      nil -> tmp
-      {_rank, match} -> Path.dirname(match)
+    candidates =
+      tmp
+      |> Path.join("**")
+      |> Path.wildcard()
+      |> Enum.filter(&File.regular?/1)
+      |> Enum.flat_map(fn path ->
+        case root_marker.(Path.relative_to(path, tmp)) do
+          false -> []
+          rank -> [{rank, path}]
+        end
+      end)
+
+    case Enum.min_by(candidates, &elem(&1, 0), fn -> nil end) do
+      nil ->
+        {:ok, tmp}
+
+      {best_rank, _} ->
+        candidates
+        |> Enum.filter(fn {rank, _} -> rank == best_rank end)
+        |> Enum.map(fn {_rank, path} -> Path.dirname(path) end)
+        |> Enum.uniq()
+        |> case do
+          [dir] -> {:ok, dir}
+          _ -> {:error, :ambiguous}
+        end
     end
   end
 
@@ -177,8 +197,15 @@ defmodule Pepe.Sourcing do
     File.mkdir_p!(tmp)
 
     case extract(archive_path, tmp) do
-      :ok ->
-        {:ok, %{type: :dir, path: root(tmp, root_marker)},
+      :ok -> stage_extracted(tmp, cleanup, root_marker)
+      {:error, reason} -> cleanup_and_fail(tmp, cleanup, {:extract, reason})
+    end
+  end
+
+  defp stage_extracted(tmp, cleanup, root_marker) do
+    case root(tmp, root_marker) do
+      {:ok, path} ->
+        {:ok, %{type: :dir, path: path},
          fn ->
            cleanup.()
            File.rm_rf(tmp)
@@ -186,10 +213,14 @@ defmodule Pepe.Sourcing do
          end}
 
       {:error, reason} ->
-        File.rm_rf(tmp)
-        cleanup.()
-        {:error, {:extract, reason}}
+        cleanup_and_fail(tmp, cleanup, reason)
     end
+  end
+
+  defp cleanup_and_fail(tmp, cleanup, reason) do
+    File.rm_rf(tmp)
+    cleanup.()
+    {:error, reason}
   end
 
   defp extract(archive_path, dest) do

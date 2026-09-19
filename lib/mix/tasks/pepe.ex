@@ -2182,6 +2182,11 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp report_skill_install(name, {:error, :ambiguous}) do
+    error("#{name} doesn't match any skill in this source, and it publishes more than one - refusing to guess which one you meant.")
+    info(dim("Check the source's own listing for the exact directory/skill name, then install that instead."))
+  end
+
   defp report_skill_install(_name, {:error, reason}), do: error("install failed: #{inspect(reason)}")
 
   defp report_skill_update(name, {:ok, installed_name, scan}) do

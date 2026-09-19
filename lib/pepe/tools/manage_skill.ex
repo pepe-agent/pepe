@@ -111,6 +111,11 @@ defmodule Pepe.Tools.ManageSkill do
       {:error, :not_found} ->
         {:error, "no skill named #{name} in any tap, the bundled registry, or PepeHub"}
 
+      {:error, :ambiguous} ->
+        {:error,
+         "#{name} doesn't match any skill in that source, and it publishes more than one - " <>
+           "refusing to guess which one you meant. Check the source's own listing for the exact name."}
+
       {:error, reason} ->
         {:error, "couldn't install #{name}: #{inspect(reason)}"}
     end

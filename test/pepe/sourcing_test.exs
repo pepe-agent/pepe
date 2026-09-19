@@ -48,7 +48,7 @@ defmodule Pepe.SourcingTest do
         name -> if String.ends_with?(name, ".md"), do: 1, else: false
       end
 
-      assert Sourcing.root(tmp, rank) == tmp
+      assert Sourcing.root(tmp, rank) == {:ok, tmp}
     end
 
     test "falls back to the given directory when nothing matches" do
@@ -56,7 +56,55 @@ defmodule Pepe.SourcingTest do
       File.mkdir_p!(tmp)
       on_exit(fn -> File.rm_rf(tmp) end)
 
-      assert Sourcing.root(tmp, fn _ -> false end) == tmp
+      assert Sourcing.root(tmp, fn _ -> false end) == {:ok, tmp}
+    end
+
+    test "two equally-ranked candidates in the SAME directory are not ambiguous - either one names the same dir" do
+      tmp = Path.join(System.tmp_dir!(), "pepe_root_rank_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp)
+      File.write!(Path.join(tmp, "a.md"), "x")
+      File.write!(Path.join(tmp, "b.md"), "x")
+      on_exit(fn -> File.rm_rf(tmp) end)
+
+      rank = fn name -> if String.ends_with?(name, ".md"), do: 1, else: false end
+
+      assert Sourcing.root(tmp, rank) == {:ok, tmp}
+    end
+
+    test "two equally-ranked candidates in DIFFERENT directories, with no more specific match, is reported as ambiguous" do
+      tmp = Path.join(System.tmp_dir!(), "pepe_root_rank_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(tmp, "skill-one"))
+      File.mkdir_p!(Path.join(tmp, "skill-two"))
+      File.write!(Path.join(tmp, "skill-one/SKILL.md"), "one")
+      File.write!(Path.join(tmp, "skill-two/SKILL.md"), "two")
+      on_exit(fn -> File.rm_rf(tmp) end)
+
+      # requested name matches neither directory, so both SKILL.md's tie at the same
+      # (non-exact) rank - the real shape of installing an unrelated name from a catalog.
+      rank = fn
+        "skill-one/SKILL.md" -> 1
+        "skill-two/SKILL.md" -> 1
+        _ -> false
+      end
+
+      assert Sourcing.root(tmp, rank) == {:error, :ambiguous}
+    end
+
+    test "an exact (lower-ranked) match breaks the tie even with other same-basename files around" do
+      tmp = Path.join(System.tmp_dir!(), "pepe_root_rank_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(Path.join(tmp, "requested-skill"))
+      File.mkdir_p!(Path.join(tmp, "other-skill"))
+      File.write!(Path.join(tmp, "requested-skill/SKILL.md"), "the one asked for")
+      File.write!(Path.join(tmp, "other-skill/SKILL.md"), "not it")
+      on_exit(fn -> File.rm_rf(tmp) end)
+
+      rank = fn
+        "requested-skill/SKILL.md" -> 0
+        "other-skill/SKILL.md" -> 1
+        _ -> false
+      end
+
+      assert Sourcing.root(tmp, rank) == {:ok, Path.join(tmp, "requested-skill")}
     end
   end
 

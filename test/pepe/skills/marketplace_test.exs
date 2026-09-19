@@ -225,6 +225,25 @@ defmodule Pepe.Skills.MarketplaceTest do
       assert {"read-pdf", "Reads PDFs. Use for PDFs."} in Pepe.Skills.list()
     end
 
+    test "installing a name that matches no skill in a multi-skill catalog refuses rather than guessing" do
+      src = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}")
+
+      write_package(Path.join(src, "catalog"), %{
+        "aaa-first/SKILL.md" => "---\nname: aaa-first\ndescription: One.\n---\n\nOne.\n",
+        "zzz-last/SKILL.md" => "---\nname: zzz-last\ndescription: Two.\n---\n\nTwo.\n"
+      })
+
+      archive = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}.tar.gz")
+      {_, 0} = System.cmd("tar", ["-czf", archive, "-C", src, "catalog"])
+
+      on_exit(fn ->
+        File.rm_rf(src)
+        File.rm(archive)
+      end)
+
+      assert {:error, :ambiguous} = Marketplace.install("no-such-skill", source: archive)
+    end
+
     test "a package carrying a metadata header is listed by its description", %{home: home} do
       src = Path.join(System.tmp_dir!(), "greet_meta_#{System.unique_integer([:positive])}")
 
