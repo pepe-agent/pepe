@@ -52,7 +52,7 @@ defmodule Pepe.Agent.SkillLearningRuntimeTest do
       name: "worker",
       model: "mock",
       system_prompt: "hi",
-      tools: ["read_file", "write_file", "list_dir"],
+      tools: ["read_file", "write_file", "list_dir", "skill"],
       auto_approve: ["*"],
       max_iterations: 3,
       skill_learning: true

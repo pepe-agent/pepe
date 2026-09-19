@@ -101,6 +101,12 @@ defmodule Pepe.Agent.SkillLearningTest do
 
       assert note(agent, [Message.user("go")] ++ busy_turn()) == nil
     end
+
+    test "an agent without the skill tool is never offered either - it could not follow through" do
+      agent = %{@agent | tools: ["bash", "read_file", "list_dir", "write_file"]}
+
+      assert note(agent, [Message.user("go")] ++ busy_turn()) == nil
+    end
   end
 
   # A turn that opened the named skill and then ran the given tools, each with its own
@@ -161,6 +167,41 @@ defmodule Pepe.Agent.SkillLearningTest do
       ]
 
       assert note(@agent, [Message.user("go")] ++ turn) == nil
+    end
+
+    test "reading a second, unrelated skill afterward does not erase the first one's failure" do
+      turn = [
+        asked([{"s1", "skill", %{"name" => "cut-a-release"}}]),
+        result("s1", "skill"),
+        asked([{"1", "bash", %{}}]),
+        result("1", "bash", "Error: tool bash crashed: no such target"),
+        # A second skill read with nothing wrong after it - must not silently clear the
+        # first skill's earlier failure just because it was read too.
+        asked([{"s2", "skill", %{"name" => "unrelated-topic"}}]),
+        result("s2", "skill"),
+        asked([{"2", "read_file", %{}}]),
+        result("2", "read_file")
+      ]
+
+      text = note(@agent, [Message.user("cut a release, then look something up")] ++ turn)
+      assert text =~ "You read the `cut-a-release` skill"
+    end
+
+    test "a second skill that ALSO fails takes over as the one to blame" do
+      turn = [
+        asked([{"s1", "skill", %{"name" => "cut-a-release"}}]),
+        result("s1", "skill"),
+        asked([{"1", "bash", %{}}]),
+        result("1", "bash", "Error: tool bash crashed: no such target"),
+        asked([{"s2", "skill", %{"name" => "unrelated-topic"}}]),
+        result("s2", "skill"),
+        asked([{"2", "read_file", %{}}]),
+        result("2", "read_file", "Error: tool read_file crashed: enoent")
+      ]
+
+      text = note(@agent, [Message.user("cut a release, then look something up")] ++ turn)
+      assert text =~ "You read the `unrelated-topic` skill"
+      refute text =~ "cut-a-release"
     end
   end
 end

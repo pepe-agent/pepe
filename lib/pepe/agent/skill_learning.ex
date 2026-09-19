@@ -68,9 +68,11 @@ defmodule Pepe.Agent.SkillLearning do
   @min_tool_calls 4
   @min_distinct_tools 2
 
-  # Writing or editing a skill is a file write. An agent without `write_file` cannot act on
-  # the offer, so it never gets made - an offer it can only walk back is worse than silence.
-  @required_tool "write_file"
+  # Writing or editing a skill is a file write, and following either offer through -
+  # "read the skill-creator skill and follow it" - is a `skill` call first. An agent
+  # missing either cannot act on the offer, so it never gets made - an offer it can
+  # only walk back is worse than silence.
+  @required_tools ~w(write_file skill)
 
   @doc """
   The ephemeral notes to append to *this model call only*, given the loop's history
@@ -96,7 +98,7 @@ defmodule Pepe.Agent.SkillLearning do
 
   defp enabled?(agent) do
     tools = Map.get(agent, :tools)
-    Map.get(agent, :skill_learning) == true and is_list(tools) and @required_tool in tools
+    Map.get(agent, :skill_learning) == true and is_list(tools) and Enum.all?(@required_tools, &(&1 in tools))
   end
 
   @doc """
@@ -153,24 +155,24 @@ defmodule Pepe.Agent.SkillLearning do
 
     turn
     |> Enum.filter(&(&1["role"] == "tool"))
-    |> Enum.reduce(:none, &advance(&1, &2, args))
+    |> Enum.reduce({nil, nil}, &advance(&1, &2, args))
     |> case do
-      {:failed, skill} -> {:ok, skill}
+      {_open, failed} when is_binary(failed) -> {:ok, failed}
       _ -> :none
     end
   end
 
-  # Walks this turn's tool results in order, holding one of three states: nothing seen yet,
-  # a skill read and so far fine, or that skill followed by a failure.
-  defp advance(msg, state, args) do
+  # Walks this turn's tool results in order, holding {open, failed}: `open` is the most
+  # recently read skill not yet followed by anything, `failed` is the last skill that
+  # *was* followed by a failure. A later skill read must not erase an earlier failure
+  # just because it was read too - only a later skill that ALSO fails takes over as the
+  # one to blame (see refine_target/1's own doc on why the most recent failure wins).
+  defp advance(msg, {open, failed}, args) do
     case skill_read(msg, args) do
-      {:ok, skill} -> {:read, skill}
-      :none -> mark_failure(msg, state)
+      {:ok, skill} -> {skill, failed}
+      :none -> if open && error_result?(msg), do: {nil, open}, else: {open, failed}
     end
   end
-
-  defp mark_failure(msg, {:read, skill}), do: if(error_result?(msg), do: {:failed, skill}, else: {:read, skill})
-  defp mark_failure(_msg, state), do: state
 
   # Every tool call the assistant made this turn, by id, so a `skill` result can be traced
   # back to *which* skill it read (the result message carries only the tool's name).
