@@ -794,6 +794,7 @@ defmodule Pepe.Agent.Session do
      %{
        agent: state.agent_name,
        model: model_id(state.agent_name, state.model_override),
+       model_name: model_name(state.agent_name, state.model_override),
        turns: turns,
        running: state.running != nil
      }, state}
@@ -1553,6 +1554,18 @@ defmodule Pepe.Agent.Session do
 
   defp apply_model_override(agent, nil), do: agent
   defp apply_model_override(agent, model_name), do: %{agent | model: model_name}
+
+  # The model *connection's* name (what `/model NAME` takes), as opposed to the upstream
+  # model id `model_id/2` reports. Falls back to the default agent the way a turn does.
+  defp model_name(agent_name, override) do
+    with %{} = agent <- Config.get_agent(agent_name) || Config.default_agent(),
+         agent = apply_model_override(agent, override),
+         %{name: name} <- Config.model_for_agent(agent) do
+      name
+    else
+      _ -> nil
+    end
+  end
 
   defp model_id(agent_name, override) do
     with name when is_binary(name) <- agent_name,

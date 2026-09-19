@@ -179,7 +179,7 @@ defmodule Pepe.ACP.McpSessionTest do
     assert "mcp__editor_probe__probe" in offered_tools()
 
     call = await_update("tool_call")["params"]["update"]
-    assert call["name"] == "mcp__editor_probe__probe"
+    assert call["_meta"]["pepe"]["tool"] == "mcp__editor_probe__probe"
 
     # Not in the always-safe set and not pre-approved: it stops for a human like any other
     # risky tool, through the editor's own permission prompt.

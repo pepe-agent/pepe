@@ -19,11 +19,10 @@ defmodule Pepe.ACP.Protocol do
   `session/load`, `session/resume`, `session/fork`, see `Pepe.ACP.Sessions`), a prompt
   turn streamed back as it happens, and a tool call that stops to ask a human. An ACP
   session is a `Pepe.Agent.Session` keyed `acp:<id>` whose history is saved on disk, so
-  closing the editor no longer ends the conversation. Not implemented, and advertised
-  as absent in `initialize_result/0` so a client never has to guess:
+  closing the editor no longer ends the conversation. Authentication methods report
+  whether Pepe has a usable model configuration and how to finish setup. Prompt
+  capabilities are advertised per agent:
 
-    * `authenticate` (`authMethods: []`). Pepe authenticates to *model providers*,
-      out of `~/.pepe/config.json`; there is nothing for an editor to log in to.
     * a prompt capability the connection can't honestly promise (`image` only for an
       agent whose model has vision, `audio` only with a transcription route). Every
       block type is *read* (see `Pepe.ACP.Content`); a block that can't be used is
@@ -32,7 +31,11 @@ defmodule Pepe.ACP.Protocol do
       `terminal/*`). Pepe's own `read_file`/`write_file`/`bash` tools already run on
       the same machine the editor does, so routing them back through the editor would
       buy nothing but a second way for them to disagree.
-    * session modes, plans, and elicitation.
+    * elicitation.
+
+  Beyond the core, `Pepe.ACP.Updates` and `Pepe.ACP.Commands` add the plan panel,
+  the context meter, slash commands and session modes; those are described where they
+  are built.
   """
 
   alias Pepe.Permissions
@@ -66,8 +69,11 @@ defmodule Pepe.ACP.Protocol do
   of answering honestly here - a client that reads `loadSession: false` will never
   send `session/load`, so there is no half-working path to fall into.
   """
-  @spec initialize_result(map()) :: map()
-  def initialize_result(prompt_capabilities \\ %{"image" => false, "audio" => false, "embeddedContext" => false}) do
+  @spec initialize_result(String.t() | nil, map()) :: map()
+  def initialize_result(
+        agent_name \\ nil,
+        prompt_capabilities \\ %{"image" => false, "audio" => false, "embeddedContext" => false}
+      ) do
     %{
       "protocolVersion" => @protocol_version,
       "agentInfo" => agent_info(),
@@ -79,7 +85,7 @@ defmodule Pepe.ACP.Protocol do
         # Editor-supplied MCP servers: the remote transports that work (Pepe.ACP.Mcp).
         "mcpCapabilities" => Pepe.ACP.Mcp.capabilities()
       },
-      "authMethods" => []
+      "authMethods" => Pepe.ACP.Auth.methods(agent_name)
     }
   end
 
@@ -163,72 +169,69 @@ defmodule Pepe.ACP.Protocol do
   ### tool calls
   ###
 
-  # ACP's ToolKind is a UI hint - it picks the icon and the verb an editor shows. The
-  # mapping is deliberately coarse and name-based: a tool Pepe doesn't recognize (a
-  # plugin's, an MCP server's) lands on "other", which is the honest answer rather
-  # than a guess dressed up as a classification.
-  @kinds %{
-    "read_file" => "read",
-    "list_dir" => "read",
-    "docs" => "read",
-    "skill" => "read",
-    "config_get" => "read",
-    "session_search" => "read",
-    "memory_search" => "read",
-    "write_file" => "edit",
-    "edit_file" => "edit",
-    "move_file" => "move",
-    "bash" => "execute",
-    "run_script" => "execute",
-    "run_code" => "execute",
-    "fetch_url" => "fetch",
-    "web_search" => "search"
-  }
+  # Kind, title, locations and result content live in `Pepe.ACP.ToolView`, so how a call
+  # is *shown* can be tested without a pipe. This module only assembles the messages.
 
   @doc "The ACP `ToolKind` for one of Pepe's tools; `\"other\"` for anything unrecognized."
   @spec tool_kind(String.t()) :: String.t()
-  def tool_kind(name), do: Map.get(@kinds, name, "other")
+  defdelegate tool_kind(name), to: Pepe.ACP.ToolView, as: :kind
 
   @doc """
-  A human-readable title for a tool call: the tool's name, plus the first sentence of
-  its own description when it has one, so an internal name like `manage_pepe` isn't
-  opaque in an editor's tool-call list.
-  """
-  @spec tool_title(String.t()) :: String.t()
-  def tool_title(name) do
-    case Pepe.Tools.summary(name) do
-      "" -> name
-      summary -> "#{name}: #{summary}"
-    end
-  end
+  The `tool_call` update announcing a call that is about to happen.
 
-  @doc "The `tool_call` update announcing a call that is about to happen."
-  @spec tool_call(String.t(), String.t(), term()) :: map()
-  def tool_call(tool_call_id, name, raw_args) do
+  Options: `:cwd` (the editor's project, so the files a call touches are reported as
+  absolute locations) and `:diff` (a `Pepe.ACP.Edits` proposal, shown as a diff before
+  anything is written). The tool's own name rides in `_meta`, not in a top-level key the
+  protocol has no place for.
+  """
+  @spec tool_call(String.t(), String.t(), term(), keyword()) :: map()
+  def tool_call(tool_call_id, name, raw_args, opts \\ []) do
+    args = Permissions.decode(raw_args)
+
     %{
       "sessionUpdate" => "tool_call",
       "toolCallId" => tool_call_id,
-      "title" => tool_title(name),
-      "name" => name,
-      "kind" => tool_kind(name),
+      "title" => Pepe.ACP.ToolView.title(name, args),
+      "kind" => Pepe.ACP.ToolView.kind(name),
       "status" => "pending",
-      "rawInput" => Permissions.decode(raw_args)
+      "rawInput" => args,
+      "_meta" => %{"pepe" => %{"tool" => name}}
     }
+    |> put_locations(name, args, opts[:cwd])
+    |> put_diff(opts[:diff])
   end
 
   @doc """
   The `tool_call_update` closing a call out. `status` is `\"completed\"` or
-  `\"failed\"` - a refused call is a failed one, not a finished one.
+  `\"failed\"` - a refused call is a failed one, not a finished one. A call that changed
+  a file keeps its diff (`:diff`) beside the output, so the editor still shows what was
+  done once the call is over.
   """
-  @spec tool_call_update(String.t(), String.t(), String.t()) :: map()
-  def tool_call_update(tool_call_id, status, output) do
+  @spec tool_call_update(String.t(), String.t(), term(), keyword()) :: map()
+  def tool_call_update(tool_call_id, status, output, opts \\ []) do
+    content =
+      case opts[:diff] do
+        nil -> Pepe.ACP.ToolView.result_content(output)
+        diff -> [Pepe.ACP.Edits.diff_content(diff) | Pepe.ACP.ToolView.result_content(output)]
+      end
+
     %{
       "sessionUpdate" => "tool_call_update",
       "toolCallId" => tool_call_id,
       "status" => status,
-      "content" => [%{"type" => "content", "content" => text_block(output)}]
+      "content" => content
     }
   end
+
+  defp put_locations(call, name, args, cwd) do
+    case Pepe.ACP.ToolView.locations(name, args, cwd) do
+      [] -> call
+      locations -> Map.put(call, "locations", locations)
+    end
+  end
+
+  defp put_diff(call, nil), do: call
+  defp put_diff(call, diff), do: Map.put(call, "content", [Pepe.ACP.Edits.diff_content(diff)])
 
   ###
   ### permissions
@@ -286,18 +289,20 @@ defmodule Pepe.ACP.Protocol do
   still gets the signal, because `Prompt.label/2` already bakes it into the option
   labels themselves.
   """
-  @spec permission_tool_call(String.t(), String.t(), term(), map()) :: map()
-  def permission_tool_call(tool_call_id, name, raw_args, notes) do
-    call = %{
-      "toolCallId" => tool_call_id,
-      "title" => tool_title(name),
-      "name" => name,
-      "kind" => tool_kind(name),
-      "status" => "pending",
-      "rawInput" => Permissions.decode(raw_args)
-    }
+  @spec permission_tool_call(String.t(), String.t(), term(), map(), keyword()) :: map()
+  def permission_tool_call(tool_call_id, name, raw_args, notes, opts \\ []) do
+    args = Permissions.decode(raw_args)
 
-    if notes == %{}, do: call, else: Map.put(call, "_meta", %{"pepe" => notes})
+    %{
+      "toolCallId" => tool_call_id,
+      "title" => Pepe.ACP.ToolView.title(name, args),
+      "kind" => Pepe.ACP.ToolView.kind(name),
+      "status" => "pending",
+      "rawInput" => args,
+      "_meta" => %{"pepe" => Map.put(notes, "tool", name)}
+    }
+    |> put_locations(name, args, opts[:cwd])
+    |> put_diff(opts[:diff])
   end
 
   @doc """
