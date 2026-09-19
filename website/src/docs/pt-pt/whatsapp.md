@@ -87,7 +87,7 @@ Passar uma conversa a um especialista não exige nenhuma maquinaria extra: basta
 
 Uma mensagem de voz chega como **texto**: é transcrita à entrada, antes de o agente correr, pelo que quem faz a pergunta a falar recebe resposta à pergunta e não um comentário sobre um ficheiro de áudio. Um PDF ou uma folha de cálculo chegam já com o conteúdo lido, ao lado do que foi dito sobre eles. Uma fotografia chega ao modelo como imagem, quando o modelo do agente tem visão.
 
-Nada disto exige credenciais novas. A Meta entrega um id de média e o Pepe resolve-o na Graph API com o mesmo token de acesso que a ligação já usa. A Meta limita a média recebida a 16 MB. Se não houver nenhuma rota de transcrição configurada nem possível de deduzir, o ficheiro fica no workspace do agente e o agente é informado de onde está. Ver [Mensagens de voz](../voice/) e [Documentos](../documents/).
+Nada disto exige credenciais novas. A Meta entrega um id de média e o Pepe resolve-o na Graph API com o mesmo token de acesso que a ligação já usa. A Meta limita a média recebida por tipo (16 MB para áudio e vídeo, 5 MB para imagens, 100 MB para documentos), e o Pepe aplica o seu próprio limite de 20 MB por cima, por isso vale o menor dos dois. Se não houver nenhuma rota de transcrição configurada nem possível de deduzir, o ficheiro fica no workspace do agente e o agente é informado de onde está. Ver [Mensagens de voz](../voice/) e [Documentos](../documents/).
 
 ### Mudar de modelo
 

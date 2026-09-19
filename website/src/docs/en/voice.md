@@ -5,7 +5,7 @@ description: A voice note arrives as text. Transcription happens at ingestion, b
 
 ## Voice messages
 
-Send a voice note on Telegram, WhatsApp or Discord and the agent receives **text**. The
+Send a voice note on Telegram or WhatsApp, or attach one to a slash command on Discord, and the agent receives **text**. The
 audio is transcribed on the way in, before a session exists and before any routing
 decision is taken, so what reaches the agent is an ordinary message.
 
@@ -34,7 +34,8 @@ Two things worth knowing:
 
 - **WhatsApp** hands over a media id rather than the file. Pepe resolves it against the
   Graph API with the same access token the connection already uses, so there is nothing
-  extra to configure. Meta caps inbound media at 16 MB.
+  extra to configure. Meta caps inbound media by type (16 MB for audio, 5 MB for
+  images, 100 MB for documents), and Pepe's own 20 MB cap applies on top.
 - **Discord** only sees files attached to a **slash command**, because the connection is
   an interactions endpoint rather than a gateway bot. Give your command an attachment
   option and `/ask file:<clip>` works, with or without anything typed alongside it. A

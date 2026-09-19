@@ -5,7 +5,7 @@ description: Uma mensagem de voz chega ao agente já como texto, transcrita à e
 
 ## Mensagens de voz
 
-Envia uma mensagem de voz no Telegram, no WhatsApp ou no Discord e o agente recebe **texto**. O áudio é transcrito logo à chegada, antes de existir sessão e antes de qualquer decisão de encaminhamento, por isso o que chega ao agente não é diferente de uma mensagem normal.
+Envia uma mensagem de voz no Telegram ou no WhatsApp, ou anexa uma a um comando de barra no Discord, e o agente recebe **texto**. O áudio é transcrito logo à chegada, antes de existir sessão e antes de qualquer decisão de encaminhamento, por isso o que chega ao agente não é diferente de uma mensagem normal.
 
 Isto não foi sempre assim. Antes, o gateway limitava-se a gravar o ficheiro na área de trabalho do agente e a entregar-lhe o caminho, deixando-o a ele descobrir como escutar aquilo: procurar um transcritor, instalá-lo, correr-lho, ler o resultado. Cada mensagem de voz virava um pequeno projeto de investigação, lento e inconsistente de cada vez que acontecia, e ainda por cima gastava uma barreira de permissão só para ler uma mensagem que tinha acabado de chegar.
 
@@ -19,7 +19,7 @@ Se já tens uma ligação de modelo à OpenAI ou à Groq, a transcrição já fu
 
 Há dois pormenores a reter:
 
-- No **WhatsApp** o que chega é um id de média, não o ficheiro. O Pepe resolve esse id na Graph API com o mesmo token de acesso que a ligação já usa, sem configuração adicional. A Meta limita a média recebida a 16 MB.
+- No **WhatsApp** o que chega é um id de média, não o ficheiro. O Pepe resolve esse id na Graph API com o mesmo token de acesso que a ligação já usa, sem configuração adicional. A Meta limita a média recebida por tipo (16 MB para áudio, 5 MB para imagens, 100 MB para documentos), e o próprio limite de 20 MB do Pepe aplica-se por cima.
 - No **Discord** só chegam ficheiros anexados a um **comando de barra**, porque a ligação é um endpoint de interações e não um bot de gateway. Dá ao teu comando uma opção de anexo e `/ask file:<clip>` funciona, com ou sem texto escrito ao lado. Uma mensagem de voz gravada no próprio canal do Discord nunca chega ao endpoint, pelo que não há forma de a transcrever.
 
 Slack, Microsoft Teams e Google Chat continuam a receber apenas texto.

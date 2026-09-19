@@ -19,10 +19,10 @@ a seguir o que está escrito.
 dezenas de procedimentos sem que isso pese na conversa, porque cada um custa uma única
 linha até o exato momento em que o trabalho pede por ele. O resumo, aliás, não é nada
 além da primeira linha não vazia do arquivo, então vale escrever essa abertura já
-dizendo quando aquela skill se aplica. Uma skill também pode declarar esse resumo num
-cabeçalho de metadados, e é isso que faz uma skill escrita em outra ferramenta
-funcionar aqui sem conversão nenhuma (veja "Um formato que outras ferramentas
-compartilham", mais abaixo).
+dizendo quando aquela skill se aplica - a menos que a skill declare esse resumo num
+cabeçalho de metadados, caso em que ele prevalece: é isso que faz uma skill escrita
+em outra ferramenta funcionar aqui sem conversão nenhuma (veja "Um formato que outras
+ferramentas compartilham", mais abaixo).
 
 <div class="note"><strong>A ferramenta skill.</strong> Só um agente com <code>skill</code> na própria lista de ferramentas consegue ler skills de verdade. Sem ela, elas continuam listadas no contexto, mas nunca chegam a ser abertas.</div>
 

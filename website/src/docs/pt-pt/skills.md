@@ -19,9 +19,10 @@ segue-o.
 procedimentos pagando apenas uma linha de contexto por cada um, e só abre a versão
 longa no exato momento em que o trabalho o exige. O resumo é simplesmente a primeira
 linha não vazia do ficheiro, por isso vale a pena escrever essa abertura já a dizer
-quando a skill se aplica. Uma skill também pode declarar esse resumo num cabeçalho de
-metadados, e é isso que faz com que uma skill escrita noutra ferramenta funcione aqui
-tal como está (vê "Um formato que outras ferramentas partilham", mais abaixo).
+quando a skill se aplica - a não ser que a skill declare esse resumo num cabeçalho de
+metadados, caso em que este vence: é isso que faz com que uma skill escrita noutra
+ferramenta funcione aqui tal como está (vê "Um formato que outras ferramentas
+partilham", mais abaixo).
 
 <div class="note"><strong>A ferramenta skill.</strong> Sem a ferramenta <code>skill</code> na sua lista, o agente até vê as skills listadas no contexto, mas nunca chega a abri-las.</div>
 

@@ -38,7 +38,7 @@ estão descritos em [Webhooks](../webhooks/).
 
 Dá ao teu comando de barra uma **opção de anexo** e as pessoas podem enviar um ficheiro com ele: `/ask prompt:o que é que ele diz? file:<clip>`. Um clip de voz é transcrito antes de o agente correr, um documento chega com o texto já lido, e uma imagem chega como imagem a um modelo com visão. O anexo basta por si, pelo que `/ask file:<clip>` sem nada escrito também funciona.
 
-É o único caminho que um ficheiro tem aqui. Um endpoint de interações vê comandos de barra e mais nada, por isso uma mensagem de voz ou um anexo publicado no canal nunca chega ao Pepe. Aplica-se o limite de upload do próprio Discord (10 MB num servidor sem boost). Ver [Mensagens de voz](../voice/) e [Documentos](../documents/).
+É o único caminho que um ficheiro tem aqui. Um endpoint de interações vê comandos de barra e mais nada, por isso uma mensagem de voz ou um anexo publicado no canal nunca chega ao Pepe. Aplica-se o limite de upload do próprio Discord: 10 MB numa conta comum ou servidor sem boost, mais com Nitro ou um servidor com boost. Ver [Mensagens de voz](../voice/) e [Documentos](../documents/).
 
 ### Trocar de modelo
 

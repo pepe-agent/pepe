@@ -6835,7 +6835,7 @@ msgstr[1] "Recuei %{count} turnos. Era toda a conversa."
 #: lib/pepe_web/live/chat_live.ex:1367
 #, elixir-autogen, elixir-format
 msgid "Usage: /rewind N, where N is how many turns to go back."
-msgstr "Utilização: /rewind N, em que N é quantos turnos recuar."
+msgstr "Utilização: /rewind N, em que N indica quantos turnos recuar."
 
 #: lib/pepe_web/live/agents_live.ex:482
 #, elixir-autogen, elixir-format

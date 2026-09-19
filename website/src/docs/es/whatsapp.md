@@ -87,7 +87,7 @@ Pasarle una conversación a un especialista no necesita ninguna maquinaria adici
 
 Una nota de voz llega como **texto**: se transcribe al entrar, antes de que el agente corra, así que quien hace la pregunta hablando recibe una respuesta a la pregunta y no un comentario sobre un archivo de audio. Un PDF o una planilla llegan con el contenido ya leído, junto a lo que se dijo sobre ellos. Una foto le llega al modelo como imagen, cuando el modelo del agente tiene visión.
 
-Nada de esto pide credenciales nuevas. Meta entrega un id de medio y Pepe lo resuelve contra la Graph API con el mismo token de acceso que la conexión ya usa. Meta limita el medio entrante a 16 MB. Si no hay ninguna ruta de transcripción configurada ni deducible, el archivo queda en el workspace del agente y se le avisa dónde está. Ver [Mensajes de voz](../voice/) y [Documentos](../documents/).
+Nada de esto pide credenciales nuevas. Meta entrega un id de medio y Pepe lo resuelve contra la Graph API con el mismo token de acceso que la conexión ya usa. Meta limita el medio entrante por tipo (16 MB para audio y video, 5 MB para imágenes, 100 MB para documentos), y Pepe aplica su propio límite de 20 MB encima, así que gana el menor de los dos. Si no hay ninguna ruta de transcripción configurada ni deducible, el archivo queda en el workspace del agente y se le avisa dónde está. Ver [Mensajes de voz](../voice/) y [Documentos](../documents/).
 
 ### Cambiar de modelo
 

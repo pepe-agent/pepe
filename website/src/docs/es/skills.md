@@ -18,10 +18,10 @@ Ese nivel de indirección es justo lo que mantiene todo esto barato. Un agente p
 conocer decenas de procedimientos sin que eso pese en la conversación, porque cada uno le
 cuesta apenas una línea hasta el momento en que el trabajo de verdad lo requiere. El
 resumen es simplemente la primera línea no vacía del archivo, así que esa primera línea
-tiene que dejar claro cuándo aplica la skill. Una skill también puede declarar ese
-resumen en una cabecera de metadatos, y eso es lo que hace que una skill escrita en otra
-herramienta funcione aquí tal cual, sin conversión (ver "Un formato que otras
-herramientas comparten", más abajo).
+tiene que dejar claro cuándo aplica la skill, a menos que la skill declare ese resumen
+en una cabecera de metadatos, en cuyo caso ese es el que gana: eso es lo que hace que
+una skill escrita en otra herramienta funcione aquí tal cual, sin conversión (ver "Un
+formato que otras herramientas comparten", más abajo).
 
 <div class="note"><strong>La herramienta skill.</strong> El agente necesita tener <code>skill</code> en su lista de herramientas para poder leerlas. Sin ella, las skills quedan listadas en su contexto pero nunca llega a abrirlas.</div>
 

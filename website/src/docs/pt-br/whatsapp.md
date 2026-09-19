@@ -128,7 +128,7 @@ canal não envia.</div>
 
 Um áudio chega como **texto**: a transcrição acontece na entrada, antes de o agente rodar, então quem mandou a pergunta falando recebe resposta à pergunta, e não um comentário sobre um arquivo de áudio. Um PDF ou uma planilha chegam já com o conteúdo lido, junto do que foi dito sobre eles. Uma foto chega ao modelo como imagem, quando o modelo do agente enxerga.
 
-Nada disso exige credencial nova. A Meta entrega um id de mídia e o Pepe resolve esse id na Graph API com o mesmo token de acesso que a conexão já usa. A Meta limita a mídia recebida a 16 MB. Se não houver nenhuma rota de transcrição configurada nem detectável, o arquivo fica no workspace do agente e ele é avisado de onde está. Veja [Mensagens de voz](../voice/) e [Documentos](../documents/).
+Nada disso exige credencial nova. A Meta entrega um id de mídia e o Pepe resolve esse id na Graph API com o mesmo token de acesso que a conexão já usa. A Meta limita a mídia recebida por tipo (16 MB para áudio e vídeo, 5 MB para imagens, 100 MB para documentos), e o Pepe aplica seu próprio limite de 20 MB por cima, então vale o menor dos dois. Se não houver nenhuma rota de transcrição configurada nem detectável, o arquivo fica no workspace do agente e ele é avisado de onde está. Veja [Mensagens de voz](../voice/) e [Documentos](../documents/).
 
 ### Trocando de modelo
 
