@@ -40,7 +40,7 @@ ruta genérica están en [Webhooks](../webhooks/).
 
 Dale a tu comando de barra una **opción de adjunto** y la gente puede mandarle un archivo: `/ask prompt:¿qué dice? file:<clip>`. Un clip de voz se transcribe antes de que el agente corra, un documento llega con su texto ya leído, y una imagen llega como imagen a un modelo con visión. El adjunto alcanza por sí solo, así que `/ask file:<clip>` sin nada escrito también funciona.
 
-Es el único camino que tiene un archivo por acá. Un endpoint de interacciones ve comandos de barra y nada más, así que una nota de voz o un adjunto publicado en el canal nunca le llega a Pepe. Aplica el límite de subida del propio Discord: 10 MB en una cuenta normal o servidor sin boost, más con Nitro o un servidor con boost. Ver [Mensajes de voz](../voice/) y [Documentos](../documents/).
+Es el único camino que tiene un archivo por acá. Un endpoint de interacciones ve comandos de barra y nada más, así que una nota de voz o un adjunto publicado en el canal nunca le llega a Pepe. Pepe acepta archivos de hasta 20 MB, y gana el límite menor entre Pepe y Discord: 10 MB en una cuenta normal o servidor sin boost, más con Nitro o un servidor con boost. Ver [Mensajes de voz](../voice/) y [Documentos](../documents/).
 
 ### Cambiar de modelo
 
