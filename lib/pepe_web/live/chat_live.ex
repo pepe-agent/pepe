@@ -1540,7 +1540,7 @@ defmodule PepeWeb.ChatLive do
           type: session_type(key),
           agent: agent,
           model: model_of(agent),
-          turns: Enum.count(messages, &(&1["role"] == "user")),
+          turns: Enum.count(messages, &Pepe.LLM.Message.person_turn?/1),
           running: false
         }
 

@@ -508,7 +508,13 @@ defmodule Pepe.WebhooksTest do
       Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:1", model: "gpt"})
       Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
 
-      Mimic.stub(Pepe.Usage, :over_message_limit?, fn "acme" -> true end)
+      parent = self()
+
+      Mimic.stub(Pepe.Usage, :over_message_limit?, fn "acme" ->
+        send(parent, :checked_message_limit)
+        true
+      end)
+
       Mimic.reject(&Pepe.Webhooks.Media.resolve/3)
 
       e = entry()
@@ -543,9 +549,9 @@ defmodule Pepe.WebhooksTest do
                  "x-hub-signature-256" => sig
                })
 
-      # Give the async dispatch a moment to run (and, if it wrongly called Media.resolve/3,
-      # to fail the Mimic.reject expectation above) before the test process exits.
-      Process.sleep(50)
+      # Proves the dispatch task actually reached the limit check (not just that nothing
+      # crashed) before the test process exits - a real signal instead of a timed guess.
+      assert_receive :checked_message_limit, 1000
     end
   end
 end

@@ -777,7 +777,7 @@ defmodule Pepe.Agent.Session do
   end
 
   def handle_call(:status, _from, state) do
-    turns = Enum.count(state.messages, &(&1["role"] == "user"))
+    turns = Enum.count(state.messages, &Pepe.LLM.Message.person_turn?/1)
 
     {:reply,
      %{
