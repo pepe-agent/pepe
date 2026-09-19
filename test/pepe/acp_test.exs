@@ -212,7 +212,9 @@ defmodule Pepe.ACPTest do
       assert result["agentCapabilities"]["promptCapabilities"]["image"] == false
       assert result["agentCapabilities"]["promptCapabilities"]["audio"] == false
       assert result["agentCapabilities"]["promptCapabilities"]["embeddedContext"] == true
-      assert result["authMethods"] == []
+      # A configured agent can answer, so the "use my configuration" method is offered,
+      # alongside the terminal setup method that is always there (see Pepe.ACP.Auth).
+      assert Enum.map(result["authMethods"], & &1["id"]) == ["pepe-config", "pepe-setup"]
     end
 
     test "refuses any other request before the handshake", %{server: server} do
@@ -306,7 +308,9 @@ defmodule Pepe.ACPTest do
       # Announced before the gate runs, so the editor can render the call it is about
       # to be asked about.
       call = await_update("tool_call")["params"]["update"]
-      assert call["name"] == "bash"
+      # The tool's name is `_meta`, not a top-level key the protocol has no field for.
+      assert call["_meta"]["pepe"]["tool"] == "bash"
+      refute Map.has_key?(call, "name")
       assert call["kind"] == "execute"
       assert call["status"] == "pending"
       assert call["rawInput"]["command"] == "echo curl"
