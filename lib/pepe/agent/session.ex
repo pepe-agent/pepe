@@ -1519,17 +1519,14 @@ defmodule Pepe.Agent.Session do
     for {msg, idx} <- Enum.with_index(messages), turn_start?(msg), do: idx
   end
 
-  # A turn starts on something the person actually said. A `<system-reminder>` user
-  # message is Pepe's own scaffolding wearing the user role (the compaction summary, the
+  # A turn starts on something the person actually said, not one of Pepe's own
+  # `<system-reminder>` notes riding along in the user role (the compaction summary, the
   # widget's language hint) because several providers drop every system message after the
   # first - counting one as a turn would make `/rewind 1` throw away a real exchange, and
-  # cutting at one would silently delete the conversation's own condensed memory.
-  defp turn_start?(%{"role" => "user", "content" => content}) when is_binary(content),
-    do: not String.starts_with?(content, "<system-reminder>")
-
-  # A multimodal turn (text plus images) carries a content list, and is always real input.
-  defp turn_start?(%{"role" => "user"}), do: true
-  defp turn_start?(_msg), do: false
+  # cutting at one would silently delete the conversation's own condensed memory. Same
+  # predicate every adapter already uses to find the last real user turn for an inbound
+  # image, so the two can never drift apart again.
+  defp turn_start?(msg), do: Pepe.LLM.Message.person_turn?(msg)
 
   # Resolve the bound agent (falling back to the default), with this session's model
   # override applied, if any. Used by every handler that runs a live turn (`:chat`,
