@@ -156,6 +156,11 @@ defmodule Pepe.Skills do
     full = Path.join(dir, entry)
 
     cond do
+      # `.archive/` (skills taken out of circulation) and `.backups/` live beside the skills
+      # but are not skills - see Pepe.Skills.Lifecycle.
+      String.starts_with?(entry, ".") ->
+        []
+
       String.ends_with?(entry, ".md") and File.regular?(full) ->
         [{String.replace_suffix(entry, ".md", ""), summary(full)}]
 
