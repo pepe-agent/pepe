@@ -254,7 +254,12 @@ defmodule Pepe.ACP.Server do
       # `cwd` is the directory the editor opened, and the one the agent's file and
       # shell tools should resolve against - an ACP path is always absolute, but the
       # workspace the model is told about has to match the project actually open.
+      # `cwd_override` (not plain `cwd`) is what actually makes that happen: an ACP
+      # session always has a real agent bound, and Pepe.Agent.Workspace resolves every
+      # other bound-agent call inside that agent's own persistent workspace regardless
+      # of `cwd` - only `cwd_override` outranks it (see that module's own doc).
       cwd: session.cwd,
+      cwd_override: session.cwd,
       source: "acp",
       on_event: fn event -> GenServer.cast(server, {:event, session_id, event}) end,
       authorize: fn name, args, ctx ->

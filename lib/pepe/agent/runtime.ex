@@ -69,6 +69,11 @@ defmodule Pepe.Agent.Runtime do
           on_event: (term() -> any()),
           stream: boolean(),
           cwd: String.t(),
+          # Set only by a caller that hands the model someone else's already-open
+          # project (the ACP editor bridge) - see Pepe.Agent.Workspace.resolve_in_ctx/2's
+          # doc for why this is a distinct key from plain `cwd` above, not a stronger
+          # default for it.
+          cwd_override: String.t() | nil,
           session_key: String.t() | nil,
           source: String.t() | nil,
           sender: String.t() | nil,
@@ -251,6 +256,7 @@ defmodule Pepe.Agent.Runtime do
 
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
+      cwd_override: opts[:cwd_override],
       agent: agent,
       # The primary model (same head-of-chain compact_for_send/4 sizes against), so a
       # tool can size its output to the model's context window (read_file's page cap).

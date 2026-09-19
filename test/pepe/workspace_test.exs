@@ -47,6 +47,24 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert Workspace.resolve_in_ctx("notes.md", %{cwd: "/tmp"}) == "/tmp/notes.md"
   end
 
+  test "resolve_in_ctx: cwd_override wins even with a bound agent" do
+    ctx = %{agent: %{name: "zak"}, cwd: "/tmp", cwd_override: "/projects/editor-open-dir"}
+
+    assert Workspace.resolve_in_ctx("lib/foo.ex", ctx) == "/projects/editor-open-dir/lib/foo.ex"
+    assert Workspace.resolve_in_ctx("/etc/hosts", ctx) == "/etc/hosts"
+  end
+
+  test "resolve_in_ctx: a nil cwd_override falls back to the bound agent, not an error" do
+    ctx = %{agent: %{name: "zak"}, cwd: "/tmp", cwd_override: nil}
+    assert Workspace.resolve_in_ctx("notes.md", ctx) == Path.join(Workspace.dir("zak"), "notes.md")
+  end
+
+  test "cwd_in_ctx: cwd_override wins even with a bound agent, and is never created on disk" do
+    ctx = %{agent: %{name: "zak"}, cwd: "/tmp", cwd_override: "/projects/editor-open-dir"}
+    assert Workspace.cwd_in_ctx(ctx) == "/projects/editor-open-dir"
+    refute File.dir?("/projects/editor-open-dir")
+  end
+
   test "an agent with no SOUL and the default seed gets onboarding guidance" do
     agent = %{name: "zak", system_prompt: Pepe.Config.Agent.default_prompt()}
     prompt = Workspace.system_prompt(agent)
