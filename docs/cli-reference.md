@@ -126,8 +126,9 @@ the `initialize` handshake reports exactly which parts - see `Pepe.ACP.Protocol`
 
 `chat` (alias: `tui`) opens a session-backed console: it keeps context across
 turns and prints a summary box (agent · model · session) on open. The same slash
-commands as the other gateways work: `/new`, `/undo`, `/compact`, `/status`,
-`/agent <name>`, `/models`, `/model <name> [session|global]`, `/help`, `/exit`.
+commands as the other gateways work: `/new`, `/undo`, `/rewind N`, `/compact`,
+`/status`, `/agent <name>`, `/models`, `/model <name> [session|global]`, `/help`,
+`/exit`.
 Replies stream as they arrive, and a risky tool asks for permission through an
 arrow-key menu (see **Permissions**). There's no multi-user concept in a local
 console, so `/model` always offers the session-vs-global choice. See

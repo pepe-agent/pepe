@@ -113,8 +113,9 @@ defmodule Pepe.ACP.Server do
   def handle_call({:authorize, session_id, name, args, ctx}, from, state) do
     case state.sessions[session_id] do
       # The session went away under a turn that was still running (only reachable if
-      # the editor disconnected mid-call). Nobody can be asked, so nothing new runs.
-      nil -> {:reply, :deny, state}
+      # the editor disconnected mid-call). Nobody can be asked, so nothing new runs -
+      # the same "nobody answered" reason a timeout gets, not "the user said no".
+      nil -> {:reply, {:deny, Pepe.Permissions.cancelled_reason()}, state}
       session -> {:noreply, ask_permission(session_id, session, name, args, ctx, from, state)}
     end
   end
