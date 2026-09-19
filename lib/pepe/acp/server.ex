@@ -274,19 +274,40 @@ defmodule Pepe.ACP.Server do
         GenServer.cast(server, {:prompt_done, session_id, result})
       end)
 
-    run = %{request_id: id, stream?: stream?, task: task}
+    # Monitored (not linked - a crashing turn must not take the connection down) so a
+    # turn that *exits* instead of returning (the underlying Session GenServer crashing
+    # mid-call propagates as an exit out of Pepe.Agent.chat/4) still finishes the
+    # request. With no monitor, that exit was invisible here: no {:prompt_done, ...}
+    # cast ever arrives, `run` stays set forever, every later prompt is refused as
+    # already in flight, and even `session/cancel` cannot recover it.
+    ref = Process.monitor(task)
+    run = %{request_id: id, stream?: stream?, task: task, monitor_ref: ref}
     put_session(state, session_id, %{session | run: run, tools: []})
   end
 
   defp finish_prompt(session_id, result, state) do
     case state.sessions[session_id] do
       %{run: %{} = run} = session ->
+        Process.demonitor(run.monitor_ref, [:flush])
         state = put_session(state, session_id, %{session | run: nil, tools: []})
         respond_to_prompt(session_id, run, result, state)
 
-      # A turn that finished after its own cancellation already answered the request.
+      # A turn that finished after its own cancellation already answered the request,
+      # or the task's normal exit reached here as a :DOWN after its own cast already did.
       _ ->
         state
+    end
+  end
+
+  # The monitored turn task exited without ever casting {:prompt_done, ...} - it
+  # crashed rather than returned. A normal completion demonitors before this can
+  # arrive (see finish_prompt/3), so reaching here with `reason: :normal` is only a
+  # benign race and finish_prompt/3's own no-op clause handles it the same way.
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
+    case Enum.find(state.sessions, fn {_id, s} -> match?(%{run: %{monitor_ref: ^ref}}, s) end) do
+      {session_id, _session} -> {:noreply, finish_prompt(session_id, {:error, reason}, state)}
+      nil -> {:noreply, state}
     end
   end
 
@@ -322,7 +343,20 @@ defmodule Pepe.ACP.Server do
         # request left hanging dies with the task that was blocked on it; the editor
         # is expected to answer those with a `cancelled` outcome, and an answer that
         # arrives for a `from` nobody is waiting on is simply dropped.
-        Session.stop(session.key)
+        #
+        # Session.stop/1 is a bare GenServer.call - if the session process is already
+        # gone (crashed independently of this cancel, or a cancel racing in before the
+        # first turn has finished registering it), that call exits `:noproc`, and
+        # since this all runs inside this GenServer's own callback, an uncaught exit
+        # here would take the whole connection down with it. Nothing left running is
+        # exactly the state a missing session is already in, so there is nothing to do
+        # but swallow it.
+        try do
+          Session.stop(session.key)
+        catch
+          :exit, _ -> :ok
+        end
+
         drop_pending(session_id, state)
 
       _ ->

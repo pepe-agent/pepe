@@ -390,4 +390,106 @@ defmodule Pepe.ACPTest do
       assert await_response(12)["result"]["stopReason"] == "cancelled"
     end
   end
+
+  ###
+  ### cwd_override - a tool call must resolve inside the project the editor has open,
+  ### never the agent's own persistent workspace (see Pepe.Agent.Workspace's own doc)
+  ###
+
+  # Always asks to read "marker.txt" (a relative path), then answers once the tool
+  # result comes back - unlike BashPlug, there is no risk hint on a plain in-workspace
+  # read_file, so no permission round trip is expected. Mirrors BashPlug's own
+  # stream-vs-not branching: the ACP editor agent is streaming, and a JSON body
+  # answering a streamed request parses as an empty stream, silently losing the tool
+  # call - the failure mode this test itself hit once while it was being written.
+  defmodule ReadFilePlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      {:ok, body, conn} = read_body(conn)
+      request = Jason.decode!(body)
+      last = List.last(request["messages"])
+      answering? = last["role"] == "tool"
+      respond(conn, request["stream"] == true, answering?)
+    end
+
+    defp tool_calls do
+      [
+        %{
+          "id" => "call_1",
+          "type" => "function",
+          "function" => %{"name" => "read_file", "arguments" => ~s({"path":"marker.txt"})}
+        }
+      ]
+    end
+
+    defp respond(conn, false, true) do
+      json(conn, %{"role" => "assistant", "content" => "Read it."}, "stop")
+    end
+
+    defp respond(conn, false, false) do
+      json(conn, %{"role" => "assistant", "content" => nil, "tool_calls" => tool_calls()}, "tool_calls")
+    end
+
+    defp respond(conn, true, answering?) do
+      conn = conn |> put_resp_content_type("text/event-stream") |> send_chunked(200)
+
+      chunks =
+        if answering? do
+          [delta(%{"content" => "Read it."}), finish("stop")]
+        else
+          [delta(%{"tool_calls" => tool_calls()}), finish("tool_calls")]
+        end
+
+      Enum.each(chunks ++ ["data: [DONE]\n\n"], fn c -> {:ok, _} = chunk(conn, c) end)
+      conn
+    end
+
+    defp json(conn, message, finish_reason) do
+      payload = %{"choices" => [%{"index" => 0, "message" => message, "finish_reason" => finish_reason}]}
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+    end
+
+    defp delta(d) do
+      "data: #{Jason.encode!(%{"choices" => [%{"index" => 0, "delta" => d, "finish_reason" => nil}]})}\n\n"
+    end
+
+    defp finish(reason) do
+      "data: #{Jason.encode!(%{"choices" => [%{"index" => 0, "delta" => %{}, "finish_reason" => reason}]})}\n\n"
+    end
+  end
+
+  describe "cwd_override" do
+    test "a read_file call resolves against the editor's cwd, not the agent's own workspace", %{server: server} do
+      project = Path.join(System.tmp_dir!(), "acp_project_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(project)
+      File.write!(Path.join(project, "marker.txt"), "from the editor's project")
+
+      {:ok, llm} = Bandit.start_link(plug: ReadFilePlug, port: 0, scheme: :http)
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(llm)
+
+      on_exit(fn ->
+        Process.exit(llm, :normal)
+        File.rm_rf(project)
+      end)
+
+      Config.put_model(%Model{name: "mock_rf", base_url: "http://localhost:#{port}", api_key: "test", model: "mock-model"})
+      Config.put_agent(%Agent{name: "editor", model: "mock_rf", tools: ["read_file"], max_iterations: 5})
+
+      initialize(server)
+      request(server, 20, "session/new", %{"cwd" => project, "mcpServers" => []})
+      session_id = await_response(20)["result"]["sessionId"]
+
+      prompt(server, 21, session_id, "read the marker")
+
+      done = await_update("tool_call_update")["params"]["update"]
+      assert hd(done["content"])["content"]["text"] =~ "from the editor's project"
+      assert await_response(21)["result"]["stopReason"] == "end_turn"
+
+      refute File.exists?(Path.join(Pepe.Agent.Workspace.dir("editor"), "marker.txt"))
+    end
+  end
 end
