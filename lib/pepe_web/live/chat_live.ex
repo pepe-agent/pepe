@@ -30,6 +30,7 @@ defmodule PepeWeb.ChatLive do
       {"/inline", gettext("Feed a message into the running turn: TEXT")},
       {"/goal", gettext("Pursue a goal until a reviewer approves: OBJECTIVE | SUCCESS CRITERION")},
       {"/retry", gettext("Redo the last answer")},
+      {"/rewind", gettext("Go back several turns at once: N")},
       {"/fork", gettext("Branch this conversation into a new one")},
       {"/name", gettext("Label this conversation in the sidebar: TEXT")},
       {"/usage", gettext("Show this month's spend and message count")},
@@ -1210,6 +1211,7 @@ defmodule PepeWeb.ChatLive do
   defp dispatch_slash("/inline", socket, key, cmd), do: inline_into_turn(socket, key, cmd)
   defp dispatch_slash("/goal", socket, key, cmd), do: start_goal(socket, key, cmd)
   defp dispatch_slash("/retry", socket, key, _cmd), do: retry_last(socket, key)
+  defp dispatch_slash("/rewind", socket, key, cmd), do: rewind_session(socket, key, cmd)
   defp dispatch_slash("/fork", socket, key, _cmd), do: fork_session(socket, key)
   defp dispatch_slash("/name", socket, key, cmd), do: label_session(socket, key, cmd)
   defp dispatch_slash("/compact", socket, key, _cmd), do: compact_session(socket, key)
@@ -1351,6 +1353,44 @@ defmodule PepeWeb.ChatLive do
 
       true ->
         put_flash(socket, :error, gettext("Nothing to retry yet."))
+    end
+  end
+
+  # `/rewind N` - drop the last N exchanges and carry on from before them, re-rendering the
+  # transcript from what's left. Irreversible (see Pepe.Agent.Session.rewind/2), so the flash
+  # says how many turns actually went rather than only that something happened.
+  defp rewind_session(socket, key, cmd) do
+    args = cmd |> String.replace_prefix("/rewind", "") |> String.trim()
+
+    case Session.parse_rewind_count(args) do
+      {:ok, count} -> apply_rewind(socket, key, count)
+      :error -> put_flash(socket, :error, gettext("Usage: /rewind N, where N is how many turns to go back."))
+    end
+  end
+
+  defp apply_rewind(socket, key, count) do
+    case Session.rewind(key, count) do
+      {:ok, 0} ->
+        socket |> assign(input: "") |> put_flash(:error, gettext("Nothing to rewind yet."))
+
+      {:ok, dropped} ->
+        flash =
+          if dropped < count,
+            do:
+              ngettext(
+                "Rewound %{count} turn. That was the whole conversation.",
+                "Rewound %{count} turns. That was the whole conversation.",
+                dropped,
+                count: dropped
+              ),
+            else: ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
+
+        socket
+        |> assign(messages: history(key), streaming: "", activity: [], input: "")
+        |> put_flash(:info, flash)
+
+      {:error, :busy} ->
+        put_flash(socket, :error, gettext("Wait for the current turn to finish."))
     end
   end
 
@@ -1500,7 +1540,7 @@ defmodule PepeWeb.ChatLive do
           type: session_type(key),
           agent: agent,
           model: model_of(agent),
-          turns: Enum.count(messages, &(&1["role"] == "user")),
+          turns: Enum.count(messages, &Pepe.LLM.Message.person_turn?/1),
           running: false
         }
 

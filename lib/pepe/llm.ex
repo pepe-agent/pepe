@@ -14,6 +14,7 @@ defmodule Pepe.LLM do
   """
 
   alias Pepe.Config.Model
+  alias Pepe.LLM.Message
   alias Pepe.LLM.SSE
 
   # Enough of the raw stream to carry an error body (a provider's "why"); a success body is much
@@ -210,7 +211,7 @@ defmodule Pepe.LLM do
   defp with_images(messages, images) when images in [nil, []], do: messages
 
   defp with_images(messages, images) do
-    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> m["role"] == "user" end) |> List.last() do
+    case messages |> Enum.with_index() |> Enum.filter(fn {m, _} -> Message.person_turn?(m) end) |> List.last() do
       {_m, idx} -> List.update_at(messages, idx, &attach_openai_images(&1, images))
       nil -> messages
     end

@@ -11,6 +11,12 @@ defmodule Pepe.Webhooks.WhatsApp do
   Note the Cloud API's 24-hour rule: free-form replies are only allowed within 24h
   of the user's last message. Reactive support fits; proactive sends outside the
   window need pre-approved templates (not handled here).
+
+  Inbound media (a voice note, a photo, a PDF) arrives as a media id rather than as
+  bytes: it is described by `parse/1` and fetched later by `fetch_media/2`, which
+  resolves the id to a short-lived download url and pulls it with the same token. What
+  reaches the agent is the transcript, the document text, or the image itself - see
+  `Pepe.Webhooks.Media`.
   """
   @behaviour Pepe.Webhooks.Provider
   use Gettext, backend: Pepe.Gettext
@@ -18,6 +24,10 @@ defmodule Pepe.Webhooks.WhatsApp do
   alias Pepe.Config
 
   @graph "https://graph.facebook.com/v21.0"
+
+  # Inbound message types that carry a file, each under a key of the same name holding a
+  # media `id` (plus `mime_type`, and `filename` on a document, `caption` on the rest).
+  @media_types ~w(audio voice image video document)
 
   @impl true
   def name, do: "whatsapp"
@@ -153,12 +163,105 @@ defmodule Pepe.Webhooks.WhatsApp do
     end
   end
 
-  # Only text messages become a conversation turn; media/status/etc. are ignored
-  # for now (the door is open to handle them like the Telegram media path later).
+  # Text is the message. Media is a message too: the attachment is described here and
+  # resolved to text later, off the request process (`Pepe.Webhooks.Media`), so a voice
+  # note arrives as words and a PDF arrives with its contents. Statuses, reactions,
+  # system events and the rest are still ignored.
   defp normalize(%{"from" => from, "type" => "text", "text" => %{"body" => body}} = m, names),
     do: [%{from: from, text: body, id: m["id"], name: names[from]}]
 
+  defp normalize(%{"from" => from, "type" => type} = m, names) when type in @media_types do
+    part = m[type] || %{}
+
+    case part["id"] do
+      id when is_binary(id) and id != "" ->
+        media = %{
+          kind: kind(type),
+          ref: id,
+          filename: part["filename"],
+          mime: part["mime_type"],
+          # The webhook payload never carries a size (only a sha256); it is read off the
+          # media metadata in fetch_media/2 instead, before the bytes are pulled.
+          size: nil
+        }
+
+        [%{from: from, text: part["caption"] || "", id: m["id"], name: names[from], media: media}]
+
+      _ ->
+        []
+    end
+  end
+
   defp normalize(_, _names), do: []
+
+  # A voice note and an uploaded audio file both just need transcribing, so both are
+  # "audio" here - unlike Telegram, where the distinction buys a spoken reply back.
+  # A sticker is deliberately absent: it is a reaction, not a message, and running an
+  # agent over a thumbs-up is worse than ignoring one.
+  defp kind("voice"), do: "audio"
+  defp kind("audio"), do: "audio"
+  defp kind("image"), do: "image"
+  defp kind("video"), do: "video"
+  defp kind(_other), do: "document"
+
+  @doc """
+  Fetch an inbound attachment. Two steps, both authenticated: the media id resolves to a
+  short-lived download url on the Graph API, and that url is then fetched with the same
+  bearer token (Meta returns `401` without it).
+
+  The url is never taken from the webhook payload - it comes back from an authenticated
+  Graph call - so a crafted inbound event cannot point this at a host of its choosing.
+  The scheme is still checked, and the declared size is honored before the transfer.
+  """
+  @impl true
+  def fetch_media(config, %{ref: id}) when is_binary(id) do
+    pc = provider_config(config)
+    token = Config.interpolate(pc["access_token"])
+
+    if is_binary(token) and token != "" do
+      with {:ok, url, size} <- media_url(token, id),
+           :ok <- Pepe.Webhooks.Media.within_cap(size),
+           :ok <- https(url) do
+        download(token, url)
+      end
+    else
+      {:error, :no_access_token}
+    end
+  end
+
+  def fetch_media(_config, _media), do: {:error, :no_media_id}
+
+  # The metadata answer carries `file_size` alongside the url, which is the one chance to
+  # refuse an oversized file before paying for it.
+  defp media_url(token, id) do
+    case Req.get("#{@graph}/#{id}", auth: {:bearer, token}, receive_timeout: 15_000) do
+      {:ok, %{status: s, body: %{"url" => url} = body}} when s in 200..299 and is_binary(url) ->
+        {:ok, url, body["file_size"]}
+
+      {:ok, %{status: s, body: b}} ->
+        {:error, {:http, s, b}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp download(token, url) do
+    # `decode_body: false` keeps Req from parsing an OGG or a PDF as whatever its
+    # content-type suggests; what is wanted here is the bytes, exactly as sent.
+    case Req.get(url, auth: {:bearer, token}, decode_body: false, receive_timeout: 120_000) do
+      {:ok, %{status: s, body: body}} when s in 200..299 and is_binary(body) -> {:ok, body}
+      {:ok, %{status: s}} -> {:error, {:http, s}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp https(url) do
+    case URI.parse(url) do
+      %URI{scheme: "https", host: h} when is_binary(h) and h != "" -> :ok
+      _ -> {:error, :bad_media_url}
+    end
+  end
 
   @impl true
   def deliver_file(config, to, path, caption) do

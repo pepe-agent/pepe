@@ -182,9 +182,14 @@ defmodule Pepe.Webhooks do
   defp session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
 
   # Run one inbound message through the bound agent, off the request process.
-  defp dispatch(entry, mod, %{from: from, text: text} = message) do
+  #
+  # An attachment is resolved to text first (Pepe.Webhooks.Media), inside the task rather
+  # than in parse/1: it costs a download and a transcription, neither of which belongs on
+  # the request the provider is waiting on. It happens *before* command/3 so a `/new` said
+  # out loud still reads as a command - the whole point of resolving media at the door.
+  defp dispatch(entry, mod, %{from: from} = message) do
     if allowed?(entry, from) do
-      Task.start(fn -> converse(entry, mod, from, text, Map.get(message, :name)) end)
+      Task.start(fn -> resolve_and_converse(entry, mod, message) end)
     else
       Logger.info("[webhooks] #{entry["slug"]}: ignored message from disallowed #{from}")
     end
@@ -192,7 +197,38 @@ defmodule Pepe.Webhooks do
     :ok
   end
 
-  defp converse(entry, mod, from, text, sender_name) do
+  defp resolve_and_converse(entry, mod, %{from: from} = message) do
+    if over_message_limit?(entry) do
+      # A voice note or a document is a download plus a transcription - real cost -
+      # and start_turn/4 refuses this message on message-limit grounds regardless of
+      # what it resolves to, so nothing here is worth spending that on. Whether it's
+      # actually refused is still decided exactly once, inside the session itself;
+      # this only skips paying for media a refusal would never use.
+      converse(entry, mod, from, message[:text] || "", Map.get(message, :name), %{})
+    else
+      case Pepe.Webhooks.Media.resolve(mod, entry, message) do
+        {:ok, text, opts} -> converse(entry, mod, from, text, Map.get(message, :name), opts)
+        # Nothing to answer, and the sender has already been told why.
+        :ignore -> :ok
+      end
+    end
+  end
+
+  # Same "does this message count against the cap" rule Pepe.Agent.Session applies for
+  # real (agent.exempt_message_limit) - called here too only to short-circuit before a
+  # costly media fetch, never as a second place the actual decision is made. The other
+  # half of Session's own rule (not one of Pepe's internal surfaces - tui/web/api/acp)
+  # is skipped: every webhook session key is "provider:agent:from", never one of those.
+  defp over_message_limit?(entry) do
+    with %{} = agent <- Config.get_agent(entry["agent"]),
+         false <- agent.exempt_message_limit do
+      Pepe.Usage.over_message_limit?(Project.of(agent.name))
+    else
+      _ -> false
+    end
+  end
+
+  defp converse(entry, mod, from, text, sender_name, opts) do
     agent = entry["agent"]
     key = session_key(entry, from)
 
@@ -224,15 +260,22 @@ defmodule Pepe.Webhooks do
 
       :chat ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
-        run_chat(entry, mod, key, from, text, sender_name)
+        run_chat(entry, mod, key, from, text, sender_name, opts)
     end
   end
 
-  defp run_chat(entry, mod, key, from, text, sender_name) do
+  defp run_chat(entry, mod, key, from, text, sender_name, opts) do
     # A webhook sender is never the operator, the same "a stranger" content class every
     # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
     # was the one inbound surface that never withdrew auto_approve for it.
-    case Session.chat(key, text, learn: learn?(entry, from), authorize: nil, untrusted: true, sender: sender_name) do
+    case Session.chat(key, text,
+           learn: learn?(entry, from),
+           authorize: nil,
+           untrusted: true,
+           sender: sender_name,
+           # An inbound image, for a vision model: rides this turn only, never persisted.
+           images: opts[:images]
+         ) do
       {:ok, reply} ->
         mod.deliver(entry, from, reply)
 

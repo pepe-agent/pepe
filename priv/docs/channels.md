@@ -63,7 +63,10 @@ reach you as prompts, the gateway handles them. Know they exist so you can point
 user at the right one instead of trying to do it yourself:
 
 - `/new` - start a fresh conversation (clears context). `/undo` - drop the last
-  message. `/compact` - summarize history to reclaim context.
+  message. `/rewind N` - drop the last N exchanges and carry on from before them,
+  for when you went down a bad path several turns ago; it is irreversible, and
+  asking for more turns than the conversation has rewinds all of them and says how
+  many. `/compact` - summarize history to reclaim context.
 - `/agent <name>` - switch which agent this chat talks to. `/model <name>
   [session|global]` / `/models` - show or change the model (a trainer may set it
   globally, others only for their own conversation). `/tools` - list runtime tools.

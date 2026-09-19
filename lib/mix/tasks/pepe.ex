@@ -91,6 +91,7 @@ defmodule Mix.Tasks.Pepe do
                                                # work until an independent reviewer says the criterion is met
       mix pepe tui [AGENT | --agent NAME] [--session KEY]   # interactive console, keeps the session (alias: chat)
       mix pepe serve [--port 4000]             # OpenAI API + WebSocket server
+      mix pepe acp [AGENT | --agent NAME]      # speak Agent Client Protocol on stdin/stdout (code editors)
       mix pepe gateway telegram setup          # configure the default Telegram bot
       mix pepe gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
                                           [--heartbeat-minutes N] [--heartbeat-hours 8-22]
@@ -157,6 +158,24 @@ defmodule Mix.Tasks.Pepe do
 
   @impl true
   def run(argv) do
+    # `acp` owns stdout for a JSON-RPC protocol where anything else on the pipe is a
+    # violation (see Pepe.ACP.Stdio). Quieting the shell here covers every later line
+    # this task itself prints, but NOT Mix's own "Compiling 3 files (.ex)": from a
+    # source checkout, that lands on stdout before this task's code has even loaded,
+    # which is upstream of anywhere this run/1 body could reach - MIX_QUIET=1 is what
+    # actually stops that one (see docs/cli-reference.md). (Pepe.CLI, the compiled
+    # binary, never reaches either path - it has no Mix compile step to print from.)
+    #
+    # Pepe.ACP.Stdio.take_stdout!/0 is called here too, not only inside its own
+    # run/1: dispatch(["acp" | _]) starts the whole :pepe application first (a real
+    # supervision tree - Repo, PubSub, whatever else boots - can log on its own
+    # before acp_cmd/1 ever reaches Stdio.run/1), so the redirect has to be in place
+    # before that boot, not after it, for the guarantee to actually hold.
+    if match?(["acp" | _], argv) do
+      Mix.shell(Mix.Shell.Quiet)
+      Pepe.ACP.Stdio.take_stdout!()
+    end
+
     # Ensure the project is compiled (mix tasks don't recompile by default).
     Mix.Task.run("compile", ["--no-deps-check"])
     apply_locale()
@@ -194,6 +213,7 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["help", "project" | _]), do: project_cmd(["help"])
   def dispatch(["help", "media" | _]), do: media_cmd(["help"])
   def dispatch(["help", "serve" | _]), do: serve_help()
+  def dispatch(["help", "acp" | _]), do: acp_help()
   def dispatch(["help", "run" | _]), do: run_help()
   def dispatch(["help", "backup" | _]), do: backup_help()
   def dispatch(["help", "extract" | _]), do: extract_help()
@@ -325,6 +345,14 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["goal" | rest]), do: with_app([persist: true], fn -> goal_cmd(rest) end)
   def dispatch(["chat" | rest]), do: with_app([persist: true], fn -> tui_cmd(rest) end)
   def dispatch(["tui" | rest]), do: with_app([persist: true], fn -> tui_cmd(rest) end)
+
+  def dispatch(["acp", "help" | _]), do: acp_help()
+
+  # No `serve`, no gateways, no session persistence: an ACP session belongs to the
+  # editor that opened it and dies with the pipe (this agent reports `loadSession:
+  # false`, so there is nothing to come back to), and an editor integration has no
+  # business opening an HTTP port on the side.
+  def dispatch(["acp" | rest]), do: with_app([], fn -> acp_cmd(rest) end)
 
   def dispatch(["serve", "help" | _]), do: serve_help()
 
@@ -1953,6 +1981,9 @@ defmodule Mix.Tasks.Pepe do
       {:error, {:wrong_kind, "skill"}} ->
         error("#{src} is a skill on PepeHub, not a plugin - install it with: mix pepe skill install #{src}")
 
+      {:error, :ambiguous} ->
+        error("#{src} holds more than one plugin with nothing to tell them apart - point at the one you want directly.")
+
       {:error, reason} ->
         error("install failed: #{inspect(reason)}")
     end
@@ -2164,6 +2195,11 @@ defmodule Mix.Tasks.Pepe do
     else
       error("no skill named #{name} in any tap or the bundled registry - pass --source URL to install directly")
     end
+  end
+
+  defp report_skill_install(name, {:error, :ambiguous}) do
+    error("#{name} doesn't match any skill in this source, and it publishes more than one - refusing to guess which one you meant.")
+    info(dim("Check the source's own listing for the exact directory/skill name, then install that instead."))
   end
 
   defp report_skill_install(_name, {:error, reason}), do: error("install failed: #{inspect(reason)}")
@@ -3455,6 +3491,7 @@ defmodule Mix.Tasks.Pepe do
           session_search_project_wide: :boolean,
           micro_compaction: :boolean,
           capability_nudge: :boolean,
+          skill_learning: :boolean,
           admin: :boolean
         ]
       )
@@ -3729,7 +3766,8 @@ defmodule Mix.Tasks.Pepe do
         commitments: opts[:commitments] || false,
         session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
         micro_compaction: opts[:micro_compaction] || false,
-        capability_nudge: opts[:capability_nudge] || false
+        capability_nudge: opts[:capability_nudge] || false,
+        skill_learning: opts[:skill_learning] || false
     }
   end
 
@@ -3950,6 +3988,57 @@ defmodule Mix.Tasks.Pepe do
       project -> Config.default_agent_for(project)
       true -> Config.default_agent_name()
     end
+  end
+
+  ###
+  ### acp (code editors)
+  ###
+
+  # Agent resolution is `tui`'s, not `run`'s: an editor names an agent in its own
+  # settings file and gets no second chance to fix a typo, so an unknown name is a
+  # hard error rather than something quietly treated as part of a prompt.
+  defp acp_cmd(args) do
+    {opts, rest} = OptionParser.parse!(args, strict: [agent: :string, project: :string])
+    raw = opts[:agent] || List.first(rest)
+    agent_name = resolve_tui_agent_name(raw, opts[:project])
+
+    case agent_name && Config.get_agent(agent_name) do
+      # Every message here goes to stderr (see `error/1`), which is the only place a
+      # failure may be reported on this command: stdout belongs to the protocol.
+      nil ->
+        error("no agent. create one with `mix pepe agent add ...` or pass one: mix pepe acp [AGENT]")
+
+      agent ->
+        Pepe.ACP.Stdio.run(agent.name)
+    end
+  end
+
+  defp acp_help do
+    info("""
+    mix pepe acp - talk to an agent from a code editor, over the Agent Client Protocol
+
+      mix pepe acp [AGENT]            # bind the connection to a named agent
+      mix pepe acp --agent NAME       # the same, as a flag
+      mix pepe acp --project CO       # that project's default agent
+
+    ACP is an open, editor-neutral protocol: JSON-RPC over stdin/stdout, the same
+    idea as a language server but for an agent instead of a language. You do not run
+    this command yourself - your editor starts it as a child process and speaks to
+    it. Point the editor's external/custom agent setting at this command.
+
+    What it supports: opening a session, sending a prompt, streaming the answer and
+    each tool call back as it happens, and asking permission before a risky tool
+    runs. That last one is the reason to prefer it over a plain API: a tool call
+    that needs a human goes to the same gate every other Pepe surface uses, and
+    comes out in the editor as a real prompt you answer.
+
+    What it does not support, and says so during the handshake: resuming an earlier
+    session, authentication, image/audio attachments, and routing file reads or a
+    terminal back through the editor. The agent's own tools already run here.
+
+    Anything the agent may do is the agent's configuration, not the editor's:
+    `mix pepe agent list` to see it, `mix pepe tools` for what exists.
+    """)
   end
 
   ###

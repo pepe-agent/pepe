@@ -38,6 +38,7 @@ defmodule Pepe.Agent.Runtime do
 
   alias Pepe.Agent.Compaction
   alias Pepe.Agent.LoopGuard
+  alias Pepe.Agent.SkillLearning
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
@@ -68,6 +69,11 @@ defmodule Pepe.Agent.Runtime do
           on_event: (term() -> any()),
           stream: boolean(),
           cwd: String.t(),
+          # Set only by a caller that hands the model someone else's already-open
+          # project (the ACP editor bridge) - see Pepe.Agent.Workspace.resolve_in_ctx/2's
+          # doc for why this is a distinct key from plain `cwd` above, not a stronger
+          # default for it.
+          cwd_override: String.t() | nil,
           session_key: String.t() | nil,
           source: String.t() | nil,
           sender: String.t() | nil,
@@ -250,6 +256,7 @@ defmodule Pepe.Agent.Runtime do
 
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
+      cwd_override: opts[:cwd_override],
       agent: agent,
       # The primary model (same head-of-chain compact_for_send/4 sizes against), so a
       # tool can size its output to the model's context window (read_file's page cap).
@@ -338,7 +345,14 @@ defmodule Pepe.Agent.Runtime do
     # the caller (Session.spawn_run) recovers this turn's new messages by dropping the prior history
     # by length - if compaction shrank the list in place, that drop would eat into the turn and
     # silently lose it (and re-summarize every turn after). A no-op until the history is large.
-    to_send = compact_for_send(agent, chain, messages, ctx)
+    # Opt-in (`skill_learning`), and empty for every turn that hasn't earned it: one
+    # ephemeral note inviting the agent to offer to save what it just worked out as a
+    # skill, or to correct a skill that just led it wrong. Appended to what is SENT and
+    # nowhere else, exactly like the out-of-turns nudge below - it is chrome about this
+    # turn, and persisting it would have a later turn read it back as conversation. See
+    # Pepe.Agent.SkillLearning for the criterion and why it lives in code rather than in
+    # the system prompt.
+    to_send = compact_for_send(agent, chain, messages, ctx) ++ SkillLearning.reminders(agent, messages)
 
     result = chat_with_failover(chain, to_send, chat_opts, ctx, opts)
 

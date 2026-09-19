@@ -47,6 +47,30 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert Workspace.resolve_in_ctx("notes.md", %{cwd: "/tmp"}) == "/tmp/notes.md"
   end
 
+  # Unique per test run so a real directory a developer or CI host happens to already
+  # have at this path can never make "was never created" pass for the wrong reason.
+  defp override_dir, do: Path.join(System.tmp_dir!(), "pepe_ws_override_#{System.unique_integer([:positive])}")
+
+  test "resolve_in_ctx: cwd_override wins even with a bound agent" do
+    override = override_dir()
+    ctx = %{agent: %{name: "zak"}, cwd: "/tmp", cwd_override: override}
+
+    assert Workspace.resolve_in_ctx("lib/foo.ex", ctx) == Path.join(override, "lib/foo.ex")
+    assert Workspace.resolve_in_ctx("/etc/hosts", ctx) == "/etc/hosts"
+  end
+
+  test "resolve_in_ctx: a nil cwd_override falls back to the bound agent, not an error" do
+    ctx = %{agent: %{name: "zak"}, cwd: "/tmp", cwd_override: nil}
+    assert Workspace.resolve_in_ctx("notes.md", ctx) == Path.join(Workspace.dir("zak"), "notes.md")
+  end
+
+  test "cwd_in_ctx: cwd_override wins even with a bound agent, and is never created on disk" do
+    override = override_dir()
+    ctx = %{agent: %{name: "zak"}, cwd: "/tmp", cwd_override: override}
+    assert Workspace.cwd_in_ctx(ctx) == override
+    refute File.dir?(override)
+  end
+
   test "an agent with no SOUL and the default seed gets onboarding guidance" do
     agent = %{name: "zak", system_prompt: Pepe.Config.Agent.default_prompt()}
     prompt = Workspace.system_prompt(agent)

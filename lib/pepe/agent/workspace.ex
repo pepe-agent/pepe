@@ -104,20 +104,39 @@ defmodule Pepe.Agent.Workspace do
     end
   end
 
-  @doc "Resolve a path from a tool `ctx` - uses the bound agent's workspace, else `cwd`."
-  def resolve_in_ctx(path, ctx) do
-    case ctx[:agent] do
-      %{name: name} when is_binary(name) ->
-        resolve(path, name)
+  @doc """
+  Resolve a path from a tool `ctx` - uses the bound agent's workspace, else `cwd`.
 
-      _ ->
+  `ctx[:cwd_override]`, when set, wins even over a bound agent - the one deliberate
+  exception to "an agent's tools always resolve inside its own persistent workspace".
+  It exists for a caller that hands the model someone else's already-open project (the
+  ACP editor bridge is the only one today: the directory the editor has open, not the
+  agent's own `~/.pepe/...` workspace, is what `read_file`/`bash` must resolve against
+  for that to be useful at all). Plain `ctx[:cwd]` stays a fallback used only when no
+  agent is bound, exactly as before - conflating the two was tried once already and
+  reintroduces the bug `cwd_in_ctx/1`'s own doc describes: a bound agent's tools
+  silently resolving wherever the OS process happened to start, because ordinary
+  callers (Flow, an approved pending call, a Graph node) already pass a `cwd` of their
+  own alongside an `agent` without meaning it to take priority.
+  """
+  def resolve_in_ctx(path, ctx) do
+    cond do
+      is_binary(ctx[:cwd_override]) ->
+        if Path.type(path) == :absolute, do: path, else: Path.join(ctx[:cwd_override], path)
+
+      match?(%{name: name} when is_binary(name), ctx[:agent]) ->
+        resolve(path, ctx[:agent].name)
+
+      true ->
         if Path.type(path) == :absolute, do: path, else: Path.join(ctx[:cwd] || File.cwd!(), path)
     end
   end
 
   @doc """
-  Working directory for a tool `ctx` - the bound agent's workspace (created if
-  missing), else the caller-provided `cwd`, else the OS process cwd.
+  Working directory for a tool `ctx` - `ctx[:cwd_override]` if set (see
+  `resolve_in_ctx/2`'s own doc for why that one key alone outranks a bound agent),
+  else the bound agent's workspace (created if missing), else the caller-provided
+  `cwd`, else the OS process cwd.
 
   This is the command-running counterpart of `resolve_in_ctx/2`: `bash` and
   `run_script` both resolve their working directory here, so a shell command's
@@ -127,13 +146,16 @@ defmodule Pepe.Agent.Workspace do
   from instead of the agent's workspace.
   """
   def cwd_in_ctx(ctx) do
-    case ctx[:agent] do
-      %{name: name} when is_binary(name) ->
-        dir = dir(name)
+    cond do
+      is_binary(ctx[:cwd_override]) ->
+        ctx[:cwd_override]
+
+      match?(%{name: name} when is_binary(name), ctx[:agent]) ->
+        dir = dir(ctx[:agent].name)
         File.mkdir_p!(dir)
         dir
 
-      _ ->
+      true ->
         ctx[:cwd] || File.cwd!()
     end
   end

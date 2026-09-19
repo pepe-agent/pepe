@@ -10,6 +10,7 @@ flowchart LR
     API["HTTP - /v1"] --> AG
     WS["WebSocket"] --> AG
     TG["Telegram"] --> AG
+    ACP["ACP - code editors"] --> AG
 
     AG["<b>Pepe.Agent</b><br/>oneshot · keyed chat sessions"] --> RT
     RT["<b>Pepe.Agent.Runtime</b><br/>the tool-calling loop"] --> LLM
@@ -27,6 +28,7 @@ flowchart LR
 | **`Pepe.Agent.Session`** | One `GenServer` per conversation key (e.g. `telegram:12345`), under a `DynamicSupervisor` + `Registry`. Runs execute off-process, so a session stays responsive (e.g. to `/stop`). Crash isolation and context retention for free. |
 | **`Pepe.Permissions`** | Gates risky tool calls (running code, writing files, changing config). Each surface renders the prompt natively; read-only tools run freely. |
 | **Gateways** | `Pepe.Gateways.Telegram` (long polling) and `Pepe.Gateways.TUI` (the `pepe chat` console). They start only on `serve`/`gateway`, so a local `run`/`chat` never spins up the poller. |
+| **`Pepe.ACP`** | The [Agent Client Protocol](https://agentclientprotocol.com) surface (`pepe acp`): JSON-RPC over stdin/stdout, for a code editor driving an agent the way it drives a language server. Three modules, split the way `Pepe.MCP` already is: `Protocol` (pure encoding, and the single statement of which capabilities are real), `Server` (the connection, transport-free so it can be tested over real JSON with no pipe), `Stdio` (the bytes). Its core-subset scope, and why each omitted part is omitted, is in `Pepe.ACP.Protocol`'s moduledoc. |
 
 > **Web vs non-web surfaces.** `lib/pepe/gateways/` holds the non-web surfaces (the
 > Telegram poller, the `pepe chat` console). Everything served by the Phoenix endpoint

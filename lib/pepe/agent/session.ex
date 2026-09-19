@@ -23,7 +23,11 @@ defmodule Pepe.Agent.Session do
   # messaging it - never counted or blocked by Pepe.Config.project_message_limit/1.
   # Everything else (telegram, a webhook provider, widget:...) counts by default,
   # so a newly added channel is covered without having to list it here.
-  @internal_sources ~w(tui web api)
+  #
+  # `acp` belongs with `tui` for the same reason it is here at all: it is a person at
+  # their own keyboard, in their own editor, driving their own agent (see Pepe.ACP) -
+  # not somebody being served by it.
+  @internal_sources ~w(tui web api acp)
 
   ###
   ### client API
@@ -97,6 +101,78 @@ defmodule Pepe.Agent.Session do
   @doc "Drop the last user turn (and its responses) from the history."
   @spec undo(term()) :: :ok | {:error, :busy}
   def undo(key), do: GenServer.call(via(key), :undo)
+
+  @doc """
+  Rewind the conversation by `count` turns: the last `count` user messages and
+  everything that came after each of them (the agent's answers, its tool calls and
+  their results) are dropped, and the conversation carries on from there. The
+  history-level counterpart of `undo/1` (which is exactly `rewind(key, 1)`) for
+  when an agent went down a bad path several exchanges ago and the person wants to
+  try again from before it, without losing the conversation to `reset/1`.
+
+  Returns `{:ok, dropped}` with the number of turns actually removed, which is
+  `count` unless the conversation was shorter - asking to go back further than the
+  history reaches rewinds everything it has and reports the smaller number, rather
+  than refusing and leaving the person to guess the right value. `{:ok, 0}` means
+  there was nothing to rewind. `{:error, :busy}` while a turn is in flight.
+
+  ## Why turns, and not a message id
+
+  The unit is "the last N turns", not "back to message #7". Every surface this runs
+  on is plain text with no UI (a Telegram chat, the CLI REPL), so a message id would
+  have to be printed on every single reply, on every channel, to be usable at all -
+  a permanent cost on every conversation to serve a rare command. Counting back the
+  turns a person can see in their own scrollback needs nothing printed anywhere, and
+  "go back two questions" is how someone actually describes it.
+
+  ## Why it is irreversible
+
+  A rewound turn is gone: no undo stack, no redo. Keeping one would mean a second
+  copy of the history per live session, plus invalidation rules for every other thing
+  that rewrites `messages` (compaction, `/new`, an agent switch, a fork seed) - a lot
+  of machinery guarding a command whose whole point is "that path was wrong, drop it".
+  Branching without losing the original is what `fork/2` is for, and the full
+  transcript still lives in `Pepe.Trace` either way.
+
+  ## What it does to a compaction summary
+
+  A history condensed by `/compact` carries the summary as a `<system-reminder>`
+  message near the head. It is deliberately not counted as a turn and never
+  dropped: it stands in for turns compaction *already* discarded, which no rewind
+  can bring back, so removing it would only lose context without undoing anything.
+  What the rewind does drop can therefore never be described by it - the summary
+  covers strictly older conversation than the tail being cut.
+
+  The cross-turn micro-compaction cache (`Pepe.Agent.MicroCompaction`) is cleared
+  instead. Its running summary is folded from the oldest exchanges of a message
+  list that just changed length, and its `covered` counter is an index into that
+  list, so after a rewind it can both mis-index and describe turns that no longer
+  exist. Dropping it is safe by that module's own design (the next turn simply
+  folds again from scratch) and is what `/compact` already does for the same reason.
+  """
+  @spec rewind(term(), pos_integer()) :: {:ok, non_neg_integer()} | {:error, :busy}
+  def rewind(key, count \\ 1), do: GenServer.call(via(key), {:rewind, count})
+
+  @doc """
+  Read the argument of a `/rewind` command: `{:ok, count}`, or `:error` for anything
+  that isn't a whole number of turns (`0`, `-2`, `"two"`, trailing junk). A bare
+  `/rewind` with no argument means one turn, so the shortest form still does the
+  obvious thing. Lives here, next to `rewind/2`, so every surface that offers the
+  command agrees on what a valid count is instead of each inventing its own parse.
+  """
+  @spec parse_rewind_count(String.t()) :: {:ok, pos_integer()} | :error
+  def parse_rewind_count(args) do
+    case String.trim(to_string(args)) do
+      "" ->
+        {:ok, 1}
+
+      trimmed ->
+        case Integer.parse(trimmed) do
+          {count, ""} when count > 0 -> {:ok, count}
+          _ -> :error
+        end
+    end
+  end
 
   @doc "Cancel the in-flight run for this session, if any."
   @spec stop(term()) :: :ok | {:error, :not_running}
@@ -683,12 +759,25 @@ defmodule Pepe.Agent.Session do
     {:reply, {:error, :busy}, state}
   end
 
+  # `/undo` is `/rewind 1` with a plain `:ok` - it predates the count and its callers
+  # don't care how many turns went, but there is one implementation of "drop a turn".
   def handle_call(:undo, _from, state) do
-    {:reply, :ok, persist(%{state | messages: drop_last_turn(state.messages)})}
+    {_dropped, state} = do_rewind(state, 1)
+    {:reply, :ok, state}
+  end
+
+  # Same mid-run refusal as `:undo`, and for the same reason.
+  def handle_call({:rewind, _count}, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
+  def handle_call({:rewind, count}, _from, state) do
+    {dropped, state} = do_rewind(state, count)
+    {:reply, {:ok, dropped}, state}
   end
 
   def handle_call(:status, _from, state) do
-    turns = Enum.count(state.messages, &(&1["role"] == "user"))
+    turns = Enum.count(state.messages, &Pepe.LLM.Message.person_turn?/1)
 
     {:reply,
      %{
@@ -1404,16 +1493,40 @@ defmodule Pepe.Agent.Session do
     end
   end
 
-  # Truncate back to just before the last user message.
-  defp drop_last_turn(messages) do
-    case messages
-         |> Enum.with_index()
-         |> Enum.filter(&(elem(&1, 0)["role"] == "user"))
-         |> List.last() do
-      {_msg, idx} -> Enum.take(messages, idx)
-      nil -> messages
+  # Truncate back to just before the `count`-th user message from the end, and forget the
+  # micro-compaction cache if anything actually went (see `rewind/2`'s doc for why). Returns
+  # `{dropped, state}`, persisted. Shared by `:undo` and `:rewind` so there is exactly one
+  # notion of where a turn starts.
+  defp do_rewind(state, count) do
+    {messages, dropped} = drop_last_turns(state.messages, count)
+
+    if dropped > 0, do: Pepe.Agent.MicroCompaction.clear(state.key)
+
+    {dropped, persist(%{state | messages: messages})}
+  end
+
+  defp drop_last_turns(messages, count) when is_integer(count) and count > 0 do
+    case messages |> turn_starts() |> Enum.take(-count) do
+      [] -> {messages, 0}
+      [cut | _] = taken -> {Enum.take(messages, cut), length(taken)}
     end
   end
+
+  defp drop_last_turns(messages, _count), do: {messages, 0}
+
+  # Indexes of the messages that start a turn, oldest first.
+  defp turn_starts(messages) do
+    for {msg, idx} <- Enum.with_index(messages), turn_start?(msg), do: idx
+  end
+
+  # A turn starts on something the person actually said, not one of Pepe's own
+  # `<system-reminder>` notes riding along in the user role (the compaction summary, the
+  # widget's language hint) because several providers drop every system message after the
+  # first - counting one as a turn would make `/rewind 1` throw away a real exchange, and
+  # cutting at one would silently delete the conversation's own condensed memory. Same
+  # predicate every adapter already uses to find the last real user turn for an inbound
+  # image, so the two can never drift apart again.
+  defp turn_start?(msg), do: Pepe.LLM.Message.person_turn?(msg)
 
   # Resolve the bound agent (falling back to the default), with this session's model
   # override applied, if any. Used by every handler that runs a live turn (`:chat`,

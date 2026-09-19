@@ -19,7 +19,9 @@ That is what keeps skills cheap. An agent can know dozens of procedures
 without them weighing the conversation down, because each one costs a single
 line until the moment the work actually calls for it. The summary is simply the
 first non-empty line of the file, so that opening line should say when the
-skill applies.
+skill applies. A skill can also state its summary in a metadata header instead,
+which is what makes skills written elsewhere work here unchanged (see
+[A format other tools share](#a-format-other-tools-share) below).
 
 <div class="note"><strong>The skill tool.</strong> An agent needs the <code>skill</code> tool in its tool list to read skills. Without it the skills are listed in its context but never opened.</div>
 
@@ -62,6 +64,34 @@ shows up in its own list right away.
 This is what makes an agent's know-how durable. A procedure it worked out once
 gets written down instead of being rediscovered every session.
 
+### Learning without being asked
+
+Asking for a skill is something that occurs to nobody in the middle of the task they
+actually wanted done, so most procedures never get written down at all. The
+`skill_learning` flag, off by default, closes that gap from the other side: Pepe watches
+what a turn really did, and on the turns that earned it the agent may raise the subject
+itself.
+
+* **A procedure worth keeping.** The task took at least four successful tool calls across
+  at least two different tools, and no existing skill was consulted. The agent may end its
+  reply with one sentence offering to save what it just worked out.
+* **A skill that turned out to be wrong.** The agent read a skill and something after it
+  failed. Its instructions led somewhere that did not work, so the agent may offer to
+  correct that skill with what the failure taught it: an edit to the skill that already
+  exists, never a second one under a new name.
+
+Offering is all it does. Nothing is written or changed until you say yes, and a quick
+lookup, a retry loop on a single tool, or a task an existing skill already covered goes by
+in silence.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+Turn it on for an agent whose know-how should accumulate, and leave it off when the skill
+library is curated by hand. The same switch is in the dashboard's agent editor, and an
+agent with the `manage_agent` tool can set `skill_learning` on another.
+
 ### Packaging a skill with scripts
 
 A skill can also ship as a small package instead of a single file: a `<name>/`
@@ -89,6 +119,31 @@ before. Every file in a package is security-scanned before install, not just
 the doc: `SKILL.md` gets the usual prompt-injection scan, and each bundled
 script gets the same deep scan a plugin's code gets.
 
+### A format other tools share
+
+Plenty of agent tools now publish skills in the same shape Pepe uses: a folder
+with a `SKILL.md` in it. Their files open with a `---` fenced YAML header
+carrying at least a `name` and a `description`, and that `description` is the
+summary. Pepe reads that header, so a skill written for any of those tools
+works here as it is, with nothing to convert.
+
+```markdown
+---
+name: read-pdf
+description: Extracts text and tables from PDFs. Use when the user sends a PDF.
+---
+
+Run `scripts/extract.py` with the path.
+```
+
+The header is optional, and nothing about existing skills changes: with no
+header, the first non-empty line is still the summary. Use the header when a
+skill is meant to travel, because a skill of yours that carries one is equally
+readable by every other tool that speaks the format. Keys beyond `name` and
+`description` (`license`, `compatibility`, `metadata`) are kept in the file and
+otherwise left alone. The full format is documented at
+[agentskills.io](https://agentskills.io/specification).
+
 ### Installing one from elsewhere
 
 Two paths, depending on where it's coming from. An agent holding the
@@ -115,6 +170,7 @@ pepe skill search release            # search every tap plus the bundled registr
 pepe skill install cut-a-release     # install by name
 pepe skill install @jhonathas/google-workspace   # or a PepeHub reference (see below)
 pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # or directly
+pepe skill install read-pdf --source https://github.com/some-org/skills          # one skill out of a shared collection
 pepe skill update cut-a-release      # re-fetch from the exact source it was installed from
 pepe skill tap add https://github.com/your-team/pepe-skills   # add a registry beyond the bundled default
 ```
@@ -126,6 +182,11 @@ or tap uses that shape. It's installed under the bare package slug (`google-work
 `@jhonathas/google-workspace`), the name every other skill command and the `skill` tool use.
 Pointing `skill install` at a name that turns out to be a plugin on PepeHub, not a skill, fails
 with a clear message telling you to use `plugin install` instead.
+
+A source can hold a whole collection of skills side by side, each in its own folder,
+which is how most public collections are published. Installing by name picks the
+folder with that name, so `pepe skill install read-pdf --source <repo>` brings back
+that one skill and its files, not whichever one the repository happened to list first.
 
 Every install goes through the same static security scan `manage_skill`/`install-skill` use; a dangerous
 verdict is refused unless you pass `--force`. Trust is `"official"` for the bundled, in-repo

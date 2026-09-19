@@ -504,6 +504,21 @@ defmodule Pepe.Permissions do
     @timeout_prefix <> " (the permission request expired after #{minutes} minutes)"
   end
 
+  @doc """
+  The deny reason for a live prompt that was **withdrawn** rather than answered: the
+  surface took the question away before anyone looked at it (an editor cancelling the
+  turn over `Pepe.ACP`, a connection dropping mid-prompt).
+
+  Built on the same `@timeout_prefix` as `timeout_reason/1`, and for the same reason:
+  `denied_message/2` has to tell the model "nobody answered" and not "the user
+  refused". The two are different facts with different next moves - a refusal means
+  find another way, an unanswered question means ask again when someone is around -
+  and a withdrawn prompt is squarely the second, even though no clock ran out.
+  """
+  @spec cancelled_reason() :: String.t()
+  def cancelled_reason,
+    do: @timeout_prefix <> " (the request was withdrawn before anyone answered it)"
+
   # A human is "on the line" exactly when there's a real authorize callback to answer to -
   # the same test `ask/4` itself uses to tell an interactive surface from an unattended one.
   defp interactive_and_risk_free?(name, args, [], ctx),

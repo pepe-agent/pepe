@@ -147,6 +147,25 @@ defmodule Pepe.LLM.VisionTest do
     assert Enum.any?(last_user["content"], &(&1["type"] == "input_text" and &1["text"] == "what is in this picture?"))
   end
 
+  test "a trailing system-reminder never steals the image from the message a person wrote" do
+    port = start_plug(OpenAIPlug)
+    model = %Model{name: "m", base_url: "http://127.0.0.1:#{port}/v1", api: "openai-completions", api_key: "x", model: "gpt", vision: true}
+
+    # Pepe's own per-turn chrome rides in the user role, and since Pepe.Agent.SkillLearning
+    # one of those notes can land AFTER the user's turn - at which point "the last user
+    # message" is no longer the message the photo belongs to.
+    reminder = Message.user("<system-reminder>\nsomething about this turn\n</system-reminder>")
+
+    LLM.chat(model, messages() ++ [reminder], images: [image()])
+
+    assert_receive {:req, body}, 2_000
+    last_user = body["messages"] |> Enum.filter(&(&1["role"] == "user")) |> List.last()
+    assert last_user["content"] =~ "something about this turn"
+
+    with_image = body["messages"] |> Enum.filter(&is_list(&1["content"])) |> List.last()
+    assert %{"type" => "text", "text" => "what is in this picture?"} in with_image["content"]
+  end
+
   test "no images: the last user message stays a plain string (all adapters)" do
     port = start_plug(OpenAIPlug)
     model = %Model{name: "m", base_url: "http://127.0.0.1:#{port}/v1", api: "openai-completions", api_key: "x", model: "gpt", vision: true}

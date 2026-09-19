@@ -19,7 +19,10 @@ segue-o.
 procedimentos pagando apenas uma linha de contexto por cada um, e só abre a versão
 longa no exato momento em que o trabalho o exige. O resumo é simplesmente a primeira
 linha não vazia do ficheiro, por isso vale a pena escrever essa abertura já a dizer
-quando a skill se aplica.
+quando a skill se aplica - a não ser que a skill declare esse resumo num cabeçalho de
+metadados, caso em que este vence: é isso que faz com que uma skill escrita noutra
+ferramenta funcione aqui tal como está (vê "Um formato que outras ferramentas
+partilham", mais abaixo).
 
 <div class="note"><strong>A ferramenta skill.</strong> Sem a ferramenta <code>skill</code> na sua lista, o agente até vê as skills listadas no contexto, mas nunca chega a abri-las.</div>
 
@@ -63,6 +66,34 @@ maneira de fazer alguma coisa e, guiado pelo `skill-creator`, ele grava um
 É isto que torna durável o conhecimento acumulado por um agente: um procedimento
 descoberto uma vez fica escrito, em vez de precisar de ser reinventado a cada sessão.
 
+### Aprender sem ninguém pedir
+
+A meio da tarefa que a pessoa queria mesmo ver resolvida, ninguém se lembra de pedir uma
+skill, e por isso quase nenhum procedimento chega a ficar escrito. O `skill_learning`,
+desligado por omissão, fecha essa falha pelo outro lado: o Pepe repara no que o turno fez
+de facto e, nos turnos que o justificam, é o próprio agente a levantar o assunto.
+
+* **Um procedimento que vale a pena guardar.** A tarefa exigiu pelo menos quatro chamadas
+  de ferramenta bem-sucedidas, em pelo menos duas ferramentas diferentes, e não houve
+  nenhuma skill existente consultada. O agente pode terminar a resposta com uma frase a
+  propor guardar aquilo que acabou de descobrir.
+* **Uma skill que afinal estava errada.** O agente leu uma skill e algo a seguir falhou.
+  As instruções dela levaram a um sítio que não funciona, por isso o agente pode propor
+  corrigi-la com o que a falha lhe ensinou: uma edição à skill que já existe, nunca uma
+  segunda com outro nome.
+
+Propor é tudo o que ele faz. Nada é escrito nem alterado antes do teu sim, e uma consulta
+rápida, um ciclo de tentativas na mesma ferramenta ou uma tarefa que já tinha skill passam
+sem uma palavra.
+
+```bash
+pepe agent add ops --skill-learning ...
+```
+
+Liga-o num agente cujo conhecimento deve ir acumulando e deixa-o desligado quando a
+biblioteca de skills é tratada à mão. O mesmo interruptor está no editor de agentes do
+painel, e um agente com a ferramenta `manage_agent` pode ligar o `skill_learning` noutro.
+
 ### Empacotar uma skill com scripts
 
 Uma skill também pode chegar como um pequeno pacote em vez de um ficheiro solto: uma
@@ -90,6 +121,30 @@ que passa por análise de segurança antes de instalar, é cada ficheiro do paco
 o `SKILL.md` recebe a análise habitual contra injeção de prompt, e cada script
 incluído recebe a mesma análise profunda que o código de um plugin recebe.
 
+### Um formato que outras ferramentas partilham
+
+Muitas ferramentas de agente publicam hoje as suas skills exactamente na forma que o
+Pepe já usa: uma pasta com um `SKILL.md` lá dentro. Os ficheiros delas abrem com um
+bloco YAML entre `---` a trazer pelo menos `name` e `description`, e é essa
+`description` que serve de resumo. O Pepe lê esse cabeçalho, por isso uma skill escrita
+para qualquer uma dessas ferramentas corre aqui tal como está, sem nada a converter.
+
+```markdown
+---
+name: read-pdf
+description: Extrai texto e tabelas de PDFs. Usa quando o utilizador enviar um PDF.
+---
+
+Corre `scripts/extract.py` com o caminho.
+```
+
+O cabeçalho é opcional e nada muda nas skills que já tens: sem ele, o resumo continua a
+ser a primeira linha não vazia. Usa-o quando a skill for feita para circular, porque uma
+skill tua que o traga fica igualmente legível por todas as outras ferramentas que falam
+este formato. Chaves para além de `name` e `description` (`license`, `compatibility`,
+`metadata`) ficam guardadas no ficheiro e não são tocadas. O formato completo está
+documentado em [agentskills.io](https://agentskills.io/specification).
+
 ### Instalar uma vinda de fora
 
 Há dois caminhos, consoante a origem. Um agente com a ferramenta `manage_skill`
@@ -116,6 +171,7 @@ pepe skill search release            # pesquisa em cada tap mais o registo inclu
 pepe skill install cut-a-release     # instala pelo nome
 pepe skill install @jhonathas/google-workspace   # ou uma referência do PepeHub (vê abaixo)
 pepe skill install cut-a-release --source https://example.com/cut-a-release.md   # ou diretamente
+pepe skill install read-pdf --source https://github.com/some-org/skills          # uma skill de dentro de uma colecção
 pepe skill update cut-a-release      # volta a obtê-la a partir da fonte exata de onde foi instalada
 pepe skill tap add https://github.com/a-tua-equipa/pepe-skills   # acrescenta um registo além do incluído
 ```
@@ -129,6 +185,11 @@ instalado sob o slug puro do pacote (`google-workspace`, e não
 própria ferramenta `skill` usam. Se apontares o `skill install` para um nome que
 afinal é um plugin no PepeHub, e não uma skill, a instalação falha com uma mensagem
 clara a indicar `plugin install` em vez disso.
+
+Uma origem pode guardar uma colecção inteira de skills lado a lado, cada uma na sua
+própria pasta, que é como a maioria das colecções públicas é publicada. Instalar por
+nome escolhe a pasta com esse nome, por isso `pepe skill install read-pdf --source
+<repo>` traz essa skill e os ficheiros dela, e não a primeira que o repositório listar.
 
 Toda instalação passa pela mesma análise de segurança estática que o
 `manage_skill`/`install-skill` já usam; um veredito perigoso é recusado a menos que

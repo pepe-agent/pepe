@@ -16,6 +16,20 @@ Skills are how Pepe grows new know-how without new code.
 - That's the whole economy: the summary must make it obvious *when* to open the
   skill; the body holds the *how*. Keep the body lean - every skill you read spends
   tokens, so include only what isn't obvious.
+- **Or a metadata header**, the portable form other agent tools publish in: open the
+  file with a `---` fenced YAML block carrying `name` and `description`, and that
+  `description` becomes the summary instead of the first line. Use this when the skill
+  is meant to be shared outside this Pepe; use the plain first-line form otherwise.
+  A skill written for any compatible tool already works here unchanged.
+
+  ```
+  ---
+  name: read-pdf
+  description: Extracts text and tables from PDFs. Use when the user sends a PDF.
+  ---
+
+  Run `scripts/extract.py` with the path.
+  ```
 
 ## When to make a skill (and when not to)
 

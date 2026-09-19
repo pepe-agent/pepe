@@ -4,7 +4,8 @@ defmodule Pepe.Gateways.TUI do
 
   Like `mix pepe run`, but it *holds* the session: the conversation keeps context
   across turns and the same slash commands as the other gateways work - `/new`,
-  `/undo`, `/compact`, `/status`, `/agent`, `/models`, `/model`, `/help`, `/exit`.
+  `/undo`, `/rewind`, `/compact`, `/status`, `/agent`, `/models`, `/model`, `/help`,
+  `/exit`.
   Replies stream to stdout and risky tools prompt through the shared arrow-key
   permission menu (`Pepe.Permissions.Prompt`), scoped to the console session.
 
@@ -275,6 +276,23 @@ defmodule Pepe.Gateways.TUI do
     info(gettext("↩️ Undid your last message."))
   end
 
+  # `/rewind N` - go back N exchanges at once. Reports how many turns actually went, so
+  # hitting the start of the conversation reads as an answer rather than a refusal.
+  defp run_command(key, "rewind", rest) do
+    case Session.parse_rewind_count(rest) do
+      {:ok, count} ->
+        case Session.rewind(key, count) do
+          {:ok, 0} -> info(gettext("Nothing to rewind yet."))
+          {:ok, dropped} when dropped < count -> info("⏪ " <> rewound_all(dropped))
+          {:ok, dropped} -> info("⏪ " <> rewound(dropped))
+          {:error, :busy} -> error(gettext("Wait for the current turn to finish."))
+        end
+
+      :error ->
+        info(gettext("Usage: /rewind N, where N is how many turns to go back."))
+    end
+  end
+
   defp run_command(key, "retry", _rest) do
     case last_user_text(key) do
       nil ->
@@ -361,12 +379,24 @@ defmodule Pepe.Gateways.TUI do
   defp run_command(_key, "help", _rest) do
     info(
       gettext("Commands:") <>
-        "\n/new  /undo  /retry  /compact  /learn  /usage  /status  /agent <name>  /models  /model <name> [session|global]  /help  /exit"
+        "\n/new  /undo  /rewind <n>  /retry  /compact  /learn  /usage  /status  /agent <name>  /models  /model <name> [session|global]  /help  /exit"
     )
   end
 
   defp run_command(_key, cmd, _rest) do
     info(gettext("Unknown command: /%{cmd}", cmd: cmd))
+  end
+
+  defp rewound(dropped),
+    do: ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
+
+  defp rewound_all(dropped) do
+    ngettext(
+      "Rewound %{count} turn. That was the whole conversation.",
+      "Rewound %{count} turns. That was the whole conversation.",
+      dropped,
+      count: dropped
+    )
   end
 
   # No trainers/locked distinction here (single-operator console) - always the

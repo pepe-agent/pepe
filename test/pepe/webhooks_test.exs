@@ -91,7 +91,7 @@ defmodule Pepe.WebhooksTest do
       assert :error = WhatsApp.authenticate(e, body, %{})
     end
 
-    test "parse extracts text messages and ignores the rest" do
+    test "parse extracts text and media messages, and ignores the rest" do
       payload = %{
         "entry" => [
           %{
@@ -105,7 +105,8 @@ defmodule Pepe.WebhooksTest do
                       "text" => %{"body" => "oi"},
                       "id" => "m1"
                     },
-                    %{"from" => "5511999", "type" => "image", "image" => %{"id" => "x"}}
+                    %{"from" => "5511999", "type" => "image", "image" => %{"id" => "x"}},
+                    %{"from" => "5511999", "type" => "reaction", "reaction" => %{"emoji" => "👍"}}
                   ]
                 }
               }
@@ -114,7 +115,11 @@ defmodule Pepe.WebhooksTest do
         ]
       }
 
-      assert {:ok, [%{from: "5511999", text: "oi", id: "m1"}]} = WhatsApp.parse(payload)
+      # The image is a message too - described here, fetched later (see
+      # test/pepe/webhooks/media_test.exs). A reaction still isn't one.
+      assert {:ok, [text, image]} = WhatsApp.parse(payload)
+      assert %{from: "5511999", text: "oi", id: "m1"} = text
+      assert %{text: "", media: %{kind: "image", ref: "x"}} = image
 
       assert :ignore =
                WhatsApp.parse(%{"entry" => [%{"changes" => [%{"value" => %{"statuses" => []}}]}]})
@@ -495,6 +500,58 @@ defmodule Pepe.WebhooksTest do
       # Pepe.Permissions' unattended_reason/1 for this exact wording.
       assert opts[:json]["text"]["body"] =~ "content from outside"
       refute opts[:json]["text"]["body"] =~ "/tmp/whatsapp_test_dummy"
+    end
+  end
+
+  describe "message limit checked before spending on media" do
+    test "a project already over its message limit never pays for a download/transcription" do
+      Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:1", model: "gpt"})
+      Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
+
+      parent = self()
+
+      Mimic.stub(Pepe.Usage, :over_message_limit?, fn "acme" ->
+        send(parent, :checked_message_limit)
+        true
+      end)
+
+      Mimic.reject(&Pepe.Webhooks.Media.resolve/3)
+
+      e = entry()
+      Config.put_webhook("support", e)
+
+      body =
+        Jason.encode!(%{
+          "entry" => [
+            %{
+              "changes" => [
+                %{
+                  "value" => %{
+                    "messages" => [
+                      %{
+                        "from" => "5511999",
+                        "type" => "audio",
+                        "audio" => %{"id" => "media123", "mime_type" => "audio/ogg"},
+                        "id" => "wamid.in"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        })
+
+      sig = "sha256=" <> (:crypto.mac(:hmac, :sha256, "s3cr3t", body) |> Base.encode16(case: :lower))
+
+      assert :ok =
+               Webhooks.handle_inbound("acme", "whatsapp", "support", body, Jason.decode!(body), %{
+                 "x-hub-signature-256" => sig
+               })
+
+      # Proves the dispatch task actually reached the limit check (not just that nothing
+      # crashed) before the test process exits - a real signal instead of a timed guess.
+      assert_receive :checked_message_limit, 1000
     end
   end
 end

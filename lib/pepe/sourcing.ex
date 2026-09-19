@@ -16,7 +16,8 @@ defmodule Pepe.Sourcing do
       (`".exs"` for a plugin, `".md"` for a skill).
     * `root_marker` - a 1-arg function ranking which directory inside an extracted archive
       is the real package root (see `root/2`); a plugin ranks `manifest.json` above any
-      other `.exs`, a skill ranks `SKILL.md` above any other `.md`.
+      other `.exs`, a skill ranks the entry doc of the *requested* skill above any other
+      entry doc, which is what lets one skill be installed out of a multi-skill catalog.
   """
 
   @doc """
@@ -39,10 +40,24 @@ defmodule Pepe.Sourcing do
   def stage(path, single_ext, root_marker) do
     cond do
       not (File.exists?(path) or File.dir?(path)) -> {:error, :not_found}
-      File.dir?(path) -> {:ok, %{type: :dir, path: path}, fn -> :ok end}
+      File.dir?(path) -> stage_directory(path, root_marker)
       archive?(path) -> stage_archive(path, fn -> :ok end, root_marker)
       String.ends_with?(path, single_ext) -> {:ok, %{type: :file, path: path}, fn -> :ok end}
       true -> {:error, :unsupported_source}
+    end
+  end
+
+  # A local directory gets the exact same root selection an archive's extracted
+  # contents get - a directory handed in by path can be a catalog (many packages
+  # side by side) just as easily as a downloaded one can, and skipping root/2 here
+  # meant a nested `<name>/SKILL.md` inside a local catalog directory was never
+  # found at all, only ever a package whose own top level already held the entry
+  # file. A single-package directory resolves to itself unchanged, exactly as
+  # before, since root/2 finds that same top-level match either way.
+  defp stage_directory(path, root_marker) do
+    case root(path, root_marker) do
+      {:ok, resolved} -> {:ok, %{type: :dir, path: resolved}, fn -> :ok end}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -97,30 +112,55 @@ defmodule Pepe.Sourcing do
   @doc """
   The directory inside `tmp` that best satisfies `root_marker`, else `tmp` itself.
 
-  `root_marker` ranks a basename: `false` for no match, a lower integer for a more
-  specific one - a plugin's exact `manifest.json` or a skill's exact `SKILL.md`
+  `root_marker` ranks a path *relative to `tmp`*: `false` for no match, a lower integer
+  for a more specific one - a plugin's exact `manifest.json` or a skill's exact `SKILL.md`
   outranks any incidental same-extension file elsewhere in the tree (a package's own
   reference docs, say). Picking merely the first regular file matching a boolean
   predicate depended on `Path.wildcard/1`'s traversal order, which nothing guarantees,
   and silently resolved to the wrong directory the first time a package shipped more
   than one file the predicate could match.
+
+  The marker sees the whole relative path, not just the basename, because a name alone
+  cannot disambiguate a *catalog* - a repository shipping many packages side by side,
+  each with an entry doc of the identical name. Only the enclosing directory says which
+  one was asked for.
+
+  When two or more candidates tie for the best (lowest) rank in *different* directories,
+  there is no principled way to pick one - the requested name matched nothing exactly, and
+  guessing would silently install whichever entry the filesystem happened to list first
+  under the name the caller asked for. That case is `{:error, :ambiguous}` rather than a
+  guess. A tie inside the *same* directory (two same-ranked files sitting next to each
+  other) is not ambiguous at this level - `root/2` only ever returns the directory, and
+  every candidate in it resolves to the same answer.
   """
-  @spec root(String.t(), (String.t() -> false | pos_integer())) :: String.t()
+  @spec root(String.t(), (String.t() -> false | non_neg_integer())) ::
+          {:ok, String.t()} | {:error, :ambiguous}
   def root(tmp, root_marker) do
-    tmp
-    |> Path.join("**")
-    |> Path.wildcard()
-    |> Enum.filter(&File.regular?/1)
-    |> Enum.flat_map(fn path ->
-      case root_marker.(Path.basename(path)) do
-        false -> []
-        rank -> [{rank, path}]
-      end
-    end)
-    |> Enum.min_by(&elem(&1, 0), fn -> nil end)
-    |> case do
-      nil -> tmp
-      {_rank, match} -> Path.dirname(match)
+    candidates =
+      tmp
+      |> Path.join("**")
+      |> Path.wildcard()
+      |> Enum.filter(&File.regular?/1)
+      |> Enum.flat_map(fn path ->
+        case root_marker.(Path.relative_to(path, tmp)) do
+          false -> []
+          rank -> [{rank, path}]
+        end
+      end)
+
+    case Enum.min_by(candidates, &elem(&1, 0), fn -> nil end) do
+      nil ->
+        {:ok, tmp}
+
+      {best_rank, _} ->
+        candidates
+        |> Enum.filter(fn {rank, _} -> rank == best_rank end)
+        |> Enum.map(fn {_rank, path} -> Path.dirname(path) end)
+        |> Enum.uniq()
+        |> case do
+          [dir] -> {:ok, dir}
+          _ -> {:error, :ambiguous}
+        end
     end
   end
 
@@ -171,8 +211,15 @@ defmodule Pepe.Sourcing do
     File.mkdir_p!(tmp)
 
     case extract(archive_path, tmp) do
-      :ok ->
-        {:ok, %{type: :dir, path: root(tmp, root_marker)},
+      :ok -> stage_extracted(tmp, cleanup, root_marker)
+      {:error, reason} -> cleanup_and_fail(tmp, cleanup, {:extract, reason})
+    end
+  end
+
+  defp stage_extracted(tmp, cleanup, root_marker) do
+    case root(tmp, root_marker) do
+      {:ok, path} ->
+        {:ok, %{type: :dir, path: path},
          fn ->
            cleanup.()
            File.rm_rf(tmp)
@@ -180,10 +227,14 @@ defmodule Pepe.Sourcing do
          end}
 
       {:error, reason} ->
-        File.rm_rf(tmp)
-        cleanup.()
-        {:error, {:extract, reason}}
+        cleanup_and_fail(tmp, cleanup, reason)
     end
+  end
+
+  defp cleanup_and_fail(tmp, cleanup, reason) do
+    File.rm_rf(tmp)
+    cleanup.()
+    {:error, reason}
   end
 
   defp extract(archive_path, dest) do

@@ -198,6 +198,82 @@ defmodule Pepe.Skills.MarketplaceTest do
       refute File.exists?(Path.join([home, "skills", "greet"]))
     end
 
+    test "installing from a catalog picks the requested skill, not whichever doc came first", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}")
+
+      write_package(Path.join(src, "catalog"), %{
+        "aaa-first/SKILL.md" => "---\nname: aaa-first\ndescription: The wrong one.\n---\n\nWrong.\n",
+        "read-pdf/SKILL.md" => "---\nname: read-pdf\ndescription: Reads PDFs. Use for PDFs.\n---\n\nRight.\n",
+        "read-pdf/scripts/extract.py" => "print('pdf')\n",
+        "zzz-last/SKILL.md" => "---\nname: zzz-last\ndescription: Also wrong.\n---\n\nWrong.\n"
+      })
+
+      archive = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}.tar.gz")
+      {_, 0} = System.cmd("tar", ["-czf", archive, "-C", src, "catalog"])
+
+      on_exit(fn ->
+        File.rm_rf(src)
+        File.rm(archive)
+      end)
+
+      assert {:ok, "read-pdf", _scan} = Marketplace.install("read-pdf", source: archive)
+
+      installed = Path.join([home, "skills", "read-pdf"])
+      assert File.read!(Path.join(installed, "SKILL.md")) =~ "Right."
+      assert File.read!(Path.join(installed, "scripts/extract.py")) == "print('pdf')\n"
+      refute File.exists?(Path.join([home, "skills", "aaa-first"]))
+      assert {"read-pdf", "Reads PDFs. Use for PDFs."} in Pepe.Skills.list()
+    end
+
+    test "installing from a LOCAL DIRECTORY catalog also picks the requested skill, not whichever came first", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "catalog_dir_#{System.unique_integer([:positive])}")
+
+      write_package(Path.join(src, "aaa-first"), %{"SKILL.md" => "---\nname: aaa-first\ndescription: Wrong.\n---\n\nWrong.\n"})
+      write_package(Path.join(src, "read-pdf"), %{"SKILL.md" => "---\nname: read-pdf\ndescription: Right.\n---\n\nRight.\n"})
+
+      on_exit(fn -> File.rm_rf(src) end)
+
+      assert {:ok, "read-pdf", _scan} = Marketplace.install("read-pdf", source: src)
+
+      installed = Path.join([home, "skills", "read-pdf"])
+      assert File.read!(Path.join(installed, "SKILL.md")) =~ "Right."
+      refute File.exists?(Path.join([home, "skills", "aaa-first"]))
+    end
+
+    test "installing a name that matches no skill in a multi-skill catalog refuses rather than guessing" do
+      src = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}")
+
+      write_package(Path.join(src, "catalog"), %{
+        "aaa-first/SKILL.md" => "---\nname: aaa-first\ndescription: One.\n---\n\nOne.\n",
+        "zzz-last/SKILL.md" => "---\nname: zzz-last\ndescription: Two.\n---\n\nTwo.\n"
+      })
+
+      archive = Path.join(System.tmp_dir!(), "catalog_#{System.unique_integer([:positive])}.tar.gz")
+      {_, 0} = System.cmd("tar", ["-czf", archive, "-C", src, "catalog"])
+
+      on_exit(fn ->
+        File.rm_rf(src)
+        File.rm(archive)
+      end)
+
+      assert {:error, :ambiguous} = Marketplace.install("no-such-skill", source: archive)
+    end
+
+    test "a package carrying a metadata header is listed by its description", %{home: home} do
+      src = Path.join(System.tmp_dir!(), "greet_meta_#{System.unique_integer([:positive])}")
+
+      write_package(src, %{
+        "SKILL.md" => "---\nname: greet\ndescription: Greets a person. Use when the user says hello.\n---\n\nSay hi.\n",
+        "scripts/hello.py" => "print('hi')\n"
+      })
+
+      on_exit(fn -> File.rm_rf(src) end)
+
+      assert {:ok, "greet", %{verdict: :safe}} = Marketplace.install("greet", source: src)
+      assert File.regular?(Path.join([home, "skills", "greet", "scripts/hello.py"]))
+      assert {"greet", "Greets a person. Use when the user says hello."} in Pepe.Skills.list()
+    end
+
     test "remove deletes the whole package directory", %{home: home} do
       src = Path.join(System.tmp_dir!(), "greet_pkg_#{System.unique_integer([:positive])}")
       write_package(src, %{"SKILL.md" => "Use when greeting someone.\n", "scripts/hello.py" => "print('hi')\n"})

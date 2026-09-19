@@ -473,6 +473,14 @@ defmodule PepeWeb.AgentsLive do
                 </label>
                 <p class={[hlp(), check_indent()]}>{gettext("After helping with something, the agent may add one short, natural sentence pointing at a related capability (Watches, Scheduled tasks, Goals, an installed skill) when one genuinely fits. Not every turn, not a menu. Off is right for an agent meant to stay terse and transactional.")}</p>
               </div>
+
+              <div>
+                <label class="flex items-start gap-2.5 text-sm">
+                  <input type="checkbox" name="skill_learning" value="true" checked={@edit_agent[:skill_learning]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
+                  <span>{gettext("Learn from what it does (offer to save and correct its own skills)")}</span>
+                </label>
+                <p class={[hlp(), check_indent()]}>{gettext("After a task that took several steps to work out, the agent may offer to save that procedure as a skill, so the next time is direct. And when it follows a skill that then leads it wrong, it may offer to correct that skill with what it just learned. It only offers: nothing is written or changed without your yes.")}</p>
+              </div>
             </.form_section>
 
             <.form_section :if={!@edit_agent.new?} collapsible title={gettext("Assembled prompt")}>
@@ -604,7 +612,8 @@ defmodule PepeWeb.AgentsLive do
       commitments: false,
       session_search_scope: "self",
       micro_compaction: false,
-      capability_nudge: false
+      capability_nudge: false,
+      skill_learning: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -796,7 +805,8 @@ defmodule PepeWeb.AgentsLive do
         commitments: params["commitments"] == "true",
         session_search_scope: session_search_scope_param(params),
         micro_compaction: params["micro_compaction"] == "true",
-        capability_nudge: params["capability_nudge"] == "true"
+        capability_nudge: params["capability_nudge"] == "true",
+        skill_learning: params["skill_learning"] == "true"
     }
   end
 
@@ -836,7 +846,8 @@ defmodule PepeWeb.AgentsLive do
         commitments: params["commitments"] == "true",
         session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
         micro_compaction: params["micro_compaction"] == "true",
-        capability_nudge: params["capability_nudge"] == "true"
+        capability_nudge: params["capability_nudge"] == "true",
+        skill_learning: params["skill_learning"] == "true"
     }
   end
 

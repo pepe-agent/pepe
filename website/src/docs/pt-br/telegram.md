@@ -120,6 +120,7 @@ também aparecem no menu "/" do Telegram, já no idioma configurado.
 |---|---|
 | `/new` | Começa uma conversa nova |
 | `/undo` | Desfaz sua última mensagem |
+| `/rewind N` | Volta N trocas atrás e segue a conversa dali |
 | `/retry` | Refaz a última resposta |
 | `/compact` | Resume o histórico para liberar contexto |
 | `/stop` | Para a execução atual |
@@ -130,6 +131,23 @@ também aparecem no menu "/" do Telegram, já no idioma configurado.
 | `/learn` | Salva o que o agente aprendeu na memória e nas skills |
 | `/whoami` | Mostra seus ids de usuário e de chat do Telegram |
 | `/help` | Lista os comandos que você pode rodar |
+
+#### Voltando algumas trocas atrás
+
+Quando o agente pega um caminho errado e as três respostas seguintes já vêm em
+cima dele, `/rewind 3` tira essas três trocas da conversa e retoma de antes
+delas. Nada mais muda: mesmo chat, mesmo agente, tudo que ele já sabia de antes
+continua lá. A contagem é de trocas, do jeito que você enxerga na própria tela,
+então não existe número de mensagem para procurar em lugar nenhum.
+
+Se você pedir mais do que a conversa tem, ele volta tudo que dá e diz quantas
+trocas foram, em vez de recusar e deixar você chutar um número menor. O que sai
+não volta, então, quando a ideia for testar outro caminho sem perder o atual,
+ramifique a conversa (o `/fork` do painel).
+
+Se o histórico já tiver sido resumido para economizar contexto, o resumo fica.
+Ele cobre trocas que foram condensadas muito antes, que nenhum rewind traz de
+volta, e nunca fala do que o rewind acabou de tirar.
 
 E os comandos de operador, liberados só para os treinadores do bot:
 

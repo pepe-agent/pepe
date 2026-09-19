@@ -141,7 +141,16 @@ defmodule Pepe.Config.Agent do
             # helps with something, when one genuinely fits - not a menu, not every turn.
             # Discovery through use, not an onboarding blast. Off by default because an agent
             # built to be terse/transactional should stay that way unless its owner opts in.
-            capability_nudge: false
+            capability_nudge: false,
+            # Off by default. When on, Pepe.Agent.SkillLearning watches what a turn actually
+            # did and, only when it crossed a measured bar, appends one ephemeral note to
+            # that model call: after a multi-step task worked out from scratch, offering to
+            # save the procedure as a skill; after an existing skill was read and something
+            # then failed, offering to correct that skill. Unlike capability_nudge this costs
+            # nothing on an ordinary turn - there is no system-prompt paragraph, only a note
+            # on the turns that earn one. The agent never writes a skill file off the back of
+            # it without an explicit yes from the user.
+            skill_learning: false
 
   @type t :: %__MODULE__{}
 
@@ -194,7 +203,8 @@ defmodule Pepe.Config.Agent do
         commitments: map["commitments"] || false,
         session_search_scope: map["session_search_scope"] || "self",
         micro_compaction: map["micro_compaction"] || false,
-        capability_nudge: map["capability_nudge"] || false
+        capability_nudge: map["capability_nudge"] || false,
+        skill_learning: map["skill_learning"] || false
     }
   end
 end

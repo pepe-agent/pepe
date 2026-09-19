@@ -97,6 +97,13 @@ defmodule Pepe.Tools.ManageAgent do
             successfully helps with something, when one genuinely fits. Turn it ON for "let
             it tell people what else it can do", "help people discover its other features".
             Off is right for an agent meant to stay terse and transactional.
+          - skill_learning: whether the target may offer, unprompted, to turn what it just
+            did into a skill - saving a multi-step procedure it worked out from scratch, or
+            correcting a skill it followed that then led it wrong. It only ever offers, and
+            only on a turn that actually did the work; it never writes or edits a skill file
+            without the user saying yes. Turn it ON for "let it learn from what it does",
+            "make it keep what it figures out". Off is right for an agent whose skills are
+            curated by hand.
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
       - remember: append a durable fact to the target's memory (train it) - needs
@@ -119,7 +126,7 @@ defmodule Pepe.Tools.ManageAgent do
             "type" => "string",
             "description" => "For set_flag: which switch.",
             "enum" =>
-              ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments session_search_project_wide micro_compaction capability_nudge)
+              ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments session_search_project_wide micro_compaction capability_nudge skill_learning)
           }
         },
         "required" => ["action"]
@@ -278,7 +285,8 @@ defmodule Pepe.Tools.ManageAgent do
     "commitments" => :commitments,
     "session_search_project_wide" => :session_search_scope,
     "micro_compaction" => :micro_compaction,
-    "capability_nudge" => :capability_nudge
+    "capability_nudge" => :capability_nudge,
+    "skill_learning" => :skill_learning
   }
 
   defp set_flag(target, flag_name, value, ctx) do
@@ -385,7 +393,7 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
-    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}, session_search_project_wide=#{on_off(a.session_search_scope == "project")}, micro_compaction=#{on_off(a.micro_compaction)}, capability_nudge=#{on_off(a.capability_nudge)}
+    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}, session_search_project_wide=#{on_off(a.session_search_scope == "project")}, micro_compaction=#{on_off(a.micro_compaction)}, capability_nudge=#{on_off(a.capability_nudge)}, skill_learning=#{on_off(a.skill_learning)}
     persona: #{persona_preview(a.name)}
     """
   end

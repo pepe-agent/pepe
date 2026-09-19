@@ -239,6 +239,25 @@ defmodule Pepe.Tools.ManageAgentTest do
       assert Config.get_agent("sales").capability_nudge == false
     end
 
+    test "skill_learning can be turned on and off by chat, same as any other simple switch" do
+      assert {:ok, msg} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "skill_learning", "value" => "on"},
+                 ctx(["sales"])
+               )
+
+      assert msg =~ "on"
+      assert Config.get_agent("sales").skill_learning == true
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "skill_learning", "value" => "off"},
+                 ctx(["sales"])
+               )
+
+      assert Config.get_agent("sales").skill_learning == false
+    end
+
     test "trust_untrusted_content can be turned on from an ordinary conversation" do
       assert {:ok, _} =
                ManageAgent.run(

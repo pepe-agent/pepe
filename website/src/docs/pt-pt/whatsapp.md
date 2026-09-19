@@ -83,6 +83,12 @@ Passar uma conversa a um especialista não exige nenhuma maquinaria extra: basta
 
 <div class="note"><strong>Regra das 24 horas.</strong> A Meta só permite respostas em formato livre dentro das 24 horas seguintes à última mensagem do utilizador. O suporte reativo encaixa nisto sem esforço; já mensagens proativas fora dessa janela exigem modelos pré-aprovados, que este canal não envia.</div>
 
+### Mensagens de voz, fotografias e ficheiros
+
+Uma mensagem de voz chega como **texto**: é transcrita à entrada, antes de o agente correr, pelo que quem faz a pergunta a falar recebe resposta à pergunta e não um comentário sobre um ficheiro de áudio. Um PDF ou uma folha de cálculo chegam já com o conteúdo lido, ao lado do que foi dito sobre eles. Uma fotografia chega ao modelo como imagem, quando o modelo do agente tem visão.
+
+Nada disto exige credenciais novas. A Meta entrega um id de média e o Pepe resolve-o na Graph API com o mesmo token de acesso que a ligação já usa. A Meta limita a média recebida por tipo (16 MB para áudio e vídeo, 5 MB para imagens, 100 MB para documentos), e o Pepe aplica o seu próprio limite de 20 MB por cima, por isso vale o menor dos dois. Se não houver nenhuma rota de transcrição configurada nem possível de deduzir, o ficheiro fica no workspace do agente e o agente é informado de onde está. Ver [Mensagens de voz](../voice/) e [Documentos](../documents/).
+
 ### Mudar de modelo
 
 `/model` e `/models` só disparam numa ligação em modo `admin` (vê a comparação acima); em `support`, tornam-se texto simples como qualquer outro comando de barra. O `/models` lista os modelos disponíveis para o projeto dessa ligação; o `/model` mostra o que está ativo, ou muda-o:

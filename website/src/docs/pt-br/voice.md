@@ -5,8 +5,8 @@ description: Um áudio chega como texto para o agente. A transcrição acontece 
 
 ## Mensagens de voz
 
-Manda um áudio para o seu bot do Telegram, e o que o agente recebe é
-**texto**. A transcrição acontece na chegada, antes mesmo de existir uma
+Manda um áudio no Telegram ou no WhatsApp, ou anexa um a um comando de barra
+no Discord, e o que o agente recebe é **texto**. A transcrição acontece na chegada, antes mesmo de existir uma
 sessão e antes de qualquer decisão de roteamento, então o agente sempre vê
 uma mensagem comum, como qualquer outra.
 
@@ -25,6 +25,28 @@ credencial e pede ao provedor o modelo de transcrição dele (`whisper-1` na
 OpenAI, `whisper-large-v3-turbo` na Groq), em vez do modelo de chat com o
 qual a conexão foi configurada. Basta mandar o áudio que ele já vem
 respondido, sem nenhum ajuste prévio.
+
+### Em quais canais isso funciona
+
+**Telegram, WhatsApp e Discord** tratam um anexo da mesma forma: áudio vira
+transcrição, documento vira texto, e imagem vai para um modelo com visão como
+imagem mesmo. Os ajustes desta página valem para os três, então basta
+configurar a transcrição uma vez.
+
+Dois detalhes que vale saber:
+
+- No **WhatsApp**, o que chega é um id de mídia, não o arquivo. O Pepe resolve
+  esse id na Graph API com o mesmo token de acesso que a conexão já usa, sem
+  nenhuma configuração extra. A Meta limita mídia recebida por tipo (16 MB
+  para áudio, 5 MB para imagens, 100 MB para documentos), e o próprio limite
+  de 20 MB do Pepe se aplica por cima.
+- No **Discord**, só chegam arquivos anexados a um **comando de barra**, porque
+  a conexão é um endpoint de interações e não um bot de gateway. Dê ao seu
+  comando uma opção de anexo e `/ask file:<áudio>` funciona, com ou sem texto
+  digitado junto. Um áudio gravado direto no canal do Discord nunca chega ao
+  endpoint, e por isso não tem como ser transcrito.
+
+Slack, Microsoft Teams e Google Chat continuam recebendo apenas texto.
 
 ### Como a rota é escolhida
 
@@ -100,8 +122,8 @@ painel, e no `pepe setup` em **Mídia**.
 
 ## Fotos
 
-Envie uma foto para o seu bot do Telegram e, com um **modelo que suporte
-visão**, o agente enxerga a imagem de verdade, não apenas um nome de
+Envie uma foto no Telegram, no WhatsApp ou no Discord e, com um **modelo que
+suporte visão**, o agente enxerga a imagem de verdade, não apenas um nome de
 arquivo. Antes disso, ele só recebia uma linha de texto do tipo "o usuário
 enviou uma foto, salva em `…`", enquanto a imagem em si nunca chegava ao
 modelo, deixando o agente adivinhando, ou pior, inventando o que havia
