@@ -198,10 +198,33 @@ defmodule Pepe.Webhooks do
   end
 
   defp resolve_and_converse(entry, mod, %{from: from} = message) do
-    case Pepe.Webhooks.Media.resolve(mod, entry, message) do
-      {:ok, text, opts} -> converse(entry, mod, from, text, Map.get(message, :name), opts)
-      # Nothing to answer, and the sender has already been told why.
-      :ignore -> :ok
+    if over_message_limit?(entry) do
+      # A voice note or a document is a download plus a transcription - real cost -
+      # and start_turn/4 refuses this message on message-limit grounds regardless of
+      # what it resolves to, so nothing here is worth spending that on. Whether it's
+      # actually refused is still decided exactly once, inside the session itself;
+      # this only skips paying for media a refusal would never use.
+      converse(entry, mod, from, message[:text] || "", Map.get(message, :name), %{})
+    else
+      case Pepe.Webhooks.Media.resolve(mod, entry, message) do
+        {:ok, text, opts} -> converse(entry, mod, from, text, Map.get(message, :name), opts)
+        # Nothing to answer, and the sender has already been told why.
+        :ignore -> :ok
+      end
+    end
+  end
+
+  # Same "does this message count against the cap" rule Pepe.Agent.Session applies for
+  # real (agent.exempt_message_limit) - called here too only to short-circuit before a
+  # costly media fetch, never as a second place the actual decision is made. The other
+  # half of Session's own rule (not one of Pepe's internal surfaces - tui/web/api/acp)
+  # is skipped: every webhook session key is "provider:agent:from", never one of those.
+  defp over_message_limit?(entry) do
+    with %{} = agent <- Config.get_agent(entry["agent"]),
+         false <- agent.exempt_message_limit do
+      Pepe.Usage.over_message_limit?(Project.of(agent.name))
+    else
+      _ -> false
     end
   end
 

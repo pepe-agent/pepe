@@ -502,4 +502,50 @@ defmodule Pepe.WebhooksTest do
       refute opts[:json]["text"]["body"] =~ "/tmp/whatsapp_test_dummy"
     end
   end
+
+  describe "message limit checked before spending on media" do
+    test "a project already over its message limit never pays for a download/transcription" do
+      Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:1", model: "gpt"})
+      Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
+
+      Mimic.stub(Pepe.Usage, :over_message_limit?, fn "acme" -> true end)
+      Mimic.reject(&Pepe.Webhooks.Media.resolve/3)
+
+      e = entry()
+      Config.put_webhook("support", e)
+
+      body =
+        Jason.encode!(%{
+          "entry" => [
+            %{
+              "changes" => [
+                %{
+                  "value" => %{
+                    "messages" => [
+                      %{
+                        "from" => "5511999",
+                        "type" => "audio",
+                        "audio" => %{"id" => "media123", "mime_type" => "audio/ogg"},
+                        "id" => "wamid.in"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        })
+
+      sig = "sha256=" <> (:crypto.mac(:hmac, :sha256, "s3cr3t", body) |> Base.encode16(case: :lower))
+
+      assert :ok =
+               Webhooks.handle_inbound("acme", "whatsapp", "support", body, Jason.decode!(body), %{
+                 "x-hub-signature-256" => sig
+               })
+
+      # Give the async dispatch a moment to run (and, if it wrongly called Media.resolve/3,
+      # to fail the Mimic.reject expectation above) before the test process exits.
+      Process.sleep(50)
+    end
+  end
 end
