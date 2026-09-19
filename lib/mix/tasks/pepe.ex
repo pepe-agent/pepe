@@ -159,10 +159,12 @@ defmodule Mix.Tasks.Pepe do
   @impl true
   def run(argv) do
     # `acp` owns stdout for a JSON-RPC protocol where anything else on the pipe is a
-    # violation (see Pepe.ACP.Stdio) - and Mix's own "Compiling 3 files (.ex)" lands
-    # there before this task's code ever runs, which is far enough upstream that the
-    # command itself cannot take it back. Quieting the shell first is the only place
-    # it can be stopped. (Pepe.CLI, the compiled binary, never reaches this at all.)
+    # violation (see Pepe.ACP.Stdio). Quieting the shell here covers every later line
+    # this task itself prints, but NOT Mix's own "Compiling 3 files (.ex)": from a
+    # source checkout, that lands on stdout before this task's code has even loaded,
+    # which is upstream of anywhere this run/1 body could reach - MIX_QUIET=1 is what
+    # actually stops that one (see docs/cli-reference.md). (Pepe.CLI, the compiled
+    # binary, never reaches either path - it has no Mix compile step to print from.)
     if match?(["acp" | _], argv), do: Mix.shell(Mix.Shell.Quiet)
     # Ensure the project is compiled (mix tasks don't recompile by default).
     Mix.Task.run("compile", ["--no-deps-check"])
@@ -1968,6 +1970,9 @@ defmodule Mix.Tasks.Pepe do
 
       {:error, {:wrong_kind, "skill"}} ->
         error("#{src} is a skill on PepeHub, not a plugin - install it with: mix pepe skill install #{src}")
+
+      {:error, :ambiguous} ->
+        error("#{src} holds more than one plugin with nothing to tell them apart - point at the one you want directly.")
 
       {:error, reason} ->
         error("install failed: #{inspect(reason)}")
