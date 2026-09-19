@@ -31,6 +31,40 @@ defmodule Pepe.Net do
   defp unmap({0, 0, 0, 0, 0, 0xFFFF, hi, lo}), do: {bsr(hi, 8), band(hi, 0xFF), bsr(lo, 8), band(lo, 0xFF)}
   defp unmap(ip), do: ip
 
+  @doc """
+  Whether `host` (a hostname or a literal IP) is safe to fetch from: every address it
+  resolves to is public. `:ok`, or `{:error, :internal_address}` when any of them is
+  loopback/private/link-local, or `{:error, :unresolvable}` when it resolves to nothing.
+
+  Checks *every* resolved address, not the first, so a hostname with one public and one
+  internal record does not get through. It does not pin the address for the request that
+  follows, so a DNS answer that flips in between (rebinding) is not fully closed: the same
+  trade-off `fetch_url` makes, acceptable where the URL is not attacker-chosen end to end.
+  """
+  @spec public_host(String.t()) :: :ok | {:error, :internal_address | :unresolvable}
+  def public_host(host) when is_binary(host) do
+    case parse_address(host) do
+      {:ok, ip} -> reject_internal([ip])
+      :error -> host |> resolve_all() |> reject_internal()
+    end
+  end
+
+  defp resolve_all(host) do
+    charlist = String.to_charlist(host)
+    hostent_addrs(charlist, :inet) ++ hostent_addrs(charlist, :inet6)
+  end
+
+  # :inet.gethostbyname/2 returns the :hostent record as a plain tuple, not a map.
+  defp hostent_addrs(charlist, family) do
+    case :inet.gethostbyname(charlist, family) do
+      {:ok, {:hostent, _name, _aliases, _addrtype, _length, addrs}} -> addrs
+      {:error, _} -> []
+    end
+  end
+
+  defp reject_internal([]), do: {:error, :unresolvable}
+  defp reject_internal(ips), do: if(Enum.any?(ips, &internal?/1), do: {:error, :internal_address}, else: :ok)
+
   @doc "Parse a string into an `:inet` address tuple. `{:ok, tuple}` or `:error`."
   def parse_address(s) when is_binary(s) do
     case :inet.parse_address(String.to_charlist(String.trim(s))) do
