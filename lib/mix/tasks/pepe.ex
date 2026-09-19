@@ -165,7 +165,17 @@ defmodule Mix.Tasks.Pepe do
     # which is upstream of anywhere this run/1 body could reach - MIX_QUIET=1 is what
     # actually stops that one (see docs/cli-reference.md). (Pepe.CLI, the compiled
     # binary, never reaches either path - it has no Mix compile step to print from.)
-    if match?(["acp" | _], argv), do: Mix.shell(Mix.Shell.Quiet)
+    #
+    # Pepe.ACP.Stdio.take_stdout!/0 is called here too, not only inside its own
+    # run/1: dispatch(["acp" | _]) starts the whole :pepe application first (a real
+    # supervision tree - Repo, PubSub, whatever else boots - can log on its own
+    # before acp_cmd/1 ever reaches Stdio.run/1), so the redirect has to be in place
+    # before that boot, not after it, for the guarantee to actually hold.
+    if match?(["acp" | _], argv) do
+      Mix.shell(Mix.Shell.Quiet)
+      Pepe.ACP.Stdio.take_stdout!()
+    end
+
     # Ensure the project is compiled (mix tasks don't recompile by default).
     Mix.Task.run("compile", ["--no-deps-check"])
     apply_locale()

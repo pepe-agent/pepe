@@ -31,6 +31,10 @@ defmodule Pepe.ACP.Stdio do
   """
   @spec run(String.t() | nil) :: :ok
   def run(agent_name) do
+    # Already done by Mix.Tasks.Pepe.run/1 before the :pepe application (and every
+    # Logger call its own supervision tree can make while booting) ever started -
+    # this second call is a harmless idempotent safety net for any other caller
+    # that reaches here directly (a test, say) without going through that path.
     take_stdout!()
 
     {:ok, server} = Server.start_link(agent: agent_name, writer: &write_line/1)
@@ -86,7 +90,14 @@ defmodule Pepe.ACP.Stdio do
   # Best-effort on purpose: a release with its own logging setup, or a test harness
   # that swapped the handler out, has nothing here to move, and refusing to start over
   # that would be worse than the log lines this is protecting against.
-  defp take_stdout! do
+  @doc """
+  Move the kernel `:logger`'s default handler from stdout to stderr, immediately -
+  no `Logger` macro call, no `Application` dependency, so this is safe to call
+  before `:pepe` (or anything else) has started. That earliness is the whole
+  point: anything started after this runs may still log freely, safely, since the
+  redirect is already in place.
+  """
+  def take_stdout! do
     with {:ok, handler} <- :logger.get_handler_config(:default),
          module when module != nil <- handler[:module],
          config = handler |> Map.drop([:id, :module]) |> Map.update(:config, %{}, &Map.put(&1, :type, :standard_error)),
