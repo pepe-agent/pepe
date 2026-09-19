@@ -67,5 +67,6 @@ Cada canal por webhook não passa de um pequeno módulo que implementa o mesmo c
 - `respond` (opcional): produz uma resposta síncrona quando o protocolo a exige antes de qualquer trabalho do agente, como o desafio `url_verification` do Slack ou o ping com confirmação adiada do Discord.
 - `deliver`: envia uma resposta em texto de volta ao remetente.
 - `deliver_file` (opcional): envia um ficheiro como anexo.
+- `fetch_media` (opcional): descarrega um anexo recebido que o `parse` só descreveu e devolve os bytes. Tudo o que vem depois do descarregamento (transcrever, ler um documento, entregar uma imagem a um modelo com visão) é partilhado. Um provider sem este callback avisa quem enviou de que o canal não recebe anexos, em vez de descartar o ficheiro em silêncio.
 
 Um plugin que implemente este contrato regista-se automaticamente como um novo fornecedor sob o seu próprio `name`, alcançável pela mesma rota `/webhooks/...`, sem qualquer ligação extra a fazer.

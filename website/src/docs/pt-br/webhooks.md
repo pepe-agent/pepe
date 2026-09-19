@@ -130,6 +130,7 @@ nova. Os callbacks desse contrato são:
 - `deliver`: envia uma resposta em texto de volta para quem mandou a
   mensagem.
 - `deliver_file` (opcional): envia um arquivo como anexo.
+- `fetch_media` (opcional): baixa um anexo recebido que o `parse` só descreveu e devolve os bytes. Tudo que vem depois do download (transcrever, ler um documento, entregar uma imagem a um modelo com visão) é compartilhado. Um provider sem esse callback avisa quem enviou que o canal não recebe anexos, em vez de descartar o arquivo em silêncio.
 
 Um plugin que implemente esse contrato se registra sozinho como um novo
 provedor, sob o próprio `name`, e já fica acessível na mesma rota

@@ -114,6 +114,7 @@ new route. The callbacks are:
   Discord's ping and deferred acknowledgement.
 - `deliver`: send a text reply back to the sender.
 - `deliver_file` (optional): send a file as an attachment.
+- `fetch_media` (optional): download an inbound attachment that `parse` only described, and return its bytes. Everything after the download (transcription, reading a document, handing an image to a vision model) is shared. A provider without it tells the sender the channel doesn't take attachments, instead of dropping the file silently.
 
 If you write a plugin that implements this contract, it registers as a new
 provider under its own `name`, reachable at the same `/webhooks/...` route with
