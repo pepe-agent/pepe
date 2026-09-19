@@ -74,6 +74,14 @@ defmodule Pepe.Media do
     end
   end
 
+  @doc """
+  Whether any transcription route exists right now (an explicit model or command, or a
+  connection whose provider is known to serve it). A surface that has to *say* whether it
+  can take audio (ACP's `initialize`) asks this rather than promising and failing later.
+  """
+  @spec transcription_available? :: boolean()
+  def transcription_available?, do: route(settings()) != :none
+
   @doc "Whether a transcript should be echoed back to the chat (`media.audio.echo`)."
   @spec echo? :: boolean()
   def echo?, do: settings()["echo"] == true

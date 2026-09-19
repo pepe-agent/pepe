@@ -44,6 +44,7 @@ defmodule Pepe.ACP.Server do
 
   require Logger
 
+  alias Pepe.ACP.Content
   alias Pepe.ACP.Protocol
   alias Pepe.Agent.Session
   alias Pepe.Permissions.Prompt
@@ -160,7 +161,7 @@ defmodule Pepe.ACP.Server do
 
   defp handle_request("initialize", id, _params, state) do
     %{state | initialized?: true}
-    |> write(Protocol.response(id, Protocol.initialize_result()))
+    |> write(Protocol.response(id, Protocol.initialize_result(Content.capabilities(state.agent))))
   end
 
   defp handle_request(_method, id, _params, %{initialized?: false} = state),
@@ -239,34 +240,58 @@ defmodule Pepe.ACP.Server do
         reply_error(state, id, :invalid_request, "this session already has a prompt turn in flight; cancel it first")
 
       session ->
-        case Protocol.prompt_text(params["prompt"]) do
-          {:ok, text} -> run_prompt(id, session_id, session, text, state)
-          {:error, reason} -> reply_error(state, id, :invalid_params, reason)
+        blocks = Content.resolve(params["prompt"], vision?: Content.vision_model?(state.agent), cwd: session.cwd)
+
+        case blocks do
+          {:ok, prompt} ->
+            state = tell_notes(state, session_id, prompt.notes)
+            run_prompt(id, session_id, session, prompt.text, prompt_opts(prompt), state)
+
+          {:error, reason} ->
+            reply_error(state, id, :invalid_params, reason)
         end
     end
   end
 
-  defp run_prompt(id, session_id, session, text, state) do
+  # Whatever in the prompt could not be used was reported by `Pepe.ACP.Content` as a note;
+  # the person reads it in the reply stream before the answer begins.
+  defp tell_notes(state, session_id, notes) do
+    Enum.reduce(notes, state, fn note, state ->
+      write(state, Protocol.session_update(session_id, Protocol.message_chunk(Content.note_text(note))))
+    end)
+  end
+
+  # Images ride this turn only, and text that came out of a binary format taints the turn
+  # exactly as an attached document does anywhere else.
+  defp prompt_opts(prompt) do
+    images = if prompt.images == [], do: [], else: [images: prompt.images]
+    taint = if prompt.untrusted?, do: [untrusted: true], else: []
+    images ++ taint
+  end
+
+  defp run_prompt(id, session_id, session, text, extra_opts, state) do
     server = self()
     stream? = Pepe.Agent.stream_for?(state.agent)
 
-    opts = [
-      stream: stream?,
-      # `cwd` is the directory the editor opened, and the one the agent's file and
-      # shell tools should resolve against - an ACP path is always absolute, but the
-      # workspace the model is told about has to match the project actually open.
-      # `cwd_override` (not plain `cwd`) is what actually makes that happen: an ACP
-      # session always has a real agent bound, and Pepe.Agent.Workspace resolves every
-      # other bound-agent call inside that agent's own persistent workspace regardless
-      # of `cwd` - only `cwd_override` outranks it (see that module's own doc).
-      cwd: session.cwd,
-      cwd_override: session.cwd,
-      source: "acp",
-      on_event: fn event -> GenServer.cast(server, {:event, session_id, event}) end,
-      authorize: fn name, args, ctx ->
-        GenServer.call(server, {:authorize, session_id, name, args, ctx}, :infinity)
-      end
-    ]
+    opts =
+      extra_opts ++
+        [
+          stream: stream?,
+          # `cwd` is the directory the editor opened, and the one the agent's file and
+          # shell tools should resolve against - an ACP path is always absolute, but the
+          # workspace the model is told about has to match the project actually open.
+          # `cwd_override` (not plain `cwd`) is what actually makes that happen: an ACP
+          # session always has a real agent bound, and Pepe.Agent.Workspace resolves every
+          # other bound-agent call inside that agent's own persistent workspace regardless
+          # of `cwd` - only `cwd_override` outranks it (see that module's own doc).
+          cwd: session.cwd,
+          cwd_override: session.cwd,
+          source: "acp",
+          on_event: fn event -> GenServer.cast(server, {:event, session_id, event}) end,
+          authorize: fn name, args, ctx ->
+            GenServer.call(server, {:authorize, session_id, name, args, ctx}, :infinity)
+          end
+        ]
 
     {:ok, task} =
       Task.start(fn ->

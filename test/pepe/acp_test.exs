@@ -199,8 +199,12 @@ defmodule Pepe.ACPTest do
       # Absent capabilities are the point: a client that reads these never sends
       # `session/load` or an image block, so there is no half-working path.
       assert result["agentCapabilities"]["loadSession"] == false
+      # This agent's mock model has no vision and no transcription route is configured, so
+      # image and audio are not promised; embedded context is text and always works. See
+      # test/pepe/acp/prompt_blocks_test.exs for the vision and audio cases.
       assert result["agentCapabilities"]["promptCapabilities"]["image"] == false
-      assert result["agentCapabilities"]["promptCapabilities"]["embeddedContext"] == false
+      assert result["agentCapabilities"]["promptCapabilities"]["audio"] == false
+      assert result["agentCapabilities"]["promptCapabilities"]["embeddedContext"] == true
       assert result["authMethods"] == []
     end
 
@@ -275,12 +279,12 @@ defmodule Pepe.ACPTest do
 
       request(server, 5, "session/prompt", %{
         "sessionId" => session_id,
-        "prompt" => [%{"type" => "image", "mimeType" => "image/png", "data" => "aaaa"}]
+        "prompt" => [%{"type" => "video", "mimeType" => "video/mp4", "data" => "aaaa"}]
       })
 
       error = await_response(5)["error"]
       assert error["code"] == -32_602
-      assert error["message"] =~ "image"
+      assert error["message"] =~ "video"
     end
 
     test "an unknown session id is an error, not a new session", %{server: server} do

@@ -25,10 +25,10 @@ defmodule Pepe.ACP.Protocol do
       `session/new` and gone when the editor disconnects.
     * `authenticate` (`authMethods: []`). Pepe authenticates to *model providers*,
       out of `~/.pepe/config.json`; there is nothing for an editor to log in to.
-    * image, audio and embedded-resource prompt blocks (all three prompt capabilities
-      `false`). `text` is the one block type every agent MUST accept, and
-      `resource_link` is baseline too - both are handled; anything else is refused
-      out loud rather than silently dropped on the floor.
+    * a prompt capability the connection can't honestly promise (`image` only for an
+      agent whose model has vision, `audio` only with a transcription route). Every
+      block type is *read* (see `Pepe.ACP.Content`); a block that can't be used is
+      reported out loud, never silently dropped.
     * the client-side file system and terminal methods (`fs/read_text_file`,
       `terminal/*`). Pepe's own `read_file`/`write_file`/`bash` tools already run on
       the same machine the editor does, so routing them back through the editor would
@@ -67,18 +67,14 @@ defmodule Pepe.ACP.Protocol do
   of answering honestly here - a client that reads `loadSession: false` will never
   send `session/load`, so there is no half-working path to fall into.
   """
-  @spec initialize_result() :: map()
-  def initialize_result do
+  @spec initialize_result(map()) :: map()
+  def initialize_result(prompt_capabilities \\ %{"image" => false, "audio" => false, "embeddedContext" => false}) do
     %{
       "protocolVersion" => @protocol_version,
       "agentInfo" => agent_info(),
       "agentCapabilities" => %{
         "loadSession" => false,
-        "promptCapabilities" => %{
-          "image" => false,
-          "audio" => false,
-          "embeddedContext" => false
-        }
+        "promptCapabilities" => prompt_capabilities
       },
       "authMethods" => []
     }
@@ -134,55 +130,6 @@ defmodule Pepe.ACP.Protocol do
   @doc "A `text` content block."
   @spec text_block(String.t()) :: map()
   def text_block(text), do: %{"type" => "text", "text" => text}
-
-  ###
-  ### prompt content
-  ###
-
-  @doc """
-  Flatten a `session/prompt` content-block array into the one string Pepe's runtime
-  takes, or say which block type we can't read.
-
-  Only two variants are accepted, and that is not an oversight: `text` is the block
-  every ACP agent MUST support, and `resource_link` is baseline too (it carries a URI,
-  not bytes - the agent is expected to go read it, which is exactly what Pepe's own
-  `read_file` does). Image, audio and embedded `resource` blocks are gated behind
-  prompt capabilities this agent advertises as `false`, so a well-behaved client never
-  sends them; a client that does gets an error instead of a prompt that quietly lost
-  half of what the user attached.
-  """
-  @spec prompt_text([map()]) :: {:ok, String.t()} | {:error, String.t()}
-  def prompt_text(blocks) when is_list(blocks) do
-    blocks
-    |> Enum.reduce_while({:ok, []}, fn block, {:ok, acc} ->
-      case block_text(block) do
-        {:ok, text} -> {:cont, {:ok, [text | acc]}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
-    |> case do
-      {:ok, parts} -> {:ok, parts |> Enum.reverse() |> Enum.join("\n")}
-      {:error, _} = error -> error
-    end
-  end
-
-  def prompt_text(_other), do: {:error, "`prompt` must be an array of content blocks"}
-
-  defp block_text(%{"type" => "text", "text" => text}) when is_binary(text), do: {:ok, text}
-
-  # A mention of something the user pointed at in their editor. Rendered the way a
-  # person would type it, with the URI kept intact so the agent can act on it.
-  defp block_text(%{"type" => "resource_link", "uri" => uri} = block) when is_binary(uri) do
-    case block["name"] do
-      name when is_binary(name) and name != "" -> {:ok, "@#{name} (#{uri})"}
-      _ -> {:ok, "@#{uri}"}
-    end
-  end
-
-  defp block_text(%{"type" => type}) when is_binary(type),
-    do: {:error, "this agent does not accept `#{type}` content blocks (see the prompt capabilities it reported in `initialize`)"}
-
-  defp block_text(_other), do: {:error, "every entry in `prompt` must be a content block with a `type`"}
 
   ###
   ### tool calls
