@@ -74,6 +74,8 @@ defmodule Pepe.Agent.Runtime do
           # doc for why this is a distinct key from plain `cwd` above, not a stronger
           # default for it.
           cwd_override: String.t() | nil,
+          # The session whose editor-supplied MCP servers this run may call (ACP only).
+          mcp_scope: String.t() | nil,
           session_key: String.t() | nil,
           source: String.t() | nil,
           sender: String.t() | nil,
@@ -254,11 +256,14 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp run_chain(agent, chain, messages, opts) do
-    specs = Tools.specs(agent.tools)
+    specs = Tools.specs(agent.tools, mcp_scope: opts[:mcp_scope])
 
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
       cwd_override: opts[:cwd_override],
+      # The session whose editor-supplied MCP servers this turn may call (see
+      # Pepe.ACP.Mcp). Set only by the surface that owns that session.
+      mcp_scope: opts[:mcp_scope],
       agent: agent,
       # The primary model (same head-of-chain compact_for_send/4 sizes against), so a
       # tool can size its output to the model's context window (read_file's page cap).

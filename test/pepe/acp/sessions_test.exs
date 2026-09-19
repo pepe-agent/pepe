@@ -288,15 +288,15 @@ defmodule Pepe.ACP.SessionsTest do
       assert resumed["error"]["code"] == -32_602
     end
 
-    test "a relative cwd and client MCP servers are refused on load like they are on new" do
+    test "a relative cwd and malformed MCP server list are refused on load like they are on new" do
       sid = save_session([])
       conn = connect(:a)
 
       {_, relative} = call(conn, 20, "session/load", %{"sessionId" => sid, "cwd" => "relative", "mcpServers" => []})
       assert relative["error"]["message"] =~ "absolute"
 
-      {_, mcp} = call(conn, 21, "session/load", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => [%{"name" => "x"}]})
-      assert mcp["error"]["message"] =~ "pepe mcp add"
+      {_, mcp} = call(conn, 21, "session/load", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => "invalid"})
+      assert mcp["error"]["message"] =~ "must be a list"
     end
   end
 

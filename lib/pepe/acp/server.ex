@@ -45,6 +45,7 @@ defmodule Pepe.ACP.Server do
   require Logger
 
   alias Pepe.ACP.Content
+  alias Pepe.ACP.Mcp
   alias Pepe.ACP.Protocol
   alias Pepe.ACP.Replay
   alias Pepe.ACP.Sessions
@@ -122,6 +123,15 @@ defmodule Pepe.ACP.Server do
 
   def handle_cast({:prompt_done, session_id, result}, state),
     do: {:noreply, finish_prompt(session_id, result, state)}
+
+  # A note about an editor-supplied MCP server that was refused or did not start. Written
+  # as ordinary agent text so it shows in the editor's panel whether or not the turn
+  # streams, and only for a session that still exists.
+  def handle_cast({:mcp_notice, session_id, text}, state) do
+    if Map.has_key?(state.sessions, session_id),
+      do: {:noreply, write(state, Protocol.session_update(session_id, Protocol.message_chunk(text <> "\n\n")))},
+      else: {:noreply, state}
+  end
 
   @impl true
   # A synchronous marker behind everything already queued - `Pepe.ACP.Stdio` uses it at
@@ -224,7 +234,7 @@ defmodule Pepe.ACP.Server do
   defp new_session(id, params, state) do
     with :ok <- check_open_params(params),
          session_id = Sessions.generate_id(),
-         {:ok, state} <- open_live(state, session_id, params["cwd"], state.agent, false) do
+         {:ok, state} <- open_live(state, session_id, params["cwd"], state.agent, false, params["mcpServers"]) do
       write(state, Protocol.response(id, %{"sessionId" => session_id}))
     else
       {:error, kind, message} -> reply_error(state, id, kind, message)
@@ -241,14 +251,8 @@ defmodule Pepe.ACP.Server do
       not is_binary(params["cwd"]) or not absolute?(params["cwd"]) ->
         {:error, :invalid_params, "`cwd` is required and must be an absolute path"}
 
-      # Silently ignoring these would be the worse answer by far: the user configured
-      # MCP servers in their editor, and would have no way to find out the agent never
-      # connected to any of them. Pepe has its own MCP configuration
-      # (`mix pepe mcp add`, stored per agent in ~/.pepe/config.json), which is what
-      # actually reaches the model on every other surface too.
-      params["mcpServers"] not in [nil, []] ->
-        {:error, :invalid_params,
-         "this agent does not connect to client-supplied MCP servers; configure them on the agent itself with `pepe mcp add` and they apply on every surface"}
+      not is_nil(params["mcpServers"]) and not is_list(params["mcpServers"]) ->
+        {:error, :invalid_params, "`mcpServers` must be a list"}
 
       true ->
         :ok
@@ -261,7 +265,7 @@ defmodule Pepe.ACP.Server do
   # this connection. `persist: true` is what makes its history survive the connection:
   # the session saves itself after every change, whatever changed it (a turn, `/undo`,
   # a compaction), so nothing here has to remember to.
-  defp open_live(state, session_id, cwd, agent_name, persisted?) do
+  defp open_live(state, session_id, cwd, agent_name, persisted?, mcp_servers) do
     key = Sessions.key(session_id)
 
     case SessionSupervisor.ensure(key, agent_name, persist: Sessions.enabled?()) do
@@ -273,6 +277,7 @@ defmodule Pepe.ACP.Server do
         # editor as an update to the old `call_1`.
         prefix = if persisted?, do: "call_r#{System.unique_integer([:positive])}", else: "call"
         session = %{key: key, cwd: cwd, run: nil, tools: [], seq: 0, persisted?: persisted?, prefix: prefix}
+        {:ok, _summary} = Mcp.attach(session, mcp_servers)
         {:ok, put_session(state, session_id, session)}
 
       {:error, reason} ->
@@ -312,7 +317,7 @@ defmodule Pepe.ACP.Server do
     with :ok <- check_open_params(params),
          {:ok, session_id, meta} <- fetch_saved(params["sessionId"]),
          :ok <- check_owner(meta, state),
-         {:ok, state} <- claim_and_open(state, session_id, meta, params["cwd"]) do
+         {:ok, state} <- claim_and_open(state, session_id, meta, params["cwd"], params["mcpServers"]) do
       Sessions.update_cwd(session_id, params["cwd"])
       state = if kind == :load, do: replay(state, session_id), else: state
 
@@ -329,7 +334,7 @@ defmodule Pepe.ACP.Server do
          {:ok, source_id, meta} <- fetch_saved(params["sessionId"]),
          :ok <- check_owner(meta, state),
          new_id = Sessions.generate_id(),
-         {:ok, state} <- open_live(state, new_id, params["cwd"], meta["agent"], true),
+         {:ok, state} <- open_live(state, new_id, params["cwd"], meta["agent"], true, params["mcpServers"]),
          :ok <- copy_history(state, source_id, new_id) do
       Sessions.create(new_id, params["cwd"], meta["agent"])
       # A brand-new id nobody else knows: the claim cannot be contested.
@@ -369,15 +374,17 @@ defmodule Pepe.ACP.Server do
 
   # One process at a time may have a saved session open (see `Pepe.ACP.Sessions`). Already
   # open on THIS connection is not a conflict: the editor asked twice, the lock is ours.
-  defp claim_and_open(state, session_id, meta, cwd) do
+  defp claim_and_open(state, session_id, meta, cwd, mcp_servers) do
     case state.sessions[session_id] do
       %{} = live ->
-        {:ok, put_session(state, session_id, %{live | cwd: cwd})}
+        live = %{live | cwd: cwd}
+        {:ok, _summary} = Mcp.attach(live, mcp_servers)
+        {:ok, put_session(state, session_id, live)}
 
       nil ->
         case Sessions.claim(session_id) do
           :ok ->
-            case open_live(state, session_id, cwd, meta["agent"], true) do
+            case open_live(state, session_id, cwd, meta["agent"], true, mcp_servers) do
               {:ok, _state} = opened ->
                 opened
 
@@ -500,6 +507,8 @@ defmodule Pepe.ACP.Server do
           # of `cwd` - only `cwd_override` outranks it (see that module's own doc).
           cwd: session.cwd,
           cwd_override: session.cwd,
+          # This session's own editor-supplied MCP servers, and no one else's (Pepe.ACP.Mcp).
+          mcp_scope: session.key,
           source: "acp",
           on_event: fn event -> GenServer.cast(server, {:event, session_id, event}) end,
           authorize: fn name, args, ctx ->
@@ -509,6 +518,12 @@ defmodule Pepe.ACP.Server do
 
     {:ok, task} =
       Task.start(fn ->
+        # Tell the person which of their editor's MCP servers did not come up, before the
+        # answer starts. Waits (bounded) for servers still starting - here, in the turn's
+        # own task, so the connection stays free to read.
+        for notice <- Mcp.notices(session.key),
+            do: GenServer.cast(server, {:mcp_notice, session_id, notice})
+
         result = Pepe.Agent.chat(session.key, state.agent, text, opts)
         GenServer.cast(server, {:prompt_done, session_id, result})
       end)
