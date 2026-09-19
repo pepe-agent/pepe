@@ -73,9 +73,10 @@ defmodule Pepe.ACP.Stdio do
   # is a cast, so at EOF there can be messages sitting in the server's mailbox that
   # have not produced their replies yet - and the caller is about to let the VM exit.
   # One synchronous call behind them is enough: it cannot be served until everything
-  # queued ahead of it has been.
+  # queued ahead of it has been. `close/1` is that call, and also the moment the
+  # connection lets go of the saved sessions it was holding open.
   defp drain(server) do
-    GenServer.call(server, :flush, 5_000)
+    Server.close(server)
   catch
     # The connection is already gone, which is the state this was waiting for anyway.
     :exit, _ -> :ok

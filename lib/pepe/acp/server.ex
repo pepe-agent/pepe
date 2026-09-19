@@ -46,7 +46,12 @@ defmodule Pepe.ACP.Server do
 
   alias Pepe.ACP.Content
   alias Pepe.ACP.Protocol
+  alias Pepe.ACP.Replay
+  alias Pepe.ACP.Sessions
   alias Pepe.Agent.Session
+  alias Pepe.Agent.SessionPersistence
+  alias Pepe.Agent.SessionSupervisor
+  alias Pepe.Config
   alias Pepe.Permissions.Prompt
 
   defstruct writer: nil,
@@ -77,12 +82,25 @@ defmodule Pepe.ACP.Server do
   @spec handle_line(GenServer.server(), binary()) :: :ok
   def handle_line(server, line), do: GenServer.cast(server, {:line, line})
 
+  @doc """
+  The client is gone: let go of everything this connection was holding open (the
+  session locks, see `Pepe.ACP.Sessions`), after everything already queued has been
+  handled - like `:flush`, a call cannot be served ahead of the lines before it. The
+  saved conversations stay exactly where they are.
+  """
+  @spec close(GenServer.server()) :: :ok
+  def close(server), do: GenServer.call(server, :close, 5_000)
+
   ###
   ### server callbacks
   ###
 
   @impl true
   def init(opts) do
+    # Off the connection's own path: sweeping the store is housekeeping, and a slow disk
+    # must not delay the handshake.
+    if Sessions.enabled?(), do: Task.start(&Sessions.prune/0)
+
     {:ok,
      %__MODULE__{
        writer: Keyword.fetch!(opts, :writer),
@@ -110,6 +128,11 @@ defmodule Pepe.ACP.Server do
   # EOF to be sure the last lines it read actually produced their replies before the VM
   # is allowed to exit.
   def handle_call(:flush, _from, state), do: {:reply, :ok, state}
+
+  def handle_call(:close, _from, state) do
+    for {session_id, %{persisted?: true}} <- state.sessions, do: Sessions.release(session_id)
+    {:reply, :ok, state}
+  end
 
   def handle_call({:authorize, session_id, name, args, ctx}, from, state) do
     case state.sessions[session_id] do
@@ -168,6 +191,10 @@ defmodule Pepe.ACP.Server do
     do: reply_error(state, id, :invalid_request, "`initialize` must be the first request on the connection")
 
   defp handle_request("session/new", id, params, state), do: new_session(id, params, state)
+  defp handle_request("session/list", id, params, state), do: list_sessions(id, params, state)
+  defp handle_request("session/load", id, params, state), do: reopen_session(:load, id, params, state)
+  defp handle_request("session/resume", id, params, state), do: reopen_session(:resume, id, params, state)
+  defp handle_request("session/fork", id, params, state), do: fork_session(id, params, state)
   defp handle_request("session/prompt", id, params, state), do: start_prompt(id, params, state)
 
   defp handle_request(method, id, _params, state),
@@ -195,9 +222,24 @@ defmodule Pepe.ACP.Server do
   ###
 
   defp new_session(id, params, state) do
+    with :ok <- check_open_params(params),
+         session_id = Sessions.generate_id(),
+         {:ok, state} <- open_live(state, session_id, params["cwd"], state.agent, false) do
+      write(state, Protocol.response(id, %{"sessionId" => session_id}))
+    else
+      {:error, kind, message} -> reply_error(state, id, kind, message)
+    end
+  end
+
+  # What `session/new`, `session/load`, `session/resume` and `session/fork` all take: the
+  # directory the editor opened and the MCP servers it wants connected.
+  #
+  # ONE place, on purpose: connecting client-supplied MCP servers is a single decision
+  # for all four methods, made here.
+  defp check_open_params(params) do
     cond do
       not is_binary(params["cwd"]) or not absolute?(params["cwd"]) ->
-        reply_error(state, id, :invalid_params, "`cwd` is required and must be an absolute path")
+        {:error, :invalid_params, "`cwd` is required and must be an absolute path"}
 
       # Silently ignoring these would be the worse answer by far: the user configured
       # MCP servers in their editor, and would have no way to find out the agent never
@@ -205,25 +247,196 @@ defmodule Pepe.ACP.Server do
       # (`mix pepe mcp add`, stored per agent in ~/.pepe/config.json), which is what
       # actually reaches the model on every other surface too.
       params["mcpServers"] not in [nil, []] ->
-        reply_error(
-          state,
-          id,
-          :invalid_params,
-          "this agent does not connect to client-supplied MCP servers; configure them on the agent itself with `pepe mcp add` and they apply on every surface"
-        )
+        {:error, :invalid_params,
+         "this agent does not connect to client-supplied MCP servers; configure them on the agent itself with `pepe mcp add` and they apply on every surface"}
 
       true ->
-        session_id = "sess_#{System.unique_integer([:positive, :monotonic])}"
-        key = "acp:#{session_id}"
-
-        session = %{key: key, cwd: params["cwd"], run: nil, tools: [], seq: 0}
-
-        %{state | sessions: Map.put(state.sessions, session_id, session)}
-        |> write(Protocol.response(id, %{"sessionId" => session_id}))
+        :ok
     end
   end
 
   defp absolute?(path), do: Path.type(path) == :absolute
+
+  # Start (or find) the `Pepe.Agent.Session` behind an ACP session id and register it on
+  # this connection. `persist: true` is what makes its history survive the connection:
+  # the session saves itself after every change, whatever changed it (a turn, `/undo`,
+  # a compaction), so nothing here has to remember to.
+  defp open_live(state, session_id, cwd, agent_name, persisted?) do
+    key = Sessions.key(session_id)
+
+    case SessionSupervisor.ensure(key, agent_name, persist: Sessions.enabled?()) do
+      {:ok, _pid} ->
+        Phoenix.PubSub.subscribe(Pepe.PubSub, "session:" <> key)
+
+        # A reopened session's tool-call ids get their own prefix: the history it replays
+        # already holds ids from earlier runs, and a fresh `call_1` would be read by the
+        # editor as an update to the old `call_1`.
+        prefix = if persisted?, do: "call_r#{System.unique_integer([:positive])}", else: "call"
+        session = %{key: key, cwd: cwd, run: nil, tools: [], seq: 0, persisted?: persisted?, prefix: prefix}
+        {:ok, put_session(state, session_id, session)}
+
+      {:error, reason} ->
+        {:error, :internal, "could not start the session: #{inspect(reason)}"}
+    end
+  end
+
+  ###
+  ### session/list, session/load, session/resume, session/fork
+  ###
+
+  defp list_sessions(id, params, state) do
+    cwd = params["cwd"]
+
+    cond do
+      cwd != nil and (not is_binary(cwd) or not absolute?(cwd)) ->
+        reply_error(state, id, :invalid_params, "`cwd` must be an absolute path")
+
+      true ->
+        case Sessions.page(state.agent, cwd, params["cursor"]) do
+          {:ok, metas, next} ->
+            sessions = Enum.map(metas, &Protocol.session_info(&1["id"], &1["cwd"], Sessions.title(&1), &1["updated_at"]))
+            result = %{"sessions" => sessions}
+            write(state, Protocol.response(id, if(next, do: Map.put(result, "nextCursor", next), else: result)))
+
+          {:error, :bad_cursor} ->
+            reply_error(state, id, :invalid_params, "unknown `cursor` (use one returned by a previous `session/list`)")
+        end
+    end
+  end
+
+  # `load` streams the whole conversation back before it answers (a client builds its
+  # panel from those notifications while the request is still open); `resume` picks the
+  # conversation up without replaying it, for a client that already has the thread on
+  # screen. Both refuse an id they do not know rather than quietly starting a new one.
+  defp reopen_session(kind, id, params, state) do
+    with :ok <- check_open_params(params),
+         {:ok, session_id, meta} <- fetch_saved(params["sessionId"]),
+         :ok <- check_owner(meta, state),
+         {:ok, state} <- claim_and_open(state, session_id, meta, params["cwd"]) do
+      Sessions.update_cwd(session_id, params["cwd"])
+      state = if kind == :load, do: replay(state, session_id), else: state
+
+      state
+      |> announce_info(session_id, meta)
+      |> write(Protocol.response(id, %{}))
+    else
+      {:error, code, message} -> reply_error(state, id, code, message)
+    end
+  end
+
+  defp fork_session(id, params, state) do
+    with :ok <- check_open_params(params),
+         {:ok, source_id, meta} <- fetch_saved(params["sessionId"]),
+         :ok <- check_owner(meta, state),
+         new_id = Sessions.generate_id(),
+         {:ok, state} <- open_live(state, new_id, params["cwd"], meta["agent"], true),
+         :ok <- copy_history(state, source_id, new_id) do
+      Sessions.create(new_id, params["cwd"], meta["agent"])
+      # A brand-new id nobody else knows: the claim cannot be contested.
+      Sessions.claim(new_id)
+      write(state, Protocol.response(id, %{"sessionId" => new_id}))
+    else
+      {:error, kind, message} -> reply_error(state, id, kind, message)
+    end
+  end
+
+  defp fetch_saved(session_id) do
+    case Sessions.fetch(session_id) do
+      {:ok, meta} -> {:ok, session_id, meta}
+      :error -> {:error, :invalid_params, "unknown `sessionId` (list the saved ones with `session/list`, or start one with `session/new`)"}
+    end
+  end
+
+  # A conversation belongs to the agent it was held with. Answering it as another agent
+  # would splice two personas and two tool sets into one history, and a list that mixes
+  # them would offer conversations this connection cannot honestly continue.
+  defp check_owner(meta, state) do
+    recorded = Sessions.canonical_agent(meta["agent"])
+    bound = Sessions.canonical_agent(state.agent)
+
+    cond do
+      Config.get_agent(recorded) == nil ->
+        {:error, :invalid_params, "the agent this session was held with (`#{recorded}`) no longer exists"}
+
+      recorded != bound ->
+        {:error, :invalid_params,
+         "this session belongs to agent `#{recorded}`, and this connection is bound to `#{bound}`; open it with `pepe acp #{recorded}`"}
+
+      true ->
+        :ok
+    end
+  end
+
+  # One process at a time may have a saved session open (see `Pepe.ACP.Sessions`). Already
+  # open on THIS connection is not a conflict: the editor asked twice, the lock is ours.
+  defp claim_and_open(state, session_id, meta, cwd) do
+    case state.sessions[session_id] do
+      %{} = live ->
+        {:ok, put_session(state, session_id, %{live | cwd: cwd})}
+
+      nil ->
+        case Sessions.claim(session_id) do
+          :ok ->
+            case open_live(state, session_id, cwd, meta["agent"], true) do
+              {:ok, _state} = opened ->
+                opened
+
+              error ->
+                Sessions.release(session_id)
+                error
+            end
+
+          {:error, {:held, pid}} ->
+            {:error, :invalid_request,
+             "this session is open in another Pepe process#{if pid, do: " (pid #{pid})", else: ""}; close it there, or continue from a copy with `session/fork`"}
+        end
+    end
+  end
+
+  defp replay(state, session_id) do
+    messages =
+      try do
+        Session.history(state.sessions[session_id].key)
+      catch
+        :exit, _ -> []
+      end
+
+    messages
+    |> Replay.updates()
+    |> Enum.reduce(state, fn update, acc -> write(acc, Protocol.session_update(session_id, update)) end)
+  end
+
+  defp announce_info(state, session_id, meta) do
+    update = Protocol.session_info_update(title: Sessions.title(meta), updated_at: meta["updated_at"])
+    write(state, Protocol.session_update(session_id, update))
+  end
+
+  # The new session starts with a copy of the source's conversation. When the source is
+  # open here the live process is the truth (`Session.fork/2` also carries its model
+  # override); when it is only on disk, the saved history is.
+  defp copy_history(state, source_id, new_id) do
+    new_key = Sessions.key(new_id)
+    source_key = Sessions.key(source_id)
+
+    if Map.has_key?(state.sessions, source_id) do
+      case Session.fork(source_key, new_key) do
+        {:ok, _key} -> :ok
+        {:error, reason} -> {:error, :internal, "could not copy the session: #{inspect(reason)}"}
+      end
+    else
+      case SessionPersistence.load(source_key) do
+        {:ok, _agent, messages, pii_map, _pending} ->
+          snapshot = %{messages: Pepe.LLM.Message.sanitize_replay(messages), model_override: nil, pii_map: pii_map}
+          Session.seed(new_key, snapshot)
+
+        # Nothing was ever saved for it: forking an empty conversation is an empty one.
+        :error ->
+          :ok
+      end
+    end
+  catch
+    :exit, reason -> {:error, :internal, "could not copy the session: #{inspect(reason)}"}
+  end
 
   ###
   ### session/prompt
@@ -270,6 +483,7 @@ defmodule Pepe.ACP.Server do
   end
 
   defp run_prompt(id, session_id, session, text, extra_opts, state) do
+    {session, state} = save_on_first_turn(session_id, session, state)
     server = self()
     stream? = Pepe.Agent.stream_for?(state.agent)
 
@@ -310,11 +524,29 @@ defmodule Pepe.ACP.Server do
     put_session(state, session_id, %{session | run: run, tools: []})
   end
 
+  # A session is recorded (and its lock taken) when its first turn starts, not when it is
+  # created: an editor opens a session every time its panel opens, and most of them never
+  # get a message. Recording those would fill the history list with empty "New thread"
+  # entries.
+  defp save_on_first_turn(_session_id, %{persisted?: true} = session, state), do: {session, state}
+
+  defp save_on_first_turn(session_id, session, state) do
+    if Sessions.enabled?() do
+      Sessions.create(session_id, session.cwd, Sessions.canonical_agent(state.agent))
+      Sessions.claim(session_id)
+      session = %{session | persisted?: true}
+      {session, put_session(state, session_id, session)}
+    else
+      {session, state}
+    end
+  end
+
   defp finish_prompt(session_id, result, state) do
     case state.sessions[session_id] do
       %{run: %{} = run} = session ->
         Process.demonitor(run.monitor_ref, [:flush])
         state = put_session(state, session_id, %{session | run: nil, tools: []})
+        state = note_turn(state, session_id)
         respond_to_prompt(session_id, run, result, state)
 
       # A turn that finished after its own cancellation already answered the request,
@@ -334,6 +566,43 @@ defmodule Pepe.ACP.Server do
       {session_id, _session} -> {:noreply, finish_prompt(session_id, {:error, reason}, state)}
       nil -> {:noreply, state}
     end
+  end
+
+  # The session was given a name (it is generated a turn or two in, off the turn's own
+  # path): tell the editor, so its history entry stops being the first message's opening.
+  def handle_info({:titled, key, title}, state) do
+    case Enum.find(state.sessions, fn {_id, session} -> session.key == key end) do
+      {session_id, _session} ->
+        {:noreply, write(state, Protocol.session_update(session_id, Protocol.session_info_update(title: title)))}
+
+      nil ->
+        {:noreply, state}
+    end
+  end
+
+  # The session topic carries other things (a file ready to send, ...) that are not this
+  # connection's business.
+  def handle_info(_other, state), do: {:noreply, state}
+
+  # A turn ended, however it ended: the session was used just now. The editor is told
+  # (a history panel re-sorts by it), before the answer to the prompt closes the turn.
+  defp note_turn(state, session_id) do
+    case state.sessions[session_id] do
+      %{persisted?: true, key: key} ->
+        updated_at = Sessions.touch(session_id, current_agent(key, state.agent))
+        write(state, Protocol.session_update(session_id, Protocol.session_info_update(updated_at: updated_at)))
+
+      _ ->
+        state
+    end
+  end
+
+  # The agent the session ended the turn with (a conversation can hand itself to another
+  # agent mid-way), so a later `session/list` files it under the right one.
+  defp current_agent(key, fallback) do
+    Session.status(key).agent
+  catch
+    :exit, _ -> fallback
   end
 
   defp respond_to_prompt(session_id, run, {:ok, reply}, state) do
@@ -412,7 +681,7 @@ defmodule Pepe.ACP.Server do
   # with no id to thread through the event callback.
   defp on_event({:tool_call, name, raw_args}, session_id, state) do
     with_session(state, session_id, fn session ->
-      id = "call_#{session.seq + 1}"
+      id = "#{session.prefix}_#{session.seq + 1}"
       entry = %{id: id, name: name, args: raw_args, denied: nil}
       session = %{session | seq: session.seq + 1, tools: session.tools ++ [entry]}
 

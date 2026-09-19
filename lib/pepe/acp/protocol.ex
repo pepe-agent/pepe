@@ -15,14 +15,13 @@ defmodule Pepe.ACP.Protocol do
 
   ## What is implemented, and what is not
 
-  This is the protocol's **core subset**, not all of it: the handshake, one session,
-  a prompt turn streamed back as it happens, and a tool call that stops to ask a
-  human. Deliberately absent, and advertised as absent in `initialize_result/0` so a
-  client never has to guess:
+  The handshake, sessions that outlive the connection (`session/new`, `session/list`,
+  `session/load`, `session/resume`, `session/fork`, see `Pepe.ACP.Sessions`), a prompt
+  turn streamed back as it happens, and a tool call that stops to ask a human. An ACP
+  session is a `Pepe.Agent.Session` keyed `acp:<id>` whose history is saved on disk, so
+  closing the editor no longer ends the conversation. Not implemented, and advertised
+  as absent in `initialize_result/0` so a client never has to guess:
 
-    * `session/load`, `session/fork`, `session/resume`, `session/list` (`loadSession:
-      false`). An ACP session here is a live `Pepe.Agent.Session`, born with
-      `session/new` and gone when the editor disconnects.
     * `authenticate` (`authMethods: []`). Pepe authenticates to *model providers*,
       out of `~/.pepe/config.json`; there is nothing for an editor to log in to.
     * a prompt capability the connection can't honestly promise (`image` only for an
@@ -73,7 +72,9 @@ defmodule Pepe.ACP.Protocol do
       "protocolVersion" => @protocol_version,
       "agentInfo" => agent_info(),
       "agentCapabilities" => %{
-        "loadSession" => false,
+        "loadSession" => true,
+        # An empty object per capability is the whole declaration: presence means "supported".
+        "sessionCapabilities" => %{"list" => %{}, "resume" => %{}, "fork" => %{}},
         "promptCapabilities" => prompt_capabilities
       },
       "authMethods" => []
@@ -126,6 +127,31 @@ defmodule Pepe.ACP.Protocol do
   @spec message_chunk(String.t()) :: map()
   def message_chunk(text),
     do: %{"sessionUpdate" => "agent_message_chunk", "content" => text_block(text)}
+
+  @doc "A `user_message_chunk` update: something the person said, replayed on `session/load`."
+  @spec user_message_chunk(String.t()) :: map()
+  def user_message_chunk(text),
+    do: %{"sessionUpdate" => "user_message_chunk", "content" => text_block(text)}
+
+  @doc """
+  A `session_info_update`: the session's title and/or last-activity time changed. A field
+  that is left out means "unchanged" in ACP, so only what is known is sent.
+  """
+  @spec session_info_update(keyword()) :: map()
+  def session_info_update(fields) do
+    Enum.reduce(fields, %{"sessionUpdate" => "session_info_update"}, fn
+      {:title, title}, acc when is_binary(title) -> Map.put(acc, "title", title)
+      {:updated_at, at}, acc when is_binary(at) -> Map.put(acc, "updatedAt", at)
+      _other, acc -> acc
+    end)
+  end
+
+  @doc "One entry of a `session/list` result."
+  @spec session_info(String.t(), String.t(), String.t(), String.t() | nil) :: map()
+  def session_info(session_id, cwd, title, updated_at) do
+    %{"sessionId" => session_id, "cwd" => cwd, "title" => title}
+    |> then(&if(is_binary(updated_at), do: Map.put(&1, "updatedAt", updated_at), else: &1))
+  end
 
   @doc "A `text` content block."
   @spec text_block(String.t()) :: map()
