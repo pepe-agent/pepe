@@ -29,6 +29,7 @@ defmodule PepeWeb.ChatLive do
       {"/stop", gettext("Stop the current run")},
       {"/inline", gettext("Feed a message into the running turn: TEXT")},
       {"/goal", gettext("Pursue a goal until a reviewer approves: OBJECTIVE | SUCCESS CRITERION")},
+      {"/undo", gettext("Undo your last message")},
       {"/retry", gettext("Redo the last answer")},
       {"/rewind", gettext("Go back several turns at once: N")},
       {"/fork", gettext("Branch this conversation into a new one")},
@@ -1210,7 +1211,9 @@ defmodule PepeWeb.ChatLive do
   defp dispatch_slash("/stop", socket, key, _cmd), do: stop_turn(socket, key)
   defp dispatch_slash("/inline", socket, key, cmd), do: inline_into_turn(socket, key, cmd)
   defp dispatch_slash("/goal", socket, key, cmd), do: start_goal(socket, key, cmd)
-  defp dispatch_slash("/retry", socket, key, _cmd), do: retry_last(socket, key)
+  # Conversation only, like everywhere else; what its files did is left alone and said so.
+  defp dispatch_slash("/undo", socket, key, _cmd), do: apply_rewind(socket, key, 1, :chat)
+  defp dispatch_slash("/retry", socket, key, cmd), do: retry_last(socket, key, cmd)
   defp dispatch_slash("/rewind", socket, key, cmd), do: rewind_session(socket, key, cmd)
   defp dispatch_slash("/fork", socket, key, _cmd), do: fork_session(socket, key)
   defp dispatch_slash("/name", socket, key, cmd), do: label_session(socket, key, cmd)
@@ -1329,73 +1332,82 @@ defmodule PepeWeb.ChatLive do
     end
   end
 
-  # Redo the last answer: drop the last user turn (and its responses), then re-send the
-  # same user message so the model tries again. No-op with a friendly note if there's
-  # no user turn yet, or if a turn is already running.
-  defp retry_last(socket, key) do
-    cond do
-      socket.assigns.running ->
-        put_flash(socket, :error, gettext("Wait for the current turn to finish."))
+  # Redo the last answer: take the last person turn back and send the same message again so the
+  # model tries once more. `/retry files` also puts back the files that turn changed, so the
+  # retry starts from the same files. A friendly note if there is nothing to retry, the message
+  # carried attachments (it cannot be sent again exactly), or a turn is already running.
+  defp retry_last(socket, key, cmd) do
+    mode = if "files" in Enum.map(slash_args(cmd), &String.downcase/1), do: :both, else: :chat
 
-      text = last_user_text(socket.assigns.messages) ->
-        Session.undo(key)
-        stream? = stream_reply(key, text)
+    if socket.assigns.running do
+      put_flash(socket, :error, gettext("Wait for the current turn to finish."))
+    else
+      case Session.retry(key, mode) do
+        {:ok, %{text: text, files: files, roots: roots}} ->
+          stream? = stream_reply(key, text)
 
-        socket
-        |> assign(
-          messages: history(key) ++ [%{role: "user", content: text}],
-          streaming: "",
-          streamed_run?: stream?,
-          running: true,
-          activity: [],
-          input: ""
-        )
+          socket
+          |> assign(
+            messages: history(key) ++ [%{role: "user", content: text}],
+            streaming: "",
+            streamed_run?: stream?,
+            running: true,
+            activity: [],
+            input: ""
+          )
+          |> flash_lines(Pepe.Checkpoints.Report.file_lines(files, roots: roots))
 
-      true ->
-        put_flash(socket, :error, gettext("Nothing to retry yet."))
+        {:error, :nothing} ->
+          put_flash(socket, :error, gettext("Nothing to retry yet."))
+
+        {:error, :not_text} ->
+          put_flash(socket, :error, gettext("That message had an attachment, so it can't be sent again exactly. Send it again yourself."))
+
+        {:error, :busy} ->
+          put_flash(socket, :error, gettext("Wait for the current turn to finish."))
+      end
     end
   end
 
-  # `/rewind N` - drop the last N exchanges and carry on from before them, re-rendering the
-  # transcript from what's left. Irreversible (see Pepe.Agent.Session.rewind/2), so the flash
-  # says how many turns actually went rather than only that something happened.
+  defp flash_lines(socket, []), do: socket
+  defp flash_lines(socket, lines), do: put_flash(socket, :info, Enum.join(lines, "\n"))
+
+  # `/rewind` lists the recent turns to pick from; `/rewind N [chat|files]` goes back N turns,
+  # by default the conversation and the files those turns changed, re-rendering the transcript
+  # from what's left. Irreversible (see Pepe.Agent.Session.rewind_to/4), so the flash says what
+  # actually went rather than only that something happened.
   defp rewind_session(socket, key, cmd) do
     args = cmd |> String.replace_prefix("/rewind", "") |> String.trim()
 
-    case Session.parse_rewind_count(args) do
-      {:ok, count} -> apply_rewind(socket, key, count)
-      :error -> put_flash(socket, :error, gettext("Usage: /rewind N, where N is how many turns to go back."))
+    case Pepe.Checkpoints.Report.parse_rewind(args) do
+      :list ->
+        socket |> assign(input: "") |> put_flash(:info, Pepe.Checkpoints.Report.turn_list(Session.turns(key)))
+
+      {:ok, count, mode} ->
+        apply_rewind(socket, key, count, mode)
+
+      :error ->
+        put_flash(
+          socket,
+          :error,
+          gettext("Usage: /rewind N, where N is how many turns to go back.") <> "\n" <> Pepe.Checkpoints.Report.usage()
+        )
     end
   end
 
-  defp apply_rewind(socket, key, count) do
-    case Session.rewind(key, count) do
-      {:ok, 0} ->
+  defp apply_rewind(socket, key, count, mode) do
+    case Session.rewind_to(key, count, mode) do
+      {:ok, %{dropped: 0}} when mode != :files ->
         socket |> assign(input: "") |> put_flash(:error, gettext("Nothing to rewind yet."))
 
-      {:ok, dropped} ->
-        flash =
-          if dropped < count,
-            do:
-              ngettext(
-                "Rewound %{count} turn. That was the whole conversation.",
-                "Rewound %{count} turns. That was the whole conversation.",
-                dropped,
-                count: dropped
-              ),
-            else: ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
-
+      {:ok, result} ->
         socket
         |> assign(messages: history(key), streaming: "", activity: [], input: "")
-        |> put_flash(:info, flash)
+        |> put_flash(:info, Pepe.Checkpoints.Report.summary(result, requested: count, mode: mode))
 
       {:error, :busy} ->
         put_flash(socket, :error, gettext("Wait for the current turn to finish."))
     end
-  end
-
-  defp last_user_text(messages) do
-    messages |> Enum.reverse() |> Enum.find_value(fn m -> m.role == "user" && m.content end)
   end
 
   # This month's spend and message count for the project that owns this session's agent.

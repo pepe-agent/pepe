@@ -258,6 +258,43 @@ defmodule Pepe.Tools.ManageAgentTest do
       assert Config.get_agent("sales").skill_learning == false
     end
 
+    test "checkpoints is on by default and can be turned off and back on by chat" do
+      assert Config.get_agent("sales").checkpoints == true
+
+      assert {:ok, msg} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "checkpoints", "value" => "off"},
+                 ctx(["sales"])
+               )
+
+      assert msg =~ "off"
+      assert Config.get_agent("sales").checkpoints == false
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "checkpoints", "value" => "on"},
+                 ctx(["sales"])
+               )
+
+      assert Config.get_agent("sales").checkpoints == true
+    end
+
+    test "checkpoint_shell is off by default and can be turned on by chat, and shows in get" do
+      assert Config.get_agent("sales").checkpoint_shell == false
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "checkpoint_shell", "value" => "on"},
+                 ctx(["sales"])
+               )
+
+      assert Config.get_agent("sales").checkpoint_shell == true
+
+      assert {:ok, shown} = ManageAgent.run(%{"action" => "get", "target" => "sales"}, ctx(["sales"]))
+      assert shown =~ "checkpoints=on"
+      assert shown =~ "checkpoint_shell=on"
+    end
+
     test "trust_untrusted_content can be turned on from an ordinary conversation" do
       assert {:ok, _} =
                ManageAgent.run(

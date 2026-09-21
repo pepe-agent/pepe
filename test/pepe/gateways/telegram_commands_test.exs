@@ -11,6 +11,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
   """
   use ExUnit.Case, async: false
 
+  alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.Config.Model
   alias Pepe.Gateways.Telegram
@@ -115,6 +116,10 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
         :tool ->
           if last["role"] == "tool", do: model_reply(conn, "ran it", nil), else: model_reply(conn, nil, bash_call())
 
+        # Writes notes.md in its workspace, then says so: a turn that changes a file.
+        :write ->
+          if last["role"] == "tool", do: model_reply(conn, "wrote it", nil), else: model_reply(conn, nil, write_call())
+
         :ask_user ->
           if last["role"] == "tool",
             do: model_reply(conn, "you picked #{last["content"]}", nil),
@@ -184,6 +189,16 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
           "function" => %{"name" => "read_file", "arguments" => ~s({"path":"f#{n}.txt"})}
         }
       end
+    end
+
+    defp write_call do
+      [
+        %{
+          "id" => "w1",
+          "type" => "function",
+          "function" => %{"name" => "write_file", "arguments" => ~s({"path":"notes.md","content":"written by the agent"})}
+        }
+      ]
     end
 
     defp model_reply(conn, content, tool_calls) do
@@ -1371,6 +1386,149 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       refute Telegram.bot_active?(%{"enabled" => true})
       refute Telegram.bot_active?(%{"enabled" => false, "bot_token" => "t"})
       assert Telegram.bot_active?(%{"bot_token" => "t"})
+    end
+  end
+
+  describe "rewind, retry and putting files back" do
+    setup %{chat: chat} do
+      start_bot!()
+
+      Config.put_agent(%Pepe.Config.Agent{
+        name: "assistant",
+        model: "mock",
+        system_prompt: "You help. CHAT-#{chat}",
+        tools: ["write_file"],
+        auto_approve: ["*"],
+        max_iterations: 4
+      })
+
+      model_answers(:write)
+      workspace = Workspace.dir("assistant")
+      File.mkdir_p!(workspace)
+      File.write!(Path.join(workspace, "notes.md"), "original")
+      {:ok, notes: Path.join(workspace, "notes.md")}
+    end
+
+    # A whole turn that writes the file, until the bot goes quiet.
+    defp write_turn(chat, text) do
+      say(chat, text)
+      assert Enum.any?(everything_said(chat), &(&1 =~ "wrote it"))
+    end
+
+    defp reply_to(chat, command) do
+      say(chat, command)
+      await_reply(chat)
+    end
+
+    test "a bare /rewind lists the recent turns and what each changed", %{chat: chat} do
+      write_turn(chat, "please write the notes")
+
+      list = reply_to(chat, "/rewind")
+
+      assert list =~ "Recent turns, newest first:"
+      assert list =~ "1. please write the notes (1 file)"
+      assert list =~ "/rewind N chat"
+      assert list =~ "/rewind N files"
+    end
+
+    test "/rewind N puts the files back along with the conversation", %{chat: chat, notes: notes} do
+      write_turn(chat, "please write the notes")
+      assert File.read!(notes) == "written by the agent"
+
+      reply = reply_to(chat, "/rewind 1")
+
+      assert reply =~ "Rewound 1 turn"
+      assert reply =~ "Put back 1 file: notes.md"
+      assert File.read!(notes) == "original"
+      assert reply_to(chat, "/status") =~ "Turns: 0"
+    end
+
+    test "/rewind N files puts files back and keeps the conversation", %{chat: chat, notes: notes} do
+      write_turn(chat, "please write the notes")
+
+      reply = reply_to(chat, "/rewind 1 files")
+
+      assert reply =~ "Put files back for the last 1 turn. The conversation is unchanged."
+      assert reply =~ "Put back 1 file: notes.md"
+      assert File.read!(notes) == "original"
+      assert reply_to(chat, "/status") =~ "Turns: 1"
+    end
+
+    test "/rewind N chat goes back in the conversation only, and says the files stayed", %{chat: chat, notes: notes} do
+      write_turn(chat, "please write the notes")
+
+      reply = reply_to(chat, "/rewind 1 chat")
+
+      assert reply =~ "Rewound 1 turn"
+      assert reply =~ "The 1 file those turns changed was left as it is"
+      assert File.read!(notes) == "written by the agent"
+      assert reply_to(chat, "/status") =~ "Turns: 0"
+    end
+
+    test "a file edited by hand afterwards is kept, and named", %{chat: chat, notes: notes} do
+      write_turn(chat, "please write the notes")
+      File.write!(notes, "my own edit")
+
+      reply = reply_to(chat, "/rewind 1")
+
+      assert reply =~ "Left 1 file alone because it changed afterwards: notes.md"
+      assert File.read!(notes) == "my own edit"
+    end
+
+    test "/undo takes back the conversation and says a turn's files were left alone", %{chat: chat, notes: notes} do
+      write_turn(chat, "please write the notes")
+
+      reply = reply_to(chat, "/undo")
+
+      assert reply =~ "Undid your last message"
+      assert reply =~ "left as it is"
+      assert File.read!(notes) == "written by the agent"
+    end
+
+    test "/rewind with something it cannot read says how to use it", %{chat: chat} do
+      reply = reply_to(chat, "/rewind banana")
+
+      assert reply =~ "Usage: /rewind N"
+      assert reply =~ "/rewind N files"
+    end
+
+    test "/retry files puts the file back before asking the same thing again", %{chat: chat, notes: notes} do
+      write_turn(chat, "please write the notes")
+
+      say(chat, "/retry files")
+      said = everything_said(chat)
+
+      assert Enum.any?(said, &(&1 =~ "Put back 1 file: notes.md"))
+      assert Enum.any?(said, &(&1 =~ "wrote it"))
+      # The model wrote it again, and the conversation holds one turn rather than two.
+      assert File.read!(notes) == "written by the agent"
+      assert reply_to(chat, "/status") =~ "Turns: 1"
+    end
+  end
+
+  describe "who may rewind, undo and retry a group's shared conversation" do
+    @stranger 77
+
+    setup do: start_bot!(%{"trainers" => [@user]})
+
+    # A group's chat id is negative, and that is what marks the conversation as shared.
+    for cmd <- ["/rewind 1", "/rewind", "/undo", "/retry"] do
+      test "a member who is not a trainer is refused #{cmd} in a group", %{chat: chat} do
+        group = -chat
+        say(group, unquote(cmd), type: "group", user: @stranger)
+        assert await_reply(group) =~ "That command isn't available here."
+      end
+
+      test "a trainer may use #{cmd} in a group", %{chat: chat} do
+        group = -chat
+        say(group, unquote(cmd), type: "group", user: @user)
+        refute await_reply(group) =~ "That command isn't available here."
+      end
+    end
+
+    test "in a private chat nobody is gated, since the conversation is their own", %{chat: chat} do
+      say(chat, "/rewind", user: @stranger)
+      refute await_reply(chat) =~ "That command isn't available here."
     end
   end
 end

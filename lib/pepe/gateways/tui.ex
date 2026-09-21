@@ -244,16 +244,11 @@ defmodule Pepe.Gateways.TUI do
     end
   end
 
-  # Text of the most recent user message in a session, or nil (used by /retry).
-  defp last_user_text(key) do
-    key
-    |> Session.history()
-    |> Enum.reverse()
-    |> Enum.find_value(fn m -> m["role"] == "user" && m["content"] end)
-  rescue
-    _ -> nil
-  catch
-    :exit, _ -> nil
+  defp rewind(key, count, mode) do
+    case Session.rewind_to(key, count, mode) do
+      {:ok, result} -> info("⏪ " <> Pepe.Checkpoints.Report.summary(result, requested: count, mode: mode))
+      {:error, :busy} -> error(gettext("Wait for the current turn to finish."))
+    end
   end
 
   defp command(key, text) do
@@ -272,35 +267,50 @@ defmodule Pepe.Gateways.TUI do
   end
 
   defp run_command(key, "undo", _rest) do
-    Session.undo(key)
-    info(gettext("↩️ Undid your last message."))
-  end
+    # A conversation-only take-back; if that turn had changed files, say they were left alone.
+    case Session.rewind_to(key, 1, :chat) do
+      {:ok, result} ->
+        info(Enum.join([gettext("↩️ Undid your last message.") | Pepe.Checkpoints.Report.kept_lines(result.kept)], "\n"))
 
-  # `/rewind N` - go back N exchanges at once. Reports how many turns actually went, so
-  # hitting the start of the conversation reads as an answer rather than a refusal.
-  defp run_command(key, "rewind", rest) do
-    case Session.parse_rewind_count(rest) do
-      {:ok, count} ->
-        case Session.rewind(key, count) do
-          {:ok, 0} -> info(gettext("Nothing to rewind yet."))
-          {:ok, dropped} when dropped < count -> info("⏪ " <> rewound_all(dropped))
-          {:ok, dropped} -> info("⏪ " <> rewound(dropped))
-          {:error, :busy} -> error(gettext("Wait for the current turn to finish."))
-        end
-
-      :error ->
-        info(gettext("Usage: /rewind N, where N is how many turns to go back."))
+      {:error, :busy} ->
+        error(gettext("Wait for the current turn to finish."))
     end
   end
 
-  defp run_command(key, "retry", _rest) do
-    case last_user_text(key) do
-      nil ->
+  # `/rewind` lists the recent turns to pick from; `/rewind N [chat|files]` goes back N turns,
+  # by default the conversation and the files those turns changed. Reports what actually went,
+  # so hitting the start of the conversation reads as an answer rather than a refusal.
+  defp run_command(key, "rewind", rest) do
+    case Pepe.Checkpoints.Report.parse_rewind(rest) do
+      :list ->
+        info(Pepe.Checkpoints.Report.turn_list(Session.turns(key)))
+
+      {:ok, count, mode} ->
+        rewind(key, count, mode)
+
+      :error ->
+        info(gettext("Usage: /rewind N, where N is how many turns to go back.") <> "\n" <> Pepe.Checkpoints.Report.usage())
+    end
+  end
+
+  # `/retry` asks the last message again from the conversation as it was before it; `/retry
+  # files` also puts back the files that turn changed, so it starts from the same files.
+  defp run_command(key, "retry", rest) do
+    mode = if rest |> String.downcase() == "files", do: :both, else: :chat
+
+    case Session.retry(key, mode) do
+      {:ok, %{text: text, files: files, roots: roots}} ->
+        Enum.each(Pepe.Checkpoints.Report.file_lines(files, roots: roots), &info/1)
+        say(key, text)
+
+      {:error, :nothing} ->
         info(gettext("Nothing to retry yet."))
 
-      text ->
-        Session.undo(key)
-        say(key, text)
+      {:error, :not_text} ->
+        info(gettext("That message had an attachment, so it can't be sent again exactly. Send it again yourself."))
+
+      {:error, :busy} ->
+        error(gettext("Wait for the current turn to finish."))
     end
   end
 
@@ -385,18 +395,6 @@ defmodule Pepe.Gateways.TUI do
 
   defp run_command(_key, cmd, _rest) do
     info(gettext("Unknown command: /%{cmd}", cmd: cmd))
-  end
-
-  defp rewound(dropped),
-    do: ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
-
-  defp rewound_all(dropped) do
-    ngettext(
-      "Rewound %{count} turn. That was the whole conversation.",
-      "Rewound %{count} turns. That was the whole conversation.",
-      dropped,
-      count: dropped
-    )
   end
 
   # No trainers/locked distinction here (single-operator console) - always the
