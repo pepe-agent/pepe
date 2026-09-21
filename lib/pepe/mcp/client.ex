@@ -159,7 +159,7 @@ defmodule Pepe.MCP.Client do
 
   defp open_port(exe, spec) do
     args = spec |> Map.get(:args, []) |> Enum.map(&Protocol.interp(&1, spec))
-    env = spec |> Map.get(:env, %{}) |> env_list(spec)
+    env = spec |> Map.get(:env, %{}) |> env_list(spec) |> isolate(spec)
 
     port =
       Port.open(
@@ -179,6 +179,42 @@ defmodule Pepe.MCP.Client do
   end
 
   defp env_list(_env, _spec), do: []
+
+  # What a literal spec's child may inherit from Pepe. `Port.open`'s `{:env, list}` only ADDS
+  # to the parent's environment, so a `literal` spec (one an editor supplied, which can come
+  # straight out of a cloned repository) would otherwise read every provider key and gateway
+  # token Pepe holds with one `env` in its own command. So for those the rest is unset: what
+  # remains is what a program needs to run at all, plus what the editor named itself. A
+  # server the operator configured (no `:literal`) keeps the whole environment, as ever.
+  @inherited ~w(PATH HOME LANG LC_ALL TMPDIR USER LOGNAME SHELL TERM)
+
+  # The same for Windows, where a child without them cannot start a shell or find a profile.
+  @inherited_windows ~w[SYSTEMROOT SYSTEMDRIVE WINDIR COMSPEC PATHEXT OS USERPROFILE USERNAME APPDATA
+                        LOCALAPPDATA TEMP TMP PROGRAMFILES PROGRAMFILES(X86) PROGRAMDATA COMPUTERNAME
+                        NUMBER_OF_PROCESSORS PROCESSOR_ARCHITECTURE]
+
+  defp isolate(env, %{literal: true}) do
+    named = MapSet.new(env, fn {name, _value} -> List.to_string(name) end)
+
+    dropped =
+      for {name, _value} <- System.get_env(),
+          not inherited?(name),
+          not MapSet.member?(named, name),
+          # Windows keeps drive-cwd bookkeeping in variables named "=C:"; they are not settable.
+          not String.starts_with?(name, "="),
+          do: {String.to_charlist(name), false}
+
+    env ++ dropped
+  end
+
+  defp isolate(env, _spec), do: env
+
+  defp inherited?(name) do
+    case :os.type() do
+      {:win32, _} -> String.upcase(name) in @inherited or String.upcase(name) in @inherited_windows
+      _ -> name in @inherited
+    end
+  end
 
   # A spec may name the directory the server starts in (an editor's open project, for one).
   # Only an existing directory is honored: a stale path must not turn a working server into

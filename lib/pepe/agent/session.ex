@@ -229,6 +229,10 @@ defmodule Pepe.Agent.Session do
   @doc "Return `%{agent:, model:, turns:, running:}` for the session."
   def status(key), do: GenServer.call(via(key), :status)
 
+  @doc "Return the configured model connection name currently used by the session."
+  @spec model_name(term()) :: String.t() | nil
+  def model_name(key), do: GenServer.call(via(key), :model_name)
+
   @doc "Summarize older turns into one message to free up context."
   @spec compact(term()) :: {:ok, String.t()} | {:error, term()}
   def compact(key), do: GenServer.call(via(key), :compact, :infinity)
@@ -794,10 +798,13 @@ defmodule Pepe.Agent.Session do
      %{
        agent: state.agent_name,
        model: model_id(state.agent_name, state.model_override),
-       model_name: model_name(state.agent_name, state.model_override),
        turns: turns,
        running: state.running != nil
      }, state}
+  end
+
+  def handle_call(:model_name, _from, state) do
+    {:reply, model_name(state.agent_name, state.model_override), state}
   end
 
   # Refuse mid-run: a compaction computed from the pre-turn history would be overwritten by

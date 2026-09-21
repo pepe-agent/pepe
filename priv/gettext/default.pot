@@ -11,6 +11,7 @@
 msgid ""
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:153
 #: lib/pepe/gateways/telegram.ex:2234
 #: lib/pepe/gateways/tui.ex:331
 #: lib/pepe_web/live/agents_live.ex:129
@@ -26,6 +27,9 @@ msgstr ""
 msgid "(empty response)"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:154
+#: lib/pepe/acp/commands.ex:163
+#: lib/pepe/acp/commands.ex:188
 #: lib/pepe/gateways/telegram.ex:2235
 #: lib/pepe/gateways/telegram.ex:2386
 #: lib/pepe/gateways/tui.ex:332
@@ -35,18 +39,21 @@ msgstr ""
 msgid "(unset)"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:152
 #: lib/pepe/gateways/telegram.ex:2233
 #: lib/pepe/gateways/tui.ex:330
 #, elixir-autogen, elixir-format
 msgid "Agent: %{agent}\nModel: %{model}\nTurns: %{turns}"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:372
 #: lib/pepe/gateways/telegram.ex:2367
 #: lib/pepe/gateways/tui.ex:381
 #, elixir-autogen, elixir-format
 msgid "Commands:"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:142
 #: lib/pepe/gateways/telegram.ex:2208
 #: lib/pepe/gateways/tui.ex:322
 #, elixir-autogen, elixir-format
@@ -133,12 +140,14 @@ msgstr ""
 msgid "Usage: /agent <name>"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:123
 #: lib/pepe/gateways/telegram.ex:2145
 #: lib/pepe/gateways/tui.ex:276
 #, elixir-autogen, elixir-format
 msgid "↩️ Undid your last message."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:141
 #: lib/pepe/gateways/telegram.ex:2204
 #: lib/pepe/gateways/tui.ex:321
 #, elixir-autogen, elixir-format
@@ -150,6 +159,7 @@ msgstr ""
 msgid "🧠 Pepe ready."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:115
 #: lib/pepe/gateways/telegram.ex:2137
 #: lib/pepe/gateways/tui.ex:271
 #: lib/pepe_web/live/chat_live.ex:712
@@ -184,6 +194,8 @@ msgstr ""
 msgid "Cleared all saved permissions."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:163
+#: lib/pepe/acp/commands.ex:188
 #: lib/pepe/gateways/tui.ex:368
 #: lib/pepe_web/live/chat_live.ex:1453
 #, elixir-autogen, elixir-format
@@ -241,6 +253,7 @@ msgstr ""
 msgid "Show your Telegram ids"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:297
 #: lib/pepe/gateways/telegram.ex:2454
 #: lib/pepe/gateways/tui.ex:439
 #: lib/pepe_web/live/chat_live.ex:1499
@@ -248,6 +261,8 @@ msgstr ""
 msgid "There's no agent to set the model on."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:294
+#: lib/pepe/acp/commands.ex:300
 #: lib/pepe/gateways/telegram.ex:2418
 #: lib/pepe/gateways/telegram.ex:2451
 #: lib/pepe/gateways/telegram.ex:2521
@@ -337,6 +352,7 @@ msgstr ""
 msgid "Available models"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:321
 #: lib/pepe/gateways/telegram.ex:2589
 #, elixir-autogen, elixir-format
 msgid "Available tools"
@@ -2982,6 +2998,7 @@ msgstr ""
 msgid "Renaming updates every agent, cron, hook and default pointing at this connection."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:178
 #: lib/pepe/gateways/tui.ex:360
 #: lib/pepe_web/live/chat_live.ex:1304
 #, elixir-autogen, elixir-format
@@ -2995,6 +3012,7 @@ msgstr ""
 msgid "Change to %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:291
 #: lib/pepe/gateways/telegram.ex:2448
 #: lib/pepe/gateways/tui.ex:433
 #: lib/pepe_web/live/chat_live.ex:1492
@@ -3002,6 +3020,7 @@ msgstr ""
 msgid "Model set to %{name} (%{scope})."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:197
 #: lib/pepe/gateways/telegram.ex:2253
 #: lib/pepe/gateways/telegram.ex:2438
 #: lib/pepe/gateways/tui.ex:375
@@ -3126,6 +3145,7 @@ msgstr ""
 msgid "switch"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:305
 #: lib/pepe/gateways/telegram.ex:2459
 #: lib/pepe/gateways/tui.ex:444
 #: lib/pepe_web/live/chat_live.ex:1502
@@ -3133,6 +3153,7 @@ msgstr ""
 msgid "everyone"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:304
 #: lib/pepe/gateways/telegram.ex:2458
 #: lib/pepe/gateways/tui.ex:443
 #: lib/pepe_web/live/chat_live.ex:1501
@@ -3502,7 +3523,7 @@ msgstr ""
 msgid "empty Enter to finish"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:4926
+#: lib/mix/tasks/pepe.ex:5155
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr ""
@@ -3522,17 +3543,17 @@ msgstr ""
 msgid "page %{page}/%{pages}"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:4740
+#: lib/mix/tasks/pepe.ex:4969
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:4741
+#: lib/mix/tasks/pepe.ex:4970
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:4749
+#: lib/mix/tasks/pepe.ex:4978
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -3760,6 +3781,7 @@ msgstr ""
 msgid "Show this month's spend and message count"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:213
 #: lib/pepe/gateways/telegram.ex:2299
 #: lib/pepe/gateways/tui.ex:311
 #: lib/pepe_web/live/chat_live.ex:1406
@@ -3767,6 +3789,7 @@ msgstr ""
 msgid "This month: %{cost} · %{count} messages"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:251
 #: lib/pepe/gateways/tui.ex:288
 #: lib/pepe_web/live/chat_live.ex:1338
 #: lib/pepe_web/live/chat_live.ex:1393
@@ -3968,6 +3991,7 @@ msgstr ""
 msgid "List models available to this project"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:175
 #: lib/pepe/gateways/telegram.ex:2473
 #: lib/pepe/gateways/telegram.ex:2494
 #: lib/pepe/gateways/tui.ex:356
@@ -5421,7 +5445,7 @@ msgstr ""
 msgid "not installed"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:167
+#: lib/mix/tasks/pepe.ex:189
 #, elixir-autogen, elixir-format
 msgid "No more input (stdin closed). Aborting."
 msgstr ""
@@ -6496,7 +6520,7 @@ msgstr ""
 msgid "Usage: /inline <message>, feeds it into the running turn."
 msgstr ""
 
-#: lib/pepe/agent/workspace.ex:242
+#: lib/pepe/agent/workspace.ex:264
 #, elixir-autogen, elixir-format
 msgid "You are Pepe, an AI agent, but your identity isn't set up yet: you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Pepe and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the rename_agent tool. Always reply in the user's language."
 msgstr ""
@@ -6646,6 +6670,7 @@ msgstr ""
 msgid "Go back several turns at once: N"
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:264
 #: lib/pepe/gateways/telegram.ex:2161
 #: lib/pepe/gateways/tui.ex:285
 #: lib/pepe_web/live/chat_live.ex:1374
@@ -6653,6 +6678,7 @@ msgstr ""
 msgid "Nothing to rewind yet."
 msgstr ""
 
+#: lib/pepe/acp/commands.ex:272
 #: lib/pepe/gateways/telegram.ex:2733
 #: lib/pepe/gateways/tui.ex:391
 #: lib/pepe_web/live/chat_live.ex:1386
@@ -6662,6 +6688,7 @@ msgid_plural "Rewound %{count} turns."
 msgstr[0] ""
 msgstr[1] ""
 
+#: lib/pepe/acp/commands.ex:275
 #: lib/pepe/gateways/telegram.ex:2737
 #: lib/pepe/gateways/tui.ex:394
 #: lib/pepe_web/live/chat_live.ex:1380
@@ -6671,6 +6698,7 @@ msgid_plural "Rewound %{count} turns. That was the whole conversation."
 msgstr[0] ""
 msgstr[1] ""
 
+#: lib/pepe/acp/commands.ex:133
 #: lib/pepe/gateways/telegram.ex:2168
 #: lib/pepe/gateways/tui.ex:292
 #: lib/pepe_web/live/chat_live.ex:1367
@@ -6686,4 +6714,378 @@ msgstr ""
 #: lib/pepe_web/live/agents_live.ex:480
 #, elixir-autogen, elixir-format
 msgid "Learn from what it does (offer to save and correct its own skills)"
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:339
+#, elixir-autogen, elixir-format
+msgid "Context window: %{size} tokens"
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:344
+#: lib/pepe/acp/commands.ex:347
+#, elixir-autogen, elixir-format
+msgid "Last request: ~%{used} tokens (%{pct}%)"
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:350
+#, elixir-autogen, elixir-format
+msgid "No request has been made yet, so there is nothing to measure."
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:318
+#, elixir-autogen, elixir-format
+msgid "No tools are enabled for this agent."
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:105
+#, elixir-autogen, elixir-format
+msgid "Queued for after the current turn. (%{count} waiting)"
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:231
+#, elixir-autogen, elixir-format
+msgid "Usage: /queue <prompt>"
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:217
+#, elixir-autogen, elixir-format
+msgid "Usage: /steer <guidance>"
+msgstr ""
+
+#: lib/pepe/acp/commands.ex:224
+#, elixir-autogen, elixir-format
+msgid "⏩ Steer sent to the running turn."
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:98
+#: lib/pepe/acp/mcp/descriptor.ex:102
+#: lib/pepe/acp/mcp/descriptor.ex:108
+#, elixir-autogen, elixir-format
+msgid "(unnamed)"
+msgstr ""
+
+#: lib/pepe/acp/mcp/notice.ex:24
+#, elixir-autogen, elixir-format
+msgid "MCP server `%{name}` from your editor was not used: %{reason}."
+msgstr ""
+
+#: lib/pepe/acp/mcp/notice.ex:35
+#, elixir-autogen, elixir-format
+msgid "MCP server `%{name}` offers %{total} tools; only the first %{max} are available in this session."
+msgstr ""
+
+#: lib/pepe/acp/mcp/notice.ex:27
+#, elixir-autogen, elixir-format
+msgid "MCP server `%{name}`%{where} from your editor %{why}. Its tools are not available in this session."
+msgstr ""
+
+#: lib/pepe/acp/mcp/notice.ex:43
+#, elixir-autogen, elixir-format
+msgid "MCP server `%{name}`: the input schema of the tool `%{tool}` is too large to pass on, so the tool is offered without one."
+msgstr ""
+
+#: lib/pepe/acp/content.ex:112
+#, elixir-autogen, elixir-format
+msgid "Note: %{note}"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:581
+#, elixir-autogen, elixir-format
+msgid "The attached %{kind} (%{label}) was not included: %{why}."
+msgstr ""
+
+#: lib/pepe/acp/content.ex:580
+#, elixir-autogen, elixir-format
+msgid "The attached %{kind} was not included: %{why}."
+msgstr ""
+
+#: lib/pepe/acp/content.ex:315
+#, elixir-autogen, elixir-format
+msgid "Transcript of the audio: %{text}"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:157
+#: lib/pepe/acp/mcp/descriptor.ex:161
+#, elixir-autogen, elixir-format
+msgid "`args` must be a list of strings"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:174
+#, elixir-autogen, elixir-format
+msgid "`env` must be a list of name/value pairs"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:220
+#, elixir-autogen, elixir-format
+msgid "`headers` must be a list of name/value pairs"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:601
+#, elixir-autogen, elixir-format
+msgid "a turn can carry at most %{max} images"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:40
+#, elixir-autogen, elixir-format
+msgid "answered 401 Unauthorized: add an `Authorization` header to the server's headers in your editor"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:42
+#, elixir-autogen, elixir-format
+msgid "answered HTTP %{status}"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:48
+#, elixir-autogen, elixir-format
+msgid "connected but could not list its tools"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:37
+#, elixir-autogen, elixir-format
+msgid "could not be reached"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:24
+#: lib/pepe/acp/mcp/failure.ex:50
+#, elixir-autogen, elixir-format
+msgid "could not be started"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:49
+#, elixir-autogen, elixir-format
+msgid "could not be started (%{name})"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:23
+#, elixir-autogen, elixir-format
+msgid "could not be started: it has no command to run"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:21
+#, elixir-autogen, elixir-format
+msgid "could not be started: the command `%{command}` was not found on PATH"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:36
+#, elixir-autogen, elixir-format
+msgid "did not answer the MCP handshake in time"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:34
+#, elixir-autogen, elixir-format
+msgid "did not complete the MCP handshake"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:253
+#, elixir-autogen, elixir-format
+msgid "each environment variable must have a `name` and a `value`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:254
+#, elixir-autogen, elixir-format
+msgid "each header must have a `name` and a `value`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:29
+#, elixir-autogen, elixir-format
+msgid "exited during the MCP handshake (status %{status})"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:247
+#, elixir-autogen, elixir-format
+msgid "invalid environment variable name `%{name}`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:248
+#, elixir-autogen, elixir-format
+msgid "invalid header name `%{name}`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:250
+#, elixir-autogen, elixir-format
+msgid "invalid value for environment variable `%{name}`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:251
+#, elixir-autogen, elixir-format
+msgid "invalid value for header `%{name}`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:45
+#, elixir-autogen, elixir-format
+msgid "is not an MCP endpoint (HTTP %{status})"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:599
+#, elixir-autogen, elixir-format
+msgid "it could not be read (%{reason})"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:603
+#, elixir-autogen, elixir-format
+msgid "it could not be written out to be read"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:119
+#, elixir-autogen, elixir-format
+msgid "it has neither a `command` nor a `url`"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:595
+#, elixir-autogen, elixir-format
+msgid "it is larger than the %{limit} limit"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:607
+#, elixir-autogen, elixir-format
+msgid "it is not a PNG, JPEG, GIF or WebP image within the %{limit} limit"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:596
+#, elixir-autogen, elixir-format
+msgid "its data is not valid base64"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:604
+#, elixir-autogen, elixir-format
+msgid "its text could not be extracted"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:266
+#, elixir-autogen, elixir-format
+msgid "its tool namespace `%{ns}` is already taken by a server configured on this Pepe"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:47
+#, elixir-autogen, elixir-format
+msgid "never announced an event-stream endpoint"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:602
+#, elixir-autogen, elixir-format
+msgid "no speech could be made out in it"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:598
+#, elixir-autogen, elixir-format
+msgid "no transcription route is configured (see `media.audio`)"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:98
+#, elixir-autogen, elixir-format
+msgid "not an MCP server description"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:597
+#, elixir-autogen, elixir-format
+msgid "only PNG, JPEG, GIF and WebP images are supported"
+msgstr ""
+
+#: lib/pepe/acp/mcp/failure.ex:32
+#, elixir-autogen, elixir-format
+msgid "refused the MCP handshake: %{message}"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:141
+#, elixir-autogen, elixir-format
+msgid "the `command` is empty"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:142
+#, elixir-autogen, elixir-format
+msgid "the `command` is too long"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:144
+#, elixir-autogen, elixir-format
+msgid "the `command` must be an absolute path or a bare name found on PATH"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:200
+#, elixir-autogen, elixir-format
+msgid "the `url` is too long"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:203
+#, elixir-autogen, elixir-format
+msgid "the `url` must be an http or https address"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:600
+#, elixir-autogen, elixir-format
+msgid "the model this agent uses can't see images"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:103
+#, elixir-autogen, elixir-format
+msgid "the name is too long"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:149
+#, elixir-autogen, elixir-format
+msgid "the server has no `command`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:207
+#, elixir-autogen, elixir-format
+msgid "the server has no `url`"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:102
+#: lib/pepe/acp/mcp/descriptor.ex:108
+#, elixir-autogen, elixir-format
+msgid "the server has no name"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:610
+#, elixir-autogen, elixir-format
+msgid "this kind of file (%{kind}) can't be read here"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:155
+#, elixir-autogen, elixir-format
+msgid "too many arguments (at most %{max})"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:167
+#, elixir-autogen, elixir-format
+msgid "too many environment variables (at most %{max})"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:213
+#, elixir-autogen, elixir-format
+msgid "too many headers (at most %{max})"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:80
+#, elixir-autogen, elixir-format
+msgid "too many servers (at most %{max} per session)"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:610
+#, elixir-autogen, elixir-format
+msgid "unknown type"
+msgstr ""
+
+#: lib/pepe/acp/mcp/descriptor.ex:115
+#, elixir-autogen, elixir-format
+msgid "unsupported transport `%{type}`"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:585
+#, elixir-autogen, elixir-format
+msgctxt "kind of attachment"
+msgid "audio"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:586
+#, elixir-autogen, elixir-format
+msgctxt "kind of attachment"
+msgid "file"
+msgstr ""
+
+#: lib/pepe/acp/content.ex:584
+#, elixir-autogen, elixir-format
+msgctxt "kind of attachment"
+msgid "image"
 msgstr ""

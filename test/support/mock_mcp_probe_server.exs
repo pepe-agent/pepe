@@ -1,5 +1,6 @@
 # A minimal MCP stdio server whose one tool reports the process it runs in: its working
-# directory, its arguments and one environment variable. Used to prove what an editor-supplied
+# directory, its arguments, one environment variable it was given (PEPE_PROBE), whether a
+# variable of Pepe's own (PEPE_ACP_SENTINEL) leaked to it, and whether it has a PATH. Used to prove what an editor-supplied
 # server was actually started with. Bare `elixir`, no project deps, like mock_mcp_server.exs.
 
 reply = fn map ->
@@ -44,7 +45,8 @@ loop = fn loop ->
 
         %{"method" => "tools/call", "id" => id} ->
           text =
-            "cwd=#{File.cwd!()} argv=#{Enum.join(System.argv(), "|")} env=#{System.get_env("PEPE_PROBE") || ""}"
+            "cwd=#{File.cwd!()} argv=#{Enum.join(System.argv(), "|")} env=#{System.get_env("PEPE_PROBE") || ""} " <>
+              "sentinel=#{System.get_env("PEPE_ACP_SENTINEL") || "none"} path=#{if System.get_env("PATH"), do: "yes", else: "no"}"
 
           reply.(%{
             "jsonrpc" => "2.0",

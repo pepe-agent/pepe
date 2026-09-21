@@ -38,11 +38,21 @@ defmodule Pepe.ACP.Content do
   framed but not tainted: it is what the person is looking at, no different from typed
   text or a `read_file` result.
 
+  ## Two audiences, two languages
+
+  A note is for the *person* and is worded (and translated) in their locale. The marker line
+  that goes into the prompt is for the *model* and is always English, like every other
+  frame around attached content (`[Attached file: ...]`), so a prompt does not change shape
+  with the language of whoever typed it.
+
   Everything that touches the outside (transcription, document extraction, the image
   loader, the clock's temp dir) is injectable through `resolve/2`'s options, so the whole
   module is testable without a model, a network or a disk it does not own.
   """
 
+  use Gettext, backend: Pepe.Gettext
+
+  alias Pepe.ACP.Edits
   alias Pepe.LLM.Image
   alias Pepe.Media.Document
   alias Pepe.Media.Vision
@@ -99,7 +109,7 @@ defmodule Pepe.ACP.Content do
 
   @doc "How a note for the person is worded when it is written into the reply stream."
   @spec note_text(String.t()) :: String.t()
-  def note_text(note), do: "Note: #{note}\n\n"
+  def note_text(note), do: gettext("Note: %{note}", note: note) <> "\n\n"
 
   ###
   ### resolve
@@ -137,6 +147,22 @@ defmodule Pepe.ACP.Content do
     do: {:error, "`prompt` has too many content blocks (the limit is #{@max_blocks})"}
 
   def resolve(_other, _opts), do: {:error, "`prompt` must be an array of content blocks"}
+
+  @doc """
+  Is `blocks` a well-formed prompt? The structural half of `resolve/2` and nothing else: no
+  file is read, nothing is transcribed. `:ok`, or `{:error, message}` for the client's bug.
+
+  It exists so a connection can refuse a malformed prompt at once, in its own process, and
+  hand the slow half (`resolve/2`: a transcription is a network call, a document a read) to
+  the task that runs the turn, where it cannot keep the connection from hearing a cancel.
+  """
+  @spec validate_prompt(term()) :: :ok | {:error, String.t()}
+  def validate_prompt(blocks) when is_list(blocks) and length(blocks) <= @max_blocks, do: validate(blocks)
+
+  def validate_prompt(blocks) when is_list(blocks),
+    do: {:error, "`prompt` has too many content blocks (the limit is #{@max_blocks})"}
+
+  def validate_prompt(_other), do: {:error, "`prompt` must be an array of content blocks"}
 
   defp context(opts) do
     %{
@@ -205,7 +231,7 @@ defmodule Pepe.ACP.Content do
     if length(acc.images) < ctx.max_parts do
       %{acc | images: [image | acc.images], parts: ["[Attached image: #{label}]" | acc.parts]}
     else
-      apply_effects(refused("image", label, "a turn can carry at most #{ctx.max_parts} images"), acc, ctx)
+      apply_effects(refused("image", label, {:max_images, ctx.max_parts}), acc, ctx)
     end
   end
 
@@ -218,7 +244,7 @@ defmodule Pepe.ACP.Content do
 
     case decode(data, ctx.image_max_bytes) do
       {:ok, bytes} -> image_effects(bytes, label, ctx)
-      {:error, reason} -> refused("image", label, reason_text(reason, ctx.image_max_bytes))
+      {:error, reason} -> refused("image", label, why(reason, ctx.image_max_bytes))
     end
   end
 
@@ -227,7 +253,7 @@ defmodule Pepe.ACP.Content do
          {:ok, text} <- transcribe(bytes, block["mimeType"], ctx) do
       transcript_effects(text, ctx)
     else
-      {:error, reason} -> refused("audio", "audio", reason_text(reason, ctx.max_bytes))
+      {:error, reason} -> refused("audio", "audio", why(reason, ctx.max_bytes))
     end
   end
 
@@ -242,7 +268,7 @@ defmodule Pepe.ACP.Content do
 
     case decode(blob, ctx.max_bytes) do
       {:ok, bytes} -> blob_effects(bytes, res["mimeType"], uri, label, ctx)
-      {:error, reason} -> refused("file", label, reason_text(reason, ctx.max_bytes))
+      {:error, reason} -> refused("file", label, why(reason, ctx.max_bytes))
     end
   end
 
@@ -250,15 +276,14 @@ defmodule Pepe.ACP.Content do
   ### images
   ###
 
-  defp image_effects(_bytes, label, %{vision?: false}),
-    do: refused("image", label, "the model this agent uses can't see images")
+  defp image_effects(_bytes, label, %{vision?: false}), do: refused("image", label, :no_vision)
 
   defp image_effects(bytes, label, ctx) do
     with :ok <- within(bytes, ctx.image_max_bytes),
          {:ok, image} <- Image.from_bytes(bytes) do
       [{:image, image, label}]
     else
-      {:error, reason} -> refused("image", label, reason_text(reason, ctx.image_max_bytes))
+      {:error, reason} -> refused("image", label, why(reason, ctx.image_max_bytes))
     end
   end
 
@@ -283,11 +308,11 @@ defmodule Pepe.ACP.Content do
     end
   end
 
-  defp transcript_effects("", _ctx), do: refused("audio", "audio", "no speech could be made out in it")
+  defp transcript_effects("", _ctx), do: refused("audio", "audio", :no_speech)
 
   defp transcript_effects(text, ctx) do
     text = ExternalContent.sanitize(text)
-    echo = if ctx.echo?.(), do: [{:note, "Transcript of the audio: " <> text}], else: []
+    echo = if ctx.echo?.(), do: [{:note, gettext("Transcript of the audio: %{text}", text: text)}], else: []
     [{:text, text} | echo]
   end
 
@@ -321,7 +346,7 @@ defmodule Pepe.ACP.Content do
       String.starts_with?(mime_main(mime), "image/") -> image_effects(bytes, label, ctx)
       ext in @office -> office_blob(bytes, ext, uri, label, ctx)
       text?(bytes) -> plain_effects(label, uri, bytes, nil)
-      true -> refused("file", label, "this kind of file (#{mime_main(mime) |> blank_to("unknown type")}) can't be read here")
+      true -> refused("file", label, {:unreadable_kind, mime_main(mime)})
     end
   end
 
@@ -331,7 +356,7 @@ defmodule Pepe.ACP.Content do
     try do
       case File.write(path, bytes) do
         :ok -> office_result(ctx.extract.(path), uri, label)
-        {:error, _} -> refused("file", label, "it could not be written out to be read")
+        {:error, _} -> refused("file", label, :not_written)
       end
     after
       File.rm(path)
@@ -339,7 +364,7 @@ defmodule Pepe.ACP.Content do
   end
 
   defp office_result({:ok, text}, uri, label), do: office_effects(label, uri, text, nil)
-  defp office_result(:unavailable, _uri, label), do: refused("file", label, "its text could not be extracted")
+  defp office_result(:unavailable, _uri, label), do: refused("file", label, :no_text)
 
   ###
   ### resource links
@@ -374,13 +399,12 @@ defmodule Pepe.ACP.Content do
     end
   end
 
-  defp local_image(_path, label, %{vision?: false}),
-    do: refused("image", label, "the model this agent uses can't see images")
+  defp local_image(_path, label, %{vision?: false}), do: refused("image", label, :no_vision)
 
   defp local_image(path, label, ctx) do
     case ctx.load_image.(path) do
       {:ok, image} -> [{:image, image, label}]
-      :none -> refused("image", label, "it is not a PNG, JPEG, GIF or WebP image within the #{mb(ctx.image_max_bytes)} limit")
+      :none -> refused("image", label, {:not_image, ctx.image_max_bytes})
     end
   end
 
@@ -389,8 +413,8 @@ defmodule Pepe.ACP.Content do
          {:ok, text} <- ctx.extract.(path) do
       office_effects(label, uri, text, nil)
     else
-      {:ok, %File.Stat{}} -> refused("file", label, "it is larger than the #{mb(ctx.max_bytes)} limit")
-      _ -> refused("file", label, "its text could not be extracted")
+      {:ok, %File.Stat{}} -> refused("file", label, {:too_large, ctx.max_bytes})
+      _ -> refused("file", label, :no_text)
     end
   end
 
@@ -417,12 +441,16 @@ defmodule Pepe.ACP.Content do
 
   # Only a `file:` URI (or a bare absolute path) that resolves to a regular file *inside* the
   # project the editor opened is ever read. Anything else stays a pointer.
+  #
+  # "Inside" is judged by where the path REALLY leads, links followed on every component
+  # (`Pepe.ACP.Edits.real_path/1`, the same walk the edit modes use): a lexical prefix check
+  # is fooled by `project/dirlink/secret` when `dirlink` points at `/etc`.
   defp local_file(_uri, nil), do: :error
 
   defp local_file(uri, cwd) do
     with {:ok, raw} <- file_path(uri),
-         path = Path.expand(raw),
-         root = Path.expand(cwd),
+         path = Edits.real_path(raw),
+         root = Edits.real_path(cwd),
          true <- String.starts_with?(path <> "/", root <> "/"),
          {:ok, %File.Stat{type: :regular}} <- File.lstat(path) do
       {:ok, path}
@@ -538,17 +566,48 @@ defmodule Pepe.ACP.Content do
   defp within(bytes, cap) when byte_size(bytes) > cap, do: {:error, :too_large}
   defp within(_bytes, _cap), do: :ok
 
+  # Something in the prompt could not be used. The model gets a marker line (English, always)
+  # and the person gets a note (their language), built from the same reason.
   defp refused(kind, label, why) do
-    subject = if label in [nil, "", kind], do: "The attached #{kind}", else: "The attached #{kind} (#{label})"
-    sentence = "#{subject} was not included: #{why}."
-    [{:text, "[#{sentence}]"}, {:note, sentence}]
+    marker = Gettext.with_locale(Pepe.Gettext, "en", fn -> refusal(kind, label, why) end)
+    [{:text, "[#{marker}]"}, {:note, refusal(kind, label, why)}]
   end
 
-  defp reason_text(:too_large, cap), do: "it is larger than the #{mb(cap)} limit"
-  defp reason_text(:bad_base64, _cap), do: "its data is not valid base64"
-  defp reason_text(:unsupported_image_type, _cap), do: "only PNG, JPEG, GIF and WebP images are supported"
-  defp reason_text(:no_transcription, _cap), do: "no transcription route is configured (see `media.audio`)"
-  defp reason_text(other, _cap), do: "it could not be read (#{inspect(other)})"
+  defp refusal(kind, label, why) do
+    reason = why_text(why)
+
+    if label in [nil, "", kind],
+      do: gettext("The attached %{kind} was not included: %{why}.", kind: kind_word(kind), why: reason),
+      else: gettext("The attached %{kind} (%{label}) was not included: %{why}.", kind: kind_word(kind), label: label, why: reason)
+  end
+
+  defp kind_word("image"), do: pgettext("kind of attachment", "image")
+  defp kind_word("audio"), do: pgettext("kind of attachment", "audio")
+  defp kind_word("file"), do: pgettext("kind of attachment", "file")
+
+  # A decode failure, as the reason it becomes.
+  defp why(:too_large, cap), do: {:too_large, cap}
+  defp why(:bad_base64, _cap), do: :bad_base64
+  defp why(:unsupported_image_type, _cap), do: :unsupported_image_type
+  defp why(:no_transcription, _cap), do: :no_transcription
+  defp why(other, _cap), do: {:unreadable, other}
+
+  defp why_text({:too_large, cap}), do: gettext("it is larger than the %{limit} limit", limit: mb(cap))
+  defp why_text(:bad_base64), do: gettext("its data is not valid base64")
+  defp why_text(:unsupported_image_type), do: gettext("only PNG, JPEG, GIF and WebP images are supported")
+  defp why_text(:no_transcription), do: gettext("no transcription route is configured (see `media.audio`)")
+  defp why_text({:unreadable, other}), do: gettext("it could not be read (%{reason})", reason: inspect(other))
+  defp why_text(:no_vision), do: gettext("the model this agent uses can't see images")
+  defp why_text({:max_images, max}), do: gettext("a turn can carry at most %{max} images", max: max)
+  defp why_text(:no_speech), do: gettext("no speech could be made out in it")
+  defp why_text(:not_written), do: gettext("it could not be written out to be read")
+  defp why_text(:no_text), do: gettext("its text could not be extracted")
+
+  defp why_text({:not_image, cap}),
+    do: gettext("it is not a PNG, JPEG, GIF or WebP image within the %{limit} limit", limit: mb(cap))
+
+  defp why_text({:unreadable_kind, mime}),
+    do: gettext("this kind of file (%{kind}) can't be read here", kind: blank_to(mime, gettext("unknown type")))
 
   defp mb(bytes) when rem(bytes, 1_048_576) == 0, do: "#{div(bytes, 1_048_576)} MB"
   defp mb(bytes), do: "#{Float.round(bytes / 1_000_000, 1)} MB"

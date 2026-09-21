@@ -15,6 +15,13 @@ defmodule Pepe.ACP.Mcp.Manager do
   A server that has not finished by then is left out of that turn and picked up by the next
   one that finds it ready - it is never waited on twice.
 
+  ## Notices are data
+
+  What the person should be told (a server refused, one that did not start, tools left out)
+  is stored as a small tagged tuple, never as a sentence: this process has no idea what
+  language the person reads, and the sentence is worded (and translated) by
+  `Pepe.ACP.Mcp.Notice` at the moment someone asks for it, in that person's own process.
+
   ## Generations
 
   Attaching to a scope that already has servers replaces them. A start that finishes after
@@ -27,13 +34,16 @@ defmodule Pepe.ACP.Mcp.Manager do
 
   require Logger
 
-  alias Pepe.ACP.Mcp.Descriptor
   alias Pepe.ACP.Mcp.Failure
   alias Pepe.ACP.Mcp.Supervisor, as: McpSupervisor
 
   @max_tools 64
   @tool_name_length 48
   @description_length 1024
+  # What the model is handed for one tool's arguments, encoded. A schema is server-supplied
+  # text that goes into every model call of the session, so it is bounded the way a
+  # description is; a legitimate one is a few kilobytes at most.
+  @schema_bytes 16_384
 
   ###
   ### API
@@ -42,11 +52,13 @@ defmodule Pepe.ACP.Mcp.Manager do
   def start_link(_opts), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
 
   @doc """
-  Register `servers` for `scope`, owned by `owner`, and start them in the background.
-  Returns `{:ok, %{accepted: [name], rejected: [{name, reason}]}}` at once.
+  Register already-validated servers for `scope`, owned by `owner`, and start them in the
+  background. `accepted` and `rejected` are what `Pepe.ACP.Mcp.Descriptor.normalize/2` made of
+  the editor's descriptions: it runs in the caller (which knows the person's language, and
+  words the reasons), not here.
   """
-  def attach(scope, owner, servers, cwd),
-    do: GenServer.call(__MODULE__, {:attach, scope, owner, servers, cwd})
+  def attach(scope, owner, accepted, rejected),
+    do: GenServer.call(__MODULE__, {:attach, scope, owner, accepted, rejected})
 
   @doc "Stop and forget everything attached to `scope`."
   def detach(scope), do: GenServer.cast(__MODULE__, {:detach, scope})
@@ -57,7 +69,7 @@ defmodule Pepe.ACP.Mcp.Manager do
   @doc "OpenAI tool specs for the servers of `scope` that are up."
   def specs(scope), do: GenServer.call(__MODULE__, {:specs, scope})
 
-  @doc "The notices not yet shown for `scope`, once."
+  @doc "The notices not yet shown for `scope`, once, as data (see `Pepe.ACP.Mcp.Notice`)."
   def notices(scope), do: GenServer.call(__MODULE__, {:notices, scope})
 
   @doc "Resolve a namespaced tool name against `scope`'s own servers."
@@ -78,14 +90,11 @@ defmodule Pepe.ACP.Mcp.Manager do
   end
 
   @impl true
-  def handle_call({:attach, scope, owner, servers, cwd}, _from, state) do
+  def handle_call({:attach, scope, owner, accepted, rejected}, _from, state) do
     state = drop_scope(state, scope)
-    {accepted, rejected} = Descriptor.normalize(servers, cwd: cwd)
-
-    reply = {:ok, %{accepted: Enum.map(accepted, & &1.name), rejected: rejected}}
 
     if accepted == [] and rejected == [] do
-      {:reply, reply, state}
+      {:reply, :ok, state}
     else
       gen = make_ref()
 
@@ -95,12 +104,12 @@ defmodule Pepe.ACP.Mcp.Manager do
         gen: gen,
         servers: Map.new(accepted, &{&1.ns, new_server(scope, gen, &1)}),
         order: Enum.map(accepted, & &1.ns),
-        notices: Enum.map(rejected, fn {name, reason} -> "MCP server `#{name}` from your editor was not used: #{reason}." end),
+        notices: Enum.map(rejected, fn {name, reason} -> {:rejected, name, reason} end),
         waiters: []
       }
 
       Enum.each(accepted, &start_async(scope, gen, &1))
-      {:reply, reply, put_in(state.scopes[scope], entry)}
+      {:reply, :ok, put_in(state.scopes[scope], entry)}
     end
   end
 
@@ -247,9 +256,11 @@ defmodule Pepe.ACP.Mcp.Manager do
           GenServer.reply(from, :timeout)
         end)
 
+        # Every server, not only the ones that reached :ready: stopping what is not running is
+        # a no-op, and a client that IS registered but was never marked ready (its start
+        # finished while this was being decided) must not outlive the scope that owned it.
         entry.servers
         |> Map.values()
-        |> Enum.filter(&(&1.status == :ready))
         |> Enum.map(&{&1.key, supervisor_for(scope, &1.ns)})
         |> stop_async()
 
@@ -279,13 +290,30 @@ defmodule Pepe.ACP.Mcp.Manager do
     end)
   end
 
-  defp start_server(scope, gen, server) do
-    case Pepe.MCP.start_spec(key(scope, gen, server.ns), server.spec, supervisor_for(scope, server.ns)) do
-      {:ok, pid, module} -> {:ok, module.list_tools(pid)}
+  # Starts the client and asks it for its tools. A client that STARTED but then could not
+  # list its tools is a running process and an OS subprocess that nothing will ever adopt
+  # (the server is settled as failed), so it is stopped here, on the way out, rather than
+  # left for the life of `pepe acp`. `opts[:list_tools]` is the one seam a test uses.
+  @doc false
+  def start_server(scope, gen, server, opts \\ []) do
+    key = key(scope, gen, server.ns)
+    sup = supervisor_for(scope, server.ns)
+    list_tools = Keyword.get(opts, :list_tools, fn module, pid -> module.list_tools(pid) end)
+
+    case Pepe.MCP.start_spec(key, server.spec, sup) do
+      {:ok, pid, module} -> list_or_stop(list_tools, module, pid, key, sup)
       {:error, reason} -> {:error, reason}
     end
   catch
     kind, _reason -> {:error, {:exception, Atom.to_string(kind)}}
+  end
+
+  defp list_or_stop(list_tools, module, pid, key, sup) do
+    {:ok, list_tools.(module, pid)}
+  catch
+    kind, _reason ->
+      Pepe.MCP.stop_spec(key, sup)
+      {:error, {:exception, Atom.to_string(kind)}}
   end
 
   defp settle(server, {:ok, tools}) do
@@ -294,13 +322,12 @@ defmodule Pepe.ACP.Mcp.Manager do
   end
 
   defp settle(server, {:error, reason}) do
-    Logger.warning("[acp] editor MCP server #{server.ns} failed: #{Failure.describe(reason)}")
+    # The log is for whoever runs Pepe, in the language the source is written in.
+    Logger.warning(
+      "[acp] editor MCP server #{server.ns} failed: #{Gettext.with_locale(Pepe.Gettext, "en", fn -> Failure.describe(reason) end)}"
+    )
 
-    note =
-      "MCP server `#{server.name}`#{where(server)} from your editor #{Failure.describe(reason)}. " <>
-        "Its tools are not available in this session."
-
-    {%{server | status: :failed}, [note]}
+    {%{server | status: :failed}, [{:failed, server.name, where(server), reason}]}
   end
 
   defp where(%{transport: :stdio}), do: ""
@@ -319,13 +346,19 @@ defmodule Pepe.ACP.Mcp.Manager do
         {Map.put(acc, name, tool), MapSet.put(used, name)}
       end)
 
-    notes =
-      if dropped == [],
-        do: [],
-        else: ["MCP server `#{server.name}` offers #{length(valid)} tools; only the first #{@max_tools} are available in this session."]
+    truncated = if dropped == [], do: [], else: [{:truncated, server.name, length(valid), @max_tools}]
 
-    {exposed, notes}
+    # An oversized schema is dropped here, once, so it is neither kept in memory nor encoded
+    # again for every model call; the tool is then offered as "an object, arguments unchecked".
+    oversized = for {name, tool} <- exposed, oversized_schema?(tool["inputSchema"]), do: name
+
+    exposed = Map.new(exposed, fn {name, tool} -> {name, if(name in oversized, do: Map.delete(tool, "inputSchema"), else: tool)} end)
+
+    {exposed, truncated ++ Enum.map(Enum.sort(oversized), &{:schema, server.name, &1})}
   end
+
+  defp oversized_schema?(%{"type" => "object"} = schema), do: byte_size(Jason.encode!(schema)) > @schema_bytes
+  defp oversized_schema?(_other), do: false
 
   defp tool_name(name), do: name |> String.replace(~r/[^A-Za-z0-9_-]/, "_") |> String.slice(0, @tool_name_length)
 

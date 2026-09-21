@@ -60,6 +60,8 @@ defmodule Pepe.ACP.Server do
             initialized?: false,
             sessions: %{},
             pending: %{},
+            # Slash commands in flight, by their own ref (see `start_command/6`).
+            commands: %{},
             next_id: 1,
             next_session: 1
 
@@ -79,6 +81,10 @@ defmodule Pepe.ACP.Server do
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
+    # A process has its own gettext locale and this one starts with the default, not with the
+    # person's: the caller (`Pepe.ACP.Stdio.run/1`, inside the Mix task that applied the
+    # configured locale) is the one that knows it, so it is handed over here.
+    opts = Keyword.put_new(opts, :locale, Gettext.get_locale(Pepe.Gettext))
     GenServer.start_link(__MODULE__, opts, Keyword.take(opts, [:name]))
   end
 
@@ -101,6 +107,8 @@ defmodule Pepe.ACP.Server do
 
   @impl true
   def init(opts) do
+    Gettext.put_locale(Pepe.Gettext, opts[:locale])
+
     # Off the connection's own path: sweeping the store is housekeeping, and a slow disk
     # must not delay the handshake.
     if Sessions.enabled?(), do: Task.start(&Sessions.prune/0)
@@ -127,17 +135,31 @@ defmodule Pepe.ACP.Server do
   def handle_cast({:prompt_done, session_id, result}, state),
     do: {:noreply, finish_prompt(session_id, result, state)}
 
-  # A note about an editor-supplied MCP server that was refused or did not start. Written
-  # as ordinary agent text so it shows in the editor's panel whether or not the turn
-  # streams, and only for a session that still exists.
-  def handle_cast({:mcp_notice, session_id, text}, state) do
-    if Map.has_key?(state.sessions, session_id),
-      do: {:noreply, write(state, Protocol.session_update(session_id, Protocol.message_chunk(text <> "\n\n")))},
-      else: {:noreply, state}
+  # Something the person should read before the answer begins: a part of their prompt that
+  # could not be used, an editor MCP server that did not start. Written as ordinary agent text
+  # so it shows in the editor's panel whether or not the turn streams, and only while the
+  # turn that produced it is still the session's current one (a cancelled turn's task may
+  # still have a note in flight).
+  def handle_cast({:note, session_id, task, text}, state) do
+    case state.sessions[session_id] do
+      %{run: %{task: ^task}} ->
+        {:noreply, write(state, Protocol.session_update(session_id, Protocol.message_chunk(text)))}
+
+      _ ->
+        {:noreply, state}
+    end
   end
 
-  def handle_cast({:command_done, id, session_id, result}, state),
-    do: {:noreply, finish_command(id, session_id, result, state)}
+  def handle_cast({:command_done, cmd_ref, result}, state) do
+    case Map.pop(state.commands, cmd_ref) do
+      {nil, _commands} ->
+        {:noreply, state}
+
+      {cmd, commands} ->
+        Process.demonitor(cmd.monitor, [:flush])
+        {:noreply, finish_command(cmd.id, cmd.session_id, result, %{state | commands: commands})}
+    end
+  end
 
   @impl true
   # A synchronous marker behind everything already queued - `Pepe.ACP.Stdio` uses it at
@@ -260,7 +282,7 @@ defmodule Pepe.ACP.Server do
 
           state
           |> write(Protocol.response(id, Map.put(fields, "sessionId", session_id)))
-          |> write(Protocol.session_update(session_id, Pepe.ACP.Updates.available_commands()))
+          |> announce_commands(session_id)
         else
           {:error, kind, message} -> reply_error(state, id, kind, message)
         end
@@ -332,22 +354,25 @@ defmodule Pepe.ACP.Server do
   defp list_sessions(id, params, state) do
     cwd = params["cwd"]
 
-    cond do
-      cwd != nil and (not is_binary(cwd) or not absolute?(cwd)) ->
-        reply_error(state, id, :invalid_params, "`cwd` must be an absolute path")
-
-      true ->
-        case Sessions.page(state.agent, cwd, params["cursor"]) do
-          {:ok, metas, next} ->
-            sessions = Enum.map(metas, &Protocol.session_info(&1["id"], &1["cwd"], Sessions.title(&1), &1["updated_at"]))
-            result = %{"sessions" => sessions}
-            write(state, Protocol.response(id, if(next, do: Map.put(result, "nextCursor", next), else: result)))
-
-          {:error, :bad_cursor} ->
-            reply_error(state, id, :invalid_params, "unknown `cursor` (use one returned by a previous `session/list`)")
-        end
+    if cwd != nil and (not is_binary(cwd) or not absolute?(cwd)) do
+      reply_error(state, id, :invalid_params, "`cwd` must be an absolute path")
+    else
+      list_page(id, cwd, params["cursor"], state)
     end
   end
+
+  defp list_page(id, cwd, cursor, state) do
+    case Sessions.page(state.agent, cwd, cursor) do
+      {:ok, metas, next} ->
+        result = %{"sessions" => Enum.map(metas, &session_info/1)}
+        write(state, Protocol.response(id, if(next, do: Map.put(result, "nextCursor", next), else: result)))
+
+      {:error, :bad_cursor} ->
+        reply_error(state, id, :invalid_params, "unknown `cursor` (use one returned by a previous `session/list`)")
+    end
+  end
+
+  defp session_info(meta), do: Protocol.session_info(meta["id"], meta["cwd"], Sessions.title(meta), meta["updated_at"])
 
   # `load` streams the whole conversation back before it answers (a client builds its
   # panel from those notifications while the request is still open); `resume` picks the
@@ -363,7 +388,8 @@ defmodule Pepe.ACP.Server do
 
       state
       |> announce_info(session_id, meta)
-      |> write(Protocol.response(id, %{}))
+      |> write(Protocol.response(id, session_fields(state, session_id)))
+      |> announce_commands(session_id)
     else
       {:error, code, message} -> reply_error(state, id, code, message)
     end
@@ -379,11 +405,26 @@ defmodule Pepe.ACP.Server do
       Sessions.create(new_id, params["cwd"], meta["agent"])
       # A brand-new id nobody else knows: the claim cannot be contested.
       Sessions.claim(new_id)
-      write(state, Protocol.response(id, %{"sessionId" => new_id}))
+
+      state
+      |> write(Protocol.response(id, Map.put(session_fields(state, new_id), "sessionId", new_id)))
+      |> announce_commands(new_id)
     else
       {:error, kind, message} -> reply_error(state, id, kind, message)
     end
   end
+
+  # What every session response carries about how the session is set up: the models, the
+  # modes and the config options an editor renders its pickers from. `session/new` sends them
+  # and so do `load`, `resume` and `fork`, or a reopened thread has no pickers until some
+  # `set_*` call happens to arrive.
+  defp session_fields(state, session_id) do
+    session = state.sessions[session_id]
+    Pepe.ACP.Settings.session_fields(session.key, state.agent, Map.get(session, :mode, Pepe.ACP.Settings.default_mode()))
+  end
+
+  defp announce_commands(state, session_id),
+    do: write(state, Protocol.session_update(session_id, Pepe.ACP.Updates.available_commands()))
 
   defp fetch_saved(session_id) do
     case Sessions.fetch(session_id) do
@@ -422,22 +463,32 @@ defmodule Pepe.ACP.Server do
         {:ok, put_session(state, session_id, live)}
 
       nil ->
-        case Sessions.claim(session_id) do
-          :ok ->
-            case open_live(state, session_id, cwd, meta["agent"], true, mcp_servers) do
-              {:ok, _state} = opened ->
-                opened
-
-              error ->
-                Sessions.release(session_id)
-                error
-            end
-
-          {:error, {:held, pid}} ->
-            {:error, :invalid_request,
-             "this session is open in another Pepe process#{if pid, do: " (pid #{pid})", else: ""}; close it there, or continue from a copy with `session/fork`"}
-        end
+        open_claimed(state, session_id, meta, cwd, mcp_servers)
     end
+  end
+
+  defp open_claimed(state, session_id, meta, cwd, mcp_servers) do
+    case Sessions.claim(session_id) do
+      :ok -> open_or_release(state, session_id, meta, cwd, mcp_servers)
+      {:error, {:held, pid}} -> {:error, :invalid_request, held_message(pid)}
+    end
+  end
+
+  # A failed open must not leave the saved session locked by a connection that never got it.
+  defp open_or_release(state, session_id, meta, cwd, mcp_servers) do
+    case open_live(state, session_id, cwd, meta["agent"], true, mcp_servers) do
+      {:ok, _state} = opened ->
+        opened
+
+      error ->
+        Sessions.release(session_id)
+        error
+    end
+  end
+
+  defp held_message(pid) do
+    owner = if pid, do: " (pid #{pid})", else: ""
+    "this session is open in another Pepe process#{owner}; close it there, or continue from a copy with `session/fork`"
   end
 
   defp replay(state, session_id) do
@@ -506,25 +557,28 @@ defmodule Pepe.ACP.Server do
         reply_error(state, id, :invalid_request, "this session already has a prompt turn in flight; cancel it first")
 
       {session, :none} ->
-        blocks = Content.resolve(params["prompt"], vision?: Content.vision_model?(state.agent), cwd: session.cwd)
-
-        case blocks do
-          {:ok, prompt} ->
-            state = tell_notes(state, session_id, prompt.notes)
-            run_prompt(id, session_id, session, prompt.text, prompt_opts(prompt), state)
-
-          {:error, reason} ->
-            reply_error(state, id, :invalid_params, reason)
+        # A malformed prompt is refused here and now. The rest of `Content.resolve/2` reads
+        # files and may transcribe audio over the network, so it runs in the turn's own task
+        # (see `run_prompt/5`): this process is what hears the editor's next message.
+        case Content.validate_prompt(params["prompt"]) do
+          :ok -> run_prompt(id, session_id, session, {:blocks, params["prompt"]}, state)
+          {:error, reason} -> reply_error(state, id, :invalid_params, reason)
         end
     end
   end
 
-  # Whatever in the prompt could not be used was reported by `Pepe.ACP.Content` as a note;
-  # the person reads it in the reply stream before the answer begins.
-  defp tell_notes(state, session_id, notes) do
-    Enum.reduce(notes, state, fn note, state ->
-      write(state, Protocol.session_update(session_id, Protocol.message_chunk(Content.note_text(note))))
-    end)
+  # What the turn's task does before the model is called: turn the prompt into text (the slow
+  # half of `Content`), and say what could not be used. Whatever is not `{:ok, ...}` here was
+  # already checked by `Content.validate_prompt/1`, so it is not expected.
+  defp prepare({:text, text, extra}, _agent, _session), do: {:ok, text, extra, []}
+
+  defp prepare({:blocks, blocks}, agent, session) do
+    opts = [vision?: Content.vision_model?(agent), cwd: session.cwd] ++ Application.get_env(:pepe, :acp_content_opts, [])
+
+    case Content.resolve(blocks, opts) do
+      {:ok, prompt} -> {:ok, prompt.text, prompt_opts(prompt), Enum.map(prompt.notes, &Content.note_text/1)}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   # Images ride this turn only, and text that came out of a binary format taints the turn
@@ -542,9 +596,14 @@ defmodule Pepe.ACP.Server do
   # Commands run in a task, not in this process: `/compact` is a model call and this
   # process is what reads the editor's next message (a cancel, a permission answer).
   # The answer comes back as `{:command_done, ...}`.
+  #
+  # The task is monitored, like a turn's: a command whose task was killed, or a `/compact`
+  # that never returns, must not leave the request's JSON-RPC id unanswered for the life of
+  # the connection (see `command_died/3` and `cancel/2`).
   defp start_command(id, session_id, session, name, args, state) do
     server = self()
     locale = Gettext.get_locale(Pepe.Gettext)
+    cmd_ref = make_ref()
 
     ctx = %{
       key: session.key,
@@ -553,12 +612,14 @@ defmodule Pepe.ACP.Server do
       last_usage: Map.get(session, :last_usage)
     }
 
-    Task.start(fn ->
-      Gettext.put_locale(Pepe.Gettext, locale)
-      GenServer.cast(server, {:command_done, id, session_id, run_command(name, args, ctx)})
-    end)
+    {:ok, task} =
+      Task.start(fn ->
+        Gettext.put_locale(Pepe.Gettext, locale)
+        GenServer.cast(server, {:command_done, cmd_ref, run_command(name, args, ctx)})
+      end)
 
-    state
+    cmd = %{id: id, session_id: session_id, name: name, task: task, monitor: Process.monitor(task)}
+    %{state | commands: Map.put(state.commands, cmd_ref, cmd)}
   end
 
   defp run_command(name, args, ctx) do
@@ -579,10 +640,10 @@ defmodule Pepe.ACP.Server do
         answer_with_text(state, session_id, id, text)
 
       {%{run: nil} = session, {:prompt, text}} ->
-        run_prompt(id, session_id, session, text, [], state)
+        run_prompt(id, session_id, session, {:text, text, []}, state)
 
       {%{run: nil} = session, {:queue, text}} ->
-        run_prompt(id, session_id, session, text, [], state)
+        run_prompt(id, session_id, session, {:text, text, []}, state)
 
       # A turn started while the command was being worked out: hold the text for after it.
       {session, {kind, text}} when kind in [:prompt, :queue] ->
@@ -596,12 +657,19 @@ defmodule Pepe.ACP.Server do
     |> write(Protocol.response(id, %{"stopReason" => "end_turn"}))
   end
 
+  # A prompt lined up behind the running turn keeps ITS request open. `/queue` is a
+  # `session/prompt` and every `session/prompt` gets exactly one answer, carrying the stop
+  # reason of the turn it started: that answer comes when the queued turn has run (see
+  # `drain_queue/3`), or as "cancelled" if the turn ahead of it is cancelled (`drop_queue/2`).
+  # Answering "queued" straight away, as this once did, left a turn running with no request
+  # to report its end to, and a client that saw its `/queue` answered and sent the next prompt
+  # was refused as "already in flight".
   defp enqueue(state, session_id, session, id, text) do
-    queued = Map.get(session, :queued, []) ++ [text]
+    queued = Map.get(session, :queued, []) ++ [{id, text}]
 
     state
     |> put_session(session_id, Map.put(session, :queued, queued))
-    |> answer_with_text(session_id, id, Pepe.ACP.Commands.queued(length(queued)))
+    |> write(Protocol.session_update(session_id, Protocol.message_chunk(Pepe.ACP.Commands.queued(length(queued)) <> "\n\n")))
   end
 
   ###
@@ -649,29 +717,32 @@ defmodule Pepe.ACP.Server do
 
   defp set_config_option(id, params, state) do
     with_known_session(state, id, params, fn session_id, session ->
-      case {params["configId"], params["value"]} do
-        {"mode", mode} ->
-          if Pepe.ACP.Settings.mode?(mode) do
-            state
-            |> change_mode(session_id, session, mode)
-            |> write(Protocol.response(id, %{"configOptions" => options(state, session, mode)}))
-          else
-            reply_error(state, id, :invalid_params, "unknown value for `mode`")
-          end
-
-        {"model", model} ->
-          case Pepe.ACP.Settings.set_model(session.key, state.agent, model) do
-            :ok ->
-              write(state, Protocol.response(id, %{"configOptions" => options(state, session, Map.get(session, :mode))}))
-
-            {:error, message} ->
-              reply_error(state, id, :invalid_params, message)
-          end
-
-        _other ->
-          reply_error(state, id, :invalid_params, "unknown `configId` (see `configOptions` in the `session/new` response)")
-      end
+      apply_config(params["configId"], params["value"], id, session_id, session, state)
     end)
+  end
+
+  defp apply_config("mode", mode, id, session_id, session, state) do
+    if Pepe.ACP.Settings.mode?(mode) do
+      state
+      |> change_mode(session_id, session, mode)
+      |> write(Protocol.response(id, %{"configOptions" => options(state, session, mode)}))
+    else
+      reply_error(state, id, :invalid_params, "unknown value for `mode`")
+    end
+  end
+
+  defp apply_config("model", model, id, _session_id, session, state) do
+    case Pepe.ACP.Settings.set_model(session.key, state.agent, model) do
+      :ok ->
+        write(state, Protocol.response(id, %{"configOptions" => options(state, session, Map.get(session, :mode))}))
+
+      {:error, message} ->
+        reply_error(state, id, :invalid_params, message)
+    end
+  end
+
+  defp apply_config(_config_id, _value, id, _session_id, _session, state) do
+    reply_error(state, id, :invalid_params, "unknown `configId` (see `configOptions` in the `session/new` response)")
   end
 
   defp with_known_session(state, id, params, fun) do
@@ -704,43 +775,41 @@ defmodule Pepe.ACP.Server do
     )
   end
 
-  defp run_prompt(id, session_id, session, text, extra_opts, state) do
+  # `input` is `{:text, text, extra_opts}` (a prompt whose text is already known: a queued one,
+  # a `/steer` with nothing to steer) or `{:blocks, blocks}` (the editor's own prompt, still
+  # to be resolved by `prepare/3` in the task).
+  defp run_prompt(id, session_id, session, input, state) do
     {session, state} = save_on_first_turn(session_id, session, state)
     server = self()
+    agent = state.agent
+    locale = Gettext.get_locale(Pepe.Gettext)
     stream? = Pepe.Agent.stream_for?(state.agent)
 
     opts =
-      extra_opts ++
-        [
-          stream: stream?,
-          # `cwd` is the directory the editor opened, and the one the agent's file and
-          # shell tools should resolve against - an ACP path is always absolute, but the
-          # workspace the model is told about has to match the project actually open.
-          # `cwd_override` (not plain `cwd`) is what actually makes that happen: an ACP
-          # session always has a real agent bound, and Pepe.Agent.Workspace resolves every
-          # other bound-agent call inside that agent's own persistent workspace regardless
-          # of `cwd` - only `cwd_override` outranks it (see that module's own doc).
-          cwd: session.cwd,
-          cwd_override: session.cwd,
-          # This session's own editor-supplied MCP servers, and no one else's (Pepe.ACP.Mcp).
-          mcp_scope: session.key,
-          source: "acp",
-          on_event: fn event -> GenServer.cast(server, {:event, session_id, event}) end,
-          authorize: fn name, args, ctx ->
-            GenServer.call(server, {:authorize, session_id, name, args, ctx}, :infinity)
-          end
-        ]
+      [
+        stream: stream?,
+        # `cwd` is the directory the editor opened, and the one the agent's file and
+        # shell tools should resolve against - an ACP path is always absolute, but the
+        # workspace the model is told about has to match the project actually open.
+        # `cwd_override` (not plain `cwd`) is what actually makes that happen: an ACP
+        # session always has a real agent bound, and Pepe.Agent.Workspace resolves every
+        # other bound-agent call inside that agent's own persistent workspace regardless
+        # of `cwd` - only `cwd_override` outranks it (see that module's own doc).
+        cwd: session.cwd,
+        cwd_override: session.cwd,
+        # This session's own editor-supplied MCP servers, and no one else's (Pepe.ACP.Mcp).
+        mcp_scope: session.key,
+        source: "acp",
+        on_event: fn event -> GenServer.cast(server, {:event, session_id, event}) end,
+        authorize: fn name, args, ctx ->
+          GenServer.call(server, {:authorize, session_id, name, args, ctx}, :infinity)
+        end
+      ]
 
     {:ok, task} =
       Task.start(fn ->
-        # Tell the person which of their editor's MCP servers did not come up, before the
-        # answer starts. Waits (bounded) for servers still starting - here, in the turn's
-        # own task, so the connection stays free to read.
-        for notice <- Mcp.notices(session.key),
-            do: GenServer.cast(server, {:mcp_notice, session_id, notice})
-
-        result = Pepe.Agent.chat(session.key, state.agent, text, opts)
-        GenServer.cast(server, {:prompt_done, session_id, result})
+        Gettext.put_locale(Pepe.Gettext, locale)
+        turn(server, session_id, session, input, agent, opts)
       end)
 
     # Monitored (not linked - a crashing turn must not take the connection down) so a
@@ -752,6 +821,26 @@ defmodule Pepe.ACP.Server do
     ref = Process.monitor(task)
     run = %{request_id: id, stream?: stream?, task: task, monitor_ref: ref}
     put_session(state, session_id, Map.merge(session, %{run: run, tools: [], turn_usage: @no_usage}))
+  end
+
+  # The body of a turn's own task. Everything slow that comes before the model runs here, so
+  # the connection stays free to hear a cancel or a permission answer meanwhile: turning the
+  # prompt's blocks into text (a transcription, a document read) and waiting (bounded) for
+  # the editor's MCP servers still starting.
+  defp turn(server, session_id, session, input, agent, opts) do
+    me = self()
+
+    case prepare(input, agent, session) do
+      {:ok, text, extra_opts, notes} ->
+        notices = Enum.map(Mcp.notices(session.key), &(&1 <> "\n\n"))
+        for note <- notes ++ notices, do: GenServer.cast(server, {:note, session_id, me, note})
+
+        result = Pepe.Agent.chat(session.key, agent, text, extra_opts ++ opts)
+        GenServer.cast(server, {:prompt_done, session_id, result})
+
+      {:error, reason} ->
+        GenServer.cast(server, {:prompt_done, session_id, {:error, {:bad_prompt, reason}}})
+    end
   end
 
   # A session is recorded (and its lock taken) when its first turn starts, not when it is
@@ -797,7 +886,7 @@ defmodule Pepe.ACP.Server do
   def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
     case Enum.find(state.sessions, fn {_id, s} -> match?(%{run: %{monitor_ref: ^ref}}, s) end) do
       {session_id, _session} -> {:noreply, finish_prompt(session_id, {:error, reason}, state)}
-      nil -> {:noreply, state}
+      nil -> {:noreply, command_died(ref, reason, state)}
     end
   end
 
@@ -816,6 +905,19 @@ defmodule Pepe.ACP.Server do
   # The session topic carries other things (a file ready to send, ...) that are not this
   # connection's business.
   def handle_info(_other, state), do: {:noreply, state}
+
+  # A slash command's task went down without reporting (killed from outside). The request is
+  # answered, as an error a person can read, instead of waiting forever.
+  defp command_died(ref, reason, state) do
+    case Enum.find(state.commands, fn {_cmd_ref, cmd} -> cmd.monitor == ref end) do
+      {cmd_ref, cmd} ->
+        state = %{state | commands: Map.delete(state.commands, cmd_ref)}
+        answer_with_text(state, cmd.session_id, cmd.id, "Error: /#{cmd.name} failed (#{inspect(reason)})")
+
+      nil ->
+        state
+    end
+  end
 
   # A turn ended, however it ended: the session was used just now. The editor is told
   # (a history panel re-sorts by it), before the answer to the prompt closes the turn.
@@ -890,14 +992,27 @@ defmodule Pepe.ACP.Server do
         state
 
       {_queued, {:error, :stopped}} ->
-        put_session(state, session_id, Map.put(session, :queued, []))
+        drop_queue(state, session_id)
 
-      {[next | rest], _result} ->
+      {[{next_id, next} | rest], _result} ->
         session = Map.put(session, :queued, rest)
 
         state
         |> write(Protocol.session_update(session_id, Pepe.ACP.Updates.user_message(next)))
-        |> then(&run_prompt(nil, session_id, session, next, [], &1))
+        |> then(&run_prompt(next_id, session_id, session, {:text, next, []}, &1))
+    end
+  end
+
+  # Nothing lined up behind a cancelled turn runs, and every request that was waiting on one
+  # is answered - as cancelled, which is what happened to it.
+  defp drop_queue(state, session_id) do
+    case state.sessions[session_id] do
+      %{queued: [_ | _] = queued} = session ->
+        state = put_session(state, session_id, %{session | queued: []})
+        Enum.reduce(queued, state, fn {id, _text}, acc -> write(acc, Protocol.response(id, %{"stopReason" => "cancelled"})) end)
+
+      _ ->
+        state
     end
   end
 
@@ -907,36 +1022,66 @@ defmodule Pepe.ACP.Server do
 
   defp cancel(session_id, state) do
     case state.sessions[session_id] do
-      %{run: %{}} = session ->
-        # The session kills the turn and answers its caller `{:error, :stopped}`,
-        # which arrives here as `:prompt_done` and becomes stopReason "cancelled" -
-        # the response ACP requires a cancelled turn to still produce. Any permission
-        # request left hanging dies with the task that was blocked on it; the editor
-        # is expected to answer those with a `cancelled` outcome, and an answer that
-        # arrives for a `from` nobody is waiting on is simply dropped.
-        #
-        # Session.stop/1 is a bare GenServer.call - if the session process is already
-        # gone (crashed independently of this cancel, or a cancel racing in before the
-        # first turn has finished registering it), that call exits `:noproc`, and
-        # since this all runs inside this GenServer's own callback, an uncaught exit
-        # here would take the whole connection down with it. Nothing left running is
-        # exactly the state a missing session is already in, so there is nothing to do
-        # but swallow it.
-        try do
-          Session.stop(session.key)
-        catch
-          :exit, _ -> :ok
-        end
-
-        # `drain_queue/3` clears what was queued when the cancelled turn reports back;
-        # clearing it here as well means a queued turn can't sneak in between.
+      nil ->
         state
-        |> put_session(session_id, Map.put(session, :queued, []))
-        |> then(&drop_pending(session_id, &1))
 
-      _ ->
+      session ->
         state
+        |> cancel_turn(session_id, session)
+        |> cancel_commands(session_id)
     end
+  end
+
+  # Which of the two places a turn can be when the editor says stop:
+  #
+  #   * inside `Pepe.Agent.chat/4`: the session is running it, `Session.stop/1` cancels it and
+  #     the turn's task reports `{:error, :stopped}`, which becomes stopReason "cancelled";
+  #   * BEFORE that, still in the task's preparation (a transcription, an MCP server starting):
+  #     the session has nothing running, so `Session.stop/1` has nothing to stop and used to
+  #     be swallowed, and the turn went on to call, and bill, the model and answer "end_turn".
+  #     There the task itself is killed and the request answered "cancelled" here.
+  defp cancel_turn(state, session_id, %{run: %{task: task}} = session) do
+    state = drop_queue(state, session_id)
+
+    case stop_session(session.key) do
+      # `drain_queue/3` has nothing left to drop when the cancelled turn reports back.
+      :ok ->
+        drop_pending(session_id, state)
+
+      :not_running ->
+        Process.exit(task, :kill)
+        # A model call that slipped in between the two checks is the session's own run now.
+        _ = stop_session(session.key)
+
+        finish_prompt(session_id, {:error, :stopped}, drop_pending(session_id, state))
+    end
+  end
+
+  defp cancel_turn(state, _session_id, _session), do: state
+
+  # `Session.stop/1` is a bare GenServer.call: a session that is already gone exits
+  # `:noproc`, and this runs inside this connection's own process, where an uncaught exit
+  # would take the whole connection down with it. A session that is not there is a session
+  # that is not running.
+  defp stop_session(key) do
+    case Session.stop(key) do
+      :ok -> :ok
+      _not_running -> :not_running
+    end
+  catch
+    :exit, _ -> :not_running
+  end
+
+  # A command still running when the editor says stop (a `/compact` waiting on a model that
+  # never answers) is ended and its request answered, or its id would never be.
+  defp cancel_commands(state, session_id) do
+    {mine, others} = Enum.split_with(state.commands, fn {_ref, cmd} -> cmd.session_id == session_id end)
+
+    Enum.reduce(mine, %{state | commands: Map.new(others)}, fn {_ref, cmd}, acc ->
+      Process.exit(cmd.task, :kill)
+      Process.demonitor(cmd.monitor, [:flush])
+      write(acc, Protocol.response(cmd.id, %{"stopReason" => "cancelled"}))
+    end)
   end
 
   defp drop_pending(session_id, state) do

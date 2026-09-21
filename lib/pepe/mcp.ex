@@ -67,7 +67,7 @@ defmodule Pepe.MCP do
   purpose: a client's handshake blocks the supervisor starting it, and one flaky
   editor-supplied server must not stall every configured server's lazy start.
   """
-  @spec start_spec(term(), map(), atom() | pid()) :: {:ok, pid(), module()} | {:error, term()}
+  @spec start_spec(term(), map(), Supervisor.supervisor()) :: {:ok, pid(), module()} | {:error, term()}
   def start_spec(key, spec, sup) do
     with {:ok, module} <- Transport.for_spec(spec) do
       spawn_transport(key, spec, module, sup)
@@ -75,7 +75,7 @@ defmodule Pepe.MCP do
   end
 
   @doc "Stop the client registered as `key` under `sup`. No-op when nothing is running."
-  @spec stop_spec(term(), atom() | pid()) :: :ok
+  @spec stop_spec(term(), Supervisor.supervisor()) :: :ok
   def stop_spec(key, sup) do
     case Registry.lookup(@registry, key) do
       [{pid, _}] -> DynamicSupervisor.terminate_child(sup, pid)

@@ -78,12 +78,11 @@ defmodule Pepe.ACP.Replay do
 
   defp user_text(parts) when is_list(parts) do
     parts
-    |> Enum.map(fn
+    |> Enum.map_join("\n", fn
       %{"type" => "text", "text" => text} when is_binary(text) -> strip_notes(text)
       %{"type" => type} when is_binary(type) -> "[#{type}]"
       _other -> ""
     end)
-    |> Enum.join("\n")
     |> String.trim()
   end
 
