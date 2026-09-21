@@ -916,7 +916,6 @@ defmodule Pepe.Agent.Session do
      %{
        agent: state.agent_name,
        model: model_id(state.agent_name, state.model_override),
-       model_name: model_name(state.agent_name, state.model_override),
        turns: turns,
        running: state.running != nil
      }, state}

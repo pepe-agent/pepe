@@ -35,7 +35,9 @@ defmodule Pepe.ACP.Mcp do
   `notices/1` are what a turn uses.
   """
 
+  alias Pepe.ACP.Mcp.Descriptor
   alias Pepe.ACP.Mcp.Manager
+  alias Pepe.ACP.Mcp.Notice
 
   @prefix "mcp__editor_"
 
@@ -74,8 +76,13 @@ defmodule Pepe.ACP.Mcp do
     {:ok, %{accepted: [], rejected: []}}
   end
 
-  def attach(%{key: key} = session, servers, opts) when is_list(servers),
-    do: Manager.attach(key, opts[:owner] || self(), servers, session[:cwd])
+  # The descriptions are checked here, in the caller, not in the manager: the reasons a person
+  # reads ("the `command` is empty") are worded in the caller's language.
+  def attach(%{key: key} = session, servers, opts) when is_list(servers) do
+    {accepted, rejected} = Descriptor.normalize(servers, cwd: session[:cwd])
+    :ok = Manager.attach(key, opts[:owner] || self(), accepted, rejected)
+    {:ok, %{accepted: Enum.map(accepted, & &1.name), rejected: rejected}}
+  end
 
   def attach(_session, _servers, _opts), do: {:error, :invalid}
 
@@ -106,7 +113,7 @@ defmodule Pepe.ACP.Mcp do
 
   def notices(scope) do
     _ = Manager.await(scope, @await_ms)
-    Manager.notices(scope)
+    scope |> Manager.notices() |> Enum.map(&Notice.text/1)
   catch
     :exit, _ -> []
   end

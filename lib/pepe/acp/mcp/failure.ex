@@ -8,41 +8,46 @@ defmodule Pepe.ACP.Mcp.Failure do
   unhappy server answered with, an argument list. So this never inspects a reason it does
   not recognise, quotes nothing from an argument or a header, and clips what a *server* said
   about itself to a short single line.
+
+  The words are gettext strings, worded in the locale of the process that calls this: the
+  caller is the person's own (see `Pepe.ACP.Mcp.Notice`).
   """
+
+  use Gettext, backend: Pepe.Gettext
 
   @doc "A short sentence fragment (`\"could not be reached\"`) for a startup `reason`."
   @spec describe(term()) :: String.t()
   def describe({:mcp_start_failed, {:not_found, command}}) when is_binary(command),
-    do: "could not be started: the command `#{clip(command)}` was not found on PATH"
+    do: gettext("could not be started: the command `%{command}` was not found on PATH", command: clip(command))
 
-  def describe({:mcp_start_failed, :no_command}), do: "could not be started: it has no command to run"
-  def describe({:mcp_start_failed, _other}), do: "could not be started"
+  def describe({:mcp_start_failed, :no_command}), do: gettext("could not be started: it has no command to run")
+  def describe({:mcp_start_failed, _other}), do: gettext("could not be started")
 
   def describe({:mcp_handshake_failed, :timeout}), do: describe(:timeout)
 
   def describe({:mcp_handshake_failed, {:exit, status}}) when is_integer(status),
-    do: "exited during the MCP handshake (status #{status})"
+    do: gettext("exited during the MCP handshake (status %{status})", status: status)
 
   def describe({:mcp_handshake_failed, %{"message" => message}}) when is_binary(message),
-    do: "refused the MCP handshake: #{clip(message)}"
+    do: gettext("refused the MCP handshake: %{message}", message: clip(message))
 
-  def describe({:mcp_handshake_failed, _other}), do: "did not complete the MCP handshake"
+  def describe({:mcp_handshake_failed, _other}), do: gettext("did not complete the MCP handshake")
 
-  def describe(:timeout), do: "did not answer the MCP handshake in time"
-  def describe({:mcp_unreachable, _}), do: "could not be reached"
+  def describe(:timeout), do: gettext("did not answer the MCP handshake in time")
+  def describe({:mcp_unreachable, _}), do: gettext("could not be reached")
 
   def describe({:mcp_unauthorized, _}),
-    do: "answered 401 Unauthorized: add an `Authorization` header to the server's headers in your editor"
+    do: gettext("answered 401 Unauthorized: add an `Authorization` header to the server's headers in your editor")
 
-  def describe({:mcp_http_error, status, _body}) when is_integer(status), do: "answered HTTP #{status}"
+  def describe({:mcp_http_error, status, _body}) when is_integer(status), do: gettext("answered HTTP %{status}", status: status)
 
   def describe({:mcp_not_streamable, status}) when is_integer(status),
-    do: "is not an MCP endpoint (HTTP #{status})"
+    do: gettext("is not an MCP endpoint (HTTP %{status})", status: status)
 
-  def describe({:mcp_no_endpoint_event, _url}), do: "never announced an event-stream endpoint"
-  def describe({:mcp_tools_failed, _}), do: "connected but could not list its tools"
-  def describe({:exception, name}) when is_binary(name), do: "could not be started (#{clip(name)})"
-  def describe(_unknown), do: "could not be started"
+  def describe({:mcp_no_endpoint_event, _url}), do: gettext("never announced an event-stream endpoint")
+  def describe({:mcp_tools_failed, _}), do: gettext("connected but could not list its tools")
+  def describe({:exception, name}) when is_binary(name), do: gettext("could not be started (%{name})", name: clip(name))
+  def describe(_unknown), do: gettext("could not be started")
 
   @doc "`http://host:port` of a URL and nothing else: no path, query string or credentials."
   @spec host_label(String.t()) :: String.t()

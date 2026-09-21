@@ -140,6 +140,14 @@ defmodule Pepe.ACP.SessionsTest do
 
   defp acp_dir, do: Path.join([Config.home(), "data", "acp_sessions"])
 
+  # What every session response carries, so an editor has its pickers whichever way the
+  # session was opened: the modes, the model and mode options, and the models.
+  defp assert_session_setup(result) do
+    assert %{"currentModeId" => "default", "availableModes" => [_ | _]} = result["modes"]
+    assert [%{"id" => "model"}, %{"id" => "mode"}] = result["configOptions"]
+    assert %{"currentModelId" => "mock"} = result["models"]
+  end
+
   # A saved session, written the way a finished `pepe acp` run leaves it.
   defp save_session(opts) do
     id = opts[:id] || Sessions.generate_id()
@@ -188,7 +196,7 @@ defmodule Pepe.ACP.SessionsTest do
     test "are unguessable and never repeat, unlike a per-connection counter" do
       ids = for _ <- 1..200, do: Sessions.generate_id()
 
-      assert length(Enum.uniq(ids)) == 200
+      assert Enum.count_until(Enum.uniq(ids), 201) == 200
       assert Enum.all?(ids, &Sessions.valid_id?/1)
       assert Enum.all?(ids, &(byte_size(&1) == 29))
     end
@@ -233,7 +241,7 @@ defmodule Pepe.ACP.SessionsTest do
       conn_b = connect(:b)
       {notifications, response} = call(conn_b, 20, "session/load", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => []})
 
-      assert response["result"] == %{}
+      assert_session_setup(response["result"])
       # The transcript arrives BEFORE the response: a client builds its panel from it.
       assert kinds(notifications) == ["user_message_chunk", "agent_message_chunk", "session_info_update"]
       assert [%{"content" => %{"text" => "remember the blue key"}}] = updates(notifications, "user_message_chunk")
@@ -261,11 +269,41 @@ defmodule Pepe.ACP.SessionsTest do
 
       {notifications, response} = call(conn, 20, "session/resume", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => []})
 
-      assert response["result"] == %{}
+      assert_session_setup(response["result"])
       assert kinds(notifications) == ["session_info_update"]
 
       {_, %{"result" => %{"stopReason" => "end_turn"}}} = ask(conn, sid, "and now?")
       assert Enum.any?(last_llm_messages(), &(&1["content"] == "earlier question"))
+    end
+
+    test "load, resume and fork each hand the editor its pickers AND its slash commands, like session/new", %{} do
+      source = save_session([])
+      conn = {_server, tag} = connect(:a)
+
+      {_, %{"result" => loaded}} = call(conn, 20, "session/load", %{"sessionId" => source, "cwd" => "/work/project", "mcpServers" => []})
+      assert_session_setup(loaded)
+
+      assert_receive {:out, ^tag,
+                      %{"method" => "session/update", "params" => %{"update" => %{"sessionUpdate" => "available_commands_update"}}}}
+
+      {_, %{"result" => resumed}} = call(conn, 21, "session/resume", %{"sessionId" => source, "cwd" => "/work/project", "mcpServers" => []})
+      assert_session_setup(resumed)
+
+      assert_receive {:out, ^tag,
+                      %{"method" => "session/update", "params" => %{"update" => %{"sessionUpdate" => "available_commands_update"}}}}
+
+      {_, %{"result" => forked}} = call(conn, 22, "session/fork", %{"sessionId" => source, "cwd" => "/work/branch", "mcpServers" => []})
+      assert "sess_" <> _ = forked["sessionId"]
+      assert forked["sessionId"] != source
+      assert_session_setup(forked)
+
+      assert_receive {:out, ^tag,
+                      %{
+                        "method" => "session/update",
+                        "params" => %{"sessionId" => forked_id, "update" => %{"sessionUpdate" => "available_commands_update"}}
+                      }}
+
+      assert forked_id == forked["sessionId"]
     end
 
     test "loading points the session at the directory the editor has open now" do
@@ -336,8 +374,8 @@ defmodule Pepe.ACP.SessionsTest do
       {_, %{"result" => %{"sessions" => first, "nextCursor" => cursor}}} = call(conn, 4, "session/list", %{})
       {_, %{"result" => %{"sessions" => second} = last}} = call(conn, 5, "session/list", %{"cursor" => cursor})
 
-      assert length(first) == 50
-      assert length(second) == 5
+      assert Enum.count_until(first, 51) == 50
+      assert Enum.count_until(second, 6) == 5
       refute Map.has_key?(last, "nextCursor")
       assert Enum.sort(Enum.map(first ++ second, & &1["sessionId"])) == Enum.sort(ids)
 
@@ -395,7 +433,7 @@ defmodule Pepe.ACP.SessionsTest do
 
       {_, response} = call(connect(:a), 20, "session/load", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => []})
 
-      assert response["result"] == %{}
+      assert_session_setup(response["result"])
       assert File.read!(Path.join(acp_dir(), sid <> ".lock")) == System.pid()
     end
 
@@ -406,8 +444,8 @@ defmodule Pepe.ACP.SessionsTest do
       {_, first} = call(conn, 20, "session/load", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => []})
       {_, second} = call(conn, 21, "session/load", %{"sessionId" => sid, "cwd" => "/work/project", "mcpServers" => []})
 
-      assert first["result"] == %{}
-      assert second["result"] == %{}
+      assert_session_setup(first["result"])
+      assert_session_setup(second["result"])
     end
 
     test "closing the connection gives the lock back, and only ours" do
@@ -578,13 +616,25 @@ defmodule Pepe.ACP.SessionsTest do
       assert {:ok, _} = Sessions.fetch(held)
     end
 
+    test "prune never deletes a session this very VM has claimed, however old it is" do
+      # The scenario: the history panel offers a 31-day-old thread, the person picks it right
+      # after the editor launches, and the connection's own startup sweep runs meanwhile.
+      mine = save_session(updated_at: "2020-01-01T00:00:00Z")
+      assert :ok = Sessions.claim(mine)
+
+      Sessions.prune()
+
+      assert {:ok, _} = Sessions.fetch(mine)
+      assert {:ok, _agent, _messages, _pii, _pending} = SessionPersistence.load(Sessions.key(mine))
+    end
+
     test "past 200 sessions the oldest go first" do
       ids = for n <- 1..205, do: save_session(updated_at: DateTime.utc_now() |> DateTime.add(-n, :second) |> DateTime.to_iso8601())
 
       Sessions.prune()
 
       kept = Enum.filter(ids, &match?({:ok, _}, Sessions.fetch(&1)))
-      assert length(kept) == 200
+      assert Enum.count_until(kept, 201) == 200
       assert Enum.take(ids, 200) == kept
     end
   end

@@ -140,6 +140,29 @@ defmodule Pepe.ACP.ContentTest do
       refute resolved.text =~ "TOP SECRET"
     end
 
+    test "a symlinked DIRECTORY that leads out of the project is not followed either", %{dir: dir, project: project} do
+      outside = Path.join(dir, "outside")
+      File.mkdir_p!(outside)
+      File.write!(Path.join(outside, "secret.txt"), "TOP SECRET")
+      File.ln_s!(outside, Path.join(project, "dirlink"))
+
+      for uri <- [Path.join(project, "dirlink/secret.txt"), "file://" <> Path.join(project, "dirlink/secret.txt")] do
+        resolved = resolve!([%{"type" => "resource_link", "uri" => uri}], cwd: project)
+
+        refute resolved.text =~ "TOP SECRET"
+        assert resolved.text =~ "@"
+      end
+    end
+
+    test "a link that stays inside the project is read", %{project: project} do
+      File.mkdir_p!(Path.join(project, "real"))
+      File.write!(Path.join(project, "real/notes.txt"), "inside notes")
+      File.ln_s!(Path.join(project, "real"), Path.join(project, "alias"))
+
+      assert %{text: text} = resolve!([%{"type" => "resource_link", "uri" => Path.join(project, "alias/notes.txt")}], cwd: project)
+      assert text =~ "inside notes"
+    end
+
     test "without a project directory nothing is read at all", %{project: project} do
       File.write!(Path.join(project, "a.txt"), "plain")
       assert %{text: "@" <> _} = resolve!([%{"type" => "resource_link", "uri" => Path.join(project, "a.txt")}])

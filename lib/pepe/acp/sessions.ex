@@ -20,6 +20,13 @@ defmodule Pepe.ACP.Sessions do
       pid and the way out (`session/fork`), instead of racing. A lock left behind by a
       process that died is recognized (its pid is gone) and taken over.
 
+  The lock is per **OS process**, not per connection: a `pepe acp` process serves exactly
+  one editor over its stdio, so the two are the same thing in production. Two
+  `Pepe.ACP.Server` processes inside one VM (which only tests and embedding code ever
+  start) therefore both read a lock as `:ours` and may share a session; nothing here
+  arbitrates between them. That is deliberate and left unguarded: the tests that pin the
+  hand-over between two connections rely on it, and no real deployment can reach it.
+
   ## Ids
 
   `sess_` followed by 24 characters of URL-safe base64 from 18 random bytes. Not a
@@ -358,7 +365,10 @@ defmodule Pepe.ACP.Sessions do
 
   @doc """
   Delete what is past retention: sessions untouched for #{@retention_days} days, then the oldest
-  beyond #{@max_sessions}. Never touches a session another live process has open.
+  beyond #{@max_sessions}. Never touches a session that is open: not one another live process
+  holds, and not one this very process has claimed either (the sweep runs concurrently with the
+  connection's first requests, so a thread the person just picked from the history panel may
+  be a 31-day-old one).
   """
   @spec prune() :: :ok
   def prune do
@@ -368,7 +378,7 @@ defmodule Pepe.ACP.Sessions do
       {kept, overflow} = Enum.split(newest_first, @max_sessions)
       expired = Enum.filter(kept, &(&1["updated_at"] < cutoff))
 
-      for meta <- overflow ++ expired, not open_elsewhere?(meta["id"]), do: delete(meta["id"])
+      for meta <- overflow ++ expired, not open?(meta["id"]), do: delete(meta["id"])
     end
 
     :ok
@@ -376,7 +386,13 @@ defmodule Pepe.ACP.Sessions do
     _ -> :ok
   end
 
-  defp open_elsewhere?(id), do: match?({:alive, _pid}, holder(lock_path(id)))
+  defp open?(id) do
+    case holder(lock_path(id)) do
+      :ours -> true
+      {:alive, _pid} -> true
+      :gone -> false
+    end
+  end
 
   @doc "Forget a session entirely: metadata, lock, history and title."
   @spec delete(String.t()) :: :ok

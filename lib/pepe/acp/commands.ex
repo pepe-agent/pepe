@@ -118,34 +118,28 @@ defmodule Pepe.ACP.Commands do
   end
 
   def run("undo", _args, ctx) do
-    idle(ctx, fn ->
-      with :ok <- ensure(ctx) do
-        case Session.undo(ctx.key) do
-          :ok -> {:reply, gettext("↩️ Undid your last message.")}
-          {:error, :busy} -> wait()
-        end
+    idle_ready(ctx, fn ->
+      case Session.undo(ctx.key) do
+        :ok -> {:reply, gettext("↩️ Undid your last message.")}
+        {:error, :busy} -> wait()
       end
     end)
   end
 
   def run("rewind", args, ctx) do
-    idle(ctx, fn ->
-      with :ok <- ensure(ctx) do
-        case Session.parse_rewind_count(args) do
-          {:ok, count} -> rewind(ctx, count)
-          :error -> {:reply, gettext("Usage: /rewind N, where N is how many turns to go back.")}
-        end
+    idle_ready(ctx, fn ->
+      case Session.parse_rewind_count(args) do
+        {:ok, count} -> rewind(ctx, count)
+        :error -> {:reply, gettext("Usage: /rewind N, where N is how many turns to go back.")}
       end
     end)
   end
 
   def run("compact", _args, ctx) do
-    idle(ctx, fn ->
-      with :ok <- ensure(ctx) do
-        case Session.compact(ctx.key) do
-          {:ok, _summary} -> {:reply, gettext("🗜️ History compacted.")}
-          {:error, _reason} -> {:reply, gettext("I couldn't summarize right now. Try again shortly?")}
-        end
+    idle_ready(ctx, fn ->
+      case Session.compact(ctx.key) do
+        {:ok, _summary} -> {:reply, gettext("🗜️ History compacted.")}
+        {:error, _reason} -> {:reply, gettext("I couldn't summarize right now. Try again shortly?")}
       end
     end)
   end
@@ -165,7 +159,7 @@ defmodule Pepe.ACP.Commands do
 
   def run("context", _args, ctx) do
     with :ok <- ensure(ctx) do
-      s = Session.status(ctx.key)
+      s = Session.status(ctx.key) |> Map.put(:model_name, Session.model_name(ctx.key))
       model_line = gettext("Current model: %{model}", model: s.model || gettext("(unset)"))
 
       {:reply, Enum.join([model_line | context_lines(s, ctx[:last_usage])], "\n")}
@@ -246,6 +240,13 @@ defmodule Pepe.ACP.Commands do
 
   defp idle(%{running?: true}, _fun), do: wait()
   defp idle(_ctx, fun), do: fun.()
+
+  # `idle/2` plus the session-must-exist step every command that touches the session needs.
+  defp idle_ready(ctx, fun) do
+    idle(ctx, fn ->
+      with :ok <- ensure(ctx), do: fun.()
+    end)
+  end
 
   defp wait, do: {:reply, gettext("Wait for the current turn to finish.")}
 

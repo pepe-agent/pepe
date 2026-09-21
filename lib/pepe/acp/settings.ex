@@ -159,10 +159,7 @@ defmodule Pepe.ACP.Settings do
   end
 
   defp live_model(key) do
-    case Session.status(key) do
-      %{model_name: name} -> name
-      _ -> nil
-    end
+    Session.model_name(key)
   catch
     :exit, _ -> nil
   end

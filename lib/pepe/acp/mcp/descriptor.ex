@@ -16,6 +16,14 @@ defmodule Pepe.ACP.Mcp.Descriptor do
       that arrived from an editor (project-level editor settings can come out of a cloned
       repository) would let it read Pepe's environment, run a resolver command or read a
       file and hand the result to whatever the server is. See `Pepe.MCP.Protocol.interp/2`.
+    * A **minimal environment** for a stdio server. Not interpolating `${VAR}` is not enough on
+      its own: a child process inherits its parent's environment, so the command itself
+      (`sh -c 'env | ...'`) could read every provider key and gateway token Pepe was started
+      with. The child gets only what a program needs to run (`PATH`, `HOME`, `LANG`,
+      `LC_ALL`, `TMPDIR`, `USER`, `LOGNAME`, `SHELL`, `TERM`, and on Windows the system
+      variables a shell needs) plus the `env` the editor named, and everything else is unset.
+      See `Pepe.MCP.Client`. A server the operator configured with `pepe mcp add` is not
+      affected and inherits the environment as before.
     * `name: nil`. A stored OAuth token is looked up by server name; an editor-supplied
       server must never be handed the token of a configured server that shares its name.
     * A namespaced tool prefix (`mcp__editor_<name>__`) that is refused outright when it
@@ -25,6 +33,8 @@ defmodule Pepe.ACP.Mcp.Descriptor do
     * Bounded: at most eight servers, and limits on argument, variable and header counts and
       sizes.
   """
+
+  use Gettext, backend: Pepe.Gettext
 
   alias Pepe.Config
 
@@ -67,7 +77,7 @@ defmodule Pepe.ACP.Mcp.Descriptor do
 
     rejected =
       Enum.map(invalid, fn {:error, name, reason} -> {name, reason} end) ++
-        Enum.map(over, &{&1.name, "too many servers (at most #{@max_servers} per session)"})
+        Enum.map(over, &{&1.name, gettext("too many servers (at most %{max} per session)", max: @max_servers)})
 
     {accepted, clashes} = namespace(kept)
     {accepted, rejected ++ clashes}
@@ -85,25 +95,28 @@ defmodule Pepe.ACP.Mcp.Descriptor do
     end
   end
 
-  defp one(_desc, _cwd), do: {:error, "(unnamed)", "not an MCP server description"}
+  defp one(_desc, _cwd), do: {:error, gettext("(unnamed)"), gettext("not an MCP server description")}
 
   defp fetch_name(%{"name" => name}) when is_binary(name) do
     case String.trim(name) do
-      "" -> {:error, "(unnamed)", "the server has no name"}
-      trimmed when byte_size(trimmed) > @max_name -> {:error, clip(trimmed), "the name is too long"}
+      "" -> {:error, gettext("(unnamed)"), gettext("the server has no name")}
+      trimmed when byte_size(trimmed) > @max_name -> {:error, clip(trimmed), gettext("the name is too long")}
       trimmed -> {:ok, trimmed}
     end
   end
 
-  defp fetch_name(_desc), do: {:error, "(unnamed)", "the server has no name"}
+  defp fetch_name(_desc), do: {:error, gettext("(unnamed)"), gettext("the server has no name")}
 
   defp transport(%{"type" => "http"}, _name), do: {:ok, :http}
   defp transport(%{"type" => "sse"}, _name), do: {:ok, :sse}
   defp transport(%{"type" => "stdio"}, _name), do: {:ok, :stdio}
-  defp transport(%{"type" => other}, name), do: {:error, name, "unsupported transport `#{clip(to_string_safe(other))}`"}
+
+  defp transport(%{"type" => other}, name),
+    do: {:error, name, gettext("unsupported transport `%{type}`", type: clip(to_string_safe(other)))}
+
   defp transport(%{"url" => _}, _name), do: {:ok, :http}
   defp transport(%{"command" => _}, _name), do: {:ok, :stdio}
-  defp transport(_desc, name), do: {:error, name, "it has neither a `command` nor a `url`"}
+  defp transport(_desc, name), do: {:error, name, gettext("it has neither a `command` nor a `url`")}
 
   ###
   ### stdio
@@ -125,39 +138,40 @@ defmodule Pepe.ACP.Mcp.Descriptor do
   # not the editor's project - accepting it would run something other than what was meant.
   defp command(cmd, name) when is_binary(cmd) do
     cond do
-      cmd == "" or String.contains?(cmd, <<0>>) -> {:error, name, "the `command` is empty"}
-      byte_size(cmd) > 4096 -> {:error, name, "the `command` is too long"}
+      cmd == "" or String.contains?(cmd, <<0>>) -> {:error, name, gettext("the `command` is empty")}
+      byte_size(cmd) > 4096 -> {:error, name, gettext("the `command` is too long")}
       Path.type(cmd) == :absolute -> {:ok, cmd}
-      String.contains?(cmd, ["/", "\\"]) -> {:error, name, "the `command` must be an absolute path or a bare name found on PATH"}
+      String.contains?(cmd, ["/", "\\"]) -> {:error, name, gettext("the `command` must be an absolute path or a bare name found on PATH")}
       true -> {:ok, cmd}
     end
   end
 
-  defp command(_cmd, name), do: {:error, name, "the server has no `command`"}
+  defp command(_cmd, name), do: {:error, name, gettext("the server has no `command`")}
 
   defp args(nil, _name), do: {:ok, []}
 
   defp args(list, name) when is_list(list) do
     cond do
-      length(list) > @max_args -> {:error, name, "too many arguments (at most #{@max_args})"}
+      length(list) > @max_args -> {:error, name, gettext("too many arguments (at most %{max})", max: @max_args)}
       Enum.all?(list, &text?/1) -> {:ok, list}
-      true -> {:error, name, "`args` must be a list of strings"}
+      true -> {:error, name, gettext("`args` must be a list of strings")}
     end
   end
 
-  defp args(_other, name), do: {:error, name, "`args` must be a list of strings"}
+  defp args(_other, name), do: {:error, name, gettext("`args` must be a list of strings")}
 
   defp env(nil, _name), do: {:ok, %{}}
 
   defp env(list, name) when is_list(list) do
-    cond do
-      length(list) > @max_env -> {:error, name, "too many environment variables (at most #{@max_env})"}
-      true -> pairs(list, name, @env_name, "environment variable")
+    if length(list) > @max_env do
+      {:error, name, gettext("too many environment variables (at most %{max})", max: @max_env)}
+    else
+      pairs(list, name, @env_name, :env)
     end
   end
 
   defp env(map, name) when is_map(map), do: env(Enum.map(map, fn {k, v} -> %{"name" => k, "value" => v} end), name)
-  defp env(_other, name), do: {:error, name, "`env` must be a list of name/value pairs"}
+  defp env(_other, name), do: {:error, name, gettext("`env` must be a list of name/value pairs")}
 
   ###
   ### http / sse
@@ -183,27 +197,27 @@ defmodule Pepe.ACP.Mcp.Descriptor do
   defp url(url, name) when is_binary(url) do
     case URI.parse(url) do
       %URI{scheme: scheme, host: host} when scheme in ["http", "https"] and is_binary(host) and host != "" ->
-        if byte_size(url) <= 4096, do: {:ok, url}, else: {:error, name, "the `url` is too long"}
+        if byte_size(url) <= 4096, do: {:ok, url}, else: {:error, name, gettext("the `url` is too long")}
 
       _ ->
-        {:error, name, "the `url` must be an http or https address"}
+        {:error, name, gettext("the `url` must be an http or https address")}
     end
   end
 
-  defp url(_url, name), do: {:error, name, "the server has no `url`"}
+  defp url(_url, name), do: {:error, name, gettext("the server has no `url`")}
 
   defp headers(nil, _name), do: {:ok, %{}}
 
   defp headers(list, name) when is_list(list) do
     if length(list) > @max_headers,
-      do: {:error, name, "too many headers (at most #{@max_headers})"},
-      else: pairs(list, name, @header_name, "header")
+      do: {:error, name, gettext("too many headers (at most %{max})", max: @max_headers)},
+      else: pairs(list, name, @header_name, :header)
   end
 
   defp headers(map, name) when is_map(map),
     do: headers(Enum.map(map, fn {k, v} -> %{"name" => k, "value" => v} end), name)
 
-  defp headers(_other, name), do: {:error, name, "`headers` must be a list of name/value pairs"}
+  defp headers(_other, name), do: {:error, name, gettext("`headers` must be a list of name/value pairs")}
 
   ###
   ### shared
@@ -211,24 +225,33 @@ defmodule Pepe.ACP.Mcp.Descriptor do
 
   # A header value with a line break would split the request (header injection); an
   # environment variable may legitimately hold one.
-  defp pairs(list, name, name_pattern, what) do
+  defp pairs(list, name, name_pattern, kind) do
     Enum.reduce_while(list, {:ok, %{}}, fn
       %{"name" => key, "value" => value}, {:ok, acc} when is_binary(key) and is_binary(value) ->
         cond do
           not Regex.match?(name_pattern, key) ->
-            {:halt, {:error, name, "invalid #{what} name `#{clip(key)}`"}}
+            {:halt, {:error, name, invalid_name(kind, clip(key))}}
 
-          not text?(value) or (what == "header" and String.contains?(value, ["\r", "\n"])) ->
-            {:halt, {:error, name, "invalid value for #{what} `#{key}`"}}
+          not text?(value) or (kind == :header and String.contains?(value, ["\r", "\n"])) ->
+            {:halt, {:error, name, invalid_value(kind, key)}}
 
           true ->
             {:cont, {:ok, Map.put(acc, key, value)}}
         end
 
       _other, _acc ->
-        {:halt, {:error, name, "each #{what} must have a `name` and a `value`"}}
+        {:halt, {:error, name, incomplete_pair(kind)}}
     end)
   end
+
+  defp invalid_name(:env, key), do: gettext("invalid environment variable name `%{name}`", name: key)
+  defp invalid_name(:header, key), do: gettext("invalid header name `%{name}`", name: key)
+
+  defp invalid_value(:env, key), do: gettext("invalid value for environment variable `%{name}`", name: key)
+  defp invalid_value(:header, key), do: gettext("invalid value for header `%{name}`", name: key)
+
+  defp incomplete_pair(:env), do: gettext("each environment variable must have a `name` and a `value`")
+  defp incomplete_pair(:header), do: gettext("each header must have a `name` and a `value`")
 
   defp text?(value), do: is_binary(value) and byte_size(value) <= @max_value and not String.contains?(value, <<0>>)
 
@@ -240,7 +263,8 @@ defmodule Pepe.ACP.Mcp.Descriptor do
         ns = unique("editor_" <> slug(server.name), used)
 
         if Config.mcp_server(ns) do
-          {acc, [{server.name, "its tool namespace `#{ns}` is already taken by a server configured on this Pepe"} | bad], used}
+          {acc, [{server.name, gettext("its tool namespace `%{ns}` is already taken by a server configured on this Pepe", ns: ns)} | bad],
+           used}
         else
           {[%{server | ns: ns} | acc], bad, MapSet.put(used, ns)}
         end
