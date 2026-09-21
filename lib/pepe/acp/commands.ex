@@ -44,7 +44,8 @@ defmodule Pepe.ACP.Commands do
     {"new", "Start a new conversation", nil},
     {"reset", "Start a new conversation (same as /new)", nil},
     {"undo", "Take back your last message", nil},
-    {"rewind", "Go back N turns of the conversation", "number of turns (default 1)"},
+    {"rewind", "List recent turns, or go back N turns of the conversation and the files they changed", "N [chat|files]"},
+    {"retry", "Ask your last message again", "files (also put back the files it changed)"},
     {"compact", "Summarize older history to free up context", nil},
     {"status", "Show the agent, the model and the turn count", nil},
     {"context", "Show how full the model's context window is", nil},
@@ -63,9 +64,10 @@ defmodule Pepe.ACP.Commands do
           required(:key) => String.t(),
           required(:agent) => String.t() | nil,
           required(:running?) => boolean(),
-          optional(:last_usage) => %{used: integer(), size: integer()} | nil
+          optional(:last_usage) => %{used: integer(), size: integer()} | nil,
+          optional(:cwd) => String.t() | nil
         }
-  @type result :: {:reply, String.t()} | {:prompt, String.t()} | {:queue, String.t()}
+  @type result :: {:reply, String.t()} | {:prompt, String.t()} | {:prompt, String.t(), String.t()} | {:queue, String.t()}
 
   @doc "The `availableCommands` an editor is told about."
   @spec available() :: [map()]
@@ -119,18 +121,50 @@ defmodule Pepe.ACP.Commands do
 
   def run("undo", _args, ctx) do
     idle_ready(ctx, fn ->
-      case Session.undo(ctx.key) do
-        :ok -> {:reply, gettext("↩️ Undid your last message.")}
-        {:error, :busy} -> wait()
+      # A conversation-only take-back; if that turn had changed files, say they were left alone.
+      case Session.rewind_to(ctx.key, 1, :chat, roots: roots(ctx)) do
+        {:ok, result} ->
+          {:reply, Enum.join([gettext("↩️ Undid your last message.") | Pepe.Checkpoints.Report.kept_lines(result.kept)], "\n")}
+
+        {:error, :busy} ->
+          wait()
       end
     end)
   end
 
   def run("rewind", args, ctx) do
     idle_ready(ctx, fn ->
-      case Session.parse_rewind_count(args) do
-        {:ok, count} -> rewind(ctx, count)
-        :error -> {:reply, gettext("Usage: /rewind N, where N is how many turns to go back.")}
+      case Pepe.Checkpoints.Report.parse_rewind(args) do
+        :list ->
+          {:reply, Pepe.Checkpoints.Report.turn_list(Session.turns(ctx.key))}
+
+        {:ok, count, mode} ->
+          rewind(ctx, count, mode)
+
+        :error ->
+          {:reply, gettext("Usage: /rewind N, where N is how many turns to go back.") <> "\n" <> Pepe.Checkpoints.Report.usage()}
+      end
+    end)
+  end
+
+  # Ask the last message again: the turn is taken back and its text becomes a normal turn.
+  # `files` also puts back what that turn changed, and says so before the new turn starts.
+  def run("retry", args, ctx) do
+    idle_ready(ctx, fn ->
+      mode = if args |> String.trim() |> String.downcase() == "files", do: :both, else: :chat
+
+      case Session.retry(ctx.key, mode, roots: roots(ctx)) do
+        {:ok, %{text: text, files: files, roots: roots}} ->
+          retry_prompt(text, Pepe.Checkpoints.Report.file_lines(files, roots: roots))
+
+        {:error, :nothing} ->
+          {:reply, gettext("Nothing to retry yet.")}
+
+        {:error, :not_text} ->
+          {:reply, gettext("That message had an attachment, so it can't be sent again exactly. Send it again yourself.")}
+
+        {:error, :busy} ->
+          wait()
       end
     end)
   end
@@ -259,26 +293,20 @@ defmodule Pepe.ACP.Commands do
     end
   end
 
-  defp rewind(ctx, count) do
-    case Session.rewind(ctx.key, count) do
-      {:ok, 0} -> {:reply, gettext("Nothing to rewind yet.")}
-      {:ok, dropped} when dropped < count -> {:reply, "⏪ " <> rewound_all(dropped)}
-      {:ok, dropped} -> {:reply, "⏪ " <> rewound(dropped)}
+  defp retry_prompt(text, []), do: {:prompt, text}
+  defp retry_prompt(text, lines), do: {:prompt, text, Enum.join(lines, "\n")}
+
+  defp rewind(ctx, count, mode) do
+    case Session.rewind_to(ctx.key, count, mode, roots: roots(ctx)) do
+      {:ok, result} -> {:reply, "⏪ " <> Pepe.Checkpoints.Report.summary(result, requested: count, mode: mode)}
       {:error, :busy} -> wait()
     end
   end
 
-  defp rewound(dropped),
-    do: ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
-
-  defp rewound_all(dropped) do
-    ngettext(
-      "Rewound %{count} turn. That was the whole conversation.",
-      "Rewound %{count} turns. That was the whole conversation.",
-      dropped,
-      count: dropped
-    )
-  end
+  # The editor's working directory is a folder a rewind may put files back into, like an
+  # agent's own workspace: its tools resolve there (see `cwd_override`), so that is where
+  # their changes were recorded.
+  defp roots(ctx), do: if(is_binary(ctx[:cwd]), do: [ctx.cwd], else: [])
 
   # An editor is one person's tool, so no "this conversation or everyone?" question: a
   # bare `/model NAME` is this conversation, and `global` is spelled out to get the other.

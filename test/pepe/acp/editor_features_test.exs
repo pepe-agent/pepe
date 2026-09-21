@@ -317,6 +317,65 @@ defmodule Pepe.ACP.EditorFeaturesTest do
       assert [%{"status" => "completed"}] = updates(notes, "tool_call_update")
     end
 
+    test "/rewind puts back what a turn wrote in the project, and /retry files does it before asking again", %{project: project} do
+      with_models()
+      {conn, _} = initialized()
+      %{"sessionId" => id} = open(conn, project)
+      {_, %{"result" => %{}}} = call(conn, 30, "session/set_mode", %{"sessionId" => id, "modeId" => "accept_edits"})
+
+      File.write!(Path.join(project, "out.txt"), "before")
+      {_notes, %{"result" => %{"stopReason" => "end_turn"}}} = prompt(conn, id, "WRITEFILE please", 31)
+      assert File.read!(Path.join(project, "out.txt")) == "hi"
+
+      # The list says which turn changed a file.
+      {notes, _} = prompt(conn, id, "/rewind", 32)
+      assert said(notes) =~ "1. WRITEFILE please (1 file)"
+
+      # Files only: the project goes back, the conversation stays.
+      {notes, _} = prompt(conn, id, "/rewind 1 files", 33)
+      assert said(notes) =~ "Put back 1 file: out.txt."
+      assert said(notes) =~ "The conversation is unchanged."
+      assert File.read!(Path.join(project, "out.txt")) == "before"
+
+      # Retry with files: what it put back is announced before the same message goes out again,
+      # and the model then writes the file again.
+      {notes, %{"result" => %{"stopReason" => "end_turn"}}} = prompt(conn, id, "/retry files", 34)
+      assert said(notes) =~ "The files of those turns were already put back."
+      assert File.read!(Path.join(project, "out.txt")) == "hi"
+
+      # Both: the write and the conversation go.
+      {notes, _} = prompt(conn, id, "/rewind 1", 35)
+      assert said(notes) =~ "Rewound 1 turn."
+      assert said(notes) =~ "Put back 1 file: out.txt."
+      assert File.read!(Path.join(project, "out.txt")) == "before"
+    end
+
+    test "/rewind chat and /undo leave the project's files and say so", %{project: project} do
+      with_models()
+      {conn, _} = initialized()
+      %{"sessionId" => id} = open(conn, project)
+      {_, %{"result" => %{}}} = call(conn, 40, "session/set_mode", %{"sessionId" => id, "modeId" => "accept_edits"})
+
+      {_notes, _} = prompt(conn, id, "WRITEFILE please", 41)
+      {notes, _} = prompt(conn, id, "/undo", 42)
+
+      assert said(notes) =~ "Undid your last message"
+      assert said(notes) =~ "left as it is"
+      assert File.read!(Path.join(project, "out.txt")) == "hi"
+    end
+
+    test "/retry with nothing said yet says so, and /rewind with junk says how to use it", %{project: project} do
+      with_models()
+      {conn, _} = initialized()
+      %{"sessionId" => id} = open(conn, project)
+
+      {notes, _} = prompt(conn, id, "/retry", 50)
+      assert said(notes) =~ "Nothing to retry yet."
+
+      {notes, _} = prompt(conn, id, "/rewind banana", 51)
+      assert said(notes) =~ "Usage: /rewind N"
+    end
+
     defp prompt_line(session_id, text, id) do
       Jason.encode!(%{
         "jsonrpc" => "2.0",
@@ -350,7 +409,8 @@ defmodule Pepe.ACP.EditorFeaturesTest do
       {notes, %{"result" => %{"stopReason" => "end_turn"}}} = prompt(conn, id, "/help")
 
       assert said(notes) =~ "Commands:"
-      assert said(notes) =~ "/rewind <number of turns (default 1)>"
+      assert said(notes) =~ "/rewind <N [chat|files]>"
+      assert said(notes) =~ "/retry <files"
       refute llm_called?()
     end
 
@@ -398,11 +458,18 @@ defmodule Pepe.ACP.EditorFeaturesTest do
       assert said(notes) =~ "Nothing to rewind yet"
 
       {_notes, _} = prompt(conn, id, "first question", 6)
+
+      # A bare /rewind lists the turns to pick from instead of guessing.
       {notes, _} = prompt(conn, id, "/rewind", 7)
+      assert said(notes) =~ "Recent turns, newest first:"
+      assert said(notes) =~ "1. first question"
+      assert said(notes) =~ "/rewind N chat"
+
+      {notes, _} = prompt(conn, id, "/rewind 1", 8)
       assert said(notes) =~ "Rewound 1 turn"
 
-      {_notes, _} = prompt(conn, id, "another question", 8)
-      {notes, _} = prompt(conn, id, "/undo", 9)
+      {_notes, _} = prompt(conn, id, "another question", 9)
+      {notes, _} = prompt(conn, id, "/undo", 10)
       assert said(notes) =~ "Undid your last message"
     end
 

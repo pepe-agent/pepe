@@ -15,6 +15,7 @@ defmodule Pepe.Agent.Session do
   alias Pepe.Agent.Runtime
   alias Pepe.Agent.SessionTitles
   alias Pepe.Agent.Workspace
+  alias Pepe.Checkpoints
   alias Pepe.Config
   alias Pepe.LLM
   alias Pepe.LLM.Message
@@ -173,6 +174,51 @@ defmodule Pepe.Agent.Session do
         end
     end
   end
+
+  @doc """
+  The newest `limit` person turns of the conversation, newest first, for a `/rewind` listing:
+  `%{n:, preview:, files:}` (`n` is what to pass to `rewind_to/4`; `files` is how many files
+  that turn changed and can still be put back, `0` for none, `nil` when nothing is known
+  about it).
+  """
+  @spec turns(term(), pos_integer()) :: [map()]
+  def turns(key, limit \\ 10), do: GenServer.call(via(key), {:turns, limit})
+
+  @doc """
+  `rewind/2` that can also put files back. `mode` is what to undo:
+
+    * `:both` (the default) - the conversation and the files those turns changed, as if they
+      had never happened;
+    * `:chat` - the conversation only, exactly `rewind/2`; the files stay as they are;
+    * `:files` - the files only; the conversation stays, and a note is added to it so the
+      agent knows they were put back.
+
+  Options: `:roots`, extra directories a file may be restored into (an editor's working
+  directory). Returns `{:ok, %{dropped:, files:, kept:}}`: how many turns left the conversation,
+  the `Pepe.Checkpoints.Restore` report (with `:unreached` and `:expired` counts) or `nil` when
+  files were not asked for, and, for `:chat`, how many files a full rewind would have put back
+  (`kept`). `{:error, :busy}` while a turn is in flight.
+
+  Files are put back per file and only when nothing else touched them since; everything it
+  skipped or could not cover is in the report, never silently ignored. See `Pepe.Checkpoints`.
+  """
+  @spec rewind_to(term(), pos_integer(), :both | :chat | :files, keyword()) ::
+          {:ok, %{dropped: non_neg_integer(), files: map() | nil, kept: non_neg_integer() | nil, roots: [Path.t()]}}
+          | {:error, :busy}
+  def rewind_to(key, count, mode \\ :both, opts \\ []),
+    do: GenServer.call(via(key), {:rewind_to, count, mode, opts}, 30_000)
+
+  @doc """
+  Take back the last person turn so it can be asked again: drops it like `rewind/2` and
+  returns its text for the caller to send as a new message. `mode` `:both` also puts back the
+  files that turn changed, so the retry starts from the same files it did.
+
+  `{:error, :nothing}` when there is no turn to retry, `{:error, :not_text}` when the turn
+  carried attachments (it cannot be replayed exactly), `{:error, :busy}` mid-turn.
+  """
+  @spec retry(term(), :chat | :both, keyword()) ::
+          {:ok, %{text: String.t(), files: map() | nil, roots: [Path.t()]}} | {:error, :nothing | :not_text | :busy}
+  def retry(key, mode \\ :chat, opts \\ []), do: GenServer.call(via(key), {:retry, mode, opts}, 30_000)
 
   @doc "Cancel the in-flight run for this session, if any."
   @spec stop(term()) :: :ok | {:error, :not_running}
@@ -705,6 +751,8 @@ defmodule Pepe.Agent.Session do
     Pepe.Permissions.SessionStore.clear(state.key)
     state = state |> cancel_queue({:error, :stopped}) |> cancel_running({:error, :stopped})
 
+    Checkpoints.forget_session(state.key)
+
     {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], mention_optional: false})}
   end
 
@@ -734,6 +782,7 @@ defmodule Pepe.Agent.Session do
     if same_agent?(agent_name, state.agent_name) do
       {:reply, :ok, state}
     else
+      Checkpoints.forget_session(state.key)
       {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name)})}
     end
   end
@@ -789,6 +838,42 @@ defmodule Pepe.Agent.Session do
   def handle_call({:rewind, count}, _from, state) do
     {dropped, state} = do_rewind(state, count)
     {:reply, {:ok, dropped}, state}
+  end
+
+  def handle_call({:turns, limit}, _from, state) do
+    {:reply, Checkpoints.turns(state.key, state.messages, limit), state}
+  end
+
+  def handle_call({:rewind_to, _count, _mode, _opts}, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
+  def handle_call({:rewind_to, count, mode, opts}, _from, state) do
+    roots = Checkpoints.allowed_roots(state.agent_name, List.wrap(opts[:roots]))
+    {files, state} = restore_files(state, count, mode, opts)
+    kept = if mode == :chat, do: kept_files(state, count, opts)
+    {dropped, state} = if mode in [:both, :chat], do: do_rewind(state, count), else: {0, state}
+    {:reply, {:ok, %{dropped: dropped, files: files, kept: kept, roots: roots}}, note_restore(state, files, count, mode)}
+  end
+
+  def handle_call({:retry, _mode, _opts}, _from, %{running: %{}} = state) do
+    {:reply, {:error, :busy}, state}
+  end
+
+  def handle_call({:retry, mode, opts}, _from, state) do
+    case last_person_message(state.messages) do
+      nil ->
+        {:reply, {:error, :nothing}, state}
+
+      %{"content" => text} when not is_binary(text) ->
+        {:reply, {:error, :not_text}, state}
+
+      %{"content" => text} ->
+        roots = Checkpoints.allowed_roots(state.agent_name, List.wrap(opts[:roots]))
+        {files, state} = restore_files(state, 1, mode, opts)
+        {_dropped, state} = do_rewind(state, 1)
+        {:reply, {:ok, %{text: text, files: files, roots: roots}}, state}
+    end
   end
 
   def handle_call(:status, _from, state) do
@@ -904,6 +989,7 @@ defmodule Pepe.Agent.Session do
           reply_folded(folded, {:ok, turn_reply})
 
           {next_agent, messages, pii_map} = resolve_post_turn_agent(state, agent_name, all_messages, entries)
+          commit_checkpoints(state, messages)
 
           state =
             %{
@@ -1030,6 +1116,7 @@ defmodule Pepe.Agent.Session do
   # NEXT, unrelated normal turn: an aside is meant to change nothing downstream, and a flag surviving
   # into a later user turn would silently discard that turn's own history.
   def handle_cast(:end_session, state) do
+    Checkpoints.forget_session(state.key)
     {:noreply, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], reset_pending: false})}
   end
 
@@ -1043,6 +1130,7 @@ defmodule Pepe.Agent.Session do
   end
 
   def handle_cast({:switch_agent, agent_name}, state) do
+    Checkpoints.forget_session(state.key)
     {:noreply, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), switch_pending: nil})}
   end
 
@@ -1062,6 +1150,7 @@ defmodule Pepe.Agent.Session do
   defp cancel_ttl(state), do: state
 
   defp maybe_clear(%{ephemeral: true, key: key} = state) do
+    Checkpoints.forget_session(key)
     if persist?(Map.get(state, :persist, false)), do: SessionPersistence.delete(key)
     state
   end
@@ -1512,6 +1601,50 @@ defmodule Pepe.Agent.Session do
     end
   end
 
+  # Put back the files the newest `count` turns changed, before the conversation drops them
+  # (the log is aligned against the history that is still whole). `nil` when files were not
+  # asked for.
+  defp restore_files(state, count, mode, opts) when mode in [:both, :files] do
+    roots = Checkpoints.allowed_roots(state.agent_name, List.wrap(opts[:roots]))
+    {Checkpoints.restore(state.key, state.messages, count, roots: roots), state}
+  end
+
+  defp restore_files(state, _count, _mode, _opts), do: {nil, state}
+
+  # How many files a conversation-only rewind leaves behind that a full one would have put
+  # back, so the answer can say so instead of implying the files went too.
+  defp kept_files(state, count, opts) do
+    roots = Checkpoints.allowed_roots(state.agent_name, List.wrap(opts[:roots]))
+    report = Checkpoints.restore(state.key, state.messages, count, roots: roots, dry_run: true)
+    length(report.restored) + length(report.removed)
+  rescue
+    _ -> nil
+  end
+
+  # `:files` leaves the conversation as it is, so the agent has to be told that files it
+  # wrote were put back, or it will keep reasoning about a state that no longer exists.
+  defp note_restore(state, %{restored: restored, removed: removed} = files, count, :files)
+       when restored != [] or removed != [] do
+    note = Pepe.Checkpoints.Report.agent_note(files, count)
+    persist(%{state | messages: state.messages ++ [Message.user(note)]})
+  end
+
+  defp note_restore(state, _files, _count, _mode), do: state
+
+  # Tie what the finished run changed to the person turn(s) it added, so a rewind knows which
+  # files belong to which turn (see Pepe.Checkpoints.commit_turn/2). Never allowed to fail a
+  # turn that already succeeded.
+  defp commit_checkpoints(state, messages) do
+    before = Enum.count(state.messages, &Message.person_turn?/1)
+    people = Enum.filter(messages, &Message.person_turn?/1)
+    added = max(length(people) - before, 1)
+    Checkpoints.commit_turn(state.key, people |> Enum.take(-added) |> Enum.map(&Checkpoints.fingerprint/1))
+  rescue
+    _ -> :ok
+  end
+
+  defp last_person_message(messages), do: messages |> Enum.reverse() |> Enum.find(&Message.person_turn?/1)
+
   # Truncate back to just before the `count`-th user message from the end, and forget the
   # micro-compaction cache if anything actually went (see `rewind/2`'s doc for why). Returns
   # `{dropped, state}`, persisted. Shared by `:undo` and `:rewind` so there is exactly one
@@ -1519,7 +1652,10 @@ defmodule Pepe.Agent.Session do
   defp do_rewind(state, count) do
     {messages, dropped} = drop_last_turns(state.messages, count)
 
-    if dropped > 0, do: Pepe.Agent.MicroCompaction.clear(state.key)
+    if dropped > 0 do
+      Pepe.Agent.MicroCompaction.clear(state.key)
+      Checkpoints.pop_turns(state.key, dropped)
+    end
 
     {dropped, persist(%{state | messages: messages})}
   end

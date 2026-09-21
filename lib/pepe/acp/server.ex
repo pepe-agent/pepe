@@ -609,7 +609,8 @@ defmodule Pepe.ACP.Server do
       key: session.key,
       agent: state.agent,
       running?: session.run != nil,
-      last_usage: Map.get(session, :last_usage)
+      last_usage: Map.get(session, :last_usage),
+      cwd: session.cwd
     }
 
     {:ok, task} =
@@ -642,11 +643,19 @@ defmodule Pepe.ACP.Server do
       {%{run: nil} = session, {:prompt, text}} ->
         run_prompt(id, session_id, session, {:text, text, []}, state)
 
+      # A prompt that comes with something to say first (what `/retry files` put back).
+      {%{run: nil} = session, {:prompt, text, note}} ->
+        state = write(state, Protocol.session_update(session_id, Protocol.message_chunk(note <> "\n\n")))
+        run_prompt(id, session_id, session, {:text, text, []}, state)
+
       {%{run: nil} = session, {:queue, text}} ->
         run_prompt(id, session_id, session, {:text, text, []}, state)
 
       # A turn started while the command was being worked out: hold the text for after it.
       {session, {kind, text}} when kind in [:prompt, :queue] ->
+        enqueue(state, session_id, session, id, text)
+
+      {session, {:prompt, text, _note}} ->
         enqueue(state, session_id, session, id, text)
     end
   end

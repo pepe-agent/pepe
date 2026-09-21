@@ -390,7 +390,10 @@ defmodule Pepe.Tools do
       Pepe.Config.Journal.put_source("chat:#{name}")
 
       try do
-        case mod.run(args, ctx) do
+        # Every tool body runs through the checkpoint wrapper: for the few tools that change
+        # files at a known path it records what changed (so `/rewind` can put it back), and
+        # for every other tool it is a plain call.
+        case Pepe.Checkpoints.around(name, args, ctx, fn -> mod.run(args, ctx) end) do
           {:ok, result} -> to_string(result)
           {:error, reason} -> annotate_error("Error: #{reason}")
         end

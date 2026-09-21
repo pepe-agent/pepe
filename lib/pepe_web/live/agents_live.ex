@@ -481,6 +481,22 @@ defmodule PepeWeb.AgentsLive do
                 </label>
                 <p class={[hlp(), check_indent()]}>{gettext("After a task that took several steps to work out, the agent may offer to save that procedure as a skill, so the next time is direct. And when it follows a skill that then leads it wrong, it may offer to correct that skill with what it just learned. It only offers: nothing is written or changed without your yes.")}</p>
               </div>
+
+              <div>
+                <label class="flex items-start gap-2.5 text-sm">
+                  <input type="checkbox" name="checkpoints" value="true" checked={@edit_agent[:checkpoints]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
+                  <span>{gettext("Keep a copy of files it changes (so /rewind can put them back)")}</span>
+                </label>
+                <p class={[hlp(), check_indent()]}>{gettext("Before a file tool overwrites, edits or moves a file, a copy of what was there is kept for a couple of weeks. /rewind can then restore those files along with the conversation. Files that look like credentials are never copied. Off means /rewind only goes back in the conversation.")}</p>
+              </div>
+
+              <div>
+                <label class="flex items-start gap-2.5 text-sm">
+                  <input type="checkbox" name="checkpoint_shell" value="true" checked={@edit_agent[:checkpoint_shell]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
+                  <span>{gettext("Also cover shell commands")}</span>
+                </label>
+                <p class={[hlp(), check_indent()]}>{gettext("Also copy the working folder around each shell command, so /rewind can undo what a command changed. It walks the folder twice per command and stops at a size limit, so it is off by default and never covers a huge folder completely.")}</p>
+              </div>
             </.form_section>
 
             <.form_section :if={!@edit_agent.new?} collapsible title={gettext("Assembled prompt")}>
@@ -613,7 +629,9 @@ defmodule PepeWeb.AgentsLive do
       session_search_scope: "self",
       micro_compaction: false,
       capability_nudge: false,
-      skill_learning: false
+      skill_learning: false,
+      checkpoints: true,
+      checkpoint_shell: false
     }
 
     {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
@@ -806,7 +824,9 @@ defmodule PepeWeb.AgentsLive do
         session_search_scope: session_search_scope_param(params),
         micro_compaction: params["micro_compaction"] == "true",
         capability_nudge: params["capability_nudge"] == "true",
-        skill_learning: params["skill_learning"] == "true"
+        skill_learning: params["skill_learning"] == "true",
+        checkpoints: params["checkpoints"] == "true",
+        checkpoint_shell: params["checkpoint_shell"] == "true"
     }
   end
 
@@ -847,7 +867,9 @@ defmodule PepeWeb.AgentsLive do
         session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
         micro_compaction: params["micro_compaction"] == "true",
         capability_nudge: params["capability_nudge"] == "true",
-        skill_learning: params["skill_learning"] == "true"
+        skill_learning: params["skill_learning"] == "true",
+        checkpoints: params["checkpoints"] == "true",
+        checkpoint_shell: params["checkpoint_shell"] == "true"
     }
   end
 
