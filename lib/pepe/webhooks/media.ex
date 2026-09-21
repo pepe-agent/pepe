@@ -138,6 +138,7 @@ defmodule Pepe.Webhooks.Media do
 
     with :ok <- File.mkdir_p(dir),
          :ok <- File.write(Path.join(dir, name), bytes) do
+      Pepe.Webhooks.Media.Retention.prune(dir, name)
       {:ok, "media/#{name}"}
     end
   end

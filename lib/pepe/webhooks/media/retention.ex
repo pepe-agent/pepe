@@ -80,18 +80,17 @@ defmodule Pepe.Webhooks.Media.Retention do
 
   defp list(dir) do
     case File.ls(dir) do
-      {:ok, names} ->
-        Enum.flat_map(names, fn name ->
-          path = Path.join(dir, name)
+      {:ok, names} -> Enum.flat_map(names, &file_entry(dir, &1))
+      {:error, _} -> []
+    end
+  end
 
-          case File.stat(path, time: :posix) do
-            {:ok, %File.Stat{type: :regular, size: size, mtime: mtime}} -> [%{name: name, path: path, size: size, mtime: mtime}]
-            _ -> []
-          end
-        end)
+  defp file_entry(dir, name) do
+    path = Path.join(dir, name)
 
-      {:error, _} ->
-        []
+    case File.stat(path, time: :posix) do
+      {:ok, %File.Stat{type: :regular, size: size, mtime: mtime}} -> [%{name: name, path: path, size: size, mtime: mtime}]
+      _ -> []
     end
   end
 end

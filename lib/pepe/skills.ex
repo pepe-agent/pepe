@@ -39,32 +39,31 @@ defmodule Pepe.Skills do
   """
 
   alias Pepe.Config
-
-  # A `description` is a purpose-written trigger: the "what it does" half runs first and
-  # the "when to use it" half - the half that decides whether the agent opens the skill at
-  # all - runs last, so cutting it as short as a prose opening line would defeat it. The
-  # cap is still well under the interchange format's own 1024, so one verbose skill cannot
-  # crowd out the rest of the index.
-  @description_limit 500
-  @first_line_limit 120
+  alias Pepe.Skills.Catalog
 
   @doc "User skills directory."
   def user_dir, do: Path.join(Config.home(), "skills")
 
-  defp builtin_dir, do: Application.app_dir(:pepe, "priv/skills")
+  @doc "Directory containing the skills shipped with Pepe."
+  def builtin_dir, do: Application.app_dir(:pepe, "priv/skills")
 
-  @doc "All skills as `[{name, summary}]` (user skills override built-ins by name)."
-  def list do
-    (skills_in(builtin_dir()) ++ skills_in(user_dir()))
-    |> Map.new()
-    |> Enum.sort_by(&elem(&1, 0))
+  @doc "Visible skills as `[{name, summary}]`, resolved through the tiered catalog."
+  def list(opts \\ []) do
+    opts
+    |> Catalog.visible()
+    |> Enum.map(&{&1.name, &1.summary})
   end
 
-  @doc "Read a skill's full Markdown by name (user dir wins over built-in)."
-  def read(name) do
-    case read_from(user_dir(), name) do
-      {:error, :not_found} -> read_from(builtin_dir(), name)
-      result -> result
+  @doc "Read a visible skill's full Markdown by name, path or declared alias."
+  def read(name, opts \\ []) do
+    case Catalog.find(name, opts) do
+      {:ok, skill} ->
+        if Catalog.disabled?(skill.name, opts) or not Catalog.platform_ok?(skill),
+          do: {:error, :not_found},
+          else: File.read(skill.entry)
+
+      error ->
+        error
     end
   end
 
@@ -126,85 +125,4 @@ defmodule Pepe.Skills do
   catch
     _, _ -> :error
   end
-
-  defp read_from(dir, name) do
-    loose = Path.join(dir, name <> ".md")
-    package = Path.join(dir, name)
-
-    cond do
-      File.regular?(loose) -> File.read(loose)
-      File.dir?(package) -> read_package(package)
-      true -> {:error, :not_found}
-    end
-  end
-
-  defp read_package(dir) do
-    case package_entry(dir) do
-      nil -> {:error, :not_found}
-      file -> File.read(file)
-    end
-  end
-
-  defp skills_in(dir) do
-    case File.ls(dir) do
-      {:ok, entries} -> Enum.flat_map(entries, &skill_entry(dir, &1))
-      _ -> []
-    end
-  end
-
-  defp skill_entry(dir, entry) do
-    full = Path.join(dir, entry)
-
-    cond do
-      # `.archive/` (skills taken out of circulation) and `.backups/` live beside the skills
-      # but are not skills - see Pepe.Skills.Lifecycle.
-      String.starts_with?(entry, ".") ->
-        []
-
-      String.ends_with?(entry, ".md") and File.regular?(full) ->
-        [{String.replace_suffix(entry, ".md", ""), summary(full)}]
-
-      File.dir?(full) ->
-        case package_entry(full) do
-          nil -> []
-          doc -> [{entry, summary(doc)}]
-        end
-
-      true ->
-        []
-    end
-  end
-
-  # A metadata header's `description` is the skill's "use-when" summary; without one, the
-  # first non-empty line of the body is.
-  defp summary(path) do
-    case File.read(path) do
-      {:ok, content} -> summarize(content)
-      _ -> ""
-    end
-  end
-
-  defp summarize(content) do
-    {meta, body} = header(content)
-
-    case meta["description"] do
-      description when is_binary(description) -> one_line(description, @description_limit)
-      _ -> first_line(body)
-    end
-  end
-
-  # A bare `---` is never a summary in either shape - it is a horizontal rule, or the fence
-  # of a header that did not parse. Skipping it is what keeps an unreadable header from
-  # putting the literal fence in the skills index, where it tells the agent nothing at all
-  # about when to open the skill.
-  defp first_line(body) do
-    case body |> String.split("\n") |> Enum.find(&(String.trim(&1) not in ["", "---"])) do
-      nil -> ""
-      line -> line |> String.replace_prefix("# ", "") |> one_line(@first_line_limit)
-    end
-  end
-
-  # The index is one line per skill, and YAML folded/literal scalars carry real newlines -
-  # left in, a single description would break the listing into bogus entries.
-  defp one_line(text, limit), do: text |> String.replace(~r/\s+/, " ") |> String.trim() |> String.slice(0, limit)
 end

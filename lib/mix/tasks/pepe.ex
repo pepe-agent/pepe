@@ -309,10 +309,25 @@ defmodule Mix.Tasks.Pepe do
 
   def dispatch(["plugin" | rest]), do: with_config(fn -> plugin_cmd(rest) end)
 
-  # `skill install`/`update`/`search` reach a tap or a registry over the network (needs Req);
-  # list/remove/audit/tap only touch config.json and local files.
-  def dispatch(["skill", sub | rest]) when sub in ["install", "update", "search"],
-    do: with_app([], fn -> skill_cmd([sub | rest]) end)
+  # Marketplace network operations and lifecycle metadata both need the application
+  # (Req for the former, Repo for the latter).
+  def dispatch(["skill", sub | rest])
+      when sub in [
+             "install",
+             "update",
+             "search",
+             "status",
+             "adopt",
+             "release",
+             "pin",
+             "unpin",
+             "archive",
+             "restore",
+             "purge",
+             "log",
+             "curator"
+           ],
+      do: with_app([], fn -> skill_cmd([sub | rest]) end)
 
   def dispatch(["skill" | rest]), do: with_config(fn -> skill_cmd(rest) end)
   def dispatch(["migrate" | rest]), do: with_config(fn -> migrate_cmd(rest) end)
@@ -2140,6 +2155,117 @@ defmodule Mix.Tasks.Pepe do
   defp skill_cmd(["audit"]), do: Enum.each(Pepe.Skills.Marketplace.audit(nil), &print_skill_audit_line/1)
   defp skill_cmd(["audit", name]), do: Enum.each(Pepe.Skills.Marketplace.audit(name), &print_skill_audit_line/1)
 
+  defp skill_cmd(["status", name]) do
+    origin = Pepe.Skills.Ownership.origin(name)
+    stat = Pepe.Skills.Stats.get(name)
+    pinned = stat && stat.pinned
+    state = (stat && stat.state) || if(origin == :missing, do: "missing", else: "active")
+    info("#{name}: origin=#{origin} state=#{state} pinned=#{pinned == true}")
+  end
+
+  defp skill_cmd(["adopt", name]) do
+    if Pepe.Skills.Ownership.user_entry(name) do
+      Pepe.Skills.Stats.adopt(name, skill_cli_actor())
+      Pepe.Skills.Ledger.log(name, "adopt", skill_cli_actor())
+      ok("adopted #{name}; background maintenance may now update it")
+    else
+      error("no user skill named #{name}")
+    end
+  end
+
+  defp skill_cmd(["release", name]) do
+    Pepe.Skills.Stats.release(name)
+    Pepe.Skills.Ledger.log(name, "release", skill_cli_actor())
+    ok("released #{name} from background maintenance")
+  end
+
+  defp skill_cmd([action, name]) when action in ["pin", "unpin"] do
+    if Pepe.Skills.Ownership.origin(name) == :missing do
+      error("no skill named #{name}")
+    else
+      pinned? = action == "pin"
+      Pepe.Skills.Stats.pin(name, pinned?)
+      Pepe.Skills.Ledger.log(name, action, skill_cli_actor())
+      ok("#{action}ned #{name}")
+    end
+  end
+
+  defp skill_cmd(["archive", name]) do
+    case Pepe.Skills.Lifecycle.archive(name, skill_cli_actor()) do
+      {:ok, path} -> ok("archived #{name} at #{path}")
+      {:error, :not_found} -> error("no user skill named #{name}")
+      {:error, reason} -> error("could not archive #{name}: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["restore", name]) do
+    case Pepe.Skills.Lifecycle.restore(name, skill_cli_actor()) do
+      {:ok, path} -> ok("restored #{name} to #{path}")
+      {:error, :exists} -> error("a user skill named #{name} already exists")
+      {:error, :not_archived} -> error("no archived skill named #{name}")
+      {:error, reason} -> error("could not restore #{name}: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["purge", name | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [force: :boolean])
+
+    if opts[:force] do
+      case Pepe.Skills.Lifecycle.purge(name, skill_cli_actor()) do
+        {:ok, count} -> ok("permanently removed #{count} archived copy/copies of #{name}")
+        {:error, :not_archived} -> error("no archived skill named #{name}")
+      end
+    else
+      error("purge is irreversible; re-run with --force")
+    end
+  end
+
+  defp skill_cmd(["lint", name]) do
+    case Pepe.Skills.Lint.skill(name) do
+      {:ok, []} -> ok("#{name}: no lint findings")
+      {:ok, findings} -> info(Pepe.Skills.Lint.format(findings))
+      {:error, :not_found} -> error("no user skill named #{name}")
+    end
+  end
+
+  defp skill_cmd(["log" | rest]) do
+    skill = List.first(rest)
+
+    case Pepe.Skills.Ledger.recent(50, skill) do
+      [] -> info("No skill lifecycle events recorded.")
+      events -> Enum.each(events, &(Pepe.Skills.Ledger.describe(&1) |> info()))
+    end
+  end
+
+  defp skill_cmd(["curator", "backup" | rest]) do
+    reason =
+      Enum.join(rest, " ")
+      |> case do
+        "" -> "manual"
+        value -> value
+      end
+
+    case Pepe.Skills.Backup.create(reason, skill_cli_actor()) do
+      {:ok, id} -> ok("skill backup created: #{id}")
+      {:error, reason} -> error("could not create skill backup: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["curator", "backups"]) do
+    case Pepe.Skills.Backup.list() do
+      [] -> info("No skill backups.")
+      snapshots -> Enum.each(snapshots, &info("  #{&1.id}  #{&1.bytes} bytes"))
+    end
+  end
+
+  defp skill_cmd(["curator", "rollback" | rest]) do
+    case Pepe.Skills.Backup.rollback(List.first(rest), skill_cli_actor()) do
+      {:ok, id} -> ok("restored skill backup #{id}")
+      {:error, :no_snapshot} -> error("no matching skill backup")
+      {:error, reason} -> error("could not restore skill backup: #{inspect(reason)}")
+    end
+  end
+
   defp skill_cmd(["tap", "add", url]) do
     Config.add_skill_tap(url)
     ok("added tap #{url}")
@@ -2161,7 +2287,9 @@ defmodule Mix.Tasks.Pepe do
 
   defp skill_usage,
     do:
-      "usage: mix pepe skill list|search QUERY|install NAME [--force] [--source URL]|update [NAME]|remove NAME|audit [NAME]|tap add|list|remove URL"
+      "usage: mix pepe skill list|search QUERY|install NAME [--force] [--source URL]|update [NAME]|remove NAME|audit [NAME]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|curator backup|backups|rollback [ID]|tap add|list|remove URL"
+
+  defp skill_cli_actor, do: "user:cli"
 
   defp skill_list do
     builtin_and_user = Pepe.Skills.list()

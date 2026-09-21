@@ -220,9 +220,8 @@ defmodule Pepe.Webhooks.WhatsApp do
 
     if is_binary(token) and token != "" do
       with {:ok, url, size} <- media_url(token, id),
-           :ok <- Pepe.Webhooks.Media.within_cap(size),
-           :ok <- https(url) do
-        download(token, url)
+           :ok <- Pepe.Webhooks.Media.within_cap(size) do
+        download_media(url, token)
       end
     else
       {:error, :no_access_token}
@@ -230,6 +229,13 @@ defmodule Pepe.Webhooks.WhatsApp do
   end
 
   def fetch_media(_config, _media), do: {:error, :no_media_id}
+
+  defp download_media(url, token) do
+    case Pepe.Webhooks.Media.Download.get(url, bearer: token) do
+      {:error, :bad_url} -> {:error, :bad_media_url}
+      result -> result
+    end
+  end
 
   # The metadata answer carries `file_size` alongside the url, which is the one chance to
   # refuse an oversized file before paying for it.
@@ -243,23 +249,6 @@ defmodule Pepe.Webhooks.WhatsApp do
 
       {:error, reason} ->
         {:error, reason}
-    end
-  end
-
-  defp download(token, url) do
-    # `decode_body: false` keeps Req from parsing an OGG or a PDF as whatever its
-    # content-type suggests; what is wanted here is the bytes, exactly as sent.
-    case Req.get(url, auth: {:bearer, token}, decode_body: false, receive_timeout: 120_000) do
-      {:ok, %{status: s, body: body}} when s in 200..299 and is_binary(body) -> {:ok, body}
-      {:ok, %{status: s}} -> {:error, {:http, s}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp https(url) do
-    case URI.parse(url) do
-      %URI{scheme: "https", host: h} when is_binary(h) and h != "" -> :ok
-      _ -> {:error, :bad_media_url}
     end
   end
 

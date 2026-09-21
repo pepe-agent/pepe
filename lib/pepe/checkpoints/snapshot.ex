@@ -128,11 +128,15 @@ defmodule Pepe.Checkpoints.Snapshot do
             %{state | partial?: true}
 
           true ->
-            case File.read(path) do
-              {:ok, data} -> put(state, path, %{sha: sha(data), size: size, mode: mode, data: data}, size)
-              {:error, _} -> state
-            end
+            read_and_put(state, path, size, mode)
         end
+    end
+  end
+
+  defp read_and_put(state, path, size, mode) do
+    case File.read(path) do
+      {:ok, data} -> put(state, path, %{sha: sha(data), size: size, mode: mode, data: data}, size)
+      {:error, _} -> state
     end
   end
 
