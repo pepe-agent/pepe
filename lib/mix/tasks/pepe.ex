@@ -130,6 +130,8 @@ defmodule Mix.Tasks.Pepe do
       mix pepe browser install                  # host-level help for the `browser` agent tool
       mix pepe plugin list|install|remove ...     # user plugins (tools/channels) loaded at runtime
       mix pepe skill list|search|install|update ... # skill marketplace: taps + the bundled registry
+      mix pepe skill curator status|run|pause|...  # the curator that tidies agent-written skills (see: skill help)
+      mix pepe skill log|undo ID|archived|adopt|pin  # what changed in skills, put it back, keep some out of reach
       mix pepe migrate SOURCE [--dry-run]         # import models/agents from another runtime
       mix pepe eval [SUITE]                     # run an agent eval suite
       mix pepe mcp add|list|tools|login|remove ... # external tool servers (MCP: local or remote)
@@ -322,6 +324,9 @@ defmodule Mix.Tasks.Pepe do
              "restore",
              "purge",
              "log",
+             "undo",
+             "archived",
+             "unmanaged",
              "curator"
            ],
       do: with_app([], fn -> skill_cmd([sub | rest]) end)
@@ -2156,29 +2161,23 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp skill_cmd(["adopt", name]) do
-    if Pepe.Skills.Ownership.user_entry(name) do
-      Pepe.Skills.Stats.adopt(name, skill_cli_actor())
-      Pepe.Skills.Ledger.log(name, "adopt", skill_cli_actor())
-      ok("adopted #{name}; background maintenance may now update it")
-    else
-      error("no user skill named #{name}")
+    case Pepe.Skills.Lifecycle.adopt(name, skill_cli_actor()) do
+      :ok -> ok("adopted #{name}; background maintenance may now update it")
+      {:error, message} -> error(message)
     end
   end
 
   defp skill_cmd(["release", name]) do
-    Pepe.Skills.Stats.release(name)
-    Pepe.Skills.Ledger.log(name, "release", skill_cli_actor())
-    ok("released #{name} from background maintenance")
+    case Pepe.Skills.Lifecycle.release(name, skill_cli_actor()) do
+      :ok -> ok("released #{name} from background maintenance")
+      {:error, message} -> error(message)
+    end
   end
 
   defp skill_cmd([action, name]) when action in ["pin", "unpin"] do
-    if Pepe.Skills.Ownership.origin(name) == :missing do
-      error("no skill named #{name}")
-    else
-      pinned? = action == "pin"
-      Pepe.Skills.Stats.pin(name, pinned?)
-      Pepe.Skills.Ledger.log(name, action, skill_cli_actor())
-      ok("#{action}ned #{name}")
+    case Pepe.Skills.Lifecycle.pin(name, action == "pin", skill_cli_actor()) do
+      :ok -> ok("#{action}ned #{name}")
+      {:error, message} -> error(message)
     end
   end
 
@@ -2225,7 +2224,41 @@ defmodule Mix.Tasks.Pepe do
 
     case Pepe.Skills.Ledger.recent(50, skill) do
       [] -> info("No skill lifecycle events recorded.")
-      events -> Enum.each(events, &(Pepe.Skills.Ledger.describe(&1) |> info()))
+      events -> Enum.each(events, &(Pepe.Skills.Ledger.describe_with_id(&1) |> info()))
+    end
+  end
+
+  defp skill_cmd(["undo", id | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [force: :boolean])
+
+    case Pepe.Skills.Manage.undo(id, skill_cli_actor(), force: opts[:force] == true) do
+      {:ok, result} -> ok(result.message)
+      {:error, message} -> error(message)
+    end
+  end
+
+  defp skill_cmd(["undo"]), do: error("usage: mix pepe skill undo ID [--force]  (ids are the first column of `skill log`)")
+
+  defp skill_cmd(["archived"]) do
+    case Pepe.Skills.Lifecycle.archived() do
+      [] ->
+        info("No archived skills.")
+
+      archived ->
+        Enum.each(archived, &info("  #{green(&1.name)} #{dim("archived by #{&1.by}, restore: mix pepe skill restore #{&1.name}")}"))
+    end
+  end
+
+  defp skill_cmd(["unmanaged"]) do
+    names = for {name, _summary} <- Pepe.Skills.list(), Pepe.Skills.Ownership.origin(name) == :user, do: name
+
+    case names do
+      [] ->
+        info("Every skill in your directory is either installed, or already in the curator's care.")
+
+      _ ->
+        info(bold("skills the curator leaves alone") <> dim(" (yours; `mix pepe skill adopt NAME` hands one over)"))
+        Enum.each(names, &info("  #{&1}"))
     end
   end
 
@@ -2275,11 +2308,86 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp skill_cmd(["curator" | rest]), do: skill_curator_cmd(rest)
+
   defp skill_cmd(_), do: error(skill_usage())
+
+  defp skill_curator_cmd(["status"]), do: Pepe.Skills.Curator.Status.get() |> Pepe.Skills.Curator.Status.lines() |> Enum.each(&info/1)
+  defp skill_curator_cmd([]), do: skill_curator_cmd(["status"])
+
+  defp skill_curator_cmd(["run" | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [dry_run: :boolean, consolidate: :boolean])
+    run_opts = [dry_run: opts[:dry_run] == true] ++ if(opts[:consolidate], do: [consolidate: true], else: [])
+
+    if opts[:dry_run], do: info(dim("dry run: nothing will be changed"))
+    {:ok, report} = Pepe.Skills.Curator.run(run_opts)
+    ok(report["summary"])
+    info(dim("report: #{report["report"]}"))
+    if report["backup"], do: info(dim("snapshot before changes: #{report["backup"]} (mix pepe skill curator rollback #{report["backup"]})"))
+    if opts[:dry_run] && get_in(report, ["consolidation", "model_summary"]), do: info("\n" <> report["consolidation"]["model_summary"])
+  end
+
+  defp skill_curator_cmd(["pause"]) do
+    Pepe.Skills.Curator.State.set_paused(true)
+    ok("curator paused; it will not run on its own until `mix pepe skill curator resume`")
+  end
+
+  defp skill_curator_cmd(["resume"]) do
+    Pepe.Skills.Curator.State.set_paused(false)
+    ok("curator resumed")
+  end
+
+  defp skill_curator_cmd(["usage"]) do
+    case Pepe.Skills.Curator.Status.usage() do
+      [] ->
+        info("No skill is in the curator's care yet (it looks after skills an agent wrote on its own).")
+
+      rows ->
+        info(bold("skills in the curator's care") <> dim("  state, idle days, used / opened / edited / failed"))
+
+        Enum.each(
+          rows,
+          &info(
+            "  #{green(&1.name)}  #{&1.state}  #{&1.idle_days}d  #{&1.use_count} / #{&1.view_count} / #{&1.patch_count} / #{&1.fail_count}"
+          )
+        )
+    end
+  end
+
+  defp skill_curator_cmd(["reports"]) do
+    case Pepe.Skills.Curator.reports() do
+      [] -> info("No curator reports yet.")
+      ids -> Enum.each(ids, &info("  #{&1}"))
+    end
+  end
+
+  defp skill_curator_cmd(["report" | rest]) do
+    case Pepe.Skills.Curator.read_report(List.first(rest)) do
+      {:ok, text} -> info(text)
+      {:error, :not_found} -> error("no such report; `mix pepe skill curator reports` lists them")
+    end
+  end
+
+  defp skill_curator_cmd(["settings"]) do
+    Enum.each(Pepe.Skills.Curator.Settings.all(), fn {key, value} -> info("  #{key} = #{value}") end)
+  end
+
+  defp skill_curator_cmd(["set", key, value]) do
+    case Pepe.Skills.Curator.Settings.put(key, value) do
+      :ok -> ok("#{key} = #{Pepe.Skills.Curator.Settings.get(key)}")
+      {:error, message} -> error(message)
+    end
+  end
+
+  defp skill_curator_cmd(_),
+    do:
+      error(
+        "usage: mix pepe skill curator status|run [--dry-run] [--consolidate]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]"
+      )
 
   defp skill_usage,
     do:
-      "usage: mix pepe skill list|search QUERY|install NAME [--force] [--source URL]|update [NAME]|remove NAME|audit [NAME]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|curator backup|backups|rollback [ID]|tap add|list|remove URL"
+      "usage: mix pepe skill list|search QUERY|install NAME [--force] [--source URL]|update [NAME]|remove NAME|audit [NAME]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|undo ID [--force]|archived|unmanaged|curator status|run|pause|resume|usage|reports|report|settings|set|backup|backups|rollback|tap add|list|remove URL"
 
   defp skill_cli_actor, do: "user:cli"
 
@@ -2379,6 +2487,33 @@ defmodule Mix.Tasks.Pepe do
       skill remove NAME                   delete a marketplace-installed skill
       skill audit [NAME]                  re-scan installed skill(s) in place
       skill tap add|list|remove URL       manage extra registries beyond the bundled default
+
+    Skills an agent wrote on its own (background review) are looked after by the curator;
+    yours, installed ones and pinned ones are never touched:
+
+      skill log [NAME]                    every change, newest first; the first column is its id
+      skill undo ID [--force]             put back what that change replaced (refuses when
+                                         the file changed since, unless --force)
+      skill archived                      what was archived, and how to restore it
+      skill unmanaged                     your skills, which the curator leaves alone
+      skill adopt|release NAME            hand a skill of yours to the curator, or take it back
+      skill pin|unpin NAME                a pinned skill is changed only by you
+      skill curator status                on/off, last and next run, what is in its care
+      skill curator run [--dry-run] [--consolidate]
+                                         run now; --dry-run only reports, --consolidate adds
+                                         the model pass that merges overlapping skills
+      skill curator pause|resume          stop or restart the automatic runs
+      skill curator usage                 use counts and idle days of each skill in its care
+      skill curator reports | report [ID] the saved run reports
+      skill curator settings | set KEY VALUE
+                                         enabled, interval_hours, min_idle_hours,
+                                         stale_after_days, archive_after_days, consolidate
+      skill curator backup|backups|rollback [ID]
+                                         whole-library snapshots (one is taken before any run
+                                         that changes something)
+
+    The curator never deletes: it marks unused skills stale, then archives them, and
+    `skill restore NAME` brings one back. Only `skill purge NAME --force` is irreversible.
 
     Every install goes through the same Sentinel scan a hand-installed skill already gets;
     a dangerous verdict is refused unless --force. Trust is "official" only for the bundled,
@@ -4862,6 +4997,7 @@ defmodule Mix.Tasks.Pepe do
       {:plugin, "Plugins - install a channel or tool"},
       {:privacy, "Privacy - redact PII before it reaches a model"},
       {:media, "Media - voice replies (TTS) and voice-note transcription"},
+      {:skills, "Skills - the curator that tidies skills agents wrote on their own"},
       {:language, "Language for system messages"},
       {:timezone, "Default timezone for scheduled tasks"},
       {:sandbox, "Sandbox - isolate the shell tools (bash / run_script)"},
@@ -4888,6 +5024,7 @@ defmodule Mix.Tasks.Pepe do
   defp handle_config_action(:plugin), do: then_menu(&setup_plugin/0)
   defp handle_config_action(:privacy), do: then_menu(&setup_privacy/0)
   defp handle_config_action(:media), do: then_menu(&setup_media/0)
+  defp handle_config_action(:skills), do: then_menu(&setup_skills/0)
   defp handle_config_action(:language), do: then_menu(&setup_language/0)
   defp handle_config_action(:timezone), do: then_menu(&setup_timezone/0)
   defp handle_config_action(:sandbox), do: then_menu(&setup_sandbox/0)
@@ -5016,6 +5153,43 @@ defmodule Mix.Tasks.Pepe do
     info(dim("Configure them in the dashboard (Privacy tab), or with: mix pepe hooks"))
 
     if Owl.IO.confirm(message: "Show the current hooks now?", default: false), do: hooks_cmd(["list"])
+  end
+
+  defp setup_skills do
+    info(
+      bold("Skills") <>
+        dim(" - the curator tidies skills an agent wrote on its own: unused ones are marked stale, then archived (never deleted).")
+    )
+
+    info(dim("Skills you wrote, installed ones and pinned ones are never touched. `mix pepe skill curator status` shows what it is doing."))
+
+    enabled =
+      ask_yes?(
+        "Let the curator run on its own?" <> dim(" (currently #{if Pepe.Skills.Curator.Settings.enabled?(), do: "on", else: "off"})")
+      )
+
+    put_curator_setting("enabled", enabled)
+
+    if enabled do
+      put_curator_days("stale_after_days", "Mark a skill stale after how many unused days?")
+      put_curator_days("archive_after_days", "Archive it after how many unused days?")
+
+      merge? = ask_yes?("Also merge overlapping skills into broader ones? (costs a model run each time)")
+      put_curator_setting("consolidate", merge?)
+    end
+  end
+
+  defp put_curator_days(key, question) do
+    current = Pepe.Skills.Curator.Settings.get(key)
+    answer = Pepe.TUI.input(label: "#{question} [#{current}]", optional: true) |> blank_default(to_string(current))
+    put_curator_setting(key, answer)
+  end
+
+  defp put_curator_setting(key, value) do
+    case Pepe.Skills.Curator.Settings.put(key, value) do
+      :ok -> ok("#{key} = #{Pepe.Skills.Curator.Settings.get(key)}")
+      {:error, message} -> error(message)
+    end
   end
 
   defp setup_media do

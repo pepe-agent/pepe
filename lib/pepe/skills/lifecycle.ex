@@ -63,6 +63,47 @@ defmodule Pepe.Skills.Lifecycle do
     end
   end
 
+  @doc "Hand a skill of yours to the curator (it becomes agent-owned: background maintenance may update it)."
+  @spec adopt(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def adopt(name, actor) do
+    case Ownership.origin(name) do
+      :user ->
+        Stats.adopt(name, actor)
+        Ledger.log(name, "adopt", actor)
+
+      :agent ->
+        {:error, "'#{name}' is already in the curator's care."}
+
+      :missing ->
+        {:error, "no skill of yours named '#{name}'."}
+
+      other ->
+        {:error, "'#{name}' is #{other} and not yours to hand over."}
+    end
+  end
+
+  @doc "Take a skill back out of background maintenance (it becomes yours)."
+  @spec release(String.t(), String.t()) :: :ok | {:error, String.t()}
+  def release(name, actor) do
+    if Ownership.origin(name) == :agent do
+      Stats.release(name)
+      Ledger.log(name, "release", actor)
+    else
+      {:error, "'#{name}' is not in the curator's care."}
+    end
+  end
+
+  @doc "Pin or unpin a skill: a pinned skill is changed only by a person, present."
+  @spec pin(String.t(), boolean(), String.t()) :: :ok | {:error, String.t()}
+  def pin(name, pinned?, actor) do
+    if Ownership.origin(name) == :missing do
+      {:error, "no skill named '#{name}'."}
+    else
+      Stats.pin(name, pinned?)
+      Ledger.log(name, if(pinned?, do: "pin", else: "unpin"), actor)
+    end
+  end
+
   @doc "Every archived skill, newest first."
   @spec archived() :: [archived()]
   def archived do

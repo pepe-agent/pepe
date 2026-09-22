@@ -162,6 +162,79 @@ defmodule Pepe.Agent.SkillLearning do
     end
   end
 
+  @doc """
+  Which skills this turn read, split into those that then worked and those that did not:
+  `%{used: [name], failed: [name]}`. A skill is *failed* when a tool other than `skill`
+  errored after it was opened, the same evidence `refine_target/1` uses, but kept per skill
+  here so several skills read in one turn are each counted once. Names are the catalog's own.
+  """
+  @spec outcomes([map()]) :: %{used: [String.t()], failed: [String.t()]}
+  def outcomes(turn) do
+    args = tool_call_args(turn)
+
+    {_open, read, failed} =
+      turn
+      |> Enum.filter(&(&1["role"] == "tool"))
+      |> Enum.reduce({nil, MapSet.new(), MapSet.new()}, &outcome_step(&1, &2, args))
+
+    %{used: read |> MapSet.difference(failed) |> Enum.sort(), failed: Enum.sort(failed)}
+  end
+
+  defp outcome_step(msg, {open, read, failed}, args) do
+    case skill_read(msg, args) do
+      {:ok, skill} ->
+        {skill, MapSet.put(read, skill), failed}
+
+      :none ->
+        if open && msg["name"] != "skill" && error_result?(msg), do: {nil, read, MapSet.put(failed, open)}, else: {open, read, failed}
+    end
+  end
+
+  @doc """
+  Count what the turn that just ended taught about the skills it opened: one *use* for each
+  that then worked, one *fail* for each that led to an error. These counters are what the
+  curator's staleness clock and the "this skill keeps failing" signal read. Silent and
+  best-effort (`Pepe.Skills.Stats` never raises), and inert for a background maintenance run,
+  whose reads are not real use.
+  """
+  @spec record_outcomes([map()], map()) :: :ok
+  def record_outcomes(messages, ctx) when is_list(messages) do
+    if is_binary(ctx[:review_run]) do
+      :ok
+    else
+      %{used: used, failed: failed} = messages |> current_turn() |> outcomes()
+      Enum.each(used, &record_outcome(&1, :use))
+      Enum.each(failed, &record_outcome(&1, :fail))
+    end
+  end
+
+  def record_outcomes(_messages, _ctx), do: :ok
+
+  defp record_outcome(name, kind) do
+    case Pepe.Skills.Catalog.find(name) do
+      {:ok, %{name: canonical}} -> if kind == :use, do: Pepe.Skills.Stats.bump_use(canonical), else: Pepe.Skills.Stats.bump_fail(canonical)
+      _ -> :ok
+    end
+  end
+
+  @doc """
+  Whether the turn just ended is worth a background review, and of what: `:save` (a
+  procedure worked out from scratch), `{:refine, skill}` (a skill that led it wrong), or
+  `:none`. The same measured bar as the in-turn offer, so the two never disagree about what
+  counts as worth keeping.
+  """
+  @spec review_signal([map()]) :: :save | {:refine, String.t()} | :none
+  def review_signal(turn) do
+    case refine_target(turn) do
+      {:ok, skill} -> {:refine, skill}
+      :none -> if worth_saving?(turn), do: :save, else: :none
+    end
+  end
+
+  @doc "Did this turn take in outside content (a fetched page, a search result, an attachment)?"
+  @spec tainted?([map()]) :: boolean()
+  def tainted?(turn), do: Enum.any?(turn, &Pepe.Security.ExternalContent.marked?(&1["content"]))
+
   # Walks this turn's tool results in order, holding {open, failed}: `open` is the most
   # recently read skill not yet followed by anything, `failed` is the last skill that
   # *was* followed by a failure. A later skill read must not erase an earlier failure

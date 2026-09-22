@@ -23,11 +23,20 @@ defmodule Pepe.Skills.Ledger do
   @doc "Record `action` on `skill` by `actor`. `detail` is any JSON-encodable map or string."
   @spec log(String.t(), String.t(), String.t(), map() | String.t() | nil) :: :ok
   def log(skill, action, actor, detail \\ nil) do
+    record(skill, action, actor, detail)
+    :ok
+  end
+
+  @doc "Like `log/4`, and returns the new event's id (`nil` when the row could not be written)."
+  @spec record(String.t(), String.t(), String.t(), map() | String.t() | nil) :: String.t() | nil
+  def record(skill, action, actor, detail \\ nil) do
     Stats.safe(
       fn ->
+        id = new_id()
+
         %Event{}
         |> Event.changeset(%{
-          id: new_id(),
+          id: id,
           at: System.system_time(:microsecond),
           skill: skill,
           action: action,
@@ -36,9 +45,9 @@ defmodule Pepe.Skills.Ledger do
         })
         |> Repo.insert!()
 
-        :ok
+        id
       end,
-      :ok
+      nil
     )
   end
 
@@ -49,6 +58,32 @@ defmodule Pepe.Skills.Ledger do
     query = if skill, do: from(e in query, where: e.skill == ^skill), else: query
     Stats.safe(fn -> Repo.all(query) end, [])
   end
+
+  @doc "Every event by `actor` written at or after `at` (a `System.system_time(:microsecond)` value), oldest first."
+  @spec since(integer(), String.t()) :: [Event.t()]
+  def since(at, actor) when is_integer(at) do
+    query = from(e in Event, where: e.at >= ^at and e.actor == ^actor, order_by: [asc: e.at, asc: e.id])
+    Stats.safe(fn -> Repo.all(query) end, [])
+  end
+
+  @doc "The event with this id, or `nil`."
+  @spec get(String.t()) :: Event.t() | nil
+  def get(id) when is_binary(id), do: Stats.safe(fn -> Repo.get(Event, id) end, nil)
+
+  @doc "The structured `detail` of an event as a map (`%{}` when it was plain text or empty)."
+  @spec detail(Event.t()) :: map()
+  def detail(%Event{detail: detail}) when is_binary(detail) do
+    case Jason.decode(detail) do
+      {:ok, %{} = map} -> map
+      _ -> %{}
+    end
+  end
+
+  def detail(_), do: %{}
+
+  @doc "Like `describe/1`, led by the event id so a person can name it to `pepe skill undo`."
+  @spec describe_with_id(Event.t()) :: String.t()
+  def describe_with_id(%Event{} = e), do: "#{e.id}  #{describe(e)}"
 
   @doc "One line for an event, for CLI and dashboard listings."
   @spec describe(Event.t()) :: String.t()

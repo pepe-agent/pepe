@@ -63,6 +63,12 @@ defmodule Pepe.Permissions.Risk do
   defp path_hints(name, %{"path" => p} = args) when name in ["write_file", "edit_file"],
     do: writes_outside(p, args)
 
+  # `skill_manage` always writes the skills directory, whatever the action: the same
+  # `:writes_skill` risk a file write into `skills/` earns, and `:flagged_skill` on top when
+  # what it is writing trips the scanner (`Pepe.Skills.Manage` scans again, so this is the
+  # gate's view of it, not the only check).
+  defp path_hints("skill_manage", args), do: [:writes_skill | flagged_skill_args(args)]
+
   defp path_hints("move_file", %{"from" => from, "to" => to}),
     do: Enum.uniq(writes_outside(from) ++ writes_outside(to))
 
@@ -106,6 +112,12 @@ defmodule Pepe.Permissions.Risk do
   # becomes one more line in the authorize prompt.
   defp flagged_skill(args) do
     text = Enum.map_join(["content", "new_string"], "\n", &to_string(args[&1] || ""))
+    if Pepe.Skills.Sentinel.scan(text).verdict == :danger, do: [:flagged_skill], else: []
+  end
+
+  # The same scan over every field `skill_manage` can carry text in.
+  defp flagged_skill_args(args) when is_map(args) do
+    text = Enum.map_join(["content", "new_string", "file_content"], "\n", &to_string(args[&1] || ""))
     if Pepe.Skills.Sentinel.scan(text).verdict == :danger, do: [:flagged_skill], else: []
   end
 
