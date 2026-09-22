@@ -1,0 +1,9 @@
+reviews:
+  path_filters:
+    - "!.agents/skills/autofix/**"
+    - "!.agents/skills/code-review/**"
+    - "!.claude/agent-memory/**"
+    - "!.claude/skills/autofix/**"
+    - "!.claude/skills/code-review/**"
+    - "!.claude/worktrees/**"
+    - "!skills-lock.json"
