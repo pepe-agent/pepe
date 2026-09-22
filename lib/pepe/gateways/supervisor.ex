@@ -13,6 +13,7 @@ defmodule Pepe.Gateways.Supervisor do
 
   alias Pepe.Config
   alias Pepe.Gateways.DiscordSupervisor
+  alias Pepe.Gateways.DiscordWatchdog
   alias Pepe.Gateways.PluginSupervisor
   alias Pepe.Gateways.Telegram
 
@@ -62,7 +63,8 @@ defmodule Pepe.Gateways.Supervisor do
       telegram_specs() ++
         [
           Supervisor.child_spec(PluginSupervisor, restart: :transient),
-          Supervisor.child_spec(DiscordSupervisor, restart: :transient)
+          Supervisor.child_spec(DiscordSupervisor, restart: :transient),
+          {DiscordWatchdog, DiscordSupervisor}
         ]
     else
       []

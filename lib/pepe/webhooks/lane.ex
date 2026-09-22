@@ -40,6 +40,14 @@ defmodule Pepe.Webhooks.Lane do
 
   defstruct key: nil, queue: :queue.new(), resolving: nil, requests: nil
 
+  # A defensive backstop, not the real bound: resolving is already bounded by
+  # Pepe.Webhooks.Media.Download's own ~120s and Pepe.Media's own ~60s per step. This only
+  # protects against a future unbounded step somewhere in that chain freezing this
+  # conversation's lane forever - the queue would fill, and it would never idle-exit.
+  # `:webhook_lane_deadline_ms` exists for a test that wants to see it fire without waiting
+  # three real minutes; nothing else sets it.
+  defp job_deadline_ms, do: Application.get_env(:pepe, :webhook_lane_deadline_ms, 180_000)
+
   @doc """
   Put `job` (`%{entry:, mod:, message:, callers:}`) at the back of conversation `key`'s
   lane, starting the lane if it is not running. `:ok`, or `{:error, :full}` when the lane
@@ -83,17 +91,35 @@ defmodule Pepe.Webhooks.Lane do
 
   @impl true
   # The message being resolved finished: carry on with what it became.
-  def handle_info({ref, result}, %{resolving: %{task: %{ref: ref}, job: job}} = state) do
+  def handle_info({ref, result}, %{resolving: %{task: %{ref: ref}, job: job, deadline: deadline}} = state) do
     Process.demonitor(ref, [:flush])
+    Process.cancel_timer(deadline)
     state = pump(begin(%{state | resolving: nil}, job, result))
     {:noreply, state, timeout(state)}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, reason}, %{resolving: %{task: %{ref: ref}, job: job}} = state) do
+  def handle_info(
+        {:DOWN, ref, :process, _pid, reason},
+        %{resolving: %{task: %{ref: ref}, job: job, deadline: deadline}} = state
+      ) do
+    Process.cancel_timer(deadline)
     Logger.warning("[webhooks] #{job.entry["slug"]}: resolving a message from #{job.message.from} crashed: #{inspect(reason)}")
     state = pump(%{state | resolving: nil})
     {:noreply, state, timeout(state)}
   end
+
+  # The job in front of the line has been resolving longer than any real step in that chain
+  # should ever take - see @job_deadline_ms. `Task.shutdown/2` also accounts for the task's
+  # own reply or DOWN message, wherever it eventually lands, so nothing further is needed for
+  # either once this runs.
+  def handle_info({:deadline, ref}, %{resolving: %{task: %{ref: ref} = task, job: job}} = state) do
+    Logger.warning("[webhooks] #{job.entry["slug"]}: resolving a message from #{job.message.from} took too long and was stopped")
+    Task.shutdown(task, :brutal_kill)
+    state = pump(%{state | resolving: nil})
+    {:noreply, state, timeout(state)}
+  end
+
+  def handle_info({:deadline, _ref}, state), do: {:noreply, state}
 
   def handle_info(:timeout, state) do
     if idle?(state), do: {:stop, :normal, state}, else: {:noreply, state}
@@ -128,7 +154,8 @@ defmodule Pepe.Webhooks.Lane do
             Pepe.Webhooks.prepare(job)
           end)
 
-        %{state | queue: rest, resolving: %{task: task, job: job}}
+        deadline = Process.send_after(self(), {:deadline, task.ref}, job_deadline_ms())
+        %{state | queue: rest, resolving: %{task: task, job: job, deadline: deadline}}
 
       {:empty, _} ->
         state

@@ -80,11 +80,27 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
       refute Map.has_key?(Config.get_webhook("chat")["config"], "require_mention")
     end
 
-    test "--gateway without a token is refused, and nothing is written" do
-      err = pepe_err(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway"])
+    test "--gateway without a token defaults to an env var reference named for the connection, not a hard error" do
+      pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway"])
 
-      assert err =~ "--bot-token"
-      assert Config.get_webhook("chat") == nil
+      assert Config.get_webhook("chat")["config"]["bot_token"] == "${DISCORD_BOT_TOKEN_CHAT}"
+    end
+
+    test "a --bot-token that isn't a ${ENV_VAR} reference or a vault ref is still accepted, with a warning" do
+      out = pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway", "--bot-token", "sk-literal-value"])
+
+      assert out =~ "doesn't look like a"
+      assert Config.get_webhook("chat")["config"]["bot_token"] == "sk-literal-value"
+    end
+
+    test "a ${ENV_VAR} or vault-ref --bot-token draws no warning" do
+      out = pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway", "--bot-token", "${MY_TOKEN}"])
+      refute out =~ "doesn't look like a"
+
+      pepe(["gateway", "discord", "remove", "chat"])
+
+      out = pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway", "--bot-token", "exec:op read op://vault/item"])
+      refute out =~ "doesn't look like a"
     end
 
     test "a connection with neither slash commands nor the gateway would receive nothing, so it is refused" do
@@ -102,6 +118,23 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
       pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway", "--bot-token", "t"])
       assert pepe_err(["gateway", "discord", "add", "chat", "--agent", "b", "--gateway", "--bot-token", "t"]) =~ "already exists"
       assert Config.get_webhook("chat")["agent"] == "a"
+    end
+
+    test "an admin connection reading channel messages from anyone draws a warning" do
+      out = pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--mode", "admin", "--gateway", "--bot-token", "t"])
+      assert out =~ "warning: this is an admin connection"
+    end
+
+    test "a support connection reading channel messages draws no such warning" do
+      out = pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway", "--bot-token", "t"])
+      refute out =~ "admin connection"
+    end
+
+    test "an admin connection with only slash commands (no --gateway) draws no such warning" do
+      out =
+        pepe(["gateway", "discord", "add", "cmds", "--agent", "a", "--mode", "admin", "--application-id", "123", "--public-key", "abcd"])
+
+      refute out =~ "admin connection"
     end
   end
 
