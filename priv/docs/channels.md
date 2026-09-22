@@ -142,15 +142,35 @@ triggers a `url_verification` handshake, answered synchronously. Subscribe to
 `@mentioned` (the default; `require_mention: "false"` answers every message); a direct
 message always replies.
 
-### Discord (Interactions endpoint)
+### Discord (Interactions endpoint, plus an optional gateway)
 
-Discord runs over slash commands, not a gateway bot. Config: `public_key` (the app's
+By default Discord runs over slash commands only. Config: `public_key` (the app's
 public key, hex, for the required Ed25519 signature check) and `application_id` (used
 to post the follow-up answer). Set the app's "Interactions Endpoint URL" to the
 connection URL and add a slash command with a text option (e.g. `/ask prompt:...`) -
 the option's value is the prompt you receive. Discord demands a synchronous ack within
 3s, so the command is answered with a deferred response and your real reply is posted
 as a follow-up once you finish. A `from` here is the interaction token, not a user id.
+An attachment on the slash command is the only way this endpoint ever sees a file - a
+voice message or image posted directly into a channel is not an interaction at all.
+
+Turning on `receive_channel_messages` (alongside a `bot_token`) opens a second,
+persistent connection: Discord's gateway, a WebSocket the bot holds open for as long as
+it runs. That is what lets an ordinary message typed in a channel, a DM, an @mention, or
+an attachment dropped straight into a channel reach you at all - the interactions
+endpoint above never sees any of those. It goes through the same door as a webhook POST
+(parsed, gated by the allowlist, ordered, answered with the bot's token), so nothing
+about how you're addressed changes, only which messages you're addressed with.
+
+### Attachments on WhatsApp and Discord
+
+A voice note arrives as a transcript, a document arrives with its text extracted, and a
+photo reaches you as an image, the same as Telegram - one shared pipeline, so
+configuring transcription once covers all three. On Discord, that only applies to a
+file that actually reaches you: a slash command's attachment option, or, with the
+gateway connection above enabled, one dropped straight into a channel. A WhatsApp
+sticker is not treated as a message; it is a reaction someone left on something else.
+An attachment over 20MB is refused before it is downloaded, with a reply explaining why.
 
 ### Microsoft Teams (Bot Framework)
 

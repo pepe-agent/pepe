@@ -1,14 +1,21 @@
 ---
 title: Discord
-description: Responda comandos de barra no seu servidor do Discord com um agente do Pepe.
+description: Responda comandos de barra, ou mensagens comuns de canal, no seu servidor do Discord com um agente do Pepe.
 ---
 
 ## Discord
 
-No Discord, as pessoas conversam com o agente através de um comando de barra (`/ask`, por
-exemplo). Como o Discord entrega esses comandos pelo endpoint de Interactions, e não por
-uma conexão persistente, isso se encaixa bem no gateway de webhook do Pepe. A configuração
-é feita pelo assistente guiado (ou direto pelo dashboard):
+O Discord dá ao Pepe duas formas diferentes de receber uma mensagem, e uma conexão pode
+usar uma delas ou as duas:
+
+- Um **comando de barra** (`/ask`, por exemplo), entregue pelo endpoint de Interactions do
+  Discord. Isso se encaixa no gateway de webhook do Pepe do mesmo jeito que qualquer outro
+  provedor: nenhum processo para manter rodando, é o Discord quem chama o seu servidor.
+- Uma **mensagem comum** digitada num canal, numa DM, ou numa resposta, entregue pelo
+  gateway do Discord: um WebSocket que o bot mantém aberto. Isso exige um opt-in e um token
+  de bot (mais abaixo), por ser uma conexão persistente e não uma chamada de webhook.
+
+Comece pelo assistente guiado (ou direto pelo dashboard):
 
 ```bash
 pepe setup
@@ -38,7 +45,39 @@ rota genérica funciona por trás disso.
 
 Dê ao seu comando de barra uma **opção de anexo** e as pessoas podem mandar um arquivo junto: `/ask prompt:o que ele fala? file:<áudio>`. Um áudio é transcrito antes de o agente rodar, um documento chega com o texto já lido, e uma imagem chega como imagem a um modelo com visão. O anexo sozinho já basta, então `/ask file:<áudio>` sem nada digitado também funciona.
 
-Esse é o único caminho que um arquivo tem por aqui. Um endpoint de interações enxerga comandos de barra e mais nada, então um áudio ou um anexo postado direto no canal nunca chega ao Pepe. O Pepe aceita arquivos de até 20 MB, e vale o menor limite entre o Pepe e o Discord: 10 MB numa conta comum ou servidor sem boost, mais com Nitro ou um servidor com boost. Veja [Mensagens de voz](../voice/) e [Documentos](../documents/).
+Esse é o único caminho que um arquivo tem pelo endpoint de Interactions: ele enxerga comandos de barra e mais nada, então um áudio ou um anexo postado direto no canal não chega ao Pepe por aí. Chega pelo outro caminho, pelo gateway: veja **Mensagens comuns de canal** logo abaixo. O Pepe aceita arquivos de até 20 MB por padrão (`max_attachment_mb` na conexão aumenta ou diminui esse limite), e vale o menor entre o limite do Pepe e o limite de upload do próprio Discord: 10 MB numa conta comum ou servidor sem boost, mais com Nitro ou um servidor com boost. Veja [Mensagens de voz](../voice/) e [Documentos](../documents/).
+
+### Mensagens comuns de canal
+
+Uma conexão também pode responder a uma mensagem digitada direto num canal, uma foto solta
+nele, um áudio gravado ali mesmo, ou uma DM para o bot, não só um comando de barra. Isso
+exige um opt-in próprio, porque significa que o Pepe mantém uma conexão persistente com o
+gateway do Discord, em vez de só responder chamadas de webhook:
+
+```bash
+pepe gateway discord add support --agent atendimento --gateway --bot-token '${DISCORD_BOT_TOKEN}'
+```
+
+ou os campos equivalentes no dashboard (uma conexão pode ter `--application-id`/`--public-key`
+para comandos de barra e `--gateway`/`--bot-token` para mensagens de canal ao mesmo tempo).
+O `mix pepe serve` roda a conexão dos dois jeitos. Flags:
+
+- `--gateway`: liga esse modo.
+- `--bot-token '${ENV}'`: o token do bot, tirado do Discord Developer Portal, guardado como
+  `${ENV_VAR}`. Ative também a intent **Message Content** na página do Bot do app, ou o
+  Discord não entrega o texto de uma mensagem que não mencionar o bot.
+- `--no-require-mention`: num servidor, por padrão o bot só responde a uma mensagem que o
+  @mencione ou responda a algo que ele disse. Passe essa flag para responder a qualquer
+  mensagem num canal que ele consiga ver. Numa DM, o bot sempre responde, independente
+  dessa flag.
+- `--max-attachment-mb N`: aumenta ou diminui o limite padrão de 20 MB para essa conexão.
+
+Anexos da própria mensagem, da mensagem que ela responde (assim dá para responder "o que ele
+fala?" depois que o áudio já chegou), e de uma mensagem encaminhada ao bot contam todos, e
+passam pelo mesmo tratamento de áudio-para-transcrição, documento-para-texto,
+imagem-para-visão que um anexo de comando de barra. As mensagens de uma conexão são
+respondidas na ordem em que o Discord as entregou. Se a conexão cair, ela reconecta e
+retoma sozinha, sem perder nada do que foi dito no intervalo.
 
 ### Trocando de modelo
 

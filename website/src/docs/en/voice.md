@@ -5,7 +5,7 @@ description: A voice note arrives as text. Transcription happens at ingestion, b
 
 ## Voice messages
 
-Send a voice note on Telegram or WhatsApp, or attach one to a slash command on Discord, and the agent receives **text**. The
+Send a voice note on Telegram or WhatsApp, or on Discord (as a slash command's attachment, or spoken straight into a channel the bot listens to), and the agent receives **text**. The
 audio is transcribed on the way in, before a session exists and before any routing
 decision is taken, so what reaches the agent is an ordinary message.
 
@@ -36,11 +36,12 @@ Two things worth knowing:
   Graph API with the same access token the connection already uses, so there is nothing
   extra to configure. Meta caps inbound media by type (16 MB for audio, 5 MB for
   images, 100 MB for documents), and Pepe's own 20 MB cap applies on top.
-- **Discord** only sees files attached to a **slash command**, because the connection is
-  an interactions endpoint rather than a gateway bot. Give your command an attachment
-  option and `/ask file:<clip>` works, with or without anything typed alongside it. A
-  voice message recorded straight into a Discord channel never reaches the endpoint at
-  all, so it cannot be transcribed.
+- **Discord** has two separate routes, and a connection can offer either or both. A
+  slash command's **attachment option** works on any connection: give your command one
+  and `/ask file:<clip>` works, with or without anything typed alongside it. A voice
+  message recorded straight into a channel, or dropped into a DM, needs the connection's
+  `--gateway`/`--bot-token` opt-in (see [Discord](../discord/)); without it, that message
+  never reaches Pepe and cannot be transcribed.
 
 Slack, Microsoft Teams and Google Chat still take text only.
 
