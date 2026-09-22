@@ -181,6 +181,10 @@ defmodule PepeWeb.DashUI do
   # the plain, always-open <div> every existing caller already renders.
   attr :collapsible, :boolean, default: false
   attr :open, :boolean, default: false
+  # A stable id for a collapsible section, so the hook below can tell "this is the same
+  # <details> as last render" across a phx-change patch. Required only when collapsible;
+  # a plain, non-collapsible section has no open/closed state to preserve.
+  attr :id, :string, default: nil
   slot :inner_block, required: true
 
   @doc """
@@ -196,7 +200,12 @@ defmodule PepeWeb.DashUI do
       </div>
       {render_slot(@inner_block)}
     </div>
-    <details :if={@collapsible} open={@open} class="group rounded-xl border border-zinc-800/80 bg-zinc-900/30">
+    <%!-- `open` only sets the INITIAL state: @open never changes after mount, but every other
+          field in this same form re-renders this section on every phx-change (checking a box
+          elsewhere in the form included), and without help LiveView's patch would reassert
+          `open={@open}` and slam shut whatever the operator had opened by hand. The hook below
+          remembers the section's live open/closed state across patches instead. --%>
+    <details :if={@collapsible} open={@open} id={@id} phx-hook=".KeepOpen" class="group rounded-xl border border-zinc-800/80 bg-zinc-900/30">
       <summary class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-zinc-200 marker:hidden [&::-webkit-details-marker]:hidden sm:px-6 sm:py-4">
         {@title}
         <.icon name="hero-chevron-down" class="size-4 shrink-0 text-zinc-500 transition group-open:rotate-180" />
@@ -205,6 +214,17 @@ defmodule PepeWeb.DashUI do
         {render_slot(@inner_block)}
       </div>
     </details>
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".KeepOpen">
+      export default {
+        mounted() {
+          this.userOpen = this.el.open
+          this.el.addEventListener("toggle", () => { this.userOpen = this.el.open })
+        },
+        updated() {
+          this.el.open = this.userOpen
+        }
+      }
+    </script>
     """
   end
 
