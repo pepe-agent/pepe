@@ -4,8 +4,8 @@ defmodule Pepe.Gateways.TUI do
 
   Like `mix pepe run`, but it *holds* the session: the conversation keeps context
   across turns and the same slash commands as the other gateways work - `/new`,
-  `/undo`, `/rewind`, `/compact`, `/status`, `/agent`, `/models`, `/model`, `/help`,
-  `/exit`.
+  `/undo`, `/rewind`, `/compact`, `/status`, `/agent`, `/models`, `/model`, `/skills`,
+  `/skill`, `/help`, `/exit`, and every installed skill as its own command (`/deploy staging`).
   Replies stream to stdout and risky tools prompt through the shared arrow-key
   permission menu (`Pepe.Permissions.Prompt`), scoped to the console session.
 
@@ -25,6 +25,7 @@ defmodule Pepe.Gateways.TUI do
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
+  alias Pepe.Skills.Commands
 
   @default_session_key "tui:local"
 
@@ -386,16 +387,56 @@ defmodule Pepe.Gateways.TUI do
     end
   end
 
+  defp run_command(key, "skills", _rest), do: info(skills_text(key))
+
+  defp run_command(key, "skill", "") do
+    info(skills_text(key))
+  end
+
+  defp run_command(key, "skill", words) do
+    [name | rest] = String.split(words, ~r/\s+/, parts: 2)
+    run_skill(key, name, Enum.join(rest))
+  end
+
   defp run_command(_key, "help", _rest) do
     info(
       gettext("Commands:") <>
-        "\n/new  /undo  /rewind <n>  /retry  /compact  /learn  /usage  /status  /agent <name>  /models  /model <name> [session|global]  /help  /exit"
+        "\n/new  /undo  /rewind <n>  /retry  /compact  /learn  /usage  /status  /agent <name>  /models  /model <name> [session|global]  /skills  /skill <name> [input]  /help  /exit"
     )
   end
 
-  defp run_command(_key, cmd, _rest) do
-    info(gettext("Unknown command: /%{cmd}", cmd: cmd))
+  # An unknown command might be an installed skill, offered as its own command.
+  defp run_command(key, cmd, rest) do
+    case Commands.find(cmd, skill_opts(key)) do
+      {:ok, %{name: name}} -> say(key, Commands.instruction(name, rest))
+      :none -> info(gettext("Unknown command: /%{cmd}", cmd: cmd))
+    end
   end
+
+  # The skills this console's agent is offered, one per line with what it still needs.
+  defp skills_text(key) do
+    case Commands.list(skill_opts(key)) do
+      [] ->
+        gettext("No skills are available yet.")
+
+      skills ->
+        gettext("Available skills (run with /skill <name>):") <> "\n" <> Enum.map_join(skills, "\n", &skill_line/1)
+    end
+  end
+
+  defp skill_line(%{name: name, summary: summary, needs: needs}),
+    do: "- #{name}: #{summary}" <> if(needs, do: " (#{needs})", else: "")
+
+  # A skill runs as an ordinary turn: the agent is told to carry it out and reads it through
+  # its own `skill` tool, so it is subject to the same trust marking as everywhere else.
+  defp run_skill(key, name, input) do
+    case Commands.find(name, skill_opts(key)) do
+      {:ok, %{name: skill}} -> say(key, Commands.instruction(skill, input))
+      :none -> info(gettext("Unknown skill: %{name}", name: name))
+    end
+  end
+
+  defp skill_opts(key), do: [agent: Session.status(key).agent, channel: key |> String.split(":", parts: 2) |> hd()]
 
   # No trainers/locked distinction here (single-operator console) - always the
   # `:global`-eligible ask-flow, same reasoning as the dashboard chat.

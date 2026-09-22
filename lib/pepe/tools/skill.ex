@@ -24,15 +24,19 @@ defmodule Pepe.Tools.Skill do
 
   @impl true
   def run(%{"name" => name}, ctx) when is_binary(name) do
-    opts = [cwd: ctx[:cwd], channel: channel(ctx), agent: ctx[:agent], offer: false]
+    # An editor's open project (`cwd_override`) is where a trusted repository's own skills live.
+    opts = [cwd: ctx[:cwd_override] || ctx[:cwd], channel: channel(ctx), agent: ctx[:agent], offer: false]
 
-    case Pepe.Skills.read(name, opts) do
-      {:ok, content} ->
+    case Pepe.Skills.fetch(name, opts) do
+      {:ok, skill, content} ->
         # A maintenance run reading a skill is not the skill being used: counting it would keep
         # every skill looking active forever (the curator's staleness clock reads these).
-        if is_nil(ctx[:review_run]), do: Pepe.Skills.Stats.bump_view(name)
-        mark_read(ctx, name, opts)
-        {:ok, mark_if_community(name, content)}
+        if is_nil(ctx[:review_run]), do: Pepe.Skills.Stats.bump_view(skill.name)
+        mark_read(ctx, skill.name, opts)
+        {:ok, mark_if_community(skill.name, Pepe.Skills.Render.render(skill, content, ctx))}
+
+      {:error, {:ambiguous, entries}} ->
+        {:error, "the skill name #{name} is defined more than once (#{Enum.join(entries, ", ")}); read it as category/name"}
 
       _ ->
         {:error, "no skill named #{name}"}

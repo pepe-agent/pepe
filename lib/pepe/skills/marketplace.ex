@@ -120,6 +120,139 @@ defmodule Pepe.Skills.Marketplace do
     end
   end
 
+  @typedoc "What `preview/2` reports about a skill that is not installed."
+  @type preview :: %{
+          name: String.t(),
+          source: String.t(),
+          trust_level: String.t(),
+          scan: map(),
+          hash: String.t(),
+          excerpt: String.t(),
+          files: [String.t()],
+          validation: [Pepe.Skills.Lint.finding()]
+        }
+
+  @doc """
+  Look at a skill before installing it: resolve it exactly as `install/2` would (same options),
+  fetch it into a temporary place, and report what is in it - the opening of its instructions,
+  the files it ships, the Sentinel's verdict and the specification check - without placing
+  anything or touching what is installed.
+  """
+  @spec preview(String.t(), keyword()) :: {:ok, preview()} | {:error, term()}
+  def preview(name, opts \\ []) do
+    local_name = Pepe.PepeHub.local_name(name)
+
+    with {:ok, source, trust} <- source_for(name, opts[:source]),
+         {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", skill_root_rank(local_name)) do
+      try do
+        with {:ok, placement, content, scan} <- prepare(staged, local_name) do
+          {:ok,
+           %{
+             name: local_name,
+             source: source,
+             trust_level: trust,
+             scan: scan,
+             hash: content_hash(content),
+             excerpt: excerpt(content),
+             files: placed_files(placement, local_name),
+             validation: Pepe.Skills.Validate.findings(content, expected_name: local_name)
+           }}
+        end
+      after
+        cleanup.()
+      end
+    end
+  end
+
+  @doc """
+  Whether an installed skill has a newer version at the exact source it was installed from,
+  without changing anything: `{:ok, :current}`, `{:ok, :update_available}`, or
+  `{:ok, {:source_changed, pinned, now}}` when the name resolves somewhere else than it was
+  installed from (what `update/1` would refuse). With `nil`, every installed skill, as
+  `[{name, result}]`.
+  """
+  @spec check(String.t() | nil) :: term()
+  def check(nil), do: Config.installed_skills() |> Map.keys() |> Enum.sort() |> Enum.map(&{&1, check(&1)})
+
+  def check(name) when is_binary(name) do
+    case Config.installed_skill(name) do
+      nil -> {:error, :not_found}
+      %{"source" => pinned} = meta -> check_pinned(name, pinned, meta["hash"])
+    end
+  end
+
+  defp check_pinned(name, pinned, hash) do
+    case resolve(name) do
+      {:ok, other, _trust} when other != pinned -> {:ok, {:source_changed, pinned, other}}
+      _ -> compare_hash(name, pinned, hash)
+    end
+  end
+
+  defp compare_hash(name, source, hash) do
+    with {:ok, staged, cleanup} <- Sourcing.stage(source, ".md", skill_root_rank(name)) do
+      try do
+        case prepare(staged, name) do
+          {:ok, _placement, content, _scan} -> {:ok, if(content_hash(content) == hash, do: :current, else: :update_available)}
+          {:error, reason} -> {:error, reason}
+        end
+      after
+        cleanup.()
+      end
+    end
+  end
+
+  @typedoc "One line of a registry listing."
+  @type listing :: %{name: String.t(), description: String.t() | nil, source: String.t(), trust_level: String.t()}
+
+  @doc """
+  A page of every skill the bundled registry and the taps offer, by name. Options: `:page`
+  (from 1), `:per_page` (default 20), `:trust` (`"official"` or `"community"`) to keep one kind.
+  """
+  @spec browse(keyword()) :: %{entries: [listing()], page: pos_integer(), pages: pos_integer(), total: non_neg_integer()}
+  def browse(opts \\ []) do
+    per_page = max(opts[:per_page] || 20, 1)
+
+    all =
+      for {name, entry, trust} <- all_entries(),
+          opts[:trust] in [nil, trust] do
+        %{name: name, description: entry["description"], source: entry["source"], trust_level: trust}
+      end
+
+    all = Enum.sort_by(all, & &1.name)
+    pages = max(ceil(length(all) / per_page), 1)
+    page = opts[:page] |> Kernel.||(1) |> max(1) |> min(pages)
+
+    %{entries: all |> Enum.drop((page - 1) * per_page) |> Enum.take(per_page), page: page, pages: pages, total: length(all)}
+  end
+
+  defp source_for(name, nil) do
+    case resolve(name) do
+      {:ok, source, trust} -> {:ok, source, trust}
+      :not_found -> {:error, :not_found}
+    end
+  end
+
+  defp source_for(_name, source) when is_binary(source), do: {:ok, source, "community"}
+
+  defp excerpt(content) do
+    all = String.split(content, "\n")
+    lines = Enum.take(all, 40)
+    suffix = if Enum.count_until(all, 41) > 40, do: "\n[...]", else: ""
+    Enum.join(lines, "\n") <> suffix
+  end
+
+  defp placed_files({:file, _content}, name), do: [name <> ".md"]
+
+  defp placed_files({:package, dir}, _name) do
+    dir
+    |> Path.join("**/*")
+    |> Path.wildcard()
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.map(&Path.relative_to(&1, dir))
+    |> Enum.sort()
+    |> Enum.take(100)
+  end
+
   @doc """
   Update one installed skill (or, with `nil`, every installed skill) from the exact source it
   was installed from. Refuses (does not silently re-source) if the name now resolves to a

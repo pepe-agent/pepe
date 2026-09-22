@@ -1333,6 +1333,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     setup %{chat: chat} do
       File.mkdir_p!(Path.join(Config.home(), "skills"))
       File.write!(Path.join([Config.home(), "skills", "ship-it.md"]), "# Ship it\n\nHow to ship.\n")
+      Config.put_agent(%{Config.get_agent("assistant") | tools: ["bash", "skill"]})
       start_bot!()
       {:ok, chat: chat}
     end
@@ -1355,6 +1356,40 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       assert prompt =~ ~s(Carry out the "ship-it" skill now.)
       assert prompt =~ "now please"
       assert await_reply(chat) =~ "here is my answer"
+    end
+
+    test "/skill NAME with words after it hands them over as the input", %{chat: chat} do
+      say(chat, "/skill ship-it to staging")
+
+      assert_receive {:llm, ^chat, prompt}, 5_000
+      assert prompt =~ ~s(Carry out the "ship-it" skill now.)
+      assert prompt =~ "Input: to staging"
+    end
+
+    test "a skill disabled on Telegram is not a command, and one that needs something says so", %{chat: chat} do
+      File.write!(
+        Path.join([Config.home(), "skills", "needs-key.md"]),
+        "---\nname: needs-key\ndescription: Use when a key is needed.\nrequired_environment_variables: [PEPE_TEST_SURELY_UNSET_KEY]\n---\n\nSteps.\n"
+      )
+
+      Pepe.Skills.Settings.disable("ship-it", "telegram")
+
+      say(chat, "/skill")
+      reply = await_reply(chat)
+
+      refute reply =~ "ship-it"
+      assert reply =~ "needs-key"
+      assert reply =~ "needs PEPE_TEST_SURELY_UNSET_KEY"
+
+      say(chat, "/ship_it")
+      assert await_reply(chat) =~ "Unknown command: /ship_it"
+    end
+
+    test "an agent without the skill tool is offered no skill commands", %{chat: chat} do
+      Config.put_agent(%{Config.get_agent("assistant") | tools: ["bash"]})
+
+      say(chat, "/skill")
+      assert await_reply(chat) =~ "No skills are available yet."
     end
   end
 
