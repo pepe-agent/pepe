@@ -57,7 +57,15 @@ defmodule Pepe.Tools.ManagePepeTest do
   end
 
   test "restores the persist_sessions app env after a with_app command" do
+    prev = Application.get_env(:pepe, :persist_sessions)
     Application.put_env(:pepe, :persist_sessions, true)
+
+    on_exit(fn ->
+      if prev == nil,
+        do: Application.delete_env(:pepe, :persist_sessions),
+        else: Application.put_env(:pepe, :persist_sessions, prev)
+    end)
+
     assert {:ok, _} = ManagePepe.run(%{"command" => "doctor"}, ctx())
     assert Application.get_env(:pepe, :persist_sessions) == true
   end
