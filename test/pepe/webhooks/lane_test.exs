@@ -169,6 +169,27 @@ defmodule Pepe.Webhooks.LaneTest do
       assert_receive {:delivered, "u3", "echo: still here"}, 5_000
     end
 
+    test "a job that never resolves is stopped after its deadline, and the next one still runs" do
+      prev = Application.get_env(:pepe, :webhook_lane_deadline_ms)
+      Application.put_env(:pepe, :webhook_lane_deadline_ms, 50)
+
+      on_exit(fn ->
+        if prev,
+          do: Application.put_env(:pepe, :webhook_lane_deadline_ms, prev),
+          else: Application.delete_env(:pepe, :webhook_lane_deadline_ms)
+      end)
+
+      assert :ok = Lane.submit(key("u6"), job("u6", "stuck", note(:d, "never released")))
+      task = await_fetch(:d)
+
+      assert :ok = Lane.submit(key("u6"), job("u6", "still gets through"))
+
+      # The stuck job's own task never calls `release/2` - the deadline is what ends it.
+      assert_receive {:llm_asked, "still gets through"}, 5_000
+      assert_receive {:delivered, "u6", "echo: still gets through"}, 5_000
+      refute Process.alive?(task)
+    end
+
     test "the wait is bounded: past fifty waiting messages, the rest are refused" do
       assert :ok = Lane.submit(key("u4"), job("u4", "block", note(:b, "x")))
       task = await_fetch(:b)

@@ -220,3 +220,8 @@ msgstr "opcional, de 1 a 100: el archivo más grande que se acepta de un mensaje
 #, elixir-autogen, elixir-format
 msgid "optional, 1 to 100: the largest file taken in from a message (default 20). Meta's own limit still applies"
 msgstr "opcional, de 1 a 100: el archivo más grande que se acepta de un mensaje (predeterminado: 20). El límite propio de Meta sigue aplicándose"
+
+#: lib/pepe/webhooks.ex:213
+#, elixir-autogen, elixir-format
+msgid "I'm a bit behind on messages here. Could you send that again in a moment?"
+msgstr "Ando un poco atrasado con los mensajes. ¿Podrías enviarlo de nuevo en un momento?"

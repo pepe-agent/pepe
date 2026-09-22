@@ -40,6 +40,7 @@ defmodule Pepe.Gateways.Discord do
   require Logger
 
   alias Pepe.Config
+  alias Pepe.Gateways.Discord.Dispatcher
   alias Pepe.Gateways.Discord.Protocol
   alias Pepe.Webhooks.Discord, as: Provider
 
@@ -48,6 +49,11 @@ defmodule Pepe.Gateways.Discord do
 
   # How long a freshly opened socket has to say hello before it is written off.
   @hello_deadline_ms 30_000
+
+  # A resume url that keeps failing (host refuses, or accepts and never says hello) is
+  # retried this many times before it's written off in favor of asking Discord for a fresh
+  # one - otherwise a resume url that has gone bad is retried forever.
+  @max_resume_attempts 3
 
   defstruct slug: nil,
             conn: nil,
@@ -63,7 +69,8 @@ defmodule Pepe.Gateways.Discord do
             acked?: true,
             heartbeat: nil,
             attempt: 0,
-            content?: true
+            content?: true,
+            dispatcher: nil
 
   @doc "Whether this webhook connection asks for the gateway and has what it needs to open one."
   @spec active?(map()) :: boolean()
@@ -83,7 +90,8 @@ defmodule Pepe.Gateways.Discord do
   @impl true
   def init(slug) do
     send(self(), :connect)
-    {:ok, %__MODULE__{slug: slug}}
+    {:ok, dispatcher} = Dispatcher.start_link(slug)
+    {:ok, %__MODULE__{slug: slug, dispatcher: dispatcher}}
   end
 
   ###
@@ -91,7 +99,15 @@ defmodule Pepe.Gateways.Discord do
   ###
 
   @impl true
+  # A stale :connect from an earlier, already-superseded reconnect campaign (see the
+  # heartbeat guard above for how one could still be scheduled): this connection already
+  # has a socket open or opening, so starting a second one on top of it would leak the
+  # first. Nothing to do - the live one already has its own :connect if it ever needs one.
+  def handle_info(:connect, %{conn: conn} = state) when conn != nil, do: {:noreply, state}
+
   def handle_info(:connect, state) do
+    state = maybe_drop_stale_resume_url(state)
+
     with {:ok, entry} <- fetch_entry(state.slug),
          {:ok, url} <- gateway_url(state, token(entry)),
          {:ok, state} <- open(state, url) do
@@ -114,15 +130,23 @@ defmodule Pepe.Gateways.Discord do
 
   def handle_info({:hello_deadline, _ref}, state), do: {:noreply, state}
 
-  def handle_info(:heartbeat, %{acked?: false} = state) do
+  # `Process.cancel_timer/1` (in `reconnect/2`, `schedule_heartbeat/2`) does not flush a
+  # `:heartbeat` that was already delivered to this process's own mailbox before the timer
+  # was cancelled - so one can still arrive after a reconnect already reset this connection.
+  # Gating both clauses on `status: :open` (the one thing a reconnect always clears first)
+  # is what keeps a message like that from triggering a second, redundant reconnect on top
+  # of whatever already started, which would leak the socket the first one opened.
+  def handle_info(:heartbeat, %{status: :open, acked?: false} = state) do
     Logger.warning("[discord:#{state.slug}] heartbeat was never acknowledged; reconnecting")
     settle(reconnect(state, :resume))
   end
 
-  def handle_info(:heartbeat, state) do
+  def handle_info(:heartbeat, %{status: :open} = state) do
     state = send_frame(state, Protocol.heartbeat(state.seq))
     settle(schedule_heartbeat(%{state | acked?: false}, state.interval))
   end
+
+  def handle_info(:heartbeat, state), do: {:noreply, state}
 
   # Whatever the socket says: the upgrade answer, frames, or the connection going away.
   def handle_info(message, %{conn: conn} = state) when conn != nil do
@@ -155,6 +179,19 @@ defmodule Pepe.Gateways.Discord do
     end
   end
 
+  # A resume url that has failed @max_resume_attempts connects in a row in this reconnect
+  # campaign (attempt counts every :connect try and resets to 0 on READY/RESUMED) is written
+  # off: session_id and seq stay, so RESUME can still be tried through the fresh url this
+  # falls through to asking for, but the stale url itself is never tried again until a new
+  # READY hands over a current one.
+  defp maybe_drop_stale_resume_url(%{resume_url: url, attempt: attempt, slug: slug} = state)
+       when is_binary(url) and attempt >= @max_resume_attempts do
+    Logger.warning("[discord:#{slug}] giving up on the resume url after #{attempt} failed attempts; asking Discord for a fresh one")
+    %{state | resume_url: nil}
+  end
+
+  defp maybe_drop_stale_resume_url(state), do: state
+
   # A session that can be resumed goes back to the URL Discord gave for it; a new one asks
   # Discord where to connect (and how many session starts are left, so a bot in a restart
   # loop is stopped before Discord bans the token for it).
@@ -182,6 +219,18 @@ defmodule Pepe.Gateways.Discord do
   defp open(state, url) do
     uri = URI.parse(url)
     secure? = uri.scheme in ["wss", "https"]
+
+    if secure? or test_gateway_override?() do
+      really_open(state, uri, secure?)
+    else
+      # The bot token rides the IDENTIFY/RESUME frame; sending it over anything Discord did
+      # not itself say to use tls for would send it in the clear. This should never actually
+      # be reachable against the real API, so failing closed here costs nothing real.
+      {:fatal, "the gateway url #{url} is not secure (wss/https); refusing to send the bot token over it"}
+    end
+  end
+
+  defp really_open(state, uri, secure?) do
     port = uri.port || if(secure?, do: 443, else: 80)
     path = (uri.path in [nil, ""] && "/") || uri.path
     path = path <> "?v=10&encoding=json"
@@ -197,6 +246,10 @@ defmodule Pepe.Gateways.Discord do
       {:error, _conn, reason} -> {:retry, reason}
     end
   end
+
+  # The one legitimate non-tls case is a test standing in for Discord over plain HTTP; it
+  # always overrides where the REST lookup itself points first.
+  defp test_gateway_override?, do: is_binary(Application.get_env(:pepe, :discord_api))
 
   ###
   ### what the socket said
@@ -290,7 +343,9 @@ defmodule Pepe.Gateways.Discord do
 
   # Only what somebody said, by a person, and only what could be for this bot, ever leaves this
   # process: a busy server is a firehose of messages that are nobody's business, and each one
-  # that got as far as `Pepe.Webhooks` would cost a session to look at.
+  # that got this far still only reaches `Pepe.Webhooks` through the dispatcher (never called
+  # here directly), so a slow session or lane downstream can never delay this process's own
+  # heartbeat.
   defp handle_message(state, d) do
     payload = %{"t" => "MESSAGE_CREATE", "d" => d, "bot_id" => state.bot_id}
 
@@ -298,7 +353,7 @@ defmodule Pepe.Gateways.Discord do
          false <- get_in(d, ["author", "bot"]) == true or get_in(d, ["author", "id"]) == state.bot_id,
          {:ok, entry} <- fetch_entry(state.slug),
          true <- Provider.addressed?(entry, payload) or session?(entry, d) do
-      Pepe.Webhooks.handle_gateway_event(state.slug, payload)
+      Dispatcher.dispatch(state.dispatcher, payload)
     end
   rescue
     e -> Logger.warning("[discord:#{state.slug}] could not handle a message: #{Exception.message(e)}")

@@ -412,8 +412,12 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["gateway", "whatsapp" | rest]),
     do: with_config(fn -> gateway_cmd(["whatsapp" | rest]) end)
 
-  # Discord connections too: the CLI edits config, and a running `serve` opens or closes the
-  # gateway socket by itself when the connection changes.
+  # Discord connections too: the CLI edits config. `Pepe.Gateways.DiscordSupervisor.reload/0`
+  # does reconcile live sockets against config on every write, but it runs in whichever OS
+  # process calls `Config.put_webhook/2` - the CLI's own, here, where there is no gateway
+  # supervisor to reconcile. A dashboard edit reaches `reload/0` inside the running `serve`
+  # VM instead, and does take effect live; a CLI edit needs `mix pepe serve` restarted, same
+  # as most other config changes made this way while it's running.
   def dispatch(["gateway", "discord" | rest]),
     do: with_config(fn -> gateway_cmd(["discord" | rest]) end)
 
@@ -5095,6 +5099,7 @@ defmodule Mix.Tasks.Pepe do
       )
 
     mode = if opts[:mode] == "admin", do: "admin", else: "support"
+    opts = default_discord_bot_token(slug, opts)
 
     case discord_add_error(slug, opts) do
       nil -> save_discord_connection(slug, mode, opts)
@@ -5130,7 +5135,7 @@ defmodule Mix.Tasks.Pepe do
 
       add SLUG --agent HANDLE [--project CO] [--mode support|admin]
                slash commands:   --application-id ID --public-key HEX
-               channel messages: --gateway --bot-token ${ENV} [--no-require-mention]
+               channel messages: --gateway --bot-token '${ENV}' [--no-require-mention]
                [--max-attachment-mb N]
                [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
       list                     list connections
@@ -5250,15 +5255,13 @@ defmodule Mix.Tasks.Pepe do
   defp discord_add_agent_error(opts) do
     if is_nil(opts[:agent]),
       do: "discord add needs --agent HANDLE (who answers)",
-      else: discord_add_gateway_error(opts)
-  end
-
-  defp discord_add_gateway_error(opts) do
-    if opts[:gateway] == true and is_nil(opts[:bot_token]),
-      do: "--gateway needs --bot-token (the bot's token from the app's Bot page)",
       else: discord_add_route_error(opts)
   end
 
+  # A missing --bot-token is defaulted (default_discord_bot_token/2, called before this
+  # runs) rather than refused - see its own doc for why - so there is nothing left to
+  # validate about --gateway on its own here, only the two ways a connection ends up
+  # actually reachable at all.
   defp discord_add_route_error(opts) do
     slash? = is_binary(opts[:application_id]) and is_binary(opts[:public_key])
     channel? = opts[:gateway] == true and is_binary(opts[:bot_token])
@@ -5267,6 +5270,41 @@ defmodule Mix.Tasks.Pepe do
       do: nil,
       else:
         "discord add needs --application-id and --public-key (slash commands), or --gateway with --bot-token (channel messages), or both"
+  end
+
+  # `--gateway` with no `--bot-token` used to be a hard error; a token given but unquoted
+  # (`--bot-token ${ENV}`) is already expanded by the shell before Mix ever sees it, and
+  # lands in config.json as the literal secret. WhatsApp's own `add` already defaults its
+  # token to `${WA_TOKEN_<SLUG>}` rather than requiring one spelled out - Discord does the
+  # same now, and warns (does not refuse) on a value that looks like neither a `${...}`
+  # reference nor a vault ref, since it may well be a real placeholder from a shell that
+  # does not expand `${...}` the same way (or the operator's actual, considered choice).
+  defp default_discord_bot_token(slug, opts) do
+    cond do
+      opts[:gateway] != true ->
+        opts
+
+      is_binary(opts[:bot_token]) ->
+        warn_if_plaintext_token(opts[:bot_token])
+        opts
+
+      true ->
+        Keyword.put(opts, :bot_token, "${DISCORD_BOT_TOKEN_#{String.upcase(slug)}}")
+    end
+  end
+
+  defp warn_if_plaintext_token(token) do
+    reference? = (String.starts_with?(token, "${") and String.ends_with?(token, "}")) or Pepe.Secrets.Vault.ref?(token)
+
+    unless reference? do
+      info(
+        dim(
+          "warning: --bot-token doesn't look like a ${ENV_VAR} reference or a vault ref (exec:/file:) - " <>
+            "it will be stored as given in config.json. If your shell already expanded a ${VAR} you meant to keep " <>
+            "literal, quote it next time (--bot-token '${VAR}')."
+        )
+      )
+    end
   end
 
   defp print_whatsapp_conn_line({slug, e}) do
@@ -5344,6 +5382,7 @@ defmodule Mix.Tasks.Pepe do
 
     Config.put_webhook(slug, entry)
     ok("discord #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
+    warn_if_open_admin_gateway(mode, entry)
 
     if opts[:application_id] do
       co = entry["project"] || "default"
@@ -5355,6 +5394,27 @@ defmodule Mix.Tasks.Pepe do
       info(dim("   channel messages are read once `mix pepe serve` is running; enable the Message Content intent on the app's Bot page"))
     end
   end
+
+  # An admin connection gets slash commands and trainer-level reach (`/model`, learning) by
+  # default; reading ordinary channel messages on top of that, with no `allowed_numbers` to
+  # narrow who it listens to, means everyone who can see the bot in a channel gets that reach.
+  # There is no `--allowed-numbers` flag for this command yet (see Config.put_webhook/2 or the
+  # dashboard for restricting it), so today this always fires for an unrestricted admin gateway
+  # connection - the warning is the whole fix, not a hint the CLI can close on its own.
+  defp warn_if_open_admin_gateway("admin", entry) do
+    open? = get_in(entry, ["config", "receive_channel_messages"]) == "true" and not is_list(entry["allowed_numbers"])
+
+    if open? do
+      info(
+        dim(
+          "warning: this is an admin connection reading channel messages from anyone, with no allowed_numbers set - " <>
+            "restrict who it listens to via the dashboard or config.json before running it for real."
+        )
+      )
+    end
+  end
+
+  defp warn_if_open_admin_gateway(_mode, _entry), do: :ok
 
   defp print_telegram_bot_line(b) do
     state = if Pepe.Gateways.Telegram.bot_active?(b), do: green("active"), else: dim("inactive")

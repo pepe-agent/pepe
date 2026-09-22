@@ -136,6 +136,27 @@ defmodule Pepe.Gateways.DiscordTest do
       assert_receive {:gateway_connected, second}, 5_000
       assert second != first
     end
+
+    test "a stale heartbeat delivered after a reconnect already reset the connection does not open a second one", ctx do
+      {gateway, _socket} = connect(ctx, %{interval: 20})
+
+      # `Process.cancel_timer/1` does not flush a message already sitting in the mailbox -
+      # this reproduces exactly that: a reconnect has already reset the connection (as
+      # `reconnect/2` itself would), and a `:heartbeat` that was in flight before that
+      # arrives afterward. It must be a no-op, not a second reconnect on top of whatever
+      # already started.
+      state = :sys.get_state(gateway)
+      :sys.replace_state(gateway, fn s -> %{s | status: :closed, conn: nil, acked?: false} end)
+      send(gateway, :heartbeat)
+
+      refute_receive {:gateway_connected, _}, 200
+      assert :sys.get_state(gateway).status == :closed
+
+      # Restore a live-looking connection and prove a stale :connect is equally inert.
+      :sys.replace_state(gateway, fn _ -> state end)
+      send(gateway, :connect)
+      refute_receive {:gateway_connected, _}, 200
+    end
   end
 
   describe "when the connection ends" do
@@ -159,6 +180,20 @@ defmodule Pepe.Gateways.DiscordTest do
       send(socket, {:push, %{"op" => 7, "d" => nil}})
 
       assert_receive {:resume, %{"session_id" => "sess-1"}}, 5_000
+    end
+
+    test "a resume url that keeps failing is written off in favor of a fresh one, keeping the session", ctx do
+      {_gateway, socket} = connect(ctx, %{broken_resume?: true})
+      assert_receive {:identify, _}, 5_000
+      assert_received {:gateway_bot, _}
+
+      send(socket, {:close, 4000})
+
+      # Three failed connect attempts against the broken resume url (backoff shortened to a
+      # few ms in this suite's setup), then it asks Discord where to connect again instead of
+      # retrying that url forever, and resumes the same session through the fresh one.
+      assert_receive {:gateway_bot, _}, 5_000
+      assert_receive {:resume, %{"session_id" => "sess-1", "seq" => 1}}, 5_000
     end
 
     test "a session Discord says is not resumable is started over, not resumed", ctx do
@@ -298,6 +333,31 @@ defmodule Pepe.Gateways.DiscordTest do
       assert_receive {:posted, "C1", %{"content" => _}, _}, 5_000
       assert [saved] = Path.wildcard(Path.join(ctx.home, "**/media/*"))
       assert File.read!(saved) == "remember the milk"
+    end
+  end
+
+  describe "handling a message never blocks the socket's own heartbeat" do
+    test "heartbeats keep going out on schedule while a message is still being handled", ctx do
+      test_pid = self()
+
+      stub(Pepe.Webhooks, :handle_gateway_event, fn _slug, payload ->
+        send(test_pid, {:handling_started, payload})
+        Process.sleep(300)
+        send(test_pid, {:handling_finished, payload})
+        :ok
+      end)
+
+      {_gateway, socket} = connect(ctx, %{interval: 20})
+
+      push(socket, channel_message("slow1", "hello", dm()))
+      assert_receive {:handling_started, _}, 5_000
+
+      # The handler above is asleep for 300ms; at a 20ms interval that's room for well over
+      # ten heartbeats. Seeing several proves the socket process itself was never blocked
+      # waiting on the slow call, which runs in the dispatcher, not here.
+      for _ <- 1..5, do: assert_receive({:heartbeat, _}, 5_000)
+
+      assert_receive {:handling_finished, _}, 5_000
     end
   end
 

@@ -20,6 +20,8 @@ defmodule Pepe.Webhooks do
   on the entry to keep non-trainers from touching it at all.
   """
 
+  use Gettext, backend: Pepe.Gettext
+
   require Logger
 
   alias Pepe.Agent.Session
@@ -203,8 +205,12 @@ defmodule Pepe.Webhooks do
         job = %{entry: entry, mod: mod, message: message, callers: [self() | Process.get(:"$callers", [])]}
 
         case Pepe.Webhooks.Lane.submit(session_key(entry, from), job) do
-          :ok -> :ok
-          {:error, reason} -> Logger.warning("[webhooks] #{entry["slug"]}: dropped a message from #{from}: #{inspect(reason)}")
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("[webhooks] #{entry["slug"]}: dropped a message from #{from}: #{inspect(reason)}")
+            reply_async(mod, entry, from, dgettext("webhooks", "I'm a bit behind on messages here. Could you send that again in a moment?"))
         end
     end
 

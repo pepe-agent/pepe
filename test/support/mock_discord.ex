@@ -11,7 +11,9 @@ defmodule Pepe.Test.MockDiscord do
       `{:posted, channel_id, body, headers}`.
 
   Options: `:test` (pid told about everything), `:interval` (heartbeat interval the socket
-  announces, ms), `:ack?` (whether heartbeats are acknowledged).
+  announces, ms), `:ack?` (whether heartbeats are acknowledged), `:broken_resume?` (report a
+  `resume_gateway_url` on a port nothing listens on, to exercise giving up on a resume url
+  that never works).
   """
   import Plug.Conn
 
@@ -35,7 +37,14 @@ defmodule Pepe.Test.MockDiscord do
   end
 
   def call(%{path_info: ["gw"]} = conn, opts) do
-    opts = Map.put(opts, :resume_url, "ws://#{conn.host}:#{conn.port}/gw")
+    resume_url =
+      if Map.get(opts, :broken_resume?, false),
+        # Port 1 is never listening: a connect attempt against it is refused immediately,
+        # every time, without waiting on a real timeout.
+        do: "ws://127.0.0.1:1/gw",
+        else: "ws://#{conn.host}:#{conn.port}/gw"
+
+    opts = Map.put(opts, :resume_url, resume_url)
     WebSockAdapter.upgrade(conn, Pepe.Test.MockDiscordSocket, opts, [])
   end
 
