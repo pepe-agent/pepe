@@ -35,6 +35,7 @@ defmodule Pepe.ACP.Commands do
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Project
+  alias Pepe.Skills.Commands, as: SkillCommands
 
   # name, the description an editor shows in its command palette, and the hint for its
   # argument. These are protocol metadata read by an editor, so they stay in English,
@@ -44,7 +45,8 @@ defmodule Pepe.ACP.Commands do
     {"new", "Start a new conversation", nil},
     {"reset", "Start a new conversation (same as /new)", nil},
     {"undo", "Take back your last message", nil},
-    {"rewind", "Go back N turns of the conversation", "number of turns (default 1)"},
+    {"rewind", "List recent turns, or go back N turns of the conversation and the files they changed", "N [chat|files]"},
+    {"retry", "Ask your last message again", "files (also put back the files it changed)"},
     {"compact", "Summarize older history to free up context", nil},
     {"status", "Show the agent, the model and the turn count", nil},
     {"context", "Show how full the model's context window is", nil},
@@ -54,47 +56,75 @@ defmodule Pepe.ACP.Commands do
     {"usage", "Show this month's spend and message count", nil},
     {"steer", "Give guidance to the turn that is running now", "guidance for the running turn"},
     {"queue", "Run a prompt after the current turn finishes", "prompt to run next"},
+    {"skill", "Run an installed skill", "skill name and its input"},
     {"version", "Show the Pepe version", nil}
   ]
 
   @names Enum.map(@commands, &elem(&1, 0))
 
+  # An installed skill is offered as a command of its own, unless a built-in already has its
+  # name. Which ones is per session: the agent's tools and the project's directory decide.
+  @type skill_opts :: [agent: String.t() | nil, cwd: String.t() | nil]
+
   @type ctx :: %{
           required(:key) => String.t(),
           required(:agent) => String.t() | nil,
           required(:running?) => boolean(),
-          optional(:last_usage) => %{used: integer(), size: integer()} | nil
+          optional(:last_usage) => %{used: integer(), size: integer()} | nil,
+          optional(:cwd) => String.t() | nil
         }
-  @type result :: {:reply, String.t()} | {:prompt, String.t()} | {:queue, String.t()}
+  @type result :: {:reply, String.t()} | {:prompt, String.t()} | {:prompt, String.t(), String.t()} | {:queue, String.t()}
 
-  @doc "The `availableCommands` an editor is told about."
-  @spec available() :: [map()]
-  def available do
-    Enum.map(@commands, fn {name, description, hint} ->
-      base = %{"name" => name, "description" => description}
-      if hint, do: Map.put(base, "input", %{"hint" => hint}), else: base
-    end)
+  @doc """
+  The `availableCommands` an editor is told about: the built-ins, then one per installed
+  skill the session's agent is offered (see `Pepe.Skills.Commands`).
+  """
+  @spec available(skill_opts()) :: [map()]
+  def available(opts \\ []) do
+    builtin =
+      Enum.map(@commands, fn {name, description, hint} ->
+        base = %{"name" => name, "description" => description}
+        if hint, do: Map.put(base, "input", %{"hint" => hint}), else: base
+      end)
+
+    skills =
+      for %{name: name, summary: summary} <- SkillCommands.list(skill_opts(opts) ++ [reserved: @names]) do
+        %{"name" => name, "description" => summary, "input" => %{"hint" => "what the skill should work on"}}
+      end
+
+    builtin ++ skills
   end
 
   @doc "Is a `session/prompt`'s content a command? Only a lone text block ever is."
-  @spec from_blocks(term()) :: {:command, String.t(), String.t()} | :none
-  def from_blocks([%{"type" => "text", "text" => text}]) when is_binary(text), do: parse(text)
-  def from_blocks(_other), do: :none
+  @spec from_blocks(term(), skill_opts()) :: {:command, String.t(), String.t()} | :none
+  def from_blocks(blocks, opts \\ [])
+  def from_blocks([%{"type" => "text", "text" => text}], opts) when is_binary(text), do: parse(text, opts)
+  def from_blocks(_other, _opts), do: :none
 
-  @doc "Parse `/name args`; `:none` for anything that isn't one of our commands."
-  @spec parse(String.t()) :: {:command, String.t(), String.t()} | :none
-  def parse(text) do
-    case Regex.run(~r{\A\s*/([A-Za-z][A-Za-z_]*)(?:\s+(.*))?\z}s, text) do
-      [_, name] -> known(name, "")
-      [_, name, args] -> known(name, String.trim(args))
+  @doc """
+  Parse `/name args`; `:none` for anything that isn't one of our commands. An installed skill
+  the session is offered counts as one: `/deploy staging` is `/skill deploy staging`.
+  """
+  @spec parse(String.t(), skill_opts()) :: {:command, String.t(), String.t()} | :none
+  def parse(text, opts \\ []) do
+    case Regex.run(~r{\A\s*/([A-Za-z][A-Za-z0-9_-]*)(?:\s+(.*))?\z}s, text) do
+      [_, name] -> known(name, "", opts)
+      [_, name, args] -> known(name, String.trim(args), opts)
       _ -> :none
     end
   end
 
-  defp known(name, args) do
-    name = String.downcase(name)
-    if name in @names, do: {:command, name, args}, else: :none
+  defp known(name, args, opts) do
+    lowered = String.downcase(name)
+
+    cond do
+      lowered in @names -> {:command, lowered, args}
+      match?({:ok, _}, SkillCommands.find(name, skill_opts(opts))) -> {:command, "skill", String.trim(name <> " " <> args)}
+      true -> :none
+    end
   end
+
+  defp skill_opts(opts), do: [agent: opts[:agent], channel: "acp", cwd: opts[:cwd]]
 
   ###
   ### commands
@@ -119,18 +149,50 @@ defmodule Pepe.ACP.Commands do
 
   def run("undo", _args, ctx) do
     idle_ready(ctx, fn ->
-      case Session.undo(ctx.key) do
-        :ok -> {:reply, gettext("↩️ Undid your last message.")}
-        {:error, :busy} -> wait()
+      # A conversation-only take-back; if that turn had changed files, say they were left alone.
+      case Session.rewind_to(ctx.key, 1, :chat, roots: roots(ctx)) do
+        {:ok, result} ->
+          {:reply, Enum.join([gettext("↩️ Undid your last message.") | Pepe.Checkpoints.Report.kept_lines(result.kept)], "\n")}
+
+        {:error, :busy} ->
+          wait()
       end
     end)
   end
 
   def run("rewind", args, ctx) do
     idle_ready(ctx, fn ->
-      case Session.parse_rewind_count(args) do
-        {:ok, count} -> rewind(ctx, count)
-        :error -> {:reply, gettext("Usage: /rewind N, where N is how many turns to go back.")}
+      case Pepe.Checkpoints.Report.parse_rewind(args) do
+        :list ->
+          {:reply, Pepe.Checkpoints.Report.turn_list(Session.turns(ctx.key))}
+
+        {:ok, count, mode} ->
+          rewind(ctx, count, mode)
+
+        :error ->
+          {:reply, gettext("Usage: /rewind N, where N is how many turns to go back.") <> "\n" <> Pepe.Checkpoints.Report.usage()}
+      end
+    end)
+  end
+
+  # Ask the last message again: the turn is taken back and its text becomes a normal turn.
+  # `files` also puts back what that turn changed, and says so before the new turn starts.
+  def run("retry", args, ctx) do
+    idle_ready(ctx, fn ->
+      mode = if args |> String.trim() |> String.downcase() == "files", do: :both, else: :chat
+
+      case Session.retry(ctx.key, mode, roots: roots(ctx)) do
+        {:ok, %{text: text, files: files, roots: roots}} ->
+          retry_prompt(text, Pepe.Checkpoints.Report.file_lines(files, roots: roots))
+
+        {:error, :nothing} ->
+          {:reply, gettext("Nothing to retry yet.")}
+
+        {:error, :not_text} ->
+          {:reply, gettext("That message had an attachment, so it can't be sent again exactly. Send it again yourself.")}
+
+        {:error, :busy} ->
+          wait()
       end
     end)
   end
@@ -232,6 +294,24 @@ defmodule Pepe.ACP.Commands do
   def run("queue", text, %{running?: true}), do: {:queue, text}
   def run("queue", text, _ctx), do: {:prompt, text}
 
+  def run("skill", "", ctx), do: {:reply, skills_text(ctx)}
+
+  # A skill runs as an ordinary turn: the agent is told to carry it out and reads it through
+  # its own `skill` tool, which is what keeps community content marked untrusted. Behind a
+  # running turn it waits its turn, like `/queue`.
+  def run("skill", words, ctx) do
+    [name | rest] = String.split(words, ~r/\s+/, parts: 2)
+
+    case SkillCommands.find(name, skill_opts(ctx)) do
+      {:ok, %{name: skill}} ->
+        turn = SkillCommands.instruction(skill, Enum.join(rest))
+        if ctx.running?, do: {:queue, turn}, else: {:prompt, turn}
+
+      :none ->
+        {:reply, gettext("Unknown skill: %{name}", name: name)}
+    end
+  end
+
   def run("version", _args, _ctx), do: {:reply, "Pepe v" <> Pepe.Update.current()}
 
   ###
@@ -250,6 +330,19 @@ defmodule Pepe.ACP.Commands do
 
   defp wait, do: {:reply, gettext("Wait for the current turn to finish.")}
 
+  defp skills_text(ctx) do
+    case SkillCommands.list(skill_opts(ctx)) do
+      [] ->
+        gettext("No skills are available yet.")
+
+      skills ->
+        gettext("Available skills (run with /skill <name>):") <> "\n" <> Enum.map_join(skills, "\n", &skill_line/1)
+    end
+  end
+
+  defp skill_line(%{name: name, summary: summary, needs: needs}),
+    do: "- #{name}: #{summary}" <> if(needs, do: " (#{needs})", else: "")
+
   # A session process is only started by a session's first message, so a command sent
   # before one (`/model` as the very first thing typed) has to start it.
   defp ensure(ctx) do
@@ -259,26 +352,20 @@ defmodule Pepe.ACP.Commands do
     end
   end
 
-  defp rewind(ctx, count) do
-    case Session.rewind(ctx.key, count) do
-      {:ok, 0} -> {:reply, gettext("Nothing to rewind yet.")}
-      {:ok, dropped} when dropped < count -> {:reply, "⏪ " <> rewound_all(dropped)}
-      {:ok, dropped} -> {:reply, "⏪ " <> rewound(dropped)}
+  defp retry_prompt(text, []), do: {:prompt, text}
+  defp retry_prompt(text, lines), do: {:prompt, text, Enum.join(lines, "\n")}
+
+  defp rewind(ctx, count, mode) do
+    case Session.rewind_to(ctx.key, count, mode, roots: roots(ctx)) do
+      {:ok, result} -> {:reply, "⏪ " <> Pepe.Checkpoints.Report.summary(result, requested: count, mode: mode)}
       {:error, :busy} -> wait()
     end
   end
 
-  defp rewound(dropped),
-    do: ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
-
-  defp rewound_all(dropped) do
-    ngettext(
-      "Rewound %{count} turn. That was the whole conversation.",
-      "Rewound %{count} turns. That was the whole conversation.",
-      dropped,
-      count: dropped
-    )
-  end
+  # The editor's working directory is a folder a rewind may put files back into, like an
+  # agent's own workspace: its tools resolve there (see `cwd_override`), so that is where
+  # their changes were recorded.
+  defp roots(ctx), do: if(is_binary(ctx[:cwd]), do: [ctx.cwd], else: [])
 
   # An editor is one person's tool, so no "this conversation or everyone?" question: a
   # bare `/model NAME` is this conversation, and `global` is spelled out to get the other.

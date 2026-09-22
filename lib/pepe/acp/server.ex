@@ -424,7 +424,13 @@ defmodule Pepe.ACP.Server do
   end
 
   defp announce_commands(state, session_id),
-    do: write(state, Protocol.session_update(session_id, Pepe.ACP.Updates.available_commands()))
+    do:
+      write(state, Protocol.session_update(session_id, Pepe.ACP.Updates.available_commands(skill_scope(state, state.sessions[session_id]))))
+
+  # What decides which installed skills a session is offered as commands: its agent's tools
+  # and the directory the editor opened it in (a project's own skills, if the operator trusts it).
+  defp skill_scope(state, session),
+    do: [agent: state.agent || Pepe.Config.default_agent_name(), cwd: session && session.cwd]
 
   defp fetch_saved(session_id) do
     case Sessions.fetch(session_id) do
@@ -546,7 +552,9 @@ defmodule Pepe.ACP.Server do
     # A slash command is routed before the "turn already in flight" check, because a few
     # of them (`/steer`, `/queue`, reading state) are exactly what someone types while a
     # turn is running. Commands that rewrite the conversation refuse on their own.
-    case {state.sessions[session_id], Pepe.ACP.Commands.from_blocks(params["prompt"])} do
+    session = state.sessions[session_id]
+
+    case {session, Pepe.ACP.Commands.from_blocks(params["prompt"], skill_scope(state, session))} do
       {nil, _command} ->
         reply_error(state, id, :invalid_params, "unknown `sessionId` (create one with `session/new`)")
 
@@ -609,7 +617,8 @@ defmodule Pepe.ACP.Server do
       key: session.key,
       agent: state.agent,
       running?: session.run != nil,
-      last_usage: Map.get(session, :last_usage)
+      last_usage: Map.get(session, :last_usage),
+      cwd: session.cwd
     }
 
     {:ok, task} =
@@ -642,11 +651,19 @@ defmodule Pepe.ACP.Server do
       {%{run: nil} = session, {:prompt, text}} ->
         run_prompt(id, session_id, session, {:text, text, []}, state)
 
+      # A prompt that comes with something to say first (what `/retry files` put back).
+      {%{run: nil} = session, {:prompt, text, note}} ->
+        state = write(state, Protocol.session_update(session_id, Protocol.message_chunk(note <> "\n\n")))
+        run_prompt(id, session_id, session, {:text, text, []}, state)
+
       {%{run: nil} = session, {:queue, text}} ->
         run_prompt(id, session_id, session, {:text, text, []}, state)
 
       # A turn started while the command was being worked out: hold the text for after it.
       {session, {kind, text}} when kind in [:prompt, :queue] ->
+        enqueue(state, session_id, session, id, text)
+
+      {session, {:prompt, text, _note}} ->
         enqueue(state, session_id, session, id, text)
     end
   end
