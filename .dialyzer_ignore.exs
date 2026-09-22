@@ -23,5 +23,14 @@
   # claims the call (and everything only reachable after it) can never succeed. It
   # does: this session ran real Lua scripts through it repeatedly, including live
   # runtime-error cases that exercise the branches dialyzer thinks are dead.
-  {"lib/pepe/tools/run_code.ex", :call}
+  {"lib/pepe/tools/run_code.ex", :call},
+  # dialyzer's success typing narrows Mint.WebSocket.new/4's return to only the
+  # {:error, ...} shape at this call site and reports {:ok, conn, websocket} as
+  # unreachable. It is not: this is the real websocket upgrade handshake, and the
+  # test suite completes it over a real Bandit server on a real TCP socket
+  # (test/pepe/gateways/discord_test.exs, via test/support/mock_discord_socket.ex,
+  # a genuine WebSock implementation) - the connection would never open at all if
+  # this branch were actually dead. Mint.WebSocket.new/4's own @spec (deps/mint_web_socket)
+  # declares the {:ok, ...} return explicitly.
+  {"lib/pepe/gateways/discord.ex", :pattern_match}
 ]

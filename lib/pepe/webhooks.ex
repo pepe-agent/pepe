@@ -20,6 +20,8 @@ defmodule Pepe.Webhooks do
   on the entry to keep non-trainers from touching it at all.
   """
 
+  use Gettext, backend: Pepe.Gettext
+
   require Logger
 
   alias Pepe.Agent.Session
@@ -179,38 +181,78 @@ defmodule Pepe.Webhooks do
     Session.mention_optional?(key)
   end
 
-  defp session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
+  @doc false
+  def session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
 
   # Run one inbound message through the bound agent, off the request process.
   #
-  # An attachment is resolved to text first (Pepe.Webhooks.Media), inside the task rather
-  # than in parse/1: it costs a download and a transcription, neither of which belongs on
-  # the request the provider is waiting on. It happens *before* command/3 so a `/new` said
-  # out loud still reads as a command - the whole point of resolving media at the door.
+  # Messages of one conversation go through one lane (Pepe.Webhooks.Lane), in the order they
+  # were received: an attachment is resolved to text first (Pepe.Webhooks.Media), inside a
+  # task rather than in parse/1 because it costs a download and a transcription that do not
+  # belong on the request the provider is waiting on, and a slow voice note must not let the
+  # text message sent after it reach the agent first. It happens *before* command/3 so a
+  # `/new` said out loud still reads as a command - the whole point of resolving media at the
+  # door. Different conversations never wait for each other.
   defp dispatch(entry, mod, %{from: from} = message) do
-    if allowed?(entry, from) do
-      Task.start(fn -> resolve_and_converse(entry, mod, message) end)
-    else
-      Logger.info("[webhooks] #{entry["slug"]}: ignored message from disallowed #{from}")
+    cond do
+      not allowed?(entry, actor(message)) ->
+        Logger.info("[webhooks] #{entry["slug"]}: ignored message from disallowed #{actor(message)}")
+
+      Pepe.Webhooks.Dedup.seen?(entry["slug"], message[:id]) ->
+        Logger.debug("[webhooks] #{entry["slug"]}: skipping duplicate delivery of #{message[:id]}")
+
+      true ->
+        job = %{entry: entry, mod: mod, message: message, callers: [self() | Process.get(:"$callers", [])]}
+
+        case Pepe.Webhooks.Lane.submit(session_key(entry, from), job) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("[webhooks] #{entry["slug"]}: dropped a message from #{from}: #{inspect(reason)}")
+            reply_async(mod, entry, from, dgettext("webhooks", "I'm a bit behind on messages here. Could you send that again in a moment?"))
+        end
     end
 
     :ok
   end
 
-  defp resolve_and_converse(entry, mod, %{from: from} = message) do
+  # Who is speaking, as opposed to where the conversation lives: on a channel where many
+  # people share one conversation (a Discord server channel) the allowlist and the trainer
+  # rules are about the person, while `from` names the place the reply goes.
+  defp actor(message), do: message[:sender_id] || message.from
+
+  @doc """
+  Feed one event that arrived over a persistent connection (Discord's gateway) through the
+  same parse, gate and dispatch as a webhook `POST`, minus the signature check: the socket was
+  authenticated with the bot's own token when it was opened, and there is no request to
+  authenticate. `slug` names the connection.
+  """
+  @spec handle_gateway_event(String.t(), map()) :: :ok | {:error, :unknown_connection}
+  def handle_gateway_event(slug, payload) do
+    with entry when is_map(entry) <- Config.get_webhook(slug),
+         mod when not is_nil(mod) <- provider(entry["provider"]) do
+      run_parse(mod, Map.put(entry, "slug", slug), payload)
+    else
+      _ -> {:error, :unknown_connection}
+    end
+  end
+
+  @doc false
+  # First half of a job, run in a task off the lane: what the agent should be given for this
+  # message, or `:ignore` when there is nothing to answer.
+  @spec prepare(map()) :: {:ok, String.t(), keyword()} | :ignore
+  def prepare(%{entry: entry, mod: mod, message: message}) do
     if over_message_limit?(entry) do
       # A voice note or a document is a download plus a transcription - real cost -
       # and start_turn/4 refuses this message on message-limit grounds regardless of
       # what it resolves to, so nothing here is worth spending that on. Whether it's
       # actually refused is still decided exactly once, inside the session itself;
       # this only skips paying for media a refusal would never use.
-      converse(entry, mod, from, message[:text] || "", Map.get(message, :name), %{})
+      {:ok, message[:text] || "", []}
     else
-      case Pepe.Webhooks.Media.resolve(mod, entry, message) do
-        {:ok, text, opts} -> converse(entry, mod, from, text, Map.get(message, :name), opts)
-        # Nothing to answer, and the sender has already been told why.
-        :ignore -> :ok
-      end
+      # Nothing to answer means the sender has already been told why.
+      Pepe.Webhooks.Media.resolve(mod, entry, message)
     end
   end
 
@@ -228,62 +270,94 @@ defmodule Pepe.Webhooks do
     end
   end
 
-  defp converse(entry, mod, from, text, sender_name, opts) do
+  @doc false
+  # Second half, run by the lane in order: a command is carried out here (its state change
+  # happens now, so the next message sees it) and its reply sent off in a task; a message for
+  # the agent is *not* run here - the lane hands it to the session without waiting for the
+  # turn (`{:chat, key, text, opts}`), so the next message in the conversation can still be
+  # queued or folded into the turn the way an in-flight one always could.
+  @spec begin(map(), String.t(), keyword()) :: {:chat, String.t(), String.t(), keyword()} | :done
+  def begin(%{entry: entry, mod: mod, message: message}, text, opts) do
+    from = message.from
     agent = entry["agent"]
     key = session_key(entry, from)
 
-    case command(entry, text, from) do
+    case command(entry, text, actor(message)) do
       {:reset, reply} ->
+        SessionSupervisor.ensure(key, agent, session_opts(entry))
         Session.reset(key)
-        mod.deliver(entry, from, reply)
+        reply_async(mod, entry, from, reply)
 
       {:reply, reply} ->
-        mod.deliver(entry, from, reply)
+        reply_async(mod, entry, from, reply)
 
       {:model_show} ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
         %{model: model} = Session.status(key)
-        mod.deliver(entry, from, "Current model: #{model || "(unset)"}")
+        reply_async(mod, entry, from, "Current model: #{model || "(unset)"}")
 
       {:model_set, name, scope, perm} ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
-        mod.deliver(entry, from, apply_model_change(key, agent, name, scope, perm))
+        reply_async(mod, entry, from, apply_model_change(key, agent, name, scope, perm))
 
       {:mention, waived?} ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
         Session.set_mention_optional(key, waived?)
-        mod.deliver(entry, from, mention_reply(waived?))
+        reply_async(mod, entry, from, mention_reply(waived?))
 
       {:mention_status} ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
-        mod.deliver(entry, from, mention_status_reply(Session.mention_optional?(key)))
+        reply_async(mod, entry, from, mention_status_reply(Session.mention_optional?(key)))
 
       :chat ->
         SessionSupervisor.ensure(key, agent, session_opts(entry))
-        run_chat(entry, mod, key, from, text, sender_name, opts)
+        {:chat, key, text, chat_opts(entry, message, opts)}
     end
   end
 
-  defp run_chat(entry, mod, key, from, text, sender_name, opts) do
-    # A webhook sender is never the operator, the same "a stranger" content class every
-    # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
-    # was the one inbound surface that never withdrew auto_approve for it.
-    case Session.chat(key, text,
-           learn: learn?(entry, from),
-           authorize: nil,
-           untrusted: true,
-           sender: sender_name,
-           # An inbound image, for a vision model: rides this turn only, never persisted.
-           images: opts[:images]
-         ) do
+  # A webhook sender is never the operator, the same "a stranger" content class every
+  # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
+  # was the one inbound surface that never withdrew auto_approve for it.
+  defp chat_opts(entry, message, opts) do
+    [
+      learn: learn?(entry, actor(message)),
+      authorize: nil,
+      untrusted: true,
+      sender: Map.get(message, :name),
+      # An inbound image, for a vision model: rides this turn only, never persisted.
+      images: opts[:images]
+    ]
+  end
+
+  @doc false
+  # What the lane does with the session's answer to a message it handed over.
+  @spec finish(map(), term()) :: :ok
+  def finish(%{entry: entry, mod: mod, message: message}, result) do
+    case result do
       {:ok, reply} ->
-        mod.deliver(entry, from, reply)
+        deliver(mod, entry, message.from, reply)
 
       {:error, :busy} ->
         :ok
 
       {:error, reason} ->
         Logger.warning("[webhooks] #{entry["slug"]}: run failed: #{inspect(reason)}")
+    end
+  end
+
+  defp reply_async(mod, entry, to, text) do
+    Task.Supervisor.start_child(Pepe.Webhooks.TaskSupervisor, fn ->
+      Config.put_locale()
+      deliver(mod, entry, to, text)
+    end)
+
+    :done
+  end
+
+  defp deliver(mod, entry, to, text) do
+    case mod.deliver(entry, to, text) do
+      {:error, reason} -> Logger.warning("[webhooks] #{entry["slug"]}: could not deliver to #{to}: #{inspect(reason)}")
+      _ -> :ok
     end
   end
 

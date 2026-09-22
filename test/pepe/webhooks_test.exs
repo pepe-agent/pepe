@@ -554,4 +554,44 @@ defmodule Pepe.WebhooksTest do
       assert_receive :checked_message_limit, 1000
     end
   end
+
+  describe "a lane that refuses a message" do
+    test "the sender is told, not left silent" do
+      Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:1", model: "gpt"})
+      Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
+
+      parent = self()
+
+      Mimic.stub(Pepe.Webhooks.Lane, :submit, fn _key, _job -> {:error, :full} end)
+
+      Mimic.stub(Req, :post, fn "https://graph.facebook.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"messages" => [%{"id" => "wamid.out"}]}}}
+      end)
+
+      e = entry()
+      Config.put_webhook("support", e)
+
+      body =
+        Jason.encode!(%{
+          "entry" => [
+            %{
+              "changes" => [
+                %{"value" => %{"messages" => [%{"from" => "5511999", "type" => "text", "text" => %{"body" => "hi"}, "id" => "wamid.in"}]}}
+              ]
+            }
+          ]
+        })
+
+      sig = "sha256=" <> (:crypto.mac(:hmac, :sha256, "s3cr3t", body) |> Base.encode16(case: :lower))
+
+      assert :ok =
+               Webhooks.handle_inbound("acme", "whatsapp", "support", body, Jason.decode!(body), %{
+                 "x-hub-signature-256" => sig
+               })
+
+      assert_receive {:delivered, _url, opts}, 1000
+      assert opts[:json]["text"]["body"] =~ "behind"
+    end
+  end
 end

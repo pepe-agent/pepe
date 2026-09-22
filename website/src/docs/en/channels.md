@@ -38,6 +38,10 @@ Channels differ only in how a message reaches Pepe:
   and a generic inbound route) receive messages that the platform delivers to
   an address on your server, so Pepe must be reachable from the internet. Pepe
   exposes one URL per connection. You register it with the provider once.
+  Discord is the one exception that can straddle both shapes: its slash
+  commands are a webhook, but a connection can also opt into a Telegram-style
+  persistent connection to answer ordinary channel messages. See
+  [Discord](../discord/).
 
 Every webhook channel, whatever the platform, is served by the same inbound
 endpoint:
@@ -56,7 +60,7 @@ These are the webhook channels that ship with Pepe, and what each one needs:
 |---|---|---|
 | **WhatsApp** | Meta Cloud API webhook | `phone_number_id`, `access_token`, `app_secret`, `verify_token` |
 | **Slack** | Events API webhook | `bot_token` (`xoxb-`), `signing_secret` |
-| **Discord** | Interactions endpoint (slash commands) | `public_key`, `application_id` |
+| **Discord** | Interactions endpoint (slash commands), plus an optional gateway connection for ordinary messages | `public_key`, `application_id`, or `bot_token` for the gateway |
 | **Microsoft Teams** | Bot Framework webhook | `app_id`, `app_password`, `tenant_id` |
 | **Google Chat** | Chat API webhook | `access_token` (OAuth for the Chat API) |
 
@@ -72,11 +76,14 @@ native human handoff. Channel plugins are configured on the dashboard's
   `url_verification` challenge itself. Add the `message.channels` and
   `app_mention` events. The signing secret verifies every request. See
   [Slack](../slack/).
-- **Discord.** This uses the Interactions endpoint rather than a gateway bot, so
-  it responds to **slash commands**. Add a command with a text option, then set
-  the app's "Interactions Endpoint URL" to the connection URL. The app public key
-  verifies the Ed25519 signature. The command is acknowledged immediately and the
-  answer arrives as a follow-up. See [Discord](../discord/).
+- **Discord.** Over the Interactions endpoint, it responds to **slash
+  commands**: add a command with a text option, then set the app's
+  "Interactions Endpoint URL" to the connection URL. The app public key
+  verifies the Ed25519 signature. The command is acknowledged immediately and
+  the answer arrives as a follow-up. A connection can also opt into a
+  persistent gateway connection (`--gateway` and a bot token) to answer
+  ordinary channel messages and DMs the same way Telegram does. See
+  [Discord](../discord/).
 - **Microsoft Teams.** Register a bot in Azure and set its messaging endpoint to
   the connection URL. Pepe replies to the activity's `serviceUrl` with a token
   minted from the app credentials. The inbound Bot Framework JWT is validated, so

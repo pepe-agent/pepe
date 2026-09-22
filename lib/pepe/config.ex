@@ -3183,22 +3183,30 @@ defmodule Pepe.Config do
   @doc "Does a webhook connection with this slug exist?"
   def webhook_exists?(slug), do: not is_nil(get_webhook(slug))
 
-  @doc "Create or replace a webhook connection (keyed by its slug)."
+  @doc "Create or replace a webhook connection (keyed by its slug). A Discord connection that asks for the gateway is (re)connected."
   def put_webhook(slug, map) when is_binary(slug) and is_map(map) do
     clean = Map.delete(map, "slug")
 
-    update(fn config ->
-      config
-      |> update_in(["webhooks"], fn w -> Map.put(w || %{}, slug, clean) end)
-    end)
+    result =
+      update(fn config ->
+        config
+        |> update_in(["webhooks"], fn w -> Map.put(w || %{}, slug, clean) end)
+      end)
+
+    Pepe.Gateways.DiscordSupervisor.reload()
+    result
   end
 
   @doc "Delete a webhook connection."
   def delete_webhook(slug) do
-    update(fn config ->
-      config
-      |> update_in(["webhooks"], &Map.delete(&1 || %{}, slug))
-    end)
+    result =
+      update(fn config ->
+        config
+        |> update_in(["webhooks"], &Map.delete(&1 || %{}, slug))
+      end)
+
+    Pepe.Gateways.DiscordSupervisor.reload()
+    result
   end
 
   ###

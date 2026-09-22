@@ -13,15 +13,20 @@ defmodule Pepe.Media do
   text, so it reaches the agent exactly as if it had been typed. Wait until the agent is
   already running and that decision has been made without the words.
 
-  Three routes, tried in order, any of which may be missing:
+  Three kinds of route, tried in this order, any of which may be missing:
 
     1. `media.audio.model` in the config: a model connection, referenced by name. Its own
        `fallbacks` chain applies, so failover here costs nothing extra.
     2. `media.audio.command`: a local command, for a machine that must not send audio
        anywhere. `{file}` is substituted with the path.
-    3. No config at all: a connection you already have is used when its provider is known
-       to transcribe (see `@transcribers`). Configuring OpenAI or Groq for chat is enough
-       to make voice work, with nothing else to set up.
+    3. No config at all: every connection you already have whose provider is known to
+       transcribe (see `@transcribers`). Configuring OpenAI, Groq or Mistral for chat is
+       enough to make voice work, with nothing else to set up.
+
+  A route that fails does not end the attempt: the next one is tried, so a provider that is
+  down, over quota or missing a key costs one warning in the log and not the person's voice
+  note (a machine that keeps a local command as its safety net gets to use it). Silence is
+  not a failure: a transcript that came back empty is a read, and is never retried.
 
   When every route is absent or fails, `transcribe/1` returns `:unavailable` and the
   caller falls back to handing the file to the agent, which can still work it out with
@@ -39,8 +44,13 @@ defmodule Pepe.Media do
   # already has when we know that endpoint is actually there.
   @transcribers %{
     "api.openai.com" => "whisper-1",
-    "api.groq.com" => "whisper-large-v3-turbo"
+    "api.groq.com" => "whisper-large-v3-turbo",
+    "api.mistral.ai" => "voxtral-mini-latest"
   }
+
+  # Hosts whose transcription endpoint takes only `model` and `file`: a form field it does
+  # not know (`response_format`) is a request it may refuse, so it is left off.
+  @bare_form ~w(api.mistral.ai)
 
   defp transcribers, do: Application.get_env(:pepe, :transcriber_hosts, @transcribers)
 
@@ -74,6 +84,14 @@ defmodule Pepe.Media do
     end
   end
 
+  @doc """
+  Whether any transcription route exists right now (an explicit model or command, or a
+  connection whose provider is known to serve it). A surface that has to *say* whether it
+  can take audio (ACP's `initialize`) asks this rather than promising and failing later.
+  """
+  @spec transcription_available? :: boolean()
+  def transcription_available?, do: routes(settings()) != []
+
   @doc "Whether a transcript should be echoed back to the chat (`media.audio.echo`)."
   @spec echo? :: boolean()
   def echo?, do: settings()["echo"] == true
@@ -87,39 +105,65 @@ defmodule Pepe.Media do
   ###
 
   defp run(path, settings) do
-    case route(settings) do
-      {:model, model} -> via_model(path, model, settings)
-      {:command, template} -> via_command(path, template, settings)
-      :none -> :unavailable
+    case routes(settings) do
+      [] -> :unavailable
+      routes -> try_routes(routes, path, settings)
     end
   end
 
-  # An explicit model wins, then an explicit command, then a connection that happens to be
-  # able to do this. The command is second, not last, because a machine that configured one
-  # did so to keep audio local, and reaching past it to a provider would defeat the point.
-  defp route(settings) do
-    cond do
-      model = configured_model(settings["model"]) -> {:model, model}
-      is_binary(settings["command"]) and settings["command"] != "" -> {:command, settings["command"]}
-      model = detected_model() -> {:model, model}
-      true -> :none
+  # Each route in turn until one reads the file. What is returned when none does is the
+  # *last* failure, which is the one the log line should carry.
+  defp try_routes([route], path, settings), do: attempt(route, path, settings)
+
+  defp try_routes([route | rest], path, settings) do
+    case attempt(route, path, settings) do
+      {:ok, _text} = ok ->
+        ok
+
+      {:error, reason} ->
+        Logger.info("[media] #{describe(route)} could not transcribe #{Path.basename(path)}: #{inspect(reason)}; trying the next route")
+        try_routes(rest, path, settings)
     end
+  end
+
+  defp attempt({:model, model}, path, settings), do: via_model(path, model, settings)
+  defp attempt({:command, template}, path, settings), do: via_command(path, template, settings)
+
+  defp describe({:model, %Model{name: name}}), do: "model connection #{name}"
+  defp describe({:command, _template}), do: "the local command"
+
+  # An explicit model wins, then an explicit command, then every connection that happens
+  # to be able to do this. The command is second, not last, because a machine that
+  # configured one did so to keep audio local, and reaching past it to a provider first
+  # would defeat the point; it is still a fallback for the routes after it.
+  defp routes(settings) do
+    explicit = configured_model(settings["model"])
+
+    command =
+      case settings["command"] do
+        template when is_binary(template) and template != "" -> [{:command, template}]
+        _ -> []
+      end
+
+    detected = Enum.reject(detected_models(), &(explicit && &1.name == explicit.name))
+
+    List.wrap(explicit && {:model, explicit}) ++ command ++ Enum.map(detected, &{:model, &1})
   end
 
   defp configured_model(nil), do: nil
   defp configured_model(name) when is_binary(name), do: Config.get_model(name)
   defp configured_model(_), do: nil
 
-  # A connection the user already has, whose provider we know serves transcription. The
+  # Connections the user already has, whose provider we know serves transcription. The
   # model id is ours, not theirs: they configured that connection to chat, so its `model`
   # names a chat model, which the transcription endpoint would reject.
-  defp detected_model do
+  defp detected_models do
     known = transcribers()
 
-    Enum.find_value(Config.models(), fn %Model{} = m ->
+    Enum.flat_map(Config.models(), fn %Model{} = m ->
       case known[host(m.base_url)] do
-        nil -> nil
-        audio_model -> %{m | model: audio_model}
+        nil -> []
+        audio_model -> [%{m | model: audio_model}]
       end
     end)
   end
@@ -143,11 +187,9 @@ defmodule Pepe.Media do
     # The filename matters, and is not decoration: providers read the audio format off its
     # extension, and a part sent without one is rejected as an unknown format.
     form =
-      [
-        model: model.model,
-        response_format: "text",
-        file: {File.read!(path), filename: Path.basename(path)}
-      ]
+      [model: model.model]
+      |> put_format(host(model.base_url))
+      |> Kernel.++(file: {File.read!(path), filename: Path.basename(path)})
       |> put_language(settings["language"])
 
     req =
@@ -163,6 +205,12 @@ defmodule Pepe.Media do
       {:ok, %{status: status, body: body}} -> {:error, {:http, status, brief(body)}}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp put_format(form, host) do
+    if host in Application.get_env(:pepe, :bare_form_hosts, @bare_form),
+      do: form,
+      else: Keyword.put(form, :response_format, "text")
   end
 
   defp put_language(form, lang) when is_binary(lang) and lang != "", do: [{:language, lang} | form]

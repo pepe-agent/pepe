@@ -41,7 +41,11 @@ Pepe:
   Google Chat, y una ruta entrante genérica) reciben lo que la plataforma les
   manda a una dirección de tu propio servidor, así que en este caso Pepe sí
   tiene que estar accesible desde internet. Por cada conexión, Pepe expone
-  una URL, que registras con el proveedor una única vez.
+  una URL, que registras con el proveedor una única vez. Discord es la única
+  excepción que puede pisar ambas formas: sus comandos de barra son un
+  webhook, pero una conexión también puede pedir una conexión persistente al
+  estilo Telegram para contestar mensajes normales de canal. Ver
+  [Discord](../discord/).
 
 Todo canal por webhook, sea cual sea la plataforma, se sirve desde el mismo
 endpoint de entrada:
@@ -62,7 +66,7 @@ pide cada uno:
 |---|---|---|
 | **WhatsApp** | Webhook de la Meta Cloud API | `phone_number_id`, `access_token`, `app_secret`, `verify_token` |
 | **Slack** | Webhook de la Events API | `bot_token` (`xoxb-`), `signing_secret` |
-| **Discord** | Endpoint de Interactions (comandos de barra) | `public_key`, `application_id` |
+| **Discord** | Endpoint de Interactions (comandos de barra), más una conexión de pasarela opcional para mensajes normales | `public_key`, `application_id`, o `bot_token` para la pasarela |
 | **Microsoft Teams** | Webhook del Bot Framework | `app_id`, `app_password`, `tenant_id` |
 | **Google Chat** | Webhook de la Chat API | `access_token` (OAuth de la Chat API) |
 
@@ -79,12 +83,14 @@ canal se configuran desde la pestaña **Integrations** del panel, no desde
   `url_verification` lo responde Pepe solo. Suma los eventos
   `message.channels` y `app_mention`. Cada petición queda verificada con el
   signing secret. Ver [Slack](../slack/).
-- **Discord.** Aquí se usa el endpoint de Interactions en vez de un bot de
-  gateway, por lo que lo que responde son **comandos de barra**. Agrega un
-  comando con una opción de texto, y después pon la "Interactions Endpoint
-  URL" de la app apuntando a la URL de tu conexión. La public key de la app
-  verifica la firma Ed25519. El comando se confirma al instante, y la
-  respuesta llega después como follow-up. Ver [Discord](../discord/).
+- **Discord.** Por el endpoint de Interactions responde a **comandos de
+  barra**: agrega un comando con una opción de texto, y después pon la
+  "Interactions Endpoint URL" de la app apuntando a la URL de tu conexión. La
+  public key de la app verifica la firma Ed25519. El comando se confirma al
+  instante, y la respuesta llega después como follow-up. Una conexión también
+  puede pedir una conexión de pasarela persistente (`--gateway` y un token de
+  bot) para contestar mensajes normales de canal y DMs, igual que Telegram.
+  Ver [Discord](../discord/).
 - **Microsoft Teams.** Registra un bot en Azure y configura su messaging
   endpoint con la URL de tu conexión. Pepe contesta al `serviceUrl` de la
   activity con un token generado a partir de las credenciales de la app. Como
