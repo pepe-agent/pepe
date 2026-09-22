@@ -109,6 +109,95 @@ defmodule Pepe.MediaTest do
     end
   end
 
+  describe "when a route fails" do
+    test "the next connection that can transcribe is tried", %{audio: audio, base_url: base} do
+      Application.put_env(:pepe, :transcriber_hosts, %{"127.0.0.1" => "whisper-1"})
+      on_exit(fn -> Application.delete_env(:pepe, :transcriber_hosts) end)
+
+      # The first connection answers 404 (nothing there); the second is the stand-in that works.
+      put_model("aa-down", "http://127.0.0.1:9/v1", "chat")
+      put_model("bb-up", base, "chat")
+
+      assert {:ok, "deploy the thing"} = Media.transcribe(audio)
+      assert_receive {:asked, _body, _type}
+    end
+
+    test "a configured model that is down falls back to the local command", %{audio: audio} do
+      put_model("scribe", "http://127.0.0.1:9/v1", "whisper-1")
+      Config.put_media("audio", %{"model" => "scribe", "command" => "echo from the safety net"})
+
+      assert {:ok, "from the safety net"} = Media.transcribe(audio)
+    end
+
+    test "a configured model that is down falls back to a connection already there", %{audio: audio, base_url: base} do
+      Application.put_env(:pepe, :transcriber_hosts, %{"127.0.0.1" => "whisper-1"})
+      on_exit(fn -> Application.delete_env(:pepe, :transcriber_hosts) end)
+
+      put_model("scribe", "http://127.0.0.1:9/v1", "whisper-1")
+      put_model("chat", base, "gpt-5")
+      Config.put_media("audio", %{"model" => "scribe"})
+
+      assert {:ok, "deploy the thing"} = Media.transcribe(audio)
+    end
+
+    test "when every route fails there is nothing to transcribe, and no crash", %{audio: audio} do
+      put_model("scribe", "http://127.0.0.1:9/v1", "whisper-1")
+      Config.put_media("audio", %{"model" => "scribe", "command" => "exit 3"})
+
+      assert :unavailable = Media.transcribe(audio)
+    end
+
+    test "silence is a read, not a failure: the next route is not asked", %{audio: audio, base_url: base} do
+      Application.put_env(:pepe, :transcriber_hosts, %{"127.0.0.1" => "whisper-1"})
+      on_exit(fn -> Application.delete_env(:pepe, :transcriber_hosts) end)
+
+      put_model("openai", base, "gpt-5")
+      # A command that reads the file and finds nothing in it: exit 0, no words.
+      Config.put_media("audio", %{"command" => "true"})
+
+      assert {:ok, ""} = Media.transcribe(audio)
+      refute_receive {:asked, _, _}
+    end
+  end
+
+  describe "Mistral" do
+    test "is recognised as a provider that transcribes, and asked for its own model" do
+      assert Media.transcription_available?() == false
+
+      put_model("mistral", "https://api.mistral.ai/v1", "mistral-large-latest")
+      assert Media.transcription_available?()
+    end
+
+    test "is sent a request of only the fields it documents", %{audio: audio, base_url: base} do
+      Application.put_env(:pepe, :transcriber_hosts, %{"127.0.0.1" => "voxtral-mini-latest"})
+      Application.put_env(:pepe, :bare_form_hosts, ["127.0.0.1"])
+
+      on_exit(fn ->
+        Application.delete_env(:pepe, :transcriber_hosts)
+        Application.delete_env(:pepe, :bare_form_hosts)
+      end)
+
+      put_model("mistral", base, "mistral-large-latest")
+
+      assert {:ok, "deploy the thing"} = Media.transcribe(audio)
+      assert_receive {:asked, body, _type}
+      assert body =~ "voxtral-mini-latest"
+      refute body =~ "response_format"
+      refute body =~ "mistral-large-latest"
+    end
+
+    test "the other providers still get the plain-text response format", %{audio: audio, base_url: base} do
+      Application.put_env(:pepe, :transcriber_hosts, %{"127.0.0.1" => "whisper-1"})
+      on_exit(fn -> Application.delete_env(:pepe, :transcriber_hosts) end)
+
+      put_model("openai", base, "gpt-5")
+
+      assert {:ok, _} = Media.transcribe(audio)
+      assert_receive {:asked, body, _type}
+      assert body =~ "response_format"
+    end
+  end
+
   describe "a local command" do
     test "is used when set, and its output is the transcript", %{audio: audio} do
       Config.put_media("audio", %{"command" => "echo hello from disk"})

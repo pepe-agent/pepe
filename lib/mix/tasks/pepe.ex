@@ -407,6 +407,11 @@ defmodule Mix.Tasks.Pepe do
   def dispatch(["gateway", "whatsapp" | rest]),
     do: with_config(fn -> gateway_cmd(["whatsapp" | rest]) end)
 
+  # Discord connections too: the CLI edits config, and a running `serve` opens or closes the
+  # gateway socket by itself when the connection changes.
+  def dispatch(["gateway", "discord" | rest]),
+    do: with_config(fn -> gateway_cmd(["discord" | rest]) end)
+
   def dispatch(["gateway" | rest]), do: with_app([gateways: true], fn -> gateway_cmd(rest) end)
 
   def dispatch(other) do
@@ -4576,6 +4581,7 @@ defmodule Mix.Tasks.Pepe do
           access_token: :string,
           app_secret: :string,
           verify_token: :string,
+          max_attachment_mb: :integer,
           trainers: :string,
           ttl_min: :integer,
           ephemeral: :boolean,
@@ -4627,12 +4633,96 @@ defmodule Mix.Tasks.Pepe do
 
       add SLUG --agent HANDLE --phone-number-id ID [--project CO] [--mode support|admin]
                [--access-token ${ENV}] [--app-secret ${ENV}] [--verify-token X]
+               [--max-attachment-mb N]
                [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
       list                     list connections + their Callback URLs
       set-agent SLUG HANDLE     rebind a connection to another agent
       remove SLUG               delete a connection
 
     Served by `mix pepe serve`. Register the printed Callback URL in your Meta app.
+    """)
+  end
+
+  defp gateway_cmd(["discord", "list" | _]) do
+    case Config.webhooks() |> Enum.filter(fn {_s, e} -> e["provider"] == "discord" end) do
+      [] ->
+        info(
+          "no Discord connections. Add one:\n  mix pepe gateway discord add support --agent <handle> --gateway --bot-token '${DISCORD_TOKEN}'"
+        )
+
+      conns ->
+        Enum.each(conns, &print_discord_conn_line/1)
+    end
+  end
+
+  defp gateway_cmd(["discord", "add", slug | rest]) do
+    {opts, _, _} =
+      OptionParser.parse(rest,
+        strict: [
+          agent: :string,
+          project: :string,
+          mode: :string,
+          application_id: :string,
+          public_key: :string,
+          bot_token: :string,
+          gateway: :boolean,
+          require_mention: :boolean,
+          max_attachment_mb: :integer,
+          trainers: :string,
+          ttl_min: :integer,
+          ephemeral: :boolean,
+          commands: :boolean
+        ]
+      )
+
+    mode = if opts[:mode] == "admin", do: "admin", else: "support"
+
+    case discord_add_error(slug, opts) do
+      nil -> save_discord_connection(slug, mode, opts)
+      message -> error(message)
+    end
+  end
+
+  defp gateway_cmd(["discord", "set-agent", slug, agent | _]) do
+    case Config.get_webhook(slug) do
+      %{"provider" => "discord"} = e ->
+        Config.put_webhook(slug, Map.put(e, "agent", agent))
+        ok("#{green(slug)} -> agent #{agent}")
+
+      _ ->
+        error("unknown discord connection: #{slug}")
+    end
+  end
+
+  defp gateway_cmd(["discord", "remove", slug | _]) do
+    case Config.get_webhook(slug) do
+      %{"provider" => "discord"} ->
+        Config.delete_webhook(slug)
+        ok("#{green(slug)} removed")
+
+      _ ->
+        error("unknown discord connection: #{slug}")
+    end
+  end
+
+  defp gateway_cmd(["discord" | _]) do
+    info("""
+    mix pepe gateway discord - Discord connections
+
+      add SLUG --agent HANDLE [--project CO] [--mode support|admin]
+               slash commands:   --application-id ID --public-key HEX
+               channel messages: --gateway --bot-token ${ENV} [--no-require-mention]
+               [--max-attachment-mb N]
+               [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
+      list                     list connections
+      set-agent SLUG HANDLE    rebind a connection to another agent
+      remove SLUG              delete a connection
+
+    --gateway makes the bot read ordinary messages, files and voice messages in channels and
+    direct messages (a server channel is answered only when the bot is @mentioned or replied
+    to, unless --no-require-mention). Turn on the Message Content intent on the app's Bot page
+    to let it read every message. Both need `mix pepe serve`; slash commands also need the
+    Interactions Endpoint URL registered in the Discord app.
     """)
   end
 
@@ -4732,6 +4822,34 @@ defmodule Mix.Tasks.Pepe do
   defp gateway_cmd(_),
     do: error("usage: mix pepe gateway telegram [setup|add|list|remove]  (or: help)")
 
+  defp discord_add_error(slug, opts) do
+    if Config.webhook_exists?(slug),
+      do: "a webhook connection named #{slug} already exists",
+      else: discord_add_agent_error(opts)
+  end
+
+  defp discord_add_agent_error(opts) do
+    if is_nil(opts[:agent]),
+      do: "discord add needs --agent HANDLE (who answers)",
+      else: discord_add_gateway_error(opts)
+  end
+
+  defp discord_add_gateway_error(opts) do
+    if opts[:gateway] == true and is_nil(opts[:bot_token]),
+      do: "--gateway needs --bot-token (the bot's token from the app's Bot page)",
+      else: discord_add_route_error(opts)
+  end
+
+  defp discord_add_route_error(opts) do
+    slash? = is_binary(opts[:application_id]) and is_binary(opts[:public_key])
+    channel? = opts[:gateway] == true and is_binary(opts[:bot_token])
+
+    if slash? or channel?,
+      do: nil,
+      else:
+        "discord add needs --application-id and --public-key (slash commands), or --gateway with --bot-token (channel messages), or both"
+  end
+
   defp print_whatsapp_conn_line({slug, e}) do
     co = e["project"] || "default"
     puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}")
@@ -4756,7 +4874,8 @@ defmodule Mix.Tasks.Pepe do
             "phone_number_id" => opts[:phone_number_id],
             "access_token" => opts[:access_token] || "${WA_TOKEN_#{String.upcase(slug)}}",
             "app_secret" => opts[:app_secret] || "${WA_APP_SECRET_#{String.upcase(slug)}}",
-            "verify_token" => opts[:verify_token] || slug
+            "verify_token" => opts[:verify_token] || slug,
+            "max_attachment_mb" => opts[:max_attachment_mb] && Integer.to_string(opts[:max_attachment_mb])
           }
           |> reject_nil_values()
       }
@@ -4768,6 +4887,54 @@ defmodule Mix.Tasks.Pepe do
     info("register this Callback URL in the Meta app:")
     info(bold("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
     info(dim("   verify token: #{entry["config"]["verify_token"]}"))
+  end
+
+  defp print_discord_conn_line({slug, e}) do
+    c = e["config"] || %{}
+    co = e["project"] || "default"
+    reads = if c["receive_channel_messages"] == "true", do: "channel messages on", else: "slash commands only"
+    puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}  (#{reads})")
+    puts(dim("   #{webhook_host()}/webhooks/#{co}/discord/#{slug}"))
+  end
+
+  defp save_discord_connection(slug, mode, opts) do
+    support? = mode == "support"
+
+    entry =
+      %{
+        "provider" => "discord",
+        "project" => blank_default(opts[:project], nil),
+        "agent" => opts[:agent],
+        "mode" => mode,
+        "commands" => Keyword.get(opts, :commands, mode == "admin"),
+        "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
+        "ephemeral" => Keyword.get(opts, :ephemeral, support?),
+        "session_ttl_min" => opts[:ttl_min],
+        "config" =>
+          %{
+            "application_id" => opts[:application_id],
+            "public_key" => opts[:public_key],
+            "bot_token" => opts[:bot_token],
+            "receive_channel_messages" => if(opts[:gateway] == true, do: "true"),
+            "require_mention" => if(opts[:require_mention] == false, do: "false"),
+            "max_attachment_mb" => opts[:max_attachment_mb] && Integer.to_string(opts[:max_attachment_mb])
+          }
+          |> reject_nil_values()
+      }
+      |> reject_nil_values()
+
+    Config.put_webhook(slug, entry)
+    ok("discord #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
+
+    if opts[:application_id] do
+      co = entry["project"] || "default"
+      info("set this as the app's Interactions Endpoint URL:")
+      info(bold("   #{webhook_host()}/webhooks/#{co}/discord/#{slug}"))
+    end
+
+    if opts[:gateway] do
+      info(dim("   channel messages are read once `mix pepe serve` is running; enable the Message Content intent on the app's Bot page"))
+    end
   end
 
   defp print_telegram_bot_line(b) do

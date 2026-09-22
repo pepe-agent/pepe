@@ -214,6 +214,11 @@ defmodule Pepe.MixProject do
       ## What is it: talking to the outside world (model providers, fetch_url, email)
       ## and turning what comes back into something an agent or the dashboard can use.
       {:req, "~> 0.5"},
+      # The WebSocket client for a persistent messaging connection (Discord's gateway,
+      # Pepe.Gateways.Discord). Already in the lock as the transport of the browser tool's
+      # CDP client (cdp_ex); declared here because it is used directly now, and a transitive
+      # dependency is not something to lean on by name.
+      {:mint_web_socket, "~> 1.0"},
       {:swoosh, "~> 1.16"},
       # HTML parsing for `fetch_url`'s readable-text extraction (Pepe.Readable) - the
       # actual "readability" hex package pulls in httpoison/hackney (for a URL-fetching
