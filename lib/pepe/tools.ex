@@ -56,6 +56,8 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.SessionSearch
   alias Pepe.Tools.SetRoute
   alias Pepe.Tools.Skill
+  alias Pepe.Tools.SkillCurator
+  alias Pepe.Tools.SkillManage
   alias Pepe.Tools.SwitchAgent
   alias Pepe.Tools.TelegramAccess
   alias Pepe.Tools.TelegramPoll
@@ -105,6 +107,8 @@ defmodule Pepe.Tools do
     ManageSkill,
     ManageToken,
     ScanSkill,
+    SkillManage,
+    SkillCurator,
     RenameAgent,
     ConfigGet,
     ConfigSet,

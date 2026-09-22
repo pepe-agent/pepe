@@ -67,8 +67,14 @@ defmodule Pepe.Tools.ReadFile do
     full = resolve(path, ctx)
 
     case File.read(full) do
-      {:ok, content} -> {:ok, window(content, args["offset"], args["limit"], max_bytes(ctx))}
-      {:error, reason} -> {:error, "cannot read #{full}: #{:file.format_error(reason)}"}
+      {:ok, content} ->
+        # A background skill run must have read a file before it may rewrite it; see
+        # Pepe.Skills.Tracker. A no-op for every other caller.
+        Pepe.Skills.Tracker.mark_path(ctx[:review_run], full)
+        {:ok, window(content, args["offset"], args["limit"], max_bytes(ctx))}
+
+      {:error, reason} ->
+        {:error, "cannot read #{full}: #{:file.format_error(reason)}"}
     end
   end
 

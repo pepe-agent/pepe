@@ -9,9 +9,11 @@ defmodule Pepe.Skills.Ownership do
       name overrides it, which is then a `:user` skill.
     * `:installed` - came from a registry, tap or URL (`pepe skill install`). Its source
       owns it; an update replaces whatever was edited locally.
-    * `:agent` - an agent wrote it through `skill_manage`, or a person handed it over with
-      `pepe skill adopt`. The only origin the background review and the curator may change
-      on their own.
+    * `:agent` - the background review or the curator wrote it through `skill_manage` with
+      nobody present, or a person handed it over with `pepe skill adopt`. The only origin the
+      background review and the curator may change on their own. A skill an agent wrote in a
+      conversation, with the person in front of it, is that person's (`:user`): they saw and
+      allowed it, and nothing runs behind their back to rewrite it.
     * `:user` - anything else in the user skills directory: written by hand, or written
       before ownership was recorded. A skill nobody declared to be an agent's stays a
       person's, which is the safe default for the files most likely to matter to them.

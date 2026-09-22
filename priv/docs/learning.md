@@ -19,9 +19,9 @@ returning each matching entry tagged with the file it came from.
 
 After a conversation you get a background **review**: a restricted copy of you runs
 over the transcript with tools cut down to file/skill management only (`read_file`,
-`write_file`, `edit_file`, `list_dir`, `skill`) - no shell, no network, and no human
-permission prompt, so the review can update your workspace but nothing else. The live
-session is untouched. It fires three ways:
+`write_file`, `edit_file`, `list_dir`, `skill`, `skill_manage`) - no shell, no network, and
+no human permission prompt, so the review can update your workspace but nothing else. The
+live session is untouched. It fires three ways:
 
 - on **`/compact`** - reviewed before the history is squashed, while detail is fresh.
 - on **idle** - about 90 seconds after the last turn.
@@ -62,3 +62,39 @@ mix pepe learn status                      # which agents consolidate on a sched
 
 The nightly job is a managed `consolidate` entry on the scheduled-tasks page, and each
 run is recorded like any other run.
+
+## Writing skills: `skill_manage`
+
+Skills are written through the `skill_manage` tool (actions `create`, `edit`, `patch`,
+`delete`, `write_file`, `remove_file`), not with the file tools. Every change is scanned,
+size-limited, snapshotted and recorded (who, what, before and after), so a person can undo
+it with `mix pepe skill undo ID`. Rules that apply to you:
+
+- In a conversation with a person present, the call goes through the normal permission
+  prompt, and what you create is **theirs** afterwards.
+- In the background review and the curator, nobody is asked, so the rules are tighter: you
+  may only change skills an **agent wrote in the background** (or a person handed over with
+  `mix pepe skill adopt`). Skills the person wrote, installed skills, bundled skills and
+  pinned skills are refused - suggest the change in your summary instead. You must open a
+  skill with `skill` before you patch or overwrite it. Prefer `patch` on the skill you
+  used, then on a broader "umbrella" skill, then a support file (`references/`,
+  `templates/`, `scripts/`), and only then a new class-level skill.
+- A transcript that took in outside content (a fetched page, a search result, an
+  attachment) is reviewed for memory only, never for skills.
+
+## The skill curator
+
+Unused skills an agent wrote in the background are tidied by the **curator**: after
+`stale_after_days` (default 14) without being used, opened or changed a skill is marked
+stale, after `archive_after_days` (default 30) it is archived (moved aside, never
+deleted; `mix pepe skill restore NAME` brings it back). It runs on its own about weekly,
+only when nothing has been said in any conversation for a couple of hours, takes a
+snapshot of the whole skills directory first, and writes a report. An optional model pass
+(`consolidate`, off by default) merges overlapping skills into broader ones through
+`skill_manage`. Skills a person wrote, installed and pinned skills are never touched.
+
+A person can look after it from chat with the `skill_curator` tool (`status`, `usage`,
+`run` with `dry_run`, `pause`/`resume`, `settings`, `adopt`/`release`, `pin`/`unpin`,
+`restore`, `log`, `undo`), from `mix pepe skill curator ...`, from the Learning page of
+the dashboard, or from `mix pepe setup` (Skills). Prefer a dry run first when asked to
+"clean up my skills", and say what it found before running it for real.

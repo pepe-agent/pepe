@@ -80,6 +80,8 @@ defmodule Pepe.Agent.Runtime do
           source: String.t() | nil,
           sender: String.t() | nil,
           review: boolean(),
+          review_run: String.t() | nil,
+          review_actor: String.t() | nil,
           untrusted: boolean(),
           images: [map()] | nil,
           agent_chain: [String.t()] | nil,
@@ -274,6 +276,11 @@ defmodule Pepe.Agent.Runtime do
       # When true (autonomous consolidation), file writes are staged for review
       # instead of applied - see Pepe.Approval.
       review: opts[:review] == true,
+      # Set only for a background skill review or curator pass (see Pepe.Skills.Review): an
+      # id the tools use to remember what this run has read, and who to name in the ledger.
+      # Its presence is what marks a skill write as "nobody is present" to Pepe.Skills.Manage.
+      review_run: opts[:review_run],
+      review_actor: opts[:review_actor],
       # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
       agent_chain: opts[:agent_chain],
       # Set only while a Pepe.Graph.Runner node is executing - `run_graph`'s tool reads
@@ -394,6 +401,8 @@ defmodule Pepe.Agent.Runtime do
         content = content || ""
         emit(opts, {:assistant, content})
         emit(opts, {:done, content})
+        # The turn is over: count each skill it opened as used or failed (curator's clock).
+        SkillLearning.record_outcomes(messages, ctx)
         {:ok, content, messages ++ [Message.assistant(content)]}
 
       {:error, reason} ->
@@ -719,7 +728,7 @@ defmodule Pepe.Agent.Runtime do
   # Exposed via `stageable?/1` (not just the private guard below) so `RunCode`'s
   # sandbox bridge can apply the exact same staging rule to a script-called tool
   # instead of keeping a second copy of this list that could silently drift from it.
-  @stageable ~w(write_file edit_file move_file)
+  @stageable ~w(write_file edit_file move_file skill_manage)
   @doc false
   def stageable?(name), do: name in @stageable
 
