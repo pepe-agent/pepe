@@ -76,10 +76,13 @@ arquivo_teste_aprovacao_*.txt
 /voice_*.txt
 /voice_*.vtt
 
-# Local agent tooling state, not part of the project.
+# Local agent tooling state, not part of the project. The .claude/skills/ entries
+# have no trailing slash on purpose: .claude/skills/autofix and .claude/skills/code-review
+# are symlinks into .agents/skills/, and a pattern with a trailing slash only matches a
+# real directory, never a symlink (even one pointing at a directory).
 /.claude/agent-memory/
-/.claude/skills/autofix/
-/.claude/skills/code-review/
+/.claude/skills/autofix
+/.claude/skills/code-review
 /.claude/worktrees/
 /.agents/skills/autofix/
 /.agents/skills/code-review/
