@@ -1,18 +1,18 @@
-#  "msgid"s in this file come from POT (.pot) files.
-# #
-# # Do not add, change, or remove "msgid"s manually here as
-# # they're tied to the ones in the corresponding POT file
-# # (with the same domain).
-# #
-# # Use "mix gettext.extract --merge" or "mix gettext.merge"
-# # to merge POT files into PO files.
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
 msgid ""
 msgstr ""
 "Language: es\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: lib/pepe/webhooks/googlechat.ex:39
-#: lib/pepe/webhooks/whatsapp.ex:53
+#: lib/pepe/webhooks/whatsapp.ex:49
 #, elixir-autogen, elixir-format
 msgid "Access token"
 msgstr "Token de acceso"
@@ -27,28 +27,27 @@ msgstr "Id de la app"
 msgid "App password"
 msgstr "Contraseña de la app"
 
-#: lib/pepe/webhooks/whatsapp.ex:59
+#: lib/pepe/webhooks/whatsapp.ex:55
 #, elixir-autogen, elixir-format
 msgid "App secret"
 msgstr "Secreto de la app"
 
-#: lib/pepe/webhooks/discord.ex:76
+#: lib/pepe/webhooks/discord.ex:52
 #, elixir-autogen, elixir-format
 msgid "Application ID"
 msgstr "ID de la aplicación"
 
-#: lib/pepe/webhooks/discord.ex:95
 #: lib/pepe/webhooks/slack.ex:33
 #, elixir-autogen, elixir-format
 msgid "Bot token"
 msgstr "Token del bot"
 
-#: lib/pepe/webhooks/whatsapp.ex:55
+#: lib/pepe/webhooks/whatsapp.ex:51
 #, elixir-autogen, elixir-format
 msgid "Graph API bearer token; store as ${ENV_VAR}"
 msgstr "Token bearer de la Graph API; guárdalo como ${ENV_VAR}"
 
-#: lib/pepe/webhooks/whatsapp.ex:47
+#: lib/pepe/webhooks/whatsapp.ex:43
 #, elixir-autogen, elixir-format
 msgid "Phone number ID"
 msgstr "ID del número de teléfono"
@@ -58,12 +57,11 @@ msgstr "ID del número de teléfono"
 msgid "Project number"
 msgstr "Número de proyecto"
 
-#: lib/pepe/webhooks/discord.ex:70
+#: lib/pepe/webhooks/discord.ex:46
 #, elixir-autogen, elixir-format
 msgid "Public key"
 msgstr "Clave pública"
 
-#: lib/pepe/webhooks/discord.ex:106
 #: lib/pepe/webhooks/msteams.ex:54
 #: lib/pepe/webhooks/slack.ex:45
 #, elixir-autogen, elixir-format
@@ -85,7 +83,7 @@ msgstr "Secreto de firma"
 msgid "Tenant id"
 msgstr "Id del tenant"
 
-#: lib/pepe/webhooks/whatsapp.ex:65
+#: lib/pepe/webhooks/whatsapp.ex:61
 #, elixir-autogen, elixir-format
 msgid "Verify token"
 msgstr "Token de verificación"
@@ -95,11 +93,10 @@ msgstr "Token de verificación"
 msgid "an OAuth token for the Chat API; store as ${ENV_VAR}"
 msgstr "un token OAuth para la Chat API; guárdalo como ${ENV_VAR}"
 
-#: lib/pepe/webhooks/whatsapp.ex:67
+#: lib/pepe/webhooks/whatsapp.ex:63
 #, elixir-autogen, elixir-format
 msgid "any string you choose; echoed during the subscribe handshake"
-msgstr ""
-"cualquier texto que elijas; se devuelve durante el handshake de suscripción"
+msgstr "cualquier texto que elijas; se devuelve durante el handshake de suscripción"
 
 #: lib/pepe/webhooks/slack.ex:41
 #, elixir-autogen, elixir-format
@@ -109,23 +106,17 @@ msgstr "está en la Basic Information de la app; guárdalo como ${ENV_VAR}"
 #: lib/pepe/webhooks/slack.ex:49
 #, elixir-autogen, elixir-format
 msgid "in a channel, reply only when the bot is @mentioned (default true); a direct message always replies"
-msgstr ""
-"en un canal, responder solo cuando se @menciona al bot (predeterminado: "
-"true); un mensaje directo siempre recibe respuesta"
+msgstr "en un canal, responder solo cuando se @menciona al bot (predeterminado: true); un mensaje directo siempre recibe respuesta"
 
 #: lib/pepe/webhooks/googlechat.ex:59
 #, elixir-autogen, elixir-format
 msgid "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
-msgstr ""
-"en un espacio con varias personas, responder solo cuando se @menciona a la "
-"app (predeterminado: true); un mensaje directo siempre recibe respuesta"
+msgstr "en un espacio con varias personas, responder solo cuando se @menciona a la app (predeterminado: true); un mensaje directo siempre recibe respuesta"
 
 #: lib/pepe/webhooks/msteams.ex:58
 #, elixir-autogen, elixir-format
 msgid "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
-msgstr ""
-"en un canal de equipo o un chat de grupo, responder solo cuando se @menciona"
-" al bot (predeterminado: true); un chat 1:1 siempre recibe respuesta"
+msgstr "en un canal de equipo o un chat de grupo, responder solo cuando se @menciona al bot (predeterminado: true); un chat 1:1 siempre recibe respuesta"
 
 #: lib/pepe/webhooks/msteams.ex:50
 #, elixir-autogen, elixir-format
@@ -135,12 +126,9 @@ msgstr "el id de tenant de Azure (o botframework.com)"
 #: lib/pepe/webhooks/googlechat.ex:48
 #, elixir-autogen, elixir-format
 msgid "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
-msgstr ""
-"el número de proyecto de Cloud con el que está registrada la app de Chat; la"
-" Authentication Audience de la app tiene que estar puesta en \"Project "
-"Number\""
+msgstr "el número de proyecto de Cloud con el que está registrada la app de Chat; la Authentication Audience de la app tiene que estar puesta en \"Project Number\""
 
-#: lib/pepe/webhooks/discord.ex:72
+#: lib/pepe/webhooks/discord.ex:48
 #, elixir-autogen, elixir-format
 msgid "the app's Public Key (hex), for signature verification"
 msgstr "la Public Key (hex) de la app, para verificar la firma"
@@ -155,17 +143,17 @@ msgstr "el id de app (cliente) de Microsoft del bot"
 msgid "the client secret; store as ${ENV_VAR}"
 msgstr "el client secret; guárdalo como ${ENV_VAR}"
 
-#: lib/pepe/webhooks/whatsapp.ex:49
+#: lib/pepe/webhooks/whatsapp.ex:45
 #, elixir-autogen, elixir-format
 msgid "the sending endpoint id from Meta"
 msgstr "el id del endpoint de envío que da Meta"
 
-#: lib/pepe/webhooks/discord.ex:78
+#: lib/pepe/webhooks/discord.ex:54
 #, elixir-autogen, elixir-format
 msgid "used to post the reply"
 msgstr "se usa para publicar la respuesta"
 
-#: lib/pepe/webhooks/whatsapp.ex:61
+#: lib/pepe/webhooks/whatsapp.ex:57
 #, elixir-autogen, elixir-format
 msgid "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}"
 msgstr "verifica el X-Hub-Signature-256 entrante; guárdalo como ${ENV_VAR}"
@@ -174,83 +162,3 @@ msgstr "verifica el X-Hub-Signature-256 entrante; guárdalo como ${ENV_VAR}"
 #, elixir-autogen, elixir-format
 msgid "xoxb-... ; store as ${ENV_VAR}"
 msgstr "xoxb-... ; guárdalo como ${ENV_VAR}"
-
-#: lib/pepe/webhooks/media.ex:418
-#, elixir-autogen, elixir-format
-msgid "I can't pick up attachments on this channel yet. Could you send it as text?"
-msgstr ""
-"Todavía no puedo recibir archivos adjuntos por este canal. ¿Puedes "
-"enviármelo como texto?"
-
-#: lib/pepe/webhooks/media.ex:420
-#, elixir-autogen, elixir-format
-msgid "I couldn't download that file. Could you send it again?"
-msgstr "No pude descargar ese archivo. ¿Puedes enviarlo otra vez?"
-
-#: lib/pepe/webhooks/media.ex:265
-#, elixir-autogen, elixir-format
-msgid "I couldn't make out any speech in that."
-msgstr "No pude distinguir ninguna voz ahí."
-
-#: lib/pepe/webhooks.ex:213
-#, elixir-autogen, elixir-format
-msgid "I'm a bit behind on messages here. Could you send that again in a moment?"
-msgstr ""
-"Ando un poco atrasado con los mensajes. ¿Podrías enviarlo de nuevo en un "
-"momento?"
-
-#: lib/pepe/webhooks/discord.ex:117
-#: lib/pepe/webhooks/whatsapp.ex:71
-#, elixir-autogen, elixir-format
-msgid "Largest attachment (MB)"
-msgstr "Tamaño máximo de adjunto (MB)"
-
-#: lib/pepe/webhooks/discord.ex:82
-#, elixir-autogen, elixir-format
-msgid "Receive channel messages"
-msgstr "Recibir mensajes de canales"
-
-#: lib/pepe/webhooks/media.ex:412
-#, elixir-autogen, elixir-format
-msgid "That file is too big for me to take in here. Could you send a smaller version, or share it another way?"
-msgstr ""
-"Ese archivo es demasiado grande para que pueda recibirlo aquí. ¿Puedes "
-"enviar una versión más pequeña o compartirlo de otra forma?"
-
-#: lib/pepe/webhooks/discord.ex:88
-#, elixir-autogen, elixir-format
-msgid "also answer ordinary messages, attachments and voice messages in channels and direct messages, not only slash commands; needs the bot token below"
-msgstr ""
-"responder también a mensajes normales, archivos adjuntos y mensajes de voz "
-"en canales y mensajes directos, no solo a comandos de barra; necesita el "
-"token del bot de más abajo"
-
-#: lib/pepe/webhooks/discord.ex:110
-#, elixir-autogen, elixir-format
-msgid "in a server channel, reply only when the bot is @mentioned or replied to (default true); a direct message always replies"
-msgstr ""
-"en un canal de servidor, responder solo cuando se @menciona al bot o se "
-"responde a un mensaje suyo (predeterminado: true); un mensaje directo "
-"siempre recibe respuesta"
-
-#: lib/pepe/webhooks/discord.ex:99
-#, elixir-autogen, elixir-format
-msgid "only for channel messages: the bot's token from the app's Bot page, with the Message Content intent enabled there to read every message; store as ${ENV_VAR}"
-msgstr ""
-"solo para mensajes de canal: el token del bot, de la página Bot de la app, "
-"con el intent Message Content activado allí para leer todos los mensajes; "
-"guárdalo como ${ENV_VAR}"
-
-#: lib/pepe/webhooks/discord.ex:121
-#, elixir-autogen, elixir-format
-msgid "optional, 1 to 100: the largest file taken in from a message (default 20). Discord's own limit still applies"
-msgstr ""
-"opcional, de 1 a 100: el archivo más grande que se acepta de un mensaje "
-"(predeterminado: 20). El límite propio de Discord sigue aplicándose"
-
-#: lib/pepe/webhooks/whatsapp.ex:75
-#, elixir-autogen, elixir-format
-msgid "optional, 1 to 100: the largest file taken in from a message (default 20). Meta's own limit still applies"
-msgstr ""
-"opcional, de 1 a 100: el archivo más grande que se acepta de un mensaje "
-"(predeterminado: 20). El límite propio de Meta sigue aplicándose"
