@@ -70,8 +70,8 @@ defmodule Pepe.Webhooks.Media.Download do
   defp hop(_url, hops, %{max_redirects: max}) when hops > max, do: {:error, :too_many_redirects}
 
   defp hop(url, hops, ctx) do
-    with {:ok, host} <- validate(url, ctx) do
-      case request(url, ctx, host) do
+    with {:ok, _host} <- validate(url, ctx) do
+      case request(url, ctx) do
         {:ok, %{status: status} = resp} when status in 300..399 -> redirect(resp, url, hops, ctx)
         {:ok, %{status: status} = resp} when status in 200..299 -> body(resp, ctx)
         {:ok, %{status: status}} -> {:error, {:http, status}}
@@ -98,10 +98,14 @@ defmodule Pepe.Webhooks.Media.Download do
 
   defp host_allowed?(host, hosts) do
     host = String.downcase(host)
-    Enum.any?(hosts, fn allowed -> host == allowed or String.ends_with?(host, "." <> allowed) end)
+
+    Enum.any?(hosts, fn allowed ->
+      allowed = String.downcase(allowed)
+      host == allowed or String.ends_with?(host, "." <> allowed)
+    end)
   end
 
-  defp request(url, ctx, host) do
+  defp request(url, ctx) do
     opts =
       [
         decode_body: false,
@@ -111,19 +115,31 @@ defmodule Pepe.Webhooks.Media.Download do
         headers: ctx.headers,
         into: collector(ctx.max_bytes)
       ]
-      |> put_auth(ctx, host)
+      |> put_auth(ctx, url)
 
     Req.get(url, opts)
   end
 
   # The credential only ever travels to the origin the download began at.
-  defp put_auth(opts, %{bearer: token, origin: origin}, host) when is_binary(token) and token != "" do
-    if String.downcase(host) == origin, do: Keyword.put(opts, :auth, {:bearer, token}), else: opts
+  defp put_auth(opts, %{bearer: token, origin: origin}, url) when is_binary(token) and token != "" do
+    if origin(url) == origin, do: Keyword.put(opts, :auth, {:bearer, token}), else: opts
   end
 
   defp put_auth(opts, _ctx, _host), do: opts
 
-  defp origin(url), do: url |> URI.parse() |> Map.get(:host) |> to_string() |> String.downcase()
+  defp origin(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, port: port} when is_binary(scheme) and is_binary(host) ->
+        {String.downcase(scheme), String.downcase(host), port || default_port(scheme)}
+
+      _ ->
+        nil
+    end
+  end
+
+  defp default_port("https"), do: 443
+  defp default_port("http"), do: 80
+  defp default_port(_scheme), do: nil
 
   # Counts bytes as they land and halts the transfer past the cap. A declared length over the
   # cap is refused on the first chunk, before it is kept.

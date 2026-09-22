@@ -188,25 +188,13 @@ defmodule Pepe.Webhooks.Discord do
   """
   @impl true
   def fetch_media(_config, %{ref: url}) when is_binary(url) do
-    with :ok <- cdn(url) do
-      # `decode_body: false`: what is wanted is the bytes, not Req's reading of whatever
-      # the content-type claims they are.
-      case Req.get(url, decode_body: false, receive_timeout: 120_000) do
-        {:ok, %{status: s, body: body}} when s in 200..299 and is_binary(body) -> {:ok, body}
-        {:ok, %{status: s}} -> {:error, {:discord, s}}
-        {:error, reason} -> {:error, reason}
-      end
+    case Pepe.Webhooks.Media.Download.get(url, hosts: @cdn_hosts) do
+      {:error, :bad_url} -> {:error, :bad_attachment_url}
+      result -> result
     end
   end
 
   def fetch_media(_config, _media), do: {:error, :no_attachment_url}
-
-  defp cdn(url) do
-    case URI.parse(url) do
-      %URI{scheme: "https", host: host} when host in @cdn_hosts -> :ok
-      _ -> {:error, :bad_attachment_url}
-    end
-  end
 
   @impl true
   def deliver(config, token, text) do
