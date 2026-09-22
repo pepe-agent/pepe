@@ -158,29 +158,72 @@ defmodule Pepe.MCP.Client do
   defp executable(_), do: {:error, :no_command}
 
   defp open_port(exe, spec) do
-    args = spec |> Map.get(:args, []) |> Enum.map(&Protocol.interp/1)
-    env = spec |> Map.get(:env, %{}) |> env_list()
+    args = spec |> Map.get(:args, []) |> Enum.map(&Protocol.interp(&1, spec))
+    env = spec |> Map.get(:env, %{}) |> env_list(spec) |> isolate(spec)
 
     port =
-      Port.open({:spawn_executable, exe}, [
-        :binary,
-        :exit_status,
-        {:args, args},
-        {:env, env}
-      ])
+      Port.open(
+        {:spawn_executable, exe},
+        [:binary, :exit_status, {:args, args}, {:env, env}] ++ working_dir(spec)
+      )
 
     {:ok, port}
   rescue
     e -> {:error, e}
   end
 
-  defp env_list(env) when is_map(env) do
+  defp env_list(env, spec) when is_map(env) do
     Enum.map(env, fn {k, v} ->
-      {String.to_charlist(to_string(k)), String.to_charlist(Protocol.interp(to_string(v)))}
+      {String.to_charlist(to_string(k)), String.to_charlist(Protocol.interp(to_string(v), spec))}
     end)
   end
 
-  defp env_list(_), do: []
+  defp env_list(_env, _spec), do: []
+
+  # What a literal spec's child may inherit from Pepe. `Port.open`'s `{:env, list}` only ADDS
+  # to the parent's environment, so a `literal` spec (one an editor supplied, which can come
+  # straight out of a cloned repository) would otherwise read every provider key and gateway
+  # token Pepe holds with one `env` in its own command. So for those the rest is unset: what
+  # remains is what a program needs to run at all, plus what the editor named itself. A
+  # server the operator configured (no `:literal`) keeps the whole environment, as ever.
+  @inherited ~w(PATH HOME LANG LC_ALL TMPDIR USER LOGNAME SHELL TERM)
+
+  # The same for Windows, where a child without them cannot start a shell or find a profile.
+  @inherited_windows ~w[SYSTEMROOT SYSTEMDRIVE WINDIR COMSPEC PATHEXT OS USERPROFILE USERNAME APPDATA
+                        LOCALAPPDATA TEMP TMP PROGRAMFILES PROGRAMFILES(X86) PROGRAMDATA COMPUTERNAME
+                        NUMBER_OF_PROCESSORS PROCESSOR_ARCHITECTURE]
+
+  defp isolate(env, %{literal: true}) do
+    named = MapSet.new(env, fn {name, _value} -> List.to_string(name) end)
+
+    dropped =
+      for {name, _value} <- System.get_env(),
+          not inherited?(name),
+          not MapSet.member?(named, name),
+          # Windows keeps drive-cwd bookkeeping in variables named "=C:"; they are not settable.
+          not String.starts_with?(name, "="),
+          do: {String.to_charlist(name), false}
+
+    env ++ dropped
+  end
+
+  defp isolate(env, _spec), do: env
+
+  defp inherited?(name) do
+    case :os.type() do
+      {:win32, _} -> String.upcase(name) in @inherited or String.upcase(name) in @inherited_windows
+      _ -> name in @inherited
+    end
+  end
+
+  # A spec may name the directory the server starts in (an editor's open project, for one).
+  # Only an existing directory is honored: a stale path must not turn a working server into
+  # a failed spawn.
+  defp working_dir(%{cwd: dir}) when is_binary(dir) do
+    if File.dir?(dir), do: [{:cd, String.to_charlist(dir)}], else: []
+  end
+
+  defp working_dir(_spec), do: []
 
   defp send_rpc(port, id, method, params) do
     line = Jason.encode!(Protocol.request(id, method, params))
