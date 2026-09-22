@@ -118,7 +118,7 @@ server](../deploy/) for why a container needs that.
 
 `chat` (also called `tui`) opens a conversation right in your terminal that remembers
 context as you go. Type `/help` inside it for the full list of shortcuts: new
-conversation, undo, switch agent or model, and more.
+conversation, undo, rewind a few exchanges, switch agent or model, and more.
 
 ## Telegram gateway
 

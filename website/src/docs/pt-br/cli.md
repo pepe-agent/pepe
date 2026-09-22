@@ -118,7 +118,7 @@ vale para a imagem Docker oficial, que sempre escuta em todas as interfaces, vej
 
 `chat` (também chamado de `tui`) abre uma conversa direto no terminal, mantendo o contexto
 conforme você segue usando. Digite `/help` lá dentro para ver todos os atalhos disponíveis:
-nova conversa, desfazer, trocar de agente ou modelo, entre outros.
+nova conversa, desfazer, voltar algumas trocas, trocar de agente ou modelo, entre outros.
 
 ## Gateway do Telegram
 
