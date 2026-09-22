@@ -23,14 +23,44 @@ defmodule Pepe.Tools.Skill do
   end
 
   @impl true
-  def run(%{"name" => name}, _ctx) when is_binary(name) do
-    case Pepe.Skills.read(name) do
-      {:ok, content} -> {:ok, mark_if_community(name, content)}
-      _ -> {:error, "no skill named #{name}"}
+  def run(%{"name" => name}, ctx) when is_binary(name) do
+    opts = [cwd: ctx[:cwd], channel: channel(ctx), agent: ctx[:agent], offer: false]
+
+    case Pepe.Skills.read(name, opts) do
+      {:ok, content} ->
+        # A maintenance run reading a skill is not the skill being used: counting it would keep
+        # every skill looking active forever (the curator's staleness clock reads these).
+        if is_nil(ctx[:review_run]), do: Pepe.Skills.Stats.bump_view(name)
+        mark_read(ctx, name, opts)
+        {:ok, mark_if_community(name, content)}
+
+      _ ->
+        {:error, "no skill named #{name}"}
     end
   end
 
   def run(_args, _ctx), do: {:error, "missing 'name'"}
+
+  # A background skill run may only rewrite what it opened in the same run (see
+  # Pepe.Skills.Tracker). Marks the name as asked and the catalog's own name for it, so
+  # reading by an alias still counts. Nothing at all for a foreground turn.
+  defp mark_read(%{review_run: run}, name, opts) when is_binary(run) do
+    Pepe.Skills.Tracker.mark_read(run, name, nil)
+
+    case Pepe.Skills.Catalog.find(name, opts) do
+      {:ok, %{name: canonical}} -> Pepe.Skills.Tracker.mark_read(run, canonical, nil)
+      _ -> :ok
+    end
+  end
+
+  defp mark_read(_ctx, _name, _opts), do: :ok
+
+  defp channel(ctx) do
+    case ctx[:source] || ctx[:session_key] do
+      value when is_binary(value) -> value |> String.split(":", parts: 2) |> hd()
+      _ -> nil
+    end
+  end
 
   # A hand-authored or built-in skill (no marketplace provenance at all) is implicitly
   # trusted, same as always. A skill installed from the bundled, in-repo registry is

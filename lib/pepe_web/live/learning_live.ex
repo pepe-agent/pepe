@@ -96,6 +96,8 @@ defmodule PepeWeb.LearningLive do
         </div>
 
         <div :if={!@editing} class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+          <.live_component module={PepeWeb.SkillCuratorComponent} id="skill-curator-panel" />
+
           <div :if={@pending != []} class="mb-4 rounded-xl border border-amber-800/50 bg-amber-950/20 p-3">
             <div class="mb-2 text-sm font-semibold text-amber-200">
               {ngettext("%{count} write awaiting your review", "%{count} writes awaiting your review", length(@pending))}
@@ -222,6 +224,8 @@ defmodule PepeWeb.LearningLive do
   def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   @impl true
+  def handle_info({:flash, kind, msg}, socket), do: {:noreply, put_flash(socket, kind, msg)}
+
   def handle_info({:consolidated, name, result}, socket) do
     flash =
       case result do
@@ -263,6 +267,11 @@ defmodule PepeWeb.LearningLive do
 
   defp describe("edit_file", %{"old_string" => old, "new_string" => new}) when is_binary(old) and is_binary(new),
     do: gettext("Replaces \"%{old}\" with \"%{new}\"", old: peek(old), new: peek(new))
+
+  defp describe("skill_manage", %{"action" => action, "name" => name} = args) do
+    detail = args["new_string"] || args["content"] || args["file_content"] || ""
+    gettext("Skill %{name}: %{action}. %{peek}", name: name, action: action, peek: peek(detail))
+  end
 
   defp describe(_tool, args),
     do: args |> Map.drop(["path"]) |> Enum.map_join(", ", fn {k, v} -> "#{k}: #{peek(v)}" end)

@@ -92,6 +92,47 @@ Turn it on for an agent whose know-how should accumulate, and leave it off when 
 library is curated by hand. The same switch is in the dashboard's agent editor, and an
 agent with the `manage_agent` tool can set `skill_learning` on another.
 
+### Tidying up after itself
+
+An agent that writes its own skills eventually piles up a few nobody goes back to clean
+up. The curator does that on a schedule, and only ever to a skill an agent wrote on its
+own: a skill you wrote by hand, installed, or pinned is never touched, whatever state it's
+in.
+
+On by default, it makes two passes:
+
+- **A deterministic pass, no model call.** An agent-written skill moves through `active`
+  &rarr; `stale` &rarr; `archived` purely on how long it has gone unused (stale after 14
+  days, archived after 30, both configurable). Used again while stale, it goes back to
+  active. Archiving moves it into `.archive/` - nothing is deleted, and `pepe skill
+  restore` brings it back.
+- **An optional model pass** (`consolidate`, off by default because it spends a run):
+  merges overlapping narrow skills into broader ones, through the same reviewed, scanned
+  `manage_skill` path as any other skill edit.
+
+It runs at most once a week, and only once nothing has happened in any conversation for a
+couple of hours - never mid-work. Before it changes anything it snapshots the whole skill
+library, so a run is always reversible:
+
+```bash
+pepe skill curator status                  # last run, next run, counts
+pepe skill curator run --dry-run           # see what it would do, change nothing
+pepe skill curator run --consolidate       # also merge overlapping skills, just this once
+pepe skill curator pause                   # stop it from starting another run on its own
+pepe skill curator backup                  # snapshot the library by hand
+pepe skill curator rollback [ID]           # restore the last snapshot (or a named one)
+pepe skill curator settings                # stale_after_days, archive_after_days, etc.
+pepe skill curator set archive_after_days 45
+```
+
+A single run never archives more than half the library (or 20 skills, whichever is
+larger) unless you pass `--force` - a guardrail against a misconfigured threshold, or a
+big batch of skills all going idle at once, taking out the library before anyone notices.
+It also leaves alone any skill that was edited by hand outside `manage_skill`, since that
+edit was never reviewed by anything the curator trusts. Turn it off entirely with `pepe
+skill curator set enabled false`. It's CLI-only for now - there's no dashboard or
+conversational control for it yet.
+
 ### Packaging a skill with scripts
 
 A skill can also ship as a small package instead of a single file: a `<name>/`

@@ -176,7 +176,9 @@ defmodule Pepe.Application do
           # Per-session rate limiter for the embeddable chat widget (in-memory ETS, no DB).
           PepeWeb.WidgetThrottle,
           # Per-chat rate limiter for inbound Telegram messages (in-memory ETS, no DB).
-          Pepe.Gateways.Telegram.Throttle
+          Pepe.Gateways.Telegram.Throttle,
+          # What a background skill run has read, and the review rate limits (in-memory ETS).
+          Pepe.Skills.Tracker
         ] ++ endpoint_children ++ scheduler_children() ++ restore_children()
 
     opts = [strategy: :one_for_one, name: Pepe.Supervisor]
@@ -267,7 +269,8 @@ defmodule Pepe.Application do
       maybe_children(server?, [{Task.Supervisor, name: Pepe.Board.TaskSupervisor}, Pepe.Board.Scheduler]) ++
       maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Watch.TaskSupervisor}, Pepe.Watch.Scheduler]) ++
       maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Commitments.TaskSupervisor}, Pepe.Commitments.Scheduler]) ++
-      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Insight.TaskSupervisor}, Pepe.Insight.Scheduler])
+      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Insight.TaskSupervisor}, Pepe.Insight.Scheduler]) ++
+      maybe_children(server? or persist?, [{Task.Supervisor, name: Pepe.Skills.Curator.TaskSupervisor}, Pepe.Skills.Curator.Scheduler])
   end
 
   defp maybe_children(true, children), do: children

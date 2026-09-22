@@ -93,6 +93,47 @@ Ligue para um agente cujo conhecimento deve ir se acumulando, e deixe desligado 
 biblioteca de skills é curada na mão. O mesmo interruptor está no editor de agentes do
 painel, e um agente com a ferramenta `manage_agent` pode ligar o `skill_learning` em outro.
 
+### Arrumando a própria bagunça
+
+Um agente que escreve as próprias skills acaba acumulando um monte que ninguém volta para
+arrumar. É isso que a curadora faz, com hora marcada, e só em skills que um agente
+escreveu por conta própria: uma skill que você escreveu na mão, instalou, ou fixou nunca é
+tocada, seja qual for o estado dela.
+
+Ligada por padrão, ela faz duas passadas:
+
+- **Uma passada determinística, sem modelo nenhum.** Uma skill escrita por agente vai
+  passando por `active` &rarr; `stale` &rarr; `archived` só de acordo com quanto tempo
+  fica sem uso (fica `stale` depois de 14 dias, é arquivada depois de 30, os dois
+  configuráveis). Se for usada de novo enquanto `stale`, volta para `active`. Arquivar
+  move a skill para `.archive/` - nada é apagado, e `pepe skill restore` traz de volta.
+- **Uma passada opcional com modelo** (`consolidate`, desligada por padrão porque custa uma
+  chamada): funde skills parecidas e estreitas demais em outras mais amplas, pelo mesmo
+  caminho revisado e escaneado que qualquer edição via `manage_skill` usa.
+
+Ela roda no máximo uma vez por semana, e só quando nada acontece em nenhuma conversa por
+algumas horas - nunca no meio do trabalho. Antes de mudar qualquer coisa, ela tira um
+snapshot da biblioteca de skills inteira, então uma rodada sempre pode ser desfeita:
+
+```bash
+pepe skill curator status                  # última rodada, próxima, contagens
+pepe skill curator run --dry-run           # ver o que faria, sem mudar nada
+pepe skill curator run --consolidate       # também fundir skills parecidas, só dessa vez
+pepe skill curator pause                   # impede novas rodadas automáticas
+pepe skill curator backup                  # tira um snapshot na mão
+pepe skill curator rollback [ID]           # restaura o último snapshot (ou um específico)
+pepe skill curator settings                # stale_after_days, archive_after_days, etc.
+pepe skill curator set archive_after_days 45
+```
+
+Uma única rodada nunca arquiva mais que metade da biblioteca (ou 20 skills, o que for
+maior) a menos que você passe `--force` - uma proteção contra um limite mal configurado,
+ou um monte de skills ficando ociosas de uma vez, que derrubaria a biblioteca antes de
+alguém perceber. Ela também deixa de lado qualquer skill editada na mão fora do
+`manage_skill`, já que essa edição nunca passou por nada em que a curadora confie. Desligue
+tudo com `pepe skill curator set enabled false`. Por enquanto é só CLI - ainda não tem
+controle pelo painel nem pela conversa.
+
 ### Empacotando uma skill com scripts
 
 Em vez de um único arquivo, uma skill também pode vir como um pequeno pacote: uma

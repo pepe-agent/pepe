@@ -181,7 +181,7 @@ defmodule Pepe.Agent.Workspace do
       behavior_contract(),
       knowledge_index(name),
       docs_index(),
-      skills_index(),
+      skills_index(agent),
       capability_nudge_note(agent),
       convention_note()
     ]
@@ -268,8 +268,8 @@ defmodule Pepe.Agent.Workspace do
 
   # List available skills (name + one-line summary). The agent reads the relevant
   # one with the `skill` tool when its topic comes up - not loaded in full here.
-  defp skills_index do
-    case Pepe.Skills.list() do
+  defp skills_index(agent) do
+    case Pepe.Skills.list(agent: agent) do
       [] ->
         nil
 

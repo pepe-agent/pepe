@@ -999,7 +999,9 @@ defmodule Pepe.Agent.Session do
   def handle_info(:idle_review, state) do
     with true <- state.learn_allowed,
          agent when not is_nil(agent) <- Config.get_agent(state.agent_name) do
-      Pepe.Agent.Reflect.review_async(agent, state.messages)
+      # Idleness means "something just happened": look at the last few exchanges, not the
+      # whole history (see Pepe.Agent.Reflect's moduledoc for why).
+      Pepe.Agent.Reflect.review_async(agent, state.messages, digest: 8)
     end
 
     {:noreply, %{state | idle_ref: nil}}
