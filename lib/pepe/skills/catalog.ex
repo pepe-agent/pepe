@@ -57,7 +57,7 @@ defmodule Pepe.Skills.Catalog do
   def conflicts(opts \\ []) do
     for {name, [first | _] = group} <- gather(opts),
         peers = Enum.filter(group, &(&1.source == first.source)),
-        length(peers) > 1,
+        match?([_, _ | _], peers),
         do: {name, Enum.map(peers, & &1.entry)}
   end
 
@@ -120,8 +120,10 @@ defmodule Pepe.Skills.Catalog do
   defp resolve([single]), do: {:ok, single}
 
   defp resolve([first | _] = group) do
-    peers = Enum.filter(group, &(&1.source == first.source))
-    if length(peers) > 1, do: {:error, {:ambiguous, Enum.map(peers, & &1.entry)}}, else: {:ok, first}
+    case Enum.filter(group, &(&1.source == first.source)) do
+      [_, _ | _] = peers -> {:error, {:ambiguous, Enum.map(peers, & &1.entry)}}
+      _single -> {:ok, first}
+    end
   end
 
   # name => [skills], highest-precedence tier first, sorted by name.

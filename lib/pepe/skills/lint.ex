@@ -146,8 +146,7 @@ defmodule Pepe.Skills.Lint do
     |> Regex.scan(body)
     |> Enum.map(&hd/1)
     |> Enum.uniq()
-    |> Enum.reject(&(String.contains?(&1, "*") or String.ends_with?(&1, "/")))
-    |> Enum.reject(&File.exists?(Path.join(dir, &1)))
+    |> Enum.reject(&(String.contains?(&1, "*") or String.ends_with?(&1, "/") or File.exists?(Path.join(dir, &1))))
     |> Enum.map(&finding(:warning, :dangling_reference, "the body points at '#{&1}' but that file is not in the skill's directory."))
   end
 

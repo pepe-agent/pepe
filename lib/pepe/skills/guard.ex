@@ -99,18 +99,20 @@ defmodule Pepe.Skills.Guard do
       {:ok, entries} ->
         entries
         |> Enum.sort()
-        |> Enum.flat_map(fn entry ->
-          path = Path.join(dir, entry)
-
-          case File.lstat(path) do
-            {:ok, %{type: :directory}} -> [{path, :directory} | walk(path)]
-            {:ok, %{type: type}} -> [{path, type}]
-            _ -> []
-          end
-        end)
+        |> Enum.flat_map(&walk_entry(dir, &1))
 
       _ ->
         []
+    end
+  end
+
+  defp walk_entry(dir, entry) do
+    path = Path.join(dir, entry)
+
+    case File.lstat(path) do
+      {:ok, %{type: :directory}} -> [{path, :directory} | walk(path)]
+      {:ok, %{type: type}} -> [{path, type}]
+      _ -> []
     end
   end
 end

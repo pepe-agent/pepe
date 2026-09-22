@@ -28,7 +28,7 @@ defmodule Pepe.Skills.Ledger do
         %Event{}
         |> Event.changeset(%{
           id: new_id(),
-          at: System.system_time(:second),
+          at: System.system_time(:microsecond),
           skill: skill,
           action: action,
           actor: actor,
@@ -53,7 +53,8 @@ defmodule Pepe.Skills.Ledger do
   @doc "One line for an event, for CLI and dashboard listings."
   @spec describe(Event.t()) :: String.t()
   def describe(%Event{} = e) do
-    time = e.at |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M")
+    unit = if e.at > 10_000_000_000, do: :microsecond, else: :second
+    time = e.at |> DateTime.from_unix!(unit) |> Calendar.strftime("%Y-%m-%d %H:%M")
     suffix = if e.detail in [nil, ""], do: "", else: " - " <> String.slice(e.detail, 0, 100)
     "#{time}  #{e.skill}  #{e.action}  (#{e.actor})#{suffix}"
   end

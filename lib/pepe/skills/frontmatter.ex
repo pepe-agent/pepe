@@ -78,12 +78,14 @@ defmodule Pepe.Skills.Frontmatter do
   defp requote(yaml) do
     yaml
     |> String.split("\n")
-    |> Enum.map_join("\n", fn line ->
-      case Regex.run(~r/^([A-Za-z0-9_.-]+):[ \t]+(.+?)\r?$/, line) do
-        [_, key, value] -> if plain_with_colon?(value), do: ~s(#{key}: #{quote_scalar(value)}), else: line
-        _ -> line
-      end
-    end)
+    |> Enum.map_join("\n", &requote_line/1)
+  end
+
+  defp requote_line(line) do
+    case Regex.run(~r/^([A-Za-z0-9_.-]+):[ \t]+(.+?)\r?$/, line) do
+      [_, key, value] -> if plain_with_colon?(value), do: ~s(#{key}: #{quote_scalar(value)}), else: line
+      _ -> line
+    end
   end
 
   defp plain_with_colon?(value) do
