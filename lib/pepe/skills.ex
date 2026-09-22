@@ -114,38 +114,14 @@ defmodule Pepe.Skills do
 
   `{%{}, content}` when there is no header at all, and also when what looks like one does
   not parse as a YAML map: a doc that merely opens with a horizontal rule is still just a
-  doc, and is returned byte-for-byte rather than half-eaten.
+  doc, and is returned byte-for-byte rather than half-eaten. Delegates to
+  `Pepe.Skills.Frontmatter.parse/1`, the one parser every reader of a skill's header shares
+  (the catalog already used it directly; this used to be a second, less forgiving one that
+  read a header `Frontmatter` would recover as "no header" instead).
   """
   @spec header(String.t()) :: {map(), String.t()}
-  def header("---\n" <> rest = content), do: split_header(rest, content)
-  def header("---\r\n" <> rest = content), do: split_header(rest, content)
-  def header(content) when is_binary(content), do: {%{}, content}
-
-  defp split_header(rest, original) do
-    case Regex.split(~r/^---[ \t]*\r?$/m, rest, parts: 2) do
-      [yaml, body] -> parse_header(yaml, body, original)
-      _ -> {%{}, original}
-    end
-  end
-
-  defp parse_header(yaml, body, original) do
-    case yaml_map(yaml) do
-      {:ok, map} -> {map, body |> String.replace_prefix("\r\n", "") |> String.replace_prefix("\n", "")}
-      :error -> {%{}, original}
-    end
-  end
-
-  # The YAML parser raises (rather than returning an error tuple) on some malformed
-  # input, and a third-party skill's header is exactly the place to expect malformed
-  # input - a bad header must degrade to "no header", never take down the skills index.
-  defp yaml_map(yaml) do
-    case YamlElixir.read_from_string(yaml) do
-      {:ok, map} when is_map(map) -> {:ok, map}
-      _ -> :error
-    end
-  rescue
-    _ -> :error
-  catch
-    _, _ -> :error
+  def header(content) when is_binary(content) do
+    fm = Pepe.Skills.Frontmatter.parse(content)
+    {fm.meta, fm.body}
   end
 end

@@ -27,6 +27,7 @@ defmodule Pepe.Skills.Catalog do
   channels, or is scoped to an environment (`docker`) that is not this one.
   """
 
+  alias Pepe.Security.ExternalContent
   alias Pepe.Skills
   alias Pepe.Skills.Frontmatter
   alias Pepe.Skills.Project
@@ -274,8 +275,13 @@ defmodule Pepe.Skills.Catalog do
     end
   end
 
-  # The index is one line per skill, and YAML folded/literal scalars carry real newlines.
-  defp one_line(text, limit), do: text |> String.replace(~r/\s+/, " ") |> String.trim() |> String.slice(0, limit)
+  # The index is one line per skill, and YAML folded/literal scalars carry real newlines. A
+  # community skill's `description` is exactly as trusted as a fetched web page, and this
+  # line lands in the system prompt as the skills index reads it - `strip_framing/1` is the
+  # same defence `Readiness.setup_block/1` uses so a forged `<system-reminder>` (or a model
+  # control token, or an invisible character) in the description can't reach it.
+  defp one_line(text, limit),
+    do: text |> ExternalContent.strip_framing() |> String.replace(~r/\s+/, " ") |> String.trim() |> String.slice(0, limit)
 
   # -- what a caller is offered -----------------------------------------------------------
 
