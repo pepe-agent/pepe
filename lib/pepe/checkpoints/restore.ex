@@ -231,7 +231,9 @@ defmodule Pepe.Checkpoints.Restore do
     end
   end
 
-  defp chmod(path, mode) when is_integer(mode), do: File.chmod(path, Bitwise.band(mode, 0o7777))
+  # A record is data read back from disk, not something to trust with setuid/setgid/sticky
+  # bits - mask to the permission bits only (0o777), never the full 0o7777 mode word.
+  defp chmod(path, mode) when is_integer(mode), do: File.chmod(path, Bitwise.band(mode, 0o777))
   defp chmod(_path, _mode), do: :ok
 
   # The current content, kept before it is replaced. A restore record lists it so a person

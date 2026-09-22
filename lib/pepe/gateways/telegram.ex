@@ -2299,13 +2299,16 @@ defmodule Pepe.Gateways.Telegram do
     mode = if args |> String.trim() |> String.downcase() == "files", do: :both, else: :chat
 
     case Pepe.Agent.Session.retry(session_key(chat_id), mode) do
-      {:ok, %{text: text, files: files, roots: roots}} ->
+      {:ok, %{text: text, files: files, roots: roots, untrusted: untrusted, sender_tag: sender_tag}} ->
         case Pepe.Checkpoints.Report.file_lines(files, roots: roots) do
           [] -> :ok
           lines -> send_message(chat_id, Enum.join(lines, "\n"))
         end
 
-        chat_with_agent(chat_id, nil, text)
+        # Resubmitted with the same trust context the original turn had, not the default -
+        # a retried document-derived turn must stay untrusted, and a retried group message
+        # must keep naming its original sender. See Session.retry/3's own doc.
+        chat_with_agent(chat_id, nil, text, untrusted: untrusted, sender_tag: sender_tag)
 
       {:error, :nothing} ->
         send_message(chat_id, gettext("Nothing to retry yet."))

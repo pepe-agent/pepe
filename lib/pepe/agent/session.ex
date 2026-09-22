@@ -231,11 +231,17 @@ defmodule Pepe.Agent.Session do
   returns its text for the caller to send as a new message. `mode` `:both` also puts back the
   files that turn changed, so the retry starts from the same files it did.
 
+  The result also carries `:untrusted` and `:sender_tag`, the trust context the original
+  turn was given (see the `:untrusted` opt on `chat/3`) - the caller must pass both back
+  into its resubmission so a retried turn keeps the same authority the original had,
+  rather than silently defaulting to trusted.
+
   `{:error, :nothing}` when there is no turn to retry, `{:error, :not_text}` when the turn
   carried attachments (it cannot be replayed exactly), `{:error, :busy}` mid-turn.
   """
   @spec retry(term(), :chat | :both, keyword()) ::
-          {:ok, %{text: String.t(), files: map() | nil, roots: [Path.t()]}} | {:error, :nothing | :not_text | :busy}
+          {:ok, %{text: String.t(), files: map() | nil, roots: [Path.t()], untrusted: boolean(), sender_tag: term()}}
+          | {:error, :nothing | :not_text | :busy}
   def retry(key, mode \\ :chat, opts \\ []), do: GenServer.call(via(key), {:retry, mode, opts}, 30_000)
 
   @doc "Cancel the in-flight run for this session, if any."
@@ -395,6 +401,12 @@ defmodule Pepe.Agent.Session do
       # its own map in from disk (see the load branch above), and clobbering it to [] here would
       # reintroduce the "user sees PERSON_1 after restart" bug. A fresh session has none, so [].
       |> Map.put_new(:pii_map, [])
+      # The trust context (`:untrusted`, `:sender_tag`) the most recently STARTED turn
+      # was given - not persisted across a restart, only kept for as long as this
+      # process runs. `/retry` reads it back so a retried turn is resubmitted with the
+      # same authority the original had, instead of quietly defaulting to trusted (see
+      # `handle_call({:retry, ...})`).
+      |> Map.put_new(:last_turn_meta, nil)
       |> Map.merge(%{
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
@@ -888,9 +900,12 @@ defmodule Pepe.Agent.Session do
 
       %{"content" => text} ->
         roots = Checkpoints.allowed_roots(state.agent_name, List.wrap(opts[:roots]))
+        meta = state.last_turn_meta || %{untrusted: false, sender_tag: nil}
         {files, state} = restore_files(state, 1, mode, opts)
         {_dropped, state} = do_rewind(state, 1)
-        {:reply, {:ok, %{text: text, files: files, roots: roots}}, state}
+
+        reply = %{text: text, files: files, roots: roots, untrusted: meta.untrusted, sender_tag: meta.sender_tag}
+        {:reply, {:ok, reply}, state}
     end
   end
 
@@ -947,6 +962,8 @@ defmodule Pepe.Agent.Session do
     opts = Keyword.put(opts, :session_key, state.key)
     # Whether this conversation may feed the memory/skill review (set by the surface).
     state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
+    # Remember this turn's trust context for `/retry` - see `last_turn_meta`'s own doc above.
+    state = %{state | last_turn_meta: %{untrusted: opts[:untrusted] == true, sender_tag: opts[:sender_tag]}}
     # A new message cancels any pending idle review and re-arms the TTL.
     state = state |> cancel_idle() |> arm_ttl()
     # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
@@ -1035,6 +1052,7 @@ defmodule Pepe.Agent.Session do
         {:error, reason} ->
           reply(from, {:error, reason})
           reply_folded(folded, {:error, reason})
+          discard_checkpoints(state)
           clear_pending(%{state | running: nil})
       end
 
@@ -1209,6 +1227,7 @@ defmodule Pepe.Agent.Session do
     Process.exit(pid, :kill)
     reply(from, msg)
     reply_folded(Map.get(running, :folded_froms, []), msg)
+    discard_checkpoints(state)
     clear_pending(%{state | running: nil})
   end
 
@@ -1663,6 +1682,15 @@ defmodule Pepe.Agent.Session do
     _ -> :ok
   end
 
+  # A run that errors or is stopped adds no turn for `commit_checkpoints/2` to attach its
+  # file changes to - without this, they would sit in `pending` and silently roll onto
+  # whatever turn commits next (see `Checkpoints.discard_pending/1`'s own doc).
+  defp discard_checkpoints(state) do
+    Checkpoints.discard_pending(state.key)
+  rescue
+    _ -> :ok
+  end
+
   defp last_person_message(messages), do: messages |> Enum.reverse() |> Enum.find(&Message.person_turn?/1)
 
   # Truncate back to just before the `count`-th user message from the end, and forget the
@@ -1675,6 +1703,11 @@ defmodule Pepe.Agent.Session do
     if dropped > 0 do
       Pepe.Agent.MicroCompaction.clear(state.key)
       Checkpoints.pop_turns(state.key, dropped)
+      # A dropped turn's own "allow for this session" answers must go with it - a grant
+      # a person gave in response to a call that no longer exists must not silently keep
+      # authorizing whatever the retried/rewound-to turn does instead. Same clearing
+      # `:reset` already does for a fresh conversation.
+      Pepe.Permissions.SessionStore.clear(state.key)
     end
 
     {dropped, persist(%{state | messages: messages})}
