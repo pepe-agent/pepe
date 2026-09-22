@@ -12,7 +12,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: lib/pepe/webhooks/googlechat.ex:39
-#: lib/pepe/webhooks/whatsapp.ex:39
+#: lib/pepe/webhooks/whatsapp.ex:49
 #, elixir-autogen, elixir-format
 msgid "Access token"
 msgstr "Token de acceso"
@@ -27,12 +27,12 @@ msgstr "Id de la app"
 msgid "App password"
 msgstr "Contraseña de la app"
 
-#: lib/pepe/webhooks/whatsapp.ex:45
+#: lib/pepe/webhooks/whatsapp.ex:55
 #, elixir-autogen, elixir-format
 msgid "App secret"
 msgstr "Secreto de la app"
 
-#: lib/pepe/webhooks/discord.ex:42
+#: lib/pepe/webhooks/discord.ex:52
 #, elixir-autogen, elixir-format
 msgid "Application ID"
 msgstr "ID de la aplicación"
@@ -42,12 +42,12 @@ msgstr "ID de la aplicación"
 msgid "Bot token"
 msgstr "Token del bot"
 
-#: lib/pepe/webhooks/whatsapp.ex:41
+#: lib/pepe/webhooks/whatsapp.ex:51
 #, elixir-autogen, elixir-format
 msgid "Graph API bearer token; store as ${ENV_VAR}"
 msgstr "Token bearer de la Graph API; guárdalo como ${ENV_VAR}"
 
-#: lib/pepe/webhooks/whatsapp.ex:33
+#: lib/pepe/webhooks/whatsapp.ex:43
 #, elixir-autogen, elixir-format
 msgid "Phone number ID"
 msgstr "ID del número de teléfono"
@@ -57,7 +57,7 @@ msgstr "ID del número de teléfono"
 msgid "Project number"
 msgstr "Número de proyecto"
 
-#: lib/pepe/webhooks/discord.ex:36
+#: lib/pepe/webhooks/discord.ex:46
 #, elixir-autogen, elixir-format
 msgid "Public key"
 msgstr "Clave pública"
@@ -83,7 +83,7 @@ msgstr "Secreto de firma"
 msgid "Tenant id"
 msgstr "Id del tenant"
 
-#: lib/pepe/webhooks/whatsapp.ex:51
+#: lib/pepe/webhooks/whatsapp.ex:61
 #, elixir-autogen, elixir-format
 msgid "Verify token"
 msgstr "Token de verificación"
@@ -93,7 +93,7 @@ msgstr "Token de verificación"
 msgid "an OAuth token for the Chat API; store as ${ENV_VAR}"
 msgstr "un token OAuth para la Chat API; guárdalo como ${ENV_VAR}"
 
-#: lib/pepe/webhooks/whatsapp.ex:53
+#: lib/pepe/webhooks/whatsapp.ex:63
 #, elixir-autogen, elixir-format
 msgid "any string you choose; echoed during the subscribe handshake"
 msgstr "cualquier texto que elijas; se devuelve durante el handshake de suscripción"
@@ -128,7 +128,7 @@ msgstr "el id de tenant de Azure (o botframework.com)"
 msgid "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
 msgstr "el número de proyecto de Cloud con el que está registrada la app de Chat; la Authentication Audience de la app tiene que estar puesta en \"Project Number\""
 
-#: lib/pepe/webhooks/discord.ex:38
+#: lib/pepe/webhooks/discord.ex:48
 #, elixir-autogen, elixir-format
 msgid "the app's Public Key (hex), for signature verification"
 msgstr "la Public Key (hex) de la app, para verificar la firma"
@@ -143,17 +143,17 @@ msgstr "el id de app (cliente) de Microsoft del bot"
 msgid "the client secret; store as ${ENV_VAR}"
 msgstr "el client secret; guárdalo como ${ENV_VAR}"
 
-#: lib/pepe/webhooks/whatsapp.ex:35
+#: lib/pepe/webhooks/whatsapp.ex:45
 #, elixir-autogen, elixir-format
 msgid "the sending endpoint id from Meta"
 msgstr "el id del endpoint de envío que da Meta"
 
-#: lib/pepe/webhooks/discord.ex:44
+#: lib/pepe/webhooks/discord.ex:54
 #, elixir-autogen, elixir-format
 msgid "used to post the reply"
 msgstr "se usa para publicar la respuesta"
 
-#: lib/pepe/webhooks/whatsapp.ex:47
+#: lib/pepe/webhooks/whatsapp.ex:57
 #, elixir-autogen, elixir-format
 msgid "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}"
 msgstr "verifica el X-Hub-Signature-256 entrante; guárdalo como ${ENV_VAR}"
