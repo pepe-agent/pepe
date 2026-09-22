@@ -30,19 +30,31 @@ defmodule Pepe.Checkpoints.Snapshot do
   @doc "Directory names never descended into."
   def skip_dirs, do: @skip_dirs
 
+  @sensitive_exact ~w(.env .ds_store thumbs.db id_rsa id_ed25519 id_ecdsa id_dsa .netrc .npmrc .pypirc
+                       .envrc credentials.json .git-credentials .htpasswd .pgpass .my.cnf token.json)
+  @sensitive_prefixes ~w(.env. .env- id_rsa secrets. service-account)
+  @sensitive_suffixes ~w(.pem .key .p12 .pfx .keystore .jks .kdbx .log .p8 .gpg .asc .tfstate .ovpn)
+  # Anything under one of these directories, anywhere in the path, is sensitive by
+  # location - a credential doesn't have to have a credential-shaped name to be one.
+  @sensitive_dirs ~w(.ssh .aws .gnupg .kube .docker)
+
   @doc """
   Whether a path looks like a credential or machine-local junk that must never be copied
-  into the checkpoint store: dotenv files, private keys, certificates, keychains, OS
-  metadata and logs.
+  into the checkpoint store: dotenv files, private keys, certificates, keychains, cloud
+  and container config directories, OS metadata and logs.
   """
   @spec sensitive?(Path.t()) :: boolean()
   def sensitive?(path) do
     base = path |> Path.basename() |> String.downcase()
 
-    base in [".env", ".ds_store", "thumbs.db", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", ".netrc", ".npmrc", ".pypirc"] or
-      String.starts_with?(base, ".env.") or
-      String.starts_with?(base, "id_rsa") or
-      Enum.any?(~w(.pem .key .p12 .pfx .keystore .jks .kdbx .log), &String.ends_with?(base, &1))
+    base in @sensitive_exact or
+      Enum.any?(@sensitive_prefixes, &String.starts_with?(base, &1)) or
+      Enum.any?(@sensitive_suffixes, &String.ends_with?(base, &1)) or
+      under_sensitive_dir?(path)
+  end
+
+  defp under_sensitive_dir?(path) do
+    path |> Path.split() |> Enum.any?(&(String.downcase(&1) in @sensitive_dirs))
   end
 
   @doc """
@@ -93,6 +105,13 @@ defmodule Pepe.Checkpoints.Snapshot do
   defp elem_type(info), do: elem(info, 2)
   defp elem_size(info), do: elem(info, 1)
   defp elem_mode(info), do: elem(info, 7)
+
+  defp walk_dir(_path, %{count: count, max_files: max} = state, _explicit?) when count >= max,
+    # Already over the file cap - every add_file call from here on would just re-set
+    # partial?: true without adding anything, so stop listing directories entirely
+    # instead of doing a full recursive `ls` of whatever remains for no reason (this
+    # matters most when a whole tree, like $HOME, is what got walked into).
+    do: %{state | partial?: true}
 
   defp walk_dir(path, state, explicit?) do
     if not explicit? and Path.basename(path) in @skip_dirs do

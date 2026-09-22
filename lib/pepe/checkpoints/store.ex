@@ -52,12 +52,17 @@ defmodule Pepe.Checkpoints.Store do
 
   defp blob_path(sha), do: Path.join([root(), "blobs", binary_part(sha, 0, 2), sha])
 
-  @doc "Store `data` under its own hash (a no-op when already stored). Returns the hash."
+  @doc """
+  Store `data` under its own hash. Returns the hash. When the blob already exists on
+  disk, its content is left alone but its mtime is bumped to now - a blob whose only
+  live reference was pruned, then reused unchanged by a later write, must not still
+  look old enough for `Retention` to collect out from under the record that now needs it.
+  """
   @spec put_blob(binary()) :: String.t()
   def put_blob(data) do
     sha = Pepe.Checkpoints.Snapshot.sha(data)
     path = blob_path(sha)
-    if not File.exists?(path), do: atomic_write(path, data)
+    if File.exists?(path), do: File.touch(path), else: atomic_write(path, data)
     sha
   end
 
@@ -250,6 +255,9 @@ defmodule Pepe.Checkpoints.Store do
     File.mkdir_p!(Path.dirname(path))
     tmp = path <> ".tmp-" <> Integer.to_string(System.unique_integer([:positive]))
     File.write!(tmp, data)
+    # A blob is a copy of whatever the tool wrote, which can be as sensitive as the
+    # workspace file it came from - store it owner-only rather than at the process umask.
+    File.chmod!(tmp, 0o600)
     File.rename!(tmp, path)
     :ok
   end

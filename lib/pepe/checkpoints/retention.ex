@@ -158,7 +158,11 @@ defmodule Pepe.Checkpoints.Retention do
 
   defp drop_batch(batch, cap, deleted, rounds) do
     Enum.each(batch, fn {id, scope} -> Store.delete_record(scope, id) end)
-    collect_blobs(System.os_time(:microsecond), 0)
+    # Same grace as the ordinary collector, not zero: a blob `Checkpoints.record/3` just
+    # wrote (blobs land before their own record - see its own comment) can still be
+    # unreferenced for a moment here, and a zero grace would collect it out from under
+    # the record that is about to name it.
+    collect_blobs(System.os_time(:microsecond))
     shrink_to(cap, deleted + length(batch), rounds + 1)
   end
 

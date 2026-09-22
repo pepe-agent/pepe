@@ -1343,8 +1343,10 @@ defmodule PepeWeb.ChatLive do
       put_flash(socket, :error, gettext("Wait for the current turn to finish."))
     else
       case Session.retry(key, mode) do
-        {:ok, %{text: text, files: files, roots: roots}} ->
-          stream? = stream_reply(key, text)
+        {:ok, %{text: text, files: files, roots: roots, untrusted: untrusted}} ->
+          # Same trust context the original turn had - an attachment-derived turn must
+          # stay untrusted on retry, not quietly default to trusted. See Session.retry/3.
+          stream? = stream_reply(key, text, untrusted: untrusted)
 
           socket
           |> assign(

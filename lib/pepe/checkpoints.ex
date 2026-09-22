@@ -45,6 +45,7 @@ defmodule Pepe.Checkpoints do
   alias Pepe.Checkpoints.Retention
   alias Pepe.Checkpoints.Snapshot
   alias Pepe.Checkpoints.Store
+  alias Pepe.Config
   alias Pepe.LLM.Message
 
   @file_tools ~w(write_file edit_file)
@@ -66,20 +67,39 @@ defmodule Pepe.Checkpoints do
         fun.()
 
       tracking ->
-        pre = safely(fn -> Snapshot.take(tracking.roots, skip: &store_path?/1) end)
+        with_root_lock([tracking.scope], fn ->
+          pre = safely(fn -> Snapshot.take(tracking.roots, skip: &store_path?/1) end)
 
-        try do
-          result = fun.()
-          safely(fn -> record(tracking, pre, result) end)
-          result
-        catch
-          kind, reason ->
-            stack = __STACKTRACE__
-            safely(fn -> record(tracking, pre, :crashed) end)
-            :erlang.raise(kind, reason, stack)
-        end
+          try do
+            result = fun.()
+            safely(fn -> record(tracking, pre, result) end)
+            result
+          catch
+            kind, reason ->
+              stack = __STACKTRACE__
+              safely(fn -> record(tracking, pre, :crashed) end)
+              :erlang.raise(kind, reason, stack)
+          end
+        end)
     end
   end
+
+  # Two sessions of the same agent can share a workspace (a Telegram group and the
+  # dashboard chat on the same agent, say), and a tool writing a file while a rewind is
+  # hashing-then-restoring that same file is a real race, not a theoretical one - the
+  # write can land between the hash and the rename. This lock makes a tool call that
+  # changes files and a restore on an overlapping set of roots mutually exclusive,
+  # cluster-wide (the same primitive `Store.update_log/2` already uses for the log).
+  # Roots are locked in a fixed, sorted order so two calls that share only some roots
+  # can never deadlock each other waiting in opposite orders.
+  defp with_root_lock(roots, fun) do
+    roots |> Enum.map(&Path.expand/1) |> Enum.uniq() |> Enum.sort() |> lock_each(fun)
+  end
+
+  defp lock_each([], fun), do: fun.()
+
+  defp lock_each([root | rest], fun),
+    do: :global.trans({{:pepe_checkpoints_root, root}, self()}, fn -> lock_each(rest, fun) end)
 
   # Decide what a tool call may change and which of that we may copy. `nil` = not tracked.
   defp tracking(name, args, ctx) do
@@ -178,7 +198,19 @@ defmodule Pepe.Checkpoints do
 
   defp inside?(path, root), do: path == root or String.starts_with?(path, root <> "/")
 
-  defp store_path?(path), do: inside?(path, Path.expand(Store.root()))
+  # Never snapshot the checkpoint store's own tree (it would recurse into its own blobs),
+  # Pepe's config file (can hold literal secrets) or its database directory (~/.pepe/data -
+  # every agent's commitments, usage, the operational store generally). checkpoint_shell
+  # can point at any directory a command happens to run in, including $HOME - but an
+  # agent's own workspace also lives under Config.home() (projects/<project>/agents/<name>),
+  # so only these specific, never-a-workspace paths are excluded, not the whole home tree.
+  defp store_path?(path) do
+    home = Path.expand(Config.home())
+
+    inside?(path, Path.expand(Store.root())) or
+      path == Path.join(home, "config.json") or
+      inside?(path, Path.join(home, "data"))
+  end
 
   defp record(tracking, %{files: _} = pre, result) do
     post = Snapshot.take(tracking.roots, skip: &store_path?/1)
@@ -277,6 +309,22 @@ defmodule Pepe.Checkpoints do
       if log["pending"] != [], do: Retention.maybe_prune()
     end
 
+    :ok
+  end
+
+  @doc """
+  Drop whatever a run left in `pending` without committing it to a turn.
+
+  `commit_turn/2` is only ever called once a run actually adds a message to the
+  conversation. A run that errors or is stopped adds nothing, but the files its tool
+  calls already changed were still recorded and are still sitting in `pending` - left
+  there, the NEXT turn to actually commit would silently inherit them, and a rewind of
+  that later turn would restore files an earlier, different, unrelated action changed.
+  Called from the error and stop paths in `Pepe.Agent.Session` instead.
+  """
+  @spec discard_pending(term()) :: :ok
+  def discard_pending(key) do
+    if Store.read_log(key)["pending"] != [], do: Store.update_log(key, fn log -> %{log | "pending" => []} end)
     :ok
   end
 
@@ -379,15 +427,19 @@ defmodule Pepe.Checkpoints do
   """
   @spec restore(term(), [map()], pos_integer(), keyword()) :: map()
   def restore(key, messages, count, opts) do
+    roots = Keyword.fetch!(opts, :roots)
     window = Store.read_log(key)["turns"] |> align(messages) |> Enum.take(count)
     known = for {_fp, %{} = entry} <- window, entry["restored"] != true, do: entry
     unreached = Enum.count(window, fn {_fp, entry} -> entry == :unknown end)
 
     refs = known |> Enum.reverse() |> Enum.flat_map(&List.wrap(&1["refs"]))
     records = Enum.flat_map(refs, &read_ref/1)
-    report = Restore.run(records, Keyword.fetch!(opts, :roots), Keyword.take(opts, [:dry_run]))
+    report = with_root_lock(roots, fn -> Restore.run(records, roots, Keyword.take(opts, [:dry_run])) end)
 
-    unless opts[:dry_run], do: mark_restored(key, length(window) - unreached)
+    # A turn with any skipped file (unwritable, changed since, ...) is NOT marked restored:
+    # doing so anyway would make a fixed-and-retried /rewind of the same turns report
+    # "already put back" without ever having put the skipped file back.
+    if !opts[:dry_run] and report.skipped == [], do: mark_restored(key, length(window) - unreached)
 
     report
     |> Map.put(:unreached, unreached)
