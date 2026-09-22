@@ -120,7 +120,7 @@ defmodule Pepe.Skills.Frontmatter do
       fallback_for_tools: list(get(meta, "fallback_for_tools")),
       channels: list(get(meta, "channels")),
       required_env: required_env(meta),
-      required_commands: list(get(meta, "required_commands")),
+      required_commands: get(meta, "required_commands") |> list() |> Enum.filter(&command_name?/1),
       config_vars: config_vars(meta)
     }
   end
@@ -170,6 +170,13 @@ defmodule Pepe.Skills.Frontmatter do
   defp words(_value), do: []
 
   @env_name ~r/^[A-Za-z_][A-Za-z0-9_]*$/
+  # An executable name or a relative path to one - letters, digits, `_-./`. `required_commands`
+  # is free text from a skill's own frontmatter, and every entry that survives here is later
+  # interpolated into the skills index and into a `<system-reminder>` block a missing one
+  # produces (`Pepe.Skills.Readiness`), so this is the same "not text, a name" boundary
+  # `@env_name` already draws for a variable, just permissive enough for `docker-compose`,
+  # `git-lfs` and `./scripts/setup.sh`.
+  @command_name ~r{^[\w./-]+$}
 
   # `required_environment_variables`, `setup.collect_secrets` and the legacy
   # `prerequisites.env_vars` all mean "this skill needs these variables"; merged, deduped,
@@ -215,6 +222,8 @@ defmodule Pepe.Skills.Frontmatter do
       }
     end
   end
+
+  defp command_name?(name), do: Regex.match?(@command_name, name)
 
   # `metadata.pepe.config`: values an operator sets once, injected when the skill loads.
   defp config_vars(meta) do
