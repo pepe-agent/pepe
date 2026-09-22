@@ -188,6 +188,36 @@ todas as outras ferramentas que falam esse formato. Chaves além de `name` e
 são mexidas. O formato completo está documentado em
 [agentskills.io](https://agentskills.io/specification).
 
+Duas peças a mais fecham esse ciclo com o formato:
+
+```bash
+pepe skill validate PATH|NOME
+```
+
+checa uma skill contra o que a especificação realmente exige (o formato e tamanho do
+`name`, o tamanho da `description`, os tipos de `license`/`compatibility`/`metadata`, o
+`SKILL.md` abrindo com um cabeçalho que faz parse) e reporta à parte o que só tropeça
+numa convenção própria, apenas indicativa, do Pepe. O que falha na especificação não vai
+rodar em outra ferramenta; o que só falha nas convenções do Pepe continua funcionando
+aqui do mesmo jeito. O mesmo relatório roda automaticamente em toda instalação e aparece
+no painel.
+
+Uma skill também pode declarar o que precisa para realmente rodar: variáveis de ambiente
+(`required_environment_variables`, ou as grafias `setup.collect_secrets`/
+`prerequisites.env_vars` que outras ferramentas usam) e comandos (`required_commands`). O
+Pepe mostra o que está faltando no índice de skills, no `pepe skill list`, e no momento
+em que a skill é aberta, em vez do agente só descobrir quando o primeiro comando falha no
+meio da tarefa. Um requisito faltando nunca esconde a skill: as instruções continuam
+valendo a pena ler, e talvez você esteja prestes a configurar a variável.
+
+Uma skill instalada também vira o próprio comando de barra em toda superfície que tiver
+isso (Telegram, o console, o chat do painel, um editor via ACP): uma skill chamada
+`weather` responde tanto a `/weather` quanto a `/skill weather`, e aparece no menu "/".
+Rodá-la continua sendo um turno comum, lido pela ferramenta `skill`, nunca um texto
+colado dentro do que você digitou, então a mesma marcação de confiança se aplica como em
+qualquer outro lugar onde uma skill é lida, e só é oferecida a quem realmente pode vê-la
+- veja a [referência de comandos do Telegram](../telegram/) para entender essa checagem.
+
 ### Instalando uma skill de fora
 
 Existem dois caminhos possíveis, dependendo de onde ela vem. Um agente que tem a
