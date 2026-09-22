@@ -78,6 +78,12 @@ arquivo_teste_aprovacao_*.txt
 
 # Local agent tooling state, not part of the project.
 /.claude/agent-memory/
+/.claude/skills/autofix/
+/.claude/skills/code-review/
+/.claude/worktrees/
+/.agents/skills/autofix/
+/.agents/skills/code-review/
+/skills-lock.json
 
 /undefined
 
