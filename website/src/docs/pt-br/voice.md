@@ -5,8 +5,9 @@ description: Um áudio chega como texto para o agente. A transcrição acontece 
 
 ## Mensagens de voz
 
-Manda um áudio no Telegram ou no WhatsApp, ou anexa um a um comando de barra
-no Discord, e o que o agente recebe é **texto**. A transcrição acontece na chegada, antes mesmo de existir uma
+Manda um áudio no Telegram ou no WhatsApp, ou no Discord (como anexo de um
+comando de barra, ou falado direto num canal que o bot escuta), e o que o
+agente recebe é **texto**. A transcrição acontece na chegada, antes mesmo de existir uma
 sessão e antes de qualquer decisão de roteamento, então o agente sempre vê
 uma mensagem comum, como qualquer outra.
 
@@ -40,11 +41,13 @@ Dois detalhes que vale saber:
   nenhuma configuração extra. A Meta limita mídia recebida por tipo (16 MB
   para áudio, 5 MB para imagens, 100 MB para documentos), e o próprio limite
   de 20 MB do Pepe se aplica por cima.
-- No **Discord**, só chegam arquivos anexados a um **comando de barra**, porque
-  a conexão é um endpoint de interações e não um bot de gateway. Dê ao seu
-  comando uma opção de anexo e `/ask file:<áudio>` funciona, com ou sem texto
-  digitado junto. Um áudio gravado direto no canal do Discord nunca chega ao
-  endpoint, e por isso não tem como ser transcrito.
+- No **Discord** há dois caminhos separados, e uma conexão pode oferecer um
+  deles ou os dois. A **opção de anexo** de um comando de barra funciona em
+  qualquer conexão: dê ao seu comando uma opção de anexo e `/ask file:<áudio>`
+  funciona, com ou sem texto digitado junto. Um áudio gravado direto num
+  canal, ou mandado numa DM, precisa do opt-in `--gateway`/`--bot-token` da
+  conexão (veja [Discord](../discord/)); sem isso, essa mensagem nunca chega
+  ao Pepe e não tem como ser transcrita.
 
 Slack, Microsoft Teams e Google Chat continuam recebendo apenas texto.
 

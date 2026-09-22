@@ -40,7 +40,10 @@ Os canais distinguem-se apenas na forma como uma mensagem chega ao Pepe:
   e uma rota de entrada genérica) recebem mensagens que a plataforma entrega
   num endereço no teu servidor, por isso o Pepe precisa de estar acessível a
   partir da internet. O Pepe expõe um URL por ligação. Regista-o uma única vez
-  junto do fornecedor.
+  junto do fornecedor. O Discord é a única exceção que consegue ficar a meio
+  das duas formas: os seus comandos de barra são um webhook, mas uma ligação
+  também pode optar por uma ligação persistente, à semelhança do Telegram,
+  para responder a mensagens normais de canal. Vê [Discord](../discord/).
 
 Todos os canais por webhook, qualquer que seja a plataforma, são servidos pelo
 mesmo endpoint de entrada:
@@ -59,7 +62,7 @@ Estes são os canais por webhook que vêm com o Pepe, e o que cada um precisa:
 |---|---|---|
 | **WhatsApp** | Webhook da Meta Cloud API | `phone_number_id`, `access_token`, `app_secret`, `verify_token` |
 | **Slack** | Webhook da Events API | `bot_token` (`xoxb-`), `signing_secret` |
-| **Discord** | Endpoint de Interactions (comandos de barra) | `public_key`, `application_id` |
+| **Discord** | Endpoint de Interactions (comandos de barra), mais uma ligação de gateway opcional para mensagens normais | `public_key`, `application_id`, ou `bot_token` para o gateway |
 | **Microsoft Teams** | Webhook do Bot Framework | `app_id`, `app_password`, `tenant_id` |
 | **Google Chat** | Webhook da Chat API | `access_token` (OAuth para a Chat API) |
 
@@ -74,11 +77,13 @@ separador **Integrations** do painel, e não em **Channels**.
   Subscriptions e aponta o request URL para o URL da ligação. O Pepe responde
   sozinho ao desafio `url_verification`. Adiciona os eventos `message.channels` e
   `app_mention`. O signing secret verifica cada pedido. Vê [Slack](../slack/).
-- **Discord.** Isto usa o endpoint de Interactions, e não um bot de gateway, por
-  isso responde a **comandos de barra**. Adiciona um comando com uma opção de
-  texto e depois aponta o "Interactions Endpoint URL" da aplicação para o URL da
-  ligação. A public key da aplicação verifica a assinatura Ed25519. O comando é
-  confirmado de imediato e a resposta chega como follow-up. Vê
+- **Discord.** Pelo endpoint de Interactions responde a **comandos de barra**:
+  adiciona um comando com uma opção de texto e depois aponta o "Interactions
+  Endpoint URL" da aplicação para o URL da ligação. A public key da aplicação
+  verifica a assinatura Ed25519. O comando é confirmado de imediato e a
+  resposta chega como follow-up. Uma ligação também pode optar por uma ligação
+  de gateway persistente (`--gateway` e um token de bot) para responder a
+  mensagens normais de canal e DMs, tal como o Telegram. Vê
   [Discord](../discord/).
 - **Microsoft Teams.** Regista um bot no Azure e aponta o respetivo messaging
   endpoint para o URL da ligação. O Pepe responde ao `serviceUrl` da activity com

@@ -66,8 +66,9 @@ defmodule Pepe.ACP.Protocol do
   The `initialize` result: every capability we actually have, and nothing we don't.
 
   An omitted or false capability means UNSUPPORTED in ACP, which is the whole point
-  of answering honestly here - a client that reads `loadSession: false` will never
-  send `session/load`, so there is no half-working path to fall into.
+  of answering honestly here - a capability reported `false` (`image`, `audio`,
+  `embeddedContext` for an agent that genuinely can't do them) tells a client not to
+  even try, so there is no half-working path to fall into.
   """
   @spec initialize_result(String.t() | nil, map()) :: map()
   def initialize_result(

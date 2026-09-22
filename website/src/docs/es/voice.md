@@ -5,7 +5,7 @@ description: Una nota de voz llega convertida en texto. La transcripción ocurre
 
 ## Mensajes de voz
 
-Manda una nota de voz por Telegram o WhatsApp, o adjúntala a un comando de barra en Discord, y lo que recibe el agente es **texto**. El audio se transcribe al llegar, antes de que exista una sesión y antes de tomar cualquier decisión de enrutado, así que al agente le llega un mensaje corriente y silvestre.
+Manda una nota de voz por Telegram o WhatsApp, o por Discord (como adjunto de un comando de barra, o hablada directo en un canal que el bot escuche), y lo que recibe el agente es **texto**. El audio se transcribe al llegar, antes de que exista una sesión y antes de tomar cualquier decisión de enrutado, así que al agente le llega un mensaje corriente y silvestre.
 
 No siempre funcionó así. Antes, el gateway guardaba el archivo en el workspace del agente y le pasaba la ruta, dejando que el agente resolviera por su cuenta cómo "escucharlo": buscar un transcriptor, instalarlo, correrlo, leer la salida. Cada nota de voz se volvía un pequeño proyecto de investigación. Era lento, salía distinto cada vez, y encima gastaba un aviso de permiso solo por el hecho de leer el mensaje recién llegado.
 
@@ -20,7 +20,7 @@ Si ya tienes una conexión de modelo con OpenAI o con Groq, la transcripción ya
 Dos detalles que conviene tener presentes:
 
 - En **WhatsApp** lo que llega es un id de medio, no el archivo. Pepe lo resuelve contra la Graph API con el mismo token de acceso que la conexión ya usa, sin configuración adicional. Meta limita el medio entrante por tipo (16 MB para audio, 5 MB para imágenes, 100 MB para documentos), y el propio límite de 20 MB de Pepe aplica encima.
-- En **Discord** solo llegan archivos adjuntos a un **comando de barra**, porque la conexión es un endpoint de interacciones y no un bot de gateway. Dale a tu comando una opción de adjunto y `/ask file:<clip>` funciona, con o sin texto escrito al lado. Una nota de voz grabada en el propio canal de Discord nunca llega al endpoint, así que no hay manera de transcribirla.
+- En **Discord** hay dos caminos separados, y una conexión puede ofrecer uno, el otro, o ambos. La **opción de adjunto** de un comando de barra funciona en cualquier conexión: dale a tu comando una opción de adjunto y `/ask file:<clip>` funciona, con o sin texto escrito al lado. Una nota de voz grabada directo en un canal, o mandada por DM, necesita el opt-in `--gateway`/`--bot-token` de la conexión (ver [Discord](../discord/)); sin eso, ese mensaje nunca le llega a Pepe y no hay manera de transcribirlo.
 
 Slack, Microsoft Teams y Google Chat siguen recibiendo solo texto.
 
