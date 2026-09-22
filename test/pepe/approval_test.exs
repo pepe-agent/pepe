@@ -54,4 +54,46 @@ defmodule Pepe.ApprovalTest do
     assert {:error, :not_found} = Approval.approve("nope")
     assert {:error, :not_found} = Approval.reject("nope")
   end
+
+  describe "a staged skill write" do
+    setup do
+      {:ok, _} = Application.ensure_all_started(:pepe)
+      File.mkdir_p!(Path.join(Config.home(), "skills"))
+      Pepe.RepoSetup.start!()
+      Config.put_agent(%Config.Agent{name: "reviewer-bot", tools: ["skill_manage"]})
+      :ok
+    end
+
+    @doc_v1 "---\nname: auto-skill\ndescription: Use when auto-skilling.\n---\n\nDo the thing.\n"
+
+    defp skill_call(action, extra) do
+      %{
+        "id" => "t1",
+        "function" => %{
+          "name" => "skill_manage",
+          "arguments" => Jason.encode!(Map.merge(%{"action" => action, "name" => "auto-skill"}, extra))
+        }
+      }
+    end
+
+    test "replayed on approval stays background-owned: review_run/review_actor survive the round trip" do
+      call = skill_call("create", %{"content" => @doc_v1})
+      {:ok, id, _} = Approval.stage("reviewer-bot", call, %{"review_run" => "run-1", "review_actor" => "review"})
+
+      assert {:ok, _} = Approval.approve(id)
+
+      assert Pepe.Skills.Ownership.origin("auto-skill") == :agent
+      assert Pepe.Skills.Ownership.background_writable?("auto-skill")
+      assert Enum.any?(Pepe.Skills.Ledger.recent(5, "auto-skill"), &(&1.actor == "review"))
+    end
+
+    test "a staged write with no review metadata (a plain foreground stage) still replays as a person's own" do
+      call = skill_call("create", %{"content" => @doc_v1})
+      {:ok, id, _} = Approval.stage("reviewer-bot", call)
+
+      assert {:ok, _} = Approval.approve(id)
+
+      assert Pepe.Skills.Ownership.origin("auto-skill") == :user
+    end
+  end
 end

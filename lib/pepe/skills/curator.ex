@@ -39,7 +39,7 @@ defmodule Pepe.Skills.Curator do
   alias Pepe.Skills.Curator.Settings
   alias Pepe.Skills.Curator.State
   alias Pepe.Skills.Ledger
-  alias Pepe.Skills.Lifecycle
+  alias Pepe.Skills.Manage
   alias Pepe.Skills.Ownership
   alias Pepe.Skills.Snapshots
   alias Pepe.Skills.Stat
@@ -50,13 +50,32 @@ defmodule Pepe.Skills.Curator do
   @keep_reports 30
   @blob_days 90
 
+  # The most an unattended run archives at once without `force: true`: a misconfigured
+  # `archive_after_days` (or a big batch of skills all going idle together) then loses at
+  # most this many to one pass instead of gutting the library before anyone notices -
+  # `max/2` so a small library (fewer than 40 candidates) is never capped below 20, which
+  # would make the guardrail the thing getting in normal operators' way.
+  @min_archive_cap 20
+
   @type transition :: %{name: String.t(), from: String.t(), to: String.t(), reason: String.t()}
 
   ###
   ### what it may touch
   ###
 
-  @doc "The skills the curator may act on: agent-written, unpinned, not auto-loaded, not archived."
+  @ledger_lookback 200
+
+  @doc """
+  The skills the curator may act on: agent-written, unpinned, not auto-loaded, not
+  archived, and matching what the ledger last recorded for it.
+
+  That last part guards against a skill someone edited by hand outside `skill_manage` (a
+  stray text editor on the file, a restored backup, anything that never went through
+  `Pepe.Skills.Manage`): its on-disk entry doc no longer hashes to the ledger's last
+  recorded `"after"`, which is the only signal available that a person's own edit is
+  sitting there un-owned by any ledger row - the curator leaves it alone rather than fold
+  a change nobody reviewed into its own maintenance pass.
+  """
   @spec candidates() :: [Stat.t()]
   def candidates do
     protected = MapSet.new(Pepe.Skills.Settings.auto_load())
@@ -65,9 +84,28 @@ defmodule Pepe.Skills.Curator do
     |> Map.values()
     |> Enum.filter(fn s ->
       s.managed and not s.pinned and s.state != "archived" and not MapSet.member?(protected, s.name) and
-        Ownership.origin(s.name) == :agent
+        Ownership.origin(s.name) == :agent and not hand_edited?(s.name)
     end)
     |> Enum.sort_by(& &1.name)
+  end
+
+  defp hand_edited?(name) do
+    with path when is_binary(path) <- Ownership.user_doc(name),
+         {:ok, bytes} <- File.read(path),
+         last when is_binary(last) <- last_recorded_hash(name) do
+      Snapshots.hash(bytes) != last
+    else
+      _ -> false
+    end
+  end
+
+  defp last_recorded_hash(name) do
+    Enum.find_value(Ledger.recent(@ledger_lookback, name), fn event ->
+      case Ledger.detail(event) do
+        %{"file" => "SKILL.md", "after" => after_hash} -> after_hash
+        _ -> nil
+      end
+    end)
   end
 
   ###
@@ -97,8 +135,37 @@ defmodule Pepe.Skills.Curator do
 
   defp decide(_stat, _anchor, _stale_cutoff, _archive_cutoff), do: nil
 
+  defp cap_archiving(plan, true), do: plan
+
+  defp cap_archiving(plan, false) do
+    {archiving, rest} = Enum.split_with(plan, &(&1.to == "archived"))
+    cap = max(@min_archive_cap, ceil(length(candidates()) * 0.5))
+
+    if length(archiving) > cap do
+      over = length(archiving) - cap
+
+      skipped =
+        archiving
+        |> Enum.drop(cap)
+        |> Enum.map(
+          &Map.put(
+            &1,
+            :error,
+            "not applied: archiving #{length(archiving)} skills in one run exceeds the safety cap of #{cap}" <>
+              " (#{over} held back); rerun with `--force` to archive them anyway"
+          )
+        )
+
+      rest ++ Enum.take(archiving, cap) ++ skipped
+    else
+      plan
+    end
+  end
+
+  defp apply_transition(%{error: _} = t), do: {:error, t}
+
   defp apply_transition(%{to: "archived"} = t) do
-    case Lifecycle.archive(t.name, @actor, reason: t.reason) do
+    case Manage.delete(t.name, actor: @actor, origin: :background) do
       {:ok, _} -> {:ok, t}
       {:error, reason} -> {:error, Map.put(t, :error, inspect(reason))}
     end
@@ -116,18 +183,19 @@ defmodule Pepe.Skills.Curator do
 
   @doc """
   Run the curator now. Options: `dry_run` (report only), `consolidate` (override the setting
-  for this run), `now`. Returns `{:ok, report}`; the report is also written to disk.
+  for this run), `force` (skip the per-run archive cap), `now`. Returns `{:ok, report}`; the
+  report is also written to disk.
   """
   @spec run(keyword()) :: {:ok, map()}
   def run(opts \\ []) do
     dry? = opts[:dry_run] == true
     consolidate? = Keyword.get(opts, :consolidate, Settings.consolidate?())
     started = System.monotonic_time(:millisecond)
-    plan = plan(opts[:now] || DateTime.utc_now())
-
-    backup = if not dry? and (plan != [] or consolidate?), do: snapshot()
-    {done, failed} = if dry?, do: {plan, []}, else: transitions(plan)
-    consolidation = if consolidate?, do: Consolidate.run(dry_run: dry?)
+    plan = (opts[:now] || DateTime.utc_now()) |> plan() |> cap_archiving(opts[:force] == true)
+    needs_backup? = not dry? and (plan != [] or consolidate?)
+    backup = if needs_backup?, do: snapshot()
+    backup_failed? = needs_backup? and is_nil(backup)
+    {done, failed, consolidation} = outcome(plan, dry?, consolidate?, backup_failed?)
 
     report =
       %{
@@ -140,7 +208,7 @@ defmodule Pepe.Skills.Curator do
         "backup" => backup,
         "duration_ms" => System.monotonic_time(:millisecond) - started
       }
-      |> Map.put("summary", summary(done, failed, consolidation, dry?))
+      |> Map.put("summary", summary(done, failed, consolidation, dry?, backup_failed?))
 
     path = write_report(report)
     report = Map.put(report, "report", path)
@@ -152,6 +220,35 @@ defmodule Pepe.Skills.Curator do
     case Backup.create("curator", @actor) do
       {:ok, id} -> id
       _ -> nil
+    end
+  end
+
+  defp outcome(plan, _dry?, _consolidate?, true) do
+    skipped = Enum.map(plan, &Map.put(&1, :error, "not applied: the safety snapshot before this run failed"))
+    {[], skipped, nil}
+  end
+
+  defp outcome(plan, dry?, consolidate?, false) do
+    {done, failed} = if dry?, do: Enum.split_with(plan, &(not Map.has_key?(&1, :error))), else: transitions(plan)
+    {done, failed, if(consolidate?, do: run_consolidation(dry?))}
+  end
+
+  # A wedged model server (or a chain that keeps failing over and retrying) would otherwise
+  # hold this whole synchronous run open indefinitely - @iterations turns is a soft bound
+  # only while every call inside them actually returns. This hard ceiling makes sure the
+  # curator's own run always finishes one way or another.
+  @consolidation_timeout_ms 15 * 60 * 1000
+
+  defp run_consolidation(dry?) do
+    task = Task.async(fn -> Consolidate.run(dry_run: dry?) end)
+
+    case Task.yield(task, @consolidation_timeout_ms) do
+      {:ok, result} ->
+        result
+
+      nil ->
+        Task.shutdown(task, :brutal_kill)
+        %{"ran" => false, "summary" => "consolidation timed out after #{div(@consolidation_timeout_ms, 60_000)} minutes and was stopped"}
     end
   end
 
@@ -178,8 +275,13 @@ defmodule Pepe.Skills.Curator do
   defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 
   @doc "One line describing a run's outcome (in the conditional for a dry run)."
-  @spec summary([transition()], [transition()], map() | nil, boolean()) :: String.t()
-  def summary(done, failed, consolidation, dry? \\ false) do
+  @spec summary([transition()], [transition()], map() | nil, boolean(), boolean()) :: String.t()
+  def summary(done, failed, consolidation, dry? \\ false, backup_failed? \\ false)
+
+  def summary(_done, failed, _consolidation, _dry?, true),
+    do: "skipped: the safety snapshot before this run failed, so none of #{length(failed)} planned change(s) were applied"
+
+  def summary(done, failed, consolidation, dry?, false) do
     counts = Enum.frequencies_by(done, & &1.to)
     stale = Map.get(counts, "stale", 0)
     archived = Map.get(counts, "archived", 0)

@@ -42,7 +42,8 @@ defmodule Pepe.Tools.SkillCurator do
       - log: recent skill changes (newest first, with an id for `undo`); `name` narrows to one skill.
       - report: the text of the latest run report (or of `id`).
       - run: run now. `dry_run` (default true) only reports; `consolidate` adds the model pass \
-        that merges overlapping skills. A real run snapshots the library first.
+        that merges overlapping skills. A real run snapshots the library first, and archives at \
+        most a safety-capped number of skills at once unless `force`.
       - pause / resume: stop or restart the automatic runs.
       - settings: with no `key`, show them; with `key` and `value`, change one (enabled, \
         interval_hours, min_idle_hours, stale_after_days, archive_after_days, consolidate).
@@ -62,7 +63,10 @@ defmodule Pepe.Tools.SkillCurator do
           "consolidate" => %{"type" => "boolean", "description" => "run only: also run the model pass that merges overlapping skills."},
           "key" => %{"type" => "string", "description" => "settings: which setting."},
           "value" => %{"type" => "string", "description" => "settings: its new value."},
-          "force" => %{"type" => "boolean", "description" => "undo only: revert even if the file changed since."}
+          "force" => %{
+            "type" => "boolean",
+            "description" => "undo: revert even if the file changed since. run: skip the per-run archive safety cap."
+          }
         },
         "required" => ["action"]
       }
@@ -122,14 +126,19 @@ defmodule Pepe.Tools.SkillCurator do
 
   defp dispatch("run", args, _actor) do
     dry? = Map.get(args, "dry_run", true) != false
-    opts = [dry_run: dry?] ++ if(args["consolidate"] == true, do: [consolidate: true], else: [])
+
+    opts =
+      [dry_run: dry?] ++
+        if(args["consolidate"] == true, do: [consolidate: true], else: []) ++
+        if(args["force"] == true, do: [force: true], else: [])
+
     {:ok, report} = Curator.run(opts)
     {:ok, run_message(report, dry?)}
   end
 
   defp dispatch("pause", _args, _actor) do
     State.set_paused(true)
-    {:ok, "Curator paused."}
+    {:ok, "Curator paused: it will not start another run on its own. A run already in progress finishes; this does not stop it."}
   end
 
   defp dispatch("resume", _args, _actor) do

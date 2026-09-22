@@ -12,6 +12,7 @@ defmodule Pepe.Skills.CuratorTest do
   alias Pepe.Config.Agent
   alias Pepe.Config.Model
   alias Pepe.Repo
+  alias Pepe.Skills.Backup
   alias Pepe.Skills.Curator
   alias Pepe.Skills.Curator.Consolidate
   alias Pepe.Skills.Curator.Settings
@@ -112,6 +113,14 @@ defmodule Pepe.Skills.CuratorTest do
 
       assert Enum.map(Curator.candidates(), & &1.name) == ["mine-a"]
     end
+
+    test "not a skill someone edited by hand outside skill_manage, even though it is still agent-owned and unpinned", %{dir: dir} do
+      agent_skill("untouched", 0)
+      agent_skill("hand-edited-after", 0)
+      File.write!(Path.join([dir, "hand-edited-after", "SKILL.md"]), doc("hand-edited-after", "A person changed this directly."))
+
+      assert Enum.map(Curator.candidates(), & &1.name) == ["untouched"]
+    end
   end
 
   describe "the deterministic pass" do
@@ -198,6 +207,69 @@ defmodule Pepe.Skills.CuratorTest do
       agent_skill("fresh", 1)
       assert {:ok, %{"transitions" => [], "backup" => nil}} = Curator.run()
     end
+
+    test "archiving takes the same per-skill lock a foreground write uses, so the two cannot interleave" do
+      agent_skill("racer", 45)
+      test_pid = self()
+
+      holder =
+        spawn(fn ->
+          :global.trans({{Pepe.Skills.Manage, "racer"}, self()}, fn ->
+            send(test_pid, :holding)
+
+            receive do
+              :release -> :ok
+            end
+          end)
+        end)
+
+      assert_receive :holding, 1000
+
+      runner = Task.async(fn -> Curator.run() end)
+
+      # "holder" still has the lock, so the runner cannot possibly have gotten past it to
+      # archive "racer" yet: `run/1`'s whole body is the deterministic pass over this one
+      # candidate, which is instant once it can proceed, so a still-nil yield here is not a
+      # guess about timing but a direct consequence of the lock actually being shared.
+      assert Task.yield(runner, 200) == nil
+      assert state_of("racer") == "active"
+
+      send(holder, :release)
+      assert {:ok, _report} = Task.await(runner, 2000)
+      assert state_of("racer") == "archived"
+    end
+
+    test "a run never archives more than the safety cap at once, unless forced" do
+      for n <- 1..25, do: agent_skill("batch-#{n}", 45)
+
+      assert {:ok, report} = Curator.run()
+
+      archived = Enum.count(report["transitions"], &(&1["to"] == "archived"))
+      capped = Enum.count(report["failed"], &(&1["error"] =~ "safety cap"))
+      assert archived == 20
+      assert capped == 5
+      assert archived + capped == 25
+
+      assert {:ok, report2} = Curator.run(force: true)
+      assert Enum.count(report2["transitions"], &(&1["to"] == "archived")) == 5
+      assert report2["failed"] == []
+    end
+
+    test "a run aborts and reports failure if the safety snapshot cannot be taken, rather than changing skills unprotected", %{dir: dir} do
+      agent_skill("would-be-archived", 45)
+      File.mkdir_p!(Backup.dir())
+      File.chmod!(Backup.dir(), 0o555)
+      on_exit(fn -> File.chmod(Backup.dir(), 0o755) end)
+
+      assert {:ok, report} = Curator.run()
+
+      assert report["backup"] == nil
+      assert report["transitions"] == []
+      assert report["summary"] =~ "the safety snapshot"
+      assert state_of("would-be-archived") == "active"
+      assert File.exists?(Path.join(dir, "would-be-archived"))
+      assert Enum.any?(report["failed"], &(&1["name"] == "would-be-archived"))
+    end
   end
 
   describe "when it runs by itself" do
@@ -271,6 +343,12 @@ defmodule Pepe.Skills.CuratorTest do
       assert msg =~ "cannot be longer"
       assert {:error, msg} = Settings.put("archive_after_days", 5)
       assert msg =~ "cannot be shorter"
+    end
+
+    test "archive_after_days cannot be set to 0 (it would archive a skill the moment it's created)" do
+      assert :ok = Settings.put("stale_after_days", 0)
+      assert {:error, msg} = Settings.put("archive_after_days", 0)
+      assert msg =~ "at least 1"
     end
   end
 

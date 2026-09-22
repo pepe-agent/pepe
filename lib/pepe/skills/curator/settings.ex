@@ -102,7 +102,11 @@ defmodule Pepe.Skills.Curator.Settings do
   end
 
   defp check_order("archive_after_days", value) do
-    if value >= get("stale_after_days"), do: :ok, else: {:error, "archive_after_days cannot be shorter than stale_after_days."}
+    cond do
+      value < 1 -> {:error, "archive_after_days must be at least 1 (0 would archive an agent-written skill the moment it's created)."}
+      value < get("stale_after_days") -> {:error, "archive_after_days cannot be shorter than stale_after_days."}
+      true -> :ok
+    end
   end
 
   defp check_order(_key, _value), do: :ok
