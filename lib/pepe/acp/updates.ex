@@ -81,10 +81,13 @@ defmodule Pepe.ACP.Updates do
 
   def prompt_usage(_totals), do: nil
 
-  @doc "An `available_commands_update` with every slash command the agent handles itself."
-  @spec available_commands() :: map()
-  def available_commands do
-    %{"sessionUpdate" => "available_commands_update", "availableCommands" => Pepe.ACP.Commands.available()}
+  @doc """
+  An `available_commands_update` with every slash command the agent handles itself, and one
+  per installed skill the session's agent is offered (`opts`: its `:agent` and `:cwd`).
+  """
+  @spec available_commands(keyword()) :: map()
+  def available_commands(opts \\ []) do
+    %{"sessionUpdate" => "available_commands_update", "availableCommands" => Pepe.ACP.Commands.available(opts)}
   end
 
   @doc "A `user_message_chunk`: echoes text the editor did not type itself (a queued prompt starting)."

@@ -35,6 +35,7 @@ defmodule Pepe.ACP.Commands do
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Project
+  alias Pepe.Skills.Commands, as: SkillCommands
 
   # name, the description an editor shows in its command palette, and the hint for its
   # argument. These are protocol metadata read by an editor, so they stay in English,
@@ -55,10 +56,15 @@ defmodule Pepe.ACP.Commands do
     {"usage", "Show this month's spend and message count", nil},
     {"steer", "Give guidance to the turn that is running now", "guidance for the running turn"},
     {"queue", "Run a prompt after the current turn finishes", "prompt to run next"},
+    {"skill", "Run an installed skill", "skill name and its input"},
     {"version", "Show the Pepe version", nil}
   ]
 
   @names Enum.map(@commands, &elem(&1, 0))
+
+  # An installed skill is offered as a command of its own, unless a built-in already has its
+  # name. Which ones is per session: the agent's tools and the project's directory decide.
+  @type skill_opts :: [agent: String.t() | nil, cwd: String.t() | nil]
 
   @type ctx :: %{
           required(:key) => String.t(),
@@ -69,34 +75,56 @@ defmodule Pepe.ACP.Commands do
         }
   @type result :: {:reply, String.t()} | {:prompt, String.t()} | {:prompt, String.t(), String.t()} | {:queue, String.t()}
 
-  @doc "The `availableCommands` an editor is told about."
-  @spec available() :: [map()]
-  def available do
-    Enum.map(@commands, fn {name, description, hint} ->
-      base = %{"name" => name, "description" => description}
-      if hint, do: Map.put(base, "input", %{"hint" => hint}), else: base
-    end)
+  @doc """
+  The `availableCommands` an editor is told about: the built-ins, then one per installed
+  skill the session's agent is offered (see `Pepe.Skills.Commands`).
+  """
+  @spec available(skill_opts()) :: [map()]
+  def available(opts \\ []) do
+    builtin =
+      Enum.map(@commands, fn {name, description, hint} ->
+        base = %{"name" => name, "description" => description}
+        if hint, do: Map.put(base, "input", %{"hint" => hint}), else: base
+      end)
+
+    skills =
+      for %{name: name, summary: summary} <- SkillCommands.list(skill_opts(opts) ++ [reserved: @names]) do
+        %{"name" => name, "description" => summary, "input" => %{"hint" => "what the skill should work on"}}
+      end
+
+    builtin ++ skills
   end
 
   @doc "Is a `session/prompt`'s content a command? Only a lone text block ever is."
-  @spec from_blocks(term()) :: {:command, String.t(), String.t()} | :none
-  def from_blocks([%{"type" => "text", "text" => text}]) when is_binary(text), do: parse(text)
-  def from_blocks(_other), do: :none
+  @spec from_blocks(term(), skill_opts()) :: {:command, String.t(), String.t()} | :none
+  def from_blocks(blocks, opts \\ [])
+  def from_blocks([%{"type" => "text", "text" => text}], opts) when is_binary(text), do: parse(text, opts)
+  def from_blocks(_other, _opts), do: :none
 
-  @doc "Parse `/name args`; `:none` for anything that isn't one of our commands."
-  @spec parse(String.t()) :: {:command, String.t(), String.t()} | :none
-  def parse(text) do
-    case Regex.run(~r{\A\s*/([A-Za-z][A-Za-z_]*)(?:\s+(.*))?\z}s, text) do
-      [_, name] -> known(name, "")
-      [_, name, args] -> known(name, String.trim(args))
+  @doc """
+  Parse `/name args`; `:none` for anything that isn't one of our commands. An installed skill
+  the session is offered counts as one: `/deploy staging` is `/skill deploy staging`.
+  """
+  @spec parse(String.t(), skill_opts()) :: {:command, String.t(), String.t()} | :none
+  def parse(text, opts \\ []) do
+    case Regex.run(~r{\A\s*/([A-Za-z][A-Za-z0-9_-]*)(?:\s+(.*))?\z}s, text) do
+      [_, name] -> known(name, "", opts)
+      [_, name, args] -> known(name, String.trim(args), opts)
       _ -> :none
     end
   end
 
-  defp known(name, args) do
-    name = String.downcase(name)
-    if name in @names, do: {:command, name, args}, else: :none
+  defp known(name, args, opts) do
+    lowered = String.downcase(name)
+
+    cond do
+      lowered in @names -> {:command, lowered, args}
+      match?({:ok, _}, SkillCommands.find(name, skill_opts(opts))) -> {:command, "skill", String.trim(name <> " " <> args)}
+      true -> :none
+    end
   end
+
+  defp skill_opts(opts), do: [agent: opts[:agent], channel: "acp", cwd: opts[:cwd]]
 
   ###
   ### commands
@@ -266,6 +294,24 @@ defmodule Pepe.ACP.Commands do
   def run("queue", text, %{running?: true}), do: {:queue, text}
   def run("queue", text, _ctx), do: {:prompt, text}
 
+  def run("skill", "", ctx), do: {:reply, skills_text(ctx)}
+
+  # A skill runs as an ordinary turn: the agent is told to carry it out and reads it through
+  # its own `skill` tool, which is what keeps community content marked untrusted. Behind a
+  # running turn it waits its turn, like `/queue`.
+  def run("skill", words, ctx) do
+    [name | rest] = String.split(words, ~r/\s+/, parts: 2)
+
+    case SkillCommands.find(name, skill_opts(ctx)) do
+      {:ok, %{name: skill}} ->
+        turn = SkillCommands.instruction(skill, Enum.join(rest))
+        if ctx.running?, do: {:queue, turn}, else: {:prompt, turn}
+
+      :none ->
+        {:reply, gettext("Unknown skill: %{name}", name: name)}
+    end
+  end
+
   def run("version", _args, _ctx), do: {:reply, "Pepe v" <> Pepe.Update.current()}
 
   ###
@@ -283,6 +329,19 @@ defmodule Pepe.ACP.Commands do
   end
 
   defp wait, do: {:reply, gettext("Wait for the current turn to finish.")}
+
+  defp skills_text(ctx) do
+    case SkillCommands.list(skill_opts(ctx)) do
+      [] ->
+        gettext("No skills are available yet.")
+
+      skills ->
+        gettext("Available skills (run with /skill <name>):") <> "\n" <> Enum.map_join(skills, "\n", &skill_line/1)
+    end
+  end
+
+  defp skill_line(%{name: name, summary: summary, needs: needs}),
+    do: "- #{name}: #{summary}" <> if(needs, do: " (#{needs})", else: "")
 
   # A session process is only started by a session's first message, so a command sent
   # before one (`/model` as the very first thing typed) has to start it.

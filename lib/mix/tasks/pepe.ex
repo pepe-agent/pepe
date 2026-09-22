@@ -332,7 +332,12 @@ defmodule Mix.Tasks.Pepe do
              "undo",
              "archived",
              "unmanaged",
-             "curator"
+             "curator",
+             "preview",
+             "check",
+             "browse",
+             "reset",
+             "snapshot"
            ],
       do: with_app([], fn -> skill_cmd([sub | rest]) end)
 
@@ -2179,8 +2184,8 @@ defmodule Mix.Tasks.Pepe do
   ###
 
   defp skill_cmd(["help"]), do: skill_help()
-  defp skill_cmd([]), do: skill_list()
-  defp skill_cmd(["list"]), do: skill_list()
+  defp skill_cmd([]), do: skill_list([])
+  defp skill_cmd(["list" | rest]), do: skill_list(rest)
 
   defp skill_cmd(["search", query]) do
     case Pepe.Skills.Marketplace.search(query) do
@@ -2354,6 +2359,200 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  defp skill_cmd(["validate", target]) do
+    case Pepe.Skills.Validate.run(target, cwd: File.cwd!()) do
+      {:ok, report} -> print_validation_report(report)
+      {:error, :not_found} -> error("#{target} is not a skill directory, a skill file, or the name of a known skill")
+    end
+  end
+
+  defp skill_cmd(["validate"]), do: error("usage: mix pepe skill validate PATH|NAME")
+
+  defp skill_cmd(["preview", name | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [source: :string])
+
+    case Pepe.Skills.Marketplace.preview(name, source: opts[:source]) do
+      {:ok, preview} ->
+        print_skill_preview(preview)
+
+      {:error, :not_found} ->
+        error("no skill named #{name} in any tap, the bundled registry, or PepeHub - pass --source URL to look at one directly")
+
+      {:error, reason} ->
+        error("couldn't fetch #{name}: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["preview"]), do: error("usage: mix pepe skill preview NAME [--source URL]")
+
+  defp skill_cmd(["check"]) do
+    case Pepe.Skills.Marketplace.check(nil) do
+      [] -> info("No skills installed from a marketplace.")
+      results -> Enum.each(results, fn {name, result} -> print_skill_check(name, result) end)
+    end
+  end
+
+  defp skill_cmd(["check", name]), do: print_skill_check(name, Pepe.Skills.Marketplace.check(name))
+
+  defp skill_cmd(["browse" | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [page: :integer, per_page: :integer, trust: :string])
+    page = Pepe.Skills.Marketplace.browse(page: opts[:page], per_page: opts[:per_page], trust: opts[:trust])
+
+    if page.total == 0 do
+      info("Nothing to browse. The bundled registry is empty; add a tap: mix pepe skill tap add URL")
+    else
+      Enum.each(page.entries, &print_skill_listing/1)
+      info(dim("page #{page.page} of #{page.pages} (#{page.total} skills) - mix pepe skill browse --page N"))
+    end
+  end
+
+  defp skill_cmd(["overrides"]) do
+    case Pepe.Skills.Overrides.list() do
+      [] ->
+        info("No built-in skill is overridden by a copy of yours.")
+
+      overrides ->
+        Enum.each(overrides, &info(override_line(&1)))
+    end
+  end
+
+  defp skill_cmd(["diff", name]) do
+    case Pepe.Skills.Overrides.diff(name) do
+      {:ok, []} -> info("#{name}: your copy is identical to the built-in one.")
+      {:ok, diff} -> info(Pepe.Skills.Overrides.format(diff))
+      {:error, :not_overridden} -> error("#{name} is not a built-in skill that a copy of yours overrides")
+    end
+  end
+
+  defp skill_cmd(["reset", name]) do
+    case Pepe.Skills.Overrides.reset(name, skill_cli_actor()) do
+      {:ok, dir} -> ok("#{name}: the built-in version serves again; your copy is archived in #{dir} (mix pepe skill restore #{name})")
+      {:error, :not_overridden} -> error("#{name} is not a built-in skill that a copy of yours overrides")
+      {:error, reason} -> error("couldn't reset #{name}: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["pack", target | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [out: :string, force: :boolean])
+
+    case Pepe.Skills.Pack.build(target, out: opts[:out], force: opts[:force] == true) do
+      {:ok, built} -> print_skill_pack(built)
+      {:error, :not_found} -> error("#{target} is not a skill directory, a skill file, or the name of a known skill")
+      {:error, {:invalid, report}} -> print_pack_refusal(report)
+      {:error, {:unsafe, scan}} -> print_pack_unsafe(scan)
+      {:error, reason} -> error("couldn't pack #{target}: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["pack"]), do: error("usage: mix pepe skill pack PATH|NAME [--out FILE] [--force]")
+
+  defp skill_cmd(["snapshot", "export", file]) do
+    case Pepe.Skills.Snapshot.export(file) do
+      {:ok, count} -> ok("wrote #{count} skill(s) and their settings to #{file}")
+      {:error, reason} -> error("couldn't write #{file}: #{inspect(reason)}")
+    end
+  end
+
+  defp skill_cmd(["snapshot", action, file | rest]) when action in ["restore", "import"] do
+    {opts, _, _} = OptionParser.parse(rest, strict: [force: :boolean, settings: :boolean])
+
+    case Pepe.Skills.Snapshot.restore(file, force: opts[:force] == true, settings: opts[:settings] != false) do
+      {:ok, result} -> print_snapshot_result(result)
+      {:error, :unreadable} -> error("couldn't read #{file}")
+      {:error, :not_a_snapshot} -> error("#{file} is not a skills snapshot")
+      {:error, {:unsupported_version, version}} -> error("#{file} is snapshot version #{inspect(version)}, which this Pepe does not know")
+    end
+  end
+
+  defp skill_cmd(["snapshot" | _]),
+    do: error("usage: mix pepe skill snapshot export FILE | snapshot restore FILE [--force] [--no-settings]")
+
+  defp skill_cmd([action, name | rest]) when action in ["enable", "disable"] do
+    {opts, _, _} = OptionParser.parse(rest, strict: [channel: :string])
+
+    if Pepe.Skills.Catalog.tiers_of(name) == [] do
+      error("no skill named #{name}")
+    else
+      if action == "disable",
+        do: Pepe.Skills.Settings.disable(name, opts[:channel]),
+        else: Pepe.Skills.Settings.enable(name, opts[:channel])
+
+      ok("#{name}: #{action}d#{if opts[:channel], do: " on #{opts[:channel]}", else: " everywhere"}")
+    end
+  end
+
+  defp skill_cmd(["trust" | rest]) do
+    root = rest |> List.first() |> Kernel.||(File.cwd!()) |> Pepe.Skills.Project.trust()
+    ok("trusted #{root}: its .pepe/skills and .agents/skills load now, each one still scanned")
+  end
+
+  defp skill_cmd(["untrust" | rest]) do
+    root = rest |> List.first() |> Kernel.||(File.cwd!()) |> Pepe.Skills.Project.untrust()
+    ok("no longer trusting #{root}")
+  end
+
+  defp skill_cmd(["trusted"]) do
+    case Pepe.Skills.Settings.trusted_project_dirs() do
+      [] -> info("No repository is trusted. Trust one: mix pepe skill trust [PATH]")
+      dirs -> Enum.each(dirs, &info("  #{&1}"))
+    end
+  end
+
+  defp skill_cmd(["external", "add", dir]),
+    do: skill_setting(fn -> Pepe.Skills.Settings.add_external_dir(dir) end, "reading skills in place from #{dir}")
+
+  defp skill_cmd(["external", "remove", dir]),
+    do: skill_setting(fn -> Pepe.Skills.Settings.remove_external_dir(dir) end, "no longer reading #{dir}")
+
+  defp skill_cmd(["external", "list"]) do
+    case Pepe.Skills.Settings.external_dirs_configured() do
+      [] -> info("No external skill directories. Add one: mix pepe skill external add DIR")
+      dirs -> Enum.each(dirs, &info("  #{&1}"))
+    end
+  end
+
+  defp skill_cmd(["autoload", "add", name]),
+    do:
+      skill_setting(
+        fn -> Pepe.Skills.Settings.add_auto_load(name) end,
+        "#{name} is kept in context in full for every agent that can open skills"
+      )
+
+  defp skill_cmd(["autoload", "remove", name]),
+    do: skill_setting(fn -> Pepe.Skills.Settings.remove_auto_load(name) end, "#{name} is no longer auto-loaded")
+
+  defp skill_cmd(["autoload", "list"]) do
+    case Pepe.Skills.Settings.auto_load() do
+      [] -> info("No skill is auto-loaded. Add one: mix pepe skill autoload add NAME")
+      names -> Enum.each(names, &info("  #{&1}"))
+    end
+  end
+
+  defp skill_cmd(["set", key, value]) when key in ["template-vars", "inline-shell"] and value in ["on", "off"] do
+    setting = String.replace(key, "-", "_")
+    skill_setting(fn -> Pepe.Skills.Settings.set_flag(setting, value == "on") end, "#{key} is #{value}")
+
+    if setting == "inline_shell" and value == "on",
+      do:
+        info(
+          dim(
+            "A skill's !`command` snippets now run when it loads, each through the permission gate. Skills from a community source never run them."
+          )
+        )
+  end
+
+  defp skill_cmd(["set" | _]), do: error("usage: mix pepe skill set template-vars|inline-shell on|off")
+
+  defp skill_cmd(["config"]), do: print_skill_config(nil)
+  defp skill_cmd(["config", key]), do: print_skill_config(key)
+
+  defp skill_cmd(["config", key, value]) do
+    unless Enum.any?(declared_skill_config(), &(&1.var.key == key)),
+      do: info(dim("(no skill declares #{key} yet; it is stored anyway)"))
+
+    skill_setting(fn -> Pepe.Skills.Settings.put_config(key, value) end, "#{key} = #{value}")
+  end
+
   defp skill_cmd(["tap", "add", url]) do
     Config.add_skill_tap(url)
     ok("added tap #{url}")
@@ -2448,17 +2647,215 @@ defmodule Mix.Tasks.Pepe do
         "usage: mix pepe skill curator status|run [--dry-run] [--consolidate]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]"
       )
 
+  defp override_line(%{name: name, changed?: changed?}) do
+    status = if changed?, do: "differs from the built-in", else: "identical to the built-in"
+    "  #{green(name)} #{dim(status)}"
+  end
+
   defp skill_usage,
     do:
-      "usage: mix pepe skill list|search QUERY|install NAME [--force] [--source URL]|update [NAME]|remove NAME|audit [NAME]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|undo ID [--force]|archived|unmanaged|curator status|run|pause|resume|usage|reports|report|settings|set|backup|backups|rollback|tap add|list|remove URL"
+      "usage: mix pepe skill list [--all]|search QUERY|browse|preview NAME|install NAME [--force] [--source URL]|check [NAME]|update [NAME]|remove NAME|audit [NAME]|validate PATH|NAME|pack PATH|NAME|snapshot export|restore FILE|overrides|diff NAME|reset NAME|enable|disable NAME [--channel C]|trust|untrust [PATH]|external|autoload add|remove|list|set KEY on|off|config [KEY [VALUE]]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|undo ID [--force]|archived|unmanaged|curator status|run [--dry-run] [--consolidate]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]|tap add|list|remove URL"
 
   defp skill_cli_actor, do: "user:cli"
 
-  defp skill_list do
-    builtin_and_user = Pepe.Skills.list()
-    info(bold("skills") <> dim("  (#{length(builtin_and_user)} available: built-in + user)"))
-    Enum.each(builtin_and_user, fn {name, summary} -> info("  #{green(name)}#{if summary != "", do: dim(" - " <> summary), else: ""}") end)
+  defp skill_setting(fun, message) do
+    fun.()
+    ok(message)
+  end
 
+  defp print_validation_report(report) do
+    label = report.name || Path.basename(report.entry)
+    summary = "#{report.errors} error(s), #{report.warnings} warning(s)"
+
+    cond do
+      report.findings == [] ->
+        ok("#{label}: valid, nothing to report")
+
+      report.valid? ->
+        info(Pepe.Skills.Validate.format(report.findings))
+        ok("#{label}: valid (#{summary})")
+
+      true ->
+        info(Pepe.Skills.Validate.format(report.findings))
+        error("#{label}: not valid (#{summary})")
+        arm_failure_exit()
+    end
+  end
+
+  defp print_skill_preview(preview) do
+    info("#{bold(preview.name)} #{dim("(#{preview.trust_level})")}")
+    info(dim("  from #{preview.source}"))
+    info(dim("  #{preview.hash}"))
+    info("  security scan: #{preview.scan.verdict}")
+    if preview.scan.verdict != :safe, do: info(Pepe.Skills.Sentinel.report(preview.scan))
+    info("  files: #{Enum.join(preview.files, ", ")}")
+
+    if preview.validation == [],
+      do: info("  specification check: no findings"),
+      else: info("  specification check:\n" <> Pepe.Skills.Validate.format(preview.validation))
+
+    info("\n" <> dim("--- opening of the instructions ---") <> "\n" <> preview.excerpt)
+
+    info(
+      dim(
+        "\nInstall it: mix pepe skill install #{preview.name}#{if preview.trust_level == "community", do: " --source " <> preview.source, else: ""}"
+      )
+    )
+  end
+
+  defp print_skill_check(name, {:ok, :current}), do: ok("#{name}: up to date")
+
+  defp print_skill_check(name, {:ok, :update_available}),
+    do: info(yellow("↑ ") <> "#{name}: a newer version is available - mix pepe skill update #{name}")
+
+  defp print_skill_check(name, {:ok, {:source_changed, pinned, now}}) do
+    error("#{name}: the name now resolves to a different source than it was installed from")
+    info("  installed from: #{pinned}\n  now resolves to: #{now}")
+  end
+
+  defp print_skill_check(name, {:error, :not_found}), do: error("no installed skill named #{name}")
+  defp print_skill_check(name, {:error, reason}), do: error("couldn't check #{name}: #{inspect(reason)}")
+
+  defp print_skill_listing(%{name: name, trust_level: trust, description: description, source: source}) do
+    info("  #{green(name)} #{dim("(#{trust})")}#{if description, do: " - " <> description, else: ""}")
+    info(dim("    #{source}"))
+  end
+
+  defp print_skill_pack(built) do
+    ok("packed #{built.name}: #{built.archive} (#{built.files} files, #{built.bytes} bytes)")
+    info(dim("  sha256 #{built.sha256}"))
+    if built.report.findings != [], do: info(Pepe.Skills.Validate.format(built.report.findings))
+
+    entry =
+      Jason.encode!(
+        %{built.name => Map.put(Map.delete(built.entry, "name"), "source", "https://YOUR-HOST/#{Path.basename(built.archive)}")},
+        pretty: true
+      )
+
+    info("\nTo publish it in a tap, host the archive and add this to the tap's skills_registry.json (fix the URL):\n#{entry}")
+  end
+
+  defp print_pack_refusal(report) do
+    info(Pepe.Skills.Validate.format(report.findings))
+
+    error(
+      "not packed: the skill does not pass the specification check (#{report.errors} error(s)). Fix it, or pack it anyway with --force."
+    )
+  end
+
+  defp print_pack_unsafe(scan) do
+    info(Pepe.Skills.Sentinel.report(scan))
+    error("not packed: the Sentinel flagged the skill as dangerous. Review it, or pack it anyway with --force.")
+  end
+
+  defp print_snapshot_result(result) do
+    Enum.each(result.installed, &ok("installed #{&1}"))
+    Enum.each(result.skipped, &info(dim("  #{&1}: already installed from the same source, skipped")))
+
+    Enum.each(result.failed, fn
+      {name, :unsafe} -> error("#{name}: the Sentinel flagged it as dangerous, not installed (review it, then --force)")
+      {name, reason} -> error("#{name}: #{inspect(reason)}")
+    end)
+
+    if result.settings != [], do: info("settings applied: #{Enum.join(result.settings, ", ")}")
+  end
+
+  # Every setting a visible skill declares under `metadata.pepe.config`, with the skill it is for.
+  defp declared_skill_config do
+    for %{fields: %{config_vars: vars}} = skill <- Pepe.Skills.Catalog.all(cwd: File.cwd!()),
+        var <- vars,
+        do: %{skill: skill.name, var: var}
+  end
+
+  defp print_skill_config(key) do
+    values = Pepe.Skills.Settings.config_values()
+    declared = Enum.filter(declared_skill_config(), &(is_nil(key) or &1.var.key == key))
+
+    if declared == [] and key == nil do
+      info("No skill declares a setting.")
+    else
+      Enum.each(declared, &info(config_line(&1, values)))
+
+      if declared == [], do: info("#{key} = #{inspect(Map.get(values, key))} #{dim("(no skill declares it)")}")
+    end
+  end
+
+  defp config_line(%{skill: skill, var: var}, values) do
+    value = Map.get(values, var.key, var.default)
+    shown = if value in [nil, ""], do: dim("not set"), else: to_string(value)
+    "  #{green(var.key)} = #{shown} #{dim("(#{skill}: #{var.description})")}"
+  end
+
+  # `mix pepe skill list` shows what an agent is offered, and with `--all` also what it is not
+  # and why (disabled, another OS, needs a tool, ...), so a missing skill is explained.
+  defp skill_list(args) do
+    {opts, _, _} = OptionParser.parse(args, strict: [all: :boolean, source: :string])
+    status = Pepe.Skills.Catalog.status(cwd: File.cwd!())
+    shown = Enum.filter(status, &skill_matches_source?(&1, opts[:source]))
+    offered = Enum.filter(shown, &is_nil(&1.hidden))
+    hidden = Enum.reject(shown, &is_nil(&1.hidden))
+
+    info(bold("skills") <> dim("  (#{length(offered)} available#{if hidden != [], do: ", #{length(hidden)} not offered", else: ""})"))
+    Enum.each(offered, &print_skill_status_line/1)
+
+    if opts[:all] && hidden != [] do
+      info("\n" <> bold("not offered") <> dim(" (#{length(hidden)})"))
+      Enum.each(hidden, &print_skill_status_line/1)
+    end
+
+    if hidden != [] and opts[:all] != true, do: info(dim("\n#{length(hidden)} more not offered to an agent: mix pepe skill list --all"))
+
+    case Pepe.Skills.Catalog.untrusted_project(cwd: File.cwd!()) do
+      {root, count} ->
+        info(dim("\n#{count} skill(s) in #{root} are not loaded because you have not trusted it: mix pepe skill trust #{root}"))
+
+      nil ->
+        :ok
+    end
+
+    print_marketplace_installs()
+  end
+
+  defp skill_matches_source?(_status, nil), do: true
+  defp skill_matches_source?(_status, "marketplace"), do: true
+  defp skill_matches_source?(%{skill: skill}, source), do: to_string(skill.source) == source
+
+  defp print_skill_status_line(%{skill: skill, hidden: hidden, readiness: readiness}) do
+    summary = if skill.summary != "", do: dim(" - " <> skill.summary), else: ""
+    tier = dim(" [#{skill.source}]")
+    reason = if hidden, do: " " <> yellow("(" <> skill_hidden_reason(hidden) <> ")"), else: ""
+    needs = readiness |> Pepe.Skills.Readiness.note() |> skill_needs_suffix()
+    info("  #{green(skill.name)}#{tier}#{reason}#{needs}#{summary}")
+  end
+
+  # What the specification check says about a skill just installed. Never blocks: a skill that
+  # works here but would not travel to another tool is still installed, with the notes.
+  defp report_install_validation(name) do
+    case Pepe.Skills.Validate.run(name) do
+      {:ok, %{findings: []}} ->
+        :ok
+
+      {:ok, report} ->
+        info(dim("specification check: #{report.errors} error(s), #{report.warnings} warning(s)"))
+        info(Pepe.Skills.Validate.format(report.findings))
+        info(dim("(run `mix pepe skill validate #{name}` to see this again)"))
+
+      {:error, :not_found} ->
+        :ok
+    end
+  end
+
+  defp skill_needs_suffix(nil), do: ""
+  defp skill_needs_suffix(note), do: " " <> yellow("(" <> note <> ")")
+
+  defp skill_hidden_reason(:disabled), do: "disabled"
+  defp skill_hidden_reason(:platform), do: "for another operating system"
+  defp skill_hidden_reason(:environment), do: "for another environment"
+  defp skill_hidden_reason(:channel), do: "for other channels"
+  defp skill_hidden_reason({:requires_tools, tools}), do: "needs the #{Enum.join(tools, ", ")} tool"
+  defp skill_hidden_reason({:fallback_for_tools, tools}), do: "not needed while #{Enum.join(tools, ", ")} is available"
+
+  defp print_marketplace_installs do
     case Pepe.Skills.Marketplace.list_installed() do
       [] ->
         :ok
@@ -2480,6 +2877,7 @@ defmodule Mix.Tasks.Pepe do
   defp report_skill_install(_name, {:ok, installed_name, scan}) do
     ok("installed #{green(installed_name)} into #{Pepe.Skills.user_dir()}")
     if scan.verdict != :safe, do: info(Pepe.Skills.Sentinel.report(scan))
+    report_install_validation(installed_name)
   end
 
   defp report_skill_install(_name, {:error, {:unsafe, scan}}) do
@@ -2536,8 +2934,29 @@ defmodule Mix.Tasks.Pepe do
     puts("""
     #{bold("mix pepe skill")} - install and manage skills from a marketplace
 
-      skill list                          list built-in/user skills and marketplace installs
+      skill list [--all] [--source S]     the skills an agent is offered, with what each needs;
+                                         --all also lists the ones that are not offered and why
+                                         (disabled, another OS, needs a tool, ...)
       skill search QUERY                  search every tap plus the bundled registry
+      skill browse [--page N]             page through everything the registries offer
+      skill preview NAME [--source URL]   look at a skill (files, scan, specification check,
+                                         opening text) without installing it
+      skill check [NAME]                  is there a newer version at the source it came from
+      skill validate PATH|NAME            check a skill against the open agent-skills specification
+      skill pack PATH|NAME [--out FILE]   build a .tar.gz another tool (or a tap) can install
+      skill snapshot export FILE          write the installed skills and their settings to a file
+      skill snapshot restore FILE         install them again on another machine (trust is never
+                                         carried over; inline shell and directories are not either)
+      skill overrides | diff NAME | reset NAME
+                                         built-ins your own copy shadows: list, see what differs,
+                                         put the shipped version back (your copy is archived)
+      skill enable|disable NAME [--channel C]
+                                         switch a skill off everywhere or on one channel
+      skill trust|untrust [PATH]          let a repository's own .pepe/skills load (each scanned)
+      skill external add|remove|list DIR  extra skill directories, read in place
+      skill autoload add|remove|list NAME keep a skill in context in full instead of on demand
+      skill set template-vars|inline-shell on|off
+      skill config [KEY [VALUE]]          values for the settings skills declare
       skill install NAME [--force]        install by name, resolved against taps/registry,
                                          or a PepeHub reference (@handle/name, or its
                                          page URL - hub.pepe-agent.com)

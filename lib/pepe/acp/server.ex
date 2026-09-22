@@ -424,7 +424,13 @@ defmodule Pepe.ACP.Server do
   end
 
   defp announce_commands(state, session_id),
-    do: write(state, Protocol.session_update(session_id, Pepe.ACP.Updates.available_commands()))
+    do:
+      write(state, Protocol.session_update(session_id, Pepe.ACP.Updates.available_commands(skill_scope(state, state.sessions[session_id]))))
+
+  # What decides which installed skills a session is offered as commands: its agent's tools
+  # and the directory the editor opened it in (a project's own skills, if the operator trusts it).
+  defp skill_scope(state, session),
+    do: [agent: state.agent || Pepe.Config.default_agent_name(), cwd: session && session.cwd]
 
   defp fetch_saved(session_id) do
     case Sessions.fetch(session_id) do
@@ -546,7 +552,9 @@ defmodule Pepe.ACP.Server do
     # A slash command is routed before the "turn already in flight" check, because a few
     # of them (`/steer`, `/queue`, reading state) are exactly what someone types while a
     # turn is running. Commands that rewrite the conversation refuse on their own.
-    case {state.sessions[session_id], Pepe.ACP.Commands.from_blocks(params["prompt"])} do
+    session = state.sessions[session_id]
+
+    case {session, Pepe.ACP.Commands.from_blocks(params["prompt"], skill_scope(state, session))} do
       {nil, _command} ->
         reply_error(state, id, :invalid_params, "unknown `sessionId` (create one with `session/new`)")
 

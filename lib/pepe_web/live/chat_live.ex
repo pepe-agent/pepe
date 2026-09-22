@@ -19,6 +19,7 @@ defmodule PepeWeb.ChatLive do
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
   alias Pepe.Session.Focus
+  alias Pepe.Skills.Commands
 
   # How many of the most recent messages to render before "Load earlier messages".
   @window 40
@@ -37,9 +38,25 @@ defmodule PepeWeb.ChatLive do
       {"/usage", gettext("Show this month's spend and message count")},
       {"/compact", gettext("Summarize history to free up context")},
       {"/models", gettext("List models available to this project")},
-      {"/model", gettext("Show or change the model: NAME [session|global]")}
+      {"/model", gettext("Show or change the model: NAME [session|global]")},
+      {"/skill", gettext("Run an installed skill: NAME [input]")}
     ]
   end
+
+  # Every installed skill this conversation's agent is offered, as a command of its own
+  # (`/ship-it staging`). A name that a built-in command already uses is left to the built-in.
+  defp skill_commands(key, agent) do
+    reserved = ["reset" | Enum.map(slash_commands(), fn {cmd, _} -> String.trim_leading(cmd, "/") end)]
+
+    for %{name: name, summary: summary} <- Commands.list(skill_command_opts(key, agent) ++ [reserved: reserved]) do
+      {"/" <> name, summary}
+    end
+  end
+
+  # The channel a conversation belongs to is the first segment of its key (`web`, `telegram`, ...),
+  # which is what a skill switched off for one channel is keyed by.
+  defp skill_command_opts(key, agent),
+    do: [agent: agent, channel: key |> to_string() |> String.split(":", parts: 2) |> hd()]
 
   @impl true
   # 20MB matches Telegram's own bot-API download cap (see friendly_error(:too_large) in the
@@ -289,10 +306,10 @@ defmodule PepeWeb.ChatLive do
                     one-line row made every longer description (and most translations of
                     the short ones) wrap into a ragged block. --%>
               <div
-                :if={slash_matches(@input) != []}
-                class="absolute bottom-full left-3 mb-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl sm:left-5"
+                :if={slash_matches(@input, @selected, @agent) != []}
+                class="absolute bottom-full left-3 mb-2 max-h-96 w-96 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl sm:left-5"
               >
-                <button :for={{cmd, desc} <- slash_matches(@input)} type="button" phx-click="run_slash" phx-value-cmd={cmd}
+                <button :for={{cmd, desc} <- slash_matches(@input, @selected, @agent)} type="button" phx-click="run_slash" phx-value-cmd={cmd}
                   class="block w-full px-3 py-2 text-left hover:bg-zinc-800">
                   <span class="block font-mono text-[15px] text-orange-400">{cmd}</span>
                   <span class="block text-sm leading-snug text-zinc-500">{desc}</span>
@@ -1224,8 +1241,36 @@ defmodule PepeWeb.ChatLive do
   defp dispatch_slash("/usage", socket, key, _cmd),
     do: socket |> assign(input: "") |> put_flash(:info, usage_line(key))
 
-  defp dispatch_slash(_name, socket, _key, cmd),
-    do: put_flash(socket, :error, gettext("Unknown command %{cmd}", cmd: cmd))
+  defp dispatch_slash("/skill", socket, key, cmd) do
+    case slash_rest(cmd) do
+      "" ->
+        put_flash(socket, :error, gettext("Usage: /skill NAME [input]"))
+
+      words ->
+        [name | rest] = String.split(words, ~r/\s+/, parts: 2)
+        run_skill_command(socket, key, name, Enum.join(rest), gettext("Unknown skill: %{name}", name: name))
+    end
+  end
+
+  # Anything else may be an installed skill offered as its own command.
+  defp dispatch_slash(name, socket, key, cmd) do
+    run_skill_command(socket, key, name, slash_rest(cmd), gettext("Unknown command %{cmd}", cmd: cmd))
+  end
+
+  # A skill command is an ordinary turn: the agent is told to carry the skill out and reads it
+  # through its own `skill` tool, so community content stays marked untrusted.
+  defp run_skill_command(socket, key, word, input, unknown) do
+    case Commands.find(word, skill_command_opts(key, socket.assigns.agent)) do
+      {:ok, _entry} when socket.assigns.running ->
+        put_flash(socket, :error, gettext("A run is already going. Wait for it to finish, or use /stop."))
+
+      {:ok, %{name: skill}} ->
+        send_turn(socket, Commands.instruction(skill, input), false)
+
+      :none ->
+        put_flash(socket, :error, unknown)
+    end
+  end
 
   defp new_conversation(socket, key) do
     Session.reset(key)
@@ -1457,6 +1502,7 @@ defmodule PepeWeb.ChatLive do
   defp slash?(text), do: String.starts_with?(text, "/")
   defp slash_name(text), do: text |> String.split(~r/\s+/, parts: 2) |> List.first()
   defp slash_args(text), do: text |> String.split(~r/\s+/, trim: true) |> tl()
+  defp slash_rest(text), do: text |> String.split(~r/\s+/, parts: 2) |> Enum.at(1, "") |> String.trim()
 
   # The dashboard has no untrusted-participant tier - a logged-in operator always
   # gets `:global` permission (may change the model for everyone, or just this
@@ -1518,10 +1564,13 @@ defmodule PepeWeb.ChatLive do
   defp scope_project(scope) when scope in [nil, "all", "root"], do: nil
   defp scope_project(scope), do: scope
 
-  defp slash_matches(input) do
-    if slash?(input),
-      do: Enum.filter(slash_commands(), fn {cmd, _} -> String.starts_with?(cmd, input) end),
-      else: []
+  defp slash_matches(input, key, agent) do
+    if slash?(input) do
+      skills = if key, do: skill_commands(key, agent), else: []
+      Enum.filter(slash_commands() ++ skills, fn {cmd, _} -> String.starts_with?(cmd, input) end)
+    else
+      []
+    end
   end
 
   # A default agent for the current scope: the project's own, else the global default.

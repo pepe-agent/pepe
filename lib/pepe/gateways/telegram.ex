@@ -183,33 +183,24 @@ defmodule Pepe.Gateways.Telegram do
   # command charset; any that would collide with a built-in are dropped.
   @spec skill_commands() :: [{String.t(), String.t()}]
   defp skill_commands do
-    reserved = MapSet.new(Enum.map(menu(), &elem(&1, 0)))
-
-    Pepe.Skills.list()
-    |> Enum.map(fn {name, summary} ->
-      {command_name(name), command_desc(skill_summary(name) || summary, name)}
+    skill_command_opts(reserved: Enum.map(menu(), &elem(&1, 0)))
+    |> Pepe.Skills.Commands.list()
+    |> Enum.map(fn %{name: name, command: command, summary: summary} ->
+      {command, command_desc(skill_summary(name) || summary, name)}
     end)
-    |> Enum.reject(fn {cmd, _desc} -> cmd == "" or MapSet.member?(reserved, cmd) end)
-    |> Enum.uniq_by(&elem(&1, 0))
   end
 
-  # The skill whose command form matches `cmd`, or nil.
+  # The skill whose command form matches `cmd`, or nil. Only skills this chat's agent is
+  # offered on Telegram count: a disabled skill, or one for another channel, is not a command.
   @spec skill_for_command(String.t()) :: String.t() | nil
   defp skill_for_command(cmd) do
-    Enum.find_value(Pepe.Skills.list(), fn {name, _summary} ->
-      if command_name(name) == cmd, do: name
-    end)
+    case Pepe.Skills.Commands.find(cmd, skill_command_opts()) do
+      {:ok, %{name: name}} -> name
+      :none -> nil
+    end
   end
 
-  # Telegram commands: lowercase a-z, digits, underscore, ≤32 chars.
-  @spec command_name(String.t()) :: String.t()
-  defp command_name(name) do
-    name
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9_]+/, "_")
-    |> String.trim("_")
-    |> String.slice(0, 32)
-  end
+  defp skill_command_opts(extra \\ []), do: Keyword.merge([agent: agent_default(), channel: "telegram"], extra)
 
   # Telegram descriptions must be 1-256 chars; fall back to a generic line.
   @spec command_desc(String.t(), String.t()) :: String.t()
@@ -2342,7 +2333,11 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "skill", ""), do: send_html(chat_id, skills_text())
-  defp run_command(chat_id, "skill", name), do: run_skill(chat_id, name, "")
+
+  defp run_command(chat_id, "skill", words) do
+    [name | rest] = String.split(words, ~r/\s+/, parts: 2)
+    run_skill(chat_id, name, Enum.join(rest))
+  end
 
   defp run_command(chat_id, "approve", args) do
     manage_approvals(chat_id, String.split(args))
@@ -2676,29 +2671,31 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp skills_text do
-    case Pepe.Skills.list() do
+    case Pepe.Skills.Commands.list(skill_command_opts()) do
       [] ->
         gettext("No skills are available yet.")
 
       skills ->
         htmlb(gettext("Available skills (run with /skill <name>):")) <>
           "\n\n" <>
-          Enum.map_join(skills, "\n\n", fn {name, summary} ->
-            "• " <> htmlb(name) <> " - " <> esc(skill_summary(name) || summary)
+          Enum.map_join(skills, "\n\n", fn %{name: name, summary: summary, needs: needs} ->
+            "• " <> htmlb(name) <> " - " <> esc(skill_summary(name) || summary) <> needs_note(needs)
           end)
     end
   end
 
+  defp needs_note(nil), do: ""
+  defp needs_note(needs), do: " (" <> esc(needs) <> ")"
+
   # Run a skill by handing the agent an instruction to carry it out; it reads the
   # skill via its `skill` tool and follows the steps (replying in the user's tongue).
   defp run_skill(chat_id, name, args) do
-    case Pepe.Skills.read(name) do
-      {:error, _reason} ->
+    case Pepe.Skills.Commands.find(name, skill_command_opts()) do
+      :none ->
         send_message(chat_id, gettext("Unknown skill: %{name}", name: name))
 
-      {:ok, _content} ->
-        extra = if args == "", do: "", else: "\n\nInput: #{args}"
-        chat_with_agent(chat_id, nil, "Carry out the \"#{name}\" skill now." <> extra)
+      {:ok, %{name: skill}} ->
+        chat_with_agent(chat_id, nil, Pepe.Skills.Commands.instruction(skill, args))
     end
   end
 

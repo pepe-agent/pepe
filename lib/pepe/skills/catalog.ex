@@ -71,6 +71,18 @@ defmodule Pepe.Skills.Catalog do
   end
 
   @doc """
+  Every copy of the skill called `name`, one per tier that defines it, highest precedence
+  first (the first is the one that is served). Empty when nothing has that name.
+  """
+  @spec tiers_of(String.t(), opts()) :: [Skill.t()]
+  def tiers_of(name, opts \\ []) do
+    case List.keyfind(gather(opts), name, 0) do
+      {_name, group} -> group
+      nil -> []
+    end
+  end
+
+  @doc """
   Look a skill up by name, by `category/name`, or by the `name` in its own header.
   `{:error, {:ambiguous, entries}}` when the name is defined twice inside its tier.
   """
@@ -280,13 +292,61 @@ defmodule Pepe.Skills.Catalog do
   @spec visible(opts()) :: [Skill.t()]
   def visible(opts \\ []) do
     disabled = Settings.disabled_on(opts[:channel])
-    offer? = Keyword.get(opts, :offer, true)
-
-    opts
-    |> all()
-    |> Enum.reject(&(MapSet.member?(disabled, &1.name) or not platform_ok?(&1)))
-    |> Enum.filter(&(not offer? or relevant?(&1, opts)))
+    Enum.filter(all(opts), &(reason(&1, opts, disabled) == nil))
   end
+
+  @typedoc "Why a skill is not offered: the one reason that decided it."
+  @type hidden_reason ::
+          :disabled
+          | :platform
+          | :environment
+          | :channel
+          | {:requires_tools, [String.t()]}
+          | {:fallback_for_tools, [String.t()]}
+
+  @doc """
+  Why `skill` is not offered to this caller, or `nil` when it is. The same decision
+  `visible/1` makes, with the reason kept: a disabled or wrong-platform skill is hidden
+  from everyone, and unless `offer: false` the relevance gates (environment, channel and
+  tools) apply on top.
+  """
+  @spec hidden_reason(Skill.t(), opts()) :: hidden_reason() | nil
+  def hidden_reason(%Skill{} = skill, opts \\ []), do: reason(skill, opts, Settings.disabled_on(opts[:channel]))
+
+  defp reason(skill, opts, disabled) do
+    cond do
+      MapSet.member?(disabled, skill.name) -> :disabled
+      not platform_ok?(skill) -> :platform
+      Keyword.get(opts, :offer, true) -> relevance_reason(skill, opts)
+      true -> nil
+    end
+  end
+
+  @typedoc "One skill, whether it is offered, and whether the machine has what it declares it needs."
+  @type status :: %{skill: Skill.t(), hidden: hidden_reason() | nil, readiness: Pepe.Skills.Readiness.t()}
+
+  @doc """
+  Every skill that exists with the reason it is hidden (or `nil`) and its readiness, in name
+  order. This is what `mix pepe skill list` prints, so an operator asking "where did my skill
+  go?" gets the answer instead of an absence. Options as for `visible/1`, plus `:env` and
+  `:which` for `Pepe.Skills.Readiness.check/2`.
+  """
+  @spec status(opts()) :: [status()]
+  def status(opts \\ []) do
+    disabled = Settings.disabled_on(opts[:channel])
+    readiness_opts = Keyword.take(opts, [:env, :which])
+
+    for skill <- all(opts) do
+      %{skill: skill, hidden: reason(skill, opts, disabled), readiness: Pepe.Skills.Readiness.check(skill, readiness_opts)}
+    end
+  end
+
+  @doc """
+  `{root, count}` when the repository around `opts[:cwd]` ships skills of its own that are
+  not offered because the operator has not trusted it, else `nil`.
+  """
+  @spec untrusted_project(opts()) :: {String.t(), pos_integer()} | nil
+  def untrusted_project(opts \\ []), do: Project.untrusted(opts[:cwd])
 
   @doc "Whether `name` is switched off for the given channel (`opts[:channel]`)."
   @spec disabled?(String.t(), opts()) :: boolean()
@@ -317,22 +377,29 @@ defmodule Pepe.Skills.Catalog do
     end
   end
 
-  defp relevant?(%Skill{fields: fields}, opts) do
-    tools = agent_tools(opts[:agent])
-
-    environments_ok?(fields.environments) and
-      channels_ok?(fields.channels, opts[:channel]) and
-      tools_ok?(fields, tools)
+  defp relevance_reason(%Skill{fields: fields}, opts) do
+    cond do
+      not environments_ok?(fields.environments) -> :environment
+      not channels_ok?(fields.channels, opts[:channel]) -> :channel
+      true -> tools_reason(fields, agent_tools(opts[:agent]))
+    end
   end
 
   defp agent_tools(%{tools: tools}) when is_list(tools), do: tools
   defp agent_tools(_agent), do: nil
 
   # No agent given: nothing to compare against, so nothing is hidden on tool grounds.
-  defp tools_ok?(_fields, nil), do: true
+  defp tools_reason(_fields, nil), do: nil
 
-  defp tools_ok?(fields, tools) do
-    Enum.all?(fields.requires_tools, &(&1 in tools)) and not Enum.any?(fields.fallback_for_tools, &(&1 in tools))
+  defp tools_reason(fields, tools) do
+    missing = Enum.reject(fields.requires_tools, &(&1 in tools))
+    covered = Enum.filter(fields.fallback_for_tools, &(&1 in tools))
+
+    cond do
+      missing != [] -> {:requires_tools, missing}
+      covered != [] -> {:fallback_for_tools, covered}
+      true -> nil
+    end
   end
 
   defp channels_ok?([], _channel), do: true
