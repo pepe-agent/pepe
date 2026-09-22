@@ -829,7 +829,7 @@ msgstr "Nome, URL base e id do modelo são obrigatórios."
 msgid "No default agent configured."
 msgstr "Nenhum agente predefinido configurado."
 
-#: lib/pepe_web/live/learning_live.ex:137
+#: lib/pepe_web/live/learning_live.ex:139
 #, elixir-autogen, elixir-format
 msgid "Nothing learned yet."
 msgstr "Nada aprendido ainda."
@@ -865,6 +865,7 @@ msgid "Report the result to"
 msgstr "Enviar o resultado para"
 
 #: lib/pepe_web/live/scheduled_live.ex:264
+#: lib/pepe_web/live/skill_curator_component.ex:59
 #, elixir-autogen, elixir-format
 msgid "Run now"
 msgstr "Executar agora"
@@ -1297,6 +1298,7 @@ msgstr ""
 msgid "Open"
 msgstr "Abrir"
 
+#: lib/pepe_web/live/skill_curator_component.ex:65
 #: lib/pepe_web/live/watches_live.ex:51
 #, elixir-autogen, elixir-format
 msgid "Pause"
@@ -1314,6 +1316,7 @@ msgstr ""
 msgid "Reload from disk"
 msgstr "Recarregar do disco"
 
+#: lib/pepe_web/live/skill_curator_component.ex:64
 #: lib/pepe_web/live/watches_live.ex:52
 #, elixir-autogen, elixir-format
 msgid "Resume"
@@ -1324,7 +1327,7 @@ msgstr "Retomar"
 msgid "Save config"
 msgstr "Guardar configuração"
 
-#: lib/pepe_web/live/learning_live.ex:191
+#: lib/pepe_web/live/learning_live.ex:193
 #, elixir-autogen, elixir-format
 msgid "Saved %{title}."
 msgstr "%{title} guardado."
@@ -2155,7 +2158,7 @@ msgid "Couldn't connect. Check the command and the env var token"
 msgstr ""
 "Não foi possível ligar. Verifica o comando e a variável de ambiente do token"
 
-#: lib/pepe_web/live/learning_live.ex:290
+#: lib/pepe_web/live/learning_live.ex:299
 #, elixir-autogen, elixir-format
 msgid "Editing the built-in: saving creates your own copy"
 msgstr "A editar o embutido: ao guardar, é criada a tua própria cópia"
@@ -2347,22 +2350,22 @@ msgstr "← Voltar"
 msgid "Consolidate now"
 msgstr "Consolidar agora"
 
-#: lib/pepe_web/live/learning_live.ex:228
+#: lib/pepe_web/live/learning_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Consolidated: %{summary}"
 msgstr "Consolidado: %{summary}"
 
-#: lib/pepe_web/live/learning_live.ex:229
+#: lib/pepe_web/live/learning_live.ex:233
 #, elixir-autogen, elixir-format
 msgid "Consolidation could not run."
 msgstr "Não foi possível executar a consolidação."
 
-#: lib/pepe_web/live/learning_live.ex:160
+#: lib/pepe_web/live/learning_live.ex:162
 #, elixir-autogen, elixir-format
 msgid "Nightly consolidation off for %{agent}."
 msgstr "Consolidação noturna desligada para %{agent}."
 
-#: lib/pepe_web/live/learning_live.ex:167
+#: lib/pepe_web/live/learning_live.ex:169
 #, elixir-autogen, elixir-format
 msgid "Nightly consolidation on for %{agent} at %{at}."
 msgstr "Consolidação noturna ligada para %{agent} às %{at}."
@@ -2469,6 +2472,7 @@ msgid "running"
 msgstr "em execução"
 
 #: lib/pepe_web/live/scheduled_live.ex:264
+#: lib/pepe_web/live/skill_curator_component.ex:59
 #, elixir-autogen, elixir-format
 msgid "Running..."
 msgstr "A executar..."
@@ -2504,6 +2508,7 @@ msgid "Run log"
 msgstr "Registo de execuções"
 
 #: lib/pepe_web/live/scheduled_live.ex:276
+#: lib/pepe_web/live/skill_curator_component.ex:75
 #, elixir-autogen, elixir-format
 msgid "Last run"
 msgstr "Última execução"
@@ -2962,6 +2967,7 @@ msgid "CI pipeline, teammate laptop..."
 msgstr "Pipeline de CI, portátil de um colega..."
 
 #: lib/pepe_web/live/channels_live.ex:213
+#: lib/pepe_web/live/skill_curator_component.ex:93
 #: lib/pepe_web/live/tokens_live.ex:63
 #, elixir-autogen, elixir-format
 msgid "Dismiss"
@@ -3621,7 +3627,7 @@ msgstr "Escreve os números que queres marcar (ex.: 1 3) e prime Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:5212
+#: lib/mix/tasks/pepe.ex:5386
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -3641,17 +3647,17 @@ msgstr "n = página seguinte  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:5026
+#: lib/mix/tasks/pepe.ex:5163
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (podes usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:5027
+#: lib/mix/tasks/pepe.ex:5164
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:5035
+#: lib/mix/tasks/pepe.ex:5172
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -3735,32 +3741,32 @@ msgstr ""
 "Autoriza no navegador e volta aqui; isto conclui sozinho. Se não concluir, "
 "cola o URL de redirecionamento abaixo."
 
-#: lib/pepe_web/live/learning_live.ex:102
+#: lib/pepe_web/live/learning_live.ex:104
 #, elixir-autogen, elixir-format
 msgid "(staged by consolidation, not yet applied)"
 msgstr "(preparadas pela consolidação, ainda não aplicadas)"
 
-#: lib/pepe_web/live/learning_live.ex:114
+#: lib/pepe_web/live/learning_live.ex:116
 #, elixir-autogen, elixir-format
 msgid "Approve"
 msgstr "Aprovar"
 
-#: lib/pepe_web/live/learning_live.ex:201
+#: lib/pepe_web/live/learning_live.ex:203
 #, elixir-autogen, elixir-format
 msgid "Approved and applied."
 msgstr "Aprovado e aplicado."
 
-#: lib/pepe_web/live/learning_live.ex:115
+#: lib/pepe_web/live/learning_live.ex:117
 #, elixir-autogen, elixir-format
 msgid "Reject"
 msgstr "Rejeitar"
 
-#: lib/pepe_web/live/learning_live.ex:213
+#: lib/pepe_web/live/learning_live.ex:215
 #, elixir-autogen, elixir-format
 msgid "Rejected, nothing was written."
 msgstr "Rejeitado, nada foi gravado."
 
-#: lib/pepe_web/live/learning_live.ex:202
+#: lib/pepe_web/live/learning_live.ex:204
 #, elixir-autogen, elixir-format
 msgid "That write is no longer pending."
 msgstr "Essa escrita já não está pendente."
@@ -3798,6 +3804,7 @@ msgid "Check for updates"
 msgstr "Verificar atualizações"
 
 #: lib/pepe_web/live/config_live.ex:56
+#: lib/pepe_web/live/skill_curator_component.ex:62
 #, elixir-autogen, elixir-format
 msgid "Checking..."
 msgstr "A verificar..."
@@ -4248,7 +4255,7 @@ msgstr ""
 "Não foi possível guardar %{name}: o nome deve ter só letras, dígitos, - ou "
 "_."
 
-#: lib/pepe_web/live/learning_live.ex:304
+#: lib/pepe_web/live/learning_live.ex:313
 #, elixir-autogen, elixir-format
 msgid "Invalid path."
 msgstr "Caminho inválido."
@@ -4523,6 +4530,7 @@ msgid "Archive"
 msgstr "Arquivar"
 
 #: lib/pepe_web/live/board_live.ex:267
+#: lib/pepe_web/live/skill_curator_component.ex:134
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr "Arquivado"
@@ -4780,11 +4788,13 @@ msgid "inherit"
 msgstr "herdar"
 
 #: lib/pepe_web/live/board_live.ex:252
+#: lib/pepe_web/live/skill_curator_component.ex:168
 #, elixir-autogen, elixir-format
 msgid "off"
 msgstr "desligado"
 
 #: lib/pepe_web/live/board_live.ex:251
+#: lib/pepe_web/live/skill_curator_component.ex:170
 #, elixir-autogen, elixir-format
 msgid "on"
 msgstr "ligado"
@@ -5602,7 +5612,7 @@ msgstr "sem limite: o agente executa a tarefa até terminar (mais seguro para tr
 msgid "not installed"
 msgstr "não instalado"
 
-#: lib/mix/tasks/pepe.ex:190
+#: lib/mix/tasks/pepe.ex:192
 #, elixir-autogen, elixir-format
 msgid "No more input (stdin closed). Aborting."
 msgstr "Sem mais entrada (stdin fechado). A abortar."
@@ -5619,7 +5629,7 @@ msgid_plural "%{count} cards"
 msgstr[0] "%{count} cartão"
 msgstr[1] "%{count} cartões"
 
-#: lib/pepe_web/live/learning_live.ex:101
+#: lib/pepe_web/live/learning_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "%{count} write awaiting your review"
 msgid_plural "%{count} writes awaiting your review"
@@ -6113,12 +6123,12 @@ msgstr "Renomear guarda isto como um servidor novo. O início de sessão por OAu
 msgid "Renaming saves this under the new name and drops the old one. Anything pointing at the old name has to be updated by hand."
 msgstr "Renomear guarda isto com o novo nome e larga o antigo. Tudo o que apontar para o nome antigo tem de ser atualizado à mão."
 
-#: lib/pepe_web/live/learning_live.ex:265
+#: lib/pepe_web/live/learning_live.ex:269
 #, elixir-autogen, elixir-format
 msgid "Replaces \"%{old}\" with \"%{new}\""
 msgstr "Substitui \"%{old}\" por \"%{new}\""
 
-#: lib/pepe_web/live/learning_live.ex:262
+#: lib/pepe_web/live/learning_live.ex:266
 #, elixir-autogen, elixir-format
 msgid "Replaces the whole file with: %{peek}"
 msgstr "Substitui o ficheiro inteiro por: %{peek}"
@@ -6363,7 +6373,7 @@ msgstr "pergunta ao agente"
 msgid "blocked"
 msgstr "bloqueado"
 
-#: lib/pepe_web/live/learning_live.ex:109
+#: lib/pepe_web/live/learning_live.ex:111
 #, elixir-autogen, elixir-format
 msgid "by %{agent}"
 msgstr "por %{agent}"
@@ -6506,6 +6516,7 @@ msgid "paste code here"
 msgstr "cola aqui o código"
 
 #: lib/pepe_web/live/chat_live.ex:464
+#: lib/pepe_web/live/skill_curator_component.ex:169
 #, elixir-autogen, elixir-format
 msgid "paused"
 msgstr "pausado"
@@ -7410,3 +7421,168 @@ msgid "The saved copy of %{count} file has expired: %{files}."
 msgid_plural "The saved copy of %{count} files has expired: %{files}."
 msgstr[0] "A cópia guardada de %{count} ficheiro expirou: %{files}."
 msgstr[1] "As cópias guardadas de %{count} ficheiros expiraram: %{files}."
+
+#: lib/pepe_web/live/skill_curator_component.ex:85
+#, elixir-autogen, elixir-format
+msgid "%{active} active, %{stale} stale, %{archived} archived"
+msgstr "%{active} ativas, %{stale} obsoletas, %{archived} arquivadas"
+
+#: lib/pepe_web/live/skill_curator_component.ex:108
+#, elixir-autogen, elixir-format
+msgid "Also merge overlapping skills (uses a model run)"
+msgstr "Também fundir skills sobrepostas (usa uma chamada ao modelo)"
+
+#: lib/pepe_web/live/skill_curator_component.ex:164
+#, elixir-autogen, elixir-format
+msgid "Archive after (days)"
+msgstr "Arquivar após (dias)"
+
+#: lib/pepe_web/live/skill_curator_component.ex:122
+#, elixir-autogen, elixir-format
+msgid "Closest to going stale"
+msgstr "Mais perto de ficar obsoleta"
+
+#: lib/pepe_web/live/skill_curator_component.ex:214
+#, elixir-autogen, elixir-format
+msgid "Could not restore %{name}."
+msgstr "Não foi possível restaurar %{name}."
+
+#: lib/pepe_web/live/skill_curator_component.ex:204
+#, elixir-autogen, elixir-format
+msgid "Curator settings saved."
+msgstr "Definições do curador guardadas."
+
+#: lib/pepe_web/live/skill_curator_component.ex:83
+#, elixir-autogen, elixir-format
+msgid "In its care"
+msgstr "Ao seu cuidado"
+
+#: lib/pepe_web/live/skill_curator_component.ex:79
+#, elixir-autogen, elixir-format
+msgid "Next run"
+msgstr "Próxima execução"
+
+#: lib/pepe_web/live/skill_curator_component.ex:162
+#, elixir-autogen, elixir-format
+msgid "Only when idle (hours)"
+msgstr "Só quando inativo (horas)"
+
+#: lib/pepe_web/live/skill_curator_component.ex:129
+#, elixir-autogen, elixir-format
+msgid "Pin"
+msgstr "Fixar"
+
+#: lib/pepe_web/live/skill_curator_component.ex:231
+#, elixir-autogen, elixir-format
+msgid "Pinned %{name}: only you can change it now."
+msgstr "%{name} fixada: só tu podes alterá-la agora."
+
+#: lib/pepe_web/live/skill_curator_component.ex:62
+#, elixir-autogen, elixir-format
+msgid "Preview"
+msgstr "Pré-visualização"
+
+#: lib/pepe_web/live/skill_curator_component.ex:246
+#, elixir-autogen, elixir-format
+msgid "Preview: nothing was changed"
+msgstr "Pré-visualização: nada foi alterado"
+
+#: lib/pepe_web/live/skill_curator_component.ex:145
+#, elixir-autogen, elixir-format
+msgid "Recent changes to skills"
+msgstr "Alterações recentes nas skills"
+
+#: lib/pepe_web/live/skill_curator_component.ex:140
+#, elixir-autogen, elixir-format
+msgid "Restore"
+msgstr "Restaurar"
+
+#: lib/pepe_web/live/skill_curator_component.ex:213
+#, elixir-autogen, elixir-format
+msgid "Restored %{name}."
+msgstr "%{name} restaurada."
+
+#: lib/pepe_web/live/skill_curator_component.ex:104
+#, elixir-autogen, elixir-format
+msgid "Run automatically"
+msgstr "Executar automaticamente"
+
+#: lib/pepe_web/live/skill_curator_component.ex:161
+#, elixir-autogen, elixir-format
+msgid "Run every (hours)"
+msgstr "Executar a cada (horas)"
+
+#: lib/pepe_web/live/skill_curator_component.ex:246
+#, elixir-autogen, elixir-format
+msgid "Run finished"
+msgstr "Execução concluída"
+
+#: lib/pepe_web/live/skill_curator_component.ex:117
+#, elixir-autogen, elixir-format
+msgid "Save settings"
+msgstr "Guardar definições"
+
+#: lib/pepe_web/live/skill_curator_component.ex:99
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr "Definições"
+
+#: lib/pepe_web/live/learning_live.ex:273
+#, elixir-autogen, elixir-format
+msgid "Skill %{name}: %{action}. %{peek}"
+msgstr "Skill %{name}: %{action}. %{peek}"
+
+#: lib/pepe_web/live/skill_curator_component.ex:54
+#, elixir-autogen, elixir-format
+msgid "Skill curator"
+msgstr "Curador de skills"
+
+#: lib/pepe_web/live/skill_curator_component.ex:70
+#, elixir-autogen, elixir-format
+msgid "Skills an agent wrote on its own are tidied automatically: after a while unused they are marked stale, then archived. Nothing is deleted, and you can restore any of them. Your own skills, installed ones and pinned ones are never touched."
+msgstr "As skills que um agente escreve por sua conta são arrumadas automaticamente: ao fim de um tempo sem uso ficam obsoletas, depois são arquivadas. Nada é apagado, e podes restaurar qualquer uma delas. As tuas próprias skills, as instaladas e as fixadas nunca são tocadas."
+
+#: lib/pepe_web/live/skill_curator_component.ex:163
+#, elixir-autogen, elixir-format
+msgid "Stale after (days)"
+msgstr "Obsoleta após (dias)"
+
+#: lib/pepe_web/live/skill_curator_component.ex:252
+#, elixir-autogen, elixir-format
+msgid "The curator could not run."
+msgstr "O curador não conseguiu correr."
+
+#: lib/pepe_web/live/skill_curator_component.ex:152
+#, elixir-autogen, elixir-format
+msgid "Undo"
+msgstr "Desfazer"
+
+#: lib/pepe_web/live/skill_curator_component.ex:138
+#, elixir-autogen, elixir-format
+msgid "archived by %{who}"
+msgstr "arquivada por %{who}"
+
+#: lib/pepe_web/live/skill_curator_component.ex:150
+#, elixir-autogen, elixir-format
+msgid "by %{who}"
+msgstr "por %{who}"
+
+#: lib/pepe_web/live/skill_curator_component.ex:126
+#, elixir-autogen, elixir-format
+msgid "idle %{days} days, used %{count} times"
+msgstr "inativa há %{days} dias, usada %{count} vezes"
+
+#: lib/pepe_web/live/skill_curator_component.ex:175
+#, elixir-autogen, elixir-format
+msgid "never"
+msgstr "nunca"
+
+#: lib/pepe_web/live/skill_curator_component.ex:178
+#, elixir-autogen, elixir-format
+msgid "none scheduled"
+msgstr "nada agendado"
+
+#: lib/pepe_web/live/skill_curator_component.ex:127
+#, elixir-autogen, elixir-format
+msgid "stale"
+msgstr "obsoleta"
