@@ -126,10 +126,6 @@ defmodule Pepe.Application do
           # one-shot can call an MCP tool too, and a supervisor that only exists while
           # serving would leave that path with nowhere to run.
           {Task.Supervisor, name: Pepe.MCP.TaskSupervisor},
-          # MCP servers an editor hands over for one ACP session (Pepe.ACP.Mcp): the
-          # manager that scopes them to that session, and their own supervisors, kept
-          # apart from the configured servers' one above.
-          Pepe.ACP.Mcp.Supervisor,
           # The `browser` tool's Chrome sessions: same lazy registry + dynamic supervisor shape.
           {Registry, keys: :unique, name: Pepe.Browser.Registry},
           {DynamicSupervisor, name: Pepe.Browser.DynSup, strategy: :one_for_one},

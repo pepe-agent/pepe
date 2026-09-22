@@ -86,18 +86,4 @@ defmodule Pepe.MCP.Protocol do
   """
   def interp(value) when is_binary(value), do: Pepe.Config.interpolate(value) || ""
   def interp(value), do: value
-
-  @doc """
-  `interp/1` for a value that belongs to `spec`, except that a spec marked `literal: true`
-  is left exactly as written.
-
-  A configured server's values come from the operator's own `config.json`, where `${VAR}`,
-  `exec:` and `file:` are the documented way to keep a secret out of the file. A server an
-  editor hands over for one session is a different provenance - project-level editor
-  settings can come out of a cloned repository - and there those same strings are not a
-  request to read Pepe's environment, run a resolver command or read a local file and send
-  the result to whatever that server is. They are just text.
-  """
-  def interp(value, %{literal: true}), do: value
-  def interp(value, _spec), do: interp(value)
 end
