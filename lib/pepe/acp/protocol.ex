@@ -15,27 +15,25 @@ defmodule Pepe.ACP.Protocol do
 
   ## What is implemented, and what is not
 
-  The handshake, sessions that outlive the connection (`session/new`, `session/list`,
-  `session/load`, `session/resume`, `session/fork`, see `Pepe.ACP.Sessions`), a prompt
-  turn streamed back as it happens, and a tool call that stops to ask a human. An ACP
-  session is a `Pepe.Agent.Session` keyed `acp:<id>` whose history is saved on disk, so
-  closing the editor no longer ends the conversation. Authentication methods report
-  whether Pepe has a usable model configuration and how to finish setup. Prompt
-  capabilities are advertised per agent:
+  This is the protocol's **core subset**, not all of it: the handshake, one session,
+  a prompt turn streamed back as it happens, and a tool call that stops to ask a
+  human. Deliberately absent, and advertised as absent in `initialize_result/0` so a
+  client never has to guess:
 
-    * a prompt capability the connection can't honestly promise (`image` only for an
-      agent whose model has vision, `audio` only with a transcription route). Every
-      block type is *read* (see `Pepe.ACP.Content`); a block that can't be used is
-      reported out loud, never silently dropped.
+    * `session/load`, `session/fork`, `session/resume`, `session/list` (`loadSession:
+      false`). An ACP session here is a live `Pepe.Agent.Session`, born with
+      `session/new` and gone when the editor disconnects.
+    * `authenticate` (`authMethods: []`). Pepe authenticates to *model providers*,
+      out of `~/.pepe/config.json`; there is nothing for an editor to log in to.
+    * image, audio and embedded-resource prompt blocks (all three prompt capabilities
+      `false`). `text` is the one block type every agent MUST accept, and
+      `resource_link` is baseline too - both are handled; anything else is refused
+      out loud rather than silently dropped on the floor.
     * the client-side file system and terminal methods (`fs/read_text_file`,
       `terminal/*`). Pepe's own `read_file`/`write_file`/`bash` tools already run on
       the same machine the editor does, so routing them back through the editor would
       buy nothing but a second way for them to disagree.
-    * elicitation.
-
-  Beyond the core, `Pepe.ACP.Updates` and `Pepe.ACP.Commands` add the plan panel,
-  the context meter, slash commands and session modes; those are described where they
-  are built.
+    * session modes, plans, and elicitation.
   """
 
   alias Pepe.Permissions
@@ -66,27 +64,23 @@ defmodule Pepe.ACP.Protocol do
   The `initialize` result: every capability we actually have, and nothing we don't.
 
   An omitted or false capability means UNSUPPORTED in ACP, which is the whole point
-  of answering honestly here - a capability reported `false` (`image`, `audio`,
-  `embeddedContext` for an agent that genuinely can't do them) tells a client not to
-  even try, so there is no half-working path to fall into.
+  of answering honestly here - a client that reads `loadSession: false` will never
+  send `session/load`, so there is no half-working path to fall into.
   """
-  @spec initialize_result(String.t() | nil, map()) :: map()
-  def initialize_result(
-        agent_name \\ nil,
-        prompt_capabilities \\ %{"image" => false, "audio" => false, "embeddedContext" => false}
-      ) do
+  @spec initialize_result() :: map()
+  def initialize_result do
     %{
       "protocolVersion" => @protocol_version,
       "agentInfo" => agent_info(),
       "agentCapabilities" => %{
-        "loadSession" => true,
-        # An empty object per capability is the whole declaration: presence means "supported".
-        "sessionCapabilities" => %{"list" => %{}, "resume" => %{}, "fork" => %{}},
-        "promptCapabilities" => prompt_capabilities,
-        # Editor-supplied MCP servers: the remote transports that work (Pepe.ACP.Mcp).
-        "mcpCapabilities" => Pepe.ACP.Mcp.capabilities()
+        "loadSession" => false,
+        "promptCapabilities" => %{
+          "image" => false,
+          "audio" => false,
+          "embeddedContext" => false
+        }
       },
-      "authMethods" => Pepe.ACP.Auth.methods(agent_name)
+      "authMethods" => []
     }
   end
 
@@ -137,102 +131,129 @@ defmodule Pepe.ACP.Protocol do
   def message_chunk(text),
     do: %{"sessionUpdate" => "agent_message_chunk", "content" => text_block(text)}
 
-  @doc "A `user_message_chunk` update: something the person said, replayed on `session/load`."
-  @spec user_message_chunk(String.t()) :: map()
-  def user_message_chunk(text),
-    do: %{"sessionUpdate" => "user_message_chunk", "content" => text_block(text)}
-
-  @doc """
-  A `session_info_update`: the session's title and/or last-activity time changed. A field
-  that is left out means "unchanged" in ACP, so only what is known is sent.
-  """
-  @spec session_info_update(keyword()) :: map()
-  def session_info_update(fields) do
-    Enum.reduce(fields, %{"sessionUpdate" => "session_info_update"}, fn
-      {:title, title}, acc when is_binary(title) -> Map.put(acc, "title", title)
-      {:updated_at, at}, acc when is_binary(at) -> Map.put(acc, "updatedAt", at)
-      _other, acc -> acc
-    end)
-  end
-
-  @doc "One entry of a `session/list` result."
-  @spec session_info(String.t(), String.t(), String.t(), String.t() | nil) :: map()
-  def session_info(session_id, cwd, title, updated_at) do
-    %{"sessionId" => session_id, "cwd" => cwd, "title" => title}
-    |> then(&if(is_binary(updated_at), do: Map.put(&1, "updatedAt", updated_at), else: &1))
-  end
-
   @doc "A `text` content block."
   @spec text_block(String.t()) :: map()
   def text_block(text), do: %{"type" => "text", "text" => text}
 
   ###
+  ### prompt content
+  ###
+
+  @doc """
+  Flatten a `session/prompt` content-block array into the one string Pepe's runtime
+  takes, or say which block type we can't read.
+
+  Only two variants are accepted, and that is not an oversight: `text` is the block
+  every ACP agent MUST support, and `resource_link` is baseline too (it carries a URI,
+  not bytes - the agent is expected to go read it, which is exactly what Pepe's own
+  `read_file` does). Image, audio and embedded `resource` blocks are gated behind
+  prompt capabilities this agent advertises as `false`, so a well-behaved client never
+  sends them; a client that does gets an error instead of a prompt that quietly lost
+  half of what the user attached.
+  """
+  @spec prompt_text([map()]) :: {:ok, String.t()} | {:error, String.t()}
+  def prompt_text(blocks) when is_list(blocks) do
+    blocks
+    |> Enum.reduce_while({:ok, []}, fn block, {:ok, acc} ->
+      case block_text(block) do
+        {:ok, text} -> {:cont, {:ok, [text | acc]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, parts} -> {:ok, parts |> Enum.reverse() |> Enum.join("\n")}
+      {:error, _} = error -> error
+    end
+  end
+
+  def prompt_text(_other), do: {:error, "`prompt` must be an array of content blocks"}
+
+  defp block_text(%{"type" => "text", "text" => text}) when is_binary(text), do: {:ok, text}
+
+  # A mention of something the user pointed at in their editor. Rendered the way a
+  # person would type it, with the URI kept intact so the agent can act on it.
+  defp block_text(%{"type" => "resource_link", "uri" => uri} = block) when is_binary(uri) do
+    case block["name"] do
+      name when is_binary(name) and name != "" -> {:ok, "@#{name} (#{uri})"}
+      _ -> {:ok, "@#{uri}"}
+    end
+  end
+
+  defp block_text(%{"type" => type}) when is_binary(type),
+    do: {:error, "this agent does not accept `#{type}` content blocks (see the prompt capabilities it reported in `initialize`)"}
+
+  defp block_text(_other), do: {:error, "every entry in `prompt` must be a content block with a `type`"}
+
+  ###
   ### tool calls
   ###
 
-  # Kind, title, locations and result content live in `Pepe.ACP.ToolView`, so how a call
-  # is *shown* can be tested without a pipe. This module only assembles the messages.
+  # ACP's ToolKind is a UI hint - it picks the icon and the verb an editor shows. The
+  # mapping is deliberately coarse and name-based: a tool Pepe doesn't recognize (a
+  # plugin's, an MCP server's) lands on "other", which is the honest answer rather
+  # than a guess dressed up as a classification.
+  @kinds %{
+    "read_file" => "read",
+    "list_dir" => "read",
+    "docs" => "read",
+    "skill" => "read",
+    "config_get" => "read",
+    "session_search" => "read",
+    "memory_search" => "read",
+    "write_file" => "edit",
+    "edit_file" => "edit",
+    "move_file" => "move",
+    "bash" => "execute",
+    "run_script" => "execute",
+    "run_code" => "execute",
+    "fetch_url" => "fetch",
+    "web_search" => "search"
+  }
 
   @doc "The ACP `ToolKind` for one of Pepe's tools; `\"other\"` for anything unrecognized."
   @spec tool_kind(String.t()) :: String.t()
-  defdelegate tool_kind(name), to: Pepe.ACP.ToolView, as: :kind
+  def tool_kind(name), do: Map.get(@kinds, name, "other")
 
   @doc """
-  The `tool_call` update announcing a call that is about to happen.
-
-  Options: `:cwd` (the editor's project, so the files a call touches are reported as
-  absolute locations) and `:diff` (a `Pepe.ACP.Edits` proposal, shown as a diff before
-  anything is written). The tool's own name rides in `_meta`, not in a top-level key the
-  protocol has no place for.
+  A human-readable title for a tool call: the tool's name, plus the first sentence of
+  its own description when it has one, so an internal name like `manage_pepe` isn't
+  opaque in an editor's tool-call list.
   """
-  @spec tool_call(String.t(), String.t(), term(), keyword()) :: map()
-  def tool_call(tool_call_id, name, raw_args, opts \\ []) do
-    args = Permissions.decode(raw_args)
+  @spec tool_title(String.t()) :: String.t()
+  def tool_title(name) do
+    case Pepe.Tools.summary(name) do
+      "" -> name
+      summary -> "#{name}: #{summary}"
+    end
+  end
 
+  @doc "The `tool_call` update announcing a call that is about to happen."
+  @spec tool_call(String.t(), String.t(), term()) :: map()
+  def tool_call(tool_call_id, name, raw_args) do
     %{
       "sessionUpdate" => "tool_call",
       "toolCallId" => tool_call_id,
-      "title" => Pepe.ACP.ToolView.title(name, args),
-      "kind" => Pepe.ACP.ToolView.kind(name),
+      "title" => tool_title(name),
+      "name" => name,
+      "kind" => tool_kind(name),
       "status" => "pending",
-      "rawInput" => args,
-      "_meta" => %{"pepe" => %{"tool" => name}}
+      "rawInput" => Permissions.decode(raw_args)
     }
-    |> put_locations(name, args, opts[:cwd])
-    |> put_diff(opts[:diff])
   end
 
   @doc """
   The `tool_call_update` closing a call out. `status` is `\"completed\"` or
-  `\"failed\"` - a refused call is a failed one, not a finished one. A call that changed
-  a file keeps its diff (`:diff`) beside the output, so the editor still shows what was
-  done once the call is over.
+  `\"failed\"` - a refused call is a failed one, not a finished one.
   """
-  @spec tool_call_update(String.t(), String.t(), term(), keyword()) :: map()
-  def tool_call_update(tool_call_id, status, output, opts \\ []) do
-    content =
-      case opts[:diff] do
-        nil -> Pepe.ACP.ToolView.result_content(output)
-        diff -> [Pepe.ACP.Edits.diff_content(diff) | Pepe.ACP.ToolView.result_content(output)]
-      end
-
+  @spec tool_call_update(String.t(), String.t(), String.t()) :: map()
+  def tool_call_update(tool_call_id, status, output) do
     %{
       "sessionUpdate" => "tool_call_update",
       "toolCallId" => tool_call_id,
       "status" => status,
-      "content" => content
+      "content" => [%{"type" => "content", "content" => text_block(output)}]
     }
   end
-
-  defp put_locations(call, name, args, cwd) do
-    case Pepe.ACP.ToolView.locations(name, args, cwd) do
-      [] -> call
-      locations -> Map.put(call, "locations", locations)
-    end
-  end
-
-  defp put_diff(call, nil), do: call
-  defp put_diff(call, diff), do: Map.put(call, "content", [Pepe.ACP.Edits.diff_content(diff)])
 
   ###
   ### permissions
@@ -290,20 +311,18 @@ defmodule Pepe.ACP.Protocol do
   still gets the signal, because `Prompt.label/2` already bakes it into the option
   labels themselves.
   """
-  @spec permission_tool_call(String.t(), String.t(), term(), map(), keyword()) :: map()
-  def permission_tool_call(tool_call_id, name, raw_args, notes, opts \\ []) do
-    args = Permissions.decode(raw_args)
-
-    %{
+  @spec permission_tool_call(String.t(), String.t(), term(), map()) :: map()
+  def permission_tool_call(tool_call_id, name, raw_args, notes) do
+    call = %{
       "toolCallId" => tool_call_id,
-      "title" => Pepe.ACP.ToolView.title(name, args),
-      "kind" => Pepe.ACP.ToolView.kind(name),
+      "title" => tool_title(name),
+      "name" => name,
+      "kind" => tool_kind(name),
       "status" => "pending",
-      "rawInput" => args,
-      "_meta" => %{"pepe" => Map.put(notes, "tool", name)}
+      "rawInput" => Permissions.decode(raw_args)
     }
-    |> put_locations(name, args, opts[:cwd])
-    |> put_diff(opts[:diff])
+
+    if notes == %{}, do: call, else: Map.put(call, "_meta", %{"pepe" => notes})
   end
 
   @doc """

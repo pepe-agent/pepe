@@ -4,7 +4,6 @@ msgstr ""
 "Language: es\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/pepe/acp/commands.ex:215
 #: lib/pepe/gateways/telegram.ex:2240
 #: lib/pepe/gateways/tui.ex:342
 #: lib/pepe_web/live/agents_live.ex:129
@@ -20,9 +19,6 @@ msgstr "(predeterminado)"
 msgid "(empty response)"
 msgstr "(respuesta vacía)"
 
-#: lib/pepe/acp/commands.ex:216
-#: lib/pepe/acp/commands.ex:225
-#: lib/pepe/acp/commands.ex:250
 #: lib/pepe/gateways/telegram.ex:2241
 #: lib/pepe/gateways/telegram.ex:2410
 #: lib/pepe/gateways/tui.ex:343
@@ -32,7 +28,6 @@ msgstr "(respuesta vacía)"
 msgid "(unset)"
 msgstr "(sin definir)"
 
-#: lib/pepe/acp/commands.ex:214
 #: lib/pepe/gateways/telegram.ex:2239
 #: lib/pepe/gateways/tui.ex:341
 #, elixir-autogen, elixir-format
@@ -42,14 +37,12 @@ msgstr ""
 "Modelo: %{model}\n"
 "Turnos: %{turns}"
 
-#: lib/pepe/acp/commands.ex:459
 #: lib/pepe/gateways/telegram.ex:2391
 #: lib/pepe/gateways/tui.ex:403
 #, elixir-autogen, elixir-format
 msgid "Commands:"
 msgstr "Comandos:"
 
-#: lib/pepe/acp/commands.ex:204
 #: lib/pepe/gateways/telegram.ex:2214
 #: lib/pepe/gateways/tui.ex:333
 #, elixir-autogen, elixir-format
@@ -140,14 +133,12 @@ msgstr "Comando desconocido: /%{cmd}"
 msgid "Usage: /agent <name>"
 msgstr "Uso: /agent <nombre>"
 
-#: lib/pepe/acp/commands.ex:155
 #: lib/pepe/gateways/telegram.ex:2146
 #: lib/pepe/gateways/tui.ex:274
 #, elixir-autogen, elixir-format
 msgid "↩️ Undid your last message."
 msgstr "↩️ Deshice tu último mensaje."
 
-#: lib/pepe/acp/commands.ex:203
 #: lib/pepe/gateways/telegram.ex:2210
 #: lib/pepe/gateways/tui.ex:332
 #, elixir-autogen, elixir-format
@@ -159,7 +150,6 @@ msgstr "🗜️ Historial compactado."
 msgid "🧠 Pepe ready."
 msgstr "🧠 Pepe listo."
 
-#: lib/pepe/acp/commands.ex:145
 #: lib/pepe/gateways/telegram.ex:2136
 #: lib/pepe/gateways/tui.ex:267
 #: lib/pepe_web/live/chat_live.ex:730
@@ -184,7 +174,6 @@ msgstr "Permitido siempre (limpiar con /approve clear <tool>):"
 msgid "Ask a side question that isn't saved - /btw <q>"
 msgstr "Hacer una pregunta aparte que no se guarda - /btw <q>"
 
-#: lib/pepe/acp/commands.ex:339
 #: lib/pepe/gateways/telegram.ex:2679
 #: lib/pepe/gateways/tui.ex:423
 #, elixir-autogen, elixir-format
@@ -196,8 +185,6 @@ msgstr "Skills disponibles (ejecuta con /skill <name>):"
 msgid "Cleared all saved permissions."
 msgstr "Borré todos los permisos guardados."
 
-#: lib/pepe/acp/commands.ex:225
-#: lib/pepe/acp/commands.ex:250
 #: lib/pepe/gateways/tui.ex:379
 #: lib/pepe_web/live/chat_live.ex:1513
 #, elixir-autogen, elixir-format
@@ -230,7 +217,6 @@ msgstr "Gestionar permisos guardados - /approve"
 msgid "No agent is configured."
 msgstr "No hay ningún agente configurado."
 
-#: lib/pepe/acp/commands.ex:336
 #: lib/pepe/gateways/telegram.ex:2676
 #: lib/pepe/gateways/tui.ex:420
 #, elixir-autogen, elixir-format
@@ -257,7 +243,6 @@ msgstr "Ver o establecer el modelo - /model <name>"
 msgid "Show your Telegram ids"
 msgstr "Mostrar tus ids de Telegram"
 
-#: lib/pepe/acp/commands.ex:384
 #: lib/pepe/gateways/telegram.ex:2478
 #: lib/pepe/gateways/tui.ex:478
 #: lib/pepe_web/live/chat_live.ex:1559
@@ -265,8 +250,6 @@ msgstr "Mostrar tus ids de Telegram"
 msgid "There's no agent to set the model on."
 msgstr "No hay agente para establecer el modelo."
 
-#: lib/pepe/acp/commands.ex:381
-#: lib/pepe/acp/commands.ex:387
 #: lib/pepe/gateways/telegram.ex:2442
 #: lib/pepe/gateways/telegram.ex:2475
 #: lib/pepe/gateways/telegram.ex:2545
@@ -278,7 +261,6 @@ msgstr "No hay agente para establecer el modelo."
 msgid "Unknown model: %{name}"
 msgstr "Modelo desconocido: %{name}"
 
-#: lib/pepe/acp/commands.ex:311
 #: lib/pepe/gateways/telegram.ex:2695
 #: lib/pepe/gateways/tui.ex:435
 #: lib/pepe_web/live/chat_live.ex:1251
@@ -361,7 +343,6 @@ msgstr "Sesión"
 msgid "Available models"
 msgstr "Modelos disponibles"
 
-#: lib/pepe/acp/commands.ex:408
 #: lib/pepe/gateways/telegram.ex:2613
 #, elixir-autogen, elixir-format
 msgid "Available tools"
@@ -3092,7 +3073,6 @@ msgstr ""
 "Renombrar actualiza cada agente, cron, hook y valor predeterminado que "
 "apunte a esta conexión."
 
-#: lib/pepe/acp/commands.ex:240
 #: lib/pepe/gateways/tui.ex:371
 #: lib/pepe_web/live/chat_live.ex:1352
 #, elixir-autogen, elixir-format
@@ -3108,7 +3088,6 @@ msgstr ""
 "¿Cambiar a %{name} solo para esta conversación, o para todos? Responde "
 "/model %{name} session o /model %{name} global."
 
-#: lib/pepe/acp/commands.ex:378
 #: lib/pepe/gateways/telegram.ex:2472
 #: lib/pepe/gateways/tui.ex:472
 #: lib/pepe_web/live/chat_live.ex:1552
@@ -3116,7 +3095,6 @@ msgstr ""
 msgid "Model set to %{name} (%{scope})."
 msgstr "Modelo establecido en %{name} (%{scope})."
 
-#: lib/pepe/acp/commands.ex:259
 #: lib/pepe/gateways/telegram.ex:2259
 #: lib/pepe/gateways/telegram.ex:2462
 #: lib/pepe/gateways/tui.ex:386
@@ -3241,7 +3219,6 @@ msgstr "listarlos todos"
 msgid "switch"
 msgstr "cambiar"
 
-#: lib/pepe/acp/commands.ex:392
 #: lib/pepe/gateways/telegram.ex:2483
 #: lib/pepe/gateways/tui.ex:483
 #: lib/pepe_web/live/chat_live.ex:1562
@@ -3249,7 +3226,6 @@ msgstr "cambiar"
 msgid "everyone"
 msgstr "todos"
 
-#: lib/pepe/acp/commands.ex:391
 #: lib/pepe/gateways/telegram.ex:2482
 #: lib/pepe/gateways/tui.ex:482
 #: lib/pepe_web/live/chat_live.ex:1561
@@ -3639,7 +3615,7 @@ msgstr "Escribe los números que quieres marcar (ej.: 1 3) y pulsa Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vacío para terminar"
 
-#: lib/mix/tasks/pepe.ex:6036
+#: lib/mix/tasks/pepe.ex:6022
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma configurado a %{code}"
@@ -3659,17 +3635,17 @@ msgstr "n = página siguiente  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:5813
+#: lib/mix/tasks/pepe.ex:5799
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (puedes usar una referencia ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:5814
+#: lib/mix/tasks/pepe.ex:5800
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:5822
+#: lib/mix/tasks/pepe.ex:5808
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -3888,7 +3864,6 @@ msgstr "Etiqueta eliminada."
 msgid "Labeled “%{title}”."
 msgstr "Etiquetada como «%{title}»."
 
-#: lib/pepe/acp/commands.ex:189
 #: lib/pepe/gateways/telegram.ex:2305
 #: lib/pepe/gateways/tui.ex:308
 #: lib/pepe_web/live/chat_live.ex:1408
@@ -3908,7 +3883,6 @@ msgstr "Rehacer la última respuesta"
 msgid "Show this month's spend and message count"
 msgstr "Mostrar el gasto y los mensajes de este mes"
 
-#: lib/pepe/acp/commands.ex:275
 #: lib/pepe/gateways/telegram.ex:2319
 #: lib/pepe/gateways/tui.ex:322
 #: lib/pepe_web/live/chat_live.ex:1465
@@ -3916,7 +3890,6 @@ msgstr "Mostrar el gasto y los mensajes de este mes"
 msgid "This month: %{cost} · %{count} messages"
 msgstr "Este mes: %{cost} · %{count} mensajes"
 
-#: lib/pepe/acp/commands.ex:331
 #: lib/pepe/gateways/tui.ex:251
 #: lib/pepe/gateways/tui.ex:277
 #: lib/pepe/gateways/tui.ex:314
@@ -4142,7 +4115,6 @@ msgstr "Nombre de proyecto inválido o duplicado."
 msgid "List models available to this project"
 msgstr "Lista los modelos disponibles para este proyecto"
 
-#: lib/pepe/acp/commands.ex:237
 #: lib/pepe/gateways/telegram.ex:2497
 #: lib/pepe/gateways/telegram.ex:2518
 #: lib/pepe/gateways/tui.ex:367
@@ -5822,7 +5794,7 @@ msgstr ""
 msgid "not installed"
 msgstr "no instalado"
 
-#: lib/mix/tasks/pepe.ex:192
+#: lib/mix/tasks/pepe.ex:189
 #, elixir-autogen, elixir-format
 msgid "No more input (stdin closed). Aborting."
 msgstr "No hay más entrada (stdin cerrado). Abortando."
@@ -7211,7 +7183,6 @@ msgid_plural "Rewound %{count} turns. That was the whole conversation."
 msgstr[0] "Retrocedí %{count} turno. Era toda la conversación."
 msgstr[1] "Retrocedí %{count} turnos. Era toda la conversación."
 
-#: lib/pepe/acp/commands.ex:173
 #: lib/pepe/gateways/telegram.ex:2173
 #: lib/pepe/gateways/tui.ex:293
 #: lib/pepe_web/live/chat_live.ex:1440
@@ -7235,493 +7206,15 @@ msgid "Learn from what it does (offer to save and correct its own skills)"
 msgstr ""
 "Aprender de lo que hace (ofrecerse a guardar y corregir sus propias skills)"
 
-#: lib/pepe/acp/commands.ex:426
-#, elixir-autogen, elixir-format
-msgid "Context window: %{size} tokens"
-msgstr "Ventana de contexto: %{size} tokens"
-
-#: lib/pepe/acp/commands.ex:431
-#: lib/pepe/acp/commands.ex:434
-#, elixir-autogen, elixir-format
-msgid "Last request: ~%{used} tokens (%{pct}%)"
-msgstr "Última solicitud: ~%{used} tokens (%{pct}%)"
-
-#: lib/pepe/acp/commands.ex:437
-#, elixir-autogen, elixir-format
-msgid "No request has been made yet, so there is nothing to measure."
-msgstr ""
-"Todavía no se ha hecho ninguna solicitud, así que no hay nada que medir."
-
-#: lib/pepe/acp/commands.ex:405
-#, elixir-autogen, elixir-format
-msgid "No tools are enabled for this agent."
-msgstr "No hay herramientas habilitadas para este agente."
-
-#: lib/pepe/acp/commands.ex:135
-#, elixir-autogen, elixir-format
-msgid "Queued for after the current turn. (%{count} waiting)"
-msgstr "En cola para después del turno actual. (%{count} en espera)"
-
-#: lib/pepe/acp/commands.ex:293
-#, elixir-autogen, elixir-format
-msgid "Usage: /queue <prompt>"
-msgstr "Uso: /queue <mensaje>"
-
-#: lib/pepe/acp/commands.ex:279
-#, elixir-autogen, elixir-format
-msgid "Usage: /steer <guidance>"
-msgstr "Uso: /steer <indicación>"
-
-#: lib/pepe/acp/commands.ex:286
-#, elixir-autogen, elixir-format
-msgid "⏩ Steer sent to the running turn."
-msgstr "⏩ Indicación enviada al turno en curso."
-
-#: lib/pepe/acp/mcp/descriptor.ex:98
-#: lib/pepe/acp/mcp/descriptor.ex:102
-#: lib/pepe/acp/mcp/descriptor.ex:108
-#, elixir-autogen, elixir-format
-msgid "(unnamed)"
-msgstr "(sin nombre)"
-
-#: lib/pepe/acp/mcp/notice.ex:24
-#, elixir-autogen, elixir-format
-msgid "MCP server `%{name}` from your editor was not used: %{reason}."
-msgstr "El servidor MCP `%{name}` de tu editor no se usó: %{reason}."
-
-#: lib/pepe/acp/mcp/notice.ex:35
-#, elixir-autogen, elixir-format
-msgid "MCP server `%{name}` offers %{total} tools; only the first %{max} are available in this session."
-msgstr ""
-"El servidor MCP `%{name}` ofrece %{total} herramientas; solo las primeras "
-"%{max} están disponibles en esta sesión."
-
-#: lib/pepe/acp/mcp/notice.ex:27
-#, elixir-autogen, elixir-format
-msgid "MCP server `%{name}`%{where} from your editor %{why}. Its tools are not available in this session."
-msgstr ""
-"El servidor MCP `%{name}`%{where} de tu editor %{why}. Sus herramientas no "
-"están disponibles en esta sesión."
-
-#: lib/pepe/acp/mcp/notice.ex:43
-#, elixir-autogen, elixir-format
-msgid "MCP server `%{name}`: the input schema of the tool `%{tool}` is too large to pass on, so the tool is offered without one."
-msgstr ""
-"Servidor MCP `%{name}`: el esquema de entrada de la herramienta `%{tool}` es"
-" demasiado grande para transmitirlo, así que la herramienta se ofrece sin "
-"él."
-
-#: lib/pepe/acp/content.ex:112
-#, elixir-autogen, elixir-format
-msgid "Note: %{note}"
-msgstr "Nota: %{note}"
-
-#: lib/pepe/acp/content.ex:581
-#, elixir-autogen, elixir-format
-msgid "The attached %{kind} (%{label}) was not included: %{why}."
-msgstr "El adjunto (%{kind}: %{label}) no se incluyó: %{why}."
-
-#: lib/pepe/acp/content.ex:580
-#, elixir-autogen, elixir-format
-msgid "The attached %{kind} was not included: %{why}."
-msgstr "El adjunto (%{kind}) no se incluyó: %{why}."
-
-#: lib/pepe/acp/content.ex:315
-#, elixir-autogen, elixir-format
-msgid "Transcript of the audio: %{text}"
-msgstr "Transcripción del audio: %{text}"
-
-#: lib/pepe/acp/mcp/descriptor.ex:157
-#: lib/pepe/acp/mcp/descriptor.ex:161
-#, elixir-autogen, elixir-format
-msgid "`args` must be a list of strings"
-msgstr "`args` debe ser una lista de textos"
-
-#: lib/pepe/acp/mcp/descriptor.ex:174
-#, elixir-autogen, elixir-format
-msgid "`env` must be a list of name/value pairs"
-msgstr "`env` debe ser una lista de pares nombre/valor"
-
-#: lib/pepe/acp/mcp/descriptor.ex:220
-#, elixir-autogen, elixir-format
-msgid "`headers` must be a list of name/value pairs"
-msgstr "`headers` debe ser una lista de pares nombre/valor"
-
-#: lib/pepe/acp/content.ex:601
-#, elixir-autogen, elixir-format
-msgid "a turn can carry at most %{max} images"
-msgstr "un mensaje puede llevar como máximo %{max} imágenes"
-
-#: lib/pepe/acp/mcp/failure.ex:40
-#, elixir-autogen, elixir-format
-msgid "answered 401 Unauthorized: add an `Authorization` header to the server's headers in your editor"
-msgstr ""
-"respondió 401 Unauthorized: añade un encabezado `Authorization` a los "
-"headers del servidor en tu editor"
-
-#: lib/pepe/acp/mcp/failure.ex:42
-#, elixir-autogen, elixir-format
-msgid "answered HTTP %{status}"
-msgstr "respondió HTTP %{status}"
-
-#: lib/pepe/acp/mcp/failure.ex:48
-#, elixir-autogen, elixir-format
-msgid "connected but could not list its tools"
-msgstr "se conectó, pero no pudo listar sus herramientas"
-
-#: lib/pepe/acp/mcp/failure.ex:37
-#, elixir-autogen, elixir-format
-msgid "could not be reached"
-msgstr "no se pudo alcanzar"
-
-#: lib/pepe/acp/mcp/failure.ex:24
-#: lib/pepe/acp/mcp/failure.ex:50
-#, elixir-autogen, elixir-format
-msgid "could not be started"
-msgstr "no se pudo iniciar"
-
-#: lib/pepe/acp/mcp/failure.ex:49
-#, elixir-autogen, elixir-format
-msgid "could not be started (%{name})"
-msgstr "no se pudo iniciar (%{name})"
-
-#: lib/pepe/acp/mcp/failure.ex:23
-#, elixir-autogen, elixir-format
-msgid "could not be started: it has no command to run"
-msgstr "no se pudo iniciar: no tiene ningún comando que ejecutar"
-
-#: lib/pepe/acp/mcp/failure.ex:21
-#, elixir-autogen, elixir-format
-msgid "could not be started: the command `%{command}` was not found on PATH"
-msgstr "no se pudo iniciar: el comando `%{command}` no se encontró en el PATH"
-
-#: lib/pepe/acp/mcp/failure.ex:36
-#, elixir-autogen, elixir-format
-msgid "did not answer the MCP handshake in time"
-msgstr "no respondió al handshake MCP a tiempo"
-
-#: lib/pepe/acp/mcp/failure.ex:34
-#, elixir-autogen, elixir-format
-msgid "did not complete the MCP handshake"
-msgstr "no completó el handshake MCP"
-
-#: lib/pepe/acp/mcp/descriptor.ex:253
-#, elixir-autogen, elixir-format
-msgid "each environment variable must have a `name` and a `value`"
-msgstr "cada variable de entorno debe tener un `name` y un `value`"
-
-#: lib/pepe/acp/mcp/descriptor.ex:254
-#, elixir-autogen, elixir-format
-msgid "each header must have a `name` and a `value`"
-msgstr "cada header debe tener un `name` y un `value`"
-
-#: lib/pepe/acp/mcp/failure.ex:29
-#, elixir-autogen, elixir-format
-msgid "exited during the MCP handshake (status %{status})"
-msgstr "terminó durante el handshake MCP (estado %{status})"
-
-#: lib/pepe/acp/mcp/descriptor.ex:247
-#, elixir-autogen, elixir-format
-msgid "invalid environment variable name `%{name}`"
-msgstr "nombre de variable de entorno no válido: `%{name}`"
-
-#: lib/pepe/acp/mcp/descriptor.ex:248
-#, elixir-autogen, elixir-format
-msgid "invalid header name `%{name}`"
-msgstr "nombre de header no válido: `%{name}`"
-
-#: lib/pepe/acp/mcp/descriptor.ex:250
-#, elixir-autogen, elixir-format
-msgid "invalid value for environment variable `%{name}`"
-msgstr "valor no válido para la variable de entorno `%{name}`"
-
-#: lib/pepe/acp/mcp/descriptor.ex:251
-#, elixir-autogen, elixir-format
-msgid "invalid value for header `%{name}`"
-msgstr "valor no válido para el header `%{name}`"
-
-#: lib/pepe/acp/mcp/failure.ex:45
-#, elixir-autogen, elixir-format
-msgid "is not an MCP endpoint (HTTP %{status})"
-msgstr "no es un endpoint MCP (HTTP %{status})"
-
-#: lib/pepe/acp/content.ex:599
-#, elixir-autogen, elixir-format
-msgid "it could not be read (%{reason})"
-msgstr "no se pudo leer (%{reason})"
-
-#: lib/pepe/acp/content.ex:603
-#, elixir-autogen, elixir-format
-msgid "it could not be written out to be read"
-msgstr "no se pudo guardar para leerlo"
-
-#: lib/pepe/acp/mcp/descriptor.ex:119
-#, elixir-autogen, elixir-format
-msgid "it has neither a `command` nor a `url`"
-msgstr "no tiene `command` ni `url`"
-
-#: lib/pepe/acp/content.ex:595
-#, elixir-autogen, elixir-format
-msgid "it is larger than the %{limit} limit"
-msgstr "supera el límite de %{limit}"
-
-#: lib/pepe/acp/content.ex:607
-#, elixir-autogen, elixir-format
-msgid "it is not a PNG, JPEG, GIF or WebP image within the %{limit} limit"
-msgstr "no es una imagen PNG, JPEG, GIF o WebP dentro del límite de %{limit}"
-
-#: lib/pepe/acp/content.ex:596
-#, elixir-autogen, elixir-format
-msgid "its data is not valid base64"
-msgstr "sus datos no son base64 válido"
-
-#: lib/pepe/acp/content.ex:604
-#, elixir-autogen, elixir-format
-msgid "its text could not be extracted"
-msgstr "no se pudo extraer el texto"
-
-#: lib/pepe/acp/mcp/descriptor.ex:266
-#, elixir-autogen, elixir-format
-msgid "its tool namespace `%{ns}` is already taken by a server configured on this Pepe"
-msgstr ""
-"su espacio de nombres de herramientas `%{ns}` ya lo usa un servidor "
-"configurado en este Pepe"
-
-#: lib/pepe/acp/mcp/failure.ex:47
-#, elixir-autogen, elixir-format
-msgid "never announced an event-stream endpoint"
-msgstr "nunca anunció un endpoint de event-stream"
-
-#: lib/pepe/acp/content.ex:602
-#, elixir-autogen, elixir-format
-msgid "no speech could be made out in it"
-msgstr "no se distinguió ninguna voz"
-
-#: lib/pepe/acp/content.ex:598
-#, elixir-autogen, elixir-format
-msgid "no transcription route is configured (see `media.audio`)"
-msgstr "no hay ninguna ruta de transcripción configurada (mira `media.audio`)"
-
-#: lib/pepe/acp/mcp/descriptor.ex:98
-#, elixir-autogen, elixir-format
-msgid "not an MCP server description"
-msgstr "no es una descripción de servidor MCP"
-
-#: lib/pepe/acp/content.ex:597
-#, elixir-autogen, elixir-format
-msgid "only PNG, JPEG, GIF and WebP images are supported"
-msgstr "solo se admiten imágenes PNG, JPEG, GIF y WebP"
-
-#: lib/pepe/acp/mcp/failure.ex:32
-#, elixir-autogen, elixir-format
-msgid "refused the MCP handshake: %{message}"
-msgstr "rechazó el handshake MCP: %{message}"
-
-#: lib/pepe/acp/mcp/descriptor.ex:141
-#, elixir-autogen, elixir-format
-msgid "the `command` is empty"
-msgstr "el `command` está vacío"
-
-#: lib/pepe/acp/mcp/descriptor.ex:142
-#, elixir-autogen, elixir-format
-msgid "the `command` is too long"
-msgstr "el `command` es demasiado largo"
-
-#: lib/pepe/acp/mcp/descriptor.ex:144
-#, elixir-autogen, elixir-format
-msgid "the `command` must be an absolute path or a bare name found on PATH"
-msgstr ""
-"el `command` debe ser una ruta absoluta o un nombre simple que esté en el "
-"PATH"
-
-#: lib/pepe/acp/mcp/descriptor.ex:200
-#, elixir-autogen, elixir-format
-msgid "the `url` is too long"
-msgstr "la `url` es demasiado larga"
-
-#: lib/pepe/acp/mcp/descriptor.ex:203
-#, elixir-autogen, elixir-format
-msgid "the `url` must be an http or https address"
-msgstr "la `url` debe ser una dirección http o https"
-
-#: lib/pepe/acp/content.ex:600
-#, elixir-autogen, elixir-format
-msgid "the model this agent uses can't see images"
-msgstr "el modelo que usa este agente no puede ver imágenes"
-
-#: lib/pepe/acp/mcp/descriptor.ex:103
-#, elixir-autogen, elixir-format
-msgid "the name is too long"
-msgstr "el nombre es demasiado largo"
-
-#: lib/pepe/acp/mcp/descriptor.ex:149
-#, elixir-autogen, elixir-format
-msgid "the server has no `command`"
-msgstr "el servidor no tiene `command`"
-
-#: lib/pepe/acp/mcp/descriptor.ex:207
-#, elixir-autogen, elixir-format
-msgid "the server has no `url`"
-msgstr "el servidor no tiene `url`"
-
-#: lib/pepe/acp/mcp/descriptor.ex:102
-#: lib/pepe/acp/mcp/descriptor.ex:108
-#, elixir-autogen, elixir-format
-msgid "the server has no name"
-msgstr "el servidor no tiene nombre"
-
-#: lib/pepe/acp/content.ex:610
-#, elixir-autogen, elixir-format
-msgid "this kind of file (%{kind}) can't be read here"
-msgstr "este tipo de archivo (%{kind}) no se puede leer aquí"
-
-#: lib/pepe/acp/mcp/descriptor.ex:155
-#, elixir-autogen, elixir-format
-msgid "too many arguments (at most %{max})"
-msgstr "demasiados argumentos (como máximo %{max})"
-
-#: lib/pepe/acp/mcp/descriptor.ex:167
-#, elixir-autogen, elixir-format
-msgid "too many environment variables (at most %{max})"
-msgstr "demasiadas variables de entorno (como máximo %{max})"
-
-#: lib/pepe/acp/mcp/descriptor.ex:213
-#, elixir-autogen, elixir-format
-msgid "too many headers (at most %{max})"
-msgstr "demasiados headers (como máximo %{max})"
-
-#: lib/pepe/acp/mcp/descriptor.ex:80
-#, elixir-autogen, elixir-format
-msgid "too many servers (at most %{max} per session)"
-msgstr "demasiados servidores (como máximo %{max} por sesión)"
-
-#: lib/pepe/acp/content.ex:610
-#, elixir-autogen, elixir-format
-msgid "unknown type"
-msgstr "tipo desconocido"
-
-#: lib/pepe/acp/mcp/descriptor.ex:115
-#, elixir-autogen, elixir-format
-msgid "unsupported transport `%{type}`"
-msgstr "transporte no admitido: `%{type}`"
-
-#: lib/pepe/acp/content.ex:585
-#, elixir-autogen, elixir-format
-msgctxt "kind of attachment"
-msgid "audio"
-msgstr "audio"
-
-#: lib/pepe/acp/content.ex:586
-#, elixir-autogen, elixir-format
-msgctxt "kind of attachment"
-msgid "file"
-msgstr "archivo"
-
-#: lib/pepe/acp/content.ex:584
-#, elixir-autogen, elixir-format
-msgctxt "kind of attachment"
-msgid "image"
-msgstr "imagen"
-
 #: lib/pepe_web/live/skill_curator_component.ex:85
 #, elixir-autogen, elixir-format
 msgid "%{active} active, %{stale} stale, %{archived} archived"
 msgstr "%{active} activas, %{stale} obsoletas, %{archived} archivadas"
 
-#: lib/pepe/checkpoints/report.ex:272
-#, elixir-autogen, elixir-format
-msgid "%{count} file"
-msgid_plural "%{count} files"
-msgstr[0] "%{count} archivo"
-msgstr[1] "%{count} archivos"
-
-#: lib/pepe/checkpoints/report.ex:194
-#, elixir-autogen, elixir-format
-msgid "%{count} file it changed is outside the folders a rewind may touch: %{files}."
-msgid_plural "%{count} files it changed are outside the folders a rewind may touch: %{files}."
-msgstr[0] ""
-"%{count} archivo modificado queda fuera de las carpetas que /rewind puede "
-"restaurar: %{files}."
-msgstr[1] ""
-"%{count} archivos modificados quedan fuera de las carpetas que /rewind puede"
-" restaurar: %{files}."
-
-#: lib/pepe/checkpoints/report.ex:184
-#, elixir-autogen, elixir-format
-msgid "%{count} file looks like a credential, so it is never copied and cannot be put back: %{files}."
-msgid_plural "%{count} files look like credentials, so they are never copied and cannot be put back: %{files}."
-msgstr[0] ""
-"%{count} archivo parece una credencial, así que nunca se copia y no se puede"
-" restaurar: %{files}."
-msgstr[1] ""
-"%{count} archivos parecen credenciales, así que nunca se copian y no se "
-"pueden restaurar: %{files}."
-
-#: lib/pepe/checkpoints/report.ex:210
-#, elixir-autogen, elixir-format
-msgid "%{count} of those turns is older than the file history, so its files were not touched."
-msgid_plural "%{count} of those turns are older than the file history, so their files were not touched."
-msgstr[0] ""
-"%{count} de esos turnos es anterior al historial de archivos, así que no se "
-"tocaron sus archivos."
-msgstr[1] ""
-"%{count} de esos turnos son anteriores al historial de archivos, así que no "
-"se tocaron sus archivos."
-
-#: lib/pepe/checkpoints/report.ex:223
-#, elixir-autogen, elixir-format
-msgid "%{count} recorded change had already been cleaned up."
-msgid_plural "%{count} recorded changes had already been cleaned up."
-msgstr[0] "%{count} cambio registrado ya había sido limpiado."
-msgstr[1] "%{count} cambios registrados ya habían sido limpiados."
-
-#: lib/pepe/checkpoints/report.ex:264
-#, elixir-autogen, elixir-format
-msgid "(no text)"
-msgstr "(sin texto)"
-
-#: lib/pepe/checkpoints/report.ex:282
-#, elixir-autogen, elixir-format
-msgid "/rewind N chat goes back in the conversation only."
-msgstr "/rewind N chat vuelve atrás solo en la conversación."
-
-#: lib/pepe/checkpoints/report.ex:283
-#, elixir-autogen, elixir-format
-msgid "/rewind N files puts files back and keeps the conversation."
-msgstr "/rewind N files restaura los archivos y conserva la conversación."
-
-#: lib/pepe/checkpoints/report.ex:281
-#, elixir-autogen, elixir-format
-msgid "/rewind N goes back N turns: the conversation and the files they changed."
-msgstr ""
-"/rewind N vuelve N turnos atrás: la conversación y los archivos que "
-"cambiaron."
-
 #: lib/pepe_web/live/chat_live.ex:1265
 #, elixir-autogen, elixir-format
 msgid "A run is already going. Wait for it to finish, or use /stop."
 msgstr "Ya hay una ejecución en curso. Espera a que termine, o usa /stop."
-
-#: lib/pepe/checkpoints/report.ex:204
-#, elixir-autogen, elixir-format
-msgid "A shell command changed more files than can be recorded, so some of its changes may not be put back."
-msgstr ""
-"Un comando de shell cambió más archivos de los que se pueden registrar, así "
-"que algunos de sus cambios podrían no restaurarse."
-
-#: lib/pepe_web/live/agents_live.ex:498
-#, elixir-autogen, elixir-format
-msgid "Also copy the working folder around each shell command, so /rewind can undo what a command changed. It walks the folder twice per command and stops at a size limit, so it is off by default and never covers a huge folder completely."
-msgstr ""
-"También copia la carpeta de trabajo alrededor de cada comando de shell, para"
-" que /rewind pueda deshacer lo que un comando cambió. Recorre la carpeta dos"
-" veces por comando y se detiene en un límite de tamaño, por eso viene "
-"desactivado y nunca cubre por completo una carpeta enorme."
-
-#: lib/pepe_web/live/agents_live.ex:496
-#, elixir-autogen, elixir-format
-msgid "Also cover shell commands"
-msgstr "Cubrir también los comandos de shell"
 
 #: lib/pepe_web/live/skill_curator_component.ex:108
 #, elixir-autogen, elixir-format
@@ -7732,16 +7225,6 @@ msgstr "También fusionar skills que se superponen (usa una llamada al modelo)"
 #, elixir-autogen, elixir-format
 msgid "Archive after (days)"
 msgstr "Archivar después de (días)"
-
-#: lib/pepe_web/live/agents_live.ex:490
-#, elixir-autogen, elixir-format
-msgid "Before a file tool overwrites, edits or moves a file, a copy of what was there is kept for a couple of weeks. /rewind can then restore those files along with the conversation. Files that look like credentials are never copied. Off means /rewind only goes back in the conversation."
-msgstr ""
-"Antes de que una herramienta de archivos sobrescriba, edite o mueva un "
-"archivo, se guarda durante un par de semanas una copia de lo que había. Así "
-"/rewind puede restaurar esos archivos junto con la conversación. Los "
-"archivos que parecen credenciales nunca se copian. Desactivado significa que"
-" /rewind solo vuelve atrás en la conversación."
 
 #: lib/pepe_web/live/skills_live.ex:169
 #, elixir-autogen, elixir-format
@@ -7757,13 +7240,6 @@ msgstr "Comprobar"
 #, elixir-autogen, elixir-format
 msgid "Closest to going stale"
 msgstr "Más cerca de quedar obsoleta"
-
-#: lib/pepe/checkpoints/report.ex:166
-#, elixir-autogen, elixir-format
-msgid "Could not put back %{count} file: %{files}."
-msgid_plural "Could not put back %{count} files: %{files}."
-msgstr[0] "No se pudo restaurar %{count} archivo: %{files}."
-msgstr[1] "No se pudieron restaurar %{count} archivos: %{files}."
 
 #: lib/pepe_web/live/skill_curator_component.ex:214
 #, elixir-autogen, elixir-format
@@ -7805,21 +7281,6 @@ msgstr "Para otros canales"
 msgid "In its care"
 msgstr "A su cargo"
 
-#: lib/pepe_web/live/agents_live.ex:488
-#, elixir-autogen, elixir-format
-msgid "Keep a copy of files it changes (so /rewind can put them back)"
-msgstr ""
-"Guardar una copia de los archivos que cambia (para que /rewind pueda "
-"restaurarlos)"
-
-#: lib/pepe/checkpoints/report.ex:136
-#, elixir-autogen, elixir-format
-msgid "Left %{count} file alone because it changed afterwards: %{files}."
-msgid_plural "Left %{count} files alone because they changed afterwards: %{files}."
-msgstr[0] "Dejé %{count} archivo sin tocar porque cambió después: %{files}."
-msgstr[1] ""
-"Dejé %{count} archivos sin tocar porque cambiaron después: %{files}."
-
 #: lib/pepe_web/live/skills_live.ex:175
 #, elixir-autogen, elixir-format
 msgid "Needs the %{tools} tool"
@@ -7829,20 +7290,6 @@ msgstr "Necesita la herramienta %{tools}"
 #, elixir-autogen, elixir-format
 msgid "Next run"
 msgstr "Próxima ejecución"
-
-#: lib/pepe/checkpoints/report.ex:146
-#, elixir-autogen, elixir-format
-msgid "No copy was kept of %{count} file (too large): %{files}."
-msgid_plural "No copy was kept of %{count} files (too large): %{files}."
-msgstr[0] ""
-"No se guardó copia de %{count} archivo (demasiado grande): %{files}."
-msgstr[1] ""
-"No se guardó copia de %{count} archivos (demasiado grandes): %{files}."
-
-#: lib/pepe/checkpoints/report.ex:102
-#, elixir-autogen, elixir-format
-msgid "No file changes were recorded for those turns."
-msgstr "No se registraron cambios de archivos en esos turnos."
 
 #: lib/pepe_web/live/skills_live.ex:118
 #, elixir-autogen, elixir-format
@@ -7865,11 +7312,6 @@ msgid "Not valid: %{count} error."
 msgid_plural "Not valid: %{count} errors."
 msgstr[0] "No es válida: %{count} error."
 msgstr[1] "No es válida: %{count} errores."
-
-#: lib/pepe/checkpoints/report.ex:42
-#, elixir-autogen, elixir-format
-msgid "Nothing was put back. The conversation is unchanged."
-msgstr "No se restauró nada. La conversación sigue igual."
 
 #: lib/pepe_web/live/skills_live.ex:78
 #, elixir-autogen, elixir-format
@@ -7901,39 +7343,10 @@ msgstr "Vista previa"
 msgid "Preview: nothing was changed"
 msgstr "Vista previa: no se cambió nada"
 
-#: lib/pepe/checkpoints/report.ex:110
-#, elixir-autogen, elixir-format
-msgid "Put back %{count} file: %{files}."
-msgid_plural "Put back %{count} files: %{files}."
-msgstr[0] "Restauré %{count} archivo: %{files}."
-msgstr[1] "Restauré %{count} archivos: %{files}."
-
-#: lib/pepe/checkpoints/report.ex:44
-#, elixir-autogen, elixir-format
-msgid "Put files back for the last %{count} turn. The conversation is unchanged."
-msgid_plural "Put files back for the last %{count} turns. The conversation is unchanged."
-msgstr[0] ""
-"Restauré los archivos de %{count} turno. La conversación sigue igual."
-msgstr[1] ""
-"Restauré los archivos de los últimos %{count} turnos. La conversación sigue "
-"igual."
-
 #: lib/pepe_web/live/skill_curator_component.ex:145
 #, elixir-autogen, elixir-format
 msgid "Recent changes to skills"
 msgstr "Cambios recientes en las skills"
-
-#: lib/pepe/checkpoints/report.ex:268
-#, elixir-autogen, elixir-format
-msgid "Recent turns, newest first:"
-msgstr "Turnos recientes, del más nuevo al más antiguo:"
-
-#: lib/pepe/checkpoints/report.ex:113
-#, elixir-autogen, elixir-format
-msgid "Removed %{count} file those turns created: %{files}."
-msgid_plural "Removed %{count} files those turns created: %{files}."
-msgstr[0] "Eliminé %{count} archivo que crearon esos turnos: %{files}."
-msgstr[1] "Eliminé %{count} archivos que crearon esos turnos: %{files}."
 
 #: lib/pepe_web/live/skill_curator_component.ex:140
 #, elixir-autogen, elixir-format
@@ -8019,43 +7432,10 @@ msgstr ""
 "puede desactivar en todos lados o solo en un canal. Instala y crea skills "
 "desde el chat o con mix pepe skill."
 
-#: lib/pepe/acp/commands.ex:192
-#: lib/pepe/gateways/telegram.ex:2308
-#: lib/pepe/gateways/tui.ex:311
-#: lib/pepe_web/live/chat_live.ex:1411
-#, elixir-autogen, elixir-format
-msgid "That message had an attachment, so it can't be sent again exactly. Send it again yourself."
-msgstr ""
-"Ese mensaje tenía un adjunto, así que no se puede reenviar tal cual. Envíalo"
-" tú de nuevo."
-
-#: lib/pepe/checkpoints/report.ex:71
-#, elixir-autogen, elixir-format
-msgid "The %{count} file those turns changed was left as it is. Leave out \"chat\" to put files back too."
-msgid_plural "The %{count} files those turns changed were left as they are. Leave out \"chat\" to put files back too."
-msgstr[0] ""
-"Se dejó como está %{count} archivo de los que cambiaron esos turnos. Quita "
-"\"chat\" para restaurar también los archivos."
-msgstr[1] ""
-"Se dejaron como están %{count} archivos de los que cambiaron esos turnos. "
-"Quita \"chat\" para restaurar también los archivos."
-
 #: lib/pepe_web/live/skill_curator_component.ex:252
 #, elixir-autogen, elixir-format
 msgid "The curator could not run."
 msgstr "El curador no pudo ejecutarse."
-
-#: lib/pepe/checkpoints/report.ex:237
-#, elixir-autogen, elixir-format
-msgid "The files of those turns were already put back."
-msgstr "Los archivos de esos turnos ya estaban restaurados."
-
-#: lib/pepe/checkpoints/report.ex:156
-#, elixir-autogen, elixir-format
-msgid "The saved copy of %{count} file has expired: %{files}."
-msgid_plural "The saved copy of %{count} files has expired: %{files}."
-msgstr[0] "La copia guardada de %{count} archivo ha caducado: %{files}."
-msgstr[1] "Las copias guardadas de %{count} archivos han caducado: %{files}."
 
 #: lib/pepe_web/live/skills_live.ex:69
 #, elixir-autogen, elixir-format
@@ -8138,3 +7518,205 @@ msgstr "nada programado"
 #, elixir-autogen, elixir-format
 msgid "stale"
 msgstr "obsoleta"
+
+#: lib/pepe/checkpoints/report.ex:272
+#, elixir-autogen, elixir-format
+msgid "%{count} file"
+msgid_plural "%{count} files"
+msgstr[0] "%{count} archivo"
+msgstr[1] "%{count} archivos"
+
+#: lib/pepe/checkpoints/report.ex:194
+#, elixir-autogen, elixir-format
+msgid "%{count} file it changed is outside the folders a rewind may touch: %{files}."
+msgid_plural "%{count} files it changed are outside the folders a rewind may touch: %{files}."
+msgstr[0] ""
+"%{count} archivo modificado queda fuera de las carpetas que /rewind puede "
+"restaurar: %{files}."
+msgstr[1] ""
+"%{count} archivos modificados quedan fuera de las carpetas que /rewind puede"
+" restaurar: %{files}."
+
+#: lib/pepe/checkpoints/report.ex:184
+#, elixir-autogen, elixir-format
+msgid "%{count} file looks like a credential, so it is never copied and cannot be put back: %{files}."
+msgid_plural "%{count} files look like credentials, so they are never copied and cannot be put back: %{files}."
+msgstr[0] ""
+"%{count} archivo parece una credencial, así que nunca se copia y no se puede"
+" restaurar: %{files}."
+msgstr[1] ""
+"%{count} archivos parecen credenciales, así que nunca se copian y no se "
+"pueden restaurar: %{files}."
+
+#: lib/pepe/checkpoints/report.ex:210
+#, elixir-autogen, elixir-format
+msgid "%{count} of those turns is older than the file history, so its files were not touched."
+msgid_plural "%{count} of those turns are older than the file history, so their files were not touched."
+msgstr[0] ""
+"%{count} de esos turnos es anterior al historial de archivos, así que no se "
+"tocaron sus archivos."
+msgstr[1] ""
+"%{count} de esos turnos son anteriores al historial de archivos, así que no "
+"se tocaron sus archivos."
+
+#: lib/pepe/checkpoints/report.ex:223
+#, elixir-autogen, elixir-format
+msgid "%{count} recorded change had already been cleaned up."
+msgid_plural "%{count} recorded changes had already been cleaned up."
+msgstr[0] "%{count} cambio registrado ya había sido limpiado."
+msgstr[1] "%{count} cambios registrados ya habían sido limpiados."
+
+#: lib/pepe/checkpoints/report.ex:264
+#, elixir-autogen, elixir-format
+msgid "(no text)"
+msgstr "(sin texto)"
+
+#: lib/pepe/checkpoints/report.ex:282
+#, elixir-autogen, elixir-format
+msgid "/rewind N chat goes back in the conversation only."
+msgstr "/rewind N chat vuelve atrás solo en la conversación."
+
+#: lib/pepe/checkpoints/report.ex:283
+#, elixir-autogen, elixir-format
+msgid "/rewind N files puts files back and keeps the conversation."
+msgstr "/rewind N files restaura los archivos y conserva la conversación."
+
+#: lib/pepe/checkpoints/report.ex:281
+#, elixir-autogen, elixir-format
+msgid "/rewind N goes back N turns: the conversation and the files they changed."
+msgstr ""
+"/rewind N vuelve N turnos atrás: la conversación y los archivos que "
+"cambiaron."
+
+#: lib/pepe/checkpoints/report.ex:204
+#, elixir-autogen, elixir-format
+msgid "A shell command changed more files than can be recorded, so some of its changes may not be put back."
+msgstr ""
+"Un comando de shell cambió más archivos de los que se pueden registrar, así "
+"que algunos de sus cambios podrían no restaurarse."
+
+#: lib/pepe_web/live/agents_live.ex:498
+#, elixir-autogen, elixir-format
+msgid "Also copy the working folder around each shell command, so /rewind can undo what a command changed. It walks the folder twice per command and stops at a size limit, so it is off by default and never covers a huge folder completely."
+msgstr ""
+"También copia la carpeta de trabajo alrededor de cada comando de shell, para"
+" que /rewind pueda deshacer lo que un comando cambió. Recorre la carpeta dos"
+" veces por comando y se detiene en un límite de tamaño, por eso viene "
+"desactivado y nunca cubre por completo una carpeta enorme."
+
+#: lib/pepe_web/live/agents_live.ex:496
+#, elixir-autogen, elixir-format
+msgid "Also cover shell commands"
+msgstr "Cubrir también los comandos de shell"
+
+#: lib/pepe_web/live/agents_live.ex:490
+#, elixir-autogen, elixir-format
+msgid "Before a file tool overwrites, edits or moves a file, a copy of what was there is kept for a couple of weeks. /rewind can then restore those files along with the conversation. Files that look like credentials are never copied. Off means /rewind only goes back in the conversation."
+msgstr ""
+"Antes de que una herramienta de archivos sobrescriba, edite o mueva un "
+"archivo, se guarda durante un par de semanas una copia de lo que había. Así "
+"/rewind puede restaurar esos archivos junto con la conversación. Los "
+"archivos que parecen credenciales nunca se copian. Desactivado significa que"
+" /rewind solo vuelve atrás en la conversación."
+
+#: lib/pepe/checkpoints/report.ex:166
+#, elixir-autogen, elixir-format
+msgid "Could not put back %{count} file: %{files}."
+msgid_plural "Could not put back %{count} files: %{files}."
+msgstr[0] "No se pudo restaurar %{count} archivo: %{files}."
+msgstr[1] "No se pudieron restaurar %{count} archivos: %{files}."
+
+#: lib/pepe_web/live/agents_live.ex:488
+#, elixir-autogen, elixir-format
+msgid "Keep a copy of files it changes (so /rewind can put them back)"
+msgstr ""
+"Guardar una copia de los archivos que cambia (para que /rewind pueda "
+"restaurarlos)"
+
+#: lib/pepe/checkpoints/report.ex:136
+#, elixir-autogen, elixir-format
+msgid "Left %{count} file alone because it changed afterwards: %{files}."
+msgid_plural "Left %{count} files alone because they changed afterwards: %{files}."
+msgstr[0] "Dejé %{count} archivo sin tocar porque cambió después: %{files}."
+msgstr[1] ""
+"Dejé %{count} archivos sin tocar porque cambiaron después: %{files}."
+
+#: lib/pepe/checkpoints/report.ex:146
+#, elixir-autogen, elixir-format
+msgid "No copy was kept of %{count} file (too large): %{files}."
+msgid_plural "No copy was kept of %{count} files (too large): %{files}."
+msgstr[0] ""
+"No se guardó copia de %{count} archivo (demasiado grande): %{files}."
+msgstr[1] ""
+"No se guardó copia de %{count} archivos (demasiado grandes): %{files}."
+
+#: lib/pepe/checkpoints/report.ex:102
+#, elixir-autogen, elixir-format
+msgid "No file changes were recorded for those turns."
+msgstr "No se registraron cambios de archivos en esos turnos."
+
+#: lib/pepe/checkpoints/report.ex:42
+#, elixir-autogen, elixir-format
+msgid "Nothing was put back. The conversation is unchanged."
+msgstr "No se restauró nada. La conversación sigue igual."
+
+#: lib/pepe/checkpoints/report.ex:110
+#, elixir-autogen, elixir-format
+msgid "Put back %{count} file: %{files}."
+msgid_plural "Put back %{count} files: %{files}."
+msgstr[0] "Restauré %{count} archivo: %{files}."
+msgstr[1] "Restauré %{count} archivos: %{files}."
+
+#: lib/pepe/checkpoints/report.ex:44
+#, elixir-autogen, elixir-format
+msgid "Put files back for the last %{count} turn. The conversation is unchanged."
+msgid_plural "Put files back for the last %{count} turns. The conversation is unchanged."
+msgstr[0] ""
+"Restauré los archivos de %{count} turno. La conversación sigue igual."
+msgstr[1] ""
+"Restauré los archivos de los últimos %{count} turnos. La conversación sigue "
+"igual."
+
+#: lib/pepe/checkpoints/report.ex:268
+#, elixir-autogen, elixir-format
+msgid "Recent turns, newest first:"
+msgstr "Turnos recientes, del más nuevo al más antiguo:"
+
+#: lib/pepe/checkpoints/report.ex:113
+#, elixir-autogen, elixir-format
+msgid "Removed %{count} file those turns created: %{files}."
+msgid_plural "Removed %{count} files those turns created: %{files}."
+msgstr[0] "Eliminé %{count} archivo que crearon esos turnos: %{files}."
+msgstr[1] "Eliminé %{count} archivos que crearon esos turnos: %{files}."
+
+#: lib/pepe/gateways/telegram.ex:2308
+#: lib/pepe/gateways/tui.ex:311
+#: lib/pepe_web/live/chat_live.ex:1411
+#, elixir-autogen, elixir-format
+msgid "That message had an attachment, so it can't be sent again exactly. Send it again yourself."
+msgstr ""
+"Ese mensaje tenía un adjunto, así que no se puede reenviar tal cual. Envíalo"
+" tú de nuevo."
+
+#: lib/pepe/checkpoints/report.ex:71
+#, elixir-autogen, elixir-format
+msgid "The %{count} file those turns changed was left as it is. Leave out \"chat\" to put files back too."
+msgid_plural "The %{count} files those turns changed were left as they are. Leave out \"chat\" to put files back too."
+msgstr[0] ""
+"Se dejó como está %{count} archivo de los que cambiaron esos turnos. Quita "
+"\"chat\" para restaurar también los archivos."
+msgstr[1] ""
+"Se dejaron como están %{count} archivos de los que cambiaron esos turnos. "
+"Quita \"chat\" para restaurar también los archivos."
+
+#: lib/pepe/checkpoints/report.ex:237
+#, elixir-autogen, elixir-format
+msgid "The files of those turns were already put back."
+msgstr "Los archivos de esos turnos ya estaban restaurados."
+
+#: lib/pepe/checkpoints/report.ex:156
+#, elixir-autogen, elixir-format
+msgid "The saved copy of %{count} file has expired: %{files}."
+msgid_plural "The saved copy of %{count} files has expired: %{files}."
+msgstr[0] "La copia guardada de %{count} archivo ha caducado: %{files}."
+msgstr[1] "Las copias guardadas de %{count} archivos han caducado: %{files}."

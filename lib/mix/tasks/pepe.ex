@@ -174,10 +174,7 @@ defmodule Mix.Tasks.Pepe do
     # supervision tree - Repo, PubSub, whatever else boots - can log on its own
     # before acp_cmd/1 ever reaches Stdio.run/1), so the redirect has to be in place
     # before that boot, not after it, for the guarantee to actually hold.
-    # `pepe acp --setup` is the one form that is *not* a protocol connection: an editor's
-    # "terminal" auth method runs it in a terminal it opened, to run the interactive
-    # setup, and quieting the shell there would silence the very prompts it exists for.
-    if match?(["acp" | _], argv) and "--setup" not in argv do
+    if match?(["acp" | _], argv) do
       Mix.shell(Mix.Shell.Quiet)
       Pepe.ACP.Stdio.take_stdout!()
     end
@@ -382,12 +379,7 @@ defmodule Mix.Tasks.Pepe do
   # editor that opened it and dies with the pipe (this agent reports `loadSession:
   # false`, so there is nothing to come back to), and an editor integration has no
   # business opening an HTTP port on the side.
-  def dispatch(["acp" | rest]) do
-    # The terminal auth method the handshake advertises (see Pepe.ACP.Auth): the editor
-    # appends `--setup` to the command it starts the agent with, so the same command
-    # line that serves the protocol can also be the one that configures Pepe.
-    if "--setup" in rest, do: dispatch(["setup"]), else: with_app([], fn -> acp_cmd(rest) end)
-  end
+  def dispatch(["acp" | rest]), do: with_app([], fn -> acp_cmd(rest) end)
 
   def dispatch(["serve", "help" | _]), do: serve_help()
 
@@ -4780,8 +4772,6 @@ defmodule Mix.Tasks.Pepe do
       mix pepe acp [AGENT]            # bind the connection to a named agent
       mix pepe acp --agent NAME       # the same, as a flag
       mix pepe acp --project CO       # that project's default agent
-      mix pepe acp --setup            # run Pepe's interactive setup instead (what an
-                                      # editor's "Set up Pepe" auth method opens)
 
     ACP is an open, editor-neutral protocol: JSON-RPC over stdin/stdout, the same
     idea as a language server but for an agent instead of a language. You do not run
@@ -4794,13 +4784,9 @@ defmodule Mix.Tasks.Pepe do
     that needs a human goes to the same gate every other Pepe surface uses, and
     comes out in the editor as a real prompt you answer.
 
-    Also there: the agent's plan as the editor's task panel, a context-window meter,
-    the session slash commands (/new, /undo, /rewind, /compact, /model, /steer ...),
-    a model picker, and modes that decide whether file edits ask first.
-
     What it does not support, and says so during the handshake: resuming an earlier
-    session, image/audio attachments, and routing file reads or a terminal back
-    through the editor. The agent's own tools already run here.
+    session, authentication, image/audio attachments, and routing file reads or a
+    terminal back through the editor. The agent's own tools already run here.
 
     Anything the agent may do is the agent's configuration, not the editor's:
     `mix pepe agent list` to see it, `mix pepe tools` for what exists.

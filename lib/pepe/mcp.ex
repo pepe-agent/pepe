@@ -52,55 +52,7 @@ defmodule Pepe.MCP do
   defp start(server) do
     with {:ok, spec} <- spec(server),
          {:ok, module} <- Transport.for_spec(spec) do
-      spawn_transport(server, spec, module, @sup)
-    end
-  end
-
-  @doc """
-  Start a client for an ad-hoc `spec` - one that is not in `Pepe.Config` - under `sup`,
-  registered as `key` (any term that is not a configured server's name, so it can never
-  be found by, or shadow, a configured server).
-
-  This is how a caller that owns its own servers (an ACP session's editor-supplied ones,
-  see `Pepe.ACP.Mcp`) reuses the transports, the Streamable-HTTP-then-SSE fallback and
-  the registry without touching `config.json`. `sup` is separate from the shared one on
-  purpose: a client's handshake blocks the supervisor starting it, and one flaky
-  editor-supplied server must not stall every configured server's lazy start.
-  """
-  @spec start_spec(term(), map(), Supervisor.supervisor()) :: {:ok, pid(), module()} | {:error, term()}
-  def start_spec(key, spec, sup) do
-    with {:ok, module} <- Transport.for_spec(spec) do
-      spawn_transport(key, spec, module, sup)
-    end
-  end
-
-  @doc "Stop the client registered as `key` under `sup`. No-op when nothing is running."
-  @spec stop_spec(term(), Supervisor.supervisor()) :: :ok
-  def stop_spec(key, sup) do
-    case Registry.lookup(@registry, key) do
-      [{pid, _}] -> DynamicSupervisor.terminate_child(sup, pid)
-      [] -> :ok
-    end
-
-    :ok
-  end
-
-  @doc """
-  Call `tool` on the already-running client registered as `key`. Never starts one:
-  `{:error, :not_running}` when there is none, so a caller decides whether to (re)start it.
-  """
-  @spec call_running(term(), String.t(), map() | nil) :: {:ok, String.t()} | {:error, term()}
-  def call_running(key, tool, args) do
-    case Registry.lookup(@registry, key) do
-      [{pid, module}] ->
-        try do
-          module.call_tool(pid, tool, args)
-        catch
-          :exit, _ -> {:error, :server_down}
-        end
-
-      [] ->
-        {:error, :not_running}
+      spawn_transport(server, spec, module)
     end
   end
 
@@ -111,8 +63,8 @@ defmodule Pepe.MCP do
     end
   end
 
-  defp spawn_transport(server, spec, module, sup) do
-    case DynamicSupervisor.start_child(sup, %{
+  defp spawn_transport(server, spec, module) do
+    case DynamicSupervisor.start_child(@sup, %{
            id: {:mcp, server},
            start: {module, :start_link, [spec, [name: via(server, module)]]},
            restart: :temporary
@@ -126,7 +78,7 @@ defmodule Pepe.MCP do
       # older one before reporting a failure the operator would read as a broken URL.
       {:error, {:mcp_not_streamable, _}} = error ->
         if module == Client.Http and spec[:transport] in [nil, "auto"] do
-          spawn_transport(server, spec, Client.Sse, sup)
+          spawn_transport(server, spec, Client.Sse)
         else
           error
         end

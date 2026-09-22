@@ -197,24 +197,11 @@ defmodule Pepe.ACPTest do
       assert result["agentInfo"]["name"] == "pepe"
 
       # Absent capabilities are the point: a client that reads these never sends
-      # an image block, so there is no half-working path.
-      assert result["agentCapabilities"]["loadSession"] == true
-
-      assert result["agentCapabilities"]["sessionCapabilities"] == %{
-               "list" => %{},
-               "resume" => %{},
-               "fork" => %{}
-             }
-
-      # This agent's mock model has no vision and no transcription route is configured, so
-      # image and audio are not promised; embedded context is text and always works. See
-      # test/pepe/acp/prompt_blocks_test.exs for the vision and audio cases.
+      # `session/load` or an image block, so there is no half-working path.
+      assert result["agentCapabilities"]["loadSession"] == false
       assert result["agentCapabilities"]["promptCapabilities"]["image"] == false
-      assert result["agentCapabilities"]["promptCapabilities"]["audio"] == false
-      assert result["agentCapabilities"]["promptCapabilities"]["embeddedContext"] == true
-      # A configured agent can answer, so the "use my configuration" method is offered,
-      # alongside the terminal setup method that is always there (see Pepe.ACP.Auth).
-      assert Enum.map(result["authMethods"], & &1["id"]) == ["pepe-config", "pepe-setup"]
+      assert result["agentCapabilities"]["promptCapabilities"]["embeddedContext"] == false
+      assert result["authMethods"] == []
     end
 
     test "refuses any other request before the handshake", %{server: server} do
@@ -224,11 +211,11 @@ defmodule Pepe.ACPTest do
 
     test "an unimplemented method is reported as such, not silently ignored", %{server: server} do
       initialize(server)
-      request(server, 8, "fs/read_text_file", %{"sessionId" => "nope", "path" => "/tmp/x"})
+      request(server, 8, "session/load", %{"sessionId" => "nope", "cwd" => "/tmp", "mcpServers" => []})
 
       error = await_response(8)["error"]
       assert error["code"] == -32_601
-      assert error["message"] =~ "fs/read_text_file"
+      assert error["message"] =~ "session/load"
     end
 
     test "a line that is not JSON gets a parse error, and the connection survives", %{server: server} do
@@ -251,8 +238,16 @@ defmodule Pepe.ACPTest do
       assert await_response(3)["error"]["code"] == -32_602
     end
 
-    # Client-supplied MCP servers are accepted now (they used to be refused here); that
-    # behavior is pinned in test/pepe/acp/mcp_session_test.exs.
+    test "refuses client-supplied MCP servers rather than pretending to connect", %{server: server} do
+      initialize(server)
+
+      request(server, 3, "session/new", %{
+        "cwd" => System.tmp_dir!(),
+        "mcpServers" => [%{"name" => "x", "command" => "x", "args" => []}]
+      })
+
+      assert await_response(3)["error"]["message"] =~ "pepe mcp add"
+    end
 
     test "hands back a session id", %{server: server} do
       assert "sess_" <> _ = open_session(server)
@@ -280,12 +275,12 @@ defmodule Pepe.ACPTest do
 
       request(server, 5, "session/prompt", %{
         "sessionId" => session_id,
-        "prompt" => [%{"type" => "video", "mimeType" => "video/mp4", "data" => "aaaa"}]
+        "prompt" => [%{"type" => "image", "mimeType" => "image/png", "data" => "aaaa"}]
       })
 
       error = await_response(5)["error"]
       assert error["code"] == -32_602
-      assert error["message"] =~ "video"
+      assert error["message"] =~ "image"
     end
 
     test "an unknown session id is an error, not a new session", %{server: server} do
@@ -308,9 +303,7 @@ defmodule Pepe.ACPTest do
       # Announced before the gate runs, so the editor can render the call it is about
       # to be asked about.
       call = await_update("tool_call")["params"]["update"]
-      # The tool's name is `_meta`, not a top-level key the protocol has no field for.
-      assert call["_meta"]["pepe"]["tool"] == "bash"
-      refute Map.has_key?(call, "name")
+      assert call["name"] == "bash"
       assert call["kind"] == "execute"
       assert call["status"] == "pending"
       assert call["rawInput"]["command"] == "echo curl"

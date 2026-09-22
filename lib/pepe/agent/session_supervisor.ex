@@ -43,20 +43,11 @@ defmodule Pepe.Agent.SessionSupervisor do
   end
 
   defp restore_sessions do
-    for {key, agent_name, pending} <- Pepe.Agent.SessionPersistence.all(), not editor_session?(key) do
+    for {key, agent_name, pending} <- Pepe.Agent.SessionPersistence.all() do
       {:ok, _pid} = ensure(key, agent_name)
       if pending, do: resume_and_deliver(key)
     end
   end
-
-  # An editor conversation (`Pepe.ACP`) belongs to the `pepe acp` process an editor
-  # started, and is picked up again only when that editor asks for it
-  # (`session/load`, `session/resume`). Restoring it here would spawn an idle process
-  # per saved conversation on every boot, and worse: an interrupted turn (`pending`)
-  # would be resumed and "delivered" to a channel that does not exist, spending a model
-  # turn nobody is waiting on. The file stays where it is, so the dashboard can still
-  # show the history.
-  defp editor_session?(key), do: String.starts_with?(key, "acp:")
 
   # Best-effort: replay the interruption as an internal turn (see
   # `Pepe.Agent.Session.resume/1`) and push whatever the agent replies to the
@@ -95,8 +86,7 @@ defmodule Pepe.Agent.SessionSupervisor do
 
   @doc """
   Start (or return the existing) session process for the given key. `opts` are
-  passed to the session on first creation (e.g. `ttl_ms:`, `ephemeral:`, `persist:` to
-  save this one session to disk without the global persistence flag); an
+  passed to the session on first creation (e.g. `ttl_ms:`, `ephemeral:`); an
   already-running session keeps the options it was created with.
   """
   def ensure(key, agent_name, opts \\ []) do

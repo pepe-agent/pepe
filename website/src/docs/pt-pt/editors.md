@@ -41,27 +41,19 @@ A tua resposta significa exatamente o que significa no resto do Pepe. "Permitir 
 
 **Cancelar.** Interrompes a vez a partir do editor e o agente para, mesmo quando está à espera de uma permissão que ninguém respondeu.
 
-**A tua conversa persiste.** Fechar o editor não a termina. Cada conversa de ACP é guardada da mesma forma que uma do painel web ou do Telegram, por isso o histórico do teu editor consegue listar sessões anteriores, retomar uma de onde a deixaste ou recuperar uma que começaste noutro diretório de projeto. Duas janelas do editor não conseguem pisar a mesma conversa às escondidas: se uma já está aberta noutro sítio, és avisado e recebes a opção de a bifurcar em vez disso, o que continua a partir do mesmo ponto com um id novo e separado. Sessões sem uso há 30 dias, ou as mais antigas a partir de 200, são limpas sozinhas; nenhuma que ainda esteja aberta é tocada.
-
-**Comandos com barra, dentro do próprio painel.** Escreve `/status`, `/rewind 2`, `/model`, `/usage` e os restantes, os mesmos comandos e as mesmas respostas que terias no Telegram ou no `mix pepe chat`: aparecem na paleta de comandos do editor com a sua própria descrição. Alguns, como `/rewind` e `/undo`, reescrevem a conversa e esperam que termine uma vez em curso; outros, como `/status` e `/steer`, funcionam a qualquer momento. Tudo o que escrevas que não seja um destes segue para o agente como uma mensagem normal.
-
-**Um painel de plano e um medidor de contexto, quando o agente os usa.** Uma tarefa de vários passos que o agente acompanha com a sua própria ferramenta de planeamento aparece como uma lista de verificação no editor, atualizada conforme os passos são concluídos. Depois de cada resposta, o editor também fica a saber quanto da janela de contexto do modelo a conversa está a ocupar, o mesmo número que o `/context` mostra.
-
-**Trocar de modelo ou de quanto pode fazer sem perguntar, a meio da conversa.** As definições de sessão do teu próprio editor (não o `pepe agent add`, não o `config.json`) deixam-te escolher entre os modelos já configurados para este agente, e escolher um modo de aprovação de edições: perguntar antes de cada alteração a um ficheiro (o modo predefinido), deixar passar sem perguntar as edições dentro do projeto, ou deixar passar sem perguntar as edições em qualquer sítio. Um caminho sensível, uma chamada que uma política escalou, ou qualquer coisa depois de a conversa ter lido conteúdo de fora continua a perguntar seja qual for o modo: os modos só aliviam a pergunta de edição de ficheiros, nunca nenhum outro controlo de permissão.
-
-**Imagem, áudio e ficheiros trazidos para o prompt com `@`.** O que é realmente usado depende do agente com quem falas: uma imagem é entregue como imagem a um modelo com visão e recusada com um motivo claro a um que não vê; uma nota de voz é transcrita se tiveres uma via de transcrição configurada (vê [Voz](../voice/)); o contexto de ficheiro incorporado (o que o teu editor envia quando mencionas um ficheiro com `@`) funciona sempre. Nada é descartado às escondidas: um bloco que o agente não consegue usar é-te comunicado, não é deitado fora.
-
-**Servidores MCP configurados no editor.** Se o teu editor estiver preparado para entregar servidores MCP ao agente para este projeto, o Pepe passa agora a usá-los só nessa conversa: nunca gravados no `config.json`, nunca disponíveis para outra sessão, canal ou agente, e param assim que o editor se desliga. Um servidor que não arranca não interrompe a conversa; és avisado, e o resto continua a funcionar. Configura-os no agente, com `pepe mcp add`, quando os quiseres disponíveis em todos os canais de uma vez. Vê [MCP](../mcp/).
-
-### Configurar uma ligação a um modelo a partir do próprio editor
-
-O `session/new` num agente sem uma ligação a modelo utilizável falha de imediato e diz ao editor para oferecer autenticação, para nunca ficares com uma ligação que abre bem e depois falha na primeira mensagem. Não há onde iniciar sessão (o Pepe autentica-se junto do fornecedor do modelo com a sua própria configuração, não a do editor), por isso o que é oferecido na prática é uma escolha entre duas formas de resolver: usar as ligações de modelo que já tens configuradas no Pepe, se as tiveres, ou abrir um terminal que executa a configuração interativa do Pepe (`pepe acp --setup`) para adicionar uma.
-
 ### O que não faz, e porquê
 
-**Ler ficheiros e abrir terminais através do editor.** O agente já tem ferramentas próprias para ambas as coisas, a correr na mesma máquina. Dar essa volta só criaria um segundo conjunto de regras para manter de acordo com o primeiro.
+O Pepe implementa o núcleo do protocolo e avisa, logo no aperto de mão inicial, que partes ficaram de fora, para que o editor nunca te ofereça algo que não vai funcionar:
 
-**Fazer-te uma pergunta a meio de uma chamada de ferramenta (elicitação).** Toda a pergunta que o Pepe precisa que uma pessoa responda é ou um pedido de permissão ou uma mensagem na conversa: não há um terceiro tipo de interrupção para o qual montar uma interface à parte.
+**Retomar uma conversa anterior.** A sessão dura enquanto o editor mantiver o processo de pé. Fechado o editor, acabou. As conversas de vida longa ficam nos canais feitos para isso.
+
+**Iniciar sessão.** Não há onde. O Pepe autentica-se no fornecedor do modelo com a configuração dele próprio.
+
+**Imagem, áudio e anexos no prompt.** Só texto, para já. Podes na mesma apontar um ficheiro ao agente mencionando o caminho: ele lê-o sozinho.
+
+**Servidores MCP configurados no editor.** Se o teu editor estiver preparado para entregar servidores MCP ao agente, o Pepe recusa em vez de aceitar e depois não os usar às escondidas. Configura-os no agente, com `pepe mcp add`, e passam a valer em todos os canais de uma vez. Vê [MCP](../mcp/).
+
+**Ler ficheiros e abrir terminais através do editor.** O agente já tem ferramentas próprias para ambas as coisas, a correr na mesma máquina. Dar essa volta só criaria um segundo conjunto de regras para manter de acordo com o primeiro.
 
 ### O que o agente pode fazer
 
