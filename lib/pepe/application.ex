@@ -52,6 +52,7 @@ defmodule Pepe.Application do
     drain_tasks(Pepe.Watch.TaskSupervisor, "watch")
     drain_tasks(Pepe.Commitments.TaskSupervisor, "commitment")
     drain_tasks(Pepe.Insight.TaskSupervisor, "insight retrain")
+    drain_tasks(Pepe.Webhooks.TaskSupervisor, "inbound message")
     state
   end
 
@@ -165,6 +166,9 @@ defmodule Pepe.Application do
           Pepe.LLM.Cooldown,
           # Cross-turn running-summary state for agents with micro_compaction enabled.
           Pepe.Agent.MicroCompaction,
+          # What runs behind inbound webhook messages: per-conversation ordering, the
+          # duplicate check, and the tasks that download, transcribe and deliver.
+          Pepe.Webhooks.Supervisor,
           # Messaging gateways (Telegram, ...). No-ops when not configured.
           Pepe.Gateways.Supervisor,
           # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).

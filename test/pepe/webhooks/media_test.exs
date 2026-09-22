@@ -272,9 +272,9 @@ defmodule Pepe.Webhooks.MediaTest do
       assert msg.media.kind == "document"
     end
 
-    test "a sticker and a delivery status are still nothing to answer" do
+    test "a sticker is described as one, and a delivery status is still nothing to answer" do
       sticker = wa(%{"from" => "5511999", "id" => "w.4", "type" => "sticker", "sticker" => %{"id" => "M4"}})
-      assert :ignore = WhatsApp.parse(sticker)
+      assert {:ok, [%{media: %{kind: "sticker", ref: "M4"}}]} = WhatsApp.parse(sticker)
       assert :ignore = WhatsApp.parse(%{"entry" => [%{"changes" => [%{"value" => %{"statuses" => [%{}]}}]}]})
     end
   end

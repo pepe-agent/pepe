@@ -45,6 +45,24 @@ defmodule Pepe.Agent.Session do
     GenServer.call(via(key), {:chat, text, opts}, :infinity)
   end
 
+  @doc """
+  `chat/3` without the wait: the message is in the session's mailbox when this returns, and
+  the reply comes back later as an ordinary response message that the caller matches with
+  `:gen_server.check_response/3` against the request collection it passed in (`label` rides
+  along, so the caller can tell which message a reply belongs to). The collection API is
+  Erlang's: Elixir's `GenServer` only wraps the single-request form.
+
+  The point is order. Two callers of `chat/3` reach the session in whatever order their own
+  processes happen to run, which is not the order their messages were *received* in; a
+  single process that calls this for each message in turn puts them in the session's queue
+  in exactly that turn, and is still free to do something else while a turn runs.
+  """
+  @spec send_chat(term(), String.t(), keyword(), term(), :gen_server.request_id_collection()) ::
+          :gen_server.request_id_collection()
+  def send_chat(key, text, opts, label, collection) do
+    :gen_server.send_request(via(key), {:chat, text, opts}, label, collection)
+  end
+
   @doc "Reset the conversation history (keeps the system prompt)."
   def reset(key), do: GenServer.call(via(key), :reset)
 

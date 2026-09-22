@@ -27,7 +27,11 @@ defmodule Pepe.Webhooks.WhatsApp do
 
   # Inbound message types that carry a file, each under a key of the same name holding a
   # media `id` (plus `mime_type`, and `filename` on a document, `caption` on the rest).
-  @media_types ~w(audio voice image video document)
+  @media_types ~w(audio voice image video document sticker)
+
+  # Meta's media ids are opaque tokens of letters, digits and a few separators. One is put
+  # into a Graph URL, so anything else in that position is not an id and is not sent.
+  @media_id ~r/\A[A-Za-z0-9._-]{1,200}\z/
 
   @impl true
   def name, do: "whatsapp"
@@ -61,6 +65,17 @@ defmodule Pepe.Webhooks.WhatsApp do
         "label" => dgettext("webhooks", "Verify token"),
         "type" => "text",
         "hint" => dgettext("webhooks", "any string you choose; echoed during the subscribe handshake")
+      },
+      %{
+        "key" => "max_attachment_mb",
+        "label" => dgettext("webhooks", "Largest attachment (MB)"),
+        "type" => "text",
+        "required" => false,
+        "hint" =>
+          dgettext(
+            "webhooks",
+            "optional, 1 to 100: the largest file taken in from a message (default 20). Meta's own limit still applies"
+          )
       }
     ]
   end
@@ -192,16 +207,56 @@ defmodule Pepe.Webhooks.WhatsApp do
     end
   end
 
+  # A shared location, a shared contact card and a tapped reply button are messages too:
+  # each becomes one line of text, so the agent knows what the person meant without a
+  # channel-specific tool. The fields are the sender's, so the line is cleaned like any
+  # other outside text before it becomes part of a prompt.
+  defp normalize(%{"from" => from, "type" => "location"} = m, names) do
+    loc = m["location"] || %{}
+    place = [loc["name"], loc["address"]] |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(", ")
+    coords = "#{loc["latitude"]}, #{loc["longitude"]}"
+    line = if place == "", do: "(#{coords})", else: "#{place} (#{coords})"
+
+    text_message(m, names, from, "[The user shared a location: #{line}]")
+  end
+
+  defp normalize(%{"from" => from, "type" => "contacts"} = m, names) do
+    cards =
+      m["contacts"]
+      |> List.wrap()
+      |> Enum.map_join("; ", fn c ->
+        phones = c["phones"] |> List.wrap() |> Enum.map_join(", ", &(&1["phone"] || ""))
+        String.trim("#{get_in(c, ["name", "formatted_name"])} #{phones}")
+      end)
+
+    text_message(m, names, from, "[The user shared a contact: #{cards}]")
+  end
+
+  defp normalize(%{"from" => from, "type" => "interactive"} = m, names) do
+    reply = get_in(m, ["interactive", "button_reply"]) || get_in(m, ["interactive", "list_reply"]) || %{}
+    tapped(m, names, from, reply["title"])
+  end
+
+  defp normalize(%{"from" => from, "type" => "button"} = m, names),
+    do: tapped(m, names, from, get_in(m, ["button", "text"]))
+
   defp normalize(_, _names), do: []
+
+  defp tapped(_m, _names, _from, title) when title in [nil, ""], do: []
+  defp tapped(m, names, from, title), do: [%{from: from, text: title, id: m["id"], name: names[from]}]
+
+  defp text_message(m, names, from, text),
+    do: [%{from: from, text: Pepe.Security.ExternalContent.sanitize(text), id: m["id"], name: names[from]}]
 
   # A voice note and an uploaded audio file both just need transcribing, so both are
   # "audio" here - unlike Telegram, where the distinction buys a spoken reply back.
-  # A sticker is deliberately absent: it is a reaction, not a message, and running an
-  # agent over a thumbs-up is worse than ignoring one.
+  # A sticker is a reaction rather than a question, so Pepe.Webhooks.Media only takes one
+  # in when the model can look at it, and answers it briefly.
   defp kind("voice"), do: "audio"
   defp kind("audio"), do: "audio"
   defp kind("image"), do: "image"
   defp kind("video"), do: "video"
+  defp kind("sticker"), do: "sticker"
   defp kind(_other), do: "document"
 
   @doc """
@@ -218,20 +273,25 @@ defmodule Pepe.Webhooks.WhatsApp do
     pc = provider_config(config)
     token = Config.interpolate(pc["access_token"])
 
-    if is_binary(token) and token != "" do
-      with {:ok, url, size} <- media_url(token, id),
-           :ok <- Pepe.Webhooks.Media.within_cap(size) do
-        download_media(url, token)
-      end
-    else
-      {:error, :no_access_token}
+    cond do
+      not Regex.match?(@media_id, id) ->
+        {:error, :bad_media_id}
+
+      is_binary(token) and token != "" ->
+        with {:ok, url, size} <- media_url(token, id),
+             :ok <- Pepe.Webhooks.Media.within_cap(size, config) do
+          download_media(url, token, config)
+        end
+
+      true ->
+        {:error, :no_access_token}
     end
   end
 
   def fetch_media(_config, _media), do: {:error, :no_media_id}
 
-  defp download_media(url, token) do
-    case Pepe.Webhooks.Media.Download.get(url, bearer: token) do
+  defp download_media(url, token, config) do
+    case Pepe.Webhooks.Media.Download.get(url, bearer: token, max_bytes: Pepe.Webhooks.Media.max_bytes(config)) do
       {:error, :bad_url} -> {:error, :bad_media_url}
       result -> result
     end

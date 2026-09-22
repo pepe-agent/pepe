@@ -12,6 +12,7 @@ defmodule Pepe.Gateways.Supervisor do
   use Supervisor
 
   alias Pepe.Config
+  alias Pepe.Gateways.DiscordSupervisor
   alias Pepe.Gateways.PluginSupervisor
   alias Pepe.Gateways.Telegram
 
@@ -43,6 +44,9 @@ defmodule Pepe.Gateways.Supervisor do
   @doc "Reconcile running plugin channels (`Pepe.Gateways.Channel`) with the current config - see `PluginSupervisor.reload_plugins/0`."
   def reload_plugins, do: PluginSupervisor.reload_plugins()
 
+  @doc "Reconcile the Discord gateway connections with the current webhook config - see `Pepe.Gateways.DiscordSupervisor.reload/0`."
+  def reload_discord, do: DiscordSupervisor.reload()
+
   @impl true
   def init(_init_arg) do
     # Default restart intensity (3 / 5s). PluginSupervisor exhausting its own 5-restarts/60s
@@ -54,7 +58,15 @@ defmodule Pepe.Gateways.Supervisor do
   end
 
   defp children do
-    if enabled?(), do: telegram_specs() ++ [Supervisor.child_spec(PluginSupervisor, restart: :transient)], else: []
+    if enabled?() do
+      telegram_specs() ++
+        [
+          Supervisor.child_spec(PluginSupervisor, restart: :transient),
+          Supervisor.child_spec(DiscordSupervisor, restart: :transient)
+        ]
+    else
+      []
+    end
   end
 
   # One supervised poller per active bot, each tagged with a unique id so several

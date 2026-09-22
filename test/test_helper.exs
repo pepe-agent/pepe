@@ -9,6 +9,7 @@ ExUnit.start()
 # so a webhook round-trip test can capture the outbound message without the network).
 Mimic.copy(Pepe.Webhooks.WhatsApp)
 Mimic.copy(Pepe.Webhooks.Media)
+Mimic.copy(Pepe.Webhooks.Media.Download)
 Mimic.copy(Req)
 Mimic.copy(Pepe.LLM)
 Mimic.copy(Pepe.Browser)
