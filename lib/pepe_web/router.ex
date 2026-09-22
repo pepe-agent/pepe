@@ -132,6 +132,7 @@ defmodule PepeWeb.Router do
       live "/traces", TracesLive
       live "/mcp", ToolServersLive
       live "/databases", DbConnectionsLive
+      live "/skills", SkillsLive
       live "/plugins", PluginsLive
       live "/hooks", HooksLive
       live "/tokens", TokensLive

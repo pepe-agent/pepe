@@ -269,13 +269,30 @@ defmodule Pepe.Agent.Workspace do
   # List available skills (name + one-line summary). The agent reads the relevant
   # one with the `skill` tool when its topic comes up - not loaded in full here.
   defp skills_index(agent) do
-    case Pepe.Skills.list(agent: agent) do
+    case Pepe.Skills.index(agent: agent) do
       [] ->
         nil
 
       skills ->
         "## Skills (read the relevant one with the `skill` tool when its topic comes up)\n" <>
-          Enum.map_join(skills, "\n", fn {name, summary} -> "- #{name}: #{summary}" end)
+          Enum.map_join(skills, "\n", &index_line/1) <> auto_loaded_skills(agent)
+    end
+  end
+
+  # A skill whose declared requirements this machine lacks is still listed (its instructions
+  # are worth reading), with what it needs, so the agent says so instead of failing halfway.
+  defp index_line({name, summary, nil}), do: "- #{name}: #{summary}"
+  defp index_line({name, summary, needs}), do: "- #{name}: #{summary} (#{needs})"
+
+  # Skills the operator asked to keep in context in full (`skills.auto_load`).
+  defp auto_loaded_skills(agent) do
+    case Pepe.Skills.Render.auto_loaded(agent: agent) do
+      [] ->
+        ""
+
+      loaded ->
+        "\n\n## Skills kept in context in full\n" <>
+          Enum.map_join(loaded, "\n\n", fn {name, text} -> "### #{name}\n#{text}" end)
     end
   end
 

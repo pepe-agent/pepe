@@ -135,6 +135,14 @@ defmodule Pepe.SkillsTest do
       assert {%{"name" => "x", "description" => "d"}, "Body.\n"} =
                Pepe.Skills.header("---\nname: x\ndescription: d\n---\nBody.\n")
     end
+
+    test "header/1 recovers a plain description value that happens to contain a colon, same as Frontmatter.parse/1" do
+      content = "---\nname: x\ndescription: Use when: the user sends a PDF\n---\nBody.\n"
+
+      assert {meta, "Body.\n"} = Pepe.Skills.header(content)
+      assert meta["name"] == "x"
+      assert meta["description"] == "Use when: the user sends a PDF"
+    end
   end
 
   test "a package with no SKILL.md falls back to <dirname>.md, then its first *.md", %{home: home} do

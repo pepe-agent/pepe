@@ -186,6 +186,37 @@ este formato. Chaves para além de `name` e `description` (`license`, `compatibi
 `metadata`) ficam guardadas no ficheiro e não são tocadas. O formato completo está
 documentado em [agentskills.io](https://agentskills.io/specification).
 
+Duas peças a mais fecham este ciclo com o formato:
+
+```bash
+pepe skill validate PATH|NOME
+```
+
+verifica uma skill contra o que a especificação exige de facto (a forma e o comprimento
+do `name`, o comprimento da `description`, os tipos de `license`/`compatibility`/
+`metadata`, o `SKILL.md` a abrir com um cabeçalho que faz parse) e reporta à parte o que
+apenas tropeça numa convenção do Pepe, meramente indicativa. O que falha a especificação
+não vai correr noutra ferramenta; o que só falha as convenções do Pepe continua a
+funcionar aqui na mesma. O mesmo relatório corre automaticamente em cada instalação e
+aparece no painel.
+
+Uma skill também pode declarar o que precisa para correr de facto: variáveis de ambiente
+(`required_environment_variables`, ou as grafias `setup.collect_secrets`/
+`prerequisites.env_vars` que outras ferramentas usam) e comandos (`required_commands`). O
+Pepe mostra o que falta no índice de skills, no `pepe skill list`, e no momento em que a
+skill é aberta, em vez de o agente só descobrir quando o primeiro comando falha a meio da
+tarefa. Um requisito em falta nunca esconde a skill: as instruções continuam a valer a
+pena ler, e podes estar prestes a definir a variável.
+
+Uma skill instalada também passa a ser o seu próprio comando de barra em qualquer
+superfície que os tenha (Telegram, a consola, o chat do painel, um editor via ACP): uma
+skill chamada `weather` responde tanto a `/weather` como a `/skill weather`, e aparece no
+menu "/". Corrê-la continua a ser um turno normal, lido pela ferramenta `skill`, nunca
+texto colado dentro do que escreveste, por isso aplica-se a mesma marcação de confiança
+que em qualquer outro sítio onde uma skill é lida, e só é oferecida a quem realmente a
+pode ver - vê a [referência de comandos do Telegram](../telegram/) para perceber essa
+verificação.
+
 ### Instalar uma vinda de fora
 
 Há dois caminhos, consoante a origem. Um agente com a ferramenta `manage_skill`

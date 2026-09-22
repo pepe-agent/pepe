@@ -185,6 +185,39 @@ readable by every other tool that speaks the format. Keys beyond `name` and
 otherwise left alone. The full format is documented at
 [agentskills.io](https://agentskills.io/specification).
 
+Two more pieces close the loop with that format:
+
+```bash
+pepe skill validate PATH|NAME
+```
+
+checks a skill against what the specification actually requires (`name`'s
+shape and length, `description`'s length, `license`/`compatibility`/`metadata`
+being the right type, `SKILL.md` opening with a header that parses) and
+reports separately whatever only trips one of Pepe's own advisory
+conventions instead. What fails the specification will not travel to
+another tool; what only fails Pepe's own conventions still works here. The
+same report runs automatically on every install and shows in the dashboard.
+
+A skill can also declare what it needs to actually run: environment
+variables (`required_environment_variables`, or the
+`setup.collect_secrets`/`prerequisites.env_vars` spellings other tools use)
+and commands (`required_commands`). Pepe surfaces whatever is missing in the
+skills index, in `pepe skill list`, and the moment the skill is opened,
+instead of the agent finding out from the first command that fails partway
+through a task. A missing requirement never hides the skill: the
+instructions are still worth reading, and you may be about to set the
+variable.
+
+An installed skill also becomes its own slash command wherever the surface
+has them (Telegram, the console, the dashboard chat, an editor over ACP): a
+skill named `weather` answers to `/weather` as well as `/skill weather`, and
+shows up in the "/" menu. Running it is still an ordinary turn read through
+the `skill` tool, never text pasted into what you typed, so the same trust
+marking applies as anywhere else a skill is read, and only a skill the
+caller is actually allowed to see is offered - see
+[Telegram's command reference](../telegram/) for how that gating works.
+
 ### Installing one from elsewhere
 
 Two paths, depending on where it's coming from. An agent holding the

@@ -50,6 +50,24 @@ defmodule Pepe.Tools.ManageSkill do
         different source (a newer PepeHub version, a changed tap entry, ...).
       - remove: delete an installed skill - needs `name`.
       - audit: re-scan an installed skill (or every one, with no `name`) in place.
+      - status: every skill that exists, whether it is offered to you and why not when it \
+        is not (disabled, another OS, needs a tool you lack), and what each still needs \
+        (a missing environment variable or command).
+      - validate: check the skill called `name` against the open skill specification and \
+        the house rules; the findings say exactly what to fix.
+      - preview: look at a skill before installing it (its files, the security scan, the \
+        specification check and the opening of its instructions) - takes `name`, or \
+        `source` as for install. Installs nothing.
+      - check: whether an installed skill has a newer version at its source (`name`, or \
+        every one with none). Changes nothing.
+      - enable / disable: switch the skill `name` on or off, everywhere or only on the \
+        `channel` given (telegram, web, tui, acp, ...).
+      - autoload: keep the skill `name` in every agent's context in full (`value` "on") \
+        or back to on-demand (`value` "off").
+      - config: read (`key` alone) or set (`key` and `value`) a setting a skill declares.
+
+      Trusting a repository's own skills, external skill directories and the inline-shell \
+      switch are decisions only a person makes, at the terminal (`mix pepe skill ...`).
 
       A skill resolved from a tap, an unmarked PepeHub package, or a direct `source`, is \
       "community" trust: reading it with the `skill` tool treats its content as untrusted, \
@@ -58,16 +76,23 @@ defmodule Pepe.Tools.ManageSkill do
       %{
         "type" => "object",
         "properties" => %{
-          "action" => %{"type" => "string", "enum" => ~w(install search list update remove audit)},
+          "action" => %{
+            "type" => "string",
+            "enum" => ~w(install search list update remove audit status validate preview check enable disable autoload config)
+          },
           "name" => %{
             "type" => "string",
-            "description" => "Skill name, or a PepeHub reference (@handle/name or its page URL) - install/update/remove/audit."
+            "description" =>
+              "Skill name, or a PepeHub reference (@handle/name or its page URL) - install/update/remove/audit/validate/preview/check/enable/disable/autoload."
           },
           "source" => %{
             "type" => "string",
-            "description" => "Install directly from this URL/path instead of resolving `name` (install only)."
+            "description" => "Install (or preview) directly from this URL/path instead of resolving `name`."
           },
-          "query" => %{"type" => "string", "description" => "Search text (search only)."}
+          "query" => %{"type" => "string", "description" => "Search text (search only)."},
+          "channel" => %{"type" => "string", "description" => "Limit enable/disable to one channel (telegram, web, tui, acp, ...)."},
+          "key" => %{"type" => "string", "description" => "A setting a skill declares (config only)."},
+          "value" => %{"type" => "string", "description" => "The value to set (config), or \"on\"/\"off\" (autoload)."}
         },
         "required" => ["action"]
       }
@@ -76,22 +101,146 @@ defmodule Pepe.Tools.ManageSkill do
 
   @impl true
   def run(%{"action" => action} = args, ctx) do
-    if ctx[:agent], do: dispatch(action, args), else: {:error, "no calling agent in context"}
+    if ctx[:agent], do: dispatch(action, args, ctx), else: {:error, "no calling agent in context"}
   end
 
   def run(_args, _ctx), do: {:error, "manage_skill needs an `action`"}
 
-  defp dispatch("list", _args), do: {:ok, render_list()}
-  defp dispatch("search", %{"query" => query}), do: {:ok, render_search(query)}
-  defp dispatch("search", _args), do: {:error, "search needs `query`"}
-  defp dispatch("install", %{"name" => name} = args), do: install(name, args["source"])
-  defp dispatch("install", _args), do: {:error, "install needs `name`"}
-  defp dispatch("update", %{"name" => name}), do: update(name)
-  defp dispatch("update", _args), do: {:error, "update needs `name`"}
-  defp dispatch("remove", %{"name" => name}), do: remove(name)
-  defp dispatch("remove", _args), do: {:error, "remove needs `name`"}
-  defp dispatch("audit", args), do: {:ok, render_audit(args["name"])}
-  defp dispatch(other, _args), do: {:error, "unknown action: #{other}"}
+  defp dispatch("list", _args, _ctx), do: {:ok, render_list()}
+  defp dispatch("search", %{"query" => query}, _ctx), do: {:ok, render_search(query)}
+  defp dispatch("search", _args, _ctx), do: {:error, "search needs `query`"}
+  defp dispatch("install", %{"name" => name} = args, _ctx), do: install(name, args["source"])
+  defp dispatch("install", _args, _ctx), do: {:error, "install needs `name`"}
+  defp dispatch("update", %{"name" => name}, _ctx), do: update(name)
+  defp dispatch("update", _args, _ctx), do: {:error, "update needs `name`"}
+  defp dispatch("remove", %{"name" => name}, _ctx), do: remove(name)
+  defp dispatch("remove", _args, _ctx), do: {:error, "remove needs `name`"}
+  defp dispatch("audit", args, _ctx), do: {:ok, render_audit(args["name"])}
+  defp dispatch("status", _args, ctx), do: {:ok, render_status(ctx)}
+  defp dispatch("validate", %{"name" => name}, ctx), do: validate(name, ctx)
+  defp dispatch("validate", _args, _ctx), do: {:error, "validate needs `name`"}
+  defp dispatch("preview", %{"name" => name} = args, _ctx), do: preview(name, args["source"])
+  defp dispatch("preview", _args, _ctx), do: {:error, "preview needs `name`"}
+  defp dispatch("check", args, _ctx), do: check(args["name"])
+  defp dispatch(action, %{"name" => name} = args, _ctx) when action in ["enable", "disable"], do: switch(action, name, args["channel"])
+  defp dispatch(action, _args, _ctx) when action in ["enable", "disable"], do: {:error, "#{action} needs `name`"}
+  defp dispatch("autoload", %{"name" => name, "value" => value}, _ctx) when value in ["on", "off"], do: autoload(name, value)
+  defp dispatch("autoload", _args, _ctx), do: {:error, "autoload needs `name` and `value` of \"on\" or \"off\""}
+  defp dispatch("config", %{"key" => key} = args, _ctx), do: config(key, args["value"])
+  defp dispatch("config", _args, _ctx), do: {:error, "config needs `key`"}
+  defp dispatch(other, _args, _ctx), do: {:error, "unknown action: #{other}"}
+
+  # -- inspecting and tuning what is already there ------------------------------------------
+
+  defp render_status(ctx) do
+    opts = [agent: ctx[:agent], channel: channel(ctx), cwd: ctx[:cwd_override] || ctx[:cwd]]
+
+    lines =
+      for %{skill: skill, hidden: hidden, readiness: readiness} <- Pepe.Skills.Catalog.status(opts) do
+        reason = if hidden, do: " (not offered: #{hidden_reason(hidden)})", else: ""
+        needs = readiness |> Pepe.Skills.Readiness.note() |> then(&if(&1, do: " (#{&1})", else: ""))
+        "• #{skill.name} [#{skill.source}]#{reason}#{needs}"
+      end
+
+    if lines == [], do: "No skills.", else: Enum.join(Enum.take(lines, 200), "\n")
+  end
+
+  defp hidden_reason(:disabled), do: "disabled"
+  defp hidden_reason(:platform), do: "for another operating system"
+  defp hidden_reason(:environment), do: "for another environment"
+  defp hidden_reason(:channel), do: "for other channels"
+  defp hidden_reason({:requires_tools, tools}), do: "needs the #{Enum.join(tools, ", ")} tool"
+  defp hidden_reason({:fallback_for_tools, tools}), do: "not needed while #{Enum.join(tools, ", ")} is available"
+
+  defp channel(ctx) do
+    case ctx[:source] || ctx[:session_key] do
+      value when is_binary(value) -> value |> String.split(":", parts: 2) |> hd()
+      _ -> nil
+    end
+  end
+
+  # By name only, never by path: the agent is not asked to read files outside the skills it can see.
+  defp validate(name, ctx) do
+    case Pepe.Skills.Catalog.find(name, agent: ctx[:agent], channel: channel(ctx), cwd: ctx[:cwd_override] || ctx[:cwd], offer: false) do
+      {:ok, skill} ->
+        {:ok, report} = Pepe.Skills.Validate.run(skill.dir || skill.entry)
+        {:ok, render_validation(name, report)}
+
+      _ ->
+        {:error, "no skill named #{name}"}
+    end
+  end
+
+  defp render_validation(name, %{findings: []}), do: "#{name}: valid, nothing to report."
+
+  defp render_validation(name, report) do
+    state = if report.valid?, do: "valid", else: "not valid"
+    "#{name}: #{state} (#{report.errors} error(s), #{report.warnings} warning(s))\n" <> Pepe.Skills.Validate.format(report.findings)
+  end
+
+  defp preview(name, source) do
+    case Marketplace.preview(name, source: source) do
+      {:ok, p} -> {:ok, render_preview(p)}
+      {:error, :not_found} -> {:error, "no skill named #{name} in any tap, the bundled registry, or PepeHub"}
+      {:error, reason} -> {:error, "couldn't fetch #{name}: #{inspect(reason)}"}
+    end
+  end
+
+  defp render_preview(p) do
+    scan = if p.scan.verdict == :safe, do: "safe", else: "#{p.scan.verdict}\n" <> Sentinel.report(p.scan)
+    validation = if p.validation == [], do: "no findings", else: "\n" <> Pepe.Skills.Validate.format(p.validation)
+
+    "#{p.name} (#{p.trust_level}) from #{p.source}\nsecurity scan: #{scan}\nfiles: #{Enum.join(p.files, ", ")}\n" <>
+      "specification check: #{validation}\n\n--- opening of the instructions ---\n#{p.excerpt}"
+  end
+
+  defp check(nil) do
+    case Marketplace.check(nil) do
+      [] -> {:ok, "No skills installed from a marketplace."}
+      results -> {:ok, Enum.map_join(results, "\n", fn {name, result} -> check_line(name, result) end)}
+    end
+  end
+
+  defp check(name), do: {:ok, check_line(name, Marketplace.check(name))}
+
+  defp check_line(name, {:ok, :current}), do: "• #{name}: up to date"
+  defp check_line(name, {:ok, :update_available}), do: "• #{name}: a newer version is available (update it with the update action)"
+
+  defp check_line(name, {:ok, {:source_changed, pinned, now}}),
+    do: "• #{name}: now resolves to #{now}, not #{pinned} it was installed from (update would refuse)"
+
+  defp check_line(name, {:error, :not_found}), do: "• #{name}: not installed"
+  defp check_line(name, {:error, reason}), do: "• #{name}: couldn't check (#{inspect(reason)})"
+
+  defp switch(action, name, channel) do
+    if Pepe.Skills.Catalog.tiers_of(name) == [] do
+      {:error, "no skill named #{name}"}
+    else
+      if action == "disable", do: Pepe.Skills.Settings.disable(name, channel), else: Pepe.Skills.Settings.enable(name, channel)
+      {:ok, "#{name} is now #{action}d#{if channel, do: " on #{channel}", else: " everywhere"}."}
+    end
+  end
+
+  defp autoload(name, "on") do
+    if Pepe.Skills.Render.community?(name) do
+      {:error, "#{name} came from a community source; its text is not kept in the system prompt."}
+    else
+      Pepe.Skills.Settings.add_auto_load(name)
+      {:ok, "#{name} is kept in context in full from the next conversation."}
+    end
+  end
+
+  defp autoload(name, "off") do
+    Pepe.Skills.Settings.remove_auto_load(name)
+    {:ok, "#{name} is back to being read on demand."}
+  end
+
+  defp config(key, nil), do: {:ok, "#{key} = #{inspect(Map.get(Pepe.Skills.Settings.config_values(), key))}"}
+
+  defp config(key, value) do
+    Pepe.Skills.Settings.put_config(key, value)
+    {:ok, "#{key} = #{value}"}
+  end
 
   defp install(name, source) do
     case Marketplace.install(name, source: source) do

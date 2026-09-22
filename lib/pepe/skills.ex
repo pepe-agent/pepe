@@ -40,6 +40,7 @@ defmodule Pepe.Skills do
 
   alias Pepe.Config
   alias Pepe.Skills.Catalog
+  alias Pepe.Skills.Readiness
 
   @doc "User skills directory."
   def user_dir, do: Path.join(Config.home(), "skills")
@@ -54,16 +55,38 @@ defmodule Pepe.Skills do
     |> Enum.map(&{&1.name, &1.summary})
   end
 
+  @doc """
+  Visible skills as `[{name, summary, needs}]`: the same set as `list/1`, with `needs` set to a
+  short note (`"needs API_KEY"`) for a skill whose declared requirements this machine lacks, and
+  `nil` otherwise. This is what the skills index in the system prompt is built from.
+  """
+  @spec index(keyword()) :: [{String.t(), String.t(), String.t() | nil}]
+  def index(opts \\ []) do
+    for skill <- Catalog.visible(opts) do
+      {skill.name, skill.summary, skill |> Readiness.check() |> Readiness.note()}
+    end
+  end
+
   @doc "Read a visible skill's full Markdown by name, path or declared alias."
   def read(name, opts \\ []) do
-    case Catalog.find(name, opts) do
-      {:ok, skill} ->
-        if Catalog.disabled?(skill.name, opts) or not Catalog.platform_ok?(skill),
-          do: {:error, :not_found},
-          else: File.read(skill.entry)
+    with {:ok, _skill, content} <- fetch(name, opts), do: {:ok, content}
+  end
 
-      error ->
-        error
+  @doc """
+  Like `read/2`, but also returns the skill, so a caller that renders the text (see
+  `Pepe.Skills.Render`) does not look it up twice. Only the hard gates apply (disabled, wrong
+  operating system): a person asking for a skill by name gets it even if the agent would not
+  have been offered it.
+  """
+  @spec fetch(String.t(), keyword()) :: {:ok, Pepe.Skills.Skill.t(), String.t()} | {:error, term()}
+  def fetch(name, opts \\ []) do
+    with {:ok, skill} <- Catalog.find(name, opts),
+         false <- Catalog.disabled?(skill.name, opts) or not Catalog.platform_ok?(skill),
+         {:ok, content} <- File.read(skill.entry) do
+      {:ok, skill, content}
+    else
+      true -> {:error, :not_found}
+      error -> error
     end
   end
 
@@ -91,38 +114,14 @@ defmodule Pepe.Skills do
 
   `{%{}, content}` when there is no header at all, and also when what looks like one does
   not parse as a YAML map: a doc that merely opens with a horizontal rule is still just a
-  doc, and is returned byte-for-byte rather than half-eaten.
+  doc, and is returned byte-for-byte rather than half-eaten. Delegates to
+  `Pepe.Skills.Frontmatter.parse/1`, the one parser every reader of a skill's header shares
+  (the catalog already used it directly; this used to be a second, less forgiving one that
+  read a header `Frontmatter` would recover as "no header" instead).
   """
   @spec header(String.t()) :: {map(), String.t()}
-  def header("---\n" <> rest = content), do: split_header(rest, content)
-  def header("---\r\n" <> rest = content), do: split_header(rest, content)
-  def header(content) when is_binary(content), do: {%{}, content}
-
-  defp split_header(rest, original) do
-    case Regex.split(~r/^---[ \t]*\r?$/m, rest, parts: 2) do
-      [yaml, body] -> parse_header(yaml, body, original)
-      _ -> {%{}, original}
-    end
-  end
-
-  defp parse_header(yaml, body, original) do
-    case yaml_map(yaml) do
-      {:ok, map} -> {map, body |> String.replace_prefix("\r\n", "") |> String.replace_prefix("\n", "")}
-      :error -> {%{}, original}
-    end
-  end
-
-  # The YAML parser raises (rather than returning an error tuple) on some malformed
-  # input, and a third-party skill's header is exactly the place to expect malformed
-  # input - a bad header must degrade to "no header", never take down the skills index.
-  defp yaml_map(yaml) do
-    case YamlElixir.read_from_string(yaml) do
-      {:ok, map} when is_map(map) -> {:ok, map}
-      _ -> :error
-    end
-  rescue
-    _ -> :error
-  catch
-    _, _ -> :error
+  def header(content) when is_binary(content) do
+    fm = Pepe.Skills.Frontmatter.parse(content)
+    {fm.meta, fm.body}
   end
 end
