@@ -3530,7 +3530,7 @@ msgstr ""
 msgid "empty Enter to finish"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:5386
+#: lib/mix/tasks/pepe.ex:5553
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr ""
@@ -3550,17 +3550,17 @@ msgstr ""
 msgid "page %{page}/%{pages}"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:5163
+#: lib/mix/tasks/pepe.ex:5330
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:5164
+#: lib/mix/tasks/pepe.ex:5331
 #, elixir-autogen, elixir-format, fuzzy
 msgid " (optional)"
 msgstr ""
 
-#: lib/mix/tasks/pepe.ex:5172
+#: lib/mix/tasks/pepe.ex:5339
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
