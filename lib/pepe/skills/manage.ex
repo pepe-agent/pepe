@@ -96,7 +96,8 @@ defmodule Pepe.Skills.Manage do
            :ok <- require_read(name, file, ctx),
            {:ok, current} <- read(path),
            {:ok, updated} <- replace(current, old, new, opts[:replace_all] == true),
-           {:ok, findings} <- check_content(name, rel, updated) do
+           {:ok, findings} <- check_content(name, rel, updated),
+           :ok <- check_safe(updated, rel) do
         write_change(ctx, "patch", name, rel, path, updated, findings)
       end
     end)

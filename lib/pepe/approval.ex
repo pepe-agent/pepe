@@ -66,10 +66,27 @@ defmodule Pepe.Approval do
       nil ->
         {:error, :not_found}
 
-      %{"agent" => name, "tool_call" => call} ->
-        result = Pepe.Tools.execute(call, %{agent: Config.get_agent(name), cwd: File.cwd!()})
+      %{"agent" => name, "tool_call" => call} = entry ->
+        result = Pepe.Tools.execute(call, replay_ctx(name, entry))
         File.rm(path(id))
         {:ok, result}
+    end
+  end
+
+  # `review_run`/`review_actor` are what marked this write as unattended when it was
+  # staged (see `Pepe.Agent.Runtime.stage_for_review/3`); a plain approval replay must
+  # carry them back in, or a tool like `skill_manage` sees a bare context and treats the
+  # write as a person's own foreground one - wrong ownership, wrong stats, and a review
+  # queue a background actor could no longer be told apart from a person in front of it.
+  defp replay_ctx(name, entry) do
+    base = %{agent: Config.get_agent(name), cwd: File.cwd!()}
+
+    case entry["meta"] do
+      %{"review_run" => run} when is_binary(run) ->
+        base |> Map.put(:review_run, run) |> Map.put(:review_actor, entry["meta"]["review_actor"])
+
+      _ ->
+        base
     end
   end
 

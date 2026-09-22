@@ -734,7 +734,12 @@ defmodule Pepe.Agent.Runtime do
 
   defp stage_for_review(name, call, ctx) do
     agent = (ctx[:agent] && ctx.agent.name) || "unknown"
-    {:ok, id, _} = Pepe.Approval.stage(agent, call)
+    # `review_run`/`review_actor` are what tell a tool like `skill_manage` this call has
+    # nobody present (see `Pepe.Tools.SkillManage.origin/1`); carried here so `approve/1`
+    # can rebuild the same background context when it finally replays the call, instead of
+    # the approval defaulting it back to a person's own, foreground write.
+    meta = %{"review_run" => ctx[:review_run], "review_actor" => ctx[:review_actor]}
+    {:ok, id, _} = Pepe.Approval.stage(agent, call, meta)
     "Staged this #{name} for review (id #{id}); it will be applied only after you approve it with `pepe review approve #{id}`."
   end
 

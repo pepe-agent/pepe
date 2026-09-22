@@ -2582,8 +2582,11 @@ defmodule Mix.Tasks.Pepe do
   defp skill_curator_cmd([]), do: skill_curator_cmd(["status"])
 
   defp skill_curator_cmd(["run" | rest]) do
-    {opts, _, _} = OptionParser.parse(rest, strict: [dry_run: :boolean, consolidate: :boolean])
-    run_opts = [dry_run: opts[:dry_run] == true] ++ if(opts[:consolidate], do: [consolidate: true], else: [])
+    {opts, _, _} = OptionParser.parse(rest, strict: [dry_run: :boolean, consolidate: :boolean, force: :boolean])
+
+    run_opts =
+      [dry_run: opts[:dry_run] == true] ++
+        if(opts[:consolidate], do: [consolidate: true], else: []) ++ if(opts[:force], do: [force: true], else: [])
 
     if opts[:dry_run], do: info(dim("dry run: nothing will be changed"))
     {:ok, report} = Pepe.Skills.Curator.run(run_opts)
@@ -2595,7 +2598,8 @@ defmodule Mix.Tasks.Pepe do
 
   defp skill_curator_cmd(["pause"]) do
     Pepe.Skills.Curator.State.set_paused(true)
-    ok("curator paused; it will not run on its own until `mix pepe skill curator resume`")
+    ok("curator paused; it will not start another run on its own until `mix pepe skill curator resume`")
+    info(dim("a run already in progress finishes; this does not stop it"))
   end
 
   defp skill_curator_cmd(["resume"]) do
@@ -2648,7 +2652,7 @@ defmodule Mix.Tasks.Pepe do
   defp skill_curator_cmd(_),
     do:
       error(
-        "usage: mix pepe skill curator status|run [--dry-run] [--consolidate]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]"
+        "usage: mix pepe skill curator status|run [--dry-run] [--consolidate] [--force]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]"
       )
 
   defp override_line(%{name: name, changed?: changed?}) do
@@ -2658,7 +2662,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp skill_usage,
     do:
-      "usage: mix pepe skill list [--all]|search QUERY|browse|preview NAME|install NAME [--force] [--source URL]|check [NAME]|update [NAME]|remove NAME|audit [NAME]|validate PATH|NAME|pack PATH|NAME|snapshot export|restore FILE|overrides|diff NAME|reset NAME|enable|disable NAME [--channel C]|trust|untrust [PATH]|external|autoload add|remove|list|set KEY on|off|config [KEY [VALUE]]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|undo ID [--force]|archived|unmanaged|curator status|run [--dry-run] [--consolidate]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]|tap add|list|remove URL"
+      "usage: mix pepe skill list [--all]|search QUERY|browse|preview NAME|install NAME [--force] [--source URL]|check [NAME]|update [NAME]|remove NAME|audit [NAME]|validate PATH|NAME|pack PATH|NAME|snapshot export|restore FILE|overrides|diff NAME|reset NAME|enable|disable NAME [--channel C]|trust|untrust [PATH]|external|autoload add|remove|list|set KEY on|off|config [KEY [VALUE]]|status NAME|adopt NAME|release NAME|pin NAME|unpin NAME|archive NAME|restore NAME|purge NAME --force|lint NAME|log [NAME]|undo ID [--force]|archived|unmanaged|curator status|run [--dry-run] [--consolidate] [--force]|pause|resume|usage|reports|report [ID]|settings|set KEY VALUE|backup|backups|rollback [ID]|tap add|list|remove URL"
 
   defp skill_cli_actor, do: "user:cli"
 
@@ -2985,7 +2989,7 @@ defmodule Mix.Tasks.Pepe do
       skill adopt|release NAME            hand a skill of yours to the curator, or take it back
       skill pin|unpin NAME                a pinned skill is changed only by you
       skill curator status                on/off, last and next run, what is in its care
-      skill curator run [--dry-run] [--consolidate]
+      skill curator run [--dry-run] [--consolidate] [--force]
                                          run now; --dry-run only reports, --consolidate adds
                                          the model pass that merges overlapping skills
       skill curator pause|resume          stop or restart the automatic runs
