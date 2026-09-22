@@ -92,7 +92,6 @@ defmodule Pepe.Media do
   @spec transcription_available? :: boolean()
   def transcription_available?, do: routes(settings()) != []
 
-
   @doc "Whether a transcript should be echoed back to the chat (`media.audio.echo`)."
   @spec echo? :: boolean()
   def echo?, do: settings()["echo"] == true
