@@ -125,6 +125,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe usage export --project CO ...     # generate a client invoice (md/csv)
       mix pepe usage prices [--refresh]        # show/refresh the live model price cache
       mix pepe traces [--project CO] [ID]        # inspect/replay recent agent runs
+      mix pepe checkpoints [status|prune|clear]  # the saved file states /rewind puts back: size, cleanup
       mix pepe flow list|promote|show|remove|run ... # promote a proven trace sequence into a script
       mix pepe graph list|import|run|resume|inspect ... # nodes/edges, shared state, a verifier that can loop back
       mix pepe browser install                  # host-level help for the `browser` agent tool
@@ -301,6 +302,7 @@ defmodule Mix.Tasks.Pepe do
 
   def dispatch(["usage" | rest]), do: with_config(fn -> usage_cmd(rest) end)
   def dispatch(["traces" | rest]), do: with_config(fn -> traces_cmd(rest) end)
+  def dispatch(["checkpoints" | rest]), do: with_config(fn -> checkpoints_cmd(rest) end)
 
   # `plugin install`/`scan` may fetch a URL (needs Req); list/remove only touch files.
   def dispatch(["plugin", sub | rest]) when sub in ["install", "scan"],
@@ -1894,6 +1896,54 @@ defmodule Mix.Tasks.Pepe do
     s = s |> to_string() |> String.replace("\n", " ")
     if String.length(s) > 120, do: String.slice(s, 0, 120) <> " ...", else: s
   end
+
+  # `checkpoints` - the file states the agent's tools saved before changing a file, which
+  # `/rewind` puts back. They prune themselves (see Pepe.Checkpoints.Retention); this is the
+  # operator's view of what is held, and a way to cut it short.
+  defp checkpoints_cmd([]), do: checkpoints_cmd(["status"])
+  defp checkpoints_cmd(["help"]), do: checkpoints_help()
+
+  defp checkpoints_cmd(["status"]) do
+    status = Pepe.Checkpoints.Retention.status()
+    puts("#{bold("checkpoints")}\n")
+    puts("  held:      #{format_bytes(status.bytes)} (limit #{format_bytes(Pepe.Checkpoints.Retention.max_bytes())})")
+    puts("  records:   #{status.records} file changes across #{status.scopes} folders")
+    puts("  sessions:  #{status.sessions} with a turn history")
+    puts("  kept for:  #{Pepe.Checkpoints.Retention.max_age_days()} days")
+    if status.oldest, do: puts("  oldest:    #{status.oldest |> DateTime.from_unix!(:microsecond) |> Calendar.strftime("%Y-%m-%d %H:%M")}")
+    puts("\n#{dim("clean up now: mix pepe checkpoints prune | delete all: mix pepe checkpoints clear")}")
+  end
+
+  defp checkpoints_cmd(["prune"]) do
+    result = Pepe.Checkpoints.Retention.prune()
+    ok("pruned #{result.records} old records and #{result.blobs} unused copies, freed #{format_bytes(result.bytes)}")
+  end
+
+  defp checkpoints_cmd(["clear"]) do
+    freed = Pepe.Checkpoints.Retention.clear()
+    ok("deleted every checkpoint (#{format_bytes(freed)}). /rewind can no longer put files back for earlier turns.")
+  end
+
+  defp checkpoints_cmd(_), do: error("usage: mix pepe checkpoints [status|prune|clear]")
+
+  defp checkpoints_help do
+    puts("""
+    #{bold("mix pepe checkpoints")} - the saved file states behind /rewind
+
+      checkpoints [status]   what is held, how big, how old
+      checkpoints prune      drop what is past its age or the size limit now
+      checkpoints clear      delete all of it
+
+    Before an agent's write_file, edit_file or move_file changes a file, the file's earlier
+    content is saved here so /rewind can put it back. They are pruned on their own: kept
+    #{Pepe.Checkpoints.Retention.max_age_days()} days, at most #{format_bytes(Pepe.Checkpoints.Retention.max_bytes())}. Turn it off for an
+    agent with `--no-checkpoints` (mix pepe agent add) or on its page in the dashboard.
+    """)
+  end
+
+  defp format_bytes(bytes) when bytes < 1024, do: "#{bytes} B"
+  defp format_bytes(bytes) when bytes < 1024 * 1024, do: "#{Float.round(bytes / 1024, 1)} KiB"
+  defp format_bytes(bytes), do: "#{Float.round(bytes / (1024 * 1024), 1)} MiB"
 
   defp traces_help do
     puts("""
@@ -3768,6 +3818,8 @@ defmodule Mix.Tasks.Pepe do
           micro_compaction: :boolean,
           capability_nudge: :boolean,
           skill_learning: :boolean,
+          checkpoints: :boolean,
+          checkpoint_shell: :boolean,
           admin: :boolean
         ]
       )
@@ -4045,6 +4097,11 @@ defmodule Mix.Tasks.Pepe do
         capability_nudge: opts[:capability_nudge] || false,
         skill_learning: opts[:skill_learning] || false
     }
+    |> put_new_agent_checkpoint_flags(opts)
+  end
+
+  defp put_new_agent_checkpoint_flags(agent, opts) do
+    %{agent | checkpoints: Keyword.get(opts, :checkpoints, true), checkpoint_shell: opts[:checkpoint_shell] || false}
   end
 
   defp print_agent_line(a, default) do

@@ -35,3 +35,7 @@ config :phoenix, :plug_init_mode, :runtime
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# The checkpoint store prunes itself on use, in a background task. A test that checks what a
+# prune left behind needs it to have finished, so under test it runs inline.
+config :pepe, checkpoints_async_prune: false

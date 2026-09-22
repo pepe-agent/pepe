@@ -2109,11 +2109,19 @@ defmodule Pepe.Gateways.Telegram do
   # place. Do not gate inside a `run_command/3` clause: a command can be reached by
   # more than one name (a skill answers both to `/skill <name>` and to `/<name>`),
   # and a gate on one clause leaves the other open.
-  # Commands that reach into the shared session's in-flight turn (stop/undo/rewind/inline). In a group
+  # Commands that reach into the shared session's in-flight turn (stop/undo/rewind/retry/inline). In a group
   # the session is shared by chat id, so without a gate any allowed member could interrupt another
   # member's running turn. They are trainer-gated in groups (like the risky-tool approval button);
   # in a DM it's your own session, and a bot with no trainers makes no distinction, both unchanged.
-  @turn_control ~w(stop undo rewind inline)
+  @turn_control ~w(stop undo rewind retry inline)
+
+  # Silent mid-run, same as /undo: a rewind is refused while a turn is in flight.
+  defp rewind_chat(chat_id, key, count, mode) do
+    case Pepe.Agent.Session.rewind_to(key, count, mode) do
+      {:ok, result} -> send_message(chat_id, "⏪ " <> Pepe.Checkpoints.Report.summary(result, requested: count, mode: mode))
+      {:error, :busy} -> :ok
+    end
+  end
 
   defp dispatch(chat_id, cmd, args) do
     cond do
@@ -2141,31 +2149,38 @@ defmodule Pepe.Gateways.Telegram do
     ensure_session(chat_id)
 
     # Silent while a turn is in flight (undo is refused mid-run): no confirmation, nothing to say.
-    case Pepe.Agent.Session.undo(session_key(chat_id)) do
-      :ok -> send_message(chat_id, gettext("↩️ Undid your last message."))
-      {:error, :busy} -> :ok
+    # A conversation-only take-back; if that turn had changed files, say they were left alone.
+    case Pepe.Agent.Session.rewind_to(session_key(chat_id), 1, :chat) do
+      {:ok, result} ->
+        text = Enum.join([gettext("↩️ Undid your last message.") | Pepe.Checkpoints.Report.kept_lines(result.kept)], "\n")
+        send_message(chat_id, text)
+
+      {:error, :busy} ->
+        :ok
     end
   end
 
-  # `/rewind N` - drop the last N exchanges and carry on from before them. Irreversible
-  # by design (see Pepe.Agent.Session.rewind/2), so it answers with how many turns it
+  # `/rewind` lists the recent turns to pick from; `/rewind N [chat|files]` goes back N turns,
+  # by default the conversation and the files those turns changed (see
+  # Pepe.Agent.Session.rewind_to/4). Irreversible by design, so it answers with what it
   # actually took off, which is also how a person finds out they hit the start of the
   # conversation instead of getting a refusal they have to translate into a smaller N.
   defp run_command(chat_id, "rewind", args) do
     ensure_session(chat_id)
+    key = session_key(chat_id)
 
-    case Pepe.Agent.Session.parse_rewind_count(args) do
-      {:ok, count} ->
-        # Silent mid-run, same as /undo: a rewind is refused while a turn is in flight.
-        case Pepe.Agent.Session.rewind(session_key(chat_id), count) do
-          {:ok, 0} -> send_message(chat_id, gettext("Nothing to rewind yet."))
-          {:ok, dropped} when dropped < count -> send_message(chat_id, rewind_partial_text(dropped))
-          {:ok, dropped} -> send_message(chat_id, rewind_text(dropped))
-          {:error, :busy} -> :ok
-        end
+    case Pepe.Checkpoints.Report.parse_rewind(args) do
+      :list ->
+        send_message(chat_id, Pepe.Checkpoints.Report.turn_list(Pepe.Agent.Session.turns(key)))
+
+      {:ok, count, mode} ->
+        rewind_chat(chat_id, key, count, mode)
 
       :error ->
-        send_message(chat_id, gettext("Usage: /rewind N, where N is how many turns to go back."))
+        send_message(
+          chat_id,
+          gettext("Usage: /rewind N, where N is how many turns to go back.") <> "\n" <> Pepe.Checkpoints.Report.usage()
+        )
     end
   end
 
@@ -2279,16 +2294,30 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp run_command(chat_id, "retry", _args) do
+  defp run_command(chat_id, "retry", args) do
     ensure_session(chat_id)
+    mode = if args |> String.trim() |> String.downcase() == "files", do: :both, else: :chat
 
-    case last_user_text(session_key(chat_id)) do
-      nil ->
+    case Pepe.Agent.Session.retry(session_key(chat_id), mode) do
+      {:ok, %{text: text, files: files, roots: roots, untrusted: untrusted, sender_tag: sender_tag}} ->
+        case Pepe.Checkpoints.Report.file_lines(files, roots: roots) do
+          [] -> :ok
+          lines -> send_message(chat_id, Enum.join(lines, "\n"))
+        end
+
+        # Resubmitted with the same trust context the original turn had, not the default -
+        # a retried document-derived turn must stay untrusted, and a retried group message
+        # must keep naming its original sender. See Session.retry/3's own doc.
+        chat_with_agent(chat_id, nil, text, untrusted: untrusted, sender_tag: sender_tag)
+
+      {:error, :nothing} ->
         send_message(chat_id, gettext("Nothing to retry yet."))
 
-      text ->
-        Pepe.Agent.Session.undo(session_key(chat_id))
-        chat_with_agent(chat_id, nil, text)
+      {:error, :not_text} ->
+        send_message(chat_id, gettext("That message had an attachment, so it can't be sent again exactly. Send it again yourself."))
+
+      {:error, :busy} ->
+        :ok
     end
   end
 
@@ -2729,31 +2758,6 @@ defmodule Pepe.Gateways.Telegram do
   # The default bot keeps the legacy `telegram:<chat_id>` key so existing sessions
   # and bindings survive; named bots are namespaced to avoid collisions and to let
   # cron delivery route back to the right bot.
-  defp rewind_text(dropped),
-    do: "⏪ " <> ngettext("Rewound %{count} turn.", "Rewound %{count} turns.", dropped, count: dropped)
-
-  defp rewind_partial_text(dropped) do
-    "⏪ " <>
-      ngettext(
-        "Rewound %{count} turn. That was the whole conversation.",
-        "Rewound %{count} turns. That was the whole conversation.",
-        dropped,
-        count: dropped
-      )
-  end
-
-  # The text of the most recent user message in a session, or nil (used by /retry).
-  defp last_user_text(key) do
-    key
-    |> Pepe.Agent.Session.history()
-    |> Enum.reverse()
-    |> Enum.find_value(fn m -> m["role"] == "user" && m["content"] end)
-  rescue
-    _ -> nil
-  catch
-    :exit, _ -> nil
-  end
-
   @doc false
   def session_key(chat_id), do: bot_name() |> session_key(chat_id) |> topic_suffixed()
   defp session_key("default", chat_id), do: "telegram:#{chat_id}"

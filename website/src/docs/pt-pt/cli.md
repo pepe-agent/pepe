@@ -119,7 +119,7 @@ sempre a todas as interfaces; a razão está em [Publicar num servidor](../deplo
 
 O `chat` (também chamado `tui`) abre uma conversa diretamente no teu terminal, mantendo o
 contexto à medida que avanças. Escreve `/help` lá dentro para veres todos os atalhos:
-nova conversa, desfazer, trocar de agente ou de modelo, entre outros.
+nova conversa, desfazer, recuar algumas trocas, trocar de agente ou de modelo, entre outros.
 
 ## Gateway do Telegram
 

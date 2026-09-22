@@ -150,7 +150,18 @@ defmodule Pepe.Config.Agent do
             # nothing on an ordinary turn - there is no system-prompt paragraph, only a note
             # on the turns that earn one. The agent never writes a skill file off the back of
             # it without an explicit yes from the user.
-            skill_learning: false
+            skill_learning: false,
+            # On by default, unlike the flags above: recording what a file tool changed costs
+            # one small snapshot of the one file it names, and it is what lets `/rewind`
+            # put files back as well as the conversation (see Pepe.Checkpoints). Turn it
+            # off for an agent whose workspace should never be copied into the checkpoint
+            # store.
+            checkpoints: true,
+            # Off by default. Also snapshot the working directory around `bash` and
+            # `run_script`, so a rewind can undo what a shell command changed too. It is
+            # bounded (a file-count and byte cap, build output and dependencies skipped) and
+            # costs a directory walk per command, which is why it is opt-in.
+            checkpoint_shell: false
 
   @type t :: %__MODULE__{}
 
@@ -206,5 +217,11 @@ defmodule Pepe.Config.Agent do
         capability_nudge: map["capability_nudge"] || false,
         skill_learning: map["skill_learning"] || false
     }
+    |> put_checkpoint_flags(map)
+  end
+
+  # `checkpoints` is the one switch that defaults to ON, so a missing key must not read as off.
+  defp put_checkpoint_flags(agent, map) do
+    %{agent | checkpoints: Map.get(map, "checkpoints", true) != false, checkpoint_shell: map["checkpoint_shell"] || false}
   end
 end

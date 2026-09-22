@@ -123,8 +123,8 @@ en [Desplegar en un servidor](../deploy/).
 
 `chat` (también llamado `tui`) abre una conversación directamente en tu terminal, que
 va recordando el contexto a medida que avanzas. Escribe `/help` ahí dentro para ver
-todos los atajos disponibles: nueva conversación, deshacer, cambiar de agente o de
-modelo, y más.
+todos los atajos disponibles: nueva conversación, deshacer, retroceder unos
+intercambios, cambiar de agente o de modelo, y más.
 
 ## Gateway de Telegram
 
