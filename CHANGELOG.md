@@ -28,6 +28,7 @@ All notable changes to this project are documented here. Format follows
 - `skill_manage`'s `patch` action now runs the same security scan `create`, `edit` and `write_file` already did - a patch that turned a skill dangerous went straight to disk unchecked.
 - `Pepe.Browser` now retries the Chrome launch once when the DevTools port isn't ready in time, a transient failure seen intermittently on busy CI runners even with the existing D-Bus workaround in place.
 - **A machine missing a native ML dependency (reported: a Mac without `brew install libomp`) no longer crashes the whole app on boot, not even `pepe setup`.** EXGBoost's own `Application.start/2` calls straight into its NIF with no guard of its own, and OTP treats any required application failing to start as fatal to the whole node - `:exgboost` is no longer auto-started that way (`included_applications` in `mix.exs`); `Pepe.Application` starts it itself instead, after the VM is already up, so the same failure now just disables the mid-size tabular ML tier and logs a warning, instead of taking every other feature down with it.
+- `install.sh` now checks for OpenMP on macOS and, if it's missing, prints a one-time note suggesting `brew install libomp` for the larger GBM model tier - optional, not a blocker, since the app already degrades gracefully without it.
 
 ## [0.19.1] - 2026-09-18
 

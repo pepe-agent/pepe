@@ -108,6 +108,24 @@ case ":$PATH:" in
     ;;
 esac
 
+# macOS only: the larger GBM/XGBoost ML model tier needs OpenMP at runtime, which
+# Apple's own toolchain doesn't ship - not installed by default on any Mac. Not
+# fatal if missing (Pepe degrades to its smaller model tier instead), so this is
+# a nudge, not a blocker - and checked directly by file path rather than requiring
+# Homebrew itself to be installed.
+if [ "$os" = "Darwin" ]; then
+  has_omp=""
+  for p in /opt/homebrew/opt/libomp/lib/libomp.dylib /usr/local/opt/libomp/lib/libomp.dylib; do
+    [ -f "$p" ] && has_omp="1"
+  done
+  if [ -z "$has_omp" ]; then
+    echo
+    info "Optional: the larger ML model tier (GBM) needs OpenMP, not installed by default on macOS."
+    info "  brew install libomp"
+    info "Everything else works fine without it."
+  fi
+fi
+
 echo
 ok "Done. Next:  pepe setup"
 echo
