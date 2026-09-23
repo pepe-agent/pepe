@@ -5,6 +5,15 @@ defmodule Pepe.BrowserTest do
   # installed (a CI runner with no browser package, or a machine that hasn't opted
   # into PEPE_IMAGE_APT_PACKAGES=chromium). The tool's own dispatch logic is covered
   # separately (and always) in Pepe.Tools.BrowserTest via a mocked Pepe.Browser.
+  #
+  # Excluded from the CI gate (`--exclude live_browser` in .github/workflows/ci.yml)
+  # even though GitHub's ubuntu-latest runner happens to ship Chrome preinstalled: with
+  # no D-Bus session and shared, loaded CPU, Chrome intermittently (sometimes reliably,
+  # sometimes not - both were observed across consecutive runs) never finishes opening
+  # its DevTools port inside a launch timeout short enough to fit an ExUnit test's own
+  # 60s default. Still runs, and reliably passes, on a real developer machine.
+  @moduletag :live_browser
+
   setup_all do
     if Pepe.Browser.Session.chrome_available?() do
       :ok
