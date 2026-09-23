@@ -80,7 +80,7 @@ defmodule Pepe.Browser.Session do
     ensure_no_dbus_hang()
 
     with {:ok, exe} <- find_chrome(),
-         {:ok, browser} <- CDPEx.launch(chrome_binary: exe, headless: true, launch_timeout: 30_000),
+         {:ok, browser} <- launch_chrome(exe),
          {:ok, page} <- CDPEx.new_page(browser),
          {:ok, _guard} <- start_request_guard(page) do
       {:ok, %{key: key, browser: browser, page: page, idle_timer: schedule_idle()}}
@@ -100,6 +100,19 @@ defmodule Pepe.Browser.Session do
   defp ensure_no_dbus_hang do
     if is_nil(System.get_env("DBUS_SESSION_BUS_ADDRESS")) do
       System.put_env("DBUS_SESSION_BUS_ADDRESS", "/dev/null")
+    end
+  end
+
+  # Even with the D-Bus workaround above, a shared CI runner under load has been seen to
+  # miss `launch_timeout` on the first attempt: Chrome starts but hasn't finished writing
+  # its DevTools port before CDPEx gives up, so `CDPEx.launch/1` returns
+  # `{:error, {:debug_url_not_found, _}}`. One retry has cleared this every time it's
+  # come up in CI; a real missing-Chrome or D-Bus problem fails the same way again.
+  defp launch_chrome(exe, attempt \\ 1) do
+    case CDPEx.launch(chrome_binary: exe, headless: true, launch_timeout: 30_000) do
+      {:ok, browser} -> {:ok, browser}
+      {:error, _reason} when attempt < 2 -> launch_chrome(exe, attempt + 1)
+      {:error, reason} -> {:error, reason}
     end
   end
 
