@@ -80,6 +80,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe agent list [--project CO | --all]
       mix pepe agent route FROM TO [--remove] [--project CO]   # let FROM message TO (directed)
       mix pepe agent manage ADMIN TARGET [--remove]  # let ADMIN administer TARGET ("*" = all)
+      mix pepe agent tools NAME [--set t1,t2|*] [--add t1,t2] [--remove t1,t2] [--project CO]
       mix pepe agent rename OLD NEW          # rename + move its workspace dir
       mix pepe agent remove NAME
       mix pepe agent default NAME
@@ -4369,6 +4370,23 @@ defmodule Mix.Tasks.Pepe do
   defp agent_cmd(["manage" | _]),
     do: error("usage: mix pepe agent manage ADMIN TARGET [--remove]   (TARGET may be \"*\")")
 
+  # `add` only ever creates (Config.put_new_agent/2 refuses an existing name) - this is
+  # the only CLI path to change an already-created agent's tools, the same thing the
+  # dashboard's agent edit page and the manage_agent tool's add_tool/remove_tool actions
+  # already let you do, just missing here until now. No flag lists rather than writes.
+  defp agent_cmd(["tools", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [set: :string, add: :string, remove: :string, project: :string])
+    handle = Project.handle(opts[:project], name)
+
+    case Config.get_agent(handle) do
+      nil -> error("unknown agent: #{handle}")
+      agent -> dispatch_agent_tools(agent, opts)
+    end
+  end
+
+  defp agent_cmd(["tools" | _]),
+    do: error("usage: mix pepe agent tools NAME [--set t1,t2|*] [--add t1,t2] [--remove t1,t2] [--project CO]")
+
   defp agent_cmd(["default", name | rest]) do
     {opts, _} = OptionParser.parse!(rest, strict: [project: :string])
     handle = Project.handle(opts[:project], name)
@@ -4393,6 +4411,8 @@ defmodule Mix.Tasks.Pepe do
       prompt NAME [--project CO]                            print the fully-assembled system prompt
       route FROM TO [--remove] [--project CO]              directed A->B messaging
       manage ADMIN TARGET [--remove] [--project CO]        let ADMIN administer TARGET (or "*")
+      tools NAME [--set t1,t2|*] [--add t1,t2]
+            [--remove t1,t2] [--project CO]                 view or edit an existing agent's tools
       rename OLD NEW                                        rename + move its dir
       remove NAME [--project CO]
       default NAME [--project CO]                           set the (scope) default agent
@@ -4410,6 +4430,12 @@ defmodule Mix.Tasks.Pepe do
     calls, only widens which agents it's allowed to reach with manage_agent.
     Add --project CO to scope any of these to a project; without it, the root scope.
 
+    `add` only ever creates - to change an already-created agent's tools, use `agent
+    tools`: no flag lists its current tools next to every tool that exists; --set
+    replaces the whole list (--set "*" grants everything); --add/--remove adjust it
+    incrementally. None of the three touch auto_approve, so a newly added tool still
+    prompts for approval until granted that separately, same as any other tool.
+
     --langfuse-prompt NAME makes this agent's persona come from a Langfuse-managed
     prompt of that name instead of its own --prompt/SOUL.md - edit it in Langfuse and
     the change reaches Pepe within a few minutes, no redeploy. Requires
@@ -4420,6 +4446,40 @@ defmodule Mix.Tasks.Pepe do
 
   defp agent_cmd(other),
     do: error("unknown: mix pepe agent #{Enum.join(other, " ")}  (try: mix pepe agent help)")
+
+  defp dispatch_agent_tools(agent, opts) do
+    cond do
+      opts[:set] == "*" -> save_agent_tools(agent, Pepe.Tools.names())
+      opts[:set] -> with_known_tools(opts[:set], &save_agent_tools(agent, &1))
+      opts[:add] -> with_known_tools(opts[:add], &save_agent_tools(agent, Enum.uniq(agent.tools ++ &1)))
+      opts[:remove] -> save_agent_tools(agent, agent.tools -- parse_tools_opt(opts[:remove]))
+      true -> list_agent_tools(agent)
+    end
+  end
+
+  defp with_known_tools(str, fun) do
+    tools = parse_tools_opt(str)
+
+    case Enum.reject(tools, &(&1 in Pepe.Tools.names())) do
+      [] -> fun.(tools)
+      unknown -> error("unknown tool(s): #{Enum.join(unknown, ", ")}  (mix pepe agent tools NAME with no flag lists every tool)")
+    end
+  end
+
+  defp save_agent_tools(agent, tools) do
+    case Config.put_agent(%{agent | tools: tools}) do
+      :ok -> ok("#{green(agent.name)}: #{format_tool_list(tools)}")
+      {:error, reason} -> error("could not save: #{inspect(reason)}")
+    end
+  end
+
+  defp list_agent_tools(agent) do
+    info("#{agent.name}: #{format_tool_list(agent.tools)}")
+    info(dim("every tool: #{Enum.join(Pepe.Tools.names(), ", ")}"))
+  end
+
+  defp format_tool_list([]), do: "(no tools)"
+  defp format_tool_list(tools), do: Enum.join(tools, ", ")
 
   defp save_new_agent(name, opts) do
     handle = Project.handle(opts[:project], name)
