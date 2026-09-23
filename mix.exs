@@ -16,7 +16,11 @@ defmodule Pepe.MixProject do
       listeners: [Phoenix.CodeReloader],
       test_coverage: [tool: ExCoveralls],
       dialyzer: [
-        plt_add_apps: [:mix, :ex_unit],
+        # :exgboost is `included_applications`, not `applications` (see application/0
+        # above), so dialyxir's own PLT builder - which walks the auto-derived
+        # `applications` list, not `included_applications` - stops seeing it there and
+        # every EXGBoost.* call site in Pepe.Insight.GBMTrainer looks undefined to it.
+        plt_add_apps: [:mix, :ex_unit, :exgboost],
         plt_local_path: "priv/plts",
         plt_core_path: "priv/plts",
         ignore_warnings: ".dialyzer_ignore.exs"
