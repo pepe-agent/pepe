@@ -239,7 +239,7 @@ jobs:
   binaries:
     name: binaries (${{ matrix.target }})
     needs: [test, credo, website, dialyzer]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push')
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -393,7 +393,7 @@ jobs:
   # no-op release.
   publish-binaries:
     needs: binaries
-    if: always() && startsWith(github.ref, 'refs/tags/v')
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -407,6 +407,7 @@ jobs:
           merge-multiple: true
 
       - name: Extract this version's CHANGELOG.md section
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           version="${GITHUB_REF_NAME#v}"
           awk -v ver="$version" '
@@ -420,6 +421,26 @@ jobs:
           ' CHANGELOG.md | sed '/./,$!d' > release_notes.md
           cat release_notes.md
 
+      # Not a numbered release - a rolling pre-release, always moved to whatever's newest on
+      # master, the binary equivalent of the Docker image's own `edge` tag. Marked
+      # `prerelease: true` below so GitHub's "latest release" (what install.sh defaults to)
+      # keeps skipping it - it's only ever reached by asking for it explicitly
+      # (`PEPE_VERSION=edge`), same as any other tag name that script already accepts.
+      - name: Release notes (edge)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: |
+          echo "Rolling build from master (\`${GITHUB_SHA:0:7}\`) - not a numbered release, may include unreleased changes. See CHANGELOG.md's [Unreleased] section for what's in it." > release_notes.md
+          cat release_notes.md
+
+      # The `edge` tag has to actually move to this commit before the release action runs -
+      # softprops/action-gh-release attaches to whatever the tag already points to, it
+      # doesn't relocate an existing tag on its own.
+      - name: Move the edge tag to this commit
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: |
+          git tag -f edge
+          git push origin edge --force
+
       # `pepe update` refuses to install an asset it cannot check against this file, so a
       # release without it is a release nobody can auto-update to. The names here must
       # match the asset names exactly: that is what Pepe.Update looks itself up by.
@@ -432,12 +453,14 @@ jobs:
       - name: Publish binaries to the release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'edge' }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           files: |
             burrito_out/pepe_*
             burrito_out/SHA256SUMS
           fail_on_unmatched_files: true
           body_path: release_notes.md
-          generate_release_notes: true
+          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
   # One job per architecture, each on its own native runner. ubuntu-24.04-arm is
   # free on public repos, so arm64 compiles at full speed instead of crawling

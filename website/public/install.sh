@@ -6,7 +6,7 @@
 #
 # Overrides (env vars):
 #   PEPE_REPO      GitHub repo to pull from      (default pepe-agent/pepe)
-#   PEPE_VERSION   release tag to install         (default latest)
+#   PEPE_VERSION   release tag to install         (default latest; "edge" tracks master)
 #   PEPE_BIN_DIR   where to place the binary       (default ~/.local/bin)
 
 set -eu
