@@ -157,7 +157,17 @@ defmodule Pepe.MixProject do
   def application do
     [
       mod: {Pepe.Application, []},
-      extra_applications: [:logger, :runtime_tools, :mnesia]
+      extra_applications: [:logger, :runtime_tools, :mnesia],
+      # exgboost's own Application.start/2 calls straight into its NIF, with no guard of
+      # its own - on a machine where XGBoost's native lib can't dlopen (missing system
+      # OpenMP, e.g. a Mac without `brew install libomp`), that raises, and OTP boot
+      # treats *any* required application failing to start as fatal: the whole release
+      # halts before a single line of Pepe's own code runs. `included_applications` keeps
+      # exgboost on the code path (Pepe.Insight.GBMTrainer.available?/0 still sees it, and
+      # it still starts and works wherever the native lib loads fine) without OTP auto-
+      # starting it as a boot requirement - Pepe.Application starts it itself instead, as
+      # a best-effort step that degrades instead of taking the whole app down with it.
+      included_applications: [:exgboost]
     ]
   end
 

@@ -8,6 +8,7 @@ defmodule Pepe.Application do
 
   @impl true
   def start(_type, _args) do
+    maybe_start_exgboost()
     suppress_mnesia_restart_notice()
 
     if release_cli?() do
@@ -15,6 +16,30 @@ defmodule Pepe.Application do
     else
       start_supervisor(maybe_endpoint())
     end
+  end
+
+  # See mix.exs's `included_applications: [:exgboost]` for why OTP doesn't auto-start this
+  # one at boot: exgboost's own Application.start/2 calls straight into its NIF with no
+  # guard of its own, and on a machine where XGBoost's native lib can't dlopen (missing
+  # system OpenMP - the reported failure was a Mac without `brew install libomp`), that
+  # raises. Started explicitly here instead, after the VM is already up, so the same
+  # failure returns a clean `{:error, _}` to *us* rather than being boot's own required-
+  # application failure, which halts the whole node before any of Pepe's code runs.
+  # Skipped entirely, silently, on a build that never compiled exgboost in (Windows, via
+  # PEPE_SKIP_GBM=1 - see gbm_deps/0 below) - GBMTrainer.available?/0 already handles that
+  # build the same way it always has.
+  defp maybe_start_exgboost do
+    if Code.ensure_loaded?(EXGBoost) do
+      case Application.ensure_all_started(:exgboost) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning("[insight] EXGBoost failed to start - the mid-size tabular ML tier will be unavailable: #{inspect(reason)}")
+      end
+    end
+
+    :ok
   end
 
   # Pepe.Store (see its moduledoc) deliberately stops and restarts Mnesia once at boot to
