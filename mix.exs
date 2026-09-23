@@ -171,8 +171,15 @@ defmodule Pepe.MixProject do
       # it still starts and works wherever the native lib loads fine) without OTP auto-
       # starting it as a boot requirement - Pepe.Application starts it itself instead, as
       # a best-effort step that degrades instead of taking the whole app down with it.
-      included_applications: [:exgboost]
+      # Conditional on the same PEPE_SKIP_GBM guard as gbm_deps/0 below - naming an
+      # application here that was never fetched as a dependency (the Windows build) fails
+      # release assembly outright, not just a missing-at-runtime warning.
+      included_applications: included_applications()
     ]
+  end
+
+  defp included_applications do
+    if System.get_env("PEPE_SKIP_GBM") == "1", do: [], else: [:exgboost]
   end
 
   def cli do
