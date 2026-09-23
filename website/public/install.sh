@@ -120,9 +120,11 @@ if [ "$os" = "Darwin" ]; then
   done
   if [ -z "$has_omp" ]; then
     echo
-    info "Optional: the larger ML model tier (GBM) needs OpenMP, not installed by default on macOS."
+    info "Optional: Pepe's insight tool (predictions, forecasts, classification) picks a"
+    info "stronger model on bigger datasets, which needs OpenMP - not installed by default"
+    info "on macOS:"
     info "  brew install libomp"
-    info "Everything else works fine without it."
+    info "Smaller datasets, and everything else, work fine without it."
   fi
 fi
 
