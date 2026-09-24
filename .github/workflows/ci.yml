@@ -265,6 +265,12 @@ jobs:
     env:
       PEPE_SKIP_GBM: ${{ matrix.os == 'windows' && '1' || '' }}
       PEPE_SKIP_NEURAL: ${{ matrix.os == 'windows' && '1' || '' }}
+      # See mix.exs's version/0: an edge build's version must differ from the plain
+      # numbered one, or Burrito's local extraction cache (keyed by version string) keeps
+      # running whatever it already had extracted under that same string forever, however
+      # many newer edge builds get published. Empty on a real tag - that keeps the version
+      # exactly the number it should ship as.
+      PEPE_EDGE_SHA: ${{ !startsWith(github.ref, 'refs/tags/v') && github.sha || '' }}
     strategy:
       fail-fast: false
       matrix:

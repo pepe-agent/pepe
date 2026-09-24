@@ -4,7 +4,7 @@ defmodule Pepe.MixProject do
   def project do
     [
       app: :pepe,
-      version: "0.19.1",
+      version: version(),
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
@@ -152,6 +152,28 @@ defmodule Pepe.MixProject do
       Burrito.wrap(release)
     after
       if patched && patched != original, do: File.write!(makefile, original)
+    end
+  end
+
+  # Burrito extracts a release into a directory named by this exact string
+  # (`pepe_erts-<erts>_<version>`, under the OS's app-support dir) and skips
+  # re-extracting if that directory already exists - a legitimate optimization for a real
+  # numbered release, whose content genuinely doesn't change after it ships. It is the
+  # wrong call for the "edge" channel (ci.yml's `binaries`/`publish-binaries` on every
+  # master push, see the Add a rolling "edge" binary release commit): every edge build is
+  # a different commit on the SAME unbumped version until the next real release, and a
+  # machine that already had that plain version extracted (the common case - everyone
+  # starts from a numbered release) would keep running that stale extraction forever, no
+  # matter how many newer edge builds get published - confirmed by hand, not just reasoned
+  # about: an install of a newer edge silently kept running an old one this way. PEPE_EDGE_SHA
+  # (set by the CI job's non-tag builds only) appends build metadata so every edge build
+  # gets its own extraction directory. Semver build metadata, not a pre-release segment -
+  # ignored for `Version.compare/2` precedence, so Pepe.Update/Pepe.Doctor's self-update
+  # check (which only ever compares against a real numbered release tag) is unaffected.
+  defp version do
+    case System.get_env("PEPE_EDGE_SHA") do
+      sha when is_binary(sha) and sha != "" -> "0.19.1+edge.#{sha}"
+      _ -> "0.19.1"
     end
   end
 
