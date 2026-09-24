@@ -67,6 +67,40 @@ defmodule Pepe.Tools.FetchUrlTest do
     refute msg =~ "could not resolve"
   end
 
+  test "the actual request is pinned to the resolved address, not re-resolved at connect time" do
+    # Regression test for the DNS-rebinding gap: resolving and validating a host, then handing
+    # Req the bare hostname to resolve again on its own, means an attacker who controls DNS for
+    # that host can answer differently the second time (a public IP for this check, an internal
+    # one for the real connection) and slip straight past the guard above. Asserting on what
+    # actually reaches Req.get is what makes this a regression test rather than a hope - the URL
+    # host must already be a numeric IP address by the time it gets there, with the real
+    # hostname preserved only in connect_options (for the Host header, SNI, and certificate
+    # verification - see Mint.HTTP.connect/4).
+    Mimic.expect(Req, :get, fn url, opts ->
+      uri = URI.parse(url)
+      assert {:ok, _} = Pepe.Net.parse_address(uri.host)
+      assert opts[:connect_options][:hostname] == "example.com"
+      {:ok, %{status: 200, headers: %{}, body: "ok"}}
+    end)
+
+    assert {:ok, _} = FetchUrl.run(%{"url" => "https://example.com/"}, %{})
+  end
+
+  test "an IPv6 target is pinned with a single, valid bracket pair" do
+    # Regression test: the pinned host was wrapped in brackets by hand and then wrapped again by
+    # URI.to_string/1 (which already brackets any host containing `:`), producing the doubled,
+    # unparseable authority `[[::1]]`. A real public IPv6 literal (Google's public DNS) as the
+    # URL's own host skips DNS entirely (Pepe.Net.parse_address/1 recognizes it directly), so
+    # this exercises pin_host/2 without depending on IPv6 connectivity in CI.
+    Mimic.expect(Req, :get, fn url, _opts ->
+      assert url == "https://[2001:4860:4860::8888]/"
+      assert {:ok, _} = URI.new(url)
+      {:ok, %{status: 200, headers: %{}, body: "ok"}}
+    end)
+
+    assert {:ok, _} = FetchUrl.run(%{"url" => "https://[2001:4860:4860::8888]/"}, %{})
+  end
+
   describe "readable-text extraction" do
     test "an HTML response is reduced to its readable text by default" do
       stub_response(200, %{"content-type" => ["text/html; charset=utf-8"]}, @html_article)
