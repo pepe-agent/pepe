@@ -86,6 +86,21 @@ defmodule Pepe.Tools.FetchUrlTest do
     assert {:ok, _} = FetchUrl.run(%{"url" => "https://example.com/"}, %{})
   end
 
+  test "an IPv6 target is pinned with a single, valid bracket pair" do
+    # Regression test: the pinned host was wrapped in brackets by hand and then wrapped again by
+    # URI.to_string/1 (which already brackets any host containing `:`), producing the doubled,
+    # unparseable authority `[[::1]]`. A real public IPv6 literal (Google's public DNS) as the
+    # URL's own host skips DNS entirely (Pepe.Net.parse_address/1 recognizes it directly), so
+    # this exercises pin_host/2 without depending on IPv6 connectivity in CI.
+    Mimic.expect(Req, :get, fn url, _opts ->
+      assert url == "https://[2001:4860:4860::8888]/"
+      assert {:ok, _} = URI.new(url)
+      {:ok, %{status: 200, headers: %{}, body: "ok"}}
+    end)
+
+    assert {:ok, _} = FetchUrl.run(%{"url" => "https://[2001:4860:4860::8888]/"}, %{})
+  end
+
   describe "readable-text extraction" do
     test "an HTML response is reduced to its readable text by default" do
       stub_response(200, %{"content-type" => ["text/html; charset=utf-8"]}, @html_article)

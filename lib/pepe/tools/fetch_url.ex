@@ -80,7 +80,15 @@ defmodule Pepe.Tools.FetchUrl do
              receive_timeout: 30_000,
              retry: :transient,
              redirect: false,
-             connect_options: [hostname: host]
+             connect_options: [hostname: host],
+             # `connect_options` (host included) is what Req hashes into a Finch pool's name -
+             # dynamically starting a new one, keyed by hash, whenever the combination hasn't
+             # been seen before (see Req.Finch.finch_name/1). fetch_url is meant for arbitrary,
+             # largely one-off URLs, so left at Req's own default (`:infinity`, never reaped),
+             # a pool per distinct host pinned over the process's lifetime would just accumulate
+             # forever. A finite idle time lets Finch's own cleanup reclaim one nobody's used in
+             # a while, the same way it would for any other short-lived target.
+             pool_max_idle_time: :timer.minutes(1)
            ) do
         {:ok, resp} -> handle_response(resp, url, hops, raw?)
         {:error, reason} -> {:error, "request failed: #{inspect(reason)}"}
@@ -90,8 +98,10 @@ defmodule Pepe.Tools.FetchUrl do
 
   defp pin_host(url, ip), do: %{URI.parse(url) | host: ip_to_url_host(ip)} |> URI.to_string()
 
-  defp ip_to_url_host(ip) when tuple_size(ip) == 4, do: ip |> :inet.ntoa() |> to_string()
-  defp ip_to_url_host(ip), do: "[#{:inet.ntoa(ip)}]"
+  # Bare address, no manual brackets - URI.to_string/1 already brackets a host containing `:`
+  # (an IPv6 literal, `ip_to_url_host`'s own return for a v6 tuple) on its own; wrapping it here
+  # too doubled up as `[[::1]]`, an authority Req/URI would only mangle further downstream.
+  defp ip_to_url_host(ip), do: ip |> :inet.ntoa() |> to_string()
 
   # A 3xx is followed by re-entering `fetch/3` on the (validated) target; anything else is the
   # body. Splitting this out of `fetch/3` keeps each function's nesting shallow.
