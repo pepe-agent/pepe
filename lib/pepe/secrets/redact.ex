@@ -127,7 +127,7 @@ defmodule Pepe.Secrets.Redact do
   # is far more likely to be that token than a path with exactly one component.
   defp path_like?(s), do: slash_count(s) >= 2 and not String.contains?(s, "+") and not trailing_padding?(s)
 
-  defp slash_count(s), do: s |> String.graphemes() |> Enum.count(&(&1 == "/"))
+  defp slash_count(s), do: s |> String.split("/") |> length() |> Kernel.-(1)
 
   defp trailing_padding?(s) do
     trimmed = String.trim_trailing(s, "=")
