@@ -74,8 +74,14 @@ defmodule Pepe.Secrets.Redact do
   def scrub(text), do: text
 
   # Same "not a module attribute" reason as `rules/0` above - this is Regex.compile'd fresh
-  # per call.
-  defp entropy_candidate_regex, do: ~r/[A-Za-z0-9+\/=_.~-]{#{@entropy_min_length},4096}/
+  # per call. No upper bound on the repeat count: capping it (an earlier version capped at
+  # 4096) truncates the *match*, not just a length the caller stops caring about past - a
+  # secret longer than the cap would have its tail split into a second, separately-matched-and-
+  # masked candidate, but a tail shorter than the minimum length after the cut point isn't a
+  # candidate at all and passes through raw. A plain character-class repeat has no
+  # backtracking to blow up regardless of how high the bound goes (verified: 600,000 chars
+  # scans in under a millisecond), so there is no performance reason to keep one either.
+  defp entropy_candidate_regex, do: ~r/[A-Za-z0-9+\/=_.~-]{#{@entropy_min_length},}/
 
   defp scrub_high_entropy(text) do
     Regex.replace(entropy_candidate_regex(), text, fn candidate ->
@@ -95,20 +101,38 @@ defmodule Pepe.Secrets.Redact do
   #     range and rarely have more than one `/`, an ordinary path is the opposite of both.
   #   * A long snake_case/dotted identifier or hostname (`Pepe.Config.redact_tool_output`,
   #     `ec2-54-12-34-56.compute-1.amazonaws.com`) is not one random run at all - it is several
-  #     short, ordinary words glued by `.`/`_`/`-`. Scoring the *segments* those delimiters
-  #     imply, not just the candidate as a whole, is what tells the two apart without a coarser
-  #     "needs a digit and a letter" gate, which would stop catching a lowercase-only or
-  #     digit-less base64-style secret just as wrongly.
+  #     short, ordinary words glued by `.`/`_`/`-`. What actually marks a piece of it as an
+  #     ordinary word rather than random data is its *case structure*: `redact`, `tool`,
+  #     `Config` are each all-lowercase, all-uppercase, or Capitalized - a single, predictable
+  #     case run - never the chaotic per-character case switching (`qW2mK7pL4n`) an actual
+  #     mixed-case secret has. Splitting into segments and requiring *every one* to have that
+  #     plain, predictable shape (not each one to independently clear the length bar, which a
+  #     real secret glued together by `-`/`_` - valid base64url alphabet characters, not word
+  #     separators there - could dodge just by being split into short-enough pieces) is what
+  #     tells the two apart without a coarser "needs a digit and a letter" gate, which would
+  #     stop catching a lowercase-only or digit-less base64-style secret just as wrongly. A
+  #     candidate with no `.`/`_`/`-` at all (nothing to split on) is judged on its own; this
+  #     only ever gates a *multi-segment* run.
   defp secret_like_entropy?(candidate) do
     not uuid?(candidate) and not pure_hex?(candidate) and not path_like?(candidate) and
-      Enum.any?(word_segments(candidate), &high_entropy_segment?/1)
+      not identifier_like?(candidate) and entropy_bits_per_rune(candidate) >= @entropy_bits_per_rune
   end
 
   defp word_segments(s), do: String.split(s, ~r/[._-]/, trim: true)
 
-  defp high_entropy_segment?(s) do
-    String.length(s) >= @entropy_min_length and entropy_bits_per_rune(s) >= @entropy_bits_per_rune
+  defp identifier_like?(s) do
+    case word_segments(s) do
+      [_single] -> false
+      segments -> Enum.all?(segments, &plain_word_segment?/1)
+    end
   end
+
+  # `(?:[A-Z][a-z0-9]*)+` (not just one leading capital) so a compound PascalCase/CamelCase
+  # module or type name - `SkillLearning`, `ExternalContent` - counts as plain too; it is still
+  # several ordinary Capitalized words, just glued without a delimiter between them, and a
+  # single-capital-only rule flagged the second word's capital as the chaotic mid-string case
+  # switching a real secret has.
+  defp plain_word_segment?(s), do: Regex.match?(~r/^(?:(?:[A-Z][a-z0-9]*)+|[a-z][a-z0-9]*|[A-Z0-9]+)$/, s)
 
   defp uuid?(s), do: Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, s)
 
@@ -125,6 +149,15 @@ defmodule Pepe.Secrets.Redact do
   # is the other half: a genuine path almost always has several (`/usr/local/bin`), while a
   # single `/` landing inside an otherwise unbroken token (valid in both base64 and base64url)
   # is far more likely to be that token than a path with exactly one component.
+  #
+  # Known, accepted gap: an *unpadded* secret with exactly two `/` (base64url-with-no-padding
+  # can legitimately contain them, and two is already the "genuine path" bar) still reads as
+  # path-like and slips through. Distinguishing the two by splitting on `/` and demanding every
+  # piece look path-plausible hits the identical problem `identifier_like?/1` above exists to
+  # avoid on `-`/`_`: a real secret containing `/` can just as easily be split into pieces short
+  # enough to dodge a per-piece check. Left as a real, narrower miss rather than guessed at with
+  # an unverified heuristic - the module's own moduledoc already calls this pass "heuristic, not
+  # perfect."
   defp path_like?(s), do: slash_count(s) >= 2 and not String.contains?(s, "+") and not trailing_padding?(s)
 
   defp slash_count(s), do: s |> String.split("/") |> length() |> Kernel.-(1)

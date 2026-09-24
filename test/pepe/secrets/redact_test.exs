@@ -84,6 +84,29 @@ defmodule Pepe.Secrets.RedactTest do
     assert out =~ "token is"
   end
 
+  test "does not leave a short tail exposed past the old 4096-character candidate cap" do
+    # Genuinely varied content, not a repeating pattern - a repeat has low real entropy no
+    # matter how long it runs, and would never have cleared the mask bar to begin with, which
+    # would make this pass for the wrong reason instead of exercising the cap.
+    pool = ~w(a b c d e f g h A B C D 0 1 2 3 4 5 6 7 8 9)
+    long_run = for _ <- 1..4200, into: "", do: Enum.random(pool)
+    long_secret = long_run <> "shorttail1234567890"
+    out = Redact.scrub("value seen: #{long_secret} end")
+    refute out =~ "shorttail1234567890"
+  end
+
+  test "masks a base64url-style secret using - and _ as encoding characters, not word separators" do
+    secret = "aB3xY9m-qW2mK7pL4n-R8vT1cF6d-S0hJ5gN2mQ8"
+    out = Redact.scrub("value seen: #{secret} end")
+    refute out =~ secret
+    assert out =~ "value seen:"
+  end
+
+  test "still leaves a compound PascalCase module/type name alone" do
+    text = "Pepe.Agent.SkillLearning.maybe_offer and Pepe.Security.ExternalContent"
+    assert Redact.scrub(text) == text
+  end
+
   test "leaves a UUID alone" do
     text = "the request id was 550e8400-e29b-41d4-a716-446655440000 for this trace"
     assert Redact.scrub(text) == text
