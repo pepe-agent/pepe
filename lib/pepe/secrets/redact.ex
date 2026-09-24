@@ -19,6 +19,14 @@ defmodule Pepe.Secrets.Redact do
   @keep 4
   @hint_min 16
 
+  # Fallback for a secret with no recognizable shape at all - a raw API key pasted with no
+  # `KEY=`/`Bearer ` in front of it, a password printed bare. None of the rules above look at
+  # how random a string actually *is*, only at what surrounds it, so this scores entropy per
+  # rune on long token-shaped runs and masks whatever clears the bar - after the shape rules
+  # above have already run, so this only ever sees what they left untouched.
+  @entropy_min_length 28
+  @entropy_bits_per_rune 3.6
+
   # Each rule masks the value part of a match. `:tail` masks capture 2 (a `key = value` where the
   # key names a secret); `:whole` masks capture 1 (a standalone token recognizable on its own).
   #
@@ -58,10 +66,61 @@ defmodule Pepe.Secrets.Redact do
   @doc "Mask secret-shaped substrings in `text`. Non-binaries pass through untouched."
   @spec scrub(term()) :: term()
   def scrub(text) when is_binary(text) do
-    Enum.reduce(rules(), text, fn {re, kind}, acc -> apply_rule(acc, re, kind) end)
+    rules()
+    |> Enum.reduce(text, fn {re, kind}, acc -> apply_rule(acc, re, kind) end)
+    |> scrub_high_entropy()
   end
 
   def scrub(text), do: text
+
+  # Same "not a module attribute" reason as `rules/0` above - this is Regex.compile'd fresh
+  # per call.
+  defp entropy_candidate_regex, do: ~r/[A-Za-z0-9+\/=_.~-]{#{@entropy_min_length},4096}/
+
+  defp scrub_high_entropy(text) do
+    Regex.replace(entropy_candidate_regex(), text, fn candidate ->
+      if secret_like_entropy?(candidate), do: mask(candidate), else: candidate
+    end)
+  end
+
+  # Excludes the two shapes the issue this closes named explicitly as likely false positives:
+  # a UUID and a hex hash/checksum/commit SHA both read as "random" to an entropy score just as
+  # much as an actual secret does, entropy alone cannot tell them apart, so pure-hex candidates
+  # are left to the shape rules above (which already catch a *named* hex secret via `KEY=`/
+  # `TOKEN=`) rather than guessed at here. A path is excluded by a cheaper, more legible signal
+  # than trying to entropy-score it: real secrets padded to base64 almost always carry a `+` or
+  # `=` somewhere in this length range, an ordinary path never does.
+  defp secret_like_entropy?(candidate) do
+    not uuid?(candidate) and not pure_hex?(candidate) and not path_like?(candidate) and
+      entropy_bits_per_rune(candidate) >= @entropy_bits_per_rune
+  end
+
+  defp uuid?(s), do: Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, s)
+
+  defp pure_hex?(s), do: Regex.match?(~r/^[0-9a-fA-F]+$/, s)
+
+  # A real secret's `=` is always trailing base64 padding (0-2 characters, per the base64
+  # spec); a `NAME=/some/path` assignment (PATH, LD_LIBRARY_PATH, ...) also contains an `=`,
+  # but nowhere near the end - it is the key/value separator near the *start*. Checking where
+  # the `=` sits, not just whether one exists, is what tells these two apart.
+  defp path_like?(s), do: String.contains?(s, "/") and not String.contains?(s, "+") and not trailing_padding?(s)
+
+  defp trailing_padding?(s) do
+    trimmed = String.trim_trailing(s, "=")
+    trimmed != s and not String.contains?(trimmed, "=")
+  end
+
+  defp entropy_bits_per_rune(s) do
+    graphemes = String.graphemes(s)
+    total = length(graphemes)
+
+    graphemes
+    |> Enum.frequencies()
+    |> Enum.reduce(0.0, fn {_g, count}, acc ->
+      p = count / total
+      acc - p * :math.log2(p)
+    end)
+  end
 
   defp apply_rule(text, re, :tail) do
     Regex.replace(re, text, fn _full, prefix, value -> prefix <> mask(value) end)
