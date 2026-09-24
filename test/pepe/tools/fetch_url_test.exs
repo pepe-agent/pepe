@@ -67,6 +67,25 @@ defmodule Pepe.Tools.FetchUrlTest do
     refute msg =~ "could not resolve"
   end
 
+  test "the actual request is pinned to the resolved address, not re-resolved at connect time" do
+    # Regression test for the DNS-rebinding gap: resolving and validating a host, then handing
+    # Req the bare hostname to resolve again on its own, means an attacker who controls DNS for
+    # that host can answer differently the second time (a public IP for this check, an internal
+    # one for the real connection) and slip straight past the guard above. Asserting on what
+    # actually reaches Req.get is what makes this a regression test rather than a hope - the URL
+    # host must already be a numeric IP address by the time it gets there, with the real
+    # hostname preserved only in connect_options (for the Host header, SNI, and certificate
+    # verification - see Mint.HTTP.connect/4).
+    Mimic.expect(Req, :get, fn url, opts ->
+      uri = URI.parse(url)
+      assert {:ok, _} = Pepe.Net.parse_address(uri.host)
+      assert opts[:connect_options][:hostname] == "example.com"
+      {:ok, %{status: 200, headers: %{}, body: "ok"}}
+    end)
+
+    assert {:ok, _} = FetchUrl.run(%{"url" => "https://example.com/"}, %{})
+  end
+
   describe "readable-text extraction" do
     test "an HTML response is reduced to its readable text by default" do
       stub_response(200, %{"content-type" => ["text/html; charset=utf-8"]}, @html_article)

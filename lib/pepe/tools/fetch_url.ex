@@ -66,13 +66,32 @@ defmodule Pepe.Tools.FetchUrl do
 
   defp fetch(url, hops, raw?) do
     with {:ok, host} <- parse_host(url),
-         :ok <- check_host(host) do
-      case Req.get(url, receive_timeout: 30_000, retry: :transient, redirect: false) do
+         {:ok, ip} <- resolve_and_validate(host) do
+      # The IP just validated is what actually gets dialed - the URL's host is rewritten to it,
+      # so nothing re-resolves the hostname at connect time (which is what leaves the gap
+      # `connect_options: [hostname: host]` closes below: a second DNS answer could otherwise
+      # differ from the one just checked, the classic rebinding bypass). `:hostname` is Mint's
+      # own explicit-hostname option (see `Mint.HTTP.connect/4`) - it supplies the `Host`
+      # header, SNI, and certificate hostname verification, so the request still looks exactly
+      # like a request to the real host from the far end, just dialed at a pinned address.
+      request_url = pin_host(url, ip)
+
+      case Req.get(request_url,
+             receive_timeout: 30_000,
+             retry: :transient,
+             redirect: false,
+             connect_options: [hostname: host]
+           ) do
         {:ok, resp} -> handle_response(resp, url, hops, raw?)
         {:error, reason} -> {:error, "request failed: #{inspect(reason)}"}
       end
     end
   end
+
+  defp pin_host(url, ip), do: %{URI.parse(url) | host: ip_to_url_host(ip)} |> URI.to_string()
+
+  defp ip_to_url_host(ip) when tuple_size(ip) == 4, do: ip |> :inet.ntoa() |> to_string()
+  defp ip_to_url_host(ip), do: "[#{:inet.ntoa(ip)}]"
 
   # A 3xx is followed by re-entering `fetch/3` on the (validated) target; anything else is the
   # body. Splitting this out of `fetch/3` keeps each function's nesting shallow.
@@ -142,12 +161,12 @@ defmodule Pepe.Tools.FetchUrl do
     end
   end
 
-  # Resolves every address the host could hit (not just the first) and rejects if
-  # any is internal - blocks direct internal IPs and hostnames that resolve there.
-  # Doesn't pin the resolved IP for the actual request below, so a DNS answer that
-  # flips between this check and Req's own resolution (classic rebinding) isn't
-  # fully closed - acceptable for the LLM-fetches-a-URL threat model here.
-  defp check_host(host) do
+  # Resolves every address the host could hit (not just the first) and rejects if any is
+  # internal - blocks direct internal IPs and hostnames that resolve there. Also hands back
+  # one validated address for `fetch/3` to pin the actual connection to (see `pin_host/2`):
+  # resolving here and letting the request re-resolve separately is exactly the gap a second,
+  # differently-answered DNS lookup (rebinding) could slip through.
+  defp resolve_and_validate(host) do
     case Pepe.Net.parse_address(host) do
       {:ok, ip} -> reject_if_internal(ip)
       :error -> host |> resolve_all() |> reject_any_internal()
@@ -182,12 +201,14 @@ defmodule Pepe.Tools.FetchUrl do
     if Enum.any?(ips, &Pepe.Net.internal?/1) do
       {:error, "refusing to fetch an internal/private address"}
     else
-      :ok
+      # Any of the validated addresses is safe to pin the connection to - all of them were
+      # just confirmed non-internal above.
+      {:ok, hd(ips)}
     end
   end
 
   defp reject_if_internal(ip) do
-    if Pepe.Net.internal?(ip), do: {:error, "refusing to fetch an internal/private address"}, else: :ok
+    if Pepe.Net.internal?(ip), do: {:error, "refusing to fetch an internal/private address"}, else: {:ok, ip}
   end
 
   defp stringify(body) when is_binary(body), do: body
