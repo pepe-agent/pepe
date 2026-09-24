@@ -83,27 +83,51 @@ defmodule Pepe.Secrets.Redact do
     end)
   end
 
-  # Excludes the two shapes the issue this closes named explicitly as likely false positives:
-  # a UUID and a hex hash/checksum/commit SHA both read as "random" to an entropy score just as
-  # much as an actual secret does, entropy alone cannot tell them apart, so pure-hex candidates
-  # are left to the shape rules above (which already catch a *named* hex secret via `KEY=`/
-  # `TOKEN=`) rather than guessed at here. A path is excluded by a cheaper, more legible signal
-  # than trying to entropy-score it: real secrets padded to base64 almost always carry a `+` or
-  # `=` somewhere in this length range, an ordinary path never does.
+  # Excludes the shapes real tool output is full of that would otherwise cross the entropy bar
+  # just as an actual secret does:
+  #
+  #   * A UUID and a hex hash/checksum/commit SHA both read as "random" to an entropy score just
+  #     as much as a secret does, entropy alone cannot tell them apart, so pure-hex candidates
+  #     are left to the shape rules above (which already catch a *named* hex secret via `KEY=`/
+  #     `TOKEN=`) rather than guessed at here.
+  #   * A path is excluded by a cheaper, more legible signal than trying to entropy-score it:
+  #     real secrets padded to base64 almost always carry a `+` or `=` somewhere in this length
+  #     range and rarely have more than one `/`, an ordinary path is the opposite of both.
+  #   * A long snake_case/dotted identifier or hostname (`Pepe.Config.redact_tool_output`,
+  #     `ec2-54-12-34-56.compute-1.amazonaws.com`) is not one random run at all - it is several
+  #     short, ordinary words glued by `.`/`_`/`-`. Scoring the *segments* those delimiters
+  #     imply, not just the candidate as a whole, is what tells the two apart without a coarser
+  #     "needs a digit and a letter" gate, which would stop catching a lowercase-only or
+  #     digit-less base64-style secret just as wrongly.
   defp secret_like_entropy?(candidate) do
     not uuid?(candidate) and not pure_hex?(candidate) and not path_like?(candidate) and
-      entropy_bits_per_rune(candidate) >= @entropy_bits_per_rune
+      Enum.any?(word_segments(candidate), &high_entropy_segment?/1)
+  end
+
+  defp word_segments(s), do: String.split(s, ~r/[._-]/, trim: true)
+
+  defp high_entropy_segment?(s) do
+    String.length(s) >= @entropy_min_length and entropy_bits_per_rune(s) >= @entropy_bits_per_rune
   end
 
   defp uuid?(s), do: Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, s)
 
-  defp pure_hex?(s), do: Regex.match?(~r/^[0-9a-fA-F]+$/, s)
+  # `\.?` because the candidate regex includes `.` (a valid token-edge character elsewhere), so
+  # a SHA sitting at the end of an ordinary sentence ("...commit a3f5…e8f0.") pulls the closing
+  # period into the match. Any other punctuation cannot join at all - it is outside the
+  # candidate charset to begin with - so only this one trailing case needs stripping here.
+  defp pure_hex?(s), do: Regex.match?(~r/^[0-9a-fA-F]+\.?$/, s)
 
   # A real secret's `=` is always trailing base64 padding (0-2 characters, per the base64
   # spec); a `NAME=/some/path` assignment (PATH, LD_LIBRARY_PATH, ...) also contains an `=`,
   # but nowhere near the end - it is the key/value separator near the *start*. Checking where
-  # the `=` sits, not just whether one exists, is what tells these two apart.
-  defp path_like?(s), do: String.contains?(s, "/") and not String.contains?(s, "+") and not trailing_padding?(s)
+  # the `=` sits, not just whether one exists, is what tells these two apart. The slash count
+  # is the other half: a genuine path almost always has several (`/usr/local/bin`), while a
+  # single `/` landing inside an otherwise unbroken token (valid in both base64 and base64url)
+  # is far more likely to be that token than a path with exactly one component.
+  defp path_like?(s), do: slash_count(s) >= 2 and not String.contains?(s, "+") and not trailing_padding?(s)
+
+  defp slash_count(s), do: s |> String.graphemes() |> Enum.count(&(&1 == "/"))
 
   defp trailing_padding?(s) do
     trimmed = String.trim_trailing(s, "=")

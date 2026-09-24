@@ -64,6 +64,26 @@ defmodule Pepe.Secrets.RedactTest do
     assert Redact.scrub(text) == text
   end
 
+  test "leaves a git commit SHA alone even at the end of a sentence (regression: the trailing period joined the candidate)" do
+    text = "fixed in commit a3f5e8b9c1d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0."
+    assert Redact.scrub(text) == text
+  end
+
+  test "leaves long identifiers, module names and hostnames alone (regression: word_segments treated them as one random run)" do
+    text =
+      "handle_incoming_webhook_request Pepe.Config.redact_tool_output " <>
+        "Pepe.Agent.SkillLearning.maybe_offer ec2-54-12-34-56.compute-1.amazonaws.com"
+
+    assert Redact.scrub(text) == text
+  end
+
+  test "masks an unpadded base64-style secret with a single slash (regression: path_like? excluded it on one / alone)" do
+    secret = "qP9zK3mR7vT4cB6dY1wL5hJ0eN2aF8/x"
+    out = Redact.scrub("token is #{secret} here")
+    refute out =~ secret
+    assert out =~ "token is"
+  end
+
   test "leaves a UUID alone" do
     text = "the request id was 550e8400-e29b-41d4-a716-446655440000 for this trace"
     assert Redact.scrub(text) == text
