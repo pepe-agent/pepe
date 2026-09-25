@@ -161,8 +161,16 @@ defmodule Pepe.Secrets.Redact do
   # suffix or acronym tail, it does not alternate letter/digit every couple of characters the
   # way an encoded secret that happens to fall on the lowercase-alphanumeric branch can. A
   # standalone all-digit segment (`54` in an IP octet) is its own branch, not folded into the
-  # letter ones, since it has no letters to require any of.
-  defp plain_word_segment?(s), do: Regex.match?(~r/^(?:(?:[A-Z][a-z]*)+[0-9]*|[a-z]+[0-9]*|[A-Z]+[0-9]*|[0-9]+)$/, s)
+  # letter ones, since it has no letters to require any of. `[a-z]+(?:[A-Z][a-z]*)*[0-9]*` is
+  # lowerCamelCase (`handleIncomingWebhookRequest`) - the mirror image of the PascalCase branch,
+  # a lowercase first word followed by zero or more Capitalized ones, common in the JS/Java-
+  # style identifiers tool output can just as easily contain as Elixir's own snake_case.
+  defp plain_word_segment?(s) do
+    Regex.match?(
+      ~r/^(?:(?:[A-Z][a-z]*)+[0-9]*|[a-z]+(?:[A-Z][a-z]*)*[0-9]*|[A-Z]+[0-9]*|[0-9]+)$/,
+      s
+    )
+  end
 
   defp uuid?(s), do: Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, s)
 

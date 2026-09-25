@@ -124,6 +124,11 @@ defmodule Pepe.Secrets.RedactTest do
     assert Redact.scrub(text) == text
   end
 
+  test "still leaves a lowerCamelCase code identifier alone (regression: only PascalCase and all-lowercase were recognized as plain)" do
+    text = "Pepe.Agent.handleIncomingWebhookRequest"
+    assert Redact.scrub(text) == text
+  end
+
   test "leaves a UUID alone" do
     text = "the request id was 550e8400-e29b-41d4-a716-446655440000 for this trace"
     assert Redact.scrub(text) == text
