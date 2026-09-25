@@ -113,9 +113,34 @@ defmodule Pepe.Secrets.Redact do
   #     stop catching a lowercase-only or digit-less base64-style secret just as wrongly. A
   #     candidate with no `.`/`_`/`-` at all (nothing to split on) is judged on its own; this
   #     only ever gates a *multi-segment* run.
+  #
+  # Entropy itself is scored over a sliding window, not the whole candidate at once: a
+  # real secret glued directly (no delimiter at all, so nothing for word_segments/identifier_like?
+  # to key off) to a long, low-entropy run - 32 zero characters, say - would otherwise have its
+  # own high entropy averaged down by that filler across the *whole* candidate and never clear
+  # the bar, even though a full-length substring of it is exactly as random as any other secret
+  # this pass catches. Any window clearing the bar on its own is enough to mask the whole match.
   defp secret_like_entropy?(candidate) do
     not uuid?(candidate) and not pure_hex?(candidate) and not path_like?(candidate) and
-      not identifier_like?(candidate) and entropy_bits_per_rune(candidate) >= @entropy_bits_per_rune
+      not identifier_like?(candidate) and has_high_entropy_window?(candidate)
+  end
+
+  # A tuple, not repeated `String.slice/3` calls: slicing a binary at an arbitrary offset walks
+  # it from the start to find the right grapheme boundary, so slicing at every one of up to
+  # `len` positions is O(len) work each - the sliding window this exists for turns that into
+  # O(len²) overall (confirmed: the 200,000-character ReDoS-safety test went from under a
+  # second to over 18). `elem/2` on a tuple is O(1), keeping the whole scan O(len) again.
+  defp has_high_entropy_window?(s) do
+    graphemes = s |> String.graphemes() |> List.to_tuple()
+    len = tuple_size(graphemes)
+
+    len >= @entropy_min_length and
+      Enum.any?(0..(len - @entropy_min_length), &high_entropy_at?(graphemes, &1))
+  end
+
+  defp high_entropy_at?(graphemes, start) do
+    window = for i <- start..(start + @entropy_min_length - 1), do: elem(graphemes, i)
+    entropy_of_graphemes(window) >= @entropy_bits_per_rune
   end
 
   defp word_segments(s), do: String.split(s, ~r/[._-]/, trim: true)
@@ -127,12 +152,17 @@ defmodule Pepe.Secrets.Redact do
     end
   end
 
-  # `(?:[A-Z][a-z0-9]*)+` (not just one leading capital) so a compound PascalCase/CamelCase
-  # module or type name - `SkillLearning`, `ExternalContent` - counts as plain too; it is still
-  # several ordinary Capitalized words, just glued without a delimiter between them, and a
-  # single-capital-only rule flagged the second word's capital as the chaotic mid-string case
-  # switching a real secret has.
-  defp plain_word_segment?(s), do: Regex.match?(~r/^(?:(?:[A-Z][a-z0-9]*)+|[a-z][a-z0-9]*|[A-Z0-9]+)$/, s)
+  # `(?:[A-Z][a-z]*)+` (not just one leading capital) so a compound PascalCase/CamelCase module
+  # or type name - `SkillLearning`, `ExternalContent` - counts as plain too; it is still several
+  # ordinary Capitalized words, just glued without a delimiter between them, and a single-
+  # capital-only rule flagged the second word's capital as the chaotic mid-string case switching
+  # a real secret has. Digits are allowed only as a *trailing* run on a letter branch (`ec2`,
+  # `sha256`), never interleaved through the letters (`k9m7p3q8`) - a real word takes a digit
+  # suffix or acronym tail, it does not alternate letter/digit every couple of characters the
+  # way an encoded secret that happens to fall on the lowercase-alphanumeric branch can. A
+  # standalone all-digit segment (`54` in an IP octet) is its own branch, not folded into the
+  # letter ones, since it has no letters to require any of.
+  defp plain_word_segment?(s), do: Regex.match?(~r/^(?:(?:[A-Z][a-z]*)+[0-9]*|[a-z]+[0-9]*|[A-Z]+[0-9]*|[0-9]+)$/, s)
 
   defp uuid?(s), do: Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, s)
 
@@ -167,8 +197,7 @@ defmodule Pepe.Secrets.Redact do
     trimmed != s and not String.contains?(trimmed, "=")
   end
 
-  defp entropy_bits_per_rune(s) do
-    graphemes = String.graphemes(s)
+  defp entropy_of_graphemes(graphemes) do
     total = length(graphemes)
 
     graphemes

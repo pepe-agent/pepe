@@ -107,6 +107,23 @@ defmodule Pepe.Secrets.RedactTest do
     assert Redact.scrub(text) == text
   end
 
+  test "masks a real secret even when glued directly to a long low-entropy run (regression: whole-candidate averaging diluted it below the bar)" do
+    secret = "qP9zK3mR7vT4cB6dY1wL5hJ0eN2a"
+    out = Redact.scrub("value seen: #{String.duplicate("0", 32)}#{secret} end")
+    refute out =~ secret
+  end
+
+  test "masks a secret with digits interleaved through its letters (regression: it read as a plain lowercase-alphanumeric word)" do
+    secret = "k9m7p3q8r4t6v2x5_y1z0a9b8c7d6e5f4"
+    out = Redact.scrub("value seen: #{secret} end")
+    refute out =~ secret
+  end
+
+  test "still leaves an IP-address-shaped hostname alone (regression: pure-digit segments like 54 stopped matching any plain-word branch)" do
+    text = "ec2-54-12-34-56.compute-1.amazonaws.com"
+    assert Redact.scrub(text) == text
+  end
+
   test "leaves a UUID alone" do
     text = "the request id was 550e8400-e29b-41d4-a716-446655440000 for this trace"
     assert Redact.scrub(text) == text
