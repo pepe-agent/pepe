@@ -118,9 +118,17 @@ RUN mix release
 # ---- runtime --------------------------------------------------------------
 FROM ${RUNNER_IMAGE} AS runtime
 
-# libstdc++/ncurses/openssl are what the ERTS in the release links against. The rest is
-# for the agent itself: it has a `bash` tool and fetches URLs, so a runtime with no shell
-# and no CA bundle would ship an agent that cannot work.
+# libstdc++/ncurses/openssl are what the ERTS in the release links against. libgomp1 is
+# what exgboost's NIF (libexgboost.so) links against - without it, loading the NIF fails
+# with "libgomp.so.1: cannot open shared object file", and because that load happens in
+# an `@on_load` hook that a plain OTP release runs while PRELOADING modules at boot (not
+# when Pepe.Application starts the exgboost OTP application, which is what the graceful
+# degradation in Pepe.Application actually guards - see the commit that added it), the
+# failure takes the whole `kernel` application down before Pepe's own supervision tree
+# gets a chance to catch anything. Found by actually booting a built image, not by
+# `mix test`, which never exercises a release's own boot sequence. The rest is for the
+# agent itself: it has a `bash` tool and fetches URLs, so a runtime with no shell and no
+# CA bundle would ship an agent that cannot work.
 #
 # ffmpeg is deliberately NOT here. It looks like it should be, since Telegram sends voice
 # as OGG/Opus, but neither route that actually transcribes needs it: a transcription API
@@ -131,7 +139,7 @@ FROM ${RUNNER_IMAGE} AS runtime
 # ffmpeg, add it with PEPE_IMAGE_APT_PACKAGES below or drop a static build in /tools.
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends \
-       libstdc++6 openssl libncurses6 locales ca-certificates curl git \
+       libstdc++6 openssl libncurses6 libgomp1 locales ca-certificates curl git \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Runtime shared libraries the browser Pepe.Browser.Fetcher downloads needs to
@@ -213,10 +221,23 @@ ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 # hostname changes on every recreation (redeploy) - which orphans the Mnesia disc_copies store
 # (`Pepe.Store`), since its table is bound to the node that created it. Pinning the node keeps the
 # store loadable across restarts and redeploys. 127.0.0.1 stays inside the container (no clustering).
+#
+# RELEASE_MODE=interactive, not the `bin/pepe` script's own "embedded" default: embedded mode
+# preloads every module of every included application at boot and runs each one's `@on_load`
+# hook right there, in `kernel`'s own startup, before `Pepe.Application.start/2` gets control at
+# all - which is earlier than the guard `maybe_start_exgboost/0` puts around exgboost's NIF (see
+# lib/pepe/application.ex). That guard already assumes lazy module loading (it calls
+# `Code.ensure_loaded?/1` specifically so a failed NIF load returns an error tuple instead of
+# taking the VM down) - interactive mode is what makes that assumption true, loading a module
+# only when something first references it, which is inside the guard itself. Without this, a
+# machine whose exgboost NIF can't load for ANY reason (a missing system lib, a wrong-arch
+# prebuilt binary - both hit in practice) crashes on boot before a single line of Pepe's own code
+# runs, no matter how carefully the application-level start is guarded.
 ENV PEPE_HOME=/data \
     PEPE_SERVE=1 \
     PORT=4000 \
     MIX_ENV=prod \
+    RELEASE_MODE=interactive \
     RELEASE_DISTRIBUTION=name \
     RELEASE_NODE=pepe@127.0.0.1 \
     HOME=/tools/home \
@@ -252,3 +273,52 @@ EXPOSE 4000
 # no daemon, no supervisor, PID 1 is the VM and docker stop reaches it.
 ENTRYPOINT ["/usr/local/bin/pepe-entrypoint"]
 CMD ["bin/pepe", "start"]
+
+# ---- full --------------------------------------------------------------
+# `runtime` above, plus a curated set of system tools the built-in tools can already put
+# to use once they're actually installed, and the 1Password CLI (for an agent that reads
+# secrets with `op`, given a token via `secrets.expose_env` - see Pepe.Config.expose_env/0)
+# - published as the same tags with a `-full` suffix (`edge-full`, `X.Y.Z-full`), for
+# anyone who wants those working with no rebuild of their own. Nothing here is
+# Pepe-required - it's exactly the same `PEPE_IMAGE_APT_PACKAGES` escape hatch documented
+# above, pre-picked and pre-built. Same non-root posture as `runtime`: root only long
+# enough to apt-install and add 1Password's own repo, then back to `pepe` - the agent
+# itself never gains root, here or in the default image.
+FROM runtime AS full
+
+USER root
+
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends \
+       # OCR / image conversion.
+       tesseract-ocr tesseract-ocr-por tesseract-ocr-eng imagemagick \
+       # PDF: extract text.
+       poppler-utils \
+       # Voice/video. Not needed by either transcription route Pepe ships with (see the
+       # `runtime` stage's own comment above) - this is for everything else a bash/
+       # run_script task reaches for ffmpeg on.
+       ffmpeg \
+       # run_script's other interpreters - elixir is always available (it's the release
+       # itself); python3, node and ruby complete the set the tool actually advertises
+       # to the model.
+       python3 python3-pip nodejs ruby \
+       # General CLI the bash/run_script tools reach for on real tasks.
+       jq ripgrep unzip zip wget less openssh-client rsync gnupg \
+       dnsutils netcat-openbsd \
+       # Talk to a Postgres database with db_query/bash - not in the default image
+       # because not every deployment has one.
+       postgresql-client \
+  && rm -rf /var/lib/apt/lists/*
+
+# 1Password CLI (op): the skill-driven secrets pattern reads from `op` and expects it on
+# PATH. Official APT repo, always the latest stable - `$(dpkg --print-architecture)`
+# resolves to amd64 or arm64 so this one RUN block serves both of this image's platforms.
+RUN curl -sSf https://downloads.1password.com/linux/keys/1password.asc \
+      | gpg --dearmor -o /usr/share/keyrings/1password-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
+      > /etc/apt/sources.list.d/1password.list \
+ && apt-get update -y \
+ && apt-get install -y --no-install-recommends 1password-cli \
+ && rm -rf /var/lib/apt/lists/*
+
+USER pepe
