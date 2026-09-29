@@ -119,6 +119,8 @@ Y los comandos de operador, reservados a los entrenadores del bot:
 
 Cada skill instalada se convierte también en su propio comando de barra: una skill llamada `weather` responde tanto a `/weather` como a `/skill weather`, y aparece en el menú "/". Un comando de skill cuenta como comando de operador, porque una skill ejecuta instrucciones arbitrarias a través del agente.
 
+Para un bot que habla con el público en vez de con tu propio equipo - el equivalente al `mode: "support"` de una conexión de webhook - pon `commands: false` en el bot. Nada que empiece con `/` vuelve a reconocerse como comando; un cliente que escribe `/new` o `/whoami` simplemente le está haciendo una pregunta al agente que por casualidad empieza con barra, igual que cualquier otro mensaje. Se pone con `mix pepe gateway telegram add NAME --no-commands`, o directamente en el `config.json`.
+
 #### Los comandos de operador son solo para entrenadores
 
 Los comandos de la segunda tabla dejan ver la parte de operador: tu configuración, tus permisos, tu gasto y el inventario interno de modelos, herramientas y skills. Están restringidos a la lista `trainers` del bot, y ese control vive en el único punto por donde se despachan todos los comandos, así que ni siquiera un comando accesible por dos nombres distintos puede esquivarlo.
@@ -147,6 +149,8 @@ Una conversación de grupo es una única sesión compartida por todos los que pa
 ### Temas de foro
 
 En un grupo con **temas** activados, cada tema funciona como su propia conversación, y la respuesta vuelve al tema de donde salió. Puedes asignarle a un tema **su propio agente**: corre `/agent <nombre>` dentro del tema (o directamente **pídele** al agente que conecte ese tema con otro y lo hace por ti), y queda vinculado a ese agente de forma persistente, incluso a través de `/new` y de reinicios. Los nombres se comparan sin distinguir mayúsculas, así que `/agent engenheiro` encuentra igual a un agente llamado `Engenheiro`. De esta manera, un mismo grupo puede tener un tema de "soporte" atendido por el agente de soporte y uno de "ingeniería" por el de ingeniería, cada uno funcionando por su cuenta. El agente que responde un mensaje es el que está vinculado al tema si lo hay; si no, el `agent` del bot; y si tampoco, el predeterminado global. Un tema vinculado sigue respetando la regla de mención del grupo: pon `require_mention: false` (o `/mention off` dentro de ese tema) si quieres que conteste sin necesidad de @mención.
+
+Para un bot donde nadie debería poder cambiar qué agente contesta - ni de forma temporal ni permanente - pon `agent_switch_locked: true` en el bot (`--agent-switch-locked` en `mix pepe gateway telegram add`, o directamente en el `config.json`). Rechaza directamente `/agent NOMBRE`, incluso para un entrenador, además de `switch_agent` y las acciones `bind_topic`/`unbind_topic` de `manage_channel`, en cualquier chat de ese bot. `/agent` sin argumento, `/mention`, `/model` y `/new` siguen funcionando con normalidad.
 
 ### Cambiar de modelo en plena conversación
 

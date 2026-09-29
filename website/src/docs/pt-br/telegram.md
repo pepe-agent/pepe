@@ -166,6 +166,14 @@ Skills instaladas ganham comando de barra próprio: uma skill chamada
 menu "/". Um comando de skill conta como comando de operador, porque uma
 skill roda instruções livres através do agente.
 
+Para um bot que fala com o público em vez de com o seu próprio time - o
+equivalente ao `mode: "support"` de uma conexão de webhook - defina
+`commands: false` no bot. Nada que comece com `/` volta a ser reconhecido
+como comando; um cliente que digita `/new` ou `/whoami` está só perguntando
+algo ao agente que por acaso começa com barra, igual a qualquer outra
+mensagem. Defina com `mix pepe gateway telegram add NAME --no-commands`, ou
+direto no `config.json`.
+
 #### Comandos de operador são exclusivos dos treinadores
 
 A segunda tabela expõe a superfície de operador: configuração, permissões,
@@ -242,6 +250,14 @@ tópico, se houver; senão o `agent` configurado no bot; senão o padrão
 global. Um tópico vinculado continua seguindo a regra de menção do grupo,
 então use `require_mention: false` (ou `/mention off` dentro do tópico) se
 quiser que ele responda sem precisar de @menção.
+
+Para um bot onde ninguém deve poder trocar o agente que responde - nem
+temporária nem permanentemente - defina `agent_switch_locked: true` no bot
+(`--agent-switch-locked` no `mix pepe gateway telegram add`, ou direto no
+`config.json`). Isso recusa `/agent NOME` de cara, mesmo para um treinador,
+além do `switch_agent` e das ações `bind_topic`/`unbind_topic` do
+`manage_channel`, em qualquer chat daquele bot. `/agent` sem argumento,
+`/mention`, `/model` e `/new` continuam funcionando normalmente.
 
 ### Troque de modelo no meio da conversa
 

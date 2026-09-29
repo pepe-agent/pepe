@@ -202,16 +202,17 @@ ser independente.
 ## Encaminhamento entre agentes
 
 Para além de associar um canal a um agente, um agente que dispõe da ferramenta
-`set_route` pode alterar quais agentes podem escrever a quais, pela conversa. O
-encaminhamento é dirigido, por isso permitir que o agente A escreva ao agente B
-não permite que B escreva a A. Como edita a configuração, passa pela barreira de
-permissão: confirma a alteração antes de ela ter efeito. Dirias:
+`manage_agent` pode alterar quais agentes podem escrever a quais, pela conversa -
+para qualquer agente sobre o qual tenha autoridade `can_manage`. O encaminhamento é
+dirigido, por isso permitir que o agente A escreva ao agente B não permite que B
+escreva a A. Como edita a configuração, passa pela barreira de permissão: confirma
+a alteração antes de ela ter efeito. Dirias:
 
 > Deixa o agente de triagem passar para o agente de faturação.
 
-O agente chama `set_route` com `to: "billing"` (e `from` assume por predefinição
-aquele com quem está a falar), ou `action: "deny"` para remover uma rota. Na linha
-de comandos, o mesmo é `pepe agent route triage billing`.
+O agente chama `manage_agent` com `action: "allow_route"`, `target: "triage"`,
+`value: "billing"`, ou `action: "deny_route"` para remover uma rota. Na linha de
+comandos, o mesmo é `pepe agent route triage billing`.
 
 ## O que não vem incluído
 

@@ -75,6 +75,7 @@ defmodule Pepe.Agent.Runtime do
           # default for it.
           cwd_override: String.t() | nil,
           session_key: String.t() | nil,
+          agent_switch_locked: boolean(),
           source: String.t() | nil,
           sender: String.t() | nil,
           review: boolean(),
@@ -254,7 +255,7 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp run_chain(agent, chain, messages, opts) do
-    specs = Tools.specs(agent.tools)
+    specs = agent.tools |> Tools.specs() |> hide_switch_agent(opts[:agent_switch_locked] == true)
 
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
@@ -266,6 +267,15 @@ defmodule Pepe.Agent.Runtime do
       # head is the same approximation compaction already makes.
       model: hd(chain),
       session_key: opts[:session_key],
+      # Whether the owning connection refuses manage_channel's bind_topic/unbind_topic this
+      # turn (switch_agent itself is hidden from `specs` above rather than merely refused
+      # here - see hide_switch_agent/2) - set by the surface (webhooks/telegram) via
+      # Session's own per-turn opts, never derived here from session_key: a webhook session
+      # key carries no connection slug, so a fresh lookup from it can be ambiguous across two
+      # connections that share a provider+agent pair (see Pepe.Webhooks.session_key/2). The
+      # surface already knows unambiguously which connection this turn belongs to; this just
+      # carries that verdict.
+      agent_switch_locked: opts[:agent_switch_locked] == true,
       authorize: opts[:authorize],
       ask_user: opts[:ask_user],
       # When true (autonomous consolidation), file writes are staged for review
@@ -289,6 +299,37 @@ defmodule Pepe.Agent.Runtime do
 
     loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations || @max_iterations_backstop)
   end
+
+  # A model that never sees a locked-out capability never tries it, rather than trying and
+  # being told no every time - it costs tokens on every single turn for nothing. switch_agent
+  # is single-purpose, so it's hidden outright; manage_channel is a multi-action tool (list,
+  # set_trainers, ...) with unrelated legitimate uses, so it stays visible and only loses
+  # "bind_topic"/"unbind_topic" from its own `action` enum - the model can still see and use
+  # the tool, it just can no longer construct a call the API's own schema would accept for
+  # either of those two actions.
+  @manage_channel_action_enum ["function", "parameters", "properties", "action", "enum"]
+
+  defp hide_switch_agent(nil, _locked?), do: nil
+  defp hide_switch_agent(specs, false), do: specs
+
+  defp hide_switch_agent(specs, true) do
+    specs
+    |> Enum.reject(&(get_in(&1, ["function", "name"]) == "switch_agent"))
+    |> Enum.map(&strip_bind_topic_actions/1)
+    |> case do
+      [] -> nil
+      specs -> specs
+    end
+  end
+
+  defp strip_bind_topic_actions(%{"function" => %{"name" => "manage_channel"}} = spec) do
+    case get_in(spec, @manage_channel_action_enum) do
+      nil -> spec
+      enum -> put_in(spec, @manage_channel_action_enum, enum -- ["bind_topic", "unbind_topic"])
+    end
+  end
+
+  defp strip_bind_topic_actions(spec), do: spec
 
   @doc """
   Convenience: start a fresh conversation from a single user prompt.

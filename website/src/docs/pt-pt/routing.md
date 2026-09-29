@@ -110,17 +110,19 @@ permissões de quem está do outro lado.
 
 ## Alterar rotas pela conversa
 
-Dando a um agente a ferramenta `set_route`, ele passa a conseguir acrescentar ou
-remover rotas em conversa normal, guiado pela skill nativa `manage-routing`. A
-ferramenta recebe `{from, to, action}`, e o `from` assume por omissão o próprio
-agente que a está a chamar.
+Dando a um agente a ferramenta `manage_agent`, ele passa a conseguir acrescentar ou
+remover rotas em conversa normal, guiado pela skill nativa `manage-routing`, para
+qualquer agente sobre o qual tenha autoridade `can_manage` (por definir, o padrão
+é só ele próprio). As ações `allow_route`/`deny_route` recebem `{target, value}`,
+onde `target` é quem envia e `value` é quem recebe.
 
 ```text
 Autoriza-te a ti próprio a enviar mensagens ao agente billing.
 ```
 
-O agente chama `set_route` com `action: "allow"` e `to: "billing"`. Como isto altera
-configuração, o `set_route` passa mesmo pela barreira de permissão: tens de autorizar
-a rota nova antes de ela ficar escrita em disco. E o encaminhamento continua com
-sentido único, por isso autorizar este caminho não abre nenhum de volta para o
-`billing` responder por conta própria.
+O agente chama `manage_agent` com `action: "allow_route"`, `target` ele
+próprio, e `value: "billing"`. Como isto altera configuração, passa mesmo pela
+barreira de permissão: tens de autorizar a rota nova antes de ela ficar
+escrita em disco. E o encaminhamento continua com sentido único, por isso
+autorizar este caminho não abre nenhum de volta para o `billing` responder
+por conta própria.

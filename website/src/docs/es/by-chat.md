@@ -52,7 +52,7 @@ los reembolsos de más de 200 necesitan que intervenga una persona.
 Ahí el agente llama primero a `manage_agent` con `action: "add_tool"`, y
 después con `action: "remember"`. Ninguna de estas acciones pasa de largo: el
 agente propone el cambio, tú das el visto bueno, y solo entonces se aplica.
-Con la herramienta aparte `rename_agent` ("De ahora en adelante, llámate
+Con `action: "rename"`, `target` él mismo ("De ahora en adelante, llámate
 scout"), un agente también puede ponerse otro nombre a sí mismo, lo que mueve
 su carpeta de trabajo y entra en vigor desde el siguiente mensaje.
 

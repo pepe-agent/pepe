@@ -26,7 +26,7 @@ defmodule Pepe.SkillsTest do
 
   test "the skill tool returns the skill's content" do
     assert {:ok, content} = Pepe.Tools.Skill.run(%{"name" => "install-tool"}, %{})
-    assert content =~ "enable_tool"
+    assert content =~ "add_tool"
     assert {:error, _} = Pepe.Tools.Skill.run(%{"name" => "nope"}, %{})
   end
 

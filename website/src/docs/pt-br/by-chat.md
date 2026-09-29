@@ -75,9 +75,9 @@ reembolsos acima de 200 precisam de uma pessoa.
 O agente chama `manage_agent` com `action: "add_tool"` e depois com
 `action: "remember"`. Cada uma dessas ações tem barreira própria: o agente
 propõe a mudança, você a autoriza, e só então ela é aplicada. Um agente também
-pode se renomear com a ferramenta separada `rename_agent` ("De agora em
-diante, se chame scout"), que move o diretório do seu workspace e entra em
-vigor na próxima mensagem.
+pode se renomear ("De agora em diante, se chame scout") com
+`action: "rename"`, `target` ele mesmo, que move o diretório do seu workspace
+e entra em vigor na próxima mensagem.
 
 ## Instalar plugins da comunidade
 

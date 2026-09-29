@@ -159,6 +159,13 @@ answers to `/weather` as well as to `/skill weather`, and it is discoverable fro
 the "/" menu. A skill command counts as an operator command, because a skill runs
 arbitrary instructions through the agent.
 
+For a bot that talks to the public rather than to your own team - the equivalent of
+a webhook connection's `mode: "support"` - set `commands: false` on the bot. Nothing
+starting with `/` is recognized as a command anymore; a customer typing `/new` or
+`/whoami` just asks the agent a question that happens to start with a slash,
+exactly like any other message. Set it with `mix pepe gateway telegram add NAME
+--no-commands`, or directly in `config.json`.
+
 #### Operator commands are trainers-only
 
 The commands in the second table expose operator surface: your config, your
@@ -227,6 +234,13 @@ The agent for a message is the topic's bound agent if it has one, otherwise the
 bot's `agent`, otherwise the global default. A bound topic still follows the
 group's mention rule: set `require_mention: false` (or `/mention off` in that
 topic) if you want it to answer without an @mention.
+
+For a bot where nobody should ever be able to change which agent answers - neither
+temporarily nor permanently - set `agent_switch_locked: true` on the bot
+(`--agent-switch-locked` on `mix pepe gateway telegram add`, or directly in
+`config.json`). It refuses `/agent NAME` outright, even for a trainer, plus
+`switch_agent` and `manage_channel`'s `bind_topic`/`unbind_topic` for any chat on that
+bot. `/agent` with no arguments, `/mention`, `/model` and `/new` still work normally.
 
 ### Switch models mid-conversation
 

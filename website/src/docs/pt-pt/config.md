@@ -58,7 +58,7 @@ entre todos os agentes.
 Um agente sem identidade própria (sem `SOUL.md`, ainda na configuração inicial)
 apresenta-se simplesmente como Pepe, avisa que ainda não tem nome nem características
 definidas, e propõe-se a tratar disso. As tuas respostas ficam gravadas no `SOUL.md`, e é
-a própria ferramenta `rename_agent` que muda o nome do agente a partir daí.
+a ação `rename` do `manage_agent` que muda o nome do agente a partir daí.
 
 ### Um modelo barato para as tarefas menores (`utility_model`)
 

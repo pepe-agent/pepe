@@ -315,7 +315,7 @@ Instalar um plugin não entrega as ferramentas dele a todo agente de uma vez; s�
 
 **Painel:** abra o agente em Agentes e marque a ferramenta; ferramentas de plugin aparecem lado a lado com as embutidas.
 
-**Pela conversa:** um agente com `enable_tool` consegue ligar uma ferramenta para si mesmo:
+**Pela conversa:** um agente com `manage_agent` consegue ligar uma ferramenta para si mesmo:
 
 > Você: ative a ferramenta reverse_text
 >
@@ -520,4 +520,4 @@ O `run/2` de uma ferramenta só devolve texto. Para entregar um arquivo de verda
 1. Implemente `name/0`, `verify/2`, `authenticate/3`, `parse/1`, `deliver/3`; some `config_schema/0` se precisar de credenciais configuradas pelo painel.
 2. Adicione `respond/3` só se o protocolo da plataforma exigir uma resposta síncrona antes de qualquer trabalho do agente; `deliver_file/4`, só se ela conseguir receber anexos.
 
-**De um jeito ou de outro:** rode a varredura (`pepe plugin scan SRC` ou `manage_plugin scan`), instale, revise o que ela encontrou, e só então conceda a ferramenta a um agente (pela CLI, pelo painel, ou por `enable_tool`/`manage_agent` na conversa). Um canal não precisa dessa concessão: fica ativo assim que é instalado.
+**De um jeito ou de outro:** rode a varredura (`pepe plugin scan SRC` ou `manage_plugin scan`), instale, revise o que ela encontrou, e só então conceda a ferramenta a um agente (pela CLI, pelo painel, ou pelo `manage_agent` na conversa). Um canal não precisa dessa concessão: fica ativo assim que é instalado.

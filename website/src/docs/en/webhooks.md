@@ -106,6 +106,14 @@ to the engineer, permanently") with its `bind_topic`/`unbind_topic` actions - se
 [Agent-to-agent routing](../routing/) for the difference between this and
 `switch_agent`, which is deliberately temporary and undone by `/new`.
 
+Set `agent_switch_locked: true` on the connection for a channel where nobody should
+ever be able to change which agent answers - neither temporarily nor permanently. It
+refuses `/agent NAME` outright, even for a trainer, plus `switch_agent` and
+`manage_channel`'s `bind_topic`/`unbind_topic` for any conversation on that connection.
+`/agent` with no arguments (status), `/mention`, `/model` and `/new` still work
+normally. Set it with `--agent-switch-locked` on `mix pepe gateway whatsapp add` /
+`discord add`, or directly in `config.json`.
+
 ## Switching models
 
 The `/model` and `/models` commands let people check or change which AI model

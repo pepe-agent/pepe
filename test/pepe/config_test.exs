@@ -112,6 +112,62 @@ defmodule Pepe.ConfigTest do
     end
   end
 
+  describe "migration: enable_tool/set_route/rename_agent -> manage_agent" do
+    test "swaps a retired tool name for manage_agent, once, keeping every other tool" do
+      File.write!(
+        Config.path(),
+        legacy_config(%{
+          "agents" => %{
+            "assistant" => %{"model" => "mock", "system_prompt" => "hi", "tools" => ["bash", "enable_tool"]},
+            "router" => %{"model" => "mock", "system_prompt" => "r", "tools" => ["set_route", "rename_agent"]}
+          }
+        })
+      )
+
+      assert %{tools: assistant_tools} = Config.get_agent("assistant")
+      assert "bash" in assistant_tools
+      assert "manage_agent" in assistant_tools
+      refute "enable_tool" in assistant_tools
+
+      assert %{tools: router_tools} = Config.get_agent("router")
+      assert router_tools == ["manage_agent"]
+    end
+
+    test "an agent that already has manage_agent doesn't get it twice" do
+      File.write!(
+        Config.path(),
+        legacy_config(%{
+          "agents" => %{
+            "assistant" => %{"model" => "mock", "system_prompt" => "hi", "tools" => ["manage_agent", "enable_tool"]}
+          }
+        })
+      )
+
+      assert %{tools: tools} = Config.get_agent("assistant")
+      assert Enum.count(tools, &(&1 == "manage_agent")) == 1
+    end
+
+    test "an agent with no retired tool name is left untouched" do
+      File.write!(
+        Config.path(),
+        legacy_config(%{
+          "agents" => %{"assistant" => %{"model" => "mock", "system_prompt" => "hi", "tools" => ["bash", "read_file"]}}
+        })
+      )
+
+      assert %{tools: tools} = Config.get_agent("assistant")
+      assert tools == ["bash", "read_file"]
+    end
+
+    test "an agent with no explicit tools list (every built-in by default) is left untouched" do
+      File.write!(Config.path(), legacy_config(%{}))
+
+      assert %{tools: tools} = Config.get_agent("assistant")
+      assert "manage_agent" in tools
+      refute "enable_tool" in tools
+    end
+  end
+
   describe "backup/0" do
     test "returns nil when there is no config file yet" do
       assert Config.backup() == nil

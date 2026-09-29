@@ -57,6 +57,8 @@ Como un comando de canal igual necesita estar dirigido al bot para poder ejecuta
 
 Es una decisión permanente, que afecta a todo el canal, no una elección puntual de enrutamiento - por eso está reservada a **entrenadores** (la misma lista de confianza que ya controla `/model ... global`); cualquier otra persona solo recibe un "no tienes permiso". Un agente con la herramienta `manage_channel` puede hacer lo mismo en lenguaje natural ("vincula este canal al ingeniero, de forma permanente") con sus acciones `bind_topic`/`unbind_topic` - ver [Enrutamiento entre agentes](../routing/) para la diferencia entre esto y `switch_agent`, que es temporal a propósito y que el `/new` sí deshace.
 
+Para un canal donde nadie debería poder cambiar qué agente contesta - ni de forma temporal ni permanente - pon `agent_switch_locked: true` en la conexión. Rechaza directamente `/agent NOMBRE`, incluso para un entrenador, además de `switch_agent` y las acciones `bind_topic`/`unbind_topic` de `manage_channel`, en cualquier conversación de esa conexión. `/agent` sin argumento (estado), `/mention`, `/model` y `/new` siguen funcionando con normalidad. Se pone con `--agent-switch-locked` en `mix pepe gateway whatsapp add` / `discord add`, o directamente en el `config.json`.
+
 ## Cambiar de modelo
 
 Los comandos `/model` y `/models` dejan que cualquiera consulte o cambie qué modelo de IA le responde. Solo funcionan en una conexión con modo `admin` que tenga `commands` habilitado (revisa la comparación de modos en [Channels](../channels/)); en modo `support` se tratan como texto normal. `/models` lista los modelos disponibles para el proyecto de esa conexión; `/model` muestra el actual, o lo cambia:

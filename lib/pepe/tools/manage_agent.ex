@@ -18,8 +18,16 @@ defmodule Pepe.Tools.ManageAgent do
   memory live in the target's workspace (`SOUL.md`, `MEMORY.md`); tools/model live in
   its config.
 
-  Actions: `list`, `get`, `create`, `set_persona`, `set_model`, `set_utility_model`,
-  `set_flag`, `add_tool`, `remove_tool`, `remember`.
+  Actions: `list`, `get`, `create`, `rename`, `set_persona`, `set_model`, `set_utility_model`,
+  `set_flag`, `add_tool`, `remove_tool`, `allow_route`, `deny_route`, `remember`.
+
+  `rename`, `allow_route` and `deny_route` used to be their own standalone tools
+  (`rename_agent`, `set_route`, and a self-grant shortcut `enable_tool`) - folded in here so
+  every change to another agent's config goes through the same `can_manage` gate, not a
+  second, weaker one. `set_route` in particular let any agent holding it edit *any other
+  agent's* `can_message`, unchecked; `allow_route`/`deny_route` require the same authority
+  over `target` (the agent whose outbound routing changes) that every other action here
+  already requires.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -29,6 +37,7 @@ defmodule Pepe.Tools.ManageAgent do
   alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.Config.Agent
+  alias Pepe.Project
 
   @impl true
   def name, do: "manage_agent"
@@ -46,6 +55,8 @@ defmodule Pepe.Tools.ManageAgent do
       - get: show a target's definition - needs `target`.
       - create: create a new agent - needs `target` (name); optional `value` (its
         starting persona/system prompt).
+      - rename: rename a target's handle (config entry + workspace directory) - needs
+        `target`, `value` (the new name). Takes effect on its next message.
       - set_persona: set the target's persona (its SOUL.md) - needs `target`, `value`.
       - set_model: point the target at a configured model - needs `target`, `value`.
       - set_utility_model: point the target's chores (naming a conversation) at a
@@ -114,6 +125,9 @@ defmodule Pepe.Tools.ManageAgent do
             the folder twice per command. Turn it ON for "let me undo what its commands did".
       - add_tool / remove_tool: grant or revoke one tool on the target - needs
         `target`, `value` (the tool name).
+      - allow_route / deny_route: add or remove a directed route FROM `target` TO another
+        agent - needs `target` (the sender), `value` (the recipient). Directed: allowing
+        target->value does not allow value->target.
       - remember: append a durable fact to the target's memory (train it) - needs
         `target`, `value`.
       """,
@@ -122,13 +136,15 @@ defmodule Pepe.Tools.ManageAgent do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(list get create set_persona set_model set_utility_model set_flag add_tool remove_tool remember),
+            "enum" =>
+              ~w(list get create rename set_persona set_model set_utility_model set_flag add_tool remove_tool allow_route deny_route remember),
             "description" => "What to do."
           },
           "target" => %{"type" => "string", "description" => "The agent to act on."},
           "value" => %{
             "type" => "string",
-            "description" => "Payload: persona text, model name, tool name, a memory line, or \"on\"/\"off\" for set_flag."
+            "description" =>
+              "Payload: new name, persona text, model name, tool name, route recipient, a memory line, or \"on\"/\"off\" for set_flag."
           },
           "flag" => %{
             "type" => "string",
@@ -189,6 +205,22 @@ defmodule Pepe.Tools.ManageAgent do
 
   defp dispatch("get", target, _args), do: with_agent(target, &{:ok, describe(&1)})
 
+  # Config.rename_agent/2 moves the workspace directory and retargets every Telegram bot
+  # pinned to the old name, atomically, as part of its own write - nothing else to do here
+  # on success.
+  defp dispatch("rename", target, args) do
+    with {:ok, new_name} <- fetch(args, "value"),
+         qualified = Project.qualify(new_name, target),
+         :ok <- ensure_same_scope(qualified, target) do
+      case Config.rename_agent(target, qualified) do
+        :ok -> {:ok, "Renamed #{target} to #{qualified}; takes effect on its next message."}
+        {:error, :not_found} -> {:error, "no agent named #{target}"}
+        {:error, :already_exists} -> {:error, "the name #{qualified} is already taken in this project"}
+        {:error, :invalid_name} -> {:error, "#{qualified} isn't a valid agent name (letters, digits, - and _ only)"}
+      end
+    end
+  end
+
   defp dispatch("set_persona", target, args) do
     with {:ok, text} <- fetch(args, "value"),
          :ok <- ensure_exists(target) do
@@ -240,6 +272,30 @@ defmodule Pepe.Tools.ManageAgent do
     end
   end
 
+  # `target` is the sender (the agent whose can_message is edited), `value` the recipient -
+  # this is a config change to `target`, so it's already gated by the same can_manage(admin,
+  # target) check run/2 applies to every other action, unlike the standalone set_route tool
+  # this replaced (which let any caller edit any agent's routing, unchecked).
+  defp dispatch("allow_route", target, args) do
+    with {:ok, to} <- fetch(args, "value"),
+         :ok <- ensure_exists(target) do
+      if Config.get_agent(to) do
+        Config.allow_message(target, to)
+        {:ok, "#{target} can now message #{to}."}
+      else
+        {:error, "Unknown agent: #{to}"}
+      end
+    end
+  end
+
+  defp dispatch("deny_route", target, args) do
+    with {:ok, to} <- fetch(args, "value"),
+         :ok <- ensure_exists(target) do
+      Config.disallow_message(target, to)
+      {:ok, "Removed route #{target} -> #{to}."}
+    end
+  end
+
   defp dispatch("remember", target, args) do
     with {:ok, fact} <- fetch(args, "value"),
          :ok <- ensure_exists(target) do
@@ -251,6 +307,20 @@ defmodule Pepe.Tools.ManageAgent do
   end
 
   defp dispatch(other, _target, _args), do: {:error, "unknown or incomplete action: #{other}"}
+
+  # Config.rename_agent/2 can only ever rename WITHIN an agent's current project (it derives
+  # the bare name from `value` and reconstructs the handle from the target's own existing
+  # project id) - a `value` naming a different project would otherwise be silently truncated
+  # to its bare name and applied in the wrong (the original) project, while the success
+  # message went on to report the name that was actually asked for. Refuse instead of
+  # silently doing something other than what was asked.
+  defp ensure_same_scope(qualified, target) do
+    if Project.same_scope?(qualified, target) do
+      :ok
+    else
+      {:error, "#{target} can't be moved to a different project by renaming - #{qualified} is in a different scope"}
+    end
+  end
 
   # Contained defaults - what a non-first agent gets. Whether this turns out to be its
   # project's first agent, and therefore gets primary_overrides/0 applied instead, is

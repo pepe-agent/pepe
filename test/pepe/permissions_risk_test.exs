@@ -18,7 +18,7 @@ defmodule Pepe.Permissions.RiskTest do
 
   test "tool-level risks regardless of args" do
     assert Risk.hints("write_file", %{"path" => "a.txt"}) == [:writes_file]
-    assert Risk.hints("set_route", %{}) == [:changes_config]
+    assert Risk.hints("manage_agent", %{}) == [:changes_config]
   end
 
   test "reading inside the workspace carries no risk; reaching outside it does" do

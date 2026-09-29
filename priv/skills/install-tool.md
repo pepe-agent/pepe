@@ -29,7 +29,8 @@ restart. Follow these steps:
 
 2. The plugin is picked up automatically (hot-reloaded by file change) - you don't
    restart anything.
-3. Enable it on yourself with the `enable_tool` tool, passing the tool's `name`.
+3. Enable it on yourself with `manage_agent`: action `add_tool`, `target` yourself, `value`
+   the tool's `name`.
 4. It's usable from your next message.
 
 Tips:

@@ -109,7 +109,8 @@ A few filenames are **conventions** you may create and maintain yourself:
   `edit_file` as you learn.
 
 This is autonomy by convention, not hardcoded code: ordinary file tools plus a place
-where files persist. Rename yourself with `rename_agent` (it moves this directory too).
+where files persist. Rename yourself with `manage_agent`'s `rename` action, target
+yourself (it moves this directory too).
 
 ## Backup, extract, and restore
 

@@ -388,6 +388,7 @@ defmodule Pepe.Agent.Session do
       state
       |> Map.put_new(:idle_ref, nil)
       |> Map.put_new(:learn_allowed, true)
+      |> Map.put_new(:agent_switch_locked, false)
       |> Map.put_new(:model_override, nil)
       |> Map.put_new(:mention_optional, false)
       # Messages sent while a turn is running wait here (FIFO) and run right after it,
@@ -679,7 +680,7 @@ defmodule Pepe.Agent.Session do
             Workspace.time_reminder() ++
             goal_reminder(state.key) ++ [Message.user(resume_prompt(redacted))]
 
-        opts = [session_key: state.key]
+        opts = [session_key: state.key, agent_switch_locked: state.agent_switch_locked]
 
         Pepe.Hooks.start_map(state.pii_map ++ entries)
 
@@ -722,7 +723,7 @@ defmodule Pepe.Agent.Session do
       agent ->
         prompt = Pepe.Heartbeat.build_prompt(state.key, agent.name)
         messages = ensure_system(state.messages, agent) ++ Workspace.time_reminder() ++ [Message.user(prompt)]
-        opts = [session_key: state.key]
+        opts = [session_key: state.key, agent_switch_locked: state.agent_switch_locked]
 
         # The pulse prompt itself is internal (never user text, so no inbound
         # transform), but the agent can still call tools during a heartbeat - same
@@ -970,6 +971,11 @@ defmodule Pepe.Agent.Session do
     opts = Keyword.put(opts, :session_key, state.key)
     # Whether this conversation may feed the memory/skill review (set by the surface).
     state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
+    # Whether the owning connection refuses agent-switching this turn (set by the surface,
+    # same pattern as learn_allowed above) - remembered on state so a heartbeat/resume turn
+    # (which builds its own opts with no surface in the loop) still carries it forward.
+    state = %{state | agent_switch_locked: Keyword.get(opts, :agent_switch_locked, state.agent_switch_locked)}
+    opts = Keyword.put(opts, :agent_switch_locked, state.agent_switch_locked)
     # Remember this turn's trust context for `/retry` - see `last_turn_meta`'s own doc above.
     state = %{state | last_turn_meta: %{untrusted: opts[:untrusted] == true, sender_tag: opts[:sender_tag]}}
     # A new message cancels any pending idle review and re-arms the TTL.

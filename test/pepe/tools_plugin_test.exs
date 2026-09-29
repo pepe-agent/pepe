@@ -64,9 +64,16 @@ defmodule Pepe.ToolsPluginTest do
 
     assert "echo2" in Pepe.Tools.names()
 
-    # the agent adds the new tool to its own allowlist
+    # the agent adds the new tool to its own allowlist (manage_agent's add_tool, self-targeted -
+    # the standalone enable_tool shortcut this used to call folded into manage_agent)
     Pepe.Config.put_agent(%Pepe.Config.Agent{name: "zak", system_prompt: "x", tools: []})
-    assert {:ok, _} = Pepe.Tools.EnableTool.run(%{"name" => "echo2"}, %{agent: %{name: "zak"}})
+
+    assert {:ok, _} =
+             Pepe.Tools.ManageAgent.run(
+               %{"action" => "add_tool", "target" => "zak", "value" => "echo2"},
+               %{agent: %Pepe.Config.Agent{name: "zak"}}
+             )
+
     assert "echo2" in Pepe.Config.get_agent("zak").tools
   end
 

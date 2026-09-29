@@ -51,7 +51,7 @@ Eso imprime la ruta de la configuración y un resumen de lo que está definido. 
 
 Cada agente recibe además un directorio persistente en `~/.pepe/agents/<name>/`. Ahí viven su `SOUL.md` (su persona) y cualquier archivo que cree mientras trabaja (`MEMORY.md`, `people.md` y lo que decida conservar). `~/.pepe/shared/` es compartido por todos los agentes.
 
-Un agente que todavía no tiene identidad (sin `SOUL.md`, aún con la semilla por defecto) se presenta como Pepe, te dice que no tiene nombre ni características definidas, y se ofrece a configurarlo. Luego guarda tus decisiones en `SOUL.md` y se renombra con la herramienta `rename_agent`.
+Un agente que todavía no tiene identidad (sin `SOUL.md`, aún con la semilla por defecto) se presenta como Pepe, te dice que no tiene nombre ni características definidas, y se ofrece a configurarlo. Luego guarda tus decisiones en `SOUL.md` y se renombra con la acción `rename` de `manage_agent`.
 
 ### Un modelo barato para las tareas menores (`utility_model`)
 

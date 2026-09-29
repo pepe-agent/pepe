@@ -216,17 +216,18 @@ quedar aislado del siguiente.
 ## Enrutar entre agentes
 
 Más allá de vincular un canal a un agente, uno que tenga la herramienta
-`set_route` puede, desde el chat, cambiar qué agentes tienen permiso para
-escribirle a cuáles. El enrutamiento tiene dirección: dejar que el agente A
-le escriba al B no implica que B pueda escribirle a A. Como esto modifica la
+`manage_agent` puede, desde el chat, cambiar qué agentes tienen permiso para
+escribirle a cuáles - para cualquier agente sobre el que tenga autoridad
+`can_manage`. El enrutamiento tiene dirección: dejar que el agente A le
+escriba al B no implica que B pueda escribirle a A. Como esto modifica la
 configuración, pasa por la barrera de permisos, y confirmas el cambio antes
 de que quede activo. Podrías decir:
 
 > Deja que el agente de triaje derive al de facturación.
 
-El agente llama a `set_route` con `to: "billing"` (y `from` toma por defecto
-al agente con el que estás hablando en ese momento), o con `action: "deny"`
-para quitar una ruta. Desde la línea de comandos, esto mismo es
+El agente llama a `manage_agent` con `action: "allow_route"`,
+`target: "triage"`, `value: "billing"`, o con `action: "deny_route"` para
+quitar una ruta. Desde la línea de comandos, esto mismo es
 `pepe agent route triage billing`.
 
 ## Lo que no viene incluido

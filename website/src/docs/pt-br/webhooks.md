@@ -117,6 +117,14 @@ ações `bind_topic`/`unbind_topic` dela - veja
 [Roteamento entre agentes](../routing/) pra entender a diferença entre isso e o
 `switch_agent`, que é propositalmente temporário e desfeito pelo `/new`.
 
+Pra um canal onde ninguém deve poder trocar qual agente responde - nem temporária
+nem permanentemente - defina `agent_switch_locked: true` na conexão. Isso recusa
+`/agent NOME` de cara, mesmo para um treinador, além do `switch_agent` e das ações
+`bind_topic`/`unbind_topic` do `manage_channel`, em qualquer conversa dessa conexão.
+`/agent` sem argumento (status), `/mention`, `/model` e `/new` continuam funcionando
+normalmente. Defina com `--agent-switch-locked` no `mix pepe gateway whatsapp add` /
+`discord add`, ou direto no `config.json`.
+
 ## Trocando de modelo
 
 Os comandos `/model` e `/models` deixam qualquer pessoa consultar ou trocar

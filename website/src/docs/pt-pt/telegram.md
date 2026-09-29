@@ -119,6 +119,8 @@ E os comandos de operador, reservados aos formadores do bot:
 
 Cada skill instalada ganha também o seu próprio comando de barra: uma skill chamada `weather` responde tanto a `/weather` como a `/skill weather`, e aparece no menu "/". Um comando de skill conta sempre como comando de operador, porque uma skill executa instruções arbitrárias através do agente.
 
+Para um bot que fala com o público em vez de com a tua equipa - o equivalente ao `mode: "support"` de uma ligação de webhook - define `commands: false` no bot. Nada que comece por `/` volta a ser reconhecido como comando; um cliente que escreve `/new` ou `/whoami` está só a fazer uma pergunta ao agente que por acaso começa por barra, tal como qualquer outra mensagem. Define com `mix pepe gateway telegram add NAME --no-commands`, ou diretamente no `config.json`.
+
 #### Os comandos de operador são só para formadores
 
 A segunda tabela expõe a superfície de operador: a tua configuração, as tuas permissões, o teu gasto, e o inventário interno de modelos, ferramentas e skills. Por isso fica restrita à lista `trainers` do bot, com a barreira colocada no ponto único onde todos os comandos são despachados, o que impede um comando alcançável por dois nomes de a contornar.
@@ -147,6 +149,8 @@ Uma conversa de grupo é uma única sessão partilhada por toda a gente que lá 
 ### Tópicos de fórum
 
 Num grupo com **tópicos** ativados, cada tópico funciona como a sua própria conversa, e a resposta volta sempre ao tópico de onde veio. Também podes dar a um tópico **o seu próprio agente**: basta correr `/agent <nome>` dentro dele (ou simplesmente **pedir** ao agente para ligar esse tópico a outro, e ele trata disso por ti), e a associação fica guardada mesmo depois de `/new` ou de um reinício. Os nomes são comparados sem distinguir maiúsculas, por isso `/agent engenheiro` encontra um agente chamado `Engenheiro`. Assim, um mesmo grupo consegue ter um tópico de "suporte" respondido pelo agente de suporte e um de "engenharia" respondido pelo engenheiro, lado a lado. O agente que responde a uma mensagem é sempre o agente vinculado ao tópico, se existir; caso contrário, o `agent` do bot; e, na falta desse, a predefinição global. Um tópico vinculado continua a obedecer à regra de menção do grupo, por isso, se quiseres que responda sem @menção, define `require_mention: false` (ou usa `/mention off` dentro desse tópico).
+
+Para um bot onde ninguém deve poder trocar o agente que responde - nem temporária nem permanentemente - define `agent_switch_locked: true` no bot (`--agent-switch-locked` no `mix pepe gateway telegram add`, ou diretamente no `config.json`). Recusa logo o `/agent NOME`, mesmo para um formador, além do `switch_agent` e das ações `bind_topic`/`unbind_topic` do `manage_channel`, em qualquer chat desse bot. O `/agent` sem argumento, `/mention`, `/model` e `/new` continuam a funcionar normalmente.
 
 ### Muda de modelo a meio de uma conversa
 

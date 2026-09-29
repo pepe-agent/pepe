@@ -89,6 +89,118 @@ defmodule Pepe.Tools.ManageAgentTest do
     assert msg =~ "unknown tool"
   end
 
+  describe "rename (folded in from the old standalone rename_agent tool)" do
+    test "an ordinary agent may rename itself" do
+      Config.put_agent(%Agent{name: "mover", system_prompt: "m"})
+      File.mkdir_p!(Workspace.dir("mover"))
+      File.write!(Path.join(Workspace.dir("mover"), "SOUL.md"), "persona")
+
+      ctx = %{agent: %Agent{name: "mover"}}
+      assert {:ok, _} = ManageAgent.run(%{"action" => "rename", "target" => "mover", "value" => "renamed"}, ctx)
+
+      assert Config.get_agent("mover") == nil
+      assert Config.get_agent("renamed").system_prompt == "m"
+      assert File.read!(Path.join(Workspace.dir("renamed"), "SOUL.md")) == "persona"
+    end
+
+    test "an admin with can_manage authority may rename another agent" do
+      ctx = ctx(["sales"])
+      assert {:ok, _} = ManageAgent.run(%{"action" => "rename", "target" => "sales", "value" => "renamed"}, ctx)
+      assert Config.get_agent("sales") == nil
+      assert Config.get_agent("renamed")
+    end
+
+    test "an agent explicitly locked out of self-management (can_manage: []) can't rename itself" do
+      Config.put_agent(%Agent{name: "mover", system_prompt: "m", can_manage: []})
+      ctx = %{agent: %Agent{name: "mover", can_manage: []}}
+
+      assert {:error, msg} = ManageAgent.run(%{"action" => "rename", "target" => "mover", "value" => "renamed"}, ctx)
+      assert msg =~ "isn't available"
+      assert Config.get_agent("mover") != nil
+    end
+
+    test "renaming onto a colliding name is refused and never moves the workspace directory" do
+      Config.put_agent(%Agent{name: "target", system_prompt: "t"})
+      File.mkdir_p!(Workspace.dir("sales"))
+      File.mkdir_p!(Workspace.dir("target"))
+      File.write!(Path.join(Workspace.dir("sales"), "SOUL.md"), "i am sales")
+      File.write!(Path.join(Workspace.dir("target"), "SOUL.md"), "i am target")
+
+      ctx = ctx(["sales"])
+      assert {:error, _} = ManageAgent.run(%{"action" => "rename", "target" => "sales", "value" => "target"}, ctx)
+
+      assert Config.get_agent("sales").system_prompt == "x"
+      assert Config.get_agent("target").system_prompt == "t"
+      assert File.read!(Path.join(Workspace.dir("sales"), "SOUL.md")) == "i am sales"
+      assert File.read!(Path.join(Workspace.dir("target"), "SOUL.md")) == "i am target"
+    end
+
+    test "a value naming a different project is refused, not silently truncated and applied in the original project" do
+      :ok = Config.add_project("acme")
+      ctx = ctx(["sales"])
+
+      assert {:error, msg} = ManageAgent.run(%{"action" => "rename", "target" => "sales", "value" => "acme/sales"}, ctx)
+      assert msg =~ "different"
+
+      # Nothing changed - "sales" is neither renamed to "acme/sales" nor silently
+      # truncated and renamed to a bare "sales" (a no-op that would still lose the ask).
+      assert Config.get_agent("sales").system_prompt == "x"
+      refute Config.get_agent("acme/sales")
+    end
+
+    test "renaming to an invalid name is refused without touching the filesystem" do
+      File.mkdir_p!(Workspace.dir("sales"))
+      File.write!(Path.join(Workspace.dir("sales"), "SOUL.md"), "i am sales")
+
+      ctx = ctx(["sales"])
+      assert {:error, _} = ManageAgent.run(%{"action" => "rename", "target" => "sales", "value" => "../../pwn"}, ctx)
+
+      assert Config.get_agent("sales").system_prompt == "x"
+      assert File.read!(Path.join(Workspace.dir("sales"), "SOUL.md")) == "i am sales"
+    end
+  end
+
+  describe "allow_route / deny_route (folded in from the old standalone set_route tool)" do
+    test "allow_route adds a directed route from target to value" do
+      ctx = ctx(["sales"])
+      assert {:ok, msg} = ManageAgent.run(%{"action" => "allow_route", "target" => "sales", "value" => "hr"}, ctx)
+      assert msg =~ "sales can now message hr"
+      assert Config.get_agent("sales").can_message == ["default/hr"]
+      # Directed: hr -> sales was not created.
+      assert Config.get_agent("hr").can_message == []
+    end
+
+    test "deny_route removes a route" do
+      Config.allow_message("sales", "hr")
+      ctx = ctx(["sales"])
+      assert {:ok, msg} = ManageAgent.run(%{"action" => "deny_route", "target" => "sales", "value" => "hr"}, ctx)
+      assert msg =~ "Removed route sales -> hr"
+      assert Config.get_agent("sales").can_message == []
+    end
+
+    test "rejects an unknown recipient" do
+      ctx = ctx(["sales"])
+      assert {:error, msg} = ManageAgent.run(%{"action" => "allow_route", "target" => "sales", "value" => "ghost"}, ctx)
+      assert msg =~ "Unknown agent: ghost"
+    end
+
+    test "refuses to edit routing for an agent outside the manager's scope - this is exactly the bug the fold-in fixed" do
+      ctx = ctx(["hr"])
+      assert {:error, msg} = ManageAgent.run(%{"action" => "allow_route", "target" => "sales", "value" => "hr"}, ctx)
+      assert msg =~ "isn't available"
+      assert Config.get_agent("sales").can_message == []
+    end
+
+    test "a super-admin naming a target that doesn't exist gets an error, not a false success" do
+      ctx = ctx(["*"])
+      assert {:error, msg} = ManageAgent.run(%{"action" => "allow_route", "target" => "ghost", "value" => "hr"}, ctx)
+      assert msg =~ "no agent named ghost"
+
+      assert {:error, msg} = ManageAgent.run(%{"action" => "deny_route", "target" => "ghost", "value" => "hr"}, ctx)
+      assert msg =~ "no agent named ghost"
+    end
+  end
+
   test "sets the target's persona into its workspace SOUL.md" do
     assert {:ok, _} =
              ManageAgent.run(

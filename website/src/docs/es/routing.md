@@ -108,15 +108,18 @@ enrutamiento le da a un agente acceso a otro, pero nunca le lava los permisos.
 
 ## Cambiar rutas desde el chat
 
-Si le das a un agente la herramienta `set_route`, podrá agregar o quitar rutas
-conversando, guiado por la skill integrada `manage-routing`. La herramienta recibe
-`{from, to, action}`, donde `from` toma por defecto al agente que hace la llamada.
+Si le das a un agente la herramienta `manage_agent`, podrá agregar o quitar rutas
+conversando, guiado por la skill integrada `manage-routing`, para cualquier agente
+sobre el que tenga autoridad `can_manage` (sin definir, el valor por defecto es
+solo él mismo). Las acciones `allow_route`/`deny_route` reciben `{target, value}`,
+donde `target` es quien envía y `value` quien recibe.
 
 ```text
 Date permiso a ti mismo para escribirle al agente de billing.
 ```
 
-El agente llama a `set_route` con `action: "allow"` y `to: "billing"`. Como esta acción
-modifica la configuración, `set_route` sí pasa por el aviso de permisos: tú autorizas la
-ruta nueva antes de que quede escrita en disco. El enrutamiento sigue siendo dirigido, así
-que aprobar esta ruta no habilita que `billing` te responda por su cuenta.
+El agente llama a `manage_agent` con `action: "allow_route"`, `target` él
+mismo, y `value: "billing"`. Como esta acción modifica la configuración, sí
+pasa por el aviso de permisos: tú autorizas la ruta nueva antes de que quede
+escrita en disco. El enrutamiento sigue siendo dirigido, así que aprobar esta
+ruta no habilita que `billing` te responda por su cuenta.

@@ -21,7 +21,6 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Docs
   alias Pepe.Tools.Doctor
   alias Pepe.Tools.EditFile
-  alias Pepe.Tools.EnableTool
   alias Pepe.Tools.EndSession
   alias Pepe.Tools.FetchUrl
   alias Pepe.Tools.Goal
@@ -43,7 +42,6 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.MoveFile
   alias Pepe.Tools.Plan
   alias Pepe.Tools.ReadFile
-  alias Pepe.Tools.RenameAgent
   alias Pepe.Tools.Review
   alias Pepe.Tools.RunCode
   alias Pepe.Tools.RunGraph
@@ -54,7 +52,6 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.SendPresentation
   alias Pepe.Tools.SendToAgent
   alias Pepe.Tools.SessionSearch
-  alias Pepe.Tools.SetRoute
   alias Pepe.Tools.Skill
   alias Pepe.Tools.SkillCurator
   alias Pepe.Tools.SkillManage
@@ -109,11 +106,8 @@ defmodule Pepe.Tools do
     ScanSkill,
     SkillManage,
     SkillCurator,
-    RenameAgent,
     ConfigGet,
     ConfigSet,
-    EnableTool,
-    SetRoute,
     Review,
     Watch,
     Commitment,

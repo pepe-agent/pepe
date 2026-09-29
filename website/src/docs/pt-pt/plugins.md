@@ -315,7 +315,7 @@ Instalar um plugin não entrega logo as suas ferramentas a todos os agentes: só
 
 **Painel:** abre o agente em Agentes e assinala a ferramenta; as ferramentas de plugin aparecem lado a lado com as incorporadas.
 
-**Pela conversa:** um agente com `enable_tool` consegue ativar uma ferramenta para si próprio:
+**Pela conversa:** um agente com `manage_agent` consegue ativar uma ferramenta para si próprio:
 
 > Tu: ativa a ferramenta reverse_text
 >
@@ -520,4 +520,4 @@ O `run/2` de uma ferramenta só devolve texto, sempre. Para entregares um fichei
 1. Implementa `name/0`, `verify/2`, `authenticate/3`, `parse/1` e `deliver/3`; acrescenta `config_schema/0` se precisares de credenciais configuradas pelo painel.
 2. Só acrescentes `respond/3` se o protocolo da plataforma exigir mesmo uma resposta síncrona antes de qualquer trabalho do agente; e só `deliver_file/4` se conseguir receber anexos.
 
-**Seja qual for o caso:** analisa-o primeiro (`pepe plugin scan SRC` ou `manage_plugin scan`), instala-o, revê o que a verificação encontrou, e só depois concede a ferramenta a um agente (pela CLI, pelo painel, ou por `enable_tool`/`manage_agent` na conversa); um canal não precisa de nenhuma concessão especial, fica ativo assim que é instalado.
+**Seja qual for o caso:** analisa-o primeiro (`pepe plugin scan SRC` ou `manage_plugin scan`), instala-o, revê o que a verificação encontrou, e só depois concede a ferramenta a um agente (pela CLI, pelo painel, ou pelo `manage_agent` na conversa); um canal não precisa de nenhuma concessão especial, fica ativo assim que é instalado.

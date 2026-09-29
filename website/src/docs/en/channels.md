@@ -195,17 +195,17 @@ exchange should be independent.
 
 ## Routing between agents
 
-Beyond binding a channel to one agent, an agent that holds the `set_route` tool
-can change which agents may message which, from chat. Routing is directed, so
-allowing agent A to message agent B does not allow B to message A. Because it
-edits config, it goes through the permission gate: you confirm the change
-before it takes effect. You would say:
+Beyond binding a channel to one agent, an agent that holds the `manage_agent` tool
+can change which agents may message which, from chat - for any agent it has
+`can_manage` authority over. Routing is directed, so allowing agent A to message
+agent B does not allow B to message A. Because it edits config, it goes through the
+permission gate: you confirm the change before it takes effect. You would say:
 
 > Let the triage agent hand off to the billing agent.
 
-The agent calls `set_route` with `to: "billing"` (and `from` defaults to the
-one you are talking to), or `action: "deny"` to remove a route. On the command
-line the same thing is `pepe agent route triage billing`.
+The agent calls `manage_agent` with `action: "allow_route"`, `target: "triage"`,
+`value: "billing"`, or `action: "deny_route"` to remove a route. On the command line
+the same thing is `pepe agent route triage billing`.
 
 ## Not built in
 

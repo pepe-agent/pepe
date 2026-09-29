@@ -19,6 +19,14 @@ defmodule Pepe.Tools.ManageChannel do
   so the bot starts/stops live (no restart) when the server is up.
 
   Actions: `add`, `list`, `set_agent`, `enable`, `disable`, `remove`.
+
+  On a connection with `agent_switch_locked` set, `bind_topic` and `unbind_topic` are
+  refused outright (see `run/2`) - and, unlike `switch_agent` on the same connection,
+  this tool stays fully visible to the model rather than being hidden: its other actions
+  (`list`, `set_trainers`, ...) have nothing to do with the lock. Only those two action
+  names are missing from the `action` parameter's own `enum` for a locked turn (see
+  `Pepe.Agent.Runtime.run_chain/3`'s `strip_bind_topic_actions/1`), so the model can't
+  even construct a call the API's schema would accept for either of them.
   """
 
   @behaviour Pepe.Tools.Tool
@@ -57,7 +65,8 @@ defmodule Pepe.Tools.ManageChannel do
         `agent`, persistent, surviving /new and restarts. Only for an operator configuring \
         routing ahead of time. NOT for a user asking to talk to, be connected with, or \
         transferred to another agent right now; that's switch_agent (or the /agent command), \
-        never this. Needs `agent`.
+        never this. Needs `agent`. Refused outright on a channel where agent switching is \
+        locked.
       - unbind_topic: remove this conversation's agent binding (back to the channel's own \
         default agent).
       - set_trainers: who the bot LEARNS from - needs `name`, `trainers` ("*" = \
@@ -111,11 +120,24 @@ defmodule Pepe.Tools.ManageChannel do
   @impl true
   def run(%{"action" => action} = args, ctx) do
     cond do
-      is_nil(ctx[:agent]) -> {:error, "no calling agent in context"}
+      is_nil(ctx[:agent]) ->
+        {:error, "no calling agent in context"}
+
+      # A channel-wide policy, not a per-agent one - refused regardless of the calling
+      # agent's own tool allowlist. See the comment on Pepe.Agent.Runtime.run_chain/3's
+      # own ctx field for how this gets here.
+      action in ["bind_topic", "unbind_topic"] and ctx[:agent_switch_locked] == true ->
+        {:error, "agent switching is locked on this channel"}
+
       # These act on the *current* forum topic, so they need the conversation's session key.
-      action == "bind_topic" -> bind_topic(args, ctx)
-      action == "unbind_topic" -> unbind_topic(ctx)
-      true -> dispatch(action, args)
+      action == "bind_topic" ->
+        bind_topic(args, ctx)
+
+      action == "unbind_topic" ->
+        unbind_topic(ctx)
+
+      true ->
+        dispatch(action, args)
     end
   end
 

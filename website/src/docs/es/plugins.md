@@ -314,7 +314,7 @@ Instalar un plugin no le entrega sus herramientas a todos los agentes: solo qued
 
 **Panel:** abre el agente en Agentes y marca la herramienta; las herramientas de plugin aparecen junto a las integradas.
 
-**Por chat:** un agente con `enable_tool` puede activar una herramienta para sí mismo:
+**Por chat:** un agente con `manage_agent` puede activar una herramienta para sí mismo:
 
 > Tú: activa la herramienta reverse_text
 >
@@ -519,4 +519,4 @@ El `run/2` de una herramienta solo puede devolver texto. Para entregarle a la pe
 1. Implementa `name/0`, `verify/2`, `authenticate/3`, `parse/1` y `deliver/3`; agrega `config_schema/0` si necesita credenciales configuradas desde el panel.
 2. Agrega `respond/3` solo si el protocolo de la plataforma exige una respuesta síncrona antes de cualquier trabajo del agente; `deliver_file/4` solo si puede recibir adjuntos.
 
-**En cualquiera de los dos casos:** escanéalo (`pepe plugin scan SRC` o `manage_plugin scan`), instálalo, revisa lo que encontró el escaneo, y después concédele la herramienta a un agente (por CLI, panel, o `enable_tool`/`manage_agent` desde el chat). Un canal no necesita ninguna concesión: queda activo apenas se instala.
+**En cualquiera de los dos casos:** escanéalo (`pepe plugin scan SRC` o `manage_plugin scan`), instálalo, revisa lo que encontró el escaneo, y después concédele la herramienta a un agente (por CLI, panel, o `manage_agent` desde el chat). Un canal no necesita ninguna concesión: queda activo apenas se instala.

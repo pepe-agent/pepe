@@ -427,7 +427,7 @@ listed on an agent are exposed to it, gated the same as a built-in.
 **Dashboard:** open the agent under Agents and tick the tool; plugin tools
 appear alongside built-ins.
 
-**By chat:** an agent with `enable_tool` can turn on a tool for itself:
+**By chat:** an agent with `manage_agent` can turn on a tool for itself:
 
 > You: enable the reverse_text tool
 >
@@ -716,5 +716,5 @@ works from chat, on any channel whose provider implements `deliver_file/4`.
 
 **Either way:** scan it (`pepe plugin scan SRC` or `manage_plugin scan`),
 install it, review what the scan found, then grant the tool to an agent (CLI,
-dashboard, or `enable_tool`/`manage_agent` from chat); a channel needs no
-grant, it's live the moment it's installed.
+dashboard, or `manage_agent` from chat); a channel needs no grant, it's live
+the moment it's installed.
