@@ -473,7 +473,7 @@ jobs:
   # under QEMU. Each pushes an image *by digest* (no tag); `manifest` below is
   # what unites them under one name, so a `docker pull` resolves to the right one.
   image:
-    name: image (${{ matrix.arch }})
+    name: image (${{ matrix.arch }}, ${{ matrix.variant }})
     needs: [test, credo, website, dialyzer]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push')
     runs-on: ${{ matrix.runner }}
@@ -487,12 +487,29 @@ jobs:
       packages: write
     strategy:
       fail-fast: false
+      # `variant: full` builds the Dockerfile's `full` stage instead of the default
+      # `runtime` one - same release, same everything, plus the curated system tools
+      # documented on that stage (OCR/PDF/image, run_script's other interpreters, ops
+      # utilities, 1Password CLI). Published as the same tags with a `-full` suffix by
+      # the manifest job below, alongside the thin default - never replacing it.
       matrix:
         include:
           - arch: amd64
             runner: ubuntu-latest
+            variant: default
+            target: runtime
+          - arch: amd64
+            runner: ubuntu-latest
+            variant: full
+            target: full
           - arch: arm64
             runner: ubuntu-24.04-arm
+            variant: default
+            target: runtime
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            variant: full
+            target: full
     steps:
       - uses: actions/checkout@v7
 
@@ -510,10 +527,11 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          target: ${{ matrix.target }}
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}-${{ matrix.variant }}
 
       - name: Hand the digest to the manifest job
         run: |
@@ -523,24 +541,31 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: digest-${{ matrix.arch }}
+          name: digest-${{ matrix.variant }}-${{ matrix.arch }}
           path: /tmp/digests/*
           retention-days: 1
 
   # The tags live here, not on the per-arch images: this is the manifest list that
   # makes `docker pull ghcr.io/pepe-agent/pepe` serve arm64 to an M-series Mac and
-  # amd64 to a server, from one name.
+  # amd64 to a server, from one name. Runs once per variant (default, full), each only
+  # ever combining that variant's own digests - a `-full` tag must never resolve to a
+  # thin manifest just because the two ran in the same matrix.
   manifest:
+    name: manifest (${{ matrix.variant }})
     needs: image
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || (github.ref == 'refs/heads/master' && github.event_name == 'push')
     runs-on: ubuntu-latest
     permissions:
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [default, full]
     steps:
       - uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
-          pattern: digest-*
+          pattern: digest-${{ matrix.variant }}-*
           merge-multiple: true
 
       - uses: docker/setup-buildx-action@v4
@@ -553,7 +578,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # v0.3.0 publishes three names for one digest: `0.3.0` never moves, `0.3` follows the
-      # patches on that line, and `latest` follows the newest stable release.
+      # patches on that line, and `latest` follows the newest stable release. The `full`
+      # variant publishes the exact same three names with a `-full` suffix
+      # (`0.3.0-full`, `0.3-full`, `latest-full`) - `onlatest=true` is what makes the
+      # suffix reach the auto-generated `latest` tag too, not just the ones listed below.
       #
       # `latest=auto` rather than "any tag starting with v": it is metadata-action's own
       # rule, and it knows a pre-release is not a release. Tagging latest by hand would
@@ -566,6 +594,7 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=auto
+            suffix=${{ matrix.variant == 'full' && '-full' || '' }},onlatest=true
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
