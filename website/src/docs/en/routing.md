@@ -102,15 +102,17 @@ another, but it never launders that agent's permissions.
 
 ## Changing routes from chat
 
-Give an agent the `set_route` tool and it can add or remove routes conversationally,
-guided by the built-in `manage-routing` skill. The tool takes `{from, to, action}`,
-where `from` defaults to the calling agent.
+Give an agent the `manage_agent` tool and it can add or remove routes
+conversationally, guided by the built-in `manage-routing` skill, for any agent it has
+`can_manage` authority over (unset defaults to itself only). The `allow_route`/
+`deny_route` actions take `{target, value}`, where `target` is the sender and `value`
+the recipient.
 
 ```text
 Allow yourself to message the billing agent.
 ```
 
-The agent calls `set_route` with `action: "allow"` and `to: "billing"`. Since this edits
-configuration, `set_route` does pass through the permission prompt: you authorize the
-new route before it is written to disk. Routing is still directed, so allowing this one
-does not let `billing` message back.
+The agent calls `manage_agent` with `action: "allow_route"`, `target` itself, and
+`value: "billing"`. Since this edits configuration, it does pass through the
+permission prompt: you authorize the new route before it is written to disk. Routing
+is still directed, so allowing this one does not let `billing` message back.

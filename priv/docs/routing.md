@@ -61,17 +61,21 @@ through, `send_to_agent` refuses the call if:
 So a mis-configured web of routes can't spin agents forever: a chain always
 terminates.
 
-## Setting routes from chat (`set_route`)
+## Setting routes from chat (`manage_agent`'s `allow_route`/`deny_route`)
 
-Give an agent the `set_route` tool and it can add or remove routes itself, subject to
-the permission prompt (it edits config):
+An agent with the `manage_agent` tool can add or remove routes for anything it has
+`can_manage` authority over, subject to the permission prompt (it edits config):
 
-- `to: "billing" action: "allow"`: add a route from you to `billing` (`from` defaults
-  to the calling agent).
-- `from: "sales" to: "billing" action: "deny"`: remove the `sales -> billing` route.
+- `action: "allow_route" target: "sales" value: "billing"`: add a route from `sales`
+  to `billing`.
+- `action: "deny_route" target: "sales" value: "billing"`: remove the
+  `sales -> billing` route.
 
-`action` defaults to `"allow"`. Routing stays directed: allowing `A -> B` never adds
-`B -> A`. The owner can also wire routes from the CLI:
+`target` is the agent whose outbound routing changes (the "from" side) - the same
+`can_manage` authority every other `manage_agent` action needs over its `target`
+applies here too, so this can't be used to rewrite routing for an agent you have no
+authority over. Routing stays directed: allowing `A -> B` never adds `B -> A`. The
+owner can also wire routes from the CLI:
 
 ```bash
 mix pepe agent route sales billing            # let sales message billing

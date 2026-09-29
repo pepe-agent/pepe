@@ -237,7 +237,7 @@ The built-in set covers the common ground:
 | `send_to_agent` | Message another agent (subject to `can_message`). |
 | `ask_user` | Ask you to pick one of a few options, as real tappable buttons/menu where the channel supports it. |
 | `schedule_task`, `watch` | Create recurring jobs and one-shot "notify me when X" watches. |
-| `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Manage agents, tools, and routing from chat. |
+| `manage_agent` | Manage another agent (persona, model, tools, routing, rename) from chat. |
 | `manage_channel`, `end_session` | Connect and close messaging channels from chat. |
 | `manage_mcp`, `scan_skill`, `skill` | Add external tool servers and skills. |
 | `manage_plugin` | Install, scan, list, and remove community plugins (tools, channels) from chat. |
@@ -279,16 +279,16 @@ refuses the call outright rather than hang waiting for a button nobody can press
 ### Do it by chat
 
 An agent that has just installed a plugin, or that wants a capability it does not yet
-hold, can enable a tool on itself with `enable_tool`:
+hold, can enable a tool on itself with `manage_agent`:
 
 ```text
 Enable the web_search tool for yourself.
 ```
 
-The agent calls `enable_tool` with the tool name. The tool must already exist as a
-built-in or an installed plugin, and the change takes effect on the agent's next
-message. `enable_tool` is itself gated, so you authorize the grant before it is
-written.
+The agent calls `manage_agent` with action `add_tool`, `target` itself, and `value`
+the tool name. The tool must already exist as a built-in or an installed plugin, and
+the change takes effect on the agent's next message. `manage_agent` is itself gated,
+so you authorize the grant before it is written.
 
 ## The model connection
 
@@ -398,16 +398,18 @@ different projects.
 
 ### Do it by chat
 
-An agent with the `set_route` tool can change routing conversationally. `from`
-defaults to the calling agent:
+An agent with the `manage_agent` tool can change routing conversationally, for any
+agent it has `can_manage` authority over (unset defaults to itself only - see
+[Administering agents](#administering-agents) below):
 
 ```text
 Allow yourself to message the billing agent.
 ```
 
-The agent calls `set_route` with `action: "allow"` and `to: "billing"`. Routing is
-directed, so this does not let `billing` message back. Because it edits config,
-`set_route` goes through the permission gate and you authorize the change.
+The agent calls `manage_agent` with `action: "allow_route"`, `target` itself, and
+`value: "billing"`. Routing is directed, so this does not let `billing` message back.
+Because it edits config, this goes through the permission gate and you authorize the
+change.
 
 ## Administering agents
 
@@ -431,8 +433,9 @@ pepe agent manage supervisor "*"
 ### Do it by chat
 
 An admin agent uses `manage_agent` to shape the agents in its scope. Its actions are
-`list`, `get`, `create`, `set_persona`, `set_model`, `add_tool`, `remove_tool`, and
-`remember` (append a durable fact to the target's memory). For example:
+`list`, `get`, `create`, `rename`, `set_persona`, `set_model`, `add_tool`,
+`remove_tool`, `allow_route`, `deny_route`, and `remember` (append a durable fact to
+the target's memory). For example:
 
 ```text
 Give the support agent the send_file tool and add a note to its memory that
@@ -442,7 +445,7 @@ refunds over 200 need a human.
 The agent calls `manage_agent` with `action: "add_tool"` and then
 `action: "remember"`. Every one of these actions is gated: the agent proposes the
 change, you authorize it, and only then is it applied. An agent can also rename
-itself with the separate `rename_agent` tool ("From now on, call yourself scout"),
+itself ("From now on, call yourself scout") with `action: "rename"`, `target` itself,
 which moves its workspace directory and takes effect on the next message.
 
 ## Multi-tenant agents with projects

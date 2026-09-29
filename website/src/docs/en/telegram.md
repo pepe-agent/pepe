@@ -159,6 +159,13 @@ answers to `/weather` as well as to `/skill weather`, and it is discoverable fro
 the "/" menu. A skill command counts as an operator command, because a skill runs
 arbitrary instructions through the agent.
 
+For a bot that talks to the public rather than to your own team - the equivalent of
+a webhook connection's `mode: "support"` - set `commands: false` on the bot. Nothing
+starting with `/` is recognized as a command anymore; a customer typing `/new` or
+`/whoami` just asks the agent a question that happens to start with a slash,
+exactly like any other message. Set it with `mix pepe gateway telegram add NAME
+--no-commands`, or directly in `config.json`.
+
 #### Operator commands are trainers-only
 
 The commands in the second table expose operator surface: your config, your

@@ -119,6 +119,8 @@ E os comandos de operador, reservados aos formadores do bot:
 
 Cada skill instalada ganha também o seu próprio comando de barra: uma skill chamada `weather` responde tanto a `/weather` como a `/skill weather`, e aparece no menu "/". Um comando de skill conta sempre como comando de operador, porque uma skill executa instruções arbitrárias através do agente.
 
+Para um bot que fala com o público em vez de com a tua equipa - o equivalente ao `mode: "support"` de uma ligação de webhook - define `commands: false` no bot. Nada que comece por `/` volta a ser reconhecido como comando; um cliente que escreve `/new` ou `/whoami` está só a fazer uma pergunta ao agente que por acaso começa por barra, tal como qualquer outra mensagem. Define com `mix pepe gateway telegram add NAME --no-commands`, ou diretamente no `config.json`.
+
 #### Os comandos de operador são só para formadores
 
 A segunda tabela expõe a superfície de operador: a tua configuração, as tuas permissões, o teu gasto, e o inventário interno de modelos, ferramentas e skills. Por isso fica restrita à lista `trainers` do bot, com a barreira colocada no ponto único onde todos os comandos são despachados, o que impede um comando alcançável por dois nomes de a contornar.

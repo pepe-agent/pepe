@@ -210,17 +210,17 @@ intacto: só a conversa atual é reiniciada. Isso é útil num canal em modo
 ## Roteamento entre agentes
 
 Além de vincular um canal a um agente, um agente com a ferramenta
-`set_route` pode mudar, pela conversa, quais agentes podem mandar mensagem
-para quais. O roteamento é direcionado, então permitir que o agente A escreva
-para o agente B não permite o contrário. Como isso edita a configuração,
-passa pela barreira de permissão: você confirma a mudança antes de ela valer.
-Você diria:
+`manage_agent` pode mudar, pela conversa, quais agentes podem mandar mensagem
+para quais - para qualquer agente sobre o qual tenha autoridade `can_manage`.
+O roteamento é direcionado, então permitir que o agente A escreva para o
+agente B não permite o contrário. Como isso edita a configuração, passa pela
+barreira de permissão: você confirma a mudança antes de ela valer. Você diria:
 
 > Deixe o agente de triagem repassar para o agente de faturamento.
 
-O agente chama `set_route` com `to: "billing"` (e `from` assume por padrão
-aquele com quem você está falando), ou `action: "deny"` para remover uma rota.
-Na linha de comando, a mesma coisa é `pepe agent route triage billing`.
+O agente chama `manage_agent` com `action: "allow_route"`, `target: "triage"`,
+`value: "billing"`, ou `action: "deny_route"` para remover uma rota. Na linha
+de comando, a mesma coisa é `pepe agent route triage billing`.
 
 ## O que não vem embutido
 

@@ -410,13 +410,20 @@ defmodule Pepe.Gateways.Telegram do
   defp register_commands do
     Config.put_locale()
 
-    menu =
-      if is_list(bot()["trainers"]),
-        do: Enum.reject(menu(), &operator_command?(elem(&1, 0))),
-        else: full_menu()
+    # A commands: false bot never recognizes a "/" as a command (see command_mode/1) - the
+    # menu would otherwise still advertise a popup full of slashes that all just land as
+    # plain chat text, which is exactly the confusion this flag exists to avoid.
+    if bot()["commands"] == false do
+      Req.post(api_url(token(), "deleteMyCommands"), json: %{})
+    else
+      menu =
+        if is_list(bot()["trainers"]),
+          do: Enum.reject(menu(), &operator_command?(elem(&1, 0))),
+          else: full_menu()
 
-    commands = Enum.map(menu, fn {name, desc} -> %{command: name, description: desc} end)
-    Req.post(api_url(token(), "setMyCommands"), json: %{commands: commands})
+      commands = Enum.map(menu, fn {name, desc} -> %{command: name, description: desc} end)
+      Req.post(api_url(token(), "setMyCommands"), json: %{commands: commands})
+    end
 
     for scope <- @owned_scopes do
       Req.post(api_url(token(), "deleteMyCommands"), json: %{scope: %{type: scope}})
@@ -1480,12 +1487,22 @@ defmodule Pepe.Gateways.Telegram do
     Config.put_locale()
     put_learn(learn_allowed?(user_id))
 
-    case parse_command(text) do
+    case command_mode(text) do
       # /whoami is the one command that needs the sender id.
       {:command, "whoami", _args} -> whoami(chat_id, user_id)
       {:command, name, args} -> dispatch(chat_id, name, args)
       :chat -> chat_with_agent(chat_id, msg_id, text, sender_tag: sender_tag, sender: sender_name)
     end
+  end
+
+  # A bot with `commands: false` (the customer-facing equivalent of a webhook connection's
+  # own `mode: "support"` - see Pepe.Webhooks.command/3) never recognizes a "/" as a command
+  # attempt at all: everything falls through as plain chat text, same as a message that never
+  # started with "/" would. Not a per-command allowlist - the whole surface is off, so a
+  # customer typing "/help" or "/new" reads as a question to the agent, never as a command a
+  # stranger could use to reset a conversation or ask "/whoami".
+  defp command_mode(text) do
+    if bot()["commands"] == false, do: :chat, else: parse_command(text)
   end
 
   # "/cmd@botname args" -> {:command, "cmd", "args"}; anything else -> :chat.
@@ -1622,6 +1639,18 @@ defmodule Pepe.Gateways.Telegram do
 
   defp friendly_error(:message_limit_exceeded),
     do: gettext("This workspace has hit its monthly message limit. It resumes next month, or an admin can raise the cap.")
+
+  defp friendly_error(:no_model_configured),
+    do:
+      gettext(
+        "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `mix pepe model add` (`mix pepe setup` walks through both)."
+      )
+
+  defp friendly_error(reason) when reason in [:no_agent, :no_agent_configured],
+    do:
+      gettext(
+        "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `mix pepe agent add` (`mix pepe setup` walks through both)."
+      )
 
   defp friendly_error(_),
     do: gettext("Sorry, something went wrong on my end. Try again in a moment?")
@@ -2673,11 +2702,8 @@ defmodule Pepe.Gateways.Telegram do
   defp tool_summary("web_search"), do: gettext("Search the web.")
   defp tool_summary("skill"), do: gettext("Read a skill (a how-to guide).")
   defp tool_summary("send_to_agent"), do: gettext("Send a message to another agent.")
-  defp tool_summary("rename_agent"), do: gettext("Rename yourself (this agent).")
   defp tool_summary("config_get"), do: gettext("Read the Pepe configuration.")
   defp tool_summary("config_set"), do: gettext("Change a Pepe setting.")
-  defp tool_summary("enable_tool"), do: gettext("Enable a tool for yourself.")
-  defp tool_summary("set_route"), do: gettext("Add or remove an agent-to-agent route.")
   defp tool_summary(_other), do: nil
 
   # Translated one-liners for the built-in skills, shown in the "/" menu and the
@@ -3573,7 +3599,11 @@ defmodule Pepe.Gateways.Telegram do
 
   defp addressed?(text, _group, chat_id, message) do
     if require_mention?() do
-      mentions_bot?(text) or command?(text) or mention_waived?(chat_id) or
+      # A real command is unambiguously addressed to the bot by its own syntax alone - but
+      # only on a bot that still recognizes "/" as a command at all (see command_mode/1);
+      # on a commands: false bot, "/" is just a character, and treating it as automatic
+      # address would let anyone skip the @mention requirement by typing "/anything".
+      mentions_bot?(text) or (command?(text) and bot()["commands"] != false) or mention_waived?(chat_id) or
         replying_to_bot?(message["reply_to_message"] || %{})
     else
       true

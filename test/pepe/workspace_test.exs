@@ -100,13 +100,16 @@ defmodule Pepe.Agent.WorkspaceTest do
     refute prompt =~ "seed persona"
   end
 
-  test "the rename_agent tool renames the agent in config and moves its workspace" do
+  test "manage_agent's rename action renames the agent in config and moves its workspace" do
     Pepe.Config.put_agent(%Pepe.Config.Agent{name: "teste", system_prompt: "x", tools: []})
     File.mkdir_p!(Workspace.dir("teste"))
     File.write!(Path.join(Workspace.dir("teste"), "SOUL.md"), "soul")
 
     assert {:ok, _} =
-             Pepe.Tools.RenameAgent.run(%{"new_name" => "zak"}, %{agent: %{name: "teste"}})
+             Pepe.Tools.ManageAgent.run(
+               %{"action" => "rename", "target" => "teste", "value" => "zak"},
+               %{agent: %Pepe.Config.Agent{name: "teste"}}
+             )
 
     assert Pepe.Config.get_agent("teste") == nil
     assert Pepe.Config.get_agent("zak")

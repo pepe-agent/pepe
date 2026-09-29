@@ -253,7 +253,7 @@ O conjunto que já vem incluído cobre o essencial:
 | `send_to_agent` | Envia uma mensagem a outro agente (sujeito ao `can_message`). |
 | `ask_user` | Pede-te para escolheres entre algumas opções, com botões ou menu a sério onde o canal o suportar. |
 | `schedule_task`, `watch` | Criam tarefas recorrentes e vigias pontuais do tipo "avisa-me quando X acontecer". |
-| `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gerem agentes, ferramentas e encaminhamento diretamente pelo chat. |
+| `manage_agent` | Gere outro agente (persona, modelo, ferramentas, encaminhamento, renomear) pelo chat. |
 | `manage_channel`, `end_session` | Ligam e fecham canais de mensagens pelo chat. |
 | `manage_mcp`, `scan_skill`, `skill` | Adicionam servidores de ferramentas externas e skills. |
 | `manage_plugin` | Instala, verifica, lista e remove plugins da comunidade (ferramentas, canais) pelo chat. |
@@ -302,15 +302,16 @@ botão que ninguém pode carregar.
 ### Fazer isto por chat
 
 Um agente que acabou de instalar um plugin, ou que precisa de uma capacidade que
-ainda não tem, consegue ativar uma ferramenta em si próprio com o `enable_tool`:
+ainda não tem, consegue ativar uma ferramenta em si próprio com o `manage_agent`:
 
 ```text
 Enable the web_search tool for yourself.
 ```
 
-O agente chama `enable_tool` com o nome da ferramenta pretendida. Essa ferramenta
-já tem de existir, como integrada ou como plugin instalado, e a alteração só entra
-em vigor a partir da mensagem seguinte do agente. O `enable_tool` também passa por
+O agente chama `manage_agent` com a ação `add_tool`, `target` ele próprio, e
+`value` o nome da ferramenta pretendida. Essa ferramenta já tem de existir,
+como integrada ou como plugin instalado, e a alteração só entra em vigor a
+partir da mensagem seguinte do agente. O `manage_agent` também passa por
 barreira, por isso autorizas a concessão antes de ela ficar escrita.
 
 ## A ligação de modelo
@@ -430,17 +431,19 @@ recusa `A -> B` sempre que os dois estejam em projetos diferentes.
 
 ### Fazer isto por chat
 
-Um agente com a ferramenta `set_route` consegue mudar o encaminhamento por
-conversa. O `from` assume por omissão o próprio agente que está a chamar:
+Um agente com a ferramenta `manage_agent` consegue mudar o encaminhamento por
+conversa, para qualquer agente sobre o qual tenha autoridade `can_manage`
+(por definir, o padrão é só ele próprio):
 
 ```text
 Allow yourself to message the billing agent.
 ```
 
-O agente chama `set_route` com `action: "allow"` e `to: "billing"`. Como o
-encaminhamento é de sentido único, isto não permite que `billing` responda de
-volta. E como isto altera a configuração, o `set_route` passa pela barreira de
-permissão e és tu quem autoriza a mudança.
+O agente chama `manage_agent` com `action: "allow_route"`, `target` ele
+próprio, e `value: "billing"`. Como o encaminhamento é de sentido único, isto
+não permite que `billing` responda de volta. E como isto altera a
+configuração, passa pela barreira de permissão e és tu quem autoriza a
+mudança.
 
 ## Administrar agentes
 
@@ -466,9 +469,9 @@ pepe agent manage supervisor "*"
 ### Fazer isto por chat
 
 Um agente administrador usa o `manage_agent` para moldar os agentes dentro do seu
-âmbito. As suas ações são `list`, `get`, `create`, `set_persona`, `set_model`,
-`add_tool`, `remove_tool` e `remember` (que acrescenta um facto duradouro à memória
-do alvo). Por exemplo:
+âmbito. As suas ações são `list`, `get`, `create`, `rename`, `set_persona`,
+`set_model`, `add_tool`, `remove_tool`, `allow_route`, `deny_route` e `remember`
+(que acrescenta um facto duradouro à memória do alvo). Por exemplo:
 
 ```text
 Dá ao agente de apoio a ferramenta send_file e regista na memória dele que
@@ -478,9 +481,9 @@ reembolsos acima de 200 precisam de uma pessoa.
 O agente chama `manage_agent` com `action: "add_tool"` e depois com
 `action: "remember"`. Todas estas ações passam por barreira: o agente propõe a
 alteração, tu autorizas, e só depois disso é que ela é aplicada. Um agente também
-consegue mudar o seu próprio nome com a ferramenta separada `rename_agent`
-("De agora em diante, chama-te scout"), o que move o diretório do seu workspace e
-entra em vigor logo na mensagem seguinte.
+consegue mudar o seu próprio nome ("De agora em diante, chama-te scout") com
+`action: "rename"`, `target` ele próprio, o que move o diretório do seu
+workspace e entra em vigor logo na mensagem seguinte.
 
 ## Agentes multi-inquilino com projetos
 

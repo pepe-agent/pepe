@@ -33,7 +33,7 @@ Já vêm junto com o Pepe, dentro de `priv/skills/`:
 - **`skill-creator`**: como criar, editar, auditar e melhorar skills, a meta-skill.
 - **`install-tool`**: escrever uma ferramenta como plugin e habilitá-la pela conversa.
 - **`write-a-script`**: resolver tarefas complexas escrevendo um programa e salvando-o para rodar depois.
-- **`manage-routing`**: mudar rotas entre agentes usando `set_route`.
+- **`manage-routing`**: mudar rotas entre agentes usando `manage_agent`.
 - **`handle-media`**: entender uma entrada de voz, áudio, imagem ou arquivo (transcrever, ler), instalando o que faltar para isso.
 - **`install-skill`**: instalar uma skill a partir de uma URL, um gist, um repositório, ou outro Pepe.
 - **`create-watch`**: montar um watch durável do tipo "verifica X e me avisa quando acontecer".
@@ -287,7 +287,7 @@ nome vinda de outro lugar só consegue substituir a já instalada através de um
 Skills, plugins e scripts trabalham em conjunto, e é essa combinação que permite pedir
 a um agente, em linguagem natural, algo que ele ainda não sabe fazer.
 
-Junte isso a [plugins](../plugins/) e ao `enable_tool`, e dá para simplesmente pedir
+Junte isso a [plugins](../plugins/) e ao `manage_agent`, e dá para simplesmente pedir
 pela conversa que o agente instale uma ferramenta capaz de fazer X. Ele lê a skill
 `install-tool`, escreve o plugin em `plugins/<nome>.exs`, habilita a ferramenta nele
 mesmo, e já passa a usá-la, sem precisar reiniciar nada.

@@ -166,6 +166,14 @@ Skills instaladas ganham comando de barra próprio: uma skill chamada
 menu "/". Um comando de skill conta como comando de operador, porque uma
 skill roda instruções livres através do agente.
 
+Para um bot que fala com o público em vez de com o seu próprio time - o
+equivalente ao `mode: "support"` de uma conexão de webhook - defina
+`commands: false` no bot. Nada que comece com `/` volta a ser reconhecido
+como comando; um cliente que digita `/new` ou `/whoami` está só perguntando
+algo ao agente que por acaso começa com barra, igual a qualquer outra
+mensagem. Defina com `mix pepe gateway telegram add NAME --no-commands`, ou
+direto no `config.json`.
+
 #### Comandos de operador são exclusivos dos treinadores
 
 A segunda tabela expõe a superfície de operador: configuração, permissões,

@@ -48,7 +48,7 @@ refunds over 200 need a human.
 The agent calls `manage_agent` with `action: "add_tool"` and then
 `action: "remember"`. Every one of these actions is gated: the agent proposes the
 change, you authorize it, and only then is it applied. An agent can also rename
-itself with the separate `rename_agent` tool ("From now on, call yourself scout"),
+itself ("From now on, call yourself scout") with `action: "rename"`, `target` itself,
 which moves its workspace directory and takes effect on the next message.
 
 ## Installing community plugins

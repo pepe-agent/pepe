@@ -97,7 +97,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
                                           [--heartbeat-minutes N] [--heartbeat-hours 8-22]
                                           [--progress reaction|ambient|off|verbose]
-                                          [--agent-switch-locked]
+                                          [--agent-switch-locked] [--no-commands]
       mix pepe gateway telegram list           # list configured bots
       mix pepe gateway telegram remove NAME    # delete a named bot
       mix pepe gateway telegram                # run the gateway (one poller per bot)
@@ -5227,7 +5227,8 @@ defmodule Mix.Tasks.Pepe do
           heartbeat_minutes: :integer,
           heartbeat_hours: :string,
           progress: :string,
-          agent_switch_locked: :boolean
+          agent_switch_locked: :boolean,
+          commands: :boolean
         ]
       )
 
@@ -5247,7 +5248,8 @@ defmodule Mix.Tasks.Pepe do
             "heartbeat_minutes" => opts[:heartbeat_minutes],
             "heartbeat_active_hours" => parse_hour_window(opts[:heartbeat_hours]),
             "tool_progress" => valid_progress(opts[:progress]),
-            "agent_switch_locked" => opts[:agent_switch_locked]
+            "agent_switch_locked" => opts[:agent_switch_locked],
+            "commands" => opts[:commands]
           }
           |> reject_nil_values()
 

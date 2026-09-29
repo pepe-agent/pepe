@@ -254,7 +254,7 @@ O conjunto embutido já cobre o essencial:
 | `send_to_agent` | Manda mensagem para outro agente (sujeito a `can_message`). |
 | `ask_user` | Pede para você escolher entre algumas opções, com botões ou menu de verdade onde o canal permite. |
 | `schedule_task`, `watch` | Criam tarefas recorrentes e vigias de "me avise quando X" de uma vez só. |
-| `manage_agent`, `rename_agent`, `enable_tool`, `set_route` | Gerenciam agentes, ferramentas e roteamento pelo chat. |
+| `manage_agent` | Gerencia outro agente (persona, modelo, ferramentas, roteamento, renomear) pelo chat. |
 | `manage_channel`, `end_session` | Conectam e fecham canais de mensagens pelo chat. |
 | `manage_mcp`, `scan_skill`, `skill` | Adicionam servidores de ferramentas externas e skills. |
 | `manage_plugin` | Instala, varre, lista e remove plugins da comunidade (ferramentas, canais) pelo chat. |
@@ -303,16 +303,17 @@ esperando um botão que ninguém vai apertar.
 ### Faça pela conversa
 
 Um agente que acabou de instalar um plugin, ou que quer uma capacidade que ainda
-não tem, pode ativar uma ferramenta em si mesmo com `enable_tool`:
+não tem, pode ativar uma ferramenta em si mesmo com `manage_agent`:
 
 ```text
 Enable the web_search tool for yourself.
 ```
 
-O agente chama `enable_tool` com o nome da ferramenta. Ela já precisa existir
-como embutida ou como plugin instalado, e a mudança entra em vigor na próxima
-mensagem do agente. Como `enable_tool` também tem barreira, você autoriza a
-concessão antes dela ser escrita.
+O agente chama `manage_agent` com a ação `add_tool`, `target` ele mesmo, e
+`value` o nome da ferramenta. Ela já precisa existir como embutida ou como
+plugin instalado, e a mudança entra em vigor na próxima mensagem do agente.
+Como `manage_agent` também tem barreira, você autoriza a concessão antes dela
+ser escrita.
 
 ## A conexão de modelo
 
@@ -431,17 +432,18 @@ Agora `triage` pode passar trabalho para `assistant`. Remova a rota com
 
 ### Faça pela conversa
 
-Um agente com a ferramenta `set_route` pode mudar o roteamento direto pela
-conversa. `from` assume por padrão o próprio agente que está chamando:
+Um agente com a ferramenta `manage_agent` pode mudar o roteamento direto pela
+conversa, para qualquer agente sobre o qual tenha autoridade `can_manage`
+(sem definir, o padrão é só ele mesmo):
 
 ```text
 Allow yourself to message the billing agent.
 ```
 
-O agente chama `set_route` com `action: "allow"` e `to: "billing"`. Como o
-roteamento é direcionado, isso não deixa `billing` responder de volta. E, por
-editar a configuração, `set_route` passa pela barreira de permissão, então você
-autoriza a mudança.
+O agente chama `manage_agent` com `action: "allow_route"`, `target` ele
+mesmo, e `value: "billing"`. Como o roteamento é direcionado, isso não deixa
+`billing` responder de volta. E, por editar a configuração, isso passa pela
+barreira de permissão, então você autoriza a mudança.
 
 ## Administrar agentes
 
@@ -467,9 +469,9 @@ pepe agent manage supervisor "*"
 ### Faça pela conversa
 
 Um agente administrador usa o `manage_agent` para moldar os agentes do seu
-escopo. As ações dele são `list`, `get`, `create`, `set_persona`, `set_model`,
-`add_tool`, `remove_tool` e `remember` (que anexa um fato duradouro à memória do
-alvo). Por exemplo:
+escopo. As ações dele são `list`, `get`, `create`, `rename`, `set_persona`,
+`set_model`, `add_tool`, `remove_tool`, `allow_route`, `deny_route` e `remember`
+(que anexa um fato duradouro à memória do alvo). Por exemplo:
 
 ```text
 Dê ao agente de suporte a ferramenta send_file e registre na memória dele que
@@ -479,12 +481,13 @@ reembolsos acima de 200 precisam de uma pessoa.
 O agente chama `manage_agent` com `action: "add_tool"` e depois com
 `action: "remember"`. Cada uma dessas ações tem barreira própria: o agente
 propõe a mudança, você a autoriza, e só então ela é aplicada. Um agente também
-pode se renomear com a ferramenta separada `rename_agent` ("De agora em diante,
-se chame scout"), o que move o diretório do seu workspace e entra em vigor na
-próxima mensagem. Renomear é seguro porque cada agente, como cada modelo e cada
-projeto, carrega um id interno estável, e o nome é apenas um rótulo mutável:
-toda referência a ele (rota, permissão, padrão, vínculo de cron, bot ou token) é
-feita por esse id, então nada fica pendurado quando o rótulo muda.
+pode se renomear ("De agora em diante, se chame scout") com
+`action: "rename"`, `target` ele mesmo, o que move o diretório do seu
+workspace e entra em vigor na próxima mensagem. Renomear é seguro porque cada
+agente, como cada modelo e cada projeto, carrega um id interno estável, e o
+nome é apenas um rótulo mutável: toda referência a ele (rota, permissão,
+padrão, vínculo de cron, bot ou token) é feita por esse id, então nada fica
+pendurado quando o rótulo muda.
 
 ## Agentes multiprojeto
 

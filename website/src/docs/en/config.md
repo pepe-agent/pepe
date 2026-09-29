@@ -49,7 +49,7 @@ That prints the config path and a summary of what is defined. A complete file lo
 
 Each agent also gets a persistent directory at `~/.pepe/agents/<name>/`. It holds the agent's `SOUL.md` (its persona) and any files it creates as it works (`MEMORY.md`, `people.md`, and whatever else it decides to keep). `~/.pepe/shared/` is shared across every agent.
 
-An agent with no identity yet (no `SOUL.md`, still on the default seed) presents itself as Pepe, tells you it has no name or characteristics defined, and offers to set one up. It then saves your choices to `SOUL.md` and renames itself with the `rename_agent` tool.
+An agent with no identity yet (no `SOUL.md`, still on the default seed) presents itself as Pepe, tells you it has no name or characteristics defined, and offers to set one up. It then saves your choices to `SOUL.md` and renames itself with `manage_agent`'s `rename` action.
 
 ### A cheap model for the chores (`utility_model`)
 

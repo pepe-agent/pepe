@@ -33,7 +33,7 @@ Estas vienen de fábrica con Pepe, bajo `priv/skills/`:
 - **`install-tool`**: escribir una herramienta como plugin y activarla desde el chat.
 - **`write-a-script`**: resolver tareas complejas escribiendo un programa y
   ejecutándolo.
-- **`manage-routing`**: cambiar rutas entre agentes usando `set_route`.
+- **`manage-routing`**: cambiar rutas entre agentes usando `manage_agent`.
 - **`handle-media`**: entender una entrada de voz, audio, imagen o archivo
   (transcribir, leer), instalando lo que haga falta para lograrlo.
 - **`install-skill`**: instalar una skill desde una URL, un gist, un repositorio, u
@@ -293,7 +293,7 @@ mediante una actualización de rutina.
 Estos tres puntos de extensión se combinan entre sí, y esa combinación es justamente lo
 que permite pedirle a un agente, en lenguaje natural, algo que todavía no sabe hacer.
 
-Junto con [plugins](../plugins/) y `enable_tool`, puedes pedirle por chat al agente que
+Junto con [plugins](../plugins/) y `manage_agent`, puedes pedirle por chat al agente que
 instale una herramienta capaz de hacer X. El agente lee la skill `install-tool`, escribe
 el plugin en `plugins/<nombre>.exs`, activa la herramienta sobre sí mismo, y empieza a
 usarla, todo sin necesidad de reiniciar nada.

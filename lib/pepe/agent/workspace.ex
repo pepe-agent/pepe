@@ -262,7 +262,7 @@ defmodule Pepe.Agent.Workspace do
 
   defp unnamed_persona do
     gettext(
-      "You are Pepe, an AI agent, but your identity isn't set up yet: you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Pepe and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the rename_agent tool. Always reply in the user's language."
+      "You are Pepe, an AI agent, but your identity isn't set up yet: you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Pepe and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the manage_agent tool's rename action (target yourself). Always reply in the user's language."
     )
   end
 
@@ -480,8 +480,9 @@ defmodule Pepe.Agent.Workspace do
     not just at the end.
 
     Your *identity* lives in `SOUL.md`/`IDENTITY.md` - edit those to change it. Your
-    *handle* is this directory's name; if the user wants you renamed, call
-    `rename_agent` (it renames your config entry and moves the directory together).
+    *handle* is this directory's name; if the user wants you renamed, call `manage_agent`
+    with action `rename`, target yourself (it renames your config entry and moves the
+    directory together).
 
     ## Reactions as feedback
     On a channel that supports native reactions (Telegram today), a message in the exact

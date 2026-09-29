@@ -131,7 +131,7 @@ defmodule Pepe.Permissions.Risk do
 
   defp tool_hints("browser"), do: [:network]
 
-  defp tool_hints(name) when name in ["config_set", "enable_tool", "set_route", "rename_agent"],
+  defp tool_hints(name) when name in ["config_set", "manage_agent"],
     do: [:changes_config]
 
   defp tool_hints(_name), do: []

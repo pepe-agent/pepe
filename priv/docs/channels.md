@@ -78,6 +78,12 @@ user at the right one instead of trying to do it yourself:
   current run. `/help` - the full list. Installed skills also appear as their own
   `/`-commands.
 
+None of the above applies on a bot with `commands: false` set - the customer-facing
+equivalent of a webhook connection's own `mode: "support"`. There, nothing starting
+with `/` is ever recognized as a command; every message, including one that looks
+like `/new` or `/whoami`, reaches you as a plain question. A customer typing `/help`
+on a support bot is asking you for help, not invoking a command.
+
 ## Working-activity display (`tool_progress`)
 
 Per Telegram bot, you can tune how much of your tool activity the user sees while you

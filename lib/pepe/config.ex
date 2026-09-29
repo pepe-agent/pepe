@@ -448,7 +448,38 @@ defmodule Pepe.Config do
     |> maybe_migrate(&needs_project_migration?/1, &migrate_to_projects/1)
     |> maybe_migrate(&needs_agent_id_migration?/1, &migrate_agents_to_ids/1)
     |> maybe_migrate(&needs_channel_agent_migration?/1, &migrate_telegram_topics_to_channel_agents/1)
+    |> maybe_migrate(&needs_folded_agent_tools_migration?/1, &migrate_folded_agent_tools/1)
   end
+
+  # enable_tool, set_route and rename_agent folded into manage_agent (as add_tool
+  # self-targeted, allow_route/deny_route, and rename) - an agent's explicit `tools` list
+  # naming one of the retired tools would otherwise silently lose that capability (an
+  # unknown tool name is just filtered out by Tools.specs/1, no error). Swap the retired
+  # names out for manage_agent, once, the first time each config loads after the change.
+  @folded_agent_tools ~w(enable_tool set_route rename_agent)
+
+  defp needs_folded_agent_tools_migration?(config) do
+    config
+    |> Map.get("agents", %{})
+    |> Enum.any?(fn {_id, m} -> is_map(m) and is_list(m["tools"]) and Enum.any?(m["tools"], &(&1 in @folded_agent_tools)) end)
+  end
+
+  defp migrate_folded_agent_tools(config) do
+    update_in(config, ["agents"], fn agents ->
+      Map.new(agents || %{}, fn {id, m} -> {id, fold_agent_tools(m)} end)
+    end)
+  end
+
+  defp fold_agent_tools(%{"tools" => tools} = m) when is_list(tools) do
+    if Enum.any?(tools, &(&1 in @folded_agent_tools)) do
+      kept = Enum.reject(tools, &(&1 in @folded_agent_tools))
+      Map.put(m, "tools", if("manage_agent" in kept, do: kept, else: kept ++ ["manage_agent"]))
+    else
+      m
+    end
+  end
+
+  defp fold_agent_tools(m), do: m
 
   # `channel_agent/1`/`bind_channel_agent/2` generalized the old Telegram-only
   # `telegram_topics` store (keyed by a bot/chat/thread compound) into one flat map keyed by

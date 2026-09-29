@@ -72,6 +72,19 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       json(conn, %{"ok" => true, "result" => %{"message_id" => 778}})
     end
 
+    post "/bot:token/setMyCommands" do
+      send(test_pid(), {:commands_set, conn.body_params["commands"] || []})
+      json(conn, %{"ok" => true, "result" => true})
+    end
+
+    post "/bot:token/deleteMyCommands" do
+      # register_commands/0 also calls this per-scope to clear scopes Pepe never sets
+      # itself - only the scopeless call (a commands: false bot clearing its own menu)
+      # is worth telling the test about.
+      if conn.body_params["scope"] == nil, do: send(test_pid(), :commands_deleted)
+      json(conn, %{"ok" => true, "result" => true})
+    end
+
     get "/bot:token/getFile" do
       mode =
         case safe_get(:tg_cmd_files, :default) do
@@ -605,6 +618,75 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       say(chat, "/agent sales")
       assert await_reply(chat) =~ "locked"
       assert Config.channel_agent("telegram:#{chat}") == nil
+    end
+  end
+
+  describe "a bot that isn't fully set up yet" do
+    # resolve_agent/1 falls back to Config.default_agent/0 when the bot's own `agent` name
+    # doesn't resolve - the module setup's "assistant" would otherwise mask this scenario by
+    # quietly answering as the default agent, so it has to go for this to be the real
+    # nothing-configured-yet case a fresh install is actually in.
+    test "no agent configured: a plain, actionable reply instead of a generic error", %{chat: chat} do
+      Config.delete_agent("assistant")
+      start_bot!(%{"agent" => "no-such-agent"})
+
+      say(chat, "hello")
+      reply = await_reply(chat)
+      assert reply =~ "No agent is configured"
+      refute reply =~ "something went wrong"
+    end
+
+    test "no model configured: a plain, actionable reply instead of a generic error", %{chat: chat} do
+      # model_for_agent/1 falls back to the project's default model when a named one doesn't
+      # resolve - the module setup's "mock" model would mask this scenario the same way the
+      # default agent masks the no-agent case above, so both go: nothing left to fall back to.
+      Config.delete_model("mock")
+      start_bot!()
+      Config.put_agent(%{Config.get_agent("assistant") | model: "no-such-model"})
+
+      say(chat, "hello")
+      reply = await_reply(chat)
+      assert reply =~ "No model connection is set up"
+      refute reply =~ "something went wrong"
+    end
+  end
+
+  describe "commands: false (the customer-facing equivalent of a webhook connection's mode: \"support\")" do
+    test "every slash command falls through as plain chat text, not just the ones a stranger could abuse", %{chat: chat} do
+      start_bot!(%{"commands" => false})
+      Config.put_agent(%Pepe.Config.Agent{name: "sales", model: "mock", system_prompt: "You close deals."})
+
+      say(chat, "/new")
+      assert await_reply(chat) =~ "here is my answer"
+
+      say(chat, "/agent sales")
+      assert await_reply(chat) =~ "here is my answer"
+
+      say(chat, "/whoami")
+      assert await_reply(chat) =~ "here is my answer"
+    end
+
+    test "commands still work normally when unset (the default)", %{chat: chat} do
+      start_bot!()
+
+      say(chat, "/new")
+      assert await_reply(chat) =~ "New conversation"
+    end
+
+    test "the \"/\" menu is cleared instead of still advertising commands that no longer work" do
+      start_bot!(%{"commands" => false})
+      assert_receive :commands_deleted, 2_000
+      refute_receive {:commands_set, _}, 200
+    end
+
+    test "in a group, a slash no longer bypasses the @mention requirement on its own", %{chat: chat} do
+      start_bot!(%{"commands" => false, "require_mention" => true})
+
+      say(chat, "/new", type: "group")
+      refute_receive {:sent, ^chat, _text, _buttons}, 500
+
+      say(chat, "@pepebot /new", type: "group")
+      assert await_reply(chat) =~ "here is my answer"
     end
   end
 
