@@ -40,6 +40,19 @@ defmodule Pepe.Tools.SwitchAgentTest do
     assert msg =~ "no session"
   end
 
+  test "refuses when the owning connection is agent_switch_locked, even for an otherwise-allowed target" do
+    Config.put_agent(%Agent{name: "default/sup", system_prompt: "sup", tools: []})
+    from = %Agent{name: "default/eng", can_message: ["default/sup"]}
+    key = "test:switchtool:#{System.unique_integer([:positive])}"
+
+    {:ok, _} = SessionSupervisor.ensure(key, "default/eng")
+
+    ctx = %{agent: from, session_key: key, agent_switch_locked: true}
+    assert {:error, msg} = SwitchAgent.run(%{"target" => "sup"}, ctx)
+    assert msg =~ "locked"
+    assert Session.status(key).agent == "default/eng"
+  end
+
   test "refuses an agent that isn't in can_message" do
     from = %Agent{name: "default/admin", can_message: ["default/eng"]}
     assert {:error, msg} = SwitchAgent.run(%{"target" => "sup"}, ctx(from))

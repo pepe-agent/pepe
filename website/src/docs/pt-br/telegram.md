@@ -243,6 +243,14 @@ global. Um tópico vinculado continua seguindo a regra de menção do grupo,
 então use `require_mention: false` (ou `/mention off` dentro do tópico) se
 quiser que ele responda sem precisar de @menção.
 
+Para um bot onde ninguém deve poder trocar o agente que responde - nem
+temporária nem permanentemente - defina `agent_switch_locked: true` no bot
+(`--agent-switch-locked` no `mix pepe gateway telegram add`, ou direto no
+`config.json`). Isso recusa `/agent NOME` de cara, mesmo para um treinador,
+além do `switch_agent` e das ações `bind_topic`/`unbind_topic` do
+`manage_channel`, em qualquer chat daquele bot. `/agent` sem argumento,
+`/mention`, `/model` e `/new` continuam funcionando normalmente.
+
 ### Troque de modelo no meio da conversa
 
 `/model` mostra o modelo em uso naquele chat e oferece um botão **Browse

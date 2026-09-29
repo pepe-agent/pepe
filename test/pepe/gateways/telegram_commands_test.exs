@@ -597,6 +597,17 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     end
   end
 
+  describe "agent_switch_locked" do
+    test "/agent is refused outright, even for a trusted sender, and nothing is written", %{chat: chat} do
+      start_bot!(%{"agent_switch_locked" => true})
+      Config.put_agent(%Pepe.Config.Agent{name: "sales", model: "mock", system_prompt: "You close deals."})
+
+      say(chat, "/agent sales")
+      assert await_reply(chat) =~ "locked"
+      assert Config.channel_agent("telegram:#{chat}") == nil
+    end
+  end
+
   describe "the allowlists" do
     test "a user who is not on the list is ignored outright", %{chat: chat} do
       start_bot!(%{"allowed_users" => [@user]})

@@ -429,6 +429,31 @@ defmodule Pepe.WebhooksTest do
       assert %{agent: "acme/eng"} = Pepe.Agent.Session.status(key)
     end
 
+    test "agent_switch_locked refuses /agent NAME even for a trainer, but leaves status/none-arg alone" do
+      locked = admin(%{"agent_switch_locked" => true})
+      assert {:agent_status} = Webhooks.command(locked, "/agent", "boss")
+      assert {:reply, text} = Webhooks.command(locked, "/agent acme/eng", "boss")
+      assert text =~ "locked"
+    end
+
+    test "agent_switch_locked round-trip: the reply says so and nothing is written" do
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}, "agent_switch_locked" => true})
+      key = Webhooks.session_key(slack_entry, "boss")
+      message = %{from: "boss", text: "/agent acme/eng", id: "1.1"}
+
+      assert :done = Webhooks.begin(%{entry: slack_entry, mod: Pepe.Webhooks.Slack, message: message}, "/agent acme/eng", [])
+      assert_receive {:delivered, _url, opts}, 1000
+      assert opts[:json]["text"] =~ "locked"
+      assert Pepe.Config.channel_agent(key) == nil
+    end
+
     test "a non-trainer can't bind or unbind the channel, and nothing is written" do
       parent = self()
 

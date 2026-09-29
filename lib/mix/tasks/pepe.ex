@@ -97,6 +97,7 @@ defmodule Mix.Tasks.Pepe do
       mix pepe gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
                                           [--heartbeat-minutes N] [--heartbeat-hours 8-22]
                                           [--progress reaction|ambient|off|verbose]
+                                          [--agent-switch-locked]
       mix pepe gateway telegram list           # list configured bots
       mix pepe gateway telegram remove NAME    # delete a named bot
       mix pepe gateway telegram                # run the gateway (one poller per bot)
@@ -5058,7 +5059,8 @@ defmodule Mix.Tasks.Pepe do
           trainers: :string,
           ttl_min: :integer,
           ephemeral: :boolean,
-          commands: :boolean
+          commands: :boolean,
+          agent_switch_locked: :boolean
         ]
       )
 
@@ -5108,6 +5110,7 @@ defmodule Mix.Tasks.Pepe do
                [--access-token ${ENV}] [--app-secret ${ENV}] [--verify-token X]
                [--max-attachment-mb N]
                [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
+               [--agent-switch-locked]
       list                     list connections + their Callback URLs
       set-agent SLUG HANDLE     rebind a connection to another agent
       remove SLUG               delete a connection
@@ -5144,7 +5147,8 @@ defmodule Mix.Tasks.Pepe do
           trainers: :string,
           ttl_min: :integer,
           ephemeral: :boolean,
-          commands: :boolean
+          commands: :boolean,
+          agent_switch_locked: :boolean
         ]
       )
 
@@ -5188,6 +5192,7 @@ defmodule Mix.Tasks.Pepe do
                channel messages: --gateway --bot-token '${ENV}' [--no-require-mention]
                [--max-attachment-mb N]
                [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
+               [--agent-switch-locked]
       list                     list connections
       set-agent SLUG HANDLE    rebind a connection to another agent
       remove SLUG              delete a connection
@@ -5221,7 +5226,8 @@ defmodule Mix.Tasks.Pepe do
           trainers: :string,
           heartbeat_minutes: :integer,
           heartbeat_hours: :string,
-          progress: :string
+          progress: :string,
+          agent_switch_locked: :boolean
         ]
       )
 
@@ -5240,7 +5246,8 @@ defmodule Mix.Tasks.Pepe do
             "trainers" => parse_trainers(opts[:trainers]),
             "heartbeat_minutes" => opts[:heartbeat_minutes],
             "heartbeat_active_hours" => parse_hour_window(opts[:heartbeat_hours]),
-            "tool_progress" => valid_progress(opts[:progress])
+            "tool_progress" => valid_progress(opts[:progress]),
+            "agent_switch_locked" => opts[:agent_switch_locked]
           }
           |> reject_nil_values()
 
@@ -5374,6 +5381,7 @@ defmodule Mix.Tasks.Pepe do
         "commands" => Keyword.get(opts, :commands, mode == "admin"),
         "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
         "ephemeral" => Keyword.get(opts, :ephemeral, support?),
+        "agent_switch_locked" => Keyword.get(opts, :agent_switch_locked, false),
         "session_ttl_min" => opts[:ttl_min],
         "config" =>
           %{
@@ -5413,6 +5421,7 @@ defmodule Mix.Tasks.Pepe do
         "commands" => Keyword.get(opts, :commands, mode == "admin"),
         "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
         "ephemeral" => Keyword.get(opts, :ephemeral, support?),
+        "agent_switch_locked" => Keyword.get(opts, :agent_switch_locked, false),
         "session_ttl_min" => opts[:ttl_min],
         "config" =>
           %{

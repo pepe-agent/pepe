@@ -194,4 +194,20 @@ defmodule Pepe.Tools.ManageChannelTest do
     assert {:error, err} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, %{agent: %Agent{name: "boss"}})
     assert err =~ "no conversation"
   end
+
+  test "bind_topic and unbind_topic refuse outright when the owning connection is agent_switch_locked" do
+    Config.put_agent(%Agent{name: "engenheiro", system_prompt: "x", tools: []})
+    Config.bind_channel_agent("telegram:-100777", "engenheiro")
+
+    locked_ctx = %{agent: %Agent{name: "boss"}, session_key: "telegram:-100777", agent_switch_locked: true}
+
+    assert {:error, err} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, locked_ctx)
+    assert err =~ "locked"
+
+    assert {:error, err} = ManageChannel.run(%{"action" => "unbind_topic"}, locked_ctx)
+    assert err =~ "locked"
+
+    # Nothing changed - the pre-existing binding is untouched.
+    assert Config.channel_agent("telegram:-100777") == "engenheiro"
+  end
 end

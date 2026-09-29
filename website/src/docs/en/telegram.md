@@ -228,6 +228,13 @@ bot's `agent`, otherwise the global default. A bound topic still follows the
 group's mention rule: set `require_mention: false` (or `/mention off` in that
 topic) if you want it to answer without an @mention.
 
+For a bot where nobody should ever be able to change which agent answers - neither
+temporarily nor permanently - set `agent_switch_locked: true` on the bot
+(`--agent-switch-locked` on `mix pepe gateway telegram add`, or directly in
+`config.json`). It refuses `/agent NAME` outright, even for a trainer, plus
+`switch_agent` and `manage_channel`'s `bind_topic`/`unbind_topic` for any chat on that
+bot. `/agent` with no arguments, `/mention`, `/model` and `/new` still work normally.
+
 ### Switch models mid-conversation
 
 `/model` shows the model currently active in this chat, with a **Browse

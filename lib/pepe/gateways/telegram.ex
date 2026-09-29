@@ -1547,6 +1547,9 @@ defmodule Pepe.Gateways.Telegram do
              # sender_tag/2). Never embedded in the message text: the session injects
              # it as an ephemeral per-turn note so stored history stays label-free.
              sender_tag: opts[:sender_tag],
+             # Refuses switch_agent and manage_channel's bind_topic/unbind_topic for this
+             # turn - see the comment on Pepe.Agent.Runtime.run_chain/3's own ctx field.
+             agent_switch_locked: bot()["agent_switch_locked"] == true,
              on_event: activity_callback(chat_id)
            ) do
         {:ok, reply} ->
@@ -2253,13 +2256,18 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp run_command(chat_id, "agent", name) do
-    if Config.get_agent(name) do
-      ensure_session(chat_id)
-      Pepe.Agent.Session.set_agent(session_key(chat_id), name)
-      send_message(chat_id, bind_agent(chat_id, name))
-    else
-      available = Config.agents() |> Enum.map_join(", ", & &1.name)
-      send_message(chat_id, gettext("Unknown agent: %{name}", name: name) <> " (#{available})")
+    cond do
+      bot()["agent_switch_locked"] == true ->
+        send_message(chat_id, gettext("Agent switching is locked on this bot."))
+
+      Config.get_agent(name) ->
+        ensure_session(chat_id)
+        Pepe.Agent.Session.set_agent(session_key(chat_id), name)
+        send_message(chat_id, bind_agent(chat_id, name))
+
+      true ->
+        available = Config.agents() |> Enum.map_join(", ", & &1.name)
+        send_message(chat_id, gettext("Unknown agent: %{name}", name: name) <> " (#{available})")
     end
   end
 

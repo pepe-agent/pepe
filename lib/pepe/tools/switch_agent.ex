@@ -15,7 +15,13 @@ defmodule Pepe.Tools.SwitchAgent do
 
   Authorization mirrors `send_to_agent`'s: a directed allowlist (`can_message`) plus
   the same-project boundary: an agent can only switch a conversation to a peer it's
-  already allowed to route to.
+  already allowed to route to. Refused outright, regardless of the allowlist, when the
+  owning connection sets `agent_switch_locked` (see `Pepe.Webhooks` / the Telegram bot
+  config) - a channel-wide policy, not a per-agent one. On a locked connection the model
+  isn't even offered this tool in the first place (`Pepe.Agent.Runtime.run_chain/3`'s
+  `hide_switch_agent/2` drops it from the turn's tool specs entirely, so a locked turn
+  never pays tokens describing a capability it can't use); the check here is a backstop
+  for a direct call, not the primary gate.
 
   The switch takes effect **after this turn**, not mid-reply: the human still gets
   this turn's answer from the agent that's already talking to them (so it can say
@@ -77,6 +83,9 @@ defmodule Pepe.Tools.SwitchAgent do
 
       is_nil(ctx[:session_key]) ->
         {:error, "no session to switch: this only works inside a real conversation"}
+
+      ctx[:agent_switch_locked] == true ->
+        {:error, "agent switching is locked on this channel"}
 
       not Project.same_scope?(target, from_name) ->
         {:error, "Refusing to switch to #{target}: it belongs to a different project."}

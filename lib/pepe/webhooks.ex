@@ -18,6 +18,11 @@ defmodule Pepe.Webhooks do
   `trainers` member may change the model globally or just for their own
   conversation; anyone else may only change their own. Set `model_switch_locked`
   on the entry to keep non-trainers from touching it at all.
+
+  Set `agent_switch_locked` on the entry to refuse every way of changing which agent
+  answers here - `/agent NAME` (even for a trainer), `switch_agent` (temporary handoff),
+  and `manage_channel`'s `bind_topic`/`unbind_topic` (permanent handoff). `/agent` with no
+  args (status), `/mention`, `/model` and `/new` are unaffected.
   """
 
   use Gettext, backend: Pepe.Gettext
@@ -368,7 +373,13 @@ defmodule Pepe.Webhooks do
 
   defp handle_command({:agent_status}, ctx) do
     SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
-    reply_async(ctx.mod, ctx.entry, ctx.from, agent_status_reply(Config.channel_agent(ctx.key), ctx.agent))
+
+    reply_async(
+      ctx.mod,
+      ctx.entry,
+      ctx.from,
+      agent_status_reply(Config.channel_agent(ctx.key), ctx.agent, ctx.entry["agent_switch_locked"] == true)
+    )
   end
 
   defp handle_command({:agent_bind, _target, false}, ctx),
@@ -428,7 +439,7 @@ defmodule Pepe.Webhooks do
     end
   end
 
-  defp agent_status_reply(nil, agent),
+  defp agent_status_reply(nil, agent, false),
     do:
       dgettext(
         "webhooks",
@@ -436,10 +447,24 @@ defmodule Pepe.Webhooks do
         agent: agent
       )
 
-  defp agent_status_reply(bound, _agent),
+  defp agent_status_reply(bound, _agent, false),
     do: dgettext("webhooks", "This channel is bound to agent %{name}.\nUse /agent NAME to change it, or /agent none to clear.", name: bound)
 
+  defp agent_status_reply(nil, agent, true),
+    do:
+      dgettext(
+        "webhooks",
+        "This channel isn't bound to a specific agent - it uses %{agent} (this connection's default). Agent switching is locked here.",
+        agent: agent
+      )
+
+  defp agent_status_reply(bound, _agent, true),
+    do: dgettext("webhooks", "This channel is bound to agent %{name}. Agent switching is locked here.", name: bound)
+
   defp unknown_agent(name), do: dgettext("webhooks", "Unknown agent: %{name}", name: name)
+
+  defp agent_switch_locked_message,
+    do: dgettext("webhooks", "Agent switching is locked on this channel.")
 
   # A webhook sender is never the operator, the same "a stranger" content class every
   # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
@@ -451,7 +476,10 @@ defmodule Pepe.Webhooks do
       untrusted: true,
       sender: Map.get(message, :name),
       # An inbound image, for a vision model: rides this turn only, never persisted.
-      images: opts[:images]
+      images: opts[:images],
+      # Refuses switch_agent and manage_channel's bind_topic/unbind_topic for this turn -
+      # see the comment on Pepe.Agent.Runtime.run_chain/3's own ctx field.
+      agent_switch_locked: entry["agent_switch_locked"] == true
     ]
   end
 
@@ -543,11 +571,20 @@ defmodule Pepe.Webhooks do
   # allowed sender should get to make unilaterally.
   defp dispatch_command(entry, "agent", args, from) do
     trainer? = learn?(entry, from)
+    locked? = entry["agent_switch_locked"] == true
 
     case String.trim(args) do
-      "" -> {:agent_status}
-      target when target in ["none", "clear", "off"] -> {:agent_bind, nil, trainer?}
-      target -> {:agent_bind, target, trainer?}
+      "" ->
+        {:agent_status}
+
+      _ when locked? ->
+        {:reply, agent_switch_locked_message()}
+
+      target when target in ["none", "clear", "off"] ->
+        {:agent_bind, nil, trainer?}
+
+      target ->
+        {:agent_bind, target, trainer?}
     end
   end
 
