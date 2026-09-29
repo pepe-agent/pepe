@@ -37,6 +37,7 @@ defmodule Pepe.Tools.ManageAgent do
   alias Pepe.Agent.Workspace
   alias Pepe.Config
   alias Pepe.Config.Agent
+  alias Pepe.Project
 
   @impl true
   def name, do: "manage_agent"
@@ -208,12 +209,14 @@ defmodule Pepe.Tools.ManageAgent do
   # pinned to the old name, atomically, as part of its own write - nothing else to do here
   # on success.
   defp dispatch("rename", target, args) do
-    with {:ok, new_name} <- fetch(args, "value") do
-      case Config.rename_agent(target, new_name) do
-        :ok -> {:ok, "Renamed #{target} to #{new_name}; takes effect on its next message."}
+    with {:ok, new_name} <- fetch(args, "value"),
+         qualified = Project.qualify(new_name, target),
+         :ok <- ensure_same_scope(qualified, target) do
+      case Config.rename_agent(target, qualified) do
+        :ok -> {:ok, "Renamed #{target} to #{qualified}; takes effect on its next message."}
         {:error, :not_found} -> {:error, "no agent named #{target}"}
-        {:error, :already_exists} -> {:error, "the name #{new_name} is already taken in this project"}
-        {:error, :invalid_name} -> {:error, "#{new_name} isn't a valid agent name (letters, digits, - and _ only)"}
+        {:error, :already_exists} -> {:error, "the name #{qualified} is already taken in this project"}
+        {:error, :invalid_name} -> {:error, "#{qualified} isn't a valid agent name (letters, digits, - and _ only)"}
       end
     end
   end
@@ -304,6 +307,20 @@ defmodule Pepe.Tools.ManageAgent do
   end
 
   defp dispatch(other, _target, _args), do: {:error, "unknown or incomplete action: #{other}"}
+
+  # Config.rename_agent/2 can only ever rename WITHIN an agent's current project (it derives
+  # the bare name from `value` and reconstructs the handle from the target's own existing
+  # project id) - a `value` naming a different project would otherwise be silently truncated
+  # to its bare name and applied in the wrong (the original) project, while the success
+  # message went on to report the name that was actually asked for. Refuse instead of
+  # silently doing something other than what was asked.
+  defp ensure_same_scope(qualified, target) do
+    if Project.same_scope?(qualified, target) do
+      :ok
+    else
+      {:error, "#{target} can't be moved to a different project by renaming - #{qualified} is in a different scope"}
+    end
+  end
 
   # Contained defaults - what a non-first agent gets. Whether this turns out to be its
   # project's first agent, and therefore gets primary_overrides/0 applied instead, is

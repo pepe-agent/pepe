@@ -5239,6 +5239,9 @@ defmodule Mix.Tasks.Pepe do
       is_nil(opts[:token]) ->
         error("telegram add needs --token (create a bot with @BotFather)")
 
+      not is_nil(opts[:progress]) and is_nil(valid_progress(opts[:progress])) ->
+        error("--progress must be one of: reaction, ambient, off, verbose")
+
       true ->
         map =
           %{

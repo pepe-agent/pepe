@@ -135,6 +135,19 @@ defmodule Pepe.Tools.ManageAgentTest do
       assert File.read!(Path.join(Workspace.dir("target"), "SOUL.md")) == "i am target"
     end
 
+    test "a value naming a different project is refused, not silently truncated and applied in the original project" do
+      :ok = Config.add_project("acme")
+      ctx = ctx(["sales"])
+
+      assert {:error, msg} = ManageAgent.run(%{"action" => "rename", "target" => "sales", "value" => "acme/sales"}, ctx)
+      assert msg =~ "different"
+
+      # Nothing changed - "sales" is neither renamed to "acme/sales" nor silently
+      # truncated and renamed to a bare "sales" (a no-op that would still lose the ask).
+      assert Config.get_agent("sales").system_prompt == "x"
+      refute Config.get_agent("acme/sales")
+    end
+
     test "renaming to an invalid name is refused without touching the filesystem" do
       File.mkdir_p!(Workspace.dir("sales"))
       File.write!(Path.join(Workspace.dir("sales"), "SOUL.md"), "i am sales")
