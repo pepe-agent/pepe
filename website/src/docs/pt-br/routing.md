@@ -56,13 +56,12 @@ projeto para outro. Um nome simples passado em <code>--can-message</code> é res
 dentro do projeto do próprio agente, e a CLI recusa de cara qualquer rota entre agentes
 de projetos diferentes.</div>
 
-## Passando a conversa toda adiante: `switch_agent`
+## Passando a conversa toda adiante, por enquanto: `switch_agent`
 
 Se `send_to_agent` serve para uma consulta pontual, `switch_agent` faz o oposto: o
-agente que está respondendo agora entrega o **resto da conversa** para outro agente. O
-efeito é idêntico ao de o próprio usuário digitar `/agent NOME`, só que dá para chegar
-lá com um pedido natural ("me conecta com o billing", "quero falar direto com o
-suporte"), sem precisar do comando de barra.
+agente que está respondendo agora entrega o **resto da conversa** para outro agente,
+chegando lá com um pedido natural ("me conecta com o billing", "quero falar direto com
+o suporte"), sem precisar de comando nenhum.
 
 ```text
 Me conecta direto com o agente billing.
@@ -70,8 +69,16 @@ Me conecta direto com o agente billing.
 
 O agente responde chamando `switch_agent` com `target: "billing"`. A resposta a *este*
 turno ainda sai de quem já estava respondendo ("beleza, já te conectando"); a troca só
-vale a partir da próxima mensagem, exatamente como já acontece com `/agent`. Do outro
-lado, o novo agente começa do zero, sem herdar nada do histórico anterior.
+vale a partir da próxima mensagem. Do outro lado, o novo agente começa do zero, sem
+herdar nada do histórico anterior.
+
+Isso é temporário de propósito: vale só até o próximo `/new`, que devolve a conversa
+pro agente com quem ela realmente começou. **Não é a mesma coisa** que `/agent NOME`
+(ou pedir pro agente "vincula esse canal ao billing a partir de agora, pra sempre") -
+isso é uma mudança permanente na configuração do canal, coberta em
+[Telegram](../telegram/) e [Webhooks](../webhooks/), e é o tipo que o `/new` não
+desfaz. Use `switch_agent` pra "me conecta com o billing agora"; use o tipo permanente
+pra "esse canal agora é sempre do billing".
 
 A permissão usada aqui é a mesma lista `can_message` do `send_to_agent`: se um agente
 já pode mandar mensagem para outro, também pode entregar a conversa a ele, sem

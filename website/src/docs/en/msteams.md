@@ -25,7 +25,7 @@ bot mention is stripped from the incoming text before the agent sees it.
 Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/default/msteams/<slug>
+https://YOUR_HOST/webhooks/root/msteams/<slug>
 ```
 
 ### Inbound authentication

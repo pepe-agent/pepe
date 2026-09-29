@@ -49,8 +49,9 @@ defmodule Pepe.Gateways.Telegram do
 
   In a group with topics, each topic is its own conversation (its own session) and replies go
   back into the topic they came from. A topic can be **bound to its own agent**: run
-  `/agent <name>` inside the topic and it is remembered in `telegram_topics` (keyed by bot,
-  chat and thread), surviving `/new` and restarts. The agent for a message is the topic's bound
+  `/agent <name>` inside the topic and it is remembered in `Pepe.Config`'s `channel_agents`
+  (keyed by the topic's own session key, shared with every other channel's binding too),
+  surviving `/new` and restarts. The agent for a message is the topic's bound
   agent if any, then the bot's `agent`, then the global default. Being bound does not by itself
   waive `require_mention` - a topic still follows the group's mention rule.
 
@@ -336,7 +337,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp topic_agent do
     with chat_id when not is_nil(chat_id) <- chat_dict(),
-         name when is_binary(name) <- Config.telegram_topic_agent(bot_name(), chat_id, thread()),
+         name when is_binary(name) <- Config.channel_agent(session_key(chat_id)),
          true <- Config.get_agent(name) != nil do
       name
     else
@@ -347,29 +348,15 @@ defmodule Pepe.Gateways.Telegram do
   # `/agent` binds the chat (or, inside a forum topic, that topic) to the given agent
   # *persistently* (kept in config, survives `/new` and a restart) - so "this group talks
   # to the support agent" is still true after a deploy, not just until the session
-  # process holding it in memory happens to go away.
+  # process holding it in memory happens to go away. `Config.channel_agent/1` is the one
+  # place this is stored - shared with every other channel, not a Telegram-only store.
   defp bind_agent(chat_id, name) do
-    Config.bind_telegram_topic(bot_name(), chat_id, thread(), name)
+    Config.bind_channel_agent(session_key(chat_id), name)
 
     case thread() do
       nil -> gettext("Switched to agent %{name} (kept across /new and restarts).", name: name)
       _ -> gettext("This topic is now bound to agent %{name} (kept across /new and restarts).", name: name)
     end
-  end
-
-  @doc """
-  If `key` is a Telegram session, durably bind its chat (or forum topic) to `agent_name`
-  - the same persistence `/agent` gets, reachable from a tool call instead of a human
-  typing the slash command. No-op (and no error) for any other channel.
-  """
-  @spec persist_agent_binding(String.t(), String.t()) :: :ok
-  def persist_agent_binding(key, agent_name) do
-    case parse_topic_key(key) do
-      {bot, chat, thread} -> Config.bind_telegram_topic(bot, chat, thread, agent_name)
-      :error -> :ok
-    end
-
-    :ok
   end
 
   defp presence(nil), do: nil
@@ -1779,16 +1766,16 @@ defmodule Pepe.Gateways.Telegram do
   defp resolve_pending_decision(chat_id, thread_id, user_id, id, message_id, decision) do
     if may_approve?(chat_id, user_id) do
       case :ets.take(@pending, id) do
-        [{^id, pid}] ->
+        [{^id, pid, {:perm, core_text}}] ->
           forget_pending_by_chat(chat_id, thread_id, id)
-          close_prompt(chat_id, message_id, decision)
+          close_prompt(chat_id, message_id, decision, core_text)
           send(pid, {:perm_reply, id, decision})
           true
 
         _ ->
           # Already resolved (a concurrent button tap won the race) or timed out - say so
           # instead of silently swallowing the reply. edit_expired/2 itself no-ops when
-          # close_prompt/3 already wrote the real outcome for this message, so the race's
+          # close_prompt/4 already wrote the real outcome for this message, so the race's
           # winner is never overwritten by its loser.
           edit_expired(chat_id, message_id)
           true
@@ -1807,8 +1794,9 @@ defmodule Pepe.Gateways.Telegram do
   defp request_authorization(chat_id, name, args, prompt_ctx) do
     id = System.unique_integer([:positive])
     thread_id = thread()
-    :ets.insert(@pending, {id, self()})
-    message_id = send_permission_prompt(chat_id, id, name, args, prompt_ctx)
+    core_text = permission_prompt_core_text(name, args, prompt_ctx)
+    :ets.insert(@pending, {id, self(), {:perm, core_text}})
+    message_id = send_permission_prompt(chat_id, id, core_text, prompt_ctx)
     :ets.insert(@pending_by_chat, {pending_key(chat_id, thread_id), id, message_id})
 
     receive do
@@ -1841,14 +1829,23 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  defp send_permission_prompt(chat_id, id, name, args, prompt_ctx) do
-    %{tainted?: tainted?, has_session?: has_session?, policy_reason: policy_reason} = prompt_ctx
+  # The part of the prompt that stays true after it's answered (question, risk hints, args,
+  # policy/taint notes) - kept separate from the "reply with text instead" hint below, which
+  # only makes sense while the buttons are still live, so close_prompt/4 can show the original
+  # question without that now-irrelevant instruction glued to it.
+  defp permission_prompt_core_text(name, args, prompt_ctx) do
+    %{tainted?: tainted?, policy_reason: policy_reason} = prompt_ctx
     Config.put_locale()
     map = decode_args(args)
     note = if tainted?, do: "\n\n" <> esc(Prompt.taint_note()), else: ""
     policy = if p = Prompt.policy_note(policy_reason), do: "\n\n" <> esc(p), else: ""
-    hint = "\n\n" <> esc(permission_text_hint())
-    text = esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> policy <> note <> hint
+    esc(Prompt.question(name)) <> risk_lines(name, map) <> arg_block(map) <> policy <> note
+  end
+
+  defp send_permission_prompt(chat_id, id, core_text, prompt_ctx) do
+    %{tainted?: tainted?, has_session?: has_session?} = prompt_ctx
+    Config.put_locale()
+    text = core_text <> "\n\n" <> esc(permission_text_hint())
 
     # One button per shared decision, rendered as Telegram's inline keyboard.
     buttons =
@@ -1872,7 +1869,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp request_ask(chat_id, question, choices) do
     id = System.unique_integer([:positive])
-    :ets.insert(@pending, {id, self(), choices})
+    :ets.insert(@pending, {id, self(), {:ask, choices}})
     message_id = send_ask_prompt(chat_id, id, question, choices)
 
     receive do
@@ -1965,16 +1962,16 @@ defmodule Pepe.Gateways.Telegram do
         decision = Prompt.from_token(token)
 
         case :ets.take(@pending, id) do
-          [{^id, pid}] ->
+          [{^id, pid, {:perm, core_text}}] ->
             chat_id = get_in(cq, ["message", "chat", "id"])
             message_id = get_in(cq, ["message", "message_id"])
             thread_id = topic_thread_id(cq["message"])
             forget_pending_by_chat(chat_id, thread_id, id)
-            # close_prompt/3 inserts into @prompt_log before send/2 wakes the
+            # close_prompt/4 inserts into @prompt_log before send/2 wakes the
             # waiting session - if send ran first, a turn that finishes fast
             # enough could run cleanup_prompts/1 before the insert lands,
             # missing this round's cleanup (self-heals next turn, but avoid it).
-            close_prompt(chat_id, message_id, decision)
+            close_prompt(chat_id, message_id, decision, core_text)
             send(pid, {:perm_reply, id, decision})
 
           _ ->
@@ -1996,7 +1993,7 @@ defmodule Pepe.Gateways.Telegram do
         index = String.to_integer(index_str)
 
         case :ets.take(@pending, id) do
-          [{^id, pid, choices}] ->
+          [{^id, pid, {:ask, choices}}] ->
             pick = Enum.at(choices, index)
             close_ask(cq, pick)
             send(pid, {:ask_reply, id, pick})
@@ -2010,20 +2007,44 @@ defmodule Pepe.Gateways.Telegram do
     end
   end
 
-  # Replace the ask_user prompt's buttons with the picked option, so the chat shows what was
-  # answered instead of dead buttons.
+  # Replace the ask_user prompt's buttons with the picked option, keeping the original
+  # question visible above it - losing the question once it's answered made the chat
+  # history useless for remembering what was even asked.
   defp close_ask(cq, pick) do
     chat_id = get_in(cq, ["message", "chat", "id"])
     message_id = get_in(cq, ["message", "message_id"])
+    question = get_in(cq, ["message", "text"])
 
     if chat_id && message_id do
       :ets.insert(@prompt_log, {chat_id, message_id})
 
-      Req.post(api_url(token(), "editMessageText"),
-        json: %{chat_id: chat_id, message_id: message_id, text: esc(pick)}
-      )
+      case Req.post(api_url(token(), "editMessageText"),
+             json: %{
+               chat_id: chat_id,
+               message_id: message_id,
+               text: closed_prompt_text(esc(question), esc(pick)),
+               parse_mode: "HTML"
+             }
+           ) do
+        {:ok, %{status: 200}} ->
+          :ok
+
+        other ->
+          # The buttons are still live on Telegram's side when this fails (nothing else clears
+          # them), so a silent failure here would leave a clickable-looking but already-answered
+          # prompt with no trace in the logs of why it never updated.
+          Logger.warning("[telegram] could not close ask prompt chat=#{chat_id} message_id=#{message_id}: #{safe_inspect(other)}")
+      end
     end
   end
+
+  # Shared by close_ask/2 and close_prompt/4: keep the original question/prompt text
+  # visible once answered, with the outcome appended below it instead of replacing it -
+  # buttons still disappear (editMessageText with no reply_markup clears them), but the
+  # chat history still shows what was asked.
+  defp closed_prompt_text(nil, outcome), do: outcome
+  defp closed_prompt_text("", outcome), do: outcome
+  defp closed_prompt_text(original, outcome), do: original <> "\n\n<b>→ " <> outcome <> "</b>"
 
   # Edit an expired/stale prompt so its buttons stop looking clickable and the user knows why.
   defp edit_expired(nil, _message_id), do: :ok
@@ -2032,7 +2053,7 @@ defmodule Pepe.Gateways.Telegram do
   defp edit_expired(chat_id, message_id) do
     if closed_already?(chat_id, message_id) do
       # A button tap and a text reply can both race to resolve the same prompt; the loser
-      # lands here after the winner already wrote the real outcome (close_prompt/3 logs into
+      # lands here after the winner already wrote the real outcome (close_prompt/4 logs into
       # @prompt_log right before its own editMessageText). Leave that message alone instead of
       # stomping "Allowed"/"Denied" with a misleading "this expired".
       :ok
@@ -2059,16 +2080,28 @@ defmodule Pepe.Gateways.Telegram do
       end)
   end
 
-  # Replace the prompt's buttons with the shared outcome text so the chat stays tidy.
-  defp close_prompt(chat_id, message_id, decision) do
+  # Replace the prompt's buttons with the shared outcome text, keeping the original
+  # question/call preview above it (see closed_prompt_text/2) instead of wiping it.
+  defp close_prompt(chat_id, message_id, decision, core_text) do
     Config.put_locale()
 
     if chat_id && message_id do
       :ets.insert(@prompt_log, {chat_id, message_id})
 
-      Req.post(api_url(token(), "editMessageText"),
-        json: %{chat_id: chat_id, message_id: message_id, text: Prompt.outcome(decision)}
-      )
+      case Req.post(api_url(token(), "editMessageText"),
+             json: %{
+               chat_id: chat_id,
+               message_id: message_id,
+               text: closed_prompt_text(core_text, esc(Prompt.outcome(decision))),
+               parse_mode: "HTML"
+             }
+           ) do
+        {:ok, %{status: 200}} ->
+          :ok
+
+        other ->
+          Logger.warning("[telegram] could not close permission prompt chat=#{chat_id} message_id=#{message_id}: #{safe_inspect(other)}")
+      end
     end
   end
 
@@ -2856,9 +2889,19 @@ defmodule Pepe.Gateways.Telegram do
   # this point, and the reply exists only in this process's local variable until send_message
   # actually gets it out - a crash between here and Telegram's ack would otherwise lose it with no
   # trace. See redeliver_pending/1 for the boot-time recovery half of this.
+  # A blank reply is a real outcome, not a bug on its own - the model deciding a turn (a
+  # reaction delivered as "[reacted 😱]", say) genuinely warrants no reply. Sending it anyway
+  # used to mean a literal empty Telegram bubble, which reads as the bot being broken rather
+  # than as "nothing to say" - skip the send (and the voice note, which would have nothing to
+  # speak either) instead of tracking and delivering whitespace.
   defp deliver_reply(chat_id, reply) do
-    deliver_tracked(chat_id, reply)
-    maybe_send_voice(chat_id, reply)
+    if String.trim(reply) == "" do
+      Logger.debug("[telegram] blank reply skipped for chat #{chat_id}")
+      :ok
+    else
+      deliver_tracked(chat_id, reply)
+      maybe_send_voice(chat_id, reply)
+    end
   end
 
   defp deliver_tracked(chat_id, content) do
@@ -2955,14 +2998,40 @@ defmodule Pepe.Gateways.Telegram do
   defp put_if_present(map, _key, nil), do: map
   defp put_if_present(map, key, value), do: Map.put(map, key, value)
 
+  # sendDocument always renders as a generic file attachment, even for a jpg/png - sendPhoto is
+  # what actually shows a large inline image in the chat, which is what send_file is for when
+  # the agent hands it a picture. `send_as_photo?/1` is only a cheap precheck (extension + under
+  # Telegram's 10 MB photo cap) - Telegram can still refuse a photo for other reasons (an extreme
+  # aspect ratio, a corrupt file, an extension that lies about the actual content), so any
+  # non-200 from sendPhoto retries once as a plain document instead of the whole delivery failing
+  # outright for something that would have gone through fine as a file.
+  @image_extensions ~w(.jpg .jpeg .png .webp)
+  @photo_cap_bytes 10 * 1024 * 1024
+
   defp send_document(chat_id, path, caption) do
+    if send_as_photo?(path) do
+      case send_upload(chat_id, "sendPhoto", :photo, path, caption) do
+        :ok -> :ok
+        {:error, _reason} -> send_upload(chat_id, "sendDocument", :document, path, caption)
+      end
+    else
+      send_upload(chat_id, "sendDocument", :document, path, caption)
+    end
+  end
+
+  defp send_as_photo?(path) do
+    (path |> Path.extname() |> String.downcase()) in @image_extensions and
+      match?({:ok, %{size: size}} when size <= @photo_cap_bytes, File.stat(path))
+  end
+
+  defp send_upload(chat_id, method, field, path, caption) do
     fields =
       [chat_id: to_string(chat_id)]
       |> then(fn f -> if id = thread(), do: f ++ [message_thread_id: to_string(id)], else: f end)
       |> then(fn f -> if caption in [nil, ""], do: f, else: f ++ [caption: caption] end)
-      |> Kernel.++(document: {File.stream!(path), filename: Path.basename(path)})
+      |> Kernel.++([{field, {File.stream!(path), filename: Path.basename(path)}}])
 
-    case Req.post(api_url(token(), "sendDocument"), form_multipart: fields, receive_timeout: 120_000) do
+    case Req.post(api_url(token(), method), form_multipart: fields, receive_timeout: 120_000) do
       {:ok, %{status: 200}} -> :ok
       {:ok, %{status: status, body: body}} -> {:error, {:telegram, status, body}}
       {:error, reason} -> {:error, reason}
@@ -2996,25 +3065,6 @@ defmodule Pepe.Gateways.Telegram do
       [chat] -> {chat, nil}
     end
   end
-
-  @doc """
-  Parse a Telegram session key into `{bot_name, chat_id, thread_id | nil}`, or `:error` for a
-  non-Telegram key. Lets a tool bind the *current* forum topic to an agent from within a chat
-  (it has the session key, which encodes the chat and topic).
-  """
-  @spec parse_topic_key(term()) :: {String.t(), String.t(), integer() | nil} | :error
-  def parse_topic_key("telegram:" <> rest) do
-    {name, chat_part} =
-      case String.split(rest, ":", parts: 2) do
-        [n, c] -> {n, c}
-        [c] -> {"default", c}
-      end
-
-    {chat, thread} = split_topic(chat_part)
-    {name, chat, thread}
-  end
-
-  def parse_topic_key(_key), do: :error
 
   ###
   ### live activity layer

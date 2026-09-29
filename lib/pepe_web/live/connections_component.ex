@@ -396,8 +396,5 @@ defmodule PepeWeb.ConnectionsComponent do
   defp fval(values, key), do: to_string(Map.get(values, key, ""))
   defp cfgval(values, key), do: to_string(get_in(values, ["cfg", key]) || "")
 
-  defp webhook_url(project, provider, slug),
-    do: "#{webhook_host()}/webhooks/#{project || "root"}/#{provider}/#{slug}"
-
-  defp webhook_host, do: System.get_env("PEPE_PUBLIC_URL") || "https://YOUR_HOST"
+  defp webhook_url(project, provider, slug), do: Pepe.Webhooks.callback_url(project, provider, slug)
 end

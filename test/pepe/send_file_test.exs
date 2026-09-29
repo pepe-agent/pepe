@@ -84,6 +84,32 @@ defmodule Pepe.SendFileTest do
     assert opts[:json]["document"]["caption"] == "here"
   end
 
+  test "whatsapp sends a jpg/png as an image message, not a document, so it renders inline", %{home: home} do
+    jpg = Path.join(home, "chart.jpg")
+    File.write!(jpg, "fake-jpg-bytes")
+    parent = self()
+
+    Mimic.stub(Req, :post, fn url, opts ->
+      cond do
+        String.ends_with?(url, "/media") ->
+          send(parent, {:media, url, opts})
+          {:ok, %{status: 200, body: %{"id" => "MEDIA123"}}}
+
+        String.ends_with?(url, "/messages") ->
+          send(parent, {:message, url, opts})
+          {:ok, %{status: 200}}
+      end
+    end)
+
+    config = %{"config" => %{"phone_number_id" => "999", "access_token" => "tok"}}
+    assert :ok = WhatsApp.deliver_file(config, "5511", jpg, "here")
+
+    assert_received {:message, _url, opts}
+    assert opts[:json]["type"] == "image"
+    assert opts[:json]["image"]["id"] == "MEDIA123"
+    assert opts[:json]["image"]["caption"] == "here"
+  end
+
   # ---- the send_file tool routes to the session's channel ----------------------------
 
   test "send_file routes a Telegram session to sendDocument", %{xlsx: file} do
@@ -98,6 +124,73 @@ defmodule Pepe.SendFileTest do
     ctx = %{session_key: "telegram:842064390", cwd: Path.dirname(file)}
     assert {:ok, msg} = SendFile.run(%{"path" => Path.basename(file)}, ctx)
     assert msg =~ "leads.xlsx"
+    assert_received {:req, url, _opts}
+    assert url =~ "/sendDocument"
+  end
+
+  test "send_file routes a Telegram session to sendPhoto for a picture, so it renders inline instead of as a file attachment",
+       %{home: home} do
+    Config.put_telegram(%{"bot_token" => "T", "allowed_chats" => []})
+    jpg = Path.join(home, "chart.png")
+    File.write!(jpg, "fake-png-bytes")
+    parent = self()
+
+    Mimic.stub(Req, :post, fn url, opts ->
+      send(parent, {:req, url, opts})
+      {:ok, %{status: 200}}
+    end)
+
+    ctx = %{session_key: "telegram:842064390", cwd: home}
+    assert {:ok, _msg} = SendFile.run(%{"path" => "chart.png"}, ctx)
+    assert_received {:req, url, opts}
+    assert url =~ "/sendPhoto"
+    assert Keyword.has_key?(opts[:form_multipart], :photo)
+  end
+
+  test "send_file falls back to sendDocument when Telegram refuses the photo for a reason the size precheck can't catch",
+       %{home: home} do
+    Config.put_telegram(%{"bot_token" => "T", "allowed_chats" => []})
+    jpg = Path.join(home, "weird.jpg")
+    File.write!(jpg, "not actually a decodable image")
+    parent = self()
+
+    # Telegram rejects sendPhoto for reasons a size/extension precheck can never catch (an
+    # extreme aspect ratio, a file that doesn't decode as an image at all) - the extension
+    # alone said this should go as a photo, so the delivery must still succeed by retrying
+    # as a plain document instead of failing outright.
+    Mimic.stub(Req, :post, fn url, opts ->
+      cond do
+        String.ends_with?(url, "/sendPhoto") ->
+          send(parent, {:req, url, opts})
+          {:ok, %{status: 400, body: %{"ok" => false, "description" => "IMAGE_PROCESS_FAILED"}}}
+
+        String.ends_with?(url, "/sendDocument") ->
+          send(parent, {:req, url, opts})
+          {:ok, %{status: 200}}
+      end
+    end)
+
+    ctx = %{session_key: "telegram:842064390", cwd: home}
+    assert {:ok, _msg} = SendFile.run(%{"path" => "weird.jpg"}, ctx)
+    assert_received {:req, photo_url, _}
+    assert photo_url =~ "/sendPhoto"
+    assert_received {:req, doc_url, _}
+    assert doc_url =~ "/sendDocument"
+  end
+
+  test "send_file still uses sendDocument for an image over Telegram's photo cap", %{home: home} do
+    Config.put_telegram(%{"bot_token" => "T", "allowed_chats" => []})
+    big_jpg = Path.join(home, "huge.jpg")
+    File.write!(big_jpg, :binary.copy(<<0>>, 10 * 1024 * 1024 + 1))
+    parent = self()
+
+    Mimic.stub(Req, :post, fn url, opts ->
+      send(parent, {:req, url, opts})
+      {:ok, %{status: 200}}
+    end)
+
+    ctx = %{session_key: "telegram:842064390", cwd: home}
+    assert {:ok, _msg} = SendFile.run(%{"path" => "huge.jpg"}, ctx)
     assert_received {:req, url, _opts}
     assert url =~ "/sendDocument"
   end

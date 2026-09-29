@@ -20,7 +20,7 @@ El `config` de una conexión guarda:
 Las actividades entrantes llegan como `POST`. Las respuestas vuelven a la URL de servicio de la actividad con un token de acceso de app generado a partir de las credenciales de cliente. La mención al bot se elimina del texto entrante antes de que el agente lo vea. Así queda la URL de retorno:
 
 ```
-https://YOUR_HOST/webhooks/default/msteams/<slug>
+https://YOUR_HOST/webhooks/root/msteams/<slug>
 ```
 
 ### Autenticación de las solicitudes entrantes

@@ -54,7 +54,7 @@ verify token. Paste both into the Meta app's webhook configuration, and subscrib
 the `messages` field so Meta actually delivers inbound messages to you:
 
 ```
-https://YOUR_HOST/webhooks/default/whatsapp/support
+https://YOUR_HOST/webhooks/root/whatsapp/support
 ```
 
 Manage connections:

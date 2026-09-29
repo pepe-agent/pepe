@@ -263,6 +263,43 @@ defmodule Pepe.WebhooksTest do
     end
   end
 
+  describe "public_host/0 and callback_url/3" do
+    setup do
+      prev_public = System.get_env("PEPE_PUBLIC_URL")
+      prev_phx = System.get_env("PHX_HOST")
+      System.delete_env("PEPE_PUBLIC_URL")
+      System.delete_env("PHX_HOST")
+
+      on_exit(fn ->
+        if prev_public, do: System.put_env("PEPE_PUBLIC_URL", prev_public), else: System.delete_env("PEPE_PUBLIC_URL")
+        if prev_phx, do: System.put_env("PHX_HOST", prev_phx), else: System.delete_env("PHX_HOST")
+      end)
+
+      :ok
+    end
+
+    test "falls back to the YOUR_HOST placeholder when neither env var is set" do
+      assert Webhooks.public_host() == "https://YOUR_HOST"
+    end
+
+    test "PHX_HOST fills in a real host once a server is actually configured to run" do
+      System.put_env("PHX_HOST", "agents.example.com")
+      assert Webhooks.public_host() == "https://agents.example.com"
+    end
+
+    test "PEPE_PUBLIC_URL overrides PHX_HOST outright" do
+      System.put_env("PHX_HOST", "agents.example.com")
+      System.put_env("PEPE_PUBLIC_URL", "https://custom.example.org:8443")
+      assert Webhooks.public_host() == "https://custom.example.org:8443"
+    end
+
+    test "callback_url/3 defaults a nil project to the root segment" do
+      System.put_env("PHX_HOST", "agents.example.com")
+      assert Webhooks.callback_url(nil, "slack", "support") == "https://agents.example.com/webhooks/root/slack/support"
+      assert Webhooks.callback_url("acme", "slack", "support") == "https://agents.example.com/webhooks/acme/slack/support"
+    end
+  end
+
   describe "per-connection gating (admin vs support)" do
     test "allowed_numbers gates who may message" do
       open = entry(%{"allowed_numbers" => []})
@@ -346,6 +383,73 @@ defmodule Pepe.WebhooksTest do
     end
   end
 
+  describe "/agent" do
+    setup do
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/eng", model: nil})
+      :ok
+    end
+
+    test "status/bind/unbind decisions, gated by whether the sender is a trainer" do
+      a = admin()
+      assert {:agent_status} = Webhooks.command(a, "/agent", "boss")
+      assert {:agent_bind, "acme/eng", true} = Webhooks.command(a, "/agent acme/eng", "boss")
+      assert {:agent_bind, nil, true} = Webhooks.command(a, "/agent none", "boss")
+      # A non-trainer gets the same shape back - begin/3 is what actually refuses it (see
+      # the full round-trip test below), same split /model uses between deciding and doing.
+      assert {:agent_bind, "acme/eng", false} = Webhooks.command(a, "/agent acme/eng", "5511999")
+    end
+
+    test "binding a channel persists it, reasserts every turn, and survives /new - unlike switch_agent's own ephemeral routing" do
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      # `from` doubles as both the conversation id (session_key/2) and, absent a `sender_id`,
+      # the actor learn?/2 checks - matching this suite's existing /model tests' convention.
+      # "boss" is in admin/1's own `trainers: ["boss"]`.
+      key = Webhooks.session_key(slack_entry, "boss")
+
+      bind_message = %{from: "boss", text: "/agent acme/eng", id: "1.1"}
+      assert :done = Webhooks.begin(%{entry: slack_entry, mod: Pepe.Webhooks.Slack, message: bind_message}, "/agent acme/eng", [])
+
+      assert_receive {:delivered, _url, opts}, 1000
+      assert opts[:json]["text"] =~ "acme/eng"
+      assert Pepe.Config.channel_agent(key) == "acme/eng"
+      assert %{agent: "acme/eng"} = Pepe.Agent.Session.status(key)
+
+      # /new alone would revert to the connection's own default agent (see the locale test
+      # above) - but the durable binding reasserts itself right back on the very next turn,
+      # since apply_channel_binding/3 always wins over whatever a reset left behind.
+      reset_message = %{from: "boss", text: "/new", id: "2.1"}
+      assert :done = Webhooks.begin(%{entry: slack_entry, mod: Pepe.Webhooks.Slack, message: reset_message}, "/new", [])
+      assert %{agent: "acme/eng"} = Pepe.Agent.Session.status(key)
+    end
+
+    test "a non-trainer can't bind or unbind the channel, and nothing is written" do
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      key = Webhooks.session_key(slack_entry, "C1")
+      # actor/1 (and so learn?/2) reads the message's `from` absent a `sender_id` override -
+      # "C1" isn't in admin/1's own `trainers: ["boss"]`, so this is a non-trainer sender.
+      message = %{from: "C1", text: "/agent acme/eng", id: "1.1"}
+
+      assert :done = Webhooks.begin(%{entry: slack_entry, mod: Pepe.Webhooks.Slack, message: message}, "/agent acme/eng", [])
+      assert_receive {:delivered, _url, opts}, 1000
+      assert opts[:json]["text"] =~ "don't have permission"
+      assert Pepe.Config.channel_agent(key) == nil
+    end
+  end
+
   describe "/mention" do
     test "on/off/status/invalid decisions" do
       a = admin()
@@ -355,7 +459,34 @@ defmodule Pepe.WebhooksTest do
       assert {:reply, "Usage: /mention on|off"} = Webhooks.command(a, "/mention sideways", "C1")
     end
 
-    test "invoked via an @mention (the only way to reach a command in a gated Slack channel), then waives mention for later plain messages" do
+    test "command replies are built in Pepe's configured locale, not whatever locale happened to already be set on the lane's own process" do
+      # begin/3 runs in the webhook lane's own GenServer process (see Pepe.Webhooks.Lane),
+      # never the process that last called Config.put_locale/0 (Gettext's locale is
+      # per-process) - a reply built here with the wrong locale renders in English even on
+      # a Portuguese-configured install, which is exactly the bug this test guards against.
+      prev_locale = Pepe.Config.locale()
+      Pepe.Config.set_locale("pt_BR")
+      on_exit(fn -> Pepe.Config.set_locale(prev_locale) end)
+
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: nil})
+
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      message = %{from: "C1", text: "/new", id: "1.1"}
+
+      assert :done = Webhooks.begin(%{entry: slack_entry, mod: Pepe.Webhooks.Slack, message: message}, "/new", [])
+
+      assert_receive {:delivered, _url, opts}, 1_000
+      assert opts[:json]["text"] == "🧹 Nova conversa."
+    end
+
+    test "invoked via an @mention, then waives mention for later plain messages" do
       {:ok, server} = Bandit.start_link(plug: {FixedReplyPlug, reply: "hello!"}, port: 0, scheme: :http)
       {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
       on_exit(fn -> Process.exit(server, :normal) end)
@@ -390,10 +521,13 @@ defmodule Pepe.WebhooksTest do
       assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, headers)
       refute_receive {:delivered, _url, _opts}, 200
 
-      # A slash command in a channel still needs to be addressed like any other
-      # message - Slack only marks it addressed via a real app_mention event, and
-      # (unlike plain "message" text) the mention prefix must be stripped for it to
-      # parse as "/mention off" rather than chat text (see Slack.parse/1).
+      # A real command reaches the agent regardless of the mention gate (see
+      # real_command?/2) - this exercises the app_mention route anyway, since Slack's own
+      # client refuses to send a bare "/mention off" as a message at all without either a
+      # leading space or an @mention in front (see the "reaches the agent with no @mention
+      # at all" test below for the no-mention path itself). Unlike plain "message" text, the
+      # mention prefix must still be stripped for this to parse as "/mention off" rather than
+      # chat text (see Slack.parse/1).
       mention_off = %{
         "type" => "event_callback",
         "event" => %{"type" => "app_mention", "text" => "<@U0BOT123> /mention off", "channel" => "C1", "ts" => "2.0"}
@@ -408,6 +542,37 @@ defmodule Pepe.WebhooksTest do
       assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, headers)
       assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts2}, 1000
       assert opts2[:json]["text"] == "hello!"
+    end
+
+    test "a real command reaches the agent with no @mention at all, in a channel that still requires one for plain chat" do
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      secret = "sign-me"
+      # require_mention left at its default (on) - a command still has to get through with
+      # no @mention and no prior waiver, which is the whole point of this test.
+      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+      Pepe.Config.put_webhook("acme-slack", slack_entry)
+
+      ts = Integer.to_string(System.system_time(:second))
+      sig = "v0=" <> (:crypto.mac(:hmac, :sha256, secret, "v0:#{ts}:{}") |> Base.encode16(case: :lower))
+      headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
+
+      # No app_mention wrapper, no leading @mention text - just the bare command, the shape a
+      # human gets after typing a leading space to dodge Slack's own slash-command interception
+      # (see the "Typing a command in Slack" note in the webhooks docs).
+      bare_command = %{
+        "type" => "event_callback",
+        "event" => %{"type" => "message", "text" => "/mention off", "channel" => "C1", "ts" => "3.0"}
+      }
+
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", bare_command, headers)
+      assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts}, 1000
+      assert opts[:json]["text"] =~ "without being @mentioned"
     end
   end
 

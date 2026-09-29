@@ -18,6 +18,20 @@ defmodule Pepe.ConfigTest do
     {:ok, home: home}
   end
 
+  defp legacy_config(extra) do
+    Jason.encode!(
+      Map.merge(
+        %{
+          "default_model" => "mock",
+          "default_agent" => "assistant",
+          "models" => %{"mock" => %{"base_url" => "u", "api_key" => "k", "model" => "m"}},
+          "agents" => %{"assistant" => %{"model" => "mock", "system_prompt" => "hi"}}
+        },
+        extra
+      )
+    )
+  end
+
   describe "short_path/1" do
     test "shows $PEPE_HOME when the home override is set" do
       assert Config.short_path(Config.path()) == "$PEPE_HOME/config.json"
@@ -51,6 +65,50 @@ defmodule Pepe.ConfigTest do
       migrated = Jason.decode!(File.read!(Config.path()))
       assert Map.has_key?(migrated, "projects")
       assert Map.has_key?(migrated, "default_project")
+    end
+  end
+
+  describe "migration: telegram_topics -> channel_agents" do
+    test "reconstructs the real Telegram session-key format from the old compound key, and drops the old store" do
+      File.write!(
+        Config.path(),
+        legacy_config(%{
+          "telegram_topics" => %{
+            # default bot, plain chat (no thread)
+            "default:-100:chat" => "assistant",
+            # default bot, a forum topic
+            "default:-100:7" => "assistant",
+            # a named bot
+            "sales:555:chat" => "assistant"
+          }
+        })
+      )
+
+      # Any Config read triggers migrate/1 on first load.
+      assert Config.get_agent("assistant")
+
+      assert Config.channel_agent("telegram:-100") == "assistant"
+      assert Config.channel_agent("telegram:-100#t7") == "assistant"
+      assert Config.channel_agent("telegram:sales:555") == "assistant"
+
+      migrated = Jason.decode!(File.read!(Config.path()))
+      refute Map.has_key?(migrated, "telegram_topics")
+      assert Map.has_key?(migrated, "channel_agents")
+    end
+
+    test "an entry already under channel_agents wins over what the migration would reconstruct for the same key" do
+      File.write!(
+        Config.path(),
+        legacy_config(%{
+          "telegram_topics" => %{"default:-100:chat" => "assistant"},
+          # Already migrated (or hand-edited) under the new key - this must survive, not be
+          # clobbered by reconstructing the same key from the stale telegram_topics entry.
+          "channel_agents" => %{"telegram:-100" => "newer-agent"}
+        })
+      )
+
+      assert Config.get_agent("assistant")
+      assert Config.channel_agent("telegram:-100") == "newer-agent"
     end
   end
 

@@ -6,29 +6,61 @@ description: Coloca um agente do Pepe dentro do teu workspace do Slack, para as 
 ## Slack
 
 Ao ligar o Slack, as pessoas passam a poder falar com o agente dentro do próprio
-workspace. As mensagens chegam ao Pepe através da Events API do Slack; configura a
-ligação pela configuração guiada (ou pelo painel), que pede exatamente os campos
-necessários e devolve o URL de callback a registar:
+workspace. As mensagens chegam ao Pepe através da Events API do Slack.
 
-```bash
-pepe setup
-```
+### Passo a passo
 
-Escolhe a opção de canal, depois o Slack e o agente, e introduz as credenciais (uma
-referência `${ENV_VAR}` é aceite para qualquer segredo). O `config` de uma ligação
-guarda:
+1. **Criar a aplicação.** Em [api.slack.com/apps](https://api.slack.com/apps) →
+   "Create New App" → escolhe **"Blank app"** (as outras opções, como "AI agent",
+   trazem scaffolding próprio do Slack de que não precisas aqui - quem faz de agente é
+   o Pepe). Escolhe o teu workspace.
+2. **Dar permissões ao bot.** Em **OAuth & Permissions → Scopes → Bot Token Scopes**,
+   adiciona `chat:write`, `app_mentions:read`, `channels:history` e `im:history`.
+3. **Instalar a aplicação.** Ainda em OAuth & Permissions, clica em "Install to
+   Workspace" e copia o **Bot User OAuth Token** (`xoxb-...`).
+4. **Ir buscar o signing secret.** Em **Basic Information → App Credentials**, copia o
+   **Signing Secret**.
+5. **Registar a ligação no Pepe:**
+
+   ```bash
+   pepe setup
+   ```
+
+   Escolhe a opção de canal, depois o Slack e o agente, e introduz as credenciais (uma
+   referência `${ENV_VAR}` é aceite para qualquer segredo). O Pepe devolve o URL de
+   callback a registar:
+
+   ```
+   https://YOUR_HOST/webhooks/root/slack/<slug>
+   ```
+
+   Troca `YOUR_HOST` pelo domínio onde o teu servidor responde de facto (o domínio real
+   em produção; `mix pepe serve --tunnel` se for só para testar em local).
+6. **Ligar os eventos no Slack.** Na aplicação → **Event Subscriptions** → Enable
+   Events → cola o URL do passo anterior (o Slack dispara logo um handshake de
+   `url_verification`, ao qual o Pepe responde sozinho - não é preciso nenhum passo
+   manual). Em "Subscribe to bot events", adiciona `message.channels`, `app_mention` e
+   `message.im` (este último é o que faz uma mensagem direta funcionar).
+7. **Desligar o Socket Mode.** As aplicações novas do Slack costumam vir com isto
+   ligado por omissão: barra lateral → **Socket Mode**. Enquanto estiver ligado, o
+   Slack envia os eventos por WebSocket em vez de bater no teu Request URL - e o Pepe
+   só percebe o webhook HTTP clássico, por isso nada chega, silenciosamente, mesmo com
+   tudo o resto bem configurado. Deixa desligado.
+8. **Gravar.** Na página de Event Subscriptions, clica em "Save Changes" no rodapé
+   antes de saíres - colar o URL e sair sem gravar deita tudo fora.
+9. Se o Slack pedir, **reinstala a aplicação** no workspace (scopes e eventos novos
+   exigem isso).
+10. **Testar:** convida o bot para um canal (`/invite @nome-do-bot`) e menciona-o, ou
+    envia-lhe uma mensagem direta.
+
+### Campos da ligação
+
+O `config` de uma ligação guarda:
 
 - `bot_token`: o token OAuth do utilizador bot (`xoxb-...`), usado como portador nas respostas.
 - `signing_secret`: verifica o `X-Slack-Signature` nos pedidos que chegam.
 
-Na aplicação do Slack, aponta o URL de pedido de Event Subscriptions para o URL da
-ligação, e subscreve `message.channels` e `app_mention`. A primeira gravação dispara
-um handshake `url_verification`, ao qual o Pepe responde de imediato. As respostas são
-publicadas com `chat.postMessage`. O formato do URL de callback é:
-
-```
-https://YOUR_HOST/webhooks/default/slack/<slug>
-```
+As respostas são publicadas com `chat.postMessage`.
 
 Vê [Webhooks](../webhooks/) para os campos que qualquer ligação partilha (`agent`,
 `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`), e para perceberes como

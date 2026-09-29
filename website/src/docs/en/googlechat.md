@@ -27,7 +27,7 @@ Only `MESSAGE` events from a human are acted on. Replies are posted back to
 the space through the Chat REST API. Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/default/googlechat/<slug>
+https://YOUR_HOST/webhooks/root/googlechat/<slug>
 ```
 
 ### Inbound authentication

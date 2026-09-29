@@ -30,7 +30,7 @@ são publicadas de volta no espaço através da Chat REST API. O formato do URL
 de retorno é:
 
 ```
-https://YOUR_HOST/webhooks/default/googlechat/<slug>
+https://YOUR_HOST/webhooks/root/googlechat/<slug>
 ```
 
 ### Autenticação de entrada

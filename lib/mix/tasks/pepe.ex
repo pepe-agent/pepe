@@ -5358,9 +5358,8 @@ defmodule Mix.Tasks.Pepe do
   end
 
   defp print_whatsapp_conn_line({slug, e}) do
-    co = e["project"] || "default"
     puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}")
-    puts(dim("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
+    puts(dim("   #{Pepe.Webhooks.callback_url(e["project"], "whatsapp", slug)}"))
   end
 
   defp save_whatsapp_connection(slug, mode, opts) do
@@ -5389,19 +5388,17 @@ defmodule Mix.Tasks.Pepe do
       |> reject_nil_values()
 
     Config.put_webhook(slug, entry)
-    co = entry["project"] || "default"
     ok("whatsapp #{green(slug)} [#{mode}] -> agent #{opts[:agent]}")
     info("register this Callback URL in the Meta app:")
-    info(bold("   #{webhook_host()}/webhooks/#{co}/whatsapp/#{slug}"))
+    info(bold("   #{Pepe.Webhooks.callback_url(entry["project"], "whatsapp", slug)}"))
     info(dim("   verify token: #{entry["config"]["verify_token"]}"))
   end
 
   defp print_discord_conn_line({slug, e}) do
     c = e["config"] || %{}
-    co = e["project"] || "default"
     reads = if c["receive_channel_messages"] == "true", do: "channel messages on", else: "slash commands only"
     puts("#{bold(slug)} [#{e["mode"] || "support"}] -> #{e["agent"] || "(default)"}  (#{reads})")
-    puts(dim("   #{webhook_host()}/webhooks/#{co}/discord/#{slug}"))
+    puts(dim("   #{Pepe.Webhooks.callback_url(e["project"], "discord", slug)}"))
   end
 
   defp save_discord_connection(slug, mode, opts) do
@@ -5435,9 +5432,8 @@ defmodule Mix.Tasks.Pepe do
     warn_if_open_admin_gateway(mode, entry)
 
     if opts[:application_id] do
-      co = entry["project"] || "default"
       info("set this as the app's Interactions Endpoint URL:")
-      info(bold("   #{webhook_host()}/webhooks/#{co}/discord/#{slug}"))
+      info(bold("   #{Pepe.Webhooks.callback_url(entry["project"], "discord", slug)}"))
     end
 
     if opts[:gateway] do
@@ -5505,8 +5501,6 @@ defmodule Mix.Tasks.Pepe do
         nil
     end
   end
-
-  defp webhook_host, do: System.get_env("PEPE_PUBLIC_URL") || "https://YOUR_HOST"
 
   defp parse_trainers(nil), do: nil
   defp parse_trainers(str) when str in ["", "none"], do: []
@@ -5842,7 +5836,7 @@ defmodule Mix.Tasks.Pepe do
 
     Config.put_webhook(slug, %{"provider" => provider, "agent" => agent, "mode" => "support", "config" => config})
     ok("channel #{green(provider)} connected as #{slug}")
-    info(dim("Paste this into #{provider} as its webhook URL:\n  #{webhook_host()}/webhooks/root/#{provider}/#{slug}"))
+    info(dim("Paste this into #{provider} as its webhook URL:\n  #{Pepe.Webhooks.callback_url(nil, provider, slug)}"))
   end
 
   # A channel config field is required unless it's a `select` (those carry a

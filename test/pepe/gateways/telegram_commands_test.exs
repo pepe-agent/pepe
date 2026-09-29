@@ -388,14 +388,18 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
     end)
   end
 
-  defp tap_button(chat, callback_data, user \\ @user) do
+  # `text`: a real Telegram callback_query always carries the message it was attached to,
+  # `text` included - this fixture leaves it out by default since most tests don't care, but
+  # close_ask/close_prompt read it back to keep the original question/prompt visible once
+  # answered, so a test of that needs to supply it.
+  defp tap_button(chat, callback_data, user \\ @user, text \\ nil) do
     push(%{
       "update_id" => System.unique_integer([:positive]),
       "callback_query" => %{
         "id" => "cb-#{System.unique_integer([:positive])}",
         "data" => callback_data,
         "from" => %{"id" => user},
-        "message" => %{"message_id" => 777, "chat" => %{"id" => chat}}
+        "message" => %{"message_id" => 777, "chat" => %{"id" => chat}, "text" => text}
       }
     })
   end
@@ -846,6 +850,50 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       assert await_reply(chat) =~ "ran it"
     end
 
+    test "closing the prompt keeps the original call preview visible, not just the outcome", %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, prompt, [_ | _] = buttons}, 5_000
+      assert prompt =~ "rm -rf"
+
+      [%{"callback_data" => allow_once} | _] = List.flatten(buttons)
+      tap_button(chat, allow_once, @user, prompt)
+
+      assert_receive {:edited, ^chat, closed}, 5_000
+      assert closed =~ "rm -rf"
+      assert closed =~ "Allowed once"
+      # The "reply with text instead" hint only made sense while the buttons were live.
+      refute closed =~ "Buttons not working?"
+    end
+
+    test "a forged callback that reuses a pending permission's id as an ask_user answer degrades to 'expired', it does not crash the poller",
+         %{chat: chat} do
+      start_bot!()
+      model_answers(:tool)
+
+      say(chat, "do the thing")
+      assert_receive {:sent, ^chat, _prompt, [_ | _] = buttons}, 5_000
+      [%{"callback_data" => allow_once} | _] = List.flatten(buttons)
+      ["perm", id, "once"] = String.split(allow_once, ":")
+
+      # A permission entry and an ask_user entry share one ETS table and the same id space -
+      # `callback_query.data` is not cryptographically tied to the button actually shown
+      # (a raw Bot API client can send any string), so an id from one kind of prompt reaching
+      # the other kind's handler must degrade gracefully instead of pattern-matching into a
+      # crash (Enum.at/2 on a binary, or `<>` on a list).
+      tap_button(chat, "ask:#{id}:0")
+
+      assert_receive {:edited, ^chat, expired}, 5_000
+      assert expired =~ "expired"
+
+      # The poller itself is still alive and serving this chat afterwards - a crash here would
+      # have taken the whole update-processing loop down with it (see handle_update/1).
+      say(chat, "still there?")
+      assert_receive {:llm, ^chat, _prompt}, 5_000
+    end
+
     test "a denied tool ends the turn instead of running anyway", %{chat: chat} do
       start_bot!()
       model_answers(:tool)
@@ -903,7 +951,12 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
 
       say(chat, "permitir")
 
+      # The call preview is kept the same way a button tap keeps it (close_prompt/4 gets its
+      # core_text from the very same @pending entry either way) - the text-reply path plumbs it
+      # through separately (resolve_pending_decision/6 never sees the callback_query the button
+      # path reads it from), so this needs its own assertion.
       assert_receive {:edited, ^chat, outcome}, 5_000
+      assert outcome =~ "rm -rf"
       assert outcome =~ "Allowed once"
       assert await_reply(chat) =~ "ran it"
     end
@@ -1018,11 +1071,14 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       # Nothing has run yet: the turn is parked on the button, same as a permission prompt.
       refute_receive {:sent, ^chat, _text, _buttons}, 300
 
-      tap_button(chat, sushi["callback_data"])
+      tap_button(chat, sushi["callback_data"], @user, prompt)
 
-      # The prompt is closed with the pick (no dangling buttons), then the turn continues
-      # with the answer as the tool's own result.
-      assert_receive {:edited, ^chat, "Sushi"}, 5_000
+      # The prompt is closed with the pick (no dangling buttons), but the original question
+      # stays visible above it - losing it made the chat history useless for remembering what
+      # was even asked - then the turn continues with the answer as the tool's own result.
+      assert_receive {:edited, ^chat, closed}, 5_000
+      assert closed =~ "Pizza or sushi?"
+      assert closed =~ "Sushi"
       assert await_reply(chat) =~ "you picked Sushi"
     end
 
@@ -1224,7 +1280,7 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       say(chat, "/agent sales")
       assert await_reply(chat) =~ "kept across /new and restarts"
 
-      assert Config.telegram_topic_agent("default", chat, nil) == "sales"
+      assert Config.channel_agent("telegram:#{chat}") == "sales"
     end
 
     test "/tools lists what the agent can actually reach for", %{chat: chat} do

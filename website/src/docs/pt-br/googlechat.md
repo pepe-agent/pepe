@@ -19,7 +19,7 @@ O `config` de uma conexão traz:
 Só eventos `MESSAGE` vindos de uma pessoa de verdade são atendidos. As respostas voltam para o espaço pela Chat REST API. O formato da URL de retorno é este:
 
 ```
-https://YOUR_HOST/webhooks/default/googlechat/<slug>
+https://YOUR_HOST/webhooks/root/googlechat/<slug>
 ```
 
 ### Autenticação de entrada

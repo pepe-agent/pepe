@@ -20,7 +20,7 @@ O `config` de uma ligação guarda:
 As atividades recebidas chegam como pedidos `POST`. As respostas voltam para o URL de serviço indicado nessa atividade, acompanhadas de um token de acesso de aplicação gerado a partir das credenciais de cliente. A menção ao bot é removida do texto antes de o agente sequer o ver. O URL de retorno segue este formato:
 
 ```
-https://YOUR_HOST/webhooks/default/msteams/<slug>
+https://YOUR_HOST/webhooks/root/msteams/<slug>
 ```
 
 ### Autenticar o que entra

@@ -92,7 +92,12 @@ defmodule Pepe.Tools.SwitchAgentTest do
     assert Session.status(key).agent == "default/sup"
   end
 
-  test "on a Telegram session, the switch also persists - not just the in-memory session" do
+  test "the switch is session-only - it never writes a durable channel binding, on Telegram or anywhere else" do
+    # That's deliberate (see the tool's own moduledoc): a lasting handoff is
+    # manage_channel's bind_topic action, never this one - switch_agent used to persist
+    # unconditionally on Telegram, which meant plain conversational routing ("connect me
+    # with support") silently became a permanent rebind of the whole channel, with no way
+    # to tell the two apart from the outside.
     Config.put_agent(%Agent{name: "default/eng", system_prompt: "eng", tools: []})
     Config.put_agent(%Agent{name: "default/sup", system_prompt: "sup", tools: []})
     from = %Agent{name: "default/eng", can_message: ["default/sup"]}
@@ -101,19 +106,6 @@ defmodule Pepe.Tools.SwitchAgentTest do
     {:ok, _} = SessionSupervisor.ensure(key, "default/eng")
 
     assert {:ok, _out} = SwitchAgent.run(%{"target" => "sup"}, ctx(from, key))
-
-    "telegram:" <> chat = key
-    assert Config.telegram_topic_agent("default", chat, nil) == "default/sup"
-  end
-
-  test "on a non-Telegram session, the switch works but there's nothing to persist" do
-    Config.put_agent(%Agent{name: "default/eng", system_prompt: "eng", tools: []})
-    Config.put_agent(%Agent{name: "default/sup", system_prompt: "sup", tools: []})
-    from = %Agent{name: "default/eng", can_message: ["default/sup"]}
-    key = "ws:#{System.unique_integer([:positive])}"
-
-    {:ok, _} = SessionSupervisor.ensure(key, "default/eng")
-
-    assert {:ok, _out} = SwitchAgent.run(%{"target" => "sup"}, ctx(from, key))
+    assert Config.channel_agent(key) == nil
   end
 end

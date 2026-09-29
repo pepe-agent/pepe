@@ -34,7 +34,7 @@ resposta adiada, e só publica a resposta de verdade como acompanhamento assim q
 termina de processar. O formato da URL de retorno é:
 
 ```
-https://YOUR_HOST/webhooks/default/discord/<slug>
+https://YOUR_HOST/webhooks/root/discord/<slug>
 ```
 
 Veja [Webhooks](../webhooks/) para conhecer os campos que toda conexão compartilha

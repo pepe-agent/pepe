@@ -31,9 +31,10 @@ endpoint.
 
 <div class="note"><strong>Public host.</strong> Webhook channels need a URL the
 platform can reach. Expose your Pepe instance behind a reverse proxy or a
-tunnel, and set <code>PEPE_PUBLIC_URL</code> so the callback URLs the CLI prints
-are complete. For a quick tunnel while testing, run <code>pepe serve
---tunnel</code>.</div>
+tunnel. If <code>PHX_HOST</code> is already set (see <a href="../deploy/">Deploying</a>),
+the callback URLs the CLI and dashboard print already use it; set
+<code>PEPE_PUBLIC_URL</code> to override that or fill it in when it isn't. For a
+quick tunnel while testing, run <code>pepe serve --tunnel</code>.</div>
 
 ## Slack, Discord, Microsoft Teams, Google Chat
 
@@ -54,10 +55,11 @@ own page with its provider-specific fields and setup steps:
 
 ## Group @mentions
 
-Slack, Microsoft Teams and Google Chat support group/channel conversations,
-where the connection answers only when @mentioned by default (a direct
-message always reaches the agent regardless). Set `require_mention: false` on
-the connection to answer every message in every channel it's in. Or, without
+Slack, Discord (in its gateway-connected mode, see [Discord](../discord/)),
+Microsoft Teams and Google Chat support group/channel conversations, where
+the connection answers only when @mentioned by default (a direct message
+always reaches the agent regardless). Set `require_mention: false` on the
+connection to answer every message in every channel it's in. Or, without
 touching that connection-wide setting, waive it for a single channel from
 inside that channel:
 
@@ -71,8 +73,38 @@ Since a channel command still has to be addressed to run in the first place,
 the *first* `/mention off` needs an actual @mention (`@bot /mention off`);
 after that, the channel no longer needs one until `/new`. The waiver lives on
 that channel's own conversation, not the connection, so it never leaks into
-any other channel. WhatsApp and Discord don't gate on mentions today (always
+any other channel. WhatsApp doesn't gate on mentions today (always
 answered), so `/mention` is a no-op there.
+
+<div class="note"><strong>Typing a command in Slack.</strong> Slack's own
+client treats anything starting with <code>/</code> as an attempt to run one
+of its own slash commands, and refuses to send it as a message at all when
+nothing is registered under that name - so <code>/mention off</code> typed
+directly gets rejected by Slack before it ever reaches Pepe. Type a leading
+space instead (<code> /mention off</code>) to send it as plain text; Pepe
+strips it before matching the command, same as always.</div>
+
+## Binding a channel to an agent
+
+`/agent NAME` durably binds THIS conversation to an agent - a group can route its
+"support" channel to the support agent and its "engineering" channel to the engineer,
+side by side, the same way a Telegram forum topic already can (see
+[Telegram](../telegram/)). Kept across `/new` and restarts, and reasserted every turn,
+so it always wins over anything the conversation drifted to in the meantime:
+
+```text
+/agent engenheiro   # bind this channel, from now on
+/agent              # show the current binding
+/agent none         # unbind, back to the connection's own default agent
+```
+
+This is a lasting, channel-wide decision, not a one-off routing choice, so it's
+reserved for **trainers** (the same trusted list `/model ... global` already uses) -
+anyone else gets a plain "you don't have permission" instead. An agent with the
+`manage_channel` tool can do the same thing from plain language ("connect this channel
+to the engineer, permanently") with its `bind_topic`/`unbind_topic` actions - see
+[Agent-to-agent routing](../routing/) for the difference between this and
+`switch_agent`, which is deliberately temporary and undone by `/new`.
 
 ## Switching models
 

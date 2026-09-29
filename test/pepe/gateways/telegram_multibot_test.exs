@@ -40,14 +40,16 @@ defmodule Pepe.Gateways.TelegramMultibotTest do
     Config.put_telegram(%{"bot_token" => "t", "agent" => "assistant"})
     Config.put_agent(%Config.Agent{name: "engenheiro", tools: []})
 
-    assert Config.telegram_topic_agent("default", -100, 7) == nil
-    Config.bind_telegram_topic("default", -100, 7, "engenheiro")
-    assert Config.telegram_topic_agent("default", -100, 7) == "engenheiro"
+    # Keyed by the topic's own real session key (`Pepe.Gateways.Telegram.session_key/1`'s
+    # format) - the same generic store every other channel's binding uses too.
+    assert Config.channel_agent("telegram:-100#t7") == nil
+    Config.bind_channel_agent("telegram:-100#t7", "engenheiro")
+    assert Config.channel_agent("telegram:-100#t7") == "engenheiro"
 
     # A different topic is unaffected; unbinding clears it.
-    assert Config.telegram_topic_agent("default", -100, 8) == nil
-    Config.bind_telegram_topic("default", -100, 7, nil)
-    assert Config.telegram_topic_agent("default", -100, 7) == nil
+    assert Config.channel_agent("telegram:-100#t8") == nil
+    Config.bind_channel_agent("telegram:-100#t7", nil)
+    assert Config.channel_agent("telegram:-100#t7") == nil
   end
 
   test "a forum topic gets its own session and its sends are routed back to the topic" do

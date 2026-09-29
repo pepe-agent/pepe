@@ -30,7 +30,7 @@ respuestas se publican de vuelta en el espacio mediante la Chat REST API. La
 URL de retorno tiene esta forma:
 
 ```
-https://YOUR_HOST/webhooks/default/googlechat/<slug>
+https://YOUR_HOST/webhooks/root/googlechat/<slug>
 ```
 
 ### Autenticación de entrada

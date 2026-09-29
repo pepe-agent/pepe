@@ -37,7 +37,7 @@ As credenciais da ligação, guardadas dentro do seu `config`:
 Se deixares de fora `--access-token` ou `--app-secret`, a linha de comandos escreve uma referência provisória derivada do slug (por exemplo, `${WA_TOKEN_SUPPORT}` e `${WA_APP_SECRET_SUPPORT}`), para depois preencheres o valor real no teu ambiente. O comando termina por imprimir o URL de retorno e o token de verificação; cola os dois na configuração de webhook da aplicação da Meta, e subscreve o campo `messages`, ou a Meta nunca chega a entregar-te as mensagens de entrada.
 
 ```
-https://YOUR_HOST/webhooks/default/whatsapp/support
+https://YOUR_HOST/webhooks/root/whatsapp/support
 ```
 
 Para gerir ligações:

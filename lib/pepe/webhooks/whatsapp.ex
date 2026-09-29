@@ -332,8 +332,8 @@ defmodule Pepe.Webhooks.WhatsApp do
 
   defp send_document(phone_id, token, to, path, caption) do
     with {:ok, media_id} <- upload_media(phone_id, token, path) do
-      doc = document_payload(media_id, path, caption)
-      body = %{"messaging_product" => "whatsapp", "to" => to, "type" => "document", "document" => doc}
+      {type, media} = outbound_media(media_id, path, caption)
+      body = %{"messaging_product" => "whatsapp", "to" => to, "type" => type, type => media}
 
       case Req.post("#{@graph}/#{phone_id}/messages", auth: {:bearer, token}, json: body, receive_timeout: 30_000) do
         {:ok, %{status: s}} when s in 200..299 -> :ok
@@ -342,6 +342,23 @@ defmodule Pepe.Webhooks.WhatsApp do
       end
     end
   end
+
+  # Meta's Cloud API renders an "image" message inline in the chat; a "document" message
+  # always shows as a generic file attachment, even for a jpg/png. Only jpeg/png qualify for
+  # "image" (WhatsApp's own restriction - webp is sticker-only there) - anything else keeps
+  # going through as a document, same as before.
+  @whatsapp_image_extensions ~w(.jpg .jpeg .png)
+
+  defp outbound_media(media_id, path, caption) do
+    if (Path.extname(path) |> String.downcase()) in @whatsapp_image_extensions do
+      {"image", image_payload(media_id, caption)}
+    else
+      {"document", document_payload(media_id, path, caption)}
+    end
+  end
+
+  defp image_payload(media_id, caption) when caption in [nil, ""], do: %{"id" => media_id}
+  defp image_payload(media_id, caption), do: %{"id" => media_id, "caption" => caption}
 
   defp document_payload(media_id, path, caption) when caption in [nil, ""],
     do: %{"id" => media_id, "filename" => Path.basename(path)}

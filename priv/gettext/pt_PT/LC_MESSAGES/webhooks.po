@@ -189,7 +189,7 @@ msgstr "Não consegui transferir esse ficheiro. Podes enviá-lo outra vez?"
 msgid "I couldn't make out any speech in that."
 msgstr "Não consegui perceber nenhuma fala aí."
 
-#: lib/pepe/webhooks.ex:213
+#: lib/pepe/webhooks.ex:245
 #, elixir-autogen, elixir-format
 msgid "I'm a bit behind on messages here. Could you send that again in a moment?"
 msgstr ""
@@ -251,3 +251,123 @@ msgid "optional, 1 to 100: the largest file taken in from a message (default 20)
 msgstr ""
 "opcional, de 1 a 100: o maior ficheiro aceite numa mensagem (por omissão, "
 "20). O limite da própria Meta continua a aplicar-se"
+
+#: lib/pepe/webhooks.ex:336
+#, elixir-autogen, elixir-format
+msgid "(unset)"
+msgstr "(não definido)"
+
+#: lib/pepe/webhooks.ex:565
+#, elixir-autogen, elixir-format
+msgid "Available models:"
+msgstr "Modelos disponíveis:"
+
+#: lib/pepe/webhooks.ex:586
+#, elixir-autogen, elixir-format
+msgid "Change %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global."
+msgstr "Trocar para %{name} só nesta conversa, ou para todos? Responde /model %{name} session ou /model %{name} global."
+
+#: lib/pepe/webhooks.ex:337
+#, elixir-autogen, elixir-format
+msgid "Current model: %{model}"
+msgstr "Modelo atual: %{model}"
+
+#: lib/pepe/webhooks.ex:550
+#, elixir-autogen, elixir-format
+msgid "Mention requirement is currently: off (I reply without being mentioned).\nUse /mention on or /mention off."
+msgstr "A exigência de menção está: desligada (respondo sem precisar de ser mencionado).\nUsa /mention on ou /mention off."
+
+#: lib/pepe/webhooks.ex:560
+#, elixir-autogen, elixir-format
+msgid "Mention requirement is currently: on (I need an @mention).\nUse /mention on or /mention off."
+msgstr "A exigência de menção está: ligada (preciso de ser @mencionado).\nUsa /mention on ou /mention off."
+
+#: lib/pepe/webhooks.ex:597
+#, elixir-autogen, elixir-format
+msgid "Model set to %{name} (%{scope})."
+msgstr "Modelo definido para %{name} (%{scope})."
+
+#: lib/pepe/webhooks.ex:599
+#, elixir-autogen, elixir-format
+msgid "No agent to set the model on."
+msgstr "Não há agente para definir o modelo."
+
+#: lib/pepe/webhooks.ex:562
+#, elixir-autogen, elixir-format
+msgid "No models are configured for this project."
+msgstr "Não há nenhum modelo configurado para este projeto."
+
+#: lib/pepe/webhooks.ex:541
+#, elixir-autogen, elixir-format
+msgid "Noted, but this connection already answers every message here without needing a mention (require_mention is off on the connection) - this channel keeps replying without one regardless."
+msgstr "Entendido, mas esta ligação já responde a toda a mensagem aqui sem precisar de menção (o require_mention da ligação está desligado) - este canal continua a responder sem menção de qualquer forma."
+
+#: lib/pepe/webhooks.ex:553
+#, elixir-autogen, elixir-format
+msgid "This channel's own setting asks for a mention, but the connection itself already answers every message without one (require_mention is off) - so nothing here actually needs a mention right now."
+msgstr "A configuração deste canal pede uma menção, mas a própria ligação já responde a toda a mensagem sem precisar de uma (require_mention está desligado) - por isso, na prática, nada aqui precisa de menção agora."
+
+#: lib/pepe/webhooks.ex:568
+#, elixir-autogen, elixir-format
+msgid "Unknown model: %{name}"
+msgstr "Modelo desconhecido: %{name}"
+
+#: lib/pepe/webhooks.ex:507
+#, elixir-autogen, elixir-format
+msgid "Usage: /mention on|off"
+msgstr "Uso: /mention on|off"
+
+#: lib/pepe/webhooks.ex:567
+#, elixir-autogen, elixir-format
+msgid "Usage: /model NAME [session|global]"
+msgstr "Uso: /model NOME [session|global]"
+
+#: lib/pepe/webhooks.ex:577
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to change the model here."
+msgstr "Não tens permissão para trocar o modelo aqui."
+
+#: lib/pepe/webhooks.ex:534
+#, elixir-autogen, elixir-format
+msgid "👂 I'll reply here without being @mentioned, until /new."
+msgstr "👂 Vou responder aqui sem precisar de @menção, até ao /new."
+
+#: lib/pepe/webhooks.ex:547
+#, elixir-autogen, elixir-format
+msgid "📣 @mention required again in this chat."
+msgstr "📣 @menção exigida de novo nesta conversa."
+
+#: lib/pepe/webhooks.ex:481
+#, elixir-autogen, elixir-format
+msgid "🧹 New conversation."
+msgstr "🧹 Nova conversa."
+
+#: lib/pepe/webhooks.ex:412
+#, elixir-autogen, elixir-format
+msgid "This channel is bound to agent %{name}.\nUse /agent NAME to change it, or /agent none to clear."
+msgstr "Este canal está vinculado ao agente %{name}.\nUsa /agent NOME para o trocar, ou /agent none para desvincular."
+
+#: lib/pepe/webhooks.ex:363
+#, elixir-autogen, elixir-format
+msgid "This channel is no longer bound to a specific agent - back to %{agent}."
+msgstr "Este canal já não está vinculado a um agente específico - voltou para %{agent}."
+
+#: lib/pepe/webhooks.ex:397
+#, elixir-autogen, elixir-format
+msgid "This channel is now bound to agent %{name} (kept across /new and restarts)."
+msgstr "Este canal está agora vinculado ao agente %{name} (mantido entre /new e reinícios)."
+
+#: lib/pepe/webhooks.ex:405
+#, elixir-autogen, elixir-format
+msgid "This channel isn't bound to a specific agent - it uses %{agent} (this connection's default).\nUse /agent NAME to bind it."
+msgstr "Este canal não está vinculado a um agente específico - usa %{agent} (a predefinição desta ligação).\nUsa /agent NOME para o vincular."
+
+#: lib/pepe/webhooks.ex:414
+#, elixir-autogen, elixir-format
+msgid "Unknown agent: %{name}"
+msgstr "Agente desconhecido: %{name}"
+
+#: lib/pepe/webhooks.ex:357
+#, elixir-autogen, elixir-format
+msgid "You don't have permission to change this channel's agent."
+msgstr "Não tens permissão para trocar o agente deste canal."

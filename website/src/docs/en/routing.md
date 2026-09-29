@@ -54,13 +54,12 @@ boundary. Bare peer names in <code>--can-message</code> resolve inside the agent
 project, and the CLI refuses a route between two agents that live in different
 projects.</div>
 
-## Handing off the whole conversation (`switch_agent`)
+## Handing off the whole conversation, for now (`switch_agent`)
 
 `send_to_agent` is a one-off consult; `switch_agent` is the other thing: the agent
-answering right now hands the **rest of the conversation** to a different agent. It's
-the same effect as the user typing `/agent NAME` themselves, just reachable from a
-plain request ("connect me with billing", "let me talk to support directly") instead
-of the slash command.
+answering right now hands the **rest of the conversation** to a different agent -
+reachable from a plain request ("connect me with billing", "let me talk to support
+directly") instead of a command.
 
 ```text
 Let me talk to the billing agent directly.
@@ -68,9 +67,16 @@ Let me talk to the billing agent directly.
 
 The agent calls `switch_agent` with `target: "billing"`. Its own reply to *this* turn
 still goes out from the agent that's already answering ("sure, connecting you now");
-the switch only takes effect starting with the next message, the same as `/agent`
-already behaves. The new agent starts from a fresh context; it doesn't inherit this
-conversation's history.
+the switch only takes effect starting with the next message. The new agent starts from
+a fresh context; it doesn't inherit this conversation's history.
+
+This is deliberately temporary: it lasts only until `/new`, which returns the
+conversation to whichever agent it actually started with. It is **not** the same thing
+as `/agent NAME` (or asking an agent to "connect this channel to billing from now on,
+permanently") - that's a lasting change to the channel's own configuration, covered in
+[Telegram](../telegram/) and [Webhooks](../webhooks/), and it's the one `/new` does not
+undo. Use `switch_agent` for "put me through to billing right now"; use the permanent
+kind for "this channel is always billing's from now on."
 
 It uses the exact same `can_message` allowlist as `send_to_agent`: if an agent can
 message a peer, it can also hand the conversation to it, no separate route to

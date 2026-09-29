@@ -96,4 +96,20 @@ defmodule Pepe.Agent.SetAgentKeepsHistoryTest do
     :ok = Session.reset(key)
     assert [%{"role" => "system"}] = Session.history(key)
   end
+
+  test "/new (reset) after a switch_agent handoff goes back to the session's original agent, not the one it was routed to", %{
+    key: key
+  } do
+    # The "receptionist" model: whoever this session started with (a connection's own
+    # configured agent, or whatever a bare `ensure/3` call was given) is who /new returns to -
+    # a fresh start means a fresh start with the front door, not with whoever the last
+    # conversation happened to be routed to.
+    {:ok, _} = SessionSupervisor.ensure(key, "eng")
+
+    :ok = Session.set_agent(key, "sup")
+    assert %{agent: "sup"} = Session.status(key)
+
+    :ok = Session.reset(key)
+    assert %{agent: "eng"} = Session.status(key)
+  end
 end

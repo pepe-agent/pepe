@@ -48,6 +48,20 @@ defmodule Pepe.Webhooks.MentionGatingTest do
     test "a non-message payload (e.g. url_verification) is not gated here" do
       assert Slack.addressed?(entry(), %{"type" => "url_verification"})
     end
+
+    test "parse/1 strips a leading space, so ' /mention off' still reaches command/3 as a command" do
+      # Slack's own client intercepts anything starting with "/" as an attempted slash command
+      # and refuses to send it at all unless one is registered under that name - typing a
+      # leading space is how Slack itself tells someone to get a literal message through.
+      # Pepe's docs point people at that workaround, so this is what makes it actually work:
+      # parse/1 must hand command/3 a string starting with "/", not " /".
+      payload = %{
+        "type" => "event_callback",
+        "event" => %{"type" => "message", "channel" => "C1", "text" => " /mention off", "ts" => "1.1"}
+      }
+
+      assert {:ok, [%{text: "/mention off"}]} = Slack.parse(payload)
+    end
   end
 
   describe "MS Teams" do

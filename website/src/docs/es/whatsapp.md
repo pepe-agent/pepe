@@ -37,7 +37,7 @@ Las credenciales de la conexión (guardadas dentro de su `config`):
 Si dejas `--access-token` o `--app-secret` sin poner, la CLI escribe en su lugar una referencia derivada del slug (por ejemplo, `${WA_TOKEN_SUPPORT}` y `${WA_APP_SECRET_SUPPORT}`), para que después completes el valor real en tu entorno. El comando imprime la URL de retorno y el token de verificación; pega ambos en la configuración de webhook de tu app de Meta, y suscribe el campo `messages` para que Meta empiece a entregarte de verdad los mensajes entrantes:
 
 ```
-https://YOUR_HOST/webhooks/default/whatsapp/support
+https://YOUR_HOST/webhooks/root/whatsapp/support
 ```
 
 Para administrar conexiones:

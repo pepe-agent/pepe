@@ -35,7 +35,7 @@ with a deferred response and posts the real answer as a follow-up once the
 agent finishes. Callback URL shape:
 
 ```
-https://YOUR_HOST/webhooks/default/discord/<slug>
+https://YOUR_HOST/webhooks/root/discord/<slug>
 ```
 
 See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,

@@ -58,13 +58,12 @@ proyecto a otro. Un nombre simple en <code>--can-message</code> se resuelve dent
 propio proyecto del agente, y la CLI rechaza cualquier ruta entre dos agentes que
 pertenezcan a proyectos distintos.</div>
 
-## Entregar toda la conversación (`switch_agent`)
+## Entregar toda la conversación, por ahora (`switch_agent`)
 
 Si `send_to_agent` sirve para una consulta puntual, `switch_agent` cubre el otro caso: el
 agente que está respondiendo en este momento le cede **el resto de la conversación** a
-otro agente. El resultado es idéntico a que el propio usuario escribiera `/agent NOMBRE`,
-solo que se puede activar con una petición en lenguaje natural ("ponme con billing",
-"quiero hablar directo con soporte") en vez de necesitar el comando de barra.
+otro agente, activable con una petición en lenguaje natural ("ponme con billing",
+"quiero hablar directo con soporte") sin necesitar ningún comando.
 
 ```text
 Ponme directamente con el agente de billing.
@@ -72,9 +71,16 @@ Ponme directamente con el agente de billing.
 
 El agente llama a `switch_agent` con `target: "billing"`. La respuesta a *este* turno
 todavía sale del agente que venía respondiendo ("listo, te conecto ahora"); el cambio no
-entra en vigor hasta el siguiente mensaje, igual que ya ocurre con `/agent`. El agente
-nuevo arranca con el contexto en blanco: no hereda el historial de la conversación
-anterior.
+entra en vigor hasta el siguiente mensaje. El agente nuevo arranca con el contexto en
+blanco: no hereda el historial de la conversación anterior.
+
+Esto es temporal a propósito: dura solo hasta el próximo `/new`, que devuelve la
+conversación al agente con el que realmente empezó. **No es lo mismo** que `/agent
+NOMBRE` (o pedirle al agente "vincula este canal a billing desde ahora, para siempre") -
+eso es un cambio permanente en la configuración del canal, cubierto en
+[Telegram](../telegram/) y [Webhooks](../webhooks/), y es el tipo que el `/new` no
+deshace. Usa `switch_agent` para "ponme con billing ahora"; usa el tipo permanente para
+"este canal ahora es siempre de billing".
 
 `switch_agent` reutiliza la misma lista `can_message` de `send_to_agent`: si un agente
 puede escribirle a otro, también puede cederle la conversación, sin necesidad de dar de

@@ -350,6 +350,7 @@ defmodule Pepe.Agent.Session do
           %{
             key: key,
             agent_name: name || default_agent,
+            default_agent_name: default_agent,
             messages: messages,
             running: nil,
             pending_resume: pending,
@@ -360,6 +361,7 @@ defmodule Pepe.Agent.Session do
           %{
             key: key,
             agent_name: default_agent,
+            default_agent_name: default_agent,
             messages: init_messages(default_agent),
             running: nil,
             idle_ref: nil,
@@ -783,7 +785,13 @@ defmodule Pepe.Agent.Session do
 
     Checkpoints.forget_session(state.key)
 
-    {:reply, :ok, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], mention_optional: false})}
+    # A reset also undoes a switch_agent/`/agent` handoff, back to whichever agent this
+    # session actually started under (the connection's own default) - the "receptionist"
+    # model: /new is a fresh start with whoever answers first, not a fresh start with
+    # whoever you were last routed to.
+    agent_name = state.default_agent_name
+
+    {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), pii_map: [], mention_optional: false})}
   end
 
   def handle_call(:history, _from, state) do

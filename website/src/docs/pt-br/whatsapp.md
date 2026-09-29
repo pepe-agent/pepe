@@ -58,7 +58,7 @@ webhook do app da Meta e assine o campo `messages`, para que ela realmente
 comece a entregar as mensagens recebidas:
 
 ```
-https://YOUR_HOST/webhooks/default/whatsapp/support
+https://YOUR_HOST/webhooks/root/whatsapp/support
 ```
 
 Gerenciando conexões já criadas:

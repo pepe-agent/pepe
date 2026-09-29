@@ -19,7 +19,7 @@ Un `GET` a esa URL responde al handshake de verificación del proveedor (Pepe si
 
 Hay una sola ruta genérica para todo esto. Agregar un proveedor nuevo nunca implica agregar un endpoint nuevo.
 
-<div class="note"><strong>Host público.</strong> Los canales por webhook necesitan una URL a la que la plataforma pueda llegar. Expón tu instancia de Pepe detrás de un proxy inverso o un túnel, y define <code>PEPE_PUBLIC_URL</code> para que las URL de retorno que imprime la línea de comandos queden completas. Si solo necesitas un túnel rápido para probar, corre <code>pepe serve --tunnel</code>.</div>
+<div class="note"><strong>Host público.</strong> Los canales por webhook necesitan una URL a la que la plataforma pueda llegar. Expón tu instancia de Pepe detrás de un proxy inverso o un túnel. Si <code>PHX_HOST</code> ya está definido (ver <a href="../deploy/">Desplegar en un servidor</a>), las URL de retorno ya salen bien; define <code>PEPE_PUBLIC_URL</code> para sobrescribir eso o completarlo cuando no lo esté. Si solo necesitas un túnel rápido para probar, corre <code>pepe serve --tunnel</code>.</div>
 
 ## Slack, Discord, Microsoft Teams, Google Chat
 
@@ -33,7 +33,7 @@ Elige la opción de canal, escoge el proveedor y el agente, y carga las credenci
 
 ## @Menciones en grupo
 
-Slack, Microsoft Teams y Google Chat admiten conversaciones de grupo o canal, donde por defecto la conexión solo contesta si la @mencionan (un mensaje directo, en cambio, siempre le llega al agente sin importar este ajuste). Pon `require_mention: false` en la conexión si quieres que responda a todos los mensajes en todos los canales donde participa. O, sin tocar ese ajuste general de la conexión, haz la excepción para un solo canal, desde dentro de ese mismo canal:
+Slack, Discord (en su modo conectado por gateway, ver [Discord](../discord/)), Microsoft Teams y Google Chat admiten conversaciones de grupo o canal, donde por defecto la conexión solo contesta si la @mencionan (un mensaje directo, en cambio, siempre le llega al agente sin importar este ajuste). Pon `require_mention: false` en la conexión si quieres que responda a todos los mensajes en todos los canales donde participa. O, sin tocar ese ajuste general de la conexión, haz la excepción para un solo canal, desde dentro de ese mismo canal:
 
 ```text
 /mention off   # solo en este canal, hasta /new - no hace falta @mencionarlo para que responda
@@ -41,7 +41,21 @@ Slack, Microsoft Teams y Google Chat admiten conversaciones de grupo o canal, do
 /mention       # muestra el ajuste actual
 ```
 
-Como un comando de canal igual necesita estar dirigido al bot para poder ejecutarse, el *primer* `/mention off` sí necesita una @mención de verdad (`@bot /mention off`); después de eso, ese canal deja de necesitarla hasta el próximo `/new`. La excepción queda guardada en la conversación de ese canal puntual, no en la conexión, así que nunca se cuela en ningún otro canal. WhatsApp y Discord, por ahora, no filtran por menciones (siempre contestan), así que ahí `/mention` no hace nada.
+Como un comando de canal igual necesita estar dirigido al bot para poder ejecutarse, el *primer* `/mention off` sí necesita una @mención de verdad (`@bot /mention off`); después de eso, ese canal deja de necesitarla hasta el próximo `/new`. La excepción queda guardada en la conversación de ese canal puntual, no en la conexión, así que nunca se cuela en ningún otro canal. WhatsApp, por ahora, no filtra por menciones (siempre contesta), así que ahí `/mention` no hace nada.
+
+<div class="note"><strong>Escribir un comando en Slack.</strong> El propio cliente de Slack trata cualquier cosa que empiece con <code>/</code> como un intento de ejecutar uno de sus propios comandos de barra, y directamente se niega a enviarla como mensaje si no hay ninguno registrado con ese nombre - así que <code>/mention off</code> escrito tal cual llega a ser rechazado por el propio Slack antes de que le llegue a Pepe. Escribe un espacio antes de la barra (<code> /mention off</code>) para mandarlo como texto normal; Pepe quita ese espacio antes de comparar con el comando, tal como siempre hizo.</div>
+
+## Vincular un canal a un agente
+
+`/agent NOMBRE` vincula esta conversación a un agente de forma permanente - un grupo puede enrutar su canal de "soporte" al agente de soporte y el de "ingeniería" al ingeniero, uno al lado del otro, igual que ya puede hacerlo un tema de foro de Telegram (ver [Telegram](../telegram/)). Se mantiene después de `/new` y de reinicios, y se reafirma en cada mensaje, así que siempre gana, sin importar a dónde haya ido la conversación mientras tanto:
+
+```text
+/agent ingeniero   # vincula este canal, desde ahora
+/agent             # muestra el vínculo actual
+/agent none        # desvincula, vuelve al agente predeterminado de la conexión
+```
+
+Es una decisión permanente, que afecta a todo el canal, no una elección puntual de enrutamiento - por eso está reservada a **entrenadores** (la misma lista de confianza que ya controla `/model ... global`); cualquier otra persona solo recibe un "no tienes permiso". Un agente con la herramienta `manage_channel` puede hacer lo mismo en lenguaje natural ("vincula este canal al ingeniero, de forma permanente") con sus acciones `bind_topic`/`unbind_topic` - ver [Enrutamiento entre agentes](../routing/) para la diferencia entre esto y `switch_agent`, que es temporal a propósito y que el `/new` sí deshace.
 
 ## Cambiar de modelo
 

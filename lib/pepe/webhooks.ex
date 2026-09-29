@@ -38,6 +38,24 @@ defmodule Pepe.Webhooks do
     "googlechat" => Pepe.Webhooks.GoogleChat
   }
 
+  @doc """
+  The scheme+host every callback URL is built from. `PEPE_PUBLIC_URL` overrides outright;
+  else falls back to `PHX_HOST` (already set for a release's endpoint, see
+  `config/runtime.exs`) as `https://<host>`, else the `"YOUR_HOST"` placeholder. Reads the
+  raw env var, not `Application.get_env` - `config/runtime.exs` never runs under plain
+  `mix pepe ...`.
+  """
+  def public_host do
+    System.get_env("PEPE_PUBLIC_URL") ||
+      case System.get_env("PHX_HOST") do
+        host when is_binary(host) and host != "" -> "https://" <> host
+        _ -> "https://YOUR_HOST"
+      end
+  end
+
+  @doc "The full callback URL for a connection - what gets pasted into the provider's own webhook config."
+  def callback_url(project, provider, slug), do: "#{public_host()}/webhooks/#{project || "root"}/#{provider}/#{slug}"
+
   @doc "The provider module for a name (built-in or plugin), or nil."
   def provider(name), do: Map.get(registry(), name)
 
@@ -158,10 +176,24 @@ defmodule Pepe.Webhooks do
   end
 
   defp maybe_dispatch(mod, entry, payload, %{from: from} = message) do
-    if addressed?(mod, entry, payload) or mention_waived?(entry, from) do
+    if real_command?(entry, message) or addressed?(mod, entry, payload) or mention_waived?(entry, from) do
       dispatch(entry, mod, message)
     else
       :ok
+    end
+  end
+
+  # A real, recognized command (/new, /model, /mention, ...) is unambiguously addressed to the
+  # bot by its own syntax alone - unlike a plain "oi", which could be meant for anyone in a busy
+  # channel, nobody types "/mention off" by accident. Requiring an @mention on top of that was
+  # pure friction with no actual ambiguity to resolve, so a genuine command reaches the agent
+  # regardless of require_mention/addressed?/2; a support connection, or text that merely starts
+  # with "/" but isn't a command command/3 recognizes, still falls through to the ordinary gate
+  # below, exactly as before - command/3 already returns :chat for both of those cases on its own.
+  defp real_command?(entry, message) do
+    case command(entry, message[:text] || "", actor(message)) do
+      :chat -> false
+      _ -> true
     end
   end
 
@@ -278,42 +310,136 @@ defmodule Pepe.Webhooks do
   # queued or folded into the turn the way an in-flight one always could.
   @spec begin(map(), String.t(), keyword()) :: {:chat, String.t(), String.t(), keyword()} | :done
   def begin(%{entry: entry, mod: mod, message: message}, text, opts) do
+    # This runs in the lane's own process, a different one from whichever task last called
+    # Config.put_locale/0 (Gettext's locale is per-process) - every command reply built below
+    # (command/3, dispatch_command/4, and their own helpers) needs it set here, not just in
+    # reply_async/4's task, since the text is already a finished string by the time it gets
+    # there.
+    Config.put_locale()
     from = message.from
     agent = entry["agent"]
     key = session_key(entry, from)
+    # A context bag rather than several positional args threaded through every clause below -
+    # handle_command/2's own clauses are what keep this dispatch's cyclomatic complexity down
+    # (one function per command shape, instead of one long case), not this struct-less map.
+    ctx = %{entry: entry, mod: mod, message: message, text: text, opts: opts, agent: agent, key: key, from: from}
+    result = handle_command(command(entry, text, actor(message)), ctx)
+    # Reasserted AFTER dispatch, not before: /new's own reset (see Session.reset/1) reverts
+    # to the connection's plain default, and running this first would have that stomp right
+    # back over it within the very same turn. Landing here means whichever command just ran,
+    # this always has the final word - same "authoritative every turn" as
+    # Pepe.Gateways.Telegram's bind_and_resolve_agent/1, and it also covers a plain :chat turn,
+    # since nothing else reasserts before the message reaches the session.
+    apply_channel_binding(key, agent, entry)
+    result
+  end
 
-    case command(entry, text, actor(message)) do
-      {:reset, reply} ->
-        SessionSupervisor.ensure(key, agent, session_opts(entry))
-        Session.reset(key)
-        reply_async(mod, entry, from, reply)
+  defp handle_command({:reset, reply}, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    Session.reset(ctx.key)
+    reply_async(ctx.mod, ctx.entry, ctx.from, reply)
+  end
 
-      {:reply, reply} ->
-        reply_async(mod, entry, from, reply)
+  defp handle_command({:reply, reply}, ctx), do: reply_async(ctx.mod, ctx.entry, ctx.from, reply)
 
-      {:model_show} ->
-        SessionSupervisor.ensure(key, agent, session_opts(entry))
-        %{model: model} = Session.status(key)
-        reply_async(mod, entry, from, "Current model: #{model || "(unset)"}")
+  defp handle_command({:model_show}, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    %{model: model} = Session.status(ctx.key)
+    model_label = model || dgettext("webhooks", "(unset)")
+    reply_async(ctx.mod, ctx.entry, ctx.from, dgettext("webhooks", "Current model: %{model}", model: model_label))
+  end
 
-      {:model_set, name, scope, perm} ->
-        SessionSupervisor.ensure(key, agent, session_opts(entry))
-        reply_async(mod, entry, from, apply_model_change(key, agent, name, scope, perm))
+  defp handle_command({:model_set, name, scope, perm}, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    reply_async(ctx.mod, ctx.entry, ctx.from, apply_model_change(ctx.key, ctx.agent, name, scope, perm))
+  end
 
-      {:mention, waived?} ->
-        SessionSupervisor.ensure(key, agent, session_opts(entry))
-        Session.set_mention_optional(key, waived?)
-        reply_async(mod, entry, from, mention_reply(waived?))
+  defp handle_command({:mention, waived?}, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    Session.set_mention_optional(ctx.key, waived?)
+    reply_async(ctx.mod, ctx.entry, ctx.from, mention_reply(waived?, connection_mention_optional?(ctx.entry)))
+  end
 
-      {:mention_status} ->
-        SessionSupervisor.ensure(key, agent, session_opts(entry))
-        reply_async(mod, entry, from, mention_status_reply(Session.mention_optional?(key)))
+  defp handle_command({:mention_status}, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    status = mention_status_reply(Session.mention_optional?(ctx.key), connection_mention_optional?(ctx.entry))
+    reply_async(ctx.mod, ctx.entry, ctx.from, status)
+  end
 
-      :chat ->
-        SessionSupervisor.ensure(key, agent, session_opts(entry))
-        {:chat, key, text, chat_opts(entry, message, opts)}
+  defp handle_command({:agent_status}, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    reply_async(ctx.mod, ctx.entry, ctx.from, agent_status_reply(Config.channel_agent(ctx.key), ctx.agent))
+  end
+
+  defp handle_command({:agent_bind, _target, false}, ctx),
+    do: reply_async(ctx.mod, ctx.entry, ctx.from, dgettext("webhooks", "You don't have permission to change this channel's agent."))
+
+  defp handle_command({:agent_bind, nil, true}, ctx) do
+    Config.bind_channel_agent(ctx.key, nil)
+    default_agent = ctx.agent || Config.default_agent_name()
+    SessionSupervisor.ensure(ctx.key, default_agent, session_opts(ctx.entry))
+    Session.set_agent(ctx.key, default_agent)
+    reply = dgettext("webhooks", "This channel is no longer bound to a specific agent - back to %{agent}.", agent: default_agent)
+    reply_async(ctx.mod, ctx.entry, ctx.from, reply)
+  end
+
+  defp handle_command({:agent_bind, target, true}, ctx) do
+    reply_async(ctx.mod, ctx.entry, ctx.from, bind_channel_agent(ctx.key, ctx.agent, ctx.entry, target))
+  end
+
+  defp handle_command(:chat, ctx) do
+    SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
+    {:chat, ctx.key, ctx.text, chat_opts(ctx.entry, ctx.message, ctx.opts)}
+  end
+
+  # The connection's own default agent is `entry["agent"]`; a persistent bind_topic (or
+  # `/agent NAME`) can override it for THIS conversation specifically - reasserted here, every
+  # turn, so it always wins regardless of whatever a switch_agent handoff or /new left the
+  # session on (the same "authoritative every turn" pattern Pepe.Gateways.Telegram's
+  # bind_and_resolve_agent/1 already uses).
+  defp apply_channel_binding(key, agent, entry) do
+    case Config.channel_agent(key) do
+      bound when is_binary(bound) ->
+        if Config.get_agent(bound) do
+          SessionSupervisor.ensure(key, agent, session_opts(entry))
+          Session.set_agent(key, bound)
+        end
+
+      _ ->
+        :ok
     end
   end
+
+  # A bare name resolves inside the connection's own project, the same as /model and
+  # switch_agent already do; an explicitly cross-project handle ("other/agent") is refused
+  # exactly like an unknown one - never confirmed as "real, just not yours" - so a trainer on
+  # one tenant's connection can't durably bind a channel to another tenant's agent, or even
+  # learn whether a given name exists there.
+  defp bind_channel_agent(key, agent, entry, target) do
+    qualified = Project.qualify(target, agent || "")
+
+    if Project.same_scope?(qualified, agent || "") and Config.get_agent(qualified) do
+      Config.bind_channel_agent(key, qualified)
+      SessionSupervisor.ensure(key, agent, session_opts(entry))
+      Session.set_agent(key, qualified)
+      dgettext("webhooks", "This channel is now bound to agent %{name} (kept across /new and restarts).", name: qualified)
+    else
+      unknown_agent(target)
+    end
+  end
+
+  defp agent_status_reply(nil, agent),
+    do:
+      dgettext(
+        "webhooks",
+        "This channel isn't bound to a specific agent - it uses %{agent} (this connection's default).\nUse /agent NAME to bind it.",
+        agent: agent
+      )
+
+  defp agent_status_reply(bound, _agent),
+    do: dgettext("webhooks", "This channel is bound to agent %{name}.\nUse /agent NAME to change it, or /agent none to clear.", name: bound)
+
+  defp unknown_agent(name), do: dgettext("webhooks", "Unknown agent: %{name}", name: name)
 
   # A webhook sender is never the operator, the same "a stranger" content class every
   # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
@@ -380,7 +506,7 @@ defmodule Pepe.Webhooks do
 
   def command(_entry, _text, _from), do: :chat
 
-  defp dispatch_command(_entry, "new", _args, _from), do: {:reset, "🧹 New conversation."}
+  defp dispatch_command(_entry, "new", _args, _from), do: {:reset, dgettext("webhooks", "🧹 New conversation.")}
 
   defp dispatch_command(entry, "models", _args, _from) do
     {:reply, render_models(ModelSwitch.list_for(Project.of(entry["agent"])))}
@@ -393,7 +519,7 @@ defmodule Pepe.Webhooks do
       [] -> {:model_show}
       [name] -> {:model_set, name, nil, perm}
       [name, scope] -> {:model_set, name, scope, perm}
-      _ -> {:reply, "Usage: /model NAME [session|global]"}
+      _ -> {:reply, model_usage()}
     end
   end
 
@@ -406,33 +532,77 @@ defmodule Pepe.Webhooks do
       "off" -> {:mention, true}
       "on" -> {:mention, false}
       "" -> {:mention_status}
-      _ -> {:reply, "Usage: /mention on|off"}
+      _ -> {:reply, dgettext("webhooks", "Usage: /mention on|off")}
+    end
+  end
+
+  # `/agent NAME` durably binds THIS conversation to an agent - kept across /new and
+  # restarts, reasserted every turn (see apply_channel_binding/3), same as Telegram's own
+  # `/agent`. Trainer-gated (learn?/2), the same allowlist that already controls memory and
+  # `/model ... global` - a channel's routing is a shared, lasting decision, not something any
+  # allowed sender should get to make unilaterally.
+  defp dispatch_command(entry, "agent", args, from) do
+    trainer? = learn?(entry, from)
+
+    case String.trim(args) do
+      "" -> {:agent_status}
+      target when target in ["none", "clear", "off"] -> {:agent_bind, nil, trainer?}
+      target -> {:agent_bind, target, trainer?}
     end
   end
 
   defp dispatch_command(_entry, _other, _args, _from), do: :chat
 
-  defp mention_reply(true), do: "👂 I'll reply here without being @mentioned, until /new."
-  defp mention_reply(false), do: "📣 @mention required again in this chat."
+  # The `require_mention` config field is a shared convention across every provider that
+  # implements addressed?/2 gating (Slack, Discord's gateway mode, MS Teams, Google Chat),
+  # so it's read generically here rather than through any one provider module.
+  defp connection_mention_optional?(entry), do: (entry["config"] || %{})["require_mention"] == "false"
 
-  defp mention_status_reply(true),
-    do: "Mention requirement is currently: off (I reply without being mentioned).\nUse /mention on or /mention off."
+  defp mention_reply(true, _connection_optional?),
+    do: dgettext("webhooks", "👂 I'll reply here without being @mentioned, until /new.")
 
-  defp mention_status_reply(false), do: "Mention requirement is currently: on (I need an @mention).\nUse /mention on or /mention off."
+  # `/mention on` while the connection itself already answers everything (require_mention:
+  # false) can't actually re-impose the requirement - the per-channel waiver only ever loosens
+  # the connection's own default, never tightens it - so say that plainly instead of claiming
+  # an effect this can't have.
+  defp mention_reply(false, true) do
+    dgettext(
+      "webhooks",
+      "Noted, but this connection already answers every message here without needing a mention (require_mention is off on the connection) - this channel keeps replying without one regardless."
+    )
+  end
 
-  defp render_models([]), do: "No models are configured for this project."
+  defp mention_reply(false, false), do: dgettext("webhooks", "📣 @mention required again in this chat.")
+
+  defp mention_status_reply(true, _connection_optional?),
+    do: dgettext("webhooks", "Mention requirement is currently: off (I reply without being mentioned).\nUse /mention on or /mention off.")
+
+  defp mention_status_reply(false, true) do
+    dgettext(
+      "webhooks",
+      "This channel's own setting asks for a mention, but the connection itself already answers every message without one (require_mention is off) - so nothing here actually needs a mention right now."
+    )
+  end
+
+  defp mention_status_reply(false, false),
+    do: dgettext("webhooks", "Mention requirement is currently: on (I need an @mention).\nUse /mention on or /mention off.")
+
+  defp render_models([]), do: dgettext("webhooks", "No models are configured for this project.")
 
   defp render_models(models),
-    do: "Available models:\n" <> Enum.map_join(models, "\n", &"- #{&1.name} (#{&1.model})")
+    do: dgettext("webhooks", "Available models:") <> "\n" <> Enum.map_join(models, "\n", &"- #{&1.name} (#{&1.model})")
+
+  defp model_usage, do: dgettext("webhooks", "Usage: /model NAME [session|global]")
+  defp unknown_model(name), do: dgettext("webhooks", "Unknown model: %{name}", name: name)
 
   # `perm` was already computed in `command/3` (pure); this just applies it.
   defp apply_model_change(key, agent, name, scope, perm) do
     cond do
       is_nil(Config.get_model(name)) ->
-        "Unknown model: #{name}"
+        unknown_model(name)
 
       perm == :none ->
-        "You don't have permission to change the model here."
+        dgettext("webhooks", "You don't have permission to change the model here.")
 
       perm == :session or scope == "session" ->
         model_result(ModelSwitch.apply(key, agent, name, :session), name, :session)
@@ -441,17 +611,20 @@ defmodule Pepe.Webhooks do
         model_result(ModelSwitch.apply(key, agent, name, :global), name, :global)
 
       scope in [nil, ""] ->
-        "Change #{name} for this conversation only, or for everyone? " <>
-          "Reply /model #{name} session or /model #{name} global."
+        dgettext(
+          "webhooks",
+          "Change %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global.",
+          name: name
+        )
 
       true ->
-        "Usage: /model NAME [session|global]"
+        model_usage()
     end
   end
 
-  defp model_result(:ok, name, scope), do: "Model set to #{name} (#{scope})."
-  defp model_result({:error, :unknown_model}, name, _scope), do: "Unknown model: #{name}"
-  defp model_result({:error, :unknown_agent}, _name, _scope), do: "No agent to set the model on."
+  defp model_result(:ok, name, scope), do: dgettext("webhooks", "Model set to %{name} (%{scope}).", name: name, scope: scope)
+  defp model_result({:error, :unknown_model}, name, _scope), do: unknown_model(name)
+  defp model_result({:error, :unknown_agent}, _name, _scope), do: dgettext("webhooks", "No agent to set the model on.")
 
   # Per-connection session behaviour: an idle TTL (minutes -> ms; nil = never) and
   # whether history is ephemeral (support) or kept (admin).

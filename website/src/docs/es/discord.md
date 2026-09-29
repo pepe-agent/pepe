@@ -37,7 +37,7 @@ agente termina, publica la respuesta real como mensaje de seguimiento. La
 URL de retorno tiene esta forma:
 
 ```
-https://YOUR_HOST/webhooks/default/discord/<slug>
+https://YOUR_HOST/webhooks/root/discord/<slug>
 ```
 
 Los campos que comparten todas las conexiones (`agent`, `mode`, `trainers`,

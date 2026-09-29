@@ -162,26 +162,36 @@ defmodule Pepe.Tools.ManageChannelTest do
     assert listing =~ "sales-bot"
   end
 
-  test "bind_topic connects the current forum topic to an agent, by request; unbind_topic reverts" do
+  test "bind_topic connects the current conversation to an agent, by request; unbind_topic reverts" do
     Config.put_telegram(%{"bot_token" => "t"})
     Config.put_agent(%Agent{name: "engenheiro", system_prompt: "x", tools: []})
 
-    # Inside a topic - the session key carries the chat and `#t<thread>`.
+    # Inside a forum topic - the session key carries the chat and `#t<thread>`.
     topic_ctx = %{agent: %Agent{name: "boss"}, session_key: "telegram:-100777#t42"}
 
     assert {:ok, msg} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, topic_ctx)
     assert msg =~ "engenheiro"
-    assert Config.telegram_topic_agent("default", "-100777", 42) == "engenheiro"
+    assert Config.channel_agent("telegram:-100777#t42") == "engenheiro"
 
     assert {:ok, _} = ManageChannel.run(%{"action" => "unbind_topic"}, topic_ctx)
-    assert Config.telegram_topic_agent("default", "-100777", 42) == nil
+    assert Config.channel_agent("telegram:-100777#t42") == nil
 
-    # Outside a topic (no `#t`): a clear error, and nothing bound.
+    # Any other conversation - a plain chat with no `#t`, a Slack channel, whatever the
+    # session key happens to be - binds exactly the same way, since binding never has to
+    # know or care which surface it's talking to.
     general_ctx = %{agent: %Agent{name: "boss"}, session_key: "telegram:-100777"}
-    assert {:error, err} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, general_ctx)
-    assert err =~ "topic"
+    assert {:ok, _} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, general_ctx)
+    assert Config.channel_agent("telegram:-100777") == "engenheiro"
+
+    slack_ctx = %{agent: %Agent{name: "boss"}, session_key: "slack:acme/support:C1"}
+    assert {:ok, _} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, slack_ctx)
+    assert Config.channel_agent("slack:acme/support:C1") == "engenheiro"
 
     # An unknown agent is refused.
     assert {:error, _} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "ghost"}, topic_ctx)
+
+    # No session key at all (no real conversation to bind): a clear error.
+    assert {:error, err} = ManageChannel.run(%{"action" => "bind_topic", "agent" => "engenheiro"}, %{agent: %Agent{name: "boss"}})
+    assert err =~ "no conversation"
   end
 end

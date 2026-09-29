@@ -447,7 +447,45 @@ defmodule Pepe.Config do
     |> maybe_migrate(&needs_model_id_migration?/1, &migrate_model_ids/1)
     |> maybe_migrate(&needs_project_migration?/1, &migrate_to_projects/1)
     |> maybe_migrate(&needs_agent_id_migration?/1, &migrate_agents_to_ids/1)
+    |> maybe_migrate(&needs_channel_agent_migration?/1, &migrate_telegram_topics_to_channel_agents/1)
   end
+
+  # `channel_agent/1`/`bind_channel_agent/2` generalized the old Telegram-only
+  # `telegram_topics` store (keyed by a bot/chat/thread compound) into one flat map keyed by
+  # the conversation's own session key, shared by every surface - fold any existing entries
+  # into that shape once, then drop the old key entirely.
+  defp needs_channel_agent_migration?(config), do: Map.has_key?(config, "telegram_topics")
+
+  defp migrate_telegram_topics_to_channel_agents(config) do
+    migrated =
+      config
+      |> Map.get("telegram_topics", %{})
+      |> Map.new(fn {topic_key, agent} -> {telegram_session_key_from_topic_key(topic_key), agent} end)
+
+    # An entry already under "channel_agents" can only exist if the new code already ran (and
+    # wrote it) - by construction the newer of the two, so it wins over whatever this one-time
+    # migration would otherwise reconstruct for the same key.
+    channel_agents = Map.merge(migrated, Map.get(config, "channel_agents", %{}))
+
+    config
+    |> Map.put("channel_agents", channel_agents)
+    |> Map.delete("telegram_topics")
+  end
+
+  # Rebuilds the real Telegram session-key format (`Pepe.Gateways.Telegram.session_key/1`) from
+  # the old topic_key's "<bot>:<chat>:<thread-or-chat>" shape. Config can't depend on the
+  # gateway module, so the format is duplicated here, once, for this one-time migration only -
+  # every other reader/writer goes through channel_agent/1 and bind_channel_agent/2 instead.
+  defp telegram_session_key_from_topic_key(topic_key) do
+    case String.split(topic_key, ":", parts: 3) do
+      [bot, chat, "chat"] -> telegram_base_session_key(bot, chat)
+      [bot, chat, thread] -> telegram_base_session_key(bot, chat) <> "#t" <> thread
+      _ -> topic_key
+    end
+  end
+
+  defp telegram_base_session_key("default", chat), do: "telegram:#{chat}"
+  defp telegram_base_session_key(bot, chat), do: "telegram:#{bot}:#{chat}"
 
   # Upgrade agents from handle-keyed (`slug/name`) to id-keyed: each gets a stable id and stores
   # its bare label + owning project id, so renaming a project or an agent never re-keys it.
@@ -2968,40 +3006,28 @@ defmodule Pepe.Config do
   def telegram_bot(name), do: Enum.find(telegram_bots(), &(&1["name"] == name))
 
   @doc """
-  The agent a Telegram forum topic is bound to, or `nil`. A group with topics can route each
-  topic to its own agent (a "support" topic to the support agent, "engineering" to the engineer),
-  persistently and across restarts - stored flat under `telegram_topics` keyed by bot, chat and
-  thread.
+  The agent a conversation is durably bound to, or `nil` - keyed by the conversation's own
+  session key (`"telegram:123"`, `"slack:acme/support:C1"`, ...), which is already a unique,
+  stable string per surface, so one flat map (`channel_agents`) covers every channel with no
+  per-provider storage of its own. A group/channel can route to its own agent this way (a
+  "support" topic to the support agent, "engineering" to the engineer), persistently and
+  across restarts, and independent of whatever a conversational `switch_agent` handoff or a
+  `/new` did to the live session - the surface re-applies this binding every turn (see
+  `Pepe.Gateways.Telegram`'s `topic_agent/0` call site and `Pepe.Webhooks.begin/3`), so it
+  always wins.
   """
-  @spec telegram_topic_agent(String.t(), term(), term()) :: String.t() | nil
-  def telegram_topic_agent(bot_name, chat_id, thread) do
-    get_in(load(), ["telegram_topics", topic_key(bot_name, chat_id, thread)])
+  @spec channel_agent(String.t()) :: String.t() | nil
+  def channel_agent(session_key), do: get_in(load(), ["channel_agents", session_key])
+
+  @doc "Bind (or, with `nil`, unbind) a conversation's session key to an agent, persistently."
+  @spec bind_channel_agent(String.t(), String.t() | nil) :: map()
+  def bind_channel_agent(session_key, nil) do
+    update(fn config -> Map.put(config, "channel_agents", Map.delete(config["channel_agents"] || %{}, session_key)) end)
   end
 
-  @doc """
-  Bind a chat (or, with a `thread`, one of its forum topics) to an agent, persistently.
-  `nil` agent removes the binding.
-  """
-  @spec bind_telegram_topic(String.t(), term(), term(), String.t() | nil) :: map()
-  def bind_telegram_topic(bot_name, chat_id, thread, nil) do
-    update(fn config ->
-      topics = Map.delete(config["telegram_topics"] || %{}, topic_key(bot_name, chat_id, thread))
-      Map.put(config, "telegram_topics", topics)
-    end)
+  def bind_channel_agent(session_key, agent) do
+    update(fn config -> Map.put(config, "channel_agents", Map.put(config["channel_agents"] || %{}, session_key, agent)) end)
   end
-
-  def bind_telegram_topic(bot_name, chat_id, thread, agent) do
-    update(fn config ->
-      topics = Map.put(config["telegram_topics"] || %{}, topic_key(bot_name, chat_id, thread), agent)
-      Map.put(config, "telegram_topics", topics)
-    end)
-  end
-
-  # `thread` is `nil` for a plain chat (no forum topic) - `nil` doesn't implement
-  # `String.Chars`, so it needs its own branch rather than interpolating straight
-  # through; "chat" can never collide with a real thread id (always a positive integer).
-  defp topic_key(bot_name, chat_id, nil), do: "#{bot_name}:#{chat_id}:chat"
-  defp topic_key(bot_name, chat_id, thread), do: "#{bot_name}:#{chat_id}:#{thread}"
 
   @doc "Create or replace a named (non-default) Telegram bot."
   def put_telegram_bot(name, map) when is_binary(name) and is_map(map) do

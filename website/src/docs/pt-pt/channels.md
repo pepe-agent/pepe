@@ -231,5 +231,7 @@ pepe serve --port 4000
 
 A porta também é lida da variável de ambiente `PORT`. Adiciona `--tunnel` para
 abrir um túnel público e testar canais por webhook sem o teu próprio proxy
-inverso. Define `PEPE_PUBLIC_URL` para que os URLs de retorno que registas com cada
-fornecedor apontem para o teu host real.
+inverso. Se `PHX_HOST` já estiver definido (vê
+[Publicar num servidor](../deploy/)), os URLs de retorno que registas com
+cada fornecedor já saem certos; define `PEPE_PUBLIC_URL` para sobrepor isso
+ou preenchê-lo quando não estiver.

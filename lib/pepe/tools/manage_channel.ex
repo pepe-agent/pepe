@@ -26,6 +26,7 @@ defmodule Pepe.Tools.ManageChannel do
   import Pepe.Tools.Tool, only: [function: 3]
 
   alias Pepe.Config
+  alias Pepe.Project
 
   # A conventional environment-variable name (so a raw token, which contains ":",
   # is rejected - the agent must reference an env var instead).
@@ -51,12 +52,14 @@ defmodule Pepe.Tools.ManageChannel do
       - list: show configured bots (name, agent, whether active).
       - set_agent: rebind a bot to another agent - needs `name`, `agent`.
       - bind_topic: channel administration, not a conversation hand-off. Permanently routes \
-        every future message in the CURRENT Telegram forum topic to `agent`, persistent, \
-        surviving /new and restarts. Only works inside a forum topic, and only for an operator \
-        configuring routing ahead of time. NOT for a user asking to talk to, be connected with, \
-        or transferred to another agent right now; that's switch_agent (or the /agent command), \
+        every future message in the CURRENT conversation (a Telegram chat or forum topic, a \
+        Slack/Discord/Teams/Google Chat channel, a DM - whatever this conversation is) to \
+        `agent`, persistent, surviving /new and restarts. Only for an operator configuring \
+        routing ahead of time. NOT for a user asking to talk to, be connected with, or \
+        transferred to another agent right now; that's switch_agent (or the /agent command), \
         never this. Needs `agent`.
-      - unbind_topic: remove the current topic's agent binding (back to the bot's default agent).
+      - unbind_topic: remove this conversation's agent binding (back to the channel's own \
+        default agent).
       - set_trainers: who the bot LEARNS from - needs `name`, `trainers` ("*" = \
         everyone, "none" = nobody (client-facing bot), or comma-separated user ids).
       - set_heartbeat: enable/tune the bot's proactive heartbeat - needs `name`; \
@@ -118,30 +121,56 @@ defmodule Pepe.Tools.ManageChannel do
 
   def run(_args, _ctx), do: {:error, "manage_channel needs an `action`"}
 
-  # Bind the topic this conversation is in to `agent`, so from now on that topic is answered by it
-  # (persistent - survives /new and restarts). The user asks in plain language ("connect this
-  # topic to the engineer") and the agent does it; no /agent command to remember.
+  # Bind this conversation to `agent`, so from now on it is answered by it (persistent -
+  # survives /new and restarts). The user asks in plain language ("connect this channel to
+  # the engineer") and the agent does it; no /agent command to remember. Works the same for
+  # any surface - the session key already uniquely identifies the conversation - so this
+  # never needs to know it's talking to Telegram, Slack, or anything else.
   defp bind_topic(args, ctx) do
     with {:ok, agent} <- fetch(args, "agent"),
-         :ok <- ensure_agent(agent),
-         {:ok, {bot, chat, thread}} <- current_topic(ctx) do
-      Config.bind_telegram_topic(bot, chat, thread, agent)
-      {:ok, "This topic is now bound to agent #{agent} - it will answer here from now on, kept across /new and restarts."}
+         qualified = Project.qualify(agent, ctx.agent.name),
+         :ok <- ensure_same_scope(qualified, ctx.agent.name),
+         :ok <- ensure_agent(qualified),
+         {:ok, key} <- session_key(ctx) do
+      Config.bind_channel_agent(key, qualified)
+      {:ok, "This conversation is now bound to agent #{qualified} - it will answer here from now on, kept across /new and restarts."}
     end
+  end
+
+  # A bare name resolves inside the calling agent's own project, same as switch_agent; an
+  # explicitly cross-project handle ("other/agent") is refused outright, so this can't durably
+  # bind a channel to a different tenant's agent.
+  defp ensure_same_scope(qualified, from_name) do
+    if Project.same_scope?(qualified, from_name), do: :ok, else: {:error, "#{qualified} belongs to a different project"}
   end
 
   defp unbind_topic(ctx) do
-    with {:ok, {bot, chat, thread}} <- current_topic(ctx) do
-      Config.bind_telegram_topic(bot, chat, thread, nil)
-      {:ok, "This topic is no longer bound to a specific agent - it falls back to the bot's default agent."}
+    with {:ok, key} <- session_key(ctx) do
+      Config.bind_channel_agent(key, nil)
+      {:ok, "This conversation is no longer bound to a specific agent - it falls back to the channel's own default agent."}
     end
   end
 
-  defp current_topic(ctx) do
-    case Pepe.Gateways.Telegram.parse_topic_key(ctx[:session_key]) do
-      {bot, chat, thread} when not is_nil(thread) -> {:ok, {bot, chat, thread}}
-      {_bot, _chat, nil} -> {:error, "this conversation isn't a forum topic, so there's no topic to bind"}
-      :error -> {:error, "this isn't a Telegram conversation"}
+  # Nothing reads a binding written under these prefixes - the dashboard, an embedded widget,
+  # the OpenAI-compatible API and the ACP editor adapter each have their own throwaway or
+  # per-request session, not a durable channel anyone comes back to. Only Telegram
+  # (`Pepe.Gateways.Telegram.topic_agent/0`) and the shared webhook gateway
+  # (`Pepe.Webhooks.apply_channel_binding/3`) ever look one up, so refuse the rest outright
+  # instead of writing a config entry nothing will ever act on.
+  @no_channel_to_bind ~w(web: widget: api: acp:)
+
+  defp session_key(ctx) do
+    case ctx[:session_key] do
+      key when is_binary(key) and key != "" ->
+        if Enum.any?(@no_channel_to_bind, &String.starts_with?(key, &1)) do
+          {:error,
+           "this conversation has no channel to bind - that only works on Telegram, Slack, Discord, MS Teams, Google Chat or WhatsApp"}
+        else
+          {:ok, key}
+        end
+
+      _ ->
+        {:error, "no conversation to bind: this only works inside a real conversation"}
     end
   end
 

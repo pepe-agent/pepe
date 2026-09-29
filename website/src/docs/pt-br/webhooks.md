@@ -34,10 +34,12 @@ nunca implica em criar um endpoint novo.
 
 <div class="note"><strong>Host público.</strong> Um canal por webhook
 precisa de uma URL que a plataforma consiga alcançar de fato. Exponha sua
-instância do Pepe atrás de um proxy reverso ou de um túnel, e configure
-<code>PEPE_PUBLIC_URL</code> para que as URLs de retorno impressas pela
-linha de comando já saiam completas. Para um túnel rápido enquanto você
-testa, rode <code>pepe serve --tunnel</code>.</div>
+instância do Pepe atrás de um proxy reverso ou de um túnel. Se
+<code>PHX_HOST</code> já estiver definido (veja
+<a href="../deploy/">Publicando em um servidor</a>), as URLs de retorno já
+saem certas; defina <code>PEPE_PUBLIC_URL</code> para sobrescrever isso ou
+preencher quando não estiver. Para um túnel rápido enquanto testa, rode
+<code>pepe serve --tunnel</code>.</div>
 
 ## Slack, Discord, Microsoft Teams, Google Chat
 
@@ -59,7 +61,8 @@ vale para o WhatsApp.
 
 ## @Menções em grupo
 
-Slack, Microsoft Teams e Google Chat suportam conversas em grupo ou canal,
+Slack, Discord (no modo conectado por gateway, veja [Discord](../discord/)),
+Microsoft Teams e Google Chat suportam conversas em grupo ou canal,
 onde, por padrão, a conexão só responde quando é @mencionada (uma mensagem
 direta, essa sim, sempre chega ao agente, independente dessa
 configuração). Para responder a toda mensagem em qualquer canal onde
@@ -77,9 +80,42 @@ Como um comando de canal precisa, antes de tudo, ser endereçado ao bot para
 rodar, o *primeiro* `/mention off` ainda exige uma @menção de verdade
 (`@bot /mention off`); depois dele, o canal fica dispensado até o próximo
 `/new`. Essa dispensa vive na conversa daquele canal específico, não na
-conexão como um todo, então não vaza para nenhum outro canal. WhatsApp e
-Discord, por sua vez, não filtram por menção hoje (sempre respondem a
-tudo), então `/mention` simplesmente não tem efeito nenhum ali.
+conexão como um todo, então não vaza para nenhum outro canal. O WhatsApp,
+por sua vez, não filtra por menção hoje (sempre responde a tudo), então
+`/mention` simplesmente não tem efeito nenhum lá.
+
+<div class="note"><strong>Digitando um comando no Slack.</strong> O próprio
+cliente do Slack trata qualquer coisa que comece com <code>/</code> como uma
+tentativa de rodar um dos comandos de barra dele, e recusa nem enviar a
+mensagem quando não existe nenhum registrado com esse nome - então
+<code>/mention off</code> digitado direto é rejeitado pelo próprio Slack
+antes de chegar no Pepe. Digite um espaço antes da barra
+(<code> /mention off</code>) para mandar como texto comum; o Pepe remove
+esse espaço antes de casar o comando, do jeito que sempre fez.</div>
+
+## Vinculando um canal a um agente
+
+`/agent NOME` vincula essa conversa a um agente de forma permanente - um grupo pode
+rotear o canal "suporte" pro agente de suporte e o canal "engenharia" pro engenheiro,
+lado a lado, do mesmo jeito que um tópico de fórum do Telegram já consegue (veja
+[Telegram](../telegram/)). Fica valendo mesmo depois de `/new` e de reinicializações,
+e é reafirmado a cada mensagem, então sempre vence, não importa pra onde a conversa
+tenha ido:
+
+```text
+/agent engenheiro   # vincula esse canal, a partir de agora
+/agent              # mostra o vínculo atual
+/agent none         # desvincula, volta pro agente padrão da conexão
+```
+
+Isso é uma decisão permanente, que vale pro canal inteiro, não uma escolha pontual de
+roteamento - por isso é restrito a **treinadores** (a mesma lista de confiança que já
+controla o `/model ... global`); qualquer outra pessoa recebe só um "você não tem
+permissão". Um agente com a ferramenta `manage_channel` consegue fazer a mesma coisa
+por linguagem natural ("vincula esse canal ao engenheiro, permanentemente") com as
+ações `bind_topic`/`unbind_topic` dela - veja
+[Roteamento entre agentes](../routing/) pra entender a diferença entre isso e o
+`switch_agent`, que é propositalmente temporário e desfeito pelo `/new`.
 
 ## Trocando de modelo
 

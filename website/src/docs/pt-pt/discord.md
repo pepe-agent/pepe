@@ -35,7 +35,7 @@ com uma resposta diferida, e só publica a resposta real como seguimento assim q
 agente terminar. O formato do URL de retorno é:
 
 ```
-https://YOUR_HOST/webhooks/default/discord/<slug>
+https://YOUR_HOST/webhooks/root/discord/<slug>
 ```
 
 Os campos partilhados por qualquer ligação (`agent`, `mode`, `trainers`,

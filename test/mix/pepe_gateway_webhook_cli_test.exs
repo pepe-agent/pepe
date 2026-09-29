@@ -69,7 +69,9 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
     test "a slash-command connection needs no bot token and prints its endpoint" do
       out = pepe(["gateway", "discord", "add", "cmds", "--agent", "a", "--application-id", "123", "--public-key", "abcd"])
 
-      assert out =~ "/webhooks/default/discord/cmds"
+      # "root" is the actual default-project slug the webhook route resolves (regression:
+      # this used to print the literal, non-existent "default" project instead).
+      assert out =~ "/webhooks/root/discord/cmds"
       entry = Config.get_webhook("cmds")
       assert entry["config"] == %{"application_id" => "123", "public_key" => "abcd"}
       refute Pepe.Gateways.Discord.active?(entry)
