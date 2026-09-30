@@ -97,7 +97,8 @@ defmodule PepeWeb.ChatLive do
        pending_perm: nil,
        pending_ask: nil,
        renaming?: false,
-       focus: nil
+       focus: nil,
+       focus_open: :auto
      )}
   end
 
@@ -261,7 +262,7 @@ defmodule PepeWeb.ChatLive do
               </div>
             </header>
 
-            <.focus_panel :if={@focus} focus={@focus} />
+            <.focus_panel :if={@focus} focus={@focus} open={focus_open?(@focus, @focus_open)} />
 
             <div id="chat-scroll" phx-hook=".ChatScroll" class="flex-1 space-y-3 overflow-y-auto px-3 py-5 sm:px-5">
               <div :if={@messages == [] and not @running} class="flex h-full items-center justify-center text-[15px] text-zinc-600">
@@ -437,40 +438,75 @@ defmodule PepeWeb.ChatLive do
   end
 
   attr :focus, :map, required: true
+  attr :open, :boolean, default: true
 
-  # A slim panel under the header showing the session's current goal and plan checklist.
+  # A slim panel under the header showing the session's current goal and plan checklist. Its
+  # header row is always there and folds the rest away: a finished goal has nothing left to
+  # tell you, and the checklist is tall enough to crowd the conversation.
   defp focus_panel(assigns) do
+    assigns = assign(assigns, :progress, plan_progress(assigns.focus.plan))
+
     ~H"""
-    <div class="border-b border-zinc-800 bg-zinc-900/40 px-3 py-3 text-[15px] sm:px-5">
-      <div :if={@focus.goal} class="flex items-start gap-2">
-        <span class="mt-0.5 text-zinc-500">🎯</span>
-        <div class="min-w-0">
-          <span class="font-medium">{@focus.goal["objective"]}</span>
-          <span class={["ml-2 rounded-full px-2 py-0.5 text-xs font-medium", goal_badge(@focus.goal["status"])]}>
-            {goal_status_label(@focus.goal["status"])}
-          </span>
-          <span :if={@focus.goal["attempt"]} class="ml-2 text-xs text-zinc-500">
-            {gettext("attempt %{n}/%{max}", n: @focus.goal["attempt"], max: @focus.goal["max_attempts"])}
-          </span>
-          <%!-- The success criterion and the judge's last verdict: what makes this a
-                goal loop rather than a note-to-self. --%>
-          <div :if={@focus.goal["criteria"]} class="mt-1 text-sm text-zinc-500">
-            {gettext("Done when:")} {@focus.goal["criteria"]}
-          </div>
-          <div :if={@focus.goal["verdict"]} class="mt-1 text-sm text-zinc-400">
-            <span class="text-zinc-600">{gettext("Reviewer:")}</span> {@focus.goal["verdict"]}
-          </div>
+    <div class="border-b border-zinc-800 bg-zinc-900/40 px-3 py-2 text-[15px] sm:px-5">
+      <button
+        type="button"
+        phx-click="toggle_focus"
+        aria-expanded={to_string(@open)}
+        aria-controls="focus-details"
+        title={if @open, do: gettext("Hide the goal"), else: gettext("Show the goal")}
+        class="group flex w-full items-center gap-2 text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-500/60"
+      >
+        <span class="text-zinc-500">🎯</span>
+        <span class={["min-w-0 flex-1 font-medium", !@open && "truncate"]}>
+          {(@focus.goal && @focus.goal["objective"]) || gettext("Plan")}
+        </span>
+        <span
+          :if={@focus.goal}
+          class={["shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", goal_badge(@focus.goal["status"])]}
+        >
+          {goal_status_label(@focus.goal["status"])}
+        </span>
+        <span :if={@progress} class="shrink-0 text-xs text-zinc-500">{@progress}</span>
+        <.icon
+          name="hero-chevron-down"
+          class={["size-4 shrink-0 text-zinc-600 transition-transform group-hover:text-zinc-400", !@open && "-rotate-90"]}
+        />
+      </button>
+      <div :if={@open} id="focus-details" class="mt-1 pl-6">
+        <span :if={@focus.goal && @focus.goal["attempt"]} class="text-xs text-zinc-500">
+          {gettext("attempt %{n}/%{max}", n: @focus.goal["attempt"], max: @focus.goal["max_attempts"])}
+        </span>
+        <%!-- The success criterion and the judge's last verdict: what makes this a
+              goal loop rather than a note-to-self. --%>
+        <div :if={@focus.goal && @focus.goal["criteria"]} class="text-sm text-zinc-500">
+          {gettext("Done when:")} {@focus.goal["criteria"]}
         </div>
+        <div :if={@focus.goal && @focus.goal["verdict"]} class="mt-1 text-sm text-zinc-400">
+          <span class="text-zinc-600">{gettext("Reviewer:")}</span> {@focus.goal["verdict"]}
+        </div>
+        <ul :if={is_list(@focus.plan) and @focus.plan != []} class={["space-y-0.5 text-sm", @focus.goal && "mt-2"]}>
+          <li :for={s <- @focus.plan} class="flex items-center gap-2 text-zinc-400">
+            <span class="w-4 text-center">{plan_box(s["status"])}</span>
+            <span class={s["status"] == "done" && "text-zinc-600 line-through"}>{s["title"]}</span>
+          </li>
+        </ul>
       </div>
-      <ul :if={is_list(@focus.plan) and @focus.plan != []} class={["space-y-0.5 text-sm", @focus.goal && "mt-2"]}>
-        <li :for={s <- @focus.plan} class="flex items-center gap-2 text-zinc-400">
-          <span class="w-4 text-center">{plan_box(s["status"])}</span>
-          <span class={s["status"] == "done" && "text-zinc-600 line-through"}>{s["title"]}</span>
-        </li>
-      </ul>
     </div>
     """
   end
+
+  # Open by default, except once the goal is complete: it has nothing left to say, so it
+  # folds itself to the header row. A click on the header overrides this either way.
+  defp focus_open?(_focus, open) when is_boolean(open), do: open
+  defp focus_open?(%{goal: %{"status" => "complete"}}, :auto), do: false
+  defp focus_open?(_focus, :auto), do: true
+
+  # "3/4" for a plan, so the folded header still says how far along it is.
+  defp plan_progress([_ | _] = plan) do
+    "#{Enum.count(plan, &(&1["status"] == "done"))}/#{length(plan)}"
+  end
+
+  defp plan_progress(_plan), do: nil
 
   # The reader-facing wording for the goal statuses `Pepe.Tools.Goal` stores (the raw
   # value used to be printed as-is, in English, whatever the dashboard's language).
@@ -595,6 +631,14 @@ defmodule PepeWeb.ChatLive do
 
   @impl true
   def handle_event("type", %{"text" => text}, socket), do: {:noreply, assign(socket, input: text)}
+
+  # Fold or unfold the goal/plan panel. The first click turns the automatic choice (open until
+  # the goal completes) into an explicit one, so the panel stays however the operator left it
+  # for as long as this conversation is open.
+  def handle_event("toggle_focus", _params, socket) do
+    %{focus: focus, focus_open: open} = socket.assigns
+    {:noreply, assign(socket, focus_open: not focus_open?(focus, open))}
+  end
 
   def handle_event("load_older", _p, socket), do: {:noreply, assign(socket, window: socket.assigns.window + @window)}
 
@@ -1088,7 +1132,8 @@ defmodule PepeWeb.ChatLive do
       activity: [],
       attachments: [],
       renaming?: false,
-      focus: load_focus(key)
+      focus: load_focus(key),
+      focus_open: :auto
     )
   end
 
