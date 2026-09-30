@@ -76,6 +76,21 @@ defmodule Pepe.Tools.SwitchAgent do
 
   def run(_args, _ctx), do: {:error, "switch_agent needs `target`"}
 
+  # Whether the switch would be refused on policy alone. Runs before the permission gate, so a
+  # target that can never work is answered straight away instead of parked for a human's OK.
+  def preflight(%{"target" => target}, ctx) when is_binary(target) do
+    from = ctx[:agent]
+    from_name = from && from.name
+    qualified = from_name && Project.qualify(target, from_name)
+
+    case authorize(from, from_name, qualified, ctx) do
+      {:ok, _resolved} -> :ok
+      {:error, _} = err -> err
+    end
+  end
+
+  def preflight(_args, _ctx), do: :ok
+
   defp authorize(from, from_name, target, ctx) do
     cond do
       is_nil(from) ->

@@ -58,6 +58,8 @@ defmodule Pepe.Agent.AgentSwitchLockToolsTest do
       model: "m",
       system_prompt: "hi",
       tools: ["switch_agent", "manage_channel"],
+      # switch_agent is only offered to an agent that has someone to hand a conversation to.
+      can_message: ["peer"],
       auto_approve: ["*"],
       max_iterations: 2
     }

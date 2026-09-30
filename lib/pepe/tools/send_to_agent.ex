@@ -61,6 +61,22 @@ defmodule Pepe.Tools.SendToAgent do
 
   def run(_args, _ctx), do: {:error, "send_to_agent needs `to` and `message`"}
 
+  # Whether the message would be refused on policy alone (no route, other project, loop). Runs
+  # before the permission gate, so a call that can never be delivered is answered straight away.
+  def preflight(%{"to" => to}, ctx) when is_binary(to) do
+    from = ctx[:agent]
+    from_name = from && from.name
+    chain = ctx[:agent_chain] || List.wrap(from_name)
+    qualified = from_name && Project.qualify(to, from_name)
+
+    case authorize(from, from_name, qualified, chain) do
+      {:ok, _resolved} -> :ok
+      {:error, _} = err -> err
+    end
+  end
+
+  def preflight(_args, _ctx), do: :ok
+
   defp authorize(from, from_name, to, chain) do
     cond do
       is_nil(from) ->

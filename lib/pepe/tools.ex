@@ -367,6 +367,29 @@ defmodule Pepe.Tools do
     end
   end
 
+  @doc """
+  Ask a tool, before the permission gate, whether this exact call could ever succeed.
+
+  A tool may export `preflight/2` (`args, ctx`) returning `:ok` or `{:error, reason}` for a
+  call it would refuse on policy alone (a route that no longer exists, a locked channel).
+  Returns `{:refuse, text}` with the same `Error: ...` result the tool would have produced,
+  or `:ok` when the tool has no preflight, the args don't decode, or the call is fine. It
+  exists so the gate never parks a human approval for something that would be refused
+  anyway: an approval nobody can usefully give is a dead end for the user and for the model.
+  """
+  @spec preflight(String.t(), String.t() | map(), map()) :: :ok | {:refuse, String.t()}
+  def preflight(name, raw_args, ctx) do
+    with mod when not is_nil(mod) <- get(name),
+         {:module, ^mod} <- Code.ensure_loaded(mod),
+         true <- function_exported?(mod, :preflight, 2),
+         {:ok, args} <- decode_args(raw_args),
+         {:error, reason} <- mod.preflight(args, ctx) do
+      {:refuse, annotate_error("Error: #{reason}")}
+    else
+      _ -> :ok
+    end
+  end
+
   defp execute_builtin(name, raw_args, ctx) do
     with mod when not is_nil(mod) <- get(name),
          {:ok, args} <- decode_args(raw_args) do

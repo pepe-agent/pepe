@@ -255,7 +255,11 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp run_chain(agent, chain, messages, opts) do
-    specs = agent.tools |> Tools.specs() |> hide_switch_agent(opts[:agent_switch_locked] == true)
+    specs =
+      agent.tools
+      |> Tools.specs()
+      |> hide_switch_agent(opts[:agent_switch_locked] == true)
+      |> hide_unroutable(agent)
 
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
@@ -308,6 +312,19 @@ defmodule Pepe.Agent.Runtime do
   # the tool, it just can no longer construct a call the API's own schema would accept for
   # either of those two actions.
   @manage_channel_action_enum ["function", "parameters", "properties", "action", "enum"]
+
+  # An agent with nobody on its `can_message` list has no one to message or hand a conversation
+  # to, so both tools are dropped from its specs: offering them only invites a call that is
+  # refused (and costs the tokens describing them on every request).
+  defp hide_unroutable(nil, _agent), do: nil
+  defp hide_unroutable(specs, %{can_message: [_ | _]}), do: specs
+
+  defp hide_unroutable(specs, _agent) do
+    case Enum.reject(specs, &(get_in(&1, ["function", "name"]) in ["send_to_agent", "switch_agent"])) do
+      [] -> nil
+      specs -> specs
+    end
+  end
 
   defp hide_switch_agent(nil, _locked?), do: nil
   defp hide_switch_agent(specs, false), do: specs
@@ -668,7 +685,12 @@ defmodule Pepe.Agent.Runtime do
     if ctx[:review] and stageable?(name) do
       {:answered, id, name, stage_for_review(name, call, ctx)}
     else
-      gate_tool(call, id, name, raw, ctx, opts)
+      # A call the tool would refuse on policy alone never reaches the gate: parking it for a
+      # human's OK would ask someone to approve what cannot then succeed.
+      case Tools.preflight(name, raw, ctx) do
+        {:refuse, out} -> {:answered, id, name, out}
+        :ok -> gate_tool(call, id, name, raw, ctx, opts)
+      end
     end
   end
 
