@@ -4277,7 +4277,7 @@ msgid "Archive"
 msgstr "Archivar"
 
 #: lib/pepe_web/live/board_live.ex:269
-#: lib/pepe_web/live/skill_curator_component.ex:128
+#: lib/pepe_web/live/skill_curator_component.ex:130
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr "Archivada"
@@ -4523,13 +4523,13 @@ msgid "inherit"
 msgstr "heredar"
 
 #: lib/pepe_web/live/board_live.ex:254
-#: lib/pepe_web/live/skill_curator_component.ex:162
+#: lib/pepe_web/live/skill_curator_component.ex:177
 #, elixir-autogen, elixir-format
 msgid "off"
 msgstr "desactivado"
 
 #: lib/pepe_web/live/board_live.ex:253
-#: lib/pepe_web/live/skill_curator_component.ex:164
+#: lib/pepe_web/live/skill_curator_component.ex:179
 #, elixir-autogen, elixir-format
 msgid "on"
 msgstr "activado"
@@ -6126,7 +6126,7 @@ msgid "paste code here"
 msgstr "pega el código aquí"
 
 #: lib/pepe_web/live/chat_live.ex:525
-#: lib/pepe_web/live/skill_curator_component.ex:163
+#: lib/pepe_web/live/skill_curator_component.ex:178
 #, elixir-autogen, elixir-format
 msgid "paused"
 msgstr "en pausa"
@@ -6484,7 +6484,7 @@ msgstr "Ya hay una ejecución en curso. Espera a que termine o usa /stop."
 msgid "Also merge overlapping skills (uses a model run)"
 msgstr "Fusionar también skills que se solapan (usa el modelo)"
 
-#: lib/pepe_web/live/skill_curator_component.ex:158
+#: lib/pepe_web/live/skill_curator_component.ex:173
 #, elixir-autogen, elixir-format
 msgid "Archive after (days)"
 msgstr "Archivar tras (días)"
@@ -6504,12 +6504,12 @@ msgstr "Verificar"
 msgid "Closest to going stale"
 msgstr "Próximas a quedar obsoletas"
 
-#: lib/pepe_web/live/skill_curator_component.ex:215
+#: lib/pepe_web/live/skill_curator_component.ex:230
 #, elixir-autogen, elixir-format
 msgid "Could not restore %{name}."
 msgstr "No se pudo restaurar %{name}."
 
-#: lib/pepe_web/live/skill_curator_component.ex:205
+#: lib/pepe_web/live/skill_curator_component.ex:220
 #, elixir-autogen, elixir-format
 msgid "Curator settings saved."
 msgstr "Ajustes del curador guardados."
@@ -6581,17 +6581,17 @@ msgstr[1] "No válida: %{count} errores."
 msgid "Off on:"
 msgstr "Desactivada en:"
 
-#: lib/pepe_web/live/skill_curator_component.ex:156
+#: lib/pepe_web/live/skill_curator_component.ex:171
 #, elixir-autogen, elixir-format
 msgid "Only when idle (hours)"
 msgstr "Solo tras inactividad (horas)"
 
-#: lib/pepe_web/live/skill_curator_component.ex:123
+#: lib/pepe_web/live/skill_curator_component.ex:124
 #, elixir-autogen, elixir-format
 msgid "Pin"
 msgstr "Fijar"
 
-#: lib/pepe_web/live/skill_curator_component.ex:232
+#: lib/pepe_web/live/skill_curator_component.ex:247
 #, elixir-autogen, elixir-format
 msgid "Pinned %{name}: only you can change it now."
 msgstr "%{name} fijada: ahora solo tú puedes cambiarla."
@@ -6601,22 +6601,22 @@ msgstr "%{name} fijada: ahora solo tú puedes cambiarla."
 msgid "Preview"
 msgstr "Vista previa"
 
-#: lib/pepe_web/live/skill_curator_component.ex:247
+#: lib/pepe_web/live/skill_curator_component.ex:262
 #, elixir-autogen, elixir-format
 msgid "Preview: nothing was changed"
 msgstr "Vista previa: no se cambió nada"
 
-#: lib/pepe_web/live/skill_curator_component.ex:139
+#: lib/pepe_web/live/skill_curator_component.ex:143
 #, elixir-autogen, elixir-format
 msgid "Recent changes to skills"
 msgstr "Cambios recientes en skills"
 
-#: lib/pepe_web/live/skill_curator_component.ex:134
+#: lib/pepe_web/live/skill_curator_component.ex:137
 #, elixir-autogen, elixir-format
 msgid "Restore"
 msgstr "Restaurar"
 
-#: lib/pepe_web/live/skill_curator_component.ex:214
+#: lib/pepe_web/live/skill_curator_component.ex:229
 #, elixir-autogen, elixir-format
 msgid "Restored %{name}."
 msgstr "%{name} restaurada."
@@ -6631,12 +6631,12 @@ msgstr "Ejecuta una skill instalada: NOMBRE [entrada]"
 msgid "Run automatically"
 msgstr "Ejecutar automáticamente"
 
-#: lib/pepe_web/live/skill_curator_component.ex:155
+#: lib/pepe_web/live/skill_curator_component.ex:170
 #, elixir-autogen, elixir-format
 msgid "Run every (hours)"
 msgstr "Ejecutar cada (horas)"
 
-#: lib/pepe_web/live/skill_curator_component.ex:247
+#: lib/pepe_web/live/skill_curator_component.ex:262
 #, elixir-autogen, elixir-format
 msgid "Run finished"
 msgstr "Ejecución terminada"
@@ -6672,7 +6672,7 @@ msgstr "Curador de skills"
 msgid "Skills"
 msgstr "Skills"
 
-#: lib/pepe_web/live/skill_curator_component.ex:157
+#: lib/pepe_web/live/skill_curator_component.ex:172
 #, elixir-autogen, elixir-format
 msgid "Stale after (days)"
 msgstr "Obsoleta tras (días)"
@@ -6686,7 +6686,7 @@ msgstr ""
 "por qué. Puedes desactivarla en todos los canales o solo en uno. Instala y "
 "crea skills desde el chat o con mix pepe skill."
 
-#: lib/pepe_web/live/skill_curator_component.ex:253
+#: lib/pepe_web/live/skill_curator_component.ex:268
 #, elixir-autogen, elixir-format
 msgid "The curator could not run."
 msgstr "El curador no pudo ejecutarse."
@@ -6711,7 +6711,7 @@ msgstr "Activar"
 msgid "Turn on again"
 msgstr "Volver a activar"
 
-#: lib/pepe_web/live/skill_curator_component.ex:146
+#: lib/pepe_web/live/skill_curator_component.ex:151
 #, elixir-autogen, elixir-format
 msgid "Undo"
 msgstr "Deshacer"
@@ -6743,32 +6743,32 @@ msgstr "Canales por webhook"
 msgid "Yours"
 msgstr "Tuyas"
 
-#: lib/pepe_web/live/skill_curator_component.ex:132
+#: lib/pepe_web/live/skill_curator_component.ex:135
 #, elixir-autogen, elixir-format
 msgid "archived by %{who}"
 msgstr "archivada por %{who}"
 
-#: lib/pepe_web/live/skill_curator_component.ex:144
+#: lib/pepe_web/live/skill_curator_component.ex:149
 #, elixir-autogen, elixir-format
 msgid "by %{who}"
 msgstr "por %{who}"
 
-#: lib/pepe_web/live/skill_curator_component.ex:120
+#: lib/pepe_web/live/skill_curator_component.ex:121
 #, elixir-autogen, elixir-format
 msgid "idle %{days} days, used %{count} times"
 msgstr "sin uso hace %{days} días, usada %{count} veces"
 
-#: lib/pepe_web/live/skill_curator_component.ex:169
+#: lib/pepe_web/live/skill_curator_component.ex:184
 #, elixir-autogen, elixir-format
 msgid "never"
 msgstr "nunca"
 
-#: lib/pepe_web/live/skill_curator_component.ex:179
+#: lib/pepe_web/live/skill_curator_component.ex:194
 #, elixir-autogen, elixir-format
 msgid "none scheduled"
 msgstr "ninguna programada"
 
-#: lib/pepe_web/live/skill_curator_component.ex:121
+#: lib/pepe_web/live/skill_curator_component.ex:122
 #, elixir-autogen, elixir-format
 msgid "stale"
 msgstr "obsoleta"
@@ -7992,8 +7992,34 @@ msgstr ""
 msgid "Active: %{active}, stale: %{stale}, archived: %{archived}"
 msgstr "Activas: %{active}, obsoletas: %{stale}, archivadas: %{archived}"
 
-#: lib/pepe_web/live/skill_curator_component.ex:175
+#: lib/pepe_web/live/skill_curator_component.ex:190
 #, elixir-autogen, elixir-format
 msgid "First look: it waits one interval before the first real run."
 msgstr ""
 "Primera revisión: espera un intervalo antes de la primera ejecución real."
+
+#: lib/pepe_web/live/skill_curator_component.ex:164
+#, elixir-autogen, elixir-format
+msgid "archived"
+msgstr "archivada"
+
+#: lib/pepe_web/live/skill_curator_component.ex:160
+#, elixir-autogen, elixir-format
+msgid "created"
+msgstr "creada"
+
+#: lib/pepe_web/live/skill_curator_component.ex:163
+#, elixir-autogen, elixir-format
+msgid "deleted"
+msgstr "eliminada"
+
+#: lib/pepe_web/live/skill_curator_component.ex:161
+#: lib/pepe_web/live/skill_curator_component.ex:162
+#, elixir-autogen, elixir-format
+msgid "edited"
+msgstr "editada"
+
+#: lib/pepe_web/live/skill_curator_component.ex:165
+#, elixir-autogen, elixir-format
+msgid "restored"
+msgstr "restaurada"

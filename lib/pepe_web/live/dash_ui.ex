@@ -336,7 +336,7 @@ defmodule PepeWeb.DashUI do
     <div>
       <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{@title}</div>
       <div class="space-y-1 rounded-xl border border-zinc-800 p-2">
-        <div :for={r <- @rows} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-base hover:bg-zinc-800/50">
+        <div :for={r <- @rows} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-base">
           <span class="min-w-0 truncate text-zinc-300">{r.key}</span>
           <span class="flex shrink-0 items-center gap-3 text-sm">
             <span class="text-zinc-500">{DashData.tokens(r.total)}</span>

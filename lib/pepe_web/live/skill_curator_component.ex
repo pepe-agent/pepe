@@ -114,7 +114,8 @@ defmodule PepeWeb.SkillCuratorComponent do
 
       <div :if={@status.most_idle != []} class="mt-4">
         <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Closest to going stale")}</div>
-        <div :for={row <- @status.most_idle} class="flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-sm hover:bg-zinc-900">
+        <div class="divide-y divide-white/[.06] rounded-[12px] border border-white/[.08]">
+        <div :for={row <- @status.most_idle} class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
           <div class="min-w-0 truncate">
             <span class="font-medium text-zinc-200">{row.name}</span>
             <span class="ml-2 text-zinc-500">{gettext("idle %{days} days, used %{count} times", days: row.idle_days, count: row.use_count)}</span>
@@ -122,33 +123,47 @@ defmodule PepeWeb.SkillCuratorComponent do
           </div>
           <button phx-click="pin" phx-target={@myself} phx-value-name={row.name} class={btn_ghost()}>{gettext("Pin")}</button>
         </div>
+        </div>
       </div>
 
       <div :if={@archived != []} class="mt-4">
         <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Archived")}</div>
-        <div :for={a <- @archived} class="flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-sm hover:bg-zinc-900">
+        <div class="divide-y divide-white/[.06] rounded-[12px] border border-white/[.08]">
+        <div :for={a <- @archived} class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
           <div class="min-w-0 truncate">
             <span class="font-medium text-zinc-200">{a.name}</span>
             <span class="ml-2 text-zinc-500">{gettext("archived by %{who}", who: a.by)}</span>
           </div>
           <button phx-click="restore" phx-target={@myself} phx-value-name={a.name} class={btn_ghost()}>{gettext("Restore")}</button>
         </div>
+        </div>
       </div>
 
       <div :if={@changes != []} class="mt-4">
         <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Recent changes to skills")}</div>
-        <div :for={e <- @changes} class="flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-sm hover:bg-zinc-900">
+        <div class="divide-y divide-white/[.06] rounded-[12px] border border-white/[.08]">
+        <div :for={e <- @changes} class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
           <div class="min-w-0 truncate text-zinc-400">
             <span class="font-medium text-zinc-200">{e.skill}</span>
-            <span class="ml-2">{e.action}</span>
+            <span class={[tag(:muted), "ml-2"]}>{action_label(e.action)}</span>
             <span class="ml-2 text-zinc-500">{gettext("by %{who}", who: e.actor)}</span>
           </div>
           <button phx-click="undo" phx-target={@myself} phx-value-id={e.id} class={btn_ghost()}>{gettext("Undo")}</button>
+        </div>
         </div>
       </div>
     </div>
     """
   end
+
+  # The change log stores the verb as an English word; say it in the page language.
+  defp action_label("create"), do: gettext("created")
+  defp action_label("edit"), do: gettext("edited")
+  defp action_label("patch"), do: gettext("edited")
+  defp action_label("delete"), do: gettext("deleted")
+  defp action_label("archive"), do: gettext("archived")
+  defp action_label("restore"), do: gettext("restored")
+  defp action_label(other), do: other
 
   defp number_fields do
     [

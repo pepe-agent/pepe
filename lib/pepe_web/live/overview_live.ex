@@ -278,7 +278,7 @@ defmodule PepeWeb.OverviewLive do
             <div>
               <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("Top projects by spend")}</div>
               <div class="space-y-1 rounded-xl border border-zinc-800 p-2">
-                <div :for={c <- Enum.take(@month.by_project, 6)} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-base hover:bg-zinc-800/50">
+                <div :for={c <- Enum.take(@month.by_project, 6)} class="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-base">
                   <span class="truncate text-zinc-300">{c.key}</span>
                   <span class="flex shrink-0 items-center gap-3 text-sm">
                     <span class="text-zinc-500">{tokens(c.total)}</span>
