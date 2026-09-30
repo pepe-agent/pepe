@@ -180,7 +180,7 @@ defmodule PepeWeb.ChatLive do
                   <button phx-click="select" phx-value-key={s.key} title={s.key} class="min-w-0 flex-1 px-3 py-2 text-left">
                     <div class="flex items-center gap-1.5 truncate text-base font-medium">
                       <span :if={s.running} class="inline-block h-2 w-2 shrink-0 rounded-full bg-orange-500" title={gettext("Running now")}></span>
-                      <span class="truncate">{s.title || session_suffix(s.key)}</span>
+                      <span class="truncate">{s.title || untitled(s.key)}</span>
                     </div>
                     <div class="truncate text-sm text-zinc-500">{s.agent || "-"}, {gettext("%{count} turns", count: s.turns)}</div>
                   </button>
@@ -229,7 +229,7 @@ defmodule PepeWeb.ChatLive do
                   </button>
                 </form>
                 <div :if={!@renaming?} class="group/title flex min-w-0 items-center gap-1.5">
-                  <span class="truncate font-medium">{SessionTitles.get(@selected) || session_suffix(@selected)}</span>
+                  <span class="truncate font-medium">{SessionTitles.get(@selected) || untitled(@selected)}</span>
                   <button
                     type="button"
                     phx-click="start_rename"
@@ -1441,7 +1441,7 @@ defmodule PepeWeb.ChatLive do
     case Session.fork(key, new_key) do
       {:ok, ^new_key} ->
         # Label the branch off the source so it's recognizable in the sidebar.
-        parent = SessionTitles.get(key) || session_suffix(key)
+        parent = SessionTitles.get(key) || untitled(key)
         SessionTitles.set(new_key, gettext("%{name} (fork)", name: parent))
 
         socket
@@ -1742,6 +1742,12 @@ defmodule PepeWeb.ChatLive do
       _ -> "other"
     end
   end
+
+  # What to call a conversation nobody has named yet. A dashboard chat's key is a random number,
+  # which says nothing, so it is called what it is; another channel's key (a Telegram chat id)
+  # does identify who it is with, so that stays.
+  defp untitled("web:" <> _), do: gettext("New chat")
+  defp untitled(key), do: session_suffix(key)
 
   defp session_suffix(key) do
     case String.split(key, ":", parts: 2) do

@@ -644,7 +644,7 @@ defmodule PepeWeb.DashUI do
         <%!-- The wordmark keeps the system font it always had; the dashboard's own font is for the page. --%>
         <div class="leading-tight [font-family:ui-sans-serif,system-ui,-apple-system,'Segoe_UI',sans-serif]">
           <div class="text-lg font-semibold text-zinc-100">Pepe</div>
-          <div class="text-xs text-zinc-500">{gettext("agent runtime")}</div>
+          <div class="text-xs text-zinc-500">agent runtime</div>
         </div>
       </.link>
 

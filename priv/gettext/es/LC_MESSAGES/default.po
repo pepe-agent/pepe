@@ -564,7 +564,7 @@ msgstr "+ Nuevo agente"
 msgid "+ New model connection"
 msgstr "+ Nueva conexión de modelo"
 
-#: lib/pepe_web/live/chat_live.ex:1757
+#: lib/pepe_web/live/chat_live.ex:1763
 #, elixir-autogen, elixir-format
 msgid "API"
 msgstr "API"
@@ -658,7 +658,7 @@ msgstr "Elige un proveedor..."
 msgid "Compacting history..."
 msgstr "Compactando el historial..."
 
-#: lib/pepe_web/live/chat_live.ex:1756
+#: lib/pepe_web/live/chat_live.ex:1762
 #: lib/pepe_web/live/skills_live.ex:203
 #, elixir-autogen, elixir-format
 msgid "Console"
@@ -894,7 +894,7 @@ msgid "Task not found."
 msgstr "No se encontró la tarea."
 
 #: lib/pepe_web/live/channels_live.ex:231
-#: lib/pepe_web/live/chat_live.ex:1753
+#: lib/pepe_web/live/chat_live.ex:1759
 #, elixir-autogen, elixir-format
 msgid "Telegram"
 msgstr "Telegram"
@@ -932,7 +932,7 @@ msgstr "Herramientas"
 msgid "Unknown command %{cmd}"
 msgstr "Comando desconocido: %{cmd}"
 
-#: lib/pepe_web/live/chat_live.ex:1755
+#: lib/pepe_web/live/chat_live.ex:1761
 #, elixir-autogen, elixir-format
 msgid "Web"
 msgstr "Web"
@@ -1213,6 +1213,7 @@ msgstr ""
 
 #: lib/pepe_web/live/chat_live.ex:138
 #: lib/pepe_web/live/chat_live.ex:371
+#: lib/pepe_web/live/chat_live.ex:1749
 #, elixir-autogen, elixir-format
 msgid "New chat"
 msgstr "Nueva conversación"
@@ -2820,11 +2821,6 @@ msgstr ""
 msgid "No token usage was recorded for this run."
 msgstr "No se registró uso de tokens en esta ejecución."
 
-#: lib/pepe_web/live/dash_ui.ex:647
-#, elixir-autogen, elixir-format
-msgid "agent runtime"
-msgstr "runtime de agentes"
-
 #: lib/pepe_web/live/hooks_live.ex:576
 #, elixir-autogen, elixir-format
 msgid "A model swaps names and free text for realistic, reversible pseudonyms. Use a local model, or the raw PII reaches whichever provider you pick."
@@ -3006,7 +3002,7 @@ msgid "Origin:"
 msgstr "Origen:"
 
 #: lib/pepe_web/live/channels_live.ex:259
-#: lib/pepe_web/live/chat_live.ex:1754
+#: lib/pepe_web/live/chat_live.ex:1760
 #, elixir-autogen, elixir-format
 msgid "Widget"
 msgstr "Widget"
