@@ -663,7 +663,7 @@ defmodule PepeWeb.AgentsLive do
 
             </div>
 
-            <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 xl:-mx-14 xl:px-14">
+            <div class="sticky -bottom-8 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 xl:-mx-14 xl:px-14">
               <div class="min-w-0 text-sm">
                 <span :if={@draft && @draft.stale?} class="text-amber-400">
                   {gettext("This agent changed since the draft was started. Saving overwrites those changes.")}

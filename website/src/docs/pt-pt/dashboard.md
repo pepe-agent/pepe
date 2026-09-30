@@ -63,8 +63,7 @@ também dá para fazer por aqui.
 - **Channels**: acrescentar, remover e editar bots do Telegram, com efeito imediato. Ver
   [Telegram](../telegram/).
 - **MCP**: os servidores de ferramentas externas. Ver [Servidores MCP](../mcp/).
-- **Config file**: editar o `~/.pepe/config.json` diretamente ali, com validação ao
-  gravar.
+- **Configuração**: um separador para idioma, atualizações, voz (respostas e transcrição), histórico de alterações e o `~/.pepe/config.json` em bruto (validado ao gravar). Cada secção guarda por si.
 
 ## Manter em execução
 

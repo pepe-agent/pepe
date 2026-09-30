@@ -38,21 +38,21 @@ defmodule PepeWeb.ConfigLiveTest do
     Pepe.Config.Journal.put_source("cli")
     Config.put_agent(%Config.Agent{name: "assistant", tools: []})
 
-    {:ok, _view, html} = live(conn(), "/config")
+    {:ok, _view, html} = live(conn(), "/config?tab=history")
     assert html =~ "Recent changes"
     assert html =~ "cli"
     assert html =~ "agents"
   end
 
   test "the model connection shows up as an option in both media forms" do
-    {:ok, view, html} = live(conn(), "/config")
+    {:ok, view, html} = live(conn(), "/config?tab=voice")
     assert html =~ "tts-model"
     assert has_element?(view, "select#tts_model option", "tts-model")
     assert has_element?(view, "select#audio_model option", "tts-model")
   end
 
   test "turning tts on with a model connection persists it and flashes a confirmation" do
-    {:ok, view, _html} = live(conn(), "/config")
+    {:ok, view, _html} = live(conn(), "/config?tab=voice")
 
     html =
       view
@@ -65,7 +65,7 @@ defmodule PepeWeb.ConfigLiveTest do
 
   test "leaving the tts model on \"Off\" clears it" do
     Config.put_media("tts", %{"model" => "tts-model", "voice" => "alloy"})
-    {:ok, view, _html} = live(conn(), "/config")
+    {:ok, view, _html} = live(conn(), "/config?tab=voice")
 
     view
     |> form("form[phx-submit=media_tts_save]", %{"model" => "", "voice" => ""})
@@ -75,7 +75,7 @@ defmodule PepeWeb.ConfigLiveTest do
   end
 
   test "audio settings save every field, and the echo checkbox defaults to false when unchecked" do
-    {:ok, view, _html} = live(conn(), "/config")
+    {:ok, view, _html} = live(conn(), "/config?tab=voice")
 
     view
     |> form("form[phx-submit=media_audio_save]", %{
@@ -96,7 +96,7 @@ defmodule PepeWeb.ConfigLiveTest do
   end
 
   test "a local command is accepted instead of a model" do
-    {:ok, view, _html} = live(conn(), "/config")
+    {:ok, view, _html} = live(conn(), "/config?tab=voice")
 
     view
     |> form("form[phx-submit=media_audio_save]", %{"command" => "whisper {file}"})
@@ -108,12 +108,36 @@ defmodule PepeWeb.ConfigLiveTest do
 
   test "leaving audio fields blank clears them" do
     Config.put_media("audio", %{"model" => "tts-model", "language" => "pt"})
-    {:ok, view, _html} = live(conn(), "/config")
+    {:ok, view, _html} = live(conn(), "/config?tab=voice")
 
     view
     |> form("form[phx-submit=media_audio_save]", %{"model" => "", "language" => ""})
     |> render_submit()
 
     assert Config.media()["audio"] == %{"echo" => false}
+  end
+
+  test "each area has its own tab and only the open one is drawn" do
+    {:ok, view, html} = live(conn(), "/config")
+
+    # Opens on General: language and updates, nothing of the voice forms or the raw file.
+    assert html =~ "Dashboard language"
+    refute html =~ "Voice-note transcription"
+    refute html =~ "Save config"
+
+    assert view |> element("button[role=tab][phx-value-tab=voice]") |> render_click() =~ "Voice-note transcription"
+    assert view |> element("button[role=tab][phx-value-tab=file]") |> render_click() =~ "Save config"
+    assert view |> element("button[role=tab][phx-value-tab=history]") |> render_click() =~ "Recent changes"
+  end
+
+  test "the raw file can still be saved from its tab" do
+    {:ok, view, _html} = live(conn(), "/config?tab=file")
+
+    html =
+      view
+      |> form("form[phx-submit=config_save]", %{"json" => ~s({"locale": "en"})})
+      |> render_submit()
+
+    assert html =~ "Config saved."
   end
 end

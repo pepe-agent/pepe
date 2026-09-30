@@ -40,7 +40,7 @@ A barra lateral espelha a CLI, então quase tudo que você faz com o comando `pe
 - **Watches**: o "me avise quando X" de uma vez só. Veja [Watches](../watches/).
 - **Channels**: adicionar, remover e editar bots do Telegram, aplicado ao vivo. Veja [Telegram](../telegram/).
 - **MCP**: servidores de ferramentas externas. Veja [Servidores MCP](../mcp/).
-- **Config file**: editar o `~/.pepe/config.json` na hora, com validação ao salvar.
+- **Configuração**: uma aba para idioma, atualizações, voz (respostas e transcrição), histórico de mudanças e o `~/.pepe/config.json` bruto (validado ao salvar). Cada seção salva sozinha.
 
 ## Mantendo o painel no ar
 

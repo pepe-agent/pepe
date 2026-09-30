@@ -241,6 +241,39 @@ defmodule PepeWeb.DashUI do
     """
   end
 
+  attr :tabs, :list, required: true, doc: "a list of {id, label}"
+  attr :active, :string, required: true
+  attr :event, :string, required: true, doc: "the phx-click event, sent with phx-value-tab"
+  slot :actions, doc: "controls at the right end of the bar"
+
+  @doc """
+  A row of page tabs. Every tab has the same font weight and the bar keeps its height whatever
+  is in `:actions`, so switching tabs never moves the content under it.
+  """
+  def tabs(assigns) do
+    ~H"""
+    <div class="flex flex-wrap items-end justify-between gap-3 border-b border-zinc-800">
+      <div role="tablist" class="-mb-px flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          :for={{id, label} <- @tabs}
+          type="button"
+          role="tab"
+          phx-click={@event}
+          phx-value-tab={id}
+          aria-selected={to_string(@active == id)}
+          class={[
+            "shrink-0 border-b-2 px-4 py-2.5 text-base font-medium transition focus-visible:outline-offset-[-3px]",
+            (@active == id && "border-orange-400 text-orange-300") || "border-transparent text-zinc-400 hover:text-zinc-100"
+          ]}
+        >
+          {label}
+        </button>
+      </div>
+      {render_slot(@actions)}
+    </div>
+    """
+  end
+
   attr :label, :string, required: true
   attr :value, :string, required: true
   # Percent move against the previous period, or nil when there was nothing to compare with.
@@ -494,7 +527,7 @@ defmodule PepeWeb.DashUI do
       {gettext("System"),
        [
          {"tokens", "hero-key", gettext("API tokens")},
-         {"config", "hero-cog-6-tooth", gettext("Config file")}
+         {"config", "hero-cog-6-tooth", gettext("Configuration")}
        ]}
     ]
   end

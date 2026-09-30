@@ -80,6 +80,17 @@ defmodule PepeWeb.UsageLive do
 
   defp scope_arg(socket), do: if(socket.assigns.scope == "all", do: :all, else: socket.assigns.scope)
 
+  # "62% of input, saved $0.04": how much of the input the cache served and what that took off the bill.
+  defp cache_sub(%{cached: cached, in: input, saved: saved}, currency) when cached > 0 and input > 0 do
+    pct = round(cached * 100 / input)
+
+    if saved > 0,
+      do: gettext("%{pct}% of input, saved %{saved}", pct: pct, saved: money(saved, currency)),
+      else: gettext("%{pct}% of input", pct: pct)
+  end
+
+  defp cache_sub(_totals, _currency), do: gettext("Nothing from cache yet")
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -118,8 +129,13 @@ defmodule PepeWeb.UsageLive do
               ]}>{label}</button>
           </div>
 
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <.stat label={gettext("Total tokens")} value={tokens(@summary.totals.total)} />
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            <.stat label={gettext("Total tokens")} value={tokens(@summary.totals.total)}
+              sub={gettext("%{in} in, %{out} out", in: tokens(@summary.totals.in), out: tokens(@summary.totals.out))} />
+            <%!-- The part of the input the provider's prompt cache served again: billed at a
+                  fraction of the normal price, which is why it gets its own figure. --%>
+            <.stat label={gettext("From cache")} value={tokens(@summary.totals.cached)}
+              sub={cache_sub(@summary.totals, @summary.currency)} />
             <.stat label={gettext("Calls")} value={Integer.to_string(@summary.totals.count)} />
             <%!-- What we paid. Tokens served by a subscription cost nothing here; the month's
                   flat fee is added on top, once, rather than pretending each token was bought. --%>
@@ -145,11 +161,12 @@ defmodule PepeWeb.UsageLive do
               {gettext("No usage recorded yet for this scope.")}
             </div>
             <div :if={@summary.buckets != []} class="overflow-x-auto rounded-xl border border-zinc-800">
-              <table class="w-full min-w-[640px] text-base">
+              <table class="w-full min-w-[720px] text-base">
                 <thead class="border-b border-zinc-800 text-left">
                   <tr>
                     <th class={[th(), "px-3 py-3"]}>{gettext("Cycle")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Input")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]} title={gettext("The part of the input served again from the provider's cache, billed for less")}>{gettext("Cached")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Output")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Total")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Cost")}</th>
@@ -160,6 +177,7 @@ defmodule PepeWeb.UsageLive do
                   <tr :for={b <- Enum.reverse(@summary.buckets)} class="border-t border-zinc-800/70">
                     <td class="px-3 py-2 font-mono text-sm text-zinc-300">{b.key}</td>
                     <td class="px-3 py-2 text-right text-zinc-400">{tokens(b.in)}</td>
+                    <td class="px-3 py-2 text-right text-zinc-500">{tokens(b.cached)}</td>
                     <td class="px-3 py-2 text-right text-zinc-400">{tokens(b.out)}</td>
                     <td class="px-3 py-2 text-right">{tokens(b.total)}</td>
                     <td class="px-3 py-2 text-right text-zinc-400">{money(b.cost, @summary.currency)}</td>

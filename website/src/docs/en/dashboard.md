@@ -40,7 +40,7 @@ The left sidebar mirrors the CLI, so almost everything you can do with the `pepe
 - **Watches**: one-shot "notify me when X". See [Watches](../watches/).
 - **Channels**: add, remove and edit Telegram bots, applied live. See [Telegram](../telegram/).
 - **MCP**: external tool servers. See [MCP servers](../mcp/).
-- **Config file**: edit `~/.pepe/config.json` inline, validated on save.
+- **Configuration**: one tab each for language, updates, voice replies and transcription, the change history, and the raw `~/.pepe/config.json` (validated on save). Every section saves on its own.
 
 ## Keeping it running
 
