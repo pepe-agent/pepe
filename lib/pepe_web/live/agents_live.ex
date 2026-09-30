@@ -276,8 +276,8 @@ defmodule PepeWeb.AgentsLive do
                 aria-selected={to_string(@agent_tab == tab)}
                 aria-controls={"agent-tab-#{tab}"}
                 class={[
-                  "-mb-px shrink-0 border-b-2 px-4 py-2.5 text-base transition",
-                  (@agent_tab == tab && "border-orange-400 font-semibold text-orange-300") ||
+                  "-mb-px shrink-0 border-b-2 px-4 py-2.5 text-base font-medium transition focus-visible:outline-offset-[-3px]",
+                  (@agent_tab == tab && "border-orange-400 text-orange-300") ||
                     "border-transparent text-zinc-400 hover:text-zinc-100"
                 ]}
               >

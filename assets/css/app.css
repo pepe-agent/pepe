@@ -218,6 +218,12 @@
   .page-body > * {
     max-width: 75rem;
   }
+
+  /* Keep the scrollbar's lane whether or not the page is long enough to need it, so switching to a
+     shorter tab does not make every card slide sideways by the width of a scrollbar. */
+  .page-body {
+    scrollbar-gutter: stable;
+  }
 }
 
 /* The page surface: the reference's dark ground with a soft teal glow from the top right. */

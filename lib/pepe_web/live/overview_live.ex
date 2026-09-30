@@ -123,15 +123,16 @@ defmodule PepeWeb.OverviewLive do
                 phx-value-tab={tab}
                 aria-selected={to_string(@tab == tab)}
                 class={[
-                  "shrink-0 border-b-2 px-4 py-2.5 text-base transition",
-                  (@tab == tab && "border-orange-400 font-semibold text-orange-300") || "border-transparent text-zinc-400 hover:text-zinc-100"
+                  "shrink-0 border-b-2 px-4 py-2.5 text-base font-medium transition focus-visible:outline-offset-[-3px]",
+                  (@tab == tab && "border-orange-400 text-orange-300") || "border-transparent text-zinc-400 hover:text-zinc-100"
                 ]}
               >
                 {label}
               </button>
             </div>
-            <%!-- Trends and health compare the same two periods, so one switch serves both. --%>
-            <div :if={@tab in ["trends", "health"]} role="group" aria-label={gettext("Compare with")} class="mb-2 inline-flex rounded-[10px] border border-white/[.12] p-0.5 text-[13.5px]">
+            <%!-- Trends and health compare the same two periods, so one switch serves both. It keeps its space on the other tabs (invisible, not removed), so the tab bar never changes height and nothing below it moves. --%>
+            <div role="group" aria-label={gettext("Compare with")} inert={@tab not in ["trends", "health"]}
+              class={["mb-2 inline-flex rounded-[10px] border border-white/[.12] p-0.5 text-[13.5px]", @tab not in ["trends", "health"] && "invisible"]}>
               <button :for={p <- [:week, :month]} type="button" phx-click="trend_period" phx-value-period={p} aria-pressed={to_string(@trend_period == p)}
                 class={["rounded-[8px] px-3 py-1.5 transition", @trend_period == p && "bg-white/[.08] text-zinc-50", @trend_period != p && "text-zinc-500 hover:text-zinc-200"]}>
                 {if p == :week, do: gettext("Week"), else: gettext("Month")}

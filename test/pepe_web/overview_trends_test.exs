@@ -133,12 +133,13 @@ defmodule PepeWeb.OverviewTrendsTest do
 
     assert html =~ "Live sessions"
     refute html =~ ~s(phx-hook="Chart")
-    refute has_element?(view, "button[phx-value-period=week]")
+    # The week/month switch keeps its space (so the tab bar never changes height) but is hidden.
+    assert has_element?(view, "div.invisible[role=group] button[phx-value-period=week]")
 
     html = open_tab(view, "trends")
     assert html =~ ~s(id="chart-spend")
     refute html =~ "Live sessions"
-    assert has_element?(view, "button[phx-value-period=week]")
+    refute has_element?(view, "div.invisible[role=group]")
 
     # A tab can also be asked for in the address, so a link lands on it.
     {:ok, _view, html} = live(conn(), "/overview?tab=health")
