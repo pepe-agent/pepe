@@ -153,6 +153,20 @@ defmodule Pepe.LLM.Responses do
   ### request body
   ###
 
+  # The Responses API's output limit is `max_output_tokens`. Take it from `opts[:max_tokens]`
+  # (what the output-cap retry lowers) first, then the model's own; omit it when neither is set.
+  defp put_output_cap(base, model, opts) do
+    case opts[:max_tokens] || model.max_tokens do
+      cap when is_integer(cap) -> if output_cap?(model), do: Map.put(base, "max_output_tokens", cap), else: base
+      _ -> base
+    end
+  end
+
+  @doc false
+  # The ChatGPT subscription backend ("Unsupported parameter: max_output_tokens") takes no output
+  # cap at all; the real Responses API does.
+  def output_cap?(%Model{base_url: url}), do: URI.parse(to_string(url)).host != "chatgpt.com"
+
   defp build_body(%Model{} = model, messages, opts) do
     {instructions, input} = split_system(messages, opts[:images])
     tools = to_tools(opts[:tools]) ++ native_tools(model)
@@ -166,13 +180,7 @@ defmodule Pepe.LLM.Responses do
       "include" => ["reasoning.encrypted_content"]
     }
 
-    # The Responses API's output limit is `max_output_tokens`. Take it from `opts[:max_tokens]`
-    # (what the output-cap retry lowers) first, then the model's own; omit it when neither is set.
-    base =
-      case opts[:max_tokens] || model.max_tokens do
-        nil -> base
-        cap -> Map.put(base, "max_output_tokens", cap)
-      end
+    base = put_output_cap(base, model, opts)
 
     base =
       if tools == [] do

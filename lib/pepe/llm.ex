@@ -194,12 +194,20 @@ defmodule Pepe.LLM do
     %{"model" => model.model, "messages" => with_images(messages, opts[:images])}
     |> put_some("tools", opts[:tools])
     |> put_some("temperature", opts[:temperature] || model.temperature)
-    |> put_some("max_tokens", opts[:max_tokens] || model.max_tokens)
+    |> put_some(output_cap_key(model), opts[:max_tokens] || model.max_tokens)
     |> then(fn b -> if stream?, do: Map.put(b, "stream", true), else: b end)
     |> then(fn b ->
       if stream?, do: Map.put(b, "stream_options", %{"include_usage" => true}), else: b
     end)
     |> Map.merge(opts[:extra] || %{})
+  end
+
+  @doc false
+  # OpenAI's own endpoint rejects `max_tokens` on its newer models ("Use 'max_completion_tokens'
+  # instead"), and `max_completion_tokens` is accepted by every chat model there. Every other
+  # OpenAI-compatible server still expects the classic `max_tokens`.
+  def output_cap_key(%Model{base_url: url}) do
+    if URI.parse(to_string(url)).host == "api.openai.com", do: "max_completion_tokens", else: "max_tokens"
   end
 
   defp put_some(map, _key, nil), do: map
