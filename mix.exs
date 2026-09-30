@@ -172,8 +172,8 @@ defmodule Pepe.MixProject do
   # check (which only ever compares against a real numbered release tag) is unaffected.
   defp version do
     case System.get_env("PEPE_EDGE_SHA") do
-      sha when is_binary(sha) and sha != "" -> "0.19.1+edge.#{sha}"
-      _ -> "0.19.1"
+      sha when is_binary(sha) and sha != "" -> "0.20.0+edge.#{sha}"
+      _ -> "0.20.0"
     end
   end
 

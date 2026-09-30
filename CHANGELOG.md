@@ -5,7 +5,10 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-30
+
 ### Added
+- **The Pepe logo now comes as one image with the name and the words agent runtime under it**, in a dark and a light version (SVG with the text outlined, plus PNG), in `assets/brand/` and the website. Set in Inter (SIL Open Font License, included); `assets/brand/build-logo.py` rebuilds them.
 - **A new `chart` tool lets an agent send a chart as an image.** It draws a bar, line or pie chart from numbers the agent already has, in the dashboard's dark palette, and delivers it to the conversation like any attachment (an inline photo on Telegram). Pepe draws the SVG itself and converts it to PNG with `rsvg-convert` or ImageMagick, whichever the machine has (ImageMagick is in the `-full` Docker image); with neither, the SVG is sent and the agent is told so. Nothing leaves your machine. Enable it on an agent like any tool (`mix pepe agent tools NAME --add chart`). The dashboard chat now also shows any picture an agent sends inline, not only as a download link.
 - **The help text under dashboard fields is shorter and plainer, and every one starts with a capital letter.** About a hundred hints (agent editor, channels, models, projects, tokens, privacy hooks, MCP and more) went from long, technical sentences to one short sentence each, in English, pt-BR, pt-PT and es. The replies the bot sends in chat are unchanged.
 - **The Configuration page (formerly "Config file") is split into tabs**: General (language, updates), Voice, History and Settings file. Each saves on its own. The Usage page now shows input, output and cache tokens (and what the cache saved), and every clickable element shows the hand cursor.
@@ -65,6 +68,7 @@ All notable changes to this project are documented here. Format follows
 - **A webhook connection's printed callback URL (`mix pepe gateway whatsapp/discord`, `pepe setup`, the dashboard) now fills in the real host from `PHX_HOST` when a release already has it set**, instead of always showing the `https://YOUR_HOST` placeholder even on a fully configured server; `PEPE_PUBLIC_URL` still overrides it explicitly. Also fixed, in the same pass: the WhatsApp/Discord CLI printouts used the literal, non-existent project name `"default"` for a connection with no project set, instead of `"root"` - the slug the webhook route actually resolves - so the URL they told you to paste into Meta/Discord was subtly wrong.
 
 ### Changed
+- **Privacy moved from Insights to System in the dashboard sidebar**, next to API tokens and Configuration: it is a control, not something that shows what happened. A dashboard chat nobody has named is now called "New chat" instead of showing its random number.
 - **The system prompt every agent gets now tells it explicitly how to share an image: call `send_file`, never paste base64/data-URI bytes into a text reply, and never upload one to a third-party hosting site (a pastebin, catbox, imgur, ...) to hand back a link instead - the latter ships the user's data off the system without their permission.** This is a `convention_note/0` change (see `CLAUDE.md`), so it lands in every existing agent's actual system prompt silently, not something opted into per agent.
 - **`switch_agent` no longer silently writes a permanent, config-level rebind every time it's used on Telegram.** It was always meant to be a temporary, session-only handoff ("let me talk to X" for now, undone by `/new`) - it used to *also* persist that unconditionally, so ordinary conversational routing quietly became a lasting change to the whole channel with no way to tell the two apart from the outside. A lasting handoff is now deliberately a different action (`manage_channel`'s `bind_topic`, or a human typing `/agent NAME`), never a side effect of this one.
 
@@ -904,6 +908,7 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
+[0.20.0]: https://github.com/pepe-agent/pepe/compare/v0.19.1...v0.20.0
 [0.19.1]: https://github.com/pepe-agent/pepe/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/pepe-agent/pepe/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/pepe-agent/pepe/compare/v0.17.1...v0.18.0
