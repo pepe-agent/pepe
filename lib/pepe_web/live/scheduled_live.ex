@@ -108,7 +108,7 @@ defmodule PepeWeb.ScheduledLive do
         <.view_header active="cron"
           icon="🕒"
           title={gettext("Scheduled tasks")}
-          desc={gettext("Recurring jobs: an agent runs a fixed instruction on a schedule and reports the result. They fire only while the server is running.")}
+          desc={gettext("An agent does the same job on a schedule and reports the result. Only runs while Pepe is running.")}
         >
           <button :if={!@creating and !@viewing_log} phx-click="cron_new" class={btn()}>{gettext("+ New task")}</button>
           <button :if={@creating} phx-click="cron_cancel" class={btn_ghost()}>&larr; {gettext("Back to tasks")}</button>
@@ -133,7 +133,7 @@ defmodule PepeWeb.ScheduledLive do
                 <textarea id="cron_prompt" name="cron[prompt]" rows="3"
                   placeholder={gettext("Check the 06:00 XML load and report anything off.")} class={fld()}>{@form[:prompt].value}</textarea>
                 <p :if={e = @form.errors[:prompt]} class="mt-1.5 text-sm text-red-400">{elem(e, 0)}</p>
-                <p class={hlp()}>{gettext("(runs fresh each time, no chat memory)")}</p>
+                <p class={hlp()}>{gettext("(starts fresh each time, it does not remember past chats)")}</p>
               </div>
               <div class="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -155,7 +155,7 @@ defmodule PepeWeb.ScheduledLive do
                   </div>
                   <p :if={se = @form.source.errors[:schedule]} class="mt-1.5 text-sm text-red-400">{elem(se, 0)}</p>
                   <p :if={@cron_custom} class={hlp()}>
-                    {gettext("5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" is 09:30 on weekdays.")}
+                    {gettext("5 fields: minute, hour, day, month, weekday. For example \"30 9 * * 1-5\" is 09:30 on weekdays.")}
                   </p>
                 </div>
                 <div>
@@ -181,9 +181,9 @@ defmodule PepeWeb.ScheduledLive do
                 </div>
               </div>
               <div>
-                <label class={lbl()}>{gettext("Report the result to")}</label>
+                <label class={lbl()}>{gettext("Send the result to")}</label>
                 <select name="cron[deliver]" class={fld()}>
-                  <option value="none" selected={@deliver in ["none", nil, ""]}>{gettext("Nowhere (just keep the run history)")}</option>
+                  <option value="none" selected={@deliver in ["none", nil, ""]}>{gettext("Nowhere (just keep the history)")}</option>
                   <option value="log" selected={@deliver == "log"}>{gettext("The app log")}</option>
                   <option :for={t <- telegram_targets()} value={t} selected={@deliver == t}>{deliver_label(t)}</option>
                   <option value="telegram" selected={manual_chat(@deliver) != nil}>{gettext("A Telegram chat by id")}</option>
@@ -192,7 +192,7 @@ defmodule PepeWeb.ScheduledLive do
                   <label class={lbl()} for="cron_deliver_chat">{gettext("Telegram chat id")}</label>
                   <input id="cron_deliver_chat" name="cron[deliver_chat]" value={chat}
                     placeholder="123456789" class={fld()} />
-                  <p class={hlp()}>{gettext("Send /whoami to the bot to find it. Blank means the result goes nowhere.")}</p>
+                  <p class={hlp()}>{gettext("Send /whoami to the bot to get it. If left blank, the result is not sent anywhere.")}</p>
                 </div>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
@@ -216,7 +216,7 @@ defmodule PepeWeb.ScheduledLive do
 
             <details class="group mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40">
               <summary class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">
-                <span class="text-zinc-600 transition group-open:rotate-90">▸</span> {gettext("Prompt")}
+                <span class="text-zinc-600 transition group-open:rotate-90">▸</span> {gettext("Instructions")}
               </summary>
               <pre class="whitespace-pre-wrap border-t border-zinc-800 p-3 text-sm text-zinc-300">{cron.prompt}</pre>
             </details>

@@ -33,18 +33,18 @@ defmodule PepeWeb.WatchesLive do
         <.view_header active="watches"
           icon="🔭"
           title={gettext("Watches")}
-          desc={gettext("One-shot “notify me when X happens”. A watch checks a condition on a timer, messages you once when it's met, then stops. Create them from chat.")}
+          desc={gettext("Get one message when something happens. A watch checks on a timer, messages you one time when it is true, then stops. Create them from chat.")}
         />
         <div class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <.empty_state :if={@visible == []}>
-            {gettext("No watches. Ask an agent to \"notify me when ...\" from chat.")}
+            {gettext("No watches. Ask an agent in chat to \"notify me when ...\".")}
           </.empty_state>
           <div :for={w <- @visible} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{w.description}</span>
                 <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{state_label(w.state)}</span>
-                <span :if={w.pending_delivery} class={[tag(:warn), "ml-1"]}>{gettext("Fired, delivering")}</span>
+                <span :if={w.pending_delivery} class={[tag(:warn), "ml-1"]}>{gettext("Due, being sent")}</span>
                 <span :if={state_hint(w.state)} class="ml-2 text-sm text-zinc-500">{state_hint(w.state)}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
@@ -97,9 +97,9 @@ defmodule PepeWeb.WatchesLive do
   defp state_label(other), do: to_string(other)
 
   # Terminal states have no buttons left, so say why nothing can happen to them anymore.
-  defp state_hint("done"), do: gettext("This watch already fired and stopped.")
-  defp state_hint("expired"), do: gettext("Ran out of checks and stopped without firing.")
-  defp state_hint("cancelled"), do: gettext("Cancelled. It won't run again.")
+  defp state_hint("done"), do: gettext("This watch already sent its message and stopped.")
+  defp state_hint("expired"), do: gettext("Ran out of checks and stopped without sending anything.")
+  defp state_hint("cancelled"), do: gettext("Cancelled. It will not check again.")
   defp state_hint(_state), do: nil
 
   defp trigger_label(%{"type" => "probe"}), do: gettext("shell check")
@@ -128,7 +128,7 @@ defmodule PepeWeb.WatchesLive do
   defp next_check_label(%{state: "pending", next_check: ts}) when is_integer(ts),
     do: gettext("Next check %{at}", at: local_datetime(ts))
 
-  defp next_check_label(%{state: "pending"}), do: gettext("Next check on the next tick")
+  defp next_check_label(%{state: "pending"}), do: gettext("Next check soon")
   defp next_check_label(_watch), do: nil
 
   defp watch_set(socket, id, changes) do

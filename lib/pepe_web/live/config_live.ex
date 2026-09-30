@@ -58,7 +58,7 @@ defmodule PepeWeb.ConfigLive do
                 <select id="locale" name="locale" class={fld()}>
                   <option :for={{code, label} <- @locales} value={code} selected={code == @locale}>{label}</option>
                 </select>
-                <p class={hlp()}>{gettext("Applies as soon as you pick one.")}</p>
+                <p class={hlp()}>{gettext("Changes as soon as you pick one.")}</p>
               </form>
             </.form_section>
 
@@ -101,7 +101,7 @@ defmodule PepeWeb.ConfigLive do
             <.form_section title={gettext("Voice replies (text-to-speech)")}>
               <form id="tts-form" phx-submit="media_tts_save" class="space-y-6">
                 <p class={hlp()}>
-                  {gettext("Reply to a voice note with a voice note. Needs a model connection with /audio/speech.")}
+                  {gettext("Answers a voice message with a voice message. Needs a model connection that supports /audio/speech.")}
                 </p>
                 <div class="grid gap-6 sm:grid-cols-2">
                   <div>
@@ -120,10 +120,10 @@ defmodule PepeWeb.ConfigLive do
               </form>
             </.form_section>
 
-            <.form_section title={gettext("Voice-note transcription")}>
+            <.form_section title={gettext("Voice message transcription")}>
               <form id="audio-form" phx-submit="media_audio_save" class="space-y-6">
                 <p class={hlp()}>
-                  {gettext("Leave blank to use a connection known to transcribe (OpenAI, Groq).")}
+                  {gettext("Leave blank to use a service known to transcribe audio (OpenAI, Groq).")}
                 </p>
                 <div class="grid gap-6 sm:grid-cols-2">
                   <div>
@@ -134,7 +134,7 @@ defmodule PepeWeb.ConfigLive do
                     </select>
                   </div>
                   <div>
-                    <label class={lbl()} for="audio_command">{gettext("Or a local command")}</label>
+                    <label class={lbl()} for="audio_command">{gettext("Or a command on this computer")}</label>
                     <input
                       id="audio_command"
                       name="command"
@@ -150,23 +150,23 @@ defmodule PepeWeb.ConfigLive do
                     <label class={lbl()} for="audio_language">{gettext("Language")}</label>
                     <input id="audio_language" name="language" type="text" value={@media_audio["language"]} class={fld()} />
                     <p class={hlp()}>
-                      {gettext("Spoken language code (pt, en, es). Blank means auto-detect.")}
+                      {gettext("Language spoken in the audio (pt, en, es). Blank detects it automatically.")}
                     </p>
                   </div>
                   <div>
                     <label class={lbl()} for="audio_max_mb">{gettext("Max MB")}</label>
                     <input id="audio_max_mb" name="max_mb" type="number" value={@media_audio["max_mb"]} class={fld()} />
-                    <p class={hlp()}>{gettext("Largest voice note accepted. Bigger ones are refused.")}</p>
+                    <p class={hlp()}>{gettext("Largest voice message accepted, in MB. Bigger ones are refused.")}</p>
                   </div>
                   <div>
                     <label class={lbl()} for="audio_timeout">{gettext("Timeout (s)")}</label>
                     <input id="audio_timeout" name="timeout" type="number" value={@media_audio["timeout"]} class={fld()} />
-                    <p class={hlp()}>{gettext("How long to wait for the transcription before giving up.")}</p>
+                    <p class={hlp()}>{gettext("Seconds to wait for the transcription before giving up.")}</p>
                   </div>
                 </div>
                 <label class="flex items-center gap-2 text-sm text-zinc-300">
                   <input type="checkbox" name="echo" value="true" checked={@media_audio["echo"] == true} class={checkbox_cls()} />
-                  {gettext("Echo the transcript back before answering")}
+                  {gettext("Send the transcribed text back before answering")}
                 </label>
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
               </form>
@@ -176,7 +176,7 @@ defmodule PepeWeb.ConfigLive do
           <div :if={@tab == "history"} class="space-y-6">
             <.form_section title={gettext("Recent changes")}>
               <p class={hlp()}>
-                {gettext("Who changed config.json and when. Values are never recorded.")}
+                {gettext("Who changed config.json and when. The values themselves are never recorded.")}
               </p>
               <.empty_state :if={@journal == []}>{gettext("No changes recorded yet.")}</.empty_state>
               <div :if={@journal != []} class="max-h-[28rem] space-y-1.5 overflow-y-auto text-sm">
@@ -196,7 +196,7 @@ defmodule PepeWeb.ConfigLive do
             <.form_section title={gettext("config.json")}>
               <form id="config-form" phx-submit="config_save" class="flex min-h-0 flex-1 flex-col gap-3">
                 <p class={hlp()}>
-                  {gettext("Write secrets as ${ENV_VAR}. Pepe reads them from the environment and never stores the value.")}
+                  {gettext("Write secrets as ${ENV_VAR}. Pepe reads them from the environment and never saves the value.")}
                 </p>
                 <textarea
                   name="json"
@@ -265,8 +265,8 @@ defmodule PepeWeb.ConfigLive do
   def handle_event("do_update", _p, socket) do
     flash =
       case Pepe.Update.run() do
-        {:ok, :updated, v} -> {:info, gettext("Updated to v%{v}. Restart Pepe to run the new version.", v: v)}
-        {:ok, :up_to_date, _} -> {:info, gettext("Already on the latest version.")}
+        {:ok, :updated, v} -> {:info, gettext("Updated to v%{v}. Restart Pepe to use the new version.", v: v)}
+        {:ok, :up_to_date, _} -> {:info, gettext("You already have the latest version.")}
         {:error, _} -> {:error, gettext("Update failed. Try `pepe update` from a terminal.")}
       end
 

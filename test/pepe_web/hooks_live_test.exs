@@ -31,9 +31,9 @@ defmodule PepeWeb.HooksLiveTest do
   test "lists the four hooks and shows which agent uses one" do
     {:ok, _view, html} = live(conn(), "/hooks")
 
-    assert html =~ "Regex redaction"
-    assert html =~ "Model redaction"
-    assert html =~ "HTTP redaction"
+    assert html =~ "Pattern-based hiding"
+    assert html =~ "Model-based hiding"
+    assert html =~ "Hiding through your own service"
     assert html =~ "Presidio"
     # the agent from setup uses pii_redact
     assert html =~ "assistant"

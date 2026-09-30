@@ -38,7 +38,7 @@ defmodule Pepe.Webhooks.GoogleChat do
         "key" => "access_token",
         "label" => dgettext("webhooks", "Access token"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "An OAuth token for the Chat API. Store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "An OAuth access token for the Chat API. Write it as ${ENV_VAR}.")
       },
       %{
         "key" => "project_number",
@@ -47,18 +47,18 @@ defmodule Pepe.Webhooks.GoogleChat do
         "hint" =>
           dgettext(
             "webhooks",
-            "The Cloud project number. Set the app's Authentication Audience to \"Project Number\"."
+            "The Google Cloud project number. In the app's settings, set Authentication Audience to \"Project Number\"."
           )
       },
       %{
         "key" => "require_mention",
-        "label" => dgettext("webhooks", "Require mention in spaces"),
+        "label" => dgettext("webhooks", "Answer only when mentioned"),
         "type" => "select",
         "options" => ["true", "false"],
         "hint" =>
           dgettext(
             "webhooks",
-            "In group spaces, reply only when @mentioned (default true)."
+            "In group spaces, reply only when someone @mentions the bot (default: yes)."
           )
       }
     ]

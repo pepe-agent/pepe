@@ -46,7 +46,7 @@ defmodule PepeWeb.SkillsLive do
         <.view_header active="skills"
           icon="📚"
           title={gettext("Skills")}
-          desc={gettext("Step-by-step know-how an agent reads when a request calls for it. Each one shows whether agents are offered it, and if not, why. Switch one off everywhere or on a single channel. Install and create skills from chat or with mix pepe skill.")}
+          desc={gettext("Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with mix pepe skill.")}
         />
         <div class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :if={@skills == []} class="text-base text-zinc-500">{gettext("No skills found.")}</div>
@@ -193,7 +193,7 @@ defmodule PepeWeb.SkillsLive do
 
   defp hidden_label(:disabled), do: gettext("Off")
   defp hidden_label(:platform), do: gettext("For another operating system")
-  defp hidden_label(:environment), do: gettext("For another environment")
+  defp hidden_label(:environment), do: gettext("For another setup")
   defp hidden_label(:channel), do: gettext("For other channels")
   defp hidden_label({:requires_tools, tools}), do: gettext("Needs the %{tools} tool", tools: Enum.join(tools, ", "))
   defp hidden_label({:fallback_for_tools, tools}), do: gettext("Not needed while %{tools} is available", tools: Enum.join(tools, ", "))

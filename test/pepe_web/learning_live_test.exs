@@ -179,7 +179,7 @@ defmodule PepeWeb.LearningLiveTest do
 
     {:ok, view, _html} = live(conn(), "/learn")
 
-    assert render_click(view, "approve_write", %{"id" => id}) =~ "That write is no longer pending."
+    assert render_click(view, "approve_write", %{"id" => id}) =~ "That change is no longer waiting."
     refute File.exists?(Path.join(Workspace.dir("assistant"), "MEMORY.md"))
   end
 
@@ -200,9 +200,9 @@ defmodule PepeWeb.LearningLiveTest do
     {:ok, view, _html} = live(conn(), "/learn")
 
     send(view.pid, {:consolidated, "assistant", {:ok, "merged 2 duplicate notes", []}})
-    assert render(view) =~ "Consolidated: merged 2 duplicate notes"
+    assert render(view) =~ "Tidied up: merged 2 duplicate notes"
 
     send(view.pid, {:consolidated, "assistant", {:error, :no_model}})
-    assert render(view) =~ "Consolidation could not run."
+    assert render(view) =~ "Could not tidy up."
   end
 end

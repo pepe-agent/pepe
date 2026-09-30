@@ -107,7 +107,7 @@ defmodule PepeWeb.ModelsLiveTest do
     # the flash was in fact being built and then discarded by a second flash of the same
     # kind, leaving "Model openrouter-2 saved." and no hint where the -2 came from.
     assert html =~ "A model connection named openrouter already exists"
-    assert html =~ "saved this one as openrouter-2 instead"
+    assert html =~ "this one was saved as openrouter-2"
   end
 
   test "renaming a connection re-points the agents that use it" do

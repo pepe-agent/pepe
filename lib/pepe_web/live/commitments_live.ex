@@ -45,7 +45,7 @@ defmodule PepeWeb.CommitmentsLive do
         <.view_header active="commitments"
           icon="🤝"
           title={gettext("Commitments")}
-          desc={gettext("Follow-ups an agent notices in conversation: a user asking to be reminded, or the agent promising to check on something. Not created by hand; enable \"commitments\" on an agent to turn this on.")}
+          desc={gettext("Follow-ups an agent spots in a conversation, like a reminder you asked for. To get them, turn on Commitments for an agent.")}
         />
         <div class="page-body flex-1 space-y-6 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <.empty_state :if={@scoped_total == 0}>
@@ -53,14 +53,14 @@ defmodule PepeWeb.CommitmentsLive do
           </.empty_state>
           <p :if={@scoped_total > 0} class="text-sm leading-relaxed text-zinc-500">
             {gettext(
-              "%{reminder} only sends you a message. %{promise} re-runs the agent first.",
+              "%{reminder} only sends you a message. %{promise} makes the agent do the task first.",
               reminder: origin_type_label("user_reminder"),
               promise: origin_type_label("agent_promise")
             )}
           </p>
           <.commitment_section
             :if={@awaiting != []}
-            title={gettext("Awaiting your ok")}
+            title={gettext("Waiting for your OK")}
             commitments={@awaiting}
             due_options={@due_options}
           />
@@ -68,7 +68,7 @@ defmodule PepeWeb.CommitmentsLive do
           <.commitment_section
             :if={@firing != []}
             title={gettext("Stuck")}
-            desc={gettext("Interrupted mid-delivery. It will not retry on its own; cancel it.")}
+            desc={gettext("Stopped while being sent. It will not try again by itself, so cancel it.")}
             commitments={@firing}
           />
           <.commitment_section :if={@delivered != []} title={gettext("Delivered")} commitments={@delivered} />
@@ -98,7 +98,7 @@ defmodule PepeWeb.CommitmentsLive do
               <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300" title={origin_type_hint(c.origin_type)}>
                 {origin_type_label(c.origin_type)}
               </span>
-              <span :if={c.pending_delivery} class={[tag(:warn), "ml-1"]}>{gettext("Fired, delivering")}</span>
+              <span :if={c.pending_delivery} class={[tag(:warn), "ml-1"]}>{gettext("Due, being sent")}</span>
             </div>
             <div :if={c.state != "awaiting_confirmation" or is_integer(c.due_at)} class="flex shrink-0 flex-wrap gap-1 text-sm">
               <button :if={c.state == "awaiting_confirmation"} phx-click="confirm" phx-value-id={c.id} class={btn_ghost()}>{gettext("Confirm")}</button>
@@ -118,7 +118,7 @@ defmodule PepeWeb.CommitmentsLive do
             <input type="hidden" name="commitment_id" value={c.id} />
             <select name="due_when" class={[fld(), "sm:w-48"]}>
               <option value="" disabled selected={due_match(c.due_when) not in Enum.map(@due_options, &elem(&1, 1))}>
-                {gettext("Pick when it's due")}
+                {gettext("Choose when it is due")}
               </option>
               <option :for={{label, value} <- @due_options} value={value} selected={value == due_match(c.due_when)}>
                 {label}
@@ -134,7 +134,7 @@ defmodule PepeWeb.CommitmentsLive do
             <button type="button" phx-click="cancel" phx-value-id={c.id} data-confirm={gettext("Cancel commitment %{name}?", name: c.text)}
               class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
             <p class={[hlp(), "w-full"]}>
-              {gettext("Pick a day, or type an interval like \"in 5 days\". What you type wins.")}
+              {gettext("Pick a day, or type something like \"in 5 days\". What you type is used.")}
             </p>
           </form>
         </div>
@@ -215,10 +215,10 @@ defmodule PepeWeb.CommitmentsLive do
   defp origin_type_label(other), do: to_string(other)
 
   defp origin_type_hint("agent_promise"),
-    do: gettext("When it comes due, the original agent session is re-run so the agent does the thing before replying.")
+    do: gettext("When it is due, the agent does the task again in the same conversation, then replies.")
 
   defp origin_type_hint("user_reminder"),
-    do: gettext("When it comes due, you get a message on the channel this came from. The agent doesn't run again.")
+    do: gettext("When it is due, you get a message where the request came from. The agent does not do anything.")
 
   defp origin_type_hint(_other), do: nil
 

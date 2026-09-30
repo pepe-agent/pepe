@@ -67,7 +67,7 @@ defmodule PepeWeb.SkillCuratorComponent do
       </div>
 
       <p class="mt-2 text-sm leading-relaxed text-zinc-500">
-        {gettext("Unused agent-written skills go stale, then get archived. Nothing is deleted.")}
+        {gettext("Skills an agent wrote that go unused get marked as unused, then archived. Nothing is deleted.")}
       </p>
 
       <.meta_list class="mt-4">
@@ -77,7 +77,7 @@ defmodule PepeWeb.SkillCuratorComponent do
         </:item>
         <:item label={gettext("Next run")}>{next_run(@status)}</:item>
         <:item label={gettext("In its care")}>
-          {gettext("Active: %{active}, stale: %{stale}, archived: %{archived}", active: @status.active, stale: @status.stale, archived: @status.archived)}
+          {gettext("Active: %{active}, unused: %{stale}, archived: %{archived}", active: @status.active, stale: @status.stale, archived: @status.archived)}
         </:item>
       </.meta_list>
 
@@ -99,7 +99,7 @@ defmodule PepeWeb.SkillCuratorComponent do
             </label>
             <label class="flex items-center gap-2 text-sm text-zinc-300">
               <input type="checkbox" name="consolidate" value="true" checked={@status.settings["consolidate"]} class={checkbox_cls()} />
-              {gettext("Also merge overlapping skills (uses a model run)")}
+              {gettext("Also merge similar skills (uses the model)")}
             </label>
           </div>
           <div class="grid gap-3 sm:grid-cols-4">
@@ -113,7 +113,7 @@ defmodule PepeWeb.SkillCuratorComponent do
       </details>
 
       <div :if={@status.most_idle != []} class="mt-4">
-        <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Closest to going stale")}</div>
+        <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Closest to becoming unused")}</div>
         <div class="divide-y divide-white/[.06] rounded-[12px] border border-white/[.08]">
         <div :for={row <- @status.most_idle} class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
           <div class="min-w-0 truncate">
@@ -167,9 +167,9 @@ defmodule PepeWeb.SkillCuratorComponent do
 
   defp number_fields do
     [
-      {"interval_hours", gettext("Run every (hours)")},
-      {"min_idle_hours", gettext("Only when idle (hours)")},
-      {"stale_after_days", gettext("Stale after (days)")},
+      {"interval_hours", gettext("Check every (hours)")},
+      {"min_idle_hours", gettext("Only if nothing happened for (hours)")},
+      {"stale_after_days", gettext("Mark unused after (days)")},
       {"archive_after_days", gettext("Archive after (days)")}
     ]
   end
@@ -187,7 +187,10 @@ defmodule PepeWeb.SkillCuratorComponent do
   # What the last run reported, under its date. The very first look is not a run at all: it only
   # starts the clock, and its stored English sentence says so in words nobody should have to read.
   defp run_note(%{last_run_at: nil}), do: nil
-  defp run_note(%{last_run_summary: "first look" <> _}), do: gettext("First look: it waits one interval before the first real run.")
+
+  defp run_note(%{last_run_summary: "first look" <> _}),
+    do: gettext("First check: it waits one full interval before the first real cleanup.")
+
   defp run_note(%{last_run_summary: summary}) when summary in [nil, ""], do: nil
   defp run_note(%{last_run_summary: summary}), do: summary
 
@@ -217,7 +220,7 @@ defmodule PepeWeb.SkillCuratorComponent do
       |> Map.merge(%{"enabled" => params["enabled"] == "true", "consolidate" => params["consolidate"] == "true"})
 
     case apply_settings(values) do
-      :ok -> notify(:info, gettext("Curator settings saved."))
+      :ok -> notify(:info, gettext("Settings saved."))
       {:error, message} -> notify(:error, message)
     end
 
@@ -265,7 +268,7 @@ defmodule PepeWeb.SkillCuratorComponent do
   end
 
   def handle_async(:curator_run, _failed, socket) do
-    notify(:error, gettext("The curator could not run."))
+    notify(:error, gettext("The cleanup could not run."))
     {:noreply, socket |> assign(running: nil) |> load()}
   end
 

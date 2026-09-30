@@ -89,7 +89,7 @@ defmodule PepeWeb.UsageLive do
       else: gettext("%{pct}% of input", pct: pct)
   end
 
-  defp cache_sub(_totals, _currency), do: gettext("Nothing from cache yet")
+  defp cache_sub(_totals, _currency), do: gettext("Nothing reused from cache yet")
 
   @impl true
   def render(assigns) do
@@ -101,7 +101,7 @@ defmodule PepeWeb.UsageLive do
         <.view_header active="usage"
           icon="📊"
           title={gettext("Usage & billing")}
-          desc={gettext("Tokens metered per project, agent and model, by cycle. Cost uses each model's price; the amount to bill adds the project's markup. Prices are editable per model.")}
+          desc={gettext("How much each project, agent and model used, per billing period. Cost is what the provider charges; the amount to bill adds the project's markup. You can change each model's price.")}
         >
           <%!-- The freshness label is the whole reason to press the button, so it wraps under
                 it on a phone instead of being hidden away at `sm:`. --%>
@@ -111,9 +111,9 @@ defmodule PepeWeb.UsageLive do
               phx-click="refresh_prices"
               disabled={@refreshing}
               class={[btn_ghost(), "order-1 sm:order-2"]}
-              title={gettext("Fetches current provider prices; the cached list is used until then.")}
+              title={gettext("Gets the latest provider prices. Until then, the last saved prices are used.")}
             >
-              {if @refreshing, do: gettext("Refreshing..."), else: gettext("Refresh prices")}
+              {if @refreshing, do: gettext("Refreshing..."), else: gettext("Update prices")}
             </button>
           </div>
         </.view_header>
@@ -158,7 +158,7 @@ defmodule PepeWeb.UsageLive do
             <%!-- The empty state is its own block, not a `colspan` row: inside the table it
                   would inherit the 640px min width and scroll out of sight on a phone. --%>
             <div :if={@summary.buckets == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-base text-zinc-500">
-              {gettext("No usage recorded yet for this scope.")}
+              {gettext("No usage recorded yet here.")}
             </div>
             <div :if={@summary.buckets != []} class="overflow-x-auto rounded-xl border border-zinc-800">
               <table class="w-full min-w-[720px] text-base">
@@ -166,7 +166,7 @@ defmodule PepeWeb.UsageLive do
                   <tr>
                     <th class={[th(), "px-3 py-3"]}>{gettext("Cycle")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Input")}</th>
-                    <th class={[th(), "px-3 py-3 text-right"]} title={gettext("The part of the input served again from the provider's cache, billed for less")}>{gettext("Cached")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]} title={gettext("Part of the text the provider already had saved from before, so it charges less for it")}>{gettext("Cached")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Output")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Total")}</th>
                     <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Cost")}</th>
@@ -202,11 +202,11 @@ defmodule PepeWeb.UsageLive do
           <div>
             <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("By message")}</div>
             <p class="mb-2 text-sm text-zinc-500">
-              {gettext("One line per incoming message. A message often takes several model calls.")}
+              {gettext("One line per message received. One message often needs several model calls.")}
             </p>
 
             <div :if={@runs == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-base text-zinc-500">
-              {gettext("No messages recorded yet for this scope.")}
+              {gettext("No messages recorded yet here.")}
             </div>
 
             <div :if={@runs != []} class="overflow-x-auto rounded-xl border border-zinc-800">
@@ -261,7 +261,7 @@ defmodule PepeWeb.UsageLive do
                     <tr :if={open?(@open_run, run["id"])} class="border-t border-zinc-800/70 bg-zinc-950/60">
                       <td colspan="8" class="px-3 py-3">
                         <div class="mb-2 text-sm text-zinc-500">
-                          {gettext("Every model call this message took, in order")}
+                          {gettext("Every model call this message needed, in order")}
                         </div>
                         <div :for={call <- @open_run["calls"]} class="flex items-center justify-between gap-3 py-1 text-sm">
                           <span class="min-w-0 truncate font-mono text-zinc-400">{call["model"]}</span>
@@ -274,7 +274,7 @@ defmodule PepeWeb.UsageLive do
                           </span>
                         </div>
                         <div :if={@open_run["calls"] == []} class="py-1 text-sm text-zinc-600">
-                          {gettext("No metered call recorded for this message.")}
+                          {gettext("No model call recorded for this message.")}
                         </div>
                       </td>
                     </tr>

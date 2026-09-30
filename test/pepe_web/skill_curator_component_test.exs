@@ -51,7 +51,7 @@ defmodule PepeWeb.SkillCuratorComponentTest do
     {:ok, _view, html} = live(conn(), "/learn")
 
     assert html =~ "Skill curator"
-    assert html =~ "Closest to going stale"
+    assert html =~ "Closest to becoming unused"
     assert html =~ "old-one"
     assert html =~ "idle 20 days"
   end
@@ -129,7 +129,7 @@ defmodule PepeWeb.SkillCuratorComponentTest do
     }
 
     view |> form("#skill-curator form", params) |> render_submit()
-    assert render(view) =~ "Curator settings saved."
+    assert render(view) =~ "Settings saved."
     assert Settings.stale_after_days() == 7
     assert Settings.archive_after_days() == 21
     assert Settings.interval_hours() == 24

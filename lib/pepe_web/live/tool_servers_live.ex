@@ -75,9 +75,9 @@ defmodule PepeWeb.ToolServersLive do
   # instead of crashing the form.
   defp transport_options do
     Enum.map(Pepe.MCP.Transport.choices(), fn
-      "auto" -> {gettext("Auto (recommended)"), "auto"}
+      "auto" -> {gettext("Automatic (recommended)"), "auto"}
       "streamable" -> {gettext("Streamable HTTP"), "streamable"}
-      "sse" -> {gettext("HTTP+SSE (legacy)"), "sse"}
+      "sse" -> {gettext("HTTP+SSE (older)"), "sse"}
       other -> {other, other}
     end)
   end
@@ -132,7 +132,7 @@ defmodule PepeWeb.ToolServersLive do
         <.view_header active="mcp"
           icon="🧰"
           title="MCP"
-          desc={gettext("Give agents extra tools from external MCP servers (Sentry, GitHub, ...). Write tokens as ${ENV_VAR} to keep secrets out of the config file.")}
+          desc={gettext("Give your agents extra abilities from outside MCP servers (Sentry, GitHub, ...). Write keys as ${ENV_VAR} so they stay out of the settings file.")}
         >
           <button :if={!@edit_mcp} phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
           <button :if={@edit_mcp} phx-click="mcp_cancel" class={btn_ghost()}>&larr; {gettext("Back to servers")}</button>
@@ -144,8 +144,8 @@ defmodule PepeWeb.ToolServersLive do
               <span class="font-medium">{name}</span>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button phx-click="mcp_edit" phx-value-name={name} class={btn_ghost()}>{gettext("Edit")}</button>
-                <button phx-click="mcp_validate" phx-value-name={name} class={btn_ghost()}>{gettext("Validate (list tools)")}</button>
-                <button phx-click="mcp_restart" phx-value-name={name} class={btn_ghost()} title={gettext("Recovery: reconnect if this server seems stuck")}>↻ {gettext("Restart")}</button>
+                <button phx-click="mcp_validate" phx-value-name={name} class={btn_ghost()}>{gettext("Test connection")}</button>
+                <button phx-click="mcp_restart" phx-value-name={name} class={btn_ghost()} title={gettext("Reconnect if this server seems stuck")}>↻ {gettext("Restart")}</button>
                 <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
@@ -155,7 +155,7 @@ defmodule PepeWeb.ToolServersLive do
               <:item :if={!cfg["url"]} label={gettext("Command")} mono>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</:item>
             </.meta_list>
             <div :if={cfg["url"]} class="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <span :if={auth_state(name, cfg) == :header} class="inline-flex items-center gap-1.5 text-zinc-500"><.icon name="hero-key" class="size-4" /> {gettext("Static key from a header")}</span>
+              <span :if={auth_state(name, cfg) == :header} class="inline-flex items-center gap-1.5 text-zinc-500"><.icon name="hero-key" class="size-4" /> {gettext("Fixed key in a header")}</span>
               <span :if={auth_state(name, cfg) == :oauth} class="text-emerald-400">✓ {gettext("Signed in with OAuth")}</span>
               <span :if={auth_state(name, cfg) == :none} class="text-amber-400">{gettext("No credential")}</span>
               <button :if={auth_state(name, cfg) != :header} phx-click="mcp_login" phx-value-name={name} class={btn_ghost()}>
@@ -164,15 +164,15 @@ defmodule PepeWeb.ToolServersLive do
               <button :if={auth_state(name, cfg) == :oauth} phx-click="mcp_logout" phx-value-name={name} class={btn_ghost()}>{gettext("Sign out")}</button>
             </div>
             <div :if={@login && @login.server == name} class="mt-2 space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
-              <p class="text-sm text-zinc-300">{gettext("Open this link to authorize, then come back:")}</p>
+              <p class="text-sm text-zinc-300">{gettext("Open this link to allow access, then come back:")}</p>
               <a href={@login.url} target="_blank" rel="noopener" class="block break-all text-sm text-sky-400 hover:underline">{@login.url}</a>
               <form phx-submit="mcp_login_code">
-                <label for={"mcp-code-" <> name} class={lbl()}>{gettext("Authorization code")}</label>
+                <label for={"mcp-code-" <> name} class={lbl()}>{gettext("Access code")}</label>
                 <div class="flex flex-wrap gap-2">
-                  <input id={"mcp-code-" <> name} name="code" placeholder={gettext("paste code here")} class={[fld(), "min-w-0 flex-1"]} />
+                  <input id={"mcp-code-" <> name} name="code" placeholder={gettext("Paste the code here")} class={[fld(), "min-w-0 flex-1"]} />
                   <button type="submit" class={btn()}>{gettext("Finish")}</button>
                 </div>
-                <p class={hlp()}>{gettext("Only needed if the browser can't reach this machine. Otherwise it fills itself in.")}</p>
+                <p class={hlp()}>{gettext("Only needed if the browser can't reach this computer. Otherwise it fills in by itself.")}</p>
               </form>
             </div>
             <div :if={@mcp_tools[name] == :loading} class={hlp()}>{gettext("Connecting...")}</div>
@@ -181,10 +181,10 @@ defmodule PepeWeb.ToolServersLive do
                 <code class="text-zinc-300">mcp__{name}__{t["name"]}</code>
                 <span class="text-zinc-500">- {String.slice(to_string(t["description"]), 0, 90)}</span>
               </div>
-              <p class="text-sm text-zinc-500">{gettext("Give an agent only the read tools (Agents tab, Tools) to keep it read-only.")}</p>
+              <p class="text-sm text-zinc-500">{gettext("To keep an agent read-only, give it only the tools that read (Agents tab, Tools).")}</p>
             </div>
             <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-sm text-red-400">
-              {gettext("Couldn't connect. Check the command and the env var token")}
+              {gettext("Couldn't connect. Check the command and the key in its environment variable.")}
             </div>
           </div>
           <.empty_state :if={@mcp == %{}}>{gettext("No MCP servers yet. Add one with “+ New server”.")}</.empty_state>
@@ -203,39 +203,39 @@ defmodule PepeWeb.ToolServersLive do
               <div>
                 <.input field={@form[:name]} label={gettext("Name")} placeholder="sentry" />
                 <p :if={@edit_mcp[:original]} class={hlp()}>
-                  {gettext("Renaming saves a new server, so any OAuth sign-in must be redone.")}
+                  {gettext("Renaming creates a new server, so you will need to sign in with OAuth again.")}
                 </p>
               </div>
               <.input
                 field={@form[:kind]}
                 type="select"
                 label={gettext("Kind")}
-                options={[{gettext("Remote (a URL over HTTP)"), "remote"}, {gettext("Local (a command on this machine)"), "local"}]}
+                options={[{gettext("Remote (a web address)"), "remote"}, {gettext("Local (a program on this computer)"), "local"}]}
               />
               <.input :if={@form[:kind].value != "local"} field={@form[:url]} label={gettext("URL")} class={[fld(), "font-mono"]} placeholder="https://mcp.example.com/mcp" />
               <div :if={@form[:kind].value != "local"}>
                 <.input field={@form[:transport]} type="select" label={gettext("Transport")} options={transport_options()} />
-                <p class={hlp()}>{gettext("Auto picks the right protocol. Pin one only if the server supports just that one.")}</p>
+                <p class={hlp()}>{gettext("Automatic picks the right one. Choose a specific one only if the server supports just that.")}</p>
               </div>
               <div :if={@form[:kind].value == "local"}>
                 <.input field={@form[:command]} label={gettext("Command")} class={[fld(), "font-mono"]} placeholder="npx" />
-                <p class={hlp()}>{gettext("The executable to run, e.g. npx, uvx, python.")}</p>
+                <p class={hlp()}>{gettext("The program to start, such as npx, uvx or python.")}</p>
               </div>
               <div :if={@form[:kind].value == "local"}>
                 <.input field={@form[:args]} label={gettext("Arguments")} class={[fld(), "font-mono"]}
                   placeholder={"-y @sentry/mcp-server@latest --access-token ${SENTRY_AUTH_TOKEN}"} />
-                <p class={hlp()}>{gettext("Put the token as ${ENV_VAR}. The secret stays out of the config file.")}</p>
+                <p class={hlp()}>{gettext("Write the key as ${ENV_VAR} so it stays out of the settings file.")}</p>
               </div>
             </.form_section>
 
-            <.form_section :if={@form[:kind].value != "local"} title={gettext("Authentication")}>
+            <.form_section :if={@form[:kind].value != "local"} title={gettext("Sign-in")}>
               <p class="text-base leading-relaxed text-zinc-400">
-                {gettext("Use OAuth (save, then sign in on the card) or put a fixed token in Headers.")}
+                {gettext("Use OAuth (save, then sign in from the server's card) or put a fixed key in Headers.")}
               </p>
               <div>
-                <.input field={@form[:headers]} type="textarea" label={gettext("Headers (only for a fixed token)")} class={[fld(), "font-mono"]}
+                <.input field={@form[:headers]} type="textarea" label={gettext("Headers (only for a fixed key)")} class={[fld(), "font-mono"]}
                   placeholder={"Authorization: Bearer ${MCP_TOKEN}"} />
-                <p class={hlp()}>{gettext("One per line, as Key: value. Write tokens as ${ENV_VAR}.")}</p>
+                <p class={hlp()}>{gettext("One per line, as Name: value. Write keys as ${ENV_VAR}.")}</p>
               </div>
             </.form_section>
 

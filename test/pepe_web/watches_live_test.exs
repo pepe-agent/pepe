@@ -89,8 +89,8 @@ defmodule PepeWeb.WatchesLiveTest do
 
     {:ok, _view, html} = live(conn(), "/watches")
 
-    assert html =~ "Ran out of checks and stopped without firing."
-    assert html =~ "This watch already fired and stopped."
+    assert html =~ "Ran out of checks and stopped without sending anything."
+    assert html =~ "This watch already sent its message and stopped."
     # A finished watch has no next check to advertise.
     refute html =~ "Next check"
   end

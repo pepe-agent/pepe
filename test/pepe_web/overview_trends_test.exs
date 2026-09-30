@@ -131,14 +131,14 @@ defmodule PepeWeb.OverviewTrendsTest do
   test "the overview opens on the summary and only draws the charts of the tab you open" do
     {:ok, view, html} = live(conn(), "/")
 
-    assert html =~ "Live sessions"
+    assert html =~ "Open conversations"
     refute html =~ ~s(phx-hook="Chart")
     # The week/month switch keeps its space (so the tab bar never changes height) but is hidden.
     assert has_element?(view, "div.invisible[role=group] button[phx-value-period=week]")
 
     html = open_tab(view, "trends")
     assert html =~ ~s(id="chart-spend")
-    refute html =~ "Live sessions"
+    refute html =~ "Open conversations"
     refute has_element?(view, "div.invisible[role=group]")
 
     # A tab can also be asked for in the address, so a link lands on it.

@@ -142,7 +142,7 @@ defmodule PepeWeb.OverviewLive do
 
           <div :if={@tab == "summary"} class="space-y-6">
           <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <.stat label={gettext("Live sessions")} value={Integer.to_string(@live_sessions)} sub={gettext("Open right now")} />
+            <.stat label={gettext("Open conversations")} value={Integer.to_string(@live_sessions)} sub={gettext("Open right now")} />
             <.stat label={gettext("Messages this month")} value={tokens(@month.totals.count)} sub={gettext("model calls")} />
             <.stat label={gettext("Tokens this month")} value={tokens(@month.totals.total)} sub={tokens_sub(@month.totals)} />
             <%!-- Cost is what we actually paid: token prices for API connections, plus the flat
@@ -391,8 +391,8 @@ defmodule PepeWeb.OverviewLive do
     crons + watches
   end
 
-  defp scope_label("all"), do: gettext("all scopes")
-  defp scope_label("root"), do: gettext("the Principal scope")
+  defp scope_label("all"), do: gettext("all projects")
+  defp scope_label("root"), do: gettext("the Principal workspace")
   defp scope_label(project), do: project
 
   @impl true

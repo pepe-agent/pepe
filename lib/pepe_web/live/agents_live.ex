@@ -205,7 +205,7 @@ defmodule PepeWeb.AgentsLive do
         <.view_header active="agents"
           icon="🧩"
           title={agents_title(@scope)}
-          desc={gettext("An agent is a persona (its instructions) bound to a model, with the tools it's allowed to use. Define who they are and what they can do.")}
+          desc={gettext("An agent is an assistant with its own instructions, AI model and tools. Set who it is and what it can do.")}
         >
           <button :if={!@edit_agent} phx-click="agent_new" class={btn()}>{gettext("+ New agent")}</button>
           <button :if={@edit_agent} phx-click="agent_cancel" class={btn_ghost()}>&larr; {gettext("Back to agents")}</button>
@@ -286,7 +286,7 @@ defmodule PepeWeb.AgentsLive do
             </div>
 
             <div class={tab_cls(@agent_tab, "persona")} id="agent-tab-persona" role="tabpanel">
-            <.form_section id="agent-section-persona" title={gettext("Persona")}>
+            <.form_section id="agent-section-persona" title={gettext("Identity")}>
               <div>
                 <label class={lbl()} for="agent_name">{gettext("Name")}</label>
                 <input
@@ -306,26 +306,26 @@ defmodule PepeWeb.AgentsLive do
               </div>
 
               <div>
-                <label class={lbl()}>{gettext("Persona (system prompt)")}</label>
+                <label class={lbl()}>{gettext("Instructions")}</label>
                 <textarea name="system_prompt" rows="3" phx-debounce="blur" placeholder={gettext("You are ...")} class={fld()}>{@edit_agent.system_prompt}</textarea>
               </div>
 
               <div>
-                <label class={lbl()}>{gettext("Langfuse-managed prompt (optional)")}</label>
-                <input type="text" name="langfuse_prompt" value={@edit_agent[:langfuse_prompt]} placeholder={gettext("blank = use the persona above")} class={fld()} />
+                <label class={lbl()}>{gettext("Instructions from Langfuse (optional)")}</label>
+                <input type="text" name="langfuse_prompt" value={@edit_agent[:langfuse_prompt]} placeholder={gettext("Blank = use the instructions above")} class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Uses this Langfuse prompt as the persona. Falls back to the one above.")}
+                  {gettext("Uses the instructions stored in Langfuse. If they can't be loaded, uses the ones above.")}
                 </p>
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-assembled-prompt" :if={!@edit_agent.new?} title={gettext("Assembled prompt")}>
+            <.form_section id="agent-section-assembled-prompt" :if={!@edit_agent.new?} title={gettext("Full instructions")}>
               <details class="text-sm" open>
                 <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200">
-                  {gettext("What the model actually sees, not just the persona above")}
+                  {gettext("What the AI really receives, not just the instructions above")}
                 </summary>
                 <p class={hlp()}>
-                  {gettext("The exact system message sent on every chat. The persona is only the start.")}
+                  {gettext("The full text sent to the AI in every chat. The instructions above are only part of it.")}
                 </p>
                 <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">{assembled_prompt(@edit_agent)}</pre>
               </details>
@@ -333,11 +333,11 @@ defmodule PepeWeb.AgentsLive do
             </div>
 
             <div class={tab_cls(@agent_tab, "model")} id="agent-tab-model" role="tabpanel">
-            <.form_section id="agent-section-model" title={gettext("Model & fallbacks")}>
+            <.form_section id="agent-section-model" title={gettext("Model and backups")}>
               <div>
                 <label class={lbl()}>{gettext("Model")}</label>
                 <select name="model" class={fld()}>
-                  <option value="">{gettext("(use default model)")}</option>
+                  <option value="">{gettext("(Use the default model)")}</option>
                   <option :for={m <- model_names()} value={m} selected={m == @edit_agent.model}>{m}</option>
                 </select>
               </div>
@@ -345,11 +345,11 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class={lbl()}>{gettext("Backup models")}</label>
                 <p class={hlp()}>
-                  {gettext("Backup models, tried in order if this one fails. Usually you can skip it.")}
+                  {gettext("Used in order if the main model fails. Most people can skip this.")}
                 </p>
 
                 <div :if={@edit_agent.fallbacks == nil} class="mt-2 flex items-center justify-between gap-3 text-sm">
-                  <span class="text-zinc-400">{gettext("Using the model connection's backup list.")}</span>
+                  <span class="text-zinc-400">{gettext("Using the backup list from the model connection.")}</span>
                   <button type="button" phx-click="agent_fallback_override" class="shrink-0 font-medium text-orange-400 hover:text-orange-300">{gettext("Set a custom list for this agent")}</button>
                 </div>
 
@@ -364,21 +364,21 @@ defmodule PepeWeb.AgentsLive do
                     </span>
                   </div>
                   <select :if={agent_fallback_candidates(@models, @scope, @edit_agent) != []} name="agent_fallback_candidate" phx-change="agent_fallback_add" class={[fld(), "mt-2"]}>
-                    <option value="">{gettext("+ Add a fallback...")}</option>
+                    <option value="">{gettext("+ Add a backup model...")}</option>
                     <option :for={m <- agent_fallback_candidates(@models, @scope, @edit_agent)} value={m.name}>{m.name}</option>
                   </select>
-                  <button type="button" phx-click="agent_fallback_inherit" class="mt-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">{gettext("Use the connection's default instead")}</button>
+                  <button type="button" phx-click="agent_fallback_inherit" class="mt-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">{gettext("Go back to the connection's backup list")}</button>
                 </div>
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-routing" title={gettext("Complexity routing")}>
+            <.form_section id="agent-section-routing" title={gettext("Easy vs hard messages")}>
               <p class={hlp()}>
-                {gettext("Optional: simple chats go to the model below, complex ones to this agent's own model.")}
+                {gettext("Optional. Easy messages go to the model below, hard ones to this agent's own model.")}
               </p>
 
               <div>
-                <label class={lbl()}>{gettext("Triage model")}</label>
+                <label class={lbl()}>{gettext("Model that sorts messages")}</label>
                 <select name="triage_model" class={fld()}>
                   <option value="">{gettext("(off)")}</option>
                   <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:triage_model]}>{m}</option>
@@ -396,11 +396,11 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="midrun_fold" value="true" checked={@edit_agent[:midrun_fold]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Fold a correction into the running turn")}</span>
+                  <span>{gettext("Take corrections while working")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Checks if a mid-task message is a correction and applies it. Waits if unsure.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("If you send another message while the agent is still working, it checks whether it changes the task and uses it right away. If unsure, it answers after.")}</p>
                 <p :if={blank(@edit_agent[:triage_model]) == nil} class={[hlp(), check_indent(), "text-amber-500/80"]}>
-                  {gettext("No triage model set above: the check uses this agent's own model, at its cost.")}
+                  {gettext("Uses the agent's own model for this check unless you pick a cheaper one above.")}
                 </p>
               </div>
 
@@ -409,21 +409,21 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class={lbl()}>{gettext("Complex model")}</label>
                 <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-sm">
-                  <span class="text-zinc-300">{@edit_agent[:model] || gettext("(the default model)")}</span>
-                  <span class="ml-1 text-zinc-600">{gettext("(this agent's own model, chosen above)")}</span>
+                  <span class="text-zinc-300">{@edit_agent[:model] || gettext("(Default model)")}</span>
+                  <span class="ml-1 text-zinc-600">{gettext("(This agent's own model, chosen above)")}</span>
                 </div>
               </div>
             </.form_section>
 
             <.form_section id="agent-section-chores" title={gettext("Chores")}>
               <p class={hlp()}>
-                {gettext("Optional cheap model for small jobs, like naming chats.")}
+                {gettext("Optional cheaper model for small jobs, like naming conversations.")}
               </p>
 
               <div>
                 <label class={lbl()}>{gettext("Utility model")}</label>
                 <select name="utility_model" class={fld()}>
-                  <option value="">{gettext("(off: name conversations without a model)")}</option>
+                  <option value="">{gettext("(Off: names conversations without an AI model)")}</option>
                   <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:utility_model]}>{m}</option>
                 </select>
               </div>
@@ -431,11 +431,11 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="commitments" value="true" checked={@edit_agent[:commitments]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Track commitments made in conversation")}</span>
+                  <span>{gettext("Follow up on promises")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Notices promises like \"remind me Friday\" and follows up on time without being asked twice.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Catches requests like \"remind me Friday\" and follows up on time.")}</p>
                 <p :if={blank(@edit_agent[:utility_model]) == nil} class={[hlp(), check_indent(), "text-amber-500/80"]}>
-                  {gettext("No utility model set above: this does nothing until one is.")}
+                  {gettext("Pick a model for small jobs above, or this does nothing.")}
                 </p>
               </div>
             </.form_section>
@@ -445,10 +445,10 @@ defmodule PepeWeb.AgentsLive do
             <.form_section id="agent-section-capabilities" title={gettext("Capabilities")}>
               <div>
                 <label class={lbl()}>
-                  {gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span>
+                  {gettext("Tools")} <span class="text-zinc-600">{gettext("(What this agent can do)")}</span>
                   <span
                     class="ml-1 cursor-help text-zinc-600"
-                    title={gettext("The text under each tool is sent to the AI model, so it stays in English.")}
+                    title={gettext("The description under each tool is read by the AI, so it is always in English.")}
                   >ⓘ</span>
                 </label>
                 <div class="grid gap-2 sm:grid-cols-2">
@@ -462,10 +462,10 @@ defmodule PepeWeb.AgentsLive do
                     checked = ask every time, which is the safe default and needs no wording
                     about a magic blank value. --%>
               <div>
-                <label class={lbl()}>{gettext("Auto-approve")} <span class="text-zinc-600">{gettext("(tools that run without asking)")}</span></label>
+                <label class={lbl()}>{gettext("Auto-approve")} <span class="text-zinc-600">{gettext("(Tools it can use without asking you)")}</span></label>
                 <p class={hlp()}>
-                  {gettext("Nothing checked = ask before every risky tool (safest).")}
-                  {gettext("Turns off after untrusted content is read, to block hidden instructions.")}
+                  {gettext("If nothing is checked, it asks you before every risky action. This is the safest option.")}
+                  {gettext("Approval comes back after the agent reads outside files or web pages, in case they hide harmful instructions.")}
                 </p>
 
                 <label class="mt-2 flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 text-sm transition hover:border-zinc-700">
@@ -476,30 +476,30 @@ defmodule PepeWeb.AgentsLive do
                 <%!-- Outside the card's <label>, not inside it like check_card/1's own hint:
                       this one turns every permission prompt off, and must not flip because
                       someone clicked the sentence explaining that. --%>
-                <p class={hlp()}>{gettext("Every tool this agent has runs unattended.")}</p>
+                <p class={hlp()}>{gettext("Every tool this agent has will run without asking you.")}</p>
 
                 <div :if={!auto_approve_all?(@edit_agent.auto_approve)} class="mt-3 grid gap-2 sm:grid-cols-2">
                   <.check_card :for={t <- @edit_agent.tools} name="auto_approve[]" value={t}
                     checked={t in (@edit_agent.auto_approve || [])} />
                 </div>
                 <p :if={!auto_approve_all?(@edit_agent.auto_approve) and @edit_agent.tools == []} class={hlp()}>
-                  {gettext("No tools checked above, so there is nothing to auto-approve.")}
+                  {gettext("Check some tools above first. Until then there is nothing to approve.")}
                 </p>
               </div>
 
               <div>
-                <label class={lbl()}>{gettext("Privacy hooks")} <span class="text-zinc-600">{gettext("(redact PII on the message flow)")}</span></label>
+                <label class={lbl()}>{gettext("Privacy rules")} <span class="text-zinc-600">{gettext("(Hide personal data in messages)")}</span></label>
                 <div class="grid gap-2 sm:grid-cols-2">
                   <.check_card :for={h <- Pepe.Hooks.names()} name="hooks[]" value={h}
                     checked={h in (@edit_agent.hooks || [])} hint={hook_hint(h)} />
                 </div>
-                <p class={hlp()}>{gettext("Set up each hook under Privacy. Empty means no redaction.")}</p>
+                <p class={hlp()}>{gettext("Set up each option under Privacy. If none is checked, nothing is hidden.")}</p>
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-slots" title={gettext("Extension slots")}>
+            <.form_section id="agent-section-slots" title={gettext("Swappable parts")}>
               <p class={hlp()}>
-                {gettext("Each slot lets one plugin replace a part of the agent. Default uses the project's choice.")}
+                {gettext("Each one lets an add-on replace a part of how the agent works. Default uses the project's setting.")}
               </p>
               <div class="grid gap-3 sm:grid-cols-2">
                 <div :for={slot <- Pepe.Slots.names()}>
@@ -522,8 +522,8 @@ defmodule PepeWeb.AgentsLive do
             <div class={tab_cls(@agent_tab, "access")} id="agent-tab-access" role="tabpanel">
             <.form_section id="agent-section-access" title={gettext("Access")}>
               <div>
-                <label class={lbl()}>{gettext("Can message (agents it may talk to)")}</label>
-                <p class={hlp()}>{gettext("Pick the agents this one may message. None picked means it messages no one.")}</p>
+                <label class={lbl()}>{gettext("Can message other agents")}</label>
+                <p class={hlp()}>{gettext("Choose which agents this one can send messages to. If none, it can't contact any.")}</p>
                 <.agent_chips
                   names={@edit_agent.can_message}
                   candidates={agent_pick_candidates(@scope, @edit_agent.name, @edit_agent.can_message)}
@@ -538,14 +538,14 @@ defmodule PepeWeb.AgentsLive do
                     error. The mode is now a closed choice, and the names only exist when the
                     mode actually reads them. --%>
               <div>
-                <label class={lbl()} for="can_manage_mode">{gettext("Admin scope (which agents it can manage & train)")}</label>
+                <label class={lbl()} for="can_manage_mode">{gettext("Agents it can manage")}</label>
                 <select id="can_manage_mode" name="can_manage_mode" class={fld()}>
                   <option value="self" selected={@edit_agent.manage_mode == "self"}>{gettext("Itself only")}</option>
                   <option value="none" selected={@edit_agent.manage_mode == "none"}>{gettext("Nobody")}</option>
                   <option value="all" selected={@edit_agent.manage_mode == "all"}>{gettext("All agents")}</option>
                   <option value="list" selected={@edit_agent.manage_mode == "list"}>{gettext("Specific agents")}</option>
                 </select>
-                <p class={hlp()}>{gettext("What this agent is allowed to reconfigure and train.")}</p>
+                <p class={hlp()}>{gettext("Which agents this one can change settings for and teach.")}</p>
 
                 <div :if={@edit_agent.manage_mode == "list"} class="mt-2">
                   <.agent_chips
@@ -556,7 +556,7 @@ defmodule PepeWeb.AgentsLive do
                     remove="agent_manage_remove"
                   />
                   <p :if={@edit_agent.manage_list == []} class={[hlp(), "text-amber-500/80"]}>
-                    {gettext("No agent picked yet, so this manages nobody.")}
+                    {gettext("No agent chosen yet, so it can't manage anyone.")}
                   </p>
                 </div>
               </div>
@@ -566,7 +566,7 @@ defmodule PepeWeb.AgentsLive do
             <div class={tab_cls(@agent_tab, "limits")} id="agent-tab-limits" role="tabpanel">
             <.form_section id="agent-section-limits" title={gettext("Limits")}>
               <div>
-                <label class={lbl()}>{gettext("Max steps")} <span class="text-zinc-600">{gettext("(tool rounds per task)")}</span></label>
+                <label class={lbl()}>{gettext("Max steps")} <span class="text-zinc-600">{gettext("(Most tool uses per task)")}</span></label>
                 <input type="number" min="1" name="max_iterations" value={@edit_agent.max_iterations} placeholder={gettext("no limit")} class={fld()} />
                 <p class={hlp()}>
                   <span class="text-zinc-400">{gettext("blank")}</span> = {gettext("No limit: the agent keeps going until the task is done.")}
@@ -575,7 +575,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
 
               <div>
-                <label class={lbl()}>{gettext("Progress display")} <span class="text-zinc-600">{gettext("(while this agent works)")}</span></label>
+                <label class={lbl()}>{gettext("Show progress")} <span class="text-zinc-600">{gettext("(while this agent works)")}</span></label>
                 <select name="tool_progress" class={fld()}>
                   <option value="" selected={@edit_agent.tool_progress in [nil, ""]}>{gettext("Use the channel's setting")}</option>
                   <option value="reaction" selected={@edit_agent.tool_progress == "reaction"}>{gettext("React")}</option>
@@ -583,15 +583,15 @@ defmodule PepeWeb.AgentsLive do
                   <option value="ambient" selected={@edit_agent.tool_progress == "ambient"}>{gettext("Ambient")}</option>
                   <option value="off" selected={@edit_agent.tool_progress == "off"}>{gettext("Nothing")}</option>
                 </select>
-                <p class={hlp()}>{gettext("Overrides the channel default for this agent.")}</p>
+                <p class={hlp()}>{gettext("Replaces the channel's setting for this agent only.")}</p>
               </div>
 
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="exempt_message_limit" value="true" checked={@edit_agent[:exempt_message_limit]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Exempt from the project's monthly message limit")}</span>
+                  <span>{gettext("Ignore the monthly message limit")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Keeps replying after the project's monthly message cap. Spend cap still applies.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Keeps answering after the project reaches its monthly message limit. The spending limit still applies.")}</p>
               </div>
 
               <%!-- The explanation is deliberately a sibling of the label, not inside it: this
@@ -600,9 +600,9 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="trust_untrusted_content" value="true" checked={@edit_agent[:trust_untrusted_content]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Trust untrusted content (act on files & pages without re-asking)")}</span>
+                  <span>{gettext("Skip approval after reading files or web pages")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Keeps auto-approved tools running after reading files or pages. Trusted agents only.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Normally approval comes back after the agent reads a file or web page, since it could hide harmful instructions. Turn on only for agents you trust.")}</p>
               </div>
 
               <div>
@@ -614,23 +614,23 @@ defmodule PepeWeb.AgentsLive do
                     checked={@edit_agent[:session_search_scope] == "project"}
                     class={["mt-0.5 shrink-0", checkbox_cls()]}
                   />
-                  <span>{gettext("Let session_search see every conversation in this project, not just the caller's own")}</span>
+                  <span>{gettext("Search all conversations in this project")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Off: search covers only this conversation. On: covers every conversation in this project.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Off: it only looks in the current conversation. On: it can look in every conversation in this project, including other people's.")}</p>
               </div>
 
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="micro_compaction" value="true" checked={@edit_agent[:micro_compaction]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Micro-compaction (fold history gradually instead of resummarizing it all at once)")}</span>
+                  <span>{gettext("Shorten old messages gradually")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Summarizes only the oldest exchange each turn. May reduce prompt caching.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Summarizes only the oldest messages each time, not everything at once. This can raise cost slightly.")}</p>
               </div>
 
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="capability_nudge" value="true" checked={@edit_agent[:capability_nudge]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Mention other capabilities after a successful task")}</span>
+                  <span>{gettext("Suggest other features after a task")}</span>
                 </label>
                 <p class={[hlp(), check_indent()]}>{gettext("The agent may add one short tip about a related feature when it fits.")}</p>
               </div>
@@ -638,25 +638,25 @@ defmodule PepeWeb.AgentsLive do
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="skill_learning" value="true" checked={@edit_agent[:skill_learning]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Learn from what it does (offer to save and correct its own skills)")}</span>
+                  <span>{gettext("Offer to save what it learns")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("The agent may offer to save a multi-step task as a skill. Never without your yes.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("After a multi-step task, it may offer to save it as a reusable skill. It never saves without your yes.")}</p>
               </div>
 
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="checkpoints" value="true" checked={@edit_agent[:checkpoints]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Keep a copy of files it changes (so /rewind can put them back)")}</span>
+                  <span>{gettext("Back up files before changing them")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Keeps file copies for about two weeks so /rewind can restore them.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Keeps copies for about two weeks so you can undo changes with /rewind.")}</p>
               </div>
 
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="checkpoint_shell" value="true" checked={@edit_agent[:checkpoint_shell]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
-                  <span>{gettext("Also cover shell commands")}</span>
+                  <span>{gettext("Also back up for terminal commands")}</span>
                 </label>
-                <p class={[hlp(), check_indent()]}>{gettext("Also copies the folder around shell commands so /rewind can undo them.")}</p>
+                <p class={[hlp(), check_indent()]}>{gettext("Copies the folder around terminal commands too, so /rewind can undo them.")}</p>
               </div>
             </.form_section>
             </div>
@@ -666,7 +666,7 @@ defmodule PepeWeb.AgentsLive do
             <div class="sticky -bottom-8 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 xl:-mx-14 xl:px-14">
               <div class="min-w-0 text-sm">
                 <span :if={@draft && @draft.stale?} class="text-amber-400">
-                  {gettext("This agent changed since the draft was started. Saving overwrites those changes.")}
+                  {gettext("This agent was edited after you started this draft. Saving will replace those edits.")}
                 </span>
                 <span :if={@draft && !@draft.stale?} class="text-zinc-400">
                   <span class="mr-1.5 inline-block size-2 rounded-full bg-orange-400"></span>{gettext("Draft saved. It is not live until you press Save.")}
@@ -692,7 +692,7 @@ defmodule PepeWeb.AgentsLive do
   # The editor's tabs, in order. Their ids are the `@tabs` the event handler accepts.
   defp agent_tabs do
     [
-      {"persona", gettext("Persona")},
+      {"persona", gettext("Identity")},
       {"model", gettext("Model")},
       {"capabilities", gettext("Capabilities")},
       {"access", gettext("Access")},
@@ -769,10 +769,10 @@ defmodule PepeWeb.AgentsLive do
   # goes through, not the bare persona field the form above edits.
   defp assembled_prompt(agent), do: Pepe.Agent.Workspace.system_prompt(agent)
 
-  defp hook_hint("pii_redact"), do: gettext("Regex: CPF, email, cards, phones")
-  defp hook_hint("llm_redact"), do: gettext("A local model masks names/free text (reversible)")
-  defp hook_hint("http_redact"), do: gettext("Your own redaction endpoint")
-  defp hook_hint("presidio"), do: gettext("Microsoft Presidio over HTTP")
+  defp hook_hint("pii_redact"), do: gettext("Finds CPF, emails, card and phone numbers")
+  defp hook_hint("llm_redact"), do: gettext("A model on your machine hides names and free text, and can put them back in the reply.")
+  defp hook_hint("http_redact"), do: gettext("Your own service that hides personal data")
+  defp hook_hint("presidio"), do: gettext("Microsoft Presidio service, reached over HTTP")
   defp hook_hint(_), do: ""
 
   @impl true

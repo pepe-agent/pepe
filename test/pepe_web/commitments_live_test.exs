@@ -57,14 +57,14 @@ defmodule PepeWeb.CommitmentsLiveTest do
 
     {:ok, view, html} = live(conn(), "/commitments")
 
-    assert html =~ "Awaiting your ok"
+    assert html =~ "Waiting for your OK"
     assert html =~ "check the deploy"
     assert html =~ "Scheduled"
     assert html =~ "send the report"
 
     html = render_click(view, "confirm", %{"id" => awaiting.id})
     assert Config.get_commitment(awaiting.id).state == "scheduled"
-    refute html =~ "Awaiting your ok"
+    refute html =~ "Waiting for your OK"
   end
 
   test "an unresolved due date gets an inline form instead of a Confirm button that does nothing" do

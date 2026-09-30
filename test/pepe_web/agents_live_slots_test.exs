@@ -1,6 +1,6 @@
 defmodule PepeWeb.AgentsLiveSlotsTest do
   @moduledoc """
-  The agent editor's "Extension slots" section - a per-agent override for an exclusive
+  The agent editor's "Swappable parts" section - a per-agent override for an exclusive
   extension point (`Pepe.Slots`), previously only reachable via `mix pepe agent add
   --slots` or a hand-edited config.json.
   """

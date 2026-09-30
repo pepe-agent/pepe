@@ -127,6 +127,6 @@ defmodule PepeWeb.AgentsLiveDraftTest do
     Config.put_agent(%{Config.get_agent(handle()) | system_prompt: "Changed from the CLI"})
 
     view |> element(~s(button[phx-click=agent_edit][phx-value-name="#{handle()}"])) |> render_click()
-    assert render(view) =~ "changed since the draft was started"
+    assert render(view) =~ "edited after you started this draft"
   end
 end

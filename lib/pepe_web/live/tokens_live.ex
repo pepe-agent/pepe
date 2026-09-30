@@ -47,7 +47,7 @@ defmodule PepeWeb.TokensLive do
         <.view_header active="tokens"
           icon="🔑"
           title={gettext("API tokens")}
-          desc={gettext("Bearer tokens for the OpenAI-compatible /v1 API. With no token, only loopback (localhost) callers get through. Minting the first token requires one from everyone else too, local or remote: that's what secures a network-exposed server.")}
+          desc={gettext("Tokens for the OpenAI-compatible /v1 API. With none, only this computer can use it. Once you create one, everyone needs one.")}
         >
           <button :if={!@creating} phx-click="token_new" class={btn()}>{gettext("+ New token")}</button>
           <button :if={@creating} phx-click="token_cancel" class={btn_ghost()}>&larr; {gettext("Back to tokens")}</button>
@@ -58,7 +58,7 @@ defmodule PepeWeb.TokensLive do
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0 text-sm">
                 <span class="font-semibold text-amber-200">{gettext("Copy this token now.")}</span>
-                <span class="ml-1 text-amber-200/70">{gettext("Shown only once. Store it somewhere safe.")}</span>
+                <span class="ml-1 text-amber-200/70">{gettext("It is shown only once. Keep it somewhere safe.")}</span>
               </div>
               <button phx-click="token_dismiss" class="shrink-0 text-sm text-amber-200/70 hover:text-amber-200">{gettext("Dismiss")}</button>
             </div>
@@ -82,17 +82,17 @@ defmodule PepeWeb.TokensLive do
                   <option value="" selected={@token_project == nil}>{gettext("Principal")}</option>
                   <option :for={c <- @projects} value={c} selected={@token_project == c}>{c}</option>
                 </select>
-                <p class={hlp()}>{gettext("Limits the token to one workspace. Principal is the default, non-project workspace.")}</p>
+                <p class={hlp()}>{gettext("Limits the token to one project. Principal is the main workspace, outside any project.")}</p>
               </div>
               <div>
                 <label class={lbl()}>
                   {gettext("Agent")} <span class="text-zinc-600">{gettext("(optional)")}</span>
                 </label>
                 <select name="agent" class={fld()}>
-                  <option value="">{gettext("Any agent in scope")}</option>
+                  <option value="">{gettext("Any agent in this project")}</option>
                   <option :for={a <- agent_options(@token_project)} value={a}>{a}</option>
                 </select>
-                <p class={hlp()}>{gettext("Lock the token to one agent, or leave it open to any agent in the scope above.")}</p>
+                <p class={hlp()}>{gettext("Lock the token to one agent, or leave it open to any agent in the project chosen above.")}</p>
               </div>
 
               <div>
@@ -105,19 +105,19 @@ defmodule PepeWeb.TokensLive do
                     phx-click="token_toggle_widget"
                     class={checkbox_cls()}
                   />
-                  {gettext("Public widget token (for the embeddable chat widget)")}
+                  {gettext("Public chat widget token (for the chat box on your website)")}
                 </label>
-                <p class={hlp()}>{gettext("Visible in your page source, so it is pinned to one agent and one origin.")}</p>
+                <p class={hlp()}>{gettext("Anyone can see it in your page source, so it is tied to one agent and one website.")}</p>
               </div>
 
               <div :if={@token_widget}>
-                <label class={lbl()}>{gettext("Allowed origin")}</label>
+                <label class={lbl()}>{gettext("Allowed website")}</label>
                 <input name="allowed_origin" placeholder="https://example.com" class={fld()} />
-                <p class={hlp()}>{gettext("The site's address, like https://example.com. Needs an agent above.")}</p>
+                <p class={hlp()}>{gettext("The site's address, like https://example.com. You must pick an agent above.")}</p>
               </div>
             </.form_section>
 
-            <.form_section :if={!@token_widget} title={gettext("What this token may do")}>
+            <.form_section :if={!@token_widget} title={gettext("What this token can do")}>
               <label class="flex items-center gap-2 text-base text-zinc-300">
                 <input type="checkbox" name="chat" value="true" checked class={checkbox_cls()} />
                 {gettext("Run agents")}
@@ -132,30 +132,30 @@ defmodule PepeWeb.TokensLive do
                   phx-click="token_toggle_usage"
                   class={checkbox_cls()}
                 />
-                {gettext("Read usage and billing (/v1/usage)")}
+                {gettext("See usage and billing (/v1/usage)")}
               </label>
 
               <div :if={@token_usage}>
-                <label class={lbl()}>{gettext("Money it may see")}</label>
+                <label class={lbl()}>{gettext("Amounts it can see")}</label>
                 <select name="prices" class={fld()}>
-                  <option value="billable">{gettext("Billable: with the project's markup (what the client pays)")}</option>
-                  <option value="list">{gettext("List: the model's price, no markup")}</option>
-                  <option value="all">{gettext("Everything: adds our cost and the margin")}</option>
+                  <option value="billable">{gettext("Billable: with your project markup (what the client pays)")}</option>
+                  <option value="list">{gettext("List price: what the model provider charges, no markup")}</option>
+                  <option value="all">{gettext("Everything: also shows your own cost and your margin")}</option>
                 </select>
-                <p class={hlp()}>{gettext("Pick by who holds the token. A client's token should never see cost or margin.")}</p>
+                <p class={hlp()}>{gettext("Choose by who will hold the token. A client's token should never see your cost or margin.")}</p>
               </div>
 
               <div :if={@token_usage}>
                 <label class="flex items-center gap-2 text-base text-zinc-300">
                   <input type="checkbox" name="content" value="true" class={checkbox_cls()} />
-                  {gettext("Also show conversation content in a run's detail")}
+                  {gettext("Also show the conversation text in task details")}
                 </label>
-                <p class={hlp()}>{gettext("Off by default. On, run details also include prompts and tool output.")}</p>
+                <p class={hlp()}>{gettext("Off by default. When on, task details also include the messages and what the tools returned.")}</p>
               </div>
             </.form_section>
 
             <div class="flex gap-2 pt-1">
-              <button type="submit" class={btn()}>{gettext("Generate token")}</button>
+              <button type="submit" class={btn()}>{gettext("Create token")}</button>
               <button type="button" phx-click="token_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>
           </form>
@@ -190,7 +190,7 @@ defmodule PepeWeb.TokensLive do
               </div>
 
               <details :if={t["kind"] != "widget"} class="mt-2">
-                <summary class="cursor-pointer text-sm text-zinc-500 hover:text-zinc-300">{gettext("Change what it may do")}</summary>
+                <summary class="cursor-pointer text-sm text-zinc-500 hover:text-zinc-300">{gettext("Change what it can do")}</summary>
                 <form
                   id={"token-perms-#{t["id"]}"}
                   phx-submit="token_permissions"
@@ -206,7 +206,7 @@ defmodule PepeWeb.TokensLive do
 
                   <label class="flex items-center gap-2 text-base text-zinc-300">
                     <input type="checkbox" name="usage" value="true" checked={permissions(t).usage} class={checkbox_cls()} />
-                    {gettext("Read usage and billing (/v1/usage)")}
+                    {gettext("See usage and billing (/v1/usage)")}
                   </label>
 
                   <%!-- Same gate as the create form, and for the same reason: the backend refuses
@@ -215,19 +215,19 @@ defmodule PepeWeb.TokensLive do
                   <div :if={editing_usage?(@edit_usage, t)}>
                     <label class="flex items-center gap-2 text-base text-zinc-300">
                       <input type="checkbox" name="content" value="true" checked={permissions(t).usage_content} class={checkbox_cls()} />
-                      {gettext("Also show conversation content in a run's detail")}
+                      {gettext("Also show the conversation text in task details")}
                     </label>
-                    <p class={hlp()}>{gettext("Off by default. On, run details also include prompts and tool output.")}</p>
+                    <p class={hlp()}>{gettext("Off by default. When on, task details also include the messages and what the tools returned.")}</p>
                   </div>
 
                   <div>
-                    <label class={lbl()}>{gettext("Money it may see")}</label>
+                    <label class={lbl()}>{gettext("Amounts it can see")}</label>
                     <select name="prices" class={fld()}>
-                      <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable: with the project's markup (what the client pays)")}</option>
-                      <option value="list" selected={permissions(t).prices == "list"}>{gettext("List: the model's price, no markup")}</option>
-                      <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything: adds our cost and the margin")}</option>
+                      <option value="billable" selected={permissions(t).prices == "billable"}>{gettext("Billable: with your project markup (what the client pays)")}</option>
+                      <option value="list" selected={permissions(t).prices == "list"}>{gettext("List price: what the model provider charges, no markup")}</option>
+                      <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything: also shows your own cost and your margin")}</option>
                     </select>
-                    <p class={hlp()}>{gettext("Pick by who holds the token. A client's token should never see cost or margin.")}</p>
+                    <p class={hlp()}>{gettext("Choose by who will hold the token. A client's token should never see your cost or margin.")}</p>
                   </div>
 
                   <button type="submit" class={btn_ghost()}>{gettext("Save")}</button>
@@ -235,7 +235,7 @@ defmodule PepeWeb.TokensLive do
               </details>
             </div>
             <.empty_state :if={scoped_tokens(@tokens, @scope) == []}>
-              {gettext("No tokens yet. The /v1 API is open to localhost only. Create one to require a token from every caller.")}
+              {gettext("No tokens yet. The /v1 API is open only to this computer. Create one to require a token from everyone.")}
             </.empty_state>
           </div>
         </div>
@@ -410,16 +410,16 @@ defmodule PepeWeb.TokensLive do
   defp token_error(:unknown_agent), do: gettext("That agent does not exist.")
 
   defp token_error(:widget_needs_agent),
-    do: gettext("A public widget token must be locked to one agent. Pick one above.")
+    do: gettext("A public chat widget token must be tied to one agent. Pick one above.")
 
   defp token_error(:widget_cannot_read_usage),
-    do: gettext("A widget token sits in public page source, so it can never read usage.")
+    do: gettext("A chat widget token is visible in your page source, so it can never see usage.")
 
   defp token_error(:no_permissions),
-    do: gettext("That leaves the token able to do nothing: keep \"Run agents\" or add \"Read usage\".")
+    do: gettext("That would leave the token unable to do anything. Keep \"Run agents\" or add \"Read usage\".")
 
   defp token_error(:content_needs_usage),
-    do: gettext("Conversation content only means something together with \"Read usage\".")
+    do: gettext("Showing conversation text only works together with \"Read usage\".")
 
   defp token_error(:not_found), do: gettext("That token no longer exists.")
 end

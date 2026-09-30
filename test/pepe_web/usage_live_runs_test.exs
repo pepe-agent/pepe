@@ -59,7 +59,7 @@ defmodule PepeWeb.UsageLiveRunsTest do
   test "an empty scope says so, without pretending the section is missing" do
     {:ok, _view, html} = live(conn(), "/usage")
 
-    assert html =~ "No messages recorded yet for this scope."
+    assert html =~ "No messages recorded yet here."
   end
 
   test "lists a message with its source, tools and elapsed time" do
@@ -78,11 +78,11 @@ defmodule PepeWeb.UsageLiveRunsTest do
 
     {:ok, view, html} = live(conn(), "/usage")
     # Collapsed, the breakdown is not rendered at all - it is not loaded until asked for.
-    refute html =~ "Every model call this message took"
+    refute html =~ "Every model call this message needed"
 
     opened = view |> element("tr[phx-value-id='1000']") |> render_click()
 
-    assert opened =~ "Every model call this message took"
+    assert opened =~ "Every model call this message needed"
     # Two calls behind one message: the point of the whole table.
     assert opened |> String.split("mock") |> Enum.drop(1) |> Enum.count() >= 2
   end
@@ -94,6 +94,6 @@ defmodule PepeWeb.UsageLiveRunsTest do
     view |> element("tr[phx-value-id='1000']") |> render_click()
     closed = view |> element("tr[phx-value-id='1000']") |> render_click()
 
-    refute closed =~ "Every model call this message took"
+    refute closed =~ "Every model call this message needed"
   end
 end

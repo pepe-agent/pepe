@@ -116,7 +116,7 @@ defmodule PepeWeb.DbConnectionsLive do
         <.view_header active="databases"
           icon="🗄️"
           title={gettext("Databases")}
-          desc={gettext("Let an agent read from an external Postgres database with the db_query tool. Postgres is the only engine for now. The database's own Row-Level Security enforces tenant isolation, never a value the model supplies: the role and policy SQL to run once, by hand, is in the Database docs.")}
+          desc={gettext("Lets an agent read from an outside Postgres database with the db_query tool. The database decides which customer's data each agent sees. The one-time setup SQL is in the Database docs.")}
         >
           <.link href={docs_url("database")} target="_blank" rel="noopener" class={btn_ghost()}>{gettext("Database docs ↗")}</.link>
           <button :if={!@edit_conn} phx-click="conn_new" class={btn()}>{gettext("+ New connection")}</button>
@@ -135,14 +135,14 @@ defmodule PepeWeb.DbConnectionsLive do
             </div>
             <.meta_list class="mt-4">
               <:item label={gettext("Database")} mono>{cfg["user"]}@{cfg["host"]}:{cfg["port"] || 5432}/{cfg["database"]}</:item>
-              <:item label={gettext("Tenant isolation")}>
-                <span :if={tenant_scoped?(cfg)} class="text-emerald-400">✓ {gettext("tenant-scoped on %{col}", col: cfg["tenant_column"])}</span>
-                <span :if={!tenant_scoped?(cfg)} class="text-amber-400">{gettext("unscoped (no per-tenant isolation)")}</span>
+              <:item label={gettext("Separating customers' data")}>
+                <span :if={tenant_scoped?(cfg)} class="text-emerald-400">✓ {gettext("separated by %{col}", col: cfg["tenant_column"])}</span>
+                <span :if={!tenant_scoped?(cfg)} class="text-amber-400">{gettext("not separated (every customer's data is visible)")}</span>
               </:item>
             </.meta_list>
             <div :if={@checks[name]} class="mt-1 text-sm">
               <span :if={@checks[name] == :testing} class="text-zinc-500">{gettext("Connecting...")}</span>
-              <span :if={@checks[name] == :ok} class="text-emerald-400">✓ {gettext("Connected. The credentials work.")}</span>
+              <span :if={@checks[name] == :ok} class="text-emerald-400">✓ {gettext("Connected. The login details work.")}</span>
               <span :if={match?({:error, _}, @checks[name])} class="text-red-400">
                 {gettext("Could not connect:")} {elem(@checks[name], 1)}
               </span>
@@ -165,7 +165,7 @@ defmodule PepeWeb.DbConnectionsLive do
             <.form_section title={gettext("Connection")}>
               <div>
                 <.input field={@form[:name]} label={gettext("Name")} placeholder="billing_prod" />
-                <p :if={@edit_conn[:name]} class={hlp()}>{gettext("Renaming saves a new copy and drops the old one. Update anything pointing at the old name.")}</p>
+                <p :if={@edit_conn[:name]} class={hlp()}>{gettext("Renaming saves a new copy and deletes the old one. Update anything that used the old name.")}</p>
               </div>
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <.input field={@form[:host]} label={gettext("Host")} placeholder="db.internal" />
@@ -175,27 +175,27 @@ defmodule PepeWeb.DbConnectionsLive do
               <.input field={@form[:user]} label={gettext("User")} placeholder="pepe_ro" />
               <div>
                 <.input field={@form[:password]} type="password" label={gettext("Password")} class={[fld(), "font-mono"]} placeholder="${DB_PASSWORD}" />
-                <p :if={@edit_conn[:name]} class={hlp()}>{gettext("Leave blank to keep the password already saved.")}</p>
-                <p class={hlp()}>{gettext("Put it as ${ENV_VAR}. The secret stays out of the config file.")}</p>
+                <p :if={@edit_conn[:name]} class={hlp()}>{gettext("Leave blank to keep the saved password.")}</p>
+                <p class={hlp()}>{gettext("Write it as ${ENV_VAR}. The password stays out of the settings file.")}</p>
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Tenant isolation")}>
+            <.form_section title={gettext("Separating customers' data")}>
               <div>
-                <.input field={@form[:tenant_column]} label={gettext("Tenant column (optional)")} placeholder="company_id" />
-                <p class={hlp()}>{gettext("Leave empty unless the database uses Row-Level Security on this column.")}</p>
+                <.input field={@form[:tenant_column]} label={gettext("Customer column (optional)")} placeholder="company_id" />
+                <p class={hlp()}>{gettext("Leave empty unless the database uses Row-Level Security on this column to separate customers.")}</p>
               </div>
               <div :if={@form[:tenant_column].value not in [nil, ""]} class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <.input
                   field={@form[:tenant_mode]}
                   type="select"
-                  label={gettext("Tenant mode")}
+                  label={gettext("How customers are separated")}
                   options={[{gettext("Fixed value"), "fixed"}, {gettext("From the calling agent"), "agent_field"}]}
                 />
                 <div>
                   <.input :if={@form[:tenant_mode].value == "agent_field"} field={@form[:tenant_value]} type="select" label={gettext("Agent field")}
                     options={[{gettext("project"), "project"}, {gettext("bare"), "bare"}]} />
-                  <.input :if={@form[:tenant_mode].value != "agent_field"} field={@form[:tenant_value]} label={gettext("Tenant value")} placeholder="acme-inc" />
+                  <.input :if={@form[:tenant_mode].value != "agent_field"} field={@form[:tenant_value]} label={gettext("Customer value")} placeholder="acme-inc" />
                 </div>
               </div>
             </.form_section>
@@ -371,7 +371,7 @@ defmodule PepeWeb.DbConnectionsLive do
 
   defp save_flash(name, %{"tenant_column" => col}) when is_binary(col) and col != "" do
     gettext(
-      "Database connection %{name} saved, tenant-scoped on %{col}. This protects nothing on its own: make sure Row-Level Security is set up on the database itself.",
+      "Database connection %{name} saved, limited by the %{col} column. This protects nothing by itself: make sure Row-Level Security is set up on the database.",
       name: name,
       col: col
     )

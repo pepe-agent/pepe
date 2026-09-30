@@ -39,7 +39,7 @@ defmodule PepeWeb.ProjectsLiveTest do
     save(view, params)
   end
 
-  test "the page lists every project plus the principal scope" do
+  test "the page lists every project plus the Principal workspace" do
     :ok = Config.add_project("acme")
     :ok = Config.add_project("globex", %{"description" => "Globex Inc"})
 
@@ -200,7 +200,7 @@ defmodule PepeWeb.ProjectsLiveTest do
     assert Config.agents_in("globex") |> Enum.map(& &1.name) == ["globex/sales"]
   end
 
-  test "the principal scope has no name field and saves its billing settings" do
+  test "the Principal workspace has no name field and saves its billing settings" do
     {:ok, view, _html} = live(conn(), "/projects")
 
     html = render_click(view, "project_edit", %{"name" => "root"})

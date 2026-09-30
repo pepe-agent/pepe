@@ -96,7 +96,7 @@ defmodule PepeWeb.ChannelsLiveTest do
 
     html = add_bot(view, %{"name" => "default", "token" => "${OTHER_TOKEN}"})
 
-    assert html =~ "pick another name"
+    assert html =~ "Pick another name"
     assert bot_names() == ["default"]
     assert Config.telegram_bot("default")["bot_token"] == "${TELEGRAM_BOT_TOKEN}"
   end
@@ -109,7 +109,7 @@ defmodule PepeWeb.ChannelsLiveTest do
     html =
       add_bot(view, %{"name" => "support-bot", "token" => "${SHARED_TOKEN}", "agent" => "default/assistant"})
 
-    assert html =~ "this token is already used by another bot"
+    assert html =~ "This key is already used by another bot"
     assert Config.telegram_bot("support-bot") == nil
     assert bot_names() == ["default", "sales-bot"]
   end
@@ -183,7 +183,7 @@ defmodule PepeWeb.ChannelsLiveTest do
 
     html =
       add_widget(view, %{
-        "label" => "example.com widget",
+        "label" => "My website widget",
         "agent" => "default/sales",
         "allowed_origin" => "https://example.com",
         "title" => "Chat with us"
@@ -195,7 +195,7 @@ defmodule PepeWeb.ChannelsLiveTest do
     assert token["title"] == "Chat with us"
 
     assert html =~ "Widget created"
-    assert html =~ "example.com widget"
+    assert html =~ "My website widget"
 
     snippet = snippet_text(html)
     assert snippet =~ "widget.js"
@@ -322,7 +322,7 @@ defmodule PepeWeb.ChannelsLiveTest do
       html = html <> render_click(view, "bot_edit", %{"name" => "default"})
 
       assert html =~ "id 4242"
-      assert html =~ "no name on record"
+      assert html =~ "no name saved"
     end
   end
 

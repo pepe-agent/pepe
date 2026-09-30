@@ -43,7 +43,7 @@ defmodule PepeWeb.ModelsLive do
         <input name="output_price" value={@edit_model[:output_price]} placeholder={suggest_ph(@suggest, 1)} inputmode="decimal" class={fld()} />
       </div>
       <p class="text-sm text-zinc-500 sm:col-span-2">
-        {gettext("Per 1M tokens, in %{currency}. Blank uses the known price.", currency: @currency)}
+        {gettext("Price per 1 million tokens, in %{currency}. Blank uses the known price.", currency: @currency)}
       </p>
     </div>
     """
@@ -62,7 +62,7 @@ defmodule PepeWeb.ModelsLive do
       {nil, nil} ->
         case Pricing.lookup(m.model) do
           {i, o} -> priced(gettext("Auto price"), i, o, cache_rate(m), currency)
-          nil -> gettext("No price. Set one to bill for this model")
+          nil -> gettext("No price set. Add one to bill for this model")
         end
 
       {i, o} ->
@@ -201,7 +201,7 @@ defmodule PepeWeb.ModelsLive do
         <.view_header active="models"
           icon="🔌"
           title={gettext("Model connections")}
-          desc={gettext("The AI providers your agents run on: any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model...). Pick a provider and we fill in the rest.")}
+          desc={gettext("The AI services your agents use: OpenAI, OpenRouter, a model on your own machine, or any OpenAI-compatible service. Pick a provider and the rest is filled in for you.")}
         >
           <button :if={!@edit_model} phx-click="model_new" class={btn()}>{gettext("+ New connection")}</button>
           <button :if={@edit_model} phx-click="model_cancel" class={btn_ghost()}>&larr; {gettext("Back to models")}</button>
@@ -225,9 +225,9 @@ defmodule PepeWeb.ModelsLive do
                 {if @oauth.reconnect, do: gettext("Reconnecting %{name}", name: @oauth.reconnect), else: gettext("Connecting %{label}", label: @oauth.label)}
               </div>
               <a href={@oauth.url} target="_blank" rel="noopener" class={btn()}>{gettext("Open the sign-in page ↗")}</a>
-              <p class="text-sm text-zinc-500">{gettext("Authorize in the browser, then come back. If it stalls, paste the redirect URL below.")}</p>
+              <p class="text-sm text-zinc-500">{gettext("Approve access in the browser, then come back. If nothing happens, paste the address you were sent to below.")}</p>
               <form phx-submit="oauth_paste" class="flex gap-2">
-                <input name="pasted" placeholder={gettext("paste the redirect URL or code")} class={fld()} />
+                <input name="pasted" placeholder={gettext("paste the address you were sent to, or the code")} class={fld()} />
                 <button type="submit" class={btn_ghost()}>{gettext("Finish")}</button>
               </form>
               <button phx-click="oauth_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
@@ -265,7 +265,7 @@ defmodule PepeWeb.ModelsLive do
               <div>
                 <label class={lbl()}>{gettext("Name")}</label>
                 <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
-                <p class={hlp()}>{gettext("Renaming updates every agent, cron, hook and default that uses this connection.")}</p>
+                <p class={hlp()}>{gettext("Renaming updates every agent, scheduled task, privacy rule and default that uses this connection.")}</p>
               </div>
               <div>
                 <label class={lbl()}>{gettext("Base URL")}</label>
@@ -275,16 +275,16 @@ defmodule PepeWeb.ModelsLive do
                 <label class={lbl()}>{gettext("API key")}</label>
                 <input type="password" name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
                 <p :if={@edit_model.env} class={hlp()}>
-                  {gettext("Defaults to the %{env} env var (%{status}). Paste a key to load its models now.",
+                  {gettext("Uses the %{env} environment variable by default (%{status}). Paste a key to load its models now.",
                     env: @edit_model.env, status: key_status(@edit_model.env))}
                 </p>
                 <p :if={!@edit_model.env} class={hlp()}>
-                  {gettext("Write it as ${ENV_VAR} to keep the secret out of the config file.")}
+                  {gettext("Write it as ${ENV_VAR} to keep the secret out of the settings file.")}
                 </p>
               </div>
             </.form_section>
 
-            <.form_section title={gettext("Model & fallbacks")}>
+            <.form_section title={gettext("Model and backups")}>
               <div>
                 <label class={lbl()}>{gettext("Model")}</label>
                 <%!-- Same select-or-free-text as the new-connection form; while the provider's
@@ -302,7 +302,7 @@ defmodule PepeWeb.ModelsLive do
               <div>
                 <label class={lbl()}>{gettext("Fallbacks")}</label>
                 <p class={hlp()}>
-                  {gettext("Tried in order when %{name} fails briefly. The agent never sees the failure.", name: @edit_model.original_name)}
+                  {gettext("Tried in this order when %{name} briefly fails. The agent never notices the failure.", name: @edit_model.original_name)}
                 </p>
                 <div :if={@edit_model.fallbacks != []} class="mt-2 flex flex-wrap gap-2">
                   <span :for={{name, i} <- Enum.with_index(@edit_model.fallbacks)} class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 py-1 pl-2.5 pr-1.5 text-sm">
@@ -314,7 +314,7 @@ defmodule PepeWeb.ModelsLive do
                   </span>
                 </div>
                 <select :if={fallback_candidates(@models, @scope, @edit_model) != []} name="fallback_candidate" phx-change="fallback_add" class={[fld(), "mt-2"]}>
-                  <option value="">{gettext("+ Add a fallback...")}</option>
+                  <option value="">{gettext("+ Add a backup model...")}</option>
                   <option :for={m <- fallback_candidates(@models, @scope, @edit_model)} value={m.name}>{m.name}</option>
                 </select>
               </div>
@@ -327,7 +327,7 @@ defmodule PepeWeb.ModelsLive do
             <.form_section title={gettext("Security")}>
               <label class="flex items-start gap-2.5 text-sm text-zinc-300">
                 <input type="checkbox" name="require_redaction" checked={@edit_model[:require_redaction]} class={[checkbox_cls(), "mt-0.5"]} />
-                <span>{gettext("Require redaction: refuse to send raw PII to this provider (the agent must run a redaction hook)")}</span>
+                <span>{gettext("Require hiding personal data: never send unmasked personal data to this provider (the agent must have a privacy rule turned on)")}</span>
               </label>
             </.form_section>
 
@@ -368,7 +368,7 @@ defmodule PepeWeb.ModelsLive do
                   <label class={lbl()}>{gettext("API key")}</label>
                   <input type="password" name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
                   <p class={hlp()}>
-                    {gettext("Defaults to the %{env} env var (%{status}). Paste a key to load its models now.",
+                    {gettext("Uses the %{env} environment variable by default (%{status}). Paste a key to load its models now.",
                       env: @edit_model.env, status: key_status(@edit_model.env))}
                   </p>
                 </div>
@@ -616,7 +616,7 @@ defmodule PepeWeb.ModelsLive do
       if final_raw == raw_name do
         gettext("Model %{name} saved.", name: name)
       else
-        gettext("A model connection named %{name} already exists; saved this one as %{final} instead.",
+        gettext("A model connection named %{name} already exists, so this one was saved as %{final}.",
           name: scope_name(raw_name, scope),
           final: name
         )

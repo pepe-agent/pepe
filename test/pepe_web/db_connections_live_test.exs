@@ -50,9 +50,9 @@ defmodule PepeWeb.DbConnectionsLiveTest do
     {:ok, _view, html} = live(conn(), "/databases")
 
     assert html =~ "plain_pg"
-    assert html =~ "unscoped"
+    assert html =~ "not separated"
     assert html =~ "billing_pg"
-    assert html =~ "tenant-scoped on company_id"
+    assert html =~ "separated by company_id"
   end
 
   test "shows an empty state with no connections configured" do

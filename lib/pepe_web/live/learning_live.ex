@@ -60,7 +60,7 @@ defmodule PepeWeb.LearningLive do
         <.view_header active="learn"
           icon="✦"
           title={gettext("Learning")}
-          desc={gettext("What this agent has picked up: skills it can run and memory it saved, newest first. Click any item to read and edit it. \"Consolidate now\" has the agent tidy all of this, merging duplicates and dropping what is stale; it can delete things, so check the result. \"Nightly\" does the same pass on its own, once a night.")}
+          desc={gettext("What this agent has learned: skills and saved notes, newest first. Click one to read or edit it. \"Consolidate now\" tidies them, merging duplicates and removing unused ones, so check the result. \"Nightly\" does it once a night.")}
         >
           <div :if={!@editing} class="flex flex-wrap items-center gap-2">
             <button phx-click="consolidate_now" disabled={@consolidating || is_nil(@learn_agent)} class={btn_ghost()}>
@@ -104,7 +104,7 @@ defmodule PepeWeb.LearningLive do
           <div :if={@pending != []} class="mb-4 rounded-xl border border-orange-400/40 bg-orange-400/[.05] p-3">
             <div class="mb-2 text-sm font-semibold text-amber-200">
               {ngettext("%{count} write awaiting your review", "%{count} writes awaiting your review", length(@pending))}
-              <span class="ml-1 font-normal text-amber-200/60">{gettext("(staged by consolidation, not yet applied)")}</span>
+              <span class="ml-1 font-normal text-amber-200/60">{gettext("(tidied up, waiting for your OK)")}</span>
             </div>
             <div :for={p <- @pending} class="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-white/[.04]">
               <div class="min-w-0">
@@ -205,7 +205,7 @@ defmodule PepeWeb.LearningLive do
     flash =
       case Pepe.Approval.approve(id) do
         {:ok, _} -> {:info, gettext("Approved and applied.")}
-        {:error, _} -> {:error, gettext("That write is no longer pending.")}
+        {:error, _} -> {:error, gettext("That change is no longer waiting.")}
       end
 
     {:noreply,
@@ -233,8 +233,8 @@ defmodule PepeWeb.LearningLive do
   def handle_info({:consolidated, name, result}, socket) do
     flash =
       case result do
-        {:ok, summary, _} -> {:info, gettext("Consolidated: %{summary}", summary: String.slice(to_string(summary), 0, 160))}
-        {:error, _} -> {:error, gettext("Consolidation could not run.")}
+        {:ok, summary, _} -> {:info, gettext("Tidied up: %{summary}", summary: String.slice(to_string(summary), 0, 160))}
+        {:error, _} -> {:error, gettext("Could not tidy up.")}
       end
 
     socket =
@@ -300,7 +300,7 @@ defmodule PepeWeb.LearningLive do
       title: title,
       path: user,
       content: read(if(File.exists?(user), do: user, else: builtin)),
-      note: override? && gettext("Editing the built-in: saving creates your own copy")
+      note: override? && gettext("This is a built-in skill. Saving makes your own copy.")
     }
   end
 

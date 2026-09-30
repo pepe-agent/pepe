@@ -41,7 +41,7 @@ defmodule Pepe.Webhooks.MsTeams do
         "key" => "app_password",
         "label" => dgettext("webhooks", "App password"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "The client secret. Store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "The client secret. Write it as ${ENV_VAR}.")
       },
       %{
         "key" => "tenant_id",
@@ -51,13 +51,13 @@ defmodule Pepe.Webhooks.MsTeams do
       },
       %{
         "key" => "require_mention",
-        "label" => dgettext("webhooks", "Require mention in channels"),
+        "label" => dgettext("webhooks", "Answer only when mentioned"),
         "type" => "select",
         "options" => ["true", "false"],
         "hint" =>
           dgettext(
             "webhooks",
-            "In team channels, reply only when @mentioned (default true)."
+            "In team channels, reply only when someone @mentions the bot (default: yes)."
           )
       }
     ]

@@ -45,7 +45,7 @@ defmodule PepeWeb.PluginsLive do
         <.view_header active="plugins"
           icon="🧩"
           title={gettext("Plugins")}
-          desc={gettext("Install channels and tools that load at runtime, no rebuild. Pepe scans the code first, but a plugin runs with full access: install only from a source you trust.")}
+          desc={gettext("Add channels and tools without rebuilding Pepe. Pepe checks the code first, but a plugin gets full access, so install only from a source you trust.")}
         />
 
         <div class="page-body flex-1 space-y-6 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
@@ -54,10 +54,10 @@ defmodule PepeWeb.PluginsLive do
               <%!-- The trust checkbox sits inside the notice on purpose: it is what ungreys Install, so
                    the operator has to read the warning it answers before the button it unlocks. --%>
               <.notice label={gettext("Warning")} class="mb-4">
-                <p>{gettext("A plugin has full access to your data. Install only trusted ones, and Scan first.")}</p>
+                <p>{gettext("A plugin gets full access to your data. Install only ones you trust, and use Scan first.")}</p>
                 <label class="flex cursor-pointer items-center gap-2 text-zinc-100">
                   <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4" />
-                  {gettext("I trust this source and understand it runs with full access to this machine.")}
+                  {gettext("I trust this source and understand it gets full access to this machine.")}
                 </label>
               </.notice>
 
@@ -71,10 +71,10 @@ defmodule PepeWeb.PluginsLive do
               </form>
 
               <p :if={not @trust} class="mt-2 text-[13.5px] leading-relaxed text-orange-400/80">
-                {gettext("Install stays disabled until you tick the box above.")}
+                {gettext("Install is locked until you tick the box above.")}
               </p>
               <p class={hlp()}>
-                {gettext("Paste a GitHub repo, .tar.gz link or local path. Scan reads it without running it.")}
+                {gettext("Paste a GitHub repo, a .tar.gz link or a local path. Scan reads it without running it.")}
               </p>
 
               <div :if={@scan} class="mt-3">

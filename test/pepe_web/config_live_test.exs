@@ -122,10 +122,10 @@ defmodule PepeWeb.ConfigLiveTest do
 
     # Opens on General: language and updates, nothing of the voice forms or the raw file.
     assert html =~ "Dashboard language"
-    refute html =~ "Voice-note transcription"
+    refute html =~ "Voice message transcription"
     refute html =~ "Save config"
 
-    assert view |> element("button[role=tab][phx-value-tab=voice]") |> render_click() =~ "Voice-note transcription"
+    assert view |> element("button[role=tab][phx-value-tab=voice]") |> render_click() =~ "Voice message transcription"
     assert view |> element("button[role=tab][phx-value-tab=file]") |> render_click() =~ "Save config"
     assert view |> element("button[role=tab][phx-value-tab=history]") |> render_click() =~ "Recent changes"
   end

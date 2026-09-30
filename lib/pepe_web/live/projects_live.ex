@@ -74,7 +74,7 @@ defmodule PepeWeb.ProjectsLive do
         <.view_header active="projects"
           icon="🏢"
           title={gettext("Projects")}
-          desc={gettext("A project is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Principal is the default, non-project workspace.")}
+          desc={gettext("A project is a separate workspace for one client or team, kept apart from the others. Principal is the workspace outside any project.")}
         >
           <button :if={!@editing} phx-click="project_new" class={btn()}>{gettext("+ New project")}</button>
           <button :if={@editing} phx-click="project_cancel" class={btn_ghost()}>&larr; {gettext("Back to projects")}</button>
@@ -128,7 +128,7 @@ defmodule PepeWeb.ProjectsLive do
             <.limits name={name} scope={name} usage={@usage[name]} />
           </div>
           <.empty_state :if={@projects == []}>
-            {gettext("No projects yet. Everything lives in the Principal workspace. Create one to isolate a client or team.")}
+            {gettext("No projects yet. Everything lives in the Principal workspace. Create a project to keep a client or team separate.")}
           </.empty_state>
           </div>
 
@@ -151,9 +151,9 @@ defmodule PepeWeb.ProjectsLive do
                 <p class={hlp()}>
                   {if @editing.new?,
                     do:
-                      gettext("Letters, digits, - and _ only. Becomes the prefix for its agents (e.g. acme/sales)."),
+                      gettext("Letters, digits, - and _ only. It becomes the start of its agents' names (e.g. acme/sales)."),
                     else:
-                      gettext("Changing this name re-keys every agent, model, route, automation, token and file.")}
+                      gettext("Renaming changes the name of every agent, model, channel link, automation, key and file in this project.")}
                 </p>
               </div>
               <div :if={@editing.name != "root"}>
@@ -168,7 +168,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[markup]" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Multiplies the provider cost into what you bill (1.3 = +30%). Blank bills the exact cost.")}
+                  {gettext("Multiplies what the provider charges into what you bill (1.3 = +30%). Blank bills the exact cost.")}
                 </p>
               </div>
               <div>
@@ -177,7 +177,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[budget]" value={@editing.budget} placeholder="100" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Monthly spend cap in %{currency}. Agents stop at the cap. Blank means no cap.", currency: Config.currency())}
+                  {gettext("Most this project can spend per month, in %{currency}. Agents stop when it is reached. Blank means no limit.", currency: Config.currency())}
                 </p>
               </div>
               <div>
@@ -186,7 +186,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[message_limit]" value={@editing.message_limit} placeholder="5000" inputmode="numeric" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Monthly cap on customer messages. Agents stop replying when reached. Blank means no cap.")}
+                  {gettext("Most customer messages per month. Agents stop replying when it is reached. Blank means no limit.")}
                 </p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
@@ -230,7 +230,7 @@ defmodule PepeWeb.ProjectsLive do
           since={@usage.budget_reset_at && gettext("since %{date}", date: local_datetime(@usage.budget_reset_at, "%m/%d"))}
           event="project_reset_budget"
           name={@name}
-          confirm={gettext("Reset %{name}'s spend count (currently %{n}) for the rest of this month?", name: display_name(@name), n: money(@usage.month_to_date, @currency))}
+          confirm={gettext("Restart %{name}'s spending count (now %{n}) for the rest of this month?", name: display_name(@name), n: money(@usage.month_to_date, @currency))}
         />
         <.limit_row
           :if={@cap}
@@ -242,7 +242,7 @@ defmodule PepeWeb.ProjectsLive do
           since={@usage.messages_reset_at && gettext("since %{date}", date: local_datetime(@usage.messages_reset_at, "%m/%d"))}
           event="project_reset_messages"
           name={@name}
-          confirm={gettext("Reset %{name}'s message count (currently %{n}) for the rest of this month?", name: display_name(@name), n: @usage.message_count)}
+          confirm={gettext("Restart %{name}'s message count (now %{n}) for the rest of this month?", name: display_name(@name), n: @usage.message_count)}
         />
         <div :if={@usage.prepaid_balance} class="flex items-center justify-between gap-4 px-4 py-3 text-[14.5px]">
           <span class="text-zinc-400">{gettext("Prepaid balance")}</span>
@@ -252,7 +252,7 @@ defmodule PepeWeb.ProjectsLive do
         </div>
       </div>
       <p :if={@budget || @cap} class="mt-2 text-[13px] leading-relaxed text-zinc-600">
-        {gettext("Restarting a count only resets the cap check. Usage and billing keep the real totals.")}
+        {gettext("Restarting a count only lets agents work again. The Usage page and billing keep the real totals.")}
       </p>
     </div>
     """
@@ -293,7 +293,7 @@ defmodule PepeWeb.ProjectsLive do
     """
   end
 
-  defp display_name("root"), do: gettext("the principal scope")
+  defp display_name("root"), do: gettext("the Principal workspace")
   defp display_name(name), do: name
 
   @impl true

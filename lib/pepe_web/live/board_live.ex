@@ -121,7 +121,7 @@ defmodule PepeWeb.BoardLive do
         <.view_header active="board"
           icon="🗂️"
           title={gettext("Board")}
-          desc={gettext("Durable task cards with dependencies, claimed and worked by agents (or you): a resumable queue, not a chat.")}
+          desc={gettext("Task cards that agents (or you) pick up and finish. Work carries on even after a restart.")}
         >
           <button :if={@selected && !@creating_card} phx-click="card_new" class={btn()}>{gettext("+ New card")}</button>
           <button :if={@creating_card} phx-click="card_cancel" class={btn_ghost()}>&larr; {gettext("Back")}</button>
@@ -146,14 +146,14 @@ defmodule PepeWeb.BoardLive do
                   <input type="checkbox" name="board[auto_dispatch]" value="true" class={[checkbox_cls(), "mt-0.5 shrink-0"]} />
                   <span>
                     <span class="block font-medium">{gettext("Auto-dispatch")}</span>
-                    <span class={[hlp(), "block"]}>{gettext("On: a ready card with an assignee starts by itself. Off: someone has to claim it.")}</span>
+                    <span class={[hlp(), "block"]}>{gettext("On: a card that has an assignee and is ready starts on its own. Off: someone has to take it first.")}</span>
                   </span>
                 </label>
               </div>
               <div class="mb-4">
-                <label class={lbl()} for="board-claim-timeout">{gettext("Claim timeout (seconds)")}</label>
+                <label class={lbl()} for="board-claim-timeout">{gettext("Time limit to finish a card (seconds)")}</label>
                 <input id="board-claim-timeout" type="number" min="0" name="board[claim_timeout_s]" value="1800" class={fld()} />
-                <p class={hlp()}>{gettext("A running claim older than this counts as stalled. 0 means never.")}</p>
+                <p class={hlp()}>{gettext("A card being worked on for longer than this is flagged as stuck. 0 means never.")}</p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
                 <button type="submit" class={btn()}>{gettext("Create board")}</button>
@@ -170,7 +170,7 @@ defmodule PepeWeb.BoardLive do
               <.form_section title={gettext("+ New card")}>
               <.input field={@card_form[:title]} label={gettext("Title")} placeholder={gettext("Fix the checkout timeout")} />
               <.input field={@card_form[:body]} type="textarea" rows="3" label={gettext("What needs doing")}
-                placeholder={gettext("Everything the assignee needs to know: this is all it gets, no chat memory.")} />
+                placeholder={gettext("Write everything the assignee needs. It does not see any chat, so this is all it knows.")} />
               <%!-- Column gap only: each cell already ends in its own `mb-4`, which is what
                     separates this row from the next. --%>
               <div class="grid gap-x-3 sm:grid-cols-2">
@@ -184,13 +184,13 @@ defmodule PepeWeb.BoardLive do
                 <div class="mb-4">
                   <label class={lbl()} for="card-priority">{gettext("Priority")}</label>
                   <input id="card-priority" type="number" name="card[priority]" value="0" class={fld()} />
-                  <p class={hlp()}>{gettext("Higher runs first (0 is normal)")}</p>
+                  <p class={hlp()}>{gettext("Higher numbers go first (0 is normal)")}</p>
                 </div>
               </div>
               <div class="mb-4">
-                <label class={lbl()} for="card-auto-dispatch">{gettext("Auto-dispatch")} <span class="text-zinc-600">{gettext("(overrides the board's own setting)")}</span></label>
+                <label class={lbl()} for="card-auto-dispatch">{gettext("Auto-dispatch")} <span class="text-zinc-600">{gettext("(overrides the board's setting)")}</span></label>
                 <select id="card-auto-dispatch" name="card[auto_dispatch]" class={fld()}>
-                  <option value="">{gettext("Inherit from the board")}</option>
+                  <option value="">{gettext("Same as the board")}</option>
                   <option value="true">{gettext("On for this card")}</option>
                   <option value="false">{gettext("Off for this card")}</option>
                 </select>

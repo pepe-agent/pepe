@@ -32,20 +32,20 @@ defmodule Pepe.Webhooks.Slack do
         "key" => "bot_token",
         "label" => dgettext("webhooks", "Bot token"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "Starts with xoxb-. Store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "Starts with xoxb-. Write it as ${ENV_VAR}.")
       },
       %{
         "key" => "signing_secret",
         "label" => dgettext("webhooks", "Signing secret"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "From the app's Basic Information. Store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "Find it on the app's Basic Information page. Write it as ${ENV_VAR}.")
       },
       %{
         "key" => "require_mention",
-        "label" => dgettext("webhooks", "Require mention in channels"),
+        "label" => dgettext("webhooks", "Answer only when mentioned"),
         "type" => "select",
         "options" => ["true", "false"],
-        "hint" => dgettext("webhooks", "In channels, reply only when @mentioned (default true).")
+        "hint" => dgettext("webhooks", "In channels, reply only when someone @mentions the bot (default: yes).")
       }
     ]
   end

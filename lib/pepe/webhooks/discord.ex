@@ -69,17 +69,17 @@ defmodule Pepe.Webhooks.Discord do
         "key" => "public_key",
         "label" => dgettext("webhooks", "Public key"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "The app's Public Key (hex), used to verify signatures")
+        "hint" => dgettext("webhooks", "The app's Public Key (hex). Used to confirm messages really come from Discord.")
       },
       %{
         "key" => "application_id",
         "label" => dgettext("webhooks", "Application ID"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "Used to post the reply")
+        "hint" => dgettext("webhooks", "Used to send the reply")
       },
       %{
         "key" => "receive_channel_messages",
-        "label" => dgettext("webhooks", "Receive channel messages"),
+        "label" => dgettext("webhooks", "Read channel messages"),
         "type" => "select",
         # Opt-in: the first option is what a select starts on, and a new connection must not
         # start reading every message it can see.
@@ -98,18 +98,18 @@ defmodule Pepe.Webhooks.Discord do
         "hint" =>
           dgettext(
             "webhooks",
-            "From the app's Bot page. Needed to read channel messages."
+            "Find it on the app's Bot page. Needed to read channel messages."
           )
       },
       %{
         "key" => "require_mention",
-        "label" => dgettext("webhooks", "Require mention in channels"),
+        "label" => dgettext("webhooks", "Answer only when mentioned"),
         "type" => "select",
         "options" => ["true", "false"],
         "hint" =>
           dgettext(
             "webhooks",
-            "In server channels, reply only when @mentioned (default true)."
+            "In server channels, reply only when someone @mentions the bot (default: yes)."
           )
       },
       %{
@@ -120,7 +120,7 @@ defmodule Pepe.Webhooks.Discord do
         "hint" =>
           dgettext(
             "webhooks",
-            "Largest file accepted, in MB (default 20)."
+            "Biggest file it will accept, in MB (default: 20)."
           )
       }
     ]

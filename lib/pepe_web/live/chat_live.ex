@@ -28,11 +28,11 @@ defmodule PepeWeb.ChatLive do
     [
       {"/new", gettext("Start a fresh conversation")},
       {"/stop", gettext("Stop the current run")},
-      {"/inline", gettext("Feed a message into the running turn: TEXT")},
+      {"/inline", gettext("Add a message while it works: TEXT")},
       {"/goal", gettext("Pursue a goal until a reviewer approves: OBJECTIVE | SUCCESS CRITERION")},
       {"/undo", gettext("Undo your last message")},
       {"/retry", gettext("Redo the last answer")},
-      {"/rewind", gettext("Go back several turns at once: N")},
+      {"/rewind", gettext("Go back several messages: N")},
       {"/fork", gettext("Branch this conversation into a new one")},
       {"/name", gettext("Label this conversation in the sidebar: TEXT")},
       {"/usage", gettext("Show this month's spend and message count")},
@@ -182,7 +182,7 @@ defmodule PepeWeb.ChatLive do
                       <span :if={s.running} class="inline-block h-2 w-2 shrink-0 rounded-full bg-orange-500" title={gettext("Running now")}></span>
                       <span class="truncate">{s.title || untitled(s.key)}</span>
                     </div>
-                    <div class="truncate text-sm text-zinc-500">{s.agent || "-"}, {gettext("%{count} turns", count: s.turns)}</div>
+                    <div class="truncate text-sm text-zinc-500">{s.agent || "-"}, {ngettext("%{count} message", "%{count} messages", s.turns)}</div>
                   </button>
                   <button :if={s.running} phx-click="stop_session" phx-value-key={s.key} title={gettext("Stop")}
                     class="px-2 py-2 text-sm text-zinc-500 transition hover:text-red-400 lg:opacity-0 lg:group-hover:opacity-100">{gettext("Stop")}</button>
@@ -1376,7 +1376,7 @@ defmodule PepeWeb.ChatLive do
     flash =
       cond do
         text == "" -> {:error, gettext("Usage: /inline TEXT")}
-        match?(:ok, Session.inline(key, text)) -> {:info, gettext("Fed into the running turn.")}
+        match?(:ok, Session.inline(key, text)) -> {:info, gettext("Added to what it is working on.")}
         true -> {:error, gettext("Nothing is running. Send it as a normal message.")}
       end
 

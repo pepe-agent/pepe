@@ -46,25 +46,25 @@ defmodule Pepe.Webhooks.WhatsApp do
         "key" => "phone_number_id",
         "label" => dgettext("webhooks", "Phone number ID"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "The sending endpoint ID from Meta")
+        "hint" => dgettext("webhooks", "The ID Meta gives your WhatsApp number for sending messages")
       },
       %{
         "key" => "access_token",
         "label" => dgettext("webhooks", "Access token"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "Graph API bearer token; store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "Meta's access token for sending messages. Write it as ${ENV_VAR}.")
       },
       %{
         "key" => "app_secret",
         "label" => dgettext("webhooks", "App secret"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "Verifies the inbound X-Hub-Signature-256. Store as ${ENV_VAR}.")
+        "hint" => dgettext("webhooks", "Used to confirm messages really come from Meta (X-Hub-Signature-256). Write it as ${ENV_VAR}.")
       },
       %{
         "key" => "verify_token",
         "label" => dgettext("webhooks", "Verify token"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "Any string you choose. Meta echoes it when you subscribe")
+        "hint" => dgettext("webhooks", "Any text you choose. Meta asks for it back when you connect the webhook.")
       },
       %{
         "key" => "max_attachment_mb",
@@ -74,7 +74,7 @@ defmodule Pepe.Webhooks.WhatsApp do
         "hint" =>
           dgettext(
             "webhooks",
-            "Largest file accepted, in MB (default 20)."
+            "Biggest file it will accept, in MB (default: 20)."
           )
       }
     ]

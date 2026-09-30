@@ -53,7 +53,7 @@ defmodule PepeWeb.HooksLive do
         <.view_header active="hooks"
           icon="🛡️"
           title={gettext("Privacy")}
-          desc={gettext("Redact PII on the message flow before it reaches a model. Configure a hook here, then enable it on an agent (Agents). Empty = no redaction (raw text).")}
+          desc={gettext("Hides personal data in messages before they reach the AI model. Set up a rule here, then turn it on for an agent in Agents. With no rule, messages go as written.")}
         >
           <button :if={@editing} phx-click="cancel" class={btn_ghost()}>
             &larr; {gettext("Back to Privacy")}
@@ -65,8 +65,8 @@ defmodule PepeWeb.HooksLive do
             {form_panel(assigns)}
           <% else %>
             <p class="mb-4 max-w-4xl text-sm leading-relaxed text-zinc-500">
-              <span class="text-zinc-400">{gettext("PII = personally identifiable information")}</span>
-              {gettext(": personal data like name, CPF/CNPJ, email or phone, hidden before it reaches a model.")}
+              <span class="text-zinc-400">{gettext("Personal data means details that identify a person")}</span>
+              {gettext(": name, CPF/CNPJ, email or phone number. It is hidden before the message reaches the AI model.")}
             </p>
             <div class="grid max-w-4xl gap-3 sm:grid-cols-2">
               <div :for={name <- Hooks.names()} class={card()}>
@@ -124,36 +124,36 @@ defmodule PepeWeb.HooksLive do
   defp fields(%{editing: "pii_redact"} = assigns) do
     ~H"""
     <div>
-      <label class={lbl()}>{gettext("Recognizer packs")}</label>
+      <label class={lbl()}>{gettext("Ready-made rule sets")}</label>
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <.check_card :for={p <- Map.keys(Recognizers.packs())} name="packs[]" value={p}
           checked={p in list(@edit, "packs")} hint={pack_hint(p)} />
       </div>
-      <p class={hlp()}>{gettext("Region bundles of common recognizers.")}</p>
+      <p class={hlp()}>{gettext("Each set covers the usual data types for one country or region.")}</p>
     </div>
 
     <div>
-      <label class={lbl()}>{gettext("Individual recognizers")}</label>
+      <label class={lbl()}>{gettext("Single data types")}</label>
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <.check_card :for={r <- Recognizers.builtin_names()} name="recognizers[]" value={r}
           checked={r in list(@edit, "recognizers")} hint={recognizer_hint(r)} />
       </div>
-      <p class={hlp()}>{gettext("A pack above already includes these. Use them to pick single recognizers.")}</p>
+      <p class={hlp()}>{gettext("The sets above already include these. Tick them here to pick one at a time.")}</p>
     </div>
 
     <div>
-      <label class={lbl()}>{gettext("Custom patterns")}</label>
+      <label class={lbl()}>{gettext("Your own patterns")}</label>
       <div class="flex items-start gap-2">
         <textarea name="custom" rows="3" spellcheck="false" placeholder="name|pattern|REPLACE" class={fld() <> " font-mono text-sm"}>{AiFill.value(@ai, "custom", custom_text(@edit))}</textarea>
         <.ai_star field="custom" kind="pii_pattern" ai={@ai}
           placeholder={gettext("e.g. hide Brazilian medical license numbers (CRM)")} />
       </div>
-      <p class={hlp()}>{gettext("One per line: name|regex|REPLACE_LABEL. Invalid regex is dropped on save.")}</p>
+      <p class={hlp()}>{gettext("One per line: name|regex|REPLACE_LABEL. Invalid patterns are dropped when you save.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-base text-zinc-300">
       <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} class="h-4 w-4 accent-orange-500" />
-      {gettext("Reversible (restore the real values on the reply)")}
+      {gettext("Put the real values back in the reply")}
     </label>
     <.reversible_note />
     """
@@ -167,12 +167,12 @@ defmodule PepeWeb.HooksLive do
         <option value="">{gettext("Pick a configured model")}</option>
         <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
-      <p class={hlp()}>{gettext("Use a local model like Ollama. A hosted model would receive the unredacted data.")}</p>
+      <p class={hlp()}>{gettext("Use a model running on your own machine, like Ollama. A hosted model would see the data unmasked.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-base text-zinc-300">
       <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} class="h-4 w-4 accent-orange-500" />
-      {gettext("Reversible (restore the real values on the reply)")}
+      {gettext("Put the real values back in the reply")}
     </label>
     <.reversible_note />
     """
@@ -180,12 +180,12 @@ defmodule PepeWeb.HooksLive do
 
   defp fields(%{editing: "http_redact"} = assigns) do
     ~H"""
-    <.text_field name="url" label={gettext("Endpoint URL")} value={@edit["url"]} hint={gettext("Used for both directions unless you set separate URLs below.")} />
-    <.text_field name="inbound_url" label={gettext("Inbound URL (optional)")} value={@edit["inbound_url"]} />
-    <.text_field name="outbound_url" label={gettext("Outbound URL (optional)")} value={@edit["outbound_url"]} />
+    <.text_field name="url" label={gettext("Endpoint URL")} value={@edit["url"]} hint={gettext("Used for messages in both directions, unless you set separate addresses below.")} />
+    <.text_field name="inbound_url" label={gettext("Address for outgoing messages (optional)")} value={@edit["inbound_url"]} />
+    <.text_field name="outbound_url" label={gettext("Address for incoming replies (optional)")} value={@edit["outbound_url"]} />
     <div class="grid gap-3 sm:grid-cols-2">
-      <.text_field name="basic_user" label={gettext("Basic auth user")} value={get_in(@edit, ["basic_auth", "user"])} />
-      <.text_field name="basic_password" label={gettext("Basic auth password")} value={get_in(@edit, ["basic_auth", "password"])} />
+      <.text_field name="basic_user" label={gettext("Username")} value={get_in(@edit, ["basic_auth", "user"])} />
+      <.text_field name="basic_password" label={gettext("Password")} value={get_in(@edit, ["basic_auth", "password"])} />
     </div>
     <div>
       <label class={lbl()}>{gettext("Extra headers")}</label>
@@ -202,14 +202,14 @@ defmodule PepeWeb.HooksLive do
       label={gettext("Analyzer URL")}
       value={@edit["analyzer_url"]}
       placeholder="http://localhost:5002"
-      hint={gettext("Your Presidio Analyzer service, the one that finds the PII. Self-hosted, e.g. http://localhost:5002.")}
+      hint={gettext("Address of your Presidio Analyzer service, which finds the personal data. Self-hosted, e.g. http://localhost:5002.")}
     />
     <.text_field
       name="anonymizer_url"
-      label={gettext("Anonymizer URL")}
+      label={gettext("Anonymizer address")}
       value={@edit["anonymizer_url"]}
       placeholder="http://localhost:5001"
-      hint={gettext("Your Presidio Anonymizer service, the one that replaces what the analyzer found. E.g. http://localhost:5001.")}
+      hint={gettext("Address of your Presidio Anonymizer service, which hides what the analyzer found. E.g. http://localhost:5001.")}
     />
     <div class="grid gap-3 sm:grid-cols-2">
       <.text_field
@@ -217,26 +217,26 @@ defmodule PepeWeb.HooksLive do
         label={gettext("Language")}
         value={@edit["language"] || "en"}
         placeholder="en"
-        hint={gettext("ISO code, e.g. en, pt, es. Not the language name.")}
+        hint={gettext("Language code, e.g. en, pt, es. Not the language name.")}
       />
       <.text_field
         name="score_threshold"
-        label={gettext("Score threshold")}
+        label={gettext("Minimum confidence")}
         value={@edit["score_threshold"]}
         type="number"
         step="0.05"
         min="0"
         max="1"
         placeholder="0.5"
-        hint={gettext("How sure Presidio has to be before it redacts something, from 0 to 1. Higher catches less but gets it wrong less often. Blank = Presidio's own default.")}
+        hint={gettext("How sure Presidio must be before it hides something, from 0 to 1. Higher hides less but makes fewer mistakes. Blank uses Presidio's default.")}
       />
     </div>
     <.text_field
       name="entities"
-      label={gettext("Entities (comma-separated, optional)")}
+      label={gettext("Data types to look for (optional)")}
       value={Enum.join(list(@edit, "entities"), ", ")}
       placeholder="PERSON, EMAIL_ADDRESS, CREDIT_CARD"
-      hint={gettext("Which kinds of data to look for, by Presidio's own names (PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, ...). Blank = everything your Presidio install detects.")}
+      hint={gettext("Which kinds of data to find, using Presidio's names (PERSON, EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, ...). Blank finds everything your Presidio can detect.")}
     />
     """
   end
@@ -263,7 +263,7 @@ defmodule PepeWeb.HooksLive do
   defp reversible_note(assigns) do
     ~H"""
     <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <div class="mb-1.5 text-sm font-medium text-zinc-400">{gettext("How reversible works")}</div>
+      <div class="mb-1.5 text-sm font-medium text-zinc-400">{gettext("How restoring works")}</div>
       <div class="space-y-0.5 font-mono text-xs leading-relaxed">
         <%!-- Worked example, translated per locale on purpose: each language should show
              the identifier its operators actually use (SSN in en, CPF in pt, DNI in es). --%>
@@ -272,8 +272,8 @@ defmodule PepeWeb.HooksLive do
         <div><span class="text-zinc-500">{gettext("the model replies")}: </span><span class="text-orange-300">{gettext("invoice for [SSN_1]")}</span></div>
         <div><span class="text-zinc-500">{gettext("you get back")}: </span><span class="text-zinc-300">{gettext("invoice for SSN 123-45-6789")}</span> <span class="text-green-400">✓</span></div>
       </div>
-      <p class={hlp()}>{gettext("The swap back happens locally, so the model only sees the placeholder.")}</p>
-      <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: you keep the masked version.")}</p>
+      <p class={hlp()}>{gettext("The swap back happens on your machine, so the model only ever sees the placeholder.")}</p>
+      <p class={hlp()}>{gettext("On: the real value is put back in the reply. Off: the reply keeps the masked version.")}</p>
     </div>
     """
   end
@@ -414,7 +414,7 @@ defmodule PepeWeb.HooksLive do
         {:ok, Map.put(base, "score_threshold", threshold)}
 
       :error ->
-        {:error, gettext("Score threshold must be a number between 0 and 1, like 0.5. Nothing was saved."),
+        {:error, gettext("Minimum confidence must be a number between 0 and 1, like 0.5. Nothing was saved."),
          Map.put(base, "score_threshold", p["score_threshold"])}
     end
   end
@@ -501,7 +501,7 @@ defmodule PepeWeb.HooksLive do
   # ---- view helpers -------------------------------------------------------
 
   # A short hint describing what a recognizer pack bundles.
-  defp pack_hint("intl"), do: gettext("email, card, IP")
+  defp pack_hint("intl"), do: gettext("email, card, IP address")
   defp pack_hint("br"), do: gettext("CPF, CNPJ, CEP, phone")
   defp pack_hint("us"), do: gettext("SSN, phone")
   defp pack_hint(_), do: ""
@@ -511,9 +511,9 @@ defmodule PepeWeb.HooksLive do
   defp recognizer_hint("email"), do: gettext("email addresses")
   defp recognizer_hint("ip"), do: gettext("IP addresses")
   defp recognizer_hint("credit_card"), do: gettext("card numbers")
-  defp recognizer_hint("cpf"), do: gettext("Brazilian personal tax ID")
-  defp recognizer_hint("cnpj"), do: gettext("Brazilian company tax ID")
-  defp recognizer_hint("cep"), do: gettext("Brazilian postal code")
+  defp recognizer_hint("cpf"), do: gettext("Brazilian personal tax ID (CPF)")
+  defp recognizer_hint("cnpj"), do: gettext("Brazilian company tax ID (CNPJ)")
+  defp recognizer_hint("cep"), do: gettext("Brazilian postal code (CEP)")
   defp recognizer_hint("phone_br"), do: gettext("Brazilian phone numbers")
   defp recognizer_hint("ssn_us"), do: gettext("US Social Security number")
   defp recognizer_hint("phone_us"), do: gettext("US phone numbers")
@@ -525,7 +525,7 @@ defmodule PepeWeb.HooksLive do
     names = agents |> Enum.filter(&(name in (&1.hooks || []))) |> Enum.map(& &1.name)
 
     case names do
-      [] -> gettext("Not used by any agent yet")
+      [] -> gettext("No agent uses this yet")
       list -> gettext("Used by: %{a}", a: Enum.join(list, ", "))
     end
   end
@@ -563,22 +563,22 @@ defmodule PepeWeb.HooksLive do
 
   # Titles/descriptions go through gettext (literals, so they extract) rather than the
   # compile-time @meta strings.
-  defp meta_title("pii_redact"), do: gettext("Regex redaction")
-  defp meta_title("llm_redact"), do: gettext("Model redaction")
-  defp meta_title("http_redact"), do: gettext("HTTP redaction")
+  defp meta_title("pii_redact"), do: gettext("Pattern-based hiding")
+  defp meta_title("llm_redact"), do: gettext("Model-based hiding")
+  defp meta_title("http_redact"), do: gettext("Hiding through your own service")
   defp meta_title("presidio"), do: gettext("Presidio")
 
   defp meta_desc("pii_redact"),
-    do: gettext("Deterministic structured PII (CPF, CNPJ, email, cards, phones) via named recognizers and your own regex.")
+    do: gettext("Hides fixed formats like CPF, CNPJ, email, cards and phones, using built-in rules and your own patterns.")
 
   defp meta_desc("llm_redact"),
     do:
       gettext(
-        "A model swaps names and free text for realistic, reversible pseudonyms. Use a local model, or the raw PII reaches whichever provider you pick."
+        "An AI model swaps names and free text for fake ones, and can swap them back. Use a local model: a hosted one would see the real data."
       )
 
   defp meta_desc("http_redact"),
-    do: gettext("Send text to your own redaction service (one endpoint, or separate inbound/outbound).")
+    do: gettext("Sends text to your own service that hides personal data (one address, or separate ones for outgoing and incoming).")
 
-  defp meta_desc("presidio"), do: gettext("Microsoft Presidio analyzer + anonymizer over HTTP.")
+  defp meta_desc("presidio"), do: gettext("Microsoft Presidio, a tool you host yourself that finds and hides personal data.")
 end

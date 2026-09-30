@@ -91,7 +91,7 @@ defmodule PepeWeb.ConnectionsComponent do
             <:item label={gettext("Agent:")}>{e["agent"] || gettext("(default)")}</:item>
             <:item label={gettext("Webhook URL")} mono>{webhook_url(e["project"], p.name, slug)}</:item>
           </.meta_list>
-          <p class="mt-2 text-xs text-zinc-600">{gettext("Paste this into the provider as its outgoing webhook URL.")}</p>
+          <p class="mt-2 text-xs text-zinc-600">{gettext("Paste this into the provider as the address it sends messages to.")}</p>
         </div>
       </div>
 
@@ -130,7 +130,7 @@ defmodule PepeWeb.ConnectionsComponent do
             <label class={lbl()}>{gettext("Slug (URL id)")}</label>
             <input name="slug" value={fval(@form_values, "slug")} class={fld()} placeholder="support" />
             <p :if={@form_errors["slug"]} class="mt-1.5 text-sm text-red-400">{@form_errors["slug"]}</p>
-            <p :if={!@form_errors["slug"]} class={hlp()}>{gettext("A unique id used in the webhook URL.")}</p>
+            <p :if={!@form_errors["slug"]} class={hlp()}>{gettext("A short unique name that becomes part of the webhook URL.")}</p>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -144,7 +144,7 @@ defmodule PepeWeb.ConnectionsComponent do
             <div>
               <label class={lbl()}>{gettext("Mode")}</label>
               <select name="mode" class={fld()}>
-                <option value="support" selected={fval(@form_values, "mode") != "admin"}>{gettext("Support (customer-facing)")}</option>
+                <option value="support" selected={fval(@form_values, "mode") != "admin"}>{gettext("Support (for customers)")}</option>
                 <option value="admin" selected={fval(@form_values, "mode") == "admin"}>{gettext("Admin (yours)")}</option>
               </select>
             </div>
@@ -165,14 +165,14 @@ defmodule PepeWeb.ConnectionsComponent do
           </div>
         </.form_section>
 
-        <.form_section title={gettext("Provider credentials")}>
+        <.form_section title={gettext("Provider access details")}>
           <div :for={f <- @form_schema}>
             <label class={lbl()}>{f["label"]}</label>
             <%!-- The blank option matters: without it the first value is shown and saved for a field
                  nobody ever touched, which for require_mention silently flips the provider's own
                  default. Blank round-trips to "unset" because build_config/2 drops empty values. --%>
             <select :if={f["type"] == "select"} name={"cfg[" <> f["key"] <> "]"} class={fld()}>
-              <option value="" selected={cfgval(@form_values, f["key"]) == ""}>{gettext("Not set (provider default)")}</option>
+              <option value="" selected={cfgval(@form_values, f["key"]) == ""}>{gettext("Not set (use provider's default)")}</option>
               <option :for={o <- f["options"] || []} value={o} selected={cfgval(@form_values, f["key"]) == o}>
                 {option_label(f["options"], o)}
               </option>
@@ -185,7 +185,7 @@ defmodule PepeWeb.ConnectionsComponent do
             />
             <p :if={f["hint"]} class={hlp()}>{f["hint"]}</p>
             <p :if={f["type"] == "secret"} class={hlp()}>
-              {gettext("Write it as ${ENV_VAR} to keep the secret out of the config file.")}
+              {gettext("Write it as ${ENV_VAR} to keep the secret out of the settings file.")}
             </p>
           </div>
         </.form_section>
@@ -207,7 +207,7 @@ defmodule PepeWeb.ConnectionsComponent do
 
     case find_provider(socket.assigns.providers, entry["provider"]) do
       nil ->
-        send(self(), {:flash, :error, gettext("This connection's provider is not installed.")})
+        send(self(), {:flash, :error, gettext("The provider for this connection is not installed.")})
         {:noreply, socket}
 
       p ->
@@ -233,7 +233,7 @@ defmodule PepeWeb.ConnectionsComponent do
 
   def handle_event("delete", %{"slug" => slug}, socket) do
     Config.delete_webhook(slug)
-    send(self(), {:flash, :info, gettext("Removed connection %{s}.", s: slug)})
+    send(self(), {:flash, :info, gettext("Connection %{s} removed.", s: slug)})
     {:noreply, assign(socket, webhooks: Config.webhooks())}
   end
 
@@ -278,8 +278,8 @@ defmodule PepeWeb.ConnectionsComponent do
 
   defp save_errors(slug, agent, editing) do
     %{}
-    |> maybe_error("slug", slug == "" && gettext("A slug is required."))
-    |> maybe_error("slug", slug != "" && slug != editing && Config.webhook_exists?(slug) && gettext("This slug is already in use."))
+    |> maybe_error("slug", slug == "" && gettext("Enter a short name for the URL."))
+    |> maybe_error("slug", slug != "" && slug != editing && Config.webhook_exists?(slug) && gettext("This short name is already in use."))
     |> maybe_error("agent", is_nil(agent) && gettext("Choose an agent."))
   end
 
@@ -333,12 +333,15 @@ defmodule PepeWeb.ConnectionsComponent do
   end
 
   defp mode_hint("admin"),
-    do: gettext("Admin: a channel you operate. History is kept, slash commands like /new work, and conversations can become memory.")
+    do:
+      gettext(
+        "Admin: a channel only you and your team use. Chats are remembered, commands like /new work, and what you talk about can be saved to memory."
+      )
 
   defp mode_hint(_),
     do:
       gettext(
-        "Support: a customer-facing channel. Each chat starts fresh. Nothing carries over between chats or into memory, and slash commands are treated as plain text."
+        "Support: a channel for customers. Each chat starts from scratch, nothing is remembered between chats or saved to memory, and commands like /new are read as plain text."
       )
 
   defp open_form(socket, name) do

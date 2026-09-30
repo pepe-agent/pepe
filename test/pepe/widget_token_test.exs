@@ -96,15 +96,15 @@ defmodule Pepe.WidgetTokenTest do
 
     test "update_widget_token/2 leaves the label alone when the caller's opts don't include it" do
       {:ok, _raw, id} =
-        Config.add_api_token(agent: "assistant", widget: true, label: "example.com widget")
+        Config.add_api_token(agent: "assistant", widget: true, label: "My website widget")
 
       assert :ok = Config.update_widget_token(id, title: "New title")
 
-      assert Enum.find(Config.api_tokens(), &(&1["id"] == id))["label"] == "example.com widget"
+      assert Enum.find(Config.api_tokens(), &(&1["id"] == id))["label"] == "My website widget"
     end
 
     test "update_widget_token/2 does clear the label when the caller passes a blank one" do
-      {:ok, _raw, id} = Config.add_api_token(agent: "assistant", widget: true, label: "example.com widget")
+      {:ok, _raw, id} = Config.add_api_token(agent: "assistant", widget: true, label: "My website widget")
 
       assert :ok = Config.update_widget_token(id, label: "")
 

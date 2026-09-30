@@ -163,7 +163,7 @@ defmodule PepeWeb.AgentsLivePickersTest do
 
     assert html =~ "Please fix the errors below."
     assert html =~ "can&#39;t be blank"
-    # The Name field the error points at lives on the Persona tab, so that tab must be the visible one.
+    # The Name field the error points at lives on the Identity tab, so that tab must be the visible one.
     assert has_element?(view, ~s(button[role=tab][phx-value-tab=persona][aria-selected=true]))
     assert has_element?(view, ~s(button[role=tab][phx-value-tab=limits][aria-selected=false]))
 

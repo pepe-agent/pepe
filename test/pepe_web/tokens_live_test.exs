@@ -84,13 +84,13 @@ defmodule PepeWeb.TokensLiveTest do
     assert perms.prices == "list"
   end
 
-  test "leaving a token able to do nothing is refused, with a reason" do
+  test "leaving a token unable to do anything is refused, with a reason" do
     {:ok, view, _html} = live(conn(), "/tokens")
 
     # Neither box ticked: the browser posts neither key.
     html = render_submit(view, "token_create", %{"label" => "dead"})
 
-    assert html =~ "able to do nothing"
+    assert html =~ "unable to do anything"
     assert Config.api_tokens() == []
   end
 
@@ -119,7 +119,7 @@ defmodule PepeWeb.TokensLiveTest do
     html =
       render_submit(view, "token_permissions", %{"token_id" => id, "chat" => "true", "usage" => "true"})
 
-    assert html =~ "public page source"
+    assert html =~ "visible in your page source"
     refute ApiToken.permissions(only_token()).usage
   end
 end

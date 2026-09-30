@@ -1,6 +1,6 @@
 defmodule PepeWeb.AgentsLivePromptTest do
   @moduledoc """
-  The "Assembled prompt" section on an agent's edit form - what the model actually sees,
+  The "Full instructions" section on an agent's edit form - what the model actually sees,
   not just the persona field the form itself edits. Same assembly the CLI's
   `mix pepe agent prompt` and every real conversation with the agent already go through.
   """
@@ -39,7 +39,7 @@ defmodule PepeWeb.AgentsLivePromptTest do
     {:ok, view, _html} = live(conn(), "/agents")
     html = render_click(view, "agent_edit", %{"name" => "assistant"})
 
-    assert html =~ "Assembled prompt"
+    assert html =~ "Full instructions"
     assert html =~ "You are a terse assistant."
     # Framework scaffolding this test never wrote itself - proof it is the assembled
     # prompt, not the raw persona field rendered twice.
@@ -50,6 +50,6 @@ defmodule PepeWeb.AgentsLivePromptTest do
     {:ok, view, _html} = live(conn(), "/agents")
     html = render_click(view, "agent_new", %{})
 
-    refute html =~ "Assembled prompt"
+    refute html =~ "Full instructions"
   end
 end

@@ -224,14 +224,14 @@ defmodule PepeWeb.TracesLive do
           icon="🧵"
           title={(@selected && gettext("Trace")) || gettext("Traces")}
           desc={
-            (@selected && gettext("Replay of one run, step by step.")) ||
-              gettext("Recent runs from every surface, with each run's outcome, duration and tools called. Open one to replay it step by step.")
+            (@selected && gettext("Step-by-step replay of one task.")) ||
+              gettext("Recent tasks from every channel, with the result, how long each took and which tools it used. Open one to replay it step by step.")
           }
         >
           <%!-- Your traces are the test data you already have. When a run went right, this is
                 where you say so, and it becomes a case that has to keep going right. --%>
           <span :if={@selected && !@selected_recorded} class="max-w-[14rem] text-xs leading-snug text-zinc-500">
-            {gettext("keeps this run as a regression check")}
+            {gettext("saves this task as a future check")}
           </span>
           <button :if={@selected && !@selected_recorded} phx-click="promote" class={btn()}
             data-confirm={gettext("Keep this run as an eval case? It will assert that the agent still calls the same tools for this prompt.")}>
@@ -241,8 +241,8 @@ defmodule PepeWeb.TracesLive do
                 reflow the action row. --%>
           <span :if={@selected && @selected_recorded}
             class="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-800 px-3.5 py-2 text-sm text-zinc-400"
-            title={gettext("Saved to the \"recorded\" eval suite. From now on it's checked whenever you run your evals.")}>
-            {gettext("✓ Saved as an eval case")}
+            title={gettext("Saved to the \"recorded\" test group. From now on it is checked whenever you run your tests.")}>
+            {gettext("✓ Saved as a test case")}
           </span>
           <button :if={@selected} phx-click="close" class={btn_ghost()}>{gettext("← Back")}</button>
           <button :if={!@selected} phx-click="toggle_grouping" class={btn_ghost()}>
@@ -379,7 +379,7 @@ defmodule PepeWeb.TracesLive do
       :if={@total == 0}
       class={["p-10 text-center text-zinc-500", !@nested && "rounded-xl border border-dashed border-zinc-800"]}
     >
-      {gettext("No runs match these filters. Every agent run shows up here.")}
+      {gettext("No tasks match these filters. Every task an agent does shows up here.")}
     </div>
     <div :if={@traces != []} class={["overflow-x-auto", !@nested && "rounded-[14px] border border-zinc-800"]}>
       <table class="w-full min-w-[720px] text-[14px]">
@@ -412,7 +412,7 @@ defmodule PepeWeb.TracesLive do
             <td class="whitespace-nowrap px-3 py-2 text-right">
               <% {ti, to} = run_tokens(t) %>
               <% cost = run_cost(t, @models, @cache) %>
-              <div :if={cost > 0} class="text-sm text-zinc-300" title={gettext("Estimated provider cost of this run, from its token usage.")}>
+              <div :if={cost > 0} class="text-sm text-zinc-300" title={gettext("Estimated provider cost of this task, based on its usage.")}>
                 {fmt_cost(cost)}
               </div>
               <div
@@ -422,7 +422,7 @@ defmodule PepeWeb.TracesLive do
               >
                 {fmt_tokens(ti)} → {fmt_tokens(to)}
               </div>
-              <span :if={ti + to == 0} class="text-sm text-zinc-600" title={gettext("No token usage was recorded for this run.")}>–</span>
+              <span :if={ti + to == 0} class="text-sm text-zinc-600" title={gettext("No usage was recorded for this task.")}>–</span>
             </td>
             <td class="px-3 py-2 text-right">
               <button phx-click="open" phx-value-scope={t["scope"]} phx-value-id={t["id"]} class={btn_ghost()}>
@@ -445,7 +445,7 @@ defmodule PepeWeb.TracesLive do
   defp session_list(assigns) do
     ~H"""
     <div :if={@total == 0} class="rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
-      {gettext("No runs match these filters.")}
+      {gettext("No tasks match these filters.")}
     </div>
     <div :if={@groups != []} class="space-y-2">
       <div :for={g <- @groups} class="overflow-hidden rounded-xl border border-zinc-800">
@@ -463,7 +463,7 @@ defmodule PepeWeb.TracesLive do
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-4 text-right">
-            <div :if={g.cost > 0} class="text-sm text-zinc-300" title={gettext("Total estimated cost across this conversation's runs.")}>
+            <div :if={g.cost > 0} class="text-sm text-zinc-300" title={gettext("Total estimated cost of all tasks in this conversation.")}>
               {fmt_cost(g.cost)}
             </div>
             <div :if={g.tokens_in + g.tokens_out > 0} class="text-xs text-zinc-600">
@@ -508,7 +508,7 @@ defmodule PepeWeb.TracesLive do
           <:item label={gettext("Cost")} mono>{fmt_cost(@cost)}</:item>
         </.meta_list>
         <div :if={@trace["prompt"]} class="mt-3 rounded-lg bg-zinc-950/60 p-3">
-          <div class="mb-1 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("Prompt")}</div>
+          <div class="mb-1 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("Instructions")}</div>
           <div class="whitespace-pre-wrap break-words text-base text-zinc-300">{@trace["prompt"]}</div>
         </div>
         <.notice :if={error_reason(@trace)} kind={:danger} label={gettext("Error detail")} class="mt-4">
@@ -523,7 +523,7 @@ defmodule PepeWeb.TracesLive do
           </span>
           <.event ev={ev} />
         </li>
-        <li :if={@trace["events"] == []} class="text-sm text-zinc-500">{gettext("This run ended before any step ran.")}</li>
+        <li :if={@trace["events"] == []} class="text-sm text-zinc-500">{gettext("This task ended before doing anything.")}</li>
       </ol>
     </div>
     """
@@ -584,7 +584,7 @@ defmodule PepeWeb.TracesLive do
 
   defp event(%{ev: %{"t" => "hook"}} = assigns) do
     ~H"""
-    <div class="text-sm text-zinc-400">{gettext("Hook")}, {@ev["name"]} ({stage_label(@ev["stage"])}): {hook_result_label(@ev)}</div>
+    <div class="text-sm text-zinc-400">{gettext("Privacy rule")}, {@ev["name"]} ({stage_label(@ev["stage"])}): {hook_result_label(@ev)}</div>
     """
   end
 
@@ -629,7 +629,7 @@ defmodule PepeWeb.TracesLive do
 
   defp triage_verdict_label("simple"), do: gettext("simple")
   defp triage_verdict_label("complex"), do: gettext("complex")
-  defp triage_verdict_label("failed"), do: gettext("unreachable, skipped")
+  defp triage_verdict_label("failed"), do: gettext("unavailable, skipped")
   defp triage_verdict_label(v), do: v
 
   # The point in the run a hook ran at (`Pepe.Hooks`): on the way in, on the way out, or on a
@@ -643,7 +643,7 @@ defmodule PepeWeb.TracesLive do
   defp hook_result_label(%{"changed" => false}), do: gettext("no change")
 
   defp hook_result_label(%{"changed" => true, "entries" => n}) when is_integer(n) and n > 0,
-    do: gettext("changed, %{n} reversible", n: n)
+    do: gettext("changed, %{n} can be undone", n: n)
 
   defp hook_result_label(%{"changed" => true}), do: gettext("changed")
 
@@ -688,8 +688,8 @@ defmodule PepeWeb.TracesLive do
 
         message =
           if tools == [],
-            do: gettext("Kept. No tools ran, so the case asserts the agent still answers this without reaching for one."),
-            else: gettext("Kept. The case asserts the agent still calls %{tools} for this.", tools: Enum.join(tools, ", "))
+            do: gettext("Kept. No tools were used, so the test checks that the agent still answers this without using any."),
+            else: gettext("Kept. The test checks that the agent still uses %{tools} for this.", tools: Enum.join(tools, ", "))
 
         {:noreply, socket |> assign(selected_recorded: true) |> put_flash(:info, message)}
 

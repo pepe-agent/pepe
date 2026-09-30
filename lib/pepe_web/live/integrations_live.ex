@@ -37,12 +37,12 @@ defmodule PepeWeb.IntegrationsLive do
         <.view_header active="integrations"
           icon="🔌"
           title={gettext("Integrations")}
-          desc={gettext("Connect channel plugins to your agents. Each provider's fields come from the plugin itself; fill them in, then paste the webhook URL into the provider.")}
+          desc={gettext("Connect chat plugins to your agents. Fill in the fields each plugin asks for, then paste the webhook URL into the provider.")}
         />
 
         <div class={body_cls()}>
           <div :if={@providers == []} class="max-w-3xl rounded-xl border border-dashed border-zinc-800 p-10 text-center text-zinc-500">
-            <p>{gettext("No channel plugins installed yet.")}</p>
+            <p>{gettext("No chat plugins installed yet.")}</p>
             <%!-- The Plugins page installs from a URL right here, so send them there first; the
                  CLI equivalent stays as a footnote for anyone already in a terminal. --%>
             <p class="mt-3">
