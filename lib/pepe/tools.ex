@@ -13,6 +13,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.Bash
   alias Pepe.Tools.Board
   alias Pepe.Tools.Browser
+  alias Pepe.Tools.Chart
   alias Pepe.Tools.Commitment
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
@@ -77,6 +78,7 @@ defmodule Pepe.Tools do
     WebSearch,
     DbQuery,
     SendFile,
+    Chart,
     SendPresentation,
     Invoice,
     EndSession,
