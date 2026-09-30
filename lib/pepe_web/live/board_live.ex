@@ -101,7 +101,7 @@ defmodule PepeWeb.BoardLive do
   defp project_value(scope) when scope in ["all", "root"], do: ""
   defp project_value(scope), do: scope
 
-  defp column_label("triage"), do: gettext("Triage")
+  defp column_label("triage"), do: gettext("To review")
   defp column_label("todo"), do: gettext("To do")
   defp column_label("ready"), do: gettext("Ready")
   defp column_label("running"), do: gettext("Running")
@@ -145,7 +145,7 @@ defmodule PepeWeb.BoardLive do
                 <label class="flex cursor-pointer items-start gap-2.5 text-sm text-zinc-300">
                   <input type="checkbox" name="board[auto_dispatch]" value="true" class={[checkbox_cls(), "mt-0.5 shrink-0"]} />
                   <span>
-                    <span class="block font-medium">{gettext("Auto-dispatch")}</span>
+                    <span class="block font-medium">{gettext("Starts on its own")}</span>
                     <span class={[hlp(), "block"]}>{gettext("On: a card that has an assignee and is ready starts on its own. Off: someone has to take it first.")}</span>
                   </span>
                 </label>
@@ -188,7 +188,7 @@ defmodule PepeWeb.BoardLive do
                 </div>
               </div>
               <div class="mb-4">
-                <label class={lbl()} for="card-auto-dispatch">{gettext("Auto-dispatch")} <span class="text-zinc-600">{gettext("(overrides the board's setting)")}</span></label>
+                <label class={lbl()} for="card-auto-dispatch">{gettext("Starts on its own")} <span class="text-zinc-600">{gettext("(overrides the board's setting)")}</span></label>
                 <select id="card-auto-dispatch" name="card[auto_dispatch]" class={fld()}>
                   <option value="">{gettext("Same as the board")}</option>
                   <option value="true">{gettext("On for this card")}</option>
@@ -210,7 +210,7 @@ defmodule PepeWeb.BoardLive do
               <div class="min-w-0">
                 <span class="font-medium">{b.name}</span>
                 <span class="ml-2 text-sm text-zinc-500">{b.id}</span>
-                <span :if={b.auto_dispatch} class="ml-2 rounded bg-orange-700/40 px-1.5 text-sm text-orange-300">{gettext("auto-dispatch")}</span>
+                <span :if={b.auto_dispatch} class="ml-2 rounded bg-orange-700/40 px-1.5 text-sm text-orange-300">{gettext("starts on its own")}</span>
               </div>
               <button phx-click="board_remove" phx-value-id={b.id} data-confirm={gettext("Remove board %{name}? Cards on it must be deleted first.", name: b.name)}
                 class={[btn_ghost(), "shrink-0 text-red-400 hover:text-red-300"]}>✕</button>
@@ -244,18 +244,18 @@ defmodule PepeWeb.BoardLive do
                   <div :if={c.assignee} class="mt-1 text-sm text-zinc-400">{gettext("assignee")}: {c.assignee}</div>
                   <div :if={c.priority != 0} class="text-sm text-zinc-500">{gettext("priority")}: {c.priority}</div>
                   <div :if={c.depends_on != []} class="text-sm text-zinc-500">{gettext("depends on")}: {Enum.join(c.depends_on, ", ")}</div>
-                  <div :if={c.status == "running" and c.claimed_by} class="text-sm text-zinc-500">{gettext("claimed by")}: {c.claimed_by}</div>
+                  <div :if={c.status == "running" and c.claimed_by} class="text-sm text-zinc-500">{gettext("taken by")}: {c.claimed_by}</div>
                   <div :if={c.block_reason} class="mt-1 text-sm text-amber-400">⚠ {c.block_reason}</div>
                   <div class="mt-2 flex items-center gap-1.5 text-sm text-zinc-500">
-                    {gettext("auto-dispatch")}:
+                    {gettext("starts on its own")}:
                     <select phx-change="card_set_auto_dispatch" phx-value-id={c.id} name="value" class={fld_sm()}>
-                      <option value="inherit" selected={is_nil(c.auto_dispatch)}>{gettext("inherit")}</option>
+                      <option value="inherit" selected={is_nil(c.auto_dispatch)}>{gettext("same as board")}</option>
                       <option value="on" selected={c.auto_dispatch == true}>{gettext("on")}</option>
                       <option value="off" selected={c.auto_dispatch == false}>{gettext("off")}</option>
                     </select>
                   </div>
                   <div class="mt-2 flex gap-1.5 text-sm">
-                    <button :if={c.status == "ready"} phx-click="card_claim" phx-value-id={c.id} class={btn_ghost()}>{gettext("Claim")}</button>
+                    <button :if={c.status == "ready"} phx-click="card_claim" phx-value-id={c.id} class={btn_ghost()}>{gettext("Take it")}</button>
                     <button :if={c.status == "blocked"} phx-click="card_unblock" phx-value-id={c.id} class={btn_ghost()}>{gettext("Unblock")}</button>
                     <button :if={c.status in ["running", "blocked", "done"]} phx-click="card_archive" phx-value-id={c.id}
                       data-confirm={c.status == "running" && gettext("This card is still running. Archive it anyway?")}

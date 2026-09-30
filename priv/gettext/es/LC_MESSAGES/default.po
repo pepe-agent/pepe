@@ -2734,12 +2734,6 @@ msgstr "Seguridad"
 msgid "Simple model"
 msgstr "Modelo simple"
 
-#: lib/pepe_web/live/board_live.ex:104
-#: lib/pepe_web/live/traces_live.ex:579
-#, elixir-autogen, elixir-format
-msgid "Triage"
-msgstr "Triaje"
-
 #: lib/pepe_web/live/traces_live.ex:648
 #, elixir-autogen, elixir-format
 msgid "changed"
@@ -3582,12 +3576,6 @@ msgstr "Responsable"
 msgid "Auto-detect"
 msgstr "Detección automática"
 
-#: lib/pepe_web/live/board_live.ex:148
-#: lib/pepe_web/live/board_live.ex:191
-#, elixir-autogen, elixir-format
-msgid "Auto-dispatch"
-msgstr "Iniciar solo"
-
 #: lib/pepe_web/live/agents_live.ex:680
 #: lib/pepe_web/live/board_live.ex:127
 #: lib/pepe_web/live/board_live.ex:130
@@ -3611,11 +3599,6 @@ msgstr "Board creado."
 #, elixir-autogen, elixir-format
 msgid "Card created."
 msgstr "Card creada."
-
-#: lib/pepe_web/live/board_live.ex:258
-#, elixir-autogen, elixir-format
-msgid "Claim"
-msgstr "Asumir"
 
 #: lib/pepe_web/live/board_live.ex:364
 #, elixir-autogen, elixir-format
@@ -3741,17 +3724,6 @@ msgstr "Qué hay que hacer"
 msgid "assignee"
 msgstr "responsable"
 
-#: lib/pepe_web/live/board_live.ex:213
-#: lib/pepe_web/live/board_live.ex:250
-#, elixir-autogen, elixir-format
-msgid "auto-dispatch"
-msgstr "inicio automático"
-
-#: lib/pepe_web/live/board_live.ex:247
-#, elixir-autogen, elixir-format
-msgid "claimed by"
-msgstr "asumida por"
-
 #: lib/pepe_web/live/board_live.ex:246
 #, elixir-autogen, elixir-format
 msgid "depends on"
@@ -3771,11 +3743,6 @@ msgstr "Desactivado en esta card"
 #, elixir-autogen, elixir-format
 msgid "On for this card"
 msgstr "Activado en esta card"
-
-#: lib/pepe_web/live/board_live.ex:252
-#, elixir-autogen, elixir-format
-msgid "inherit"
-msgstr "heredar"
 
 #: lib/pepe_web/live/board_live.ex:254
 #: lib/pepe_web/live/skill_curator_component.ex:177
@@ -7996,3 +7963,40 @@ msgstr "todos los proyectos"
 #, elixir-autogen, elixir-format
 msgid "separated by %{col}"
 msgstr "separado por %{col}"
+
+#: lib/pepe_web/live/traces_live.ex:579
+#, elixir-autogen, elixir-format
+msgid "Message sorting"
+msgstr "Clasificación de mensajes"
+
+#: lib/pepe_web/live/board_live.ex:148
+#: lib/pepe_web/live/board_live.ex:191
+#, elixir-autogen, elixir-format
+msgid "Starts on its own"
+msgstr "Se inicia solo"
+
+#: lib/pepe_web/live/board_live.ex:258
+#, elixir-autogen, elixir-format
+msgid "Take it"
+msgstr "Asumir"
+
+#: lib/pepe_web/live/board_live.ex:104
+#, elixir-autogen, elixir-format
+msgid "To review"
+msgstr "Por revisar"
+
+#: lib/pepe_web/live/board_live.ex:252
+#, elixir-autogen, elixir-format
+msgid "same as board"
+msgstr "igual que el board"
+
+#: lib/pepe_web/live/board_live.ex:213
+#: lib/pepe_web/live/board_live.ex:250
+#, elixir-autogen, elixir-format
+msgid "starts on its own"
+msgstr "se inicia solo"
+
+#: lib/pepe_web/live/board_live.ex:247
+#, elixir-autogen, elixir-format
+msgid "taken by"
+msgstr "asumido por"

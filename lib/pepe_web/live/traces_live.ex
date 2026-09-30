@@ -576,7 +576,7 @@ defmodule PepeWeb.TracesLive do
   defp event(%{ev: %{"t" => "triage"}} = assigns) do
     ~H"""
     <div class="text-sm text-zinc-400">
-      {gettext("Triage")} ({@ev["triage_model"]}): {triage_verdict_label(@ev["verdict"])}
+      {gettext("Message sorting")} ({@ev["triage_model"]}): {triage_verdict_label(@ev["verdict"])}
       <span :if={@ev["chosen_model"]}>→ {@ev["chosen_model"]}</span>
     </div>
     """

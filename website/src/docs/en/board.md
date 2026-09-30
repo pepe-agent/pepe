@@ -105,7 +105,7 @@ visibly stuck in `todo` rather than silently promoting past an abandoned decisio
 
 ## Claims are race-free
 
-Two callers (a human clicking "Claim" and an agent's tool call, or two auto-dispatch
+Two callers (a human clicking "Take it" and an agent's tool call, or two auto-dispatch
 ticks) can never both win a claim on the same card. The first one through wins; the
 other gets a clean "not ready" error. This holds without any extra locking step on your
 part: it's just how `claim` is built.

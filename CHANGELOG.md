@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format follows
 ## [Unreleased]
 
 ### Changed
-- **The dashboard's labels and help texts were rewritten in plain language, in English, pt-BR, pt-PT and es.** Over 330 of them (the agent editor, channels, tokens, privacy, projects, models, the board and more) no longer use words only the code knows: "turn", "triage", "session", "hook", "persona", "tenant" and the like. A setting now says what it does for you ("Take corrections while working: if you send another message while the agent is still working, it checks whether it changes the task and uses it right away"). The agent editor's first tab is now Identity, "Live sessions" is Open conversations, and the conversation list counts messages instead of turns.
+- **The dashboard's labels and help texts were rewritten in plain language, in English, pt-BR, pt-PT and es.** Over 330 of them (the agent editor, channels, tokens, privacy, projects, models, the board and more) no longer use words only the code knows: "turn", "triage", "session", "hook", "persona", "tenant" and the like. A setting now says what it does for you ("Take corrections while working: if you send another message while the agent is still working, it checks whether it changes the task and uses it right away"). On the board, "Claim" is now "Take it", "Auto-dispatch" is "Starts on its own" and the "Triage" column is "To review" (the commands and the docs still say claim). The agent editor's first tab is now Identity, "Live sessions" is Open conversations, and the conversation list counts messages instead of turns.
 
 ## [0.20.0] - 2026-09-30
 

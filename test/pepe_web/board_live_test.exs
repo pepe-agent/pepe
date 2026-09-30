@@ -59,7 +59,7 @@ defmodule PepeWeb.BoardLiveTest do
     assert board.claim_timeout_s == 600
 
     html = render_click(view, "board_back")
-    assert html =~ "auto-dispatch"
+    assert html =~ "starts on its own"
   end
 
   test "a claim timeout of 0 is stored as \"never\", not silently turned into the 30-minute default" do
@@ -87,7 +87,7 @@ defmodule PepeWeb.BoardLiveTest do
     {:ok, view, _html} = live(conn(), "/board")
     html = render_click(view, "board_select", %{"id" => board.id})
 
-    assert html =~ "Triage"
+    assert html =~ "To review"
     assert html =~ "not ready to work yet"
     assert html =~ card.id
     refute html =~ "No cards yet."
@@ -100,7 +100,7 @@ defmodule PepeWeb.BoardLiveTest do
     html = render_click(view, "board_select", %{"id" => board.id})
 
     assert html =~ "No cards yet."
-    refute html =~ "Triage"
+    refute html =~ "To review"
     refute html =~ "To do"
   end
 
@@ -133,7 +133,7 @@ defmodule PepeWeb.BoardLiveTest do
     assert html =~ "a ready card"
     assert html =~ todo.id
     assert html =~ ready.id
-    assert html =~ "Claim"
+    assert html =~ "Take it"
   end
 
   test "creating a card on the selected board lands it in To do" do
@@ -190,7 +190,7 @@ defmodule PepeWeb.BoardLiveTest do
     html = render_click(view, "card_claim", %{"id" => card.id})
     assert Config.get_board_card(card.id).status == "running"
     assert Config.get_board_card(card.id).claimed_by == "dashboard"
-    assert html =~ "claimed by"
+    assert html =~ "taken by"
   end
 
   test "unblock moves a blocked card back to ready" do
@@ -250,6 +250,6 @@ defmodule PepeWeb.BoardLiveTest do
     Board.claim(card.id, "worker")
     html = render(view)
 
-    assert html =~ "claimed by"
+    assert html =~ "taken by"
   end
 end
