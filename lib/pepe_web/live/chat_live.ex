@@ -122,7 +122,8 @@ defmodule PepeWeb.ChatLive do
     <div class={shell_cls()}>
       <.sidebar active="chat" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <div class="flex h-full min-w-0">
+        <.page_topbar title={gettext("Chat")} class="border-b border-zinc-800" />
+        <div class="flex min-h-0 min-w-0 flex-1">
           <%!-- Two panes only from `lg`. Below that it's one at a time: the list until a
                 conversation is picked, then the thread (with a back button in its header).
                 The split is `lg`, not `md`, because at 768px the nav sidebar is already back
@@ -133,7 +134,6 @@ defmodule PepeWeb.ChatLive do
           ]}>
             <div class="border-b border-zinc-800 p-3">
               <div class="flex items-center gap-2">
-                <.nav_toggle class="mt-0" />
                 <button phx-click="new_chat" class={[btn(), "flex-1"]}>
                   + {gettext("New chat")}
                 </button>

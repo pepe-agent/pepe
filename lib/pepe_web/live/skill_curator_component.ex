@@ -70,22 +70,16 @@ defmodule PepeWeb.SkillCuratorComponent do
         {gettext("Unused agent-written skills go stale, then get archived. Nothing is deleted.")}
       </p>
 
-      <dl class="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-        <div class="flex gap-2">
-          <dt class="text-zinc-500">{gettext("Last run")}</dt>
-          <dd class="min-w-0 text-zinc-300">{last_run(@status)}</dd>
-        </div>
-        <div class="flex gap-2">
-          <dt class="text-zinc-500">{gettext("Next run")}</dt>
-          <dd class="text-zinc-300">{next_run(@status)}</dd>
-        </div>
-        <div class="flex gap-2">
-          <dt class="text-zinc-500">{gettext("In its care")}</dt>
-          <dd class="text-zinc-300">
-            {gettext("%{active} active, %{stale} stale, %{archived} archived", active: @status.active, stale: @status.stale, archived: @status.archived)}
-          </dd>
-        </div>
-      </dl>
+      <.meta_list class="mt-4">
+        <:item label={gettext("Last run")}>
+          {last_run(@status)}
+          <span :if={run_note(@status)} class="mt-0.5 block text-[13.5px] text-zinc-500">{run_note(@status)}</span>
+        </:item>
+        <:item label={gettext("Next run")}>{next_run(@status)}</:item>
+        <:item label={gettext("In its care")}>
+          {gettext("Active: %{active}, stale: %{stale}, archived: %{archived}", active: @status.active, stale: @status.stale, archived: @status.archived)}
+        </:item>
+      </.meta_list>
 
       <div :if={@result} class="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
         <div class="mb-1 flex items-center justify-between text-sm text-zinc-400">
@@ -173,7 +167,14 @@ defmodule PepeWeb.SkillCuratorComponent do
   defp pill_cls(_), do: "bg-zinc-800 text-zinc-400"
 
   defp last_run(%{last_run_at: nil}), do: gettext("never")
-  defp last_run(%{last_run_at: at, last_run_summary: summary}), do: "#{Calendar.strftime(at, "%Y-%m-%d %H:%M")} UTC, #{summary}"
+  defp last_run(%{last_run_at: at}), do: "#{Calendar.strftime(at, "%Y-%m-%d %H:%M")} UTC"
+
+  # What the last run reported, under its date. The very first look is not a run at all: it only
+  # starts the clock, and its stored English sentence says so in words nobody should have to read.
+  defp run_note(%{last_run_at: nil}), do: nil
+  defp run_note(%{last_run_summary: "first look" <> _}), do: gettext("First look: it waits one interval before the first real run.")
+  defp run_note(%{last_run_summary: summary}) when summary in [nil, ""], do: nil
+  defp run_note(%{last_run_summary: summary}), do: summary
 
   defp next_run(%{next_run_at: nil}), do: gettext("none scheduled")
   defp next_run(%{next_run_at: at}), do: "#{Calendar.strftime(at, "%Y-%m-%d %H:%M")} UTC"

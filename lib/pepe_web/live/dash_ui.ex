@@ -445,6 +445,26 @@ defmodule PepeWeb.DashUI do
     """
   end
 
+  attr :title, :string, required: true
+  attr :class, :string, default: nil
+
+  @doc """
+  The slim bar at the top of every page: the nav drawer button below `md` and the breadcrumb.
+  `view_header/1` starts with it; the chat, which has no title block, uses it alone.
+  """
+  def page_topbar(assigns) do
+    ~H"""
+    <div class={["flex min-h-14 shrink-0 items-center gap-4 px-4 py-2 sm:px-8 xl:px-14", @class]}>
+      <.nav_toggle class="" />
+      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center gap-2.5">
+        <span class="text-[14.5px] font-semibold tracking-[.01em] text-zinc-100">Pepe</span>
+        <span class="text-xs text-[#4e5c68]">/</span>
+        <span class="truncate text-[13.5px] text-zinc-400">{@title}</span>
+      </nav>
+    </div>
+    """
+  end
+
   # `icon` is kept so existing callers still compile; the page no longer draws an emoji.
   attr :icon, :string, default: nil
   attr :title, :string, required: true
@@ -464,14 +484,7 @@ defmodule PepeWeb.DashUI do
 
     ~H"""
     <header class="shrink-0">
-      <div class="flex min-h-14 items-center gap-4 px-4 py-2 sm:px-8 xl:px-14">
-        <.nav_toggle class="" />
-        <nav aria-label="Breadcrumb" class="flex min-w-0 items-center gap-2.5">
-          <span class="text-[14.5px] font-semibold tracking-[.01em] text-zinc-100">Pepe</span>
-          <span class="text-xs text-[#4e5c68]">/</span>
-          <span class="truncate text-[13.5px] text-zinc-400">{@title}</span>
-        </nav>
-      </div>
+      <.page_topbar title={@title} />
       <%!-- The title block and its actions share one column, capped like the page body below it,
             so on a wide screen the page's main button stays next to its title instead of drifting
             to the far edge of the window. --%>
