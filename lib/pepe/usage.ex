@@ -481,7 +481,13 @@ defmodule Pepe.Usage do
     # What we actually paid for these tokens. Nothing, on a subscription: the month was
     # bought in advance and is counted once, as `subscriptions`.
     |> Map.put("cost", if(e["sub"], do: 0.0, else: list))
+    # What the provider's prompt cache took off the bill: the cached tokens at the price they
+    # would have cost fresh, minus what they cost. Nothing on a subscription (nothing was billed).
+    |> Map.put("saved", if(e["sub"], do: 0.0, else: saved(e["cached"] || 0, ip, cp)))
   end
+
+  defp saved(cached, ip, cp) when is_number(ip) and is_number(cp) and cached > 0, do: max(cached * (ip - cp) / 1_000_000, 0.0)
+  defp saved(_cached, _ip, _cp), do: 0.0
 
   @doc """
   The `{input_price, output_price, cached_input_price}` per 1M tokens for a model connection: its
@@ -509,7 +515,7 @@ defmodule Pepe.Usage do
   defp sum(entries) do
     Enum.reduce(
       entries,
-      %{in: 0, out: 0, cached: 0, total: 0, list: 0.0, cost: 0.0, billable: 0.0, count: 0},
+      %{in: 0, out: 0, cached: 0, total: 0, list: 0.0, cost: 0.0, billable: 0.0, saved: 0.0, count: 0},
       fn e, a ->
         %{
           in: a.in + e["in"],
@@ -521,6 +527,7 @@ defmodule Pepe.Usage do
           list: a.list + e["list"],
           cost: a.cost + e["cost"],
           billable: a.billable + e["billable"],
+          saved: a.saved + e["saved"],
           count: a.count + 1
         }
       end
