@@ -35,6 +35,12 @@ recebe, a menos que o agente já tenha essa ferramenta pré-aprovada. O agente
 proprietário, esse omnipotente, nunca pergunta nada. Como a barreira decide isto está em
 [Segurança e sandbox](../security/).
 
+## Tendências na visão geral
+
+A visão geral compara o andamento desta semana (ou deste mês) com o do período anterior: gasto, tokens, execuções e erros, cada um com a variação. A comparação é *até agora contra o mesmo ponto do período anterior*: uma quarta-feira mede-se contra a quarta passada, não contra a semana inteira. Por baixo, dois gráficos mostram as últimas oito semanas: o gasto, e as execuções com os erros. A última barra é a semana em curso, chamada "Esta semana" porque ainda não acabou. Uma execução é um turno do agente, e um erro é uma execução que não terminou bem.
+
+Um segundo bloco, *Como está a correr*, traz as boas notícias: a taxa de sucesso (execuções que terminaram bem), o tempo típico de resposta (a mediana, para uma execução encravada não estragar uma boa semana) e quanto a cache de prompt do fornecedor poupou, cada um contra o período anterior, e ainda gráficos da taxa de sucesso e da parte da entrada servida pela cache por semana, das horas de maior movimento do dia e dos canais de onde vêm as conversas.
+
 ## O que a barra lateral traz
 
 A barra lateral espelha a CLI: praticamente tudo o que dá para fazer com o comando `pepe`

@@ -12,9 +12,9 @@ flowchart LR
     TG["Telegram"] --> AG
     ACP["ACP - code editors"] --> AG
 
-    AG["<b>Pepe.Agent</b><br/>oneshot · keyed chat sessions"] --> RT
+    AG["<b>Pepe.Agent</b><br/>oneshot, keyed chat sessions"] --> RT
     RT["<b>Pepe.Agent.Runtime</b><br/>the tool-calling loop"] --> LLM
-    RT --> TL["<b>Pepe.Tools</b><br/>bash · files · web · MCP"]
+    RT --> TL["<b>Pepe.Tools</b><br/>bash, files, web, MCP"]
     LLM["<b>Pepe.LLM</b><br/>calls the model over HTTP<br/>(OpenAI API format)"] --> PROV(["any OpenAI-compatible provider"])
     CFG["<b>Pepe.Config</b> - ~/.pepe/config.json"] -.-> AG
 ```

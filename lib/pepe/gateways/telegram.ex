@@ -2386,7 +2386,7 @@ defmodule Pepe.Gateways.Telegram do
     project = Project.of(agent_default())
     cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(project))
     count = Pepe.Usage.message_count_month_to_date(project)
-    send_message(chat_id, gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
+    send_message(chat_id, gettext("This month: %{cost}, %{count} messages", cost: cost, count: count))
   end
 
   defp run_command(chat_id, "inline", "") do
@@ -2803,7 +2803,7 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   defp manage_approvals(chat_id, _other) do
-    send_message(chat_id, gettext("Usage: /approve  ·  /approve clear  ·  /approve clear <tool>"))
+    send_message(chat_id, gettext("Usage: /approve, /approve clear, /approve clear <tool>"))
   end
 
   defp update_agent_approvals(chat_id, fun, ok_message) do
@@ -3351,7 +3351,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp activity_line(name, raw) do
     case decode_args(raw) do
-      map when map_size(map) > 0 -> @tool_running <> " " <> name <> " · " <> map_preview(map)
+      map when map_size(map) > 0 -> @tool_running <> " " <> name <> ", " <> map_preview(map)
       _ -> @tool_running <> " " <> name
     end
   end

@@ -50,6 +50,19 @@ defmodule PepeWeb.ChatLiveAttachmentTest do
     assert html =~ "here you go"
   end
 
+  test "a picture is shown inline as well as linked, other files are only linked", %{key: key} do
+    {:ok, view, _html} = live(conn(), "/chat?chat=#{key}")
+
+    send(view.pid, {:session_event, key, {:file_ready, "tok-img", "orders.png", "Orders per week"}})
+    send(view.pid, {:session_event, key, {:file_ready, "tok-doc", "orders.xlsx", nil}})
+
+    html = render(view)
+    assert html =~ ~s(<img src="/dashboard/files/tok-img")
+    assert html =~ ~s(alt="Orders per week")
+    refute html =~ ~s(<img src="/dashboard/files/tok-doc")
+    assert html =~ ~s(href="/dashboard/files/tok-doc")
+  end
+
   test "an attachment with no caption renders without one", %{key: key} do
     {:ok, view, _html} = live(conn(), "/chat?chat=#{key}")
 

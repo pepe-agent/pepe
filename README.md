@@ -9,16 +9,16 @@
 </p>
 
 <p align="center">
-  Web dashboard &nbsp;·&nbsp; OpenAI-compatible HTTP &nbsp;·&nbsp; WebSocket &nbsp;·&nbsp; Telegram &nbsp;·&nbsp; WhatsApp &nbsp;·&nbsp; CLI
+  Web dashboard ,  OpenAI-compatible HTTP ,  WebSocket ,  Telegram ,  WhatsApp ,  CLI
 </p>
 
 <p align="center">
   <a href="https://pepe-agent.com"><strong>Website</strong></a>
-  &nbsp;·&nbsp;
+  &nbsp;&nbsp;
   <a href="https://pepe-agent.com/en/docs/">Documentation</a>
-  &nbsp;·&nbsp;
+  &nbsp;&nbsp;
   <a href="https://pepe-agent.com/en/docs/quickstart/">Quickstart</a>
-  &nbsp;·&nbsp;
+  &nbsp;&nbsp;
   <a href="https://github.com/sponsors/jhonathas">Sponsor</a>
 </p>
 
@@ -184,15 +184,15 @@ mix pepe run "list the files here and summarize the project"
 **The docs live at [pepe-agent.com/docs](https://pepe-agent.com/en/docs/)**, in English,
 Portuguese and Spanish. One topic per page; open just what you need.
 
-**Start** &nbsp; [Install](https://pepe-agent.com/en/docs/install/) · [Docker](https://pepe-agent.com/en/docs/docker/) · [Quickstart](https://pepe-agent.com/en/docs/quickstart/)
+**Start** &nbsp; [Install](https://pepe-agent.com/en/docs/install/), [Docker](https://pepe-agent.com/en/docs/docker/), [Quickstart](https://pepe-agent.com/en/docs/quickstart/)
 
-**Configure** &nbsp; [Models](https://pepe-agent.com/en/docs/models/) · [Agents](https://pepe-agent.com/en/docs/agents/) · [Configuration](https://pepe-agent.com/en/docs/config/) · [Secrets & vaults](https://pepe-agent.com/en/docs/secrets/) · [Usage & billing](https://pepe-agent.com/en/docs/billing/) · [Projects](https://pepe-agent.com/en/docs/projects/)
+**Configure** &nbsp; [Models](https://pepe-agent.com/en/docs/models/), [Agents](https://pepe-agent.com/en/docs/agents/), [Configuration](https://pepe-agent.com/en/docs/config/), [Secrets & vaults](https://pepe-agent.com/en/docs/secrets/), [Usage & billing](https://pepe-agent.com/en/docs/billing/), [Projects](https://pepe-agent.com/en/docs/projects/)
 
-**What an agent can do** &nbsp; [Skills](https://pepe-agent.com/en/docs/skills/) · [PepeHub](https://hub.pepe-agent.com) (skill/plugin marketplace) · [Learning](https://pepe-agent.com/en/docs/learning/) (memory search included) · [Agent-to-agent routing](https://pepe-agent.com/en/docs/routing/) · [Delegation](https://pepe-agent.com/en/docs/delegation/) · [Admin agents](https://pepe-agent.com/en/docs/admin-agents/) · [Session search](https://pepe-agent.com/en/docs/session-search/) · [Browser](https://pepe-agent.com/en/docs/browser/) · [Fetch URL](https://pepe-agent.com/en/docs/fetch-url/)
+**What an agent can do** &nbsp; [Skills](https://pepe-agent.com/en/docs/skills/), [PepeHub](https://hub.pepe-agent.com) (skill/plugin marketplace), [Learning](https://pepe-agent.com/en/docs/learning/) (memory search included), [Agent-to-agent routing](https://pepe-agent.com/en/docs/routing/), [Delegation](https://pepe-agent.com/en/docs/delegation/), [Admin agents](https://pepe-agent.com/en/docs/admin-agents/), [Session search](https://pepe-agent.com/en/docs/session-search/), [Browser](https://pepe-agent.com/en/docs/browser/), [Fetch URL](https://pepe-agent.com/en/docs/fetch-url/)
 
-**Talk to it** &nbsp; [Dashboard](https://pepe-agent.com/en/docs/dashboard/) · [HTTP API](https://pepe-agent.com/en/docs/api/) · [Usage API](https://pepe-agent.com/en/docs/usage-api/) · [WebSocket](https://pepe-agent.com/en/docs/websocket/) · [Code editors](https://pepe-agent.com/en/docs/editors/) · [Telegram](https://pepe-agent.com/en/docs/telegram/) · [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/) · [Slack, Discord, Teams, Chat](https://pepe-agent.com/en/docs/channels/) · [Widget](https://pepe-agent.com/en/docs/widget/)
+**Talk to it** &nbsp; [Dashboard](https://pepe-agent.com/en/docs/dashboard/), [HTTP API](https://pepe-agent.com/en/docs/api/), [Usage API](https://pepe-agent.com/en/docs/usage-api/), [WebSocket](https://pepe-agent.com/en/docs/websocket/), [Code editors](https://pepe-agent.com/en/docs/editors/), [Telegram](https://pepe-agent.com/en/docs/telegram/), [WhatsApp](https://pepe-agent.com/en/docs/whatsapp/), [Slack, Discord, Teams, Chat](https://pepe-agent.com/en/docs/channels/), [Widget](https://pepe-agent.com/en/docs/widget/)
 
-**Automate & operate** &nbsp; [Goals](https://pepe-agent.com/en/docs/goals/) · [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/) · [Flows](https://pepe-agent.com/en/docs/flows/) · [Board](https://pepe-agent.com/en/docs/board/) · [Watches](https://pepe-agent.com/en/docs/watches/) · [MCP servers](https://pepe-agent.com/en/docs/mcp/) · [Plugins](https://pepe-agent.com/en/docs/plugins/) · [Security](https://pepe-agent.com/en/docs/security/) · [Privacy hooks](https://pepe-agent.com/en/docs/privacy/) · [Traces](https://pepe-agent.com/en/docs/traces/) · [Evals](https://pepe-agent.com/en/docs/evals/)
+**Automate & operate** &nbsp; [Goals](https://pepe-agent.com/en/docs/goals/), [Scheduled tasks](https://pepe-agent.com/en/docs/scheduled/), [Flows](https://pepe-agent.com/en/docs/flows/), [Board](https://pepe-agent.com/en/docs/board/), [Watches](https://pepe-agent.com/en/docs/watches/), [MCP servers](https://pepe-agent.com/en/docs/mcp/), [Plugins](https://pepe-agent.com/en/docs/plugins/), [Security](https://pepe-agent.com/en/docs/security/), [Privacy hooks](https://pepe-agent.com/en/docs/privacy/), [Traces](https://pepe-agent.com/en/docs/traces/), [Evals](https://pepe-agent.com/en/docs/evals/)
 
 ### In this repository
 
@@ -200,7 +200,7 @@ Only what you read when you are working *on* Pepe rather than *with* it. Everyth
 user reads lives on the site, once, so the two cannot drift apart, which is precisely
 what they did while there were two copies.
 
-[Architecture](docs/architecture.md) · [CLI reference](docs/cli-reference.md) · [Adding a tool](docs/adding-a-tool.md) · [Tests](docs/tests.md) · [Migrating from another runtime](docs/migrating.md) · [Contributing & help wanted](docs/contributing.md)
+[Architecture](docs/architecture.md), [CLI reference](docs/cli-reference.md), [Adding a tool](docs/adding-a-tool.md), [Tests](docs/tests.md), [Migrating from another runtime](docs/migrating.md), [Contributing & help wanted](docs/contributing.md)
 
 **More screenshots**
 

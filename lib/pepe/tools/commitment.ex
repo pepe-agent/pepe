@@ -112,7 +112,7 @@ defmodule Pepe.Tools.Commitment do
   defp describe(%Commitment{} = c) do
     [
       "• #{c.id} - #{c.text} (#{c.state})",
-      "  who: #{c.origin_type} · due: #{c.due_when || "unresolved"}"
+      "  who: #{c.origin_type}, due: #{c.due_when || "unresolved"}"
     ]
     |> Enum.join("\n")
   end

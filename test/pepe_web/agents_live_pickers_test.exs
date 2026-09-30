@@ -22,6 +22,7 @@ defmodule PepeWeb.AgentsLivePickersTest do
     File.mkdir_p!(home)
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_agent(%Agent{name: "assistant", tools: ["bash", "read_file"]})
     Config.put_agent(%Agent{name: "helper"})
@@ -153,15 +154,19 @@ defmodule PepeWeb.AgentsLivePickersTest do
     assert html =~ "Memory search"
   end
 
-  test "the persona section is open even when a save fails validation" do
+  test "the persona tab is showing even when a save fails validation while another tab was open" do
     {:ok, view, _html} = live(conn(), "/agents")
     render_click(view, "agent_new", %{})
+    render_click(view, "agent_tab", %{"tab" => "limits"})
 
     html = render_submit(view, "agent_save", %{"agent" => %{"name" => ""}, "system_prompt" => "kept"})
 
     assert html =~ "Please fix the errors below."
     assert html =~ "can&#39;t be blank"
-    assert Regex.run(~r/<details open[^>]*>\s*<summary[^>]*>\s*Persona/s, html)
+    # The Name field the error points at lives on the Persona tab, so that tab must be the visible one.
+    assert has_element?(view, ~s(button[role=tab][phx-value-tab=persona][aria-selected=true]))
+    assert has_element?(view, ~s(button[role=tab][phx-value-tab=limits][aria-selected=false]))
+
     assert html =~ "kept"
   end
 

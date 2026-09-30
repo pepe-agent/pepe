@@ -19,7 +19,7 @@ defmodule PepeWeb.ProjectsLive do
     {:ok,
      socket
      |> assign(
-       page_title: "Pepe · Projects",
+       page_title: "Pepe: Projects",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -71,7 +71,7 @@ defmodule PepeWeb.ProjectsLive do
     <div class={shell_cls()}>
       <.sidebar active="projects" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="projects"
           icon="🏢"
           title={gettext("Projects")}
           desc={gettext("A project is an isolated workspace (tenant): its agents, models and automations are walled off from every other. Principal is the default, non-project workspace.")}
@@ -80,13 +80,13 @@ defmodule PepeWeb.ProjectsLive do
           <button :if={@editing} phx-click="project_cancel" class={btn_ghost()}>&larr; {gettext("Back to projects")}</button>
         </.view_header>
 
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :if={!@editing} class="space-y-3">
           <div class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{gettext("Principal")}</span>
-                <span class="ml-2 text-sm text-zinc-500">{gettext("%{count} agents", count: length(Config.agents_in(nil)))}</span>
+                <span class="ml-2 text-sm text-zinc-500">{ngettext("%{count} agent", "%{count} agents", length(Config.agents_in(nil)))}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <.link navigate={~p"/overview?scope=root"} class={btn_ghost()}>{gettext("Open")}</.link>
@@ -94,76 +94,17 @@ defmodule PepeWeb.ProjectsLive do
               </div>
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-2 gap-y-1 text-sm">
-              <span :if={Config.project_markup(nil) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
+              <span :if={Config.project_markup(nil) != 1.0} class="rounded bg-orange-400/15 px-1.5 text-orange-300">
                 {gettext("markup ×%{m}", m: Config.project_markup(nil))}
               </span>
-              <span
-                :if={Config.project_budget(nil)}
-                title={gettext("Spend counted toward the cap, not the billable total. See Usage for the real month total, which resets never touch.")}
-                class={[
-                  "rounded px-1.5",
-                  (@usage["root"].over_budget && "bg-red-800/60 text-red-200") ||
-                    (@usage["root"].near_budget && "bg-amber-800/50 text-amber-100") ||
-                    "bg-emerald-900/40 text-emerald-200"
-                ]}
-              >
-                {money(@usage["root"].month_to_date, Config.currency())} / {money(Config.project_budget(nil), Config.currency())}
-                <span :if={@usage["root"].budget_reset_at} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(@usage["root"].budget_reset_at, "%m/%d"))}
-                </span>
-              </span>
-              <span :if={Config.project_budget(nil)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
-              <button
-                :if={Config.project_budget(nil)}
-                phx-click="project_reset_budget"
-                phx-value-name="root"
-                data-confirm={gettext("Reset the principal scope's spend count (currently %{n}) for the rest of this month?", n: money(@usage["root"].month_to_date, Config.currency()))}
-                class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
-              >
-                {gettext("reset")}
-              </button>
-              <span
-                :if={Config.project_message_limit(nil)}
-                title={gettext("Messages counted toward the cap. A reset clears it, so it may not include every message this month.")}
-                class={[
-                  "rounded px-1.5",
-                  (@usage["root"].over_message_limit && "bg-red-800/60 text-red-200") ||
-                    "bg-emerald-900/40 text-emerald-200"
-                ]}
-              >
-                {gettext("%{used}/%{limit} msgs/mo", used: @usage["root"].message_count, limit: Config.project_message_limit(nil))}
-                <span :if={@usage["root"].messages_reset_at} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(@usage["root"].messages_reset_at, "%m/%d"))}
-                </span>
-              </span>
-              <span :if={Config.project_message_limit(nil)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
-              <button
-                :if={Config.project_message_limit(nil)}
-                phx-click="project_reset_messages"
-                phx-value-name="root"
-                data-confirm={gettext("Reset the principal scope's message count (currently %{n}) for the rest of this month?", n: @usage["root"].message_count)}
-                class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
-              >
-                {gettext("reset")}
-              </button>
-              <span :if={@usage["root"].prepaid_balance} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
-              <span
-                :if={@usage["root"].prepaid_balance}
-                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above; add funds with mix pepe project credit.")}
-                class={[
-                  "rounded px-1.5",
-                  (@usage["root"].prepaid_balance <= 0 && "bg-red-800/60 text-red-200") || "bg-sky-900/40 text-sky-200"
-                ]}
-              >
-                {gettext("balance: %{amount}", amount: money(@usage["root"].prepaid_balance, Config.currency()))}
-              </span>
             </div>
+            <.limits name="root" scope={nil} usage={@usage["root"]} />
           </div>
           <div :for={name <- @projects} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{name}</span>
-                <span class="ml-2 text-sm text-zinc-500">{gettext("%{count} agents", count: length(Config.agents_in(name)))}</span>
+                <span class="ml-2 text-sm text-zinc-500">{ngettext("%{count} agent", "%{count} agents", length(Config.agents_in(name)))}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <.link navigate={~p"/overview?scope=#{name}"} class={btn_ghost()}>{gettext("Open")}</.link>
@@ -180,84 +121,24 @@ defmodule PepeWeb.ProjectsLive do
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-2 gap-y-1 text-sm">
               <span :if={desc_of(name)} class="text-zinc-400">{desc_of(name)}</span>
-              <span :if={Config.project_markup(name) != 1.0} class="rounded bg-amber-800/40 px-1.5 text-amber-200">
+              <span :if={Config.project_markup(name) != 1.0} class="rounded bg-orange-400/15 px-1.5 text-orange-300">
                 {gettext("markup ×%{m}", m: Config.project_markup(name))}
               </span>
-              <span
-                :if={Config.project_budget(name)}
-                title={gettext("Spend counted toward the cap, not the billable total. See Usage for the real month total, which resets never touch.")}
-                class={[
-                  "rounded px-1.5",
-                  (@usage[name].over_budget && "bg-red-800/60 text-red-200") ||
-                    "bg-emerald-900/40 text-emerald-200"
-                ]}
-              >
-                {money(@usage[name].month_to_date, Config.currency())} / {money(Config.project_budget(name), Config.currency())}
-                <span :if={@usage[name].budget_reset_at} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(@usage[name].budget_reset_at, "%m/%d"))}
-                </span>
-              </span>
-              <span :if={Config.project_budget(name)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
-              <button
-                :if={Config.project_budget(name)}
-                phx-click="project_reset_budget"
-                phx-value-name={name}
-                data-confirm={gettext("Reset %{name}'s spend count (currently %{n}) for the rest of this month?", name: name, n: money(@usage[name].month_to_date, Config.currency()))}
-                class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
-              >
-                {gettext("reset")}
-              </button>
-              <span
-                :if={Config.project_message_limit(name)}
-                title={gettext("Messages counted toward the cap. A reset clears it, so it may not include every message this month.")}
-                class={[
-                  "rounded px-1.5",
-                  (@usage[name].over_message_limit && "bg-red-800/60 text-red-200") ||
-                    "bg-emerald-900/40 text-emerald-200"
-                ]}
-              >
-                {gettext("%{used}/%{limit} msgs/mo", used: @usage[name].message_count, limit: Config.project_message_limit(name))}
-                <span :if={@usage[name].messages_reset_at} class="text-zinc-500">
-                  · {gettext("since %{date}", date: local_datetime(@usage[name].messages_reset_at, "%m/%d"))}
-                </span>
-              </span>
-              <span :if={Config.project_message_limit(name)} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
-              <button
-                :if={Config.project_message_limit(name)}
-                phx-click="project_reset_messages"
-                phx-value-name={name}
-                data-confirm={gettext("Reset %{name}'s message count (currently %{n}) for the rest of this month?", name: name, n: @usage[name].message_count)}
-                class="text-xs font-medium text-zinc-500 hover:text-zinc-300"
-              >
-                {gettext("reset")}
-              </button>
-              <span :if={@usage[name].prepaid_balance} aria-hidden="true" class="-mx-1 text-zinc-700">·</span>
-              <span
-                :if={@usage[name].prepaid_balance}
-                title={gettext("Real funds credited (a payment, or added by hand), depleted by billable spend. Separate from the monthly cap above; add funds with mix pepe project credit.")}
-                class={[
-                  "rounded px-1.5",
-                  (@usage[name].prepaid_balance <= 0 && "bg-red-800/60 text-red-200") || "bg-sky-900/40 text-sky-200"
-                ]}
-              >
-                {gettext("balance: %{amount}", amount: money(@usage[name].prepaid_balance, Config.currency()))}
-              </span>
             </div>
+            <.limits name={name} scope={name} usage={@usage[name]} />
           </div>
-          <p :if={@projects == []} class="text-[15px] text-zinc-500">
+          <.empty_state :if={@projects == []}>
             {gettext("No projects yet. Everything lives in the Principal workspace. Create one to isolate a client or team.")}
-          </p>
+          </.empty_state>
           </div>
 
-          <div :if={@editing} class="max-w-2xl">
+          <div :if={@editing} class="max-w-3xl">
             <.form for={@form} phx-submit="project_save" class="space-y-4">
-              <div class="text-lg font-semibold">
-                {cond do
+              <.form_section title={cond do
                   @editing.name == "root" -> gettext("Edit Principal")
                   @editing.new? -> gettext("+ New project")
                   true -> gettext("Edit %{name}", name: @editing.name)
-                end}
-              </div>
+                end}>
               <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
                 {gettext("Please fix the errors below.")}
               </div>
@@ -312,6 +193,7 @@ defmodule PepeWeb.ProjectsLive do
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
                 <button type="button" phx-click="project_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </.form>
           </div>
         </div>
@@ -319,6 +201,100 @@ defmodule PepeWeb.ProjectsLive do
     </div>
     """
   end
+
+  attr :name, :string, required: true, doc: "\"root\" or the project slug, what the reset events carry"
+  attr :scope, :any, required: true, doc: "nil for the principal scope, else the slug"
+  attr :usage, :map, required: true
+
+  # The spend cap, the message cap and the prepaid balance of one project, as labelled rows with
+  # a bar, instead of loose pills with a bare "reset" beside them. Starting a count over only
+  # clears what the cap checks; the real totals on the Usage page never change.
+  defp limits(assigns) do
+    assigns =
+      assign(assigns,
+        budget: Config.project_budget(assigns.scope),
+        cap: Config.project_message_limit(assigns.scope),
+        currency: Config.currency()
+      )
+
+    ~H"""
+    <div :if={@budget || @cap || @usage.prepaid_balance} class="mt-4">
+      <div class="divide-y divide-white/[.06] rounded-[12px] border border-white/[.08]">
+        <.limit_row
+          :if={@budget}
+          label={gettext("Monthly spend")}
+          used={money(@usage.month_to_date, @currency)}
+          of={gettext("of %{limit}", limit: money(@budget, @currency))}
+          ratio={@usage.month_to_date / max(@budget, 1.0e-9)}
+          state={(@usage.over_budget && :over) || (@usage.near_budget && :near) || :ok}
+          since={@usage.budget_reset_at && gettext("since %{date}", date: local_datetime(@usage.budget_reset_at, "%m/%d"))}
+          event="project_reset_budget"
+          name={@name}
+          confirm={gettext("Reset %{name}'s spend count (currently %{n}) for the rest of this month?", name: display_name(@name), n: money(@usage.month_to_date, @currency))}
+        />
+        <.limit_row
+          :if={@cap}
+          label={gettext("Messages this month")}
+          used={Integer.to_string(@usage.message_count)}
+          of={gettext("of %{limit}", limit: @cap)}
+          ratio={@usage.message_count / max(@cap, 1)}
+          state={(@usage.over_message_limit && :over) || :ok}
+          since={@usage.messages_reset_at && gettext("since %{date}", date: local_datetime(@usage.messages_reset_at, "%m/%d"))}
+          event="project_reset_messages"
+          name={@name}
+          confirm={gettext("Reset %{name}'s message count (currently %{n}) for the rest of this month?", name: display_name(@name), n: @usage.message_count)}
+        />
+        <div :if={@usage.prepaid_balance} class="flex items-center justify-between gap-4 px-4 py-3 text-[14.5px]">
+          <span class="text-zinc-400">{gettext("Prepaid balance")}</span>
+          <span class={["font-mono", (@usage.prepaid_balance <= 0 && "text-danger-ink") || "text-zinc-100"]}>
+            {money(@usage.prepaid_balance, @currency)}
+          </span>
+        </div>
+      </div>
+      <p :if={@budget || @cap} class="mt-2 text-[13px] leading-relaxed text-zinc-600">
+        {gettext("Starting a count over only clears what the cap checks. Usage and billing keep the real totals.")}
+      </p>
+    </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :used, :string, required: true
+  attr :of, :string, required: true
+  attr :ratio, :float, required: true
+  attr :state, :atom, values: [:ok, :near, :over], required: true
+  attr :since, :string, default: nil
+  attr :event, :string, required: true
+  attr :name, :string, required: true
+  attr :confirm, :string, required: true
+
+  defp limit_row(assigns) do
+    ~H"""
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3.5">
+      <div class="w-40 text-[14px] text-zinc-400">{@label}</div>
+      <div class="min-w-[12rem] flex-1">
+        <div class="flex items-baseline justify-between gap-3 text-[14.5px]">
+          <span class={["font-mono", @state == :over && "text-danger-ink", @state != :over && "text-zinc-100"]}>{@used}</span>
+          <span class="text-zinc-500">{@of}</span>
+        </div>
+        <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[.07]" role="progressbar" aria-label={@label} aria-valuemin="0" aria-valuemax="100" aria-valuenow={round(min(@ratio, 1.0) * 100)}>
+          <div
+            class={["h-full rounded-full", @state == :over && "bg-danger-ink", @state == :near && "bg-orange-400", @state == :ok && "bg-teal-ink"]}
+            style={"width: #{max(round(min(@ratio, 1.0) * 100), 1)}%"}
+          >
+          </div>
+        </div>
+        <p :if={@since} class="mt-1.5 text-[12.5px] text-zinc-600">{@since}</p>
+      </div>
+      <button phx-click={@event} phx-value-name={@name} data-confirm={@confirm} class={[btn_ghost(), "h-9 px-3 text-[13.5px]"]}>
+        <.icon name="hero-arrow-path" class="size-4" />{gettext("Start over")}
+      </button>
+    </div>
+    """
+  end
+
+  defp display_name("root"), do: gettext("the principal scope")
+  defp display_name(name), do: name
 
   @impl true
   def handle_event("project_new", _p, socket),

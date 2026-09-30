@@ -79,6 +79,14 @@ herramientas para marcar y el alcance de administración. El resultado es la mis
 entrada escrita en <code>~/.pepe/config.json</code>, así que puedes combinar la CLI,
 el panel y la edición manual sin ningún problema.</div>
 
+El formulario se divide en pestañas (Persona, Modelo, Capacidades, Acceso, Límites), y lo que
+cambias se conserva como **borrador** mientras trabajas: se guarda sobre la marcha, así que
+salir de la página no pierde nada, pero no toca al agente en funcionamiento hasta que pulses
+**Guardar**. Guardar lo publica y limpia el borrador; el siguiente cambio empieza otro. Un
+agente con borrador sin publicar aparece marcado como **Borrador** en la lista, **Descartar
+borrador** vuelve a la versión guardada, y si el agente se modificó de otra forma mientras tu
+borrador estaba abierto, el editor te avisa antes de que Guardar pise ese cambio.
+
 ### Hazlo por chat
 
 Cualquier agente que tenga la herramienta `manage_agent` puede crear y configurar
@@ -253,6 +261,7 @@ El conjunto integrado cubre lo esencial:
 | `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabaja con archivos dentro del espacio de trabajo del agente. |
 | `fetch_url`, `web_search` | Lee una página web o busca en la web. |
 | `send_file` | Entrega un archivo que el agente generó, por el canal actual. |
+| `chart` | Dibuja un gráfico de barras, líneas o circular con números que el agente ya tiene y lo envía como imagen. Necesita un conversor de SVG en la máquina (`rsvg-convert` o ImageMagick, ya incluido en la imagen Docker `-full`); sin uno, el gráfico se envía como SVG. |
 | `send_to_agent` | Envía un mensaje a otro agente (sujeto a `can_message`). |
 | `ask_user` | Te pide elegir entre varias opciones, con botones o un menú reales donde el canal lo permite. |
 | `schedule_task`, `watch` | Crea trabajos recurrentes y vigilancias puntuales del tipo "avísame cuando pase X". |

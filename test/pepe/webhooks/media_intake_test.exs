@@ -240,7 +240,7 @@ defmodule Pepe.Webhooks.MediaIntakeTest do
     # operator runs Pepe in, not in English by default.
     for {locale, too_big, no_speech} <- [
           {"es", "demasiado grande", "No pude distinguir ninguna voz"},
-          {"pt_BR", "grande demais", "Não consegui identificar nenhuma fala"},
+          {"pt_BR", "grande demais", "Não consegui entender nenhuma fala"},
           {"pt_PT", "demasiado grande", "Não consegui perceber nenhuma fala"}
         ] do
       test "in #{locale}: too big, unreadable download, and silence" do

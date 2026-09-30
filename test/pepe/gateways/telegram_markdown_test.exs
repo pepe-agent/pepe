@@ -45,14 +45,14 @@ defmodule Pepe.Gateways.Telegram.MarkdownTest do
     table = "| Dimensão | Premissa |\n|---|---|\n| Ambição | Crescer |\n| Norte | Entregar mais |"
     out = Markdown.to_html(table)
 
-    # separator row gone, each row is "label — value", no leftover pipes
-    assert out == "<b>Dimensão</b> — Premissa\n<b>Ambição</b> — Crescer\n<b>Norte</b> — Entregar mais"
+    # separator row gone, each row is "label: value", no leftover pipes
+    assert out == "<b>Dimensão</b>: Premissa\n<b>Ambição</b>: Crescer\n<b>Norte</b>: Entregar mais"
     refute out =~ "|"
     refute out =~ "---"
   end
 
   test "a 3-column row joins the trailing cells" do
-    assert Markdown.to_html("| A | B | C |") == "<b>A</b> — B · C"
+    assert Markdown.to_html("| A | B | C |") == "<b>A</b>: B, C"
   end
 
   test "prose with a stray pipe is left alone" do

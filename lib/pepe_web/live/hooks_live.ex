@@ -18,10 +18,10 @@ defmodule PepeWeb.HooksLive do
   alias PepeWeb.AiFill
 
   @icons %{
-    "pii_redact" => "🧩",
-    "llm_redact" => "🧠",
-    "http_redact" => "🔌",
-    "presidio" => "🛡️"
+    "pii_redact" => "hero-puzzle-piece",
+    "llm_redact" => "hero-cpu-chip",
+    "http_redact" => "hero-globe-alt",
+    "presidio" => "hero-shield-check"
   }
 
   @impl true
@@ -29,7 +29,7 @@ defmodule PepeWeb.HooksLive do
     {:ok,
      socket
      |> assign(
-       page_title: "Pepe · Privacy",
+       page_title: "Pepe: Privacy",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -50,7 +50,7 @@ defmodule PepeWeb.HooksLive do
     <div class={shell_cls()}>
       <.sidebar active="hooks" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="hooks"
           icon="🛡️"
           title={gettext("Privacy")}
           desc={gettext("Redact PII on the message flow before it reaches a model. Configure a hook here, then enable it on an agent (Agents). Empty = no redaction (raw text).")}
@@ -60,7 +60,7 @@ defmodule PepeWeb.HooksLive do
           </button>
         </.view_header>
 
-        <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <%= if @editing do %>
             {form_panel(assigns)}
           <% else %>
@@ -72,13 +72,9 @@ defmodule PepeWeb.HooksLive do
               <div :for={name <- Hooks.names()} class={card()}>
                 <div class="flex items-start justify-between gap-2">
                   <div class="flex items-center gap-2 font-medium">
-                    <span>{meta_icon(name)}</span> <span>{meta_title(name)}</span>
+                    <.icon name={meta_icon(name)} class="size-[18px] shrink-0 text-zinc-500" /> <span>{meta_title(name)}</span>
                   </div>
-                  <span class={[
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    (configured?(@settings, name) && "bg-orange-600/20 text-orange-300") ||
-                      "bg-zinc-800 text-zinc-500"
-                  ]}>
+                  <span class={tag((configured?(@settings, name) && :ok) || :muted)}>
                     {(configured?(@settings, name) && gettext("configured")) || gettext("Not set")}
                   </span>
                 </div>
@@ -107,23 +103,18 @@ defmodule PepeWeb.HooksLive do
 
   defp form_panel(assigns) do
     ~H"""
-    <div class="max-w-2xl">
-      <div class="mb-4 flex items-center gap-2">
-        <span class="text-lg">{meta_icon(@editing)}</span>
-        <div>
-          <div class="font-medium">{meta_title(@editing)}</div>
-          <div class="text-sm text-zinc-500">
+    <div class="max-w-3xl">
+      <form phx-submit="save">
+        <.form_section title={meta_title(@editing)}>
+          <p class="-mt-3 font-mono text-[12px] tracking-[.04em] text-zinc-600">
             {gettext("Config key: %{key}", key: @editing)}
+          </p>
+          {fields(assigns)}
+          <div class="flex items-center gap-2 border-t border-zinc-800 pt-5">
+            <button type="submit" class={btn()}>{gettext("Save")}</button>
+            <button type="button" phx-click="cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
           </div>
-        </div>
-      </div>
-
-      <form phx-submit="save" class="space-y-4">
-        {fields(assigns)}
-        <div class="flex items-center gap-2 border-t border-zinc-800 pt-4">
-          <button type="submit" class={btn()}>{gettext("Save")}</button>
-          <button type="button" phx-click="cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
-        </div>
+        </.form_section>
       </form>
       <.ai_popup ai={@ai} models={Enum.map(Config.models(), & &1.name)} default_model={Config.default_model_name()} />
     </div>
@@ -160,7 +151,7 @@ defmodule PepeWeb.HooksLive do
       <p class={hlp()}>{gettext("One per line: name|regex|REPLACE_LABEL. Invalid regex is dropped on save.")}</p>
     </div>
 
-    <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+    <label class="flex items-center gap-2 text-base text-zinc-300">
       <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} class="h-4 w-4 accent-orange-500" />
       {gettext("Reversible (restore the real values on the reply)")}
     </label>
@@ -179,7 +170,7 @@ defmodule PepeWeb.HooksLive do
       <p class={hlp()}>{gettext("Use a local model (e.g. Ollama): a remote/hosted model here sends the raw, unredacted PII to that provider first, defeating the purpose of this hook.")}</p>
     </div>
 
-    <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+    <label class="flex items-center gap-2 text-base text-zinc-300">
       <input type="checkbox" name="reversible" value="true" checked={bool(@edit, "reversible", true)} class="h-4 w-4 accent-orange-500" />
       {gettext("Reversible (restore the real values on the reply)")}
     </label>

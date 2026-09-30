@@ -30,7 +30,7 @@ defmodule Pepe.Tools.ConfigGet do
     text = """
     Models: #{join(models)} (default: #{Config.default_model_name() || "none"})
     Agents: #{join(agents)} (default: #{Config.default_agent_name() || "none"})
-    Language: #{Config.locale()} · Timezone: #{Config.default_timezone()}
+    Language: #{Config.locale()}, Timezone: #{Config.default_timezone()}
     Telegram: #{telegram_status(telegram)}
     Bots: #{join(bots)}
     MCP servers: #{join(mcp)}

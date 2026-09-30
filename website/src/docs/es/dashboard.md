@@ -36,6 +36,12 @@ botones que le llegan a un usuario de Telegram, salvo que el agente ya tenga esa
 herramienta preaprobada. El agente propietario, el omnipotente, nunca pregunta.
 En [Seguridad y sandbox](../security/) está explicado cómo decide esa barrera.
 
+## Tendencias en el resumen
+
+El resumen compara cómo va esta semana (o este mes) con la anterior: gasto, tokens, ejecuciones y errores, cada uno con su variación. La comparación es *hasta ahora contra el mismo punto del periodo anterior*: un miércoles se mide contra el miércoles pasado, no contra la semana completa. Debajo, dos gráficos muestran las últimas ocho semanas: el gasto, y las ejecuciones con sus errores. La última barra es la semana en curso, llamada "Esta semana" porque aún no termina. Una ejecución es un turno del agente, y un error es una ejecución que no terminó bien.
+
+Un segundo bloque, *Cómo va*, trae las buenas noticias: la tasa de éxito (ejecuciones que terminaron bien), el tiempo típico de respuesta (la mediana, para que una ejecución atascada no arruine una buena semana) y cuánto ahorró el caché de prompts del proveedor, cada uno frente al periodo anterior, además de gráficos de la tasa de éxito y de la parte de la entrada servida desde el caché por semana, las horas con más actividad del día y los canales de donde vienen las conversaciones.
+
 ## Lo que encuentras en la barra lateral
 
 La barra lateral es un espejo de la CLI: casi cualquier cosa que hagas con el

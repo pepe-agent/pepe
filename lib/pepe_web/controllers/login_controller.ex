@@ -84,7 +84,7 @@ defmodule PepeWeb.LoginController do
 
     html = """
     <!doctype html><html lang="en"><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1"><title>Pepe · Sign in</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"><title>Pepe, Sign in</title>
     <style>
       *{box-sizing:border-box} body{margin:0;background:#09090b;color:#e4e4e7;
         font:15px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;

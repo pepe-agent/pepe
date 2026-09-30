@@ -20,6 +20,12 @@ Sessions live inside the running process, so run everything from the one `pepe s
 
 Risky tools are authorized inline here too. The run pauses and shows an allow/deny prompt, which is the web version of the buttons a Telegram user gets, unless the agent has already pre-approved that tool. The omnipotent owner agent never prompts. See [Security and sandbox](../security/) for how the gate decides.
 
+## Trends on the overview
+
+The overview page compares how this week (or this month) is going with the one before it: spend, tokens, runs and errors, each with how much it moved. The comparison is *so far against the same point of the previous period*, so a Wednesday is measured against last Wednesday and not against a full week. Below it, two charts show the last eight weeks: spend, and runs with errors. The last bar is the week in progress, labelled "This week" because it is not finished. A run is one agent turn, and an error is a run that did not end well.
+
+A second block, *How it's going*, is the good news: the success rate (runs that ended well), the typical reply time (the median, so one stuck run does not spoil a good week), and what the provider's prompt cache saved you, each against the previous period, plus charts of the success rate and the share of input served from cache by week, the busiest hours of the day and which channels conversations come from.
+
 ## What the sidebar holds
 
 The left sidebar mirrors the CLI, so almost everything you can do with the `pepe` command you can also do here:

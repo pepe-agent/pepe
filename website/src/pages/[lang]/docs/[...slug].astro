@@ -104,7 +104,7 @@ if (slug !== "index") {
 const breadcrumbJsonLd = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: breadcrumbItems };
 ---
 
-<Base title={`${frontmatter.title} · Pepe docs`} description={frontmatter.description} lang={lang} docs={true}>
+<Base title={`Pepe docs: ${frontmatter.title}`} description={frontmatter.description} lang={lang} docs={true}>
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
   <div class="container docs">
     <aside class="docs-nav">

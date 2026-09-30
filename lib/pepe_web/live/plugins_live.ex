@@ -19,7 +19,7 @@ defmodule PepeWeb.PluginsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Plugins",
+       page_title: "Pepe: Plugins",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -42,28 +42,24 @@ defmodule PepeWeb.PluginsLive do
     <div class={shell_cls()}>
       <.sidebar active="plugins" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="plugins"
           icon="🧩"
           title={gettext("Plugins")}
           desc={gettext("Install channels and tools that load at runtime, no rebuild. Pepe scans the code first, but a plugin runs with full access: install only from a source you trust.")}
         />
 
-        <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 space-y-6 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <.form_section title={gettext("Install a plugin")}>
             <div>
-              <p class="mb-3 flex items-start gap-2 text-[15px] text-amber-300">
-                <span class="mt-0.5">⚠️</span>
-                <span>
-                  {gettext("A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand.")}
-                </span>
-              </p>
-
-              <%!-- The trust checkbox comes first on purpose: it is what ungreys Install, so the
-                   operator has to meet it before the button it unlocks. --%>
-              <label class="mb-3 flex items-center gap-2 text-sm text-zinc-300">
-                <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4 accent-orange-500" />
-                {gettext("I trust this source and understand it runs with full access to this machine.")}
-              </label>
+              <%!-- The trust checkbox sits inside the notice on purpose: it is what ungreys Install, so
+                   the operator has to read the warning it answers before the button it unlocks. --%>
+              <.notice label={gettext("Warning")} class="mb-4">
+                <p>{gettext("A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand.")}</p>
+                <label class="flex cursor-pointer items-center gap-2 text-zinc-100">
+                  <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4" />
+                  {gettext("I trust this source and understand it runs with full access to this machine.")}
+                </label>
+              </.notice>
 
               <form id="plugin-install" phx-submit="install" phx-change="src_change" class="flex flex-col gap-2 sm:flex-row">
                 <input name="src" value={@src} autocomplete="off"
@@ -74,7 +70,7 @@ defmodule PepeWeb.PluginsLive do
                 </button>
               </form>
 
-              <p :if={not @trust} class="mt-1.5 text-sm leading-relaxed text-amber-300/80">
+              <p :if={not @trust} class="mt-2 text-[13.5px] leading-relaxed text-orange-400/80">
                 {gettext("Install stays disabled until you tick the box above.")}
               </p>
               <p class={hlp()}>
@@ -84,7 +80,7 @@ defmodule PepeWeb.PluginsLive do
               <div :if={@scan} class="mt-3">
                 <.scan_report scan={@scan} />
                 <button :if={@blocked} phx-click="install_force" disabled={@working or not @trust}
-                  class={[btn(), "mt-3 bg-red-600 hover:bg-red-500 disabled:opacity-50"]}>
+                  class={[btn(), "mt-3 !bg-danger-ink hover:!opacity-90 disabled:opacity-50"]}>
                   {gettext("Install anyway (I have reviewed it)")}
                 </button>
               </div>
@@ -104,7 +100,7 @@ defmodule PepeWeb.PluginsLive do
                     {kind_label(p.kind)}
                   </span>
                 </div>
-                <div :if={manifest_desc(p)} class="mt-0.5 truncate text-[15px] text-zinc-400">{manifest_desc(p)}</div>
+                <div :if={manifest_desc(p)} class="mt-0.5 truncate text-base text-zinc-400">{manifest_desc(p)}</div>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1">
                 <button :if={configurable?(p)} phx-click="configure" phx-value-name={p.name} class={btn_ghost()}>{gettext("Configure")}</button>
@@ -150,7 +146,7 @@ defmodule PepeWeb.PluginsLive do
   defp scan_report(assigns) do
     ~H"""
     <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <div class="mb-2 flex items-center gap-2 text-[15px]">
+      <div class="mb-2 flex items-center gap-2 text-base">
         <span class={["rounded-full px-2.5 py-0.5 text-xs font-medium", verdict_badge(@scan.verdict)]}>
           {verdict_label(@scan.verdict)}
         </span>
@@ -159,7 +155,7 @@ defmodule PepeWeb.PluginsLive do
       <div :if={@scan.findings == []} class="text-sm text-zinc-500">{gettext("Nothing flagged.")}</div>
       <ul class="space-y-1 text-sm">
         <li :for={f <- @scan.findings} class="flex items-start gap-2">
-          <span>{severity_icon(f.severity)}</span>
+          <.icon name={severity_icon(f.severity)} class={["mt-0.5 size-4 shrink-0", (f.severity == :danger && "text-danger-ink") || "text-orange-400"]} />
           <span class="font-mono text-zinc-400">{finding_where(f)}</span>
           <span class="rounded bg-zinc-800 px-1.5 text-xs text-zinc-400">{f.category}</span>
           <span class="min-w-0 truncate text-zinc-300">{f.match}</span>
@@ -295,14 +291,14 @@ defmodule PepeWeb.PluginsLive do
   defp kind_hint(_), do: nil
 
   defp verdict_badge(:danger), do: "bg-red-500/15 text-red-400"
-  defp verdict_badge(:caution), do: "bg-amber-500/15 text-amber-300"
-  defp verdict_badge(_), do: "bg-green-500/15 text-green-400"
+  defp verdict_badge(:caution), do: "bg-orange-400/15 text-orange-300"
+  defp verdict_badge(_), do: "bg-teal-ink/15 text-teal-ink"
 
   defp verdict_label(:danger), do: gettext("danger")
   defp verdict_label(:caution), do: gettext("caution")
   defp verdict_label(_), do: gettext("clean")
 
-  defp severity_icon(:danger), do: "🚫"
-  defp severity_icon(:caution), do: "⚠️"
+  defp severity_icon(:danger), do: "hero-no-symbol"
+  defp severity_icon(:caution), do: "hero-exclamation-triangle"
   defp severity_icon(_), do: "•"
 end

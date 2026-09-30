@@ -611,7 +611,7 @@ defmodule Mix.Tasks.Pepe do
     Pepe.Providers.all()
     |> Enum.each(fn p ->
       key = p.env || "no key"
-      puts("  #{bold(p.label)}\n    base-url: #{p.base_url || "(custom)"}  ·  key: #{key}")
+      puts("  #{bold(p.label)}\n    base-url: #{p.base_url || "(custom)"}, key: #{key}")
     end)
   end
 
@@ -1146,7 +1146,7 @@ defmodule Mix.Tasks.Pepe do
         )
 
       %{fetched_at: at, count: c} ->
-        info("#{c} live prices cached · refreshed #{local_datetime(at)}")
+        info("#{c} live prices cached, refreshed #{local_datetime(at)}")
     end
   end
 
@@ -1225,7 +1225,7 @@ defmodule Mix.Tasks.Pepe do
     money = run_money(scope, runs)
     currency = Config.currency()
 
-    puts("#{bold("runs")} · #{if scope == :all, do: "all scopes", else: scope} · #{currency}\n")
+    puts("#{bold("runs")}, #{if scope == :all, do: "all scopes", else: scope}, #{currency}\n")
 
     if runs == [] do
       info("no runs recorded yet for this scope.")
@@ -1243,7 +1243,7 @@ defmodule Mix.Tasks.Pepe do
       "  #{bold(run["id"])}  #{local_datetime(run["at"])}  #{String.pad_trailing(to_string(run["agent"]), 18)} " <>
         "#{String.pad_leading("#{calls} calls", 9)}  " <>
         "#{String.pad_leading(fmt_money(if(totals, do: totals.billable, else: 0.0), currency), 12)}  " <>
-        "#{run["source"] || "-"} · #{tools}"
+        "#{run["source"] || "-"}, #{tools}"
     )
   end
 
@@ -1256,9 +1256,9 @@ defmodule Mix.Tasks.Pepe do
         currency = Config.currency()
         entries = scope |> Pepe.Usage.Log.entries_for_run(run["id"]) |> Pepe.Usage.price_entries()
 
-        puts("#{bold("run #{run["id"]}")} · #{run["project"]} · #{local_datetime(run["at"])}\n")
+        puts("#{bold("run #{run["id"]}")}, #{run["project"]}, #{local_datetime(run["at"])}\n")
         puts("  agent    #{run["agent"]}")
-        puts("  source   #{run["source"] || "-"}#{if run["session"], do: " · #{run["session"]}", else: ""}")
+        puts("  source   #{run["source"] || "-"}#{if run["session"], do: ", #{run["session"]}", else: ""}")
         puts("  outcome  #{run["outcome"] || "-"} in #{run["ms"] || 0}ms")
         puts("  tools    #{if run["tools"] == [], do: "none", else: Enum.join(run["tools"], " → ")}")
 
@@ -1308,7 +1308,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp print_usage(s, scope) do
     label = if scope == :all, do: "all scopes", else: scope
-    puts("#{bold("usage")} · #{label} · by #{s.granularity} · #{s.currency}\n")
+    puts("#{bold("usage")}, #{label}, by #{s.granularity}, #{s.currency}\n")
 
     if s.buckets == [] do
       info("no usage recorded yet for this scope.")
@@ -1388,7 +1388,7 @@ defmodule Mix.Tasks.Pepe do
       |> Enum.take(limit)
 
     label = if scope == :all, do: "all scopes", else: scope
-    puts("#{bold("traces")} · #{label}\n")
+    puts("#{bold("traces")}, #{label}\n")
 
     if traces == [] do
       info("no runs recorded yet.")
@@ -2134,7 +2134,7 @@ defmodule Mix.Tasks.Pepe do
     info("#{bold("migrate " <> report.source)} #{dim(report.home)}#{tag}\n")
 
     Enum.each(report.applied, fn a -> info("  #{green("✓")} #{a.kind} #{bold(a.name)}") end)
-    Enum.each(report.skipped, fn s -> info("  #{dim("·")} #{dim("skipped #{s.what}: #{s.reason}")}") end)
+    Enum.each(report.skipped, fn s -> info("  #{dim("-")} #{dim("skipped #{s.what}: #{s.reason}")}") end)
 
     info("\n#{bold("#{length(report.applied)} imported")}, #{length(report.skipped)} skipped.")
     if report.dry_run, do: info(dim("Re-run without --dry-run to apply."))
@@ -3590,7 +3590,7 @@ defmodule Mix.Tasks.Pepe do
     audio = Config.media()["audio"] || %{}
 
     puts(bold("tts (spoken replies)") <> "  " <> media_kind_status(tts))
-    if tts["model"], do: puts("  model: #{tts["model"]}  ·  voice: #{tts["voice"] || "alloy"}")
+    if tts["model"], do: puts("  model: #{tts["model"]}, voice: #{tts["voice"] || "alloy"}")
 
     puts(bold("audio (voice-note transcription)") <> "  " <> media_kind_status(audio))
 
@@ -3984,18 +3984,18 @@ defmodule Mix.Tasks.Pepe do
   defp print_approval(r, now) do
     state =
       case r.status do
-        "pending" -> "pending · expires in #{max(div((r.expires_at || now) - now, 60), 0)}m"
+        "pending" -> "pending, expires in #{max(div((r.expires_at || now) - now, 60), 0)}m"
         other -> other
       end
 
-    taint = if r.tainted, do: " · ⚠ tainted run", else: ""
+    taint = if r.tainted, do: ", ⚠ tainted run", else: ""
     where = r.session_key || "no session"
     # Shown in full, never truncated: `approve` runs the FULL stored args, so the human
     # must see all of them - a benign-looking prefix can hide the dangerous tail of a
     # long command, and a parked call can originate from a tainted run.
     args = Jason.encode!(r.args)
 
-    puts("#{bold(r.id)} [#{state}] #{r.tool} · #{r.agent || "?"} · #{where}#{taint}\n  #{dim(args)}")
+    puts("#{bold(r.id)} [#{state}] #{r.tool}, #{r.agent || "?"}, #{where}#{taint}\n  #{dim(args)}")
   end
 
   defp approvals_error(id, :not_found), do: error("unknown approval: #{id}")
@@ -4087,8 +4087,8 @@ defmodule Mix.Tasks.Pepe do
   defp print_grant(g) do
     state = if g.revoked_at, do: "revoked", else: "active"
     where = g.granted_by || "?"
-    reason = if g.reason, do: " · #{g.reason}", else: ""
-    puts("#{bold(g.id)} [#{state}] #{Pepe.Permissions.Grant.describe(g.grant)} · #{g.agent} · via #{g.source} (#{where})#{reason}")
+    reason = if g.reason, do: ", #{g.reason}", else: ""
+    puts("#{bold(g.id)} [#{state}] #{Pepe.Permissions.Grant.describe(g.grant)}, #{g.agent}, via #{g.source} (#{where})#{reason}")
   end
 
   defp watch_cmd(["add", description | rest]) do
@@ -4138,7 +4138,7 @@ defmodule Mix.Tasks.Pepe do
           detail = w.trigger["command"] || w.trigger["prompt"] || ""
 
           puts(
-            "#{bold(w.id)} [#{w.state}] - #{w.description}\n  #{w.trigger["type"]} every #{w.interval_s}s · checks #{w.checks}/#{w.max_checks} · #{String.slice(to_string(detail), 0, 60)}"
+            "#{bold(w.id)} [#{w.state}] - #{w.description}\n  #{w.trigger["type"]} every #{w.interval_s}s, checks #{w.checks}/#{w.max_checks}, #{String.slice(to_string(detail), 0, 60)}"
           )
         end)
     end
@@ -4538,11 +4538,11 @@ defmodule Mix.Tasks.Pepe do
   # closure (see its doc), so this is the only way to report what was really stored.
   defp report_saved_agent(handle, opts) do
     saved = Config.get_agent(handle)
-    admin_note = if opts[:admin], do: " · can administer every agent (--admin)", else: ""
+    admin_note = if opts[:admin], do: ", can administer every agent (--admin)", else: ""
 
     primary_note =
       if saved.auto_approve == ["*"],
-        do: " · first agent in its project: born fully permissive, no approval prompts",
+        do: ", first agent in its project: born fully permissive, no approval prompts",
         else: ""
 
     ok("agent #{green(handle)} saved (tools: #{Enum.join(saved.tools, ", ")})#{admin_note}#{primary_note}")
@@ -6068,7 +6068,7 @@ defmodule Mix.Tasks.Pepe do
     info(bold("Welcome to Pepe setup") <> " - let's get you ready.\n")
     setup_language()
 
-    info("\n" <> bold("Step 1/2 · Model connection"))
+    info("\n" <> bold("Step 1/2, Model connection"))
 
     case choose_provider() do
       {nil, _, _} ->
@@ -6097,7 +6097,7 @@ defmodule Mix.Tasks.Pepe do
             Config.set_default_model(name)
             ok("model #{green(name)} -> #{model_id}")
 
-            info("\n" <> bold("Step 2/2 · Agent"))
+            info("\n" <> bold("Step 2/2, Agent"))
             add_agent(true)
             maybe_setup_telegram()
             maybe_setup_migrate()
@@ -6668,8 +6668,8 @@ defmodule Mix.Tasks.Pepe do
       ok("backup written to #{green(out)}#{backup_size(out)}")
 
       info(
-        "  included: config.json · agent & project workspaces · shared · sessions" <>
-          if(snapshot, do: " · database (verified snapshot)", else: "")
+        "  included: config.json, agent & project workspaces, shared, sessions" <>
+          if(snapshot, do: ", database (verified snapshot)", else: "")
       )
 
       info("  skipped:  data/mnesia (disposable cache, rebuilds itself)")
@@ -6934,7 +6934,7 @@ defmodule Mix.Tasks.Pepe do
         info(
           bold("✦ TimeLearn - ") <>
             green(name) <>
-            dim("  (#{c[:skill] || 0} skills · #{c[:memory] || 0} memories)")
+            dim("  (#{c[:skill] || 0} skills, #{c[:memory] || 0} memories)")
         )
 
         case Enum.reverse(Pepe.Learning.timeline(name)) do
@@ -6946,7 +6946,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp print_learning_node(node) do
     icon = if node.kind == :skill, do: "🧠", else: "📝"
-    meta = dim("· #{node.source} · #{learn_date(node.at)}")
+    meta = dim("#{node.source}, #{learn_date(node.at)}")
     info("\n#{icon} #{bold(node.title)} #{meta}")
     info(dim("   " <> (node.summary |> String.replace("\n", " ") |> String.slice(0, 96))))
   end
@@ -6991,7 +6991,7 @@ defmodule Mix.Tasks.Pepe do
       info(dim("No agent has scheduled consolidation. Turn it on: mix pepe learn auto AGENT"))
     else
       info(bold("scheduled memory consolidation"))
-      Enum.each(scheduled, fn c -> info("  #{green(c.agent)}  #{dim("#{c.schedule} · #{c.timezone}")}") end)
+      Enum.each(scheduled, fn c -> info("  #{green(c.agent)}  #{dim("#{c.schedule}, #{c.timezone}")}") end)
     end
   end
 
@@ -7171,7 +7171,7 @@ defmodule Mix.Tasks.Pepe do
 
   defp print_cron_log_line(e) do
     mark = if e["ok"], do: "✅", else: "⚠️"
-    info("\n#{mark} #{dim(learn_date(e["at"]))} #{dim("· " <> e["source"])}")
+    info("\n#{mark} #{dim(learn_date(e["at"]))} #{dim(e["source"])}")
 
     info(
       dim(
@@ -7188,7 +7188,7 @@ defmodule Mix.Tasks.Pepe do
     info("\n#{bold(c.id)} - #{c.name}  [#{state}]")
     info(dim("   when:    #{c.schedule} (#{c.timezone})"))
     if next, do: info(dim("   next:    #{Calendar.strftime(next, "%Y-%m-%d %H:%M %Z")}"))
-    info(dim("   agent:   #{c.agent}#{if c.model, do: " · model #{c.model}", else: ""}"))
+    info(dim("   agent:   #{c.agent}#{if c.model, do: ", model #{c.model}", else: ""}"))
     info(dim("   deliver: #{c.deliver}"))
     if c.last_run, do: info(dim("   last:    #{learn_date(c.last_run)}"))
   end
@@ -7456,7 +7456,7 @@ defmodule Mix.Tasks.Pepe do
     auto = if b.auto_dispatch, do: green("on"), else: dim("off")
     n = length(Config.board_cards_for(b.id))
     info("\n#{bold(b.id)} - #{b.name}  (#{n} card(s))")
-    info(dim("   auto_dispatch: #{auto} · claim_timeout_s: #{b.claim_timeout_s || "off"}"))
+    info(dim("   auto_dispatch: #{auto}, claim_timeout_s: #{b.claim_timeout_s || "off"}"))
   end
 
   defp print_card_line(c) do

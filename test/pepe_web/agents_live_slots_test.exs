@@ -21,6 +21,7 @@ defmodule PepeWeb.AgentsLiveSlotsTest do
     File.mkdir_p!(Path.join(home, "plugins"))
     prev = System.get_env("PEPE_HOME")
     System.put_env("PEPE_HOME", home)
+    Pepe.RepoSetup.start!()
 
     Config.put_agent(%Agent{name: "assistant"})
 

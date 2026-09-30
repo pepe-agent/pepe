@@ -160,7 +160,7 @@ defmodule Pepe.Tools.SessionSearch do
     tools = Enum.join(t["tools"] || [], ", ")
     prompt = clip(t["prompt"])
 
-    "#{t["id"]}  #{fmt_time(t["at"])}  #{t["agent"]}  #{kind}#{if tools != "", do: "  [#{tools}]", else: ""}#{if prompt != "", do: "  · #{prompt}", else: ""}"
+    "#{t["id"]}  #{fmt_time(t["at"])}  #{t["agent"]}  #{kind}#{if tools != "", do: "  [#{tools}]", else: ""}#{if prompt != "", do: " , #{prompt}", else: ""}"
   end
 
   defp clip(nil), do: ""

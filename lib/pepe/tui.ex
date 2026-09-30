@@ -216,7 +216,7 @@ defmodule Pepe.TUI do
   defp select_hint(page, pages, total) do
     if pages > 1 do
       gettext("Type the number of the option and press Enter.") <>
-        "\n" <> dim("(#{range(page, total)}  ·  " <> gettext("n = next page  ·  p = previous page") <> ")")
+        "\n" <> dim("(#{range(page, total)}, " <> gettext("n = next page, p = previous page") <> ")")
     else
       gettext("Type the number of the option (1-%{total}) and press Enter.", total: total)
     end
@@ -227,13 +227,13 @@ defmodule Pepe.TUI do
     picked =
       case MapSet.size(chosen) do
         0 -> ""
-        n -> "  ·  " <> gettext("%{count} marked", count: n)
+        n -> ", " <> gettext("%{count} marked", count: n)
       end
 
-    nav = if pages > 1, do: "  ·  " <> gettext("n = next page  ·  p = previous"), else: ""
+    nav = if pages > 1, do: ", " <> gettext("n = next page, p = previous"), else: ""
 
     gettext("Type the numbers you want to mark (e.g. 1 3) and press Enter.") <>
-      "\n" <> dim("(#{range(page, total)}#{nav}  ·  " <> gettext("empty Enter to finish") <> ")#{picked}")
+      "\n" <> dim("(#{range(page, total)}#{nav}, " <> gettext("empty Enter to finish") <> ")#{picked}")
   end
 
   defp range(page, total) do
@@ -292,7 +292,7 @@ defmodule Pepe.TUI do
       :error ->
         {:error,
          gettext(
-           "I didn't get that. Type numbers from 1 to %{total} separated by spaces and press Enter (n/p changes page · empty Enter finishes).",
+           "I didn't get that. Type numbers from 1 to %{total} separated by spaces and press Enter (n/p changes page, empty Enter finishes).",
            total: total
          )}
 

@@ -78,6 +78,14 @@ tools, and the admin scope. It writes the identical entry to
 <code>~/.pepe/config.json</code>, so you can mix and match the CLI, the dashboard,
 and hand-editing freely.</div>
 
+The form is split into tabs (Persona, Model, Capabilities, Access, Limits), and what you
+change is kept as a **draft** while you work: it is saved as you go, so leaving the page
+loses nothing, but it does not touch the running agent until you press **Save**. Saving
+publishes it and clears the draft; the next change starts a new one. An agent with an
+unpublished draft is marked **Draft** in the list, **Discard draft** goes back to the saved
+version, and if the agent was changed some other way while your draft was open, the editor
+warns you before Save overwrites that.
+
 ### Do it by chat
 
 Any agent that has the `manage_agent` tool can create and configure other agents
@@ -234,6 +242,7 @@ The built-in set covers the common ground:
 | `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Work with files in the agent's workspace. |
 | `fetch_url`, `web_search` | Read a web page or search the web. |
 | `send_file` | Deliver a file the agent produced on the current channel. |
+| `chart` | Draw a bar, line or pie chart from numbers the agent already has and send it as an image. Needs an SVG converter on the machine (`rsvg-convert` or ImageMagick, already in the `-full` Docker image); without one the chart is sent as an SVG. |
 | `send_to_agent` | Message another agent (subject to `can_message`). |
 | `ask_user` | Ask you to pick one of a few options, as real tappable buttons/menu where the channel supports it. |
 | `schedule_task`, `watch` | Create recurring jobs and one-shot "notify me when X" watches. |

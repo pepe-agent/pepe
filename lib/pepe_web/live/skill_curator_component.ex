@@ -51,7 +51,7 @@ defmodule PepeWeb.SkillCuratorComponent do
     <div id="skill-curator" class="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2.5">
-          <span class="text-[15px] font-semibold">{gettext("Skill curator")}</span>
+          <span class="text-base font-semibold">{gettext("Skill curator")}</span>
           <span class={["rounded px-1.5 text-sm", pill_cls(@status)]}>{headline(@status)}</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -124,7 +124,7 @@ defmodule PepeWeb.SkillCuratorComponent do
           <div class="min-w-0 truncate">
             <span class="font-medium text-zinc-200">{row.name}</span>
             <span class="ml-2 text-zinc-500">{gettext("idle %{days} days, used %{count} times", days: row.idle_days, count: row.use_count)}</span>
-            <span :if={row.state == "stale"} class="ml-2 rounded bg-amber-800/40 px-1.5 text-amber-200">{gettext("stale")}</span>
+            <span :if={row.state == "stale"} class={[tag(:warn), "ml-2"]}>{gettext("stale")}</span>
           </div>
           <button phx-click="pin" phx-target={@myself} phx-value-name={row.name} class={btn_ghost()}>{gettext("Pin")}</button>
         </div>
@@ -169,7 +169,7 @@ defmodule PepeWeb.SkillCuratorComponent do
   defp headline(%{paused: true}), do: gettext("paused")
   defp headline(_), do: gettext("on")
 
-  defp pill_cls(%{enabled: true, paused: false}), do: "bg-emerald-900/40 text-emerald-300"
+  defp pill_cls(%{enabled: true, paused: false}), do: "bg-teal-ink/15 text-teal-ink"
   defp pill_cls(_), do: "bg-zinc-800 text-zinc-400"
 
   defp last_run(%{last_run_at: nil}), do: gettext("never")

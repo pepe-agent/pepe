@@ -7,8 +7,16 @@ defmodule PepeWeb.AgentsLive do
   import PepeWeb.DashData
 
   alias Ecto.Changeset
+  alias Pepe.Drafts
   alias Pepe.Config
   alias Pepe.Runtime.Stats
+
+  # The `kind` under which this screen's drafts are stored (see Pepe.Drafts).
+  @draft_kind "agent"
+
+  # Which tab each form section lives on. Every section stays in the DOM (the inactive tabs are
+  # only hidden), so one form still submits every field whatever tab it is showing.
+  @tabs ~w(persona model capabilities access limits)
 
   @impl true
   def mount(params, _session, socket) do
@@ -18,7 +26,7 @@ defmodule PepeWeb.AgentsLive do
 
     {:ok,
      assign(socket,
-       page_title: "Pepe · Agents",
+       page_title: "Pepe: Agents",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -27,12 +35,104 @@ defmodule PepeWeb.AgentsLive do
        models: Config.models(),
        edit_agent: nil,
        form: agent_form(""),
+       agent_tab: "persona",
+       draft: nil,
+       draft_keys: Drafts.keys(@draft_kind),
        footprint: Stats.by_agent()
      )}
   end
 
   @impl true
   def handle_info(:footprint, socket), do: {:noreply, assign(socket, footprint: Stats.by_agent())}
+
+  # Which draft a form belongs to: the agent's own name, or "new" for one not created yet.
+  defp draft_key(%{new?: true}), do: "new"
+  defp draft_key(%{name: name}), do: name
+
+  # Open the editor on `edit`, laying an unpublished draft over it when there is one. `base` is
+  # the agent as it stands now; the draft remembers what it started from, so a change made
+  # elsewhere in the meantime (the CLI, another tab) is flagged instead of silently overwritten.
+  defp open_editor(socket, edit, key) do
+    live = if edit.new?, do: nil, else: snapshot(edit)
+
+    {edit, draft} =
+      case Drafts.get(@draft_kind, key) do
+        nil ->
+          {edit, nil}
+
+        %{data: %{"edit" => saved} = data, updated_at: at} ->
+          {restore(edit, saved), %{at: at, stale?: data["base"] != live}}
+
+        _ ->
+          {edit, nil}
+      end
+
+    assign(socket,
+      edit_agent: edit,
+      form: agent_form(if(edit.new?, do: "", else: edit.name)),
+      agent_tab: "persona",
+      draft: draft
+    )
+  end
+
+  # Write the form's current state to its draft. Called after every change, so leaving the page
+  # or losing the browser loses nothing. The `base` is captured once, when the draft starts.
+  defp remember(%{assigns: %{edit_agent: nil}} = socket), do: socket
+
+  defp remember(socket) do
+    %{edit_agent: edit, draft: draft} = socket.assigns
+    key = draft_key(edit)
+
+    base =
+      case Drafts.get(@draft_kind, key) do
+        %{data: %{"base" => base}} -> base
+        _ -> live_snapshot(edit)
+      end
+
+    data = %{"edit" => snapshot(edit), "base" => base}
+    Drafts.put(@draft_kind, key, data)
+
+    assign(socket,
+      draft: %{at: System.os_time(:second), stale?: draft != nil and draft.stale?},
+      draft_keys: Drafts.keys(@draft_kind)
+    )
+  end
+
+  # The agent as it is stored right now, in the same shape a draft keeps its state in.
+  defp live_snapshot(%{new?: true}), do: nil
+
+  defp live_snapshot(%{name: name}) do
+    case Config.get_agent(name) do
+      nil -> nil
+      a -> a |> Map.from_struct() |> Map.put(:new?, false) |> Map.merge(manage_state(a.can_manage)) |> snapshot()
+    end
+  end
+
+  # The form state as plain JSON-safe data. `new?` is left out: it says how the editor was
+  # opened, not what was edited. A value that can't be encoded turns the snapshot into nil
+  # rather than failing the keystroke that triggered it.
+  defp snapshot(edit) do
+    edit
+    |> Map.delete(:new?)
+    |> Map.new(fn {k, v} -> {to_string(k), v} end)
+    |> Jason.encode!()
+    |> Jason.decode!()
+  rescue
+    _ -> nil
+  end
+
+  # Fold a stored snapshot back over the editor's map. Only keys the form already has are
+  # taken (matched by name, never turned into new atoms from stored text).
+  defp restore(edit, saved) when is_map(saved) do
+    Enum.reduce(edit, edit, fn {key, _current}, acc ->
+      case Map.fetch(saved, to_string(key)) do
+        {:ok, value} when key != :new? -> Map.put(acc, key, value)
+        _ -> acc
+      end
+    end)
+  end
+
+  defp restore(edit, _saved), do: edit
 
   defp agent_changeset(name) do
     {%{}, %{name: :string}}
@@ -55,14 +155,14 @@ defmodule PepeWeb.AgentsLive do
 
   defp update_agent_fallbacks(socket, fun) do
     edit_agent = socket.assigns.edit_agent
-    assign(socket, edit_agent: %{edit_agent | fallbacks: fun.(edit_agent.fallbacks || [])})
+    remember(assign(socket, edit_agent: %{edit_agent | fallbacks: fun.(edit_agent.fallbacks || [])}))
   end
 
   # A chip list held in LiveView state rather than in a form field (`can_message`,
   # `manage_list`), the same way the fallback chain is.
   defp update_agent_list(socket, key, fun) do
     edit_agent = socket.assigns.edit_agent
-    assign(socket, edit_agent: Map.put(edit_agent, key, fun.(Map.get(edit_agent, key) || [])))
+    remember(assign(socket, edit_agent: Map.put(edit_agent, key, fun.(Map.get(edit_agent, key) || []))))
   end
 
   # `can_manage`'s four modes, unpacked into the two things the form actually edits: the
@@ -102,7 +202,7 @@ defmodule PepeWeb.AgentsLive do
     <div class={shell_cls()}>
       <.sidebar active="agents" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="agents"
           icon="🧩"
           title={agents_title(@scope)}
           desc={gettext("An agent is a persona (its instructions) bound to a model, with the tools it's allowed to use. Define who they are and what they can do.")}
@@ -111,32 +211,44 @@ defmodule PepeWeb.AgentsLive do
           <button :if={@edit_agent} phx-click="agent_cancel" class={btn_ghost()}>&larr; {gettext("Back to agents")}</button>
         </.view_header>
 
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
-          <div :if={!@edit_agent} class="space-y-3">
-          <div :for={a <- scoped_agents(@agents, @scope)} class={card()}>
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <span :if={Pepe.Project.of(a.name)} class="mr-1 rounded bg-indigo-800 px-1.5 text-sm text-indigo-100">{Pepe.Project.of(a.name)}</span>
-                <span class="font-medium">{Pepe.Project.name_of(a.name)}</span>
-                <span :if={a.name == @default_agent} class="ml-2 rounded bg-green-700 px-1.5 text-sm">{gettext("default")}</span>
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <div :if={!@edit_agent} class="border-t border-zinc-800">
+            <div :if={"new" in @draft_keys} class="flex flex-col gap-3 border-b border-zinc-800 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                <span class="text-[16.5px] font-medium text-zinc-50">{gettext("New agent")}</span>
+                <span class={tag(:warn)}>{gettext("Draft")}</span>
               </div>
-              <div class="flex shrink-0 flex-wrap gap-1 text-sm">
+              <button phx-click="agent_new" class={btn_ghost()}>{gettext("Continue editing")}</button>
+            </div>
+            <div :for={a <- scoped_agents(@agents, @scope)} class="flex flex-col gap-3 border-b border-zinc-800 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                  <span class="text-[16.5px] font-medium text-zinc-50">{Pepe.Project.name_of(a.name)}</span>
+                  <span :if={Pepe.Project.of(a.name)} class={tag(:muted)}>{Pepe.Project.of(a.name)}</span>
+                  <span :if={a.name == @default_agent} class={tag(:ok)}>{gettext("default")}</span>
+                  <span :if={a.name in @draft_keys} class={tag(:warn)}>{gettext("Draft")}</span>
+                </div>
+                <.meta_list class="mt-3">
+                  <:item label={gettext("Model:")}>{a.model || gettext("(default)")} <span class="text-zinc-500">{gettext("%{count} tools", count: length(a.tools))}</span></:item>
+                  <:item :if={@footprint[a.name]} label={gettext("Conversations")}>
+                    {gettext("%{count} live", count: @footprint[a.name].sessions)}
+                  </:item>
+                  <:item :if={@footprint[a.name]} label={gettext("Memory")}>{@footprint[a.name].memory_kb} KB</:item>
+                  <:item :if={a.can_message != []} label={gettext("Messages:")}>{Enum.join(a.can_message, ", ")}</:item>
+                  <:item :if={a.can_manage} label={gettext("Manages:")}>{manages_text(a.can_manage)}</:item>
+                </.meta_list>
+              </div>
+              <div class="flex shrink-0 flex-wrap gap-2">
                 <button phx-click="agent_edit" phx-value-name={a.name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button :if={a.name != @default_agent} phx-click="agent_default" phx-value-name={a.name} class={btn_ghost()}>{gettext("Set default")}</button>
-                <button phx-click="agent_delete" phx-value-name={a.name} data-confirm={gettext("Delete agent %{name}?", name: a.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
+                <button phx-click="agent_delete" phx-value-name={a.name} data-confirm={gettext("Delete agent %{name}?", name: a.name)} class={[btn_ghost(), "hover:!border-danger-ink/50 hover:!text-danger-ink"]} aria-label={gettext("Delete")}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-sm text-zinc-400">{gettext("Model:")} {a.model || gettext("(default)")} · {gettext("%{count} tools", count: length(a.tools))}</div>
-            <div :if={@footprint[a.name]} class="text-sm text-zinc-500">
-              {gettext("%{count} live conversations", count: @footprint[a.name].sessions)} · {@footprint[a.name].memory_kb} KB
-            </div>
-            <div :if={a.can_message != []} class="text-sm text-zinc-500">-> {gettext("Messages:")} {Enum.join(a.can_message, ", ")}</div>
-            <div :if={a.can_manage} class="text-sm text-zinc-500">⚙ {gettext("Manages:")} {manages_text(a.can_manage)}</div>
-          </div>
           </div>
 
-          <div :if={@edit_agent} class="max-w-2xl">
+          <div :if={@edit_agent}>
           <.form for={@form} id="agent-form" phx-submit="agent_save" phx-change="agent_change" class="space-y-6">
+            <div class="max-w-3xl space-y-6">
             <div class="text-lg font-semibold">{if @edit_agent.new?, do: gettext("+ New agent"), else: gettext("Edit %{name}", name: @edit_agent.name)}</div>
             <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
               {gettext("Please fix the errors below.")}
@@ -145,7 +257,36 @@ defmodule PepeWeb.AgentsLive do
             <%!-- Always open, never collapsible-shut: this holds the Name field the error
                   banner above points at, and a brand-new agent must land on a visible,
                   editable form rather than a stack of closed bars. --%>
-            <.form_section id="agent-section-persona" collapsible open title={gettext("Persona")}>
+
+
+
+
+
+
+
+
+
+            <div role="tablist" class="-mx-1 flex gap-1 overflow-x-auto border-b border-zinc-800 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button
+                :for={{tab, label} <- agent_tabs()}
+                type="button"
+                role="tab"
+                phx-click="agent_tab"
+                phx-value-tab={tab}
+                aria-selected={to_string(@agent_tab == tab)}
+                aria-controls={"agent-tab-#{tab}"}
+                class={[
+                  "-mb-px shrink-0 border-b-2 px-4 py-2.5 text-base transition",
+                  (@agent_tab == tab && "border-orange-400 font-semibold text-orange-300") ||
+                    "border-transparent text-zinc-400 hover:text-zinc-100"
+                ]}
+              >
+                {label}
+              </button>
+            </div>
+
+            <div class={tab_cls(@agent_tab, "persona")} id="agent-tab-persona" role="tabpanel">
+            <.form_section id="agent-section-persona" title={gettext("Persona")}>
               <div>
                 <label class={lbl()} for="agent_name">{gettext("Name")}</label>
                 <input
@@ -178,7 +319,21 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-model" collapsible open title={gettext("Model & fallbacks")}>
+            <.form_section id="agent-section-assembled-prompt" :if={!@edit_agent.new?} title={gettext("Assembled prompt")}>
+              <details class="text-sm" open>
+                <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200">
+                  {gettext("What the model actually sees, not just the persona above")}
+                </summary>
+                <p class={hlp()}>
+                  {gettext("This is the exact system message every real conversation with this agent sends: the persona above is only the seed, and Pepe assembles the rest around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time).")}
+                </p>
+                <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">{assembled_prompt(@edit_agent)}</pre>
+              </details>
+            </.form_section>
+            </div>
+
+            <div class={tab_cls(@agent_tab, "model")} id="agent-tab-model" role="tabpanel">
+            <.form_section id="agent-section-model" title={gettext("Model & fallbacks")}>
               <div>
                 <label class={lbl()}>{gettext("Model")}</label>
                 <select name="model" class={fld()}>
@@ -217,7 +372,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-routing" collapsible title={gettext("Complexity routing")}>
+            <.form_section id="agent-section-routing" title={gettext("Complexity routing")}>
               <p class={hlp()}>
                 {gettext("Optional: checks if the chat is simple or complex before the first reply. Simple -> the model below handles it. Complex -> this agent's own model (above) handles it. Best-effort: if the check fails, this agent's own model answers directly.")}
               </p>
@@ -255,12 +410,12 @@ defmodule PepeWeb.AgentsLive do
                 <label class={lbl()}>{gettext("Complex model")}</label>
                 <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-sm">
                   <span class="text-zinc-300">{@edit_agent[:model] || gettext("(the default model)")}</span>
-                  <span class="ml-1 text-zinc-600">{gettext("· this agent's own model, chosen above")}</span>
+                  <span class="ml-1 text-zinc-600">{gettext("(this agent's own model, chosen above)")}</span>
                 </div>
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-chores" collapsible title={gettext("Chores")}>
+            <.form_section id="agent-section-chores" title={gettext("Chores")}>
               <p class={hlp()}>
                 {gettext("Housekeeping calls, like naming a conversation for this sidebar, don't need the agent's main model: point them at a cheap connection you already have. Left off, conversations are still named from the first few words of the request. That's free, offline, and never sends anyone's opening message anywhere to be read.")}
               </p>
@@ -284,8 +439,10 @@ defmodule PepeWeb.AgentsLive do
                 </p>
               </div>
             </.form_section>
+            </div>
 
-            <.form_section id="agent-section-capabilities" collapsible title={gettext("Capabilities")}>
+            <div class={tab_cls(@agent_tab, "capabilities")} id="agent-tab-capabilities" role="tabpanel">
+            <.form_section id="agent-section-capabilities" title={gettext("Capabilities")}>
               <div>
                 <label class={lbl()}>
                   {gettext("Tools")} <span class="text-zinc-600">{gettext("(what this agent can do)")}</span>
@@ -340,7 +497,7 @@ defmodule PepeWeb.AgentsLive do
               </div>
             </.form_section>
 
-            <.form_section id="agent-section-slots" collapsible title={gettext("Extension slots")}>
+            <.form_section id="agent-section-slots" title={gettext("Extension slots")}>
               <p class={hlp()}>
                 {gettext("Each slot hands one extension point to a single installed plugin: memory search, where a shell command actually runs, how long conversations get condensed, or the whole reasoning loop. \"Default\" inherits the installation's (or project's) choice; picking a name here overrides it for this agent only.")}
               </p>
@@ -360,8 +517,10 @@ defmodule PepeWeb.AgentsLive do
                 </div>
               </div>
             </.form_section>
+            </div>
 
-            <.form_section id="agent-section-access" collapsible title={gettext("Access")}>
+            <div class={tab_cls(@agent_tab, "access")} id="agent-tab-access" role="tabpanel">
+            <.form_section id="agent-section-access" title={gettext("Access")}>
               <div>
                 <label class={lbl()}>{gettext("Can message (agents it may talk to)")}</label>
                 <p class={hlp()}>{gettext("Pick the agents this one may send messages to. None picked = it talks to no one.")}</p>
@@ -402,8 +561,10 @@ defmodule PepeWeb.AgentsLive do
                 </div>
               </div>
             </.form_section>
+            </div>
 
-            <.form_section id="agent-section-limits" collapsible title={gettext("Limits")}>
+            <div class={tab_cls(@agent_tab, "limits")} id="agent-tab-limits" role="tabpanel">
+            <.form_section id="agent-section-limits" title={gettext("Limits")}>
               <div>
                 <label class={lbl()}>{gettext("Max steps")} <span class="text-zinc-600">{gettext("(tool rounds per task)")}</span></label>
                 <input type="number" min="1" name="max_iterations" value={@edit_agent.max_iterations} placeholder={gettext("no limit")} class={fld()} />
@@ -498,22 +659,27 @@ defmodule PepeWeb.AgentsLive do
                 <p class={[hlp(), check_indent()]}>{gettext("Also copy the working folder around each shell command, so /rewind can undo what a command changed. It walks the folder twice per command and stops at a size limit, so it is off by default and never covers a huge folder completely.")}</p>
               </div>
             </.form_section>
+            </div>
 
-            <.form_section id="agent-section-assembled-prompt" :if={!@edit_agent.new?} collapsible title={gettext("Assembled prompt")}>
-              <details class="text-sm" open>
-                <summary class="cursor-pointer text-zinc-400 hover:text-zinc-200">
-                  {gettext("What the model actually sees, not just the persona above")}
-                </summary>
-                <p class={hlp()}>
-                  {gettext("This is the exact system message every real conversation with this agent sends: the persona above is only the seed, and Pepe assembles the rest around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time).")}
-                </p>
-                <pre class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">{assembled_prompt(@edit_agent)}</pre>
-              </details>
-            </.form_section>
+            </div>
 
-            <div class="flex gap-2 pt-1">
-              <button type="submit" class={btn()}>{gettext("Save")}</button>
-              <button type="button" phx-click="agent_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
+            <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 xl:-mx-14 xl:px-14">
+              <div class="min-w-0 text-sm">
+                <span :if={@draft && @draft.stale?} class="text-amber-400">
+                  {gettext("This agent changed since the draft was started. Saving overwrites those changes.")}
+                </span>
+                <span :if={@draft && !@draft.stale?} class="text-zinc-400">
+                  <span class="mr-1.5 inline-block size-2 rounded-full bg-orange-400"></span>{gettext("Draft saved. It is not live until you press Save.")}
+                </span>
+                <span :if={!@draft} class="text-zinc-600">{gettext("No unsaved changes.")}</span>
+              </div>
+              <div class="flex gap-2">
+                <button :if={@draft} type="button" phx-click="agent_discard_draft" data-confirm={gettext("Discard the draft and go back to the saved version?")} class={btn_ghost()}>
+                  {gettext("Discard draft")}
+                </button>
+                <button type="button" phx-click="agent_cancel" class={btn_ghost()}>{gettext("Back")}</button>
+                <button type="submit" class={btn()}>{gettext("Save")}</button>
+              </div>
             </div>
           </.form>
           </div>
@@ -522,6 +688,21 @@ defmodule PepeWeb.AgentsLive do
     </div>
     """
   end
+
+  # The editor's tabs, in order. Their ids are the `@tabs` the event handler accepts.
+  defp agent_tabs do
+    [
+      {"persona", gettext("Persona")},
+      {"model", gettext("Model")},
+      {"capabilities", gettext("Capabilities")},
+      {"access", gettext("Access")},
+      {"limits", gettext("Limits")}
+    ]
+  end
+
+  # A tab's panel is always rendered, only hidden when it is not the active one: the form has to
+  # keep submitting every field whatever tab the operator happens to be looking at.
+  defp tab_cls(active, tab), do: ["space-y-6", active != tab && "hidden"]
 
   # A short, one-line description for a tool, taken from its spec.
   defp tool_hint(name), do: Pepe.Tools.summary(name)
@@ -596,45 +777,7 @@ defmodule PepeWeb.AgentsLive do
 
   @impl true
   def handle_event("agent_new", _p, socket) do
-    blank = %{
-      new?: true,
-      name: "",
-      system_prompt: "",
-      model: nil,
-      # Every tool checked by default - same as the CLI (`mix pepe agent add` with no
-      # `--tools`) and `mix pepe setup` already do. The operator unchecks what they don't
-      # want instead of having to remember and pick everything they do.
-      tools: Pepe.Tools.names(),
-      auto_approve: [],
-      can_message: [],
-      can_manage: nil,
-      manage_mode: "self",
-      manage_list: [],
-      hooks: [],
-      slots: %{},
-      fallbacks: nil,
-      triage_model: nil,
-      simple_model: nil,
-      utility_model: nil,
-      langfuse_prompt: nil,
-      max_iterations: nil,
-      tool_progress: nil,
-      exempt_message_limit: false,
-      # Missing here until the error banner made it reachable: a new agent whose save is
-      # rejected (a blank name) re-renders through the same param merge every other field
-      # goes through, and a key absent from this map is a KeyError, not a default.
-      trust_untrusted_content: false,
-      midrun_fold: false,
-      commitments: false,
-      session_search_scope: "self",
-      micro_compaction: false,
-      capability_nudge: false,
-      skill_learning: false,
-      checkpoints: true,
-      checkpoint_shell: false
-    }
-
-    {:noreply, assign(socket, edit_agent: blank, form: agent_form(""))}
+    {:noreply, open_editor(socket, blank_agent(), "new")}
   end
 
   def handle_event("agent_edit", %{"name" => name}, socket) do
@@ -649,12 +792,39 @@ defmodule PepeWeb.AgentsLive do
           |> Map.put(:new?, false)
           |> Map.merge(manage_state(a.can_manage))
 
-        {:noreply, assign(socket, edit_agent: edit, form: agent_form(a.name))}
+        {:noreply, open_editor(socket, edit, a.name)}
     end
   end
 
+  # Leaving the editor keeps any draft: that is the point of it. Only Save (which publishes it)
+  # and Discard throw one away.
   def handle_event("agent_cancel", _p, socket),
-    do: {:noreply, assign(socket, edit_agent: nil)}
+    do: {:noreply, assign(socket, edit_agent: nil, draft: nil, draft_keys: Drafts.keys(@draft_kind))}
+
+  def handle_event("agent_tab", %{"tab" => tab}, socket) when tab in @tabs,
+    do: {:noreply, assign(socket, agent_tab: tab)}
+
+  def handle_event("agent_tab", _p, socket), do: {:noreply, socket}
+
+  def handle_event("agent_discard_draft", _p, %{assigns: %{edit_agent: nil}} = socket), do: {:noreply, socket}
+
+  def handle_event("agent_discard_draft", _p, socket) do
+    %{edit_agent: edit} = socket.assigns
+    key = draft_key(edit)
+    Drafts.delete(@draft_kind, key)
+
+    fresh =
+      with false <- edit.new?, %Pepe.Config.Agent{} = a <- Config.get_agent(edit.name) do
+        a |> Map.from_struct() |> Map.put(:new?, false) |> Map.merge(manage_state(a.can_manage))
+      else
+        _ -> blank_agent()
+      end
+
+    {:noreply,
+     socket
+     |> assign(edit_agent: fresh, form: agent_form(if(edit.new?, do: "", else: edit.name)), draft: nil)
+     |> assign(draft_keys: Drafts.keys(@draft_kind))}
+  end
 
   # The form is live, not only read on submit: the auto-approve grid follows the tool grid
   # above it, the admin-scope picker appears the moment the mode asks for names, and the
@@ -665,7 +835,7 @@ defmodule PepeWeb.AgentsLive do
     do: {:noreply, socket}
 
   def handle_event("agent_change", params, socket),
-    do: {:noreply, assign(socket, edit_agent: merge_form(socket.assigns.edit_agent, params))}
+    do: {:noreply, remember(assign(socket, edit_agent: merge_form(socket.assigns.edit_agent, params)))}
 
   def handle_event("agent_message_add", %{"agent_message_candidate" => name}, socket) when name != "",
     do: {:noreply, update_agent_list(socket, :can_message, &(&1 ++ [name]))}
@@ -704,11 +874,11 @@ defmodule PepeWeb.AgentsLive do
   end
 
   def handle_event("agent_fallback_override", _p, socket) do
-    {:noreply, assign(socket, edit_agent: %{socket.assigns.edit_agent | fallbacks: []})}
+    {:noreply, remember(assign(socket, edit_agent: %{socket.assigns.edit_agent | fallbacks: []}))}
   end
 
   def handle_event("agent_fallback_inherit", _p, socket) do
-    {:noreply, assign(socket, edit_agent: %{socket.assigns.edit_agent | fallbacks: nil})}
+    {:noreply, remember(assign(socket, edit_agent: %{socket.assigns.edit_agent | fallbacks: nil}))}
   end
 
   def handle_event("agent_fallback_add", %{"agent_fallback_candidate" => name}, socket) when name != "" do
@@ -759,11 +929,18 @@ defmodule PepeWeb.AgentsLive do
   defp save_agent(socket, params, name, existing) do
     case Config.put_agent(agent_from_params(existing, params, name, socket.assigns.edit_agent)) do
       :ok ->
+        # Published: the form's state is now the real config, so the draft has nothing left to
+        # hold. The next change starts a new one.
+        Drafts.delete(@draft_kind, draft_key(socket.assigns.edit_agent))
+        Drafts.delete(@draft_kind, "new")
+
         {:noreply,
          socket
          |> assign(
            agents: Config.agents(),
            edit_agent: nil,
+           draft: nil,
+           draft_keys: Drafts.keys(@draft_kind),
            form: agent_form(""),
            default_agent: Config.default_agent_name()
          )
@@ -836,7 +1013,49 @@ defmodule PepeWeb.AgentsLive do
   # Keep what the user typed on screen and show the validation error under the field.
   defp reshow_invalid_agent(params, cs, socket) do
     edit = merge_form(socket.assigns.edit_agent, params)
-    {:noreply, assign(socket, edit_agent: edit, form: to_form(%{cs | action: :validate}, as: :agent))}
+    # The error points at the Name field, which lives on the Persona tab: bring that tab forward
+    # whichever one the operator pressed Save from.
+    {:noreply, assign(socket, edit_agent: edit, agent_tab: "persona", form: to_form(%{cs | action: :validate}, as: :agent))}
+  end
+
+  defp blank_agent do
+    %{
+      new?: true,
+      name: "",
+      system_prompt: "",
+      model: nil,
+      # Every tool checked by default - same as the CLI (`mix pepe agent add` with no
+      # `--tools`) and `mix pepe setup` already do. The operator unchecks what they don't
+      # want instead of having to remember and pick everything they do.
+      tools: Pepe.Tools.names(),
+      auto_approve: [],
+      can_message: [],
+      can_manage: nil,
+      manage_mode: "self",
+      manage_list: [],
+      hooks: [],
+      slots: %{},
+      fallbacks: nil,
+      triage_model: nil,
+      simple_model: nil,
+      utility_model: nil,
+      langfuse_prompt: nil,
+      max_iterations: nil,
+      tool_progress: nil,
+      exempt_message_limit: false,
+      # Missing here until the error banner made it reachable: a new agent whose save is
+      # rejected (a blank name) re-renders through the same param merge every other field
+      # goes through, and a key absent from this map is a KeyError, not a default.
+      trust_untrusted_content: false,
+      midrun_fold: false,
+      commitments: false,
+      session_search_scope: "self",
+      micro_compaction: false,
+      capability_nudge: false,
+      skill_learning: false,
+      checkpoints: true,
+      checkpoint_shell: false
+    }
   end
 
   # Every plain form field folded back into `edit_agent`, so the screen reflects what the

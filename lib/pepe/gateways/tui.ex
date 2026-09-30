@@ -77,7 +77,7 @@ defmodule Pepe.Gateways.TUI do
     ]
 
     box("🧠 Pepe", rows)
-    info(dim(gettext("/help for commands · /exit to quit")))
+    info(dim(gettext("/help for commands, /exit to quit")))
   end
 
   defp model_label(nil), do: gettext("(no model set)")
@@ -319,7 +319,7 @@ defmodule Pepe.Gateways.TUI do
     project = key |> Session.status() |> Map.get(:agent) |> Project.of()
     cost = Pepe.Usage.format_cost(Pepe.Usage.month_to_date(project))
     count = Pepe.Usage.message_count_month_to_date(project)
-    info(gettext("This month: %{cost} · %{count} messages", cost: cost, count: count))
+    info(gettext("This month: %{cost}, %{count} messages", cost: cost, count: count))
   end
 
   defp run_command(key, "learn", _rest) do

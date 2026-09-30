@@ -17,7 +17,7 @@ defmodule PepeWeb.ScheduledLive do
 
     {:ok,
      assign(socket,
-       page_title: "Pepe · Scheduled",
+       page_title: "Pepe: Scheduled",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -97,7 +97,6 @@ defmodule PepeWeb.ScheduledLive do
   # Run log for the dedicated log view (full output, newest first) and the card summary.
   defp cron_log_entries(id), do: Pepe.Cron.Log.tail(id, 50)
   defp cron_last(id), do: List.first(Pepe.Cron.Log.tail(id, 1))
-  defp cron_last_icon(id), do: (cron_last(id)["ok"] && "✅") || "⚠️"
 
   @impl true
   def render(assigns) do
@@ -106,7 +105,7 @@ defmodule PepeWeb.ScheduledLive do
     <div class={shell_cls()}>
       <.sidebar active="cron" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="cron"
           icon="🕒"
           title={gettext("Scheduled tasks")}
           desc={gettext("Recurring jobs: an agent runs a fixed instruction on a schedule and reports the result. They fire only while the server is running.")}
@@ -116,12 +115,10 @@ defmodule PepeWeb.ScheduledLive do
           <button :if={@viewing_log} phx-click="cron_log_close" class={btn_ghost()}>&larr; {gettext("Back to tasks")}</button>
         </.view_header>
 
-        <div :if={@creating} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          <div class="max-w-2xl">
+        <div :if={@creating} class="page-body min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <div class="max-w-3xl">
             <.form id="cron-form" for={@form} phx-submit="cron_create" phx-change="cron_validate" class="space-y-4">
-              <div class="text-lg font-semibold">
-                {if @edit_cron, do: gettext("Edit %{name}", name: @edit_cron.name), else: gettext("+ New task")}
-              </div>
+              <.form_section title={if @edit_cron, do: gettext("Edit %{name}", name: @edit_cron.name), else: gettext("+ New task")}>
               <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
                 {gettext("Please fix the errors below.")}
               </div>
@@ -202,19 +199,20 @@ defmodule PepeWeb.ScheduledLive do
                 <button type="submit" class={btn()}>{if @edit_cron, do: gettext("Save"), else: gettext("Create task")}</button>
                 <button type="button" phx-click="cron_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </.form>
             <.ai_popup ai={@ai} models={model_names()} default_model={Config.default_model_name()} />
           </div>
         </div>
 
-        <div :if={@viewing_log} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div :if={@viewing_log} class="page-body min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <% cron = Enum.find(@crons, &(&1.id == @viewing_log)) %>
-          <p :if={is_nil(cron)} class="text-[15px] text-zinc-500">
+          <p :if={is_nil(cron)} class="text-base text-zinc-500">
             {gettext("This task no longer exists. Go back to the list to pick another one.")}
           </p>
           <div :if={cron} class="max-w-3xl">
             <div class="text-lg font-semibold">{cron.name}</div>
-            <div class="mt-0.5 text-sm text-zinc-500"><code>{cron.schedule}</code> · {cron.timezone} · {cron.agent}{model_suffix(cron.model)}</div>
+            <div class="mt-0.5 text-sm text-zinc-500"><code>{cron.schedule}</code>, {cron.timezone}, {cron.agent}{model_suffix(cron.model)}</div>
 
             <details class="group mt-4 rounded-lg border border-zinc-800 bg-zinc-900/40">
               <summary class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">
@@ -225,29 +223,29 @@ defmodule PepeWeb.ScheduledLive do
 
             <div class="mt-6 border-t border-zinc-800 pt-5">
               <div class="mb-3 flex items-baseline gap-2">
-                <span class="text-sm font-semibold uppercase tracking-wider text-zinc-400">{gettext("Run log")}</span>
+                <span class="font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-500">{gettext("Run log")}</span>
                 <span class="text-sm text-zinc-600">{length(cron_log_entries(@viewing_log))}</span>
               </div>
-              <p :if={cron_log_entries(@viewing_log) == []} class="text-[15px] text-zinc-500">{gettext("No runs yet.")}</p>
+              <.empty_state :if={cron_log_entries(@viewing_log) == []}>{gettext("No runs yet.")}</.empty_state>
               <div :for={e <- cron_log_entries(@viewing_log)} class="mb-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
                 <div class="mb-2 flex items-center gap-2 border-b border-zinc-800/70 pb-2 text-sm">
-                  <span>{(e["ok"] && "✅") || "⚠️"}</span>
+                  <.ok_icon ok={!!e["ok"]} />
                   <span class="font-medium text-zinc-300">{learn_date(e["at"])}</span>
-                  <span class="text-zinc-500">· {e["source"]}</span>
+                  <span class="text-zinc-500">{e["source"]}</span>
                 </div>
-                <pre class="max-h-96 overflow-auto whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-300">{e["output"]}</pre>
+                <pre class="max-h-96 overflow-auto whitespace-pre-wrap text-base leading-relaxed text-zinc-300">{e["output"]}</pre>
               </div>
             </div>
           </div>
         </div>
 
-        <div :if={!@creating and !@viewing_log} class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+        <div :if={!@creating and !@viewing_log} class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <% shown = scoped_by_agent(@crons, @scope, & &1.agent) %>
           <div :for={c <- shown} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{c.name}</span>
-                <span class={["ml-2 rounded px-1.5 text-sm", c.enabled && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                <span class={[tag((c.enabled && :ok) || :muted), "ml-2"]}>
                   {(c.enabled && gettext("enabled")) || gettext("disabled")}
                 </span>
                 <span :if={MapSet.member?(@running, c.id)} class="ml-2 inline-flex items-center gap-1.5 align-middle text-sm font-medium text-orange-300">
@@ -269,20 +267,20 @@ defmodule PepeWeb.ScheduledLive do
                 <button phx-click="cron_remove" phx-value-id={c.id} data-confirm={gettext("Remove scheduled task %{name}?", name: c.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 space-y-1">
-              <div class="text-sm text-zinc-400"><code>{c.schedule}</code> · {c.timezone} · {gettext("next")} {cron_next(c)}</div>
-              <div class="text-sm text-zinc-500">{c.agent}{model_suffix(c.model)} · → {deliver_label(c.deliver)}</div>
-              <div :if={cron_last(c.id)} class="text-sm text-zinc-500">
-                {cron_last_icon(c.id)} {gettext("Last run")} {learn_date(cron_last(c.id)["at"])} ·
-                <button phx-click="cron_log" phx-value-id={c.id} class="text-orange-400 hover:text-orange-300">{gettext("See log")}</button>
-              </div>
-            </div>
+            <.meta_list class="mt-4">
+              <:item label={gettext("When")}><span class="font-mono text-[13px] text-zinc-400">{c.schedule}</span> <span class="text-zinc-500">{c.timezone}, {gettext("next")} {cron_next(c)}</span></:item>
+              <:item label={gettext("Agent:")}>{c.agent}{model_suffix(c.model)} <span class="text-zinc-500">→ {deliver_label(c.deliver)}</span></:item>
+              <:item :if={cron_last(c.id)} label={gettext("Last run")}>
+                <.ok_icon ok={!!cron_last(c.id)["ok"]} class="mr-1.5 align-[-3px]" /> {learn_date(cron_last(c.id)["at"])}
+                <button phx-click="cron_log" phx-value-id={c.id} class="ml-2 text-orange-400 hover:text-orange-300">{gettext("See log")}</button>
+              </:item>
+            </.meta_list>
           </div>
-          <p :if={shown == []} class="text-[15px] text-zinc-500">
+          <.empty_state :if={shown == []}>
             {if @scope == "all",
               do: gettext("No scheduled tasks yet. Create one with “+ New task”."),
               else: gettext("No scheduled tasks in this project yet. Create one with “+ New task”.")}
-          </p>
+          </.empty_state>
         </div>
       </main>
     </div>

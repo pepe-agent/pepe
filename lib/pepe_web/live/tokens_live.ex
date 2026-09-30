@@ -20,7 +20,7 @@ defmodule PepeWeb.TokensLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · API tokens",
+       page_title: "Pepe: API tokens",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -44,7 +44,7 @@ defmodule PepeWeb.TokensLive do
     <div class={shell_cls()}>
       <.sidebar active="tokens" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="tokens"
           icon="🔑"
           title={gettext("API tokens")}
           desc={gettext("Bearer tokens for the OpenAI-compatible /v1 API. With no token, only loopback (localhost) callers get through. Minting the first token requires one from everyone else too, local or remote: that's what secures a network-exposed server.")}
@@ -53,8 +53,8 @@ defmodule PepeWeb.TokensLive do
           <button :if={@creating} phx-click="token_cancel" class={btn_ghost()}>&larr; {gettext("Back to tokens")}</button>
         </.view_header>
 
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
-          <div :if={@raw} class="mb-6 max-w-2xl rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <div :if={@raw} class="mb-6 max-w-2xl rounded-lg border border-orange-400/40 bg-orange-400/[.05] p-3">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0 text-sm">
                 <span class="font-semibold text-amber-200">{gettext("Copy this token now.")}</span>
@@ -96,7 +96,7 @@ defmodule PepeWeb.TokensLive do
               </div>
 
               <div>
-                <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                <label class="flex items-center gap-2 text-base text-zinc-300">
                   <input
                     type="checkbox"
                     name="widget"
@@ -118,12 +118,12 @@ defmodule PepeWeb.TokensLive do
             </.form_section>
 
             <.form_section :if={!@token_widget} title={gettext("What this token may do")}>
-              <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+              <label class="flex items-center gap-2 text-base text-zinc-300">
                 <input type="checkbox" name="chat" value="true" checked class={checkbox_cls()} />
                 {gettext("Run agents")}
               </label>
 
-              <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+              <label class="flex items-center gap-2 text-base text-zinc-300">
                 <input
                   type="checkbox"
                   name="usage"
@@ -146,7 +146,7 @@ defmodule PepeWeb.TokensLive do
               </div>
 
               <div :if={@token_usage}>
-                <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                <label class="flex items-center gap-2 text-base text-zinc-300">
                   <input type="checkbox" name="content" value="true" class={checkbox_cls()} />
                   {gettext("Also show conversation content in a run's detail")}
                 </label>
@@ -199,12 +199,12 @@ defmodule PepeWeb.TokensLive do
                 >
                   <input type="hidden" name="token_id" value={t["id"]} />
 
-                  <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                  <label class="flex items-center gap-2 text-base text-zinc-300">
                     <input type="checkbox" name="chat" value="true" checked={permissions(t).chat} class={checkbox_cls()} />
                     {gettext("Run agents")}
                   </label>
 
-                  <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                  <label class="flex items-center gap-2 text-base text-zinc-300">
                     <input type="checkbox" name="usage" value="true" checked={permissions(t).usage} class={checkbox_cls()} />
                     {gettext("Read usage and billing (/v1/usage)")}
                   </label>
@@ -213,7 +213,7 @@ defmodule PepeWeb.TokensLive do
                         content without usage (`:content_needs_usage`), so the option must not be
                         offered until usage is on rather than fail on submit. --%>
                   <div :if={editing_usage?(@edit_usage, t)}>
-                    <label class="flex items-center gap-2 text-[15px] text-zinc-300">
+                    <label class="flex items-center gap-2 text-base text-zinc-300">
                       <input type="checkbox" name="content" value="true" checked={permissions(t).usage_content} class={checkbox_cls()} />
                       {gettext("Also show conversation content in a run's detail")}
                     </label>
@@ -234,9 +234,9 @@ defmodule PepeWeb.TokensLive do
                 </form>
               </details>
             </div>
-            <p :if={scoped_tokens(@tokens, @scope) == []} class="text-[15px] text-zinc-500">
+            <.empty_state :if={scoped_tokens(@tokens, @scope) == []}>
               {gettext("No tokens yet. The /v1 API is open to localhost only. Create one to require a token from every caller.")}
-            </p>
+            </.empty_state>
           </div>
         </div>
       </main>
@@ -350,7 +350,7 @@ defmodule PepeWeb.TokensLive do
     scope = if t["agent"], do: "#{base} / #{t["agent"]}", else: base
 
     if t["kind"] == "widget" do
-      scope <> " · " <> gettext("widget (%{origin})", origin: t["allowed_origin"] || gettext("no origin set"))
+      scope <> ", " <> gettext("widget (%{origin})", origin: t["allowed_origin"] || gettext("no origin set"))
     else
       scope
     end

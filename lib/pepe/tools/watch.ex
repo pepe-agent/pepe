@@ -230,7 +230,7 @@ defmodule Pepe.Tools.Watch do
 
     [
       "• #{w.id} - #{w.description} (#{w.state})",
-      "  trigger: #{kind} · every #{w.interval_s}s · #{String.slice(to_string(detail), 0, 60)}",
+      "  trigger: #{kind}, every #{w.interval_s}s, #{String.slice(to_string(detail), 0, 60)}",
       "  checks: #{w.checks}/#{w.max_checks}",
       w.pending_delivery && "  ⏳ fired, waiting to deliver"
     ]

@@ -21,7 +21,7 @@ export const ui = {
     "nav.security": "Security",
     "nav.docs": "Docs",
 
-    "hero.eyebrow": "Elixir / OTP · self-hosted",
+    "hero.eyebrow": "Elixir / OTP, self-hosted",
     "hero.title": 'The AI agent runtime<br/>you <span class="grad">run yourself</span>.',
     "hero.lead":
       "Build a team of virtual employees that handles your inbox, answers customers, digs through your site's data, and runs your Google and Meta ad campaigns: practically anything you'd do yourself. It runs on your own server, with your own keys, under your control.",
@@ -197,7 +197,7 @@ export const ui = {
     "nav.security": "Seguridad",
     "nav.docs": "Docs",
 
-    "hero.eyebrow": "Elixir / OTP · autoalojado",
+    "hero.eyebrow": "Elixir / OTP, autoalojado",
     "hero.title": 'El runtime de agentes IA<br/>que <span class="grad">ejecutas tú mismo</span>.',
     "hero.lead":
       "Monta un equipo de empleados virtuales que gestiona tu correo, atiende a tus clientes, analiza los datos de tu sitio y lleva tus campañas en Google y Meta: prácticamente todo lo que harías tú mismo. Se ejecuta en tu propio servidor, con tus propias claves, bajo tu control.",
@@ -373,7 +373,7 @@ export const ui = {
     "nav.security": "Segurança",
     "nav.docs": "Docs",
 
-    "hero.eyebrow": "Elixir / OTP · auto-hospedado",
+    "hero.eyebrow": "Elixir / OTP, auto-hospedado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">você mesmo executa</span>.',
     "hero.lead":
       "Monte uma equipe de funcionários virtuais que cuida do e-mail, atende clientes, analisa os dados do seu site e gerencia campanhas no Google e no Meta: praticamente tudo o que você faria. Roda no seu próprio servidor, com as suas chaves, sob o seu controle.",
@@ -549,7 +549,7 @@ export const ui = {
     "nav.security": "Segurança",
     "nav.docs": "Docs",
 
-    "hero.eyebrow": "Elixir / OTP · auto-alojado",
+    "hero.eyebrow": "Elixir / OTP, auto-alojado",
     "hero.title": 'O runtime de agentes de IA<br/>que <span class="grad">executas tu próprio</span>.',
     "hero.lead":
       "Monta uma equipa de funcionários virtuais que trata do teu email, atende clientes, analisa os dados do teu site e gere as campanhas no Google e no Meta: praticamente tudo o que farias. Corre no teu próprio servidor, com as tuas chaves, sob o teu controlo.",

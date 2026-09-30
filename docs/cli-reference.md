@@ -125,7 +125,7 @@ through Mix and needs nothing. Only the protocol's core subset is implemented, a
 the `initialize` handshake reports exactly which parts - see `Pepe.ACP.Protocol`.
 
 `chat` (alias: `tui`) opens a session-backed console: it keeps context across
-turns and prints a summary box (agent · model · session) on open. The same slash
+turns and prints a summary box (agent, model, session) on open. The same slash
 commands as the other gateways work: `/new`, `/undo`, `/rewind N`, `/compact`,
 `/status`, `/agent <name>`, `/models`, `/model <name> [session|global]`, `/help`,
 `/exit`.
@@ -153,7 +153,7 @@ mix pepe token add --project acme --label "acme mobile app"   # prints pepe_... 
 mix pepe token add --agent acme/sales --label "one integration"
 mix pepe token add --agent acme/sales --widget \
   --allowed-origin https://example.com     # a token safe to embed in public page source
-mix pepe token list                        # id · fingerprint · scope · permissions · label
+mix pepe token list                        # id, fingerprint, scope, permissions, label
 mix pepe token update <id> --greeting "Hi! How can I help?"
 mix pepe token revoke <id>
 ```

@@ -14,7 +14,7 @@ defmodule PepeWeb.DbConnectionsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Databases",
+       page_title: "Pepe: Databases",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -113,7 +113,7 @@ defmodule PepeWeb.DbConnectionsLive do
     <div class={shell_cls()}>
       <.sidebar active="databases" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="databases"
           icon="🗄️"
           title={gettext("Databases")}
           desc={gettext("Let an agent read from an external Postgres database with the db_query tool. Postgres is the only engine for now. The database's own Row-Level Security enforces tenant isolation, never a value the model supplies: the role and policy SQL to run once, by hand, is in the Database docs.")}
@@ -122,7 +122,7 @@ defmodule PepeWeb.DbConnectionsLive do
           <button :if={!@edit_conn} phx-click="conn_new" class={btn()}>{gettext("+ New connection")}</button>
           <button :if={@edit_conn} phx-click="conn_cancel" class={btn_ghost()}>&larr; {gettext("Back to connections")}</button>
         </.view_header>
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :if={!@edit_conn} class="space-y-3">
           <div :for={{name, cfg} <- @connections} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -133,13 +133,13 @@ defmodule PepeWeb.DbConnectionsLive do
                 <button phx-click="conn_remove" phx-value-name={name} data-confirm={gettext("Remove database connection %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-sm text-zinc-400">
-              <code>{cfg["user"]}@{cfg["host"]}:{cfg["port"] || 5432}/{cfg["database"]}</code>
-            </div>
-            <div class="mt-1 text-sm">
-              <span :if={tenant_scoped?(cfg)} class="text-emerald-400">✓ {gettext("tenant-scoped on %{col}", col: cfg["tenant_column"])}</span>
-              <span :if={!tenant_scoped?(cfg)} class="text-amber-400">{gettext("unscoped (no per-tenant isolation)")}</span>
-            </div>
+            <.meta_list class="mt-4">
+              <:item label={gettext("Database")} mono>{cfg["user"]}@{cfg["host"]}:{cfg["port"] || 5432}/{cfg["database"]}</:item>
+              <:item label={gettext("Tenant isolation")}>
+                <span :if={tenant_scoped?(cfg)} class="text-emerald-400">✓ {gettext("tenant-scoped on %{col}", col: cfg["tenant_column"])}</span>
+                <span :if={!tenant_scoped?(cfg)} class="text-amber-400">{gettext("unscoped (no per-tenant isolation)")}</span>
+              </:item>
+            </.meta_list>
             <div :if={@checks[name]} class="mt-1 text-sm">
               <span :if={@checks[name] == :testing} class="text-zinc-500">{gettext("Connecting...")}</span>
               <span :if={@checks[name] == :ok} class="text-emerald-400">✓ {gettext("Connected. The credentials work.")}</span>
@@ -153,7 +153,7 @@ defmodule PepeWeb.DbConnectionsLive do
           </.empty_state>
           </div>
 
-          <div :if={@edit_conn} class="max-w-2xl">
+          <div :if={@edit_conn} class="max-w-3xl">
           <.form id="db-form" for={@form} phx-submit="conn_save" phx-change="conn_change" class="space-y-4">
             <div class="text-lg font-semibold">
               {if @edit_conn[:name], do: gettext("Edit %{name}", name: @edit_conn[:name]), else: gettext("+ New database connection")}

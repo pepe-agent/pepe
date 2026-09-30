@@ -96,7 +96,7 @@ defmodule Pepe.Gateways.Telegram.Markdown do
       case cells do
         [] -> line
         [only] -> only
-        [first | rest] -> "<b>#{first}</b> — " <> Enum.join(rest, " · ")
+        [first | rest] -> "<b>#{first}</b>: " <> Enum.join(rest, ", ")
       end
     else
       line

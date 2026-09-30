@@ -13,7 +13,7 @@ defmodule PepeWeb.ChannelsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Channels",
+       page_title: "Pepe: Channels",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -171,7 +171,7 @@ defmodule PepeWeb.ChannelsLive do
     <div class={shell_cls()}>
       <.sidebar active="bots" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="bots"
           icon="📡"
           title={gettext("Channels")}
           desc={gettext("Connect agents to messaging channels so people can chat with them: a Telegram bot, or a webhook channel like WhatsApp, Slack, Discord, Teams or Google Chat. Each channel binds to one agent.")}
@@ -184,13 +184,13 @@ defmodule PepeWeb.ChannelsLive do
           <button :if={@adding != nil} phx-click="add_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
           <button :if={@adding_channel} phx-click="channel_cancel" class={btn_ghost()}>&larr; {gettext("Back to channels")}</button>
         </.view_header>
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <%!-- LIST: channel groups only for what exists, plus one "Add a channel" picker --%>
           <div :if={!@edit_bot and @adding == nil} class="space-y-6">
             <%!-- One picker for every channel type: Telegram plus each webhook provider - kept at
                  the top so it's never buried below a growing list of existing channels --%>
             <div :if={not @adding_channel} class="border-b border-zinc-800 pb-5">
-              <div class="mb-2 text-sm font-medium text-zinc-400">{gettext("Add a channel")}</div>
+              <div class={[eyebrow(), "mb-3"]}>{gettext("Add a channel")}</div>
               <div class="flex flex-wrap gap-2">
                 <button phx-click="add" phx-value-kind="bot" class={btn_ghost()}>{gettext("+ Telegram bot")}</button>
                 <button :for={p <- @native_channels} phx-click="add_channel" phx-value-name={p.name} class={btn_ghost()}>
@@ -204,7 +204,7 @@ defmodule PepeWeb.ChannelsLive do
             </div>
 
             <%!-- Just-minted widget token, with a ready-to-paste snippet --%>
-            <div :if={@widget_raw && not @adding_channel} class="rounded-lg border border-amber-700/60 bg-amber-950/40 p-3">
+            <div :if={@widget_raw && not @adding_channel} class="rounded-lg border border-orange-400/40 bg-orange-400/[.05] p-3">
               <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0 text-sm">
                   <span class="font-semibold text-amber-200">{gettext("Widget created")}</span>
@@ -229,14 +229,14 @@ defmodule PepeWeb.ChannelsLive do
             <div :if={not @adding_channel and @scoped_bots != []}>
               <div class="mb-2 flex items-center gap-2 font-medium">
                 <span>{gettext("Telegram")}</span>
-                <span class="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">telegram</span>
+                <span class={tag(:muted)}>telegram</span>
               </div>
 
               <div :for={b <- @scoped_bots} class={[card(), "mb-2"]}>
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">
                     <span class="font-medium">{b["name"]}</span>
-                    <span class={["ml-2 rounded px-1.5 py-0.5 text-sm", bot_active?(b) && "bg-green-700" || "bg-zinc-700 text-zinc-400"]}>
+                    <span class={[tag((bot_active?(b) && :ok) || :muted), "ml-2"]}>
                       {(bot_active?(b) && gettext("active")) || gettext("inactive")}
                     </span>
                   </div>
@@ -246,8 +246,10 @@ defmodule PepeWeb.ChannelsLive do
                       data-confirm={gettext("Remove bot %{name}?", name: b["name"])} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
                   </div>
                 </div>
-                <div class="mt-1 text-sm text-zinc-400">{gettext("Agent:")} {b["agent"] || gettext("(default)")}</div>
-                <div class="text-sm text-zinc-500">{gettext("Token:")} {token_hint(b["bot_token"])}</div>
+                <.meta_list class="mt-4">
+                  <:item label={gettext("Agent:")}>{b["agent"] || gettext("(default)")}</:item>
+                  <:item label={gettext("Token:")} mono>{token_hint(b["bot_token"])}</:item>
+                </.meta_list>
               </div>
             </div>
 
@@ -255,7 +257,7 @@ defmodule PepeWeb.ChannelsLive do
             <div :if={not @adding_channel and @scoped_widget_tokens != []}>
               <div class="mb-2 flex items-center gap-2 font-medium">
                 <span>{gettext("Widget")}</span>
-                <span class="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">widget</span>
+                <span class={tag(:muted)}>widget</span>
               </div>
 
               <div :for={t <- @scoped_widget_tokens} class={[card(), "mb-2"]}>
@@ -270,8 +272,10 @@ defmodule PepeWeb.ChannelsLive do
                     <.link navigate={~p"/tokens?scope=#{@scope}"} class={btn_ghost()}>{gettext("Manage token")}</.link>
                   </div>
                 </div>
-                <div class="mt-1 text-sm text-zinc-400">{gettext("Agent:")} {t["agent"] || gettext("(default)")}</div>
-                <div class="text-sm text-zinc-500">{gettext("Origin:")} {t["allowed_origin"] || gettext("no origin set")}</div>
+                <.meta_list class="mt-4">
+                  <:item label={gettext("Agent:")}>{t["agent"] || gettext("(default)")}</:item>
+                  <:item label={gettext("Origin:")} mono>{t["allowed_origin"] || gettext("no origin set")}</:item>
+                </.meta_list>
                 <p class={hlp()}>{gettext("Agent and origin are fixed at minting. To change them, create a new widget and revoke this one. Appearance stays editable right here.")}</p>
 
                 <form :if={@edit_widget == t["id"]} phx-submit="widget_edit_save" class="mt-3 border-t border-zinc-800 pt-3">
@@ -305,9 +309,9 @@ defmodule PepeWeb.ChannelsLive do
           </div>
 
           <%!-- ADD A WIDGET --%>
-          <div :if={@adding == :widget} class="max-w-2xl">
+          <div :if={@adding == :widget} class="max-w-3xl">
             <form phx-submit="widget_add" class="space-y-4">
-              <div class="text-lg font-semibold">{gettext("+ Add a widget")}</div>
+              <.form_section title={gettext("+ Add a widget")}>
               <div>
                 <label class={lbl()}>{gettext("Label")} <span class="text-zinc-600">{gettext("(optional)")}</span></label>
                 <input name="widget[label]" placeholder={gettext("example.com widget")} class={fld()} />
@@ -336,13 +340,14 @@ defmodule PepeWeb.ChannelsLive do
                 <button type="submit" class={btn()}>{gettext("Create widget")}</button>
                 <button type="button" phx-click="add_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </form>
           </div>
 
           <%!-- EDIT A TELEGRAM BOT --%>
-          <div :if={@edit_bot} class="max-w-2xl">
+          <div :if={@edit_bot} class="max-w-3xl">
             <form phx-submit="bot_save" class="space-y-4">
-              <div class="text-lg font-semibold">{gettext("Edit %{name}", name: @edit_bot["name"])}</div>
+              <.form_section title={gettext("Edit %{name}", name: @edit_bot["name"])}>
               <input type="hidden" name="name" value={@edit_bot["name"]} />
               <div>
                 <label class={lbl()}>{gettext("This bot talks to")}</label>
@@ -383,7 +388,7 @@ defmodule PepeWeb.ChannelsLive do
               <div>
                 <label class="flex items-center gap-2">
                   <input type="checkbox" name="require_approval" value="true" checked={@edit_bot["require_approval"] == true} class={checkbox_cls()} />
-                  <span class="text-[15px] text-zinc-300">{gettext("Require approval for new users")}</span>
+                  <span class="text-base text-zinc-300">{gettext("Require approval for new users")}</span>
                 </label>
                 <p class={hlp()}>{gettext("When on, the bot ignores anyone not on its allowlist. When off, it answers everyone (unless you set an explicit user allowlist).")}</p>
 
@@ -391,7 +396,7 @@ defmodule PepeWeb.ChannelsLive do
                      `type="button"` on every action so a click here never submits the form. --%>
                 <div :if={@edit_bot["require_approval"] == true} class="mt-3 space-y-3">
                   <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-                    <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500">{gettext("Waiting for approval")}</div>
+                    <div class="font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("Waiting for approval")}</div>
                     <p :if={pending_users(@edit_bot) == []} class="mt-1.5 text-sm text-zinc-600">{gettext("No one is waiting.")}</p>
                     <div :if={pending_users(@edit_bot) != []} class="mt-2 space-y-1.5">
                       <div
@@ -410,7 +415,7 @@ defmodule PepeWeb.ChannelsLive do
                             phx-click="bot_approve_user"
                             phx-value-name={@edit_bot["name"]}
                             phx-value-id={u["id"]}
-                            class="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-600"
+                            class={btn()}
                           >
                             {gettext("Add")}
                           </button>
@@ -429,7 +434,7 @@ defmodule PepeWeb.ChannelsLive do
                   </div>
 
                   <div class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-                    <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500">{gettext("Allowed users")}</div>
+                    <div class="font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("Allowed users")}</div>
                     <p :if={allowed_users(@edit_bot) == []} class="mt-1.5 text-sm text-zinc-600">{gettext("No one has been approved yet.")}</p>
                     <div :if={allowed_users(@edit_bot) != []} class="mt-2 space-y-1.5">
                       <div
@@ -465,13 +470,14 @@ defmodule PepeWeb.ChannelsLive do
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
                 <button type="button" phx-click="bot_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </form>
           </div>
 
           <%!-- ADD A TELEGRAM BOT --%>
-          <div :if={@adding == :bot} class="max-w-2xl">
+          <div :if={@adding == :bot} class="max-w-3xl">
             <.form for={@form} phx-submit="bot_add" class="space-y-4">
-              <div class="text-lg font-semibold">{gettext("+ Add a bot")}</div>
+              <.form_section title={gettext("+ Add a bot")}>
               <div :if={@form.errors != []} class="rounded-lg border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-300">
                 {gettext("Please fix the errors below.")}
               </div>
@@ -494,6 +500,7 @@ defmodule PepeWeb.ChannelsLive do
                 <button type="submit" class={btn()}>{gettext("Add bot")}</button>
                 <button type="button" phx-click="add_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </.form>
           </div>
 

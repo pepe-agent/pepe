@@ -97,7 +97,7 @@ defmodule PepeWeb.AiFill do
       phx-click="ai_toggle" phx-value-field={@ai.open} phx-value-kind={@ai.kind}>
       <div class="w-full max-w-sm rounded-xl border border-orange-500/40 bg-zinc-900 p-4 shadow-2xl"
         onclick="event.stopPropagation()">
-        <div class="mb-2 text-[15px] font-medium text-orange-300">✦ {gettext("Fill with AI")}</div>
+        <div class="mb-2 text-base font-medium text-orange-300">✦ {gettext("Fill with AI")}</div>
         <form phx-submit="ai_generate" class="space-y-2">
           <input type="hidden" name="field" value={@ai.open} />
           <input type="hidden" name="kind" value={@ai.kind} />

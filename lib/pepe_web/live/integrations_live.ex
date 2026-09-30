@@ -19,7 +19,7 @@ defmodule PepeWeb.IntegrationsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Integrations",
+       page_title: "Pepe: Integrations",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -34,7 +34,7 @@ defmodule PepeWeb.IntegrationsLive do
     <div class={shell_cls()}>
       <.sidebar active="integrations" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="integrations"
           icon="🔌"
           title={gettext("Integrations")}
           desc={gettext("Connect channel plugins to your agents. Each provider's fields come from the plugin itself; fill them in, then paste the webhook URL into the provider.")}

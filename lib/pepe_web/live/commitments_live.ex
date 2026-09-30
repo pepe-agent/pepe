@@ -12,7 +12,7 @@ defmodule PepeWeb.CommitmentsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Commitments",
+       page_title: "Pepe: Commitments",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -42,15 +42,15 @@ defmodule PepeWeb.CommitmentsLive do
     <div class={shell_cls()}>
       <.sidebar active="commitments" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="commitments"
           icon="🤝"
           title={gettext("Commitments")}
           desc={gettext("Follow-ups an agent notices in conversation: a user asking to be reminded, or the agent promising to check on something. Not created by hand; enable \"commitments\" on an agent to turn this on.")}
         />
-        <div class="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
-          <div :if={@scoped_total == 0} class="text-[15px] text-zinc-500">
+        <div class="page-body flex-1 space-y-6 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <.empty_state :if={@scoped_total == 0}>
             {gettext("No commitments yet.")}
-          </div>
+          </.empty_state>
           <p :if={@scoped_total > 0} class="text-sm leading-relaxed text-zinc-500">
             {gettext(
               "“%{reminder}” just sends you a message when it comes due. “%{promise}” re-runs the agent first, so it actually does the thing before it answers.",
@@ -87,7 +87,7 @@ defmodule PepeWeb.CommitmentsLive do
     ~H"""
     <div>
       <div class="mb-2">
-        <div class="text-sm font-semibold uppercase tracking-wider text-zinc-500">{@title}</div>
+        <div class="font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{@title}</div>
         <div :if={@desc} class={hlp()}>{@desc}</div>
       </div>
       <div class="space-y-3">
@@ -98,7 +98,7 @@ defmodule PepeWeb.CommitmentsLive do
               <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300" title={origin_type_hint(c.origin_type)}>
                 {origin_type_label(c.origin_type)}
               </span>
-              <span :if={c.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("Fired · delivering")}</span>
+              <span :if={c.pending_delivery} class={[tag(:warn), "ml-1"]}>{gettext("Fired, delivering")}</span>
             </div>
             <div :if={c.state != "awaiting_confirmation" or is_integer(c.due_at)} class="flex shrink-0 flex-wrap gap-1 text-sm">
               <button :if={c.state == "awaiting_confirmation"} phx-click="confirm" phx-value-id={c.id} class={btn_ghost()}>{gettext("Confirm")}</button>
@@ -106,7 +106,7 @@ defmodule PepeWeb.CommitmentsLive do
             </div>
           </div>
           <div class="mt-1 text-sm text-zinc-400">
-            {c.agent} · {gettext("due")} {c.due_when || gettext("unresolved")} · {watch_origin_label(c.origin)}
+            {c.agent}, {gettext("due")} {c.due_when || gettext("unresolved")}, {watch_origin_label(c.origin)}
           </div>
           <div :if={c.source_excerpt} class="truncate text-sm text-zinc-500">“<em>{c.source_excerpt}</em>”</div>
 

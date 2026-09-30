@@ -20,6 +20,12 @@ As sessões vivem dentro do processo em execução, então rode tudo a partir do
 
 As ferramentas arriscadas também são autorizadas ali mesmo. A execução pausa e mostra um pedido de permitir/negar, que é a versão web dos botões que um usuário do Telegram recebe, a menos que o agente já tenha aquela ferramenta pré-aprovada. O agente dono onipotente nunca pergunta. Veja [Segurança e ambiente isolado](../security/) para entender como a barreira decide.
 
+## Tendências na visão geral
+
+A visão geral compara como esta semana (ou este mês) está indo com a anterior: gasto, tokens, execuções e erros, cada um com a variação. A comparação é *até agora contra o mesmo ponto do período anterior*: uma quarta-feira é medida contra a quarta passada, não contra a semana inteira. Abaixo, dois gráficos mostram as últimas oito semanas: o gasto, e as execuções com os erros. A última barra é a semana em andamento, chamada de "Esta semana" porque ainda não terminou. Uma execução é um turno do agente, e um erro é uma execução que não terminou bem.
+
+Um segundo bloco, *Como está indo*, traz as boas notícias: a taxa de sucesso (execuções que terminaram bem), o tempo típico de resposta (a mediana, para uma execução travada não estragar uma boa semana) e quanto o cache de prompt do provedor economizou, cada um contra o período anterior, além de gráficos da taxa de sucesso e da parte da entrada atendida pelo cache por semana, dos horários mais movimentados do dia e de quais canais as conversas vêm.
+
 ## O que tem na barra lateral
 
 A barra lateral espelha a CLI, então quase tudo que você faz com o comando `pepe` também dá para fazer aqui:

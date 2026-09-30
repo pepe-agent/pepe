@@ -94,6 +94,139 @@
   --noise: 0;
 }
 
+/* Fonts: two variable families, self-hosted so the dashboard renders the same offline and
+   behind a strict CSP. Both are SIL Open Font License 1.1 (see priv/static/fonts/README.md). */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/Manrope.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono.ttf") format("truetype");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The dashboard's palette and type scale, measured from the design reference. Every page is
+   written in Tailwind's `zinc-*` (surfaces, borders, text) and `orange-*` (the accent), plus its
+   `text-*` sizes and `rounded-*` radii, so re-defining those here re-themes all of them at once.
+
+   - zinc 50..600 are the text ramp (ink1..ink10 of the reference), cool blue-grays.
+   - zinc 700..900 are translucent white, not solid grays: the reference draws every border and
+     raised surface as white at 14% / 8% / 3% over the page, which is why its hairlines look
+     right on both the sidebar and the page background.
+   - orange is gold. Text on a gold surface is the dark ink `--color-on-accent`, never white. */
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-zinc-50: #f2f7fa;
+  --color-zinc-100: #e6edf3;
+  --color-zinc-200: #dce6ed;
+  --color-zinc-300: #c6d3dc;
+  --color-zinc-400: #8a9aa7;
+  --color-zinc-500: #6e7e8b;
+  --color-zinc-600: #5d6d7a;
+  --color-zinc-700: rgb(255 255 255 / 0.14);
+  --color-zinc-800: rgb(255 255 255 / 0.08);
+  --color-zinc-900: rgb(255 255 255 / 0.03);
+  --color-zinc-950: #0a1117;
+
+  --color-orange-50: #fff9e5;
+  --color-orange-100: #fdefc0;
+  --color-orange-200: #fae08a;
+  --color-orange-300: #f7ce5c;
+  --color-orange-400: #f0c043;
+  --color-orange-500: #f7ce5c;
+  --color-orange-600: #f0c043;
+  --color-orange-700: #c9982a;
+  --color-orange-800: #8a6a1f;
+  --color-orange-900: #4a3a12;
+  --color-orange-950: #2a2108;
+
+  /* Status colors: the reference's red and teal, over Tailwind's red/green/emerald ramps. */
+  --color-red-300: #f0a29b;
+  --color-red-400: #e8746b;
+  --color-red-500: #e8746b;
+  --color-green-300: #8ee3d6;
+  --color-green-400: #5fd3c4;
+  --color-green-500: #2fb3a3;
+  --color-emerald-300: #8ee3d6;
+  --color-emerald-400: #5fd3c4;
+  --color-emerald-500: #2fb3a3;
+
+  --color-on-accent: #12212b;
+  --color-rail: #080e13;
+  --color-teal-ink: #2fb3a3;
+  --color-danger-ink: #e8746b;
+
+  /* Type scale. The reference sets its UI at 13-14px and its reading text at 14.5-15.5px; the
+     dashboard used Tailwind's defaults (14 / 12 / 18 px), which read larger and looser. */
+  --text-xs: 0.78125rem;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.3;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 1.2;
+
+  /* Buttons and menu items are 9px and 11px in the reference, cards 14px, fields 10px. */
+  --radius-lg: 0.5625rem;
+  --radius-xl: 0.875rem;
+}
+
+/* Scrollbars: thin and quiet, so a long sidebar or a long form does not draw a bright bar. */
+@layer base {
+  /* Native checkboxes and radios take the accent instead of the browser's gray. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-orange-400);
+  }
+
+  /* A number is short: a timeout, a port, a limit. It should not stretch across the whole box. */
+  input[type="number"] {
+    max-width: 12rem;
+  }
+
+  /* Keyboard focus in the accent, not the browser's blue. Elements that draw their own focus
+     (fields use a border and a ring) opt out with `outline-none`, which still wins. */
+  :focus-visible {
+    outline: 2px solid rgb(240 192 67 / 0.55);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  }
+}
+
+/* One reading column for every page: the title block and the body share this cap, so on a wide
+   screen the content and the page's main button stay close together instead of stretching to
+   the edge of the window. Left-aligned, like the reference. */
+@layer components {
+  .page-column,
+  .page-body > * {
+    max-width: 75rem;
+  }
+}
+
+/* The page surface: the reference's dark ground with a soft teal glow from the top right. */
+.page-ground {
+  background:
+    radial-gradient(900px 420px at 78% -8%, rgb(24 92 96 / 0.3), transparent 70%),
+    var(--color-zinc-950);
+}
+
 /* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);

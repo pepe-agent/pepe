@@ -80,6 +80,14 @@ seleção de ferramentas e o escopo de administração. Ela grava a mesma entrad
 <code>~/.pepe/config.json</code>, então dá para combinar livremente a CLI, o
 painel e a edição manual.</div>
 
+O formulário é dividido em abas (Persona, Modelo, Capacidades, Acesso, Limites), e o que
+você altera fica guardado como **rascunho** enquanto trabalha: é salvo aos poucos, então sair
+da página não perde nada, mas nada disso mexe no agente em funcionamento até você clicar em
+**Salvar**. Salvar publica e limpa o rascunho; a próxima alteração começa outro. Um agente
+com rascunho não publicado aparece marcado com **Rascunho** na lista, **Descartar rascunho**
+volta para a versão salva, e se o agente foi alterado de outro jeito enquanto o seu rascunho
+estava aberto, o editor avisa antes de o Salvar sobrescrever essa mudança.
+
 ### Faça pela conversa
 
 Qualquer agente com a ferramenta `manage_agent` pode criar e configurar outros
@@ -251,6 +259,7 @@ O conjunto embutido já cobre o essencial:
 | `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabalham com arquivos no workspace do agente. |
 | `fetch_url`, `web_search` | Leem uma página web ou buscam na web. |
 | `send_file` | Entrega um arquivo que o agente produziu, no canal atual. |
+| `chart` | Desenha um gráfico de barras, linhas ou pizza com números que o agente já tem e envia como imagem. Precisa de um conversor de SVG na máquina (`rsvg-convert` ou ImageMagick, já presente na imagem Docker `-full`); sem um, o gráfico vai como SVG. |
 | `send_to_agent` | Manda mensagem para outro agente (sujeito a `can_message`). |
 | `ask_user` | Pede para você escolher entre algumas opções, com botões ou menu de verdade onde o canal permite. |
 | `schedule_task`, `watch` | Criam tarefas recorrentes e vigias de "me avise quando X" de uma vez só. |

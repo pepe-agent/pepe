@@ -72,7 +72,7 @@ defmodule PepeWeb.ConnectionsComponent do
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <span class="font-medium">{slug}</span>
-              <span class={["ml-2 rounded px-1.5 py-0.5 text-sm", (e["mode"] == "admin" && "bg-indigo-700") || "bg-zinc-700 text-zinc-300"]}>
+              <span class={[tag((e["mode"] == "admin" && :warn) || :muted), "ml-2"]}>
                 {mode_badge(e["mode"])}
               </span>
             </div>
@@ -87,12 +87,11 @@ defmodule PepeWeb.ConnectionsComponent do
               >✕</button>
             </div>
           </div>
-          <div class="mt-1 text-sm text-zinc-400">{gettext("Agent:")} {e["agent"] || gettext("(default)")}</div>
-          <div class="mt-2 text-sm text-zinc-500">
-            {gettext("Webhook URL")}:
-            <code class="break-all text-zinc-300">{webhook_url(e["project"], p.name, slug)}</code>
-          </div>
-          <p class="mt-1 text-xs text-zinc-600">{gettext("Paste this into the provider as its outgoing webhook URL.")}</p>
+          <.meta_list class="mt-4">
+            <:item label={gettext("Agent:")}>{e["agent"] || gettext("(default)")}</:item>
+            <:item label={gettext("Webhook URL")} mono>{webhook_url(e["project"], p.name, slug)}</:item>
+          </.meta_list>
+          <p class="mt-2 text-xs text-zinc-600">{gettext("Paste this into the provider as its outgoing webhook URL.")}</p>
         </div>
       </div>
 
@@ -115,7 +114,7 @@ defmodule PepeWeb.ConnectionsComponent do
 
   defp form_view(assigns) do
     ~H"""
-    <div class="max-w-2xl">
+    <div class="max-w-3xl">
       <form id={@id <> "-form"} phx-submit="save" phx-change="form_change" phx-target={@myself} class="space-y-4">
         <div class="text-lg font-semibold">
           {(@editing_slug && gettext("Edit %{p} connection", p: @form_label)) ||
@@ -152,7 +151,7 @@ defmodule PepeWeb.ConnectionsComponent do
           </div>
 
           <p class={[hlp(), "-mt-2 flex items-start gap-1.5"]}>
-            <span>{(fval(@form_values, "mode") == "admin" && "🛠️") || "🙋"}</span>
+            <.icon name={(fval(@form_values, "mode") == "admin" && "hero-wrench-screwdriver") || "hero-user"} class="mt-0.5 size-4 shrink-0 text-zinc-500" />
             <span>{mode_hint(fval(@form_values, "mode"))}</span>
           </p>
 

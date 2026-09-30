@@ -27,7 +27,7 @@ defmodule PepeWeb.TracesLive do
     {:ok,
      socket
      |> assign(
-       page_title: "Pepe · Traces",
+       page_title: "Pepe: Traces",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -220,7 +220,7 @@ defmodule PepeWeb.TracesLive do
     <div class={shell_cls()}>
       <.sidebar active="traces" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="traces"
           icon="🧵"
           title={(@selected && gettext("Trace")) || gettext("Traces")}
           desc={
@@ -262,7 +262,7 @@ defmodule PepeWeb.TracesLive do
             f_from={@f_from}
             f_to={@f_to}
           />
-          <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
             <.trace_list :if={!@selected and !@group_by_session} traces={@traces} total={@total} models={@models} cache={@price_cache} />
             <.session_list
               :if={!@selected and @group_by_session}
@@ -298,7 +298,7 @@ defmodule PepeWeb.TracesLive do
 
   defp filter_bar(assigns) do
     ~H"""
-    <form id="trace-filters" phx-change="filter" class="flex flex-wrap items-end gap-3 border-b border-zinc-800 px-4 py-3 sm:px-6">
+    <form id="trace-filters" phx-change="filter" class="flex flex-wrap items-end gap-3 border-b border-zinc-800 px-4 py-3 sm:px-8 xl:px-14">
       <div>
         <label class="mb-1 block text-xs font-medium text-zinc-500">{gettext("Agent")}</label>
         <select name="agent" class={[fld(), "py-1.5"]}>
@@ -350,7 +350,7 @@ defmodule PepeWeb.TracesLive do
 
   defp pager(assigns) do
     ~H"""
-    <div class="flex items-center justify-between border-t border-zinc-800 px-4 py-3 text-sm sm:px-6 text-zinc-500">
+    <div class="flex items-center justify-between border-t border-zinc-800 px-4 py-3 text-sm text-zinc-500 sm:px-8 xl:px-14">
       <span>{gettext("%{from}-%{to} of %{total}", from: @from, to: @to, total: @total)}</span>
       <div class="flex items-center gap-2">
         <button phx-click="page" phx-value-page={@page - 1} disabled={@page <= 1} class={[btn_ghost(), @page <= 1 && "opacity-40"]}>
@@ -381,31 +381,31 @@ defmodule PepeWeb.TracesLive do
     >
       {gettext("No runs match these filters. Every agent run, from any surface, shows up here.")}
     </div>
-    <div :if={@traces != []} class={["overflow-x-auto", !@nested && "rounded-xl border border-zinc-800"]}>
-      <table class="w-full min-w-[720px] text-[15px]">
-        <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
+    <div :if={@traces != []} class={["overflow-x-auto", !@nested && "rounded-[14px] border border-zinc-800"]}>
+      <table class="w-full min-w-[720px] text-[14px]">
+        <thead class="border-b border-zinc-800 text-left">
           <tr>
-            <th class="px-3 py-2 font-medium">{gettext("When")}</th>
-            <th class="px-3 py-2 font-medium">{gettext("Agent")}</th>
-            <th class="px-3 py-2 font-medium">{gettext("Source")}</th>
-            <th class="px-3 py-2 font-medium">{gettext("Request")}</th>
-            <th class="px-3 py-2 font-medium">{gettext("Outcome")}</th>
-            <th class="px-3 py-2 font-medium">{gettext("Tools")}</th>
-            <th class="px-3 py-2 text-right font-medium">{gettext("Cost")}</th>
-            <th class="px-3 py-2"></th>
+            <th class={[th(), "px-3 py-3"]}>{gettext("When")}</th>
+            <th class={[th(), "px-3 py-3"]}>{gettext("Agent")}</th>
+            <th class={[th(), "px-3 py-3"]}>{gettext("Source")}</th>
+            <th class={[th(), "px-3 py-3"]}>{gettext("Request")}</th>
+            <th class={[th(), "px-3 py-3"]}>{gettext("Outcome")}</th>
+            <th class={[th(), "px-3 py-3"]}>{gettext("Tools")}</th>
+            <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Cost")}</th>
+            <th class="px-3 py-3"></th>
           </tr>
         </thead>
         <tbody>
-          <tr :for={t <- @traces} class="border-t border-zinc-800/70 hover:bg-zinc-800/40">
+          <tr :for={t <- @traces} class="border-t border-zinc-800 transition hover:bg-white/[.03]">
             <td class="whitespace-nowrap px-3 py-2 font-mono text-sm text-zinc-400">{fmt_at(t["at"])}</td>
             <td class="px-3 py-2">
               <span class="text-zinc-200">{t["agent"]}</span>
             </td>
             <td class="whitespace-nowrap px-3 py-2">
-              <span class="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">{source_label(trace_source(t))}</span>
+              <span class={tag(:muted)}>{source_label(trace_source(t))}</span>
             </td>
             <td class="px-3 py-2 text-sm text-zinc-400">
-              <div class="max-w-[22rem] truncate">{prompt_snippet(t["prompt"])}</div>
+              <div class="max-w-[15rem] truncate">{prompt_snippet(t["prompt"])}</div>
             </td>
             <td class="px-3 py-2"><.outcome_badge outcome={t["outcome"]} /></td>
             <td class="px-3 py-2 text-sm text-zinc-400">{tools_label(t["tools"])}</td>
@@ -456,10 +456,10 @@ defmodule PepeWeb.TracesLive do
           class="flex w-full flex-wrap items-center justify-between gap-3 bg-zinc-900/40 px-4 py-3 text-left hover:bg-zinc-900/70"
         >
           <div class="min-w-0">
-            <div class="truncate text-[15px] font-medium text-zinc-100">{g.title || g.id}</div>
+            <div class="truncate text-base font-medium text-zinc-100">{g.title || g.id}</div>
             <div class="mt-0.5 truncate text-xs text-zinc-500">
-              {g.id} · {gettext("%{n} runs", n: g.count)} · {Enum.join(g.agents, ", ")}
-              <span :if={g.source}>· {source_label(g.source)}</span>
+              {g.id}, {gettext("%{n} runs", n: g.count)}, {Enum.join(g.agents, ", ")}
+              <span :if={g.source}>{source_label(g.source)}</span>
             </div>
           </div>
           <div class="flex shrink-0 items-center gap-4 text-right">
@@ -489,38 +489,37 @@ defmodule PepeWeb.TracesLive do
     assigns = assign(assigns, tokens_in: tin, tokens_out: tout, cost: run_cost(assigns.trace, assigns.models, assigns.cache))
 
     ~H"""
-    <div class="mx-auto max-w-3xl space-y-5">
+    <div class="max-w-3xl space-y-5">
       <div class={card()}>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div class="text-lg font-semibold">{@trace["agent"]}</div>
             <div class="mt-0.5 text-sm text-zinc-500">
-              {fmt_at(@trace["at"])} · {fmt_ms(@trace["ms"])}
-              <span class="ml-1">· {source_label(trace_source(@trace))}</span>
+              {fmt_at(@trace["at"])}, {fmt_ms(@trace["ms"])}
+              <span class="ml-1">{source_label(trace_source(@trace))}</span>
             </div>
           </div>
           <.outcome_badge outcome={@trace["outcome"]} />
         </div>
 
-        <div :if={@tokens_in + @tokens_out > 0} class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          <span class="text-zinc-500">{gettext("Input")}: <span class="text-zinc-300">{@tokens_in}</span> {gettext("tokens")}</span>
-          <span class="text-zinc-500">{gettext("Output")}: <span class="text-zinc-300">{@tokens_out}</span> {gettext("tokens")}</span>
-          <span class="text-zinc-500">{gettext("Cost")}: <span class="text-zinc-300">{fmt_cost(@cost)}</span></span>
-        </div>
+        <.meta_list :if={@tokens_in + @tokens_out > 0} class="mt-4">
+          <:item label={gettext("Input")} mono>{@tokens_in} {gettext("tokens")}</:item>
+          <:item label={gettext("Output")} mono>{@tokens_out} {gettext("tokens")}</:item>
+          <:item label={gettext("Cost")} mono>{fmt_cost(@cost)}</:item>
+        </.meta_list>
         <div :if={@trace["prompt"]} class="mt-3 rounded-lg bg-zinc-950/60 p-3">
-          <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-600">{gettext("Prompt")}</div>
-          <div class="whitespace-pre-wrap break-words text-[15px] text-zinc-300">{@trace["prompt"]}</div>
+          <div class="mb-1 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("Prompt")}</div>
+          <div class="whitespace-pre-wrap break-words text-base text-zinc-300">{@trace["prompt"]}</div>
         </div>
-        <div :if={error_reason(@trace)} class="mt-3 rounded-lg border border-red-900/50 bg-red-950/30 p-3">
-          <div class="mb-1 text-xs font-semibold uppercase tracking-wider text-red-400">{gettext("Error detail")}</div>
-          <pre class="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-red-200">{error_reason(@trace)}</pre>
-        </div>
+        <.notice :if={error_reason(@trace)} kind={:danger} label={gettext("Error detail")} class="mt-4">
+          <pre class="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[13.5px] leading-relaxed text-zinc-200">{error_reason(@trace)}</pre>
+        </.notice>
       </div>
 
       <ol class="relative space-y-3 border-l border-zinc-800 pl-5">
         <li :for={ev <- @trace["events"]} class="relative">
           <span class="absolute -left-[26px] top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-xs ring-1 ring-zinc-700">
-            {event_icon(ev)}
+            <.icon name={event_icon(ev)} class="size-3 text-zinc-400" />
           </span>
           <.event ev={ev} />
         </li>
@@ -535,7 +534,7 @@ defmodule PepeWeb.TracesLive do
   defp event(%{ev: %{"t" => "tool_call"}} = assigns) do
     ~H"""
     <div>
-      <div class="text-[15px] font-medium text-orange-300">{gettext("Tool")} · {@ev["name"]}</div>
+      <div class="text-base font-medium text-orange-300">{gettext("Tool")}, {@ev["name"]}</div>
       <.blob text={@ev["args"]} />
     </div>
     """
@@ -544,7 +543,7 @@ defmodule PepeWeb.TracesLive do
   defp event(%{ev: %{"t" => "tool_result"}} = assigns) do
     ~H"""
     <div>
-      <div class="text-sm text-zinc-500">{gettext("Result")} · {@ev["name"]}</div>
+      <div class="text-sm text-zinc-500">{gettext("Result")}, {@ev["name"]}</div>
       <.blob text={@ev["out"]} />
     </div>
     """
@@ -554,15 +553,15 @@ defmodule PepeWeb.TracesLive do
     ~H"""
     <div>
       <div class="text-sm text-zinc-500">{gettext("Assistant")}</div>
-      <div class="mt-1 whitespace-pre-wrap break-words text-[15px] text-zinc-200">{@ev["text"]}</div>
+      <div class="mt-1 whitespace-pre-wrap break-words text-base text-zinc-200">{@ev["text"]}</div>
     </div>
     """
   end
 
   defp event(%{ev: %{"t" => "tool_denied"}} = assigns) do
     ~H"""
-    <div class="text-[15px] text-yellow-400">
-      {gettext("Blocked")} · {@ev["name"]}
+    <div class="text-base text-yellow-400">
+      {gettext("Blocked")}, {@ev["name"]}
       <span :if={@ev["reason"]} class="text-zinc-400">- {@ev["reason"]}</span>
     </div>
     """
@@ -585,21 +584,21 @@ defmodule PepeWeb.TracesLive do
 
   defp event(%{ev: %{"t" => "hook"}} = assigns) do
     ~H"""
-    <div class="text-sm text-zinc-400">{gettext("Hook")} · {@ev["name"]} ({stage_label(@ev["stage"])}): {hook_result_label(@ev)}</div>
+    <div class="text-sm text-zinc-400">{gettext("Hook")}, {@ev["name"]} ({stage_label(@ev["stage"])}): {hook_result_label(@ev)}</div>
     """
   end
 
   defp event(%{ev: %{"t" => "usage"}} = assigns) do
     ~H"""
     <div class="text-sm text-zinc-500">
-      {@ev["model"]} · {gettext("in")} {@ev["in"]} · {gettext("out")} {@ev["out"]} {gettext("tokens")}
+      {@ev["model"]}, {gettext("in")} {@ev["in"]}, {gettext("out")} {@ev["out"]} {gettext("tokens")}
     </div>
     """
   end
 
   defp event(%{ev: %{"t" => "error"}} = assigns) do
     ~H"""
-    <div class="text-[15px] text-red-400">{gettext("Error")}: {@ev["reason"]}</div>
+    <div class="text-base text-red-400">{gettext("Error")}: {@ev["reason"]}</div>
     """
   end
 
@@ -660,7 +659,7 @@ defmodule PepeWeb.TracesLive do
 
   defp outcome_badge(%{outcome: %{"kind" => "ok"}} = assigns) do
     ~H"""
-    <span class="rounded-full bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-400">{gettext("ok")}</span>
+    <span class="rounded-full bg-teal-ink/15 px-2.5 py-1 text-xs font-medium text-teal-ink">{gettext("ok")}</span>
     """
   end
 
@@ -839,14 +838,14 @@ defmodule PepeWeb.TracesLive do
     end
   end
 
-  defp event_icon(%{"t" => "tool_call"}), do: "🔧"
-  defp event_icon(%{"t" => "tool_result"}), do: "↳"
-  defp event_icon(%{"t" => "assistant"}), do: "💬"
-  defp event_icon(%{"t" => "tool_denied"}), do: "🚫"
-  defp event_icon(%{"t" => "failover"}), do: "⇄"
-  defp event_icon(%{"t" => "triage"}), do: "🧭"
-  defp event_icon(%{"t" => "hook"}), do: "🛡"
-  defp event_icon(%{"t" => "usage"}), do: "◷"
-  defp event_icon(%{"t" => "error"}), do: "⚠"
-  defp event_icon(_), do: "·"
+  defp event_icon(%{"t" => "tool_call"}), do: "hero-wrench"
+  defp event_icon(%{"t" => "tool_result"}), do: "hero-arrow-turn-down-right"
+  defp event_icon(%{"t" => "assistant"}), do: "hero-chat-bubble-left"
+  defp event_icon(%{"t" => "tool_denied"}), do: "hero-no-symbol"
+  defp event_icon(%{"t" => "failover"}), do: "hero-arrows-right-left"
+  defp event_icon(%{"t" => "triage"}), do: "hero-map"
+  defp event_icon(%{"t" => "hook"}), do: "hero-shield-check"
+  defp event_icon(%{"t" => "usage"}), do: "hero-clock"
+  defp event_icon(%{"t" => "error"}), do: "hero-exclamation-triangle"
+  defp event_icon(_), do: "hero-minus-small"
 end

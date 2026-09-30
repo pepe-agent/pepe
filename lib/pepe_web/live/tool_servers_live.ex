@@ -13,7 +13,7 @@ defmodule PepeWeb.ToolServersLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · MCP",
+       page_title: "Pepe: MCP",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -129,7 +129,7 @@ defmodule PepeWeb.ToolServersLive do
     <div class={shell_cls()}>
       <.sidebar active="mcp" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="mcp"
           icon="🧰"
           title="MCP"
           desc={gettext("Give agents extra tools from external MCP servers (Sentry, GitHub, ...). Write tokens as ${ENV_VAR} to keep secrets out of the config file.")}
@@ -137,7 +137,7 @@ defmodule PepeWeb.ToolServersLive do
           <button :if={!@edit_mcp} phx-click="mcp_new" class={btn()}>{gettext("+ New server")}</button>
           <button :if={@edit_mcp} phx-click="mcp_cancel" class={btn_ghost()}>&larr; {gettext("Back to servers")}</button>
         </.view_header>
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :if={!@edit_mcp} class="space-y-3">
           <div :for={{name, cfg} <- @mcp} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -149,13 +149,13 @@ defmodule PepeWeb.ToolServersLive do
                 <button phx-click="mcp_remove" phx-value-name={name} data-confirm={gettext("Remove MCP server %{name}?", name: name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div :if={cfg["url"]} class="mt-1 text-sm text-zinc-400">
-              <code>{cfg["url"]}</code>
-              <span class="text-zinc-500">· {cfg["transport"] || "auto"}</span>
-            </div>
-            <div :if={!cfg["url"]} class="mt-1 text-sm text-zinc-400"><code>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</code></div>
+            <.meta_list class="mt-4">
+              <:item :if={cfg["url"]} label="URL" mono>{cfg["url"]}</:item>
+              <:item :if={cfg["url"]} label={gettext("Transport")}>{cfg["transport"] || "auto"}</:item>
+              <:item :if={!cfg["url"]} label={gettext("Command")} mono>{cfg["command"]} {Enum.join(cfg["args"] || [], " ")}</:item>
+            </.meta_list>
             <div :if={cfg["url"]} class="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <span :if={auth_state(name, cfg) == :header} class="text-zinc-500">🔑 {gettext("Static key from a header")}</span>
+              <span :if={auth_state(name, cfg) == :header} class="inline-flex items-center gap-1.5 text-zinc-500"><.icon name="hero-key" class="size-4" /> {gettext("Static key from a header")}</span>
               <span :if={auth_state(name, cfg) == :oauth} class="text-emerald-400">✓ {gettext("Signed in with OAuth")}</span>
               <span :if={auth_state(name, cfg) == :none} class="text-amber-400">{gettext("No credential")}</span>
               <button :if={auth_state(name, cfg) != :header} phx-click="mcp_login" phx-value-name={name} class={btn_ghost()}>
@@ -187,10 +187,10 @@ defmodule PepeWeb.ToolServersLive do
               {gettext("Couldn't connect. Check the command and the env var token")}
             </div>
           </div>
-          <p :if={@mcp == %{}} class="text-[15px] text-zinc-500">{gettext("No MCP servers yet. Add one with “+ New server”.")}</p>
+          <.empty_state :if={@mcp == %{}}>{gettext("No MCP servers yet. Add one with “+ New server”.")}</.empty_state>
           </div>
 
-          <div :if={@edit_mcp} class="max-w-2xl">
+          <div :if={@edit_mcp} class="max-w-3xl">
           <.form id="mcp-form" for={@form} phx-submit="mcp_save" phx-change="mcp_change" class="space-y-6">
             <div class="text-lg font-semibold">
               {if @edit_mcp[:original], do: gettext("Edit MCP server"), else: gettext("+ New MCP server")}
@@ -229,7 +229,7 @@ defmodule PepeWeb.ToolServersLive do
             </.form_section>
 
             <.form_section :if={@form[:kind].value != "local"} title={gettext("Authentication")}>
-              <p class="text-[15px] leading-relaxed text-zinc-400">
+              <p class="text-base leading-relaxed text-zinc-400">
                 {gettext("Two ways in, pick one. Most hosted servers use OAuth: leave Headers empty, save, then press “Sign in with OAuth” on the server's card. A server that hands out a fixed token instead wants that token as a header below.")}
               </p>
               <div>

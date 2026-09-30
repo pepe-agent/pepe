@@ -67,20 +67,21 @@ defmodule PepeWeb.CoreComponents do
       class="toast toast-top toast-end z-50"
       {@rest}
     >
+      <%!-- A quiet dark card with a colored edge (teal for a notice, red for an error), the same
+            surface as the rest of the dashboard, not daisyUI's filled blue and red alerts. --%>
       <div class={[
-        "alert w-80 sm:w-96 max-w-80 sm:max-w-96 text-wrap",
-        @kind == :info && "alert-info",
-        @kind == :error && "alert-error"
+        "flex w-80 max-w-80 items-start gap-3 rounded-[11px] border border-white/[.12] border-l-[3px] bg-[#0f1921] px-3.5 py-3 text-[14px] text-zinc-100 shadow-xl shadow-black/40 sm:w-96 sm:max-w-96",
+        @kind == :info && "border-l-teal-ink",
+        @kind == :error && "border-l-danger-ink"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
-        <div>
+        <.icon :if={@kind == :info} name="hero-check-circle" class="mt-px size-5 shrink-0 text-teal-ink" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="mt-px size-5 shrink-0 text-danger-ink" />
+        <div class="min-w-0 flex-1">
           <p :if={@title} class="font-semibold">{@title}</p>
-          <p class="whitespace-pre-line">{msg}</p>
+          <p class="whitespace-pre-line leading-snug">{msg}</p>
         </div>
-        <div class="flex-1" />
-        <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
+        <button type="button" class="group cursor-pointer" aria-label={gettext("close")}>
+          <.icon name="hero-x-mark" class="size-[18px] text-zinc-500 group-hover:text-zinc-200" />
         </button>
       </div>
     </div>
@@ -249,7 +250,7 @@ defmodule PepeWeb.CoreComponents do
   def input(%{type: "select"} = assigns) do
     ~H"""
     <div class="mb-4">
-      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-zinc-300">{@label}</label>
+      <label :if={@label} for={@id} class={PepeWeb.DashUI.lbl()}>{@label}</label>
       <select
         id={@id}
         name={@name}
@@ -268,7 +269,7 @@ defmodule PepeWeb.CoreComponents do
   def input(%{type: "textarea"} = assigns) do
     ~H"""
     <div class="mb-4">
-      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-zinc-300">{@label}</label>
+      <label :if={@label} for={@id} class={PepeWeb.DashUI.lbl()}>{@label}</label>
       <textarea
         id={@id}
         name={@name}
@@ -284,7 +285,7 @@ defmodule PepeWeb.CoreComponents do
   def input(assigns) do
     ~H"""
     <div class="mb-4">
-      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-zinc-300">{@label}</label>
+      <label :if={@label} for={@id} class={PepeWeb.DashUI.lbl()}>{@label}</label>
       <input
         type={@type}
         name={@name}
@@ -298,10 +299,9 @@ defmodule PepeWeb.CoreComponents do
     """
   end
 
-  # The dashboard's dark field style, matched to PepeWeb.DashUI.fld/0.
-  defp dash_field,
-    do:
-      "w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+  # The dashboard's field style: the one definition, in PepeWeb.DashUI, so a field built here
+  # and one written by hand in a page can never drift apart.
+  defp dash_field, do: PepeWeb.DashUI.fld()
 
   # Helper used by inputs to generate form errors, shown right below the field.
   defp error(assigns) do

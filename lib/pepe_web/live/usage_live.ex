@@ -31,7 +31,7 @@ defmodule PepeWeb.UsageLive do
     {:ok,
      socket
      |> assign(
-       page_title: "Pepe · Usage",
+       page_title: "Pepe: Usage",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -87,7 +87,7 @@ defmodule PepeWeb.UsageLive do
     <div class={shell_cls()}>
       <.sidebar active="usage" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="usage"
           icon="📊"
           title={gettext("Usage & billing")}
           desc={gettext("Tokens metered per project, agent and model, by cycle. Cost uses each model's price; the amount to bill adds the project's markup. Prices are editable per model.")}
@@ -107,13 +107,13 @@ defmodule PepeWeb.UsageLive do
           </div>
         </.view_header>
 
-        <div class="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 space-y-5 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm text-zinc-500">{gettext("Cycle")}</span>
             <button :for={{g, label} <- granularity_options()} phx-click="set_granularity" phx-value-g={g}
               class={[
                 "rounded-lg px-3 py-1.5 text-sm transition",
-                (@granularity == g && "bg-orange-600 font-medium text-white") ||
+                (@granularity == g && "bg-orange-600 font-semibold text-on-accent") ||
                   "border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700"
               ]}>{label}</button>
           </div>
@@ -138,22 +138,22 @@ defmodule PepeWeb.UsageLive do
           </div>
 
           <div>
-            <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("By cycle")}</div>
+            <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("By cycle")}</div>
             <%!-- The empty state is its own block, not a `colspan` row: inside the table it
                   would inherit the 640px min width and scroll out of sight on a phone. --%>
-            <div :if={@summary.buckets == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-[15px] text-zinc-500">
+            <div :if={@summary.buckets == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-base text-zinc-500">
               {gettext("No usage recorded yet for this scope.")}
             </div>
             <div :if={@summary.buckets != []} class="overflow-x-auto rounded-xl border border-zinc-800">
-              <table class="w-full min-w-[640px] text-[15px]">
-                <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
+              <table class="w-full min-w-[640px] text-base">
+                <thead class="border-b border-zinc-800 text-left">
                   <tr>
-                    <th class="px-3 py-2 font-medium">{gettext("Cycle")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("Input")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("Output")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("Total")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("Cost")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("To bill")}</th>
+                    <th class={[th(), "px-3 py-3"]}>{gettext("Cycle")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Input")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Output")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Total")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Cost")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("To bill")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -182,27 +182,27 @@ defmodule PepeWeb.UsageLive do
           </div>
 
           <div>
-            <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500">{gettext("By message")}</div>
+            <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("By message")}</div>
             <p class="mb-2 text-sm text-zinc-500">
               {gettext("One line per incoming message. A message often takes several model calls: answer, run a tool, read the result, answer again. Calls drive the cost, not tools: every call re-sends the whole conversation, and each tool result makes it longer.")}
             </p>
 
-            <div :if={@runs == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-[15px] text-zinc-500">
+            <div :if={@runs == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-base text-zinc-500">
               {gettext("No messages recorded yet for this scope.")}
             </div>
 
             <div :if={@runs != []} class="overflow-x-auto rounded-xl border border-zinc-800">
-              <table class="w-full min-w-[720px] text-[15px]">
-                <thead class="bg-zinc-900/60 text-left text-sm text-zinc-500">
+              <table class="w-full min-w-[720px] text-[14px]">
+                <thead class="border-b border-zinc-800 text-left">
                   <tr>
-                    <th class="w-6 py-2 pl-3 pr-0"><span class="sr-only">{gettext("Expand")}</span></th>
-                    <th class="px-3 py-2 font-medium">{gettext("When")}</th>
-                    <th class="px-3 py-2 font-medium">{gettext("Agent")}</th>
-                    <th class="px-3 py-2 font-medium">{gettext("Came from")}</th>
-                    <th class="px-3 py-2 font-medium">{gettext("Tools")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("Calls")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("Took")}</th>
-                    <th class="px-3 py-2 text-right font-medium">{gettext("To bill")}</th>
+                    <th class="w-6 py-3 pl-3 pr-0"><span class="sr-only">{gettext("Expand")}</span></th>
+                    <th class={[th(), "px-3 py-3"]}>{gettext("When")}</th>
+                    <th class={[th(), "px-3 py-3"]}>{gettext("Agent")}</th>
+                    <th class={[th(), "px-3 py-3"]}>{gettext("Came from")}</th>
+                    <th class={[th(), "px-3 py-3"]}>{gettext("Tools")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Calls")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("Took")}</th>
+                    <th class={[th(), "px-3 py-3 text-right"]}>{gettext("To bill")}</th>
                   </tr>
                 </thead>
                 <tbody>

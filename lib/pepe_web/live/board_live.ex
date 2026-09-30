@@ -21,7 +21,7 @@ defmodule PepeWeb.BoardLive do
 
     {:ok,
      assign(socket,
-       page_title: "Pepe · Board",
+       page_title: "Pepe: Board",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -118,7 +118,7 @@ defmodule PepeWeb.BoardLive do
     <div class={shell_cls()}>
       <.sidebar active="board" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="board"
           icon="🗂️"
           title={gettext("Board")}
           desc={gettext("Durable task cards with dependencies, claimed and worked by agents (or you): a resumable queue, not a chat.")}
@@ -130,14 +130,14 @@ defmodule PepeWeb.BoardLive do
           <button :if={@creating_board} phx-click="board_cancel" class={btn_ghost()}>&larr; {gettext("Back")}</button>
         </.view_header>
 
-        <div :if={@creating_board} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <div :if={@creating_board} class="page-body min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <%!-- One field rhythm for both forms on this page: every field is a block ending in
                 `mb-4`, whether it comes from `.input` (which carries its own) or is hand-rolled
                 (which then wears it explicitly). The form itself adds no `space-y-*`, so the two
                 kinds can't end up 16px apart on one row and 32px on the next. --%>
-          <div class="max-w-2xl">
+          <div class="max-w-3xl">
             <.form id="board-form" for={@board_form} phx-submit="board_create">
-              <div class="mb-4 text-lg font-semibold">{gettext("+ New board")}</div>
+              <.form_section title={gettext("+ New board")}>
               <.input field={@board_form[:name]} label={gettext("Name")} placeholder={gettext("Engineering")} />
               <.input type="select" id="board-project" name="board[project]" label={gettext("Project")}
                 value={project_value(@scope)} options={project_options(@projects)} />
@@ -159,14 +159,15 @@ defmodule PepeWeb.BoardLive do
                 <button type="submit" class={btn()}>{gettext("Create board")}</button>
                 <button type="button" phx-click="board_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </.form>
           </div>
         </div>
 
-        <div :if={@creating_card} class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          <div class="max-w-2xl">
+        <div :if={@creating_card} class="page-body min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <div class="max-w-3xl">
             <.form id="card-form" for={@card_form} phx-submit="card_create">
-              <div class="mb-4 text-lg font-semibold">{gettext("+ New card")}</div>
+              <.form_section title={gettext("+ New card")}>
               <.input field={@card_form[:title]} label={gettext("Title")} placeholder={gettext("Fix the checkout timeout")} />
               <.input field={@card_form[:body]} type="textarea" rows="3" label={gettext("What needs doing")}
                 placeholder={gettext("Everything the assignee needs to know: this is all it gets, no chat memory.")} />
@@ -198,11 +199,12 @@ defmodule PepeWeb.BoardLive do
                 <button type="submit" class={btn()}>{gettext("Create card")}</button>
                 <button type="button" phx-click="card_cancel" class={btn_ghost()}>{gettext("Cancel")}</button>
               </div>
+              </.form_section>
             </.form>
           </div>
         </div>
 
-        <div :if={!@selected and !@creating_board and !@creating_card} class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+        <div :if={!@selected and !@creating_board and !@creating_card} class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :for={b <- @boards} class={[card(), "cursor-pointer"]} phx-click="board_select" phx-value-id={b.id}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
@@ -217,10 +219,10 @@ defmodule PepeWeb.BoardLive do
               {ngettext("%{count} card", "%{count} cards", length(Config.board_cards_for(b.id)))}
             </div>
           </div>
-          <p :if={@boards == []} class="text-[15px] text-zinc-500">{gettext("No boards yet. Create one with “+ New board”.")}</p>
+          <.empty_state :if={@boards == []}>{gettext("No boards yet. Create one with “+ New board”.")}</.empty_state>
         </div>
 
-        <div :if={@selected && !@creating_card} class="flex-1 overflow-x-auto overflow-y-auto p-4 sm:p-6">
+        <div :if={@selected && !@creating_card} class="flex-1 overflow-x-auto overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div class="mb-4 flex items-center gap-3">
             <span class="text-lg font-semibold">{Enum.find(@boards, &(&1.id == @selected)) |> then(& &1 && &1.name)}</span>
             <label class="flex items-center gap-1.5 text-sm text-zinc-400">
@@ -229,10 +231,10 @@ defmodule PepeWeb.BoardLive do
           </div>
           <%!-- The empty state replaces the columns rather than trailing them: a board with no
                 cards would otherwise show six empty headers before saying there's nothing here. --%>
-          <p :if={@cards == []} class="text-[15px] text-zinc-500">{gettext("No cards yet. Create one with “+ New card”.")}</p>
+          <.empty_state :if={@cards == []}>{gettext("No cards yet. Create one with “+ New card”.")}</.empty_state>
           <div :if={@cards != []} class="flex gap-4">
             <div :for={status <- @statuses} class="w-72 shrink-0">
-              <div class="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              <div class="mb-2 flex items-center gap-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-500">
                 {column_label(status)} <span class="text-zinc-600">{length(column(@cards, status))}</span>
               </div>
               <div class="space-y-3">
@@ -263,7 +265,7 @@ defmodule PepeWeb.BoardLive do
               </div>
             </div>
             <div :if={@show_archived} class="w-72 shrink-0">
-              <div class="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-500">
                 {gettext("Archived")} <span class="text-zinc-600">{length(column(@cards, "archived"))}</span>
               </div>
               <div class="space-y-3">

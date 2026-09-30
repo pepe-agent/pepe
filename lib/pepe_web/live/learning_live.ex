@@ -21,7 +21,7 @@ defmodule PepeWeb.LearningLive do
 
     {:ok,
      assign(socket,
-       page_title: "Pepe · Learning",
+       page_title: "Pepe: Learning",
        scope: scope,
        projects: Config.project_slugs(),
        new_project: false,
@@ -57,7 +57,7 @@ defmodule PepeWeb.LearningLive do
     <div class={shell_cls()}>
       <.sidebar active="learn" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="learn"
           icon="✦"
           title={gettext("Learning")}
           desc={gettext("What this agent has picked up: skills it can run and memory it saved, newest first. Click any item to read and edit it. \"Consolidate now\" has the agent tidy all of this, merging duplicates and dropping what is stale; it can delete things, so check the result. \"Nightly\" does the same pass on its own, once a night.")}
@@ -79,33 +79,36 @@ defmodule PepeWeb.LearningLive do
           <button :if={@editing} phx-click="learn_close" class={btn_ghost()}>&larr; {gettext("Back")}</button>
         </.view_header>
 
-        <div :if={@editing} class="flex min-h-0 flex-1 flex-col gap-3 p-4 sm:p-6">
-          <div class="text-[15px]">
-            <span class="font-medium">{@editing.title}</span>
-            <span class="ml-2 text-sm text-zinc-500">{@editing.path}</span>
-            <span :if={@editing.note} class="ml-2 rounded bg-amber-800/40 px-1.5 text-sm text-amber-200">{@editing.note}</span>
-          </div>
-          <form phx-submit="learn_save" class="flex min-h-0 flex-1 flex-col gap-3">
-            <textarea name="content" spellcheck="false"
-              class="min-h-0 w-full flex-1 resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-relaxed text-zinc-100 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500">{@editing.content}</textarea>
-            <div class="flex gap-2">
+        <div :if={@editing} class="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-1 sm:px-8 xl:px-14">
+          <form phx-submit="learn_save" class="page-column flex min-h-0 flex-1 flex-col rounded-[14px] border border-zinc-800 bg-zinc-900">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-zinc-800 px-5 py-3.5">
+              <span class="text-base font-medium text-zinc-50">{@editing.title}</span>
+              <span class="font-mono text-[12px] text-zinc-500">{@editing.path}</span>
+              <span :if={@editing.note} class={tag(:warn)}>{@editing.note}</span>
+            </div>
+            <textarea
+              name="content"
+              spellcheck="false"
+              class="min-h-0 w-full flex-1 resize-none bg-transparent p-5 font-mono text-[13.5px] leading-relaxed text-zinc-100 outline-none"
+            >{@editing.content}</textarea>
+            <div class="flex gap-2 border-t border-zinc-800 px-5 py-3.5">
               <button type="submit" class={btn()}>{gettext("Save")}</button>
               <button type="button" phx-click="learn_close" class={btn_ghost()}>{gettext("Cancel")}</button>
             </div>
           </form>
         </div>
 
-        <div :if={!@editing} class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+        <div :if={!@editing} class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <.live_component module={PepeWeb.SkillCuratorComponent} id="skill-curator-panel" />
 
-          <div :if={@pending != []} class="mb-4 rounded-xl border border-amber-800/50 bg-amber-950/20 p-3">
+          <div :if={@pending != []} class="mb-4 rounded-xl border border-orange-400/40 bg-orange-400/[.05] p-3">
             <div class="mb-2 text-sm font-semibold text-amber-200">
               {ngettext("%{count} write awaiting your review", "%{count} writes awaiting your review", length(@pending))}
               <span class="ml-1 font-normal text-amber-200/60">{gettext("(staged by consolidation, not yet applied)")}</span>
             </div>
-            <div :for={p <- @pending} class="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-amber-900/20">
+            <div :for={p <- @pending} class="flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-white/[.04]">
               <div class="min-w-0">
-                <div class="flex flex-wrap items-baseline gap-x-2 text-[15px]">
+                <div class="flex flex-wrap items-baseline gap-x-2 text-base">
                   <span class="font-medium">{p.tool}</span>
                   <span :if={p.path} class="font-mono text-sm text-zinc-300">{p.path}</span>
                   <span class="text-sm text-zinc-500">{gettext("by %{agent}", agent: p.agent)}</span>
@@ -126,17 +129,17 @@ defmodule PepeWeb.LearningLive do
             phx-value-title={n.title}
             class={[card(), "flex w-full gap-3 text-left hover:bg-zinc-900"]}
           >
-            <span class="text-lg">{learn_icon(n.kind)}</span>
+            <.icon name={learn_icon(n.kind)} class="mt-0.5 size-5 shrink-0 text-zinc-500" />
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span class="font-medium">{n.title}</span>
                 <span class="rounded bg-zinc-800 px-1.5 text-sm text-zinc-400">{n.source}</span>
                 <span class="text-sm text-zinc-500">{learn_date(n.at)}</span>
               </div>
-              <div class="truncate text-[15px] text-zinc-400">{n.summary}</div>
+              <div class="truncate text-base text-zinc-400">{n.summary}</div>
             </div>
           </button>
-          <p :if={@learn_nodes == []} class="text-[15px] text-zinc-500">{gettext("Nothing learned yet.")}</p>
+          <p :if={@learn_nodes == []} class="text-base text-zinc-500">{gettext("Nothing learned yet.")}</p>
         </div>
       </main>
     </div>

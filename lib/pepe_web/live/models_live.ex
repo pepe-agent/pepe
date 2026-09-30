@@ -13,7 +13,7 @@ defmodule PepeWeb.ModelsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Models",
+       page_title: "Pepe: Models",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -61,23 +61,29 @@ defmodule PepeWeb.ModelsLive do
     case {m.input_price, m.output_price} do
       {nil, nil} ->
         case Pricing.lookup(m.model) do
-          {i, o} ->
-            gettext("Auto price · in %{in} · out %{out}",
-              in: money(i, currency),
-              out: money(o, currency)
-            )
-
-          nil ->
-            gettext("No price. Set one to bill for this model")
+          {i, o} -> priced(gettext("Auto price"), i, o, cache_rate(m), currency)
+          nil -> gettext("No price. Set one to bill for this model")
         end
 
       {i, o} ->
-        gettext("Price · in %{in} · out %{out}",
-          in: money(i || 0.0, currency),
-          out: money(o || 0.0, currency)
-        )
+        priced(gettext("Price"), i || 0.0, o || 0.0, cache_rate(m), currency)
     end
   end
+
+  defp priced(label, i, o, nil, currency),
+    do: gettext("%{label}, in %{in}, out %{out}", label: label, in: money(i, currency), out: money(o, currency))
+
+  defp priced(label, i, o, c, currency),
+    do:
+      gettext("%{label}, in %{in}, cached in %{cached}, out %{out}",
+        label: label,
+        in: money(i, currency),
+        cached: money(c, currency),
+        out: money(o, currency)
+      )
+
+  # What a re-read (cached) input token costs: the connection's own rate, else the price book's.
+  defp cache_rate(m), do: Map.get(m, :cached_input_price) || Pricing.cached_rate(m.model, Pricing.load_cache())
 
   defp parse_price(value) do
     case value |> to_string() |> String.trim() |> String.replace(",", ".") do
@@ -192,7 +198,7 @@ defmodule PepeWeb.ModelsLive do
     <div class={shell_cls()}>
       <.sidebar active="models" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="models"
           icon="🔌"
           title={gettext("Model connections")}
           desc={gettext("The AI providers your agents run on: any OpenAI-compatible endpoint (OpenAI, OpenRouter, a local model...). Pick a provider and we fill in the rest.")}
@@ -200,7 +206,7 @@ defmodule PepeWeb.ModelsLive do
           <button :if={!@edit_model} phx-click="model_new" class={btn()}>{gettext("+ New connection")}</button>
           <button :if={@edit_model} phx-click="model_cancel" class={btn_ghost()}>&larr; {gettext("Back to models")}</button>
         </.view_header>
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="page-body flex-1 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :if={!@edit_model} class="space-y-3">
           <div :if={Pepe.Providers.subscription_methods() != []} class={card()}>
             <div class="font-medium">{gettext("Sign in with a subscription")}</div>
@@ -232,7 +238,7 @@ defmodule PepeWeb.ModelsLive do
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{m.name}</span>
-                <span :if={m.name == @default_model} class="ml-2 rounded bg-green-700 px-1.5 text-sm">{gettext("default")}</span>
+                <span :if={m.name == @default_model} class={[tag(:ok), "ml-2"]}>{gettext("default")}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button :if={is_map(m.oauth)} phx-click="oauth_reconnect" phx-value-name={m.name} class={btn_ghost()}>{gettext("Reconnect")}</button>
@@ -241,12 +247,15 @@ defmodule PepeWeb.ModelsLive do
                 <button phx-click="model_delete" phx-value-name={m.name} data-confirm={gettext("Delete model %{name}?", name: m.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
-            <div class="mt-1 text-sm text-zinc-400">{m.model} · {m.base_url}</div>
-            <div class="mt-0.5 text-sm text-zinc-500">{price_line(m, @currency)}</div>
+            <.meta_list class="mt-4">
+              <:item label={gettext("Model:")} mono>{m.model}</:item>
+              <:item label={gettext("Base URL")} mono>{m.base_url}</:item>
+              <:item label={gettext("Billing")}>{price_line(m, @currency)}</:item>
+            </.meta_list>
           </div>
           </div>
 
-          <div :if={@edit_model} class="max-w-2xl">
+          <div :if={@edit_model} class="max-w-3xl">
           <%!-- Editing an existing connection: fields shown directly (no provider picker). --%>
           <form :if={@edit_model.edit} phx-submit="model_save" class="space-y-4">
             <div class="text-lg font-semibold">{gettext("Edit %{name}", name: @edit_model.original_name)}</div>
@@ -332,13 +341,15 @@ defmodule PepeWeb.ModelsLive do
           <form :if={!@edit_model.edit} phx-submit="model_save" class="space-y-4">
             <div class="text-lg font-semibold">{gettext("+ New model connection")}</div>
 
-            <div>
-              <label class={lbl()}>{gettext("Provider")}</label>
-              <select name="provider" phx-change="model_pick_provider" class={fld()}>
-                <option value="">{gettext("Choose a provider...")}</option>
-                <option :for={{k, label} <- provider_options()} value={k} selected={k == @edit_model.provider}>{label}</option>
-              </select>
-            </div>
+            <.form_section title={gettext("Provider")}>
+              <div>
+                <label class={lbl()} for="model-provider">{gettext("Provider")}</label>
+                <select id="model-provider" name="provider" phx-change="model_pick_provider" class={fld()}>
+                  <option value="">{gettext("Choose a provider...")}</option>
+                  <option :for={{k, label} <- provider_options()} value={k} selected={k == @edit_model.provider}>{label}</option>
+                </select>
+              </div>
+            </.form_section>
 
             <div :if={@edit_model.provider} class="space-y-4">
               <.form_section title={gettext("Connection")}>

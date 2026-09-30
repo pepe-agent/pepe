@@ -165,10 +165,10 @@ pepe cron logs morning-brief
 ```
 ✦ Runs of morning-brief
 
-✅ 2026-07-06 09:00 · scheduler
+✅ 2026-07-06 09:00 scheduler
    3 issues overnight. Top: DB connection pool exhausted (x42), ...
 
-⚠️ 2026-07-05 09:00 · scheduler
+⚠️ 2026-07-05 09:00 scheduler
    error: :timeout
 ```
 

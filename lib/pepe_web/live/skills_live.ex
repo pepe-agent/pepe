@@ -27,7 +27,7 @@ defmodule PepeWeb.SkillsLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Skills",
+       page_title: "Pepe: Skills",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -43,20 +43,20 @@ defmodule PepeWeb.SkillsLive do
     <div class={shell_cls()}>
       <.sidebar active="skills" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="skills"
           icon="📚"
           title={gettext("Skills")}
           desc={gettext("Step-by-step know-how an agent reads when a request calls for it. Each one shows whether agents are offered it, and if not, why. Switch one off everywhere or on a single channel. Install and create skills from chat or with mix pepe skill.")}
         />
-        <div class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
-          <div :if={@skills == []} class="text-[15px] text-zinc-500">{gettext("No skills found.")}</div>
+        <div class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <div :if={@skills == []} class="text-base text-zinc-500">{gettext("No skills found.")}</div>
           <div :for={row <- @skills} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{row.skill.name}</span>
-                <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{tier_label(row.skill.source)}</span>
-                <span :if={row.hidden} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{hidden_label(row.hidden)}</span>
-                <span :if={row.needs} class="ml-1 rounded bg-zinc-800 px-1.5 text-sm text-amber-400">{row.needs}</span>
+                <span class={[tag(:muted), "ml-2"]}>{tier_label(row.skill.source)}</span>
+                <span :if={row.hidden} class={[tag(:warn), "ml-1"]}>{hidden_label(row.hidden)}</span>
+                <span :if={row.needs} class={[tag(:warn), "ml-1"]}>{row.needs}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button phx-click="skill_check" phx-value-name={row.skill.name} class={btn_ghost()}>{gettext("Check")}</button>
@@ -64,6 +64,7 @@ defmodule PepeWeb.SkillsLive do
                   :if={!row.off}
                   phx-click="skill_off"
                   phx-value-name={row.skill.name}
+                  title={gettext("Turn off on every channel")}
                   class={btn_ghost()}
                 >
                   {gettext("Turn off")}
@@ -74,21 +75,27 @@ defmodule PepeWeb.SkillsLive do
               </div>
             </div>
             <div class="mt-1 text-sm text-zinc-400">{row.skill.summary}</div>
-            <div class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-zinc-500">
-              <span :if={row.off_on != []}>{gettext("Off on:")}</span>
-              <button
-                :for={channel <- row.off_on}
-                phx-click="skill_channel_on"
-                phx-value-name={row.skill.name}
-                phx-value-channel={channel}
-                title={gettext("Turn on again")}
-                class="rounded bg-zinc-800 px-1.5 text-zinc-300 hover:bg-zinc-700"
-              >
-                {channel_label(channel)} ✕
-              </button>
-              <form id={"skill-channel-#{row.skill.name}"} phx-submit="skill_channel_off" class="flex items-center gap-1">
+            <div class="mt-3 space-y-2">
+              <div :if={row.off_on != []} class="flex flex-wrap items-center gap-2 text-[13.5px] text-zinc-500">
+                <span>{gettext("Off on:")}</span>
+                <button
+                  :for={channel <- row.off_on}
+                  phx-click="skill_channel_on"
+                  phx-value-name={row.skill.name}
+                  phx-value-channel={channel}
+                  title={gettext("Turn on again")}
+                  class={[tag(:warn), "cursor-pointer transition hover:bg-orange-400/10"]}
+                >
+                  {channel_label(channel)} ✕
+                </button>
+              </div>
+              <form :if={channels() -- row.off_on != []} id={"skill-channel-#{row.skill.name}"} phx-submit="skill_channel_off" class="flex flex-wrap items-center gap-1.5">
                 <input type="hidden" name="name" value={row.skill.name} />
-                <select name="channel" class={[fld_sm(), "w-auto"]}>
+                <label for={"skill-channel-pick-#{row.skill.name}"} class="text-[13.5px] text-zinc-500">
+                  {gettext("Turn off on just one channel:")}
+                </label>
+                <select id={"skill-channel-pick-#{row.skill.name}"} name="channel" required class={[fld_sm(), "w-auto"]}>
+                  <option value="" disabled selected>{gettext("Pick a channel")}</option>
                   <option :for={channel <- channels() -- row.off_on} value={channel}>{channel_label(channel)}</option>
                 </select>
                 <button class={btn_ghost()}>{gettext("Turn off there")}</button>
@@ -103,14 +110,30 @@ defmodule PepeWeb.SkillsLive do
   end
 
   @impl true
-  def handle_event("skill_off", %{"name" => name}, socket), do: {:noreply, switch(socket, fn -> Settings.disable(name, nil) end)}
-  def handle_event("skill_on", %{"name" => name}, socket), do: {:noreply, switch(socket, fn -> Settings.enable(name, nil) end)}
+  def handle_event("skill_off", %{"name" => name}, socket) do
+    {:noreply, socket |> switch(fn -> Settings.disable(name, nil) end) |> put_flash(:info, gettext("%{skill} is now off.", skill: name))}
+  end
 
-  def handle_event("skill_channel_off", %{"name" => name, "channel" => channel}, socket) when channel in @channels,
-    do: {:noreply, switch(socket, fn -> Settings.disable(name, channel) end)}
+  def handle_event("skill_on", %{"name" => name}, socket) do
+    {:noreply, socket |> switch(fn -> Settings.enable(name, nil) end) |> put_flash(:info, gettext("%{skill} is on again.", skill: name))}
+  end
 
-  def handle_event("skill_channel_on", %{"name" => name, "channel" => channel}, socket) when channel in @channels,
-    do: {:noreply, switch(socket, fn -> Settings.enable(name, channel) end)}
+  def handle_event("skill_channel_off", %{"name" => name, "channel" => channel}, socket) when channel in @channels do
+    {:noreply,
+     socket
+     |> switch(fn -> Settings.disable(name, channel) end)
+     |> put_flash(:info, gettext("%{skill} is now off on %{channel}.", skill: name, channel: channel_label(channel)))}
+  end
+
+  # Submitted with no channel picked (the select is `required`, this is only the backstop).
+  def handle_event("skill_channel_off", _params, socket), do: {:noreply, socket}
+
+  def handle_event("skill_channel_on", %{"name" => name, "channel" => channel}, socket) when channel in @channels do
+    {:noreply,
+     socket
+     |> switch(fn -> Settings.enable(name, channel) end)
+     |> put_flash(:info, gettext("%{skill} is on again on %{channel}.", skill: name, channel: channel_label(channel)))}
+  end
 
   def handle_event("skill_check", %{"name" => name}, socket) do
     case Validate.run(name) do

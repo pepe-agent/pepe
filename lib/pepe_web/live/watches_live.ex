@@ -12,7 +12,7 @@ defmodule PepeWeb.WatchesLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Watches",
+       page_title: "Pepe: Watches",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -30,21 +30,21 @@ defmodule PepeWeb.WatchesLive do
     <div class={shell_cls()}>
       <.sidebar active="watches" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="watches"
           icon="🔭"
           title={gettext("Watches")}
           desc={gettext("One-shot “notify me when X happens”. A watch checks a condition on a timer, messages you once when it's met, then stops. Create them from chat.")}
         />
-        <div class="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
-          <div :if={@visible == []} class="text-[15px] text-zinc-500">
+        <div class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
+          <.empty_state :if={@visible == []}>
             {gettext("No watches. Ask an agent to \"notify me when ...\" from chat.")}
-          </div>
+          </.empty_state>
           <div :for={w <- @visible} class={card()}>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <span class="font-medium">{w.description}</span>
                 <span class="ml-2 rounded bg-zinc-700 px-1.5 text-sm text-zinc-300">{state_label(w.state)}</span>
-                <span :if={w.pending_delivery} class="ml-1 rounded bg-amber-700 px-1.5 text-sm">{gettext("Fired · delivering")}</span>
+                <span :if={w.pending_delivery} class={[tag(:warn), "ml-1"]}>{gettext("Fired, delivering")}</span>
                 <span :if={state_hint(w.state)} class="ml-2 text-sm text-zinc-500">{state_hint(w.state)}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
@@ -54,7 +54,7 @@ defmodule PepeWeb.WatchesLive do
               </div>
             </div>
             <div class="mt-1 text-sm text-zinc-400">
-              {trigger_label(w.trigger)} · {interval_label(w.interval_s)} · {checks_label(w.checks, w.max_checks)} · {origin_label(w.origin)}
+              {trigger_label(w.trigger)}, {interval_label(w.interval_s)}, {checks_label(w.checks, w.max_checks)}, {origin_label(w.origin)}
             </div>
             <div class="truncate text-sm text-zinc-500"><code>{w.trigger["command"] || w.trigger["prompt"]}</code></div>
             <div :if={next_check_label(w)} class="text-sm text-zinc-500">{next_check_label(w)}</div>

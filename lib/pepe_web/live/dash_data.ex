@@ -67,8 +67,8 @@ defmodule PepeWeb.DashData do
   def agent_names, do: Config.agents() |> Enum.map(& &1.name) |> Enum.sort()
 
   def agents_title("all"), do: gettext("Agents")
-  def agents_title("root"), do: gettext("Agents · Principal")
-  def agents_title(project), do: gettext("Agents · %{c}", c: project)
+  def agents_title("root"), do: gettext("Agents (Principal)")
+  def agents_title(project), do: gettext("Agents (%{c})", c: project)
   def model_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
 
   @doc "Qualify a bare name into the selected project scope (leave root/all/qualified as-is)."
@@ -178,7 +178,7 @@ defmodule PepeWeb.DashData do
 
   def cron_history(id), do: Pepe.Cron.Log.tail(id, 3)
   def model_suffix(nil), do: ""
-  def model_suffix(model), do: " · #{model}"
+  def model_suffix(model), do: ", #{model}"
 
   def deliver_label("none"), do: gettext("Nowhere")
   def deliver_label("log"), do: gettext("App log")
@@ -252,8 +252,8 @@ defmodule PepeWeb.DashData do
   def watch_origin_label(%{"channel" => ch}), do: ch
   def watch_origin_label(_), do: "log"
 
-  def learn_icon(:skill), do: "🧠"
-  def learn_icon(_memory), do: "📝"
+  def learn_icon(:skill), do: "hero-sparkles"
+  def learn_icon(_memory), do: "hero-document-text"
 
   def learn_date(0), do: "-"
   def learn_date(ts), do: local_datetime(ts)
@@ -330,7 +330,16 @@ defmodule PepeWeb.DashData do
 
   def money(_amount, currency), do: money(0.0, currency)
 
-  @doc "Compact token count: 812 · 12.3K · 4.5M."
+  @doc "Just the prefix `money/2` puts before the number (`$`, `R$ `, `CHF `), for a chart axis."
+  def money_symbol(currency) do
+    case @currency_symbols[currency] do
+      nil -> "#{currency} "
+      "$" -> "$"
+      sym -> "#{sym} "
+    end
+  end
+
+  @doc "Compact token count: 812, 12.3K, 4.5M."
   def tokens(n) when is_integer(n) and n >= 1_000_000,
     do: "#{:erlang.float_to_binary(n / 1_000_000, decimals: 1)}M"
 
@@ -345,6 +354,6 @@ defmodule PepeWeb.DashData do
     do: gettext("Using the built-in price list (never updated from the provider)")
 
   def price_cache_label(%{fetched_at: at, count: count}) do
-    gettext("%{count} live prices · refreshed %{date}", count: count, date: local_datetime(at))
+    gettext("%{count} live prices, refreshed %{date}", count: count, date: local_datetime(at))
   end
 end

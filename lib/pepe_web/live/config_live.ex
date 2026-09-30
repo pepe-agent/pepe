@@ -15,7 +15,7 @@ defmodule PepeWeb.ConfigLive do
   def mount(params, _session, socket) do
     {:ok,
      assign(socket,
-       page_title: "Pepe · Config",
+       page_title: "Pepe: Config",
        scope: params["scope"] || "all",
        projects: Config.project_slugs(),
        new_project: false,
@@ -39,7 +39,7 @@ defmodule PepeWeb.ConfigLive do
     <div class={shell_cls()}>
       <.sidebar active="config" scope={@scope} projects={@projects} new_project={@new_project} />
       <main class="flex min-w-0 flex-1 flex-col">
-        <.view_header
+        <.view_header active="config"
           icon="⚙️"
           title={gettext("Configuration file")}
           desc={gettext("The raw config.json the runtime reads. Saving validates the JSON first and refuses a broken file. Write secrets as ${ENV_VAR} references: Pepe resolves them at read time and never stores the raw value.")}
@@ -158,7 +158,7 @@ defmodule PepeWeb.ConfigLive do
                 <span class="w-36 shrink-0 font-mono text-xs text-zinc-500">{local_datetime(entry["at"])}</span>
                 <span class="w-28 shrink-0 truncate text-zinc-300">{entry["source"]}</span>
                 <span class="min-w-0 flex-1 truncate text-zinc-500">{Enum.join(entry["changed"] || [], ", ")}</span>
-                <span :if={entry["external"]} class="shrink-0 rounded bg-amber-700/60 px-1.5 text-xs text-amber-200">
+                <span :if={entry["external"]} class={[tag(:warn), "shrink-0"]}>
                   {gettext("external")}
                 </span>
               </div>
