@@ -66,7 +66,7 @@ defmodule PepeWeb.HooksLive do
           <% else %>
             <p class="mb-4 max-w-4xl text-sm leading-relaxed text-zinc-500">
               <span class="text-zinc-400">{gettext("PII = personally identifiable information")}</span>
-              {gettext(": any data that points to a specific person, like name, CPF/CNPJ, email, phone, card, address. These hooks hide it before the text reaches a model, so the provider never sees the real data.")}
+              {gettext(": personal data like name, CPF/CNPJ, email or phone, hidden before it reaches a model.")}
             </p>
             <div class="grid max-w-4xl gap-3 sm:grid-cols-2">
               <div :for={name <- Hooks.names()} class={card()}>
@@ -138,7 +138,7 @@ defmodule PepeWeb.HooksLive do
         <.check_card :for={r <- Recognizers.builtin_names()} name="recognizers[]" value={r}
           checked={r in list(@edit, "recognizers")} hint={recognizer_hint(r)} />
       </div>
-      <p class={hlp()}>{gettext("A pack above already turns these on (br = cpf, cnpj, cep, phone_br), so ticking both is redundant, not additive. Use these to pick one recognizer without taking its whole pack.")}</p>
+      <p class={hlp()}>{gettext("A pack above already includes these. Use them to pick single recognizers.")}</p>
     </div>
 
     <div>
@@ -167,7 +167,7 @@ defmodule PepeWeb.HooksLive do
         <option value="">{gettext("Pick a configured model")}</option>
         <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
-      <p class={hlp()}>{gettext("Use a local model (e.g. Ollama): a remote/hosted model here sends the raw, unredacted PII to that provider first, defeating the purpose of this hook.")}</p>
+      <p class={hlp()}>{gettext("Use a local model like Ollama. A hosted model would receive the unredacted data.")}</p>
     </div>
 
     <label class="flex items-center gap-2 text-base text-zinc-300">
@@ -272,8 +272,8 @@ defmodule PepeWeb.HooksLive do
         <div><span class="text-zinc-500">{gettext("the model replies")}: </span><span class="text-orange-300">{gettext("invoice for [SSN_1]")}</span></div>
         <div><span class="text-zinc-500">{gettext("you get back")}: </span><span class="text-zinc-300">{gettext("invoice for SSN 123-45-6789")}</span> <span class="text-green-400">✓</span></div>
       </div>
-      <p class={hlp()}>{gettext("The swap back happens locally, so the model only ever handled the placeholder, never the real value.")}</p>
-      <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: one-way, the model and you keep the masked version.")}</p>
+      <p class={hlp()}>{gettext("The swap back happens locally, so the model only sees the placeholder.")}</p>
+      <p class={hlp()}>{gettext("On: the real value is restored in the reply. Off: you keep the masked version.")}</p>
     </div>
     """
   end

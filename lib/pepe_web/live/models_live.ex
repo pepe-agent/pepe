@@ -43,7 +43,7 @@ defmodule PepeWeb.ModelsLive do
         <input name="output_price" value={@edit_model[:output_price]} placeholder={suggest_ph(@suggest, 1)} inputmode="decimal" class={fld()} />
       </div>
       <p class="text-sm text-zinc-500 sm:col-span-2">
-        {gettext("Per 1M tokens, in %{currency}. Leave blank to use the known/auto price for this model.", currency: @currency)}
+        {gettext("Per 1M tokens, in %{currency}. Blank uses the known price.", currency: @currency)}
       </p>
     </div>
     """
@@ -211,7 +211,7 @@ defmodule PepeWeb.ModelsLive do
           <div :if={Pepe.Providers.subscription_methods() != []} class={card()}>
             <div class="font-medium">{gettext("Sign in with a subscription")}</div>
             <p class="mt-0.5 text-sm text-zinc-500">
-              {gettext("Use your ChatGPT or Claude subscription instead of an API key. Works when this dashboard runs on the same machine as your browser.")}
+              {gettext("Use your ChatGPT or Claude subscription instead of an API key.")}
             </p>
 
             <div :if={!@oauth} class="mt-2 flex flex-wrap gap-2">
@@ -225,7 +225,7 @@ defmodule PepeWeb.ModelsLive do
                 {if @oauth.reconnect, do: gettext("Reconnecting %{name}", name: @oauth.reconnect), else: gettext("Connecting %{label}", label: @oauth.label)}
               </div>
               <a href={@oauth.url} target="_blank" rel="noopener" class={btn()}>{gettext("Open the sign-in page ↗")}</a>
-              <p class="text-sm text-zinc-500">{gettext("Authorize in the browser, then come back; this finishes on its own. If it doesn't, paste the redirect URL below.")}</p>
+              <p class="text-sm text-zinc-500">{gettext("Authorize in the browser, then come back. If it stalls, paste the redirect URL below.")}</p>
               <form phx-submit="oauth_paste" class="flex gap-2">
                 <input name="pasted" placeholder={gettext("paste the redirect URL or code")} class={fld()} />
                 <button type="submit" class={btn_ghost()}>{gettext("Finish")}</button>
@@ -265,7 +265,7 @@ defmodule PepeWeb.ModelsLive do
               <div>
                 <label class={lbl()}>{gettext("Name")}</label>
                 <input name="name" value={@edit_model.name} phx-change="model_name_change" class={fld()} />
-                <p class={hlp()}>{gettext("Renaming updates every agent, cron, hook and default pointing at this connection.")}</p>
+                <p class={hlp()}>{gettext("Renaming updates every agent, cron, hook and default that uses this connection.")}</p>
               </div>
               <div>
                 <label class={lbl()}>{gettext("Base URL")}</label>
@@ -275,7 +275,7 @@ defmodule PepeWeb.ModelsLive do
                 <label class={lbl()}>{gettext("API key")}</label>
                 <input type="password" name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
                 <p :if={@edit_model.env} class={hlp()}>
-                  {gettext("Defaults to the %{env} env var (%{status}). Paste a key here to load its models now.",
+                  {gettext("Defaults to the %{env} env var (%{status}). Paste a key to load its models now.",
                     env: @edit_model.env, status: key_status(@edit_model.env))}
                 </p>
                 <p :if={!@edit_model.env} class={hlp()}>
@@ -302,7 +302,7 @@ defmodule PepeWeb.ModelsLive do
               <div>
                 <label class={lbl()}>{gettext("Fallbacks")}</label>
                 <p class={hlp()}>
-                  {gettext("Tried in this order when %{name} errors transiently (rate limit, 5xx, network): the agent never sees the failure.", name: @edit_model.original_name)}
+                  {gettext("Tried in order when %{name} fails briefly. The agent never sees the failure.", name: @edit_model.original_name)}
                 </p>
                 <div :if={@edit_model.fallbacks != []} class="mt-2 flex flex-wrap gap-2">
                   <span :for={{name, i} <- Enum.with_index(@edit_model.fallbacks)} class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 py-1 pl-2.5 pr-1.5 text-sm">
@@ -368,7 +368,7 @@ defmodule PepeWeb.ModelsLive do
                   <label class={lbl()}>{gettext("API key")}</label>
                   <input type="password" name="api_key" value={@edit_model.api_key} phx-blur="model_key" class={fld()} />
                   <p class={hlp()}>
-                    {gettext("Defaults to the %{env} env var (%{status}). Paste a key here to load its models now.",
+                    {gettext("Defaults to the %{env} env var (%{status}). Paste a key to load its models now.",
                       env: @edit_model.env, status: key_status(@edit_model.env))}
                   </p>
                 </div>

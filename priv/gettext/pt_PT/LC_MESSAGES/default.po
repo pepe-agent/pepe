@@ -587,7 +587,7 @@ msgstr "Agente %{name} guardado."
 
 #: lib/pepe_web/live/dash_data.ex:69
 #: lib/pepe_web/live/dash_ui.ex:471
-#: lib/pepe_web/live/overview_live.ex:174
+#: lib/pepe_web/live/overview_live.ex:175
 #, elixir-autogen, elixir-format
 msgid "Agents"
 msgstr "Agentes"
@@ -672,14 +672,6 @@ msgstr "Criar tarefa"
 #, elixir-autogen, elixir-format
 msgid "Daily XML check"
 msgstr "Verificação diária de XML"
-
-#: lib/pepe_web/live/models_live.ex:278
-#: lib/pepe_web/live/models_live.ex:371
-#, elixir-autogen, elixir-format
-msgid "Defaults to the %{env} env var (%{status}). Paste a key here to load its models now."
-msgstr ""
-"Por predefinição usa a variável de ambiente %{env} (%{status}). Cola aqui "
-"uma chave para carregar já os modelos."
 
 #: lib/pepe_web/live/agents_live.ex:244
 #, elixir-autogen, elixir-format
@@ -777,7 +769,7 @@ msgid "Model connections"
 msgstr "Ligações de modelo"
 
 #: lib/pepe_web/live/dash_ui.ex:472
-#: lib/pepe_web/live/overview_live.ex:176
+#: lib/pepe_web/live/overview_live.ex:177
 #, elixir-autogen, elixir-format
 msgid "Models"
 msgstr "Modelos"
@@ -1087,13 +1079,6 @@ msgstr "Argumentos"
 msgid "Command"
 msgstr "Comando"
 
-#: lib/pepe_web/live/tool_servers_live.ex:184
-#, elixir-autogen, elixir-format
-msgid "Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only."
-msgstr ""
-"Dá ao agente só as ferramentas de leitura (separador Agentes -> Ferramentas)"
-" para ele ficar só de leitura."
-
 #: lib/pepe_web/live/tool_servers_live.ex:149
 #, elixir-autogen, elixir-format
 msgid "Remove MCP server %{name}?"
@@ -1143,13 +1128,6 @@ msgstr "+ Nova ligação"
 msgid "+ New server"
 msgstr "+ Novo servidor"
 
-#: lib/pepe_web/live/scheduled_live.ex:158
-#, elixir-autogen, elixir-format
-msgid "5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" = 09:30 on weekdays. Invalid expressions are rejected."
-msgstr ""
-"5 campos: minuto hora dia mês dia-da-semana. Ex.: \"30 9 * * 1-5\" = 09:30 "
-"nos dias úteis. Expressões inválidas são rejeitadas."
-
 #: lib/pepe_web/live/channels_live.ex:420
 #: lib/pepe_web/live/dash_ui.ex:640
 #: lib/pepe_web/live/dash_ui.ex:641
@@ -1191,7 +1169,7 @@ msgstr "Cancelar o watch %{name}?"
 
 #: lib/pepe_web/live/channels_live.ex:176
 #: lib/pepe_web/live/dash_ui.ex:484
-#: lib/pepe_web/live/overview_live.ex:177
+#: lib/pepe_web/live/overview_live.ex:178
 #, elixir-autogen, elixir-format
 msgid "Channels"
 msgstr "Canais"
@@ -1329,13 +1307,6 @@ msgstr "Sistema"
 msgid "The top level must be a JSON object { ... }."
 msgstr "O nível de topo tem de ser um objeto JSON { ... }."
 
-#: lib/pepe_web/live/channels_live.ex:467
-#, elixir-autogen, elixir-format
-msgid "Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file."
-msgstr ""
-"Dica: usa uma referência a variável de ambiente, como ${MY_BOT_TOKEN}, para "
-"manter o segredo fora do ficheiro de configuração."
-
 #: lib/pepe_web/live/dash_ui.ex:482
 #: lib/pepe_web/live/watches_live.ex:35
 #, elixir-autogen, elixir-format
@@ -1461,7 +1432,7 @@ msgid "Input price"
 msgstr "Preço de entrada"
 
 #: lib/pepe_web/live/dash_data.ex:313
-#: lib/pepe_web/live/overview_live.ex:137
+#: lib/pepe_web/live/overview_live.ex:138
 #, elixir-autogen, elixir-format
 msgid "Month"
 msgstr "Mês"
@@ -1481,13 +1452,6 @@ msgstr "Saída"
 #, elixir-autogen, elixir-format
 msgid "Output price"
 msgstr "Preço de saída"
-
-#: lib/pepe_web/live/models_live.ex:46
-#, elixir-autogen, elixir-format
-msgid "Per 1M tokens, in %{currency}. Leave blank to use the known/auto price for this model."
-msgstr ""
-"Por 1M de tokens, em %{currency}. Em branco, usa o preço conhecido do "
-"modelo."
 
 #: lib/pepe_web/live/usage_live.ex:126
 #, elixir-autogen, elixir-format
@@ -1528,7 +1492,7 @@ msgid "Usage & billing"
 msgstr "Utilização e faturação"
 
 #: lib/pepe_web/live/dash_data.ex:312
-#: lib/pepe_web/live/overview_live.ex:137
+#: lib/pepe_web/live/overview_live.ex:138
 #, elixir-autogen, elixir-format
 msgid "Week"
 msgstr "Semana"
@@ -1564,7 +1528,7 @@ msgstr "Modo"
 msgid "This connection talks to"
 msgstr "Esta ligação fala com"
 
-#: lib/pepe_web/live/overview_live.ex:178
+#: lib/pepe_web/live/overview_live.ex:179
 #, elixir-autogen, elixir-format
 msgid "Automations"
 msgstr "Automações"
@@ -1574,12 +1538,12 @@ msgstr "Automações"
 msgid "Live activity and this month's usage across %{scope}."
 msgstr "Atividade em tempo real e utilização deste mês em %{scope}."
 
-#: lib/pepe_web/live/overview_live.ex:144
+#: lib/pepe_web/live/overview_live.ex:145
 #, elixir-autogen, elixir-format
 msgid "Live sessions"
 msgstr "Sessões ativas"
 
-#: lib/pepe_web/live/overview_live.ex:145
+#: lib/pepe_web/live/overview_live.ex:146
 #: lib/pepe_web/live/projects_live.ex:237
 #, elixir-autogen, elixir-format
 msgid "Messages this month"
@@ -1597,27 +1561,27 @@ msgstr "Visão geral"
 msgid "Privacy hooks"
 msgstr "Hooks de privacidade"
 
-#: lib/pepe_web/live/overview_live.ex:150
+#: lib/pepe_web/live/overview_live.ex:151
 #, elixir-autogen, elixir-format
 msgid "To bill this month"
 msgstr "A faturar este mês"
 
-#: lib/pepe_web/live/overview_live.ex:146
+#: lib/pepe_web/live/overview_live.ex:147
 #, elixir-autogen, elixir-format
 msgid "Tokens this month"
 msgstr "Tokens este mês"
 
-#: lib/pepe_web/live/overview_live.ex:294
+#: lib/pepe_web/live/overview_live.ex:295
 #, elixir-autogen, elixir-format
 msgid "Top agents"
 msgstr "Principais agentes"
 
-#: lib/pepe_web/live/overview_live.ex:293
+#: lib/pepe_web/live/overview_live.ex:294
 #, elixir-autogen, elixir-format
 msgid "Top models"
 msgstr "Modelos com mais gasto"
 
-#: lib/pepe_web/live/overview_live.ex:393
+#: lib/pepe_web/live/overview_live.ex:394
 #, elixir-autogen, elixir-format
 msgid "all scopes"
 msgstr "todos os âmbitos"
@@ -1627,18 +1591,18 @@ msgstr "todos os âmbitos"
 msgid "in + out"
 msgstr "entrada + saída"
 
-#: lib/pepe_web/live/overview_live.ex:145
+#: lib/pepe_web/live/overview_live.ex:146
 #, elixir-autogen, elixir-format
 msgid "model calls"
 msgstr "chamadas ao modelo"
 
-#: lib/pepe_web/live/overview_live.ex:273
-#: lib/pepe_web/live/overview_live.ex:287
+#: lib/pepe_web/live/overview_live.ex:274
+#: lib/pepe_web/live/overview_live.ex:288
 #, elixir-autogen, elixir-format
 msgid "No usage yet"
 msgstr "Ainda sem utilização"
 
-#: lib/pepe_web/live/overview_live.ex:144
+#: lib/pepe_web/live/overview_live.ex:145
 #, elixir-autogen, elixir-format
 msgid "Open right now"
 msgstr "Abertas agora"
@@ -1684,13 +1648,6 @@ msgstr "%{h} limpo."
 #, elixir-autogen, elixir-format
 msgid "Configure"
 msgstr "Configurar"
-
-#: lib/pepe_web/live/agents_live.ex:496
-#, elixir-autogen, elixir-format
-msgid "Configure each hook (packs, model, ...) under Privacy; empty = no redaction (raw)."
-msgstr ""
-"Configura cada hook (pacotes, modelo, ...) em Privacidade. Vazio = sem "
-"ocultação (texto original)."
 
 #: lib/pepe_web/live/hooks_live.ex:145
 #, elixir-autogen, elixir-format
@@ -2036,14 +1993,6 @@ msgstr "(corre do zero de cada vez, sem memória da conversa)"
 msgid "(what this agent can do)"
 msgstr "(o que este agente pode fazer)"
 
-#: lib/pepe_web/live/hooks_live.ex:69
-#, elixir-autogen, elixir-format
-msgid ": any data that points to a specific person, like name, CPF/CNPJ, email, phone, card, address. These hooks hide it before the text reaches a model, so the provider never sees the real data."
-msgstr ""
-": qualquer dado que identifique uma pessoa, como nome, CPF/CNPJ, email, "
-"telefone, cartão, morada. Estes hooks ocultam-no antes de o texto chegar a "
-"um modelo, por isso o fornecedor nunca vê os dados reais."
-
 #: lib/pepe_web/live/projects_live.ex:163
 #, elixir-autogen, elixir-format
 msgid "Acme Inc, sales team"
@@ -2086,13 +2035,6 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "Invalid name. Use letters, digits, - and _."
 msgstr "Nome inválido. Usa letras, dígitos, - e _."
-
-#: lib/pepe_web/live/hooks_live.ex:276
-#, elixir-autogen, elixir-format
-msgid "On: the real value is restored in the reply. Off: one-way, the model and you keep the masked version."
-msgstr ""
-"Ligado: o valor real volta na resposta. Desligado: só num sentido, o modelo "
-"e tu ficam com a versão ocultada."
 
 #: lib/pepe_web/live/tool_servers_live.ex:227
 #, elixir-autogen, elixir-format
@@ -2146,13 +2088,6 @@ msgstr "escolhe outro nome"
 #, elixir-autogen, elixir-format
 msgid "⚠ not set yet. Export it before use."
 msgstr "⚠ ainda não está definida. Exporta-a antes de usar."
-
-#: lib/pepe_web/live/projects_live.ex:156
-#, elixir-autogen, elixir-format
-msgid "This name keys every agent, model, route, automation, token and file. Changing it re-keys them all."
-msgstr ""
-"Este nome identifica todos os agentes, modelos, rotas, automações, tokens e "
-"ficheiros. Mudá-lo altera-os a todos."
 
 #: lib/pepe_web/live/projects_live.ex:176
 #, elixir-autogen, elixir-format
@@ -2412,13 +2347,6 @@ msgstr "Pacotes de recognizers comuns, por região."
 #, elixir-autogen, elixir-format
 msgid "SSN, phone"
 msgstr "SSN, telefone"
-
-#: lib/pepe_web/live/hooks_live.ex:275
-#, elixir-autogen, elixir-format
-msgid "The swap back happens locally, so the model only ever handled the placeholder, never the real value."
-msgstr ""
-"A troca de volta é feita localmente, por isso o modelo só viu o marcador, "
-"nunca o valor real."
 
 #: lib/pepe_web/live/scheduled_live.ex:154
 #, elixir-autogen, elixir-format
@@ -2709,13 +2637,6 @@ msgstr "Todos os agentes"
 msgid "Any outcome"
 msgstr "Qualquer resultado"
 
-#: lib/pepe_web/live/traces_live.ex:382
-#, elixir-autogen, elixir-format
-msgid "No runs match these filters. Every agent run, from any surface, shows up here."
-msgstr ""
-"Nenhuma execução corresponde a estes filtros. Todas as execuções de agentes "
-"aparecem aqui, venham de onde vierem."
-
 #: lib/pepe_web/live/traces_live.ex:354
 #, elixir-autogen, elixir-format
 msgid "%{from}-%{to} of %{total}"
@@ -2736,7 +2657,7 @@ msgstr "Agentes: Principal"
 msgid "Principal"
 msgstr "Principal"
 
-#: lib/pepe_web/live/overview_live.ex:394
+#: lib/pepe_web/live/overview_live.ex:395
 #, elixir-autogen, elixir-format
 msgid "the Principal scope"
 msgstr "o âmbito Principal"
@@ -3039,13 +2960,6 @@ msgstr "Não foi possível renomear %{old}."
 #, elixir-autogen, elixir-format
 msgid "Model %{old} renamed to %{name} and saved."
 msgstr "Modelo %{old} renomeado para %{name} e guardado."
-
-#: lib/pepe_web/live/models_live.ex:268
-#, elixir-autogen, elixir-format
-msgid "Renaming updates every agent, cron, hook and default pointing at this connection."
-msgstr ""
-"Ao renomear, atualiza todos os agentes, crons, hooks e predefinições que "
-"usam esta ligação."
 
 #: lib/pepe/gateways/tui.ex:371
 #: lib/pepe_web/live/chat_live.ex:1429
@@ -3420,14 +3334,6 @@ msgstr "simples"
 msgid "unreachable, skipped"
 msgstr "inacessível, ignorado"
 
-#: lib/pepe_web/live/agents_live.ex:377
-#, elixir-autogen, elixir-format
-msgid "Optional: checks if the chat is simple or complex before the first reply. Simple -> the model below handles it. Complex -> this agent's own model (above) handles it. Best-effort: if the check fails, this agent's own model answers directly."
-msgstr ""
-"Opcional: antes da primeira resposta, verifica se a conversa é simples ou "
-"complexa. Simples: responde o modelo abaixo. Complexa: responde o modelo do "
-"agente (acima). Se a verificação falhar, responde o modelo do agente."
-
 #: lib/pepe_web/live/projects_live.ex:185
 #, elixir-autogen, elixir-format
 msgid "Monthly message limit"
@@ -3655,24 +3561,10 @@ msgstr "Iniciar sessão com uma subscrição"
 msgid "Sign-in failed: %{reason}"
 msgstr "Falha no início de sessão: %{reason}"
 
-#: lib/pepe_web/live/models_live.ex:214
-#, elixir-autogen, elixir-format
-msgid "Use your ChatGPT or Claude subscription instead of an API key. Works when this dashboard runs on the same machine as your browser."
-msgstr ""
-"Usa a tua subscrição do ChatGPT ou do Claude em vez de uma chave de API. "
-"Funciona quando este painel corre na mesma máquina que o teu navegador."
-
 #: lib/pepe_web/live/models_live.ex:230
 #, elixir-autogen, elixir-format
 msgid "paste the redirect URL or code"
 msgstr "cola o URL de redirecionamento ou o código"
-
-#: lib/pepe_web/live/models_live.ex:228
-#, elixir-autogen, elixir-format
-msgid "Authorize in the browser, then come back; this finishes on its own. If it doesn't, paste the redirect URL below."
-msgstr ""
-"Autoriza no navegador e volta aqui: isto conclui sozinho. Se não concluir, "
-"cola abaixo o URL de redirecionamento."
 
 #: lib/pepe_web/live/learning_live.ex:107
 #, elixir-autogen, elixir-format
@@ -3874,34 +3766,34 @@ msgstr "Uso: /goal OBJETIVO | CRITÉRIO DE SUCESSO"
 msgid "attempt %{n}/%{max}"
 msgstr "tentativa %{n}/%{max}"
 
-#: lib/pepe_web/live/overview_live.ex:161
+#: lib/pepe_web/live/overview_live.ex:162
 #, elixir-autogen, elixir-format
 msgid "CPU"
 msgstr "CPU"
 
 #: lib/pepe_web/live/agents_live.ex:233
-#: lib/pepe_web/live/overview_live.ex:162
+#: lib/pepe_web/live/overview_live.ex:163
 #, elixir-autogen, elixir-format
 msgid "Conversations"
 msgstr "Conversas"
 
 #: lib/pepe_web/live/agents_live.ex:236
-#: lib/pepe_web/live/overview_live.ex:160
+#: lib/pepe_web/live/overview_live.ex:161
 #, elixir-autogen, elixir-format
 msgid "Memory"
 msgstr "Memória"
 
-#: lib/pepe_web/live/overview_live.ex:164
+#: lib/pepe_web/live/overview_live.ex:165
 #, elixir-autogen, elixir-format
 msgid "Processes"
 msgstr "Processos"
 
-#: lib/pepe_web/live/overview_live.ex:156
+#: lib/pepe_web/live/overview_live.ex:157
 #, elixir-autogen, elixir-format
 msgid "Runtime footprint"
 msgstr "Consumo do runtime"
 
-#: lib/pepe_web/live/overview_live.ex:157
+#: lib/pepe_web/live/overview_live.ex:158
 #, elixir-autogen, elixir-format
 msgid "up %{t}"
 msgstr "ativo há %{t}"
@@ -4103,21 +3995,6 @@ msgstr "Projeto %{name} atualizado."
 msgid "Project %{old} renamed to %{new}."
 msgstr "Projeto %{old} renomeado para %{new}."
 
-#: lib/pepe_web/live/tokens_live.ex:85
-#, elixir-autogen, elixir-format
-msgid "Scopes the token to a single workspace. Principal is the default, non-project workspace."
-msgstr ""
-"Limita o token a um só workspace. Principal é o workspace predefinido, sem "
-"projeto."
-
-#: lib/pepe_web/live/projects_live.ex:180
-#, elixir-autogen, elixir-format
-msgid "Spend cap for the month in %{currency}. When reached, this project's agents stop making model calls until next month. Blank = no cap."
-msgstr ""
-"Limite de gasto do mês, em %{currency}. Ao ser atingido, os agentes deste "
-"projeto deixam de chamar o modelo até ao mês seguinte. Em branco, sem "
-"limite."
-
 #: lib/pepe_web/live/channels_live.ex:744
 #: lib/pepe_web/live/tokens_live.ex:409
 #, elixir-autogen, elixir-format
@@ -4144,7 +4021,7 @@ msgstr ""
 "de cada modelo; o valor a faturar soma a margem do projeto. Os preços podem "
 "ser editados por modelo."
 
-#: lib/pepe_web/live/overview_live.ex:278
+#: lib/pepe_web/live/overview_live.ex:279
 #, elixir-autogen, elixir-format
 msgid "Top projects by spend"
 msgstr "Projetos com mais gasto"
@@ -4165,19 +4042,11 @@ msgid "writes outside its workspace"
 msgstr "escreve fora do seu workspace"
 
 #: lib/pepe_web/live/dash_ui.ex:470
-#: lib/pepe_web/live/overview_live.ex:175
+#: lib/pepe_web/live/overview_live.ex:176
 #: lib/pepe_web/live/projects_live.ex:76
 #, elixir-autogen, elixir-format
 msgid "Projects"
 msgstr "Projetos"
-
-#: lib/pepe_web/live/agents_live.ex:594
-#, elixir-autogen, elixir-format
-msgid "This agent keeps replying even after the project (see Projects) hits its monthly customer-message cap. Doesn't affect the separate spend cap."
-msgstr ""
-"Este agente continua a responder mesmo depois de o projeto (ver Projetos) "
-"atingir o limite mensal de mensagens de clientes. Não afeta o limite de "
-"gastos, que é à parte."
 
 #: lib/pepe_web/live/agents_live.ex:957
 #, elixir-autogen, elixir-format
@@ -4231,13 +4100,6 @@ msgstr "(ferramentas que correm sem perguntar)"
 msgid "Auto-approve"
 msgstr "Aprovar automaticamente"
 
-#: lib/pepe_web/live/agents_live.ex:468
-#, elixir-autogen, elixir-format
-msgid "It's suspended automatically once the agent reads untrusted content (a fetched page, an incoming message), so prompt injection can't ride it."
-msgstr ""
-"Fica suspenso assim que o agente lê conteúdo não fiável (uma página obtida, "
-"uma mensagem recebida), para que uma injeção de prompt não o aproveite."
-
 #: lib/pepe_web/live/channels_live.ex:360
 #, elixir-autogen, elixir-format
 msgid "While the agent works"
@@ -4275,32 +4137,6 @@ msgstr "Nada"
 msgid "React"
 msgstr "Reagir"
 
-#: lib/pepe_web/live/channels_live.ex:377
-#, elixir-autogen, elixir-format
-msgid "a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing."
-msgstr ""
-"um registo de atividade em direto: cada ferramenta que o agente usa e "
-"porquê, para veres exatamente o que está a fazer."
-
-#: lib/pepe_web/live/channels_live.ex:380
-#, elixir-autogen, elixir-format
-msgid "a single line describing the kind of work happening, with no tool names or per-step detail."
-msgstr ""
-"uma só linha com o tipo de trabalho em curso, sem nomes de ferramentas nem "
-"detalhe de cada passo."
-
-#: lib/pepe_web/live/channels_live.ex:374
-#, elixir-autogen, elixir-format
-msgid "just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal."
-msgstr ""
-"só um 👀 na tua mensagem enquanto trabalha, retirado quando a resposta chega."
-" O sinal mais discreto."
-
-#: lib/pepe_web/live/channels_live.ex:383
-#, elixir-autogen, elixir-format
-msgid "no status message at all, just Telegram's native typing indicator."
-msgstr "sem mensagem de estado, só o \"a escrever...\" nativo do Telegram."
-
 #: lib/pepe_web/live/agents_live.ex:569
 #, elixir-autogen, elixir-format
 msgid "(tool rounds per task)"
@@ -4316,13 +4152,6 @@ msgstr "(enquanto este agente trabalha)"
 msgid "Max steps"
 msgstr "Máx. de passos"
 
-#: lib/pepe_web/live/agents_live.ex:586
-#, elixir-autogen, elixir-format
-msgid "Overrides the channel default for this agent, so one agent can be detailed and another quiet on the same bot."
-msgstr ""
-"Substitui a predefinição do canal para este agente, para que num mesmo bot "
-"um agente possa ser detalhado e outro discreto."
-
 #: lib/pepe_web/live/agents_live.ex:578
 #, elixir-autogen, elixir-format
 msgid "Progress display"
@@ -4332,14 +4161,6 @@ msgstr "Mostrar progresso"
 #, elixir-autogen, elixir-format
 msgid "React (default)"
 msgstr "Reagir (predefinição)"
-
-#: lib/pepe_web/live/agents_live.ex:573
-#, elixir-autogen, elixir-format
-msgid "Set a number only to deliberately cap long tasks. A low cap makes the agent quit multi-step work halfway and reply with what's left unfinished."
-msgstr ""
-"Define um número só se quiseres limitar tarefas longas. Um limite baixo faz "
-"o agente largar a meio as tarefas com vários passos e responder com o que "
-"ficou por fazer."
 
 #: lib/pepe/gateways/telegram.ex:358
 #, elixir-autogen, elixir-format
@@ -4400,13 +4221,6 @@ msgstr "uma skill cujo conteúdo parece inseguro"
 msgid "adds or changes a skill"
 msgstr "adiciona ou altera uma skill"
 
-#: lib/pepe_web/live/channels_live.ex:393
-#, elixir-autogen, elixir-format
-msgid "When on, the bot ignores anyone not on its allowlist. When off, it answers everyone (unless you set an explicit user allowlist)."
-msgstr ""
-"Ativado, o bot ignora quem não está na lista de permitidos. Desativado, "
-"responde a todos (a menos que definas uma lista explícita de utilizadores)."
-
 #: lib/pepe_web/live/channels_live.ex:446
 #, elixir-autogen, elixir-format
 msgid "(no name on record)"
@@ -4453,13 +4267,6 @@ msgstr "+ Novo card"
 #, elixir-autogen, elixir-format
 msgid "A board with that name already exists there."
 msgstr "Já existe um board com esse nome."
-
-#: lib/pepe_web/live/board_live.ex:156
-#, elixir-autogen, elixir-format
-msgid "A running claim older than this is treated as stalled and blocked. 0 = never."
-msgstr ""
-"Um card assumido há mais tempo do que isto é dado como encravado e "
-"bloqueado. 0 = nunca."
 
 #: lib/pepe_web/live/board_live.ex:128
 #, elixir-autogen, elixir-format
@@ -4589,14 +4396,6 @@ msgstr "Ainda não há boards. Cria um com \"+ Novo board\"."
 msgid "No cards yet. Create one with “+ New card”."
 msgstr "Ainda não há cards. Cria um com \"+ Novo card\"."
 
-#: lib/pepe_web/live/agents_live.ex:403
-#, elixir-autogen, elixir-format
-msgid "No triage model set above: the check runs on this agent's own model instead, at its cost and speed, on every message that arrives mid-turn."
-msgstr ""
-"Sem modelo de triagem acima: a verificação corre no modelo do próprio "
-"agente, com o custo e a velocidade dele, em cada mensagem que chega a meio "
-"de um turno."
-
 #: lib/pepe_web/live/config_live.ex:87
 #: lib/pepe_web/live/skills_live.ex:194
 #, elixir-autogen, elixir-format
@@ -4622,13 +4421,6 @@ msgstr "Pronto"
 #, elixir-autogen, elixir-format
 msgid "Remove board %{name}? Cards on it must be deleted first."
 msgstr "Remover o board %{name}? Os cards têm de ser eliminados antes."
-
-#: lib/pepe_web/live/config_live.ex:81
-#, elixir-autogen, elixir-format
-msgid "Reply to a voice note with a voice note. Needs a model connection serving an OpenAI-compatible /audio/speech."
-msgstr ""
-"Responde a uma nota de voz com outra nota de voz. Precisa de uma ligação de "
-"modelo com /audio/speech compatível com a OpenAI."
 
 #: lib/pepe_web/live/board_live.ex:107
 #, elixir-autogen, elixir-format
@@ -4679,15 +4471,6 @@ msgstr "Transcrição de notas de voz"
 #, elixir-autogen, elixir-format
 msgid "What needs doing"
 msgstr "O que é preciso fazer"
-
-#: lib/pepe_web/live/agents_live.ex:401
-#, elixir-autogen, elixir-format
-msgid "When a message arrives while this agent is still working, a check decides if it's a correction of that turn ('wait, make it 3pm instead') and steers it in, instead of always waiting for the turn to finish first. Biased toward waiting on any doubt."
-msgstr ""
-"Se chegar uma mensagem enquanto o agente ainda trabalha, uma verificação "
-"decide se é uma correção a esse turno ('espera, muda para as 15h') e "
-"aplica-a logo, em vez de esperar sempre que o turno acabe. Na dúvida, "
-"espera."
 
 #: lib/pepe_web/live/board_live.ex:244
 #, elixir-autogen, elixir-format
@@ -5059,15 +4842,6 @@ msgstr "Valores que pode ver"
 msgid "Navigation menu"
 msgstr "Menu de navegação"
 
-#: lib/pepe_web/live/tokens_live.ex:153
-#: lib/pepe_web/live/tokens_live.ex:220
-#, elixir-autogen, elixir-format
-msgid "Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output."
-msgstr ""
-"Desativado por omissão: um relatório de utilização é uma fatura, não uma "
-"transcrição. Se ativares, o detalhe da execução inclui também o prompt e os "
-"argumentos e o resultado de cada ferramenta."
-
 #: lib/pepe_web/live/dash_ui.ex:523
 #, elixir-autogen, elixir-format
 msgid "Open the menu"
@@ -5077,14 +4851,6 @@ msgstr "Abrir menu"
 #, elixir-autogen, elixir-format
 msgid "Permissions updated."
 msgstr "Permissões atualizadas."
-
-#: lib/pepe_web/live/tokens_live.ex:145
-#: lib/pepe_web/live/tokens_live.ex:230
-#, elixir-autogen, elixir-format
-msgid "Pick this from who holds the token. A client's token should never see cost or margin."
-msgstr ""
-"Escolhe consoante quem fica com o token. O token de um cliente nunca deve "
-"ver custo nem margem."
 
 #: lib/pepe_web/live/tokens_live.ex:135
 #: lib/pepe_web/live/tokens_live.ex:209
@@ -5225,13 +4991,6 @@ msgstr "Do agente que faz o pedido"
 msgid "Host"
 msgstr "Host"
 
-#: lib/pepe_web/live/db_connections_live.ex:186
-#, elixir-autogen, elixir-format
-msgid "Leave empty for an unscoped connection. Set this only if the database enforces isolation on this column with Row-Level Security."
-msgstr ""
-"Deixa vazio para uma ligação sem âmbito. Define só se a base de dados isolar"
-" por esta coluna com Row-Level Security."
-
 #: lib/pepe_web/live/agents_live.ex:625
 #, elixir-autogen, elixir-format
 msgid "Micro-compaction (fold history gradually instead of resummarizing it all at once)"
@@ -5331,14 +5090,6 @@ msgstr ""
 "Já existe uma ligação de modelo chamada %{name}. Esta foi guardada como "
 "%{final}."
 
-#: lib/pepe_web/live/plugins_live.ex:57
-#, elixir-autogen, elixir-format
-msgid "A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand."
-msgstr ""
-"Um plugin corre com acesso total aos teus dados e a esta máquina. Instala só"
-" de uma fonte que conheces e em que confias, e revê-o antes com Analisar. "
-"Nunca coles uma ligação que não percebas."
-
 #: lib/pepe_web/live/tokens_live.ex:413
 #, elixir-autogen, elixir-format
 msgid "A public widget token must be locked to one agent. Pick one above."
@@ -5351,13 +5102,6 @@ msgstr ""
 msgid "A widget always pins to one agent, never a whole workspace."
 msgstr ""
 "Um widget fica sempre ligado a um só agente, nunca a um workspace inteiro."
-
-#: lib/pepe_web/live/channels_live.ex:279
-#, elixir-autogen, elixir-format
-msgid "Agent and origin are fixed at minting. To change them, create a new widget and revoke this one. Appearance stays editable right here."
-msgstr ""
-"O agente e a origem ficam fixos na criação. Para os mudar, cria um widget "
-"novo e revoga este. A aparência continua editável aqui."
 
 #: lib/pepe_web/live/tokens_live.ex:50
 #, elixir-autogen, elixir-format
@@ -5395,16 +5139,6 @@ msgstr ""
 "Isto não protege nada por si só: confirma que o Row-Level Security está "
 "configurado na própria base de dados."
 
-#: lib/pepe_web/live/agents_live.ex:502
-#, elixir-autogen, elixir-format
-msgid "Each slot hands one extension point to a single installed plugin: memory search, where a shell command actually runs, how long conversations get condensed, or the whole reasoning loop. \"Default\" inherits the installation's (or project's) choice; picking a name here overrides it for this agent only."
-msgstr ""
-"Cada slot entrega um ponto de extensão a um único plugin instalado: pesquisa"
-" de memória, onde um comando de shell corre, como as conversas são "
-"condensadas ou todo o ciclo de raciocínio. \"Predefinição\" segue a escolha "
-"da instalação (ou do projeto). Escolher um nome aqui substitui-a só para "
-"este agente."
-
 #: lib/pepe_web/live/tokens_live.ex:143
 #: lib/pepe_web/live/tokens_live.ex:228
 #, elixir-autogen, elixir-format
@@ -5432,24 +5166,6 @@ msgstr ""
 " ...). Escreve os tokens como ${ENV_VAR} para manter os segredos fora do "
 "ficheiro de configuração."
 
-#: lib/pepe_web/live/agents_live.ex:420
-#, elixir-autogen, elixir-format
-msgid "Housekeeping calls, like naming a conversation for this sidebar, don't need the agent's main model: point them at a cheap connection you already have. Left off, conversations are still named from the first few words of the request. That's free, offline, and never sends anyone's opening message anywhere to be read."
-msgstr ""
-"Tarefas de apoio, como dar nome a uma conversa na barra lateral, não "
-"precisam do modelo principal do agente: indica uma ligação barata que já "
-"tenhas. Se ficar desativado, as conversas são nomeadas com as primeiras "
-"palavras do pedido. É grátis, funciona offline e a primeira mensagem de "
-"ninguém sai daqui."
-
-#: lib/pepe_web/live/agents_live.ex:348
-#, elixir-autogen, elixir-format
-msgid "If this agent's model is down or times out, Pepe retries on the backup models in order. By default it uses the backup list already set on the model connection, so you rarely need to touch this."
-msgstr ""
-"Se o modelo do agente estiver em baixo ou demorar demasiado, o Pepe tenta os"
-" modelos de reserva, por ordem. Por defeito usa a lista de reserva da "
-"ligação do modelo, por isso raramente é preciso mexer aqui."
-
 #: lib/pepe_web/live/plugins_live.ex:48
 #, elixir-autogen, elixir-format
 msgid "Install channels and tools that load at runtime, no rebuild. Pepe scans the code first, but a plugin runs with full access: install only from a source you trust."
@@ -5463,13 +5179,6 @@ msgstr ""
 msgid "Label this conversation in the sidebar: TEXT"
 msgstr "Dá um nome a esta conversa na barra lateral: TEXTO"
 
-#: lib/pepe_web/live/config_live.ex:103
-#, elixir-autogen, elixir-format
-msgid "Leave unset and Pepe automatically uses a connection already known to transcribe (OpenAI, Groq)."
-msgstr ""
-"Se não definires nada, o Pepe usa uma ligação que já saiba transcrever "
-"(OpenAI, Groq)."
-
 #: lib/pepe_web/live/tokens_live.ex:142
 #: lib/pepe_web/live/tokens_live.ex:227
 #, elixir-autogen, elixir-format
@@ -5481,89 +5190,10 @@ msgstr "Tabela: o preço do modelo, sem margem"
 msgid "MCP server %{name} saved. Validate it."
 msgstr "Servidor MCP %{name} guardado. Valida-o."
 
-#: lib/pepe_web/live/projects_live.ex:189
-#, elixir-autogen, elixir-format
-msgid "Monthly cap on customer messages. At the cap, this project's agents stop replying until next month; you can exempt individual agents. Blank = no cap."
-msgstr ""
-"Limite mensal de mensagens de clientes. Ao atingi-lo, os agentes deste "
-"projeto deixam de responder até ao mês seguinte, mas podes isentar agentes "
-"em particular. Em branco, sem limite."
-
-#: lib/pepe_web/live/projects_live.ex:171
-#, elixir-autogen, elixir-format
-msgid "Multiplies the provider cost into the amount you bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost."
-msgstr ""
-"Multiplica o custo do fornecedor para obter o valor faturado (ex.: 1,3 = "
-"+30%). Em branco, fatura o custo exato do fornecedor."
-
-#: lib/pepe_web/live/agents_live.ex:605
-#, elixir-autogen, elixir-format
-msgid "Normally, once the agent takes in a file or a fetched page, its auto-approved tools go back to asking, so a hidden instruction in that content can't run unattended. Turning this on reopens that path: a hidden instruction in what the agent reads can run tools unattended. Use it only for a trusted owner's agent that must act on documents you send it."
-msgstr ""
-"Normalmente, depois de o agente receber um ficheiro ou uma página obtida, as"
-" ferramentas aprovadas automaticamente voltam a pedir confirmação, para que "
-"uma instrução escondida nesse conteúdo não corra sem supervisão. Ao ativar "
-"isto, esse caminho volta a abrir-se: uma instrução escondida no que o agente"
-" lê pode executar ferramentas sem supervisão. Usa só num agente de um dono "
-"de confiança, que tenha de agir sobre documentos que lhe envias."
-
 #: lib/pepe_web/live/chat_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Nothing is running. Send it as a normal message."
 msgstr "Nada em execução. Envia como mensagem normal."
-
-#: lib/pepe_web/live/agents_live.ex:436
-#, elixir-autogen, elixir-format
-msgid "Notices a stated follow-up after each turn (\"remind me Friday\", \"I'll check and tell you tomorrow\") and tracks it without being asked twice. A user's reminder comes back as a message at the right time. The agent's own promise re-runs its session first, so the work is actually done before the agent reports it done."
-msgstr ""
-"Depois de cada turno, deteta um compromisso dito na conversa (\"lembra-me na"
-" sexta\", \"vou ver e digo-te amanhã\") e acompanha-o sem ser preciso "
-"repetir. O lembrete de um utilizador volta como mensagem à hora certa. Numa "
-"promessa do próprio agente, a sessão volta a correr primeiro, para o "
-"trabalho estar mesmo feito antes de ele dizer que acabou."
-
-#: lib/pepe_web/live/agents_live.ex:619
-#, elixir-autogen, elixir-format
-msgid "Off (the default), session_search only ever reaches the calling conversation's own history. On, it reaches every conversation in this project, including other agents'. Turn it on only for an agent with one operator/team on the other end, where there's no other customer's or agent's conversation to leak."
-msgstr ""
-"Desativado (o predefinido), o session_search só chega ao histórico da "
-"própria conversa que o chama. Ativado, chega a todas as conversas do "
-"projeto, incluindo as de outros agentes. Ativa só num agente com um único "
-"operador ou equipa do outro lado, onde não haja conversas de outros clientes"
-" ou agentes a expor."
-
-#: lib/pepe_web/live/board_live.ex:149
-#, elixir-autogen, elixir-format
-msgid "On: a ready card with an assignee starts on its own. Off (the default): a card starts only when someone claims it, from this page or through the board tool."
-msgstr ""
-"Ativado: um card pronto e com responsável arranca sozinho. Desativado (o "
-"predefinido): só arranca quando alguém o assume, nesta página ou através da "
-"ferramenta board."
-
-#: lib/pepe_web/live/agents_live.ex:627
-#, elixir-autogen, elixir-format
-msgid "Once the context window fills, each turn folds only the oldest exchange into a running summary instead of resummarizing everything from scratch: a smaller, steadier cost instead of one big stall. Trade-off: while active, the summary changes every turn, which costs some of the model provider's prompt caching."
-msgstr ""
-"Quando a janela de contexto enche, cada turno junta só a troca mais antiga a"
-" um resumo contínuo, em vez de resumir tudo de raiz: um custo menor e mais "
-"estável, sem uma grande paragem. Contrapartida: com isto ativo o resumo muda"
-" em cada turno, e perde-se parte da cache de prompt do fornecedor do modelo."
-
-#: lib/pepe_web/live/usage_live.ex:187
-#, elixir-autogen, elixir-format
-msgid "One line per incoming message. A message often takes several model calls: answer, run a tool, read the result, answer again. Calls drive the cost, not tools: every call re-sends the whole conversation, and each tool result makes it longer."
-msgstr ""
-"Uma linha por mensagem recebida. Uma mensagem leva muitas vezes várias "
-"chamadas ao modelo: responder, executar uma ferramenta, ler o resultado, "
-"responder outra vez. O custo vem das chamadas, não das ferramentas: cada "
-"chamada reenvia a conversa toda, e cada resultado de ferramenta alonga-a."
-
-#: lib/pepe_web/live/channels_live.ex:334
-#, elixir-autogen, elixir-format
-msgid "Optional: blank fields fall back to the embed snippet's own data-* attributes. You can edit them here later without touching the site."
-msgstr ""
-"Opcional: os campos em branco usam os atributos data-* do próprio excerto. "
-"Podes editá-los aqui mais tarde, sem mexer no site."
 
 #: lib/pepe_web/live/chat_live.ex:32
 #, elixir-autogen, elixir-format
@@ -5613,75 +5243,12 @@ msgstr ""
 "ficheiro inválido é recusado. Escreve os segredos como referências "
 "${ENV_VAR}: o Pepe resolve-os ao ler e nunca guarda o valor real."
 
-#: lib/pepe_web/live/tokens_live.ex:116
-#, elixir-autogen, elixir-format
-msgid "The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above: a public token always pins to one."
-msgstr ""
-"A origem do site (esquema + anfitrião). O WebSocket do widget só se liga a "
-"partir de uma origem igual no browser. Exige um agente acima: um token "
-"público fica sempre fixado a um."
-
-#: lib/pepe_web/live/channels_live.ex:330
-#, elixir-autogen, elixir-format
-msgid "The site's scheme + host. Pepe refuses widget connections from any other origin."
-msgstr ""
-"O protocolo e o anfitrião do site. O Pepe recusa ligações do widget vindas "
-"de qualquer outra origem."
-
-#: lib/pepe_web/live/agents_live.ex:451
-#, elixir-autogen, elixir-format
-msgid "The text under each tool is the instruction sent to the AI model. It stays in English on purpose: it's for the model, not a translated interface label."
-msgstr ""
-"O texto debaixo de cada ferramenta é a instrução enviada ao modelo. Fica em "
-"inglês de propósito: é para o modelo, não para a interface."
-
-#: lib/pepe_web/live/agents_live.ex:328
-#, elixir-autogen, elixir-format
-msgid "This is the exact system message every real conversation with this agent sends: the persona above is only the seed, and Pepe assembles the rest around it (identity/boot files, the behavior contract, docs and skills it knows about, the current time)."
-msgstr ""
-"Esta é a mensagem de sistema exata enviada em cada conversa com este agente."
-" A persona acima é só o ponto de partida: o Pepe junta-lhe o resto "
-"(ficheiros de identidade e arranque, contrato de comportamento, documentação"
-" e skills que conhece, a hora atual)."
-
 #: lib/pepe_web/live/tool_servers_live.ex:305
 #, elixir-autogen, elixir-format
 msgid "This server's authorization server doesn't allow dynamic registration. Pin a client_id in config.json."
 msgstr ""
 "O servidor de autorização deste servidor não permite registo dinâmico. Fixa "
 "um client_id no config.json."
-
-#: lib/pepe_web/live/models_live.ex:305
-#, elixir-autogen, elixir-format
-msgid "Tried in this order when %{name} errors transiently (rate limit, 5xx, network): the agent never sees the failure."
-msgstr ""
-"Usadas por esta ordem quando %{name} falha temporariamente (limite de "
-"pedidos, 5xx, rede). O agente nunca vê a falha."
-
-#: lib/pepe_web/live/hooks_live.ex:170
-#, elixir-autogen, elixir-format
-msgid "Use a local model (e.g. Ollama): a remote/hosted model here sends the raw, unredacted PII to that provider first, defeating the purpose of this hook."
-msgstr ""
-"Usa um modelo local (ex.: Ollama): um modelo remoto envia primeiro o PII sem"
-" ocultar a esse fornecedor, o que anula o objetivo deste hook."
-
-#: lib/pepe_web/live/channels_live.ex:202
-#, elixir-autogen, elixir-format
-msgid "WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook: fill in the credentials, then register the Webhook URL you get here in the provider's settings. A widget is a chat bubble you embed on your site with a script tag."
-msgstr ""
-"WhatsApp, Slack, Discord, Microsoft Teams e Google Chat ligam-se pelo "
-"webhook oficial de cada plataforma: preenche as credenciais e regista aqui o"
-" URL do webhook nas definições do fornecedor. Um widget é uma bolha de chat "
-"que incorporas no teu site com uma tag script."
-
-#: lib/pepe_web/live/config_live.ex:154
-#, elixir-autogen, elixir-format
-msgid "Who touched config.json, when, and which top-level sections changed. It never records the values. \"external\" marks a change made since this process's own last write: a hand-edit, a second Pepe process, or a restore from a .bak file."
-msgstr ""
-"Quem mexeu no config.json, quando, e que secções de topo mudaram. Nunca "
-"guarda os valores. \"external\" marca uma alteração feita depois da última "
-"escrita deste processo: uma edição manual, outro processo do Pepe ou o "
-"restauro de um ficheiro .bak."
 
 #: lib/pepe_web/live/connections_component.ex:188
 #: lib/pepe_web/live/models_live.ex:282
@@ -5690,13 +5257,6 @@ msgid "Write it as ${ENV_VAR} to keep the secret out of the config file."
 msgstr ""
 "Escreve-o como ${ENV_VAR} para o segredo ficar fora do ficheiro de "
 "configuração."
-
-#: lib/pepe_web/live/agents_live.ex:572
-#, elixir-autogen, elixir-format
-msgid "no limit: the agent runs a task until it's done (safest for real work)."
-msgstr ""
-"sem limite: o agente trabalha na tarefa até acabar (o mais seguro para "
-"trabalho a sério)."
 
 #: lib/pepe_web/live/agents_live.ex:513
 #, elixir-autogen, elixir-format
@@ -5763,21 +5323,13 @@ msgstr ""
 msgid "A hex colour like #ea580c"
 msgstr "Uma cor em hexadecimal, como #ea580c"
 
-#: lib/pepe_web/live/hooks_live.ex:141
-#, elixir-autogen, elixir-format
-msgid "A pack above already turns these on (br = cpf, cnpj, cep, phone_br), so ticking both is redundant, not additive. Use these to pick one recognizer without taking its whole pack."
-msgstr ""
-"Um pacote acima já ativa estes (br = cpf, cnpj, cep, phone_br), por isso "
-"marcar os dois é redundante. Usa estes para escolher um recognizer sem levar"
-" o pacote todo."
-
 #: lib/pepe_web/live/plugins_live.ex:290
 #, elixir-autogen, elixir-format
 msgid "A single .exs script with no manifest."
 msgstr "Um único script .exs, sem manifest."
 
-#: lib/pepe_web/live/overview_live.ex:268
-#: lib/pepe_web/live/overview_live.ex:270
+#: lib/pepe_web/live/overview_live.ex:269
+#: lib/pepe_web/live/overview_live.ex:271
 #, elixir-autogen, elixir-format
 msgid "Activity (tokens, last 14 days)"
 msgstr "Atividade (tokens, últimos 14 dias)"
@@ -5818,13 +5370,6 @@ msgstr "Código de autorização"
 msgid "Auto (recommended)"
 msgstr "Automático (recomendado)"
 
-#: lib/pepe_web/live/tool_servers_live.ex:218
-#, elixir-autogen, elixir-format
-msgid "Auto tries the modern protocol and falls back on its own. Pin one only for a server that answers a single one."
-msgstr ""
-"O automático tenta o protocolo moderno e recua sozinho. Fixa um só se o "
-"servidor responder apenas a esse."
-
 #: lib/pepe_web/live/hooks_live.ex:59
 #, elixir-autogen, elixir-format
 msgid "Back to Privacy"
@@ -5838,29 +5383,22 @@ msgstr "Voltar aos tokens"
 #: lib/pepe_web/live/hooks_live.ex:515
 #, elixir-autogen, elixir-format
 msgid "Brazilian company tax ID"
-msgstr "número fiscal de empresa brasileira"
+msgstr "Número fiscal de empresa brasileira"
 
 #: lib/pepe_web/live/hooks_live.ex:514
 #, elixir-autogen, elixir-format
 msgid "Brazilian personal tax ID"
-msgstr "número fiscal pessoal brasileiro"
+msgstr "Número fiscal pessoal brasileiro"
 
 #: lib/pepe_web/live/hooks_live.ex:517
 #, elixir-autogen, elixir-format
 msgid "Brazilian phone numbers"
-msgstr "números de telefone brasileiros"
+msgstr "Números de telefone brasileiros"
 
 #: lib/pepe_web/live/hooks_live.ex:516
 #, elixir-autogen, elixir-format
 msgid "Brazilian postal code"
-msgstr "código postal brasileiro"
-
-#: lib/pepe_web/live/integrations_live.ex:55
-#, elixir-autogen, elixir-format
-msgid "Built-in channels (WhatsApp, Slack, Discord, Teams, Google Chat) live under Channels."
-msgstr ""
-"Os canais integrados (WhatsApp, Slack, Discord, Teams, Google Chat) estão em"
-" Canais."
+msgstr "Código postal brasileiro"
 
 #: lib/pepe_web/live/watches_live.ex:96
 #, elixir-autogen, elixir-format
@@ -5892,7 +5430,7 @@ msgstr "Execução de comandos"
 msgid "Config key: %{key}"
 msgstr "Chave de configuração: %{key}"
 
-#: lib/pepe_web/live/overview_live.ex:172
+#: lib/pepe_web/live/overview_live.ex:173
 #, elixir-autogen, elixir-format
 msgid "Configured"
 msgstr "Configurado"
@@ -6002,7 +5540,7 @@ msgstr ""
 #: lib/pepe_web/live/hooks_live.ex:512
 #, elixir-autogen, elixir-format
 msgid "IP addresses"
-msgstr "endereços IP"
+msgstr "Endereços IP"
 
 #: lib/pepe_web/live/hooks_live.ex:220
 #, elixir-autogen, elixir-format
@@ -6040,24 +5578,10 @@ msgid "Interrupted mid-delivery. It will not retry on its own; cancel it."
 msgstr ""
 "Interrompido a meio da entrega. Não tenta outra vez sozinho: cancela-o."
 
-#: lib/pepe_web/live/tokens_live.ex:110
-#, elixir-autogen, elixir-format
-msgid "Its raw value sits in your page's public source: it must be pinned to one agent above, it can never read usage or billing, and it only answers from the single origin you allow."
-msgstr ""
-"O valor em bruto fica no código público da tua página: tem de estar fixado a"
-" um agente acima, nunca lê utilização nem faturação, e só responde à única "
-"origem que autorizares."
-
 #: lib/pepe_web/live/agents_live.ex:543
 #, elixir-autogen, elixir-format
 msgid "Itself only"
 msgstr "Só ele"
-
-#: lib/pepe_web/live/config_live.ex:136
-#, elixir-autogen, elixir-format
-msgid "Largest voice note accepted. Anything bigger is refused instead of transcribed."
-msgstr ""
-"Tamanho máximo de uma nota de voz. Uma maior é recusada, não transcrita."
 
 #: lib/pepe_web/live/watches_live.ex:62
 #, elixir-autogen, elixir-format
@@ -6176,20 +5700,6 @@ msgstr ""
 msgid "Nowhere"
 msgstr "Nenhum"
 
-#: lib/pepe_web/live/channels_live.ex:490
-#, elixir-autogen, elixir-format
-msgid "Once added, the bot reacts with 👀 while it works and answers everyone. Both are changeable under Edit."
-msgstr ""
-"Depois de adicionado, o bot reage com 👀 enquanto trabalha e responde a toda "
-"a gente. Podes mudar as duas coisas em Editar."
-
-#: lib/pepe_web/live/tool_servers_live.ex:238
-#, elixir-autogen, elixir-format
-msgid "One per line, as Key: value. Write the token as ${ENV_VAR} so the secret stays out of the config file."
-msgstr ""
-"Um por linha, no formato Chave: valor. Escreve o token como ${ENV_VAR} para "
-"o segredo ficar fora do ficheiro de configuração."
-
 #: lib/pepe_web/live/tool_servers_live.ex:175
 #, elixir-autogen, elixir-format
 msgid "Only needed if the browser can't reach this machine. Otherwise it fills itself in."
@@ -6202,34 +5712,10 @@ msgstr ""
 msgid "Or from a terminal:"
 msgstr "Ou a partir de um terminal:"
 
-#: lib/pepe_web/live/plugins_live.ex:77
-#, elixir-autogen, elixir-format
-msgid "Paste where the plugin comes from: a GitHub repo (https://github.com/someone/my-plugin), a .tar.gz link, or a path on this machine (/home/me/plugins/my-plugin or /home/me/plugins/my-plugin.exs). Scan reads the code without running it, so it is always safe to press first."
-msgstr ""
-"Cola a origem do plugin: um repositório GitHub "
-"(https://github.com/someone/my-plugin), uma ligação .tar.gz ou um caminho "
-"nesta máquina (/home/me/plugins/my-plugin ou /home/me/plugins/my-"
-"plugin.exs). Analisar lê o código sem o executar, por isso podes carregar "
-"sempre primeiro nele."
-
 #: lib/pepe_web/live/watches_live.ex:93
 #, elixir-autogen, elixir-format
 msgid "Paused"
 msgstr "Em pausa"
-
-#: lib/pepe_web/live/commitments_live.ex:137
-#, elixir-autogen, elixir-format
-msgid "Pick a day from the list, or type an exact interval like “in 5 days” or “in 3 weeks”; what you type wins."
-msgstr ""
-"Escolhe um dia da lista ou escreve um intervalo, como \"em 5 dias\" ou \"em "
-"3 semanas\". O que escreveres tem prioridade."
-
-#: lib/pepe_web/live/agents_live.ex:526
-#, elixir-autogen, elixir-format
-msgid "Pick the agents this one may send messages to. None picked = it talks to no one."
-msgstr ""
-"Escolhe os agentes a quem este pode enviar mensagens. Nenhum = não fala com "
-"ninguém."
 
 #: lib/pepe_web/live/commitments_live.ex:121
 #, elixir-autogen, elixir-format
@@ -6250,20 +5736,6 @@ msgstr "Ciclo de raciocínio"
 #, elixir-autogen, elixir-format
 msgid "Remote (a URL over HTTP)"
 msgstr "Remoto (um URL por HTTP)"
-
-#: lib/pepe_web/live/tool_servers_live.ex:206
-#, elixir-autogen, elixir-format
-msgid "Renaming saves this as a new server. An OAuth sign-in is tied to the name, so it has to be done again."
-msgstr ""
-"Ao mudar o nome, isto é guardado como um servidor novo. O início de sessão "
-"OAuth depende do nome, por isso tem de ser repetido."
-
-#: lib/pepe_web/live/db_connections_live.ex:168
-#, elixir-autogen, elixir-format
-msgid "Renaming saves this under the new name and drops the old one. Anything pointing at the old name has to be updated by hand."
-msgstr ""
-"Ao renomear, guarda-se com o novo nome e apaga-se o antigo. O que apontar "
-"para o nome antigo tem de ser atualizado à mão."
 
 #: lib/pepe_web/live/learning_live.ex:272
 #, elixir-autogen, elixir-format
@@ -6294,13 +5766,6 @@ msgstr ""
 "O limiar de score tem de ser um número entre 0 e 1, como 0.5. Nada foi "
 "guardado."
 
-#: lib/pepe_web/live/scheduled_live.ex:195
-#, elixir-autogen, elixir-format
-msgid "Send /whoami to the bot to find it. Leave it blank and the result goes nowhere."
-msgstr ""
-"Envia /whoami ao bot para o descobrir. Se ficar em branco, o resultado não é"
-" enviado."
-
 #: lib/pepe_web/live/tool_servers_live.ex:202
 #, elixir-autogen, elixir-format
 msgid "Server"
@@ -6315,13 +5780,6 @@ msgstr "Só é mostrado uma vez. Guarda-o num sítio seguro."
 #, elixir-autogen, elixir-format
 msgid "Specific agents"
 msgstr "Agentes específicos"
-
-#: lib/pepe_web/live/config_live.ex:130
-#, elixir-autogen, elixir-format
-msgid "Spoken language as an ISO code (pt, en, es), passed to the transcriber. Blank means auto-detect."
-msgstr ""
-"Idioma falado, como código ISO (pt, en, es), enviado ao transcritor. Em "
-"branco, deteta automaticamente."
 
 #: lib/pepe_web/live/commitments_live.ex:178
 #, elixir-autogen, elixir-format
@@ -6412,24 +5870,15 @@ msgstr "Transporte"
 msgid "Tuesday"
 msgstr "Terça-feira"
 
-#: lib/pepe_web/live/tool_servers_live.ex:233
-#, elixir-autogen, elixir-format
-msgid "Two ways in, pick one. Most hosted servers use OAuth: leave Headers empty, save, then press “Sign in with OAuth” on the server's card. A server that hands out a fixed token instead wants that token as a header below."
-msgstr ""
-"Há duas formas, escolhe uma. A maioria dos servidores alojados usa OAuth: "
-"deixa os cabeçalhos vazios, guarda e carrega em \"Iniciar sessão com OAuth\""
-" no cartão do servidor. Se o servidor der um token fixo, usa esse token como"
-" cabeçalho, abaixo."
-
 #: lib/pepe_web/live/hooks_live.ex:518
 #, elixir-autogen, elixir-format
 msgid "US Social Security number"
-msgstr "número da Segurança Social dos EUA"
+msgstr "Número da Segurança Social dos EUA"
 
 #: lib/pepe_web/live/hooks_live.ex:519
 #, elixir-autogen, elixir-format
 msgid "US phone numbers"
-msgstr "números de telefone dos EUA"
+msgstr "Números de telefone dos EUA"
 
 #: lib/pepe_web/live/dash_data.ex:354
 #, elixir-autogen, elixir-format
@@ -6567,7 +6016,7 @@ msgstr "concluído"
 msgid "config.json"
 msgstr "config.json"
 
-#: lib/pepe_web/live/overview_live.ex:150
+#: lib/pepe_web/live/overview_live.ex:151
 #, elixir-autogen, elixir-format
 msgid "cost %{c} (what you pay the provider)"
 msgstr "custo %{c} (o que pagas ao fornecedor)"
@@ -6598,11 +6047,6 @@ msgid_plural "every %{count} seconds"
 msgstr[0] "cada %{count} segundo"
 msgstr[1] "cada %{count} segundos"
 
-#: lib/pepe_web/live/board_live.ex:187
-#, elixir-autogen, elixir-format
-msgid "higher runs first (0 is normal)"
-msgstr "maior corre primeiro (0 é o normal)"
-
 #: lib/pepe_web/live/channels_live.ex:408
 #: lib/pepe_web/live/channels_live.ex:447
 #, elixir-autogen, elixir-format
@@ -6614,7 +6058,7 @@ msgstr "id %{id}"
 msgid "inbound"
 msgstr "entrada"
 
-#: lib/pepe_web/live/overview_live.ex:166
+#: lib/pepe_web/live/overview_live.ex:167
 #, elixir-autogen, elixir-format
 msgid "internal tasks the runtime is juggling"
 msgstr "tarefas internas em curso no runtime"
@@ -6714,14 +6158,6 @@ msgstr "resultado de ferramenta"
 #, elixir-autogen, elixir-format
 msgid "unknown check"
 msgstr "verificação desconhecida"
-
-#: lib/pepe_web/live/commitments_live.ex:55
-#, elixir-autogen, elixir-format
-msgid "“%{reminder}” just sends you a message when it comes due. “%{promise}” re-runs the agent first, so it actually does the thing before it answers."
-msgstr ""
-"\"%{reminder}\" só te envia uma mensagem na data. \"%{promise}\" volta "
-"primeiro a correr o agente, para ele fazer mesmo a tarefa antes de "
-"responder."
 
 #: lib/pepe/slots.ex:133
 #, elixir-autogen, elixir-format
@@ -6825,27 +6261,10 @@ msgstr ""
 msgid "Allow me to run the %{tool} tool: %{desc}?"
 msgstr "Posso usar a ferramenta %{tool}: %{desc}?"
 
-#: lib/pepe_web/live/channels_live.ex:367
-#, elixir-autogen, elixir-format
-msgid "How much the bot says about what it is doing. Whichever you pick, the status updates in place and disappears when the answer arrives; only the reply stays in the chat."
-msgstr ""
-"Quanto o bot diz sobre o que está a fazer. Seja qual for a opção, o estado "
-"atualiza-se no mesmo sítio e desaparece quando a resposta chega: no chat só "
-"fica a resposta."
-
 #: lib/pepe/gateways/telegram.ex:1582
 #, elixir-autogen, elixir-format
 msgid "I'm still on the previous message; send /stop to cancel it."
 msgstr "Ainda estou na mensagem anterior; envia /stop para a cancelar."
-
-#: lib/pepe_web/live/agents_live.ex:317
-#, elixir-autogen, elixir-format
-msgid "If set, this agent's persona comes from this prompt's name in Langfuse instead of the persona above. Editing it in Langfuse reaches Pepe within a few minutes, no redeploy. Falls back to the persona above if Langfuse is unreachable or the name doesn't resolve."
-msgstr ""
-"Se preenchido, a persona do agente vem deste prompt no Langfuse, em vez da "
-"persona acima. As alterações feitas no Langfuse chegam ao Pepe em poucos "
-"minutos, sem novo deploy. Se o Langfuse não responder ou o nome não existir,"
-" usa a persona acima."
 
 #: lib/pepe/gateways/telegram.ex:2778
 #, elixir-autogen, elixir-format
@@ -6915,16 +6334,6 @@ msgstr "⚠️ Tudo permitido nesta sessão."
 #, elixir-autogen, elixir-format
 msgid "Pepe"
 msgstr "Pepe"
-
-#: lib/pepe_web/live/agents_live.ex:635
-#, elixir-autogen, elixir-format
-msgid "After helping with something, the agent may add one short, natural sentence pointing at a related capability (Watches, Scheduled tasks, Goals, an installed skill) when one genuinely fits. Not every turn, not a menu. Off is right for an agent meant to stay terse and transactional."
-msgstr ""
-"Depois de ajudar, o agente pode acrescentar uma frase curta e natural a "
-"apontar uma funcionalidade relacionada (Watches, tarefas agendadas, Goals, "
-"uma skill instalada) quando faz mesmo sentido. Nem em todos os turnos, nem "
-"como um menu. Desativado é o ideal para um agente que deve ser seco e "
-"objetivo."
 
 #: lib/pepe_web/live/agents_live.ex:633
 #, elixir-autogen, elixir-format
@@ -7057,15 +6466,6 @@ msgstr[1] "Recuei %{count} turnos. Era toda a conversa."
 #, elixir-autogen, elixir-format
 msgid "Usage: /rewind N, where N is how many turns to go back."
 msgstr "Uso: /rewind N, com N o número de turnos a recuar."
-
-#: lib/pepe_web/live/agents_live.ex:643
-#, elixir-autogen, elixir-format
-msgid "After a task that took several steps to work out, the agent may offer to save that procedure as a skill, so the next time is direct. And when it follows a skill that then leads it wrong, it may offer to correct that skill with what it just learned. It only offers: nothing is written or changed without your yes."
-msgstr ""
-"Depois de uma tarefa que exigiu vários passos, o agente pode propor guardar "
-"esse procedimento como skill, para a próxima vez ser direto. E se seguir uma"
-" skill que o leve por mau caminho, pode propor corrigi-la com o que "
-"aprendeu. Só propõe: nada é escrito nem alterado sem o teu sim."
 
 #: lib/pepe_web/live/agents_live.ex:641
 #, elixir-autogen, elixir-format
@@ -7275,15 +6675,6 @@ msgstr "Curador de skills"
 msgid "Skills"
 msgstr "Skills"
 
-#: lib/pepe_web/live/skill_curator_component.ex:70
-#, elixir-autogen, elixir-format
-msgid "Skills an agent wrote on its own are tidied automatically: after a while unused they are marked stale, then archived. Nothing is deleted, and you can restore any of them. Your own skills, installed ones and pinned ones are never touched."
-msgstr ""
-"As skills que um agente escreve sozinho são arrumadas automaticamente: sem "
-"uso durante algum tempo ficam obsoletas e depois são arquivadas. Nada é "
-"eliminado e podes restaurar qualquer uma. As tuas skills, as instaladas e as"
-" fixadas nunca são tocadas."
-
 #: lib/pepe_web/live/skill_curator_component.ex:163
 #, elixir-autogen, elixir-format
 msgid "Stale after (days)"
@@ -7458,29 +6849,10 @@ msgstr ""
 "Um comando de shell alterou mais ficheiros do que é possível registar, por "
 "isso algumas das alterações podem não ser restauradas."
 
-#: lib/pepe_web/live/agents_live.ex:659
-#, elixir-autogen, elixir-format
-msgid "Also copy the working folder around each shell command, so /rewind can undo what a command changed. It walks the folder twice per command and stops at a size limit, so it is off by default and never covers a huge folder completely."
-msgstr ""
-"Copia também a pasta de trabalho antes e depois de cada comando de shell, "
-"para o /rewind poder desfazer o que o comando alterou. Percorre a pasta duas"
-" vezes por comando e pára num limite de tamanho, por isso vem desativado e "
-"nunca cobre por completo uma pasta enorme."
-
 #: lib/pepe_web/live/agents_live.ex:657
 #, elixir-autogen, elixir-format
 msgid "Also cover shell commands"
 msgstr "Incluir também comandos de shell"
-
-#: lib/pepe_web/live/agents_live.ex:651
-#, elixir-autogen, elixir-format
-msgid "Before a file tool overwrites, edits or moves a file, a copy of what was there is kept for a couple of weeks. /rewind can then restore those files along with the conversation. Files that look like credentials are never copied. Off means /rewind only goes back in the conversation."
-msgstr ""
-"Antes de uma ferramenta de ficheiros substituir, editar ou mover um "
-"ficheiro, fica guardada uma cópia durante cerca de duas semanas. O /rewind "
-"pode então restaurar esses ficheiros junto com a conversa. Ficheiros que "
-"pareçam credenciais nunca são copiados. Desativado, o /rewind só recua na "
-"conversa."
 
 #: lib/pepe/checkpoints/report.ex:166
 #, elixir-autogen, elixir-format
@@ -7781,8 +7153,8 @@ msgstr "Só esta conversa"
 msgid "Compare with"
 msgstr "Comparar com"
 
-#: lib/pepe_web/live/overview_live.ex:191
-#: lib/pepe_web/live/overview_live.ex:206
+#: lib/pepe_web/live/overview_live.ex:192
+#: lib/pepe_web/live/overview_live.ex:207
 #, elixir-autogen, elixir-format
 msgid "Errors"
 msgstr "Erros"
@@ -7792,51 +7164,51 @@ msgstr "Erros"
 msgid "Nothing to compare with yet"
 msgstr "Ainda nada para comparar"
 
-#: lib/pepe_web/live/overview_live.ex:189
-#: lib/pepe_web/live/overview_live.ex:206
-#: lib/pepe_web/live/overview_live.ex:245
-#: lib/pepe_web/live/overview_live.ex:251
-#: lib/pepe_web/live/overview_live.ex:258
+#: lib/pepe_web/live/overview_live.ex:190
+#: lib/pepe_web/live/overview_live.ex:207
+#: lib/pepe_web/live/overview_live.ex:246
+#: lib/pepe_web/live/overview_live.ex:252
+#: lib/pepe_web/live/overview_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Runs"
 msgstr "Execuções"
 
-#: lib/pepe_web/live/overview_live.ex:203
 #: lib/pepe_web/live/overview_live.ex:204
+#: lib/pepe_web/live/overview_live.ex:205
 #, elixir-autogen, elixir-format
 msgid "Runs and errors by week"
 msgstr "Execuções e erros por semana"
 
-#: lib/pepe_web/live/overview_live.ex:185
-#: lib/pepe_web/live/overview_live.ex:200
+#: lib/pepe_web/live/overview_live.ex:186
+#: lib/pepe_web/live/overview_live.ex:201
 #, elixir-autogen, elixir-format
 msgid "Spend"
 msgstr "Gasto"
 
-#: lib/pepe_web/live/overview_live.ex:197
 #: lib/pepe_web/live/overview_live.ex:198
+#: lib/pepe_web/live/overview_live.ex:199
 #, elixir-autogen, elixir-format
 msgid "Spend by week"
 msgstr "Gasto por semana"
 
-#: lib/pepe_web/live/overview_live.ex:187
-#: lib/pepe_web/live/overview_live.ex:272
+#: lib/pepe_web/live/overview_live.ex:188
+#: lib/pepe_web/live/overview_live.ex:273
 #, elixir-autogen, elixir-format
 msgid "Tokens"
 msgstr "Tokens"
 
-#: lib/pepe_web/live/overview_live.ex:183
-#: lib/pepe_web/live/overview_live.ex:338
+#: lib/pepe_web/live/overview_live.ex:184
+#: lib/pepe_web/live/overview_live.ex:339
 #, elixir-autogen, elixir-format
 msgid "Trends"
 msgstr "Tendências"
 
-#: lib/pepe_web/live/overview_live.ex:348
+#: lib/pepe_web/live/overview_live.ex:349
 #, elixir-autogen, elixir-format
 msgid "last month"
 msgstr "mês passado"
 
-#: lib/pepe_web/live/overview_live.ex:347
+#: lib/pepe_web/live/overview_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "last week"
 msgstr "semana passada"
@@ -7846,82 +7218,82 @@ msgstr "semana passada"
 msgid "vs %{period}"
 msgstr "vs %{period}"
 
-#: lib/pepe_web/live/overview_live.ex:358
+#: lib/pepe_web/live/overview_live.ex:359
 #, elixir-autogen, elixir-format
 msgid "This week"
 msgstr "Esta semana"
 
-#: lib/pepe_web/live/overview_live.ex:242
 #: lib/pepe_web/live/overview_live.ex:243
+#: lib/pepe_web/live/overview_live.ex:244
 #, elixir-autogen, elixir-format
 msgid "Busiest hours (last 30 days)"
 msgstr "Horas de maior movimento (30 dias)"
 
-#: lib/pepe_web/live/overview_live.ex:233
+#: lib/pepe_web/live/overview_live.ex:234
 #, elixir-autogen, elixir-format
 msgid "From cache"
 msgstr "Da cache"
 
-#: lib/pepe_web/live/overview_live.ex:212
-#: lib/pepe_web/live/overview_live.ex:339
+#: lib/pepe_web/live/overview_live.ex:213
+#: lib/pepe_web/live/overview_live.ex:340
 #, elixir-autogen, elixir-format
 msgid "How it's going"
 msgstr "Como está a correr"
 
-#: lib/pepe_web/live/overview_live.ex:230
 #: lib/pepe_web/live/overview_live.ex:231
+#: lib/pepe_web/live/overview_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Input served from the cache"
 msgstr "Entrada servida pela cache"
 
-#: lib/pepe_web/live/overview_live.ex:252
-#: lib/pepe_web/live/overview_live.ex:259
+#: lib/pepe_web/live/overview_live.ex:253
+#: lib/pepe_web/live/overview_live.ex:260
 #, elixir-autogen, elixir-format
 msgid "No runs yet"
 msgstr "Ainda sem execuções"
 
-#: lib/pepe_web/live/overview_live.ex:218
+#: lib/pepe_web/live/overview_live.ex:219
 #, elixir-autogen, elixir-format
 msgid "Saved by cache"
 msgstr "Poupado pela cache"
 
-#: lib/pepe_web/live/overview_live.ex:214
-#: lib/pepe_web/live/overview_live.ex:227
+#: lib/pepe_web/live/overview_live.ex:215
+#: lib/pepe_web/live/overview_live.ex:228
 #, elixir-autogen, elixir-format
 msgid "Success rate"
 msgstr "Taxa de sucesso"
 
-#: lib/pepe_web/live/overview_live.ex:224
 #: lib/pepe_web/live/overview_live.ex:225
+#: lib/pepe_web/live/overview_live.ex:226
 #, elixir-autogen, elixir-format
 msgid "Success rate by week"
 msgstr "Taxa de sucesso por semana"
 
-#: lib/pepe_web/live/overview_live.ex:216
-#: lib/pepe_web/live/overview_live.ex:239
+#: lib/pepe_web/live/overview_live.ex:217
+#: lib/pepe_web/live/overview_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "Typical reply time"
 msgstr "Tempo típico de resposta"
 
-#: lib/pepe_web/live/overview_live.ex:248
 #: lib/pepe_web/live/overview_live.ex:249
+#: lib/pepe_web/live/overview_live.ex:250
 #, elixir-autogen, elixir-format
 msgid "Where conversations come from"
 msgstr "De onde vêm as conversas"
 
-#: lib/pepe_web/live/overview_live.ex:214
+#: lib/pepe_web/live/overview_live.ex:215
 #, elixir-autogen, elixir-format
 msgid "pts"
 msgstr "pts"
 
-#: lib/pepe_web/live/overview_live.ex:255
 #: lib/pepe_web/live/overview_live.ex:256
+#: lib/pepe_web/live/overview_live.ex:257
 #, elixir-autogen, elixir-format
 msgid "Busiest agents (last 30 days)"
 msgstr "Agentes mais ativos (30 dias)"
 
-#: lib/pepe_web/live/overview_live.ex:236
 #: lib/pepe_web/live/overview_live.ex:237
+#: lib/pepe_web/live/overview_live.ex:238
 #, elixir-autogen, elixir-format
 msgid "Reply time by week"
 msgstr "Tempo de resposta por semana"
@@ -7941,19 +7313,12 @@ msgstr "Saldo pré-pago"
 msgid "Start over"
 msgstr "Recomeçar"
 
-#: lib/pepe_web/live/projects_live.ex:255
-#, elixir-autogen, elixir-format
-msgid "Starting a count over only clears what the cap checks. Usage and billing keep the real totals."
-msgstr ""
-"Recomeçar só repõe a contagem que o limite verifica. Utilização e faturação "
-"mantêm os totais reais."
-
-#: lib/pepe_web/live/overview_live.ex:337
+#: lib/pepe_web/live/overview_live.ex:338
 #, elixir-autogen, elixir-format
 msgid "Summary"
 msgstr "Resumo"
 
-#: lib/pepe_web/live/overview_live.ex:340
+#: lib/pepe_web/live/overview_live.ex:341
 #, elixir-autogen, elixir-format
 msgid "Usage"
 msgstr "Utilização"
@@ -7976,3 +7341,546 @@ msgid "%{count} agent"
 msgid_plural "%{count} agents"
 msgstr[0] "%{count} agente"
 msgstr[1] "%{count} agentes"
+
+#: lib/pepe_web/live/commitments_live.ex:55
+#, elixir-autogen, elixir-format
+msgid "%{reminder} only sends you a message. %{promise} re-runs the agent first."
+msgstr ""
+"%{reminder} só te envia uma mensagem. %{promise} volta a executar o agente "
+"primeiro."
+
+#: lib/pepe_web/live/scheduled_live.ex:158
+#, elixir-autogen, elixir-format
+msgid "5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" is 09:30 on weekdays."
+msgstr ""
+"5 campos: minuto hora dia mês dia da semana. Ex.: \"30 9 * * 1-5\" é 09:30 "
+"nos dias úteis."
+
+#: lib/pepe_web/live/hooks_live.ex:69
+#, elixir-autogen, elixir-format
+msgid ": personal data like name, CPF/CNPJ, email or phone, hidden before it reaches a model."
+msgstr ""
+": dados pessoais como nome, CPF/CNPJ, email ou telefone, ocultados antes de "
+"chegarem a um modelo."
+
+#: lib/pepe_web/live/channels_live.ex:377
+#, elixir-autogen, elixir-format
+msgid "A live log of every tool used and why."
+msgstr "Um registo em direto de cada ferramenta usada e porquê."
+
+#: lib/pepe_web/live/hooks_live.ex:141
+#, elixir-autogen, elixir-format
+msgid "A pack above already includes these. Use them to pick single recognizers."
+msgstr ""
+"Um pacote acima já inclui estes. Usa-os para escolher reconhecedores "
+"individuais."
+
+#: lib/pepe_web/live/plugins_live.ex:57
+#, elixir-autogen, elixir-format
+msgid "A plugin has full access to your data. Install only trusted ones, and Scan first."
+msgstr ""
+"Um plugin tem acesso total aos teus dados. Instala só os de confiança e faz "
+"Scan primeiro."
+
+#: lib/pepe_web/live/board_live.ex:156
+#, elixir-autogen, elixir-format
+msgid "A running claim older than this counts as stalled. 0 means never."
+msgstr ""
+"Um card assumido e em execução há mais tempo do que isto é dado como parado."
+" 0 significa nunca."
+
+#: lib/pepe_web/live/channels_live.ex:279
+#, elixir-autogen, elixir-format
+msgid "Agent and origin are fixed. Create a new widget to change them."
+msgstr "O agente e a origem ficam fixos. Cria um widget novo para os mudar."
+
+#: lib/pepe_web/live/agents_live.ex:659
+#, elixir-autogen, elixir-format
+msgid "Also copies the folder around shell commands so /rewind can undo them."
+msgstr ""
+"Copia também a pasta em volta dos comandos de shell para o /rewind os poder "
+"desfazer."
+
+#: lib/pepe_web/live/models_live.ex:228
+#, elixir-autogen, elixir-format
+msgid "Authorize in the browser, then come back. If it stalls, paste the redirect URL below."
+msgstr ""
+"Autoriza no navegador e volta. Se ficar parado, cola abaixo o URL de "
+"redirecionamento."
+
+#: lib/pepe_web/live/tool_servers_live.ex:218
+#, elixir-autogen, elixir-format
+msgid "Auto picks the right protocol. Pin one only if the server supports just that one."
+msgstr ""
+"Auto escolhe o protocolo certo. Fixa um só se o servidor suportar apenas "
+"esse."
+
+#: lib/pepe_web/live/agents_live.ex:348
+#, elixir-autogen, elixir-format
+msgid "Backup models, tried in order if this one fails. Usually you can skip it."
+msgstr ""
+"Modelos de reserva, tentados por ordem se este falhar. Normalmente podes "
+"ignorar."
+
+#: lib/pepe_web/live/integrations_live.ex:55
+#, elixir-autogen, elixir-format
+msgid "Built-in channels (WhatsApp, Slack, Discord, Teams, Google Chat) are under Channels."
+msgstr ""
+"Os canais incluídos (WhatsApp, Slack, Discord, Teams, Google Chat) estão em "
+"Canais."
+
+#: lib/pepe_web/live/projects_live.ex:156
+#, elixir-autogen, elixir-format
+msgid "Changing this name re-keys every agent, model, route, automation, token and file."
+msgstr ""
+"Mudar este nome altera a chave de todos os agentes, modelos, rotas, "
+"automatizações, tokens e ficheiros."
+
+#: lib/pepe_web/live/agents_live.ex:401
+#, elixir-autogen, elixir-format
+msgid "Checks if a mid-task message is a correction and applies it. Waits if unsure."
+msgstr ""
+"Verifica se uma mensagem a meio da tarefa é uma correção e aplica-a. Espera "
+"se tiver dúvidas."
+
+#: lib/pepe_web/live/models_live.ex:278
+#: lib/pepe_web/live/models_live.ex:371
+#, elixir-autogen, elixir-format
+msgid "Defaults to the %{env} env var (%{status}). Paste a key to load its models now."
+msgstr ""
+"Usa por omissão a variável de ambiente %{env} (%{status}). Cola uma chave "
+"para carregar já os modelos."
+
+#: lib/pepe_web/live/agents_live.ex:502
+#, elixir-autogen, elixir-format
+msgid "Each slot lets one plugin replace a part of the agent. Default uses the project's choice."
+msgstr ""
+"Cada slot permite que um plugin substitua uma parte do agente. O padrão usa "
+"a escolha do projeto."
+
+#: lib/pepe_web/live/channels_live.ex:202
+#, elixir-autogen, elixir-format
+msgid "Fill in the credentials, then register the Webhook URL in the provider's settings."
+msgstr ""
+"Preenche as credenciais e depois regista o URL do webhook nas definições do "
+"fornecedor."
+
+#: lib/pepe_web/live/tool_servers_live.ex:184
+#, elixir-autogen, elixir-format
+msgid "Give an agent only the read tools (Agents tab, Tools) to keep it read-only."
+msgstr ""
+"Dá ao agente só as ferramentas de leitura (separador Agentes, Ferramentas) "
+"para o manter só de leitura."
+
+#: lib/pepe_web/live/channels_live.ex:367
+#, elixir-autogen, elixir-format
+msgid "How much the bot shows while working. The status disappears when the answer arrives."
+msgstr ""
+"O que o bot mostra enquanto trabalha. O estado desaparece quando chega a "
+"resposta."
+
+#: lib/pepe_web/live/channels_live.ex:374
+#, elixir-autogen, elixir-format
+msgid "Just a 👀 on your message while it works. The quietest option."
+msgstr "Só um 👀 na tua mensagem enquanto trabalha. A opção mais discreta."
+
+#: lib/pepe_web/live/agents_live.ex:605
+#, elixir-autogen, elixir-format
+msgid "Keeps auto-approved tools running after reading files or pages. Trusted agents only."
+msgstr ""
+"Mantém as ferramentas aprovadas automaticamente a funcionar depois de ler "
+"ficheiros ou páginas. Só para agentes de confiança."
+
+#: lib/pepe_web/live/agents_live.ex:651
+#, elixir-autogen, elixir-format
+msgid "Keeps file copies for about two weeks so /rewind can restore them."
+msgstr ""
+"Guarda cópias dos ficheiros durante cerca de duas semanas para o /rewind as "
+"poder restaurar."
+
+#: lib/pepe_web/live/agents_live.ex:594
+#, elixir-autogen, elixir-format
+msgid "Keeps replying after the project's monthly message cap. Spend cap still applies."
+msgstr ""
+"Continua a responder depois de atingido o limite mensal de mensagens do "
+"projeto. O limite de gastos continua a aplicar-se."
+
+#: lib/pepe_web/live/config_live.ex:136
+#, elixir-autogen, elixir-format
+msgid "Largest voice note accepted. Bigger ones are refused."
+msgstr "A maior nota de voz aceite. As maiores são recusadas."
+
+#: lib/pepe_web/live/config_live.ex:103
+#, elixir-autogen, elixir-format
+msgid "Leave blank to use a connection known to transcribe (OpenAI, Groq)."
+msgstr ""
+"Deixa em branco para usar uma ligação que se sabe que transcreve (OpenAI, "
+"Groq)."
+
+#: lib/pepe_web/live/db_connections_live.ex:186
+#, elixir-autogen, elixir-format
+msgid "Leave empty unless the database uses Row-Level Security on this column."
+msgstr ""
+"Deixa vazio, a não ser que a base de dados use Row-Level Security nesta "
+"coluna."
+
+#: lib/pepe_web/live/tokens_live.ex:85
+#, elixir-autogen, elixir-format
+msgid "Limits the token to one workspace. Principal is the default, non-project workspace."
+msgstr ""
+"Limita o token a um espaço de trabalho. Principal é o espaço de trabalho "
+"padrão, sem projeto."
+
+#: lib/pepe_web/live/projects_live.ex:189
+#, elixir-autogen, elixir-format
+msgid "Monthly cap on customer messages. Agents stop replying when reached. Blank means no cap."
+msgstr ""
+"Limite mensal de mensagens de clientes. Os agentes deixam de responder ao "
+"atingi-lo. Em branco significa sem limite."
+
+#: lib/pepe_web/live/projects_live.ex:180
+#, elixir-autogen, elixir-format
+msgid "Monthly spend cap in %{currency}. Agents stop at the cap. Blank means no cap."
+msgstr ""
+"Limite mensal de gastos em %{currency}. Os agentes param no limite. Em "
+"branco significa sem limite."
+
+#: lib/pepe_web/live/projects_live.ex:171
+#, elixir-autogen, elixir-format
+msgid "Multiplies the provider cost into what you bill (1.3 = +30%). Blank bills the exact cost."
+msgstr ""
+"Multiplica o custo do fornecedor no que cobras (1.3 = +30%). Em branco cobra"
+" o custo exato."
+
+#: lib/pepe_web/live/agents_live.ex:572
+#, elixir-autogen, elixir-format
+msgid "No limit: the agent keeps going until the task is done."
+msgstr "Sem limite: o agente continua até terminar a tarefa."
+
+#: lib/pepe_web/live/traces_live.ex:382
+#, elixir-autogen, elixir-format
+msgid "No runs match these filters. Every agent run shows up here."
+msgstr ""
+"Nenhuma execução corresponde a estes filtros. Todas as execuções de agentes "
+"aparecem aqui."
+
+#: lib/pepe_web/live/agents_live.ex:403
+#, elixir-autogen, elixir-format
+msgid "No triage model set above: the check uses this agent's own model, at its cost."
+msgstr ""
+"Sem modelo de triagem definido acima: a verificação usa o modelo do próprio "
+"agente, a custo dele."
+
+#: lib/pepe_web/live/agents_live.ex:436
+#, elixir-autogen, elixir-format
+msgid "Notices promises like \"remind me Friday\" and follows up on time without being asked twice."
+msgstr ""
+"Repara em promessas como \"lembra-me na sexta\" e cumpre-as a horas, sem "
+"precisares de repetir."
+
+#: lib/pepe_web/live/tokens_live.ex:153
+#: lib/pepe_web/live/tokens_live.ex:220
+#, elixir-autogen, elixir-format
+msgid "Off by default. On, run details also include prompts and tool output."
+msgstr ""
+"Desligado por omissão. Ligado, os detalhes da execução incluem também "
+"prompts e o resultado das ferramentas."
+
+#: lib/pepe_web/live/agents_live.ex:619
+#, elixir-autogen, elixir-format
+msgid "Off: search covers only this conversation. On: covers every conversation in this project."
+msgstr ""
+"Desligado: a pesquisa abrange só esta conversa. Ligado: abrange todas as "
+"conversas deste projeto."
+
+#: lib/pepe_web/live/board_live.ex:149
+#, elixir-autogen, elixir-format
+msgid "On: a ready card with an assignee starts by itself. Off: someone has to claim it."
+msgstr ""
+"Ligado: um card pronto e com responsável arranca sozinho. Desligado: alguém "
+"tem de o assumir."
+
+#: lib/pepe_web/live/channels_live.ex:393
+#, elixir-autogen, elixir-format
+msgid "On: the bot ignores anyone not on its allowlist. Off: it answers everyone."
+msgstr ""
+"Ligado: o bot ignora quem não está na sua lista de permitidos. Desligado: "
+"responde a todos."
+
+#: lib/pepe_web/live/hooks_live.ex:276
+#, elixir-autogen, elixir-format
+msgid "On: the real value is restored in the reply. Off: you keep the masked version."
+msgstr ""
+"Ligado: o valor real é reposto na resposta. Desligado: manténs a versão "
+"mascarada."
+
+#: lib/pepe_web/live/channels_live.ex:380
+#, elixir-autogen, elixir-format
+msgid "One line describing the kind of work, with no tool names."
+msgstr "Uma linha a descrever o tipo de trabalho, sem nomes de ferramentas."
+
+#: lib/pepe_web/live/usage_live.ex:187
+#, elixir-autogen, elixir-format
+msgid "One line per incoming message. A message often takes several model calls."
+msgstr ""
+"Uma linha por mensagem recebida. Uma mensagem costuma precisar de várias "
+"chamadas ao modelo."
+
+#: lib/pepe_web/live/tool_servers_live.ex:238
+#, elixir-autogen, elixir-format
+msgid "One per line, as Key: value. Write tokens as ${ENV_VAR}."
+msgstr "Um por linha, como Chave: valor. Escreve os tokens como ${ENV_VAR}."
+
+#: lib/pepe_web/live/agents_live.ex:420
+#, elixir-autogen, elixir-format
+msgid "Optional cheap model for small jobs, like naming chats."
+msgstr ""
+"Modelo barato opcional para tarefas pequenas, como dar nome às conversas."
+
+#: lib/pepe_web/live/channels_live.ex:334
+#, elixir-autogen, elixir-format
+msgid "Optional: blank fields use the embed snippet's own data-* attributes."
+msgstr ""
+"Opcional: os campos em branco usam os atributos data-* do próprio snippet de"
+" incorporação."
+
+#: lib/pepe_web/live/agents_live.ex:377
+#, elixir-autogen, elixir-format
+msgid "Optional: simple chats go to the model below, complex ones to this agent's own model."
+msgstr ""
+"Opcional: as conversas simples vão para o modelo abaixo e as complexas para "
+"o modelo do próprio agente."
+
+#: lib/pepe_web/live/agents_live.ex:586
+#, elixir-autogen, elixir-format
+msgid "Overrides the channel default for this agent."
+msgstr "Substitui o padrão do canal para este agente."
+
+#: lib/pepe_web/live/plugins_live.ex:77
+#, elixir-autogen, elixir-format
+msgid "Paste a GitHub repo, .tar.gz link or local path. Scan reads it without running it."
+msgstr ""
+"Cola um repositório do GitHub, uma ligação .tar.gz ou um caminho local. O "
+"Scan lê sem executar."
+
+#: lib/pepe_web/live/models_live.ex:46
+#, elixir-autogen, elixir-format
+msgid "Per 1M tokens, in %{currency}. Blank uses the known price."
+msgstr "Por 1M de tokens, em %{currency}. Em branco usa o preço conhecido."
+
+#: lib/pepe_web/live/commitments_live.ex:137
+#, elixir-autogen, elixir-format
+msgid "Pick a day, or type an interval like \"in 5 days\". What you type wins."
+msgstr ""
+"Escolhe um dia ou escreve um intervalo como \"in 5 days\". O que escreveres "
+"prevalece."
+
+#: lib/pepe_web/live/tokens_live.ex:145
+#: lib/pepe_web/live/tokens_live.ex:230
+#, elixir-autogen, elixir-format
+msgid "Pick by who holds the token. A client's token should never see cost or margin."
+msgstr ""
+"Escolhe consoante quem tem o token. O token de um cliente nunca deve ver "
+"custos nem margem."
+
+#: lib/pepe_web/live/agents_live.ex:526
+#, elixir-autogen, elixir-format
+msgid "Pick the agents this one may message. None picked means it messages no one."
+msgstr ""
+"Escolhe os agentes a quem este pode enviar mensagens. Sem nenhum, não envia "
+"a ninguém."
+
+#: lib/pepe_web/live/db_connections_live.ex:168
+#, elixir-autogen, elixir-format
+msgid "Renaming saves a new copy and drops the old one. Update anything pointing at the old name."
+msgstr ""
+"Mudar o nome guarda uma cópia nova e elimina a antiga. Atualiza tudo o que "
+"aponta para o nome antigo."
+
+#: lib/pepe_web/live/tool_servers_live.ex:206
+#, elixir-autogen, elixir-format
+msgid "Renaming saves a new server, so any OAuth sign-in must be redone."
+msgstr ""
+"Mudar o nome guarda um servidor novo, por isso qualquer início de sessão "
+"OAuth tem de ser refeito."
+
+#: lib/pepe_web/live/models_live.ex:268
+#, elixir-autogen, elixir-format
+msgid "Renaming updates every agent, cron, hook and default that uses this connection."
+msgstr ""
+"Mudar o nome atualiza todos os agentes, crons, hooks e predefinições que "
+"usam esta ligação."
+
+#: lib/pepe_web/live/config_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "Reply to a voice note with a voice note. Needs a model connection with /audio/speech."
+msgstr ""
+"Responde a uma nota de voz com uma nota de voz. Precisa de uma ligação de "
+"modelo com /audio/speech."
+
+#: lib/pepe_web/live/projects_live.ex:255
+#, elixir-autogen, elixir-format
+msgid "Restarting a count only resets the cap check. Usage and billing keep the real totals."
+msgstr ""
+"Recomeçar uma contagem só repõe a verificação do limite. A utilização e a "
+"faturação mantêm os totais reais."
+
+#: lib/pepe_web/live/scheduled_live.ex:195
+#, elixir-autogen, elixir-format
+msgid "Send /whoami to the bot to find it. Blank means the result goes nowhere."
+msgstr ""
+"Envia /whoami ao bot para o descobrir. Em branco, o resultado não vai para "
+"lado nenhum."
+
+#: lib/pepe_web/live/agents_live.ex:573
+#, elixir-autogen, elixir-format
+msgid "Set a number only to cap long tasks. A low cap can stop work halfway."
+msgstr ""
+"Define um número só para limitar tarefas longas. Um limite baixo pode parar "
+"o trabalho a meio."
+
+#: lib/pepe_web/live/agents_live.ex:496
+#, elixir-autogen, elixir-format
+msgid "Set up each hook under Privacy. Empty means no redaction."
+msgstr ""
+"Configura cada hook em Privacidade. Vazio significa sem ocultação de dados."
+
+#: lib/pepe_web/live/config_live.ex:130
+#, elixir-autogen, elixir-format
+msgid "Spoken language code (pt, en, es). Blank means auto-detect."
+msgstr ""
+"Código do idioma falado (pt, en, es). Em branco, deteta automaticamente."
+
+#: lib/pepe_web/live/agents_live.ex:627
+#, elixir-autogen, elixir-format
+msgid "Summarizes only the oldest exchange each turn. May reduce prompt caching."
+msgstr ""
+"Resume só a troca mais antiga em cada turno. Pode reduzir o cache do prompt."
+
+#: lib/pepe_web/live/agents_live.ex:635
+#, elixir-autogen, elixir-format
+msgid "The agent may add one short tip about a related feature when it fits."
+msgstr ""
+"O agente pode acrescentar uma dica curta sobre uma funcionalidade "
+"relacionada quando fizer sentido."
+
+#: lib/pepe_web/live/agents_live.ex:643
+#, elixir-autogen, elixir-format
+msgid "The agent may offer to save a multi-step task as a skill. Never without your yes."
+msgstr ""
+"O agente pode propor guardar uma tarefa de vários passos como skill. Nunca "
+"sem o teu sim."
+
+#: lib/pepe_web/live/channels_live.ex:490
+#, elixir-autogen, elixir-format
+msgid "The bot shows 👀 while working and answers everyone. You can change both under Edit."
+msgstr ""
+"O bot mostra 👀 enquanto trabalha e responde a todos. Podes mudar ambos em "
+"Editar."
+
+#: lib/pepe_web/live/agents_live.ex:328
+#, elixir-autogen, elixir-format
+msgid "The exact system message sent on every chat. The persona is only the start."
+msgstr ""
+"A mensagem de sistema exata enviada em cada conversa. A persona é só o "
+"início."
+
+#: lib/pepe_web/live/tokens_live.ex:116
+#, elixir-autogen, elixir-format
+msgid "The site's address, like https://example.com. Needs an agent above."
+msgstr ""
+"O endereço do site, como https://example.com. Precisa de um agente acima."
+
+#: lib/pepe_web/live/channels_live.ex:330
+#, elixir-autogen, elixir-format
+msgid "The site's address, like https://example.com. Other origins are refused."
+msgstr ""
+"O endereço do site, como https://example.com. Outras origens são recusadas."
+
+#: lib/pepe_web/live/hooks_live.ex:275
+#, elixir-autogen, elixir-format
+msgid "The swap back happens locally, so the model only sees the placeholder."
+msgstr ""
+"A troca de volta acontece localmente, por isso o modelo só vê o marcador."
+
+#: lib/pepe_web/live/agents_live.ex:451
+#, elixir-autogen, elixir-format
+msgid "The text under each tool is sent to the AI model, so it stays in English."
+msgstr ""
+"O texto por baixo de cada ferramenta é enviado ao modelo de IA, por isso "
+"fica em inglês."
+
+#: lib/pepe_web/live/channels_live.ex:467
+#, elixir-autogen, elixir-format
+msgid "Tip: use a reference like ${MY_BOT_TOKEN} to keep the secret out of the config file."
+msgstr ""
+"Dica: usa uma referência como ${MY_BOT_TOKEN} para manter o segredo fora do "
+"ficheiro de configuração."
+
+#: lib/pepe_web/live/models_live.ex:305
+#, elixir-autogen, elixir-format
+msgid "Tried in order when %{name} fails briefly. The agent never sees the failure."
+msgstr ""
+"Tentadas por ordem quando %{name} falha por momentos. O agente nunca vê a "
+"falha."
+
+#: lib/pepe_web/live/agents_live.ex:468
+#, elixir-autogen, elixir-format
+msgid "Turns off after untrusted content is read, to block hidden instructions."
+msgstr ""
+"Desativa-se depois de ler conteúdo não fiável, para bloquear instruções "
+"escondidas."
+
+#: lib/pepe_web/live/skill_curator_component.ex:70
+#, elixir-autogen, elixir-format
+msgid "Unused agent-written skills go stale, then get archived. Nothing is deleted."
+msgstr ""
+"As skills escritas pelo agente e não usadas ficam obsoletas e depois são "
+"arquivadas. Nada é eliminado."
+
+#: lib/pepe_web/live/tool_servers_live.ex:233
+#, elixir-autogen, elixir-format
+msgid "Use OAuth (save, then sign in on the card) or put a fixed token in Headers."
+msgstr ""
+"Usa OAuth (guarda e depois inicia sessão no card) ou coloca um token fixo em"
+" Headers."
+
+#: lib/pepe_web/live/hooks_live.ex:170
+#, elixir-autogen, elixir-format
+msgid "Use a local model like Ollama. A hosted model would receive the unredacted data."
+msgstr ""
+"Usa um modelo local como o Ollama. Um modelo alojado receberia os dados sem "
+"ocultação."
+
+#: lib/pepe_web/live/models_live.ex:214
+#, elixir-autogen, elixir-format
+msgid "Use your ChatGPT or Claude subscription instead of an API key."
+msgstr ""
+"Usa a tua subscrição do ChatGPT ou do Claude em vez de uma chave de API."
+
+#: lib/pepe_web/live/agents_live.ex:317
+#, elixir-autogen, elixir-format
+msgid "Uses this Langfuse prompt as the persona. Falls back to the one above."
+msgstr "Usa este prompt do Langfuse como persona. Se falhar, usa o de cima."
+
+#: lib/pepe_web/live/tokens_live.ex:110
+#, elixir-autogen, elixir-format
+msgid "Visible in your page source, so it is pinned to one agent and one origin."
+msgstr ""
+"Fica visível no código-fonte da página, por isso está preso a um agente e a "
+"uma origem."
+
+#: lib/pepe_web/live/config_live.ex:154
+#, elixir-autogen, elixir-format
+msgid "Who changed config.json and when. Values are never recorded."
+msgstr "Quem alterou o config.json e quando. Os valores nunca são registados."
+
+#: lib/pepe_web/live/board_live.ex:187
+#, elixir-autogen, elixir-format
+msgid "Higher runs first (0 is normal)"
+msgstr "Quem tem valor mais alto corre primeiro (0 é o normal)"
+
+#: lib/pepe_web/live/channels_live.ex:383
+#, elixir-autogen, elixir-format
+msgid "No status message, just Telegram's typing indicator."
+msgstr "Sem mensagem de estado, só o indicador de escrita do Telegram."

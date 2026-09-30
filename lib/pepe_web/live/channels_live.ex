@@ -199,7 +199,7 @@ defmodule PepeWeb.ChannelsLive do
                 <button phx-click="add" phx-value-kind="widget" class={btn_ghost()}>{gettext("+ Widget")}</button>
               </div>
               <p class="mt-2 text-sm text-zinc-500">
-                {gettext("WhatsApp, Slack, Discord, Microsoft Teams and Google Chat connect over each platform's official webhook: fill in the credentials, then register the Webhook URL you get here in the provider's settings. A widget is a chat bubble you embed on your site with a script tag.")}
+                {gettext("Fill in the credentials, then register the Webhook URL in the provider's settings.")}
               </p>
             </div>
 
@@ -276,7 +276,7 @@ defmodule PepeWeb.ChannelsLive do
                   <:item label={gettext("Agent:")}>{t["agent"] || gettext("(default)")}</:item>
                   <:item label={gettext("Origin:")} mono>{t["allowed_origin"] || gettext("no origin set")}</:item>
                 </.meta_list>
-                <p class={hlp()}>{gettext("Agent and origin are fixed at minting. To change them, create a new widget and revoke this one. Appearance stays editable right here.")}</p>
+                <p class={hlp()}>{gettext("Agent and origin are fixed. Create a new widget to change them.")}</p>
 
                 <form :if={@edit_widget == t["id"]} phx-submit="widget_edit_save" class="mt-3 border-t border-zinc-800 pt-3">
                   <input type="hidden" name="widget_id" value={t["id"]} />
@@ -327,11 +327,11 @@ defmodule PepeWeb.ChannelsLive do
               <div>
                 <label class={lbl()}>{gettext("Allowed origin")}</label>
                 <input name="widget[allowed_origin]" placeholder="https://example.com" class={fld()} />
-                <p class={hlp()}>{gettext("The site's scheme + host. Pepe refuses widget connections from any other origin.")}</p>
+                <p class={hlp()}>{gettext("The site's address, like https://example.com. Other origins are refused.")}</p>
               </div>
               <div class="border-t border-zinc-800 pt-4">
                 <div class="mb-1 text-sm font-medium text-zinc-300">{gettext("Appearance")}</div>
-                <p class={hlp()}>{gettext("Optional: blank fields fall back to the embed snippet's own data-* attributes. You can edit them here later without touching the site.")}</p>
+                <p class={hlp()}>{gettext("Optional: blank fields use the embed snippet's own data-* attributes.")}</p>
                 <div class="mt-3">
                   <.widget_appearance_fields prefix="widget" values={%{}} />
                 </div>
@@ -364,23 +364,23 @@ defmodule PepeWeb.ChannelsLive do
                   <option value="ambient" selected={@edit_bot["tool_progress"] == "ambient"}>{gettext("Ambient")}</option>
                   <option value="off" selected={@edit_bot["tool_progress"] == "off"}>{gettext("Nothing")}</option>
                 </select>
-                <p class={hlp()}>{gettext("How much the bot says about what it is doing. Whichever you pick, the status updates in place and disappears when the answer arrives; only the reply stays in the chat.")}</p>
+                <p class={hlp()}>{gettext("How much the bot shows while working. The status disappears when the answer arrives.")}</p>
                 <%!-- The per-option detail is a wall of text next to a select that already names all
                      four options, so it stays folded away until someone actually wants it. --%>
                 <details class="mt-2">
                   <summary class="cursor-pointer text-sm text-zinc-400 hover:text-zinc-200">{gettext("What each option does")}</summary>
                   <div class="mt-2 space-y-1 text-sm text-zinc-400">
                     <p>
-                      <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}): {gettext("just a 👀 dropped on your message while it works, cleared when the reply lands. The quietest signal.")}
+                      <span class="text-zinc-200">👀 {gettext("React")}</span> ({gettext("default")}): {gettext("Just a 👀 on your message while it works. The quietest option.")}
                     </p>
                     <p>
-                      <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span>: {gettext("a live activity log: every tool the agent uses and the reason it reached for it, so you can follow exactly what it's doing.")}
+                      <span class="text-zinc-200">🛠️ {gettext("Detailed")}</span>: {gettext("A live log of every tool used and why.")}
                     </p>
                     <p>
-                      <span class="text-zinc-200">💬 {gettext("Ambient")}</span>: {gettext("a single line describing the kind of work happening, with no tool names or per-step detail.")}
+                      <span class="text-zinc-200">💬 {gettext("Ambient")}</span>: {gettext("One line describing the kind of work, with no tool names.")}
                     </p>
                     <p>
-                      <span class="text-zinc-200">🚫 {gettext("Nothing")}</span>: {gettext("no status message at all, just Telegram's native typing indicator.")}
+                      <span class="text-zinc-200">🚫 {gettext("Nothing")}</span>: {gettext("No status message, just Telegram's typing indicator.")}
                     </p>
                   </div>
                 </details>
@@ -390,7 +390,7 @@ defmodule PepeWeb.ChannelsLive do
                   <input type="checkbox" name="require_approval" value="true" checked={@edit_bot["require_approval"] == true} class={checkbox_cls()} />
                   <span class="text-base text-zinc-300">{gettext("Require approval for new users")}</span>
                 </label>
-                <p class={hlp()}>{gettext("When on, the bot ignores anyone not on its allowlist. When off, it answers everyone (unless you set an explicit user allowlist).")}</p>
+                <p class={hlp()}>{gettext("On: the bot ignores anyone not on its allowlist. Off: it answers everyone.")}</p>
 
                 <%!-- Nested right under the toggle they belong to, not a separate section - and
                      `type="button"` on every action so a click here never submits the form. --%>
@@ -464,7 +464,7 @@ defmodule PepeWeb.ChannelsLive do
               <div>
                 <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("(leave blank to keep the current one)")}</span></label>
                 <input name="token" placeholder={"${TELEGRAM_BOT_TOKEN}  " <> gettext("(or paste a new token)")} class={fld()} />
-                <p class={hlp()}>{gettext("Tip: use an env-var reference like ${MY_BOT_TOKEN} to keep the secret out of the config file.")}</p>
+                <p class={hlp()}>{gettext("Tip: use a reference like ${MY_BOT_TOKEN} to keep the secret out of the config file.")}</p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
                 <button type="submit" class={btn()}>{gettext("Save")}</button>
@@ -487,7 +487,7 @@ defmodule PepeWeb.ChannelsLive do
                 <p class={hlp()}>{gettext("From @BotFather. Tip: use an env-var reference to keep the token out of the config file.")}</p>
                 <%!-- tool_progress and require_approval are edit-only fields, so say here what a
                      brand-new bot will do until someone goes and changes them. --%>
-                <p class={hlp()}>{gettext("Once added, the bot reacts with 👀 while it works and answers everyone. Both are changeable under Edit.")}</p>
+                <p class={hlp()}>{gettext("The bot shows 👀 while working and answers everyone. You can change both under Edit.")}</p>
               </div>
               <div>
                 <label class={lbl()}>{gettext("This bot talks to")}</label>

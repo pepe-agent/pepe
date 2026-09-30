@@ -67,7 +67,7 @@ defmodule PepeWeb.SkillCuratorComponent do
       </div>
 
       <p class="mt-2 text-sm leading-relaxed text-zinc-500">
-        {gettext("Skills an agent wrote on its own are tidied automatically: after a while unused they are marked stale, then archived. Nothing is deleted, and you can restore any of them. Your own skills, installed ones and pinned ones are never touched.")}
+        {gettext("Unused agent-written skills go stale, then get archived. Nothing is deleted.")}
       </p>
 
       <dl class="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">

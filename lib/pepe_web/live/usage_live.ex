@@ -184,7 +184,7 @@ defmodule PepeWeb.UsageLive do
           <div>
             <div class="mb-2 font-mono text-[11px] font-normal uppercase tracking-[.18em] text-zinc-600">{gettext("By message")}</div>
             <p class="mb-2 text-sm text-zinc-500">
-              {gettext("One line per incoming message. A message often takes several model calls: answer, run a tool, read the result, answer again. Calls drive the cost, not tools: every call re-sends the whole conversation, and each tool result makes it longer.")}
+              {gettext("One line per incoming message. A message often takes several model calls.")}
             </p>
 
             <div :if={@runs == []} class="rounded-xl border border-zinc-800 px-3 py-6 text-center text-base text-zinc-500">

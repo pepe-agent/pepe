@@ -379,7 +379,7 @@ defmodule PepeWeb.TracesLive do
       :if={@total == 0}
       class={["p-10 text-center text-zinc-500", !@nested && "rounded-xl border border-dashed border-zinc-800"]}
     >
-      {gettext("No runs match these filters. Every agent run, from any surface, shows up here.")}
+      {gettext("No runs match these filters. Every agent run shows up here.")}
     </div>
     <div :if={@traces != []} class={["overflow-x-auto", !@nested && "rounded-[14px] border border-zinc-800"]}>
       <table class="w-full min-w-[720px] text-[14px]">

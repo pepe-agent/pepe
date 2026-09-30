@@ -90,81 +90,6 @@ msgstr ""
 msgid "Verify token"
 msgstr ""
 
-#: lib/pepe/webhooks/googlechat.ex:41
-#, elixir-autogen, elixir-format
-msgid "an OAuth token for the Chat API; store as ${ENV_VAR}"
-msgstr ""
-
-#: lib/pepe/webhooks/whatsapp.ex:67
-#, elixir-autogen, elixir-format
-msgid "any string you choose; echoed during the subscribe handshake"
-msgstr ""
-
-#: lib/pepe/webhooks/slack.ex:41
-#, elixir-autogen, elixir-format
-msgid "from the app's Basic Information; store as ${ENV_VAR}"
-msgstr ""
-
-#: lib/pepe/webhooks/slack.ex:49
-#, elixir-autogen, elixir-format
-msgid "in a channel, reply only when the bot is @mentioned (default true); a direct message always replies"
-msgstr ""
-
-#: lib/pepe/webhooks/googlechat.ex:59
-#, elixir-autogen, elixir-format
-msgid "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
-msgstr ""
-
-#: lib/pepe/webhooks/msteams.ex:58
-#, elixir-autogen, elixir-format
-msgid "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
-msgstr ""
-
-#: lib/pepe/webhooks/msteams.ex:50
-#, elixir-autogen, elixir-format
-msgid "the Azure tenant id (or botframework.com)"
-msgstr ""
-
-#: lib/pepe/webhooks/googlechat.ex:48
-#, elixir-autogen, elixir-format
-msgid "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
-msgstr ""
-
-#: lib/pepe/webhooks/discord.ex:72
-#, elixir-autogen, elixir-format
-msgid "the app's Public Key (hex), for signature verification"
-msgstr ""
-
-#: lib/pepe/webhooks/msteams.ex:38
-#, elixir-autogen, elixir-format
-msgid "the bot's Microsoft app (client) id"
-msgstr ""
-
-#: lib/pepe/webhooks/msteams.ex:44
-#, elixir-autogen, elixir-format
-msgid "the client secret; store as ${ENV_VAR}"
-msgstr ""
-
-#: lib/pepe/webhooks/whatsapp.ex:49
-#, elixir-autogen, elixir-format
-msgid "the sending endpoint id from Meta"
-msgstr ""
-
-#: lib/pepe/webhooks/discord.ex:78
-#, elixir-autogen, elixir-format
-msgid "used to post the reply"
-msgstr ""
-
-#: lib/pepe/webhooks/whatsapp.ex:61
-#, elixir-autogen, elixir-format
-msgid "verifies the inbound X-Hub-Signature-256; store as ${ENV_VAR}"
-msgstr ""
-
-#: lib/pepe/webhooks/slack.ex:35
-#, elixir-autogen, elixir-format
-msgid "xoxb-... ; store as ${ENV_VAR}"
-msgstr ""
-
 #: lib/pepe/webhooks/media.ex:418
 #, elixir-autogen, elixir-format
 msgid "I can't pick up attachments on this channel yet. Could you send it as text?"
@@ -199,31 +124,6 @@ msgstr ""
 #: lib/pepe/webhooks/media.ex:412
 #, elixir-autogen, elixir-format
 msgid "That file is too big for me to take in here. Could you send a smaller version, or share it another way?"
-msgstr ""
-
-#: lib/pepe/webhooks/discord.ex:88
-#, elixir-autogen, elixir-format
-msgid "also answer ordinary messages, attachments and voice messages in channels and direct messages, not only slash commands; needs the bot token below"
-msgstr ""
-
-#: lib/pepe/webhooks/discord.ex:110
-#, elixir-autogen, elixir-format
-msgid "in a server channel, reply only when the bot is @mentioned or replied to (default true); a direct message always replies"
-msgstr ""
-
-#: lib/pepe/webhooks/discord.ex:99
-#, elixir-autogen, elixir-format
-msgid "only for channel messages: the bot's token from the app's Bot page, with the Message Content intent enabled there to read every message; store as ${ENV_VAR}"
-msgstr ""
-
-#: lib/pepe/webhooks/discord.ex:121
-#, elixir-autogen, elixir-format
-msgid "optional, 1 to 100: the largest file taken in from a message (default 20). Discord's own limit still applies"
-msgstr ""
-
-#: lib/pepe/webhooks/whatsapp.ex:75
-#, elixir-autogen, elixir-format
-msgid "optional, 1 to 100: the largest file taken in from a message (default 20). Meta's own limit still applies"
 msgstr ""
 
 #: lib/pepe/webhooks.ex:353
@@ -359,4 +259,100 @@ msgstr ""
 #: lib/pepe/webhooks.ex:455
 #, elixir-autogen, elixir-format, fuzzy
 msgid "This channel isn't bound to a specific agent - it uses %{agent} (this connection's default). Agent switching is locked here."
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:88
+#, elixir-autogen, elixir-format
+msgid "Also answer normal messages, not only slash commands. Needs the bot token."
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:99
+#, elixir-autogen, elixir-format
+msgid "From the app's Bot page. Needed to read channel messages."
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:48
+#, elixir-autogen, elixir-format
+msgid "In channels, reply only when @mentioned (default true)."
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:59
+#, elixir-autogen, elixir-format
+msgid "In group spaces, reply only when @mentioned (default true)."
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:110
+#, elixir-autogen, elixir-format
+msgid "In server channels, reply only when @mentioned (default true)."
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:58
+#, elixir-autogen, elixir-format
+msgid "In team channels, reply only when @mentioned (default true)."
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:121
+#: lib/pepe/webhooks/whatsapp.ex:75
+#, elixir-autogen, elixir-format
+msgid "Largest file accepted, in MB (default 20)."
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:48
+#, elixir-autogen, elixir-format
+msgid "The Cloud project number. Set the app's Authentication Audience to \"Project Number\"."
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:61
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Verifies the inbound X-Hub-Signature-256. Store as ${ENV_VAR}."
+msgstr ""
+
+#: lib/pepe/webhooks/googlechat.ex:41
+#, elixir-autogen, elixir-format, fuzzy
+msgid "An OAuth token for the Chat API. Store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:67
+#, elixir-autogen, elixir-format
+msgid "Any string you choose. Meta echoes it when you subscribe"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:41
+#, elixir-autogen, elixir-format, fuzzy
+msgid "From the app's Basic Information. Store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/slack.ex:35
+#, elixir-autogen, elixir-format
+msgid "Starts with xoxb-. Store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:50
+#, elixir-autogen, elixir-format, fuzzy
+msgid "The Azure tenant ID (or botframework.com)"
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:72
+#, elixir-autogen, elixir-format, fuzzy
+msgid "The app's Public Key (hex), used to verify signatures"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:38
+#, elixir-autogen, elixir-format
+msgid "The bot's Microsoft app (client) ID"
+msgstr ""
+
+#: lib/pepe/webhooks/msteams.ex:44
+#, elixir-autogen, elixir-format, fuzzy
+msgid "The client secret. Store as ${ENV_VAR}"
+msgstr ""
+
+#: lib/pepe/webhooks/whatsapp.ex:49
+#, elixir-autogen, elixir-format, fuzzy
+msgid "The sending endpoint ID from Meta"
+msgstr ""
+
+#: lib/pepe/webhooks/discord.ex:78
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Used to post the reply"
 msgstr ""

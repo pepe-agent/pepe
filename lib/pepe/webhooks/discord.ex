@@ -69,13 +69,13 @@ defmodule Pepe.Webhooks.Discord do
         "key" => "public_key",
         "label" => dgettext("webhooks", "Public key"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "the app's Public Key (hex), for signature verification")
+        "hint" => dgettext("webhooks", "The app's Public Key (hex), used to verify signatures")
       },
       %{
         "key" => "application_id",
         "label" => dgettext("webhooks", "Application ID"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "used to post the reply")
+        "hint" => dgettext("webhooks", "Used to post the reply")
       },
       %{
         "key" => "receive_channel_messages",
@@ -87,7 +87,7 @@ defmodule Pepe.Webhooks.Discord do
         "hint" =>
           dgettext(
             "webhooks",
-            "also answer ordinary messages, attachments and voice messages in channels and direct messages, not only slash commands; needs the bot token below"
+            "Also answer normal messages, not only slash commands. Needs the bot token."
           )
       },
       %{
@@ -98,7 +98,7 @@ defmodule Pepe.Webhooks.Discord do
         "hint" =>
           dgettext(
             "webhooks",
-            "only for channel messages: the bot's token from the app's Bot page, with the Message Content intent enabled there to read every message; store as ${ENV_VAR}"
+            "From the app's Bot page. Needed to read channel messages."
           )
       },
       %{
@@ -109,7 +109,7 @@ defmodule Pepe.Webhooks.Discord do
         "hint" =>
           dgettext(
             "webhooks",
-            "in a server channel, reply only when the bot is @mentioned or replied to (default true); a direct message always replies"
+            "In server channels, reply only when @mentioned (default true)."
           )
       },
       %{
@@ -120,7 +120,7 @@ defmodule Pepe.Webhooks.Discord do
         "hint" =>
           dgettext(
             "webhooks",
-            "optional, 1 to 100: the largest file taken in from a message (default 20). Discord's own limit still applies"
+            "Largest file accepted, in MB (default 20)."
           )
       }
     ]

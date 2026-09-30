@@ -78,7 +78,7 @@ defmodule PepeWeb.ConfigLive do
           <.form_section title={gettext("Voice replies (text-to-speech)")}>
             <form phx-submit="media_tts_save" class="space-y-6">
               <p class={hlp()}>
-                {gettext("Reply to a voice note with a voice note. Needs a model connection serving an OpenAI-compatible /audio/speech.")}
+                {gettext("Reply to a voice note with a voice note. Needs a model connection with /audio/speech.")}
               </p>
               <div class="grid gap-6 sm:grid-cols-2">
                 <div>
@@ -100,7 +100,7 @@ defmodule PepeWeb.ConfigLive do
           <.form_section title={gettext("Voice-note transcription")}>
             <form phx-submit="media_audio_save" class="space-y-6">
               <p class={hlp()}>
-                {gettext("Leave unset and Pepe automatically uses a connection already known to transcribe (OpenAI, Groq).")}
+                {gettext("Leave blank to use a connection known to transcribe (OpenAI, Groq).")}
               </p>
               <div class="grid gap-6 sm:grid-cols-2">
                 <div>
@@ -127,13 +127,13 @@ defmodule PepeWeb.ConfigLive do
                   <label class={lbl()} for="audio_language">{gettext("Language")}</label>
                   <input id="audio_language" name="language" type="text" value={@media_audio["language"]} class={fld()} />
                   <p class={hlp()}>
-                    {gettext("Spoken language as an ISO code (pt, en, es), passed to the transcriber. Blank means auto-detect.")}
+                    {gettext("Spoken language code (pt, en, es). Blank means auto-detect.")}
                   </p>
                 </div>
                 <div>
                   <label class={lbl()} for="audio_max_mb">{gettext("Max MB")}</label>
                   <input id="audio_max_mb" name="max_mb" type="number" value={@media_audio["max_mb"]} class={fld()} />
-                  <p class={hlp()}>{gettext("Largest voice note accepted. Anything bigger is refused instead of transcribed.")}</p>
+                  <p class={hlp()}>{gettext("Largest voice note accepted. Bigger ones are refused.")}</p>
                 </div>
                 <div>
                   <label class={lbl()} for="audio_timeout">{gettext("Timeout (s)")}</label>
@@ -151,7 +151,7 @@ defmodule PepeWeb.ConfigLive do
 
           <.form_section :if={@journal != []} title={gettext("Recent changes")}>
             <p class={hlp()}>
-              {gettext("Who touched config.json, when, and which top-level sections changed. It never records the values. \"external\" marks a change made since this process's own last write: a hand-edit, a second Pepe process, or a restore from a .bak file.")}
+              {gettext("Who changed config.json and when. Values are never recorded.")}
             </p>
             <div class="max-h-56 space-y-1.5 overflow-y-auto text-sm">
               <div :for={entry <- @journal} class="flex items-center gap-2 border-b border-zinc-800/60 py-1.5 last:border-0">

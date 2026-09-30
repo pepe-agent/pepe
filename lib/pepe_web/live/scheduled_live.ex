@@ -155,7 +155,7 @@ defmodule PepeWeb.ScheduledLive do
                   </div>
                   <p :if={se = @form.source.errors[:schedule]} class="mt-1.5 text-sm text-red-400">{elem(se, 0)}</p>
                   <p :if={@cron_custom} class={hlp()}>
-                    {gettext("5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" = 09:30 on weekdays. Invalid expressions are rejected.")}
+                    {gettext("5 fields: minute hour day month weekday. E.g. \"30 9 * * 1-5\" is 09:30 on weekdays.")}
                   </p>
                 </div>
                 <div>
@@ -192,7 +192,7 @@ defmodule PepeWeb.ScheduledLive do
                   <label class={lbl()} for="cron_deliver_chat">{gettext("Telegram chat id")}</label>
                   <input id="cron_deliver_chat" name="cron[deliver_chat]" value={chat}
                     placeholder="123456789" class={fld()} />
-                  <p class={hlp()}>{gettext("Send /whoami to the bot to find it. Leave it blank and the result goes nowhere.")}</p>
+                  <p class={hlp()}>{gettext("Send /whoami to the bot to find it. Blank means the result goes nowhere.")}</p>
                 </div>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">

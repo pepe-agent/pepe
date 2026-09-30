@@ -54,7 +54,7 @@ defmodule PepeWeb.PluginsLive do
               <%!-- The trust checkbox sits inside the notice on purpose: it is what ungreys Install, so
                    the operator has to read the warning it answers before the button it unlocks. --%>
               <.notice label={gettext("Warning")} class="mb-4">
-                <p>{gettext("A plugin runs with full access to your data and this machine. Install only from a source you know and trust, and review it first with Scan. Never paste a link you don't understand.")}</p>
+                <p>{gettext("A plugin has full access to your data. Install only trusted ones, and Scan first.")}</p>
                 <label class="flex cursor-pointer items-center gap-2 text-zinc-100">
                   <input type="checkbox" checked={@trust} phx-click="toggle_trust" class="h-4 w-4" />
                   {gettext("I trust this source and understand it runs with full access to this machine.")}
@@ -74,7 +74,7 @@ defmodule PepeWeb.PluginsLive do
                 {gettext("Install stays disabled until you tick the box above.")}
               </p>
               <p class={hlp()}>
-                {gettext("Paste where the plugin comes from: a GitHub repo (https://github.com/someone/my-plugin), a .tar.gz link, or a path on this machine (/home/me/plugins/my-plugin or /home/me/plugins/my-plugin.exs). Scan reads the code without running it, so it is always safe to press first.")}
+                {gettext("Paste a GitHub repo, .tar.gz link or local path. Scan reads it without running it.")}
               </p>
 
               <div :if={@scan} class="mt-3">

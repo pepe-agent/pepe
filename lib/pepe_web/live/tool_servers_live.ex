@@ -181,7 +181,7 @@ defmodule PepeWeb.ToolServersLive do
                 <code class="text-zinc-300">mcp__{name}__{t["name"]}</code>
                 <span class="text-zinc-500">- {String.slice(to_string(t["description"]), 0, 90)}</span>
               </div>
-              <p class="text-sm text-zinc-500">{gettext("Grant an agent only the read tools (Agents tab -> Tools) to keep it read-only.")}</p>
+              <p class="text-sm text-zinc-500">{gettext("Give an agent only the read tools (Agents tab, Tools) to keep it read-only.")}</p>
             </div>
             <div :if={match?({:error, _}, @mcp_tools[name])} class="mt-1 text-sm text-red-400">
               {gettext("Couldn't connect. Check the command and the env var token")}
@@ -203,7 +203,7 @@ defmodule PepeWeb.ToolServersLive do
               <div>
                 <.input field={@form[:name]} label={gettext("Name")} placeholder="sentry" />
                 <p :if={@edit_mcp[:original]} class={hlp()}>
-                  {gettext("Renaming saves this as a new server. An OAuth sign-in is tied to the name, so it has to be done again.")}
+                  {gettext("Renaming saves a new server, so any OAuth sign-in must be redone.")}
                 </p>
               </div>
               <.input
@@ -215,7 +215,7 @@ defmodule PepeWeb.ToolServersLive do
               <.input :if={@form[:kind].value != "local"} field={@form[:url]} label={gettext("URL")} class={[fld(), "font-mono"]} placeholder="https://mcp.example.com/mcp" />
               <div :if={@form[:kind].value != "local"}>
                 <.input field={@form[:transport]} type="select" label={gettext("Transport")} options={transport_options()} />
-                <p class={hlp()}>{gettext("Auto tries the modern protocol and falls back on its own. Pin one only for a server that answers a single one.")}</p>
+                <p class={hlp()}>{gettext("Auto picks the right protocol. Pin one only if the server supports just that one.")}</p>
               </div>
               <div :if={@form[:kind].value == "local"}>
                 <.input field={@form[:command]} label={gettext("Command")} class={[fld(), "font-mono"]} placeholder="npx" />
@@ -230,12 +230,12 @@ defmodule PepeWeb.ToolServersLive do
 
             <.form_section :if={@form[:kind].value != "local"} title={gettext("Authentication")}>
               <p class="text-base leading-relaxed text-zinc-400">
-                {gettext("Two ways in, pick one. Most hosted servers use OAuth: leave Headers empty, save, then press “Sign in with OAuth” on the server's card. A server that hands out a fixed token instead wants that token as a header below.")}
+                {gettext("Use OAuth (save, then sign in on the card) or put a fixed token in Headers.")}
               </p>
               <div>
                 <.input field={@form[:headers]} type="textarea" label={gettext("Headers (only for a fixed token)")} class={[fld(), "font-mono"]}
                   placeholder={"Authorization: Bearer ${MCP_TOKEN}"} />
-                <p class={hlp()}>{gettext("One per line, as Key: value. Write the token as ${ENV_VAR} so the secret stays out of the config file.")}</p>
+                <p class={hlp()}>{gettext("One per line, as Key: value. Write tokens as ${ENV_VAR}.")}</p>
               </div>
             </.form_section>
 

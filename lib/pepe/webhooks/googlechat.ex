@@ -38,7 +38,7 @@ defmodule Pepe.Webhooks.GoogleChat do
         "key" => "access_token",
         "label" => dgettext("webhooks", "Access token"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "an OAuth token for the Chat API; store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "An OAuth token for the Chat API. Store as ${ENV_VAR}")
       },
       %{
         "key" => "project_number",
@@ -47,7 +47,7 @@ defmodule Pepe.Webhooks.GoogleChat do
         "hint" =>
           dgettext(
             "webhooks",
-            "the Cloud project number the Chat app is registered under; the app's Authentication Audience must be set to \"Project Number\""
+            "The Cloud project number. Set the app's Authentication Audience to \"Project Number\"."
           )
       },
       %{
@@ -58,7 +58,7 @@ defmodule Pepe.Webhooks.GoogleChat do
         "hint" =>
           dgettext(
             "webhooks",
-            "in a multi-person space, reply only when the app is @mentioned (default true); a direct message always replies"
+            "In group spaces, reply only when @mentioned (default true)."
           )
       }
     ]

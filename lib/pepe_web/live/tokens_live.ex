@@ -82,7 +82,7 @@ defmodule PepeWeb.TokensLive do
                   <option value="" selected={@token_project == nil}>{gettext("Principal")}</option>
                   <option :for={c <- @projects} value={c} selected={@token_project == c}>{c}</option>
                 </select>
-                <p class={hlp()}>{gettext("Scopes the token to a single workspace. Principal is the default, non-project workspace.")}</p>
+                <p class={hlp()}>{gettext("Limits the token to one workspace. Principal is the default, non-project workspace.")}</p>
               </div>
               <div>
                 <label class={lbl()}>
@@ -107,13 +107,13 @@ defmodule PepeWeb.TokensLive do
                   />
                   {gettext("Public widget token (for the embeddable chat widget)")}
                 </label>
-                <p class={hlp()}>{gettext("Its raw value sits in your page's public source: it must be pinned to one agent above, it can never read usage or billing, and it only answers from the single origin you allow.")}</p>
+                <p class={hlp()}>{gettext("Visible in your page source, so it is pinned to one agent and one origin.")}</p>
               </div>
 
               <div :if={@token_widget}>
                 <label class={lbl()}>{gettext("Allowed origin")}</label>
                 <input name="allowed_origin" placeholder="https://example.com" class={fld()} />
-                <p class={hlp()}>{gettext("The site's origin (scheme + host). The widget's WebSocket only connects from a matching browser origin. Requires an agent above: a public token always pins to one.")}</p>
+                <p class={hlp()}>{gettext("The site's address, like https://example.com. Needs an agent above.")}</p>
               </div>
             </.form_section>
 
@@ -142,7 +142,7 @@ defmodule PepeWeb.TokensLive do
                   <option value="list">{gettext("List: the model's price, no markup")}</option>
                   <option value="all">{gettext("Everything: adds our cost and the margin")}</option>
                 </select>
-                <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
+                <p class={hlp()}>{gettext("Pick by who holds the token. A client's token should never see cost or margin.")}</p>
               </div>
 
               <div :if={@token_usage}>
@@ -150,7 +150,7 @@ defmodule PepeWeb.TokensLive do
                   <input type="checkbox" name="content" value="true" class={checkbox_cls()} />
                   {gettext("Also show conversation content in a run's detail")}
                 </label>
-                <p class={hlp()}>{gettext("Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output.")}</p>
+                <p class={hlp()}>{gettext("Off by default. On, run details also include prompts and tool output.")}</p>
               </div>
             </.form_section>
 
@@ -217,7 +217,7 @@ defmodule PepeWeb.TokensLive do
                       <input type="checkbox" name="content" value="true" checked={permissions(t).usage_content} class={checkbox_cls()} />
                       {gettext("Also show conversation content in a run's detail")}
                     </label>
-                    <p class={hlp()}>{gettext("Off by default: a usage report is a bill, not a transcript. On, a run's detail also returns the prompt and each tool's arguments and output.")}</p>
+                    <p class={hlp()}>{gettext("Off by default. On, run details also include prompts and tool output.")}</p>
                   </div>
 
                   <div>
@@ -227,7 +227,7 @@ defmodule PepeWeb.TokensLive do
                       <option value="list" selected={permissions(t).prices == "list"}>{gettext("List: the model's price, no markup")}</option>
                       <option value="all" selected={permissions(t).prices == "all"}>{gettext("Everything: adds our cost and the margin")}</option>
                     </select>
-                    <p class={hlp()}>{gettext("Pick this from who holds the token. A client's token should never see cost or margin.")}</p>
+                    <p class={hlp()}>{gettext("Pick by who holds the token. A client's token should never see cost or margin.")}</p>
                   </div>
 
                   <button type="submit" class={btn_ghost()}>{gettext("Save")}</button>

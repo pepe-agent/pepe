@@ -53,7 +53,7 @@ defmodule PepeWeb.CommitmentsLive do
           </.empty_state>
           <p :if={@scoped_total > 0} class="text-sm leading-relaxed text-zinc-500">
             {gettext(
-              "“%{reminder}” just sends you a message when it comes due. “%{promise}” re-runs the agent first, so it actually does the thing before it answers.",
+              "%{reminder} only sends you a message. %{promise} re-runs the agent first.",
               reminder: origin_type_label("user_reminder"),
               promise: origin_type_label("agent_promise")
             )}
@@ -134,7 +134,7 @@ defmodule PepeWeb.CommitmentsLive do
             <button type="button" phx-click="cancel" phx-value-id={c.id} data-confirm={gettext("Cancel commitment %{name}?", name: c.text)}
               class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
             <p class={[hlp(), "w-full"]}>
-              {gettext("Pick a day from the list, or type an exact interval like “in 5 days” or “in 3 weeks”; what you type wins.")}
+              {gettext("Pick a day, or type an interval like \"in 5 days\". What you type wins.")}
             </p>
           </form>
         </div>

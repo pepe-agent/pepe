@@ -35,19 +35,19 @@ defmodule Pepe.Webhooks.MsTeams do
         "key" => "app_id",
         "label" => dgettext("webhooks", "App id"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "the bot's Microsoft app (client) id")
+        "hint" => dgettext("webhooks", "The bot's Microsoft app (client) ID")
       },
       %{
         "key" => "app_password",
         "label" => dgettext("webhooks", "App password"),
         "type" => "secret",
-        "hint" => dgettext("webhooks", "the client secret; store as ${ENV_VAR}")
+        "hint" => dgettext("webhooks", "The client secret. Store as ${ENV_VAR}")
       },
       %{
         "key" => "tenant_id",
         "label" => dgettext("webhooks", "Tenant id"),
         "type" => "text",
-        "hint" => dgettext("webhooks", "the Azure tenant id (or botframework.com)")
+        "hint" => dgettext("webhooks", "The Azure tenant ID (or botframework.com)")
       },
       %{
         "key" => "require_mention",
@@ -57,7 +57,7 @@ defmodule Pepe.Webhooks.MsTeams do
         "hint" =>
           dgettext(
             "webhooks",
-            "in a team channel or group chat, reply only when the bot is @mentioned (default true); a 1:1 chat always replies"
+            "In team channels, reply only when @mentioned (default true)."
           )
       }
     ]

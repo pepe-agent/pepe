@@ -153,7 +153,7 @@ defmodule PepeWeb.ProjectsLive do
                     do:
                       gettext("Letters, digits, - and _ only. Becomes the prefix for its agents (e.g. acme/sales)."),
                     else:
-                      gettext("This name keys every agent, model, route, automation, token and file. Changing it re-keys them all.")}
+                      gettext("Changing this name re-keys every agent, model, route, automation, token and file.")}
                 </p>
               </div>
               <div :if={@editing.name != "root"}>
@@ -168,7 +168,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[markup]" value={@editing.markup} placeholder="1.3" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Multiplies the provider cost into the amount you bill (e.g. 1.3 = +30%). Blank = bill exactly the provider cost.")}
+                  {gettext("Multiplies the provider cost into what you bill (1.3 = +30%). Blank bills the exact cost.")}
                 </p>
               </div>
               <div>
@@ -177,7 +177,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[budget]" value={@editing.budget} placeholder="100" inputmode="decimal" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Spend cap for the month in %{currency}. When reached, this project's agents stop making model calls until next month. Blank = no cap.", currency: Config.currency())}
+                  {gettext("Monthly spend cap in %{currency}. Agents stop at the cap. Blank means no cap.", currency: Config.currency())}
                 </p>
               </div>
               <div>
@@ -186,7 +186,7 @@ defmodule PepeWeb.ProjectsLive do
                 </label>
                 <input name="project[message_limit]" value={@editing.message_limit} placeholder="5000" inputmode="numeric" class={fld()} />
                 <p class={hlp()}>
-                  {gettext("Monthly cap on customer messages. At the cap, this project's agents stop replying until next month; you can exempt individual agents. Blank = no cap.")}
+                  {gettext("Monthly cap on customer messages. Agents stop replying when reached. Blank means no cap.")}
                 </p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
@@ -252,7 +252,7 @@ defmodule PepeWeb.ProjectsLive do
         </div>
       </div>
       <p :if={@budget || @cap} class="mt-2 text-[13px] leading-relaxed text-zinc-600">
-        {gettext("Starting a count over only clears what the cap checks. Usage and billing keep the real totals.")}
+        {gettext("Restarting a count only resets the cap check. Usage and billing keep the real totals.")}
       </p>
     </div>
     """

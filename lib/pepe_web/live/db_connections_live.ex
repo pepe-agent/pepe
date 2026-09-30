@@ -165,7 +165,7 @@ defmodule PepeWeb.DbConnectionsLive do
             <.form_section title={gettext("Connection")}>
               <div>
                 <.input field={@form[:name]} label={gettext("Name")} placeholder="billing_prod" />
-                <p :if={@edit_conn[:name]} class={hlp()}>{gettext("Renaming saves this under the new name and drops the old one. Anything pointing at the old name has to be updated by hand.")}</p>
+                <p :if={@edit_conn[:name]} class={hlp()}>{gettext("Renaming saves a new copy and drops the old one. Update anything pointing at the old name.")}</p>
               </div>
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <.input field={@form[:host]} label={gettext("Host")} placeholder="db.internal" />
@@ -183,7 +183,7 @@ defmodule PepeWeb.DbConnectionsLive do
             <.form_section title={gettext("Tenant isolation")}>
               <div>
                 <.input field={@form[:tenant_column]} label={gettext("Tenant column (optional)")} placeholder="company_id" />
-                <p class={hlp()}>{gettext("Leave empty for an unscoped connection. Set this only if the database enforces isolation on this column with Row-Level Security.")}</p>
+                <p class={hlp()}>{gettext("Leave empty unless the database uses Row-Level Security on this column.")}</p>
               </div>
               <div :if={@form[:tenant_column].value not in [nil, ""]} class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <.input

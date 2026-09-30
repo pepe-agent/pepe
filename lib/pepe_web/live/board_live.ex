@@ -146,14 +146,14 @@ defmodule PepeWeb.BoardLive do
                   <input type="checkbox" name="board[auto_dispatch]" value="true" class={[checkbox_cls(), "mt-0.5 shrink-0"]} />
                   <span>
                     <span class="block font-medium">{gettext("Auto-dispatch")}</span>
-                    <span class={[hlp(), "block"]}>{gettext("On: a ready card with an assignee starts on its own. Off (the default): a card starts only when someone claims it, from this page or through the board tool.")}</span>
+                    <span class={[hlp(), "block"]}>{gettext("On: a ready card with an assignee starts by itself. Off: someone has to claim it.")}</span>
                   </span>
                 </label>
               </div>
               <div class="mb-4">
                 <label class={lbl()} for="board-claim-timeout">{gettext("Claim timeout (seconds)")}</label>
                 <input id="board-claim-timeout" type="number" min="0" name="board[claim_timeout_s]" value="1800" class={fld()} />
-                <p class={hlp()}>{gettext("A running claim older than this is treated as stalled and blocked. 0 = never.")}</p>
+                <p class={hlp()}>{gettext("A running claim older than this counts as stalled. 0 means never.")}</p>
               </div>
               <div class="flex gap-2 border-t border-zinc-800 pt-4">
                 <button type="submit" class={btn()}>{gettext("Create board")}</button>
@@ -184,7 +184,7 @@ defmodule PepeWeb.BoardLive do
                 <div class="mb-4">
                   <label class={lbl()} for="card-priority">{gettext("Priority")}</label>
                   <input id="card-priority" type="number" name="card[priority]" value="0" class={fld()} />
-                  <p class={hlp()}>{gettext("higher runs first (0 is normal)")}</p>
+                  <p class={hlp()}>{gettext("Higher runs first (0 is normal)")}</p>
                 </div>
               </div>
               <div class="mb-4">

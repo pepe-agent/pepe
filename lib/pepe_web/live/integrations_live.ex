@@ -52,7 +52,7 @@ defmodule PepeWeb.IntegrationsLive do
               {gettext("Or from a terminal:")}
               <code class="text-zinc-400">{Pepe.Invocation.hint(["plugin", "install"])}</code>
             </p>
-            <p class="mt-1 text-sm text-zinc-600">{gettext("Built-in channels (WhatsApp, Slack, Discord, Teams, Google Chat) live under Channels.")}</p>
+            <p class="mt-1 text-sm text-zinc-600">{gettext("Built-in channels (WhatsApp, Slack, Discord, Teams, Google Chat) are under Channels.")}</p>
           </div>
 
           <div :if={@providers != []} class="max-w-3xl">
