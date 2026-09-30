@@ -186,6 +186,22 @@
 
 /* Scrollbars: thin and quiet, so a long sidebar or a long form does not draw a bright bar. */
 @layer base {
+  /* Tailwind's reset gives buttons the arrow cursor, so a clickable row looked like plain text.
+     Anything you can press shows the hand; a disabled one says so. */
+  button:not(:disabled),
+  [role="button"],
+  [role="tab"],
+  summary,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   /* Native checkboxes and radios take the accent instead of the browser's gray. */
   input[type="checkbox"],
   input[type="radio"] {

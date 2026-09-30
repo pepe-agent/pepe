@@ -127,10 +127,10 @@ defmodule PepeWeb.LearningLive do
             phx-click="learn_open"
             phx-value-kind={n.kind}
             phx-value-title={n.title}
-            class={[card(), "flex w-full gap-3 text-left hover:bg-zinc-900"]}
+            class={[card(), "group flex w-full items-center gap-3 text-left hover:border-white/25 hover:bg-white/[.04]"]}
           >
-            <.icon name={learn_icon(n.kind)} class="mt-0.5 size-5 shrink-0 text-zinc-500" />
-            <div class="min-w-0">
+            <.icon name={learn_icon(n.kind)} class="size-5 shrink-0 text-zinc-500" />
+            <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
                 <span class="font-medium">{n.title}</span>
                 <span class="rounded bg-zinc-800 px-1.5 text-sm text-zinc-400">{n.source}</span>
@@ -138,6 +138,7 @@ defmodule PepeWeb.LearningLive do
               </div>
               <div class="truncate text-base text-zinc-400">{n.summary}</div>
             </div>
+            <.icon name="hero-chevron-right" class="size-5 shrink-0 text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-zinc-300" />
           </button>
           <p :if={@learn_nodes == []} class="text-base text-zinc-500">{gettext("Nothing learned yet.")}</p>
         </div>
