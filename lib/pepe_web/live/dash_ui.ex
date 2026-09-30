@@ -521,11 +521,11 @@ defmodule PepeWeb.DashUI do
        [
          {"learn", "hero-sparkles", gettext("Learning")},
          {"usage", "hero-chart-bar", gettext("Usage & billing")},
-         {"traces", "hero-queue-list", gettext("Traces")},
-         {"hooks", "hero-shield-check", gettext("Privacy")}
+         {"traces", "hero-queue-list", gettext("Traces")}
        ]},
       {gettext("System"),
        [
+         {"hooks", "hero-shield-check", gettext("Privacy")},
          {"tokens", "hero-key", gettext("API tokens")},
          {"config", "hero-cog-6-tooth", gettext("Configuration")}
        ]}
