@@ -1318,7 +1318,8 @@ defmodule Mix.Tasks.Pepe do
           "  #{String.pad_trailing(b.key, 18)} " <>
             "#{String.pad_leading(fmt_tok(b.total), 10)} tok  " <>
             "cost #{String.pad_leading(fmt_money(b.cost, s.currency), 12)}  " <>
-            "bill #{String.pad_leading(fmt_money(b.billable, s.currency), 12)}"
+            "bill #{String.pad_leading(fmt_money(b.billable, s.currency), 12)}" <>
+            cache_note(b)
         )
       end)
 
@@ -1328,7 +1329,8 @@ defmodule Mix.Tasks.Pepe do
         "\n  #{bold(String.pad_trailing("TOTAL", 18))} " <>
           "#{String.pad_leading(fmt_tok(t.total), 10)} tok  " <>
           "cost #{String.pad_leading(fmt_money(t.cost, s.currency), 12)}  " <>
-          "bill #{String.pad_leading(fmt_money(t.billable, s.currency), 12)}"
+          "bill #{String.pad_leading(fmt_money(t.billable, s.currency), 12)}" <>
+          cache_note(t)
       )
     end
 
@@ -1337,6 +1339,13 @@ defmodule Mix.Tasks.Pepe do
       Enum.each(s.by_project, &print_project_line(&1, s.currency))
     end
   end
+
+  # How much of the input came from the provider's prompt cache, so a large token count reads
+  # as what it is: mostly re-reads billed at the cache rate, not fresh input.
+  defp cache_note(%{cached: cached, in: input}) when cached > 0 and input > 0,
+    do: dim("  (#{round(cached * 100 / input)}% of input cached)")
+
+  defp cache_note(_), do: ""
 
   defp print_project_line(c, currency) do
     markup = if c.markup != 1.0, do: " (×#{c.markup})", else: ""
@@ -4298,6 +4307,30 @@ defmodule Mix.Tasks.Pepe do
     case Config.get_agent(handle) do
       nil -> error("unknown agent: #{handle}")
       agent -> puts(Pepe.Agent.Workspace.system_prompt(agent))
+    end
+  end
+
+  # What every model call costs before the user says anything: the system prompt sections and
+  # the tool specs, heaviest first. Each turn of the tool loop re-sends all of it.
+  defp agent_cmd(["footprint", name | rest]) do
+    {opts, _} = OptionParser.parse!(rest, strict: [project: :string, top: :integer])
+    handle = Project.handle(opts[:project], name)
+
+    case Config.get_agent(handle) do
+      nil ->
+        error("unknown agent: #{handle}")
+
+      agent ->
+        m = Pepe.Agent.Footprint.measure(agent)
+        top = opts[:top] || 10
+
+        puts(bold("system prompt") <> "  ~#{m.prompt_total} tokens")
+        Enum.each(m.prompt, fn {label, t} -> puts("  #{String.pad_trailing(label, 22)} #{t}") end)
+
+        puts("\n" <> bold("tools") <> "  ~#{m.tools_total} tokens across #{length(m.tools)}")
+        m.tools |> Enum.take(top) |> Enum.each(fn {n, t} -> puts("  #{String.pad_trailing(n, 22)} #{t}") end)
+
+        puts("\n" <> bold("floor per model call") <> "  ~#{m.total} tokens")
     end
   end
 

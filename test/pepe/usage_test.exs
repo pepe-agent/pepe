@@ -89,6 +89,22 @@ defmodule Pepe.UsageTest do
       assert s.totals.count == 2
     end
 
+    test "totals and buckets carry the cached share of input, and total still counts every token" do
+      Usage.record("acme/sales", "acme/gpt", %{
+        "prompt_tokens" => 18_000,
+        "completion_tokens" => 10,
+        "cached_tokens" => 17_000
+      })
+
+      Usage.record("acme/sales", "acme/gpt", %{"prompt_tokens" => 1_000, "completion_tokens" => 10})
+
+      s = Usage.summary("acme", :day)
+      assert s.totals.cached == 17_000
+      assert s.totals.in == 19_000
+      assert s.totals.total == 19_020
+      assert [%{cached: 17_000}] = s.buckets
+    end
+
     test "cost uses the model's manual price; billable applies the project markup" do
       Usage.record("acme/sales", "acme/gpt", %{
         "prompt_tokens" => 1_000_000,

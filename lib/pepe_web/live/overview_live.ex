@@ -14,6 +14,13 @@ defmodule PepeWeb.OverviewLive do
   alias Pepe.Config
   alias Pepe.Runtime.Stats
 
+  # "in + out" says nothing about cost when most of the input was re-read from the provider's
+  # cache; say so, since that is what makes a big token count cheaper than it looks.
+  defp tokens_sub(%{cached: cached, in: input}) when cached > 0 and input > 0,
+    do: gettext("in + out, %{pct}% of input cached", pct: round(cached * 100 / input))
+
+  defp tokens_sub(_), do: gettext("in + out")
+
   @impl true
   # How often the runtime footprint refreshes. CPU is a delta between two scheduler
   # samples, so the first tick is what makes it knowable at all.
@@ -93,7 +100,7 @@ defmodule PepeWeb.OverviewLive do
           <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <.stat label={gettext("Live sessions")} value={Integer.to_string(@live_sessions)} sub={gettext("Open right now")} />
             <.stat label={gettext("Messages this month")} value={tokens(@month.totals.count)} sub={gettext("model calls")} />
-            <.stat label={gettext("Tokens this month")} value={tokens(@month.totals.total)} sub={gettext("in + out")} />
+            <.stat label={gettext("Tokens this month")} value={tokens(@month.totals.total)} sub={tokens_sub(@month.totals)} />
             <%!-- Cost is what we actually paid: token prices for API connections, plus the flat
                   monthly fee of each subscription that served a call. Not the tokens a
                   subscription served priced as if they had been bought. --%>

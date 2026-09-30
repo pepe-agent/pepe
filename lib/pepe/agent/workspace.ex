@@ -169,24 +169,34 @@ defmodule Pepe.Agent.Workspace do
   `BOOT.md` is picked up fresh on every new conversation without costing anything
   on later turns.
   """
-  def system_prompt(%{name: name, system_prompt: seed} = agent) do
+  def system_prompt(agent) do
+    agent
+    |> system_prompt_sections()
+    |> Enum.map_join("\n\n", fn {_label, text} -> text end)
+  end
+
+  @doc """
+  The same pieces `system_prompt/1` joins, as `{label, text}` pairs in order, with empty
+  sections dropped. Exists so a size breakdown (`mix pepe agent footprint`) measures the
+  real assembly instead of a copy of it that could drift.
+  """
+  def system_prompt_sections(%{name: name, system_prompt: seed} = agent) do
     persona = langfuse_persona(agent) || read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
     boot = read(name, "BOOT.md") |> labeled("BOOT.md")
 
     [
-      persona,
-      identity,
-      boot,
-      behavior_contract(),
-      knowledge_index(name),
-      docs_index(),
-      skills_index(agent),
-      capability_nudge_note(agent),
-      convention_note()
+      {"persona", persona},
+      {"IDENTITY.md", identity},
+      {"BOOT.md", boot},
+      {"behavior contract", behavior_contract()},
+      {"knowledge index", knowledge_index(name)},
+      {"docs index", docs_index()},
+      {"skills index", skills_index(agent)},
+      {"capability nudge", capability_nudge_note(agent)},
+      {"conventions", convention_note()}
     ]
-    |> Enum.reject(&(&1 in [nil, ""]))
-    |> Enum.join("\n\n")
+    |> Enum.reject(fn {_label, text} -> text in [nil, ""] end)
   end
 
   @doc """

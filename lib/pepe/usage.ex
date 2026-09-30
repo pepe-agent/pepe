@@ -509,11 +509,14 @@ defmodule Pepe.Usage do
   defp sum(entries) do
     Enum.reduce(
       entries,
-      %{in: 0, out: 0, total: 0, list: 0.0, cost: 0.0, billable: 0.0, count: 0},
+      %{in: 0, out: 0, cached: 0, total: 0, list: 0.0, cost: 0.0, billable: 0.0, count: 0},
       fn e, a ->
         %{
           in: a.in + e["in"],
           out: a.out + e["out"],
+          # A subset of `in`: the input the provider served from its prompt cache. Kept apart so
+          # a total can say how much of it was re-read (cheap) rather than fresh (full price).
+          cached: a.cached + (e["cached"] || 0),
           total: a.total + e["in"] + e["out"],
           list: a.list + e["list"],
           cost: a.cost + e["cost"],

@@ -554,6 +554,11 @@ pepe agent list [--project PROJECT | --all]
 # modelo" más abajo.
 pepe agent prompt NAME [--project PROJECT]
 
+# Cuántos tokens lleva cada llamada al modelo antes de que el usuario diga nada: el
+# system prompt por sección y las tools, de las más pesadas a las más ligeras. Cada vuelta
+# del bucle de tools reenvía todo esto, así que es el mínimo de cualquier mensaje.
+pepe agent footprint NAME [--top N] [--project PROJECT]
+
 # Mensajería dirigida: deja que FROM le envíe mensajes a TO.
 pepe agent route FROM TO [--remove] [--project PROJECT]
 

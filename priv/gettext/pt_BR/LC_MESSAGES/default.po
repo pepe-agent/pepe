@@ -584,7 +584,7 @@ msgstr "Agente %{name} salvo."
 
 #: lib/pepe_web/live/dash_data.ex:69
 #: lib/pepe_web/live/dash_ui.ex:381
-#: lib/pepe_web/live/overview_live.ex:124
+#: lib/pepe_web/live/overview_live.ex:131
 #, elixir-autogen, elixir-format
 msgid "Agents"
 msgstr "Agentes"
@@ -772,7 +772,7 @@ msgid "Model connections"
 msgstr "Conexões de modelo"
 
 #: lib/pepe_web/live/dash_ui.ex:382
-#: lib/pepe_web/live/overview_live.ex:126
+#: lib/pepe_web/live/overview_live.ex:133
 #, elixir-autogen, elixir-format
 msgid "Models"
 msgstr "Modelos"
@@ -1186,7 +1186,7 @@ msgstr "Cancelar o watch %{name}?"
 
 #: lib/pepe_web/live/channels_live.ex:176
 #: lib/pepe_web/live/dash_ui.ex:394
-#: lib/pepe_web/live/overview_live.ex:127
+#: lib/pepe_web/live/overview_live.ex:134
 #, elixir-autogen, elixir-format
 msgid "Channels"
 msgstr "Canais"
@@ -1566,29 +1566,29 @@ msgstr "Modo"
 msgid "This connection talks to"
 msgstr "Esta conexão conversa com"
 
-#: lib/pepe_web/live/overview_live.ex:128
+#: lib/pepe_web/live/overview_live.ex:135
 #, elixir-autogen, elixir-format
 msgid "Automations"
 msgstr "Automações"
 
-#: lib/pepe_web/live/overview_live.ex:89
+#: lib/pepe_web/live/overview_live.ex:96
 #, elixir-autogen, elixir-format
 msgid "Live activity and this month's usage across %{scope}."
 msgstr "Atividade ao vivo e o uso deste mês em %{scope}."
 
-#: lib/pepe_web/live/overview_live.ex:94
+#: lib/pepe_web/live/overview_live.ex:101
 #, elixir-autogen, elixir-format
 msgid "Live sessions"
 msgstr "Sessões ativas"
 
-#: lib/pepe_web/live/overview_live.ex:95
+#: lib/pepe_web/live/overview_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "Messages this month"
 msgstr "Mensagens este mês"
 
 #: lib/pepe_web/live/dash_ui.ex:375
-#: lib/pepe_web/live/overview_live.ex:29
-#: lib/pepe_web/live/overview_live.ex:88
+#: lib/pepe_web/live/overview_live.ex:36
+#: lib/pepe_web/live/overview_live.ex:95
 #, elixir-autogen, elixir-format
 msgid "Overview"
 msgstr "Visão geral"
@@ -1598,48 +1598,48 @@ msgstr "Visão geral"
 msgid "Privacy hooks"
 msgstr "Hooks de privacidade"
 
-#: lib/pepe_web/live/overview_live.ex:100
+#: lib/pepe_web/live/overview_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "To bill this month"
 msgstr "A cobrar este mês"
 
-#: lib/pepe_web/live/overview_live.ex:96
+#: lib/pepe_web/live/overview_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "Tokens this month"
 msgstr "Tokens este mês"
 
-#: lib/pepe_web/live/overview_live.ex:166
+#: lib/pepe_web/live/overview_live.ex:173
 #, elixir-autogen, elixir-format
 msgid "Top agents"
 msgstr "Principais agentes"
 
-#: lib/pepe_web/live/overview_live.ex:165
+#: lib/pepe_web/live/overview_live.ex:172
 #, elixir-autogen, elixir-format
 msgid "Top models"
 msgstr "Modelos que mais gastam"
 
-#: lib/pepe_web/live/overview_live.ex:227
+#: lib/pepe_web/live/overview_live.ex:234
 #, elixir-autogen, elixir-format
 msgid "all scopes"
 msgstr "Todos os escopos"
 
-#: lib/pepe_web/live/overview_live.ex:96
+#: lib/pepe_web/live/overview_live.ex:22
 #, elixir-autogen, elixir-format
 msgid "in + out"
 msgstr "entrada + saída"
 
-#: lib/pepe_web/live/overview_live.ex:95
+#: lib/pepe_web/live/overview_live.ex:102
 #, elixir-autogen, elixir-format
 msgid "model calls"
 msgstr "chamadas ao modelo"
 
-#: lib/pepe_web/live/overview_live.ex:139
-#: lib/pepe_web/live/overview_live.ex:159
+#: lib/pepe_web/live/overview_live.ex:146
+#: lib/pepe_web/live/overview_live.ex:166
 #, elixir-autogen, elixir-format
 msgid "No usage yet"
 msgstr "Sem uso ainda"
 
-#: lib/pepe_web/live/overview_live.ex:94
+#: lib/pepe_web/live/overview_live.ex:101
 #, elixir-autogen, elixir-format
 msgid "Open right now"
 msgstr "Abertas agora"
@@ -2737,7 +2737,7 @@ msgstr "Agentes · Principal"
 msgid "Principal"
 msgstr "Principal"
 
-#: lib/pepe_web/live/overview_live.ex:228
+#: lib/pepe_web/live/overview_live.ex:235
 #, elixir-autogen, elixir-format
 msgid "the Principal scope"
 msgstr "o escopo Principal"
@@ -3590,7 +3590,7 @@ msgstr "Digite os números que quer marcar (ex: 1 3) e tecle Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:6090
+#: lib/mix/tasks/pepe.ex:6123
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -3610,17 +3610,17 @@ msgstr "n = próxima página  ·  p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:5867
+#: lib/mix/tasks/pepe.ex:5900
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (pode usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:5868
+#: lib/mix/tasks/pepe.ex:5901
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:5876
+#: lib/mix/tasks/pepe.ex:5909
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -3907,32 +3907,32 @@ msgstr "tentativa %{n}/%{max}"
 msgid "%{count} live conversations"
 msgstr "%{count} conversas ativas"
 
-#: lib/pepe_web/live/overview_live.ex:111
+#: lib/pepe_web/live/overview_live.ex:118
 #, elixir-autogen, elixir-format
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/pepe_web/live/overview_live.ex:112
+#: lib/pepe_web/live/overview_live.ex:119
 #, elixir-autogen, elixir-format
 msgid "Conversations"
 msgstr "Conversas"
 
-#: lib/pepe_web/live/overview_live.ex:110
+#: lib/pepe_web/live/overview_live.ex:117
 #, elixir-autogen, elixir-format
 msgid "Memory"
 msgstr "Memória"
 
-#: lib/pepe_web/live/overview_live.ex:114
+#: lib/pepe_web/live/overview_live.ex:121
 #, elixir-autogen, elixir-format
 msgid "Processes"
 msgstr "Processos"
 
-#: lib/pepe_web/live/overview_live.ex:106
+#: lib/pepe_web/live/overview_live.ex:113
 #, elixir-autogen, elixir-format
 msgid "Runtime footprint"
 msgstr "Consumo do runtime"
 
-#: lib/pepe_web/live/overview_live.ex:107
+#: lib/pepe_web/live/overview_live.ex:114
 #, elixir-autogen, elixir-format
 msgid "up %{t}"
 msgstr "no ar há %{t}"
@@ -4171,7 +4171,7 @@ msgstr ""
 "de cada modelo; o valor a cobrar soma o markup do projeto. Os preços são "
 "editáveis por modelo."
 
-#: lib/pepe_web/live/overview_live.ex:150
+#: lib/pepe_web/live/overview_live.ex:157
 #, elixir-autogen, elixir-format
 msgid "Top projects by spend"
 msgstr "Projetos com maior gasto"
@@ -4192,7 +4192,7 @@ msgid "writes outside its workspace"
 msgstr "escreve fora do workspace"
 
 #: lib/pepe_web/live/dash_ui.ex:380
-#: lib/pepe_web/live/overview_live.ex:125
+#: lib/pepe_web/live/overview_live.ex:132
 #: lib/pepe_web/live/projects_live.ex:76
 #, elixir-autogen, elixir-format
 msgid "Projects"
@@ -5784,7 +5784,7 @@ msgstr[1] "%{count} escritas aguardando sua revisão"
 msgid "%{n} checks so far"
 msgstr "%{n} verificações até agora"
 
-#: lib/pepe_web/live/overview_live.ex:136
+#: lib/pepe_web/live/overview_live.ex:143
 #: lib/pepe_web/live/usage_live.ex:251
 #, elixir-autogen, elixir-format
 msgid "%{n} tokens"
@@ -5829,7 +5829,7 @@ msgstr ""
 msgid "A single .exs script with no manifest."
 msgstr "Um único script .exs, sem manifest."
 
-#: lib/pepe_web/live/overview_live.ex:134
+#: lib/pepe_web/live/overview_live.ex:141
 #, elixir-autogen, elixir-format
 msgid "Activity (tokens, last 14 days)"
 msgstr "Atividade (tokens, últimos 14 dias)"
@@ -5944,7 +5944,7 @@ msgstr "Execução de comandos"
 msgid "Config key: %{key}"
 msgstr "Chave de configuração: %{key}"
 
-#: lib/pepe_web/live/overview_live.ex:122
+#: lib/pepe_web/live/overview_live.ex:129
 #, elixir-autogen, elixir-format
 msgid "Configured"
 msgstr "Configurado"
@@ -6622,7 +6622,7 @@ msgstr "concluído"
 msgid "config.json"
 msgstr "config.json"
 
-#: lib/pepe_web/live/overview_live.ex:100
+#: lib/pepe_web/live/overview_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "cost %{c} (what you pay the provider)"
 msgstr "custo %{c} (o que você paga ao provedor)"
@@ -6669,7 +6669,7 @@ msgstr "id %{id}"
 msgid "inbound"
 msgstr "entrada"
 
-#: lib/pepe_web/live/overview_live.ex:116
+#: lib/pepe_web/live/overview_live.ex:123
 #, elixir-autogen, elixir-format
 msgid "internal tasks the runtime is juggling"
 msgstr "tarefas internas que o runtime está tocando"
@@ -7673,7 +7673,7 @@ msgstr "Ainda não há agente configurado para este bot, então não consigo res
 msgid "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `mix pepe model add` (`mix pepe setup` walks through both)."
 msgstr "Ainda não há nenhuma conexão de modelo configurada, então não consigo responder. Um operador precisa adicionar uma primeiro - pelo dashboard, ou com `mix pepe model add` (o `mix pepe setup` guia pelos dois)."
 
-#: lib/pepe/agent/workspace.ex:264
+#: lib/pepe/agent/workspace.ex:274
 #, elixir-autogen, elixir-format
 msgid "You are Pepe, an AI agent, but your identity isn't set up yet: you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Pepe and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the manage_agent tool's rename action (target yourself). Always reply in the user's language."
 msgstr ""
@@ -7685,3 +7685,8 @@ msgstr ""
 "escreva sua persona no SOUL.md e, se ele escolher um nome, renomeie-se com "
 "a ação rename da ferramenta manage_agent (tendo você mesmo como alvo). "
 "Sempre responda no idioma do usuário."
+
+#: lib/pepe_web/live/overview_live.ex:20
+#, elixir-autogen, elixir-format
+msgid "in + out, %{pct}% of input cached"
+msgstr "entrada + saída, %{pct}% da entrada veio do cache"

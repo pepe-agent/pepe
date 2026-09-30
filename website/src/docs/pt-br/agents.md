@@ -548,6 +548,11 @@ pepe agent list [--project PROJ | --all]
 # que o Pepe constrói ao redor dele. Veja "Vendo exatamente o que o modelo vê" abaixo.
 pepe agent prompt NAME [--project PROJ]
 
+# Quantos tokens cada chamada ao modelo carrega antes de o usuário dizer qualquer coisa:
+# o system prompt por seção e as tools, das mais pesadas para as mais leves. Cada volta do
+# loop de tools reenvia tudo isso, então é o piso de toda mensagem.
+pepe agent footprint NAME [--top N] [--project PROJ]
+
 # Directed messaging: let FROM message TO.
 pepe agent route FROM TO [--remove] [--project PROJ]
 

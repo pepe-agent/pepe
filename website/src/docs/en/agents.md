@@ -511,6 +511,11 @@ pepe agent list [--project PROJECT | --all]
 # builds around it. See "Seeing exactly what the model sees" below.
 pepe agent prompt NAME [--project PROJECT]
 
+# How many tokens every model call carries before the user says a word: the system
+# prompt by section and the tool specs, heaviest first. Each turn of the tool loop re-sends
+# all of it, so this is the floor under every message.
+pepe agent footprint NAME [--top N] [--project PROJECT]
+
 # Directed messaging: let FROM message TO.
 pepe agent route FROM TO [--remove] [--project PROJECT]
 
