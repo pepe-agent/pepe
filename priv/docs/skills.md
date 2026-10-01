@@ -24,7 +24,8 @@ says.
 - **Built-in** skills ship under `priv/skills/*.md` - always available. The current
   set: `skill-creator` (the meta-skill: create/edit/audit/improve a skill),
   `install-tool`, `install-skill`, `write-a-script`, `manage-routing`, `handle-media`,
-  and `create-watch`.
+  `create-watch`, and `pepe-help` (where to do anything in Pepe: dashboard menu, chat request,
+  slash command or CLI; offered only to agents with `manage_agent`, and only for administrators).
 - **User** skills live under `<PEPE_HOME>/skills/*.md` (i.e. `~/.pepe/skills/`) and
   **override a built-in of the same name**. The first non-empty line is the summary;
   the rest is the procedure.

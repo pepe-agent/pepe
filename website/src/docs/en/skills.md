@@ -36,6 +36,7 @@ These ship with Pepe, under `priv/skills/`:
 - **`handle-media`**: understand a voice, audio, image or file input (transcribe, read), installing whatever it needs.
 - **`install-skill`**: install a skill from a URL, a gist, a repo, or another Pepe.
 - **`create-watch`**: set up a durable "check X and notify me when it happens" watch.
+- **`pepe-help`**: tell an administrator where to do anything in Pepe: which dashboard menu, what to ask in chat, which slash command, or which CLI command. Only offered to agents that can administer others, and it answers only the administrator.
 
 ## Writing your own
 

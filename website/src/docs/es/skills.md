@@ -39,6 +39,7 @@ Estas vienen de fábrica con Pepe, bajo `priv/skills/`:
 - **`install-skill`**: instalar una skill desde una URL, un gist, un repositorio, u
   otro Pepe.
 - **`create-watch`**: armar un watch duradero del tipo "revisa X y avísame cuando
+- **`pepe-help`**: decirle a quien administra dónde hacer cualquier cosa en Pepe: qué menú del dashboard, qué pedir en el chat, qué comando de barra o qué comando de la CLI. Solo se ofrece a agentes que administran a otros, y solo responde a quien administra.
   pase".
 
 ## Escribe las tuyas propias
