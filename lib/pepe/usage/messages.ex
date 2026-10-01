@@ -11,6 +11,8 @@ defmodule Pepe.Usage.Messages do
 
   import Ecto.Query, only: [from: 2]
 
+  require Logger
+
   alias Pepe.Config
   alias Pepe.Repo
   alias Pepe.Usage.MessageEvent
@@ -37,9 +39,22 @@ defmodule Pepe.Usage.Messages do
     from(m in MessageEvent, where: m.project == ^name) |> Repo.exists?()
   end
 
-  @doc "Record one customer-originated message for `project` (`nil` counts against root)."
+  @doc """
+  Record one customer-originated message for `project` (`nil` counts against root).
+
+  Best effort: the caller is a session starting a turn, and an unavailable ledger (the
+  database not up yet, or already gone while shutting down) must cost one uncounted message,
+  not the conversation. It is logged, never raised. `reset/1` is different on purpose: an
+  operator asked for it, so a failure there should be seen.
+  """
   @spec record(String.t() | nil) :: :ok
-  def record(project), do: insert(project, false)
+  def record(project) do
+    insert(project, false)
+  rescue
+    e ->
+      Logger.warning("[usage] could not count a message for #{inspect(project)}: #{Exception.message(e)}")
+      :ok
+  end
 
   @doc """
   Reset `project`'s counter early, before the natural month boundary - inserts a reset
