@@ -116,7 +116,7 @@ defmodule PepeWeb.HooksLive do
           </div>
         </.form_section>
       </form>
-      <.ai_popup ai={@ai} models={Enum.map(Config.models(), & &1.name)} default_model={Config.default_model_name()} />
+      <.ai_popup ai={@ai} models={Enum.map(Config.chat_models(), & &1.name)} default_model={Config.default_model_name()} />
     </div>
     """
   end
@@ -165,7 +165,7 @@ defmodule PepeWeb.HooksLive do
       <label class={lbl()}>{gettext("Model")}</label>
       <select name="model" class={fld()}>
         <option value="">{gettext("Pick a configured model")}</option>
-        <option :for={m <- Config.models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
+        <option :for={m <- Config.chat_models()} value={m.name} selected={@edit["model"] == m.name}>{m.name}</option>
       </select>
       <p class={hlp()}>{gettext("Use a model running on your own machine, like Ollama. A hosted model would see the data unmasked.")}</p>
     </div>

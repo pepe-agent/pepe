@@ -69,7 +69,12 @@ defmodule PepeWeb.DashData do
   def agents_title("all"), do: gettext("Agents")
   def agents_title("root"), do: gettext("Agents (Principal)")
   def agents_title(project), do: gettext("Agents (%{c})", c: project)
-  def model_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
+  # Connections a person may pick to chat, fall back to or run chores on: never a decision-only one.
+  def model_names, do: Config.chat_models() |> Enum.map(& &1.name) |> Enum.sort()
+
+  # The picker for "the model that sorts messages": the one place a decision-only connection
+  # (which only picks between options) is offered next to the ones that can chat.
+  def triage_names, do: Config.models() |> Enum.map(& &1.name) |> Enum.sort()
 
   @doc "Qualify a bare name into the selected project scope (leave root/all/qualified as-is)."
   def scope_name("", _scope), do: ""

@@ -283,6 +283,21 @@ defmodule Pepe.Config do
   @doc "List all model connections as structs."
   def models, do: models_in(load())
 
+  @doc """
+  The connections a person may pick for conversation, a fallback or a chore: every one except
+  those that only make decisions (see `Pepe.Config.Model.decision?/1`).
+  """
+  def chat_models, do: Enum.reject(models(), &Model.decision?/1)
+
+  @doc "Is `name` an existing connection that can chat (not decision-only)?"
+  @spec chat_model?(String.t() | nil) :: boolean()
+  def chat_model?(name) do
+    case name && get_model(name) do
+      %Model{} = model -> not Model.decision?(model)
+      _ -> false
+    end
+  end
+
   defp models_in(config) do
     config
     |> Map.get("models", %{})

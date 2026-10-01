@@ -71,6 +71,14 @@ defmodule Pepe.Config.Model do
   @spec subscription?(t()) :: boolean()
   def subscription?(%__MODULE__{oauth: oauth}), do: is_map(oauth) and oauth != %{}
 
+  @doc """
+  Whether this connection only makes decisions (picks one of a few options) instead of
+  chatting. It is never offered where a person picks a model for conversation, a fallback
+  or a chore; `Pepe.Decide` is what uses it.
+  """
+  @spec decision?(t()) :: boolean()
+  def decision?(%__MODULE__{api: api}), do: api == Pepe.Decide.Jev.api()
+
   @doc "Build a Model struct from a string-keyed map (as loaded from JSON)."
   def from_map(map) when is_map(map) do
     %__MODULE__{

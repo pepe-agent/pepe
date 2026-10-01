@@ -75,6 +75,22 @@ mix pepe agent add support --model gpt-4o --triage-model gpt-4o-mini --simple-mo
 Here a cheap model both judges the message and answers it when the chat is simple,
 while anything needing real reasoning runs on `gpt-4o`.
 
+### A decision-only connection for `triage_model`
+
+`triage_model` (and the mid-turn check of `midrun_fold`) may be a *decision-only* connection,
+for example TypeSafe Jev (provider "typesafe", `mix pepe model add NAME` and pick it, or the
+dashboard Models page). It does not chat: it picks one of a few options and returns how sure it
+is, which makes it the cheapest and fastest way to sort. It is shown with a "Decisions only"
+label and is offered only for `triage_model`; it is never valid as an agent's `model`,
+`simple_model`, `utility_model`, a backup model, or the install default.
+
+Set it for a user who asks to make sorting cheaper: `manage_agent` `set_triage_model` (an empty
+`value` turns it off), or `mix pepe agent add NAME --triage-model CONNECTION`. Tell them to give
+the connection a backup chat model on the Models page ("Add a backup model"): when the connection
+fails (no credit, wrong key, down, slow) or is unsure about the cheap option, that backup decides
+as a chat triage model always did, and with no backup answering the message counts as complex, so
+a conversation is never blocked by it. `mix pepe model test NAME` makes a real decision to check it.
+
 ## Mid-turn folding (`midrun_fold`)
 
 Normally a message that arrives while a turn is already running just waits its turn in

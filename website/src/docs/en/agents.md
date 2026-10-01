@@ -379,6 +379,18 @@ Every verdict shows up as its own step on that turn's Trace (the dashboard's
 per-run replay), alongside any privacy hook that ran on the message, so you
 can see exactly why a session ended up on one model instead of the other.
 
+### A cheaper way to sort: a decision-only connection
+
+Instead of a chat model, `triage_model` can be a *decision-only* connection: one that does not write text, it only picks between a few options and says how sure it is. It is the cheapest and fastest way to do this sorting. Today that is TypeSafe Jev. Add it like any other connection (dashboard **Models**, pick "TypeSafe Jev" and paste the key, or `pepe model add`). It carries a "Decisions only" label, and it is offered only where a model is picked to sort messages: the "Model that sorts messages" field, and the check of a message that arrives while the agent is still working. It never shows up as a model to talk with, a backup model or a chores model, and it cannot be the default.
+
+```bash
+pepe agent add assistant --model strong-expensive-model --triage-model jev --simple-model everyday-model ...
+```
+
+From chat, ask an agent that manages it ("sort support's messages with jev"; it uses `manage_agent`'s `set_triage_model`).
+
+Pepe never depends on it. If it cannot answer (the account has no credit left, the key is wrong, it is down or slow) or it is not sure about the cheap option, Pepe does not guess: it asks the connection's backup model, set on the Models page with "Add a backup model", exactly as a chat triage model works today, and if no backup answers either, the message counts as complex. After a failed call the connection is left alone for a few minutes (longer when the key is refused or the credit is gone), so a message never waits on a connection that is known to be failing. `pepe model test NAME` makes a real decision to check the connection works.
+
 ## The default agent
 
 One agent per project can be the default. The default is what runs when you do not name

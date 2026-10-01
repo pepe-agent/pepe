@@ -32,7 +32,7 @@ defmodule PepeWeb.AgentsLive do
        new_project: false,
        agents: Config.agents(),
        default_agent: Config.default_agent_name(),
-       models: Config.models(),
+       models: Config.chat_models(),
        edit_agent: nil,
        form: agent_form(""),
        agent_tab: "persona",
@@ -381,8 +381,9 @@ defmodule PepeWeb.AgentsLive do
                 <label class={lbl()}>{gettext("Model that sorts messages")}</label>
                 <select name="triage_model" class={fld()}>
                   <option value="">{gettext("(off)")}</option>
-                  <option :for={m <- model_names()} value={m} selected={m == @edit_agent[:triage_model]}>{m}</option>
+                  <option :for={m <- triage_names()} value={m} selected={m == @edit_agent[:triage_model]}>{m}</option>
                 </select>
+                <p class={hlp()}>{gettext("A decision-only connection is the cheapest way to sort. Give it a backup model on the Models page, used when it has no credit or is unsure.")}</p>
               </div>
 
               <div>

@@ -681,11 +681,16 @@ defmodule Mix.Tasks.Pepe do
   defp model_cmd(["default", name | _]) do
     # Validate first. Pointing the default at a name that does not exist leaves an install
     # that looks configured and answers nothing, and only `doctor` ever says why.
-    if Config.get_model(name) do
-      Config.set_default_model(name)
-      ok("default model -> #{name}")
-    else
-      error("unknown model connection: #{name}")
+    cond do
+      Config.chat_model?(name) ->
+        Config.set_default_model(name)
+        ok("default model -> #{name}")
+
+      Config.get_model(name) ->
+        error("#{name} only makes decisions, it cannot chat. Use it as an agent's --triage-model instead.")
+
+      true ->
+        error("unknown model connection: #{name}")
     end
   end
 
@@ -725,14 +730,7 @@ defmodule Mix.Tasks.Pepe do
       model ->
         {:ok, _} = Application.ensure_all_started(:req)
         info("pinging #{bold(name)} (#{model.model})...")
-
-        case Pepe.LLM.chat(model, [%{"role" => "user", "content" => "Reply with exactly: pong"}], max_tokens: 64) do
-          {:ok, res} ->
-            ok("#{green(name)} works - reply: #{String.slice(res.content || "", 0, 60)}")
-
-          {:error, reason} ->
-            error("#{name} failed: #{describe(reason)}")
-        end
+        if Model.decision?(model), do: test_decision(model, name), else: test_chat(model, name)
     end
   end
 
@@ -745,7 +743,7 @@ defmodule Mix.Tasks.Pepe do
       providers                              list known providers
       models --base-url URL --api-key KEY    list a provider's models
       list                                   list saved connections
-      test [NAME]                            ping a connection
+      test [NAME]                            ping a connection (a decision-only one makes a real decision)
       reconnect NAME                         redo a subscription sign-in (same connection, new token)
       remove NAME
       rename OLD NEW                         rename it, updating every reference
@@ -755,6 +753,33 @@ defmodule Mix.Tasks.Pepe do
 
   defp model_cmd(_),
     do: error("usage: mix pepe model [add|list|models|providers|test|reconnect|remove|rename|default] (or: help)")
+
+  defp test_chat(model, name) do
+    case Pepe.LLM.chat(model, [%{"role" => "user", "content" => "Reply with exactly: pong"}], max_tokens: 64) do
+      {:ok, res} ->
+        ok("#{green(name)} works - reply: #{String.slice(res.content || "", 0, 60)}")
+
+      {:error, reason} ->
+        error("#{name} failed: #{describe(reason)}")
+    end
+  end
+
+  # A decision connection cannot chat, so the test is a real, tiny decision.
+  defp test_decision(model, name) do
+    question = %{
+      state: "What is the capital of France?",
+      instructions: "Is this a quick, everyday question?",
+      criteria: %{"simple" => "A quick, everyday question.", "complex" => "Needs deep reasoning."}
+    }
+
+    case Pepe.Decide.Jev.decide(model, question) do
+      {:ok, choice, confidence, _usage} ->
+        ok("#{green(name)} works - it decided: #{choice} (confidence #{confidence || "n/a"})")
+
+      {:error, reason} ->
+        error("#{name} failed: #{describe(reason)}")
+    end
+  end
 
   defp print_model_line(m, default) do
     mark = if m.name == default, do: " #{green("(default)")}", else: ""

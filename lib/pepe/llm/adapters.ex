@@ -4,7 +4,11 @@ defmodule Pepe.LLM.Adapters do
   for what an entry is and why this is additive rather than a slot.
   """
 
-  @builtin %{"openai-responses" => Pepe.LLM.Responses, "anthropic-messages" => Pepe.LLM.Messages}
+  @builtin %{
+    "openai-responses" => Pepe.LLM.Responses,
+    "anthropic-messages" => Pepe.LLM.Messages,
+    "typesafe-systemone" => Pepe.Decide.Jev
+  }
 
   @doc "The adapter module for `api`, or nil (meaning: run as plain openai-completions)."
   @spec get(String.t() | nil) :: module() | nil

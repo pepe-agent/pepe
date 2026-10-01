@@ -70,6 +70,9 @@ defmodule Pepe.LLM.Cooldown do
   # out a real 10s/30s window.
   @doc false
   def duration_ms({:http_error, 429, _}), do: 30_000
+  # A rejected key or an account with no credit does not clear on its own in seconds: leave
+  # the connection alone for minutes, not on every message.
+  def duration_ms({:http_error, status, _}) when status in [401, 402, 403], do: 300_000
   def duration_ms(_), do: 10_000
 
   defp ensure_table do

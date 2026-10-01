@@ -102,6 +102,25 @@ defmodule Pepe.Providers do
       auth: [%{key: "api", label: "API key", type: :api_key}]
     },
     %{
+      key: "typesafe",
+      label: "TypeSafe Jev (decisions only, not for chat)",
+      base_url: "https://api.typesafe.ai/v1/systemone",
+      env: "TYPESAFE_API_KEY",
+      # Not an OpenAI-compatible endpoint: a connection to this picks between options (sorting a
+      # message as simple or complex) and never chats. See Pepe.Decide.Jev.
+      api: "typesafe-systemone",
+      models: ["jev-latest"],
+      auth: [
+        %{
+          key: "api",
+          label: "API key",
+          type: :api_key,
+          base_url: "https://api.typesafe.ai/v1/systemone",
+          api: "typesafe-systemone"
+        }
+      ]
+    },
+    %{
       key: "groq",
       label: "Groq",
       base_url: "https://api.groq.com/openai/v1",

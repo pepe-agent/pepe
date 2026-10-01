@@ -412,6 +412,18 @@ Cada veredicto queda registrado como un paso propio dentro del Trace de ese turn
 privacidad que se haya aplicado al mensaje, así que puedes ver con exactitud por
 qué una sesión terminó en un modelo y no en el otro.
 
+### Una forma más barata de clasificar: una conexión solo de decisiones
+
+En lugar de un modelo de chat, el `triage_model` puede ser una conexión *solo de decisiones*: no escribe texto, solo elige entre unas pocas opciones y dice qué tan segura está. Es la forma más barata y rápida de hacer esta clasificación. Hoy eso es TypeSafe Jev. Se añade como cualquier otra conexión (en el panel, **Modelos**, elige "TypeSafe Jev" y pega la clave, o `pepe model add`). Aparece con la etiqueta "Solo decisiones" y solo se ofrece donde se elige un modelo para clasificar mensajes: el campo "Modelo que clasifica los mensajes" y la revisión de un mensaje que llega mientras el agente aún trabaja. Nunca aparece como modelo para conversar, como modelo de respaldo ni como modelo de tareas, y no puede ser la predeterminada.
+
+```bash
+pepe agent add asistente --model modelo-fuerte-y-caro --triage-model jev --simple-model modelo-de-todos-los-dias ...
+```
+
+Desde el chat, pídeselo a un agente que la administre ("clasifica los mensajes de soporte con jev"; usa el `set_triage_model` de `manage_agent`).
+
+Pepe nunca depende de ella. Si no puede responder (la cuenta se quedó sin crédito, la clave es incorrecta, está caída o lenta) o no está segura de la opción barata, Pepe no adivina: le pregunta al modelo de respaldo de la conexión, que se define en la página Modelos con "Añadir un modelo de respaldo", igual que funciona hoy un modelo de chat en la clasificación, y si ningún respaldo responde, el mensaje cuenta como complejo. Tras una llamada fallida, la conexión se deja en paz unos minutos (más tiempo cuando se rechaza la clave o se acabó el crédito), para que ningún mensaje espere a una conexión que se sabe que está fallando. `pepe model test NOMBRE` hace una decisión real para comprobar que la conexión funciona.
+
 ## El agente por defecto
 
 Cada proyecto puede tener un agente marcado como el de por defecto: es el que se

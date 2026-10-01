@@ -18,7 +18,7 @@ defmodule Pepe.Agent.Session do
   alias Pepe.Agent.Workspace
   alias Pepe.Checkpoints
   alias Pepe.Config
-  alias Pepe.LLM
+  alias Pepe.Decide
   alias Pepe.LLM.Message
 
   # Sources that are the owner/operator using their own runtime, not a customer
@@ -587,8 +587,7 @@ defmodule Pepe.Agent.Session do
   def handle_call({:chat, text, opts}, from, %{running: %{}, classifying: nil} = state) do
     case resolve_agent(state) do
       %{midrun_fold: true} = agent ->
-        classify_model = agent.triage_model || agent.model || Config.default_model_name()
-        task = classify_midrun(classify_model, state.pending_resume, text, agent.name)
+        task = classify_midrun([agent.triage_model, agent.model], state.pending_resume, text, agent.name)
         {:noreply, %{state | classifying: %{from: from, text: text, opts: opts, ref: task.ref}}}
 
       _ ->
@@ -1448,45 +1447,38 @@ defmodule Pepe.Agent.Session do
   or expert-level knowledge to answer well.
   """
 
-  # A raw, one-off classification call directly against a model connection - no
-  # agent, no session, no tools. Returns :simple, :complex, or :failed (no such
-  # model, unreachable, or slower than @triage_timeout_ms - always treated the
-  # same as :complex by the caller, i.e. proceed on the agent's own model
-  # unchanged, but kept distinct here so it shows up honestly on the trace).
+  # One complexity decision, through `Pepe.Decide`: the triage connection first (a chat model, or
+  # a decision connection with its own fallbacks), the safe answer when nobody answers. Returns
+  # :simple, :complex, or :failed (no connection answered, or the wait ran past
+  # @triage_timeout_ms - treated by the caller the same as :complex, proceed on the agent's own
+  # model unchanged, but kept distinct so it shows up honestly on the trace).
   defp triage_verdict(triage_model_name, text, agent_name) do
-    task =
-      Task.async(fn ->
-        try do
-          case Config.get_model(triage_model_name) do
-            nil -> {:error, :no_such_model}
-            model -> {model, LLM.chat(model, [Message.system(@triage_prompt), Message.user(text)])}
-          end
-        rescue
-          e -> {:error, Exception.message(e)}
-        catch
-          kind, reason -> {:error, "triage #{kind}: #{inspect(reason)}"}
-        end
-      end)
+    question = %{
+      state: text,
+      instructions: "Is this message a quick everyday question, or does it need deep reasoning?",
+      criteria: %{
+        "simple" => "A quick, everyday question a basic model can answer well.",
+        "complex" => "Needs deep reasoning, multi-step planning, or expert-level knowledge."
+      },
+      default: "complex",
+      min_confidence: 0.7,
+      chat_system: @triage_prompt,
+      chat_user: text
+    }
+
+    task = Task.async(fn -> Decide.choose(Decide.chain([triage_model_name]), question, agent_name) end)
 
     case Task.yield(task, @triage_timeout_ms) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {model, {:ok, %{content: content} = result}}} ->
-        meter(agent_name, model, result[:usage])
-        if content |> to_string() |> String.trim() |> String.upcase() =~ "SIMPLE", do: :simple, else: :complex
-
-      _ ->
-        :failed
+      {:ok, %{via: nil}} -> :failed
+      {:ok, %{choice: "simple"}} -> :simple
+      {:ok, %{choice: "complex"}} -> :complex
+      _ -> :failed
     end
   rescue
     _ -> :failed
   catch
     _, _ -> :failed
   end
-
-  # A triage/classification call is a real, separately-billed model call - meter it, same
-  # as the main turn, so complexity-routing and mid-run-fold checks don't silently vanish
-  # from the operator's spend numbers.
-  defp meter(agent_name, model, usage) when is_map(usage), do: Pepe.Usage.record(agent_name, model, usage)
-  defp meter(_agent_name, _model, _usage), do: :ok
 
   # Same bounded-wait shape as `triage_verdict/2`, but never blocks its caller: this
   # runs from inside `handle_call`, where blocking on an LLM call would freeze the
@@ -1508,28 +1500,30 @@ defmodule Pepe.Agent.Session do
   unsure, reply QUEUE.
   """
 
-  defp classify_midrun(triage_model_name, running_text, new_text, agent_name) do
+  # `models` is the agent's triage connection (when it has one) and its own model; the chain
+  # ends with the install default, which is what this check always fell back to when no triage
+  # connection was set.
+  defp classify_midrun(models, running_text, new_text, agent_name) do
+    question = %{
+      state: "CURRENTLY WORKING ON: #{running_text}\n\nNEW MESSAGE: #{new_text}",
+      instructions: "Is the new message a correction of the task already in progress, or a new, unrelated request?",
+      criteria: %{
+        "fold" => "A correction, clarification, or change of instructions for that same task.",
+        "queue" => "An unrelated new question or task that should wait its turn."
+      },
+      default: "queue",
+      min_confidence: 0.8,
+      chat_system: @midrun_prompt,
+      chat_user: "CURRENTLY WORKING ON: #{running_text}\n\nNEW MESSAGE: #{new_text}"
+    }
+
     Task.async(fn ->
       try do
-        inner =
-          Task.async(fn ->
-            case Config.get_model(triage_model_name) do
-              nil ->
-                {:error, :no_such_model}
-
-              model ->
-                prompt = "CURRENTLY WORKING ON: #{running_text}\n\nNEW MESSAGE: #{new_text}"
-                {model, LLM.chat(model, [Message.system(@midrun_prompt), Message.user(prompt)])}
-            end
-          end)
+        inner = Task.async(fn -> Decide.choose(Decide.chain(models ++ [Config.default_model_name()]), question, agent_name) end)
 
         case Task.yield(inner, @midrun_timeout_ms) || Task.shutdown(inner, :brutal_kill) do
-          {:ok, {model, {:ok, %{content: content} = result}}} ->
-            meter(agent_name, model, result[:usage])
-            if content |> to_string() |> String.trim() |> String.upcase() =~ "FOLD", do: :fold, else: :queue
-
-          _ ->
-            :queue
+          {:ok, %{choice: "fold"}} -> :fold
+          _ -> :queue
         end
       rescue
         _ -> :queue

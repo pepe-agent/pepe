@@ -19,7 +19,7 @@ defmodule Pepe.Tools.ManageAgent do
   its config.
 
   Actions: `list`, `get`, `create`, `rename`, `set_persona`, `set_model`, `set_utility_model`,
-  `set_flag`, `add_tool`, `remove_tool`, `allow_route`, `deny_route`, `remember`.
+  `set_triage_model`, `set_flag`, `add_tool`, `remove_tool`, `allow_route`, `deny_route`, `remember`.
 
   `rename`, `allow_route` and `deny_route` used to be their own standalone tools
   (`rename_agent`, `set_route`, and a self-grant shortcut `enable_tool`) - folded in here so
@@ -63,6 +63,11 @@ defmodule Pepe.Tools.ManageAgent do
         cheap configured model - needs `target`, `value`; an empty `value` turns it
         off, and conversations are then named from the first words of the message,
         for free.
+      - set_triage_model: the connection the target uses to sort a message as simple or
+        complex (so a cheap model can answer the simple ones) and to check a message that
+        arrives mid-turn. Needs `target`, `value`; an empty `value` turns it off. Unlike
+        `set_model` it also accepts a decision connection (one that only picks between
+        options, never chats), which is the cheap way to do this.
       - set_flag: turn one of the target's switches on or off. Needs `target`, a
         `flag`, and `value` "on"/"off". The user will ask for these in plain words,
         not by the flag name; map what they mean to the right switch.
@@ -145,7 +150,7 @@ defmodule Pepe.Tools.ManageAgent do
           "action" => %{
             "type" => "string",
             "enum" =>
-              ~w(list get create rename set_persona set_model set_utility_model set_flag add_tool remove_tool allow_route deny_route remember),
+              ~w(list get create rename set_persona set_model set_utility_model set_triage_model set_flag add_tool remove_tool allow_route deny_route remember),
             "description" => "What to do."
           },
           "target" => %{"type" => "string", "description" => "The agent to act on."},
@@ -247,14 +252,25 @@ defmodule Pepe.Tools.ManageAgent do
     end
   end
 
+  defp dispatch("set_triage_model", target, args) do
+    with {:ok, agent} <- get(target) do
+      set_triage(agent, target, String.trim(to_string(args["value"] || "")))
+    end
+  end
+
   defp dispatch("set_model", target, args) do
     with {:ok, model} <- fetch(args, "value"),
          {:ok, agent} <- get(target) do
-      if Config.get_model(model) do
-        Config.put_agent(%{agent | model: model})
-        {:ok, "#{target} now uses model #{model}."}
-      else
-        {:error, "no model connection named #{model}"}
+      cond do
+        Config.chat_model?(model) ->
+          Config.put_agent(%{agent | model: model})
+          {:ok, "#{target} now uses model #{model}."}
+
+        Config.get_model(model) ->
+          {:error, decision_only(model)}
+
+        true ->
+          {:error, "no model connection named #{model}"}
       end
     end
   end
@@ -446,13 +462,35 @@ defmodule Pepe.Tools.ManageAgent do
   end
 
   defp set_utility(agent, target, model) do
+    cond do
+      Config.chat_model?(model) ->
+        Config.put_agent(%{agent | utility_model: model})
+        {:ok, "#{target} now does its chores (naming conversations) on #{model}."}
+
+      Config.get_model(model) ->
+        {:error, decision_only(model)}
+
+      true ->
+        {:error, "no model connection named #{model}"}
+    end
+  end
+
+  defp set_triage(agent, target, "") do
+    Config.put_agent(%{agent | triage_model: nil})
+    {:ok, "#{target} no longer sorts messages by complexity, and checks a mid-turn message on its own model."}
+  end
+
+  defp set_triage(agent, target, model) do
     if Config.get_model(model) do
-      Config.put_agent(%{agent | utility_model: model})
-      {:ok, "#{target} now does its chores (naming conversations) on #{model}."}
+      Config.put_agent(%{agent | triage_model: model})
+      {:ok, "#{target} now sorts messages by complexity, and checks mid-turn messages, on #{model}."}
     else
       {:error, "no model connection named #{model}"}
     end
   end
+
+  defp decision_only(model),
+    do: "#{model} only makes decisions, it cannot chat. Use it with set_triage_model, or pick a model that can chat."
 
   ###
   ### helpers

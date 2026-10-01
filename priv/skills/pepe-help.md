@@ -65,6 +65,7 @@ the top scopes every page to one project. "CLI" below means `mix pepe ...` in a 
 - Switch model inside a conversation: slash `/model NAME` and `/models` (Telegram, console,
   dashboard chat). On Telegram, reading which model is in use is trainers-only.
 - Price per model: dashboard **Models**, Edit; CLI `mix pepe usage prices [--refresh]`.
+- A cheap, fast "decision-only" connection to sort messages (TypeSafe Jev): dashboard **Models**, pick "TypeSafe Jev" and paste the key, then **Agents**, "Model that sorts messages"; chat "sort support's messages with jev" (`manage_agent set_triage_model`); CLI `mix pepe model add` then `mix pepe agent add --triage-model`. Give it a backup model on **Models** so a failure falls back to a normal model.
 
 ## Channels (docs: `channels`)
 

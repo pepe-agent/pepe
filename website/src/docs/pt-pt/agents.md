@@ -410,6 +410,18 @@ execução, no painel), ao lado de qualquer hook de privacidade que tenha corrid
 sobre a mensagem, por isso consegues ver exatamente porque é que uma sessão acabou
 num modelo e não no outro.
 
+### Uma forma mais barata de separar: uma ligação só de decisões
+
+Em vez de um modelo de conversa, o `triage_model` pode ser uma ligação *só de decisões*: não escreve texto, apenas escolhe entre algumas opções e diz o quanto tem a certeza. É a forma mais barata e mais rápida de fazer esta separação. Hoje isso é o TypeSafe Jev. Adiciona-o como qualquer outra ligação (no painel, **Modelos**, escolhe "TypeSafe Jev" e cola a chave, ou `pepe model add`). Aparece com a etiqueta "Só decisões" e só é oferecida onde se escolhe um modelo para separar mensagens: o campo "Modelo que separa as mensagens" e a verificação de uma mensagem que chega enquanto o agente ainda trabalha. Nunca aparece como modelo para conversar, como modelo de reserva ou como modelo de tarefas, e não pode ser a predefinida.
+
+```bash
+pepe agent add assistente --model modelo-forte-e-caro --triage-model jev --simple-model modelo-do-dia-a-dia ...
+```
+
+Pela conversa, pede a um agente que a administre ("separa as mensagens do suporte com o jev"; usa o `set_triage_model` do `manage_agent`).
+
+O Pepe nunca depende dela. Se não consegue responder (a conta ficou sem crédito, a chave está errada, está em baixo ou lenta) ou não tem a certeza sobre a opção barata, o Pepe não adivinha: pergunta ao modelo de reserva da ligação, definido na página Modelos em "Adicionar um modelo de reserva", tal como um modelo de conversa na triagem funciona hoje, e se nenhuma reserva responder, a mensagem conta como complexa. Depois de uma chamada que falhou, a ligação fica em paz durante alguns minutos (mais tempo quando a chave é recusada ou o crédito acabou), para nenhuma mensagem esperar por uma ligação que se sabe estar a falhar. `pepe model test NOME` faz uma decisão a sério para confirmar que a ligação funciona.
+
 ## O agente predefinido
 
 Cada projeto pode ter um agente predefinido, que é o que corre quando não indicas

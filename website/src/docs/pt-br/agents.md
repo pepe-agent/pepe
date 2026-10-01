@@ -411,6 +411,18 @@ cada execução no painel), junto de qualquer hook de privacidade que tenha roda
 sobre a mensagem, para você ver exatamente por que uma sessão terminou num
 modelo e não no outro.
 
+### Um jeito mais barato de separar: uma conexão só de decisões
+
+Em vez de um modelo de chat, o `triage_model` pode ser uma conexão *só de decisões*: ela não escreve texto, apenas escolhe entre algumas opções e diz o quanto tem certeza. É o jeito mais barato e mais rápido de fazer essa separação. Hoje isso é o TypeSafe Jev. Adicione como qualquer outra conexão (no painel, **Modelos**, escolha "TypeSafe Jev" e cole a chave, ou `pepe model add`). Ela aparece com a etiqueta "Só decisões" e só é oferecida onde se escolhe um modelo para separar mensagens: o campo "Modelo que separa as mensagens" e a checagem de uma mensagem que chega enquanto o agente ainda trabalha. Ela nunca aparece como modelo para conversar, como modelo de reserva ou como modelo de tarefas, e não pode ser a padrão.
+
+```bash
+pepe agent add assistente --model modelo-forte-e-caro --triage-model jev --simple-model modelo-do-dia-a-dia ...
+```
+
+Pelo chat, peça a um agente que o administra ("separe as mensagens do suporte com o jev"; ele usa o `set_triage_model` do `manage_agent`).
+
+O Pepe nunca depende dela. Se ela não consegue responder (a conta ficou sem crédito, a chave está errada, está fora do ar ou lenta) ou não tem certeza sobre a opção barata, o Pepe não chuta: pergunta ao modelo de reserva da conexão, definido na página Modelos em "Adicionar um modelo de reserva", exatamente como um modelo de chat na triagem funciona hoje, e se nenhuma reserva responder, a mensagem conta como complexa. Depois de uma chamada que falhou, a conexão fica em paz por alguns minutos (mais tempo quando a chave é recusada ou o crédito acabou), para nenhuma mensagem esperar uma conexão que se sabe que está falhando. `pepe model test NOME` faz uma decisão de verdade para conferir se a conexão funciona.
+
 ## O agente padrão
 
 Um agente por projeto pode ser o padrão, e é ele que roda quando você não nomeia

@@ -165,7 +165,10 @@ defmodule PepeWeb.ModelsLive do
   defp fallback_candidates(models, scope, edit_model) do
     taken = MapSet.new([edit_model.original_name | edit_model.fallbacks])
 
+    # A fallback is always a connection that can chat or answer a decision in its place, so a
+    # decision-only one is never a candidate (it is the one that falls back, not the fallback).
     models
+    |> Enum.reject(&Pepe.Config.Model.decision?/1)
     |> scoped_models(scope)
     |> Enum.reject(&MapSet.member?(taken, &1.name))
   end
@@ -239,11 +242,12 @@ defmodule PepeWeb.ModelsLive do
               <div class="min-w-0">
                 <span class="font-medium">{m.name}</span>
                 <span :if={m.name == @default_model} class={[tag(:ok), "ml-2"]}>{gettext("default")}</span>
+                <span :if={Pepe.Config.Model.decision?(m)} class={[tag(:muted), "ml-2"]}>{gettext("Decisions only")}</span>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                 <button :if={is_map(m.oauth)} phx-click="oauth_reconnect" phx-value-name={m.name} class={btn_ghost()}>{gettext("Reconnect")}</button>
                 <button phx-click="model_edit" phx-value-name={m.name} class={btn_ghost()}>{gettext("Edit")}</button>
-                <button :if={m.name != @default_model} phx-click="model_default" phx-value-name={m.name} class={btn_ghost()}>{gettext("Set default")}</button>
+                <button :if={m.name != @default_model and not Pepe.Config.Model.decision?(m)} phx-click="model_default" phx-value-name={m.name} class={btn_ghost()}>{gettext("Set default")}</button>
                 <button phx-click="model_delete" phx-value-name={m.name} data-confirm={gettext("Delete model %{name}?", name: m.name)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
               </div>
             </div>
@@ -504,9 +508,14 @@ defmodule PepeWeb.ModelsLive do
     {:noreply, assign(socket, models: Config.models(), default_model: Config.default_model_name())}
   end
 
+  # A decision-only connection cannot be the default: the default is what conversations run on.
   def handle_event("model_default", %{"name" => name}, socket) do
-    Config.set_default_model(name)
-    {:noreply, assign(socket, default_model: name)}
+    if Config.chat_model?(name) do
+      Config.set_default_model(name)
+      {:noreply, assign(socket, default_model: name)}
+    else
+      {:noreply, put_flash(socket, :error, gettext("This connection only makes decisions, it cannot be the default."))}
+    end
   end
 
   # The chip list lives in `edit_model` (LiveView state), not the native form -
@@ -659,11 +668,16 @@ defmodule PepeWeb.ModelsLive do
   # any field this form doesn't expose. `fallbacks` lives in `edit_model`
   # (chip-list state), not `params` - it's not a plain form input.
   defp write_model(socket, name, params, message) do
-    base = Config.get_model(name) || %Pepe.Config.Model{name: name}
+    existing = Config.get_model(name)
+    base = existing || %Pepe.Config.Model{name: name}
+    # A connection made from a catalog provider speaks that provider's protocol, not the default
+    # chat one (a decision connection, for one); an existing connection keeps its own.
+    api = if existing, do: base.api, else: provider_api(socket.assigns.edit_model[:provider]) || base.api
 
     Config.put_model(%{
       base
       | name: name,
+        api: api,
         base_url: params["base_url"],
         api_key: blank(params["api_key"]),
         model: params["model"],
@@ -709,9 +723,13 @@ defmodule PepeWeb.ModelsLive do
     end
   end
 
+  defp provider_api(nil), do: nil
+  defp provider_api(key), do: (Pepe.Providers.get(key) || %{})[:api]
+
   # Fetch a provider's model ids off-process so the LiveView never blocks on the call.
   defp spawn_model_fetch(provider, base, resolved_key) do
     parent = self()
+    api = provider_api(provider) || "openai"
 
     spawn(fn ->
       ids =
@@ -721,7 +739,7 @@ defmodule PepeWeb.ModelsLive do
                base_url: base,
                api_key: resolved_key,
                model: "",
-               api: "openai"
+               api: api
              },
              {:ok, list} <- Pepe.LLM.list_models(probe) do
           list

@@ -27,7 +27,7 @@ defmodule Pepe.ModelSwitch do
   def list_for(scope) do
     slug = Config.resolve_scope(scope)
 
-    Config.models()
+    Config.chat_models()
     |> Enum.filter(&(Config.resolve_scope(Project.of(&1.name)) == slug))
     |> Enum.sort_by(& &1.name)
   end
@@ -55,7 +55,7 @@ defmodule Pepe.ModelSwitch do
   @spec apply(String.t(), String.t(), String.t(), :session | :global) ::
           :ok | {:error, :unknown_model | :unknown_agent}
   def apply(session_key, _agent_name, model_name, :session) do
-    if Config.get_model(model_name) do
+    if Config.chat_model?(model_name) do
       Session.set_model(session_key, model_name)
       :ok
     else
@@ -65,7 +65,7 @@ defmodule Pepe.ModelSwitch do
 
   def apply(_session_key, agent_name, model_name, :global) do
     cond do
-      is_nil(Config.get_model(model_name)) ->
+      not Config.chat_model?(model_name) ->
         {:error, :unknown_model}
 
       is_nil(Config.get_agent(agent_name)) ->

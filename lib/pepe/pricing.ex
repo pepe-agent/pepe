@@ -54,7 +54,11 @@ defmodule Pepe.Pricing do
     "deepseek-chat" => {0.27, 1.10},
     "deepseek-reasoner" => {0.55, 2.19},
     "mistral-large" => {2.00, 6.00},
-    "mistral-small" => {0.20, 0.60}
+    "mistral-small" => {0.20, 0.60},
+    # TypeSafe's decision model (see Pepe.Decide.Jev). Its published price is US$ 42 per billion
+    # input tokens and says nothing about output tokens, so output is 0 here; type a manual price
+    # on the connection if your plan prices them.
+    "jev" => {0.042, 0.0}
   }
 
   @doc "The built-in seed price map (offline fallback)."

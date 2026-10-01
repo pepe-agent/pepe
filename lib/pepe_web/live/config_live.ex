@@ -25,7 +25,7 @@ defmodule PepeWeb.ConfigLive do
        config_text: read_config(),
        locale: Config.locale(),
        locales: Config.locales(),
-       model_names: Config.models() |> Enum.map(& &1.name),
+       model_names: Config.chat_models() |> Enum.map(& &1.name),
        media_tts: Config.media()["tts"] || %{},
        media_audio: Config.media()["audio"] || %{},
        # nil = not checked yet · :checking · :up_to_date · a version string when newer.
