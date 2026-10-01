@@ -33,13 +33,38 @@ defmodule Pepe.Decide do
           state: String.t(),
           instructions: String.t(),
           criteria: %{String.t() => String.t()},
-          default: String.t(),
+          default: String.t() | nil,
           min_confidence: float(),
           chat_system: String.t(),
           chat_user: String.t()
         }
 
-  @type decision :: %{choice: String.t(), via: String.t() | nil}
+  @type decision :: %{choice: String.t() | nil, via: String.t() | nil, confidence: float() | nil}
+
+  @doc """
+  The decision connection an agent may ask directly (the `decide` tool), followed by its own
+  fallbacks: the agent's `triage_model` when that is a decision connection, otherwise the first
+  decision connection in the agent's project. `[]` when there is none, which is also what keeps
+  the tool from being offered.
+  """
+  @spec connections_for(map() | nil) :: [Model.t()]
+  def connections_for(%{name: name} = agent) when is_binary(name) do
+    own = agent |> Map.get(:triage_model) |> chain_names()
+
+    primary =
+      Enum.find(own, &Model.decision?/1) ||
+        Enum.find(Enum.sort_by(Config.models(), & &1.name), &(Model.decision?(&1) and Pepe.Project.same_scope?(&1.name, name)))
+
+    case primary do
+      nil -> []
+      %Model{} = model -> chain([model.name])
+    end
+  end
+
+  def connections_for(_agent), do: []
+
+  defp chain_names(nil), do: []
+  defp chain_names(name), do: chain([name])
 
   @doc """
   The connections to try, in order: each name followed by its own `fallbacks`, names that no
@@ -60,8 +85,9 @@ defmodule Pepe.Decide do
   end
 
   @doc """
-  Decide. `via` is the connection that answered, or `nil` when none did and `default` is
-  only the safe fallback. Usage of every answered call is metered against `agent_name`.
+  Decide. `confidence` is the decision model's own (`nil` from a chat model). `via` is the connection that answered, or `nil` when none did and `default` is
+  only the safe fallback (`nil` itself for an open question, where nobody answering is just
+  "no decision"). Usage of every answered call is metered against `agent_name`.
   """
   @spec choose([Model.t()], question(), String.t()) :: decision()
   def choose(chain, question, agent_name) do
@@ -70,7 +96,7 @@ defmodule Pepe.Decide do
     |> try_each(question, agent_name)
   end
 
-  defp try_each([], question, _agent_name), do: %{choice: question.default, via: nil}
+  defp try_each([], question, _agent_name), do: %{choice: question.default, via: nil, confidence: nil}
 
   defp try_each([model | rest], question, agent_name) do
     case ask(model, question) do
@@ -79,7 +105,7 @@ defmodule Pepe.Decide do
         meter(agent_name, model, usage)
 
         if trusted?(choice, confidence, question),
-          do: %{choice: choice, via: model.name},
+          do: %{choice: choice, via: model.name, confidence: confidence},
           else: try_each(rest, question, agent_name)
 
       {:error, reason} ->
@@ -102,8 +128,14 @@ defmodule Pepe.Decide do
   # risky option reads as the safe default, same as before this module existed.
   defp ask_chat(model, question) do
     case LLM.chat(model, [Message.system(question.chat_system), Message.user(question.chat_user)]) do
-      {:ok, %{content: content} = result} -> {:ok, word(content, question), nil, result[:usage]}
-      {:error, reason} -> {:error, reason}
+      {:ok, %{content: content} = result} ->
+        case word(content, question) do
+          nil -> {:error, :no_option_in_reply}
+          choice -> {:ok, choice, nil, result[:usage]}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   rescue
     e -> {:error, Exception.message(e)}
@@ -111,13 +143,17 @@ defmodule Pepe.Decide do
     kind, reason -> {:error, "#{kind}: #{inspect(reason)}"}
   end
 
+  # The option the reply names: an exact match first ("SIMPLE", "complex."), then the longest
+  # option name found inside it (longest first, so "urgent" is not read out of "not urgent"
+  # before "not urgent" itself is tried). Nothing named reads as the safe `default`.
   defp word(content, question) do
-    reply = content |> to_string() |> String.trim() |> String.upcase()
+    reply = content |> to_string() |> String.trim() |> String.trim(".") |> String.upcase()
+    options = question.criteria |> Map.keys() |> Enum.reject(&(&1 == question.default))
 
-    question.criteria
-    |> Map.keys()
-    |> Enum.reject(&(&1 == question.default))
-    |> Enum.find(question.default, &(reply =~ String.upcase(&1)))
+    Enum.find(options, &(String.upcase(&1) == reply)) ||
+      options
+      |> Enum.sort_by(&(-String.length(&1)))
+      |> Enum.find(question.default, &(reply =~ String.upcase(&1)))
   end
 
   # A decision is a real, separately billed call: it counts toward the operator's spend like

@@ -91,6 +91,14 @@ fails (no credit, wrong key, down, slow) or is unsure about the cheap option, th
 as a chat triage model always did, and with no backup answering the message counts as complex, so
 a conversation is never blocked by it. `mix pepe model test NAME` makes a real decision to check it.
 
+With a decision connection set up, the agent also gets a `decide` tool: one pick among options it
+names for a piece of text, returned with a confidence band (high: act, medium: confirm, low: do not
+act). Use it for small, repeated, well-scoped choices (is this message urgent, which team owns this
+ticket), one question per call, with options described so they can be told apart and a catch-all
+such as "other"; not for open-ended judgment. It is only offered to an agent that can reach a
+decision connection, uses the connection's backup model when it cannot answer (then with no
+confidence), and never invents a choice: when nobody answers it says so and you decide.
+
 ## Mid-turn folding (`midrun_fold`)
 
 Normally a message that arrives while a turn is already running just waits its turn in

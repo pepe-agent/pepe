@@ -18,6 +18,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.ConfigGet
   alias Pepe.Tools.ConfigSet
   alias Pepe.Tools.DbQuery
+  alias Pepe.Tools.Decide
   alias Pepe.Tools.Delegate
   alias Pepe.Tools.Docs
   alias Pepe.Tools.Doctor
@@ -78,6 +79,7 @@ defmodule Pepe.Tools do
     Browser,
     WebSearch,
     DbQuery,
+    Decide,
     SendFile,
     Chart,
     SendPresentation,

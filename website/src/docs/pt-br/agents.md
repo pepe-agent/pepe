@@ -272,6 +272,7 @@ O conjunto embutido já cobre o essencial:
 | `run_script` | Escreve e roda um programa curto em Python, Node, Ruby ou Elixir. |
 | `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Trabalham com arquivos no workspace do agente. |
 | `fetch_url`, `web_search` | Leem uma página web ou buscam na web. |
+| `decide` | Pede a um modelo rápido de decisão que escolha uma entre poucas opções para um texto, com um grau de certeza. Só é oferecida quando há uma conexão de decisão configurada; veja [Roteamento de modelo por complexidade](#roteamento-de-modelo-por-complexidade). |
 | `send_file` | Entrega um arquivo que o agente produziu, no canal atual. |
 | `chart` | Desenha um gráfico de barras, linhas ou pizza com números que o agente já tem e envia como imagem. Precisa de um conversor de SVG na máquina (`rsvg-convert` ou ImageMagick, já presente na imagem Docker `-full`); sem um, o gráfico vai como SVG. |
 | `send_to_agent` | Manda mensagem para outro agente (sujeito a `can_message`). |
@@ -279,7 +280,7 @@ O conjunto embutido já cobre o essencial:
 | `schedule_task`, `watch` | Criam tarefas recorrentes e vigias de "me avise quando X" de uma vez só. |
 | `manage_agent` | Gerencia outro agente (persona, modelo, ferramentas, roteamento, renomear) pelo chat. |
 | `manage_channel`, `end_session` | Conectam e fecham canais de mensagens pelo chat. |
-| `manage_mcp`, `scan_skill`, `skill` | Adicionam servidores de ferramentas externas e skills. |
+| `manage_mcp`, `scan_skill`, `decide`, `skill` | Adicionam servidores de ferramentas externas e skills. |
 | `manage_plugin` | Instala, varre, lista e remove plugins da comunidade (ferramentas, canais) pelo chat. |
 | `config_get`, `config_set`, `doctor` | Inspecionam e alteram a configuração sob proteções, e rodam diagnósticos. |
 

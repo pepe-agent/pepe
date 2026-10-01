@@ -255,6 +255,7 @@ The built-in set covers the common ground:
 | `run_script` | Write and run a short program in Python, Node, Ruby, or Elixir. |
 | `read_file`, `write_file`, `edit_file`, `move_file`, `list_dir` | Work with files in the agent's workspace. |
 | `fetch_url`, `web_search` | Read a web page or search the web. |
+| `decide` | Ask a fast decision model to pick one of a few options for a piece of text, with a confidence. Offered only when a decision connection is set up; see [Complexity-based model routing](#complexity-based-model-routing). |
 | `send_file` | Deliver a file the agent produced on the current channel. |
 | `chart` | Draw a bar, line or pie chart from numbers the agent already has and send it as an image. Needs an SVG converter on the machine (`rsvg-convert` or ImageMagick, already in the `-full` Docker image); without one the chart is sent as an SVG. |
 | `send_to_agent` | Message another agent (subject to `can_message`). |
@@ -262,7 +263,7 @@ The built-in set covers the common ground:
 | `schedule_task`, `watch` | Create recurring jobs and one-shot "notify me when X" watches. |
 | `manage_agent` | Manage another agent (persona, model, tools, routing, rename) from chat. |
 | `manage_channel`, `end_session` | Connect and close messaging channels from chat. |
-| `manage_mcp`, `scan_skill`, `skill` | Add external tool servers and skills. |
+| `manage_mcp`, `scan_skill`, `decide`, `skill` | Add external tool servers and skills. |
 | `manage_plugin` | Install, scan, list, and remove community plugins (tools, channels) from chat. |
 | `config_get`, `config_set`, `doctor` | Inspect and change configuration under guardrails, run diagnostics. |
 
