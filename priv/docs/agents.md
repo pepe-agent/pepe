@@ -90,3 +90,23 @@ on). Without a `triage_model` it falls back to the agent's own `model` instead o
 nothing - meaning `midrun_fold` works standalone, but every message that arrives mid-turn
 now costs an extra call on that agent's own model to classify it. Set a `triage_model`
 too if that cost matters.
+
+## Offering to change agent when the subject changes (`topic_reroute`)
+
+A conversation sticks to whichever agent it was last routed to, so a user who moves on to
+another subject stays with the wrong agent until `/new`. With `topic_reroute: true` on an
+agent, that agent is offered a `hand_back` tool whenever this conversation is with it and
+not with the channel's own agent (the one `/new` returns to, usually a routing agent). When
+a message is clearly outside what the agent covers, it calls `hand_back`, which asks the
+user yes or no (real buttons where the channel has them). On yes the conversation returns
+to the channel's own agent and the user's message is re-sent to it, so it routes the
+message without the user repeating it. On no the agent keeps answering and does not offer
+again until the subject changes again.
+
+Turn it on for a user who asks to stop getting stuck with the wrong agent: `manage_agent`
+`set_flag` with `topic_reroute`, or `mix pepe agent add NAME --topic-reroute`. The agent only
+judges its own scope, so there is nothing else to configure and no list of other agents to
+keep. It does nothing on the channel's own agent, on a channel that locks agent switching,
+and a side question the agent can answer itself should just be answered. A routing agent
+whose `switch_agent` call is for a message that was itself a request should pass
+`forward_message: true` so the target gets that message at once.

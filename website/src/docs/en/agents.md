@@ -222,6 +222,20 @@ yes. Unlike `capability_nudge`, it costs nothing on an ordinary turn, because th
 extra paragraph in the system prompt, only a short note on the turns that cross the bar.
 See [Skills](../skills/) for what the agent then writes.
 
+## Offering to change agent when the subject changes
+
+A conversation can get stuck with the wrong agent. A channel starts with one agent, often one that only routes requests, which hands you to the right specialist. From then on the specialist answers everything, even after you move on to something else, until someone types `/new`.
+
+`topic_reroute`, off by default, fixes that on the specialist. When a message is clearly about something the specialist does not cover, it asks you a yes or no question, in your language and with real buttons where the channel has them: the subject seems to have changed, want to move the conversation to the right agent? On yes, the conversation goes back to the agent the channel starts with, and your message goes along with it, so that agent routes it and you do not repeat anything. On no, the specialist carries on and does not ask again until the subject changes again.
+
+```bash
+pepe agent add support --topic-reroute ...
+```
+
+Three things to know. The specialist only judges its own scope, so you never list the other agents on it; the routing agent already knows them. Nobody is moved without saying yes, and a side question the specialist can simply answer is just answered. And it does nothing on the agent the channel starts with, nor on a channel that locks agent switching. On a surface with no buttons, the specialist asks in plain text instead.
+
+For the routing agent to pass your message on to the right specialist right away, instead of waiting for your next message, its `switch_agent` call can forward the message when your message was itself a request for that agent.
+
 ## Tools and the permission gate
 
 A tool is a capability. An agent can only do what its `tools` list allows. Give an

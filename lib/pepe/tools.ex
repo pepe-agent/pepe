@@ -25,6 +25,7 @@ defmodule Pepe.Tools do
   alias Pepe.Tools.EndSession
   alias Pepe.Tools.FetchUrl
   alias Pepe.Tools.Goal
+  alias Pepe.Tools.HandBack
   alias Pepe.Tools.Insight
   alias Pepe.Tools.InsightPredict
   alias Pepe.Tools.InspectGraphRun
@@ -119,6 +120,11 @@ defmodule Pepe.Tools do
     TelegramPoll
   ]
 
+  # Offered by the runtime on its own when an agent's option calls for it, never picked
+  # from the tool list: kept out of `all/0` and `names/0` (so no tool picker, tool-list
+  # command or "every tool" default sees it) but still resolvable by name to run.
+  @internal [HandBack]
+
   @doc "All tool modules - built-ins plus loaded plugins."
   def all, do: @builtin ++ plugins()
 
@@ -132,7 +138,7 @@ defmodule Pepe.Tools do
         end
       end)
 
-    Map.new(plugin_pairs ++ Enum.map(@builtin, &{&1.name(), &1}))
+    Map.new(plugin_pairs ++ Enum.map(@builtin ++ @internal, &{&1.name(), &1}))
   end
 
   @doc "List the names of all available tools. Feeds Pepe.Config.Agent's own tools default, so a plugin whose name/0 raises is skipped rather than breaking agent config for everyone."
@@ -186,12 +192,13 @@ defmodule Pepe.Tools do
   Build the list of OpenAI tool specs for a list of tool names. Unknown names
   are skipped. An empty list yields nil (so callers omit the `tools` field).
   """
-  def specs(names) when is_list(names) do
-    builtin =
-      names
-      |> Enum.map(&get/1)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(& &1.spec())
+  def specs(names, ctx \\ %{})
+
+  def specs(names, ctx) when is_list(names) do
+    listed = names |> Enum.map(&get/1) |> Enum.reject(&is_nil/1) |> Enum.filter(&offered?(&1, ctx))
+    # An internal tool is on offer only when it says so itself: it is in no agent's list.
+    internal = Enum.filter(@internal, &internal_offered?(&1, ctx))
+    builtin = (listed ++ internal) |> Enum.uniq() |> Enum.map(& &1.spec())
 
     case builtin ++ Pepe.MCP.specs_for(names) do
       [] -> nil
@@ -199,7 +206,21 @@ defmodule Pepe.Tools do
     end
   end
 
-  def specs(_), do: nil
+  def specs(_, _ctx), do: nil
+
+  @doc """
+  Is this tool on offer in the turn described by `ctx`? True unless the tool defines
+  `offered?/1` (see `Pepe.Tools.Tool`) and answers no. The one answer behind both what the
+  model is shown (`specs/2`) and what dispatch will run.
+  """
+  @spec offered?(module(), map()) :: boolean()
+  def offered?(mod, ctx) when is_atom(mod) do
+    not (Code.ensure_loaded?(mod) and function_exported?(mod, :offered?, 1)) or mod.offered?(ctx)
+  end
+
+  # `ensure_loaded?` first: outside a release modules load on demand, and a module nobody has
+  # touched yet would otherwise look as if it had no `offered?/1`.
+  defp internal_offered?(mod, ctx), do: Code.ensure_loaded?(mod) and function_exported?(mod, :offered?, 1) and mod.offered?(ctx)
 
   @doc """
   May this tool run alongside the others the model asked for in the same turn?
@@ -394,6 +415,7 @@ defmodule Pepe.Tools do
 
   defp execute_builtin(name, raw_args, ctx) do
     with mod when not is_nil(mod) <- get(name),
+         true <- offered?(mod, ctx) || :not_offered,
          {:ok, args} <- decode_args(raw_args) do
       Pepe.Config.Journal.put_source("chat:#{name}")
 
@@ -417,6 +439,7 @@ defmodule Pepe.Tools do
       end
     else
       nil -> annotate_error("Error: unknown tool #{name}")
+      :not_offered -> annotate_error("Error: #{name} is not available on this turn")
       {:error, reason} -> annotate_error("Error: invalid arguments for #{name}: #{reason}")
     end
   end

@@ -19,6 +19,9 @@ has itself taken in a document. Confirm with the operator before you set it.
 `midrun_fold` is a lower-stakes one: with it on (and a `triage_model` already set on the
 target), a message that arrives while the target is still working gets checked for being
 a correction of that turn rather than always waiting in the queue.
+`topic_reroute` is another: it lets the target ask the user, yes or no, whether to hand the
+conversation back to the channel's own (routing) agent when a message is clearly outside what
+the target covers. Nobody is moved without a yes.
 
 
 Every call takes an `action`, and most take a `target` (the agent to act on) and a

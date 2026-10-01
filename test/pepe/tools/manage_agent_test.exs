@@ -370,6 +370,25 @@ defmodule Pepe.Tools.ManageAgentTest do
       assert Config.get_agent("sales").skill_learning == false
     end
 
+    test "topic_reroute can be turned on and off by chat, same as any other simple switch" do
+      assert {:ok, msg} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "topic_reroute", "value" => "on"},
+                 ctx(["sales"])
+               )
+
+      assert msg =~ "on"
+      assert Config.get_agent("sales").topic_reroute == true
+
+      assert {:ok, _} =
+               ManageAgent.run(
+                 %{"action" => "set_flag", "target" => "sales", "flag" => "topic_reroute", "value" => "off"},
+                 ctx(["sales"])
+               )
+
+      assert Config.get_agent("sales").topic_reroute == false
+    end
+
     test "checkpoints is on by default and can be turned off and back on by chat" do
       assert Config.get_agent("sales").checkpoints == true
 

@@ -9,6 +9,9 @@ defmodule Pepe.Config.Agent do
   @default_prompt "You are Pepe, a helpful AI agent."
 
   @derive Jason.Encoder
+  # An agent's config record is one flat row, and every on/off option added to it is a field
+  # (see `@switches` below): it legitimately outgrew the default field budget.
+  # credo:disable-for-next-line Credo.Check.Warning.StructFieldAmount
   defstruct id: nil,
             # The agent's stable identity is its `id`; `name` is a mutable label and `project` is
             # the owning project's id. `.name` as read back from Pepe.Config is the derived display
@@ -151,6 +154,14 @@ defmodule Pepe.Config.Agent do
             # on the turns that earn one. The agent never writes a skill file off the back of
             # it without an explicit yes from the user.
             skill_learning: false,
+            # Off by default. When on, and this conversation is with an agent other than the
+            # channel's own (the router `/new` returns to), the runtime offers the agent a
+            # `hand_back` tool plus a short system-prompt convention: when the user's message
+            # is clearly outside what this agent covers, ask them yes/no whether to move the
+            # conversation, and on yes hand it back to the channel's own agent, which routes
+            # the message. The agent only judges its own scope, so nothing here lists the
+            # other agents. See Pepe.Tools.HandBack.
+            topic_reroute: false,
             # On by default, unlike the flags above: recording what a file tool changed costs
             # one small snapshot of the one file it names, and it is what lets `/rewind`
             # put files back as well as the conversation (see Pepe.Checkpoints). Turn it
@@ -164,6 +175,32 @@ defmodule Pepe.Config.Agent do
             checkpoint_shell: false
 
   @type t :: %__MODULE__{}
+
+  # The on/off options of an agent, each with the value it has when nothing says otherwise.
+  # The one place that lists them: the config reader below, the dashboard form, the CLI's
+  # `agent add` switches and `manage_agent`'s `set_flag` all derive their list from here, so a
+  # new option is declared once (plus its struct field and the text that explains it).
+  # `session_search_scope` is not one of them: it is "self"/"project", not a boolean.
+  @switches [
+    exempt_message_limit: false,
+    trust_untrusted_content: false,
+    midrun_fold: false,
+    commitments: false,
+    micro_compaction: false,
+    capability_nudge: false,
+    skill_learning: false,
+    topic_reroute: false,
+    checkpoints: true,
+    checkpoint_shell: false
+  ]
+
+  @doc "Every on/off option of an agent, with its default (see the list above)."
+  @spec switch_defaults() :: keyword(boolean())
+  def switch_defaults, do: @switches
+
+  @doc "The names of every on/off option of an agent."
+  @spec switches() :: [atom()]
+  def switches, do: Keyword.keys(@switches)
 
   @doc "The default seed persona - the marker for an agent with no identity set yet."
   @spec default_prompt() :: String.t()
@@ -203,25 +240,14 @@ defmodule Pepe.Config.Agent do
     |> put_flags(map)
   end
 
-  # Split from the rest of from_map/1 to keep its cyclomatic complexity down - each `||`
-  # default counts as a branch, and this is nothing but four of them.
+  # A switch missing or null in the file takes its default; anything else counts as on unless
+  # it is literally `false`.
   defp put_flags(agent, map) do
-    %{
-      agent
-      | exempt_message_limit: map["exempt_message_limit"] || false,
-        trust_untrusted_content: map["trust_untrusted_content"] || false,
-        midrun_fold: map["midrun_fold"] || false,
-        commitments: map["commitments"] || false,
-        session_search_scope: map["session_search_scope"] || "self",
-        micro_compaction: map["micro_compaction"] || false,
-        capability_nudge: map["capability_nudge"] || false,
-        skill_learning: map["skill_learning"] || false
-    }
-    |> put_checkpoint_flags(map)
+    agent = Enum.reduce(@switches, agent, fn {key, default}, acc -> Map.put(acc, key, switch_value(map[Atom.to_string(key)], default)) end)
+    %{agent | session_search_scope: map["session_search_scope"] || "self"}
   end
 
-  # `checkpoints` is the one switch that defaults to ON, so a missing key must not read as off.
-  defp put_checkpoint_flags(agent, map) do
-    %{agent | checkpoints: Map.get(map, "checkpoints", true) != false, checkpoint_shell: map["checkpoint_shell"] || false}
-  end
+  defp switch_value(nil, default), do: default
+  defp switch_value(false, _default), do: false
+  defp switch_value(_value, _default), do: true
 end

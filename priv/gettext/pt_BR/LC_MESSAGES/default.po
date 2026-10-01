@@ -324,7 +324,7 @@ msgstr "Agente"
 
 #: lib/pepe/gateways/tui.ex:75
 #: lib/pepe_web/live/agents_live.ex:338
-#: lib/pepe_web/live/agents_live.ex:696
+#: lib/pepe_web/live/agents_live.ex:704
 #: lib/pepe_web/live/chat_live.ex:257
 #: lib/pepe_web/live/hooks_live.ex:165
 #: lib/pepe_web/live/models_live.ex:289
@@ -569,7 +569,7 @@ msgstr "Chave de API"
 msgid "Add bot"
 msgstr "Adicionar bot"
 
-#: lib/pepe_web/live/agents_live.ex:947
+#: lib/pepe_web/live/agents_live.ex:955
 #, elixir-autogen, elixir-format
 msgid "Agent %{name} saved."
 msgstr "Agente %{name} salvo."
@@ -814,7 +814,7 @@ msgstr "Remover a tarefa agendada %{name}?"
 msgid "Run now"
 msgstr "Executar agora"
 
-#: lib/pepe_web/live/agents_live.ex:681
+#: lib/pepe_web/live/agents_live.ex:689
 #: lib/pepe_web/live/channels_live.ex:470
 #: lib/pepe_web/live/chat_live.ex:224
 #: lib/pepe_web/live/config_live.ex:119
@@ -2153,7 +2153,7 @@ msgstr ""
 "Recusado: a verificação de segurança marcou este plugin como perigoso."
 
 #: lib/pepe_web/live/agents_live.ex:363
-#: lib/pepe_web/live/agents_live.ex:743
+#: lib/pepe_web/live/agents_live.ex:751
 #: lib/pepe_web/live/chat_live.ex:338
 #: lib/pepe_web/live/models_live.ex:313
 #: lib/pepe_web/live/plugins_live.ex:109
@@ -2696,7 +2696,7 @@ msgid "(off)"
 msgstr "(desativado)"
 
 #: lib/pepe_web/live/agents_live.ex:523
-#: lib/pepe_web/live/agents_live.ex:698
+#: lib/pepe_web/live/agents_live.ex:706
 #, elixir-autogen, elixir-format
 msgid "Access"
 msgstr "Acesso"
@@ -2709,7 +2709,7 @@ msgid "Billing"
 msgstr "Cobrança"
 
 #: lib/pepe_web/live/agents_live.ex:445
-#: lib/pepe_web/live/agents_live.ex:697
+#: lib/pepe_web/live/agents_live.ex:705
 #, elixir-autogen, elixir-format
 msgid "Capabilities"
 msgstr "Capacidades"
@@ -2765,7 +2765,7 @@ msgstr ""
 "mês que vem, ou um admin pode aumentar o limite."
 
 #: lib/pepe_web/live/agents_live.ex:567
-#: lib/pepe_web/live/agents_live.ex:699
+#: lib/pepe_web/live/agents_live.ex:707
 #, elixir-autogen, elixir-format
 msgid "Limits"
 msgstr "Limites"
@@ -2872,7 +2872,7 @@ msgstr "Digite os números que quer marcar (ex.: 1 3) e tecle Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio conclui"
 
-#: lib/mix/tasks/pepe.ex:6123
+#: lib/mix/tasks/pepe.ex:6107
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma definido para %{code}"
@@ -2892,17 +2892,17 @@ msgstr "n = próxima página, p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:5900
+#: lib/mix/tasks/pepe.ex:5884
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (pode usar uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:5901
+#: lib/mix/tasks/pepe.ex:5885
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:5909
+#: lib/mix/tasks/pepe.ex:5893
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -3372,7 +3372,7 @@ msgstr "escreve fora do workspace"
 msgid "Projects"
 msgstr "Projetos"
 
-#: lib/pepe_web/live/agents_live.ex:957
+#: lib/pepe_web/live/agents_live.ex:965
 #, elixir-autogen, elixir-format
 msgid "Couldn't save %{name}: the name must be letters, digits, - or _."
 msgstr ""
@@ -3570,7 +3570,7 @@ msgstr "Responsável"
 msgid "Auto-detect"
 msgstr "Detectar automaticamente"
 
-#: lib/pepe_web/live/agents_live.ex:680
+#: lib/pepe_web/live/agents_live.ex:688
 #: lib/pepe_web/live/board_live.ex:127
 #: lib/pepe_web/live/board_live.ex:130
 #: lib/pepe_web/live/learning_live.ex:79
@@ -3765,7 +3765,7 @@ msgstr "Este card ainda está em execução. Arquivar mesmo assim?"
 msgid "%{n} runs"
 msgstr "%{n} execuções"
 
-#: lib/pepe_web/live/agents_live.ex:926
+#: lib/pepe_web/live/agents_live.ex:934
 #, elixir-autogen, elixir-format
 msgid "An agent named %{name} already exists (maybe with different capitalization)."
 msgstr ""
@@ -4121,7 +4121,7 @@ msgstr "deve ser \"project\" ou \"bare\" no modo agent_field"
 msgid "project"
 msgstr "project"
 
-#: lib/pepe_web/live/agents_live.ex:754
+#: lib/pepe_web/live/agents_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "(builtin)"
 msgstr "(nativo)"
@@ -4174,7 +4174,7 @@ msgstr ""
 msgid "not installed"
 msgstr "não instalado"
 
-#: lib/mix/tasks/pepe.ex:191
+#: lib/mix/tasks/pepe.ex:193
 #, elixir-autogen, elixir-format
 msgid "No more input (stdin closed). Aborting."
 msgstr "Entrada encerrada (stdin fechado). Abortando."
@@ -4208,7 +4208,7 @@ msgstr "%{n} verificações até agora"
 msgid "%{n} tokens"
 msgstr "%{n} tokens"
 
-#: lib/pepe_web/live/agents_live.ex:747
+#: lib/pepe_web/live/agents_live.ex:755
 #, elixir-autogen, elixir-format
 msgid "+ Add an agent..."
 msgstr "+ Adicionar agente..."
@@ -4439,7 +4439,7 @@ msgstr "Próxima verificação %{at}"
 msgid "No"
 msgstr "Não"
 
-#: lib/pepe_web/live/agents_live.ex:750
+#: lib/pepe_web/live/agents_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "No other agent in this project to pick."
 msgstr "Não há outro agente neste projeto."
@@ -5528,7 +5528,7 @@ msgstr ""
 "operador precisa adicionar uma antes, pelo dashboard ou com `mix pepe model "
 "add` (o `mix pepe setup` guia pelos dois)."
 
-#: lib/pepe/agent/workspace.ex:274
+#: lib/pepe/agent/workspace.ex:275
 #, elixir-autogen, elixir-format
 msgid "You are Pepe, an AI agent, but your identity isn't set up yet: you have no name, persona or defined traits of your own. If the user asks who you are, tell them you're Pepe and that you don't have a name or personality defined yet, then offer to set one up now. If they agree, help them pick a name and a few traits, then save it: write your persona to SOUL.md, and if they choose a name, rename yourself with the manage_agent tool's rename action (target yourself). Always reply in the user's language."
 msgstr ""
@@ -5561,12 +5561,12 @@ msgstr "Mostrar o objetivo"
 msgid "Continue editing"
 msgstr "Continuar editando"
 
-#: lib/pepe_web/live/agents_live.ex:678
+#: lib/pepe_web/live/agents_live.ex:686
 #, elixir-autogen, elixir-format
 msgid "Discard draft"
 msgstr "Descartar rascunho"
 
-#: lib/pepe_web/live/agents_live.ex:677
+#: lib/pepe_web/live/agents_live.ex:685
 #, elixir-autogen, elixir-format
 msgid "Discard the draft and go back to the saved version?"
 msgstr "Descartar o rascunho e voltar à versão salva?"
@@ -5577,7 +5577,7 @@ msgstr "Descartar o rascunho e voltar à versão salva?"
 msgid "Draft"
 msgstr "Rascunho"
 
-#: lib/pepe_web/live/agents_live.ex:672
+#: lib/pepe_web/live/agents_live.ex:680
 #, elixir-autogen, elixir-format
 msgid "Draft saved. It is not live until you press Save."
 msgstr "Rascunho salvo. Só entra em vigor quando você clicar em Salvar."
@@ -5587,7 +5587,7 @@ msgstr "Rascunho salvo. Só entra em vigor quando você clicar em Salvar."
 msgid "New agent"
 msgstr "Novo agente"
 
-#: lib/pepe_web/live/agents_live.ex:674
+#: lib/pepe_web/live/agents_live.ex:682
 #, elixir-autogen, elixir-format
 msgid "No unsaved changes."
 msgstr "Nenhuma alteração pendente."
@@ -6148,7 +6148,7 @@ msgstr ""
 "Já existe uma conexão de modelo chamada %{name}, então esta foi salva como "
 "%{final}."
 
-#: lib/pepe_web/live/agents_live.ex:773
+#: lib/pepe_web/live/agents_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "A model on your machine hides names and free text, and can put them back in the reply."
 msgstr ""
@@ -6253,7 +6253,7 @@ msgstr "Agentes que ele pode gerenciar"
 msgid "Allowed website"
 msgstr "Site permitido"
 
-#: lib/pepe_web/live/agents_live.ex:657
+#: lib/pepe_web/live/agents_live.ex:665
 #, elixir-autogen, elixir-format
 msgid "Also back up for terminal commands"
 msgstr "Fazer cópia também nos comandos de terminal"
@@ -6351,7 +6351,7 @@ msgstr ""
 "O automático escolhe o certo. Escolha um específico só se o servidor aceitar"
 " apenas esse."
 
-#: lib/pepe_web/live/agents_live.ex:649
+#: lib/pepe_web/live/agents_live.ex:657
 #, elixir-autogen, elixir-format
 msgid "Back up files before changing them"
 msgstr "Fazer cópia dos arquivos antes de alterar"
@@ -6460,7 +6460,7 @@ msgstr "Conectado. Os dados de acesso funcionam."
 msgid "Connection %{s} removed."
 msgstr "Conexão %{s} removida."
 
-#: lib/pepe_web/live/agents_live.ex:659
+#: lib/pepe_web/live/agents_live.ex:667
 #, elixir-autogen, elixir-format
 msgid "Copies the folder around terminal commands too, so /rewind can undo them."
 msgstr ""
@@ -6562,7 +6562,7 @@ msgid "Fill in the details, then paste the Webhook URL into the provider's setti
 msgstr ""
 "Preencha os dados e cole a URL do webhook nas configurações do provedor."
 
-#: lib/pepe_web/live/agents_live.ex:772
+#: lib/pepe_web/live/agents_live.ex:780
 #, elixir-autogen, elixir-format
 msgid "Finds CPF, emails, card and phone numbers"
 msgstr "Encontra CPF, e-mails, cartões e telefones"
@@ -6744,7 +6744,7 @@ msgstr ""
 "Continua respondendo depois que o projeto atinge o limite mensal de "
 "mensagens. O limite de gastos continua valendo."
 
-#: lib/pepe_web/live/agents_live.ex:651
+#: lib/pepe_web/live/agents_live.ex:659
 #, elixir-autogen, elixir-format
 msgid "Keeps copies for about two weeks so you can undo changes with /rewind."
 msgstr ""
@@ -6848,7 +6848,7 @@ msgstr ""
 msgid "Mark unused after (days)"
 msgstr "Marcar como sem uso depois de (dias)"
 
-#: lib/pepe_web/live/agents_live.ex:775
+#: lib/pepe_web/live/agents_live.ex:783
 #, elixir-autogen, elixir-format
 msgid "Microsoft Presidio service, reached over HTTP"
 msgstr "Serviço Microsoft Presidio, acessado por HTTP"
@@ -7551,7 +7551,7 @@ msgstr ""
 "A troca de volta acontece no seu computador, então o modelo só vê o valor "
 "falso."
 
-#: lib/pepe_web/live/agents_live.ex:669
+#: lib/pepe_web/live/agents_live.ex:677
 #, elixir-autogen, elixir-format
 msgid "This agent was edited after you started this draft. Saving will replace those edits."
 msgstr ""
@@ -7814,7 +7814,7 @@ msgstr "Você já está na versão mais recente."
 msgid "Your own patterns"
 msgstr "Seus próprios padrões"
 
-#: lib/pepe_web/live/agents_live.ex:774
+#: lib/pepe_web/live/agents_live.ex:782
 #, elixir-autogen, elixir-format
 msgid "Your own service that hides personal data"
 msgstr "Seu próprio serviço que oculta dados pessoais"
@@ -7905,7 +7905,7 @@ msgid "How customers are separated"
 msgstr "Como os clientes são separados"
 
 #: lib/pepe_web/live/agents_live.ex:289
-#: lib/pepe_web/live/agents_live.ex:695
+#: lib/pepe_web/live/agents_live.ex:703
 #, elixir-autogen, elixir-format
 msgid "Identity"
 msgstr "Identidade"
@@ -7976,3 +7976,13 @@ msgstr "inicia sozinho"
 #, elixir-autogen, elixir-format
 msgid "taken by"
 msgstr "assumido por"
+
+#: lib/pepe_web/live/agents_live.ex:651
+#, elixir-autogen, elixir-format
+msgid "If the user moves to a topic it does not cover, it asks yes or no before passing the chat to the right agent."
+msgstr "Se o usuário muda para um assunto que ele não cobre, pergunta sim ou não antes de passar o chat para o agente certo."
+
+#: lib/pepe_web/live/agents_live.ex:649
+#, elixir-autogen, elixir-format
+msgid "Offer to switch agent when the subject changes"
+msgstr "Oferecer trocar de agente quando o assunto mudar"

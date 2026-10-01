@@ -238,6 +238,20 @@ sim explícito. Diferente do `capability_nudge`, isso não custa nada num turno 
 porque não há parágrafo extra no prompt de sistema, só uma nota curta nos turnos que
 cruzam a régua. Veja [Skills](../skills/) para o que o agente escreve depois.
 
+## Oferecer trocar de agente quando o assunto mudar
+
+Uma conversa pode ficar presa no agente errado. O canal começa com um agente, muitas vezes um que só distribui os pedidos e passa você para o especialista certo. Dali em diante o especialista responde tudo, mesmo depois que você muda de assunto, até alguém digitar `/new`.
+
+O `topic_reroute`, desligado por padrão, resolve isso no especialista. Quando uma mensagem é claramente sobre algo que ele não cobre, ele faz uma pergunta de sim ou não, no seu idioma e com botões de verdade nos canais que têm: parece que o assunto mudou, quer passar a conversa para o agente certo? Se você diz sim, a conversa volta para o agente com que o canal começa e a sua mensagem vai junto, então esse agente a encaminha e você não repete nada. Se diz não, o especialista continua e só pergunta de novo quando o assunto mudar outra vez.
+
+```bash
+pepe agent add suporte --topic-reroute ...
+```
+
+Três coisas para saber. O especialista só avalia o próprio escopo, então você não lista os outros agentes nele; quem conhece todos é o agente que distribui. Ninguém é trocado sem dizer sim, e uma pergunta solta que o especialista consegue simplesmente responder é respondida. E a opção não faz nada no agente com que o canal começa, nem em um canal que trava a troca de agente. Em um canal sem botões, o especialista pergunta em texto.
+
+Para o agente que distribui mandar a sua mensagem ao especialista certo na hora, sem esperar a sua próxima mensagem, a chamada `switch_agent` dele pode levar a mensagem junto quando ela mesma era um pedido para aquele agente.
+
 ## Ferramentas e a barreira de permissão
 
 Uma ferramenta é uma capacidade. Um agente só consegue fazer o que a lista

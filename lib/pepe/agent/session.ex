@@ -13,6 +13,7 @@ defmodule Pepe.Agent.Session do
 
   alias Pepe.Agent.CommitmentExtract
   alias Pepe.Agent.Runtime
+  alias Pepe.Agent.Session.AfterTurn
   alias Pepe.Agent.SessionTitles
   alias Pepe.Agent.Workspace
   alias Pepe.Checkpoints
@@ -88,7 +89,25 @@ defmodule Pepe.Agent.Session do
   answering; the next message is the first one the new agent sees, with a fresh
   context (same as `set_agent/2`'s own immediate-switch behavior).
   """
-  def switch_agent(key, agent_name), do: GenServer.cast(via(key), {:switch_agent, agent_name})
+  def switch_agent(key, agent_name, opts \\ []),
+    do: GenServer.cast(via(key), {:switch_agent, agent_name, opts[:forward] == true})
+
+  @doc """
+  Hand the conversation back to the agent this session started under (the channel's own
+  agent, the one `/new` returns to), after the current turn - the `hand_back` tool's half
+  of `topic_reroute`. `forward?` also re-sends the message that is being answered right now
+  to that agent, as the same caller's next turn, instead of answering it here (see
+  `forward_turn/2`).
+  """
+  def hand_back(key, forward?), do: GenServer.cast(via(key), {:hand_back, forward?})
+
+  @doc """
+  Remember the message being answered right now as the one a later "yes" should send on:
+  how `hand_back` works on a surface with no buttons (a webhook), where the question is asked
+  in plain text and the user's answer arrives as a new message ("yes"), not the request
+  itself. `hand_back(key, :remembered)` then forwards this stored message instead of the yes.
+  """
+  def remember_handback(key), do: GenServer.cast(via(key), :remember_handback)
 
   @doc """
   Override the model connection for this session only - the agent's own config on
@@ -414,8 +433,7 @@ defmodule Pepe.Agent.Session do
         ttl_ms: Keyword.get(opts, :ttl_ms, default_ttl_ms(key)),
         ephemeral: Keyword.get(opts, :ephemeral, default_ephemeral?(key)),
         persist: Keyword.get(opts, :persist, false),
-        reset_pending: false,
-        switch_pending: nil,
+        after_turn: AfterTurn.new(),
         ttl_ref: nil
       })
 
@@ -454,19 +472,13 @@ defmodule Pepe.Agent.Session do
   # between the tool call and the turn finishing is small, but not zero) and falls back
   # to staying on the agent that just answered if it's gone in the meantime, rather than
   # binding the conversation to a ghost.
-  defp resolve_post_turn_agent(%{switch_pending: target}, agent_name, _all_messages, _entries) when is_binary(target) do
-    if Config.get_agent(target) do
-      {target, init_messages(target), []}
-    else
-      {agent_name, init_messages(agent_name), []}
+  defp resolve_post_turn_agent(decision, state, agent_name, all_messages, entries) do
+    case decision do
+      {:switch, target, _forward} -> {target, init_messages(target), []}
+      :reset -> {agent_name, init_messages(agent_name), []}
+      :carry -> {agent_name, cap_retained_tool_results(all_messages), state.pii_map ++ entries}
     end
   end
-
-  defp resolve_post_turn_agent(%{reset_pending: true}, agent_name, _all_messages, _entries),
-    do: {agent_name, init_messages(agent_name), []}
-
-  defp resolve_post_turn_agent(state, agent_name, all_messages, entries),
-    do: {agent_name, cap_retained_tool_results(all_messages), state.pii_map ++ entries}
 
   # Mark a turn as in flight right before running it, so a crash mid-turn leaves a
   # durable trace `Pepe.Agent.SessionSupervisor.restore/0` can pick up on the next
@@ -483,7 +495,7 @@ defmodule Pepe.Agent.Session do
     if persist?(Map.get(state, :persist, false)) and not Map.get(state, :ephemeral, false),
       do: SessionPersistence.clear_pending(state.key)
 
-    %{state | pending_resume: nil}
+    %{state | pending_resume: nil, after_turn: AfterTurn.clear(state.after_turn)}
   end
 
   defp resume_prompt(pending_text) do
@@ -792,7 +804,15 @@ defmodule Pepe.Agent.Session do
     # whoever you were last routed to.
     agent_name = state.default_agent_name
 
-    {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), pii_map: [], mention_optional: false})}
+    {:reply, :ok,
+     persist(%{
+       state
+       | agent_name: agent_name,
+         messages: init_messages(agent_name),
+         pii_map: [],
+         mention_optional: false,
+         after_turn: AfterTurn.new()
+     })}
   end
 
   def handle_call(:history, _from, state) do
@@ -976,6 +996,9 @@ defmodule Pepe.Agent.Session do
     # (which builds its own opts with no surface in the loop) still carries it forward.
     state = %{state | agent_switch_locked: Keyword.get(opts, :agent_switch_locked, state.agent_switch_locked)}
     opts = Keyword.put(opts, :agent_switch_locked, state.agent_switch_locked)
+    # Whether there is anyone to hand this conversation back to: it is with someone other
+    # than the agent this session started under (`topic_reroute`'s `hand_back`).
+    opts = Keyword.put(opts, :handback, not same_agent?(agent.name, state.default_agent_name))
     # Remember this turn's trust context for `/retry` - see `last_turn_meta`'s own doc above.
     state = %{state | last_turn_meta: %{untrusted: opts[:untrusted] == true, sender_tag: opts[:sender_tag]}}
     # A new message cancels any pending idle review and re-arms the TTL.
@@ -996,7 +1019,7 @@ defmodule Pepe.Agent.Session do
 
     {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
 
-    running = %{task: pid, ref: ref, from: from, on_event: opts[:on_event], folded_froms: []}
+    running = %{task: pid, ref: ref, from: from, on_event: opts[:on_event], folded_froms: [], text: text, opts: opts}
     {:noreply, %{state | running: running, pending_resume: text}}
   end
 
@@ -1030,14 +1053,17 @@ defmodule Pepe.Agent.Session do
   def handle_info({:run_done, result, agent_name}, %{running: %{from: from, ref: ref} = running} = state) do
     Process.demonitor(ref, [:flush])
     folded = Map.get(running, :folded_froms, [])
+    decision = decide_after_turn(state, running, agent_name, result)
 
     state =
       case result do
         {:ok, turn_reply, all_messages, entries} ->
-          reply(from, {:ok, turn_reply})
+          # A forwarded turn's own reply is dropped: the caller is still waiting, and gets the
+          # answer of the agent the message is being re-sent to instead.
+          if is_nil(forward_of(decision)), do: reply(from, {:ok, turn_reply})
           reply_folded(folded, {:ok, turn_reply})
 
-          {next_agent, messages, pii_map} = resolve_post_turn_agent(state, agent_name, all_messages, entries)
+          {next_agent, messages, pii_map} = resolve_post_turn_agent(decision, state, agent_name, all_messages, entries)
           commit_checkpoints(state, messages)
 
           state =
@@ -1046,8 +1072,7 @@ defmodule Pepe.Agent.Session do
               | agent_name: next_agent,
                 messages: messages,
                 running: nil,
-                reset_pending: false,
-                switch_pending: nil,
+                after_turn: AfterTurn.clear(state.after_turn),
                 pii_map: pii_map,
                 pending_resume: nil
             }
@@ -1070,7 +1095,7 @@ defmodule Pepe.Agent.Session do
           clear_pending(%{state | running: nil})
       end
 
-    {:noreply, run_next(state)}
+    {:noreply, state |> forward_message(forward_of(decision), from) |> run_next()}
   end
 
   def handle_info({:run_done, _result, _agent_name}, state), do: {:noreply, state}
@@ -1159,7 +1184,7 @@ defmodule Pepe.Agent.Session do
   @impl true
   # A normal turn is in flight: let its completion (`:run_done`) clear the context after the reply.
   def handle_cast(:end_session, %{running: running} = state) when is_map(running) do
-    {:noreply, %{state | reset_pending: true}}
+    {:noreply, %{state | after_turn: AfterTurn.reset(state.after_turn)}}
   end
 
   # No normal turn to consume the flag - the agent called `end_session` from an inline heartbeat or
@@ -1169,7 +1194,7 @@ defmodule Pepe.Agent.Session do
   # into a later user turn would silently discard that turn's own history.
   def handle_cast(:end_session, state) do
     Checkpoints.forget_session(state.key)
-    {:noreply, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], reset_pending: false})}
+    {:noreply, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], after_turn: AfterTurn.clear(state.after_turn)})}
   end
 
   # An agent handed its own conversation to another agent (the `switch_agent` tool) -
@@ -1177,14 +1202,29 @@ defmodule Pepe.Agent.Session do
   # rebinding `agent_name`/wiping `messages` while the run task is mid-flight (reading
   # its own snapshot of the history) would corrupt whatever that task reports back.
   @impl true
-  def handle_cast({:switch_agent, agent_name}, %{running: running} = state) when is_map(running) do
-    {:noreply, %{state | switch_pending: agent_name}}
+  def handle_cast({:switch_agent, agent_name, forward?}, %{running: running} = state) when is_map(running) do
+    {:noreply, %{state | after_turn: AfterTurn.switch(state.after_turn, agent_name, forward?)}}
   end
 
-  def handle_cast({:switch_agent, agent_name}, state) do
+  def handle_cast({:switch_agent, agent_name, _forward?}, state) do
     Checkpoints.forget_session(state.key)
-    {:noreply, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), switch_pending: nil})}
+
+    {:noreply,
+     persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), after_turn: AfterTurn.clear(state.after_turn)})}
   end
+
+  # `hand_back`: the channel's own agent is the target. `:remembered` re-sends what an earlier
+  # plain-text question stored (`remember_handback`), not the "yes" that is being answered now.
+  def handle_cast({:hand_back, :remembered}, %{running: running} = state) when is_map(running) do
+    {:noreply, %{state | after_turn: AfterTurn.switch_asked(state.after_turn, state.default_agent_name)}}
+  end
+
+  def handle_cast({:hand_back, forward?}, state), do: handle_cast({:switch_agent, state.default_agent_name, forward?}, state)
+
+  def handle_cast(:remember_handback, %{running: %{text: text}} = state),
+    do: {:noreply, %{state | after_turn: AfterTurn.ask(state.after_turn, text)}}
+
+  def handle_cast(:remember_handback, state), do: {:noreply, state}
 
   # TTL eviction: re-armed on every message; nil ttl_ms = never expire.
   defp arm_ttl(%{ttl_ms: ms} = state) when is_integer(ms) and ms > 0 do
@@ -1252,6 +1292,23 @@ defmodule Pepe.Agent.Session do
   defp cancel_queue(%{queue: queue} = state, msg) do
     Enum.each(queue, fn {from, _text, _opts} -> reply(from, msg) end)
     %{state | queue: []}
+  end
+
+  # What the turn that just finished leaves to do (see `AfterTurn.decide/4`). A failed turn
+  # applies nothing: its pending actions are dropped with it.
+  defp decide_after_turn(state, running, agent_name, {:ok, _, _, _}),
+    do: AfterTurn.decide(state.after_turn, agent_name, running, &same_agent?/2)
+
+  defp decide_after_turn(_state, _running, _agent_name, _error), do: :carry
+
+  defp forward_of({:switch, _target, forward}), do: forward
+  defp forward_of(_decision), do: nil
+
+  defp forward_message(state, nil, _from), do: state
+
+  defp forward_message(state, {text, opts}, from) do
+    {:noreply, started} = start_turn(state, text, opts, from)
+    started
   end
 
   # Resolve the agent fresh each turn (fall back to the default if it was renamed, and

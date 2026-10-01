@@ -240,6 +240,20 @@ sí explícito. A diferencia de `capability_nudge`, no cuesta nada en un turno n
 porque no hay un párrafo extra en el prompt de sistema, solo una nota corta en los turnos
 que cruzan el listón. Mira [Skills](../skills/) para lo que el agente escribe luego.
 
+## Ofrecer cambiar de agente cuando cambia el tema
+
+Una conversación puede quedarse atascada con el agente equivocado. El canal arranca con un agente, muchas veces uno que solo reparte las solicitudes y te pasa al especialista correcto. Desde ahí el especialista responde todo, incluso después de que cambies de tema, hasta que alguien escribe `/new`.
+
+`topic_reroute`, desactivado por defecto, lo arregla en el especialista. Cuando un mensaje trata claramente de algo que él no cubre, te hace una pregunta de sí o no, en tu idioma y con botones de verdad en los canales que los tienen: parece que cambió el tema, ¿quieres pasar la conversación al agente correcto? Si dices que sí, la conversación vuelve al agente con el que arranca el canal y tu mensaje va con ella, así que ese agente lo encamina y no repites nada. Si dices que no, el especialista sigue y no vuelve a preguntar hasta que el tema cambie otra vez.
+
+```bash
+pepe agent add soporte --topic-reroute ...
+```
+
+Tres cosas que conviene saber. El especialista solo juzga su propio alcance, así que no le listas los demás agentes; quien los conoce a todos es el agente que reparte. Nadie cambia de agente sin decir que sí, y una pregunta suelta que el especialista pueda responder sin más, simplemente se responde. Y la opción no hace nada en el agente con el que arranca el canal, ni en un canal que bloquea el cambio de agente. En un canal sin botones, el especialista pregunta en texto.
+
+Para que el agente que reparte envíe tu mensaje al especialista correcto al instante, sin esperar a tu siguiente mensaje, su llamada `switch_agent` puede llevar el mensaje consigo cuando ese mensaje ya era una petición para ese agente.
+
 ## Herramientas y la barrera de permisos
 
 Una herramienta es una capacidad. Un agente solo puede hacer lo que su lista

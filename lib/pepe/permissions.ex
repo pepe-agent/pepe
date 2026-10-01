@@ -145,7 +145,9 @@ defmodule Pepe.Permissions do
   # Tools that don't go through the human gate: read-only ones, plus `send_to_agent`
   # (governed by the directed `can_message` route allowlist instead). Anything not
   # listed - including drop-in plugin tools - requires approval (the safe default).
-  @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent ask_user session_search memory_search)
+  # `hand_back` is here because it is its own confirmation: it asks the person yes/no before
+  # doing anything, and all it can do is return the conversation to the channel's own agent.
+  @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent ask_user hand_back session_search memory_search)
 
   # Unlike @always_safe, these get no free pass when there is nobody to ask (an API token, a
   # webhook, a cron, a `delegate` worker): `Pepe.Permissions.Risk`'s text heuristic is exactly

@@ -77,6 +77,8 @@ defmodule Mix.Tasks.Pepe do
   ## Agents
 
       mix pepe agent add NAME --model MODEL --prompt "..." --tools bash,read_file [--can-message b,c] [--can-manage x,y|*|none] [--admin] [--default] [--project CO]
+                           [--session-search-project-wide] and the on/off options below (--no-NAME turns one off)
+                           #{Pepe.Config.Agent.switches() |> Enum.map_join(" ", &("--" <> String.replace(Atom.to_string(&1), "_", "-")))}
       mix pepe agent list [--project CO | --all]
       mix pepe agent route FROM TO [--remove] [--project CO]   # let FROM message TO (directed)
       mix pepe agent manage ADMIN TARGET [--remove]  # let ADMIN administer TARGET ("*" = all)
@@ -4223,35 +4225,27 @@ defmodule Mix.Tasks.Pepe do
   defp agent_cmd(["add", name | rest]) do
     {opts, _} =
       OptionParser.parse!(rest,
-        strict: [
-          project: :string,
-          model: :string,
-          prompt: :string,
-          description: :string,
-          tools: :string,
-          can_message: :string,
-          can_manage: :string,
-          hooks: :string,
-          slots: :string,
-          max_iterations: :integer,
-          temperature: :float,
-          triage_model: :string,
-          simple_model: :string,
-          utility_model: :string,
-          langfuse_prompt: :string,
-          default: :boolean,
-          exempt_message_limit: :boolean,
-          trust_untrusted_content: :boolean,
-          midrun_fold: :boolean,
-          commitments: :boolean,
-          session_search_project_wide: :boolean,
-          micro_compaction: :boolean,
-          capability_nudge: :boolean,
-          skill_learning: :boolean,
-          checkpoints: :boolean,
-          checkpoint_shell: :boolean,
-          admin: :boolean
-        ]
+        strict:
+          [
+            project: :string,
+            model: :string,
+            prompt: :string,
+            description: :string,
+            tools: :string,
+            can_message: :string,
+            can_manage: :string,
+            hooks: :string,
+            slots: :string,
+            max_iterations: :integer,
+            temperature: :float,
+            triage_model: :string,
+            simple_model: :string,
+            utility_model: :string,
+            langfuse_prompt: :string,
+            default: :boolean,
+            session_search_project_wide: :boolean,
+            admin: :boolean
+          ] ++ Enum.map(Pepe.Config.Agent.switches(), &{&1, :boolean})
       )
 
     with :ok <- validate_scope(name, opts[:project]) do
@@ -4596,25 +4590,15 @@ defmodule Mix.Tasks.Pepe do
   defp put_if(overrides, true, fields), do: Enum.into(fields, overrides)
   defp put_if(overrides, false, _fields), do: overrides
 
-  # Split from new_agent_from_opts/2 to keep its cyclomatic complexity down - each `||`
-  # default below counts as a branch, same reasoning as Pepe.Config.Agent.put_flags/2.
+  # Every on/off switch comes from `Pepe.Config.Agent.switch_defaults/0`, the same list the
+  # `--flag` parsing above is built from.
   defp put_new_agent_flags(agent, opts) do
-    %{
-      agent
-      | exempt_message_limit: opts[:exempt_message_limit] || false,
-        trust_untrusted_content: opts[:trust_untrusted_content] || false,
-        midrun_fold: opts[:midrun_fold] || false,
-        commitments: opts[:commitments] || false,
-        session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self"),
-        micro_compaction: opts[:micro_compaction] || false,
-        capability_nudge: opts[:capability_nudge] || false,
-        skill_learning: opts[:skill_learning] || false
-    }
-    |> put_new_agent_checkpoint_flags(opts)
-  end
+    agent =
+      Enum.reduce(Pepe.Config.Agent.switch_defaults(), agent, fn {key, default}, acc ->
+        Map.put(acc, key, Keyword.get(opts, key, default))
+      end)
 
-  defp put_new_agent_checkpoint_flags(agent, opts) do
-    %{agent | checkpoints: Keyword.get(opts, :checkpoints, true), checkpoint_shell: opts[:checkpoint_shell] || false}
+    %{agent | session_search_scope: if(opts[:session_search_project_wide], do: "project", else: "self")}
   end
 
   defp print_agent_line(a, default) do

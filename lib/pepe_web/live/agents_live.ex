@@ -645,6 +645,14 @@ defmodule PepeWeb.AgentsLive do
 
               <div>
                 <label class="flex items-start gap-2.5 text-sm">
+                  <input type="checkbox" name="topic_reroute" value="true" checked={@edit_agent[:topic_reroute]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
+                  <span>{gettext("Offer to switch agent when the subject changes")}</span>
+                </label>
+                <p class={[hlp(), check_indent()]}>{gettext("If the user moves to a topic it does not cover, it asks yes or no before passing the chat to the right agent.")}</p>
+              </div>
+
+              <div>
+                <label class="flex items-start gap-2.5 text-sm">
                   <input type="checkbox" name="checkpoints" value="true" checked={@edit_agent[:checkpoints]} class={["mt-0.5 shrink-0", checkbox_cls()]} />
                   <span>{gettext("Back up files before changing them")}</span>
                 </label>
@@ -991,21 +999,14 @@ defmodule PepeWeb.AgentsLive do
     }
   end
 
-  defp put_agent_switches(agent, params) do
-    %{
-      agent
-      | exempt_message_limit: params["exempt_message_limit"] == "true",
-        trust_untrusted_content: params["trust_untrusted_content"] == "true",
-        midrun_fold: params["midrun_fold"] == "true",
-        commitments: params["commitments"] == "true",
-        session_search_scope: session_search_scope_param(params),
-        micro_compaction: params["micro_compaction"] == "true",
-        capability_nudge: params["capability_nudge"] == "true",
-        skill_learning: params["skill_learning"] == "true",
-        checkpoints: params["checkpoints"] == "true",
-        checkpoint_shell: params["checkpoint_shell"] == "true"
-    }
+  # Every on/off switch the form can carry (the list lives in `Pepe.Config.Agent`), as the
+  # fields to put on the agent. An unchecked box is simply absent from the params.
+  defp switches_from_params(params) do
+    switches = Map.new(Pepe.Config.Agent.switches(), &{&1, params[Atom.to_string(&1)] == "true"})
+    Map.put(switches, :session_search_scope, session_search_scope_param(params))
   end
+
+  defp put_agent_switches(agent, params), do: Map.merge(agent, switches_from_params(params))
 
   defp session_search_scope_param(%{"session_search_project_wide" => "true"}), do: "project"
   defp session_search_scope_param(_params), do: "self"
@@ -1053,6 +1054,7 @@ defmodule PepeWeb.AgentsLive do
       micro_compaction: false,
       capability_nudge: false,
       skill_learning: false,
+      topic_reroute: false,
       checkpoints: true,
       checkpoint_shell: false
     }
@@ -1078,18 +1080,9 @@ defmodule PepeWeb.AgentsLive do
         manage_mode: params["can_manage_mode"] || edit.manage_mode,
         triage_model: blank(params["triage_model"]),
         simple_model: blank(params["simple_model"]),
-        utility_model: blank(params["utility_model"]),
-        exempt_message_limit: params["exempt_message_limit"] == "true",
-        trust_untrusted_content: params["trust_untrusted_content"] == "true",
-        midrun_fold: params["midrun_fold"] == "true",
-        commitments: params["commitments"] == "true",
-        session_search_scope: if(params["session_search_project_wide"] == "true", do: "project", else: "self"),
-        micro_compaction: params["micro_compaction"] == "true",
-        capability_nudge: params["capability_nudge"] == "true",
-        skill_learning: params["skill_learning"] == "true",
-        checkpoints: params["checkpoints"] == "true",
-        checkpoint_shell: params["checkpoint_shell"] == "true"
+        utility_model: blank(params["utility_model"])
     }
+    |> Map.merge(switches_from_params(params))
   end
 
   # The auto-approve grid, as the backend still wants it: the literal "*" for "never ask",

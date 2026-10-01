@@ -115,6 +115,14 @@ defmodule Pepe.Tools.ManageAgent do
             without the user saying yes. Turn it ON for "let it learn from what it does",
             "make it keep what it figures out". Off is right for an agent whose skills are
             curated by hand.
+          - topic_reroute: whether the target, when a conversation is with it and not with
+            the channel's own routing agent, may notice the user's message is clearly outside
+            what it covers and ask them yes or no whether to move the conversation back to
+            that routing agent, which sends it to the right one. It never moves anyone without
+            a yes, and it only judges its own scope, so there is nothing to list. Turn it ON
+            for "let it notice when the subject changes", "stop users getting stuck with the
+            wrong agent without typing /new". It does nothing on an agent that is itself the
+            channel's routing agent. Off is right for an agent users should stay with.
           - checkpoints: whether file tools keep a copy of what they overwrite, edit or move
             so `/rewind` can put those files back along with the conversation. It is ON by
             default. Turn it OFF for "never copy this agent's files anywhere". Files that
@@ -149,8 +157,7 @@ defmodule Pepe.Tools.ManageAgent do
           "flag" => %{
             "type" => "string",
             "description" => "For set_flag: which switch.",
-            "enum" =>
-              ~w(trust_untrusted_content exempt_message_limit midrun_fold commitments session_search_project_wide micro_compaction capability_nudge skill_learning checkpoints checkpoint_shell)
+            "enum" => flag_names()
           }
         },
         "required" => ["action"]
@@ -356,18 +363,16 @@ defmodule Pepe.Tools.ManageAgent do
     end
   end
 
-  @flags %{
-    "trust_untrusted_content" => :trust_untrusted_content,
-    "exempt_message_limit" => :exempt_message_limit,
-    "midrun_fold" => :midrun_fold,
-    "commitments" => :commitments,
-    "session_search_project_wide" => :session_search_scope,
-    "micro_compaction" => :micro_compaction,
-    "capability_nudge" => :capability_nudge,
-    "skill_learning" => :skill_learning,
-    "checkpoints" => :checkpoints,
-    "checkpoint_shell" => :checkpoint_shell
-  }
+  # Every on/off option of an agent (`Pepe.Config.Agent.switches/0`) plus
+  # `session_search_project_wide`, which is stored as "self"/"project" but exposed here as an
+  # on/off switch like the rest.
+  defp flags do
+    Pepe.Config.Agent.switches()
+    |> Map.new(&{Atom.to_string(&1), &1})
+    |> Map.put("session_search_project_wide", :session_search_scope)
+  end
+
+  defp flag_names, do: flags() |> Map.keys() |> Enum.sort()
 
   defp set_flag(target, flag_name, value, ctx) do
     with {:ok, field} <- known_flag(flag_name),
@@ -387,8 +392,8 @@ defmodule Pepe.Tools.ManageAgent do
   defp flag_value(_field, on?), do: on?
 
   defp known_flag(name) do
-    case @flags[name] do
-      nil -> {:error, "unknown flag: #{inspect(name)}. Known: #{Enum.join(Map.keys(@flags), ", ")}"}
+    case flags()[name] do
+      nil -> {:error, "unknown flag: #{inspect(name)}. Known: #{Enum.join(flag_names(), ", ")}"}
       field -> {:ok, field}
     end
   end
@@ -473,9 +478,18 @@ defmodule Pepe.Tools.ManageAgent do
     utility_model: #{a.utility_model || "(off: chores done without a model)"}
     tools: #{Enum.join(a.tools, ", ")}
     can_message: #{Enum.join(a.can_message, ", ")}
-    flags: trust_untrusted_content=#{on_off(a.trust_untrusted_content)}, exempt_message_limit=#{on_off(a.exempt_message_limit)}, midrun_fold=#{on_off(a.midrun_fold)}, commitments=#{on_off(a.commitments)}, session_search_project_wide=#{on_off(a.session_search_scope == "project")}, micro_compaction=#{on_off(a.micro_compaction)}, capability_nudge=#{on_off(a.capability_nudge)}, skill_learning=#{on_off(a.skill_learning)}, checkpoints=#{on_off(a.checkpoints)}, checkpoint_shell=#{on_off(a.checkpoint_shell)}
+    flags: #{flag_summary(a)}
     persona: #{persona_preview(a.name)}
     """
+  end
+
+  # Every flag with its current state, in the same order and spelling `set_flag` accepts.
+  defp flag_summary(%Agent{} = a) do
+    Enum.map_join(flag_names(), ", ", fn name ->
+      field = flags()[name]
+      state = if field == :session_search_scope, do: a.session_search_scope == "project", else: Map.get(a, field)
+      "#{name}=#{on_off(state)}"
+    end)
   end
 
   defp persona_preview(name) do

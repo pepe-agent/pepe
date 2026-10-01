@@ -23,6 +23,10 @@ defmodule Pepe.Tools.SwitchAgent do
   never pays tokens describing a capability it can't use); the check here is a backstop
   for a direct call, not the primary gate.
 
+  With `forward_message`, the message being answered is also re-sent to the new agent as
+  the same caller's next turn, so a routing agent can pass a request on without the user
+  repeating it (see `Pepe.Agent.Session.switch_agent/3`).
+
   The switch takes effect **after this turn**, not mid-reply: the human still gets
   this turn's answer from the agent that's already talking to them (so it can say
   "sure, connecting you now"), and the very next message is the first one the new
@@ -49,25 +53,40 @@ defmodule Pepe.Tools.SwitchAgent do
       %{
         "type" => "object",
         "properties" => %{
-          "target" => %{"type" => "string", "description" => "The agent to hand the conversation to."}
+          "target" => %{"type" => "string", "description" => "The agent to hand the conversation to."},
+          "forward_message" => %{
+            "type" => "boolean",
+            "description" =>
+              "True when the user's message you are answering is itself a request for that agent to handle (they asked for something it covers), so it is sent to the agent right away and they do not have to repeat it. Leave it false when the message was only a request to be connected. When true, write no reply of your own."
+          }
         },
         "required" => ["target"]
       }
     )
   end
 
+  # Not offered at all on a channel that locks agent switching (see the moduledoc).
   @impl true
-  def run(%{"target" => target}, ctx) when is_binary(target) do
+  def offered?(ctx), do: ctx[:agent_switch_locked] != true and Pepe.Tools.Tool.has_routes?(ctx[:agent])
+
+  @impl true
+  def run(%{"target" => target} = args, ctx) when is_binary(target) do
     from = ctx[:agent]
     from_name = from && from.name
     qualified = from_name && Project.qualify(target, from_name)
 
     case authorize(from, from_name, qualified, ctx) do
       {:ok, resolved} ->
-        Session.switch_agent(ctx[:session_key], resolved)
+        forward? = args["forward_message"] == true
+        Session.switch_agent(ctx[:session_key], resolved, forward: forward?)
 
-        {:ok,
-         "Switched to #{resolved}. This conversation continues as #{resolved} starting with the next message. If you name the agent to the user, use this exact spelling and capitalization: #{resolved}."}
+        if forward? do
+          {:ok,
+           "Switched to #{resolved}. The user's message is being sent to #{resolved} right now and its answer is what they will see: write nothing more."}
+        else
+          {:ok,
+           "Switched to #{resolved}. This conversation continues as #{resolved} starting with the next message. If you name the agent to the user, use this exact spelling and capitalization: #{resolved}."}
+        end
 
       {:error, _} = err ->
         err

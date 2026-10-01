@@ -237,6 +237,20 @@ sim explícito. Ao contrário do `capability_nudge`, não custa nada num turno v
 não há parágrafo extra no prompt de sistema, apenas uma nota curta nos turnos que passam a
 fasquia. Vê [Skills](../skills/) para o que o agente escreve a seguir.
 
+## Propor mudar de agente quando o assunto muda
+
+Uma conversa pode ficar presa ao agente errado. O canal começa com um agente, muitas vezes um que apenas distribui os pedidos e passa a conversa ao especialista certo. A partir daí o especialista responde a tudo, mesmo depois de mudares de assunto, até alguém escrever `/new`.
+
+O `topic_reroute`, desligado por omissão, resolve isso no especialista. Quando uma mensagem é claramente sobre algo que ele não cobre, faz uma pergunta de sim ou não, na tua língua e com botões a sério nos canais que os têm: parece que o assunto mudou, queres passar a conversa ao agente certo? Se disseres sim, a conversa volta ao agente com que o canal começa e a tua mensagem segue com ela, por isso esse agente encaminha-a e não repetes nada. Se disseres não, o especialista continua e só volta a perguntar quando o assunto mudar outra vez.
+
+```bash
+pepe agent add suporte --topic-reroute ...
+```
+
+Há três coisas a saber. O especialista só avalia o seu próprio âmbito, por isso não lhe listas os outros agentes; quem os conhece a todos é o agente que distribui. Ninguém muda de agente sem dizer que sim, e uma pergunta solta a que o especialista consiga simplesmente responder é respondida. E a opção não faz nada no agente com que o canal começa, nem num canal que bloqueia a troca de agente. Num canal sem botões, o especialista pergunta em texto.
+
+Para que o agente que distribui envie a tua mensagem ao especialista certo logo, sem esperar pela mensagem seguinte, a chamada `switch_agent` dele pode levar a mensagem consigo quando ela própria era um pedido para esse agente.
+
 ## Ferramentas e a barreira de permissão
 
 Uma ferramenta é uma capacidade, e um agente só consegue fazer o que a sua lista

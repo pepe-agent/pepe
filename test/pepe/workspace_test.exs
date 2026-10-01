@@ -227,6 +227,21 @@ defmodule Pepe.Agent.WorkspaceTest do
     end
   end
 
+  describe "topic_reroute" do
+    test "off by default: nothing about changing subject in the prompt" do
+      refute Workspace.system_prompt(%{name: "zak", system_prompt: "seed"}) =~ "When the subject changes"
+      refute Workspace.system_prompt(%{name: "zak", system_prompt: "seed", topic_reroute: false}) =~ "When the subject changes"
+    end
+
+    test "on: teaches the agent to ask before moving anyone, and names no other agent" do
+      prompt = Workspace.system_prompt(%{name: "zak", system_prompt: "seed", topic_reroute: true})
+
+      assert prompt =~ "When the subject changes"
+      assert prompt =~ "hand_back"
+      assert prompt =~ "nothing changes unless they say yes"
+    end
+  end
+
   test "IDENTITY.md is small enough to stay always-loaded" do
     agent = %{name: "zak", system_prompt: "seed"}
     File.mkdir_p!(Workspace.dir("zak"))

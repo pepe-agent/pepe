@@ -61,6 +61,10 @@ defmodule Pepe.Tools.SendToAgent do
 
   def run(_args, _ctx), do: {:error, "send_to_agent needs `to` and `message`"}
 
+  # Not offered to an agent with nobody on its `can_message` list: there is no one to message.
+  @impl true
+  def offered?(ctx), do: Pepe.Tools.Tool.has_routes?(ctx[:agent])
+
   # Whether the message would be refused on policy alone (no route, other project, loop). Runs
   # before the permission gate, so a call that can never be delivered is answered straight away.
   def preflight(%{"to" => to}, ctx) when is_binary(to) do

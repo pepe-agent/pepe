@@ -255,12 +255,6 @@ defmodule Pepe.Agent.Runtime do
   end
 
   defp run_chain(agent, chain, messages, opts) do
-    specs =
-      agent.tools
-      |> Tools.specs()
-      |> hide_switch_agent(opts[:agent_switch_locked] == true)
-      |> hide_unroutable(agent)
-
     ctx = %{
       cwd: opts[:cwd] || File.cwd!(),
       cwd_override: opts[:cwd_override],
@@ -280,6 +274,9 @@ defmodule Pepe.Agent.Runtime do
       # surface already knows unambiguously which connection this turn belongs to; this just
       # carries that verdict.
       agent_switch_locked: opts[:agent_switch_locked] == true,
+      # Whether this conversation is currently with someone other than the channel's own agent
+      # (set by Session), i.e. whether there is anyone for `hand_back` to hand it back to.
+      handback: opts[:handback] == true,
       authorize: opts[:authorize],
       ask_user: opts[:ask_user],
       # When true (autonomous consolidation), file writes are staged for review
@@ -301,43 +298,28 @@ defmodule Pepe.Agent.Runtime do
       graph_run_id: opts[:graph_run_id]
     }
 
+    # Which tools are on offer this turn is the registry's call (`Tools.offered?/2`), asked of
+    # the same ctx the tools then run with. What remains here is the one thing that is not a
+    # whole tool going on or off: a locked channel keeps `manage_channel` but loses two of its
+    # actions.
+    specs = agent.tools |> Tools.specs(ctx) |> strip_locked_actions(ctx.agent_switch_locked)
+
     loop(agent, chain, messages, specs, ctx, opts, agent.max_iterations || @max_iterations_backstop)
   end
 
   # A model that never sees a locked-out capability never tries it, rather than trying and
   # being told no every time - it costs tokens on every single turn for nothing. switch_agent
-  # is single-purpose, so it's hidden outright; manage_channel is a multi-action tool (list,
+  # is single-purpose, so it's hidden outright (its own `offered?/1`, see Pepe.Tools.Tool);
+  # manage_channel is a multi-action tool (list,
   # set_trainers, ...) with unrelated legitimate uses, so it stays visible and only loses
   # "bind_topic"/"unbind_topic" from its own `action` enum - the model can still see and use
   # the tool, it just can no longer construct a call the API's own schema would accept for
   # either of those two actions.
   @manage_channel_action_enum ["function", "parameters", "properties", "action", "enum"]
 
-  # An agent with nobody on its `can_message` list has no one to message or hand a conversation
-  # to, so both tools are dropped from its specs: offering them only invites a call that is
-  # refused (and costs the tokens describing them on every request).
-  defp hide_unroutable(nil, _agent), do: nil
-  defp hide_unroutable(specs, %{can_message: [_ | _]}), do: specs
-
-  defp hide_unroutable(specs, _agent) do
-    case Enum.reject(specs, &(get_in(&1, ["function", "name"]) in ["send_to_agent", "switch_agent"])) do
-      [] -> nil
-      specs -> specs
-    end
-  end
-
-  defp hide_switch_agent(nil, _locked?), do: nil
-  defp hide_switch_agent(specs, false), do: specs
-
-  defp hide_switch_agent(specs, true) do
-    specs
-    |> Enum.reject(&(get_in(&1, ["function", "name"]) == "switch_agent"))
-    |> Enum.map(&strip_bind_topic_actions/1)
-    |> case do
-      [] -> nil
-      specs -> specs
-    end
-  end
+  defp strip_locked_actions(nil, _locked?), do: nil
+  defp strip_locked_actions(specs, false), do: specs
+  defp strip_locked_actions(specs, true), do: Enum.map(specs, &strip_bind_topic_actions/1)
 
   defp strip_bind_topic_actions(%{"function" => %{"name" => "manage_channel"}} = spec) do
     case get_in(spec, @manage_channel_action_enum) do

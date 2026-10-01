@@ -194,6 +194,7 @@ defmodule Pepe.Agent.Workspace do
       {"docs index", docs_index()},
       {"skills index", skills_index(agent)},
       {"capability nudge", capability_nudge_note(agent)},
+      {"topic reroute", topic_reroute_note(agent)},
       {"conventions", convention_note()}
     ]
     |> Enum.reject(fn {_label, text} -> text in [nil, ""] end)
@@ -322,6 +323,22 @@ defmodule Pepe.Agent.Workspace do
   end
 
   defp capability_nudge_note(_agent), do: nil
+
+  # Opt-in (`topic_reroute` on Pepe.Config.Agent, off by default). Only the convention lives
+  # here: the `hand_back` tool itself is offered per turn by the runtime, and only while this
+  # conversation is not with the channel's own agent, so on the router (or anywhere there is
+  # nobody to hand back to) the paragraph is inert text the agent never acts on. It teaches the
+  # agent to judge only its own scope and to always ask, never to move someone on its own.
+  defp topic_reroute_note(%{topic_reroute: true}) do
+    "## When the subject changes\n" <>
+      "If the user's message is clearly about something outside what you cover, and a different " <>
+      "agent would handle it better, you can offer to move the conversation with the hand_back " <>
+      "tool. It asks them yes or no and nothing changes unless they say yes. Offer only when the " <>
+      "change is clear: answer a side question or a passing remark yourself, and when unsure, " <>
+      "keep helping. If they say no, carry on and do not offer again until the subject changes again."
+  end
+
+  defp topic_reroute_note(_agent), do: nil
 
   defp labeled(nil, _file), do: nil
   defp labeled(content, file), do: "## #{file}\n#{content}"
