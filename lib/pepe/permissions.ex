@@ -463,8 +463,11 @@ defmodule Pepe.Permissions do
     "Error: `#{name}` did not run - it needs a human's OK, nobody was available to give " <>
       "one, so it was #{reason} Do not retry the call yourself and do not treat this as " <>
       "the user refusing: if a human approves it, the stored call runs exactly as issued " <>
-      "and its result arrives in this conversation as a new message. If anyone reads " <>
-      "this conversation, tell them the approve command above; then continue with " <>
+      "and its result arrives in this conversation as a new message. Tell the person " <>
+      "only that this is waiting for approval from whoever manages Pepe; never quote " <>
+      "the `mix` command or the id to them, it only works on the operator's own " <>
+      "machine and means nothing in a chat. Only if they say they are that operator " <>
+      "with terminal access, give them the command above. Then continue with " <>
       "whatever does not depend on this call."
   end
 

@@ -68,8 +68,10 @@ the agent runs, and everything else is refused.** Standing aside instead would m
 token a shell account. Say what may run unattended by putting it in the agent's `auto_approve`.
 
 Refused does not mean lost. The blocked call is parked as a durable **pending approval**, and
-the refusal you receive names its id and the exact commands that resolve it. Relay those to
-the operator when one is reachable:
+the refusal you receive names its id and the exact commands that resolve it. These are for the
+operator at a terminal, never for the person chatting with you: on Telegram, Slack, WhatsApp or
+the API, say only that it is waiting for approval from whoever manages Pepe, and give the
+commands only to someone who says they are that operator:
 
 ```shell
 mix pepe approvals list                  # what is waiting, with ids and expiry
