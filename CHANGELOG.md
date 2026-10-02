@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pictures and files sent to the bot in Slack are now read.** A message with an attachment was reduced to its text, so the agent answered "no print came with it". Images, audio and documents now go through the same intake as on other channels. The Slack app needs the `files:read` scope (reinstall it after adding it).
+
 ### Changed
 
 - **`/mention on|off` on a webhook channel (Slack, Teams, Google Chat, Discord) is now limited to the channel's trainers.** It decides whether the whole channel needs an @mention, so like `/agent` it is no longer open to every sender. Anyone can still send `/mention` to see the current setting.

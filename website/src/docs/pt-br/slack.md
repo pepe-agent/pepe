@@ -15,7 +15,7 @@ workspace. O Slack entrega as mensagens ao Pepe através da própria Events API.
    com scaffolding próprio do Slack que não é necessário aqui — quem faz o papel de
    agente é o Pepe). Selecione o workspace.
 2. **Dar permissão ao bot.** Em **OAuth & Permissions → Scopes → Bot Token Scopes**,
-   adicione `chat:write`, `app_mentions:read`, `channels:history` e `im:history`.
+   adicione `chat:write`, `app_mentions:read`, `channels:history` e `im:history`. Adicione também `files:read` se as pessoas vão enviar imagens ou arquivos; sem ele o bot não consegue abri-los.
 3. **Instalar o app.** Ainda em OAuth & Permissions, clique em "Install to Workspace"
    e copie o **Bot User OAuth Token** (`xoxb-...`).
 4. **Pegar o signing secret.** Em **Basic Information → App Credentials**, copie o

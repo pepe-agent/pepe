@@ -8,6 +8,9 @@ defmodule Pepe.Webhooks.Slack do
     * `bot_token`      - the bot user OAuth token (`xoxb-...`), the Bearer for replies
     * `signing_secret` - verifies the `X-Slack-Signature` on inbound requests
 
+  Pictures and files sent to the bot are read like on any other channel (see
+  `Pepe.Webhooks.Media`); that needs the `files:read` scope on the Slack app.
+
   Point the Slack app's Event Subscriptions request URL at the connection URL and
   subscribe to `message.channels` / `app_mention`. The first save triggers a
   `url_verification` handshake, answered synchronously here.
@@ -92,7 +95,7 @@ defmodule Pepe.Webhooks.Slack do
   @impl true
   def parse(%{"type" => "event_callback", "event" => event}) do
     if user_message?(event) do
-      {:ok, [%{from: event["channel"], text: strip_mention(event["text"]), id: event["ts"]}]}
+      {:ok, [%{from: event["channel"], text: strip_mention(event["text"] || ""), id: event["ts"], media: media(event)}]}
     else
       :ignore
     end
@@ -100,14 +103,69 @@ defmodule Pepe.Webhooks.Slack do
 
   def parse(_payload), do: :ignore
 
-  # A real message from a person: a message/app_mention event with text, not a bot echo
-  # (no bot_id) and not an edit/join/etc. subtype.
+  # A real message from a person: a message/app_mention event with text or a file, not a
+  # bot echo (no bot_id) and not an edit/join/etc. subtype. A message with an attachment
+  # arrives as the `file_share` subtype, so that one is let through.
   defp user_message?(%{"type" => type} = event) when type in ["message", "app_mention"] do
-    is_binary(event["text"]) and event["text"] != "" and
-      is_nil(event["bot_id"]) and is_nil(event["subtype"])
+    (text?(event) or media(event) != []) and
+      is_nil(event["bot_id"]) and event["subtype"] in [nil, "file_share"]
   end
 
   defp user_message?(_), do: false
+
+  defp text?(event), do: is_binary(event["text"]) and event["text"] != ""
+
+  # The files attached to the message. `url_private_download` needs the bot's token
+  # (`files:read` scope) and is fetched later by `fetch_media/2`.
+  defp media(event) do
+    for f <- List.wrap(event["files"]), is_map(f), is_binary(f["url_private_download"] || f["url_private"]) do
+      %{
+        kind: kind(f["mimetype"], f["name"]),
+        ref: f["url_private_download"] || f["url_private"],
+        filename: f["name"],
+        mime: f["mimetype"],
+        size: f["size"]
+      }
+    end
+  end
+
+  defp kind(mime, name) do
+    case to_string(mime || MIME.from_path(to_string(name))) do
+      "audio/" <> _ -> "audio"
+      "image/" <> _ -> "image"
+      "video/" <> _ -> "video"
+      _ -> "document"
+    end
+  end
+
+  @doc """
+  Fetch an attachment off Slack's file host with the bot's token. The url comes off the wire,
+  so the host is pinned to Slack's own, and the transfer is cut at the connection's size
+  limit. Without the `files:read` scope Slack answers with a login page instead of the
+  bytes, which is refused here rather than handed to the agent as the file.
+  """
+  @impl true
+  def fetch_media(config, %{ref: url} = media) when is_binary(url) do
+    token = Config.interpolate(provider_config(config)["bot_token"])
+
+    with true <- (is_binary(token) and token != "") or {:error, :no_bot_token},
+         :ok <- Pepe.Webhooks.Media.within_cap(media[:size], config),
+         {:ok, bytes} <-
+           Pepe.Webhooks.Media.Download.get(url,
+             hosts: ["files.slack.com"],
+             bearer: token,
+             max_bytes: Pepe.Webhooks.Media.max_bytes(config)
+           ) do
+      if String.starts_with?(bytes, "<!DOCTYPE html") or String.starts_with?(bytes, "<html"),
+        do: {:error, :missing_files_read_scope},
+        else: {:ok, bytes}
+    else
+      {:error, :bad_url} -> {:error, :bad_attachment_url}
+      {:error, _} = error -> error
+    end
+  end
+
+  def fetch_media(_config, _media), do: {:error, :no_attachment_url}
 
   # An app_mention's text leads with the bot's own <@U...> mention (Slack doesn't
   # strip it the way MS Teams'/Google Chat's own APIs do) - drop it so "@bot /new"
