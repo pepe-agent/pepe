@@ -82,9 +82,9 @@ pra "esse canal agora é sempre do billing".
 
 A permissão usada aqui é a mesma lista `can_message` do `send_to_agent`: se um agente
 já pode mandar mensagem para outro, também pode entregar a conversa a ele, sem
-configuração extra. A diferença é que `switch_agent`, por padrão, **passa** pela
-barreira de permissão normal: mudar quem responde a partir dali é uma decisão grande
-demais para deixar passar batido sem ninguém perceber.
+configuração extra. Como o `send_to_agent`, o `switch_agent` **não** passa pela barreira
+de permissão humana: a rota já é a autorização. Um canal que nunca deve trocar de agente
+usa `agent_switch_locked`, que recusa a troca de vez.
 
 ## Roteamento e a barreira de permissão
 

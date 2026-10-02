@@ -45,10 +45,10 @@ refused, and refused discreetly ("Agent X isn't available to you") so the permis
 model never leaks. Routes never cross a project boundary, even if an allowlist somehow
 names an agent in another project.
 
-`send_to_agent`'s allowlist check *is* its authorization, so it doesn't go through the
-human permission prompt (the callee's own risky tools still do). `switch_agent` is a
-bigger, harder-to-miss action for the human: it changes who answers every message
-after this one, so it stays behind the normal permission gate unless pre-approved.
+The allowlist check *is* the authorization for both `send_to_agent` and `switch_agent`, so
+neither goes through the human permission prompt (the callee's own risky tools still do). A
+channel that must never change agent sets `agent_switch_locked`, which refuses `switch_agent`
+outright.
 
 ## Loop & hop guard
 

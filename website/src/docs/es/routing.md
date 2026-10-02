@@ -84,10 +84,9 @@ deshace. Usa `switch_agent` para "ponme con billing ahora"; usa el tipo permanen
 
 `switch_agent` reutiliza la misma lista `can_message` de `send_to_agent`: si un agente
 puede escribirle a otro, también puede cederle la conversación, sin necesidad de dar de
-alta una ruta aparte. La diferencia es que, por defecto, `switch_agent` **sí** pasa por la
-barrera de permisos habitual: está cambiando quién responderá cada mensaje de ahí en
-adelante, una decisión de mayor peso que una persona podría aprobar sin darse cuenta si
-no se le marca explícitamente.
+alta una ruta aparte. Igual que `send_to_agent`, `switch_agent` **no** pasa por la barrera
+de permisos humana: la ruta ya es la autorización. Un canal que nunca debe cambiar de agente
+usa `agent_switch_locked`, que lo rechaza de plano.
 
 ## Cómo encaja el enrutamiento con la barrera de permisos
 

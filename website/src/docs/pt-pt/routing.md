@@ -84,11 +84,9 @@ para "este canal passa a ser sempre do billing".
 
 A lista usada é exatamente a mesma `can_message` do `send_to_agent`: se um agente já
 pode escrever a um colega, também já pode passar-lhe a conversa, sem precisar de
-configurar nada a mais para isso. A diferença fica noutro sítio: ao contrário do
-`send_to_agent`, o `switch_agent` **passa** pela barreira de permissão normal por
-predefinição, porque decide quem responde a cada mensagem daí para a frente. Ou seja,
-é uma ação com peso suficiente para um humano deixar passar sem reparar, se ninguém
-lha mostrar primeiro.
+configurar nada a mais para isso. Tal como o `send_to_agent`, o `switch_agent` **não**
+passa pela barreira de permissão humana: a rota já é a autorização. Um canal que nunca
+deve trocar de agente usa `agent_switch_locked`, que o recusa de vez.
 
 ## O encaminhamento e a barreira de permissão
 

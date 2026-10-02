@@ -80,9 +80,9 @@ kind for "this channel is always billing's from now on."
 
 It uses the exact same `can_message` allowlist as `send_to_agent`: if an agent can
 message a peer, it can also hand the conversation to it, no separate route to
-configure. Unlike `send_to_agent`, `switch_agent` **does** go through the normal
-permission gate by default: it changes who answers every message after this one, a
-bigger action a human could too easily wave through without noticing.
+configure. Like `send_to_agent`, `switch_agent` does **not** go through the human
+permission gate: the route is the authorization. A channel that must never change agent
+sets `agent_switch_locked`, which refuses it outright.
 
 ## Routing and the permission gate
 
