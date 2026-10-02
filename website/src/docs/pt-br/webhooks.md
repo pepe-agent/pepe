@@ -84,6 +84,8 @@ conexão como um todo, então não vaza para nenhum outro canal. O WhatsApp,
 por sua vez, não filtra por menção hoje (sempre responde a tudo), então
 `/mention` simplesmente não tem efeito nenhum lá.
 
+Ligar ou desligar fica reservado aos **trainers** do canal (a mesma lista de confiança do `/agent`), porque muda o comportamento do canal para todos que estão nele. Qualquer pessoa ainda pode mandar `/mention` para ver a configuração atual.
+
 <div class="note"><strong>Digitando um comando no Slack.</strong> O próprio
 cliente do Slack trata qualquer coisa que comece com <code>/</code> como uma
 tentativa de rodar um dos comandos de barra dele, e recusa nem enviar a

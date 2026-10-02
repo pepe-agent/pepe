@@ -463,6 +463,13 @@ defmodule Pepe.Webhooks do
 
   defp unknown_agent(name), do: dgettext("webhooks", "Unknown agent: %{name}", name: name)
 
+  defp mention_denied_message,
+    do:
+      dgettext(
+        "webhooks",
+        "You don't have permission to change whether this channel needs an @mention. Ask one of this channel's trainers."
+      )
+
   defp agent_switch_locked_message,
     do: dgettext("webhooks", "Agent switching is locked on this channel.")
 
@@ -555,11 +562,17 @@ defmodule Pepe.Webhooks do
   # addressed?/3 and mention_waived?/2 above) - only matters for a provider that
   # actually implements addressed?/2 gating (Slack, MS Teams, Google Chat today);
   # a no-op where the connection already answers everything.
-  defp dispatch_command(_entry, "mention", args, _from) do
+  #
+  # Changing it is trainer-gated (learn?/2), like `/agent` and `/model ... global`: it changes
+  # how the whole channel behaves for everyone in it. Reading the status stays open to all.
+  defp dispatch_command(entry, "mention", args, from) do
+    trainer? = learn?(entry, from)
+
     case args |> String.trim() |> String.downcase() do
+      "" -> {:mention_status}
+      change when change in ["on", "off"] and not trainer? -> {:reply, mention_denied_message()}
       "off" -> {:mention, true}
       "on" -> {:mention, false}
-      "" -> {:mention_status}
       _ -> {:reply, dgettext("webhooks", "Usage: /mention on|off")}
     end
   end

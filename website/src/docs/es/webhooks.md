@@ -43,6 +43,8 @@ Slack, Discord (en su modo conectado por gateway, ver [Discord](../discord/)), M
 
 Como un comando de canal igual necesita estar dirigido al bot para poder ejecutarse, el *primer* `/mention off` sí necesita una @mención de verdad (`@bot /mention off`); después de eso, ese canal deja de necesitarla hasta el próximo `/new`. La excepción queda guardada en la conversación de ese canal puntual, no en la conexión, así que nunca se cuela en ningún otro canal. WhatsApp, por ahora, no filtra por menciones (siempre contesta), así que ahí `/mention` no hace nada.
 
+Activarlo o desactivarlo queda reservado a los **trainers** del canal (la misma lista de confianza que usa `/agent`), porque cambia el comportamiento del canal para todos los que están en él. Cualquiera puede seguir enviando `/mention` para ver la configuración actual.
+
 <div class="note"><strong>Escribir un comando en Slack.</strong> El propio cliente de Slack trata cualquier cosa que empiece con <code>/</code> como un intento de ejecutar uno de sus propios comandos de barra, y directamente se niega a enviarla como mensaje si no hay ninguno registrado con ese nombre - así que <code>/mention off</code> escrito tal cual llega a ser rechazado por el propio Slack antes de que le llegue a Pepe. Escribe un espacio antes de la barra (<code> /mention off</code>) para mandarlo como texto normal; Pepe quita ese espacio antes de comparar con el comando, tal como siempre hizo.</div>
 
 ## Vincular un canal a un agente

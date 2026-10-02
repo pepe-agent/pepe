@@ -478,10 +478,19 @@ defmodule Pepe.WebhooksTest do
   describe "/mention" do
     test "on/off/status/invalid decisions" do
       a = admin()
-      assert {:mention, true} = Webhooks.command(a, "/mention off", "C1")
-      assert {:mention, false} = Webhooks.command(a, "/mention on", "C1")
-      assert {:mention_status} = Webhooks.command(a, "/mention", "C1")
-      assert {:reply, "Usage: /mention on|off"} = Webhooks.command(a, "/mention sideways", "C1")
+      assert {:mention, true} = Webhooks.command(a, "/mention off", "boss")
+      assert {:mention, false} = Webhooks.command(a, "/mention on", "boss")
+      assert {:mention_status} = Webhooks.command(a, "/mention", "boss")
+      assert {:reply, "Usage: /mention on|off"} = Webhooks.command(a, "/mention sideways", "boss")
+    end
+
+    test "only a trainer may change it; anyone may read it" do
+      a = admin(%{"trainers" => ["U1"]})
+      assert {:mention, true} = Webhooks.command(a, "/mention off", "U1")
+      assert {:reply, denied} = Webhooks.command(a, "/mention off", "U2")
+      assert denied =~ "don't have permission"
+      assert {:reply, _} = Webhooks.command(a, "/mention on", "U2")
+      assert {:mention_status} = Webhooks.command(a, "/mention", "U2")
     end
 
     test "command replies are built in Pepe's configured locale, not whatever locale happened to already be set on the lane's own process" do
@@ -527,7 +536,10 @@ defmodule Pepe.WebhooksTest do
       end)
 
       secret = "sign-me"
-      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+
+      slack_entry =
+        admin(%{"provider" => "slack", "trainers" => ["*"], "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+
       Pepe.Config.put_webhook("acme-slack", slack_entry)
 
       # Every inbound is signed (the raw body is "{}" for all three calls here), so one valid,
@@ -580,7 +592,9 @@ defmodule Pepe.WebhooksTest do
       secret = "sign-me"
       # require_mention left at its default (on) - a command still has to get through with
       # no @mention and no prior waiver, which is the whole point of this test.
-      slack_entry = admin(%{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+      slack_entry =
+        admin(%{"provider" => "slack", "trainers" => ["*"], "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+
       Pepe.Config.put_webhook("acme-slack", slack_entry)
 
       ts = Integer.to_string(System.system_time(:second))

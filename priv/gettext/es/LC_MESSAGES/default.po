@@ -2875,7 +2875,7 @@ msgstr ""
 msgid "empty Enter to finish"
 msgstr "Enter vacío para terminar"
 
-#: lib/mix/tasks/pepe.ex:6112
+#: lib/mix/tasks/pepe.ex:6132
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma cambiado a %{code}"
@@ -2895,17 +2895,17 @@ msgstr "n: página siguiente, p: página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:5889
+#: lib/mix/tasks/pepe.ex:5909
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (puedes usar una referencia ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:5890
+#: lib/mix/tasks/pepe.ex:5910
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:5898
+#: lib/mix/tasks/pepe.ex:5918
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""

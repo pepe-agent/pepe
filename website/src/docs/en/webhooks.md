@@ -76,6 +76,8 @@ that channel's own conversation, not the connection, so it never leaks into
 any other channel. WhatsApp doesn't gate on mentions today (always
 answered), so `/mention` is a no-op there.
 
+Turning it on or off is reserved for the channel's **trainers** (the same trusted list `/agent` uses), because it changes how the channel behaves for everyone in it. Anyone can still send `/mention` to see the current setting.
+
 <div class="note"><strong>Typing a command in Slack.</strong> Slack's own
 client treats anything starting with <code>/</code> as an attempt to run one
 of its own slash commands, and refuses to send it as a message at all when
