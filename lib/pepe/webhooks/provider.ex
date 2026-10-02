@@ -153,11 +153,21 @@ defmodule Pepe.Webhooks.Provider do
   @callback fetch_media(config :: map(), media :: Pepe.Webhooks.Media.t()) ::
               {:ok, binary()} | {:error, term()}
 
+  @doc """
+  Optional: show that the agent is working on a message. Called with `:start` when the
+  message is handed to the agent and `:stop` when its answer is on its way, always off the
+  lane, and its result is ignored (a failed signal never holds up a reply). A platform with
+  no typing indicator for bots can mark the message itself (Slack adds and removes a
+  reaction); one that has none omits this.
+  """
+  @callback working(config :: map(), message :: map(), state :: :start | :stop) :: :ok | {:error, term()}
+
   @optional_callbacks label: 0,
                       config_schema: 0,
                       respond: 3,
                       deliver_file: 4,
                       addressed?: 2,
                       deliver_blocks: 3,
-                      fetch_media: 2
+                      fetch_media: 2,
+                      working: 3
 end

@@ -491,6 +491,26 @@ defmodule Pepe.Webhooks do
   end
 
   @doc false
+  # Tell the platform the agent is on this message (or done with it), for providers that can
+  # show it. Fire and forget: the signal is a courtesy, never something a reply waits on.
+  @spec working(map(), :start | :stop) :: :ok
+  def working(%{entry: entry, mod: mod, message: message}, state) do
+    if function_exported?(mod, :working, 3) do
+      Task.Supervisor.start_child(Pepe.Webhooks.TaskSupervisor, fn -> signal_working(mod, entry, message, state) end)
+    end
+
+    :ok
+  end
+
+  defp signal_working(mod, entry, message, state) do
+    with {:error, reason} <- mod.working(entry, message, state) do
+      Logger.debug("[webhooks] #{entry["slug"]}: working(#{state}) failed: #{inspect(reason)}")
+    end
+
+    :ok
+  end
+
+  @doc false
   # What the lane does with the session's answer to a message it handed over.
   @spec finish(map(), term()) :: :ok
   def finish(%{entry: entry, mod: mod, message: message}, result) do

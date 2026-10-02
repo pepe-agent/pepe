@@ -9,7 +9,10 @@ defmodule Pepe.Webhooks.Slack do
     * `signing_secret` - verifies the `X-Slack-Signature` on inbound requests
 
   Pictures and files sent to the bot are read like on any other channel (see
-  `Pepe.Webhooks.Media`); that needs the `files:read` scope on the Slack app.
+  `Pepe.Webhooks.Media`); that needs the `files:read` scope on the Slack app, and sending files back needs `files:write`. While the agent works on a
+  message it carries an eyes reaction (`reactions:write`), and a reaction
+  on one of the bot's own messages is told to the agent as feedback (`reactions:read`
+  and the `reaction_added` event).
 
   Point the Slack app's Event Subscriptions request URL at the connection URL and
   subscribe to `message.channels` / `app_mention`. The first save triggers a
@@ -42,6 +45,17 @@ defmodule Pepe.Webhooks.Slack do
         "label" => dgettext("webhooks", "Signing secret"),
         "type" => "secret",
         "hint" => dgettext("webhooks", "Find it on the app's Basic Information page. Write it as ${ENV_VAR}.")
+      },
+      %{
+        "key" => "reactions",
+        "label" => dgettext("webhooks", "Learn from reactions"),
+        "type" => "select",
+        "options" => ["own", "off"],
+        "hint" =>
+          dgettext(
+            "webhooks",
+            "A 👍 or ❤️ on one of the bot's own messages is told to the agent as feedback (default: own; off to ignore reactions)."
+          )
       },
       %{
         "key" => "require_mention",
@@ -93,6 +107,9 @@ defmodule Pepe.Webhooks.Slack do
   end
 
   @impl true
+  def parse(%{"type" => "event_callback", "event" => %{"type" => "reaction_added"}} = payload),
+    do: parse_reaction(payload)
+
   def parse(%{"type" => "event_callback", "event" => event}) do
     if user_message?(event) do
       {:ok, [%{from: event["channel"], text: strip_mention(event["text"] || ""), id: event["ts"], media: media(event)}]}
@@ -102,6 +119,55 @@ defmodule Pepe.Webhooks.Slack do
   end
 
   def parse(_payload), do: :ignore
+
+  # Someone reacting to a message the bot sent is feedback on its answer, handed to the agent
+  # the same way Telegram does it: a turn that reads `[reacted 👍]`, which the agent learns from
+  # by convention. Only the bot's own messages count (`item_user` is the author of the message
+  # reacted to), so a 👍 on a colleague's message is never delivered, and neither is the bot's
+  # own eyes reaction. The bot's user id comes from the payload's `authorizations`; without it
+  # there is no telling whose message it was, so the reaction is dropped.
+  defp parse_reaction(%{"event" => %{"item" => %{"type" => "message"} = item} = event} = payload) do
+    emoji = reaction_emoji(event["reaction"])
+
+    if bot_message?(payload, event) and emoji != "" do
+      {:ok, [%{from: item["channel"], text: "[reacted #{emoji}]", id: event["event_ts"]}]}
+    else
+      :ignore
+    end
+  end
+
+  defp parse_reaction(_payload), do: :ignore
+
+  defp bot_message?(payload, event) do
+    bot_id = payload |> Map.get("authorizations") |> List.wrap() |> Enum.find_value(& &1["user_id"])
+    is_binary(bot_id) and event["item_user"] == bot_id and event["user"] != bot_id
+  end
+
+  # Slack names a reaction (`+1`, `heart`, with an optional `::skin-tone-3`); the agent is told
+  # the emoji itself where it is a common one, and `:name:` where it is not.
+  @emoji %{
+    "+1" => "👍",
+    "thumbsup" => "👍",
+    "-1" => "👎",
+    "thumbsdown" => "👎",
+    "heart" => "❤️",
+    "ok_hand" => "👌",
+    "fire" => "🔥",
+    "tada" => "🎉",
+    "pray" => "🙏",
+    "clap" => "👏",
+    "raised_hands" => "🙌",
+    "100" => "💯",
+    "white_check_mark" => "✅",
+    "x" => "❌"
+  }
+
+  defp reaction_emoji(name) when is_binary(name) do
+    base = name |> String.split("::") |> hd()
+    Map.get(@emoji, base) || if(base == "", do: "", else: ":#{base}:")
+  end
+
+  defp reaction_emoji(_name), do: ""
 
   # A real message from a person: a message/app_mention event with text or a file, not a
   # bot echo (no bot_id) and not an edit/join/etc. subtype. A message with an attachment
@@ -180,6 +246,10 @@ defmodule Pepe.Webhooks.Slack do
   @impl true
   def addressed?(_config, %{"type" => "event_callback", "event" => %{"type" => "app_mention"}}),
     do: true
+
+  # A reaction needs no mention, only the connection's `reactions` setting not being off.
+  def addressed?(config, %{"type" => "event_callback", "event" => %{"type" => "reaction_added"}}),
+    do: provider_config(config)["reactions"] != "off"
 
   def addressed?(_config, %{"type" => "event_callback", "event" => %{"channel_type" => "im"}}),
     do: true
@@ -269,29 +339,64 @@ defmodule Pepe.Webhooks.Slack do
   # `Pepe.Presentation.to_text/1` itself.
   defp to_block_kit(_other), do: nil
 
+  # Slack has no typing indicator for a bot, so the message being worked on gets an eyes
+  # reaction while the agent is on it (needs `reactions:write`). Best effort: a missing scope
+  # or an already-removed reaction is not worth more than a debug line.
   @impl true
-  def deliver_file(config, channel, path, caption) do
+  def working(config, %{from: channel, id: ts}, state) when is_binary(ts) do
     token = Config.interpolate(provider_config(config)["bot_token"])
+    method = if state == :start, do: "reactions.add", else: "reactions.remove"
 
     if is_binary(token) and token != "" do
-      parts =
-        with_initial_comment(
-          [channels: channel, filename: Path.basename(path), file: {File.stream!(path), filename: Path.basename(path)}],
-          caption
-        )
-
-      case Req.post("#{@api}/files.upload", auth: {:bearer, token}, form_multipart: parts, receive_timeout: 120_000) do
-        {:ok, %{status: s, body: %{"ok" => true}}} when s in 200..299 -> :ok
-        {:ok, %{status: s, body: body}} -> {:error, {:slack, s, body}}
-        {:error, reason} -> {:error, reason}
-      end
+      with {:ok, _} <- api_post(token, method, %{"channel" => channel, "timestamp" => ts, "name" => "eyes"}), do: :ok
     else
       {:error, :no_bot_token}
     end
   end
 
-  defp with_initial_comment(parts, caption) when caption in [nil, ""], do: parts
-  defp with_initial_comment(parts, caption), do: [{:initial_comment, caption} | parts]
+  def working(_config, _message, _state), do: :ok
+
+  # Slack retired `files.upload`; a file now goes in three steps: ask for an upload url,
+  # send the bytes there, then complete the upload into the channel (needs `files:write`).
+  @impl true
+  def deliver_file(config, channel, path, caption) do
+    token = Config.interpolate(provider_config(config)["bot_token"])
+    name = Path.basename(path)
+
+    with true <- (is_binary(token) and token != "") or {:error, :no_bot_token},
+         {:ok, bytes} <- File.read(path),
+         {:ok, %{"upload_url" => url, "file_id" => id}} <-
+           api_get(token, "files.getUploadURLExternal", filename: name, length: byte_size(bytes)),
+         :ok <- upload_bytes(url, bytes),
+         {:ok, _} <- api_post(token, "files.completeUploadExternal", complete_body(id, name, channel, caption)) do
+      :ok
+    else
+      {:error, _} = error -> error
+    end
+  end
+
+  defp complete_body(id, name, channel, caption) do
+    body = %{"files" => [%{"id" => id, "title" => name}], "channel_id" => channel}
+    if caption in [nil, ""], do: body, else: Map.put(body, "initial_comment", caption)
+  end
+
+  defp upload_bytes(url, bytes) do
+    case Req.post(url, body: bytes, headers: [{"content-type", "application/octet-stream"}], receive_timeout: 120_000) do
+      {:ok, %{status: s}} when s in 200..299 -> :ok
+      {:ok, %{status: s, body: body}} -> {:error, {:slack, s, body}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp api_get(token, method, params),
+    do: api_result(Req.get("#{@api}/#{method}", auth: {:bearer, token}, params: params, receive_timeout: 30_000))
+
+  defp api_post(token, method, json),
+    do: api_result(Req.post("#{@api}/#{method}", auth: {:bearer, token}, json: json, receive_timeout: 30_000))
+
+  defp api_result({:ok, %{status: s, body: %{"ok" => true} = body}}) when s in 200..299, do: {:ok, body}
+  defp api_result({:ok, %{status: s, body: body}}), do: {:error, {:slack, s, body}}
+  defp api_result({:error, reason}), do: {:error, reason}
 
   defp provider_config(config), do: config["config"] || %{}
 

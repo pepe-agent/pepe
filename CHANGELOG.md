@@ -5,8 +5,14 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The agent learns from reactions on Slack.** A 👍, ❤️ or 👎 on one of the bot's own messages reaches the agent as feedback on its answer, the way it already does on Telegram. Needs the `reactions:read` scope and the `reaction_added` bot event; a connection can turn it off with `reactions: off`.
+- **Slack shows that the agent is working.** Slack has no typing indicator for bots, so the message gets an eyes reaction while the agent is on it, removed when the answer is sent. Needs the `reactions:write` scope (reinstall the app after adding it).
+
 ### Fixed
 
+- **Files the agent generates are sent to Slack again.** Sending used Slack's `files.upload`, which Slack has retired; it now uses the current three-step upload. The Slack app needs the `files:write` scope (reinstall it after adding it).
 - **Pictures and files sent to the bot in Slack are now read.** A message with an attachment was reduced to its text, so the agent answered "no print came with it". Images, audio and documents now go through the same intake as on other channels. The Slack app needs the `files:read` scope (reinstall it after adding it).
 
 ### Changed

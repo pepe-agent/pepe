@@ -173,6 +173,7 @@ defmodule Pepe.Webhooks.Lane do
 
     case Pepe.Webhooks.begin(job, text, opts) do
       {:chat, key, text, chat_opts} ->
+        Pepe.Webhooks.working(job, :start)
         %{state | requests: Session.send_chat(key, text, chat_opts, job, state.requests)}
 
       :done ->
@@ -196,6 +197,8 @@ defmodule Pepe.Webhooks.Lane do
         {:reply, reply} -> reply
         {:error, {reason, _server}} -> {:error, reason}
       end
+
+    Pepe.Webhooks.working(job, :stop)
 
     Task.Supervisor.start_child(Pepe.Webhooks.TaskSupervisor, fn ->
       inherit_callers(job)

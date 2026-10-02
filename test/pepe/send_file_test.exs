@@ -29,6 +29,19 @@ defmodule Pepe.SendFileTest do
 
   # ---- provider deliver_file/4 request shape ----------------------------------------
 
+  # Slack's three-step upload: an upload url, the bytes, then the completion into the channel.
+  defp stub_slack_upload(parent) do
+    Mimic.stub(Req, :get, fn url, opts ->
+      send(parent, {:req, url, opts})
+      {:ok, %{status: 200, body: %{"ok" => true, "upload_url" => "https://files.slack.com/upload/v1/x", "file_id" => "F1"}}}
+    end)
+
+    Mimic.stub(Req, :post, fn url, opts ->
+      send(parent, {:req, url, opts})
+      {:ok, %{status: 200, body: %{"ok" => true}}}
+    end)
+  end
+
   test "discord sends the file as a multipart follow-up", %{xlsx: file} do
     parent = self()
 
@@ -45,17 +58,15 @@ defmodule Pepe.SendFileTest do
   end
 
   test "slack uploads the file to the channel", %{xlsx: file} do
-    parent = self()
-
-    Mimic.stub(Req, :post, fn url, opts ->
-      send(parent, {:req, url, opts})
-      {:ok, %{status: 200, body: %{"ok" => true}}}
-    end)
+    stub_slack_upload(self())
 
     assert :ok = Slack.deliver_file(%{"config" => %{"bot_token" => "xoxb-1"}}, "C1", file, "here")
-    assert_received {:req, "https://slack.com/api/files.upload", opts}
-    assert opts[:auth] == {:bearer, "xoxb-1"}
-    assert opts[:form_multipart][:channels] == "C1"
+    assert_received {:req, "https://slack.com/api/files.getUploadURLExternal", get_opts}
+    assert get_opts[:auth] == {:bearer, "xoxb-1"}
+    assert_received {:req, "https://files.slack.com/upload/v1/x", _}
+    assert_received {:req, "https://slack.com/api/files.completeUploadExternal", opts}
+    assert opts[:json]["channel_id"] == "C1"
+    assert opts[:json]["initial_comment"] == "here"
   end
 
   test "whatsapp uploads media then sends a document message", %{xlsx: file} do
@@ -198,17 +209,12 @@ defmodule Pepe.SendFileTest do
   test "send_file routes a Slack session to the bound connection", %{xlsx: file} do
     Config.put_agent(%Config.Agent{name: "assistant", system_prompt: "hi"})
     Config.put_webhook("team", %{"provider" => "slack", "agent" => "assistant", "config" => %{"bot_token" => "xoxb-9"}})
-    parent = self()
-
-    Mimic.stub(Req, :post, fn url, opts ->
-      send(parent, {:req, url, opts})
-      {:ok, %{status: 200, body: %{"ok" => true}}}
-    end)
+    stub_slack_upload(self())
 
     ctx = %{session_key: "slack:assistant:C42", cwd: Path.dirname(file)}
     assert {:ok, _} = SendFile.run(%{"path" => file}, ctx)
-    assert_received {:req, "https://slack.com/api/files.upload", opts}
-    assert opts[:form_multipart][:channels] == "C42"
+    assert_received {:req, "https://slack.com/api/files.completeUploadExternal", opts}
+    assert opts[:json]["channel_id"] == "C42"
   end
 
   test "send_file on a dashboard session registers a download token and tells the chat about it", %{xlsx: file} do
