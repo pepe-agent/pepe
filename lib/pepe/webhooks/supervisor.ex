@@ -17,6 +17,7 @@ defmodule Pepe.Webhooks.Supervisor do
     children = [
       Pepe.Webhooks.Dedup,
       {Registry, keys: :unique, name: Pepe.Webhooks.LaneRegistry},
+      {Registry, keys: :unique, name: Pepe.Webhooks.ApprovalRegistry},
       {DynamicSupervisor, name: Pepe.Webhooks.LaneSup, strategy: :one_for_one},
       {Task.Supervisor, name: Pepe.Webhooks.TaskSupervisor}
     ]

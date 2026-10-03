@@ -151,6 +151,18 @@ na conexão. É exatamente o mesmo mecanismo usado pelo WhatsApp; já a versão
 do Telegram acrescenta um seletor por botões, em vez de depender só de
 comandos digitados.
 
+## Aprovando ferramentas de risco no chat
+
+Por padrão, um canal por webhook não tem ninguém para perguntar, então uma ferramenta de risco que não está no `auto_approve` do agente é recusada e fica guardada para um operador aprovar pela linha de comando (`mix pepe approvals`). Para que as pessoas da conversa decidam ali mesmo, informe os **trainers** na conexão: uma lista explícita, ou `["*"]` para todos da conversa. Aí, quando o agente quer fazer algo arriscado, ele pergunta no próprio chat, mostra o comando de verdade e espera uma resposta digitada:
+
+```text
+Reply with: allow / allow all / allow session / deny
+```
+
+Só vale a resposta exata de um trainer, e ela não é repassada ao agente como mensagem. A resposta de qualquer outra pessoa, ou uma frase mais longa que contenha "allow", é só uma mensagem. As duas respostas mais amplas ("permitir tudo na sessão" e "sempre") não podem ser digitadas aqui; use uma superfície com botões para elas. Se ninguém responder em cinco minutos, conta como um não, e o agente é avisado de que ninguém respondeu, em vez de que foi recusado.
+
+Sem trainers informados nada muda: só roda o que o agente já tem pré-aprovado.
+
 ## Por baixo dos panos: o contrato do provedor
 
 Cada canal por webhook nada mais é do que um módulo pequeno implementando o

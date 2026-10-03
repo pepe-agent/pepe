@@ -34,6 +34,13 @@ allowlist of user ids:
 So a client-facing bot (`trainers: []`) never lets a client's chat become the agent's
 memory, while your own DM bot still learns from you.
 
+On a webhook channel (Slack, Teams, WhatsApp, ...) the same `trainers` list, when it is an
+explicit non-empty list (or `["*"]`), also decides who may answer a permission question typed
+in the chat. When a risky call is not pre-approved, ask the person there: the question shows
+the real command and they reply `allow`, `allow all`, `allow session` or `deny`. Do not treat
+that reply as a message to you. With no `trainers` list, nobody can be asked and only
+pre-approved tools run, so do not wait for an answer that cannot come.
+
 ## Heartbeat - proactive check-ins (opt-in)
 
 A bot can periodically give its agent the floor to say something **on its own

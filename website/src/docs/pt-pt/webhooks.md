@@ -73,6 +73,18 @@ Os comandos `/model` e `/models` permitem ver ou trocar o modelo de IA que respo
 
 Mudar **globalmente**, para todos com quem a ligação fala, fica reservado aos **formadores** (a mesma lista de confiança que controla a memória); qualquer outra pessoa numa conversa permitida só consegue mudar a sua própria conversa. Define `model_switch_locked: true` na ligação para desligar isto por completo para quem não é formador. É o mesmo mecanismo usado pelo WhatsApp; a versão do Telegram acrescenta apenas um seletor com botões em vez de comandos escritos.
 
+## Aprovar ferramentas de risco na conversa
+
+Por predefinição, um canal por webhook não tem ninguém a quem perguntar, pelo que uma ferramenta de risco que não esteja no `auto_approve` do agente é recusada e fica guardada para um operador aprovar pela linha de comandos (`mix pepe approvals`). Para que as pessoas da conversa decidam ali mesmo, indica os **trainers** na ligação: uma lista explícita, ou `["*"]` para todos os da conversa. Assim, quando o agente quer fazer algo arriscado, pergunta na própria conversa, mostra o comando verdadeiro e espera uma resposta escrita:
+
+```text
+Reply with: allow / allow all / allow session / deny
+```
+
+Só conta a resposta exata de um trainer, e ela não é passada ao agente como mensagem. A resposta de qualquer outra pessoa, ou uma frase mais longa que contenha "allow", é apenas uma mensagem. As duas respostas mais abrangentes ("permitir tudo na sessão" e "sempre") não podem ser escritas aqui; usa uma superfície com botões para essas. Se ninguém responder em cinco minutos, conta como um não, e o agente é avisado de que ninguém respondeu, e não de que foi recusado.
+
+Sem trainers indicados, nada muda: só corre o que o agente já tem pré-aprovado.
+
 ## Por baixo do capô: o contrato do fornecedor
 
 Cada canal por webhook não passa de um pequeno módulo que implementa o mesmo contrato, o que garante que todos se comportam de forma consistente, e faz com que uma plataforma nova seja apenas mais um módulo, nunca uma rota nova. Os callbacks são:

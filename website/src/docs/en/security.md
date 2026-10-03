@@ -101,7 +101,7 @@ A single wildcard `"*"` in `auto_approve` means the agent runs every tool withou
 }
 ```
 
-<div class="note"><strong>With nobody to ask, only what you pre-approved runs.</strong> The HTTP API, a webhook, a cron and a watch have no human on the other end. There is no one to prompt, so a risky tool that is not in the agent's <code>auto_approve</code> is refused rather than run. Standing aside would make an API token a shell account. Put what may run unattended into <code>auto_approve</code>, and lock the API with a token before exposing it.</div>
+<div class="note"><strong>With nobody to ask, only what you pre-approved runs.</strong> The HTTP API, a webhook, a cron and a watch have no human on the other end. There is no one to prompt, so a risky tool that is not in the agent's <code>auto_approve</code> is refused rather than run. A webhook channel can ask in the chat itself when its trainers are named (see <a href="../webhooks/">Webhooks</a>). Standing aside would make an API token a shell account. Put what may run unattended into <code>auto_approve</code>, and lock the API with a token before exposing it.</div>
 
 ## Content from a stranger withdraws pre-approval
 

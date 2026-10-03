@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A webhook channel can ask for permission in the chat itself.** When a risky tool is not pre-approved and the connection names its `trainers` (an explicit list, or `["*"]`), the agent now asks in the conversation, shows the real command, and waits for a typed `allow`, `allow all`, `allow session` or `deny` from a trainer, which is then not passed on to the agent as a message. Before, such a call was refused and held for `mix pepe approvals`. Nobody answering in five minutes counts as a no. "Allow everything for the session" and "always" cannot be typed here. Without named trainers nothing changes. The typed vocabulary now lives in one place shared with Telegram.
 - **The agent learns from reactions on Slack.** A 👍, ❤️ or 👎 on one of the bot's own messages reaches the agent as feedback on its answer, the way it already does on Telegram. Needs the `reactions:read` scope and the `reaction_added` bot event; a connection can turn it off with `reactions: off`.
 - **Slack shows that the agent is working.** Slack has no typing indicator for bots, so the message gets an eyes reaction while the agent is on it, removed when the answer is sent. Needs the `reactions:write` scope (reinstall the app after adding it).
 

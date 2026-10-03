@@ -137,6 +137,18 @@ allowed conversation can only switch their own conversation. Set
 non-trainers. This is the same mechanism WhatsApp uses; Telegram's version
 adds a tappable picker instead of typed commands.
 
+## Approving risky tools in the chat
+
+By default a webhook channel has nobody to ask, so a risky tool that is not in the agent's `auto_approve` is refused and held for an operator to approve from the command line (`mix pepe approvals`). To let the people in the conversation settle it instead, name the **trainers** on the connection: an explicit list, or `["*"]` for everyone in the conversation. Then, when the agent wants to do something risky, it asks right there, shows the actual command, and waits for a typed answer:
+
+```text
+Reply with: allow / allow all / allow session / deny
+```
+
+Only an exact reply from a trainer counts, and it is not passed on to the agent as a message. Anyone else's reply, or a longer sentence that happens to contain "allow", is just a message. The two widest answers ("allow everything for the session" and "always") cannot be typed here; use a surface with buttons for those. If nobody answers in five minutes it counts as a no, and the agent is told that nobody answered rather than that it was refused.
+
+Without named trainers nothing changes: only what the agent has pre-approved runs.
+
 ## Under the hood: the provider contract
 
 Every webhook channel is one small module that implements the same contract, so

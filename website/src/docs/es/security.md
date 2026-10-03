@@ -182,7 +182,7 @@ controlas.
 }
 ```
 
-<div class="note"><strong>Sin nadie a quien preguntarle, solo corre lo que ya aprobaste de antemano.</strong> La API HTTP, un webhook, un cron y un watch no tienen a ninguna persona del otro lado. No hay a quién preguntar, así que una herramienta riesgosa que no esté en el <code>auto_approve</code> del agente se rechaza en vez de ejecutarse. Si se hiciera a un lado sin más, un token de API terminaría siendo, en la práctica, una cuenta de shell. Pon en <code>auto_approve</code> exactamente lo que puede correr sin supervisión, y protege la API con un token antes de exponerla.</div>
+<div class="note"><strong>Sin nadie a quien preguntarle, solo corre lo que ya aprobaste de antemano.</strong> La API HTTP, un webhook, un cron y un watch no tienen a ninguna persona del otro lado. No hay a quién preguntar, así que una herramienta riesgosa que no esté en el <code>auto_approve</code> del agente se rechaza en vez de ejecutarse. Un canal por webhook puede preguntar en el propio chat cuando se indican sus trainers (mira <a href="../webhooks/">Webhooks</a>). Si se hiciera a un lado sin más, un token de API terminaría siendo, en la práctica, una cuenta de shell. Pon en <code>auto_approve</code> exactamente lo que puede correr sin supervisión, y protege la API con un token antes de exponerla.</div>
 
 ## El contenido de un desconocido anula lo pre-aprobado
 

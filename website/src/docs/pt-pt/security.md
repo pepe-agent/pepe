@@ -165,7 +165,7 @@ fidedignas.
 }
 ```
 
-<div class="note"><strong>Sem ninguém a quem perguntar, só corre o que já foi pré-aprovado.</strong> A API HTTP, um webhook, um cron e um watch não têm uma pessoa do outro lado. Como não há a quem perguntar, uma ferramenta arriscada que não conste do <code>auto_approve</code> do agente é recusada, em vez de correr na mesma. Deixar passar transformaria um token de API numa conta de shell. Coloca em <code>auto_approve</code> só o que pode mesmo correr sem supervisão, e protege a API com um token antes de a expor.</div>
+<div class="note"><strong>Sem ninguém a quem perguntar, só corre o que já foi pré-aprovado.</strong> A API HTTP, um webhook, um cron e um watch não têm uma pessoa do outro lado. Como não há a quem perguntar, uma ferramenta arriscada que não conste do <code>auto_approve</code> do agente é recusada, em vez de correr na mesma. Um canal por webhook pode perguntar na própria conversa quando os seus trainers são indicados (vê <a href="../webhooks/">Webhooks</a>). Deixar passar transformaria um token de API numa conta de shell. Coloca em <code>auto_approve</code> só o que pode mesmo correr sem supervisão, e protege a API com um token antes de a expor.</div>
 
 ## Conteúdo de um estranho retira a pré-aprovação
 

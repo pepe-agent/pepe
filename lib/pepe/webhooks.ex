@@ -328,6 +328,16 @@ defmodule Pepe.Webhooks do
     # handle_command/2's own clauses are what keep this dispatch's cyclomatic complexity down
     # (one function per command shape, instead of one long case), not this struct-less map.
     ctx = %{entry: entry, mod: mod, message: message, text: text, opts: opts, agent: agent, key: key, from: from}
+
+    # A typed "allow" / "deny" answering a permission question the agent is waiting on is that
+    # answer, not a message for the agent (Pepe.Webhooks.Approval).
+    case Pepe.Webhooks.Approval.reply(entry, key, actor(message), text) do
+      :consumed -> :done
+      :pass -> run_message(ctx)
+    end
+  end
+
+  defp run_message(%{entry: entry, message: message, text: text, agent: agent, key: key} = ctx) do
     result = handle_command(command(entry, text, actor(message)), ctx)
     # Reasserted AFTER dispatch, not before: /new's own reset (see Session.reset/1) reverts
     # to the connection's plain default, and running this first would have that stomp right
@@ -400,7 +410,7 @@ defmodule Pepe.Webhooks do
 
   defp handle_command(:chat, ctx) do
     SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
-    {:chat, ctx.key, ctx.text, chat_opts(ctx.entry, ctx.message, ctx.opts)}
+    {:chat, ctx.key, ctx.text, chat_opts(ctx)}
   end
 
   # The connection's own default agent is `entry["agent"]`; a persistent bind_topic (or
@@ -476,10 +486,13 @@ defmodule Pepe.Webhooks do
   # A webhook sender is never the operator, the same "a stranger" content class every
   # Telegram attachment path already taints (Pepe.Permissions' taint model). Until now this
   # was the one inbound surface that never withdrew auto_approve for it.
-  defp chat_opts(entry, message, opts) do
+  defp chat_opts(%{entry: entry, message: message, opts: opts} = ctx) do
     [
       learn: learn?(entry, actor(message)),
-      authorize: nil,
+      # Asks in the conversation itself, in plain text, when the connection names its approvers
+      # (Pepe.Webhooks.Approval); otherwise there is nobody to ask and only what is
+      # pre-approved runs.
+      authorize: Pepe.Webhooks.Approval.authorizer(entry, ctx.mod, ctx.from, ctx.key),
       untrusted: true,
       sender: Map.get(message, :name),
       # An inbound image, for a vision model: rides this turn only, never persisted.

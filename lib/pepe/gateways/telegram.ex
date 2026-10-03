@@ -1709,60 +1709,11 @@ defmodule Pepe.Gateways.Telegram do
       end
   end
 
-  # A short, fixed, multi-language vocabulary a plain text reply is matched against
-  # (trimmed, case/accent-folded, exact match only - never a substring inside a longer
-  # message) to resolve a pending permission prompt without tapping a button. Deliberately
-  # not translated through Gettext: these are meant to be quickly typeable regardless of
-  # the bot's configured locale or what language the person actually types in, the same way
-  # many chat bots accept "sim"/"não"/"yes"/"no" interchangeably. `permission_text_hint/0`
-  # advertises only the most common ones (see its own note); the rest still work for anyone
-  # who already knows them or copies a button's own label.
-  @text_decision_keywords %{
-    once: ["permitir", "permitir uma vez", "permitir una vez", "allow", "allow once"],
-    this_run: ["permitir tudo", "permitir agora", "permitir todo", "allow all", "allow everything"],
-    session_any: ["permitir sessao", "permitir esta sessao", "allow session", "allow this session"],
-    session_bypass: ["permitir tudo sessao", "permitir tudo a sessao", "allow everything session"],
-    deny: ["negar", "nao", "no", "deny", "denegar"]
-  }
-
-  # Kept out of @text_decision_keywords on purpose - "always" leaves auto_approve on for the
-  # rest of the session, the single most consequential thing a text reply can do here, and a
-  # typo/autocorrect ("always" instead of "allow") landing on it by accident would fail toward
-  # the worse outcome (an unintended standing grant) instead of the safer one (asking again).
-  # Requiring a leading "!" (e.g. "!sempre"/"!always"/"!siempre") makes it something nobody
-  # types without meaning to, while the button still grants it in one tap for anyone who does.
-  @always_keywords ["sempre", "always", "siempre"]
-
-  # NFD-decompose then drop combining marks (Unicode category Mn) - "sessão" -> "sessao" -
-  # so "permitir sessão"/"permitir sessao" match the same keyword regardless of whether the
-  # sender's keyboard/autocorrect put the accent back in.
-  defp normalize_reply(text) do
-    text
-    |> to_string()
-    |> String.trim()
-    |> String.downcase()
-    |> String.normalize(:nfd)
-    |> String.replace(~r/\p{Mn}/u, "")
-  end
-
-  defp decision_from_text(text) do
-    normalized = normalize_reply(text)
-    if marked_always?(normalized), do: :always, else: keyword_decision(normalized)
-  end
-
-  defp marked_always?(normalized) do
-    String.starts_with?(normalized, "!") and String.trim_leading(normalized, "!") in @always_keywords
-  end
-
-  defp keyword_decision(normalized) do
-    Enum.find_value(@text_decision_keywords, fn {decision, words} -> if normalized in words, do: decision end)
-  end
-
   # The line appended to every permission prompt, so someone whose Telegram account has no
   # established relationship with this bot (see @pending_by_chat's own note - Telegram
   # requires that before it will route a button tap, but never for an ordinary text message)
   # has a way to answer at all. Only the 3 most reached-for decisions are advertised, to keep
-  # the prompt short; @text_decision_keywords recognizes the rest too for whoever already
+  # the prompt short; Pepe.Permissions.TextDecision recognizes the rest too for whoever already
   # knows them.
   defp permission_text_hint do
     gettext("Buttons not working? Reply with text instead: allow / allow all / deny")
@@ -1777,7 +1728,7 @@ defmodule Pepe.Gateways.Telegram do
   # chat message; false when there was nothing to consume, so it falls through as usual.
   defp handle_pending_decision_reply(chat_id, thread_id, user_id, text) do
     with true <- active?(),
-         decision when not is_nil(decision) <- decision_from_text(text),
+         decision when not is_nil(decision) <- Pepe.Permissions.TextDecision.parse(text),
          key = pending_key(chat_id, thread_id),
          [{^key, id, message_id}] <- :ets.lookup(@pending_by_chat, key) do
       resolve_pending_decision(chat_id, thread_id, user_id, id, message_id, decision)
@@ -1962,29 +1913,7 @@ defmodule Pepe.Gateways.Telegram do
   # The meaningful field to show (command for bash, path for write_file, ...) in a
   # code block - not the raw JSON args.
   defp arg_block(map) when map_size(map) == 0, do: ""
-  defp arg_block(map), do: "\n<code>" <> esc(map_preview(map)) <> "</code>"
-
-  # A short hint, not the raw argument. For files, the basename is enough to know what is being
-  # touched - the full path is noise in a progress note (the reasoning line above carries the
-  # "why"). Commands and URLs keep a clipped preview.
-  defp map_preview(%{"command" => c}) when is_binary(c), do: clip(c)
-  defp map_preview(%{"path" => p}) when is_binary(p), do: base(p)
-  defp map_preview(%{"file" => f}) when is_binary(f), do: base(f)
-  defp map_preview(%{"url" => u}) when is_binary(u), do: clip(u)
-  defp map_preview(%{"to" => t}) when is_binary(t), do: base(t)
-
-  defp map_preview(%{"code" => c} = m) when is_binary(c),
-    do: "[" <> to_string(m["language"] || "code") <> "] " <> clip(c)
-
-  defp map_preview(map), do: clip(Jason.encode!(map))
-
-  defp clip(text) do
-    one = text |> to_string() |> String.replace(~r/\s+/, " ") |> String.trim()
-    if String.length(one) > 140, do: String.slice(one, 0, 139) <> "...", else: one
-  end
-
-  # Just the filename, for a file-touching tool line. The directory is noise in a progress note.
-  defp base(text), do: text |> to_string() |> String.trim() |> Path.basename() |> clip()
+  defp arg_block(map), do: "\n<code>" <> esc(Prompt.preview(map)) <> "</code>"
 
   # "perm:<id>:<token>" -> wake the waiting session and tidy the message.
   defp deliver_permission("perm:" <> rest, cq) do
@@ -3351,7 +3280,7 @@ defmodule Pepe.Gateways.Telegram do
 
   defp activity_line(name, raw) do
     case decode_args(raw) do
-      map when map_size(map) > 0 -> @tool_running <> " " <> name <> ", " <> map_preview(map)
+      map when map_size(map) > 0 -> @tool_running <> " " <> name <> ", " <> Prompt.preview(map)
       _ -> @tool_running <> " " <> name
     end
   end

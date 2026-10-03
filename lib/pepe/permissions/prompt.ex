@@ -175,4 +175,26 @@ defmodule Pepe.Permissions.Prompt do
       "\"⚠️ Allow everything for this session\" is the broadest one: it stops asking about any tool at all, for the rest of the session, even during a task that reads something from outside the conversation. Use it only when you're comfortable not being asked again for a while."
     )
   end
+
+  @doc """
+  A short hint at what a call is about to do, rather than its raw arguments: the command for
+  a shell call, the file's name for a file, the url for a fetch. Shown under the question so
+  the person answering can see the actual thing they are signing for.
+  """
+  @spec preview(map()) :: String.t()
+  def preview(%{"command" => c}) when is_binary(c), do: clip(c)
+  def preview(%{"path" => p}) when is_binary(p), do: base(p)
+  def preview(%{"file" => f}) when is_binary(f), do: base(f)
+  def preview(%{"url" => u}) when is_binary(u), do: clip(u)
+  def preview(%{"to" => t}) when is_binary(t), do: base(t)
+  def preview(%{"code" => c} = m) when is_binary(c), do: "[" <> to_string(m["language"] || "code") <> "] " <> clip(c)
+  def preview(map), do: clip(Jason.encode!(map))
+
+  defp clip(text) do
+    one = text |> to_string() |> String.replace(~r/\s+/, " ") |> String.trim()
+    if String.length(one) > 140, do: String.slice(one, 0, 139) <> "...", else: one
+  end
+
+  # Just the filename, for a file-touching tool. The directory is noise in a prompt.
+  defp base(text), do: text |> to_string() |> String.trim() |> Path.basename() |> clip()
 end

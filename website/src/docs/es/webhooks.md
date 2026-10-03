@@ -73,6 +73,18 @@ Los comandos `/model` y `/models` dejan que cualquiera consulte o cambie qué mo
 
 Cambiarlo **globalmente**, para todo lo que atiende esa conexión, queda reservado a los **entrenadores** (la misma lista de confianza que controla la memoria); cualquier otra persona en una conversación permitida solo puede cambiar su propia conversación. Pon `model_switch_locked: true` en la conexión si quieres apagar esto por completo para quien no sea entrenador. Es el mismo mecanismo que usa WhatsApp; la versión de Telegram añade, además, un selector con botones en vez de comandos escritos.
 
+## Aprobar herramientas de riesgo en el chat
+
+Por defecto, un canal por webhook no tiene a nadie a quien preguntar, así que una herramienta de riesgo que no está en el `auto_approve` del agente se rechaza y queda guardada para que un operador la apruebe desde la línea de comandos (`mix pepe approvals`). Para que las personas de la conversación lo decidan ahí mismo, indica los **trainers** en la conexión: una lista explícita, o `["*"]` para todos los de la conversación. Entonces, cuando el agente quiere hacer algo arriesgado, pregunta en el propio chat, muestra el comando real y espera una respuesta escrita:
+
+```text
+Reply with: allow / allow all / allow session / deny
+```
+
+Solo cuenta la respuesta exacta de un trainer, y no se le pasa al agente como mensaje. La respuesta de cualquier otra persona, o una frase más larga que contenga "allow", es solo un mensaje. Las dos respuestas más amplias ("permitir todo en la sesión" y "siempre") no se pueden escribir aquí; usa una superficie con botones para esas. Si nadie responde en cinco minutos, cuenta como un no, y al agente se le avisa de que nadie respondió, en lugar de que se rechazó.
+
+Sin trainers indicados no cambia nada: solo corre lo que el agente ya tiene preaprobado.
+
 ## Por dentro: el contrato del proveedor
 
 Cada canal por webhook es un módulo pequeño que implementa el mismo contrato, así que todos se comportan de manera consistente y agregar una plataforma nueva es agregar un módulo, no una ruta nueva. Las funciones de ese contrato son:
