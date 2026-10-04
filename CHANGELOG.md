@@ -13,6 +13,7 @@ All notable changes to this project are documented here. Format follows
 
 ### Fixed
 
+- **A file the agent sends on Telegram (an image, a spreadsheet, a voice reply) no longer hangs and fails.** The upload streamed the file from disk, and against Telegram that stalled until it timed out or the connection was closed, so the agent could build the file but never deliver it (a plain `curl` of the same file took milliseconds). The file is now sent whole, and an upload that hits a closed connection, a timeout, a 429 or a 5xx is retried.
 - **Files the agent generates are sent to Slack again.** Sending used Slack's `files.upload`, which Slack has retired; it now uses the current three-step upload. The Slack app needs the `files:write` scope (reinstall it after adding it).
 - **Pictures and files sent to the bot in Slack are now read.** A message with an attachment was reduced to its text, so the agent answered "no print came with it". Images, audio and documents now go through the same intake as on other channels. The Slack app needs the `files:read` scope (reinstall it after adding it).
 

@@ -250,6 +250,13 @@ defmodule Pepe.Gateways.Telegram do
 
   # Set on the responding task when the incoming turn was a voice note, so the reply can come back
   # as a voice note too (when media.tts is configured). Process-dictionary, like the bot snapshot.
+  # Req only retries a GET or HEAD unless told otherwise. An upload is a POST sent right after an
+  # agent has spent a minute or two thinking, which is exactly when the pooled connection it picks
+  # is one Telegram has already closed: the write fails with `:closed` and the file is reported as
+  # undeliverable. `:transient` retries it (on a fresh connection) for that, a timeout, a 429 or a
+  # 5xx.
+  @upload_opts [retry: :transient, max_retries: 3, receive_timeout: 120_000]
+
   @voice_reply_key :tg_voice_reply
   defp put_voice_reply(bool), do: Process.put(@voice_reply_key, bool == true)
   defp voice_reply?, do: Process.get(@voice_reply_key) == true
@@ -2832,18 +2839,7 @@ defmodule Pepe.Gateways.Telegram do
 
   # Send an Opus .ogg as a native Telegram voice note (the reply-in-voice path). Best-effort: a
   # failure is logged, never raised, since the text reply already went out.
-  defp send_voice(chat_id, path) do
-    fields =
-      [chat_id: to_string(chat_id)]
-      |> then(fn f -> if id = thread(), do: f ++ [message_thread_id: to_string(id)], else: f end)
-      |> Kernel.++(voice: {File.stream!(path), filename: Path.basename(path)})
-
-    case Req.post(api_url(token(), "sendVoice"), form_multipart: fields, receive_timeout: 120_000) do
-      {:ok, %{status: 200}} -> :ok
-      {:ok, %{status: status, body: body}} -> {:error, {:telegram, status, body}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  defp send_voice(chat_id, path), do: post_upload(chat_id, "sendVoice", :voice, path, nil)
 
   # Deliver the agent's reply: always the text (the record), plus a voice note when the turn came in
   # by voice and TTS is configured. The audio is a bonus - a TTS failure is logged, never surfaced.
@@ -2987,19 +2983,29 @@ defmodule Pepe.Gateways.Telegram do
       match?({:ok, %{size: size}} when size <= @photo_cap_bytes, File.stat(path))
   end
 
-  defp send_upload(chat_id, method, field, path, caption) do
-    fields =
-      [chat_id: to_string(chat_id)]
-      |> then(fn f -> if id = thread(), do: f ++ [message_thread_id: to_string(id)], else: f end)
-      |> then(fn f -> if caption in [nil, ""], do: f, else: f ++ [caption: caption] end)
-      |> Kernel.++([{field, {File.stream!(path), filename: Path.basename(path)}}])
+  defp send_upload(chat_id, method, field, path, caption), do: post_upload(chat_id, method, field, path, caption)
 
-    case Req.post(api_url(token(), method), form_multipart: fields, receive_timeout: 120_000) do
-      {:ok, %{status: 200}} -> :ok
-      {:ok, %{status: status, body: body}} -> {:error, {:telegram, status, body}}
-      {:error, reason} -> {:error, reason}
+  # The file goes up whole, with its size and type known, the way `curl -F` sends it. Streaming it
+  # from disk (`File.stream!`) hung against Telegram from inside the container while a plain
+  # `curl` of the same file took milliseconds, so the bytes are read first. Telegram caps a bot
+  # upload at 50MB, which is also what this holds in memory at the very most.
+  defp post_upload(chat_id, method, field, path, caption) do
+    with {:ok, bytes} <- File.read(path) do
+      part = {bytes, filename: Path.basename(path), content_type: MIME.from_path(path)}
+      upload_response(Req.post(api_url(token(), method), [form_multipart: upload_fields(chat_id, caption, field, part)] ++ @upload_opts))
     end
   end
+
+  defp upload_fields(chat_id, caption, field, part) do
+    [chat_id: to_string(chat_id)]
+    |> then(fn f -> if id = thread(), do: f ++ [message_thread_id: to_string(id)], else: f end)
+    |> then(fn f -> if caption in [nil, ""], do: f, else: f ++ [caption: caption] end)
+    |> Kernel.++([{field, part}])
+  end
+
+  defp upload_response({:ok, %{status: 200}}), do: :ok
+  defp upload_response({:ok, %{status: status, body: body}}), do: {:error, {:telegram, status, body}}
+  defp upload_response({:error, reason}), do: {:error, reason}
 
   @doc false
   # Turn a delivery/session key into {bot, chat_id, thread}. The chat part may carry a "#t<thread>"
