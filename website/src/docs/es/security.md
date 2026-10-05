@@ -35,7 +35,7 @@ necesita autorización previa.
 
 Las únicas que nunca preguntan son las de solo lectura: `read_file`, `list_dir`,
 `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` y
-`send_to_agent`. Cualquier otra cosa, incluida cualquier herramienta que agregue un
+`send_to_agent`. `end_session` tampoco pregunta nunca: solo borra el historial de la propia conversación después de la respuesta en curso, algo en lo que se apoya un canal que atiende un ticket tras otro para empezar cada uno limpio. Cualquier otra cosa, incluida cualquier herramienta que agregue un
 plugin, se considera riesgosa por defecto y exige aprobación. Es un valor por defecto
 deliberadamente conservador: una herramienta desconocida se asume peligrosa hasta que se
 demuestre lo contrario.

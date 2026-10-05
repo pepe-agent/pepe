@@ -151,7 +151,11 @@ defmodule Pepe.Permissions do
   # already holds, and changes nothing.
   # `hand_back` is here because it is its own confirmation: it asks the person yes/no before
   # doing anything, and all it can do is return the conversation to the channel's own agent.
-  @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent switch_agent ask_user hand_back decide session_search memory_search)
+  # `end_session` is here because all it does is clear this one conversation's own history after
+  # the current reply; what the agent has learned and every file are untouched. A channel that
+  # feeds the agent one ticket after another relies on it to start each one clean, and on a
+  # webhook (where nobody can be asked and pre-approval is suspended) it would otherwise never run.
+  @always_safe ~w(read_file list_dir fetch_url web_search config_get skill docs doctor scan_skill send_to_agent switch_agent ask_user hand_back decide session_search memory_search end_session)
 
   # Unlike @always_safe, these get no free pass when there is nobody to ask (an API token, a
   # webhook, a cron, a `delegate` worker): `Pepe.Permissions.Risk`'s text heuristic is exactly

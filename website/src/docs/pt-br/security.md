@@ -33,7 +33,7 @@ autorização antes.
 
 Só passam sem perguntar as ferramentas puramente de leitura: `read_file`, `list_dir`,
 `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` e
-`send_to_agent`. Tudo o que não está nessa lista, incluindo qualquer ferramenta trazida
+`send_to_agent`. O `end_session` também nunca pergunta: só limpa o histórico da própria conversa depois da resposta em curso, em que se apoia um canal que trata um chamado depois do outro para começar cada um limpo. Tudo o que não está nessa lista, incluindo qualquer ferramenta trazida
 por um plugin, é tratado como arriscado e precisa de aprovação, um padrão
 deliberadamente conservador: uma ferramenta desconhecida é sempre tratada como
 perigosa até prova em contrário.

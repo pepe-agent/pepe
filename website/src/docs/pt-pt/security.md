@@ -32,7 +32,7 @@ de autorização primeiro.
 
 As únicas que nunca perguntam são as de leitura pura: `read_file`, `list_dir`,
 `fetch_url`, `web_search`, `config_get`, `skill`, `docs`, `doctor`, `scan_skill` e
-`send_to_agent`. Tudo o resto, incluindo qualquer ferramenta de plugin acrescentada
+`send_to_agent`. O `end_session` também nunca pergunta: só limpa o histórico da própria conversa depois da resposta em curso, em que se apoia um canal que trata um pedido a seguir ao outro para começar cada um limpo. Tudo o resto, incluindo qualquer ferramenta de plugin acrescentada
 depois, é tratado como arriscado por omissão e precisa de aprovação, uma predefinição
 deliberadamente conservadora: presume-se perigosa uma ferramenta desconhecida.
 

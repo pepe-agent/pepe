@@ -30,6 +30,10 @@ defmodule Pepe.PermissionsTest do
     assert Permissions.requires_approval?("some_plugin_tool")
   end
 
+  test "end_session never asks: it only clears this conversation's own history" do
+    refute Permissions.requires_approval?("end_session")
+  end
+
   test "safe tools run without ever asking", %{agent: agent} do
     ctx = %{agent: agent, authorize: fn _, _, _ -> flunk("should not ask") end}
     assert Permissions.gate("read_file", "{}", ctx) == :allow
