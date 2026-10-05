@@ -33,17 +33,21 @@ Elige la opción de canal, escoge el proveedor y el agente, y carga las credenci
 
 ## @Menciones en grupo
 
-Slack, Discord (en su modo conectado por gateway, ver [Discord](../discord/)), Microsoft Teams y Google Chat admiten conversaciones de grupo o canal, donde por defecto la conexión solo contesta si la @mencionan (un mensaje directo, en cambio, siempre le llega al agente sin importar este ajuste). Pon `require_mention: false` en la conexión si quieres que responda a todos los mensajes en todos los canales donde participa. O, sin tocar ese ajuste general de la conexión, haz la excepción para un solo canal, desde dentro de ese mismo canal:
+Slack, Discord (en su modo conectado por gateway, ver [Discord](../discord/)), Microsoft Teams y Google Chat admiten conversaciones de grupo y de canal. Allí el bot solo contesta cuando lo @mencionan (un mensaje directo siempre le llega al agente). Un canal que debe contestar a todo, como el que recibe tickets de otro sistema, se configura desde dentro:
 
 ```text
-/mention off   # solo en este canal, hasta /new - no hace falta @mencionarlo para que responda
-/mention on    # vuelve a exigir una @mención
-/mention       # muestra el ajuste actual
+/mention off          # contesta sin mención, hasta /new
+/mention on           # vuelve a exigir mención, hasta /new
+/mention off always   # contesta sin mención, se mantiene tras /new y al reiniciar
+/mention on always    # vuelve a exigir mención para siempre (el valor por defecto)
+/mention              # muestra lo que rige aquí
 ```
 
-Como un comando de canal igual necesita estar dirigido al bot para poder ejecutarse, el *primer* `/mention off` sí necesita una @mención de verdad (`@bot /mention off`); después de eso, ese canal deja de necesitarla hasta el próximo `/new`. La excepción queda guardada en la conversación de ese canal puntual, no en la conexión, así que nunca se cuela en ningún otro canal. WhatsApp, por ahora, no filtra por menciones (siempre contesta), así que ahí `/mention` no hace nada.
+Un `/mention off` o `/mention on` simple vale para esta conversación y se olvida con `/new`. Con `always`, queda guardado para el canal, sea cual sea el agente que conteste en él. Lo dicho en la conversación gana a lo guardado para el canal, y `/new` devuelve la decisión al canal. Un ajuste nunca llega a otro canal.
 
-Activarlo o desactivarlo queda reservado a los **trainers** del canal (la misma lista de confianza que usa `/agent`), porque cambia el comportamiento del canal para todos los que están en él. Cualquiera puede seguir enviando `/mention` para ver la configuración actual.
+Como un comando de canal igual necesita estar dirigido al bot para poder ejecutarse, el *primer* `/mention off` necesita una @mención de verdad (`@bot /mention off`). Después, el canal ya no la necesita. WhatsApp no filtra por menciones (contesta a todo), así que ahí `/mention` no hace nada.
+
+Cambiarlo queda reservado a los **trainers** del canal (la misma lista de confianza que usa `/agent`), porque cambia el comportamiento del canal para todos los que están en él. Cualquiera puede seguir enviando `/mention` para ver la configuración actual.
 
 <div class="note"><strong>Escribir un comando en Slack.</strong> El propio cliente de Slack trata cualquier cosa que empiece con <code>/</code> como un intento de ejecutar uno de sus propios comandos de barra, y directamente se niega a enviarla como mensaje si no hay ninguno registrado con ese nombre - así que <code>/mention off</code> escrito tal cual llega a ser rechazado por el propio Slack antes de que le llegue a Pepe. Escribe un espacio antes de la barra (<code> /mention off</code>) para mandarlo como texto normal; Pepe quita ese espacio antes de comparar con el comando, tal como siempre hizo.</div>
 

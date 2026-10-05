@@ -49,17 +49,6 @@ defmodule Pepe.Webhooks.GoogleChat do
             "webhooks",
             "The Google Cloud project number. In the app's settings, set Authentication Audience to \"Project Number\"."
           )
-      },
-      %{
-        "key" => "require_mention",
-        "label" => dgettext("webhooks", "Answer only when mentioned"),
-        "type" => "select",
-        "options" => ["true", "false"],
-        "hint" =>
-          dgettext(
-            "webhooks",
-            "In group spaces, reply only when someone @mentions the bot (default: yes)."
-          )
       }
     ]
   end
@@ -118,11 +107,10 @@ defmodule Pepe.Webhooks.GoogleChat do
   # be @mentioned (native USER_MENTION annotation targeting the app itself) so it
   # doesn't answer every message.
   @impl true
-  def addressed?(config, %{"type" => "MESSAGE", "message" => message, "space" => space}) do
+  def addressed?(_config, %{"type" => "MESSAGE", "message" => message, "space" => space}) do
     cond do
       space["type"] in ["DM", "DIRECT_MESSAGE"] -> true
       mentions_app?(message) -> true
-      require_mention?(config) == false -> true
       true -> false
     end
   end
@@ -136,8 +124,6 @@ defmodule Pepe.Webhooks.GoogleChat do
       a["type"] == "USER_MENTION" and get_in(a, ["userMention", "user", "name"]) == "users/app"
     end)
   end
-
-  defp require_mention?(config), do: provider_config(config)["require_mention"] != "false"
 
   @impl true
   def deliver(config, space, text) do

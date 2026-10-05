@@ -47,6 +47,16 @@ defmodule Pepe.Webhooks.Slack do
         "hint" => dgettext("webhooks", "Find it on the app's Basic Information page. Write it as ${ENV_VAR}.")
       },
       %{
+        "key" => "accept_bots",
+        "label" => dgettext("webhooks", "Answer these bots and apps"),
+        "type" => "text",
+        "hint" =>
+          dgettext(
+            "webhooks",
+            "Messages from other apps are ignored by default. To answer one (a help desk posting each new ticket, say), list its bot or app id, separated by commas. Ignored ones are logged with their ids."
+          )
+      },
+      %{
         "key" => "reactions",
         "label" => dgettext("webhooks", "Learn from reactions"),
         "type" => "select",
@@ -56,13 +66,6 @@ defmodule Pepe.Webhooks.Slack do
             "webhooks",
             "A 👍 or ❤️ on one of the bot's own messages is told to the agent as feedback (default: own; off to ignore reactions)."
           )
-      },
-      %{
-        "key" => "require_mention",
-        "label" => dgettext("webhooks", "Answer only when mentioned"),
-        "type" => "select",
-        "options" => ["true", "false"],
-        "hint" => dgettext("webhooks", "In channels, reply only when someone @mentions the bot (default: yes).")
       }
     ]
   end
@@ -110,9 +113,9 @@ defmodule Pepe.Webhooks.Slack do
   def parse(%{"type" => "event_callback", "event" => %{"type" => "reaction_added"}} = payload),
     do: parse_reaction(payload)
 
-  def parse(%{"type" => "event_callback", "event" => event}) do
-    if user_message?(event) do
-      {:ok, [%{from: event["channel"], text: strip_mention(event["text"] || ""), id: event["ts"], media: media(event)}]}
+  def parse(%{"type" => "event_callback", "event" => event} = payload) do
+    if user_message?(payload, event) do
+      {:ok, [message(event)]}
     else
       :ignore
     end
@@ -169,15 +172,57 @@ defmodule Pepe.Webhooks.Slack do
 
   defp reaction_emoji(_name), do: ""
 
-  # A real message from a person: a message/app_mention event with text or a file, not a
-  # bot echo (no bot_id) and not an edit/join/etc. subtype. A message with an attachment
-  # arrives as the `file_share` subtype, so that one is let through.
-  defp user_message?(%{"type" => type} = event) when type in ["message", "app_mention"] do
-    (text?(event) or media(event) != []) and
-      is_nil(event["bot_id"]) and event["subtype"] in [nil, "file_share"]
+  # A real message: a message/app_mention event with text, attachments or a file, and not an
+  # edit/join/etc. subtype (a message with an attachment arrives as `file_share`). One written
+  # by a bot or integration is let through only to be marked (`:bot`, see `message/1`): the
+  # shared webhook layer drops it unless the connection lists that app in `accept_bots`. This
+  # app's own messages never get past here, whatever that list says, so the bot cannot be made
+  # to answer itself.
+  defp user_message?(payload, %{"type" => type} = event) when type in ["message", "app_mention"] do
+    (text?(event) or attachments_text(event) != "" or media(event) != []) and
+      event["subtype"] in [nil, "file_share", "bot_message"] and not own?(payload, event)
   end
 
-  defp user_message?(_), do: false
+  defp user_message?(_payload, _event), do: false
+
+  defp message(event) do
+    text = [strip_mention(event["text"] || ""), attachments_text(event)] |> Enum.reject(&(&1 == "")) |> Enum.join("\n\n")
+    base = %{from: event["channel"], text: text, id: event["ts"], media: media(event)}
+    if from_bot?(event), do: Map.put(base, :bot, bot_ref(event)), else: base
+  end
+
+  defp from_bot?(event), do: is_binary(event["bot_id"]) or event["subtype"] == "bot_message"
+
+  defp bot_ref(event), do: %{id: event["bot_id"], app: event["app_id"], name: event["username"] || get_in(event, ["bot_profile", "name"])}
+
+  # A message this very app sent: same app id as the payload's own, or written by the bot's own
+  # user.
+  defp own?(payload, event) do
+    own_app = payload["api_app_id"]
+    own_user = payload |> Map.get("authorizations") |> List.wrap() |> Enum.find_value(& &1["user_id"])
+
+    (is_binary(own_app) and event["app_id"] == own_app) or (is_binary(own_user) and event["user"] == own_user)
+  end
+
+  # What an integration puts in `attachments` (the coloured bar) instead of in `text`: a title,
+  # a body and labelled fields. Zoho Desk, GitHub, monitoring tools: their whole message lives
+  # here, so without it such a message reads as empty.
+  defp attachments_text(event) do
+    event["attachments"]
+    |> List.wrap()
+    |> Enum.filter(&is_map/1)
+    |> Enum.map(&attachment_text/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+  end
+
+  defp attachment_text(a) do
+    fields = for f <- List.wrap(a["fields"]), is_map(f), do: "#{f["title"]}: #{f["value"]}"
+
+    [a["pretext"], a["title"], a["text"] | fields]
+    |> Enum.filter(&(is_binary(&1) and String.trim(&1) != ""))
+    |> Enum.join("\n")
+  end
 
   defp text?(event), do: is_binary(event["text"]) and event["text"] != ""
 
@@ -241,8 +286,9 @@ defmodule Pepe.Webhooks.Slack do
 
   # A direct message always reaches the agent. In a channel, `app_mention` is Slack's
   # own unambiguous "the bot was mentioned" event; a plain `message` event in a
-  # channel only counts when require_mention is off (set up both subscriptions, per
-  # the moduledoc, so a real mention always also arrives as app_mention).
+  # channel is not addressed to the bot unless the channel was told otherwise with `/mention`
+  # (set up both subscriptions, per the moduledoc, so a real mention always also arrives as
+  # app_mention).
   @impl true
   def addressed?(_config, %{"type" => "event_callback", "event" => %{"type" => "app_mention"}}),
     do: true
@@ -254,13 +300,11 @@ defmodule Pepe.Webhooks.Slack do
   def addressed?(_config, %{"type" => "event_callback", "event" => %{"channel_type" => "im"}}),
     do: true
 
-  def addressed?(config, %{"type" => "event_callback", "event" => %{"type" => "message"} = event}) do
-    require_mention?(config) == false or String.starts_with?(event["channel"] || "", "D")
+  def addressed?(_config, %{"type" => "event_callback", "event" => %{"type" => "message"} = event}) do
+    String.starts_with?(event["channel"] || "", "D")
   end
 
   def addressed?(_config, _payload), do: true
-
-  defp require_mention?(config), do: provider_config(config)["require_mention"] != "false"
 
   @impl true
   def deliver(config, channel, text) do

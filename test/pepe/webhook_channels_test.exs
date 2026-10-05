@@ -14,12 +14,14 @@ defmodule Pepe.WebhookChannelsTest do
                Slack.respond(%{}, %{"type" => "url_verification", "challenge" => "abc123"}, %{})
     end
 
-    test "parses a user message and ignores bot echoes and edits" do
+    test "parses a user message, marks bot messages (the shared layer drops them), and ignores edits" do
       event = %{"type" => "event_callback", "event" => %{"type" => "message", "text" => "hi", "channel" => "C1", "ts" => "1.2"}}
       assert {:ok, [%{from: "C1", text: "hi", id: "1.2"}]} = Slack.parse(event)
 
+      # A bot's message is marked, not dropped here: Pepe.Webhooks drops it unless the connection
+      # lists that bot in accept_bots (see Pepe.Webhooks.SlackBotsTest).
       bot = put_in(event["event"]["bot_id"], "B1")
-      assert :ignore = Slack.parse(bot)
+      assert {:ok, [%{bot: %{id: "B1"}}]} = Slack.parse(bot)
 
       edit = put_in(event["event"]["subtype"], "message_changed")
       assert :ignore = Slack.parse(edit)

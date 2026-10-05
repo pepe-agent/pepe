@@ -55,28 +55,21 @@ own page with its provider-specific fields and setup steps:
 
 ## Group @mentions
 
-Slack, Discord (in its gateway-connected mode, see [Discord](../discord/)),
-Microsoft Teams and Google Chat support group/channel conversations, where
-the connection answers only when @mentioned by default (a direct message
-always reaches the agent regardless). Set `require_mention: false` on the
-connection to answer every message in every channel it's in. Or, without
-touching that connection-wide setting, waive it for a single channel from
-inside that channel:
+Slack, Discord (in its gateway-connected mode, see [Discord](../discord/)), Microsoft Teams and Google Chat support group and channel conversations. There the bot answers only when it is @mentioned (a direct message always reaches the agent). A channel that should answer everything, such as one that receives tickets from another system, is told so from inside it:
 
 ```text
-/mention off   # this channel only, until /new - no @mention needed to be answered
-/mention on    # back to requiring an @mention
-/mention       # show the current setting
+/mention off          # answer without a mention, until /new
+/mention on           # require a mention again, until /new
+/mention off always   # answer without a mention, kept across /new and restarts
+/mention on always    # require a mention again, for good (the default)
+/mention              # show what applies here
 ```
 
-Since a channel command still has to be addressed to run in the first place,
-the *first* `/mention off` needs an actual @mention (`@bot /mention off`);
-after that, the channel no longer needs one until `/new`. The waiver lives on
-that channel's own conversation, not the connection, so it never leaks into
-any other channel. WhatsApp doesn't gate on mentions today (always
-answered), so `/mention` is a no-op there.
+A plain `/mention off` or `/mention on` is for this conversation and is forgotten at `/new`. With `always` it is kept for the channel, whatever agent answers in it. What you said in the conversation beats what was kept for the channel, and `/new` hands the decision back to the channel. A setting never reaches another channel.
 
-Turning it on or off is reserved for the channel's **trainers** (the same trusted list `/agent` uses), because it changes how the channel behaves for everyone in it. Anyone can still send `/mention` to see the current setting.
+Since a channel command still has to be addressed to run in the first place, the *first* `/mention off` needs an actual @mention (`@bot /mention off`). After that the channel no longer needs one. WhatsApp doesn't gate on mentions (it answers everything), so `/mention` is a no-op there.
+
+Changing it is reserved for the channel's **trainers** (the same trusted list `/agent` uses), because it changes how the channel behaves for everyone in it. Anyone can still send `/mention` to see the current setting.
 
 <div class="note"><strong>Typing a command in Slack.</strong> Slack's own
 client treats anything starting with <code>/</code> as an attempt to run one

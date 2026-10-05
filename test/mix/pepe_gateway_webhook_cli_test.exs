@@ -42,7 +42,6 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
         "--gateway",
         "--bot-token",
         "${DISCORD_TOKEN}",
-        "--no-require-mention",
         "--max-attachment-mb",
         "8"
       ])
@@ -55,7 +54,6 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
       assert entry["config"] == %{
                "bot_token" => "${DISCORD_TOKEN}",
                "receive_channel_messages" => "true",
-               "require_mention" => "false",
                "max_attachment_mb" => "8"
              }
 
@@ -75,11 +73,6 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
       entry = Config.get_webhook("cmds")
       assert entry["config"] == %{"application_id" => "123", "public_key" => "abcd"}
       refute Pepe.Gateways.Discord.active?(entry)
-    end
-
-    test "the mention requirement is left at its default unless turned off" do
-      pepe(["gateway", "discord", "add", "chat", "--agent", "a", "--gateway", "--bot-token", "t"])
-      refute Map.has_key?(Config.get_webhook("chat")["config"], "require_mention")
     end
 
     test "--gateway without a token defaults to an env var reference named for the connection, not a hard error" do

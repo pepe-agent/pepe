@@ -60,7 +60,7 @@ or the equivalent fields in the dashboard (a connection can have both `--applica
 
 - `--gateway`: turns this on.
 - `--bot-token '${ENV}'`: the bot's token from the Discord Developer Portal, stored as `${ENV_VAR}`. Turn on the **Message Content** intent on the app's Bot page too, or Discord will not deliver the text of a message that does not @mention the bot.
-- `--no-require-mention`: in a server, the bot only answers a message that @mentions it or replies to something it said, by default. Pass this to answer every message in a channel it can see instead. In a direct message, the bot always answers, regardless of this flag.
+- In a server, the bot only answers a message that @mentions it or replies to something it said, by default. To answer every message in a channel it can see instead, send `/mention off always` in that channel (see [Webhooks](../webhooks/)). In a direct message, the bot always answers.
 - `--max-attachment-mb N`: raise or lower the 20 MB default cap for this connection.
 
 Attachments of the message itself, of the message it replies to (so a voice note can be answered "what does this say?" after the fact), and of a message forwarded to the bot all count, and go through the same voice-to-transcript, document-to-text, image-to-vision handling as a slash command's attachment. Messages on one connection are answered in the order Discord delivered them. If the connection drops, it reconnects and resumes automatically, with nothing said in the gap lost.

@@ -148,11 +148,6 @@ defmodule Pepe.Webhooks.DiscordMessagesTest do
       refute Discord.addressed?(%{}, payload(d))
     end
 
-    test "require_mention off opens the channel up" do
-      config = %{"config" => %{"require_mention" => "false"}}
-      assert Discord.addressed?(config, payload(message()))
-    end
-
     test "a payload that names no bot is never mistaken for a mention" do
       d = message(%{"mentions" => [%{"username" => "someone"}]})
       refute Discord.addressed?(%{}, %{"t" => "MESSAGE_CREATE", "d" => d})
@@ -355,7 +350,7 @@ defmodule Pepe.Webhooks.DiscordMessagesTest do
 
       assert schema["receive_channel_messages"]["type"] == "select"
       assert schema["bot_token"]["type"] == "secret"
-      assert schema["require_mention"]["type"] == "select"
+      refute Map.has_key?(schema, "require_mention")
       assert schema["max_attachment_mb"]["type"] == "text"
 
       # Slash commands alone need neither, so a connection that only takes those can save.

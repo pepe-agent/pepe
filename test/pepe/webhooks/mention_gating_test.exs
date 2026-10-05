@@ -1,8 +1,8 @@
 defmodule Pepe.Webhooks.MentionGatingTest do
   @moduledoc """
   Group/channel conversations should only reach the agent when the bot is actually
-  addressed - mentioned, or the connection has opted out of the default gate. A 1:1
-  conversation always reaches the agent regardless of the setting.
+  addressed - mentioned. A 1:1 conversation always reaches the agent. Whether a channel answers
+  without a mention is the channel's own `/mention` setting, applied by Pepe.Webhooks.
   """
   use ExUnit.Case, async: true
 
@@ -10,10 +10,7 @@ defmodule Pepe.Webhooks.MentionGatingTest do
   alias Pepe.Webhooks.MsTeams
   alias Pepe.Webhooks.Slack
 
-  defp entry(require_mention \\ nil) do
-    config = if require_mention, do: %{"require_mention" => require_mention}, else: %{}
-    %{"config" => config}
-  end
+  defp entry, do: %{"config" => %{}}
 
   describe "Slack" do
     test "app_mention is always addressed" do
@@ -33,11 +30,6 @@ defmodule Pepe.Webhooks.MentionGatingTest do
     test "a plain channel message is not addressed by default" do
       payload = %{"type" => "event_callback", "event" => %{"type" => "message", "channel" => "C1"}}
       refute Slack.addressed?(entry(), payload)
-    end
-
-    test "a plain channel message is addressed when require_mention is off" do
-      payload = %{"type" => "event_callback", "event" => %{"type" => "message", "channel" => "C1"}}
-      assert Slack.addressed?(entry("false"), payload)
     end
 
     test "a DM-shaped channel id (D-prefixed) is addressed even without channel_type" do
@@ -96,11 +88,6 @@ defmodule Pepe.Webhooks.MentionGatingTest do
 
       refute MsTeams.addressed?(entry(), activity)
     end
-
-    test "a channel message is addressed when require_mention is off" do
-      activity = %{"type" => "message", "conversation" => %{"conversationType" => "channel"}, "entities" => []}
-      assert MsTeams.addressed?(entry("false"), activity)
-    end
   end
 
   describe "Google Chat" do
@@ -136,11 +123,6 @@ defmodule Pepe.Webhooks.MentionGatingTest do
       }
 
       refute GoogleChat.addressed?(entry(), payload)
-    end
-
-    test "a multi-person space message is addressed when require_mention is off" do
-      payload = %{"type" => "MESSAGE", "message" => %{}, "space" => %{"type" => "ROOM"}}
-      assert GoogleChat.addressed?(entry("false"), payload)
     end
   end
 end

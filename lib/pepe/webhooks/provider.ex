@@ -115,11 +115,11 @@ defmodule Pepe.Webhooks.Provider do
   @doc """
   Optional: does this inbound payload address the bot, so it should be answered?
   Checked before `parse/1` runs. A provider whose platform supports group/channel
-  conversations implements this to honor the connection's `require_mention` setting
-  (native mention detection, e.g. Slack's `app_mention` event or Teams' mention
-  entities - default when unset is `true`, reply only when mentioned or in a 1:1
-  DM). A provider that is always 1:1, or hasn't added gating yet, can omit it
-  (default: always addressed, today's behavior).
+  conversations implements this with the platform's native mention detection (e.g. Slack's
+  `app_mention` event or Teams' mention entities): true for a mention or a 1:1 DM, false for
+  anything else said in a channel. Whether a channel answers without a mention is not the
+  provider's call: `Pepe.Webhooks` applies the channel's `/mention` setting on top. A provider
+  that is always 1:1, or hasn't added gating yet, can omit it (default: always addressed).
   """
   @callback addressed?(config :: map(), payload :: map()) :: boolean()
 

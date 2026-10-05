@@ -395,7 +395,7 @@ defmodule Pepe.Gateways.DiscordTest do
         "config" => %{"receive_channel_messages" => "true", "bot_token" => "T0K"}
       }
 
-      Pepe.Config.put_webhook("support", put_in(base, ["config", "require_mention"], "false"))
+      Pepe.Config.put_webhook("support", put_in(base, ["config", "max_attachment_mb"], "8"))
       assert [{^id, ^pid, _, _}] = Supervisor.which_children(Pepe.Gateways.DiscordSupervisor)
 
       Pepe.Config.put_webhook("support", put_in(base, ["config", "bot_token"], "N3W"))

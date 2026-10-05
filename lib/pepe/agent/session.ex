@@ -130,10 +130,19 @@ defmodule Pepe.Agent.Session do
   turn-scoped.
   """
   @spec mention_optional?(term()) :: boolean()
-  def mention_optional?(key), do: GenServer.call(via(key), :mention_optional?)
+  def mention_optional?(key), do: mention_setting(key) == true
 
-  @doc "Set/clear this session's mention-optional waiver (see `mention_optional?/1`)."
-  @spec set_mention_optional(term(), boolean()) :: :ok
+  @doc """
+  The raw setting behind `mention_optional?/1`: `true` (waived), `false` (a mention is required,
+  explicitly) or `nil` (nothing said, so whatever the surface's own default says). A webhook
+  channel needs the difference: an explicit `/mention on` has to beat a channel that was set to
+  answer without one for good, while `nil` lets that setting show through.
+  """
+  @spec mention_setting(term()) :: boolean() | nil
+  def mention_setting(key), do: GenServer.call(via(key), :mention_setting)
+
+  @doc "Set this session's mention waiver: `true`, `false`, or `nil` to say nothing (see `mention_setting/1`)."
+  @spec set_mention_optional(term(), boolean() | nil) :: :ok
   def set_mention_optional(key, waived?), do: GenServer.call(via(key), {:set_mention_optional, waived?})
 
   @doc "Drop the last user turn (and its responses) from the history."
@@ -409,7 +418,7 @@ defmodule Pepe.Agent.Session do
       |> Map.put_new(:learn_allowed, true)
       |> Map.put_new(:agent_switch_locked, false)
       |> Map.put_new(:model_override, nil)
-      |> Map.put_new(:mention_optional, false)
+      |> Map.put_new(:mention_optional, nil)
       # Messages sent while a turn is running wait here (FIFO) and run right after it,
       # instead of being rejected - each carries its caller's `from` so the reply lands
       # with whoever sent it. See handle_call({:chat...}) below.
@@ -809,7 +818,7 @@ defmodule Pepe.Agent.Session do
        | agent_name: agent_name,
          messages: init_messages(agent_name),
          pii_map: [],
-         mention_optional: false,
+         mention_optional: nil,
          after_turn: AfterTurn.new()
      })}
   end
@@ -864,7 +873,7 @@ defmodule Pepe.Agent.Session do
     {:reply, :ok, state}
   end
 
-  def handle_call(:mention_optional?, _from, state) do
+  def handle_call(:mention_setting, _from, state) do
     {:reply, state.mention_optional, state}
   end
 

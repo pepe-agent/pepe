@@ -5184,7 +5184,6 @@ defmodule Mix.Tasks.Pepe do
           public_key: :string,
           bot_token: :string,
           gateway: :boolean,
-          require_mention: :boolean,
           max_attachment_mb: :integer,
           trainers: :string,
           ttl_min: :integer,
@@ -5231,7 +5230,7 @@ defmodule Mix.Tasks.Pepe do
 
       add SLUG --agent HANDLE [--project CO] [--mode support|admin]
                slash commands:   --application-id ID --public-key HEX
-               channel messages: --gateway --bot-token '${ENV}' [--no-require-mention]
+               channel messages: --gateway --bot-token '${ENV}'
                [--max-attachment-mb N]
                [--trainers none|*|id1,id2] [--ttl-min N] [--ephemeral] [--commands]
                [--agent-switch-locked]
@@ -5241,7 +5240,7 @@ defmodule Mix.Tasks.Pepe do
 
     --gateway makes the bot read ordinary messages, files and voice messages in channels and
     direct messages (a server channel is answered only when the bot is @mentioned or replied
-    to, unless --no-require-mention). Turn on the Message Content intent on the app's Bot page
+    to; /mention off always in a channel opens it up). Turn on the Message Content intent on the app's Bot page
     to let it read every message. Both need `mix pepe serve`; slash commands also need the
     Interactions Endpoint URL registered in the Discord app.
     """)
@@ -5476,7 +5475,6 @@ defmodule Mix.Tasks.Pepe do
             "public_key" => opts[:public_key],
             "bot_token" => opts[:bot_token],
             "receive_channel_messages" => if(opts[:gateway] == true, do: "true"),
-            "require_mention" => if(opts[:require_mention] == false, do: "false"),
             "max_attachment_mb" => opts[:max_attachment_mb] && Integer.to_string(opts[:max_attachment_mb])
           }
           |> reject_nil_values()

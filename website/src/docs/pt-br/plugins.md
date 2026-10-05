@@ -84,7 +84,7 @@ Um provedor de canal ensina o Pepe a falar uma plataforma de mensagens nova, por
 | `config_schema/0` | não | Campos que o painel renderiza para configurar uma conexão, no mesmo formato do array `config` de um manifesto de plugin (mais abaixo). |
 | `respond/3` | não | Uma resposta HTTP **síncrona** ao `POST` bruto, para protocolos que exigem uma antes de qualquer trabalho do agente (o desafio de verificação de URL do Slack, o `PING` do Discord). `{:reply, status, content_type, body}`, ou `:cont` para cair em `parse/1`. |
 | `deliver_file/4` | não | Envia um arquivo como anexo. Sem essa implementação, o `send_file` simplesmente avisa que o canal não recebe arquivos. |
-| `addressed?/2` | não | Esse payload se dirige ao bot, então merece resposta? Permite que um provedor honre `require_mention` em grupos (o padrão sem essa função é considerar sempre endereçado). |
+| `addressed?/2` | não | Esse payload se dirige ao bot, então merece resposta? Permite que um provedor distinga uma menção ou mensagem direta do resto da conversa do canal (o padrão sem essa função é considerar sempre endereçado). Se um canal responde sem menção é decisão do `/mention` dele, aplicada pelo Pepe, e não do provedor. |
 | `deliver_blocks/3` | não | Renderiza conteúdo estruturado (veja [Blocos de apresentação](#blocos-de-apresentação) logo abaixo) na UI nativa da plataforma. Sem ela, a ferramenta `send_presentation` ainda entrega o conteúdo, só que achatado em texto simples via `deliver/3`. |
 
 ### Blocos de apresentação

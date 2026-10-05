@@ -109,7 +109,7 @@ registry.
 | `config_schema/0` | no | Fields the dashboard renders to configure a connection, same shape as a plugin manifest's `config` array (below). |
 | `respond/3` | no | A **synchronous** HTTP reply to the raw `POST`, for protocols that need one before any agent work (Slack's URL-verification challenge, Discord's `PING`). `{:reply, status, content_type, body}` or `:cont` to fall through to `parse/1`. |
 | `deliver_file/4` | no | Sends a file as an attachment. Omit it and `send_file` just reports the channel can't receive files. |
-| `addressed?/2` | no | Does this payload address the bot, so it should get a reply? Lets a provider honor `require_mention` in group chats (default when omitted: always addressed). |
+| `addressed?/2` | no | Does this payload address the bot, so it should get a reply? Lets a provider tell a mention or DM from other channel talk (default when omitted: always addressed). Whether a channel answers without a mention is its `/mention` setting, applied by Pepe, not by the provider. |
 | `deliver_blocks/3` | no | Renders structured content (see [Presentation blocks](#presentation-blocks) below) into the platform's own native UI. Omit it and the `send_presentation` tool still delivers, flattened to plain text through `deliver/3` instead. |
 
 ### Presentation blocks

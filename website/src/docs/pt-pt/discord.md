@@ -68,10 +68,7 @@ O `mix pepe serve` corre a ligação de ambas as formas. Flags:
 - `--bot-token '${ENV}'`: o token do bot, tirado do Discord Developer Portal, guardado
   como `${ENV_VAR}`. Ativa também a intent **Message Content** na página do Bot da
   aplicação, ou o Discord não entrega o texto de uma mensagem que não mencione o bot.
-- `--no-require-mention`: num servidor, por omissão o bot só responde a uma mensagem que
-  o @mencione ou responda a algo que ele disse. Passa esta flag para responder a
-  qualquer mensagem num canal que ele consiga ver. Numa DM, o bot responde sempre,
-  independentemente desta flag.
+- Num servidor, por omissão o bot só responde a uma mensagem que o @mencione ou responda a algo que ele disse. Para responder a qualquer mensagem num canal que ele consiga ver, envia `/mention off always` nesse canal (vê [Webhooks](../webhooks/)). Numa DM, o bot responde sempre.
 - `--max-attachment-mb N`: aumenta ou diminui o limite por omissão de 20 MB para essa
   ligação.
 

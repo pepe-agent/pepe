@@ -8,7 +8,7 @@ defmodule Mix.Tasks.PepeSetupValidationTest do
     end
 
     test "select fields are optional (they carry a default)" do
-      refute Mix.Tasks.Pepe.required_config_field?(%{"key" => "require_mention", "type" => "select"})
+      refute Mix.Tasks.Pepe.required_config_field?(%{"key" => "reactions", "type" => "select"})
     end
 
     test "a field can explicitly opt out with required: false" do

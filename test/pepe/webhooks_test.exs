@@ -478,16 +478,20 @@ defmodule Pepe.WebhooksTest do
   describe "/mention" do
     test "on/off/status/invalid decisions" do
       a = admin()
-      assert {:mention, true} = Webhooks.command(a, "/mention off", "boss")
-      assert {:mention, false} = Webhooks.command(a, "/mention on", "boss")
+      assert {:mention, true, false} = Webhooks.command(a, "/mention off", "boss")
+      assert {:mention, false, false} = Webhooks.command(a, "/mention on", "boss")
+      assert {:mention, true, true} = Webhooks.command(a, "/mention off always", "boss")
+      assert {:mention, false, true} = Webhooks.command(a, "/mention ON Always", "boss")
       assert {:mention_status} = Webhooks.command(a, "/mention", "boss")
-      assert {:reply, "Usage: /mention on|off"} = Webhooks.command(a, "/mention sideways", "boss")
+      assert {:reply, "Usage: /mention on|off [always]"} = Webhooks.command(a, "/mention sideways", "boss")
+      assert {:reply, "Usage: /mention on|off [always]"} = Webhooks.command(a, "/mention off forever", "boss")
     end
 
     test "only a trainer may change it; anyone may read it" do
       a = admin(%{"trainers" => ["U1"]})
-      assert {:mention, true} = Webhooks.command(a, "/mention off", "U1")
+      assert {:mention, true, false} = Webhooks.command(a, "/mention off", "U1")
       assert {:reply, denied} = Webhooks.command(a, "/mention off", "U2")
+      assert {:reply, ^denied} = Webhooks.command(a, "/mention off always", "U2")
       assert denied =~ "don't have permission"
       assert {:reply, _} = Webhooks.command(a, "/mention on", "U2")
       assert {:mention_status} = Webhooks.command(a, "/mention", "U2")
@@ -581,6 +585,82 @@ defmodule Pepe.WebhooksTest do
       assert opts2[:json]["text"] == "hello!"
     end
 
+    test "/mention off always is kept after /new; a plain /mention off is not" do
+      {:ok, server} = Bandit.start_link(plug: {FixedReplyPlug, reply: "hello!"}, port: 0, scheme: :http)
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      Pepe.Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:#{port}", model: "gpt"})
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
+
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      secret = "sign-me"
+
+      slack_entry =
+        admin(%{"provider" => "slack", "trainers" => ["*"], "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+
+      Pepe.Config.put_webhook("acme-slack", slack_entry)
+
+      ts = Integer.to_string(System.system_time(:second))
+      sig = "v0=" <> (:crypto.mac(:hmac, :sha256, secret, "v0:#{ts}:{}") |> Base.encode16(case: :lower))
+      headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
+
+      send_event = fn type, text ->
+        payload = %{
+          "type" => "event_callback",
+          "event" => %{"type" => type, "text" => text, "channel" => "C9", "ts" => "#{System.unique_integer([:positive])}.0"}
+        }
+
+        assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", payload, headers)
+      end
+
+      # Waits for the next reply the bot posts, so a command's effect is in place before the next step.
+      reply = fn ->
+        assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts}, 1000
+        opts[:json]["text"]
+      end
+
+      # Waits until the bot has stopped answering plain messages (nothing delivered for a moment).
+      silent? = fn -> refute_receive {:delivered, "https://slack.com/api/chat.postMessage", _}, 300 end
+
+      key = Webhooks.mention_key(Map.put(slack_entry, "slug", "acme-slack"), "C9")
+
+      # Kept for the channel: survives /new.
+      send_event.("app_mention", "<@U0BOT123> /mention off always")
+      assert reply.() =~ "even after /new"
+      assert Pepe.Config.channel_mention_optional?(key)
+
+      send_event.("app_mention", "<@U0BOT123> /new")
+      reply.()
+      send_event.("message", "just a ticket")
+      assert reply.() == "hello!"
+
+      # Said for this conversation only, it beats the channel's setting until /new...
+      send_event.("app_mention", "<@U0BOT123> /mention on")
+      assert reply.() =~ "comes back after /new"
+      send_event.("message", "another ticket")
+      silent?.()
+
+      # ...and /new hands the decision back to the channel.
+      send_event.("app_mention", "<@U0BOT123> /new")
+      reply.()
+      send_event.("message", "third ticket")
+      assert reply.() == "hello!"
+
+      # /mention on always clears it for good.
+      send_event.("app_mention", "<@U0BOT123> /mention on always")
+      assert reply.() =~ "for good"
+      refute Pepe.Config.channel_mention_optional?(key)
+      send_event.("message", "fourth ticket")
+      silent?.()
+    end
+
     test "a real command reaches the agent with no @mention at all, in a channel that still requires one for plain chat" do
       parent = self()
 
@@ -590,7 +670,7 @@ defmodule Pepe.WebhooksTest do
       end)
 
       secret = "sign-me"
-      # require_mention left at its default (on) - a command still has to get through with
+      # a channel that still requires a mention for plain chat - a command still has to get through with
       # no @mention and no prior waiver, which is the whole point of this test.
       slack_entry =
         admin(%{"provider" => "slack", "trainers" => ["*"], "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})

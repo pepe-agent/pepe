@@ -181,10 +181,46 @@ defmodule Pepe.Webhooks do
   end
 
   defp maybe_dispatch(mod, entry, payload, %{from: from} = message) do
-    if real_command?(entry, message) or addressed?(mod, entry, payload) or mention_waived?(entry, from) do
-      dispatch(entry, mod, message)
+    cond do
+      not bot_accepted?(entry, message) ->
+        :ok
+
+      real_command?(entry, message) or addressed?(mod, entry, payload) or mention_waived?(entry, from) ->
+        dispatch(entry, mod, message)
+
+      true ->
+        :ok
+    end
+  end
+
+  # A message written by a bot or an integration (a provider marks it with `:bot`, a map with
+  # the ids it knows: `:id`, `:app`, and a `:name`) is dropped unless the connection lists that
+  # bot in `accept_bots`: ids only, never a name, which anyone with access to the channel can
+  # set. A channel that gets its tasks from another system (a help desk posting each new ticket)
+  # lists that system's app id. What is dropped is logged with the ids, so the one to list can
+  # be read off the log instead of guessed. A provider that never sets `:bot` is unaffected.
+  defp bot_accepted?(entry, %{bot: bot} = message) when is_map(bot) do
+    ids = [bot[:id], bot[:app]] |> Enum.filter(&is_binary/1)
+
+    if Enum.any?(ids, &(&1 in accepted_bots(entry))) do
+      true
     else
-      :ok
+      Logger.info(
+        "[webhooks] ignored a message from a bot in #{message.from} (bot=#{inspect(bot[:id])} app=#{inspect(bot[:app])} " <>
+          "name=#{inspect(bot[:name])}); to answer it, add its id to this connection's accept_bots"
+      )
+
+      false
+    end
+  end
+
+  defp bot_accepted?(_entry, _message), do: true
+
+  defp accepted_bots(entry) do
+    case (entry["config"] || %{})["accept_bots"] do
+      list when is_list(list) -> Enum.map(list, &to_string/1)
+      text when is_binary(text) -> text |> String.split([",", " "], trim: true)
+      _ -> []
     end
   end
 
@@ -192,7 +228,7 @@ defmodule Pepe.Webhooks do
   # bot by its own syntax alone - unlike a plain "oi", which could be meant for anyone in a busy
   # channel, nobody types "/mention off" by accident. Requiring an @mention on top of that was
   # pure friction with no actual ambiguity to resolve, so a genuine command reaches the agent
-  # regardless of require_mention/addressed?/2; a support connection, or text that merely starts
+  # regardless of addressed?/2 and the channel's mention setting; a support connection, or text that merely starts
   # with "/" but isn't a command command/3 recognizes, still falls through to the ordinary gate
   # below, exactly as before - command/3 already returns :chat for both of those cases on its own.
   defp real_command?(entry, message) do
@@ -208,15 +244,29 @@ defmodule Pepe.Webhooks do
     if function_exported?(mod, :addressed?, 2), do: mod.addressed?(entry, payload), else: true
   end
 
-  # A per-conversation waiver of the addressed?/2 gate above (see the `/mention`
-  # command in dispatch_command/4) - lives on the session, not the connection, so
-  # toggling it in one channel/DM never affects any other, and a fresh conversation
-  # (`/new`) forgets it, same as Telegram's own `/mention`.
+  # Does this conversation answer without being @mentioned? Strongest first: what was said in
+  # the conversation itself (`/mention on|off`, forgotten at `/new`), then what was set for the
+  # channel for good (`/mention off always`), then the default, which is to require a mention.
+  # Kept per conversation and channel, never on the connection, so it never leaks into another
+  # channel, and the channel's own setting survives `/new` and a restart.
   defp mention_waived?(entry, from) do
+    case session_mention_setting(entry, from) do
+      nil -> Config.channel_mention_optional?(mention_key(entry, from))
+      setting -> setting
+    end
+  end
+
+  defp session_mention_setting(entry, from) do
     key = session_key(entry, from)
     SessionSupervisor.ensure(key, entry["agent"], session_opts(entry))
-    Session.mention_optional?(key)
+    Session.mention_setting(key)
   end
+
+  # The durable setting belongs to the channel on this connection, not to the agent answering
+  # in it: the session key carries the agent, so a channel moved to another agent with `/agent`
+  # would lose it. Qualified by the connection's slug, so two workspaces never share one.
+  @doc false
+  def mention_key(entry, from), do: "#{entry["slug"]}:#{from}"
 
   @doc false
   def session_key(entry, from), do: "#{entry["provider"]}:#{entry["agent"]}:#{from}"
@@ -369,16 +419,29 @@ defmodule Pepe.Webhooks do
     reply_async(ctx.mod, ctx.entry, ctx.from, apply_model_change(ctx.key, ctx.agent, name, scope, perm))
   end
 
-  defp handle_command({:mention, waived?}, ctx) do
+  # `/mention off|on` is this conversation only, forgotten at `/new`; with `always` it is set
+  # for the channel and kept. Setting it for the channel clears what the conversation said, so
+  # the channel's own setting is what shows; `on always` is just the default again (a mention
+  # is required), so it clears the stored one.
+  defp handle_command({:mention, waived?, always?}, ctx) do
     SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
-    Session.set_mention_optional(ctx.key, waived?)
-    reply_async(ctx.mod, ctx.entry, ctx.from, mention_reply(waived?, connection_mention_optional?(ctx.entry)))
+    channel_key = mention_key(ctx.entry, ctx.from)
+    kept? = Config.channel_mention_optional?(channel_key)
+
+    if always? do
+      Session.set_mention_optional(ctx.key, nil)
+      Config.put_channel_mention_optional(channel_key, waived?)
+    else
+      Session.set_mention_optional(ctx.key, waived?)
+    end
+
+    reply_async(ctx.mod, ctx.entry, ctx.from, mention_reply(waived?, always?, kept?))
   end
 
   defp handle_command({:mention_status}, ctx) do
     SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
-    status = mention_status_reply(Session.mention_optional?(ctx.key), connection_mention_optional?(ctx.entry))
-    reply_async(ctx.mod, ctx.entry, ctx.from, status)
+    kept? = Config.channel_mention_optional?(mention_key(ctx.entry, ctx.from))
+    reply_async(ctx.mod, ctx.entry, ctx.from, mention_status_reply(Session.mention_setting(ctx.key), kept?))
   end
 
   defp handle_command({:agent_status}, ctx) do
@@ -591,22 +654,23 @@ defmodule Pepe.Webhooks do
     end
   end
 
-  # A per-conversation waiver of the connection's require_mention gate (see
-  # addressed?/3 and mention_waived?/2 above) - only matters for a provider that
-  # actually implements addressed?/2 gating (Slack, MS Teams, Google Chat today);
-  # a no-op where the connection already answers everything.
+  # `/mention [on|off] [always]`: whether this channel answers without being @mentioned (see
+  # mention_waived?/2 above) - only matters for a provider that implements addressed?/2 gating
+  # (Slack, Discord, MS Teams, Google Chat); a no-op where every message is addressed anyway.
   #
   # Changing it is trainer-gated (learn?/2), like `/agent` and `/model ... global`: it changes
   # how the whole channel behaves for everyone in it. Reading the status stays open to all.
   defp dispatch_command(entry, "mention", args, from) do
     trainer? = learn?(entry, from)
 
-    case args |> String.trim() |> String.downcase() do
-      "" -> {:mention_status}
-      change when change in ["on", "off"] and not trainer? -> {:reply, mention_denied_message()}
-      "off" -> {:mention, true}
-      "on" -> {:mention, false}
-      _ -> {:reply, dgettext("webhooks", "Usage: /mention on|off")}
+    case args |> String.trim() |> String.downcase() |> String.split(~r/\s+/, trim: true) do
+      [] -> {:mention_status}
+      [change | _] when change in ["on", "off"] and not trainer? -> {:reply, mention_denied_message()}
+      ["off"] -> {:mention, true, false}
+      ["on"] -> {:mention, false, false}
+      ["off", "always"] -> {:mention, true, true}
+      ["on", "always"] -> {:mention, false, true}
+      _ -> {:reply, dgettext("webhooks", "Usage: /mention on|off [always]")}
     end
   end
 
@@ -636,39 +700,57 @@ defmodule Pepe.Webhooks do
 
   defp dispatch_command(_entry, _other, _args, _from), do: :chat
 
-  # The `require_mention` config field is a shared convention across every provider that
-  # implements addressed?/2 gating (Slack, Discord's gateway mode, MS Teams, Google Chat),
-  # so it's read generically here rather than through any one provider module.
-  defp connection_mention_optional?(entry), do: (entry["config"] || %{})["require_mention"] == "false"
-
-  defp mention_reply(true, _connection_optional?),
+  defp mention_reply(true, false, _kept?),
     do: dgettext("webhooks", "👂 I'll reply here without being @mentioned, until /new.")
 
-  # `/mention on` while the connection itself already answers everything (require_mention:
-  # false) can't actually re-impose the requirement - the per-channel waiver only ever loosens
-  # the connection's own default, never tightens it - so say that plainly instead of claiming
-  # an effect this can't have.
-  defp mention_reply(false, true) do
+  defp mention_reply(true, true, _kept?),
+    do:
+      dgettext(
+        "webhooks",
+        "👂 I'll reply here without being @mentioned, even after /new, until you send /mention on always."
+      )
+
+  # A mention required again for this conversation only, while the channel itself is set to
+  # answer without one: say that it comes back, instead of implying it is settled.
+  defp mention_reply(false, false, true) do
     dgettext(
       "webhooks",
-      "Noted, but this connection already answers every message here without needing a mention (require_mention is off on the connection) - this channel keeps replying without one regardless."
+      "📣 @mention required again until /new. This channel is still set to answer without one, so that comes back after /new."
     )
   end
 
-  defp mention_reply(false, false), do: dgettext("webhooks", "📣 @mention required again in this chat.")
+  defp mention_reply(false, false, false), do: dgettext("webhooks", "📣 @mention required again in this chat.")
 
-  defp mention_status_reply(true, _connection_optional?),
-    do: dgettext("webhooks", "Mention requirement is currently: off (I reply without being mentioned).\nUse /mention on or /mention off.")
+  defp mention_reply(false, true, _kept?),
+    do: dgettext("webhooks", "📣 @mention required again in this channel, for good.")
 
-  defp mention_status_reply(false, true) do
-    dgettext(
-      "webhooks",
-      "This channel's own setting asks for a mention, but the connection itself already answers every message without one (require_mention is off) - so nothing here actually needs a mention right now."
-    )
-  end
+  defp mention_status_reply(true, _kept?),
+    do:
+      dgettext(
+        "webhooks",
+        "Mention requirement is currently: off until /new (I reply without being mentioned).\nUse /mention on or /mention off; add always to keep it for this channel."
+      )
 
-  defp mention_status_reply(false, false),
-    do: dgettext("webhooks", "Mention requirement is currently: on (I need an @mention).\nUse /mention on or /mention off.")
+  defp mention_status_reply(false, true),
+    do:
+      dgettext(
+        "webhooks",
+        "Mention requirement is currently: on until /new. This channel is set to answer without one, so that comes back after /new.\nUse /mention on always to change the channel."
+      )
+
+  defp mention_status_reply(nil, true),
+    do:
+      dgettext(
+        "webhooks",
+        "Mention requirement is currently: off for this channel, kept after /new (I reply without being mentioned).\nUse /mention on always to undo it."
+      )
+
+  defp mention_status_reply(_setting, false),
+    do:
+      dgettext(
+        "webhooks",
+        "Mention requirement is currently: on (I need an @mention).\nUse /mention off, or /mention off always to keep it for this channel."
+      )
 
   defp render_models([]), do: dgettext("webhooks", "No models are configured for this project.")
 

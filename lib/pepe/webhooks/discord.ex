@@ -9,7 +9,7 @@ defmodule Pepe.Webhooks.Discord do
 
     * `public_key`     - the app's public key, for the required Ed25519 signature check
     * `application_id` - used to post the follow-up answer
-    * `receive_channel_messages`, `bot_token`, `require_mention` - ordinary messages over the
+    * `receive_channel_messages`, `bot_token` - ordinary messages over the
       gateway, described below
 
   Discord requires a synchronous ack within 3s, so a command is answered with a deferred
@@ -26,7 +26,7 @@ defmodule Pepe.Webhooks.Discord do
   `receive_channel_messages` and a `bot_token`; `Pepe.Gateways.Discord` then holds the socket
   open and feeds each message to `parse/1` below, in a payload shaped
   `%{"t" => "MESSAGE_CREATE", "d" => message, "bot_id" => id}`. In a server the bot answers
-  when it is @mentioned or replied to (`require_mention` turns that off), in a DM always; the
+  when it is @mentioned or replied to (`/mention off` turns that off for a channel), in a DM always; the
   reply goes to the channel with the bot token, addressed as `"ch:<channel id>"` where an
   interaction's follow-up is addressed by its token. Attachments of the message, of the
   message it replies to, and of a message forwarded to the bot all count.
@@ -99,17 +99,6 @@ defmodule Pepe.Webhooks.Discord do
           dgettext(
             "webhooks",
             "Find it on the app's Bot page. Needed to read channel messages."
-          )
-      },
-      %{
-        "key" => "require_mention",
-        "label" => dgettext("webhooks", "Answer only when mentioned"),
-        "type" => "select",
-        "options" => ["true", "false"],
-        "hint" =>
-          dgettext(
-            "webhooks",
-            "In server channels, reply only when someone @mentions the bot (default: yes)."
           )
       },
       %{
@@ -257,14 +246,12 @@ defmodule Pepe.Webhooks.Discord do
   end
 
   # A direct message always reaches the agent. In a server channel the bot answers when it is
-  # @mentioned, or when the message replies to something it said; `require_mention: false`
-  # opens the channel up. A slash command (an interaction) is addressed by definition.
+  # @mentioned, or when the message replies to something it said, unless the channel was told
+  # otherwise with `/mention` (see Pepe.Webhooks). A slash command (an interaction) is addressed by definition.
   @impl true
-  def addressed?(config, %{"t" => "MESSAGE_CREATE", "d" => d} = payload) do
+  def addressed?(_config, %{"t" => "MESSAGE_CREATE", "d" => d} = payload) do
     bot_id = payload["bot_id"]
-
-    is_nil(d["guild_id"]) or mentioned?(d, bot_id) or replied_to?(d, bot_id) or
-      provider_config(config)["require_mention"] == "false"
+    is_nil(d["guild_id"]) or mentioned?(d, bot_id) or replied_to?(d, bot_id)
   end
 
   def addressed?(_config, _payload), do: true

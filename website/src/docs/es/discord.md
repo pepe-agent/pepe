@@ -69,10 +69,7 @@ para comandos de barra y `--gateway`/`--bot-token` para mensajes de canal a la v
 - `--bot-token '${ENV}'`: el token del bot, sacado del Discord Developer Portal, guardado
   como `${ENV_VAR}`. Activa también el intent **Message Content** en la página del Bot de
   la app, o Discord no entrega el texto de un mensaje que no mencione al bot.
-- `--no-require-mention`: en un servidor, por defecto el bot solo contesta un mensaje que
-  lo @mencione o responda a algo que dijo. Pasa esta flag para que conteste cualquier
-  mensaje en un canal que pueda ver. En un DM, el bot siempre contesta, sin importar esta
-  flag.
+- En un servidor, por defecto el bot solo contesta un mensaje que lo @mencione o responda a algo que dijo. Para que conteste cualquier mensaje en un canal que pueda ver, envía `/mention off always` en ese canal (mira [Webhooks](../webhooks/)). En un DM, el bot siempre contesta.
 - `--max-attachment-mb N`: sube o baja el límite por defecto de 20 MB para esa conexión.
 
 Los adjuntos del mensaje mismo, del mensaje al que responde (así se puede contestar "¿qué

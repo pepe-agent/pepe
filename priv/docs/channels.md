@@ -152,7 +152,7 @@ Config: `bot_token` (the `xoxb-...` bot user token, the Bearer for replies) and
 Slack app's Event Subscriptions request URL at the connection URL - the first save
 triggers a `url_verification` handshake, answered synchronously. Subscribe to
 `message.channels` and `app_mention`. In a channel the bot replies only when
-`@mentioned` (the default; `require_mention: "false"` answers every message); a direct
+`@mentioned` (a channel can be opened up with `/mention off always`); a direct
 message always replies.
 
 ### Discord (Interactions endpoint, plus an optional gateway)
@@ -195,7 +195,7 @@ Framework JWT **is** validated here (signature + `aud` == `app_id`), so the endp
 accepts POSTs straight from Microsoft; set `trust_proxy: true` only if a proxy already
 does that check. A 1:1 chat always
 replies; in a team channel or group chat the bot replies only when `@mentioned`
-(default; `require_mention: "false"` to answer all). The bot @mention is stripped from
+(a channel can be opened up with `/mention off always`). The bot @mention is stripped from
 the text before it reaches you.
 
 ### Google Chat (Chat API)
@@ -209,4 +209,4 @@ events become a turn; replies post back to the space. The inbound Google JWT **i
 validated here (signature + `aud` == `project_number`), so the endpoint accepts POSTs
 straight from Google; set `trust_proxy: true` only if a proxy already does that check.
 A DM always replies; in a multi-person space the app replies only when `@mentioned`
-(default; `require_mention: "false"` to answer all).
+(a channel can be opened up with `/mention off always`).

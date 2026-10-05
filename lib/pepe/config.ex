@@ -3075,6 +3075,25 @@ defmodule Pepe.Config do
     update(fn config -> Map.put(config, "channel_agents", Map.put(config["channel_agents"] || %{}, session_key, agent)) end)
   end
 
+  @doc """
+  Whether a conversation was told to answer without being @mentioned, durably - keyed by its
+  session key like `channel_agent/1`, so it survives `/new` and a restart. A webhook channel's
+  `/mention off` writes it; `/mention on` clears it. Only ever loosens the connection's own
+  `require_mention`, never tightens it.
+  """
+  @spec channel_mention_optional?(String.t()) :: boolean()
+  def channel_mention_optional?(session_key), do: get_in(load(), ["channel_mentions", session_key]) == true
+
+  @doc "Set or clear (`false`) a conversation's durable \"answer without a mention\" setting."
+  @spec put_channel_mention_optional(String.t(), boolean()) :: map()
+  def put_channel_mention_optional(session_key, true) do
+    update(fn config -> Map.put(config, "channel_mentions", Map.put(config["channel_mentions"] || %{}, session_key, true)) end)
+  end
+
+  def put_channel_mention_optional(session_key, false) do
+    update(fn config -> Map.put(config, "channel_mentions", Map.delete(config["channel_mentions"] || %{}, session_key)) end)
+  end
+
   @doc "Create or replace a named (non-default) Telegram bot."
   def put_telegram_bot(name, map) when is_binary(name) and is_map(map) do
     clean = map |> Map.delete("name") |> store_map_agent()

@@ -68,6 +68,14 @@ Revisa [Webhooks](../webhooks/) para conocer los campos que comparte toda conexi
 (`agent`, `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) y cómo
 funciona por dentro la ruta genérica.
 
+### Mensajes de otras apps
+
+Un canal que recibe su trabajo de otro sistema (un help desk que publica cada ticket nuevo, una alerta de monitoreo) recibe mensajes escritos por una app, y no por una persona. Pepe los ignora por defecto, para que el bot nunca se responda a sí mismo ni a otros bots. Para responder a uno, indica el id del bot (`B...`) o de la app (`A...`) en el campo **Responder a estos bots y apps** de la conexión (`accept_bots`, separados por comas). Cada mensaje ignorado queda en el log con sus ids, así que copias el correcto del log en lugar de adivinar.
+
+Las integraciones suelen poner todo el mensaje en el adjunto con la barra de color, y no en el texto. Pepe lee el título, el cuerpo y los campos del adjunto como el mensaje. Los mensajes del propio bot nunca se responden, aunque su id esté en la lista.
+
+Para que un canal así siga escuchando sin @mención, envía `/mention off` una vez en él. Sigue activo después de `/new` y de reiniciar, hasta que alguien envíe `/mention on`.
+
 ### Cambiar de modelo
 
 Con los comandos `/model` y `/models`, cualquiera puede consultar o cambiar qué modelo de

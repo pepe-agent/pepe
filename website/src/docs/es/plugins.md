@@ -84,7 +84,7 @@ Un proveedor de canal le enseña a Pepe a hablar una plataforma de mensajería n
 | `config_schema/0` | no | Los campos que el panel renderiza para configurar una conexión, con la misma forma que el array `config` de un manifiesto de plugin (ver más abajo). |
 | `respond/3` | no | Una respuesta HTTP **síncrona** al `POST` sin procesar, para protocolos que necesitan una antes de que el agente haga nada (el desafío de verificación de URL de Slack, el `PING` de Discord). Devuelve `{:reply, status, content_type, body}`, o `:cont` para dejar que siga a `parse/1`. |
 | `deliver_file/4` | no | Envía un archivo como adjunto. Si lo omites, `send_file` simplemente informa que el canal no puede recibir archivos. |
-| `addressed?/2` | no | ¿Este payload va dirigido al bot y merece respuesta? Permite que un proveedor respete `require_mention` en chats grupales (si se omite, el valor por defecto es que siempre va dirigido al bot). |
+| `addressed?/2` | no | ¿Este payload va dirigido al bot y merece respuesta? Permite que un proveedor distinga una mención o un mensaje directo del resto de la conversación del canal (si se omite, el valor por defecto es que siempre va dirigido al bot). Que un canal conteste sin mención lo decide su `/mention`, aplicado por Pepe, no el proveedor. |
 | `deliver_blocks/3` | no | Renderiza contenido estructurado (ver [Bloques de presentación](#bloques-de-presentación) más abajo) en la interfaz nativa de la plataforma. Si lo omites, la herramienta `send_presentation` igual entrega el contenido, aplanado a texto simple a través de `deliver/3`. |
 
 ### Bloques de presentación

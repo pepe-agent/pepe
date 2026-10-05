@@ -70,6 +70,14 @@ See [Webhooks](../webhooks/) for the fields every connection shares (`agent`,
 `mode`, `trainers`, `session_ttl_min`, `ephemeral`, `commands`) and how the
 generic route works under the hood.
 
+### Messages from other apps
+
+A channel that gets its work from another system (a help desk posting each new ticket, a monitoring alert) receives messages written by an app, not by a person. Pepe ignores those by default, so the bot never answers itself or other bots. To answer one, list its bot id (`B...`) or app id (`A...`) in the connection's **Answer these bots and apps** field (`accept_bots`, comma separated). Each message Pepe ignores is logged with its ids, so you can copy the right one from the log instead of guessing.
+
+Integrations often put the whole message in the coloured-bar attachment instead of the text. Pepe reads the attachment's title, body and fields as the message. The bot's own messages are never answered, even if its id is on the list.
+
+To keep such a channel listening without an @mention, send `/mention off` once in it. It stays on after `/new` and after a restart, until someone sends `/mention on`.
+
 ### Switching models
 
 The `/model` and `/models` commands let people check or change which AI model
