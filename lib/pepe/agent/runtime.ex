@@ -746,6 +746,10 @@ defmodule Pepe.Agent.Runtime do
   # context looking like an ordinary tool result. Untainted, that content would still enjoy
   # this run's own auto_approve, which is the whole thing tainting is supposed to withdraw.
   #
+  # A plugin tool taints when it says its result comes from outside (`outside_content?/0` of
+  # `Pepe.Tools.Tool`): a ticket tracker, a wiki and a mailbox return text a stranger wrote just as
+  # a fetched page does, and only the plugin knows which of its tools do.
+  #
   # `run_graph` taints for the same reason as `delegate`: a graph's own nodes can fetch,
   # search, or otherwise read outside content just like any other agent turn, and its final
   # output is a proxy for whatever a tainted node inside it produced - see
@@ -759,7 +763,7 @@ defmodule Pepe.Agent.Runtime do
   # outside content when it hands it back into the session; a second copy of
   # @outside_content in either place would silently drift from this one.
   @doc false
-  def outside_content?(name), do: name in @outside_content or Pepe.MCP.mcp_tool?(name)
+  def outside_content?(name), do: name in @outside_content or Pepe.MCP.mcp_tool?(name) or Tools.outside_content?(name)
 
   @doc false
   def taint_if_outside(name), do: if(outside_content?(name), do: Pepe.Permissions.taint(), else: :ok)

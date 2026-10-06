@@ -61,6 +61,22 @@ Vale a pena manter essa segunda cláusula de `run/2`: se o modelo esquecer de ma
 
 O segundo argumento de `run/2`, **`ctx`**, carrega a execução atual: `ctx[:agent]` (o agente em execução, por exemplo `%{name: "assistant"}`), `ctx[:session_key]` (a conversa ao vivo, ausente quando é uma execução de um turno só) e `ctx[:cwd]` (o diretório de trabalho). Trate cada chave como opcional. Uma ferramenta que lê ou escreve arquivos resolve caminhos por `Pepe.Agent.Workspace`; já uma que chama uma API externa costuma ignorar `ctx` de vez e usar direto o cliente HTTP `Req`, que já vem incluso, sem precisar de nenhuma dependência a mais.
 
+**Uma ferramenta que devolve texto escrito por outra pessoa.** Um plugin que lê um sistema
+de chamados, uma wiki ou uma caixa de e-mail devolve texto que o remetente escolheu, e o
+modelo o lê ao lado das palavras do próprio usuário. Declare isso com um `outside_content?/0`
+opcional:
+
+```elixir
+@impl true
+def outside_content?, do: true
+```
+
+Depois que uma execução recebe um resultado assim, o `auto_approve` deixa de valer nela até o
+fim, exatamente como depois do `fetch_url`: uma ferramenta que rodaria sem perguntar passa a
+perguntar, e a pessoa vê o comando antes. Marque também o próprio texto com
+`Pepe.Security.ExternalContent.mark_untrusted/2`, para o modelo lê-lo como material citado. Uma
+ferramenta que não diz nada é tratada como antes.
+
 ## O behaviour Channel provider
 
 Um provedor de canal ensina o Pepe a falar uma plataforma de mensagens nova, por cima do webhook de entrada genérico que já existe: nenhuma rota nova, só mais um módulo no registro.

@@ -11,6 +11,17 @@ defmodule Pepe.Tools.Tool do
                         asked for in the same turn? Defaults to `false`.
     * `offered?/1`    - optional; is this tool on offer in *this* turn, given the turn's
                         `ctx`? Defaults to `true`.
+    * `outside_content?/0` - optional; does what this tool returns come from somebody other
+                        than the person talking to the agent (a ticket, a page, a message)?
+                        Defaults to `false`.
+
+  ## `outside_content?/0`: text a stranger wrote
+
+  `fetch_url`, `web_search`, `db_query` and every MCP tool are known to bring in text somebody
+  else wrote, and once a run has taken any in, `auto_approve` stops applying to it (see
+  `Pepe.Permissions`). A plugin that reads a ticket tracker, a wiki or a mailbox returns the same
+  kind of text, and the runtime cannot tell from outside. Saying `true` here is how it says so.
+  Nothing else changes for the tool, and a plugin that never says is treated as before.
 
   ## `offered?/1`: one question, asked once
 
@@ -45,8 +56,9 @@ defmodule Pepe.Tools.Tool do
   @callback run(args :: map(), ctx :: ctx()) :: {:ok, String.t()} | {:error, String.t()}
   @callback concurrent?() :: boolean()
   @callback offered?(ctx :: ctx()) :: boolean()
+  @callback outside_content?() :: boolean()
 
-  @optional_callbacks concurrent?: 0, offered?: 1
+  @optional_callbacks concurrent?: 0, offered?: 1, outside_content?: 0
 
   @doc """
   Whether an agent has anyone to message or hand a conversation to (a non-empty

@@ -242,6 +242,18 @@ defmodule Pepe.Tools do
   end
 
   @doc """
+  Does this tool say that what it returns was written by somebody other than the person talking
+  to the agent (`outside_content?/0`)? `false` for an unknown tool and for one that does not say.
+  """
+  @spec outside_content?(String.t()) :: boolean()
+  def outside_content?(name) do
+    case by_name()[name] do
+      nil -> false
+      mod -> function_exported?(mod, :outside_content?, 0) and mod.outside_content?()
+    end
+  end
+
+  @doc """
   Execute a tool call. `tool_call` is the OpenAI tool_call map. Returns the
   string result (always - errors are turned into a readable string for the model).
   """

@@ -84,6 +84,21 @@ Treat every key as optional. Tools that read/write files resolve paths through
 entirely and just reach for the bundled `Req` HTTP client, no extra dependency
 needed.
 
+**A tool that returns text somebody else wrote.** A plugin that reads a ticket tracker, a
+wiki or a mailbox returns text its sender chose, which the model then reads next to the
+user's own words. Declare it with an optional `outside_content?/0`:
+
+```elixir
+@impl true
+def outside_content?, do: true
+```
+
+Once a run has taken in such a result, `auto_approve` stops applying to it for the rest of
+that run, exactly as after `fetch_url`: a tool that would have run unasked asks, and the person
+sees the command first. Also frame the text itself with
+`Pepe.Security.ExternalContent.mark_untrusted/2` so the model reads it as quoted material. A
+tool that says nothing is treated as before.
+
 ## The Channel provider behaviour
 
 A channel provider teaches Pepe to speak a new messaging platform over the
