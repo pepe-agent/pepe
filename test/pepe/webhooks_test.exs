@@ -475,6 +475,139 @@ defmodule Pepe.WebhooksTest do
     end
   end
 
+  describe "/trainers" do
+    defp slack_admin(overrides \\ %{}), do: admin(Map.merge(%{"slug" => "desk", "provider" => "slack"}, overrides))
+
+    test "status, everyone, no one, default and a list of people" do
+      a = slack_admin()
+      assert {:trainers_status} = Webhooks.command(a, "/trainers", "boss", "C1")
+      assert {:trainers_set, ["*"]} = Webhooks.command(a, "/trainers *", "boss", "C1")
+      assert {:trainers_set, []} = Webhooks.command(a, "/trainers none", "boss", "C1")
+      assert {:trainers_set, nil} = Webhooks.command(a, "/trainers default", "boss", "C1")
+      assert {:trainers_set, ["U2", "U3", "U4"]} = Webhooks.command(a, "/trainers <@U2> @U3 U4 <@U2>", "boss", "C1")
+      assert {:reply, "Usage: /trainers [* | none | default | @person ...]"} = Webhooks.command(a, "/trainers ???", "boss", "C1")
+    end
+
+    test "only a current trainer of the channel may change it; anyone may read it" do
+      a = slack_admin(%{"trainers" => ["U1"]})
+      assert {:trainers_set, ["*"]} = Webhooks.command(a, "/trainers *", "U1", "C1")
+      assert {:reply, denied} = Webhooks.command(a, "/trainers *", "U2", "C1")
+      assert denied =~ "don't have permission"
+      assert {:trainers_status} = Webhooks.command(a, "/trainers", "U2", "C1")
+    end
+
+    test "a channel's own list replaces the connection's, for that channel only" do
+      a = slack_admin(%{"trainers" => ["U1"]})
+      Config.put_channel_trainers("desk:C1", ["*"])
+      Config.put_channel_trainers("desk:C2", [])
+
+      assert Webhooks.learn?(a, "U9", "C1")
+      refute Webhooks.learn?(a, "U1", "C2")
+      refute Webhooks.learn?(a, "U9", "C3")
+      assert Webhooks.learn?(a, "U1", "C3")
+
+      Config.put_channel_trainers("desk:C1", nil)
+      refute Webhooks.learn?(a, "U9", "C1")
+    end
+
+    test "a channel with its own list obeys it even when the connection lets everyone train" do
+      a = slack_admin(%{"trainers" => ["*"]})
+      Config.put_channel_trainers("desk:C1", ["U5"])
+      assert Webhooks.learn?(a, "U5", "C1")
+      refute Webhooks.learn?(a, "U6", "C1")
+      assert Webhooks.learn?(a, "U6", "C2")
+    end
+
+    test "a connection list that named the channel itself still works" do
+      a = slack_admin(%{"trainers" => ["C1"]})
+      assert Webhooks.learn?(a, "U9", "C1")
+      refute Webhooks.learn?(a, "U9", "C2")
+    end
+
+    test "in a Slack channel a trainer sets the channel's list from the chat, and others are refused" do
+      {:ok, server} = Bandit.start_link(plug: {FixedReplyPlug, reply: "hello!"}, port: 0, scheme: :http)
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      on_exit(fn -> Process.exit(server, :normal) end)
+
+      Pepe.Config.put_model(%Pepe.Config.Model{name: "m", base_url: "http://localhost:#{port}", model: "gpt"})
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/support", model: "m", tools: []})
+
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      # The first message in C1 also records the channel and asks Slack for its name, off the
+      # request; answer that here so the test never reaches out.
+      Mimic.stub(Req, :get, fn "https://slack.com" <> _ = _url, _opts -> {:ok, %{status: 200, body: %{"ok" => false}}} end)
+
+      secret = "sign-me"
+
+      entry =
+        admin(%{"provider" => "slack", "trainers" => ["U1"], "config" => %{"bot_token" => "xoxb-1", "signing_secret" => secret}})
+
+      Pepe.Config.put_webhook("acme-slack", entry)
+
+      ts = Integer.to_string(System.system_time(:second))
+      sig = "v0=" <> (:crypto.mac(:hmac, :sha256, secret, "v0:#{ts}:{}") |> Base.encode16(case: :lower))
+      headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
+
+      say = fn user, text, stamp ->
+        payload = %{
+          "type" => "event_callback",
+          "event" => %{"type" => "message", "channel" => "C1", "user" => user, "text" => " " <> text, "ts" => stamp}
+        }
+
+        assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", payload, headers)
+      end
+
+      say.("U2", "/trainers <@U2>", "1.0")
+      assert_receive {:delivered, _url, denied}, 1_000
+      assert denied[:json]["text"] =~ "don't have permission"
+      assert Pepe.Config.channel_trainers("acme-slack:C1") == nil
+
+      say.("U1", "/trainers <@U2>", "2.0")
+      assert_receive {:delivered, _url, done}, 1_000
+      assert done[:json]["text"] =~ "<@U2> can train this channel"
+      assert Pepe.Config.channel_trainers("acme-slack:C1") == ["U2"]
+
+      # The connection's own trainer is no longer one in this channel; the new one is.
+      say.("U1", "/trainers default", "3.0")
+      assert_receive {:delivered, _url, refused}, 1_000
+      assert refused[:json]["text"] =~ "don't have permission"
+
+      say.("U2", "/trainers default", "4.0")
+      assert_receive {:delivered, _url, back}, 1_000
+      assert back[:json]["text"] =~ "follows the connection again"
+      assert Pepe.Config.channel_trainers("acme-slack:C1") == nil
+    end
+
+    test "a typed trainers value is read and shown the same way" do
+      assert Webhooks.parse_trainers(nil) == nil
+      assert Webhooks.parse_trainers("  ") == nil
+      assert Webhooks.parse_trainers("*") == ["*"]
+      assert Webhooks.parse_trainers("none") == []
+      assert Webhooks.parse_trainers("U1, <@U2> U3") == ["U1", "U2", "U3"]
+
+      for list <- [nil, [], ["*"], ["U1", "U2"]], do: assert(Webhooks.parse_trainers(Webhooks.trainers_value(list)) == list)
+    end
+
+    test "Slack messages carry who wrote them, and a bot message does not" do
+      person = %{
+        "type" => "event_callback",
+        "event" => %{"type" => "message", "channel" => "C1", "user" => "U7", "text" => "hi", "ts" => "1.1"}
+      }
+
+      assert {:ok, [%{sender_id: "U7", from: "C1"}]} = Pepe.Webhooks.Slack.parse(person)
+
+      bot = put_in(person, ["event", "bot_id"], "B1")
+      assert {:ok, [message]} = Pepe.Webhooks.Slack.parse(bot)
+      refute Map.has_key?(message, :sender_id)
+    end
+  end
+
   describe "/mention" do
     test "on/off/status/invalid decisions" do
       a = admin()
@@ -889,6 +1022,311 @@ defmodule Pepe.WebhooksTest do
 
       assert_receive {:delivered, _url, opts}, 1000
       assert opts[:json]["text"]["body"] =~ "behind"
+    end
+  end
+
+  describe "channels heard from" do
+    alias Pepe.SeenChannels
+
+    @secret "sign-me"
+
+    defp slack_connection(slug, overrides \\ %{}) do
+      base = %{"provider" => "slack", "config" => %{"bot_token" => "xoxb-1", "signing_secret" => @secret}}
+      Pepe.Config.put_webhook(slug, admin(Map.merge(base, overrides)))
+    end
+
+    defp slack_say(slug, event) do
+      ts = Integer.to_string(System.system_time(:second))
+      sig = "v0=" <> (:crypto.mac(:hmac, :sha256, @secret, "v0:#{ts}:{}") |> Base.encode16(case: :lower))
+      headers = %{"x-slack-request-timestamp" => ts, "x-slack-signature" => sig}
+      payload = %{"type" => "event_callback", "event" => Map.merge(%{"type" => "message", "user" => "U2", "ts" => "1.0"}, event)}
+      assert :ok = Webhooks.handle_inbound("acme", "slack", slug, "{}", payload, headers)
+    end
+
+    # The lookup runs in a task of its own; the stub hands its pid over so the test can wait
+    # for it to finish writing instead of sleeping.
+    defp stub_channel_lookup(parent, name) do
+      Mimic.stub(Req, :get, fn "https://slack.com/api/conversations.info", opts ->
+        send(parent, {:looked_up, self(), opts[:params][:channel], opts[:retry]})
+        {:ok, %{status: 200, body: %{"ok" => true, "channel" => %{"id" => opts[:params][:channel], "name" => name}}}}
+      end)
+    end
+
+    test "a channel message the bot does not answer is still recorded, and named once by lookup" do
+      slack_connection("acme-slack")
+      stub_channel_lookup(self(), "ops")
+
+      # No mention, so the message never reaches the agent; the channel is listed all the same.
+      slack_say("acme-slack", %{"channel" => "C1", "text" => "morning all"})
+
+      assert [%{channel: "C1", provider: "slack", kind: "group"}] = SeenChannels.list("acme-slack")
+
+      assert_receive {:looked_up, task, "C1", false}, 1_000
+      ref = Process.monitor(task)
+      assert_receive {:DOWN, ^ref, :process, ^task, _}, 1_000
+      assert [%{name: "#ops"}] = SeenChannels.list("acme-slack")
+
+      # The next message refreshes the row without asking Slack again.
+      slack_say("acme-slack", %{"channel" => "C1", "text" => "again", "ts" => "2.0"})
+      refute_receive {:looked_up, _task, "C1", _retry}, 200
+      assert [%{channel: "C1"}] = SeenChannels.list("acme-slack")
+    end
+
+    test "a direct message is marked as one and gets no lookup" do
+      slack_connection("acme-slack")
+      stub_channel_lookup(self(), "nope")
+
+      slack_say("acme-slack", %{"channel" => "D7", "channel_type" => "im", "text" => "hi"})
+
+      assert [%{channel: "D7", kind: "dm", name: nil}] = SeenChannels.list("acme-slack")
+      refute_receive {:looked_up, _task, "D7", _retry}, 200
+    end
+
+    test "two connections keep their own lists, even for the same channel id" do
+      slack_connection("acme-slack")
+      slack_connection("acme-slack-2")
+      stub_channel_lookup(self(), "ops")
+
+      slack_say("acme-slack", %{"channel" => "C1", "text" => "one"})
+      slack_say("acme-slack-2", %{"channel" => "C1", "text" => "two"})
+
+      assert [%{connection: "acme-slack", channel: "C1"}] = SeenChannels.list("acme-slack")
+      assert [%{connection: "acme-slack-2", channel: "C1"}] = SeenChannels.list("acme-slack-2")
+    end
+
+    test "a failed lookup leaves the id to be shown, and nothing else breaks" do
+      slack_connection("acme-slack")
+      parent = self()
+
+      Mimic.stub(Req, :get, fn "https://slack.com/api/conversations.info", _opts ->
+        send(parent, {:looked_up, self()})
+        {:ok, %{status: 200, body: %{"ok" => false, "error" => "missing_scope"}}}
+      end)
+
+      slack_say("acme-slack", %{"channel" => "C1", "text" => "hi"})
+
+      assert_receive {:looked_up, task}, 1_000
+      ref = Process.monitor(task)
+      assert_receive {:DOWN, ^ref, :process, ^task, _}, 1_000
+      assert [%{channel: "C1", name: nil}] = SeenChannels.list("acme-slack")
+    end
+
+    test "without the repo the message still goes through and nothing is recorded" do
+      slack_connection("acme-slack")
+      stop_supervised!(Pepe.Repo)
+
+      slack_say("acme-slack", %{"channel" => "C1", "text" => "hi"})
+      refute_receive {:looked_up, _task, _channel, _retry}, 100
+    end
+
+    test "a WhatsApp conversation is a direct message named after the contact" do
+      Pepe.Config.put_webhook("support", entry())
+      body = ~s({"hello":"world"})
+      sig = "sha256=" <> (:crypto.mac(:hmac, :sha256, "s3cr3t", body) |> Base.encode16(case: :lower))
+
+      payload = %{
+        "entry" => [
+          %{
+            "changes" => [
+              %{
+                "value" => %{
+                  "contacts" => [%{"wa_id" => "5511999", "profile" => %{"name" => "Ana"}}],
+                  "messages" => [%{"from" => "5511999", "type" => "text", "text" => %{"body" => "oi"}, "id" => "m1"}]
+                }
+              }
+            ]
+          }
+        ]
+      }
+
+      Mimic.stub(Pepe.Webhooks.Lane, :submit, fn _key, _job -> :ok end)
+      assert :ok = Webhooks.handle_inbound("acme", "whatsapp", "support", body, payload, %{"x-hub-signature-256" => sig})
+
+      assert [%{channel: "5511999", provider: "whatsapp", kind: "dm", name: "Ana"}] = SeenChannels.list("support")
+    end
+  end
+
+  describe "mention precedence" do
+    # Every level a plain channel message can be decided at, from the strongest down: what the
+    # conversation said (until /new), the channel's own durable setting, the connection's default.
+    setup do
+      Mimic.stub(Req, :get, fn "https://slack.com" <> _ = _url, _opts -> {:ok, %{status: 200, body: %{"ok" => false}}} end)
+      parent = self()
+      Mimic.stub(Pepe.Webhooks.Lane, :submit, fn _key, job -> send(parent, {:submitted, job.message.text}) && :ok end)
+      :ok
+    end
+
+    defp plain_message(slug, text) do
+      slack_say(slug, %{"channel" => "C1", "text" => text, "ts" => "#{System.unique_integer([:positive])}.0"})
+    end
+
+    test "the conversation beats the channel, the channel beats the connection, the connection beats the default" do
+      cases =
+        for connection <- [false, true], channel <- [nil, true, false], conversation <- [nil, true, false] do
+          expected = Enum.find([conversation, channel, connection], &is_boolean/1)
+          {connection, channel, conversation, expected}
+        end
+
+      for {connection, channel, conversation, expected} <- cases do
+        slug = "m-#{System.unique_integer([:positive])}"
+        slack_connection(slug, if(connection, do: %{"mention_optional" => true}, else: %{}))
+        entry = Map.put(Pepe.Config.get_webhook(slug), "slug", slug)
+        Pepe.Config.put_channel_mention(Webhooks.mention_key(entry, "C1"), channel)
+
+        key = Webhooks.session_key(entry, "C1")
+        Pepe.Agent.SessionSupervisor.ensure(key, entry["agent"])
+        Pepe.Agent.Session.set_mention_optional(key, conversation)
+
+        text = "hello #{slug}"
+        plain_message(slug, text)
+
+        if expected do
+          assert_receive {:submitted, ^text}, 1_000
+        else
+          refute_receive {:submitted, ^text}, 150
+        end
+
+        assert Webhooks.channel_mention_waived?(entry, "C1") == Enum.find([channel, connection], &is_boolean/1)
+      end
+    end
+
+    test "a message written to someone else is skipped even when the openness comes from the connection" do
+      slack_connection("open", %{"mention_optional" => true})
+
+      # Slack's parse drops a leading <@...> tag from the text, so the agent sees what follows it.
+      slack_say("open", %{"channel" => "C1", "text" => "<@U777> can you look at this?", "ts" => "1.0"})
+
+      # Without the bot's own id in the payload nothing can be told apart, so it is answered...
+      assert_receive {:submitted, "can you look at this?"}, 1_000
+
+      # ...and with it, a message tagging only someone else is for them.
+      payload_with_bot = fn text, ts ->
+        ts_now = Integer.to_string(System.system_time(:second))
+        sig = "v0=" <> (:crypto.mac(:hmac, :sha256, @secret, "v0:#{ts_now}:{}") |> Base.encode16(case: :lower))
+        headers = %{"x-slack-request-timestamp" => ts_now, "x-slack-signature" => sig}
+
+        payload = %{
+          "type" => "event_callback",
+          "authorizations" => [%{"user_id" => "UBOT"}],
+          "event" => %{"type" => "message", "user" => "U2", "channel" => "C1", "text" => text, "ts" => ts}
+        }
+
+        assert :ok = Webhooks.handle_inbound("acme", "slack", "open", "{}", payload, headers)
+      end
+
+      payload_with_bot.("<@U777> please", "2.0")
+      refute_receive {:submitted, "please"}, 150
+
+      payload_with_bot.("<@UBOT> <@U777> both of you", "3.0")
+      assert_receive {:submitted, "<@U777> both of you"}, 1_000
+    end
+
+    defp mention_command(entry, text) do
+      message = %{from: "C1", sender_id: "boss", text: text, id: "#{System.unique_integer([:positive])}.0"}
+      assert :done = Webhooks.begin(%{entry: entry, mod: Pepe.Webhooks.Slack, message: message}, text, [])
+      assert_receive {:delivered, _url, opts}, 1_000
+      opts[:json]["text"]
+    end
+
+    defp deliveries_to(parent) do
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+    end
+
+    test "with a connection that requires a mention, /mention on always only clears the channel's own setting" do
+      deliveries_to(self())
+      entry = admin(%{"slug" => "desk", "provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+
+      assert mention_command(entry, "/mention off always") =~ "even after /new"
+      assert Pepe.Config.channel_mention("desk:C1") == true
+
+      reply = mention_command(entry, "/mention on always")
+      assert reply =~ "for good"
+      refute reply =~ "other channels"
+      assert Pepe.Config.channel_mention("desk:C1") == nil
+    end
+
+    test "with a connection that answers without one, /mention on always stores the channel's own requirement" do
+      deliveries_to(self())
+      entry = admin(%{"slug" => "desk", "provider" => "slack", "mention_optional" => true, "config" => %{"bot_token" => "xoxb-1"}})
+
+      reply = mention_command(entry, "/mention on always")
+      assert reply =~ "for good"
+      assert reply =~ "other channels keep answering without one"
+      assert Pepe.Config.channel_mention("desk:C1") == false
+      refute Webhooks.channel_mention_waived?(entry, "C1")
+
+      # /mention on for the conversation while the connection is open says the openness comes back.
+      Pepe.Config.put_channel_mention("desk:C1", nil)
+      assert mention_command(entry, "/mention on") =~ "This connection answers without one in every channel, so that comes back after /new"
+
+      Pepe.Agent.Session.set_mention_optional(Webhooks.session_key(entry, "C1"), nil)
+      assert mention_command(entry, "/mention off always") =~ "even after /new"
+      assert Pepe.Config.channel_mention("desk:C1") == true
+    end
+
+    test "/mention says where the answer in force comes from" do
+      deliveries_to(self())
+      required = admin(%{"slug" => "desk", "provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      open = Map.put(required, "mention_optional", true)
+      key = Webhooks.session_key(required, "C1")
+
+      assert mention_command(required, "/mention") =~ "needs an @mention (the default)"
+      assert mention_command(open, "/mention") =~ "the connection's default for every channel"
+
+      Pepe.Config.put_channel_mention("desk:C1", true)
+      assert mention_command(required, "/mention") =~ "answers without an @mention, set for this channel"
+
+      Pepe.Config.put_channel_mention("desk:C1", false)
+      assert mention_command(open, "/mention") =~ "requires an @mention, set for this channel"
+
+      Pepe.Config.put_channel_mention("desk:C1", nil)
+      Pepe.Agent.SessionSupervisor.ensure(key, required["agent"])
+      Pepe.Agent.Session.set_mention_optional(key, true)
+      status = mention_command(required, "/mention")
+      assert status =~ "for this conversation until /new"
+      assert status =~ "After /new: a mention is required, the default"
+
+      Pepe.Agent.Session.set_mention_optional(key, false)
+      assert mention_command(open, "/mention") =~ "After /new: the connection answers without one in every channel"
+    end
+  end
+
+  describe "the channel's agent beats the connection's" do
+    test "a bound channel runs its own agent every turn; dropping the binding hands the conversation back" do
+      parent = self()
+
+      Mimic.stub(Req, :post, fn "https://slack.com" <> _ = url, opts ->
+        send(parent, {:delivered, url, opts})
+        {:ok, %{status: 200, body: %{"ok" => true}}}
+      end)
+
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/support", tools: []})
+      Pepe.Config.put_agent(%Pepe.Config.Agent{name: "acme/eng", tools: []})
+      entry = admin(%{"slug" => "desk", "provider" => "slack", "config" => %{"bot_token" => "xoxb-1"}})
+      key = Webhooks.session_key(entry, "C1")
+
+      # A binding set outside the chat (the dashboard, say) is what the next turn runs on.
+      Pepe.Config.bind_channel_agent(key, "acme/eng")
+      message = %{from: "C1", sender_id: "boss", text: "hello", id: "1.0"}
+      assert {:chat, ^key, "hello", _opts} = Webhooks.begin(%{entry: entry, mod: Pepe.Webhooks.Slack, message: message}, "hello", [])
+      assert %{agent: "acme/eng"} = Pepe.Agent.Session.status(key)
+
+      # Dropped in the chat: back to the connection's own agent, and the next turn stays there.
+      none = %{from: "C1", sender_id: "boss", text: "/agent none", id: "2.0"}
+      assert :done = Webhooks.begin(%{entry: entry, mod: Pepe.Webhooks.Slack, message: none}, "/agent none", [])
+      assert_receive {:delivered, _url, _opts}, 1_000
+      assert Pepe.Config.channel_agent(key) == nil
+      assert %{agent: "acme/support"} = Pepe.Agent.Session.status(key)
+
+      again = %{from: "C1", sender_id: "boss", text: "hello again", id: "3.0"}
+
+      assert {:chat, ^key, "hello again", _opts} =
+               Webhooks.begin(%{entry: entry, mod: Pepe.Webhooks.Slack, message: again}, "hello again", [])
+
+      assert %{agent: "acme/support"} = Pepe.Agent.Session.status(key)
     end
   end
 end

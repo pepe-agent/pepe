@@ -447,7 +447,11 @@ defmodule Pepe.Gateways.Telegram do
     state =
       case token() && get_updates(token(), state.offset) do
         {:ok, updates} ->
-          Enum.each(updates, &handle_update/1)
+          Enum.each(updates, fn update ->
+            note_chat(update)
+            handle_update(update)
+          end)
+
           %{state | offset: next_offset(updates, state.offset)}
 
         nil ->
@@ -687,6 +691,43 @@ defmodule Pepe.Gateways.Telegram do
   rescue
     _ -> :ok
   end
+
+  @doc false
+  # Remember the chat an update came from (a group, a forum topic, a direct message), under this
+  # bot's name, for the bot's card on the Channels page (Pepe.SeenChannels). Before any gate, so a
+  # group the bot only listens in is listed too; a failed write never reaches the poller. A topic
+  # is its own entry, with the same `#t<thread>` suffix its session key carries.
+  def note_chat(%{"message" => %{"chat" => %{"id" => id} = chat} = message}), do: note_chat(chat, id, message)
+  def note_chat(%{"edited_message" => %{"chat" => %{"id" => id} = chat} = message}), do: note_chat(chat, id, message)
+  def note_chat(_update), do: :ok
+
+  defp note_chat(chat, chat_id, message) do
+    kind = if chat["type"] == "private", do: "dm", else: "group"
+    Pepe.SeenChannels.touch(bot_name(), "telegram", topic_channel(chat_id, topic_thread_id(message)), kind: kind, name: chat_title(chat))
+    :ok
+  end
+
+  defp topic_channel(chat_id, nil), do: to_string(chat_id)
+  defp topic_channel(chat_id, thread), do: "#{chat_id}#t#{thread}"
+
+  # A group has a title; a private chat is named after the person on the other end, or stays
+  # unnamed (the id is shown) when Telegram sent no name.
+  defp chat_title(%{"title" => title}) when is_binary(title), do: title
+
+  defp chat_title(chat) do
+    case [chat["first_name"], chat["last_name"]] |> Enum.reject(&(&1 in [nil, ""])) |> Enum.join(" ") do
+      "" -> chat["username"]
+      name -> name
+    end
+  end
+
+  @doc false
+  # The session key of one of this bot's channels as `note_chat/1` records it (`<chat_id>` or
+  # `<chat_id>#t<thread>`), for a caller outside the poller (the Channels page) that has no
+  # process dictionary to read the bot or the thread from. Mirrors `session_key/1`.
+  @spec channel_session_key(String.t(), String.t()) :: String.t()
+  def channel_session_key("default", channel), do: "telegram:#{channel}"
+  def channel_session_key(bot_name, channel), do: "telegram:#{bot_name}:#{channel}"
 
   defp handle_update(%{"message" => %{"text" => text} = message}),
     do: dispatch_text(message, text)

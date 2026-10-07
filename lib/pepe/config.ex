@@ -3076,22 +3076,82 @@ defmodule Pepe.Config do
   end
 
   @doc """
-  Whether a conversation was told to answer without being @mentioned, durably - keyed by its
-  session key like `channel_agent/1`, so it survives `/new` and a restart. A webhook channel's
-  `/mention off` writes it; `/mention on` clears it. Only ever loosens the connection's own
-  `require_mention`, never tightens it.
+  A channel's own durable answer to "does this channel need an @mention?": `true` answers
+  without one, `false` requires one, `nil` has no setting of its own and inherits the
+  connection's default (`mention_optional` on the entry; absent means a mention is required).
+  Keyed by connection slug and channel (`slug:channel`, see `Pepe.Webhooks.mention_key/2`), so
+  it survives `/new`, a restart and a change of agent. Written by `/mention off|on always`, the
+  dashboard and `pepe gateway mention`, never by the model. An entry written by an earlier
+  version is `true` or absent, which read the same here; any other shape reads as `nil`.
   """
-  @spec channel_mention_optional?(String.t()) :: boolean()
-  def channel_mention_optional?(session_key), do: get_in(load(), ["channel_mentions", session_key]) == true
-
-  @doc "Set or clear (`false`) a conversation's durable \"answer without a mention\" setting."
-  @spec put_channel_mention_optional(String.t(), boolean()) :: map()
-  def put_channel_mention_optional(session_key, true) do
-    update(fn config -> Map.put(config, "channel_mentions", Map.put(config["channel_mentions"] || %{}, session_key, true)) end)
+  @spec channel_mention(String.t()) :: boolean() | nil
+  def channel_mention(channel_key) do
+    case get_in(load(), ["channel_mentions", channel_key]) do
+      value when is_boolean(value) -> value
+      _ -> nil
+    end
   end
 
-  def put_channel_mention_optional(session_key, false) do
-    update(fn config -> Map.put(config, "channel_mentions", Map.delete(config["channel_mentions"] || %{}, session_key)) end)
+  @doc "Set a channel's own mention setting, or clear it with `nil` so the connection's default applies again."
+  @spec put_channel_mention(String.t(), boolean() | nil) :: map()
+  def put_channel_mention(channel_key, nil) do
+    update(fn config -> Map.put(config, "channel_mentions", Map.delete(config["channel_mentions"] || %{}, channel_key)) end)
+  end
+
+  def put_channel_mention(channel_key, value) when is_boolean(value) do
+    update(fn config -> Map.put(config, "channel_mentions", Map.put(config["channel_mentions"] || %{}, channel_key, value)) end)
+  end
+
+  @doc "Every channel with a mention setting of its own, as `%{\"slug:channel\" => true | false}`."
+  @spec channel_mentions_all() :: %{String.t() => boolean()}
+  def channel_mentions_all do
+    case get_in(load(), ["channel_mentions"]) do
+      map when is_map(map) -> :maps.filter(fn _k, v -> is_boolean(v) end, map)
+      _ -> %{}
+    end
+  end
+
+  @doc "Whether a channel's own setting is to answer without a mention. The old two-state read; `channel_mention/1` tells the three apart."
+  @spec channel_mention_optional?(String.t()) :: boolean()
+  def channel_mention_optional?(channel_key), do: channel_mention(channel_key) == true
+
+  @doc "The old two-state write: `true` opens the channel, `false` clears its own setting. Prefer `put_channel_mention/2`."
+  @spec put_channel_mention_optional(String.t(), boolean()) :: map()
+  def put_channel_mention_optional(channel_key, true), do: put_channel_mention(channel_key, true)
+  def put_channel_mention_optional(channel_key, false), do: put_channel_mention(channel_key, nil)
+
+  @doc """
+  Who may train a conversation (turn it into memory, change its agent, model and mention setting),
+  set for one channel, or `nil` when the channel has none and the connection's own `trainers`
+  applies. Keyed by connection slug and channel like `channel_mention_optional?/1`, so it survives
+  `/new` and a restart. `["*"]` is everyone there, `[]` no one, a list only those people. The
+  channel's list is the stronger one: it replaces the connection's, it is not added to it.
+  """
+  @spec channel_trainers(String.t()) :: [String.t()] | nil
+  def channel_trainers(channel_key) do
+    case get_in(load(), ["channel_trainers", channel_key]) do
+      list when is_list(list) -> list
+      _ -> nil
+    end
+  end
+
+  @doc "Set a channel's trainers, or clear them with `nil` so the connection's list applies again."
+  @spec put_channel_trainers(String.t(), [String.t()] | nil) :: map()
+  def put_channel_trainers(channel_key, nil) do
+    update(fn config -> Map.put(config, "channel_trainers", Map.delete(config["channel_trainers"] || %{}, channel_key)) end)
+  end
+
+  def put_channel_trainers(channel_key, list) when is_list(list) do
+    update(fn config -> Map.put(config, "channel_trainers", Map.put(config["channel_trainers"] || %{}, channel_key, list)) end)
+  end
+
+  @doc "Every channel with its own trainers, as `%{\"slug:channel\" => list}`."
+  @spec channel_trainers_all() :: %{String.t() => [String.t()]}
+  def channel_trainers_all do
+    case get_in(load(), ["channel_trainers"]) do
+      map when is_map(map) -> map
+      _ -> %{}
+    end
   end
 
   @doc "Create or replace a named (non-default) Telegram bot."

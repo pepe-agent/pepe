@@ -89,9 +89,23 @@ defmodule PepeWeb.ConnectionsComponent do
           </div>
           <.meta_list class="mt-4">
             <:item label={gettext("Agent:")}>{e["agent"] || gettext("(default)")}</:item>
+            <:item :if={mention_gated?(p.name)} label={gettext("Mention:")}>{mention_default_label(e["mention_optional"] == true)}</:item>
             <:item label={gettext("Webhook URL")} mono>{webhook_url(e["project"], p.name, slug)}</:item>
           </.meta_list>
           <p class="mt-2 text-xs text-zinc-600">{gettext("Paste this into the provider as the address it sends messages to.")}</p>
+          <%!-- The channels this connection has heard from, each with its own settings. --%>
+          <.live_component
+            module={PepeWeb.SeenChannelsComponent}
+            id={"seen-" <> slug}
+            connection={slug}
+            provider={p.name}
+            agent={e["agent"]}
+            trainers={e["trainers"]}
+            mention_optional={e["mention_optional"] == true}
+            mention_gated={mention_gated?(p.name)}
+            agents={scoped_agent_names(e["project"] || "default")}
+            controls={:webhook}
+          />
         </div>
       </div>
 
@@ -163,6 +177,29 @@ defmodule PepeWeb.ConnectionsComponent do
             </select>
             <p :if={@form_errors["agent"]} class="mt-1.5 text-sm text-red-400">{@form_errors["agent"]}</p>
           </div>
+
+          <div>
+            <label class={lbl()}>{gettext("Who can train this connection")}</label>
+            <input name="trainers" value={fval(@form_values, "trainers")} class={fld()} placeholder="*" />
+            <p class={hlp()}>
+              {gettext(
+                "Write * for everyone, none for no one, or the ids of the people, separated by commas. Empty means everyone in an Admin connection and no one in a Support one. A channel can have its own list, set in the chat with /trainers; that one wins for that channel."
+              )}
+            </p>
+          </div>
+
+          <div :if={mention_gated?(@adding)}>
+            <label class={lbl()}>{gettext("Answer without being mentioned")}</label>
+            <select name="mention_optional" class={fld()}>
+              <option value="false" selected={fval(@form_values, "mention_optional") != "true"}>{mention_default_label(false)}</option>
+              <option value="true" selected={fval(@form_values, "mention_optional") == "true"}>{mention_default_label(true)}</option>
+            </select>
+            <p class={hlp()}>
+              {gettext(
+                "The default for every channel of this connection. A channel can have its own setting, from the chat with /mention off always or /mention on always, or in its row below; that one wins for that channel. A direct message always answers."
+              )}
+            </p>
+          </div>
         </.form_section>
 
         <.form_section title={gettext("Provider access details")}>
@@ -216,6 +253,8 @@ defmodule PepeWeb.ConnectionsComponent do
           "project" => entry["project"] || "default",
           "agent" => entry["agent"] || "",
           "mode" => entry["mode"] || "support",
+          "trainers" => Pepe.Webhooks.trainers_value(entry["trainers"]),
+          "mention_optional" => to_string(entry["mention_optional"] == true),
           "cfg" => entry["config"] || %{}
         }
 
@@ -233,6 +272,7 @@ defmodule PepeWeb.ConnectionsComponent do
 
   def handle_event("delete", %{"slug" => slug}, socket) do
     Config.delete_webhook(slug)
+    Pepe.SeenChannels.delete_connection(slug)
     send(self(), {:flash, :info, gettext("Connection %{s} removed.", s: slug)})
     {:noreply, assign(socket, webhooks: Config.webhooks())}
   end
@@ -296,7 +336,9 @@ defmodule PepeWeb.ConnectionsComponent do
         # A support channel is customer-facing: history is ephemeral and it never
         # trains memory; an admin channel keeps history and enables slash commands.
         "commands" => mode == "admin",
-        "trainers" => if(support?, do: [], else: nil),
+        "trainers" => Pepe.Webhooks.parse_trainers(params["trainers"]) || if(support?, do: [], else: nil),
+        # Stored only when set: absent is "a mention is required", the default since always.
+        "mention_optional" => if(params["mention_optional"] == "true", do: true),
         "ephemeral" => support?,
         "config" => build_config(schema, params["cfg"] || %{})
       })
@@ -312,6 +354,21 @@ defmodule PepeWeb.ConnectionsComponent do
   # The stored value is "support"/"admin"; the badge shows the translated word, never the raw one.
   defp mode_badge("admin"), do: gettext("Admin")
   defp mode_badge(_), do: gettext("Support")
+
+  # The connection's default for every channel; a channel's own setting is in its row.
+  defp mention_default_label(true), do: gettext("Yes, in every channel")
+  defp mention_default_label(false), do: gettext("No, a mention is required")
+
+  # Only a provider that gates on mentions at all (addressed?/2: Slack, Discord, Teams, Google
+  # Chat) has anything to set; WhatsApp answers every message, so the field would be noise.
+  defp mention_gated?(name) when is_binary(name) do
+    case Pepe.Webhooks.provider(name) do
+      nil -> false
+      mod -> Code.ensure_loaded?(mod) and function_exported?(mod, :addressed?, 2)
+    end
+  end
+
+  defp mention_gated?(_name), do: false
 
   # A schema's option list is raw config values. When those values are just a boolean written as
   # strings, the operator should read Yes/No, not `true`/`false`; anything else shows as-is,

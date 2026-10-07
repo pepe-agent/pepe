@@ -4,23 +4,23 @@ msgstr ""
 "Language: pt_PT\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/pepe/gateways/telegram.ex:2246
+#: lib/pepe/gateways/telegram.ex:2287
 #: lib/pepe/gateways/tui.ex:342
 #: lib/pepe_web/live/agents_live.ex:232
 #: lib/pepe_web/live/channels_live.ex:250
-#: lib/pepe_web/live/channels_live.ex:276
+#: lib/pepe_web/live/channels_live.ex:286
 #: lib/pepe_web/live/connections_component.ex:91
 #, elixir-autogen, elixir-format
 msgid "(default)"
 msgstr "(predefinido)"
 
-#: lib/pepe/gateways/telegram.ex:3484
+#: lib/pepe/gateways/telegram.ex:3525
 #, elixir-autogen, elixir-format
 msgid "(empty response)"
 msgstr "(resposta vazia)"
 
-#: lib/pepe/gateways/telegram.ex:2247
-#: lib/pepe/gateways/telegram.ex:2416
+#: lib/pepe/gateways/telegram.ex:2288
+#: lib/pepe/gateways/telegram.ex:2457
 #: lib/pepe/gateways/tui.ex:343
 #: lib/pepe/gateways/tui.ex:379
 #: lib/pepe_web/live/chat_live.ex:1590
@@ -28,7 +28,7 @@ msgstr "(resposta vazia)"
 msgid "(unset)"
 msgstr "(por definir)"
 
-#: lib/pepe/gateways/telegram.ex:2245
+#: lib/pepe/gateways/telegram.ex:2286
 #: lib/pepe/gateways/tui.ex:341
 #, elixir-autogen, elixir-format
 msgid "Agent: %{agent}\nModel: %{model}\nTurns: %{turns}"
@@ -37,19 +37,19 @@ msgstr ""
 "Modelo: %{model}\n"
 "Turnos: %{turns}"
 
-#: lib/pepe/gateways/telegram.ex:2397
+#: lib/pepe/gateways/telegram.ex:2438
 #: lib/pepe/gateways/tui.ex:403
 #, elixir-autogen, elixir-format
 msgid "Commands:"
 msgstr "Comandos:"
 
-#: lib/pepe/gateways/telegram.ex:2215
+#: lib/pepe/gateways/telegram.ex:2256
 #: lib/pepe/gateways/tui.ex:333
 #, elixir-autogen, elixir-format
 msgid "I couldn't summarize right now. Try again shortly?"
 msgstr "Não consegui resumir agora. Tenta outra vez daqui a pouco."
 
-#: lib/pepe/gateways/telegram.ex:1621
+#: lib/pepe/gateways/telegram.ex:1662
 #, elixir-autogen, elixir-format
 msgid "I'm having a connection problem right now. Could you try again?"
 msgstr "Estou com um problema de ligação. Podes tentar outra vez?"
@@ -59,7 +59,7 @@ msgstr "Estou com um problema de ligação. Podes tentar outra vez?"
 msgid "List commands"
 msgstr "Listar comandos"
 
-#: lib/pepe/gateways/telegram.ex:1636
+#: lib/pepe/gateways/telegram.ex:1677
 #, elixir-autogen, elixir-format
 msgid "My credentials need to be refreshed. Please ask the team to reconnect."
 msgstr ""
@@ -71,7 +71,7 @@ msgstr ""
 msgid "Show session info"
 msgstr "Mostrar informações da sessão"
 
-#: lib/pepe/gateways/telegram.ex:1663
+#: lib/pepe/gateways/telegram.ex:1704
 #, elixir-autogen, elixir-format
 msgid "Sorry, something went wrong on my end. Try again in a moment?"
 msgstr "Desculpa, algo correu mal do meu lado. Tenta outra vez daqui a pouco."
@@ -98,12 +98,12 @@ msgstr "Mudar de agente: /agent <nome>"
 msgid "Switched to agent %{name}."
 msgstr "Agora com o agente %{name}."
 
-#: lib/pepe/gateways/telegram.ex:1633
+#: lib/pepe/gateways/telegram.ex:1674
 #, elixir-autogen, elixir-format
 msgid "That took too long. Could you try again, please?"
 msgstr "Demorou demasiado. Podes tentar outra vez?"
 
-#: lib/pepe/gateways/telegram.ex:1639
+#: lib/pepe/gateways/telegram.ex:1680
 #, elixir-autogen, elixir-format
 msgid "The model returned an error just now. Could you try again?"
 msgstr "O modelo devolveu um erro. Podes tentar outra vez?"
@@ -114,42 +114,42 @@ msgstr "O modelo devolveu um erro. Podes tentar outra vez?"
 msgid "Undo your last message"
 msgstr "Desfazer a tua última mensagem"
 
-#: lib/pepe/gateways/telegram.ex:2235
+#: lib/pepe/gateways/telegram.ex:2276
 #: lib/pepe/gateways/tui.ex:358
 #, elixir-autogen, elixir-format
 msgid "Unknown agent: %{name}"
 msgstr "Agente desconhecido: %{name}"
 
-#: lib/pepe/gateways/telegram.ex:2388
+#: lib/pepe/gateways/telegram.ex:2429
 #: lib/pepe/gateways/tui.ex:412
 #, elixir-autogen, elixir-format
 msgid "Unknown command: /%{cmd}"
 msgstr "Comando desconhecido: /%{cmd}"
 
-#: lib/pepe/gateways/telegram.ex:2220
+#: lib/pepe/gateways/telegram.ex:2261
 #: lib/pepe/gateways/tui.ex:350
 #, elixir-autogen, elixir-format
 msgid "Usage: /agent <name>"
 msgstr "Uso: /agent <nome>"
 
-#: lib/pepe/gateways/telegram.ex:2147
+#: lib/pepe/gateways/telegram.ex:2188
 #: lib/pepe/gateways/tui.ex:274
 #, elixir-autogen, elixir-format
 msgid "↩️ Undid your last message."
 msgstr "↩️ Desfiz a tua última mensagem."
 
-#: lib/pepe/gateways/telegram.ex:2211
+#: lib/pepe/gateways/telegram.ex:2252
 #: lib/pepe/gateways/tui.ex:332
 #, elixir-autogen, elixir-format
 msgid "🗜️ History compacted."
 msgstr "🗜️ Histórico compactado."
 
-#: lib/pepe/gateways/telegram.ex:2377
+#: lib/pepe/gateways/telegram.ex:2418
 #, elixir-autogen, elixir-format
 msgid "🧠 Pepe ready."
 msgstr "🧠 Pepe pronto."
 
-#: lib/pepe/gateways/telegram.ex:2137
+#: lib/pepe/gateways/telegram.ex:2178
 #: lib/pepe/gateways/tui.ex:267
 #: lib/pepe_web/live/chat_live.ex:806
 #: lib/pepe_web/live/chat_live.ex:1365
@@ -163,7 +163,7 @@ msgstr "🧠 Nova conversa iniciada."
 msgid "not allowed"
 msgstr "não permitido"
 
-#: lib/pepe/gateways/telegram.ex:2719
+#: lib/pepe/gateways/telegram.ex:2760
 #, elixir-autogen, elixir-format
 msgid "Always allowed (clear with /approve clear <tool>):"
 msgstr "Sempre permitido (remove com /approve clear <ferramenta>):"
@@ -173,13 +173,13 @@ msgstr "Sempre permitido (remove com /approve clear <ferramenta>):"
 msgid "Ask a side question that isn't saved - /btw <q>"
 msgstr "Fazer uma pergunta à parte, sem a guardar: /btw <pergunta>"
 
-#: lib/pepe/gateways/telegram.ex:2682
+#: lib/pepe/gateways/telegram.ex:2723
 #: lib/pepe/gateways/tui.ex:423
 #, elixir-autogen, elixir-format
 msgid "Available skills (run with /skill <name>):"
 msgstr "Skills disponíveis (executa com /skill <nome>):"
 
-#: lib/pepe/gateways/telegram.ex:2729
+#: lib/pepe/gateways/telegram.ex:2770
 #, elixir-autogen, elixir-format
 msgid "Cleared all saved permissions."
 msgstr "Apaguei todas as permissões guardadas."
@@ -210,19 +210,19 @@ msgstr "Listar ou executar uma skill: /skill <nome>"
 msgid "Manage saved tool permissions - /approve"
 msgstr "Gerir as permissões guardadas: /approve"
 
-#: lib/pepe/gateways/telegram.ex:2711
-#: lib/pepe/gateways/telegram.ex:2750
+#: lib/pepe/gateways/telegram.ex:2752
+#: lib/pepe/gateways/telegram.ex:2791
 #, elixir-autogen, elixir-format
 msgid "No agent is configured."
 msgstr "Não há nenhum agente configurado."
 
-#: lib/pepe/gateways/telegram.ex:2679
+#: lib/pepe/gateways/telegram.ex:2720
 #: lib/pepe/gateways/tui.ex:420
 #, elixir-autogen, elixir-format
 msgid "No skills are available yet."
 msgstr "Ainda não há skills."
 
-#: lib/pepe/gateways/telegram.ex:2737
+#: lib/pepe/gateways/telegram.ex:2778
 #, elixir-autogen, elixir-format
 msgid "Removed %{tool}."
 msgstr "%{tool} removida."
@@ -242,16 +242,16 @@ msgstr "Ver ou definir o modelo: /model <nome>"
 msgid "Show your Telegram ids"
 msgstr "Mostrar os teus ids do Telegram"
 
-#: lib/pepe/gateways/telegram.ex:2484
+#: lib/pepe/gateways/telegram.ex:2525
 #: lib/pepe/gateways/tui.ex:478
 #: lib/pepe_web/live/chat_live.ex:1636
 #, elixir-autogen, elixir-format
 msgid "There's no agent to set the model on."
 msgstr "Não há agente onde definir o modelo."
 
-#: lib/pepe/gateways/telegram.ex:2448
-#: lib/pepe/gateways/telegram.ex:2481
-#: lib/pepe/gateways/telegram.ex:2551
+#: lib/pepe/gateways/telegram.ex:2489
+#: lib/pepe/gateways/telegram.ex:2522
+#: lib/pepe/gateways/telegram.ex:2592
 #: lib/pepe/gateways/tui.ex:446
 #: lib/pepe/gateways/tui.ex:475
 #: lib/pepe_web/live/chat_live.ex:1602
@@ -260,31 +260,31 @@ msgstr "Não há agente onde definir o modelo."
 msgid "Unknown model: %{name}"
 msgstr "Modelo desconhecido: %{name}"
 
-#: lib/pepe/gateways/telegram.ex:2698
+#: lib/pepe/gateways/telegram.ex:2739
 #: lib/pepe/gateways/tui.ex:435
 #: lib/pepe_web/live/chat_live.ex:1328
 #, elixir-autogen, elixir-format
 msgid "Unknown skill: %{name}"
 msgstr "Skill desconhecida: %{name}"
 
-#: lib/pepe/gateways/telegram.ex:2742
+#: lib/pepe/gateways/telegram.ex:2783
 #, elixir-autogen, elixir-format
 msgid "Usage: /approve, /approve clear, /approve clear <tool>"
 msgstr "Uso: /approve, /approve clear, /approve clear <ferramenta>"
 
-#: lib/pepe/gateways/telegram.ex:2353
+#: lib/pepe/gateways/telegram.ex:2394
 #, elixir-autogen, elixir-format
 msgid "Usage: /btw <question>"
 msgstr "Uso: /btw <pergunta>"
 
-#: lib/pepe/gateways/telegram.ex:2409
+#: lib/pepe/gateways/telegram.ex:2450
 #, elixir-autogen, elixir-format
 msgid "Your user id: %{user}\nThis chat id: %{chat}"
 msgstr ""
 "O teu id de utilizador: %{user}\n"
 "Id deste chat: %{chat}"
 
-#: lib/pepe/gateways/telegram.ex:2290
+#: lib/pepe/gateways/telegram.ex:2331
 #, elixir-autogen, elixir-format
 msgid "Nothing is running right now."
 msgstr "Não há nada em execução."
@@ -295,7 +295,7 @@ msgstr "Não há nada em execução."
 msgid "Stop the current run"
 msgstr "Parar a execução atual"
 
-#: lib/pepe/gateways/telegram.ex:2289
+#: lib/pepe/gateways/telegram.ex:2330
 #, elixir-autogen, elixir-format
 msgid "🛑 Stopped."
 msgstr "🛑 Parado."
@@ -311,9 +311,10 @@ msgid "/help for commands, /exit to quit"
 msgstr "/help para ver os comandos, /exit para sair"
 
 #: lib/pepe/gateways/tui.ex:74
-#: lib/pepe_web/live/channels_live.ex:320
+#: lib/pepe_web/live/channels_live.ex:330
 #: lib/pepe_web/live/chat_live.ex:591
 #: lib/pepe_web/live/scheduled_live.ex:170
+#: lib/pepe_web/live/seen_channels_component.ex:80
 #: lib/pepe_web/live/tokens_live.ex:89
 #: lib/pepe_web/live/traces_live.ex:303
 #: lib/pepe_web/live/traces_live.ex:389
@@ -339,97 +340,97 @@ msgstr "Modelo"
 msgid "Session"
 msgstr "Sessão"
 
-#: lib/pepe/gateways/telegram.ex:2533
+#: lib/pepe/gateways/telegram.ex:2574
 #, elixir-autogen, elixir-format
 msgid "Available models"
 msgstr "Modelos disponíveis"
 
-#: lib/pepe/gateways/telegram.ex:2619
+#: lib/pepe/gateways/telegram.ex:2660
 #, elixir-autogen, elixir-format
 msgid "Available tools"
 msgstr "Ferramentas disponíveis"
 
-#: lib/pepe/gateways/telegram.ex:2642
+#: lib/pepe/gateways/telegram.ex:2683
 #, elixir-autogen, elixir-format
 msgid "Change a Pepe setting."
 msgstr "Altera uma definição do Pepe."
 
-#: lib/pepe/gateways/telegram.ex:2633
+#: lib/pepe/gateways/telegram.ex:2674
 #, elixir-autogen, elixir-format
 msgid "Create or overwrite a file."
 msgstr "Cria ou substitui um ficheiro."
 
-#: lib/pepe/gateways/telegram.ex:2637
+#: lib/pepe/gateways/telegram.ex:2678
 #, elixir-autogen, elixir-format
 msgid "Fetch a URL (HTTP GET)."
 msgstr "Obtém um URL (HTTP GET)."
 
-#: lib/pepe/gateways/telegram.ex:2636
+#: lib/pepe/gateways/telegram.ex:2677
 #, elixir-autogen, elixir-format
 msgid "List files in a directory."
 msgstr "Lista os ficheiros de uma pasta."
 
-#: lib/pepe/gateways/telegram.ex:2635
+#: lib/pepe/gateways/telegram.ex:2676
 #, elixir-autogen, elixir-format
 msgid "Move or rename a file or directory."
 msgstr "Move ou renomeia um ficheiro ou pasta."
 
-#: lib/pepe/gateways/telegram.ex:2639
+#: lib/pepe/gateways/telegram.ex:2680
 #, elixir-autogen, elixir-format
 msgid "Read a skill (a how-to guide)."
 msgstr "Lê uma skill (um guia prático)."
 
-#: lib/pepe/gateways/telegram.ex:2632
+#: lib/pepe/gateways/telegram.ex:2673
 #, elixir-autogen, elixir-format
 msgid "Read a text file."
 msgstr "Lê um ficheiro de texto."
 
-#: lib/pepe/gateways/telegram.ex:2641
+#: lib/pepe/gateways/telegram.ex:2682
 #, elixir-autogen, elixir-format
 msgid "Read the Pepe configuration."
 msgstr "Lê a configuração do Pepe."
 
-#: lib/pepe/gateways/telegram.ex:2634
+#: lib/pepe/gateways/telegram.ex:2675
 #, elixir-autogen, elixir-format
 msgid "Replace text in a file."
 msgstr "Substitui texto num ficheiro."
 
-#: lib/pepe/gateways/telegram.ex:2630
+#: lib/pepe/gateways/telegram.ex:2671
 #, elixir-autogen, elixir-format
 msgid "Run a shell command and return its output."
 msgstr "Executa um comando de shell e devolve o resultado."
 
-#: lib/pepe/gateways/telegram.ex:2638
+#: lib/pepe/gateways/telegram.ex:2679
 #, elixir-autogen, elixir-format
 msgid "Search the web."
 msgstr "Pesquisa na web."
 
-#: lib/pepe/gateways/telegram.ex:2640
+#: lib/pepe/gateways/telegram.ex:2681
 #, elixir-autogen, elixir-format
 msgid "Send a message to another agent."
 msgstr "Envia uma mensagem para outro agente."
 
-#: lib/pepe/gateways/telegram.ex:2631
+#: lib/pepe/gateways/telegram.ex:2672
 #, elixir-autogen, elixir-format
 msgid "Write and run a program for complex tasks."
 msgstr "Escreve e executa um programa para tarefas complexas."
 
-#: lib/pepe/gateways/telegram.ex:2656
+#: lib/pepe/gateways/telegram.ex:2697
 #, elixir-autogen, elixir-format
 msgid "Change which agents can message each other."
 msgstr "Muda que agentes podem falar entre si."
 
-#: lib/pepe/gateways/telegram.ex:2657
+#: lib/pepe/gateways/telegram.ex:2698
 #, elixir-autogen, elixir-format
 msgid "Create, edit, audit or improve a skill."
 msgstr "Criar, editar, auditar ou melhorar uma skill."
 
-#: lib/pepe/gateways/telegram.ex:2648
+#: lib/pepe/gateways/telegram.ex:2689
 #, elixir-autogen, elixir-format
 msgid "How to install a new tool when asked."
 msgstr "Como instalar uma ferramenta nova quando pedirem."
 
-#: lib/pepe/gateways/telegram.ex:2660
+#: lib/pepe/gateways/telegram.ex:2701
 #, elixir-autogen, elixir-format
 msgid "Tackle a complex task by writing and running a script."
 msgstr "Resolve uma tarefa complexa escrevendo e executando um script."
@@ -480,7 +481,7 @@ msgstr "Ações"
 msgid "Attempting to reconnect"
 msgstr "A tentar voltar a ligar"
 
-#: lib/pepe/gateways/telegram.ex:1624
+#: lib/pepe/gateways/telegram.ex:1665
 #, elixir-autogen, elixir-format
 msgid "I couldn't download that file. Could you send it again?"
 msgstr "Não consegui descarregar esse ficheiro. Podes enviá-lo outra vez?"
@@ -490,7 +491,7 @@ msgstr "Não consegui descarregar esse ficheiro. Podes enviá-lo outra vez?"
 msgid "Something went wrong!"
 msgstr "Algo correu mal!"
 
-#: lib/pepe/gateways/telegram.ex:2654
+#: lib/pepe/gateways/telegram.ex:2695
 #, elixir-autogen, elixir-format
 msgid "Understand a voice/audio/image/file the user sent."
 msgstr ""
@@ -506,7 +507,7 @@ msgstr "Sem ligação à internet"
 msgid "close"
 msgstr "fechar"
 
-#: lib/pepe/gateways/telegram.ex:2278
+#: lib/pepe/gateways/telegram.ex:2319
 #, elixir-autogen, elixir-format
 msgid "No agent to learn with."
 msgstr "Não há agente para aprender."
@@ -516,7 +517,7 @@ msgstr "Não há agente para aprender."
 msgid "Save what I learned to memory/skills"
 msgstr "Guardar o que aprendi na memória e nas skills"
 
-#: lib/pepe/gateways/telegram.ex:2276
+#: lib/pepe/gateways/telegram.ex:2317
 #: lib/pepe/gateways/tui.ex:327
 #, elixir-autogen, elixir-format
 msgid "🧠 Reviewing what I learned..."
@@ -538,7 +539,7 @@ msgstr "(nenhum)"
 msgid "(this connection)"
 msgstr "(esta ligação)"
 
-#: lib/pepe_web/live/channels_live.ex:480
+#: lib/pepe_web/live/channels_live.ex:490
 #, elixir-autogen, elixir-format
 msgid "+ Add a bot"
 msgstr "+ Adicionar bot"
@@ -565,7 +566,7 @@ msgstr "API"
 msgid "API key"
 msgstr "Chave de API"
 
-#: lib/pepe_web/live/channels_live.ex:500
+#: lib/pepe_web/live/channels_live.ex:510
 #, elixir-autogen, elixir-format
 msgid "Add bot"
 msgstr "Adicionar bot"
@@ -589,13 +590,13 @@ msgstr "Agentes"
 msgid "Base URL"
 msgstr "URL base"
 
-#: lib/pepe_web/live/channels_live.ex:582
+#: lib/pepe_web/live/channels_live.ex:592
 #, elixir-autogen, elixir-format
 msgid "Bot %{name} added."
 msgstr "Bot %{name} adicionado."
 
-#: lib/pepe_web/live/channels_live.ex:465
-#: lib/pepe_web/live/channels_live.ex:486
+#: lib/pepe_web/live/channels_live.ex:475
+#: lib/pepe_web/live/channels_live.ex:496
 #, elixir-autogen, elixir-format
 msgid "Bot token"
 msgstr "Token do bot"
@@ -603,12 +604,12 @@ msgstr "Token do bot"
 #: lib/pepe_web/components/layouts/root.html.heex:42
 #: lib/pepe_web/live/board_live.ex:160
 #: lib/pepe_web/live/board_live.ex:200
-#: lib/pepe_web/live/channels_live.ex:270
-#: lib/pepe_web/live/channels_live.ex:341
-#: lib/pepe_web/live/channels_live.ex:471
-#: lib/pepe_web/live/channels_live.ex:501
+#: lib/pepe_web/live/channels_live.ex:280
+#: lib/pepe_web/live/channels_live.ex:351
+#: lib/pepe_web/live/channels_live.ex:481
+#: lib/pepe_web/live/channels_live.ex:511
 #: lib/pepe_web/live/chat_live.ex:227
-#: lib/pepe_web/live/connections_component.ex:195
+#: lib/pepe_web/live/connections_component.ex:232
 #: lib/pepe_web/live/dash_ui.ex:668
 #: lib/pepe_web/live/dash_ui.ex:669
 #: lib/pepe_web/live/db_connections_live.ex:205
@@ -703,7 +704,7 @@ msgid "Edit"
 msgstr "Editar"
 
 #: lib/pepe_web/live/agents_live.ex:252
-#: lib/pepe_web/live/channels_live.ex:350
+#: lib/pepe_web/live/channels_live.ex:360
 #: lib/pepe_web/live/db_connections_live.ex:159
 #: lib/pepe_web/live/models_live.ex:265
 #: lib/pepe_web/live/projects_live.ex:140
@@ -742,8 +743,8 @@ msgstr "Todas as horas"
 msgid "First of the month"
 msgstr "No primeiro dia do mês"
 
-#: lib/pepe/gateways/telegram.ex:2277
-#: lib/pepe/gateways/telegram.ex:2281
+#: lib/pepe/gateways/telegram.ex:2318
+#: lib/pepe/gateways/telegram.ex:2322
 #, elixir-autogen, elixir-format
 msgid "Learning is off for this chat."
 msgstr "A aprendizagem está desativada neste chat."
@@ -767,7 +768,7 @@ msgstr "Modelos"
 
 #: lib/pepe_web/live/agents_live.ex:291
 #: lib/pepe_web/live/board_live.ex:141
-#: lib/pepe_web/live/channels_live.ex:484
+#: lib/pepe_web/live/channels_live.ex:494
 #: lib/pepe_web/live/db_connections_live.ex:167
 #: lib/pepe_web/live/models_live.ex:270
 #: lib/pepe_web/live/models_live.ex:361
@@ -816,7 +817,7 @@ msgid "Run now"
 msgstr "Executar agora"
 
 #: lib/pepe_web/live/agents_live.ex:690
-#: lib/pepe_web/live/channels_live.ex:470
+#: lib/pepe_web/live/channels_live.ex:480
 #: lib/pepe_web/live/chat_live.ex:224
 #: lib/pepe_web/live/config_live.ex:119
 #: lib/pepe_web/live/config_live.ex:171
@@ -828,6 +829,7 @@ msgstr "Executar agora"
 #: lib/pepe_web/live/plugins_live.ex:134
 #: lib/pepe_web/live/projects_live.ex:193
 #: lib/pepe_web/live/scheduled_live.ex:199
+#: lib/pepe_web/live/seen_channels_component.ex:128
 #: lib/pepe_web/live/tokens_live.ex:233
 #: lib/pepe_web/live/tool_servers_live.ex:243
 #, elixir-autogen, elixir-format
@@ -884,8 +886,8 @@ msgstr "O registo da app"
 msgid "The run failed. Check the model connection."
 msgstr "A execução falhou. Verifica a ligação do modelo."
 
-#: lib/pepe_web/live/channels_live.ex:353
-#: lib/pepe_web/live/channels_live.ex:493
+#: lib/pepe_web/live/channels_live.ex:363
+#: lib/pepe_web/live/channels_live.ex:503
 #, elixir-autogen, elixir-format
 msgid "This bot talks to"
 msgstr "Este bot fala com"
@@ -937,7 +939,7 @@ msgid "active"
 msgstr "ativo"
 
 #: lib/pepe_web/live/channels_live.ex:250
-#: lib/pepe_web/live/channels_live.ex:276
+#: lib/pepe_web/live/channels_live.ex:286
 #: lib/pepe_web/live/connections_component.ex:91
 #: lib/pepe_web/live/learning_live.ex:73
 #: lib/pepe_web/live/scheduled_live.ex:272
@@ -961,7 +963,7 @@ msgid "blank"
 msgstr "vazio"
 
 #: lib/pepe_web/live/agents_live.ex:228
-#: lib/pepe_web/live/channels_live.ex:374
+#: lib/pepe_web/live/channels_live.ex:384
 #: lib/pepe_web/live/models_live.ex:244
 #, elixir-autogen, elixir-format
 msgid "default"
@@ -1019,7 +1021,7 @@ msgstr "seguinte"
 msgid "nobody"
 msgstr "ninguém"
 
-#: lib/pepe_web/live/channels_live.ex:484
+#: lib/pepe_web/live/channels_live.ex:494
 #, elixir-autogen, elixir-format
 msgid "sales"
 msgstr "vendas"
@@ -1066,13 +1068,13 @@ msgstr "Remover o servidor MCP %{name}?"
 msgid "Connecting..."
 msgstr "A ligar..."
 
-#: lib/pepe/gateways/telegram.ex:2651
+#: lib/pepe/gateways/telegram.ex:2692
 #, elixir-autogen, elixir-format
 msgid "Install a skill from a URL, with a security review first."
 msgstr ""
 "Instala uma skill a partir de um URL, depois de uma revisão de segurança."
 
-#: lib/pepe_web/live/channels_live.ex:316
+#: lib/pepe_web/live/channels_live.ex:326
 #: lib/pepe_web/live/projects_live.ex:161
 #: lib/pepe_web/live/projects_live.ex:167
 #: lib/pepe_web/live/projects_live.ex:176
@@ -1094,7 +1096,7 @@ msgstr "+ Nova ligação"
 msgid "+ New server"
 msgstr "+ Novo servidor"
 
-#: lib/pepe_web/live/channels_live.ex:420
+#: lib/pepe_web/live/channels_live.ex:430
 #: lib/pepe_web/live/dash_ui.ex:686
 #: lib/pepe_web/live/dash_ui.ex:687
 #, elixir-autogen, elixir-format
@@ -1111,7 +1113,7 @@ msgstr "Agentes: %{c}"
 msgid "Automation"
 msgstr "Automação"
 
-#: lib/pepe_web/live/channels_live.ex:650
+#: lib/pepe_web/live/channels_live.ex:661
 #, elixir-autogen, elixir-format
 msgid "Bot %{name} saved."
 msgstr "Bot %{name} guardado."
@@ -1243,37 +1245,37 @@ msgstr "O nível de topo tem de ser um objeto JSON { ... }."
 msgid "Watches"
 msgstr "Watches"
 
-#: lib/pepe/gateways/telegram.ex:3150
+#: lib/pepe/gateways/telegram.ex:3191
 #, elixir-autogen, elixir-format
 msgid "checking with another agent..."
 msgstr "a falar com outro agente..."
 
-#: lib/pepe/gateways/telegram.ex:3141
+#: lib/pepe/gateways/telegram.ex:3182
 #, elixir-autogen, elixir-format
 msgid "fetching a page..."
 msgstr "a abrir uma página..."
 
-#: lib/pepe/gateways/telegram.ex:3138
+#: lib/pepe/gateways/telegram.ex:3179
 #, elixir-autogen, elixir-format
 msgid "looking things up..."
 msgstr "a pesquisar..."
 
-#: lib/pepe/gateways/telegram.ex:3144
+#: lib/pepe/gateways/telegram.ex:3185
 #, elixir-autogen, elixir-format
 msgid "running something..."
 msgstr "a executar algo..."
 
-#: lib/pepe/gateways/telegram.ex:3153
+#: lib/pepe/gateways/telegram.ex:3194
 #, elixir-autogen, elixir-format
 msgid "using a connected tool..."
 msgstr "a usar uma ferramenta ligada..."
 
-#: lib/pepe/gateways/telegram.ex:3156
+#: lib/pepe/gateways/telegram.ex:3197
 #, elixir-autogen, elixir-format
 msgid "working on it..."
 msgstr "a trabalhar nisso..."
 
-#: lib/pepe/gateways/telegram.ex:3147
+#: lib/pepe/gateways/telegram.ex:3188
 #, elixir-autogen, elixir-format
 msgid "working with files..."
 msgstr "a mexer em ficheiros..."
@@ -1432,12 +1434,12 @@ msgstr "Ainda nada"
 msgid "Refreshing..."
 msgstr "A atualizar..."
 
-#: lib/pepe_web/live/connections_component.ex:145
+#: lib/pepe_web/live/connections_component.ex:159
 #, elixir-autogen, elixir-format
 msgid "Mode"
 msgstr "Modo"
 
-#: lib/pepe_web/live/connections_component.ex:159
+#: lib/pepe_web/live/connections_component.ex:173
 #, elixir-autogen, elixir-format
 msgid "This connection talks to"
 msgstr "Esta ligação fala com"
@@ -1718,9 +1720,9 @@ msgid "Invalid: %{msg}"
 msgstr "Inválido: %{msg}"
 
 #: lib/pepe_web/live/agents_live.ex:254
-#: lib/pepe_web/live/channels_live.ex:482
-#: lib/pepe_web/live/connections_component.ex:125
-#: lib/pepe_web/live/connections_component.ex:274
+#: lib/pepe_web/live/channels_live.ex:492
+#: lib/pepe_web/live/connections_component.ex:139
+#: lib/pepe_web/live/connections_component.ex:314
 #: lib/pepe_web/live/db_connections_live.ex:162
 #: lib/pepe_web/live/projects_live.ex:143
 #: lib/pepe_web/live/scheduled_live.ex:123
@@ -1755,7 +1757,7 @@ msgstr "Conversa nova. Envia uma mensagem para começar."
 msgid "Invalid name. Use letters, digits, - and _."
 msgstr "Nome inválido. Usa letras, dígitos, - e _."
 
-#: lib/pepe_web/live/connections_component.ex:130
+#: lib/pepe_web/live/connections_component.ex:144
 #, elixir-autogen, elixir-format
 msgid "Slug (URL id)"
 msgstr "Slug (id no URL)"
@@ -1770,7 +1772,7 @@ msgstr "⚠ ainda não está definida. Exporta-a antes de usar."
 msgid "Monthly budget"
 msgstr "Orçamento mensal"
 
-#: lib/pepe/gateways/telegram.ex:1642
+#: lib/pepe/gateways/telegram.ex:1683
 #, elixir-autogen, elixir-format
 msgid "This workspace has hit its monthly spending limit. It resumes next month, or an admin can raise the cap."
 msgstr ""
@@ -1803,7 +1805,7 @@ msgstr "Reiniciar"
 msgid "Restart the Telegram gateway now?"
 msgstr "Reiniciar o gateway do Telegram agora?"
 
-#: lib/pepe_web/live/channels_live.ex:596
+#: lib/pepe_web/live/channels_live.ex:607
 #, elixir-autogen, elixir-format
 msgid "Telegram gateway restarted."
 msgstr "Gateway do Telegram reiniciado."
@@ -2045,12 +2047,12 @@ msgstr "Última execução"
 msgid "See log"
 msgstr "Ver registo"
 
-#: lib/pepe_web/live/connections_component.ex:283
+#: lib/pepe_web/live/connections_component.ex:323
 #, elixir-autogen, elixir-format
 msgid "Choose an agent."
 msgstr "Escolhe um agente."
 
-#: lib/pepe_web/live/connections_component.ex:120
+#: lib/pepe_web/live/connections_component.ex:134
 #, elixir-autogen, elixir-format
 msgid "Edit %{p} connection"
 msgstr "Editar ligação %{p}"
@@ -2061,7 +2063,7 @@ msgstr "Editar ligação %{p}"
 msgid "Integrations"
 msgstr "Integrações"
 
-#: lib/pepe_web/live/connections_component.ex:121
+#: lib/pepe_web/live/connections_component.ex:135
 #, elixir-autogen, elixir-format
 msgid "New %{p} connection"
 msgstr "Nova ligação %{p}"
@@ -2071,17 +2073,17 @@ msgstr "Nova ligação %{p}"
 msgid "Remove connection %{slug}?"
 msgstr "Remover a ligação %{slug}?"
 
-#: lib/pepe_web/live/connections_component.ex:194
+#: lib/pepe_web/live/connections_component.ex:231
 #, elixir-autogen, elixir-format
 msgid "Save connection"
 msgstr "Guardar ligação"
 
-#: lib/pepe_web/live/connections_component.ex:306
+#: lib/pepe_web/live/connections_component.ex:348
 #, elixir-autogen, elixir-format
 msgid "Saved connection %{s}."
 msgstr "Ligação %{s} guardada."
 
-#: lib/pepe_web/live/connections_component.ex:92
+#: lib/pepe_web/live/connections_component.ex:93
 #, elixir-autogen, elixir-format
 msgid "Webhook URL"
 msgstr "URL do webhook"
@@ -2231,7 +2233,7 @@ msgid "Agents (Principal)"
 msgstr "Agentes: Principal"
 
 #: lib/pepe_web/live/board_live.ex:99
-#: lib/pepe_web/live/connections_component.ex:140
+#: lib/pepe_web/live/connections_component.ex:154
 #: lib/pepe_web/live/dash_ui.ex:661
 #: lib/pepe_web/live/projects_live.ex:88
 #: lib/pepe_web/live/tokens_live.ex:82
@@ -2240,13 +2242,13 @@ msgstr "Agentes: Principal"
 msgid "Principal"
 msgstr "Principal"
 
-#: lib/pepe_web/live/connections_component.ex:161
+#: lib/pepe_web/live/connections_component.ex:175
 #, elixir-autogen, elixir-format
 msgid "Choose an agent"
 msgstr "Escolhe um agente"
 
 #: lib/pepe_web/live/channels_live.ex:193
-#: lib/pepe_web/live/connections_component.ex:100
+#: lib/pepe_web/live/connections_component.ex:114
 #, elixir-autogen, elixir-format
 msgid "Add a channel"
 msgstr "Adicionar canal"
@@ -2261,12 +2263,12 @@ msgstr "Seguinte →"
 msgid "← Previous"
 msgstr "← Anterior"
 
-#: lib/pepe_web/live/channels_live.ex:634
+#: lib/pepe_web/live/channels_live.ex:645
 #, elixir-autogen, elixir-format
 msgid "That token is already used by another bot."
 msgstr "Esse token já é usado por outro bot."
 
-#: lib/pepe_web/live/connections_component.ex:148
+#: lib/pepe_web/live/connections_component.ex:162
 #, elixir-autogen, elixir-format
 msgid "Admin (yours)"
 msgstr "Admin (teu)"
@@ -2291,8 +2293,8 @@ msgstr "Escolhe um modelo configurado"
 msgid "Request"
 msgstr "Pedido"
 
-#: lib/pepe_web/live/channels_live.ex:355
-#: lib/pepe_web/live/channels_live.ex:495
+#: lib/pepe_web/live/channels_live.ex:365
+#: lib/pepe_web/live/channels_live.ex:505
 #, elixir-autogen, elixir-format
 msgid "The default agent"
 msgstr "O agente predefinido"
@@ -2398,7 +2400,7 @@ msgstr "Fechar"
 msgid "Id %{id}"
 msgstr "Id %{id}"
 
-#: lib/pepe_web/live/channels_live.ex:316
+#: lib/pepe_web/live/channels_live.ex:326
 #: lib/pepe_web/live/tokens_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Label"
@@ -2409,7 +2411,7 @@ msgstr "Etiqueta"
 msgid "New token"
 msgstr "Novo token"
 
-#: lib/pepe_web/live/channels_live.ex:457
+#: lib/pepe_web/live/channels_live.ex:467
 #: lib/pepe_web/live/tokens_live.ex:176
 #, elixir-autogen, elixir-format
 msgid "Revoke"
@@ -2420,7 +2422,7 @@ msgstr "Revogar"
 msgid "Revoke this token? Callers using it will be locked out immediately."
 msgstr "Revogar este token? Quem o estiver a usar perde o acesso de imediato."
 
-#: lib/pepe_web/live/channels_live.ex:745
+#: lib/pepe_web/live/channels_live.ex:756
 #: lib/pepe_web/live/tokens_live.ex:410
 #, elixir-autogen, elixir-format
 msgid "That agent does not exist."
@@ -2431,13 +2433,13 @@ msgstr "Esse agente não existe."
 msgid "Token created. Copy it now, it will not be shown again."
 msgstr "Token criado. Copia-o agora, não volta a ser mostrado."
 
-#: lib/pepe_web/live/channels_live.ex:266
+#: lib/pepe_web/live/channels_live.ex:276
 #: lib/pepe_web/live/tokens_live.ex:167
 #, elixir-autogen, elixir-format
 msgid "Unlabeled"
 msgstr "Sem etiqueta"
 
-#: lib/pepe_web/live/channels_live.ex:277
+#: lib/pepe_web/live/channels_live.ex:287
 #: lib/pepe_web/live/tokens_live.ex:353
 #, elixir-autogen, elixir-format
 msgid "no origin set"
@@ -2469,7 +2471,7 @@ msgstr "Modelo %{old} renomeado para %{name} e guardado."
 msgid "Available models:"
 msgstr "Modelos disponíveis:"
 
-#: lib/pepe/gateways/telegram.ex:2461
+#: lib/pepe/gateways/telegram.ex:2502
 #: lib/pepe/gateways/tui.ex:456
 #: lib/pepe_web/live/chat_live.ex:1615
 #, elixir-autogen, elixir-format
@@ -2478,15 +2480,15 @@ msgstr ""
 "Mudar para %{name} só nesta conversa, ou para todos? Responde /model %{name}"
 " session ou /model %{name} global."
 
-#: lib/pepe/gateways/telegram.ex:2478
+#: lib/pepe/gateways/telegram.ex:2519
 #: lib/pepe/gateways/tui.ex:472
 #: lib/pepe_web/live/chat_live.ex:1629
 #, elixir-autogen, elixir-format
 msgid "Model set to %{name} (%{scope})."
 msgstr "Modelo definido para %{name} (%{scope})."
 
-#: lib/pepe/gateways/telegram.ex:2265
-#: lib/pepe/gateways/telegram.ex:2468
+#: lib/pepe/gateways/telegram.ex:2306
+#: lib/pepe/gateways/telegram.ex:2509
 #: lib/pepe/gateways/tui.ex:386
 #: lib/pepe/gateways/tui.ex:463
 #: lib/pepe_web/live/chat_live.ex:1597
@@ -2495,9 +2497,9 @@ msgstr "Modelo definido para %{name} (%{scope})."
 msgid "Usage: /model NAME [session|global]"
 msgstr "Uso: /model NOME [session|global]"
 
-#: lib/pepe/gateways/telegram.ex:2451
-#: lib/pepe/gateways/telegram.ex:2554
-#: lib/pepe/gateways/telegram.ex:2581
+#: lib/pepe/gateways/telegram.ex:2492
+#: lib/pepe/gateways/telegram.ex:2595
+#: lib/pepe/gateways/telegram.ex:2622
 #, elixir-autogen, elixir-format
 msgid "You don't have permission to change the model here."
 msgstr "Não tens permissão para mudar o modelo aqui."
@@ -2507,12 +2509,12 @@ msgstr "Não tens permissão para mudar o modelo aqui."
 msgid "+ Widget"
 msgstr "+ Widget"
 
-#: lib/pepe_web/live/channels_live.ex:277
+#: lib/pepe_web/live/channels_live.ex:287
 #, elixir-autogen, elixir-format
 msgid "Origin:"
 msgstr "Origem:"
 
-#: lib/pepe_web/live/channels_live.ex:259
+#: lib/pepe_web/live/channels_live.ex:269
 #: lib/pepe_web/live/chat_live.ex:1760
 #, elixir-autogen, elixir-format
 msgid "Widget"
@@ -2523,96 +2525,98 @@ msgstr "Widget"
 msgid "Copy"
 msgstr "Copiar"
 
-#: lib/pepe_web/live/channels_live.ex:314
+#: lib/pepe_web/live/channels_live.ex:324
 #, elixir-autogen, elixir-format
 msgid "+ Add a widget"
 msgstr "+ Adicionar widget"
 
-#: lib/pepe_web/live/channels_live.ex:322
+#: lib/pepe_web/live/channels_live.ex:332
 #, elixir-autogen, elixir-format
 msgid "Choose an agent..."
 msgstr "Escolhe um agente..."
 
-#: lib/pepe_web/live/channels_live.ex:340
+#: lib/pepe_web/live/channels_live.ex:350
 #, elixir-autogen, elixir-format
 msgid "Create widget"
 msgstr "Criar widget"
 
-#: lib/pepe_web/live/channels_live.ex:290
+#: lib/pepe_web/live/channels_live.ex:300
 #, elixir-autogen, elixir-format
 msgid "Embed snippet"
 msgstr "Excerto para incorporar"
 
-#: lib/pepe_web/live/channels_live.ex:746
+#: lib/pepe_web/live/channels_live.ex:757
 #, elixir-autogen, elixir-format
 msgid "Pick an agent for this widget."
 msgstr "Escolhe um agente para este widget."
 
-#: lib/pepe/gateways/telegram.ex:2595
+#: lib/pepe/gateways/telegram.ex:2636
 #, elixir-autogen, elixir-format
 msgid "<< Back"
 msgstr "<< Voltar"
 
-#: lib/pepe/gateways/telegram.ex:2601
+#: lib/pepe/gateways/telegram.ex:2642
 #, elixir-autogen, elixir-format
 msgid "Change to %{name} for this conversation only, or for everyone?"
 msgstr "Mudar para %{name} só nesta conversa, ou para todos?"
 
-#: lib/pepe/gateways/telegram.ex:2594
+#: lib/pepe/gateways/telegram.ex:2635
 #, elixir-autogen, elixir-format
 msgid "Everyone"
 msgstr "Todos"
 
-#: lib/pepe/gateways/telegram.ex:2593
+#: lib/pepe/gateways/telegram.ex:2634
 #, elixir-autogen, elixir-format
 msgid "This conversation only"
 msgstr "Só esta conversa"
 
-#: lib/pepe_web/live/channels_live.ex:272
+#: lib/pepe_web/live/channels_live.ex:282
 #, elixir-autogen, elixir-format
 msgid "Manage token"
 msgstr "Gerir token"
 
-#: lib/pepe/gateways/telegram.ex:2431
+#: lib/pepe/gateways/telegram.ex:2472
 #, elixir-autogen, elixir-format
 msgid "Browse models"
 msgstr "Ver modelos"
 
-#: lib/pepe/gateways/telegram.ex:2419
+#: lib/pepe/gateways/telegram.ex:2460
 #, elixir-autogen, elixir-format
 msgid "Current: %{model}"
 msgstr "Atual: %{model}"
 
-#: lib/pepe/gateways/telegram.ex:2421
+#: lib/pepe/gateways/telegram.ex:2462
 #, elixir-autogen, elixir-format
 msgid "Tap below to browse models, or use:"
 msgstr "Toca abaixo para ver os modelos, ou usa:"
 
-#: lib/pepe/gateways/telegram.ex:2424
+#: lib/pepe/gateways/telegram.ex:2465
 #, elixir-autogen, elixir-format
 msgid "list them all"
 msgstr "listar todos"
 
-#: lib/pepe/gateways/telegram.ex:2423
+#: lib/pepe/gateways/telegram.ex:2464
 #, elixir-autogen, elixir-format
 msgid "switch"
 msgstr "mudar"
 
-#: lib/pepe/gateways/telegram.ex:2489
+#: lib/pepe/gateways/telegram.ex:2530
 #: lib/pepe/gateways/tui.ex:483
 #: lib/pepe_web/live/chat_live.ex:1639
+#: lib/pepe_web/live/seen_channels_component.ex:288
+#: lib/pepe_web/live/seen_channels_component.ex:291
 #, elixir-autogen, elixir-format
 msgid "everyone"
 msgstr "todos"
 
-#: lib/pepe/gateways/telegram.ex:2488
+#: lib/pepe/gateways/telegram.ex:2529
 #: lib/pepe/gateways/tui.ex:482
 #: lib/pepe_web/live/chat_live.ex:1638
 #, elixir-autogen, elixir-format
 msgid "this conversation only"
 msgstr "só esta conversa"
 
-#: lib/pepe_web/live/channels_live.ex:333
+#: lib/pepe_web/live/channels_live.ex:343
 #, elixir-autogen, elixir-format
 msgid "Appearance"
 msgstr "Aparência"
@@ -2714,7 +2718,7 @@ msgstr "Faturação"
 msgid "Capabilities"
 msgstr "Capacidades"
 
-#: lib/pepe_web/live/connections_component.ex:128
+#: lib/pepe_web/live/connections_component.ex:142
 #: lib/pepe_web/live/db_connections_live.ex:165
 #: lib/pepe_web/live/models_live.ex:268
 #: lib/pepe_web/live/models_live.ex:359
@@ -2757,7 +2761,7 @@ msgstr "simples"
 msgid "Monthly message limit"
 msgstr "Limite mensal de mensagens"
 
-#: lib/pepe/gateways/telegram.ex:1648
+#: lib/pepe/gateways/telegram.ex:1689
 #, elixir-autogen, elixir-format
 msgid "This workspace has hit its monthly message limit. It resumes next month, or an admin can raise the cap."
 msgstr ""
@@ -2801,29 +2805,29 @@ msgstr "Âmbito Principal atualizado."
 msgid "In a group, require an @mention or not - /mention on|off"
 msgstr "Num grupo, exigir @menção ou não: /mention on|off"
 
-#: lib/pepe/gateways/telegram.ex:2201
+#: lib/pepe/gateways/telegram.ex:2242
 #, elixir-autogen, elixir-format
 msgid "Mention requirement is currently: %{status}.\nUse /mention on or /mention off."
 msgstr ""
 "Exigir menção: %{status}.\n"
 "Usa /mention on ou /mention off."
 
-#: lib/pepe/gateways/telegram.ex:2198
+#: lib/pepe/gateways/telegram.ex:2239
 #, elixir-autogen, elixir-format
 msgid "off (I reply without being mentioned)"
 msgstr "desativada (respondo sem ser mencionado)"
 
-#: lib/pepe/gateways/telegram.ex:2199
+#: lib/pepe/gateways/telegram.ex:2240
 #, elixir-autogen, elixir-format
 msgid "on (I need an @mention)"
 msgstr "ativada (preciso de ser @mencionado)"
 
-#: lib/pepe/gateways/telegram.ex:2189
+#: lib/pepe/gateways/telegram.ex:2230
 #, elixir-autogen, elixir-format
 msgid "👂 I'll reply here without being @mentioned, until /new."
 msgstr "👂 Vou responder aqui sem ser @mencionado, até ao /new."
 
-#: lib/pepe/gateways/telegram.ex:2193
+#: lib/pepe/gateways/telegram.ex:2234
 #, elixir-autogen, elixir-format
 msgid "📣 @mention required again in this chat."
 msgstr "📣 Voltou a ser preciso @mencionar neste chat."
@@ -2872,7 +2876,7 @@ msgstr "Escreve os números a marcar (ex.: 1 3) e prime Enter."
 msgid "empty Enter to finish"
 msgstr "Enter vazio para concluir"
 
-#: lib/mix/tasks/pepe.ex:6130
+#: lib/mix/tasks/pepe.ex:6244
 #, elixir-autogen, elixir-format
 msgid "language set to %{code}"
 msgstr "idioma: %{code}"
@@ -2892,17 +2896,17 @@ msgstr "n = página seguinte, p = página anterior"
 msgid "page %{page}/%{pages}"
 msgstr "página %{page}/%{pages}"
 
-#: lib/mix/tasks/pepe.ex:5907
+#: lib/mix/tasks/pepe.ex:6021
 #, elixir-autogen, elixir-format
 msgid " (a ${ENV_VAR} reference is fine)"
 msgstr " (aceita uma referência ${ENV_VAR})"
 
-#: lib/mix/tasks/pepe.ex:5908
+#: lib/mix/tasks/pepe.ex:6022
 #, elixir-autogen, elixir-format
 msgid " (optional)"
 msgstr " (opcional)"
 
-#: lib/mix/tasks/pepe.ex:5916
+#: lib/mix/tasks/pepe.ex:6030
 #, elixir-autogen, elixir-format
 msgid "\"%{field}\" is required. Please enter it (a ${ENV_VAR} reference is fine)."
 msgstr ""
@@ -3041,7 +3045,7 @@ msgstr "Juntar uma mensagem ao turno em curso: /inline <texto>"
 msgid "Usage: /inline TEXT"
 msgstr "Uso: /inline TEXTO"
 
-#: lib/pepe/gateways/telegram.ex:2336
+#: lib/pepe/gateways/telegram.ex:2377
 #, elixir-autogen, elixir-format
 msgid "➕ Fed into the running turn."
 msgstr "➕ Adicionada ao turno em curso."
@@ -3077,7 +3081,7 @@ msgstr "Etiqueta removida."
 msgid "Labeled “%{title}”."
 msgstr "Etiqueta definida: \"%{title}\"."
 
-#: lib/pepe/gateways/telegram.ex:2311
+#: lib/pepe/gateways/telegram.ex:2352
 #: lib/pepe/gateways/tui.ex:308
 #: lib/pepe_web/live/chat_live.ex:1485
 #, elixir-autogen, elixir-format
@@ -3096,7 +3100,7 @@ msgstr "Refazer a última resposta"
 msgid "Show this month's spend and message count"
 msgstr "Ver o gasto e as mensagens deste mês"
 
-#: lib/pepe/gateways/telegram.ex:2325
+#: lib/pepe/gateways/telegram.ex:2366
 #: lib/pepe/gateways/tui.ex:322
 #: lib/pepe_web/live/chat_live.ex:1542
 #, elixir-autogen, elixir-format
@@ -3113,7 +3117,7 @@ msgstr "Este mês: %{cost}, %{count} mensagens"
 msgid "Wait for the current turn to finish."
 msgstr "Espera que o turno atual termine."
 
-#: lib/pepe/gateways/telegram.ex:3580
+#: lib/pepe/gateways/telegram.ex:3621
 #, elixir-autogen, elixir-format
 msgid "That command isn't available here."
 msgstr "Esse comando não está disponível aqui."
@@ -3201,7 +3205,7 @@ msgstr ""
 msgid "Complex model"
 msgstr "Modelo complexo"
 
-#: lib/pepe/gateways/telegram.ex:1330
+#: lib/pepe/gateways/telegram.ex:1371
 #, elixir-autogen, elixir-format
 msgid "I couldn't make out any speech in that."
 msgstr "Não consegui perceber nenhuma fala."
@@ -3285,8 +3289,8 @@ msgstr "Nome de projeto inválido ou repetido."
 msgid "List models available to this project"
 msgstr "Lista os modelos disponíveis neste projeto"
 
-#: lib/pepe/gateways/telegram.ex:2503
-#: lib/pepe/gateways/telegram.ex:2524
+#: lib/pepe/gateways/telegram.ex:2544
+#: lib/pepe/gateways/telegram.ex:2565
 #: lib/pepe/gateways/tui.ex:367
 #: lib/pepe_web/live/chat_live.ex:1428
 #, elixir-autogen, elixir-format
@@ -3301,7 +3305,7 @@ msgstr ""
 " dele."
 
 #: lib/pepe_web/live/board_live.ex:142
-#: lib/pepe_web/live/connections_component.ex:138
+#: lib/pepe_web/live/connections_component.ex:152
 #: lib/pepe_web/live/dash_ui.ex:652
 #: lib/pepe_web/live/dash_ui.ex:657
 #: lib/pepe_web/live/skills_live.ex:189
@@ -3330,7 +3334,7 @@ msgstr "Projeto %{name} atualizado."
 msgid "Project %{old} renamed to %{new}."
 msgstr "Projeto %{old} renomeado para %{new}."
 
-#: lib/pepe_web/live/channels_live.ex:744
+#: lib/pepe_web/live/channels_live.ex:755
 #: lib/pepe_web/live/tokens_live.ex:409
 #, elixir-autogen, elixir-format
 msgid "That agent is not in the chosen project."
@@ -3342,7 +3346,7 @@ msgstr "Esse agente não está no projeto escolhido."
 msgid "That project already exists."
 msgstr "Esse projeto já existe."
 
-#: lib/pepe_web/live/channels_live.ex:743
+#: lib/pepe_web/live/channels_live.ex:754
 #: lib/pepe_web/live/tokens_live.ex:408
 #, elixir-autogen, elixir-format
 msgid "That project does not exist."
@@ -3418,28 +3422,28 @@ msgid "Error detail"
 msgstr "Detalhe do erro"
 
 #: lib/pepe_web/live/agents_live.ex:584
-#: lib/pepe_web/live/channels_live.ex:364
-#: lib/pepe_web/live/channels_live.ex:380
+#: lib/pepe_web/live/channels_live.ex:374
+#: lib/pepe_web/live/channels_live.ex:390
 #, elixir-autogen, elixir-format
 msgid "Ambient"
 msgstr "Resumido"
 
 #: lib/pepe_web/live/agents_live.ex:583
-#: lib/pepe_web/live/channels_live.ex:363
-#: lib/pepe_web/live/channels_live.ex:377
+#: lib/pepe_web/live/channels_live.ex:373
+#: lib/pepe_web/live/channels_live.ex:387
 #, elixir-autogen, elixir-format
 msgid "Detailed"
 msgstr "Detalhado"
 
 #: lib/pepe_web/live/agents_live.ex:585
-#: lib/pepe_web/live/channels_live.ex:365
-#: lib/pepe_web/live/channels_live.ex:383
+#: lib/pepe_web/live/channels_live.ex:375
+#: lib/pepe_web/live/channels_live.ex:393
 #, elixir-autogen, elixir-format
 msgid "Nothing"
 msgstr "Nada"
 
 #: lib/pepe_web/live/agents_live.ex:582
-#: lib/pepe_web/live/channels_live.ex:374
+#: lib/pepe_web/live/channels_live.ex:384
 #, elixir-autogen, elixir-format
 msgid "React"
 msgstr "Reagir"
@@ -3454,7 +3458,7 @@ msgstr "(enquanto este agente trabalha)"
 msgid "Max steps"
 msgstr "Máx. de passos"
 
-#: lib/pepe_web/live/channels_live.ex:362
+#: lib/pepe_web/live/channels_live.ex:372
 #, elixir-autogen, elixir-format
 msgid "React (default)"
 msgstr "Reagir (predefinição)"
@@ -3476,22 +3480,22 @@ msgstr "Usar a definição do canal"
 msgid "no limit"
 msgstr "sem limite"
 
-#: lib/pepe_web/live/channels_live.ex:429
+#: lib/pepe_web/live/channels_live.ex:439
 #, elixir-autogen, elixir-format
 msgid "Ignore"
 msgstr "Ignorar"
 
-#: lib/pepe_web/live/channels_live.ex:400
+#: lib/pepe_web/live/channels_live.ex:410
 #, elixir-autogen, elixir-format
 msgid "No one is waiting."
 msgstr "Ninguém à espera."
 
-#: lib/pepe_web/live/channels_live.ex:612
+#: lib/pepe_web/live/channels_live.ex:623
 #, elixir-autogen, elixir-format
 msgid "User added. They can talk to the bot now."
 msgstr "Utilizador adicionado. Já pode falar com o bot."
 
-#: lib/pepe_web/live/channels_live.ex:399
+#: lib/pepe_web/live/channels_live.ex:409
 #, elixir-autogen, elixir-format
 msgid "Waiting for approval"
 msgstr "À espera de aprovação"
@@ -3506,22 +3510,22 @@ msgstr "uma skill cujo conteúdo parece inseguro"
 msgid "adds or changes a skill"
 msgstr "adiciona ou altera uma skill"
 
-#: lib/pepe_web/live/channels_live.ex:627
+#: lib/pepe_web/live/channels_live.ex:638
 #, elixir-autogen, elixir-format
 msgid "Access revoked. They're blocked again."
 msgstr "Acesso revogado. Voltou a ficar bloqueado."
 
-#: lib/pepe_web/live/channels_live.ex:437
+#: lib/pepe_web/live/channels_live.ex:447
 #, elixir-autogen, elixir-format
 msgid "Allowed users"
 msgstr "Utilizadores permitidos"
 
-#: lib/pepe_web/live/channels_live.ex:438
+#: lib/pepe_web/live/channels_live.ex:448
 #, elixir-autogen, elixir-format
 msgid "No one has been approved yet."
 msgstr "Ainda ninguém foi aprovado."
 
-#: lib/pepe_web/live/channels_live.ex:454
+#: lib/pepe_web/live/channels_live.ex:464
 #, elixir-autogen, elixir-format
 msgid "Remove this person's access? They'll go back to being blocked."
 msgstr "Remover o acesso desta pessoa? Fica outra vez bloqueada."
@@ -3897,7 +3901,7 @@ msgstr ""
 "Qualquer uma destas cobre chamadas como esta, sem riscos assinalados. Tudo o"
 " que for mais arriscado volta a perguntar."
 
-#: lib/pepe/gateways/telegram.ex:1628
+#: lib/pepe/gateways/telegram.ex:1669
 #, elixir-autogen, elixir-format
 msgid "That file is too big for me to download here - Telegram bots can only fetch files up to 20MB this way. Could you send a smaller version, or share it another way?"
 msgstr ""
@@ -4135,7 +4139,7 @@ msgstr "(incluído)"
 msgid "Default"
 msgstr "Predefinição"
 
-#: lib/pepe_web/live/channels_live.ex:718
+#: lib/pepe_web/live/channels_live.ex:729
 #, elixir-autogen, elixir-format
 msgid "Couldn't save. The widget may have been removed."
 msgstr "Não foi possível guardar. O widget pode ter sido removido."
@@ -4178,7 +4182,7 @@ msgstr ""
 msgid "not installed"
 msgstr "não instalado"
 
-#: lib/mix/tasks/pepe.ex:193
+#: lib/mix/tasks/pepe.ex:195
 #, elixir-autogen, elixir-format
 msgid "No more input (stdin closed). Aborting."
 msgstr "Sem mais entrada (stdin fechado). A abortar."
@@ -4244,7 +4248,7 @@ msgstr "Um único script .exs, sem manifest."
 msgid "Activity (tokens, last 14 days)"
 msgstr "Atividade (tokens, últimos 14 dias)"
 
-#: lib/pepe_web/live/connections_component.ex:313
+#: lib/pepe_web/live/connections_component.ex:355
 #, elixir-autogen, elixir-format
 msgid "Admin"
 msgstr "Admin"
@@ -4438,7 +4442,7 @@ msgstr "%{weekday} que vem"
 msgid "Next check %{at}"
 msgstr "Próxima verificação %{at}"
 
-#: lib/pepe_web/live/connections_component.ex:337
+#: lib/pepe_web/live/connections_component.ex:394
 #, elixir-autogen, elixir-format
 msgid "No"
 msgstr "Não"
@@ -4527,7 +4531,7 @@ msgstr "Bloqueados"
 msgid "Sunday"
 msgstr "Domingo"
 
-#: lib/pepe_web/live/connections_component.ex:314
+#: lib/pepe_web/live/connections_component.ex:356
 #, elixir-autogen, elixir-format
 msgid "Support"
 msgstr "Suporte"
@@ -4609,7 +4613,7 @@ msgstr "Pesquisa na web"
 msgid "Wednesday"
 msgstr "Quarta-feira"
 
-#: lib/pepe_web/live/channels_live.ex:371
+#: lib/pepe_web/live/channels_live.ex:381
 #, elixir-autogen, elixir-format
 msgid "What each option does"
 msgstr "O que faz cada opção"
@@ -4629,7 +4633,7 @@ msgstr "Onde o agente procura no que tem em memória."
 msgid "Which service answers the agent's searches on the web."
 msgstr "O serviço que responde às pesquisas do agente na web."
 
-#: lib/pepe_web/live/connections_component.ex:336
+#: lib/pepe_web/live/connections_component.ex:393
 #, elixir-autogen, elixir-format
 msgid "Yes"
 msgstr "Sim"
@@ -4705,8 +4709,8 @@ msgid_plural "every %{count} seconds"
 msgstr[0] "cada %{count} segundo"
 msgstr[1] "cada %{count} segundos"
 
-#: lib/pepe_web/live/channels_live.ex:408
-#: lib/pepe_web/live/channels_live.ex:447
+#: lib/pepe_web/live/channels_live.ex:418
+#: lib/pepe_web/live/channels_live.ex:457
 #, elixir-autogen, elixir-format
 msgid "id %{id}"
 msgstr "id %{id}"
@@ -4756,7 +4760,7 @@ msgstr "sem intervalo definido"
 msgid "notifies on %{channel}"
 msgstr "avisa em %{channel}"
 
-#: lib/pepe_web/live/channels_live.ex:486
+#: lib/pepe_web/live/channels_live.ex:496
 #, elixir-autogen, elixir-format
 msgid "or"
 msgstr "ou"
@@ -4817,7 +4821,7 @@ msgstr "Ritmo do heartbeat"
 msgid "Model selection"
 msgstr "Seleção de modelo"
 
-#: lib/pepe/gateways/telegram.ex:1645
+#: lib/pepe/gateways/telegram.ex:1686
 #, elixir-autogen, elixir-format
 msgid "This workspace is out of prepaid balance. An admin needs to add funds before it can continue."
 msgstr ""
@@ -4874,19 +4878,19 @@ msgstr "Não permitir"
 msgid "Not allowed."
 msgstr "Não permitido."
 
-#: lib/pepe/gateways/telegram.ex:2035
+#: lib/pepe/gateways/telegram.ex:2076
 #, elixir-autogen, elixir-format
 msgid "⌛ This request expired. Ask again and a new one with buttons to tap will show up."
 msgstr "⌛ Este pedido expirou. Pede outra vez e aparece um novo, com botões."
 
-#: lib/pepe/gateways/telegram.ex:1204
+#: lib/pepe/gateways/telegram.ex:1245
 #, elixir-autogen, elixir-format
 msgid "%{n} of the %{total} files you sent couldn't be downloaded; I only saved the rest."
 msgstr ""
 "Não consegui descarregar %{n} dos %{total} ficheiros que enviaste; guardei "
 "só os restantes."
 
-#: lib/pepe/gateways/telegram.ex:1198
+#: lib/pepe/gateways/telegram.ex:1239
 #, elixir-autogen, elixir-format
 msgid "%{n} of the %{total} files you sent were too big for me to download here (Telegram bots can only fetch files up to 20MB this way); I only saved the rest."
 msgstr ""
@@ -4899,27 +4903,27 @@ msgstr ""
 msgid "Allow me to run the %{tool} tool: %{desc}?"
 msgstr "Posso usar a ferramenta %{tool}: %{desc}?"
 
-#: lib/pepe/gateways/telegram.ex:1589
+#: lib/pepe/gateways/telegram.ex:1630
 #, elixir-autogen, elixir-format
 msgid "I'm still on the previous message; send /stop to cancel it."
 msgstr "Ainda estou na mensagem anterior; envia /stop para a cancelar."
 
-#: lib/pepe/gateways/telegram.ex:2714
+#: lib/pepe/gateways/telegram.ex:2755
 #, elixir-autogen, elixir-format
 msgid "Nothing is pre-approved: I'll ask before risky tools."
 msgstr "Nada está pré-aprovado: pergunto antes de usar ferramentas de risco."
 
-#: lib/pepe/gateways/telegram.ex:2337
+#: lib/pepe/gateways/telegram.ex:2378
 #, elixir-autogen, elixir-format
 msgid "Nothing is running; just send it as a normal message."
 msgstr "Não há nada em execução; envia como mensagem normal."
 
-#: lib/pepe/gateways/telegram.ex:2329
+#: lib/pepe/gateways/telegram.ex:2370
 #, elixir-autogen, elixir-format
 msgid "Usage: /inline <message>, feeds it into the running turn."
 msgstr "Uso: /inline <mensagem>, junta-a ao turno em curso."
 
-#: lib/pepe/gateways/telegram.ex:2908
+#: lib/pepe/gateways/telegram.ex:2949
 #, elixir-autogen, elixir-format
 msgid "♻️ Recovered reply (I restarted while sending this, so it might be a duplicate):\n\n"
 msgstr ""
@@ -4991,7 +4995,7 @@ msgstr "Permitir nesta sessão (só este formato)"
 msgid "Allowed for this session (this call shape only)."
 msgstr "Permitido nesta sessão (só este formato)."
 
-#: lib/pepe/gateways/telegram.ex:1726
+#: lib/pepe/gateways/telegram.ex:1767
 #, elixir-autogen, elixir-format
 msgid "Buttons not working? Reply with text instead: allow / allow all / deny"
 msgstr ""
@@ -5088,7 +5092,7 @@ msgid_plural "Rewound %{count} turns. That was the whole conversation."
 msgstr[0] "Recuei %{count} turno. Era toda a conversa."
 msgstr[1] "Recuei %{count} turnos. Era toda a conversa."
 
-#: lib/pepe/gateways/telegram.ex:2174
+#: lib/pepe/gateways/telegram.ex:2215
 #: lib/pepe/gateways/tui.ex:293
 #: lib/pepe_web/live/chat_live.ex:1517
 #, elixir-autogen, elixir-format
@@ -5483,7 +5487,7 @@ msgid_plural "Removed %{count} files those turns created: %{files}."
 msgstr[0] "Removi %{count} ficheiro criado nesses turnos: %{files}."
 msgstr[1] "Removi %{count} ficheiros criados nesses turnos: %{files}."
 
-#: lib/pepe/gateways/telegram.ex:2314
+#: lib/pepe/gateways/telegram.ex:2355
 #: lib/pepe/gateways/tui.ex:311
 #: lib/pepe_web/live/chat_live.ex:1488
 #, elixir-autogen, elixir-format
@@ -5515,12 +5519,12 @@ msgid_plural "The saved copy of %{count} files has expired: %{files}."
 msgstr[0] "A cópia guardada de %{count} ficheiro expirou: %{files}."
 msgstr[1] "As cópias guardadas de %{count} ficheiros expiraram: %{files}."
 
-#: lib/pepe/gateways/telegram.ex:2226
+#: lib/pepe/gateways/telegram.ex:2267
 #, elixir-autogen, elixir-format
 msgid "Agent switching is locked on this bot."
 msgstr "Neste bot não se pode mudar de agente."
 
-#: lib/pepe/gateways/telegram.ex:1658
+#: lib/pepe/gateways/telegram.ex:1699
 #, elixir-autogen, elixir-format
 msgid "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `mix pepe agent add` (`mix pepe setup` walks through both)."
 msgstr ""
@@ -5528,7 +5532,7 @@ msgstr ""
 "operador tem de criar um primeiro, no dashboard ou com `mix pepe agent add` "
 "(o `mix pepe setup` guia nos dois)."
 
-#: lib/pepe/gateways/telegram.ex:1652
+#: lib/pepe/gateways/telegram.ex:1693
 #, elixir-autogen, elixir-format
 msgid "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `mix pepe model add` (`mix pepe setup` walks through both)."
 msgstr ""
@@ -5916,7 +5920,7 @@ msgstr ""
 "O agente pode acrescentar uma dica curta sobre uma funcionalidade "
 "relacionada quando fizer sentido."
 
-#: lib/pepe_web/live/channels_live.ex:490
+#: lib/pepe_web/live/channels_live.ex:500
 #, elixir-autogen, elixir-format
 msgid "The bot shows 👀 while working and answers everyone. You can change both under Edit."
 msgstr ""
@@ -6077,17 +6081,17 @@ msgstr "(Usar o modelo predefinido)"
 msgid "(What this agent can do)"
 msgstr "(O que este agente pode fazer)"
 
-#: lib/pepe_web/live/channels_live.ex:465
+#: lib/pepe_web/live/channels_live.ex:475
 #, elixir-autogen, elixir-format
 msgid "(leave blank to keep the current key)"
 msgstr "(deixa em branco para manter a chave atual)"
 
-#: lib/pepe_web/live/channels_live.ex:446
+#: lib/pepe_web/live/channels_live.ex:456
 #, elixir-autogen, elixir-format
 msgid "(no name saved)"
 msgstr "(sem nome guardado)"
 
-#: lib/pepe_web/live/channels_live.ex:466
+#: lib/pepe_web/live/channels_live.ex:476
 #, elixir-autogen, elixir-format
 msgid "(or paste a new key)"
 msgstr "(ou cola uma chave nova)"
@@ -6146,7 +6150,7 @@ msgstr ""
 msgid "A hex color code like #ea580c"
 msgstr "Um código de cor hexadecimal, como #ea580c"
 
-#: lib/pepe_web/live/channels_live.ex:377
+#: lib/pepe_web/live/channels_live.ex:387
 #, elixir-autogen, elixir-format
 msgid "A live list of every tool the agent uses and why."
 msgstr ""
@@ -6187,12 +6191,12 @@ msgstr ""
 "O token do widget de chat público tem de ficar ligado a um agente. Escolhe "
 "um acima."
 
-#: lib/pepe_web/live/connections_component.ex:133
+#: lib/pepe_web/live/connections_component.ex:147
 #, elixir-autogen, elixir-format
 msgid "A short unique name that becomes part of the webhook URL."
 msgstr "Um nome curto e único que passa a fazer parte do endereço do webhook."
 
-#: lib/pepe_web/live/channels_live.ex:325
+#: lib/pepe_web/live/channels_live.ex:335
 #, elixir-autogen, elixir-format
 msgid "A widget talks to one agent, not a whole project."
 msgstr "Um widget fala com um agente, não com um projeto inteiro."
@@ -6239,7 +6243,7 @@ msgstr ""
 "Endereço do teu serviço Presidio Anonymizer, que esconde o que o analisador "
 "encontrou. Por exemplo http://localhost:5001."
 
-#: lib/pepe_web/live/connections_component.ex:343
+#: lib/pepe_web/live/connections_component.ex:400
 #, elixir-autogen, elixir-format
 msgid "Admin: a channel only you and your team use. Chats are remembered, commands like /new work, and what you talk about can be saved to memory."
 msgstr ""
@@ -6258,7 +6262,7 @@ msgstr ""
 msgid "Agents it can manage"
 msgstr "Agentes que pode gerir"
 
-#: lib/pepe_web/live/channels_live.ex:328
+#: lib/pepe_web/live/channels_live.ex:338
 #: lib/pepe_web/live/tokens_live.ex:114
 #, elixir-autogen, elixir-format
 msgid "Allowed website"
@@ -6345,7 +6349,7 @@ msgstr ""
 "Aprova o acesso no navegador e volta. Se nada acontecer, cola abaixo o "
 "endereço que recebeste."
 
-#: lib/pepe_web/live/channels_live.ex:391
+#: lib/pepe_web/live/channels_live.ex:401
 #, elixir-autogen, elixir-format
 msgid "Approve new people first"
 msgstr "Aprovar primeiro as pessoas novas"
@@ -6466,7 +6470,7 @@ msgstr ""
 msgid "Connected. The login details work."
 msgstr "Ligado. Os dados de acesso funcionam."
 
-#: lib/pepe_web/live/connections_component.ex:236
+#: lib/pepe_web/live/connections_component.ex:276
 #, elixir-autogen, elixir-format
 msgid "Connection %{s} removed."
 msgstr "Ligação %{s} removida."
@@ -6536,12 +6540,12 @@ msgstr "Cada conjunto cobre os tipos de dados habituais de um país ou região."
 msgid "Easy vs hard messages"
 msgstr "Mensagens fáceis e difíceis"
 
-#: lib/pepe_web/live/channels_live.ex:270
+#: lib/pepe_web/live/channels_live.ex:280
 #, elixir-autogen, elixir-format
 msgid "Edit look"
 msgstr "Editar aspeto"
 
-#: lib/pepe_web/live/connections_component.ex:281
+#: lib/pepe_web/live/connections_component.ex:321
 #, elixir-autogen, elixir-format
 msgid "Enter a short name for the URL."
 msgstr "Escreve um nome curto para o endereço."
@@ -6614,7 +6618,7 @@ msgstr "Para outra configuração"
 msgid "Full instructions"
 msgstr "Instruções completas"
 
-#: lib/pepe_web/live/channels_live.ex:487
+#: lib/pepe_web/live/channels_live.ex:497
 #, elixir-autogen, elixir-format
 msgid "Get it from @BotFather. Tip: write it as an environment variable like ${MY_BOT_TOKEN} to keep it out of the settings file."
 msgstr ""
@@ -6921,7 +6925,7 @@ msgstr ""
 "Multiplica o que o fornecedor cobra pelo que tu faturas (1.3 = +30%). Em "
 "branco fatura o custo exato."
 
-#: lib/pepe_web/live/channels_live.ex:317
+#: lib/pepe_web/live/channels_live.ex:327
 #, elixir-autogen, elixir-format
 msgid "My website widget"
 msgstr "O meu widget do website"
@@ -6968,7 +6972,7 @@ msgstr ""
 "Ainda não há projetos. Tudo fica no espaço Principal. Cria um projeto para "
 "manter um cliente ou equipa separado."
 
-#: lib/pepe_web/live/channels_live.ex:383
+#: lib/pepe_web/live/channels_live.ex:393
 #, elixir-autogen, elixir-format
 msgid "No status message, only Telegram's \"typing...\" indicator."
 msgstr "Sem mensagem de estado, só o indicador \"a escrever...\" do Telegram."
@@ -7015,7 +7019,7 @@ msgstr ""
 "ficheiro ou página web, porque podem esconder instruções maliciosas. Ativa "
 "só para agentes em que confias."
 
-#: lib/pepe_web/live/connections_component.ex:175
+#: lib/pepe_web/live/connections_component.ex:212
 #, elixir-autogen, elixir-format
 msgid "Not set (use provider's default)"
 msgstr "Não definido (usa o predefinido do fornecedor)"
@@ -7057,7 +7061,7 @@ msgstr ""
 "Ligado: um card com responsável e pronto começa sozinho. Desligado: alguém "
 "tem de o assumir primeiro."
 
-#: lib/pepe_web/live/channels_live.ex:393
+#: lib/pepe_web/live/channels_live.ex:403
 #, elixir-autogen, elixir-format
 msgid "On: the bot ignores anyone not on the approved list. Off: it answers everyone."
 msgstr ""
@@ -7078,7 +7082,7 @@ msgstr ""
 "Uma linha por mensagem recebida. Uma mensagem precisa muitas vezes de várias"
 " chamadas ao modelo."
 
-#: lib/pepe_web/live/channels_live.ex:380
+#: lib/pepe_web/live/channels_live.ex:390
 #, elixir-autogen, elixir-format
 msgid "One line saying what kind of work it is doing, without tool names."
 msgstr ""
@@ -7097,7 +7101,7 @@ msgstr ""
 "Um por linha: nome|regex|ETIQUETA_DE_SUBSTITUIÇÃO. Os padrões inválidos são "
 "descartados ao guardar."
 
-#: lib/pepe_web/live/channels_live.ex:374
+#: lib/pepe_web/live/channels_live.ex:384
 #, elixir-autogen, elixir-format
 msgid "Only a 👀 on your message while it works. The quietest option."
 msgstr "Só um 👀 na tua mensagem enquanto trabalha. A opção mais discreta."
@@ -7133,7 +7137,7 @@ msgstr ""
 "Opcional. As mensagens fáceis vão para o modelo abaixo, as difíceis para o "
 "modelo próprio deste agente."
 
-#: lib/pepe_web/live/channels_live.ex:334
+#: lib/pepe_web/live/channels_live.ex:344
 #, elixir-autogen, elixir-format
 msgid "Optional. Empty fields use the values in the pasted code."
 msgstr "Opcional. Os campos vazios usam os valores do código colado."
@@ -7162,7 +7166,7 @@ msgstr ""
 msgid "Paste the code here"
 msgstr "Cola o código aqui"
 
-#: lib/pepe_web/live/connections_component.ex:94
+#: lib/pepe_web/live/connections_component.ex:95
 #, elixir-autogen, elixir-format
 msgid "Paste this into the provider as the address it sends messages to."
 msgstr ""
@@ -7208,7 +7212,7 @@ msgstr ""
 "Preço por 1 milhão de tokens, em %{currency}. Em branco usa o preço "
 "conhecido."
 
-#: lib/pepe_web/live/connections_component.ex:168
+#: lib/pepe_web/live/connections_component.ex:205
 #, elixir-autogen, elixir-format
 msgid "Provider access details"
 msgstr "Dados de acesso do fornecedor"
@@ -7322,7 +7326,7 @@ msgstr ""
 msgid "Same as the board"
 msgstr "Igual ao board"
 
-#: lib/pepe_web/live/channels_live.ex:285
+#: lib/pepe_web/live/channels_live.ex:295
 #, elixir-autogen, elixir-format
 msgid "Save look"
 msgstr "Guardar aspeto"
@@ -7460,12 +7464,12 @@ msgstr ""
 "Resume só as mensagens mais antigas de cada vez, não tudo de uma vez. Pode "
 "subir ligeiramente o custo."
 
-#: lib/pepe_web/live/connections_component.ex:147
+#: lib/pepe_web/live/connections_component.ex:161
 #, elixir-autogen, elixir-format
 msgid "Support (for customers)"
 msgstr "Suporte (para clientes)"
 
-#: lib/pepe_web/live/connections_component.ex:349
+#: lib/pepe_web/live/connections_component.ex:406
 #, elixir-autogen, elixir-format
 msgid "Support: a channel for customers. Each chat starts from scratch, nothing is remembered between chats or saved to memory, and commands like /new are read as plain text."
 msgstr ""
@@ -7510,7 +7514,7 @@ msgstr ""
 " teu próprio computador ou qualquer serviço compatível com a OpenAI. Escolhe"
 " um fornecedor e o resto é preenchido por ti."
 
-#: lib/pepe_web/live/channels_live.ex:279
+#: lib/pepe_web/live/channels_live.ex:289
 #, elixir-autogen, elixir-format
 msgid "The agent and website address can't be changed. Create a new widget to use different ones."
 msgstr ""
@@ -7546,7 +7550,7 @@ msgstr ""
 msgid "The program to start, such as npx, uvx or python."
 msgstr "O programa a iniciar, como npx, uvx ou python."
 
-#: lib/pepe_web/live/connections_component.ex:210
+#: lib/pepe_web/live/connections_component.ex:247
 #, elixir-autogen, elixir-format
 msgid "The provider for this connection is not installed."
 msgstr "O fornecedor desta ligação não está instalado."
@@ -7584,12 +7588,12 @@ msgstr ""
 msgid "This is a built-in skill. Saving makes your own copy."
 msgstr "Esta é uma skill incluída. Ao guardar, ficas com uma cópia tua."
 
-#: lib/pepe_web/live/channels_live.ex:565
+#: lib/pepe_web/live/channels_live.ex:575
 #, elixir-autogen, elixir-format
 msgid "This key is already used by another bot"
 msgstr "Esta chave já é usada por outro bot"
 
-#: lib/pepe_web/live/connections_component.ex:282
+#: lib/pepe_web/live/connections_component.ex:322
 #, elixir-autogen, elixir-format
 msgid "This short name is already in use."
 msgstr "Este nome curto já está em uso."
@@ -7614,7 +7618,7 @@ msgstr "Arrumado: %{summary}"
 msgid "Time limit to finish a card (seconds)"
 msgstr "Tempo limite para concluir um card (segundos)"
 
-#: lib/pepe_web/live/channels_live.ex:467
+#: lib/pepe_web/live/channels_live.ex:477
 #, elixir-autogen, elixir-format
 msgid "Tip: write a reference like ${MY_BOT_TOKEN} so the key stays out of the settings file."
 msgstr ""
@@ -7732,7 +7736,7 @@ msgstr "À espera do teu OK"
 msgid "What the AI really receives, not just the instructions above"
 msgstr "O que a IA realmente recebe, não só as instruções acima"
 
-#: lib/pepe_web/live/channels_live.ex:367
+#: lib/pepe_web/live/channels_live.ex:377
 #, elixir-autogen, elixir-format
 msgid "What the bot shows while the agent works. It disappears when the answer arrives."
 msgstr ""
@@ -7780,7 +7784,7 @@ msgstr ""
 "EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, ...). Em branco encontra tudo o "
 "que o teu Presidio deteta."
 
-#: lib/pepe_web/live/channels_live.ex:360
+#: lib/pepe_web/live/channels_live.ex:370
 #, elixir-autogen, elixir-format
 msgid "While the agent is working"
 msgstr "Enquanto o agente trabalha"
@@ -7797,7 +7801,7 @@ msgstr ""
 "Escreve tudo o que o responsável precisa. Ele não vê nenhuma conversa, por "
 "isso isto é tudo o que sabe."
 
-#: lib/pepe_web/live/connections_component.ex:188
+#: lib/pepe_web/live/connections_component.ex:225
 #: lib/pepe_web/live/models_live.ex:286
 #, elixir-autogen, elixir-format
 msgid "Write it as ${ENV_VAR} to keep the secret out of the settings file."
@@ -7840,7 +7844,7 @@ msgstr "Os teus próprios padrões"
 msgid "Your own service that hides personal data"
 msgstr "O teu próprio serviço que esconde dados pessoais"
 
-#: lib/pepe_web/live/channels_live.ex:330
+#: lib/pepe_web/live/channels_live.ex:340
 #, elixir-autogen, elixir-format
 msgid "Your website's address, like https://example.com. Other websites can't use this widget."
 msgstr ""
@@ -8022,3 +8026,176 @@ msgstr "Só decisões"
 #, elixir-autogen, elixir-format
 msgid "This connection only makes decisions, it cannot be the default."
 msgstr "Esta ligação só toma decisões, não pode ser a predefinida."
+
+#: lib/pepe_web/live/seen_channels_component.ex:159
+#, elixir-autogen, elixir-format
+msgid "Use the connection's"
+msgstr "Usar o da ligação"
+
+#: lib/pepe_web/live/connections_component.ex:182
+#, elixir-autogen, elixir-format
+msgid "Who can train this connection"
+msgstr "Quem pode treinar esta ligação"
+
+#: lib/pepe_web/live/connections_component.ex:185
+#, elixir-autogen, elixir-format
+msgid "Write * for everyone, none for no one, or the ids of the people, separated by commas. Empty means everyone in an Admin connection and no one in a Support one. A channel can have its own list, set in the chat with /trainers; that one wins for that channel."
+msgstr "Escreve * para todos, none para ninguém, ou os ids das pessoas, separados por vírgulas. Vazio significa todos numa ligação Admin e ninguém numa de Suporte. Um canal pode ter a sua própria lista, definida no chat com /trainers; essa vale para esse canal."
+
+#: lib/pepe_web/live/seen_channels_component.ex:289
+#, elixir-autogen, elixir-format
+msgid "no one"
+msgstr "ninguém"
+
+#: lib/pepe_web/live/seen_channels_component.ex:58
+#, elixir-autogen, elixir-format
+msgid "%{count} channel"
+msgid_plural "%{count} channels"
+msgstr[0] "%{count} canal"
+msgstr[1] "%{count} canais"
+
+#: lib/pepe_web/live/seen_channels_component.ex:50
+#, elixir-autogen, elixir-format
+msgid "No channels heard from yet. They appear here after the first message."
+msgstr "Ainda nenhum canal. Aparecem aqui depois da primeira mensagem."
+
+#: lib/pepe_web/live/seen_channels_component.ex:121
+#, elixir-autogen, elixir-format
+msgid "Who can train"
+msgstr "Quem pode treinar"
+
+#: lib/pepe_web/live/seen_channels_component.ex:302
+#, elixir-autogen, elixir-format
+msgid "active %{count} day ago"
+msgid_plural "active %{count} days ago"
+msgstr[0] "ativo há %{count} dia"
+msgstr[1] "ativo há %{count} dias"
+
+#: lib/pepe_web/live/seen_channels_component.ex:301
+#, elixir-autogen, elixir-format
+msgid "active %{count} hour ago"
+msgid_plural "active %{count} hours ago"
+msgstr[0] "ativo há %{count} hora"
+msgstr[1] "ativo há %{count} horas"
+
+#: lib/pepe_web/live/seen_channels_component.ex:300
+#, elixir-autogen, elixir-format
+msgid "active %{count} minute ago"
+msgid_plural "active %{count} minutes ago"
+msgstr[0] "ativo há %{count} minuto"
+msgstr[1] "ativo há %{count} minutos"
+
+#: lib/pepe_web/live/seen_channels_component.ex:299
+#, elixir-autogen, elixir-format
+msgid "active just now"
+msgstr "ativo mesmo agora"
+
+#: lib/pepe_web/live/seen_channels_component.ex:285
+#, elixir-autogen, elixir-format
+msgid "direct message"
+msgstr "mensagem direta"
+
+#: lib/pepe_web/live/seen_channels_component.ex:286
+#, elixir-autogen, elixir-format
+msgid "group"
+msgstr "grupo"
+
+#: lib/pepe_web/live/seen_channels_component.ex:293
+#, elixir-autogen, elixir-format
+msgid "no message yet"
+msgstr "ainda sem mensagens"
+
+#: lib/pepe_web/live/connections_component.ex:192
+#, elixir-autogen, elixir-format
+msgid "Answer without being mentioned"
+msgstr "Responder sem ser mencionado"
+
+#: lib/pepe_web/live/seen_channels_component.ex:64
+#, elixir-autogen, elixir-format
+msgid "Each setting is the connection's unless the channel has one of its own, which then wins for that channel only."
+msgstr "Cada definição é a da ligação, a menos que o canal tenha a sua própria, que então vale só para esse canal."
+
+#: lib/pepe_web/live/seen_channels_component.ex:99
+#, elixir-autogen, elixir-format
+msgid "Mention"
+msgstr "Menção"
+
+#: lib/pepe_web/live/connections_component.ex:92
+#, elixir-autogen, elixir-format
+msgid "Mention:"
+msgstr "Menção:"
+
+#: lib/pepe_web/live/connections_component.ex:360
+#, elixir-autogen, elixir-format
+msgid "No, a mention is required"
+msgstr "Não, é preciso mencionar"
+
+#: lib/pepe_web/live/seen_channels_component.ex:278
+#, elixir-autogen, elixir-format
+msgid "The bot's: %{agent}"
+msgstr "O do bot: %{agent}"
+
+#: lib/pepe_web/live/seen_channels_component.ex:277
+#, elixir-autogen, elixir-format
+msgid "The bot's: the default agent"
+msgstr "O do bot: o agente predefinido"
+
+#: lib/pepe_web/live/seen_channels_component.ex:280
+#, elixir-autogen, elixir-format
+msgid "The connection's: %{agent}"
+msgstr "O da ligação: %{agent}"
+
+#: lib/pepe_web/live/seen_channels_component.ex:125
+#, elixir-autogen, elixir-format
+msgid "The connection's: %{who}"
+msgstr "O da ligação: %{who}"
+
+#: lib/pepe_web/live/seen_channels_component.ex:279
+#, elixir-autogen, elixir-format
+msgid "The connection's: the default agent"
+msgstr "O da ligação: o agente predefinido"
+
+#: lib/pepe_web/live/connections_component.ex:198
+#, elixir-autogen, elixir-format
+msgid "The default for every channel of this connection. A channel can have its own setting, from the chat with /mention off always or /mention on always, or in its row below; that one wins for that channel. A direct message always answers."
+msgstr "A predefinição para todos os canais desta ligação. Um canal pode ter a sua própria definição, a partir da conversa com /mention off always ou /mention on always, ou na linha dele abaixo; essa vale para esse canal. Uma mensagem direta responde sempre."
+
+#: lib/pepe_web/live/seen_channels_component.ex:159
+#, elixir-autogen, elixir-format
+msgid "Use the bot's"
+msgstr "Usar o do bot"
+
+#: lib/pepe_web/live/seen_channels_component.ex:102
+#, elixir-autogen, elixir-format
+msgid "Use the connection's: %{value}"
+msgstr "Usar o da ligação: %{value}"
+
+#: lib/pepe_web/live/connections_component.ex:359
+#, elixir-autogen, elixir-format
+msgid "Yes, in every channel"
+msgstr "Sim, em todos os canais"
+
+#: lib/pepe_web/live/seen_channels_component.ex:282
+#, elixir-autogen, elixir-format
+msgid "answers without a mention"
+msgstr "responde sem menção"
+
+#: lib/pepe_web/live/seen_channels_component.ex:146
+#, elixir-autogen, elixir-format
+msgid "from the bot"
+msgstr "do bot"
+
+#: lib/pepe_web/live/seen_channels_component.ex:146
+#, elixir-autogen, elixir-format
+msgid "from the connection"
+msgstr "da ligação"
+
+#: lib/pepe_web/live/seen_channels_component.ex:145
+#, elixir-autogen, elixir-format
+msgid "own"
+msgstr "próprio"
+
+#: lib/pepe_web/live/seen_channels_component.ex:283
+#, elixir-autogen, elixir-format
+msgid "requires a mention"
+msgstr "exige menção"

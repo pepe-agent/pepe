@@ -174,6 +174,14 @@ defmodule Pepe.Webhooks.Discord do
 
   def parse(_payload), do: :ignore
 
+  # A gateway message's `from` is the channel, a direct message when it has no guild. An
+  # interaction's `from` is a one-off token, not a place, so it is not recorded.
+  @impl true
+  def channel_info(%{"t" => "MESSAGE_CREATE", "d" => %{} = d}, _message),
+    do: %{kind: if(is_binary(d["guild_id"]), do: :group, else: :dm)}
+
+  def channel_info(_payload, _message), do: :skip
+
   defp message(token, p, text, media),
     do: %{from: token, text: text, id: p["id"], name: interaction_username(p), media: media}
 

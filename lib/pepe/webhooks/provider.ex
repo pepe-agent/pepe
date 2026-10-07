@@ -172,6 +172,24 @@ defmodule Pepe.Webhooks.Provider do
   """
   @callback working(config :: map(), message :: map(), state :: :start | :stop) :: :ok | {:error, term()}
 
+  @doc """
+  Optional: what the Channels page should know about the place a parsed message came from,
+  read off the payload at no cost: `kind` (`:dm` for a one to one conversation, `:group` for
+  a channel, a group or a space) and `name` (a display name, only when the payload already
+  carries one; a lookup belongs in `channel_name/2`). Return `:skip` when `from` is not a
+  lasting place (a one-off interaction token). Without it, the channel is recorded by its id
+  alone (see `Pepe.SeenChannels`).
+  """
+  @callback channel_info(payload :: map(), message :: inbound()) ::
+              %{optional(:kind) => :dm | :group, optional(:name) => String.t() | nil} | :skip
+
+  @doc """
+  Optional: look up a channel's display name on the platform, called once, off the request,
+  when the channel is first heard from and the payload carried no name. Best effort: one
+  request, no retries, and `:error` is final (the id is shown instead).
+  """
+  @callback channel_name(config :: map(), channel :: String.t()) :: {:ok, String.t()} | :error
+
   @optional_callbacks label: 0,
                       config_schema: 0,
                       respond: 3,
@@ -180,5 +198,7 @@ defmodule Pepe.Webhooks.Provider do
                       directed_elsewhere?: 2,
                       deliver_blocks: 3,
                       fetch_media: 2,
-                      working: 3
+                      working: 3,
+                      channel_info: 2,
+                      channel_name: 2
 end

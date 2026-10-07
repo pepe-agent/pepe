@@ -250,6 +250,16 @@ defmodule PepeWeb.ChannelsLive do
                   <:item label={gettext("Agent:")}>{b["agent"] || gettext("(default)")}</:item>
                   <:item label={gettext("Token:")} mono>{token_hint(b["bot_token"])}</:item>
                 </.meta_list>
+                <%!-- The groups, topics and chats this bot has heard from, each bindable to an agent. --%>
+                <.live_component
+                  module={PepeWeb.SeenChannelsComponent}
+                  id={"seen-telegram-" <> b["name"]}
+                  connection={b["name"]}
+                  provider="telegram"
+                  agent={b["agent"]}
+                  agents={scoped_agent_names(@scope)}
+                  controls={:telegram}
+                />
               </div>
             </div>
 
@@ -587,6 +597,7 @@ defmodule PepeWeb.ChannelsLive do
 
   def handle_event("bot_remove", %{"name" => name}, socket) do
     Config.delete_telegram_bot(name)
+    Pepe.SeenChannels.delete_connection(name)
     reload_gateways()
     {:noreply, assign(socket, bots: Config.telegram_bots())}
   end

@@ -175,8 +175,54 @@ defmodule Pepe.Webhooks do
   # to extract, so the gate can't run before parsing the way it used to.
   defp run_parse(mod, entry, payload) do
     case mod.parse(payload) do
-      {:ok, messages} -> Enum.each(messages, &maybe_dispatch(mod, entry, payload, &1))
-      :ignore -> :ok
+      {:ok, messages} ->
+        Enum.each(messages, fn message ->
+          note_channel(mod, entry, payload, message)
+          maybe_dispatch(mod, entry, payload, message)
+        end)
+
+      :ignore ->
+        :ok
+    end
+  end
+
+  # Where this message came in, remembered for the Channels page (Pepe.SeenChannels) before
+  # any gate, so a channel the bot only listens in is listed too. The provider says whether it
+  # is a direct message or a group and, when its payload already carries one, the channel's
+  # name (channel_info/2); one that says nothing still gets the id recorded. The first time a
+  # channel is heard from without a name, a provider that can look one up (channel_name/2)
+  # does so once, off the request. Never in the way of the message: a failed write only logs.
+  defp note_channel(mod, entry, payload, %{from: from} = message) do
+    case channel_info(mod, payload, message) do
+      :skip ->
+        :ok
+
+      info ->
+        kind = info[:kind] && Atom.to_string(info[:kind])
+        name = info[:name]
+
+        case Pepe.SeenChannels.touch(entry["slug"], entry["provider"], from, kind: kind, name: name) do
+          :new when not is_binary(name) -> lookup_channel_name(mod, entry, from)
+          _ -> :ok
+        end
+    end
+  end
+
+  defp channel_info(mod, payload, message) do
+    if function_exported?(mod, :channel_info, 2), do: mod.channel_info(payload, message), else: %{}
+  end
+
+  defp lookup_channel_name(mod, entry, channel) do
+    if function_exported?(mod, :channel_name, 2) do
+      Task.Supervisor.start_child(Pepe.Webhooks.TaskSupervisor, fn -> store_channel_name(mod, entry, channel) end)
+    end
+
+    :ok
+  end
+
+  defp store_channel_name(mod, entry, channel) do
+    with {:ok, name} <- mod.channel_name(entry, channel) do
+      Pepe.SeenChannels.put_name(entry["slug"], channel, name)
     end
   end
 
@@ -233,7 +279,7 @@ defmodule Pepe.Webhooks do
   # with "/" but isn't a command command/3 recognizes, still falls through to the ordinary gate
   # below, exactly as before - command/3 already returns :chat for both of those cases on its own.
   defp real_command?(entry, message) do
-    case command(entry, message[:text] || "", actor(message)) do
+    case command(entry, message[:text] || "", actor(message), message.from) do
       :chat -> false
       _ -> true
     end
@@ -256,16 +302,53 @@ defmodule Pepe.Webhooks do
   end
 
   # Does this conversation answer without being @mentioned? Strongest first: what was said in
-  # the conversation itself (`/mention on|off`, forgotten at `/new`), then what was set for the
-  # channel for good (`/mention off always`), then the default, which is to require a mention.
-  # Kept per conversation and channel, never on the connection, so it never leaks into another
-  # channel, and the channel's own setting survives `/new` and a restart.
+  # the conversation itself (`/mention on|off`, forgotten at `/new`), then the channel's own
+  # durable setting (`/mention off|on always`, the dashboard, the CLI), then the connection's
+  # default (`mention_optional`, one answer for every channel of it), then a mention is
+  # required. The channel's setting survives `/new`, a restart and a change of agent, and never
+  # leaks into another channel.
   defp mention_waived?(entry, from) do
     case session_mention_setting(entry, from) do
-      nil -> Config.channel_mention_optional?(mention_key(entry, from))
+      nil -> channel_mention_waived?(entry, from)
       setting -> setting
     end
   end
+
+  @doc """
+  The durable answer for a channel, without the conversation's say: the channel's own setting
+  when it has one, else the connection's `mention_optional` default, else `false` (a mention
+  is required).
+  """
+  @spec channel_mention_waived?(map(), String.t()) :: boolean()
+  def channel_mention_waived?(entry, from) do
+    case Config.channel_mention(mention_key(entry, from)) do
+      nil -> connection_mention_optional?(entry)
+      own -> own
+    end
+  end
+
+  @doc "Whether this connection answers every channel without a mention by default (`mention_optional`)."
+  @spec connection_mention_optional?(map()) :: boolean()
+  def connection_mention_optional?(entry), do: entry["mention_optional"] == true
+
+  # Where the answer in force comes from, strongest first, with the one beneath the
+  # conversation's own (what `/new` would hand back to), for the replies that say so.
+  defp mention_source(entry, key, from) do
+    session = Session.mention_setting(key)
+    under = channel_mention_source(entry, from)
+
+    if is_boolean(session), do: {{session, :conversation}, under}, else: {under, under}
+  end
+
+  defp channel_mention_source(entry, from) do
+    case Config.channel_mention(mention_key(entry, from)) do
+      nil -> if connection_mention_optional?(entry), do: {true, :connection}, else: {false, :default}
+      own -> {own, :channel}
+    end
+  end
+
+  defp channel_mention_value(true, _entry), do: true
+  defp channel_mention_value(false, entry), do: if(connection_mention_optional?(entry), do: false, else: nil)
 
   defp session_mention_setting(entry, from) do
     key = session_key(entry, from)
@@ -293,7 +376,7 @@ defmodule Pepe.Webhooks do
   # door. Different conversations never wait for each other.
   defp dispatch(entry, mod, %{from: from} = message) do
     cond do
-      not allowed?(entry, actor(message)) ->
+      not (allowed?(entry, actor(message)) or allowed?(entry, message.from)) ->
         Logger.info("[webhooks] #{entry["slug"]}: ignored message from disallowed #{actor(message)}")
 
       Pepe.Webhooks.Dedup.seen?(entry["slug"], message[:id]) ->
@@ -399,7 +482,7 @@ defmodule Pepe.Webhooks do
   end
 
   defp run_message(%{entry: entry, message: message, text: text, agent: agent, key: key} = ctx) do
-    result = handle_command(command(entry, text, actor(message)), ctx)
+    result = handle_command(command(entry, text, actor(message), message.from), ctx)
     # Reasserted AFTER dispatch, not before: /new's own reset (see Session.reset/1) reverts
     # to the connection's plain default, and running this first would have that stomp right
     # back over it within the very same turn. Landing here means whichever command just ran,
@@ -432,27 +515,38 @@ defmodule Pepe.Webhooks do
 
   # `/mention off|on` is this conversation only, forgotten at `/new`; with `always` it is set
   # for the channel and kept. Setting it for the channel clears what the conversation said, so
-  # the channel's own setting is what shows; `on always` is just the default again (a mention
-  # is required), so it clears the stored one.
+  # the channel's own setting is what shows. `off always` stores "answers without one"; `on
+  # always` stores "requires one" only when that differs from the connection's default,
+  # otherwise it just clears the channel's own setting, so a channel never carries a value
+  # that merely repeats the default.
   defp handle_command({:mention, waived?, always?}, ctx) do
     SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
-    channel_key = mention_key(ctx.entry, ctx.from)
-    kept? = Config.channel_mention_optional?(channel_key)
+    under = channel_mention_source(ctx.entry, ctx.from)
 
     if always? do
       Session.set_mention_optional(ctx.key, nil)
-      Config.put_channel_mention_optional(channel_key, waived?)
+      Config.put_channel_mention(mention_key(ctx.entry, ctx.from), channel_mention_value(waived?, ctx.entry))
     else
       Session.set_mention_optional(ctx.key, waived?)
     end
 
-    reply_async(ctx.mod, ctx.entry, ctx.from, mention_reply(waived?, always?, kept?))
+    reply_async(ctx.mod, ctx.entry, ctx.from, mention_reply(waived?, always?, under, ctx.entry))
   end
 
   defp handle_command({:mention_status}, ctx) do
     SessionSupervisor.ensure(ctx.key, ctx.agent, session_opts(ctx.entry))
-    kept? = Config.channel_mention_optional?(mention_key(ctx.entry, ctx.from))
-    reply_async(ctx.mod, ctx.entry, ctx.from, mention_status_reply(Session.mention_setting(ctx.key), kept?))
+    {source, under} = mention_source(ctx.entry, ctx.key, ctx.from)
+    reply_async(ctx.mod, ctx.entry, ctx.from, mention_status_reply(source, under))
+  end
+
+  defp handle_command({:trainers_status}, ctx) do
+    own = Config.channel_trainers(mention_key(ctx.entry, ctx.from))
+    reply_async(ctx.mod, ctx.entry, ctx.from, trainers_status_reply(own, ctx.entry["trainers"]))
+  end
+
+  defp handle_command({:trainers_set, list}, ctx) do
+    Config.put_channel_trainers(mention_key(ctx.entry, ctx.from), list)
+    reply_async(ctx.mod, ctx.entry, ctx.from, trainers_set_reply(list, ctx.entry["trainers"]))
   end
 
   defp handle_command({:agent_status}, ctx) do
@@ -562,7 +656,7 @@ defmodule Pepe.Webhooks do
   # was the one inbound surface that never withdrew auto_approve for it.
   defp chat_opts(%{entry: entry, message: message, opts: opts} = ctx) do
     [
-      learn: learn?(entry, actor(message)),
+      learn: learn?(entry, actor(message), message.from),
       # Asks in the conversation itself, in plain text, when the connection names its approvers
       # (Pepe.Webhooks.Approval); otherwise there is nobody to ask and only what is
       # pre-approved runs.
@@ -637,25 +731,27 @@ defmodule Pepe.Webhooks do
   connection or an unrecognized slash command gets). A pure decision function -
   the model-*change* actually happens in `converse/4`, not here.
   """
-  def command(entry, "/" <> _ = text, from) do
+  def command(entry, text, from, place \\ nil)
+
+  def command(entry, "/" <> _ = text, from, place) do
     if entry["mode"] == "admin" and Map.get(entry, "commands", true) do
       [cmd | rest] = text |> String.trim_leading("/") |> String.split(~r/\s+/, parts: 2)
-      dispatch_command(entry, cmd, List.first(rest) || "", from)
+      dispatch_command(entry, cmd, List.first(rest) || "", from, place)
     else
       :chat
     end
   end
 
-  def command(_entry, _text, _from), do: :chat
+  def command(_entry, _text, _from, _place), do: :chat
 
-  defp dispatch_command(_entry, "new", _args, _from), do: {:reset, dgettext("webhooks", "🧹 New conversation.")}
+  defp dispatch_command(_entry, "new", _args, _from, _place), do: {:reset, dgettext("webhooks", "🧹 New conversation.")}
 
-  defp dispatch_command(entry, "models", _args, _from) do
+  defp dispatch_command(entry, "models", _args, _from, _place) do
     {:reply, render_models(ModelSwitch.list_for(Project.of(entry["agent"])))}
   end
 
-  defp dispatch_command(entry, "model", args, from) do
-    perm = ModelSwitch.permission(learn?(entry, from), entry["model_switch_locked"] == true)
+  defp dispatch_command(entry, "model", args, from, place) do
+    perm = ModelSwitch.permission(learn?(entry, from, place), entry["model_switch_locked"] == true)
 
     case String.split(args, ~r/\s+/, trim: true) do
       [] -> {:model_show}
@@ -671,8 +767,8 @@ defmodule Pepe.Webhooks do
   #
   # Changing it is trainer-gated (learn?/2), like `/agent` and `/model ... global`: it changes
   # how the whole channel behaves for everyone in it. Reading the status stays open to all.
-  defp dispatch_command(entry, "mention", args, from) do
-    trainer? = learn?(entry, from)
+  defp dispatch_command(entry, "mention", args, from, place) do
+    trainer? = learn?(entry, from, place)
 
     case args |> String.trim() |> String.downcase() |> String.split(~r/\s+/, trim: true) do
       [] -> {:mention_status}
@@ -690,8 +786,8 @@ defmodule Pepe.Webhooks do
   # `/agent`. Trainer-gated (learn?/2), the same allowlist that already controls memory and
   # `/model ... global` - a channel's routing is a shared, lasting decision, not something any
   # allowed sender should get to make unilaterally.
-  defp dispatch_command(entry, "agent", args, from) do
-    trainer? = learn?(entry, from)
+  defp dispatch_command(entry, "agent", args, from, place) do
+    trainer? = learn?(entry, from, place)
     locked? = entry["agent_switch_locked"] == true
 
     case String.trim(args) do
@@ -709,59 +805,167 @@ defmodule Pepe.Webhooks do
     end
   end
 
-  defp dispatch_command(_entry, _other, _args, _from), do: :chat
+  # `/trainers [* | none | default | @person ...]`: who may train THIS channel. The channel's own
+  # list replaces the connection's `trainers` for this channel only (see learn?/3); `default`
+  # removes it so the connection's list applies again. Changing it is limited to the channel's
+  # current trainers, so nobody can promote themselves. Reading it is open to all.
+  defp dispatch_command(entry, "trainers", args, from, place) do
+    trainer? = learn?(entry, from, place)
 
-  defp mention_reply(true, false, _kept?),
+    case args |> String.trim() |> String.split(~r/\s+/, trim: true) do
+      [] ->
+        {:trainers_status}
+
+      _ when not trainer? ->
+        {:reply, dgettext("webhooks", "You don't have permission to change who can train this channel. Ask one of its trainers.")}
+
+      ["default"] ->
+        {:trainers_set, nil}
+
+      ["*"] ->
+        {:trainers_set, ["*"]}
+
+      [word] when word in ["none", "nobody"] ->
+        {:trainers_set, []}
+
+      people ->
+        people |> trainer_ids() |> trainers_command_result()
+    end
+  end
+
+  defp dispatch_command(_entry, _other, _args, _from, _place), do: :chat
+
+  defp trainers_command_result([]), do: {:reply, trainers_usage()}
+  defp trainers_command_result(ids), do: {:trainers_set, ids}
+
+  defp trainers_usage,
+    do: dgettext("webhooks", "Usage: /trainers [* | none | default | @person ...]")
+
+  # `<@U123>` (a Slack tag), `@U123` or a bare id, each one a person.
+  defp trainer_ids(words) do
+    words
+    |> Enum.map(&String.replace(&1, ~r/^<@|^@|[>,|].*$/, ""))
+    |> Enum.filter(&Regex.match?(~r/^[A-Za-z0-9._:-]+$/, &1))
+    |> Enum.uniq()
+  end
+
+  defp trainers_text(["*"]), do: dgettext("webhooks", "everyone here")
+  defp trainers_text([]), do: dgettext("webhooks", "no one")
+  defp trainers_text(list) when is_list(list), do: Enum.map_join(list, ", ", &"<@#{&1}>")
+  defp trainers_text(_), do: dgettext("webhooks", "everyone here")
+
+  defp trainers_status_reply(nil, connection),
+    do:
+      dgettext(
+        "webhooks",
+        "Who can train this channel: %{who} (the connection's setting). Use /trainers to see or change it for this channel only.",
+        who: trainers_text(connection)
+      )
+
+  defp trainers_status_reply(own, _connection),
+    do:
+      dgettext(
+        "webhooks",
+        "Who can train this channel: %{who} (set for this channel). /trainers default goes back to the connection's setting.",
+        who: trainers_text(own)
+      )
+
+  defp trainers_set_reply(nil, connection),
+    do: dgettext("webhooks", "🎓 This channel follows the connection again: %{who} can train.", who: trainers_text(connection))
+
+  defp trainers_set_reply(list, _connection),
+    do: dgettext("webhooks", "🎓 Now %{who} can train this channel.", who: trainers_text(list))
+
+  defp mention_reply(true, false, _under, _entry),
     do: dgettext("webhooks", "👂 I'll reply here without being @mentioned, until /new.")
 
-  defp mention_reply(true, true, _kept?),
+  defp mention_reply(true, true, _under, _entry),
     do:
       dgettext(
         "webhooks",
         "👂 I'll reply here without being @mentioned, even after /new, until you send /mention on always."
       )
 
-  # A mention required again for this conversation only, while the channel itself is set to
-  # answer without one: say that it comes back, instead of implying it is settled.
-  defp mention_reply(false, false, true) do
+  # A mention required again for this conversation only, while the channel (or the whole
+  # connection) is set to answer without one: say that it comes back, instead of implying it is
+  # settled.
+  defp mention_reply(false, false, {true, :channel}, _entry) do
     dgettext(
       "webhooks",
       "📣 @mention required again until /new. This channel is still set to answer without one, so that comes back after /new."
     )
   end
 
-  defp mention_reply(false, false, false), do: dgettext("webhooks", "📣 @mention required again in this chat.")
+  defp mention_reply(false, false, {true, :connection}, _entry) do
+    dgettext(
+      "webhooks",
+      "📣 @mention required again until /new. This connection answers without one in every channel, so that comes back after /new."
+    )
+  end
 
-  defp mention_reply(false, true, _kept?),
-    do: dgettext("webhooks", "📣 @mention required again in this channel, for good.")
+  defp mention_reply(false, false, _under, _entry), do: dgettext("webhooks", "📣 @mention required again in this chat.")
 
-  defp mention_status_reply(true, _kept?),
+  defp mention_reply(false, true, _under, entry) do
+    if connection_mention_optional?(entry) do
+      dgettext(
+        "webhooks",
+        "📣 @mention required again in this channel, for good, while the connection's other channels keep answering without one."
+      )
+    else
+      dgettext("webhooks", "📣 @mention required again in this channel, for good.")
+    end
+  end
+
+  # The status names where the answer in force comes from: this conversation (and what comes
+  # back after /new), this channel's own setting, the connection's default, or the plain default.
+  defp mention_status_reply({true, :conversation}, under),
     do:
       dgettext(
         "webhooks",
-        "Mention requirement is currently: off until /new (I reply without being mentioned).\nUse /mention on or /mention off; add always to keep it for this channel."
+        "Right now I reply here without being @mentioned, for this conversation until /new. After /new: %{after}.\nUse /mention on or /mention off; add always to set it for this channel.",
+        after: mention_under_text(under)
       )
 
-  defp mention_status_reply(false, true),
+  defp mention_status_reply({false, :conversation}, under),
     do:
       dgettext(
         "webhooks",
-        "Mention requirement is currently: on until /new. This channel is set to answer without one, so that comes back after /new.\nUse /mention on always to change the channel."
+        "Right now I need an @mention here, for this conversation until /new. After /new: %{after}.\nUse /mention on or /mention off; add always to set it for this channel.",
+        after: mention_under_text(under)
       )
 
-  defp mention_status_reply(nil, true),
+  defp mention_status_reply({true, :channel}, _under),
     do:
       dgettext(
         "webhooks",
-        "Mention requirement is currently: off for this channel, kept after /new (I reply without being mentioned).\nUse /mention on always to undo it."
+        "This channel answers without an @mention, set for this channel and kept after /new.\nUse /mention on always to require one again."
       )
 
-  defp mention_status_reply(_setting, false),
+  defp mention_status_reply({false, :channel}, _under),
     do:
       dgettext(
         "webhooks",
-        "Mention requirement is currently: on (I need an @mention).\nUse /mention off, or /mention off always to keep it for this channel."
+        "This channel requires an @mention, set for this channel and kept after /new.\nUse /mention off always to open it up again."
       )
+
+  defp mention_status_reply({true, :connection}, _under),
+    do:
+      dgettext(
+        "webhooks",
+        "This channel answers without an @mention, the connection's default for every channel.\nUse /mention on always to require one in this channel only."
+      )
+
+  defp mention_status_reply({false, :default}, _under),
+    do:
+      dgettext(
+        "webhooks",
+        "This channel needs an @mention (the default).\nUse /mention off for this conversation, or /mention off always to keep it for this channel."
+      )
+
+  defp mention_under_text({true, :channel}), do: dgettext("webhooks", "this channel is set to answer without one")
+  defp mention_under_text({false, :channel}), do: dgettext("webhooks", "this channel is set to require one")
+  defp mention_under_text({true, :connection}), do: dgettext("webhooks", "the connection answers without one in every channel")
+  defp mention_under_text({false, :default}), do: dgettext("webhooks", "a mention is required, the default")
 
   defp render_models([]), do: dgettext("webhooks", "No models are configured for this project.")
 
@@ -834,6 +1038,45 @@ defmodule Pepe.Webhooks do
       _ -> true
     end
   end
+
+  @doc """
+  The same question for one channel of the connection: `place` is the channel the message came
+  in, `who` the person speaking. A list set for that channel (`/trainers`) is the one that
+  counts; with none, the connection's own `trainers` applies, exactly as `learn?/2`.
+  """
+  def learn?(entry, who, place) do
+    case place && Config.channel_trainers(mention_key(entry, place)) do
+      list when is_list(list) -> learn_by?(%{"trainers" => list}, who, place)
+      _ -> learn_by?(entry, who, place)
+    end
+  end
+
+  # A list written before senders were told apart named the channel itself (Slack); it still
+  # counts, so a connection set up that way keeps working.
+  defp learn_by?(entry, who, place),
+    do: learn?(entry, who) or (is_binary(place) and is_list(entry["trainers"]) and place in entry["trainers"])
+
+  @doc """
+  Read a typed trainers value: blank is "not set" (`nil`, the default applies), `*` everyone,
+  `none` no one, otherwise people separated by commas or spaces (a Slack tag like `<@U1>` works).
+  """
+  @spec parse_trainers(String.t() | nil) :: [String.t()] | nil
+  def parse_trainers(nil), do: nil
+
+  def parse_trainers(text) when is_binary(text) do
+    case String.trim(text) do
+      "" -> nil
+      "*" -> ["*"]
+      word when word in ["none", "nobody"] -> []
+      people -> people |> String.split(~r/[\s,]+/, trim: true) |> trainer_ids()
+    end
+  end
+
+  @doc "The inverse of `parse_trainers/1`, for a form field or a listing."
+  @spec trainers_value([String.t()] | nil) :: String.t()
+  def trainers_value(nil), do: ""
+  def trainers_value([]), do: "none"
+  def trainers_value(list) when is_list(list), do: Enum.join(list, ", ")
 
   defp norm(c) when c in [nil, "", "root"], do: nil
   defp norm(c), do: c

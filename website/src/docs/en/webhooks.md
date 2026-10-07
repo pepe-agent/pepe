@@ -67,6 +67,8 @@ Slack, Discord (in its gateway-connected mode, see [Discord](../discord/)), Micr
 
 A plain `/mention off` or `/mention on` is for this conversation and is forgotten at `/new`. With `always` it is kept for the channel, whatever agent answers in it. What you said in the conversation beats what was kept for the channel, and `/new` hands the decision back to the channel. A setting never reaches another channel.
 
+The rule has two levels, like every channel setting. The **connection** holds the default for all of its channels: *Answer without being mentioned* in the dashboard's connection form (`mention_optional` in the config, `pepe gateway mention SLUG --set optional|required` on the CLI), off unless you turn it on. A **channel** may hold its own answer, in either direction, and that one wins for that channel only: `/mention off always` opens a channel of a connection that requires mentions, `/mention on always` closes a channel of a connection that answers everything. When the channel's answer would merely repeat the connection's default, `/mention on always` just removes the channel's own setting. What applies, from the strongest down: this conversation (until `/new`), the channel's own setting, the connection's default, then a mention is required. `/mention` on its own says which of those is in force. Each channel's row on the Channels page shows the same thing, with an *own* or *from the connection* tag and a way back to the connection's; `pepe gateway mention SLUG --channel C --set optional|required` and `--default` do it from the CLI. The model cannot change any of it.
+
 A channel that answers without a mention still stays out of a message written to someone else. In Slack, Discord, Microsoft Teams and Google Chat, a message that tags a person, a user group or the whole channel (`@here`, `@channel`) and does not tag the bot is for them, so the bot skips it; tagging the bot, alone or alongside others, brings it back. A message from another app is exempt, since a help desk's ticket card can name people and still be the agent's job.
 
 Since a channel command still has to be addressed to run in the first place, the *first* `/mention off` needs an actual @mention (`@bot /mention off`). After that the channel no longer needs one. WhatsApp doesn't gate on mentions (it answers everything), so `/mention` is a no-op there.
@@ -80,6 +82,38 @@ nothing is registered under that name - so <code>/mention off</code> typed
 directly gets rejected by Slack before it ever reaches Pepe. Type a leading
 space instead (<code> /mention off</code>) to send it as plain text; Pepe
 strips it before matching the command, same as always.</div>
+
+## Who can train a channel
+
+`trainers` on the connection says who may turn a conversation into memory, and also who may change `/agent`, `/model ... global`, `/mention` and this very setting. It covers every channel of the connection. When one channel needs a different rule, give that channel its own list from inside it:
+
+```text
+/trainers                  # show who can train here, and where that comes from
+/trainers *                # everyone in this channel
+/trainers none             # no one
+/trainers @ana @bruno      # only these people (a Slack tag or an id)
+/trainers default          # back to the connection's list
+```
+
+A channel's own list is the stronger one: it **replaces** the connection's for that channel only, it is not added to it. Only someone who can train the channel now may change it, so nobody promotes themselves. It is kept across `/new` and restarts. The model cannot change it: it is a decision for a person, typed in the chat, from the dashboard (each connection's channel list, see below) or with `pepe gateway trainers SLUG --channel C --set ...`.
+
+On Slack the trainers are the people (their user ids), because each message now says who wrote it. A list that named the channel id keeps working.
+
+## Seeing where a connection lives
+
+On the dashboard's Channels page, each connection card says how many channels, groups and direct messages it has heard from ("12 channels"). Open it to see them: the name when the platform gave one (otherwise the id), whether it is a group or a direct message, and when the last message came in. A channel is listed from the first message that arrives in it, whether or not the bot answered, so a channel the bot only listens in is there too.
+
+Each row carries that channel's own settings, changed in place:
+
+- **Agent**: the agent this channel is bound to, the same binding `/agent` sets in the chat, or the connection's until it has one.
+- **Mention**: the channel's own answer to "does it need an @mention?", or the connection's default until it has one (see [Group @mentions](#group-mentions)). Only for providers that gate on mentions.
+- **Who can train**: the channel's own trainers (see above), or the connection's until it has a list of its own.
+
+Every setting is tagged *own* when the channel has its own value and *from the connection* when it inherits the default; *Use the connection's* removes only the channel's own value. A direct message is a channel too, listed and settable the same way.
+
+Names come with the message on Microsoft Teams, Google Chat, WhatsApp (the contact's name) and Telegram (the group's title). On Slack the name is looked up once, the first time the channel is heard from, and needs the `channels:read` scope (`groups:read` for a private channel); without it the id is shown. Slack direct messages show their id.
+
+A Telegram bot's card lists its groups, forum topics and private chats the same way, with the agent binding only: on Telegram, mentions and trainers are set per bot.
 
 ## Binding a channel to an agent
 

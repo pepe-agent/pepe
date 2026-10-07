@@ -60,8 +60,10 @@ também dá para fazer por aqui.
   agendadas](../scheduled/).
 - **Watches**: o "avisa-me quando X" que dispara uma única vez. Ver
   [Watches](../watches/).
-- **Channels**: acrescentar, remover e editar bots do Telegram, com efeito imediato. Ver
-  [Telegram](../telegram/).
+- **Channels**: acrescentar, remover e editar bots do Telegram e ligações por webhook (Slack,
+  Discord, Teams, Google Chat, WhatsApp), com efeito imediato. Cada cartão lista os canais e
+  grupos de onde já chegaram mensagens, com o agente, a menção e os treinadores desse canal. Ver
+  [Telegram](../telegram/) e [Canais por webhook](../webhooks/).
 - **MCP**: os servidores de ferramentas externas. Ver [Servidores MCP](../mcp/).
 - **Configuração**: um separador para idioma, atualizações, voz (respostas e transcrição), histórico de alterações e o `~/.pepe/config.json` em bruto (validado ao gravar). Cada secção guarda por si.
 

@@ -133,6 +133,24 @@ uses `send_to_agent` - no special routing in the webhook layer.
 Tokens are `${ENV_VAR}` refs (`access_token`, `app_secret`). Note Meta's 24-hour
 rule: free-form replies only within 24h of the customer's last message.
 
+## Where a connection lives (dashboard)
+
+The dashboard's Channels page lists, under each connection and each Telegram bot, the
+channels, groups and direct messages it has heard from, with that channel's own agent
+binding, mention setting and trainers, editable there. When a user asks which channels
+a bot is in, or wants to change one channel's agent or mention setting without typing
+commands inside it, point them there. You cannot read or change that list yourself; in
+a channel, `/agent`, `/mention` and `/trainers` (typed by a person) do the same job.
+
+Every one of those settings has two levels: the connection (the whole Slack workspace,
+the whole bot) holds the default, and one channel may hold its own value, which wins for
+that channel only. For mentions, the connection's default is `mention_optional` (absent
+means a mention is required) and a channel's own `/mention off|on always` beats it in
+either direction; what the conversation said with a plain `/mention off|on` beats both
+until `/new`. Explain that order when asked why the bot answered, or stayed quiet, in a
+channel. You cannot change any of it: a person does, in the chat, the dashboard or with
+`pepe gateway mention`.
+
 ## Other webhook channels
 
 Slack, Discord, Microsoft Teams and Google Chat are all inbound-webhook channels
@@ -152,7 +170,7 @@ Config: `bot_token` (the `xoxb-...` bot user token, the Bearer for replies) and
 Slack app's Event Subscriptions request URL at the connection URL - the first save
 triggers a `url_verification` handshake, answered synchronously. Subscribe to
 `message.channels` and `app_mention`. In a channel the bot replies only when
-`@mentioned` (a channel can be opened up with `/mention off always`, and even then a
+`@mentioned` (a channel can be opened up with `/mention off always`; who may train a channel is set per channel with `/trainers`, which a person types, never you; and even then a
 message that tags someone else and not the bot is skipped; an app listed in
 `accept_bots` is answered without a mention); a direct message always replies.
 

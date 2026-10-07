@@ -104,6 +104,17 @@ defmodule Pepe.Webhooks.MsTeams do
 
   def parse(_payload), do: :ignore
 
+  # A `personal` conversation is a one to one chat; a team channel carries its name in
+  # `channelData`, a group chat sometimes in `conversation.name`.
+  @impl true
+  def channel_info(%{"type" => "message"} = activity, _message) do
+    dm? = get_in(activity, ["conversation", "conversationType"]) == "personal"
+    name = get_in(activity, ["channelData", "channel", "name"]) || get_in(activity, ["conversation", "name"])
+    %{kind: if(dm?, do: :dm, else: :group), name: name}
+  end
+
+  def channel_info(_payload, _message), do: %{}
+
   # A 1:1 chat always reaches the agent. In a team channel or group chat the bot has to be
   # @mentioned (a native `mention` entity targeting the bot's own recipient id), unless the
   # channel was told otherwise with `/mention` (see Pepe.Webhooks).

@@ -127,6 +127,40 @@ defmodule Pepe.Webhooks.Slack do
 
   def parse(_payload), do: :ignore
 
+  # A direct message is a `D`-prefixed channel (or `channel_type: im`); anything else is a
+  # channel or a group. A reaction names its channel inside `item`.
+  @impl true
+  def channel_info(%{"event" => event}, _message) do
+    channel = event["channel"] || get_in(event, ["item", "channel"]) || ""
+    dm? = event["channel_type"] == "im" or String.starts_with?(channel, "D")
+    %{kind: if(dm?, do: :dm, else: :group)}
+  end
+
+  def channel_info(_payload, _message), do: %{}
+
+  # `conversations.info` needs `channels:read` (and `groups:read` for a private channel); without
+  # the scope the id is shown instead. One try. A direct message has no name, so it is not even
+  # asked for.
+  @impl true
+  def channel_name(config, channel) do
+    token = Config.interpolate(provider_config(config)["bot_token"])
+
+    with false <- String.starts_with?(channel, "D"),
+         true <- is_binary(token) and token != "",
+         {:ok, %{status: 200, body: %{"ok" => true, "channel" => info}}} <-
+           Req.get("#{@api}/conversations.info",
+             auth: {:bearer, token},
+             params: [channel: channel],
+             retry: false,
+             receive_timeout: 10_000
+           ),
+         name when is_binary(name) and name != "" <- info["name"] do
+      {:ok, "#" <> name}
+    else
+      _ -> :error
+    end
+  end
+
   # Someone reacting to a message the bot sent is feedback on its answer, handed to the agent
   # the same way Telegram does it: a turn that reads `[reacted 👍]`, which the agent learns from
   # by convention. Only the bot's own messages count (`item_user` is the author of the message
@@ -192,6 +226,7 @@ defmodule Pepe.Webhooks.Slack do
   defp message(event) do
     text = [strip_mention(event["text"] || ""), attachments_text(event)] |> Enum.reject(&(&1 == "")) |> Enum.join("\n\n")
     base = %{from: event["channel"], text: text, id: event["ts"], media: media(event)}
+    base = if is_binary(event["user"]) and not from_bot?(event), do: Map.put(base, :sender_id, event["user"]), else: base
     if from_bot?(event), do: Map.put(base, :bot, bot_ref(event)), else: base
   end
 

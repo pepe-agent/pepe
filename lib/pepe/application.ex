@@ -194,6 +194,9 @@ defmodule Pepe.Application do
           # What runs behind inbound webhook messages: per-conversation ordering, the
           # duplicate check, and the tasks that download, transcribe and deliver.
           Pepe.Webhooks.Supervisor,
+          # Which channels each connection has heard from, for the Channels page (the
+          # throttle is in-memory ETS; the rows are in Pepe.Repo).
+          Pepe.SeenChannels,
           # Messaging gateways (Telegram, ...). No-ops when not configured.
           Pepe.Gateways.Supervisor,
           # Per-IP rate limiter for the dashboard login (in-memory ETS, no DB).

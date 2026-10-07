@@ -95,7 +95,8 @@ defmodule Pepe.Doctor do
   # they are listed here only so a config file that hasn't been loaded by this process yet
   # doesn't warn about its own soon-to-be-migrated shape.
   @known_top_level_keys ~w(
-    agents api_tokens board_cards boards channel_agents commitments companies crons currency
+    agents api_tokens board_cards boards channel_agents channel_mentions channel_trainers commitments
+    companies crons currency
     dashboard db_connections default_agent default_model default_project hooks http_route_plugins
     locale mcp media models plugins policy_scope projects review_writes root sandbox secrets
     server skills slots telegram telegram_topics telegrams timezone watches webhooks

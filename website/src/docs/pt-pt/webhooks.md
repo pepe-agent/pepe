@@ -45,6 +45,8 @@ Slack, Discord (no modo ligado por gateway, vê [Discord](../discord/)), Microso
 
 Um `/mention off` ou `/mention on` simples vale para esta conversa e é esquecido no `/new`. Com `always`, fica guardado para o canal, seja qual for o agente que responde nele. O que foi dito na conversa vence o que foi guardado para o canal, e o `/new` devolve a decisão ao canal. Uma definição nunca chega a outro canal.
 
+A regra tem dois níveis, como qualquer definição de canal. A **ligação** guarda o valor predefinido para todos os seus canais: *Responder sem ser mencionado* no formulário da ligação no painel (`mention_optional` na configuração, `pepe gateway mention SLUG --set optional|required` na linha de comandos), desligado até o ligares. Um **canal** pode ter a sua própria resposta, em qualquer dos sentidos, e essa vence só nesse canal: `/mention off always` abre um canal de uma ligação que exige menção, `/mention on always` fecha um canal de uma ligação que responde a tudo. Quando a resposta do canal apenas repetiria a predefinição da ligação, `/mention on always` limita-se a remover a definição própria do canal. O que vale, do mais forte para o mais fraco: esta conversa (até ao `/new`), a definição própria do canal, a predefinição da ligação e, por fim, menção obrigatória. `/mention` sozinho diz qual destes está em vigor. A linha de cada canal na página Channels mostra o mesmo, com a etiqueta *próprio* ou *da ligação* e um caminho de volta ao da ligação; `pepe gateway mention SLUG --channel C --set optional|required` e `--default` fazem-no a partir da linha de comandos. O modelo não consegue alterar nada disto.
+
 Um canal que responde sem menção continua fora de uma mensagem escrita para outra pessoa. No Slack, Discord, Microsoft Teams e Google Chat, uma mensagem que identifica uma pessoa, um grupo de utilizadores ou o canal inteiro (`@here`, `@channel`) e não identifica o bot é para eles, por isso o bot ignora-a; identificar o bot, sozinho ou junto com outros, faz com que ele volte. Uma mensagem de outra aplicação fica de fora da regra, porque o cartão de um ticket pode referir pessoas e continuar a ser trabalho do agente.
 
 Como um comando de canal tem sempre de estar dirigido ao bot para correr em primeiro lugar, o *primeiro* `/mention off` precisa de uma @menção genuína (`@bot /mention off`). Depois disso, o canal já não precisa. O WhatsApp não filtra por menção (responde a tudo), por isso `/mention` não tem efeito lá.
@@ -52,6 +54,38 @@ Como um comando de canal tem sempre de estar dirigido ao bot para correr em prim
 Alterar isto está reservado aos **trainers** do canal (a mesma lista de confiança do `/agent`), porque muda o comportamento do canal para todos os que lá estão. Qualquer pessoa pode na mesma enviar `/mention` para ver a definição atual.
 
 <div class="note"><strong>Escrever um comando no Slack.</strong> O próprio cliente do Slack trata tudo o que comece por <code>/</code> como uma tentativa de correr um dos seus próprios comandos de barra, e recusa-se a enviar sequer a mensagem quando não há nenhum registado com esse nome - por isso <code>/mention off</code> escrito diretamente é rejeitado pelo Slack antes de chegar ao Pepe. Escreve um espaço antes da barra (<code> /mention off</code>) para o enviar como texto normal; o Pepe remove esse espaço antes de comparar com o comando, tal como sempre fez.</div>
+
+## Quem pode treinar um canal
+
+O `trainers` da ligação diz quem pode transformar uma conversa em memória, e também quem pode alterar `/agent`, `/model ... global`, `/mention` e esta mesma definição. Vale para todos os canais da ligação. Quando um canal precisa de outra regra, dá-lhe uma lista própria, a partir de dentro dele:
+
+```text
+/trainers                  # mostra quem pode treinar aqui e de onde isso vem
+/trainers *                # todos neste canal
+/trainers none             # ninguém
+/trainers @ana @bruno      # só estas pessoas (uma menção do Slack ou um id)
+/trainers default          # volta à lista da ligação
+```
+
+A lista própria do canal é a mais forte: **substitui** a da ligação só nesse canal, não se soma a ela. Só quem pode treinar o canal agora consegue alterá-la, por isso ninguém se promove a si próprio. É mantida depois do `/new` e de reinícios. O modelo não a consegue alterar: é uma decisão de uma pessoa, escrita no chat, no painel (a lista de canais de cada ligação, ver abaixo) ou com `pepe gateway trainers SLUG --channel C --set ...`.
+
+No Slack os trainers são as pessoas (os ids de utilizador delas), porque cada mensagem passa a indicar quem a escreveu. Uma lista que citava o id do canal continua a funcionar.
+
+## Onde está cada ligação
+
+Na página Channels do painel, o cartão de cada ligação diz de quantos canais, grupos e mensagens diretas já recebeu mensagens ("12 canais"). Abre-o para os ver: o nome, quando a plataforma o indicou (caso contrário, o id), se é um grupo ou uma mensagem direta, e quando chegou a última mensagem. Um canal entra na lista a partir da primeira mensagem que lá chega, tenha o bot respondido ou não, por isso um canal onde o bot apenas escuta também aparece.
+
+Cada linha traz as definições desse canal, que alteras no próprio sítio:
+
+- **Agente**: o agente a que o canal está vinculado, o mesmo vínculo que `/agent` cria na conversa, ou o da ligação enquanto este não tiver um.
+- **Menção**: a resposta própria do canal a "precisa de @menção?", ou a predefinição da ligação enquanto este não tiver uma (ver [@Menções em grupos](#menções-em-grupos)). Só para fornecedores que filtram por menção.
+- **Quem pode treinar**: os treinadores próprios do canal (ver acima), ou os da ligação enquanto este não tiver lista própria.
+
+Cada definição leva a etiqueta *próprio* quando o canal tem valor próprio e *da ligação* quando herda a predefinição; *Usar o da ligação* remove apenas o valor próprio do canal. Uma mensagem direta também é um canal, listada e configurável da mesma forma.
+
+O nome chega com a mensagem no Microsoft Teams, no Google Chat, no WhatsApp (o nome do contacto) e no Telegram (o título do grupo). No Slack é consultado uma vez, na primeira mensagem recebida do canal, e precisa do âmbito `channels:read` (`groups:read` para um canal privado); sem ele, aparece o id. As mensagens diretas do Slack mostram o id.
+
+O cartão de um bot do Telegram lista da mesma forma os grupos, os tópicos de fórum e as conversas privadas, apenas com o vínculo de agente: no Telegram, a menção e os treinadores definem-se por bot.
 
 ## Vincular um canal a um agente
 

@@ -117,6 +117,10 @@ defmodule Pepe.Webhooks.WhatsApp do
     if messages == [], do: :ignore, else: {:ok, messages}
   end
 
+  # Every WhatsApp conversation is one person; the contact's profile name names it.
+  @impl true
+  def channel_info(_payload, message), do: %{kind: :dm, name: message[:name]}
+
   # The Cloud API sends the sender's profile name alongside the message, in the same
   # change's `value.contacts` (keyed by `wa_id`, the same value `messages[].from` carries)
   # rather than on the message itself.

@@ -97,6 +97,8 @@ defmodule Mix.Tasks.Pepe do
       mix pepe acp [AGENT | --agent NAME]      # speak Agent Client Protocol on stdin/stdout (code editors)
       mix pepe gateway telegram setup          # configure the default Telegram bot
       mix pepe gateway telegram add NAME --token T [--agent A] [--trainers id1,id2|none]
+      mix pepe gateway trainers SLUG [--set none|*|id1,id2] [--channel C [--set ...|--default]]
+      mix pepe gateway mention SLUG [--set optional|required] [--channel C [--set optional|required|--default]]
                                           [--heartbeat-minutes N] [--heartbeat-hours 8-22]
                                           [--progress reaction|ambient|off|verbose]
                                           [--agent-switch-locked] [--no-commands]
@@ -5076,6 +5078,29 @@ defmodule Mix.Tasks.Pepe do
     end
   end
 
+  # Who may train a channel connection (any provider), and, per channel, who may train that one
+  # channel instead. A channel's own list wins over the connection's.
+  defp gateway_cmd(["trainers", slug | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [channel: :string, set: :string, default: :boolean])
+
+    case Config.get_webhook(slug) do
+      nil -> error("no connection named #{slug}")
+      entry -> trainers_cmd(slug, entry, opts)
+    end
+  end
+
+  # Whether a webhook connection answers without an @mention: the connection's default for every
+  # channel (`mention_optional`), and, per channel, that channel's own answer, which wins over the
+  # default in either direction. A person's decision: the model has no way to change it.
+  defp gateway_cmd(["mention", slug | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [channel: :string, set: :string, default: :boolean])
+
+    case Config.get_webhook(slug) do
+      nil -> error("no connection named #{slug}")
+      entry -> mention_cmd(slug, entry, opts)
+    end
+  end
+
   defp gateway_cmd(["whatsapp", "list" | _]) do
     case Config.webhooks() |> Enum.filter(fn {_s, e} -> e["provider"] == "whatsapp" end) do
       [] ->
@@ -5343,6 +5368,11 @@ defmodule Mix.Tasks.Pepe do
       telegram list               list configured bots
       telegram remove NAME        delete a named bot
       telegram                    run the gateway - one poller per bot (long-polling)
+      trainers SLUG [--set none|*|id1,id2] [--channel C [--set ...|--default]]
+                                  who may train a webhook connection, or one channel of it
+      mention SLUG [--set optional|required] [--channel C [--set optional|required|--default]]
+                                  whether a webhook connection answers without an @mention,
+                                  for every channel or for one channel of it
     """)
   end
 
@@ -5527,6 +5557,90 @@ defmodule Mix.Tasks.Pepe do
   defp token_hint(nil), do: "(none)"
   defp token_hint("${" <> _ = env), do: env
   defp token_hint(t), do: String.slice(to_string(t), 0, 6) <> "..."
+
+  defp trainers_cmd(slug, _entry, channel: channel, default: true) do
+    Config.put_channel_trainers("#{slug}:#{channel}", nil)
+    ok("#{channel} follows the connection again")
+  end
+
+  defp trainers_cmd(slug, entry, opts) do
+    channel = opts[:channel]
+    list = Pepe.Webhooks.parse_trainers(opts[:set])
+
+    cond do
+      channel && opts[:default] ->
+        trainers_cmd(slug, entry, channel: channel, default: true)
+
+      channel && is_binary(opts[:set]) ->
+        Config.put_channel_trainers("#{slug}:#{channel}", list)
+        ok("#{channel} trainers: #{trainers_label(list)}")
+
+      is_binary(opts[:set]) ->
+        Config.put_webhook(slug, Map.put(entry, "trainers", list))
+        ok("#{slug} trainers: #{trainers_label(list)}")
+
+      true ->
+        show_trainers(slug, entry)
+    end
+  end
+
+  defp show_trainers(slug, entry) do
+    info("#{slug}: #{trainers_label(entry["trainers"])}")
+
+    for {key, list} <- Config.channel_trainers_all(), String.starts_with?(key, slug <> ":") do
+      info("  #{String.replace_prefix(key, slug <> ":", "")}: #{trainers_label(list)}")
+    end
+
+    :ok
+  end
+
+  defp mention_cmd(slug, entry, opts) do
+    channel = opts[:channel]
+    value = parse_mention_value(opts[:set])
+
+    cond do
+      value == :error ->
+        error("--set must be optional (answers without a mention) or required")
+
+      channel && opts[:default] ->
+        Config.put_channel_mention("#{slug}:#{channel}", nil)
+        ok("#{channel} follows the connection again: #{mention_label(Pepe.Webhooks.connection_mention_optional?(entry))}")
+
+      channel && is_boolean(value) ->
+        Config.put_channel_mention("#{slug}:#{channel}", value)
+        ok("#{channel}: #{mention_label(value)} (this channel's own setting)")
+
+      is_boolean(value) ->
+        Config.put_webhook(slug, if(value, do: Map.put(entry, "mention_optional", true), else: Map.delete(entry, "mention_optional")))
+        ok("#{slug}: #{mention_label(value)} in every channel without a setting of its own")
+
+      true ->
+        show_mention(slug, entry)
+    end
+  end
+
+  defp show_mention(slug, entry) do
+    info("#{slug}: #{mention_label(Pepe.Webhooks.connection_mention_optional?(entry))} (the connection's default)")
+
+    for {key, value} <- Config.channel_mentions_all(), String.starts_with?(key, slug <> ":") do
+      info("  #{String.replace_prefix(key, slug <> ":", "")}: #{mention_label(value)} (own)")
+    end
+
+    :ok
+  end
+
+  defp parse_mention_value(nil), do: nil
+  defp parse_mention_value("optional"), do: true
+  defp parse_mention_value("required"), do: false
+  defp parse_mention_value(_other), do: :error
+
+  defp mention_label(true), do: "answers without a mention"
+  defp mention_label(false), do: "a mention is required"
+
+  defp trainers_label(nil), do: "the default (everyone in an admin connection, no one in a support one)"
+  defp trainers_label([]), do: "no one"
+  defp trainers_label(["*"]), do: "everyone"
+  defp trainers_label(list), do: Enum.join(list, ", ")
 
   defp trainers_hint(nil), do: "everyone (default)"
   defp trainers_hint([]), do: "no one"

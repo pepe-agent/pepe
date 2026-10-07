@@ -103,6 +103,15 @@ defmodule Pepe.Webhooks.GoogleChat do
 
   def parse(_payload), do: :ignore
 
+  # A space is a direct message or a room; a room's `displayName` comes with every event.
+  @impl true
+  def channel_info(%{"type" => "MESSAGE", "space" => space}, _message) do
+    dm? = space["type"] in ["DM", "DIRECT_MESSAGE"]
+    %{kind: if(dm?, do: :dm, else: :group), name: space["displayName"]}
+  end
+
+  def channel_info(_payload, _message), do: %{}
+
   # DMs always reach the agent. In a multi-person space, optionally require the app
   # be @mentioned (native USER_MENTION annotation targeting the app itself) so it
   # doesn't answer every message.
