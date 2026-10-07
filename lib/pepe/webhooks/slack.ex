@@ -61,10 +61,14 @@ defmodule Pepe.Webhooks.Slack do
         "label" => dgettext("webhooks", "Learn from reactions"),
         "type" => "select",
         "options" => ["own", "off"],
+        "option_labels" => %{
+          "own" => dgettext("webhooks", "Only on the bot's own messages"),
+          "off" => dgettext("webhooks", "Ignore reactions")
+        },
         "hint" =>
           dgettext(
             "webhooks",
-            "A 👍 or ❤️ on one of the bot's own messages is told to the agent as feedback (default: own; off to ignore reactions)."
+            "A 👍 or ❤️ on one of the bot's own messages is told to the agent as feedback. Choose Ignore reactions to turn that off."
           )
       }
     ]

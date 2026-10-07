@@ -4434,7 +4434,7 @@ msgstr "%{weekday} que vem"
 msgid "Next check %{at}"
 msgstr "Próxima verificação %{at}"
 
-#: lib/pepe_web/live/connections_component.ex:331
+#: lib/pepe_web/live/connections_component.ex:337
 #, elixir-autogen, elixir-format
 msgid "No"
 msgstr "Não"
@@ -4624,7 +4624,7 @@ msgstr "Onde o agente consulta o que lembra."
 msgid "Which service answers the agent's searches on the web."
 msgstr "Qual serviço faz as buscas do agente na web."
 
-#: lib/pepe_web/live/connections_component.ex:330
+#: lib/pepe_web/live/connections_component.ex:336
 #, elixir-autogen, elixir-format
 msgid "Yes"
 msgstr "Sim"
@@ -6228,7 +6228,7 @@ msgstr ""
 "Endereço do seu serviço Presidio Anonymizer, que oculta o que o analyzer "
 "encontrou. Por exemplo http://localhost:5001."
 
-#: lib/pepe_web/live/connections_component.ex:337
+#: lib/pepe_web/live/connections_component.ex:343
 #, elixir-autogen, elixir-format
 msgid "Admin: a channel only you and your team use. Chats are remembered, commands like /new work, and what you talk about can be saved to memory."
 msgstr ""
@@ -7445,7 +7445,7 @@ msgstr ""
 msgid "Support (for customers)"
 msgstr "Suporte (para clientes)"
 
-#: lib/pepe_web/live/connections_component.ex:343
+#: lib/pepe_web/live/connections_component.ex:349
 #, elixir-autogen, elixir-format
 msgid "Support: a channel for customers. Each chat starts from scratch, nothing is remembered between chats or saved to memory, and commands like /new are read as plain text."
 msgstr ""

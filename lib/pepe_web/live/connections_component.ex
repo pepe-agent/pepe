@@ -174,7 +174,7 @@ defmodule PepeWeb.ConnectionsComponent do
             <select :if={f["type"] == "select"} name={"cfg[" <> f["key"] <> "]"} class={fld()}>
               <option value="" selected={cfgval(@form_values, f["key"]) == ""}>{gettext("Not set (use provider's default)")}</option>
               <option :for={o <- f["options"] || []} value={o} selected={cfgval(@form_values, f["key"]) == o}>
-                {option_label(f["options"], o)}
+                {option_label(f, o)}
               </option>
             </select>
             <input
@@ -316,8 +316,14 @@ defmodule PepeWeb.ConnectionsComponent do
   # A schema's option list is raw config values. When those values are just a boolean written as
   # strings, the operator should read Yes/No, not `true`/`false`; anything else shows as-is,
   # since only the provider knows what its own values mean.
-  defp option_label(options, o) do
-    if boolean_options?(options), do: boolean_label(o), else: o
+  # A provider that wants its own words shown instead of the raw value gives `option_labels`
+  # (value => already translated text).
+  defp option_label(field, o) do
+    cond do
+      is_map(field["option_labels"]) and is_binary(field["option_labels"][o]) -> field["option_labels"][o]
+      boolean_options?(field["options"]) -> boolean_label(o)
+      true -> o
+    end
   end
 
   defp boolean_options?(options) when is_list(options),

@@ -49,6 +49,15 @@ defmodule Pepe.Webhooks.SlackBotsTest do
     }
   end
 
+  describe "config_schema/0" do
+    test "every choice of a select field has a label to show instead of its raw value" do
+      for %{"type" => "select"} = field <- Slack.config_schema() do
+        labels = field["option_labels"] || %{}
+        for option <- field["options"], do: assert(is_binary(labels[option]), "#{field["key"]}: #{option}")
+      end
+    end
+  end
+
   describe "parse/1" do
     test "an attachment's title, body and fields are the message when text is empty" do
       assert {:ok, [msg]} = Slack.parse(event(%{}))
