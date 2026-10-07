@@ -89,6 +89,84 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert prompt =~ "Never write the value of a secret"
   end
 
+  describe "a prompt carries only the paragraphs that can matter" do
+    @group "A shared channel can hold more than one person"
+    @reactions "Reactions as feedback"
+    @image "Sharing an image"
+    @env "An env var you can't see"
+    @parallel "Work in parallel"
+    @advance "Advance with tools"
+
+    defp prompt(tools, key \\ nil) do
+      agent = %{name: "zak", system_prompt: "You are Vega, a terse ops bot.", tools: tools}
+      Workspace.system_prompt(agent, key: key)
+    end
+
+    test "with no conversation key the prompt is the full one" do
+      full = prompt(["bash", "send_file"])
+      for part <- [@group, @reactions, @image, @env, @parallel, @advance], do: assert(full =~ part)
+    end
+
+    test "a one-person surface drops the group-chat and reactions paragraphs" do
+      for key <- ["web:abc", "api:abc", "widget:abc", "acp:abc", "tui:abc"] do
+        text = prompt(["bash", "send_file"], key)
+        refute text =~ @group, key
+        refute text =~ @reactions, key
+        assert text =~ "Finish the job", key
+      end
+    end
+
+    test "a chat app keeps the group paragraph, and reactions only where they arrive" do
+      telegram = prompt(["bash", "send_file"], "telegram:123")
+      assert telegram =~ @group
+      assert telegram =~ @reactions
+
+      discord = prompt(["bash", "send_file"], "discord:acme/bot:G1")
+      assert discord =~ @group
+      refute discord =~ @reactions
+
+      assert prompt([], "slack:default/bot:C1") =~ @reactions
+    end
+
+    test "tool paragraphs go only for an agent with no tools at all" do
+      bare = prompt([])
+      for part <- [@advance, @parallel, "Persistence is for finding things", @env, @image], do: refute(bare =~ part, part)
+      assert bare =~ "Finish the job"
+      assert bare =~ "Trust tools over memory"
+
+      assert prompt(["read_file"]) =~ @advance
+    end
+
+    test "the env var paragraph needs bash and the image paragraph needs send_file" do
+      refute prompt(["read_file"]) =~ @env
+      assert prompt(["bash"]) =~ @env
+      refute prompt(["bash"]) =~ @image
+      assert prompt(["send_file"]) =~ @image
+    end
+
+    test "an agent given without a tool list keeps every paragraph" do
+      text = Workspace.system_prompt(%{name: "zak", system_prompt: "You are Vega."}, key: "telegram:1")
+      for part <- [@group, @reactions, @image, @env, @parallel, @advance], do: assert(text =~ part)
+    end
+
+    test "the same agent costs less where less applies" do
+      tokens = fn text -> div(String.length(text), 4) end
+      assert tokens.(prompt(["bash", "send_file"], "web:x")) < tokens.(prompt(["bash", "send_file"]))
+      assert tokens.(prompt([], "api:x")) < tokens.(prompt(["bash", "send_file"], "web:x"))
+    end
+  end
+
+  describe "the size of what every agent inherits" do
+    # A ceiling, not a target: the contract grows when a real case earns a paragraph, and this test is
+    # where that growth has to be noticed and decided on. Raise it on purpose, with the reason.
+    @contract_ceiling_tokens 2_100
+
+    test "the behavior contract stays under its ceiling" do
+      {_, contract} = Enum.find(Workspace.system_prompt_sections(%{name: "zak", system_prompt: "x"}), &match?({"behavior contract", _}, &1))
+      assert div(String.length(contract), 4) <= @contract_ceiling_tokens
+    end
+  end
+
   test "a user-provided seed persona is kept (no onboarding override)" do
     agent = %{name: "zak", system_prompt: "You are Vega, a terse ops bot."}
     prompt = Workspace.system_prompt(agent)

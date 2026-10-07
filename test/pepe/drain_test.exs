@@ -42,6 +42,15 @@ defmodule Pepe.DrainTest do
     :ok
   end
 
+  # The name is registered before the new process's `init/1` has run, so give it a moment.
+  defp eventually(check, tries \\ 50) do
+    cond do
+      check.() -> true
+      tries == 0 -> false
+      true -> Process.sleep(20) && eventually(check, tries - 1)
+    end
+  end
+
   # The supervisor starts a new one under the same name.
   defp await_restart(old) do
     case Process.whereis(Drain) do
@@ -67,7 +76,7 @@ defmodule Pepe.DrainTest do
       old = Process.whereis(Drain)
       GenServer.stop(old)
       await_restart(old)
-      refute Drain.draining?()
+      assert eventually(fn -> not Drain.draining?() end)
     end
   end
 

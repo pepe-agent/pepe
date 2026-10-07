@@ -92,3 +92,8 @@ See the website's [Plugins](../website/src/docs/en/plugins.md) and
 ## Shutting down
 
 `Pepe.Application.prep_stop/1` first calls `Pepe.Drain.start/0`, which flips a `:persistent_term` flag; every place that admits new work checks `Pepe.Drain.draining?/0` and refuses: `Pepe.Agent.oneshot/3`, a new turn in `Pepe.Agent.Session`, `/v1/chat/completions` (503 plus `retry-after`), `Pepe.Webhooks.handle_inbound/6` and `handle_gateway_event/2` (a 5xx the sender retries), the Telegram poller (it stops, so the offset is never confirmed and the next instance gets the updates) and the cron tick. Work already running is counted with `Pepe.Drain.enter/1` (a monitor on the process doing it, so a crash counts it out) and `prep_stop` waits for it with `Pepe.Drain.await/1`, on top of draining the task supervisors. A new entry point that starts agent work must check the gate.
+
+## What goes into a system prompt
+
+`Pepe.Agent.Workspace.system_prompt/2` builds it once per session from the agent and, when the caller has one, the conversation `:key`. The behavior contract and the conventions are written in full in the module, and `gate/5` drops a paragraph (matched by the start of its title) when its test in `@contract_gates` or `@convention_gates` says it cannot apply: a group-chat paragraph for a one-person surface (`web:`, `api:`, `widget:`, `acp:`, `tui:`), reactions where none arrive, tool paragraphs for an agent with no tools, no `bash` or no `send_file`. A test that cannot be decided keeps the paragraph, so `system_prompt(agent)` without a key stays the full prompt. Add a paragraph only for a real case, and keep `@contract_ceiling_tokens` in `test/pepe/workspace_test.exs` honest: raising it is a decision, with the reason.
+

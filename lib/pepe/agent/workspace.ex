@@ -160,6 +160,30 @@ defmodule Pepe.Agent.Workspace do
     end
   end
 
+  # Which paragraph of the contract / conventions applies to this conversation, so a prompt does not
+  # carry text that cannot matter: a paragraph is matched by the start of its own title and dropped
+  # when its test says it does not apply. The text itself is untouched, and a test that cannot be
+  # decided (no conversation key, a tool list not given) keeps the paragraph, so the plain
+  # `system_prompt(agent)` (what `mix pepe agent prompt` shows) stays the full one.
+  @contract_gates [
+    {"**A shared channel can hold more than one person.", :group_chat},
+    {"**Advance with tools;", :tools},
+    {"**Persistence is for finding things", :tools},
+    {"**Work in parallel.", :tools},
+    {"**An env var you can't see", {:tool, "bash"}}
+  ]
+
+  @convention_gates [
+    {"## Reactions as feedback", :reactions},
+    {"## Sharing an image", {:tool, "send_file"}}
+  ]
+
+  # Sessions that are one person at a time: the dashboard, the HTTP API, the embedded widget, the
+  # editor adapter and the terminal. Everything else (a chat app) may be a group.
+  @solo_prefixes ~w(web: api: widget: acp: tui: cli:)
+  # Where a reaction on the agent's own message reaches it as `[reacted ...]`.
+  @reaction_prefixes ~w(telegram: slack:)
+
   @doc """
   Build an agent's system prompt. Only the small, session-start-scoped files are
   *loaded* (`SOUL.md` persona, `IDENTITY.md`, `BOOT.md`); the rest of the
@@ -169,9 +193,9 @@ defmodule Pepe.Agent.Workspace do
   `BOOT.md` is picked up fresh on every new conversation without costing anything
   on later turns.
   """
-  def system_prompt(agent) do
+  def system_prompt(agent, opts \\ []) do
     agent
-    |> system_prompt_sections()
+    |> system_prompt_sections(opts)
     |> Enum.map_join("\n\n", fn {_label, text} -> text end)
   end
 
@@ -180,7 +204,7 @@ defmodule Pepe.Agent.Workspace do
   sections dropped. Exists so a size breakdown (`mix pepe agent footprint`) measures the
   real assembly instead of a copy of it that could drift.
   """
-  def system_prompt_sections(%{name: name, system_prompt: seed} = agent) do
+  def system_prompt_sections(%{name: name, system_prompt: seed} = agent, opts \\ []) do
     persona = langfuse_persona(agent) || read(name, "SOUL.md") || persona_seed(seed)
     identity = read(name, "IDENTITY.md") |> labeled("IDENTITY.md")
     boot = read(name, "BOOT.md") |> labeled("BOOT.md")
@@ -189,13 +213,13 @@ defmodule Pepe.Agent.Workspace do
       {"persona", persona},
       {"IDENTITY.md", identity},
       {"BOOT.md", boot},
-      {"behavior contract", behavior_contract()},
+      {"behavior contract", behavior_contract() |> gate(agent, opts, @contract_gates, ~r/\n\n(?=\*\*)/)},
       {"knowledge index", knowledge_index(name)},
       {"docs index", docs_index()},
       {"skills index", skills_index(agent)},
       {"capability nudge", capability_nudge_note(agent)},
       {"topic reroute", topic_reroute_note(agent)},
-      {"conventions", convention_note()}
+      {"conventions", convention_note() |> gate(agent, opts, @convention_gates, ~r/\n\n(?=## )/)}
     ]
     |> Enum.reject(fn {_label, text} -> text in [nil, ""] end)
   end
@@ -375,6 +399,25 @@ defmodule Pepe.Agent.Workspace do
       _ -> nil
     end
   end
+
+  defp gate(text, agent, opts, gates, split) do
+    text
+    |> String.split(split)
+    |> Enum.reject(fn paragraph ->
+      Enum.any?(gates, fn {title, test} ->
+        String.starts_with?(String.trim_leading(paragraph), title) and not applies?(test, agent, opts)
+      end)
+    end)
+    |> Enum.join("\n\n")
+  end
+
+  defp applies?(:group_chat, _agent, opts), do: not key_in?(opts[:key], @solo_prefixes)
+  defp applies?(:reactions, _agent, opts), do: opts[:key] == nil or key_in?(opts[:key], @reaction_prefixes)
+  defp applies?(:tools, agent, _opts), do: Map.get(agent, :tools) != []
+  defp applies?({:tool, name}, agent, _opts), do: not is_list(Map.get(agent, :tools)) or name in Map.get(agent, :tools)
+
+  defp key_in?(key, prefixes) when is_binary(key), do: Enum.any?(prefixes, &String.starts_with?(key, &1))
+  defp key_in?(_key, _prefixes), do: false
 
   # The base behavioural contract every agent inherits, on top of its own persona. This is what
   # makes an agent competent *by default* - finishing tasks, following the thread, answering

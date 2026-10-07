@@ -390,7 +390,7 @@ defmodule Pepe.Agent.Session do
             key: key,
             agent_name: default_agent,
             default_agent_name: default_agent,
-            messages: init_messages(default_agent),
+            messages: init_messages(default_agent, key),
             running: nil,
             idle_ref: nil,
             pending_resume: nil
@@ -483,8 +483,8 @@ defmodule Pepe.Agent.Session do
   # binding the conversation to a ghost.
   defp resolve_post_turn_agent(decision, state, agent_name, all_messages, entries) do
     case decision do
-      {:switch, target, _forward} -> {target, init_messages(target), []}
-      :reset -> {agent_name, init_messages(agent_name), []}
+      {:switch, target, _forward} -> {target, init_messages(target, state.key), []}
+      :reset -> {agent_name, init_messages(agent_name, state.key), []}
       :carry -> {agent_name, cap_retained_tool_results(all_messages), state.pii_map ++ entries}
     end
   end
@@ -524,10 +524,10 @@ defmodule Pepe.Agent.Session do
   # Seed a session with the system prompt built from the agent's CURRENT config/soul.
   # Called at session start and on /new (reset), so a fresh session always picks up
   # the latest persona/config - a live session keeps its prompt stable until then.
-  defp init_messages(agent_name) do
+  defp init_messages(agent_name, key) do
     case agent_name && Config.get_agent(agent_name) do
       nil -> []
-      agent -> [Message.system(Workspace.system_prompt(agent))]
+      agent -> [Message.system(Workspace.system_prompt(agent, key: key))]
     end
   end
 
@@ -696,7 +696,7 @@ defmodule Pepe.Agent.Session do
         Pepe.Trace.set_prompt(redacted)
 
         messages =
-          ensure_system(state.messages, agent) ++
+          ensure_system(state.messages, agent, state.key) ++
             Workspace.time_reminder() ++
             goal_reminder(state.key) ++ [Message.user(resume_prompt(redacted))]
 
@@ -742,7 +742,7 @@ defmodule Pepe.Agent.Session do
 
       agent ->
         prompt = Pepe.Heartbeat.build_prompt(state.key, agent.name)
-        messages = ensure_system(state.messages, agent) ++ Workspace.time_reminder() ++ [Message.user(prompt)]
+        messages = ensure_system(state.messages, agent, state.key) ++ Workspace.time_reminder() ++ [Message.user(prompt)]
         opts = [session_key: state.key, agent_switch_locked: state.agent_switch_locked]
 
         # The pulse prompt itself is internal (never user text, so no inbound
@@ -780,7 +780,7 @@ defmodule Pepe.Agent.Session do
         # hook entries stranded in the process dictionary. It stays ephemeral: `state` (its
         # `pii_map` included) is left untouched, so the aside changes nothing about the session.
         {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => state.pii_map})
-        messages = ensure_system(state.messages, agent) ++ Workspace.time_reminder() ++ [Message.user(redacted)]
+        messages = ensure_system(state.messages, agent, state.key) ++ Workspace.time_reminder() ++ [Message.user(redacted)]
         opts = Keyword.put(opts, :session_key, state.key)
 
         Pepe.Hooks.start_map(state.pii_map ++ entries)
@@ -816,7 +816,7 @@ defmodule Pepe.Agent.Session do
      persist(%{
        state
        | agent_name: agent_name,
-         messages: init_messages(agent_name),
+         messages: init_messages(agent_name, state.key),
          pii_map: [],
          mention_optional: nil,
          after_turn: AfterTurn.new()
@@ -850,7 +850,7 @@ defmodule Pepe.Agent.Session do
       {:reply, :ok, state}
     else
       Checkpoints.forget_session(state.key)
-      {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name)})}
+      {:reply, :ok, persist(%{state | agent_name: agent_name, messages: init_messages(agent_name, state.key)})}
     end
   end
 
@@ -1014,7 +1014,7 @@ defmodule Pepe.Agent.Session do
     # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
     # user text and the reversible map go in; the task redacts (inbound hooks)
     # before the model sees anything and restores the reply on the way out.
-    base = state.messages |> ensure_system(agent) |> maybe_add_lang_hint(opts, state.messages)
+    base = state.messages |> ensure_system(agent, state.key) |> maybe_add_lang_hint(opts, state.messages)
     mark_pending(state, text)
     # Complexity-triage only ever runs on a session's first-ever turn (same
     # boundary as the lang hint above), never when a model override is already
@@ -1204,7 +1204,9 @@ defmodule Pepe.Agent.Session do
   # into a later user turn would silently discard that turn's own history.
   def handle_cast(:end_session, state) do
     Checkpoints.forget_session(state.key)
-    {:noreply, persist(%{state | messages: init_messages(state.agent_name), pii_map: [], after_turn: AfterTurn.clear(state.after_turn)})}
+
+    {:noreply,
+     persist(%{state | messages: init_messages(state.agent_name, state.key), pii_map: [], after_turn: AfterTurn.clear(state.after_turn)})}
   end
 
   # An agent handed its own conversation to another agent (the `switch_agent` tool) -
@@ -1220,7 +1222,12 @@ defmodule Pepe.Agent.Session do
     Checkpoints.forget_session(state.key)
 
     {:noreply,
-     persist(%{state | agent_name: agent_name, messages: init_messages(agent_name), after_turn: AfterTurn.clear(state.after_turn)})}
+     persist(%{
+       state
+       | agent_name: agent_name,
+         messages: init_messages(agent_name, state.key),
+         after_turn: AfterTurn.clear(state.after_turn)
+     })}
   end
 
   # `hand_back`: the channel's own agent is the target. `:remembered` re-sends what an earlier
@@ -1686,10 +1693,10 @@ defmodule Pepe.Agent.Session do
   end
 
   # A session started before any agent existed has no system message yet - seed one.
-  defp ensure_system([%{"role" => "system"} | _] = messages, _agent), do: messages
+  defp ensure_system([%{"role" => "system"} | _] = messages, _agent, _key), do: messages
 
-  defp ensure_system(messages, agent),
-    do: [Message.system(Workspace.system_prompt(agent)) | messages]
+  defp ensure_system(messages, agent, key),
+    do: [Message.system(Workspace.system_prompt(agent, key: key)) | messages]
 
   # Who sent the message being answered right now (a multi-person Telegram group chat;
   # nil for DMs and every non-group source). Ephemeral like goal_reminder/1, and for
