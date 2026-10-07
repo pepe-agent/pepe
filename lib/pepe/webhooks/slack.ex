@@ -310,6 +310,29 @@ defmodule Pepe.Webhooks.Slack do
 
   def addressed?(_config, _payload), do: true
 
+  # A plain channel message that tags a person, a user group or the channel (`<@U..>`,
+  # `<!subteam^..>`, `<!channel>`, `<!here>`, `<!everyone>`) without tagging the bot is written
+  # to them, not to the agent. A message from another app is exempt (a help desk's ticket card may
+  # mention people and still be the agent's job), and so is a direct message. Without the bot's
+  # own user id in the payload there is no telling whether it was tagged, so nothing is skipped.
+  @impl true
+  def directed_elsewhere?(_config, %{"type" => "event_callback", "event" => %{"type" => "message"} = event} = payload) do
+    bot = payload |> Map.get("authorizations") |> List.wrap() |> Enum.find_value(& &1["user_id"])
+
+    is_binary(bot) and is_binary(event["text"]) and not from_bot?(event) and
+      not String.starts_with?(event["channel"] || "", "D") and event["channel_type"] != "im" and
+      tags_someone_else?(event["text"], bot)
+  end
+
+  def directed_elsewhere?(_config, _payload), do: false
+
+  defp tags_someone_else?(text, bot) do
+    tags = Regex.scan(~r/<(@[A-Z0-9]+|!subteam\^[A-Z0-9]+|!channel|!here|!everyone)(?:\|[^>]*)?>/, text, capture: :all_but_first)
+    tags = Enum.map(tags, &hd/1)
+
+    tags != [] and ("@" <> bot) not in tags
+  end
+
   @impl true
   def deliver(config, channel, text) do
     token = Config.interpolate(provider_config(config)["bot_token"])

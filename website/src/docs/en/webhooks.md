@@ -67,6 +67,8 @@ Slack, Discord (in its gateway-connected mode, see [Discord](../discord/)), Micr
 
 A plain `/mention off` or `/mention on` is for this conversation and is forgotten at `/new`. With `always` it is kept for the channel, whatever agent answers in it. What you said in the conversation beats what was kept for the channel, and `/new` hands the decision back to the channel. A setting never reaches another channel.
 
+A channel that answers without a mention still stays out of a message written to someone else. In Slack, Discord, Microsoft Teams and Google Chat, a message that tags a person, a user group or the whole channel (`@here`, `@channel`) and does not tag the bot is for them, so the bot skips it; tagging the bot, alone or alongside others, brings it back. A message from another app is exempt, since a help desk's ticket card can name people and still be the agent's job.
+
 Since a channel command still has to be addressed to run in the first place, the *first* `/mention off` needs an actual @mention (`@bot /mention off`). After that the channel no longer needs one. WhatsApp doesn't gate on mentions (it answers everything), so `/mention` is a no-op there.
 
 Changing it is reserved for the channel's **trainers** (the same trusted list `/agent` uses), because it changes how the channel behaves for everyone in it. Anyone can still send `/mention` to see the current setting.

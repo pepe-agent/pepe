@@ -73,6 +73,8 @@ Slack, Discord (no modo conectado por gateway, veja [Discord](../discord/)), Mic
 
 Um `/mention off` ou `/mention on` simples vale para esta conversa e é esquecido no `/new`. Com `always`, fica gravado para o canal, seja qual for o agente que responde nele. O que foi dito na conversa vence o que foi gravado para o canal, e o `/new` devolve a decisão ao canal. Uma configuração nunca chega a outro canal.
 
+Um canal que responde sem menção continua fora de uma mensagem escrita para outra pessoa. No Slack, Discord, Microsoft Teams e Google Chat, uma mensagem que marca uma pessoa, um grupo de usuários ou o canal inteiro (`@here`, `@channel`) e não marca o bot é para eles, então o bot a ignora; marcar o bot, sozinho ou junto com outros, faz ele voltar. Uma mensagem de outro aplicativo fica de fora da regra, porque o cartão de um ticket pode citar pessoas e continuar sendo trabalho do agente.
+
 Como um comando de canal precisa, antes de tudo, ser endereçado ao bot para rodar, o *primeiro* `/mention off` exige uma @menção de verdade (`@bot /mention off`). Depois disso, o canal não precisa mais. O WhatsApp não filtra por menção (responde a tudo), então `/mention` não tem efeito lá.
 
 Mudar isso é reservado aos **trainers** do canal (a mesma lista de confiança do `/agent`), porque muda o comportamento do canal para todos que estão nele. Qualquer pessoa ainda pode mandar `/mention` para ver a configuração atual.

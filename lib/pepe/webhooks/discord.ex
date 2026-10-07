@@ -256,6 +256,19 @@ defmodule Pepe.Webhooks.Discord do
 
   def addressed?(_config, _payload), do: true
 
+  # In a server, a message that tags a person, a role or everyone (a reply to someone tags them
+  # too) and does not tag or reply to the bot is for them. A message from another bot is exempt.
+  @impl true
+  def directed_elsewhere?(_config, %{"t" => "MESSAGE_CREATE", "d" => d} = payload) do
+    bot_id = payload["bot_id"]
+
+    is_binary(bot_id) and is_binary(d["guild_id"]) and get_in(d, ["author", "bot"]) != true and
+      not mentioned?(d, bot_id) and not replied_to?(d, bot_id) and
+      (List.wrap(d["mentions"]) != [] or List.wrap(d["mention_roles"]) != [] or d["mention_everyone"] == true)
+  end
+
+  def directed_elsewhere?(_config, _payload), do: false
+
   defp mentioned?(d, bot_id), do: is_binary(bot_id) and Enum.any?(List.wrap(d["mentions"]), &(&1["id"] == bot_id))
   defp replied_to?(d, bot_id), do: is_binary(bot_id) and get_in(d, ["referenced_message", "author", "id"]) == bot_id
 

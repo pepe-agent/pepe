@@ -118,6 +118,18 @@ defmodule Pepe.Webhooks.MsTeams do
 
   def addressed?(_config, _payload), do: true
 
+  # In a team chat or channel, a message with a mention entity that is not the bot (a person, a
+  # tag or the whole channel) is for them. A one to one chat is never directed elsewhere.
+  @impl true
+  def directed_elsewhere?(_config, %{"type" => "message"} = activity) do
+    mentions = activity |> Map.get("entities", []) |> List.wrap() |> Enum.filter(&(&1["type"] == "mention"))
+
+    get_in(activity, ["conversation", "conversationType"]) != "personal" and mentions != [] and
+      not mentions_bot?(activity)
+  end
+
+  def directed_elsewhere?(_config, _payload), do: false
+
   defp mentions_bot?(activity) do
     bot_id = get_in(activity, ["recipient", "id"])
 

@@ -152,8 +152,8 @@ Config: `bot_token` (the `xoxb-...` bot user token, the Bearer for replies) and
 Slack app's Event Subscriptions request URL at the connection URL - the first save
 triggers a `url_verification` handshake, answered synchronously. Subscribe to
 `message.channels` and `app_mention`. In a channel the bot replies only when
-`@mentioned` (a channel can be opened up with `/mention off always`); a direct
-message always replies.
+`@mentioned` (a channel can be opened up with `/mention off always`, and even then a
+message that tags someone else and not the bot is skipped); a direct message always replies.
 
 ### Discord (Interactions endpoint, plus an optional gateway)
 

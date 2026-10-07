@@ -185,7 +185,8 @@ defmodule Pepe.Webhooks do
       not bot_accepted?(entry, message) ->
         :ok
 
-      real_command?(entry, message) or addressed?(mod, entry, payload) or mention_waived?(entry, from) ->
+      real_command?(entry, message) or addressed?(mod, entry, payload) or
+          (mention_waived?(entry, from) and not directed_elsewhere?(mod, entry, payload)) ->
         dispatch(entry, mod, message)
 
       true ->
@@ -240,6 +241,11 @@ defmodule Pepe.Webhooks do
 
   # A provider that implements `addressed?/2` gates on it (mention-in-group / DM
   # rules); one that hasn't added gating yet is always addressed (today's behavior).
+  # A channel that answers without a mention still stays out of a message written to someone else.
+  defp directed_elsewhere?(mod, entry, payload) do
+    function_exported?(mod, :directed_elsewhere?, 2) and mod.directed_elsewhere?(entry, payload)
+  end
+
   defp addressed?(mod, entry, payload) do
     if function_exported?(mod, :addressed?, 2), do: mod.addressed?(entry, payload), else: true
   end

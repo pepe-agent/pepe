@@ -583,6 +583,19 @@ defmodule Pepe.WebhooksTest do
       assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", channel_message, headers)
       assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts2}, 1000
       assert opts2[:json]["text"] == "hello!"
+
+      # With the waiver on, a message that tags someone else and not the bot is for that person,
+      # so it is skipped. Tagging the bot as well brings it back.
+      to_other = put_in(channel_message, ["event", "text"], "<@U0GIAN> can I reopen the card?")
+      to_other = to_other |> Map.put("authorizations", [%{"user_id" => "U0BOT123"}]) |> put_in(["event", "ts"], "3.0")
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", to_other, headers)
+      refute_receive {:delivered, "https://slack.com/api/chat.postMessage", _}, 300
+
+      to_both = put_in(to_other, ["event", "text"], "<@U0GIAN> <@U0BOT123> can I reopen the card?")
+      to_both = put_in(to_both, ["event", "ts"], "4.0")
+      assert :ok = Webhooks.handle_inbound("acme", "slack", "acme-slack", "{}", to_both, headers)
+      assert_receive {:delivered, "https://slack.com/api/chat.postMessage", opts3}, 1000
+      assert opts3[:json]["text"] == "hello!"
     end
 
     test "/mention off always is kept after /new; a plain /mention off is not" do

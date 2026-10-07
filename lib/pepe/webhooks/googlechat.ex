@@ -117,6 +117,18 @@ defmodule Pepe.Webhooks.GoogleChat do
 
   def addressed?(_config, _payload), do: true
 
+  # In a space, a message that mentions a person or everyone (`@all`) and not the app is for them.
+  # A direct message, and a message from another app, are never directed elsewhere.
+  @impl true
+  def directed_elsewhere?(_config, %{"type" => "MESSAGE", "message" => message, "space" => space}) do
+    tags = message |> Map.get("annotations", []) |> List.wrap() |> Enum.filter(&(&1["type"] == "USER_MENTION"))
+
+    space["type"] not in ["DM", "DIRECT_MESSAGE"] and get_in(message, ["sender", "type"]) != "BOT" and
+      tags != [] and not mentions_app?(message)
+  end
+
+  def directed_elsewhere?(_config, _payload), do: false
+
   defp mentions_app?(message) do
     message
     |> Map.get("annotations", [])

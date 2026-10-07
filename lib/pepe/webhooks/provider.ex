@@ -124,6 +124,16 @@ defmodule Pepe.Webhooks.Provider do
   @callback addressed?(config :: map(), payload :: map()) :: boolean()
 
   @doc """
+  Optional: is this inbound message written to someone else (it tags another person, a group or
+  the whole channel, and does not tag the bot)? A channel set to answer without a mention
+  (`/mention off`) skips such a message, because the sender is talking to that person, not to the
+  agent; only tagging the bot explicitly brings it in. Checked on the raw payload, only for the
+  waiver: a message that addresses the bot is answered either way. A provider that cannot tell,
+  or has no way to tag people, omits it (default: not directed elsewhere).
+  """
+  @callback directed_elsewhere?(config :: map(), payload :: map()) :: boolean()
+
+  @doc """
   Optional: send structured content (see `Pepe.Presentation`) rendered into this
   platform's own native UI - Slack Block Kit, Discord embeds/components, a table drawn
   as monospace text, whatever the platform actually supports. A provider that can't
@@ -167,6 +177,7 @@ defmodule Pepe.Webhooks.Provider do
                       respond: 3,
                       deliver_file: 4,
                       addressed?: 2,
+                      directed_elsewhere?: 2,
                       deliver_blocks: 3,
                       fetch_media: 2,
                       working: 3
