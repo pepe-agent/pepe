@@ -153,7 +153,8 @@ Slack app's Event Subscriptions request URL at the connection URL - the first sa
 triggers a `url_verification` handshake, answered synchronously. Subscribe to
 `message.channels` and `app_mention`. In a channel the bot replies only when
 `@mentioned` (a channel can be opened up with `/mention off always`, and even then a
-message that tags someone else and not the bot is skipped); a direct message always replies.
+message that tags someone else and not the bot is skipped; an app listed in
+`accept_bots` is answered without a mention); a direct message always replies.
 
 ### Discord (Interactions endpoint, plus an optional gateway)
 

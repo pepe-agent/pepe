@@ -128,6 +128,20 @@ defmodule Pepe.Webhooks.SlackBotsTest do
       assert_receive {:submitted, _}, 1_000
     end
 
+    test "a listed app is answered in a channel without being mentioned, but people there still must mention" do
+      connect(%{"accept_bots" => "BZOHO"})
+      channel = %{"channel_type" => "channel", "channel" => "C9"}
+
+      assert :ok = Webhooks.handle_gateway_event("desk", event(channel))
+      assert_receive {:submitted, %{text: text}}, 1_000
+      assert text =~ "New ticket received"
+
+      person = %{"channel_type" => "channel", "channel" => "C9", "text" => "what is the status?", "attachments" => nil}
+      person = Map.merge(person, %{"subtype" => nil, "bot_id" => nil, "app_id" => nil, "user" => "UPERSON"})
+      assert :ok = Webhooks.handle_gateway_event("desk", event(person))
+      refute_receive {:submitted, _}, 300
+    end
+
     test "another app is still dropped" do
       connect(%{"accept_bots" => "BOTHER"})
       assert :ok = Webhooks.handle_gateway_event("desk", event(%{}))

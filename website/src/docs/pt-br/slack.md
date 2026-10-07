@@ -68,7 +68,7 @@ dos panos estão explicados em [Webhooks](../webhooks/).
 
 ### Mensagens de outros apps
 
-Um canal que recebe o trabalho de outro sistema (um help desk que posta cada novo chamado, um alerta de monitoramento) recebe mensagens escritas por um app, e não por uma pessoa. O Pepe ignora essas por padrão, para o bot nunca responder a si mesmo nem a outros bots. Para responder a uma delas, informe o id do bot (`B...`) ou do app (`A...`) no campo **Responder a estes bots e apps** da conexão (`accept_bots`, separados por vírgula). Cada mensagem ignorada fica no log com seus ids, então você copia o certo do log em vez de adivinhar.
+Um canal que recebe o trabalho de outro sistema (um help desk que posta cada novo chamado, um alerta de monitoramento) recebe mensagens escritas por um app, e não por uma pessoa. O Pepe ignora essas por padrão, para o bot nunca responder a si mesmo nem a outros bots. Para responder a uma delas, informe o id do bot (`B...`) ou do app (`A...`) no campo **Responder a estes bots e apps** da conexão (`accept_bots`, separados por vírgula). Cada mensagem ignorada fica no log com seus ids, então você copia o certo do log em vez de adivinhar. Um app da lista é respondido **sem precisar de menção**, então você não precisa do `/mention off` nesse canal: as pessoas que escrevem lá continuam precisando marcar o bot, e só o app que você listou passa sozinho.
 
 As integrações costumam pôr a mensagem inteira no anexo com a barra colorida, e não no texto. O Pepe lê o título, o corpo e os campos do anexo como a mensagem. As mensagens do próprio bot nunca são respondidas, mesmo que o id dele esteja na lista.
 

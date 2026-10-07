@@ -70,7 +70,7 @@ funciona por dentro la ruta genérica.
 
 ### Mensajes de otras apps
 
-Un canal que recibe su trabajo de otro sistema (un help desk que publica cada ticket nuevo, una alerta de monitoreo) recibe mensajes escritos por una app, y no por una persona. Pepe los ignora por defecto, para que el bot nunca se responda a sí mismo ni a otros bots. Para responder a uno, indica el id del bot (`B...`) o de la app (`A...`) en el campo **Responder a estos bots y apps** de la conexión (`accept_bots`, separados por comas). Cada mensaje ignorado queda en el log con sus ids, así que copias el correcto del log en lugar de adivinar.
+Un canal que recibe su trabajo de otro sistema (un help desk que publica cada ticket nuevo, una alerta de monitoreo) recibe mensajes escritos por una app, y no por una persona. Pepe los ignora por defecto, para que el bot nunca se responda a sí mismo ni a otros bots. Para responder a uno, indica el id del bot (`B...`) o de la app (`A...`) en el campo **Responder a estos bots y apps** de la conexión (`accept_bots`, separados por comas). Cada mensaje ignorado queda en el log con sus ids, así que copias el correcto del log en lugar de adivinar. A una app de la lista se le contesta **sin que la mencionen**, así que no necesitas `/mention off` en ese canal: las personas que escriben ahí siguen teniendo que mencionar al bot, y solo pasa por sí sola la app que indicaste.
 
 Las integraciones suelen poner todo el mensaje en el adjunto con la barra de color, y no en el texto. Pepe lee el título, el cuerpo y los campos del adjunto como el mensaje. Los mensajes del propio bot nunca se responden, aunque su id esté en la lista.
 

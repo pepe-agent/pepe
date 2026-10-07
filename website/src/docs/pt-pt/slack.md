@@ -68,7 +68,7 @@ a rota genérica funciona por dentro.
 
 ### Mensagens de outras apps
 
-Um canal que recebe o trabalho de outro sistema (um help desk que publica cada novo pedido, um alerta de monitorização) recebe mensagens escritas por uma app, e não por uma pessoa. O Pepe ignora essas por predefinição, para o bot nunca responder a si próprio nem a outros bots. Para responder a uma delas, indica o id do bot (`B...`) ou da app (`A...`) no campo **Responder a estes bots e apps** da ligação (`accept_bots`, separados por vírgulas). Cada mensagem ignorada fica no registo com os seus ids, por isso copias o certo do registo em vez de adivinhar.
+Um canal que recebe o trabalho de outro sistema (um help desk que publica cada novo pedido, um alerta de monitorização) recebe mensagens escritas por uma app, e não por uma pessoa. O Pepe ignora essas por predefinição, para o bot nunca responder a si próprio nem a outros bots. Para responder a uma delas, indica o id do bot (`B...`) ou da app (`A...`) no campo **Responder a estes bots e apps** da ligação (`accept_bots`, separados por vírgulas). Cada mensagem ignorada fica no registo com os seus ids, por isso copias o certo do registo em vez de adivinhar. Uma app da lista é respondida **sem precisar de menção**, por isso não precisas do `/mention off` nesse canal: as pessoas que escrevem lá continuam a ter de identificar o bot, e só a app que indicaste passa sozinha.
 
 As integrações costumam pôr a mensagem toda no anexo com a barra colorida, e não no texto. O Pepe lê o título, o corpo e os campos do anexo como a mensagem. As mensagens do próprio bot nunca são respondidas, mesmo que o id dele conste da lista.
 
