@@ -80,6 +80,15 @@ defmodule Pepe.Agent.WorkspaceTest do
     assert prompt =~ "offer to set one up"
   end
 
+  test "every agent is told to use the documented way before declaring a blocker, and to fix a stale note" do
+    prompt = Workspace.system_prompt(%{name: "zak", system_prompt: "You are Vega, a terse ops bot."})
+
+    assert prompt =~ "The documented way beats what you remember"
+    assert prompt =~ "source wins"
+    assert prompt =~ "Fix what you find stale"
+    assert prompt =~ "Never write the value of a secret"
+  end
+
   test "a user-provided seed persona is kept (no onboarding override)" do
     agent = %{name: "zak", system_prompt: "You are Vega, a terse ops bot."}
     prompt = Workspace.system_prompt(agent)
