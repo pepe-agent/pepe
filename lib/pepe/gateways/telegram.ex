@@ -2337,7 +2337,11 @@ defmodule Pepe.Gateways.Telegram do
     if learn?() do
       ensure_session(chat_id)
 
-      case Pepe.Agent.Session.learn(session_key(chat_id)) do
+      # Told again when it ends: the review runs in the background and can take a while, and
+      # without this the person is left staring at "Reviewing..." with no way to know it is over.
+      done = fn result -> send_message(chat_id, Pepe.Agent.Reflect.outcome_text(result)) end
+
+      case Pepe.Agent.Session.learn(session_key(chat_id), done) do
         :ok -> send_message(chat_id, gettext("🧠 Reviewing what I learned..."))
         {:error, :not_allowed} -> send_message(chat_id, gettext("Learning is off for this chat."))
         _ -> send_message(chat_id, gettext("No agent to learn with."))

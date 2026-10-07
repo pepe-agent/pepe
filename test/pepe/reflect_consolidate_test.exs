@@ -29,6 +29,39 @@ defmodule Pepe.ReflectConsolidateTest do
     :ok
   end
 
+  describe "telling the person a review is over" do
+    test "review_async calls on_done with the result, and the outcome text carries what was saved" do
+      agent = Config.get_agent("assistant")
+      messages = [%{"role" => "system", "content" => "x"}, %{"role" => "user", "content" => "hi"}]
+      parent = self()
+
+      assert :ok = Reflect.review_async(agent, messages, on_done: &send(parent, {:done, &1}))
+      assert_receive {:done, {:ok, summary, _messages} = result}, 10_000
+      assert Reflect.outcome_text(result) =~ "Done reviewing: " <> summary
+    end
+
+    test "a listener that crashes does not take anything down" do
+      agent = Config.get_agent("assistant")
+      messages = [%{"role" => "system", "content" => "x"}, %{"role" => "user", "content" => "hi"}]
+      parent = self()
+
+      assert :ok = Reflect.review_async(agent, messages, on_done: fn _ -> send(parent, :called) && raise "boom" end)
+      assert_receive :called, 10_000
+    end
+
+    test "each way a review can end has its own plain words" do
+      assert Reflect.outcome_text({:ok, "  ", []}) =~ "Nothing new to save"
+      assert Reflect.outcome_text({:ok, "Saved the Postgres access note.", []}) =~ "Saved the Postgres access note."
+      assert Reflect.outcome_text({:skipped, :outside_content}) =~ "Nothing safe to learn"
+      assert Reflect.outcome_text({:error, :timeout}) =~ "couldn't finish reviewing"
+    end
+
+    test "a long summary is cut so the chat message stays short" do
+      long = String.duplicate("a", 2_000)
+      assert String.length(Reflect.outcome_text({:ok, long, []})) < 700
+    end
+  end
+
   test "schedule_auto creates a managed consolidate cron; unschedule removes it" do
     refute Reflect.auto?("assistant")
 

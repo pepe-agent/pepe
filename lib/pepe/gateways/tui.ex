@@ -323,7 +323,7 @@ defmodule Pepe.Gateways.TUI do
   end
 
   defp run_command(key, "learn", _rest) do
-    Session.learn(key)
+    Session.learn(key, fn result -> info(Pepe.Agent.Reflect.outcome_text(result)) end)
     info(gettext("🧠 Reviewing what I learned..."))
   end
 

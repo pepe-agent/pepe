@@ -35,6 +35,8 @@ defmodule Pepe.Agent.Reflect do
   is told where to look.
   """
 
+  use Gettext, backend: Pepe.Gettext
+
   alias Pepe.Agent.Runtime
   alias Pepe.Agent.SkillLearning
   alias Pepe.Config
@@ -176,12 +178,49 @@ defmodule Pepe.Agent.Reflect do
     end
   end
 
-  @doc "Fire the review in the background - never blocks the caller. Same options as `review/3`."
+  @doc """
+  Fire the review in the background - never blocks the caller. Same options as `review/3`, plus
+  `:on_done`, a function called with the review's result when it ends (however it ends), so the
+  person who asked with `/learn` can be told it finished.
+  """
   @spec review_async(Pepe.Config.Agent.t(), [map()], keyword()) :: :ok
   def review_async(agent, messages, opts \\ []) do
-    Task.start(fn -> review(agent, messages, opts) end)
+    {on_done, opts} = Keyword.pop(opts, :on_done)
+
+    Task.start(fn ->
+      result = review(agent, messages, opts)
+      if is_function(on_done, 1), do: notify_done(on_done, result)
+    end)
+
     :ok
   end
+
+  # A listener that fails must not turn a finished review into a crash report.
+  defp notify_done(on_done, result) do
+    on_done.(result)
+  rescue
+    _ -> :ok
+  end
+
+  @summary_limit 600
+
+  @doc """
+  What to tell the person who asked for a review, once it ended: what the reviewer says it saved
+  (its last line), that there was nothing safe to learn from, or that it could not finish.
+  """
+  @spec outcome_text({:ok, String.t(), [map()]} | {:skipped, atom()} | {:error, term()}) :: String.t()
+  def outcome_text({:ok, summary, _messages}) do
+    case summary |> to_string() |> String.trim() do
+      "" -> gettext("🧠 Done reviewing. Nothing new to save.")
+      text -> gettext("🧠 Done reviewing: %{summary}", summary: String.slice(text, 0, @summary_limit))
+    end
+  end
+
+  def outcome_text({:skipped, _reason}),
+    do: gettext("🧠 Nothing safe to learn from this conversation, it included text from outside.")
+
+  def outcome_text(_error),
+    do: gettext("I couldn't finish reviewing what I learned. Try /learn again in a moment.")
 
   @consolidate_prompt """
   [Background memory maintenance - no user is watching this turn.]

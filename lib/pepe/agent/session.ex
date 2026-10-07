@@ -312,8 +312,8 @@ defmodule Pepe.Agent.Session do
   def resume(key), do: GenServer.call(via(key), :resume, 120_000)
 
   @doc "Run the memory/skill review now over this session (the `/learn` trigger)."
-  @spec learn(term()) :: :ok | {:error, :no_agent | :not_allowed}
-  def learn(key), do: GenServer.call(via(key), :learn)
+  @spec learn(term(), (term() -> any()) | nil) :: :ok | {:error, :no_agent | :not_allowed}
+  def learn(key, on_done \\ nil), do: GenServer.call(via(key), {:learn, on_done})
 
   @doc """
   Run one heartbeat pulse on this session's live context - the agent decides, on its
@@ -652,17 +652,17 @@ defmodule Pepe.Agent.Session do
     {:reply, :ok, persist(state)}
   end
 
-  def handle_call(:learn, _from, %{learn_allowed: false} = state) do
+  def handle_call({:learn, _on_done}, _from, %{learn_allowed: false} = state) do
     {:reply, {:error, :not_allowed}, state}
   end
 
-  def handle_call(:learn, _from, state) do
+  def handle_call({:learn, on_done}, _from, state) do
     case Config.get_agent(state.agent_name) || Config.default_agent() do
       nil ->
         {:reply, {:error, :no_agent}, state}
 
       agent ->
-        Pepe.Agent.Reflect.review_async(agent, state.messages)
+        Pepe.Agent.Reflect.review_async(agent, state.messages, on_done: on_done)
         {:reply, :ok, cancel_idle(state)}
     end
   end

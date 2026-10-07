@@ -573,9 +573,12 @@ defmodule Pepe.Gateways.TelegramCommandsTest do
       assert reply =~ to_string(chat)
     end
 
-    test "/learn kicks off the memory review", %{chat: chat} do
+    test "/learn kicks off the memory review, and says when it is over", %{chat: chat} do
       say(chat, "/learn")
       assert await_reply(chat) =~ "Reviewing what I learned"
+
+      # However the review ends, the person is told: they must not be left on "Reviewing...".
+      assert await_reply(chat) =~ ~r/Done reviewing|Nothing safe to learn|couldn't finish reviewing/
     end
 
     test "/help lists what can be run, and an unknown command says so and lists it too", %{chat: chat} do
