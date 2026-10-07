@@ -106,6 +106,8 @@ A lista própria do canal é a mais forte: ela **substitui** a da conexão só n
 
 No Slack os trainers são as pessoas (os ids de usuário delas), porque cada mensagem agora diz quem a escreveu. Uma lista que citava o id do canal continua funcionando.
 
+No painel você escolhe os treinadores em vez de digitar ids. O Pepe lembra quem escreveu em cada canal (o id e o nome de exibição, quando a plataforma informa) e oferece essas pessoas: todo mundo que falou na conexão, para a lista da conexão, e quem falou naquele canal, para a lista do canal. Quem ainda não escreveu pode ser adicionado pelo id. Apagar a conexão remove tudo o que foi lembrado sobre os canais e as pessoas dela. No Slack, os nomes precisam do escopo `users:read`; sem ele, aparecem os ids.
+
 ## Onde cada conexão está
 
 Na página Channels do painel, o card de cada conexão diz de quantos canais, grupos e mensagens diretas já chegou mensagem ("12 canais"). Abra para ver quais são: o nome, quando a plataforma informou um (senão, o id), se é um grupo ou uma mensagem direta, e quando chegou a última mensagem. Um canal entra na lista a partir da primeira mensagem que chega nele, tenha o bot respondido ou não. Por isso um canal em que o bot só escuta também aparece.
@@ -116,7 +118,13 @@ Cada linha traz as configurações daquele canal, que você muda ali mesmo:
 - **Menção**: a resposta própria do canal para "precisa de @menção?", ou o padrão da conexão enquanto ele não tiver uma (veja [@Menções em grupo](#menções-em-grupo)). Só para provedores que filtram por menção.
 - **Quem pode treinar**: os treinadores próprios do canal (veja acima), ou os da conexão enquanto ele não tiver lista própria.
 
-Cada configuração recebe a etiqueta *próprio* quando o canal tem valor próprio e *da conexão* quando herda o padrão; *Usar o da conexão* remove só o valor próprio do canal. Uma mensagem direta também é um canal, listada e configurável do mesmo jeito.
+Cada configuração recebe a etiqueta *próprio* quando o canal tem valor próprio e *da conexão* quando herda o padrão; *Usar o da conexão* remove só o valor próprio do canal. Uma mensagem direta também é um canal, listada e configurável do mesmo jeito, exceto pela menção: uma mensagem direta sempre responde, então não tem essa configuração.
+
+O formulário da conexão também tem *Quem pode mandar mensagem para esta conexão* (`allowed_numbers`): qualquer pessoa, ou só as pessoas escolhidas entre quem já escreveu, mais qualquer id digitado. Mensagem de qualquer outra pessoa é ignorada.
+
+### Nomes no lugar de ids
+
+Os ids da plataforma (`A0C5LM7LHS8`, `D0C5LMVCHEY`, `U07ABC`) são o que identifica tudo, e ninguém consegue ler. Por isso uma conexão, um canal e uma pessoa podem ganhar um **rótulo**: o lápis ao lado do título da conexão (ou o campo *Rótulo* no formulário dela), ao lado do título do canal na linha dele, e ao lado de uma pessoa nas listas de pessoas. O rótulo aparece em todo lugar em que o painel nomeia aquela conexão, canal ou pessoa (cards, linhas, seletores, confirmações, os destinos de tarefas agendadas e de watches), com o id pequeno e apagado ao lado, para distinguir duas com o mesmo nome; sem rótulo, aparece o nome que a plataforma deu, e sem nenhum dos dois, o id. Limpar o rótulo volta nessa mesma ordem. Um rótulo é texto para gente ler: nunca serve para comparar ou autorizar nada, que continua por id, e fica separado do nome da plataforma, para que uma atualização dele nunca sobrescreva o que você digitou. No máximo 60 caracteres. O rótulo de uma pessoa a acompanha em todos os canais da conexão; o de um canal pertence àquele canal naquela conexão.
 
 O nome vem junto com a mensagem no Microsoft Teams, no Google Chat, no WhatsApp (o nome do contato) e no Telegram (o título do grupo). No Slack ele é consultado uma vez, na primeira mensagem que chega do canal, e precisa do escopo `channels:read` (`groups:read` para canal privado); sem ele, aparece o id. Mensagens diretas do Slack mostram o id.
 

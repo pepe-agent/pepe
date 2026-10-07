@@ -95,7 +95,17 @@ defmodule Pepe.Webhooks.GoogleChat do
     human? = get_in(message, ["sender", "type"]) != "BOT"
 
     if is_binary(text) and text != "" and human? and is_binary(space["name"]) do
-      {:ok, [%{from: space["name"], text: String.trim(text), id: message["name"], name: get_in(message, ["sender", "displayName"])}]}
+      # `sender_id` is the person (`users/123`), as opposed to the space the reply goes to.
+      {:ok,
+       [
+         %{
+           from: space["name"],
+           text: String.trim(text),
+           id: message["name"],
+           name: get_in(message, ["sender", "displayName"]),
+           sender_id: get_in(message, ["sender", "name"])
+         }
+       ]}
     else
       :ignore
     end

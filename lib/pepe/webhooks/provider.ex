@@ -22,6 +22,7 @@ defmodule Pepe.Webhooks.Provider do
           required(:text) => String.t(),
           required(:id) => String.t() | nil,
           optional(:name) => String.t() | nil,
+          optional(:sender_id) => String.t() | nil,
           optional(:media) => Pepe.Webhooks.Media.t() | nil
         }
 
@@ -190,6 +191,13 @@ defmodule Pepe.Webhooks.Provider do
   """
   @callback channel_name(config :: map(), channel :: String.t()) :: {:ok, String.t()} | :error
 
+  @doc """
+  Optional: look up a person's display name on the platform, called once, off the request,
+  the first time they are heard on the connection without a name in the payload. Same terms
+  as `channel_name/2`: one request, no retries, `:error` is final.
+  """
+  @callback person_name(config :: map(), person :: String.t()) :: {:ok, String.t()} | :error
+
   @optional_callbacks label: 0,
                       config_schema: 0,
                       respond: 3,
@@ -200,5 +208,6 @@ defmodule Pepe.Webhooks.Provider do
                       fetch_media: 2,
                       working: 3,
                       channel_info: 2,
-                      channel_name: 2
+                      channel_name: 2,
+                      person_name: 2
 end

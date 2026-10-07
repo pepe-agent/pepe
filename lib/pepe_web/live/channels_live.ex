@@ -5,9 +5,12 @@ defmodule PepeWeb.ChannelsLive do
 
   import PepeWeb.DashUI
   import PepeWeb.DashData
+  import PepeWeb.TrainersPicker, only: [rename_form: 1, trainers_picker: 1]
 
   alias Ecto.Changeset
   alias Pepe.Config
+  alias Pepe.Labels
+  alias PepeWeb.TrainersPicker
 
   @impl true
   def mount(params, _session, socket) do
@@ -26,7 +29,11 @@ defmodule PepeWeb.ChannelsLive do
        adding: nil,
        adding_channel: false,
        form: nil,
-       native_channels: native_channel_cards()
+       native_channels: native_channel_cards(),
+       renaming_bot: nil,
+       renaming_person: nil,
+       bot_trainers: nil,
+       bot_people: []
      )}
   end
 
@@ -234,16 +241,35 @@ defmodule PepeWeb.ChannelsLive do
 
               <div :for={b <- @scoped_bots} class={[card(), "mb-2"]}>
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div class="min-w-0">
-                    <span class="font-medium">{b["name"]}</span>
-                    <span class={[tag((bot_active?(b) && :ok) || :muted), "ml-2"]}>
+                  <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <.named :if={@renaming_bot != b["name"]} text={Labels.connection(b["name"], b).text} id={b["name"]} class="font-medium" />
+                    <button
+                      :if={@renaming_bot != b["name"]}
+                      type="button"
+                      phx-click="bot_rename"
+                      phx-value-name={b["name"]}
+                      title={gettext("Rename")}
+                      class="text-zinc-600 transition hover:text-zinc-200"
+                    >
+                      <.icon name="hero-pencil-square" class="size-4" />
+                    </button>
+                    <%!-- Display only: the bot's name stays the identity, it is in every session key. --%>
+                    <form :if={@renaming_bot == b["name"]} phx-submit="bot_save_label" class="flex flex-wrap items-center gap-1">
+                      <input type="hidden" name="name" value={b["name"]} />
+                      <input name="label" value={b["label"] || ""} maxlength="60" placeholder={b["name"]} class={[fld_sm(), "h-[36px] w-56 py-1 text-[14px]"]} />
+                      <button type="submit" class={[btn_ghost(), "h-[36px] px-3 text-[13.5px]"]}>{gettext("Save")}</button>
+                      <button type="button" phx-click="bot_clear_label" phx-value-name={b["name"]} class={[btn_ghost(), "h-[36px] px-3 text-[13.5px]"]}>
+                        {gettext("Clear")}
+                      </button>
+                    </form>
+                    <span class={tag((bot_active?(b) && :ok) || :muted)}>
                       {(bot_active?(b) && gettext("active")) || gettext("inactive")}
                     </span>
                   </div>
                   <div class="flex shrink-0 flex-wrap gap-1 text-sm">
                     <button phx-click="bot_edit" phx-value-name={b["name"]} class={btn_ghost()}>{gettext("Edit")}</button>
                     <button phx-click="bot_remove" phx-value-name={b["name"]}
-                      data-confirm={gettext("Remove bot %{name}?", name: b["name"])} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
+                      data-confirm={gettext("Remove bot %{name}?", name: Labels.connection(b["name"], b).text)} class={[btn_ghost(), "text-red-400 hover:text-red-300"]}>✕</button>
                   </div>
                 </div>
                 <.meta_list class="mt-4">
@@ -356,9 +382,14 @@ defmodule PepeWeb.ChannelsLive do
 
           <%!-- EDIT A TELEGRAM BOT --%>
           <div :if={@edit_bot} class="max-w-3xl">
-            <form phx-submit="bot_save" class="space-y-4">
-              <.form_section title={gettext("Edit %{name}", name: @edit_bot["name"])}>
+            <form phx-submit="bot_save" phx-change="bot_change" class="space-y-4">
+              <.form_section title={gettext("Edit %{name}", name: Labels.connection(@edit_bot["name"], @edit_bot).text)}>
               <input type="hidden" name="name" value={@edit_bot["name"]} />
+              <div>
+                <label class={lbl()}>{gettext("Label")} <span class="text-zinc-600">{gettext("(optional)")}</span></label>
+                <input name="label" value={@edit_bot["label"] || ""} maxlength="60" class={fld()} placeholder={gettext("Sales bot")} />
+                <p class={hlp()}>{gettext("How this bot is shown in the dashboard. Its name stays the id.")}</p>
+              </div>
               <div>
                 <label class={lbl()}>{gettext("This bot talks to")}</label>
                 <select name="agent" class={fld()}>
@@ -472,6 +503,21 @@ defmodule PepeWeb.ChannelsLive do
                 </div>
               </div>
               <div>
+                <label class={lbl()}>{gettext("Who can train this bot")}</label>
+                <.trainers_picker
+                  id="bot-trainers"
+                  field="trainers"
+                  value={@bot_trainers}
+                  people={@bot_people}
+                  inherit_label={gettext("Default: everyone who talks to it")}
+                  rename_form="bot-rename-person"
+                  renaming={@renaming_person}
+                />
+                <p class={hlp()}>
+                  {gettext("Who the bot learns from, and who may run its operator commands. Pick from the people who have written to it, or add a Telegram user id.")}
+                </p>
+              </div>
+              <div>
                 <label class={lbl()}>{gettext("Bot token")} <span class="text-zinc-600">{gettext("(leave blank to keep the current key)")}</span></label>
                 <input name="token" placeholder={"${TELEGRAM_BOT_TOKEN}  " <> gettext("(or paste a new key)")} class={fld()} />
                 <p class={hlp()}>{gettext("Tip: write a reference like ${MY_BOT_TOKEN} so the key stays out of the settings file.")}</p>
@@ -482,6 +528,8 @@ defmodule PepeWeb.ChannelsLive do
               </div>
               </.form_section>
             </form>
+            <%!-- Outside the bot form on purpose: a person's inline rename submits here. --%>
+            <.rename_form id="bot-rename-person" target={nil} />
           </div>
 
           <%!-- ADD A TELEGRAM BOT --%>
@@ -596,10 +644,12 @@ defmodule PepeWeb.ChannelsLive do
   end
 
   def handle_event("bot_remove", %{"name" => name}, socket) do
+    text = Labels.connection(name).text
     Config.delete_telegram_bot(name)
     Pepe.SeenChannels.delete_connection(name)
+    Pepe.SeenPeople.delete_connection(name)
     reload_gateways()
-    {:noreply, assign(socket, bots: Config.telegram_bots())}
+    {:noreply, socket |> assign(bots: Config.telegram_bots()) |> put_flash(:info, gettext("Bot %{name} removed.", name: text))}
   end
 
   def handle_event("restart_gateway", _p, socket) do
@@ -608,7 +658,34 @@ defmodule PepeWeb.ChannelsLive do
   end
 
   def handle_event("bot_edit", %{"name" => name}, socket) do
-    {:noreply, assign(socket, edit_bot: Config.telegram_bot(name), adding: nil)}
+    bot = Config.telegram_bot(name)
+
+    {:noreply,
+     assign(socket,
+       edit_bot: bot,
+       adding: nil,
+       bot_trainers: TrainersPicker.form_value(bot && bot["trainers"]),
+       bot_people: TrainersPicker.people(name)
+     )}
+  end
+
+  # The form holds the picker's state between changes, so switching its mode shows the people.
+  def handle_event("bot_change", %{"trainers" => value}, socket), do: {:noreply, assign(socket, bot_trainers: value)}
+  def handle_event("bot_change", _params, socket), do: {:noreply, socket}
+
+  def handle_event("bot_rename", %{"name" => name}, socket), do: {:noreply, assign(socket, renaming_bot: name)}
+
+  def handle_event("bot_save_label", %{"name" => name, "label" => label}, socket),
+    do: {:noreply, socket |> put_bot_label(name, label) |> assign(renaming_bot: nil)}
+
+  def handle_event("bot_clear_label", %{"name" => name}, socket),
+    do: {:noreply, socket |> put_bot_label(name, nil) |> assign(renaming_bot: nil)}
+
+  # The people's inline rename inside the bot form's picker (see PepeWeb.TrainersPicker).
+  def handle_event(event, params, socket) when event in ["rename_person", "save_person_label", "clear_person_label"] do
+    name = socket.assigns.edit_bot && socket.assigns.edit_bot["name"]
+    socket = TrainersPicker.person_event(event, params, socket, name)
+    {:noreply, assign(socket, bot_people: (name && TrainersPicker.people(name)) || [])}
   end
 
   def handle_event("bot_cancel", _p, socket), do: {:noreply, assign(socket, edit_bot: nil)}
@@ -648,6 +725,8 @@ defmodule PepeWeb.ChannelsLive do
         (Config.telegram_bot(name) || %{})
         |> Map.delete("name")
         |> put_or_delete("agent", blank(params["agent"]))
+        |> put_or_delete("label", Labels.clean(params["label"]))
+        |> put_or_delete("trainers", telegram_trainers(params["trainers"]))
         |> put_or_delete("tool_progress", blank(params["tool_progress"]))
         |> Map.put("require_approval", params["require_approval"] == "true")
         |> maybe_put_token(new_token)
@@ -658,7 +737,7 @@ defmodule PepeWeb.ChannelsLive do
       {:noreply,
        socket
        |> assign(bots: Config.telegram_bots(), edit_bot: nil)
-       |> put_flash(:info, gettext("Bot %{name} saved.", name: name))}
+       |> put_flash(:info, gettext("Bot %{name} saved.", name: Labels.connection(name, bot).text))}
     end
   end
 
@@ -732,6 +811,33 @@ defmodule PepeWeb.ChannelsLive do
 
   # Does another bot (any but `exclude_name`) already resolve to this token? Compares
   # interpolated values so two ${ENV_VAR} refs to the same secret are caught too.
+  # Telegram user ids are integers in the config (what `--trainers` and the approval list write),
+  # while the picker, like every recorded person, carries them as strings.
+  defp telegram_trainers(value) do
+    case TrainersPicker.to_list(value) do
+      nil -> nil
+      list -> Enum.flat_map(list, &telegram_id/1)
+    end
+  end
+
+  defp telegram_id("*"), do: ["*"]
+
+  defp telegram_id(id) do
+    case Integer.parse(id) do
+      {n, ""} -> [n]
+      _ -> []
+    end
+  end
+
+  defp put_bot_label(socket, name, label) do
+    case Config.telegram_bot(name) do
+      nil -> socket
+      bot -> save_bot(name, bot |> Map.delete("name") |> put_or_delete("label", Labels.clean(label)))
+    end
+
+    assign(socket, bots: Config.telegram_bots())
+  end
+
   defp maybe_put_token(bot, nil), do: bot
   defp maybe_put_token(bot, token), do: Map.put(bot, "bot_token", token)
 

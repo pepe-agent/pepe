@@ -71,6 +71,8 @@ La lista propia de un canal manda: **reemplaza** a la de la conexión solo en es
 
 En Slack los trainers son las personas (sus ids de usuario), porque cada mensaje ahora indica quién lo escribió. Una lista que nombraba el id del canal sigue funcionando.
 
+En el panel eliges a los entrenadores en lugar de escribir ids. Pepe recuerda quién escribió en cada canal (su id y su nombre visible, cuando la plataforma lo da) y los ofrece: todos los que hablaron en la conexión, para la lista de la conexión, y quienes hablaron en ese canal, para la lista del canal. Quien aún no ha escrito puede añadirse por su id. Borrar la conexión elimina todo lo recordado sobre sus canales y personas. En Slack, los nombres necesitan el permiso `users:read`; sin él se muestran los ids.
+
 ## Dónde vive cada conexión
 
 En la página Channels del panel, la tarjeta de cada conexión dice de cuántos canales, grupos y mensajes directos ya recibió mensajes ("12 canales"). Ábrela para verlos: el nombre, cuando la plataforma lo dio (si no, el id), si es un grupo o un mensaje directo, y cuándo llegó el último mensaje. Un canal entra en la lista desde el primer mensaje que llega por él, haya respondido el bot o no, así que un canal donde el bot solo escucha también aparece.
@@ -81,7 +83,13 @@ Cada fila trae los ajustes propios de ese canal, que cambias ahí mismo:
 - **Mención**: la respuesta propia del canal a "¿necesita @mención?", o el valor por defecto de la conexión mientras no tenga una (ver [@Menciones en grupo](#menciones-en-grupo)). Solo para proveedores que filtran por mención.
 - **Quién puede entrenar**: los entrenadores propios del canal (ver arriba), o los de la conexión mientras no tenga lista propia.
 
-Cada ajuste lleva la etiqueta *propio* cuando el canal tiene valor propio y *de la conexión* cuando hereda el valor por defecto; *Usar el de la conexión* quita solo el valor propio del canal. Un mensaje directo también es un canal, listado y configurable del mismo modo.
+Cada ajuste lleva la etiqueta *propio* cuando el canal tiene valor propio y *de la conexión* cuando hereda el valor por defecto; *Usar el de la conexión* quita solo el valor propio del canal. Un mensaje directo también es un canal, listado y configurable del mismo modo, salvo por la mención: un mensaje directo siempre responde, así que no tiene ese ajuste.
+
+El formulario de la conexión tiene además *Quién puede escribir a esta conexión* (`allowed_numbers`): cualquiera, o solo las personas elegidas entre quienes ya escribieron, más cualquier id tecleado. Un mensaje de cualquier otra persona se ignora.
+
+### Nombres en lugar de ids
+
+Los ids de la plataforma (`A0C5LM7LHS8`, `D0C5LMVCHEY`, `U07ABC`) son la clave de todo, y nadie puede leerlos. Por eso una conexión, un canal y una persona pueden recibir una **etiqueta**: el lápiz junto al título de la conexión (o el campo *Etiqueta* en su formulario), junto al título del canal en su fila, y junto a una persona en las listas de personas. La etiqueta se muestra en todos los lugares donde el panel nombra esa conexión, canal o persona (tarjetas, filas, selectores, confirmaciones, los destinos de tareas programadas y watches), con el id pequeño y atenuado al lado para distinguir a dos con el mismo nombre; sin etiqueta se muestra el nombre que dio la plataforma, y sin ninguno de los dos, el id. Borrar la etiqueta vuelve atrás en ese mismo orden. Una etiqueta es texto para que lo lea la gente: nunca sirve para comparar ni autorizar nada, que sigue siendo por id, y se guarda aparte del nombre de la plataforma, para que una actualización de este nunca pise lo que escribiste. Como máximo 60 caracteres. La etiqueta de una persona la acompaña por todos los canales de la conexión; la de un canal pertenece a ese canal en esa conexión.
 
 El nombre llega con el mensaje en Microsoft Teams, Google Chat, WhatsApp (el nombre del contacto) y Telegram (el título del grupo). En Slack se consulta una vez, con el primer mensaje que llega del canal, y necesita el permiso `channels:read` (`groups:read` para un canal privado); sin él se muestra el id. Los mensajes directos de Slack muestran su id.
 

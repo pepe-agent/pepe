@@ -69,6 +69,27 @@ defmodule Pepe.SeenChannels do
   end
 
   @doc """
+  Store the name the operator gave a channel (`nil` clears it), kept apart from the provider's
+  own `name` so a later refresh never overwrites it. A no-op for a channel never heard from.
+  """
+  @spec put_label(String.t(), String.t(), String.t() | nil) :: :ok
+  def put_label(connection, channel, label) do
+    if repo_up?() do
+      Repo.update_all(from(c in Channel, where: c.connection == ^connection and c.channel == ^channel),
+        set: [label: Pepe.Labels.clean(label)]
+      )
+    end
+
+    :ok
+  end
+
+  @doc "One channel of a connection, or `nil` when it was never heard from (or the repo is down)."
+  @spec get(String.t(), String.t()) :: Channel.t() | nil
+  def get(connection, channel) do
+    if repo_up?(), do: Repo.get_by(Channel, connection: connection, channel: channel)
+  end
+
+  @doc """
   Every channel this connection has heard from, the most recent first. Empty without the repo
   running, so a page that lists them renders either way.
   """
@@ -90,14 +111,19 @@ defmodule Pepe.SeenChannels do
 
   defp repo_up?, do: not is_nil(Process.whereis(Repo))
 
+  defp due?(connection, channel, now), do: throttle_due?({:channel, connection, channel}, now)
+
+  @doc false
   # The throttle lives in ETS, keyed by this instance's config home as well (two instances in
   # one VM, a test suite, must not share it). Without the table (no supervision tree) every
-  # message is due: correctness over economy in a setting that has no traffic anyway.
-  defp due?(connection, channel, now) do
+  # message is due: correctness over economy in a setting that has no traffic anyway. Shared
+  # with `Pepe.SeenPeople`, which rides the same table under its own key shape.
+  @spec throttle_due?(tuple(), integer()) :: boolean()
+  def throttle_due?(what, now) do
     if :ets.whereis(@table) == :undefined do
       true
     else
-      key = {Pepe.Config.home(), connection, channel}
+      key = {Pepe.Config.home(), what}
 
       case :ets.lookup(@table, key) do
         [{^key, at}] when now - at < @refresh_s ->

@@ -99,6 +99,8 @@ A channel's own list is the stronger one: it **replaces** the connection's for t
 
 On Slack the trainers are the people (their user ids), because each message now says who wrote it. A list that named the channel id keeps working.
 
+On the dashboard you pick the trainers instead of typing ids. Pepe remembers who has written in each channel (their id, and their display name when the platform gives one) and offers them: everyone heard on the connection for the connection's list, those heard in that channel for the channel's. Someone who has not written yet can still be added by id. Deleting the connection removes everything remembered about its channels and people. On Slack, names need the `users:read` scope; without it, ids are shown.
+
 ## Seeing where a connection lives
 
 On the dashboard's Channels page, each connection card says how many channels, groups and direct messages it has heard from ("12 channels"). Open it to see them: the name when the platform gave one (otherwise the id), whether it is a group or a direct message, and when the last message came in. A channel is listed from the first message that arrives in it, whether or not the bot answered, so a channel the bot only listens in is there too.
@@ -109,7 +111,13 @@ Each row carries that channel's own settings, changed in place:
 - **Mention**: the channel's own answer to "does it need an @mention?", or the connection's default until it has one (see [Group @mentions](#group-mentions)). Only for providers that gate on mentions.
 - **Who can train**: the channel's own trainers (see above), or the connection's until it has a list of its own.
 
-Every setting is tagged *own* when the channel has its own value and *from the connection* when it inherits the default; *Use the connection's* removes only the channel's own value. A direct message is a channel too, listed and settable the same way.
+Every setting is tagged *own* when the channel has its own value and *from the connection* when it inherits the default; *Use the connection's* removes only the channel's own value. A direct message is a channel too, listed and settable the same way, except for the mention setting: a direct message always answers, so it has none.
+
+The connection form also has *Who may message this connection* (`allowed_numbers`): anyone, or only the people picked from those who have written, plus any id typed in. A message from anyone else is ignored.
+
+### Names instead of ids
+
+Platform ids (`A0C5LM7LHS8`, `D0C5LMVCHEY`, `U07ABC`) are what everything is keyed by, and nobody reads them. So a connection, a channel and a person can each be given a **label**: the pencil next to a connection's title (or the *Label* field in its form), next to a channel's title in its row, and next to a person in the people lists. The label shows everywhere the dashboard names that connection, channel or person (cards, rows, pickers, confirmations, the scheduled-task and watch targets), with the id small and muted beside it so two with the same name can be told apart; where there is no label, the platform's own name shows, and where there is none of that, the id. Clearing a label falls back the same way. A label is text for people to read: it is never used to match or authorize anything, which stays by id, and it is kept apart from the platform's name so a later refresh of that never overwrites it. At most 60 characters. A person's label follows them across the connection's channels; a channel's belongs to that channel on that connection.
 
 Names come with the message on Microsoft Teams, Google Chat, WhatsApp (the contact's name) and Telegram (the group's title). On Slack the name is looked up once, the first time the channel is heard from, and needs the `channels:read` scope (`groups:read` for a private channel); without it the id is shown. Slack direct messages show their id.
 

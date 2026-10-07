@@ -205,6 +205,41 @@ defmodule Pepe.Webhooks do
           :new when not is_binary(name) -> lookup_channel_name(mod, entry, from)
           _ -> :ok
         end
+
+        note_person(mod, entry, message)
+    end
+  end
+
+  # Who wrote it, for the trainer pickers (Pepe.SeenPeople): the sender a provider tells apart
+  # from the place (`sender_id`), named when the payload carried a name. A bot's message, or
+  # one with no sender, is nobody to pick. A provider that can look a name up (person_name/2)
+  # does so once, off the request, the first time a person is heard on the connection.
+  defp note_person(mod, entry, %{from: from, sender_id: person} = message) when is_binary(person) do
+    if is_map(message[:bot]) do
+      :ok
+    else
+      name = message[:name]
+
+      case Pepe.SeenPeople.touch(entry["slug"], from, person, name: name) do
+        :new when not is_binary(name) -> lookup_person_name(mod, entry, person)
+        _ -> :ok
+      end
+    end
+  end
+
+  defp note_person(_mod, _entry, _message), do: :ok
+
+  defp lookup_person_name(mod, entry, person) do
+    if function_exported?(mod, :person_name, 2) do
+      Task.Supervisor.start_child(Pepe.Webhooks.TaskSupervisor, fn -> store_person_name(mod, entry, person) end)
+    end
+
+    :ok
+  end
+
+  defp store_person_name(mod, entry, person) do
+    with {:ok, name} <- mod.person_name(entry, person) do
+      Pepe.SeenPeople.put_name(entry["slug"], person, name)
     end
   end
 
@@ -541,12 +576,12 @@ defmodule Pepe.Webhooks do
 
   defp handle_command({:trainers_status}, ctx) do
     own = Config.channel_trainers(mention_key(ctx.entry, ctx.from))
-    reply_async(ctx.mod, ctx.entry, ctx.from, trainers_status_reply(own, ctx.entry["trainers"]))
+    reply_async(ctx.mod, ctx.entry, ctx.from, trainers_status_reply(own, ctx.entry["trainers"], ctx.entry["slug"]))
   end
 
   defp handle_command({:trainers_set, list}, ctx) do
     Config.put_channel_trainers(mention_key(ctx.entry, ctx.from), list)
-    reply_async(ctx.mod, ctx.entry, ctx.from, trainers_set_reply(list, ctx.entry["trainers"]))
+    reply_async(ctx.mod, ctx.entry, ctx.from, trainers_set_reply(list, ctx.entry["trainers"], ctx.entry["slug"]))
   end
 
   defp handle_command({:agent_status}, ctx) do
@@ -849,32 +884,43 @@ defmodule Pepe.Webhooks do
     |> Enum.uniq()
   end
 
-  defp trainers_text(["*"]), do: dgettext("webhooks", "everyone here")
-  defp trainers_text([]), do: dgettext("webhooks", "no one")
-  defp trainers_text(list) when is_list(list), do: Enum.map_join(list, ", ", &"<@#{&1}>")
-  defp trainers_text(_), do: dgettext("webhooks", "everyone here")
+  # A person the operator named in the dashboard (Pepe.Labels) is shown with that name after the
+  # tag. Display only: the list itself, and every check against it, is ids.
+  defp trainers_text(["*"], _slug), do: dgettext("webhooks", "everyone here")
+  defp trainers_text([], _slug), do: dgettext("webhooks", "no one")
+  defp trainers_text(list, slug) when is_list(list), do: Enum.map_join(list, ", ", &person_tag(slug, &1))
+  defp trainers_text(_, _slug), do: dgettext("webhooks", "everyone here")
 
-  defp trainers_status_reply(nil, connection),
+  defp person_tag(slug, id) when is_binary(slug) do
+    case Pepe.Labels.person(slug, to_string(id)) do
+      %{label: label} when is_binary(label) -> "<@#{id}> (#{label})"
+      _ -> "<@#{id}>"
+    end
+  end
+
+  defp person_tag(_slug, id), do: "<@#{id}>"
+
+  defp trainers_status_reply(nil, connection, slug),
     do:
       dgettext(
         "webhooks",
         "Who can train this channel: %{who} (the connection's setting). Use /trainers to see or change it for this channel only.",
-        who: trainers_text(connection)
+        who: trainers_text(connection, slug)
       )
 
-  defp trainers_status_reply(own, _connection),
+  defp trainers_status_reply(own, _connection, slug),
     do:
       dgettext(
         "webhooks",
         "Who can train this channel: %{who} (set for this channel). /trainers default goes back to the connection's setting.",
-        who: trainers_text(own)
+        who: trainers_text(own, slug)
       )
 
-  defp trainers_set_reply(nil, connection),
-    do: dgettext("webhooks", "🎓 This channel follows the connection again: %{who} can train.", who: trainers_text(connection))
+  defp trainers_set_reply(nil, connection, slug),
+    do: dgettext("webhooks", "🎓 This channel follows the connection again: %{who} can train.", who: trainers_text(connection, slug))
 
-  defp trainers_set_reply(list, _connection),
-    do: dgettext("webhooks", "🎓 Now %{who} can train this channel.", who: trainers_text(list))
+  defp trainers_set_reply(list, _connection, slug),
+    do: dgettext("webhooks", "🎓 Now %{who} can train this channel.", who: trainers_text(list, slug))
 
   defp mention_reply(true, false, _under, _entry),
     do: dgettext("webhooks", "👂 I'll reply here without being @mentioned, until /new.")

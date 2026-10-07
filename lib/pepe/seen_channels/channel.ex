@@ -13,6 +13,7 @@ defmodule Pepe.SeenChannels.Channel do
     field :provider, :string
     field :channel, :string
     field :name, :string
+    field :label, :string
     field :kind, :string
     field :first_seen, :integer
     field :last_seen, :integer

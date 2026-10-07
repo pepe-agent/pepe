@@ -25,10 +25,12 @@ defmodule PepeWeb.SeenChannelsComponent do
   use Gettext, backend: Pepe.Gettext
 
   import PepeWeb.DashUI
+  import PepeWeb.TrainersPicker, only: [rename_form: 1, trainers_picker: 1]
 
   alias Pepe.Agent.Session
   alias Pepe.Config
   alias Pepe.SeenChannels
+  alias PepeWeb.TrainersPicker
 
   @impl true
   def update(assigns, socket) do
@@ -36,6 +38,9 @@ defmodule PepeWeb.SeenChannelsComponent do
      socket
      |> assign(assigns)
      |> assign_new(:open, fn -> false end)
+     |> assign_new(:drafts, fn -> %{} end)
+     |> assign_new(:renaming, fn -> nil end)
+     |> assign_new(:renaming_person, fn -> nil end)
      |> assign_new(:agent, fn -> nil end)
      |> assign_new(:trainers, fn -> nil end)
      |> assign_new(:mention_optional, fn -> false end)
@@ -66,8 +71,27 @@ defmodule PepeWeb.SeenChannelsComponent do
         <div :for={{r, i} <- Enum.with_index(@rows)} class="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
-              <span :if={r.name} class="font-medium text-zinc-200">{r.name}</span>
-              <span class={["break-all font-mono text-xs", (r.name && "text-zinc-500") || "text-zinc-300"]}>{r.channel}</span>
+              <.named :if={@renaming != r.channel} text={r.text} id={r.channel} class="text-zinc-200" />
+              <button
+                :if={@renaming != r.channel and r.recorded?}
+                type="button"
+                phx-click="rename"
+                phx-value-channel={r.channel}
+                phx-target={@myself}
+                title={gettext("Rename")}
+                class="text-zinc-600 transition hover:text-zinc-200"
+              >
+                <.icon name="hero-pencil-square" class="size-4" />
+              </button>
+              <%!-- Display only, apart from the provider's own name: the id stays the key. --%>
+              <form :if={@renaming == r.channel} phx-submit="save_label" phx-target={@myself} class="flex flex-wrap items-center gap-1">
+                <input type="hidden" name="channel" value={r.channel} />
+                <input name="label" value={r.label || ""} maxlength="60" placeholder={r.name || r.channel} class={[fld_sm(), "h-[32px] w-48 py-1 text-[13.5px]"]} />
+                <button type="submit" class={[btn_ghost(), "h-[32px] px-2.5 text-[13px]"]}>{gettext("Save")}</button>
+                <button type="button" phx-click="clear_label" phx-value-channel={r.channel} phx-target={@myself} class={[btn_ghost(), "h-[32px] px-2.5 text-[13px]"]}>
+                  {gettext("Clear")}
+                </button>
+              </form>
               <span :if={r.kind} class={tag(:muted)}>{kind_label(r.kind)}</span>
             </div>
             <span class="text-xs text-zinc-500">{last_activity(r.last_seen)}</span>
@@ -86,9 +110,9 @@ defmodule PepeWeb.SeenChannelsComponent do
               <.reset :if={r.agent} event="reset_agent" channel={r.channel} target={@myself} controls={@controls} />
             </form>
 
-            <%!-- Mention --%>
+            <%!-- Mention. Not on a direct message, which always answers: a setting there would mislead. --%>
             <form
-              :if={@controls == :webhook and @mention_gated}
+              :if={@controls == :webhook and @mention_gated and r.kind != "dm"}
               id={"#{@id}-mention-#{i}"}
               phx-change="set_mention"
               phx-target={@myself}
@@ -108,10 +132,12 @@ defmodule PepeWeb.SeenChannelsComponent do
               <.reset :if={not is_nil(r.mention)} event="reset_mention" channel={r.channel} target={@myself} controls={@controls} />
             </form>
 
-            <%!-- Trainers --%>
+            <%!-- Trainers: picked from the people heard in this very channel. The form is a draft
+                 until Save, so switching to "only these people" does not store "no one" meanwhile. --%>
             <form
               :if={@controls == :webhook}
               id={"#{@id}-trainers-#{i}"}
+              phx-change="trainers_change"
               phx-submit="save_trainers"
               phx-target={@myself}
               data-channel={r.channel}
@@ -119,16 +145,23 @@ defmodule PepeWeb.SeenChannelsComponent do
             >
               <input type="hidden" name="channel" value={r.channel} />
               <label class={row_lbl()}>{gettext("Who can train")}</label>
-              <input
-                name="trainers"
-                value={Pepe.Webhooks.trainers_value(r.own_trainers)}
-                placeholder={gettext("The connection's: %{who}", who: trainers_summary(@trainers))}
-                class={[ctl(), "w-56"]}
+              <.trainers_picker
+                id={"#{@id}-trainers-picker-#{i}"}
+                field="trainers"
+                value={Map.get(@drafts, r.channel) || TrainersPicker.form_value(r.own_trainers)}
+                people={r.people}
+                inherit_label={gettext("The connection's: %{who}", who: trainers_summary(@trainers))}
+                compact
+                rename_form={"#{@id}-rename-person-#{i}"}
+                renaming={@renaming_person}
+                target={@myself}
               />
               <button type="submit" class={[btn_ghost(), "h-[36px] px-3 text-[13.5px]"]}>{gettext("Save")}</button>
               <.origin own={not is_nil(r.own_trainers)} controls={@controls} />
               <.reset :if={r.own_trainers} event="reset_trainers" channel={r.channel} target={@myself} controls={@controls} />
             </form>
+            <%!-- Outside the trainers form on purpose: a person's inline rename submits here. --%>
+            <.rename_form :if={@controls == :webhook} id={"#{@id}-rename-person-#{i}"} target={@myself} />
           </div>
         </div>
       </div>
@@ -195,15 +228,37 @@ defmodule PepeWeb.SeenChannelsComponent do
     {:noreply, load_rows(socket)}
   end
 
-  # Blank means "no list of its own", so saving an emptied field is the same as the reset.
-  def handle_event("save_trainers", %{"channel" => channel, "trainers" => text}, socket) do
-    Config.put_channel_trainers(mention_key(socket.assigns.connection, channel), Pepe.Webhooks.parse_trainers(text))
-    {:noreply, load_rows(socket)}
+  # Keep what the row's form holds so the people list shows as the mode changes; stored on Save.
+  def handle_event("trainers_change", %{"channel" => channel, "trainers" => value}, socket) do
+    {:noreply, assign(socket, drafts: Map.put(socket.assigns.drafts, channel, value))}
+  end
+
+  # "Use the connection's" picked as the mode is the same as the reset.
+  def handle_event("save_trainers", %{"channel" => channel, "trainers" => value}, socket) do
+    Config.put_channel_trainers(mention_key(socket.assigns.connection, channel), TrainersPicker.to_list(value))
+    {:noreply, socket |> assign(drafts: Map.delete(socket.assigns.drafts, channel)) |> load_rows()}
   end
 
   def handle_event("reset_trainers", %{"channel" => channel}, socket) do
     Config.put_channel_trainers(mention_key(socket.assigns.connection, channel), nil)
-    {:noreply, load_rows(socket)}
+    {:noreply, socket |> assign(drafts: Map.delete(socket.assigns.drafts, channel)) |> load_rows()}
+  end
+
+  def handle_event("rename", %{"channel" => channel}, socket), do: {:noreply, assign(socket, renaming: channel)}
+
+  def handle_event("save_label", %{"channel" => channel, "label" => label}, socket) do
+    SeenChannels.put_label(socket.assigns.connection, channel, label)
+    {:noreply, socket |> assign(renaming: nil) |> load_rows()}
+  end
+
+  def handle_event("clear_label", %{"channel" => channel}, socket) do
+    SeenChannels.put_label(socket.assigns.connection, channel, nil)
+    {:noreply, socket |> assign(renaming: nil) |> load_rows()}
+  end
+
+  # The people's inline rename inside the trainers pickers (see PepeWeb.TrainersPicker).
+  def handle_event(event, params, socket) when event in ["rename_person", "save_person_label", "clear_person_label"] do
+    {:noreply, event |> TrainersPicker.person_event(params, socket, socket.assigns.connection) |> load_rows()}
   end
 
   # The durable binding, plus the conversation already open in that channel, if any: a webhook
@@ -243,7 +298,7 @@ defmodule PepeWeb.SeenChannelsComponent do
         String.starts_with?(key, prefix),
         channel = String.replace_prefix(key, prefix, ""),
         channel not in known do
-      %{channel: channel, name: nil, kind: nil, last_seen: nil}
+      %{channel: channel, name: nil, label: nil, kind: nil, last_seen: nil}
     end
     |> Enum.sort_by(& &1.channel)
   end
@@ -256,11 +311,16 @@ defmodule PepeWeb.SeenChannelsComponent do
     %{
       channel: c.channel,
       name: c.name,
+      label: c.label,
+      text: c.label || c.name || c.channel,
+      # A channel only known from a setting of its own has no row to hold a label.
+      recorded?: not is_nil(c.last_seen),
       kind: c.kind,
       last_seen: c.last_seen,
       agent: Config.channel_agent(session_key(assigns, c.channel)),
       mention: if(controls == :webhook, do: Config.channel_mention(channel_key)),
-      own_trainers: if(controls == :webhook, do: Config.channel_trainers(channel_key))
+      own_trainers: if(controls == :webhook, do: Config.channel_trainers(channel_key)),
+      people: if(controls == :webhook, do: TrainersPicker.people(connection, c.channel), else: [])
     }
   end
 

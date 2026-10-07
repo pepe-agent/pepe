@@ -187,7 +187,14 @@ defmodule PepeWeb.DashData do
 
   def deliver_label("none"), do: gettext("Nowhere")
   def deliver_label("log"), do: gettext("App log")
-  def deliver_label("telegram:" <> id), do: "Telegram #{id}"
+  # A chat the operator named (Pepe.Labels) reads by that name; an unknown one by its id.
+  def deliver_label("telegram:" <> id = key) do
+    case Pepe.Labels.session(key) do
+      ^key -> "Telegram #{id}"
+      text -> text
+    end
+  end
+
   def deliver_label(other), do: other
 
   @doc "A manually-typed Telegram chat id wins over the dropdown; else use the select."

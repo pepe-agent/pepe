@@ -703,9 +703,20 @@ defmodule Pepe.Gateways.Telegram do
 
   defp note_chat(chat, chat_id, message) do
     kind = if chat["type"] == "private", do: "dm", else: "group"
-    Pepe.SeenChannels.touch(bot_name(), "telegram", topic_channel(chat_id, topic_thread_id(message)), kind: kind, name: chat_title(chat))
+    channel = topic_channel(chat_id, topic_thread_id(message))
+    Pepe.SeenChannels.touch(bot_name(), "telegram", channel, kind: kind, name: chat_title(chat))
+    note_person(channel, message["from"])
     :ok
   end
+
+  # Who wrote it, for the trainer pickers (Pepe.SeenPeople). A bot is nobody to pick.
+  defp note_person(channel, %{"id" => id} = from) when is_integer(id) do
+    unless from["is_bot"] == true do
+      Pepe.SeenPeople.touch(bot_name(), channel, Integer.to_string(id), name: chat_title(from))
+    end
+  end
+
+  defp note_person(_channel, _from), do: :ok
 
   defp topic_channel(chat_id, nil), do: to_string(chat_id)
   defp topic_channel(chat_id, thread), do: "#{chat_id}#t#{thread}"

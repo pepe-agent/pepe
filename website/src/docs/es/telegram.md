@@ -175,6 +175,8 @@ Mientras una ejecución está en marcha, el bot deja ver que está ocupado. Es, 
 
 Puedes fijarlo de tres formas: desde la línea de comandos con `--progress`; desde un chat, con la herramienta `manage_channel` (`set_progress`); o en el **panel**, en Channels → tu bot → *Edit* → "While the agent works", donde cada modo aparece explicado.
 
+El mismo formulario *Edit* define **quién puede entrenar al bot** eligiendo entre las personas que ya le escribieron (Pepe recuerda el id y el nombre de cada una, por chat), con un campo para un id de usuario de Telegram que aún no haya escrito; la lista guardada es el mismo `trainers` que escribe la línea de comandos. También admite una **etiqueta** opcional, cómo se muestra el bot en el panel (el lápiz junto al título de su tarjeta hace lo mismo); el nombre del bot sigue siendo su id. La tarjeta del bot lista los grupos, temas y chats desde los que ya llegó algún mensaje, y cada uno puede recibir también una etiqueta.
+
 ### Heartbeat: avisos por iniciativa propia
 
 Un bot puede darle periódicamente la palabra a su agente para que diga algo **por su cuenta** ("terminó el deploy", "me pediste que vigilara X") y, tan importante como eso, para que la mayoría de las veces decida **no decir nada**. Viene apagado, y lo activas bot por bot:

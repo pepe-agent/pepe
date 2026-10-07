@@ -96,7 +96,17 @@ defmodule Pepe.Webhooks.MsTeams do
     from_bot? = get_in(activity, ["from", "role"]) == "bot"
 
     if is_binary(text) and text != "" and is_binary(service_url) and is_binary(conv) and not from_bot? do
-      {:ok, [%{from: "#{service_url}|#{conv}", text: strip_mention(text), id: activity["id"], name: get_in(activity, ["from", "name"])}]}
+      # `sender_id` is the person, as opposed to the conversation the reply goes to.
+      {:ok,
+       [
+         %{
+           from: "#{service_url}|#{conv}",
+           text: strip_mention(text),
+           id: activity["id"],
+           name: get_in(activity, ["from", "name"]),
+           sender_id: get_in(activity, ["from", "id"])
+         }
+       ]}
     else
       :ignore
     end

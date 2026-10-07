@@ -38,7 +38,7 @@ The left sidebar mirrors the CLI, so almost everything you can do with the `pepe
 - **Learning**: the TimeLearn timeline. See [Learning](../learning/).
 - **Scheduled**: create, run and manage scheduled tasks. See [Scheduled tasks](../scheduled/).
 - **Watches**: one-shot "notify me when X". See [Watches](../watches/).
-- **Channels**: add, remove and edit Telegram bots and webhook connections (Slack, Discord, Teams, Google Chat, WhatsApp), applied live. Each card lists the channels and groups it has heard from, with that channel's own agent, mention and trainers settings. See [Telegram](../telegram/) and [Webhook channels](../webhooks/).
+- **Channels**: add, remove and edit Telegram bots and webhook connections (Slack, Discord, Teams, Google Chat, WhatsApp), applied live. Each card lists the channels and groups it has heard from, with that channel's own agent, mention and trainers settings. Trainers are picked from the people who have written there, and a connection, a channel or a person can be given a label that shows instead of its id everywhere. See [Telegram](../telegram/) and [Webhook channels](../webhooks/).
 - **MCP**: external tool servers. See [MCP servers](../mcp/).
 - **Configuration**: one tab each for language, updates, voice replies and transcription, the change history, and the raw `~/.pepe/config.json` (validated on save). Every section saves on its own.
 

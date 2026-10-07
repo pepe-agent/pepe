@@ -175,6 +175,8 @@ Enquanto uma execução decorre, o bot dá sinal de que está ocupado, de propó
 
 Define este comportamento de três formas: pela linha de comandos com `--progress`; de dentro de uma conversa com a ferramenta `manage_channel` (`set_progress`); ou no **painel**, em Canais → o teu bot → *Editar* → "Enquanto o agente trabalha", onde cada modo vem explicado.
 
+O mesmo formulário *Editar* define **quem pode treinar o bot** escolhendo entre as pessoas que já lhe escreveram (o Pepe lembra-se do id e do nome de cada uma, por conversa), com um campo para um id de utilizador do Telegram que ainda não escreveu; a lista guardada é o mesmo `trainers` que a linha de comandos escreve. Aceita também um **rótulo** opcional, a forma como o bot aparece no painel (o lápis junto ao título do cartão faz o mesmo); o nome do bot continua a ser o id. O cartão do bot lista os grupos, tópicos e conversas de onde já chegaram mensagens, e cada um deles pode também receber um rótulo.
+
 ### Heartbeat: contactos proativos
 
 Um bot consegue, de tempos a tempos, dar a palavra ao seu agente para dizer algo **por iniciativa própria** ("o deploy terminou", "pediste-me para ficar atento a X") e, tão importante quanto isso, dar-lhe também o direito de **não dizer nada** na maior parte das vezes. Isto vem desligado, e ativa-se por bot:

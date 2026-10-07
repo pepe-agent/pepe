@@ -1045,11 +1045,31 @@ defmodule Pepe.WebhooksTest do
 
     # The lookup runs in a task of its own; the stub hands its pid over so the test can wait
     # for it to finish writing instead of sleeping.
+    # Channels are named with conversations.info, people with users.info; both run once, off the
+    # request, the first time the channel or the person is heard.
     defp stub_channel_lookup(parent, name) do
-      Mimic.stub(Req, :get, fn "https://slack.com/api/conversations.info", opts ->
-        send(parent, {:looked_up, self(), opts[:params][:channel], opts[:retry]})
-        {:ok, %{status: 200, body: %{"ok" => true, "channel" => %{"id" => opts[:params][:channel], "name" => name}}}}
+      Mimic.stub(Req, :get, fn
+        "https://slack.com/api/conversations.info", opts ->
+          send(parent, {:looked_up, self(), opts[:params][:channel], opts[:retry]})
+          {:ok, %{status: 200, body: %{"ok" => true, "channel" => %{"id" => opts[:params][:channel], "name" => name}}}}
+
+        "https://slack.com/api/users.info", opts ->
+          send(parent, {:person_looked_up, self(), opts[:params][:user], opts[:retry]})
+
+          {:ok,
+           %{
+             status: 200,
+             body: %{
+               "ok" => true,
+               "user" => %{"id" => opts[:params][:user], "real_name" => "Ana Lima", "profile" => %{"display_name" => "ana"}}
+             }
+           }}
       end)
+    end
+
+    defp await_task(task) do
+      ref = Process.monitor(task)
+      assert_receive {:DOWN, ^ref, :process, ^task, _}, 1_000
     end
 
     test "a channel message the bot does not answer is still recorded, and named once by lookup" do
@@ -1098,8 +1118,8 @@ defmodule Pepe.WebhooksTest do
       slack_connection("acme-slack")
       parent = self()
 
-      Mimic.stub(Req, :get, fn "https://slack.com/api/conversations.info", _opts ->
-        send(parent, {:looked_up, self()})
+      Mimic.stub(Req, :get, fn "https://slack.com/api/" <> method, _opts ->
+        if method == "conversations.info", do: send(parent, {:looked_up, self()})
         {:ok, %{status: 200, body: %{"ok" => false, "error" => "missing_scope"}}}
       end)
 
@@ -1143,6 +1163,44 @@ defmodule Pepe.WebhooksTest do
       assert :ok = Webhooks.handle_inbound("acme", "whatsapp", "support", body, payload, %{"x-hub-signature-256" => sig})
 
       assert [%{channel: "5511999", provider: "whatsapp", kind: "dm", name: "Ana"}] = SeenChannels.list("support")
+      # The person is the number too, named after the contact.
+      assert [%{channel: "5511999", person: "5511999", name: "Ana"}] = Pepe.SeenPeople.list("support")
+    end
+
+    test "the person who wrote is recorded for the channel and named once by lookup; a bot is not" do
+      slack_connection("acme-slack")
+      stub_channel_lookup(self(), "ops")
+
+      slack_say("acme-slack", %{"channel" => "C1", "user" => "U2", "text" => "morning"})
+      # Recorded on the request itself; the name may or may not have landed yet.
+      assert [%{channel: "C1", person: "U2"}] = Pepe.SeenPeople.list("acme-slack")
+
+      assert_receive {:person_looked_up, task, "U2", false}, 1_000
+      await_task(task)
+      assert [%{person: "U2", name: "ana"}] = Pepe.SeenPeople.list("acme-slack")
+
+      # The same person again: refreshed, not asked for again.
+      slack_say("acme-slack", %{"channel" => "C1", "user" => "U2", "text" => "again", "ts" => "2.0"})
+      refute_receive {:person_looked_up, _task, "U2", _retry}, 200
+      assert [%{person: "U2"}] = Pepe.SeenPeople.list("acme-slack")
+
+      # An app's message carries a bot mark and no sender: nobody to pick.
+      slack_say("acme-slack", %{"channel" => "C1", "user" => nil, "bot_id" => "B9", "text" => "ticket #1", "ts" => "3.0"})
+      assert [%{person: "U2"}] = Pepe.SeenPeople.list("acme-slack")
+    end
+
+    test "the same person in two channels, and on two connections, is kept apart" do
+      slack_connection("acme-slack")
+      slack_connection("acme-slack-2")
+      stub_channel_lookup(self(), "ops")
+
+      slack_say("acme-slack", %{"channel" => "C1", "user" => "U2", "text" => "one"})
+      slack_say("acme-slack", %{"channel" => "C2", "user" => "U2", "text" => "two", "ts" => "2.0"})
+      slack_say("acme-slack-2", %{"channel" => "C1", "user" => "U2", "text" => "three"})
+
+      assert ["C1", "C2"] = Pepe.SeenPeople.list("acme-slack") |> Enum.map(& &1.channel) |> Enum.sort()
+      assert [%{channel: "C1", person: "U2"}] = Pepe.SeenPeople.list("acme-slack", "C1")
+      assert [%{connection: "acme-slack-2", channel: "C1", person: "U2"}] = Pepe.SeenPeople.list("acme-slack-2")
     end
   end
 

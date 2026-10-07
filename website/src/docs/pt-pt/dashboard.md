@@ -62,7 +62,9 @@ também dá para fazer por aqui.
   [Watches](../watches/).
 - **Channels**: acrescentar, remover e editar bots do Telegram e ligações por webhook (Slack,
   Discord, Teams, Google Chat, WhatsApp), com efeito imediato. Cada cartão lista os canais e
-  grupos de onde já chegaram mensagens, com o agente, a menção e os treinadores desse canal. Ver
+  grupos de onde já chegaram mensagens, com o agente, a menção e os treinadores desse canal. Os
+  treinadores escolhem-se entre as pessoas que já lá escreveram, e uma ligação, um canal ou uma
+  pessoa podem receber um rótulo que aparece no lugar do id em todo o painel. Ver
   [Telegram](../telegram/) e [Canais por webhook](../webhooks/).
 - **MCP**: os servidores de ferramentas externas. Ver [Servidores MCP](../mcp/).
 - **Configuração**: um separador para idioma, atualizações, voz (respostas e transcrição), histórico de alterações e o `~/.pepe/config.json` em bruto (validado ao gravar). Cada secção guarda por si.

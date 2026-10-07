@@ -64,7 +64,9 @@ comando `pepe` también la puedes hacer desde aquí.
 - **Channels**: agregar, quitar y editar bots de Telegram y conexiones por webhook
   (Slack, Discord, Teams, Google Chat, WhatsApp), con cambios que se aplican en
   caliente. Cada tarjeta lista los canales y grupos desde los que ya llegó algún
-  mensaje, con el agente, la mención y los entrenadores propios de ese canal. Ver
+  mensaje, con el agente, la mención y los entrenadores propios de ese canal. Los entrenadores
+  se eligen entre las personas que ya escribieron allí, y una conexión, un canal o una persona
+  pueden recibir una etiqueta que se muestra en lugar de su id en todo el panel. Ver
   [Telegram](../telegram/) y [Canales por webhook](../webhooks/).
 - **MCP**: servidores externos de herramientas. Ver [Servidores MCP](../mcp/).
 - **Configuración**: una pestaña para idioma, actualizaciones, voz (respuestas y transcripción), historial de cambios y el `~/.pepe/config.json` en bruto (validado al guardar). Cada sección se guarda por separado.

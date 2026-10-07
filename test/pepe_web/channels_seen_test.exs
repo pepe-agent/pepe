@@ -15,6 +15,7 @@ defmodule PepeWeb.ChannelsSeenTest do
   alias Pepe.Config
   alias Pepe.Config.Agent
   alias Pepe.SeenChannels
+  alias Pepe.SeenPeople
 
   @endpoint PepeWeb.Endpoint
 
@@ -146,14 +147,18 @@ defmodule PepeWeb.ChannelsSeenTest do
       assert origin(html, "seen-desk-mention-0") =~ "from the connection"
     end
 
-    test "a direct message is a channel too and carries its own value" do
-      SeenChannels.touch("desk", "slack", "D9", kind: "dm", now: @t0)
+    test "a direct message always answers, so it has no mention row, but keeps its agent and trainers" do
+      SeenChannels.touch("desk", "slack", "D9", kind: "dm", now: @t0 + 10)
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0)
 
       {:ok, view, _html} = live(conn(), "/bots")
       open_desk(view)
 
-      view |> element("#seen-desk-mention-0") |> render_change(%{"channel" => "D9", "mention" => "required"})
-      assert Config.channel_mention("desk:D9") == false
+      # Row 0 is the DM (most recent), row 1 the group.
+      refute has_element?(view, "#seen-desk-mention-0")
+      assert has_element?(view, "#seen-desk-agent-0")
+      assert has_element?(view, "#seen-desk-trainers-0")
+      assert has_element?(view, "#seen-desk-mention-1")
     end
 
     test "the connection's default shows on the card and in the inherit choice" do
@@ -185,21 +190,65 @@ defmodule PepeWeb.ChannelsSeenTest do
   end
 
   describe "who can train" do
-    test "is the connection's until the channel gets its own list, and can go back" do
+    test "is the connection's until the channel gets its own list, picked from the people heard there, and can go back" do
       SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0)
+      SeenChannels.touch("desk", "slack", "C2", kind: "group", now: @t0)
+      SeenPeople.touch("desk", "C1", "U2", name: "Ana", now: @t0)
+      SeenPeople.touch("desk", "C2", "U3", name: "Bruno", now: @t0)
 
       {:ok, view, _html} = live(conn(), "/bots")
       html = open_desk(view)
       assert origin(html, "seen-desk-trainers-0") =~ "from the connection"
       assert html =~ "The connection&#39;s: U1"
 
-      html = view |> form("#seen-desk-trainers-0", %{"trainers" => "<@U2>, U3"}) |> render_submit()
-      assert Config.channel_trainers("desk:C1") == ["U2", "U3"]
+      # The people only show once "only these people" is picked, and only those heard in C1.
+      refute has_element?(view, "#seen-desk-trainers-0 input[value=U2]")
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+      assert has_element?(view, "#seen-desk-trainers-0 input[value=U2]")
+      assert render(view) =~ "Ana"
+      refute has_element?(view, "#seen-desk-trainers-0 input[value=U3]")
+      # Nothing is stored until Save.
+      assert Config.channel_trainers("desk:C1") == nil
+
+      html =
+        view
+        |> form("#seen-desk-trainers-0", %{"trainers" => %{"people" => ["U2"], "extra" => "<@U7>"}})
+        |> render_submit()
+
+      assert Config.channel_trainers("desk:C1") == ["U2", "U7"]
       assert origin(html, "seen-desk-trainers-0") =~ "own"
+      # The id added by hand, never heard from, stays listed and checked.
+      assert has_element?(view, "#seen-desk-trainers-0 input[value=U7][checked]")
 
       html = view |> element("#seen-desk button[phx-click=reset_trainers][phx-value-channel=C1]") |> render_click()
       assert Config.channel_trainers("desk:C1") == nil
       assert origin(html, "seen-desk-trainers-0") =~ "from the connection"
+    end
+
+    test "a stored id nobody has heard from shows as its id and stays checked" do
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0)
+      Config.put_channel_trainers("desk:C1", ["U9"])
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      open_desk(view)
+
+      assert has_element?(view, "#seen-desk-trainers-0 input[value=U9][checked]")
+    end
+
+    test "everyone, no one and the connection's are picked as a mode" do
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      open_desk(view)
+
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "*"}}) |> render_submit()
+      assert Config.channel_trainers("desk:C1") == ["*"]
+
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "none"}}) |> render_submit()
+      assert Config.channel_trainers("desk:C1") == []
+
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "default"}}) |> render_submit()
+      assert Config.channel_trainers("desk:C1") == nil
     end
 
     test "a channel with a value of its own that never sent a message is still listed" do
@@ -236,6 +285,58 @@ defmodule PepeWeb.ChannelsSeenTest do
     assert html =~ "Use the bot&#39;s"
   end
 
+  describe "the connection form's trainers" do
+    defp open_edit(view) do
+      view |> element("button[phx-click=edit][phx-value-slug=desk]") |> render_click()
+      render(view)
+    end
+
+    test "offers the people heard on any channel, annotated with where, and saves the ones checked plus a typed id" do
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", name: "#ops", now: @t0)
+      SeenChannels.touch("desk", "slack", "D9", kind: "dm", now: @t0)
+      SeenPeople.touch("desk", "C1", "U2", name: "Ana", now: @t0)
+      SeenPeople.touch("desk", "D9", "U2", now: @t0)
+      SeenPeople.touch("desk", "D9", "U3", name: "Bruno", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      html = open_edit(view)
+
+      # The stored list is ["U1"], so the people already show, U1 among them by its id.
+      assert html =~ "Ana"
+      assert html =~ "Bruno"
+      assert html =~ "in #ops, D9"
+      assert has_element?(view, "#native-channels-trainers input[value=U1][checked]")
+      refute has_element?(view, "#native-channels-trainers input[value=U2][checked]")
+
+      view
+      |> form("form[phx-submit=save]", %{"trainers" => %{"people" => ["U2", "U3"], "extra" => "U8"}})
+      |> render_submit()
+
+      assert Config.get_webhook("desk")["trainers"] == ["U2", "U3", "U8"]
+    end
+
+    test "everyone, no one and the default are modes, and switching hides the people" do
+      SeenPeople.touch("desk", "C1", "U2", name: "Ana", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      open_edit(view)
+
+      view |> form("form[phx-submit=save]", %{"trainers" => %{"mode" => "*"}}) |> render_change()
+      refute has_element?(view, "#native-channels-trainers input[value=U2]")
+      view |> form("form[phx-submit=save]", %{"trainers" => %{"mode" => "*"}}) |> render_submit()
+      assert Config.get_webhook("desk")["trainers"] == ["*"]
+
+      open_edit(view)
+      view |> form("form[phx-submit=save]", %{"trainers" => %{"mode" => "none"}}) |> render_submit()
+      assert Config.get_webhook("desk")["trainers"] == []
+
+      # Default on an admin connection is no list at all (everyone may train).
+      open_edit(view)
+      view |> form("form[phx-submit=save]", %{"trainers" => %{"mode" => "default"}}) |> render_submit()
+      refute Map.has_key?(Config.get_webhook("desk"), "trainers")
+    end
+  end
+
   test "the connection form offers the mention default only where mentions are gated, and saves it" do
     {:ok, view, _html} = live(conn(), "/bots")
 
@@ -259,12 +360,177 @@ defmodule PepeWeb.ChannelsSeenTest do
     refute render(view) =~ "Answer without being mentioned"
   end
 
-  test "removing a connection forgets its channels" do
+  describe "labels" do
+    test "a connection shows its label with the slug beside it, in the title and the confirmation, and can be cleared" do
+      {:ok, view, html} = live(conn(), "/bots")
+      assert html =~ "Remove connection desk?"
+
+      view |> element("button[phx-click=rename][phx-value-slug=desk]") |> render_click()
+      html = view |> form("form[phx-submit=save_label]", %{"label" => " Support Slack "}) |> render_submit()
+
+      assert Config.get_webhook("desk")["label"] == "Support Slack"
+      assert html =~ "Support Slack"
+      assert html =~ "Remove connection Support Slack?"
+      # The slug is still the id, shown small beside the label.
+      assert html =~ "desk"
+
+      view |> element("button[phx-click=rename][phx-value-slug=desk]") |> render_click()
+      html = view |> element("button[phx-click=clear_label][phx-value-slug=desk]") |> render_click()
+      refute Map.has_key?(Config.get_webhook("desk"), "label")
+      assert html =~ "Remove connection desk?"
+    end
+
+    test "a channel row shows its label first, the provider's name as fallback, and can be cleared" do
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", name: "#ops", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      html = open_desk(view)
+      assert html =~ "#ops"
+
+      view |> element("#seen-desk button[phx-click=rename][phx-value-channel=C1]") |> render_click()
+      html = view |> form("#seen-desk form[phx-submit=save_label]", %{"label" => "Operations"}) |> render_submit()
+      assert html =~ "Operations"
+      assert SeenChannels.get("desk", "C1").label == "Operations"
+
+      view |> element("#seen-desk button[phx-click=rename][phx-value-channel=C1]") |> render_click()
+      html = view |> element("#seen-desk button[phx-click=clear_label][phx-value-channel=C1]") |> render_click()
+      refute html =~ "Operations"
+      assert html =~ "#ops"
+    end
+
+    test "a person is renamed from the picker, and the label shows wherever the person is listed" do
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0)
+      SeenPeople.touch("desk", "C1", "U2", name: "ana", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      open_desk(view)
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+
+      view |> element("#seen-desk button[phx-click=rename_person][phx-value-person=U2]") |> render_click()
+      html = view |> element("#seen-desk-rename-person-0") |> render_submit(%{"person" => "U2", "label" => "Ana Lima"})
+
+      assert SeenPeople.get("desk", "U2").label == "Ana Lima"
+      assert html =~ "Ana Lima"
+
+      # The connection form's picker shows the same label.
+      view |> element("button[phx-click=edit][phx-value-slug=desk]") |> render_click()
+      assert render(view) =~ "Ana Lima"
+
+      view |> element("button[phx-click=cancel]") |> render_click()
+      open_desk(view)
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+      view |> element("#seen-desk button[phx-click=rename_person][phx-value-person=U2]") |> render_click()
+      html = view |> element("#seen-desk button[phx-click=clear_person_label][phx-value-person=U2]") |> render_click()
+      assert SeenPeople.get("desk", "U2").label == nil
+      refute html =~ "Ana Lima"
+      assert html =~ "ana"
+    end
+
+    test "a Telegram bot takes a label from its card and from its form, and is named by it everywhere" do
+      {:ok, view, _html} = live(conn(), "/bots")
+
+      view |> element("button[phx-click=bot_rename][phx-value-name=default]") |> render_click()
+      html = view |> form("form[phx-submit=bot_save_label]", %{"label" => "Main bot"}) |> render_submit()
+      assert Config.telegram_bot("default")["label"] == "Main bot"
+      assert html =~ "Main bot"
+      assert html =~ "Remove bot Main bot?"
+
+      render_click(view, "bot_edit", %{"name" => "default"})
+      html = view |> form("form[phx-submit=bot_save]", %{"label" => "", "token" => ""}) |> render_submit()
+      refute Map.has_key?(Config.telegram_bot("default"), "label")
+      assert html =~ "Bot default saved."
+    end
+  end
+
+  describe "people pickers elsewhere" do
+    test "who may message the connection is picked the same way, and anyone means nothing stored" do
+      SeenPeople.touch("desk", "C1", "U2", name: "Ana", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      view |> element("button[phx-click=edit][phx-value-slug=desk]") |> render_click()
+      assert render(view) =~ "Who may message this connection"
+
+      view |> form("form[phx-submit=save]", %{"allowed" => %{"mode" => "list"}}) |> render_change()
+      assert has_element?(view, "#native-channels-allowed input[value=U2]")
+
+      view |> form("form[phx-submit=save]", %{"allowed" => %{"people" => ["U2"], "extra" => "5511999"}}) |> render_submit()
+      assert Config.get_webhook("desk")["allowed_numbers"] == ["U2", "5511999"]
+
+      view |> element("button[phx-click=edit][phx-value-slug=desk]") |> render_click()
+      assert has_element?(view, "#native-channels-allowed input[value=U2][checked]")
+      view |> form("form[phx-submit=save]", %{"allowed" => %{"mode" => "default"}}) |> render_submit()
+      refute Map.has_key?(Config.get_webhook("desk"), "allowed_numbers")
+    end
+
+    test "a Telegram bot's trainers are picked from the people who wrote to it, stored as integer ids" do
+      SeenChannels.touch("default", "telegram", "-1001", kind: "group", name: "Ops team", now: @t0)
+      SeenPeople.touch("default", "-1001", "55", name: "Ana Lima", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      render_click(view, "bot_edit", %{"name" => "default"})
+      assert render(view) =~ "Who can train this bot"
+
+      view |> form("form[phx-submit=bot_save]", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+      assert render(view) =~ "Ana Lima"
+      assert has_element?(view, "#bot-trainers input[value='55']")
+
+      view
+      |> form("form[phx-submit=bot_save]", %{"token" => "", "trainers" => %{"people" => ["55"], "extra" => "66, nope"}})
+      |> render_submit()
+
+      assert Config.telegram_bot("default")["trainers"] == [55, 66]
+
+      render_click(view, "bot_edit", %{"name" => "default"})
+      assert has_element?(view, "#bot-trainers input[value='55'][checked]")
+      view |> form("form[phx-submit=bot_save]", %{"token" => "", "trainers" => %{"mode" => "*"}}) |> render_submit()
+      assert Config.telegram_bot("default")["trainers"] == ["*"]
+
+      render_click(view, "bot_edit", %{"name" => "default"})
+      view |> form("form[phx-submit=bot_save]", %{"token" => "", "trainers" => %{"mode" => "default"}}) |> render_submit()
+      refute Map.has_key?(Config.telegram_bot("default"), "trainers")
+    end
+
+    test "each channel row lists only the people heard in that channel" do
+      SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0 + 10)
+      SeenChannels.touch("desk", "slack", "C2", kind: "group", now: @t0)
+      SeenPeople.touch("desk", "C1", "U2", name: "Ana", now: @t0)
+      SeenPeople.touch("desk", "C2", "U3", name: "Bruno", now: @t0)
+
+      {:ok, view, _html} = live(conn(), "/bots")
+      open_desk(view)
+      view |> form("#seen-desk-trainers-0", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+      view |> form("#seen-desk-trainers-1", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+
+      assert has_element?(view, "#seen-desk-trainers-0 input[value=U2]")
+      refute has_element?(view, "#seen-desk-trainers-0 input[value=U3]")
+      assert has_element?(view, "#seen-desk-trainers-1 input[value=U3]")
+      refute has_element?(view, "#seen-desk-trainers-1 input[value=U2]")
+    end
+
+    test "people with a name come first alphabetically, then ids by recency, and an empty list says so" do
+      SeenPeople.touch("desk", "C1", "U9", now: @t0 + 5)
+      SeenPeople.touch("desk", "C1", "U8", now: @t0 + 9)
+      SeenPeople.touch("desk", "C1", "U2", name: "zoe", now: @t0)
+      SeenPeople.touch("desk", "C1", "U3", name: "Bruno", now: @t0 + 20)
+
+      assert ["U3", "U2", "U8", "U9"] = PepeWeb.TrainersPicker.people("desk") |> Enum.map(& &1.id)
+
+      Config.put_webhook("empty", %{"provider" => "slack", "agent" => "default/assistant", "mode" => "admin", "config" => %{}})
+      {:ok, view, _html} = live(conn(), "/bots")
+      view |> element("button[phx-click=edit][phx-value-slug=empty]") |> render_click()
+      view |> form("form[phx-submit=save]", %{"trainers" => %{"mode" => "list"}}) |> render_change()
+      assert render(view) =~ "Nobody has written here yet. Add an id below."
+    end
+  end
+
+  test "removing a connection forgets its channels and its people" do
     SeenChannels.touch("desk", "slack", "C1", kind: "group", now: @t0)
+    SeenPeople.touch("desk", "C1", "U2", now: @t0)
 
     {:ok, view, _html} = live(conn(), "/bots")
     view |> element("button[phx-click=delete][phx-value-slug=desk]") |> render_click()
 
     assert SeenChannels.list("desk") == []
+    assert SeenPeople.list("desk") == []
   end
 end

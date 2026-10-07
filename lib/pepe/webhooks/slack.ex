@@ -161,6 +161,25 @@ defmodule Pepe.Webhooks.Slack do
     end
   end
 
+  # `users.info` needs `users:read`; without it the id is shown. One try.
+  @impl true
+  def person_name(config, user) do
+    token = Config.interpolate(provider_config(config)["bot_token"])
+
+    with true <- is_binary(token) and token != "",
+         {:ok, %{status: 200, body: %{"ok" => true, "user" => info}}} <-
+           Req.get("#{@api}/users.info", auth: {:bearer, token}, params: [user: user], retry: false, receive_timeout: 10_000),
+         name when is_binary(name) and name != "" <-
+           get_in(info, ["profile", "display_name"]) |> presence() || info["real_name"] |> presence() || info["name"] do
+      {:ok, name}
+    else
+      _ -> :error
+    end
+  end
+
+  defp presence(value) when is_binary(value) and value != "", do: value
+  defp presence(_value), do: nil
+
   # Someone reacting to a message the bot sent is feedback on its answer, handed to the agent
   # the same way Telegram does it: a turn that reads `[reacted 👍]`, which the agent learns from
   # by convention. Only the bot's own messages count (`item_user` is the author of the message

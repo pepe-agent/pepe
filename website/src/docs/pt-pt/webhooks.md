@@ -71,6 +71,8 @@ A lista própria do canal é a mais forte: **substitui** a da ligação só ness
 
 No Slack os trainers são as pessoas (os ids de utilizador delas), porque cada mensagem passa a indicar quem a escreveu. Uma lista que citava o id do canal continua a funcionar.
 
+No painel escolhes os treinadores em vez de escrever ids. O Pepe lembra-se de quem escreveu em cada canal (o id e o nome de apresentação, quando a plataforma o dá) e oferece essas pessoas: todos os que falaram na ligação, para a lista da ligação, e quem falou nesse canal, para a lista do canal. Quem ainda não escreveu pode ser acrescentado pelo id. Apagar a ligação remove tudo o que foi guardado sobre os seus canais e pessoas. No Slack, os nomes precisam do âmbito `users:read`; sem ele, aparecem os ids.
+
 ## Onde está cada ligação
 
 Na página Channels do painel, o cartão de cada ligação diz de quantos canais, grupos e mensagens diretas já recebeu mensagens ("12 canais"). Abre-o para os ver: o nome, quando a plataforma o indicou (caso contrário, o id), se é um grupo ou uma mensagem direta, e quando chegou a última mensagem. Um canal entra na lista a partir da primeira mensagem que lá chega, tenha o bot respondido ou não, por isso um canal onde o bot apenas escuta também aparece.
@@ -81,7 +83,13 @@ Cada linha traz as definições desse canal, que alteras no próprio sítio:
 - **Menção**: a resposta própria do canal a "precisa de @menção?", ou a predefinição da ligação enquanto este não tiver uma (ver [@Menções em grupos](#menções-em-grupos)). Só para fornecedores que filtram por menção.
 - **Quem pode treinar**: os treinadores próprios do canal (ver acima), ou os da ligação enquanto este não tiver lista própria.
 
-Cada definição leva a etiqueta *próprio* quando o canal tem valor próprio e *da ligação* quando herda a predefinição; *Usar o da ligação* remove apenas o valor próprio do canal. Uma mensagem direta também é um canal, listada e configurável da mesma forma.
+Cada definição leva a etiqueta *próprio* quando o canal tem valor próprio e *da ligação* quando herda a predefinição; *Usar o da ligação* remove apenas o valor próprio do canal. Uma mensagem direta também é um canal, listada e configurável da mesma forma, exceto na menção: uma mensagem direta responde sempre, por isso não tem essa definição.
+
+O formulário da ligação tem também *Quem pode enviar mensagens a esta ligação* (`allowed_numbers`): qualquer pessoa, ou só as pessoas escolhidas entre quem já escreveu, mais qualquer id introduzido. Uma mensagem de outra pessoa qualquer é ignorada.
+
+### Nomes em vez de ids
+
+Os ids da plataforma (`A0C5LM7LHS8`, `D0C5LMVCHEY`, `U07ABC`) são o que identifica tudo, e ninguém os consegue ler. Por isso uma ligação, um canal e uma pessoa podem receber um **rótulo**: o lápis junto ao título da ligação (ou o campo *Rótulo* no formulário dela), junto ao título do canal na sua linha, e junto a uma pessoa nas listas de pessoas. O rótulo aparece em todo o lado onde o painel nomeia essa ligação, canal ou pessoa (cartões, linhas, seletores, confirmações, os destinos das tarefas agendadas e dos watches), com o id pequeno e esbatido ao lado, para distinguir dois com o mesmo nome; sem rótulo, aparece o nome dado pela plataforma, e sem nenhum dos dois, o id. Limpar o rótulo recua pela mesma ordem. Um rótulo é texto para pessoas lerem: nunca serve para comparar ou autorizar seja o que for, que continua a ser por id, e fica à parte do nome da plataforma, para que uma atualização deste nunca escreva por cima do que escreveste. No máximo 60 caracteres. O rótulo de uma pessoa acompanha-a em todos os canais da ligação; o de um canal pertence a esse canal nessa ligação.
 
 O nome chega com a mensagem no Microsoft Teams, no Google Chat, no WhatsApp (o nome do contacto) e no Telegram (o título do grupo). No Slack é consultado uma vez, na primeira mensagem recebida do canal, e precisa do âmbito `channels:read` (`groups:read` para um canal privado); sem ele, aparece o id. As mensagens diretas do Slack mostram o id.
 

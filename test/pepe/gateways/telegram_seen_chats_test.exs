@@ -52,6 +52,18 @@ defmodule Pepe.Gateways.TelegramSeenChatsTest do
     assert %{kind: "dm", name: "Ana Lima"} = rows["55"]
   end
 
+  test "the person who wrote is recorded for the chat, named; a bot is not" do
+    chat = %{"id" => -100_1, "type" => "supergroup", "title" => "Ops team"}
+    ana = %{"id" => 55, "first_name" => "Ana", "last_name" => "Lima"}
+    bot = %{"id" => 77, "is_bot" => true, "first_name" => "Deployer"}
+
+    assert :ok = Telegram.note_chat(%{"message" => %{"chat" => chat, "from" => ana, "text" => "hi"}})
+    assert :ok = Telegram.note_chat(%{"message" => %{"chat" => chat, "from" => bot, "text" => "deployed"}})
+    assert :ok = Telegram.note_chat(%{"message" => %{"chat" => chat, "text" => "no sender at all"}})
+
+    assert [%{channel: "-1001", person: "55", name: "Ana Lima"}] = Pepe.SeenPeople.list("default")
+  end
+
   test "an update that is not a message is ignored" do
     assert :ok = Telegram.note_chat(%{"callback_query" => %{"data" => "perm:1"}})
     assert [] = SeenChannels.list("default")

@@ -16,8 +16,11 @@ defmodule PepeWeb.ConnectionsComponent do
 
   import PepeWeb.DashUI
   import PepeWeb.DashData
+  import PepeWeb.TrainersPicker, only: [rename_form: 1, trainers_picker: 1]
 
   alias Pepe.Config
+  alias Pepe.Labels
+  alias PepeWeb.TrainersPicker
 
   @impl true
   # A parent LiveView can open a provider's form directly via
@@ -40,7 +43,10 @@ defmodule PepeWeb.ConnectionsComponent do
      |> assign_new(:form_label, fn -> nil end)
      |> assign_new(:form_schema, fn -> [] end)
      |> assign_new(:form_values, fn -> %{} end)
-     |> assign_new(:form_errors, fn -> %{} end)}
+     |> assign_new(:form_errors, fn -> %{} end)
+     |> assign_new(:form_people, fn -> [] end)
+     |> assign_new(:renaming, fn -> nil end)
+     |> assign_new(:renaming_person, fn -> nil end)}
   end
 
   @impl true
@@ -70,9 +76,29 @@ defmodule PepeWeb.ConnectionsComponent do
 
         <div :for={{slug, e} <- conns_for(@webhooks, p.name)} class={[card(), "mb-2"]}>
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <span class="font-medium">{slug}</span>
-              <span class={[tag((e["mode"] == "admin" && :warn) || :muted), "ml-2"]}>
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <.named :if={@renaming != slug} text={Labels.connection(slug, e).text} id={slug} class="font-medium" />
+              <button
+                :if={@renaming != slug}
+                type="button"
+                phx-click="rename"
+                phx-value-slug={slug}
+                phx-target={@myself}
+                title={gettext("Rename")}
+                class="text-zinc-600 transition hover:text-zinc-200"
+              >
+                <.icon name="hero-pencil-square" class="size-4" />
+              </button>
+              <%!-- Display only: the slug stays the identity (it is in the webhook URL and every key). --%>
+              <form :if={@renaming == slug} phx-submit="save_label" phx-target={@myself} class="flex flex-wrap items-center gap-1">
+                <input type="hidden" name="slug" value={slug} />
+                <input name="label" value={e["label"] || ""} maxlength="60" placeholder={slug} class={[fld_sm(), "h-[36px] w-56 py-1 text-[14px]"]} />
+                <button type="submit" class={[btn_ghost(), "h-[36px] px-3 text-[13.5px]"]}>{gettext("Save")}</button>
+                <button type="button" phx-click="clear_label" phx-value-slug={slug} phx-target={@myself} class={[btn_ghost(), "h-[36px] px-3 text-[13.5px]"]}>
+                  {gettext("Clear")}
+                </button>
+              </form>
+              <span class={tag((e["mode"] == "admin" && :warn) || :muted)}>
                 {mode_badge(e["mode"])}
               </span>
             </div>
@@ -82,13 +108,16 @@ defmodule PepeWeb.ConnectionsComponent do
                 phx-click="delete"
                 phx-value-slug={slug}
                 phx-target={@myself}
-                data-confirm={gettext("Remove connection %{slug}?", slug: slug)}
+                data-confirm={gettext("Remove connection %{slug}?", slug: Labels.connection(slug, e).text)}
                 class={[btn_ghost(), "text-red-400 hover:text-red-300"]}
               >✕</button>
             </div>
           </div>
           <.meta_list class="mt-4">
-            <:item label={gettext("Agent:")}>{e["agent"] || gettext("(default)")}</:item>
+            <:item label={gettext("Default agent:")}>
+              {e["agent"] || gettext("(default)")}
+              <span class="text-zinc-500">{gettext("answers the channels that have no agent of their own")}</span>
+            </:item>
             <:item :if={mention_gated?(p.name)} label={gettext("Mention:")}>{mention_default_label(e["mention_optional"] == true)}</:item>
             <:item label={gettext("Webhook URL")} mono>{webhook_url(e["project"], p.name, slug)}</:item>
           </.meta_list>
@@ -147,6 +176,12 @@ defmodule PepeWeb.ConnectionsComponent do
             <p :if={!@form_errors["slug"]} class={hlp()}>{gettext("A short unique name that becomes part of the webhook URL.")}</p>
           </div>
 
+          <div>
+            <label class={lbl()}>{gettext("Label")} <span class="text-zinc-600">{gettext("(optional)")}</span></label>
+            <input name="label" value={fval(@form_values, "label")} maxlength="60" class={fld()} placeholder={gettext("Support team Slack")} />
+            <p class={hlp()}>{gettext("How this connection is shown in the dashboard. The slug above stays the id.")}</p>
+          </div>
+
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class={lbl()}>{gettext("Project")}</label>
@@ -170,22 +205,48 @@ defmodule PepeWeb.ConnectionsComponent do
           </p>
 
           <div>
-            <label class={lbl()}>{gettext("This connection talks to")}</label>
+            <label class={lbl()}>{gettext("Default agent")}</label>
             <select name="agent" class={fld()}>
               <option value="">{gettext("Choose an agent")}</option>
               <option :for={a <- scoped_agent_names(form_project(@form_values))} value={a} selected={fval(@form_values, "agent") == a}>{a}</option>
             </select>
             <p :if={@form_errors["agent"]} class="mt-1.5 text-sm text-red-400">{@form_errors["agent"]}</p>
+            <p :if={!@form_errors["agent"]} class={hlp()}>{gettext("Answers the channels of this connection that have no agent of their own.")}</p>
           </div>
 
           <div>
             <label class={lbl()}>{gettext("Who can train this connection")}</label>
-            <input name="trainers" value={fval(@form_values, "trainers")} class={fld()} placeholder="*" />
+            <.trainers_picker
+              id={@id <> "-trainers"}
+              field="trainers"
+              value={@form_values["trainers"]}
+              people={@form_people}
+              inherit_label={gettext("Default: everyone in an Admin connection, no one in a Support one")}
+              rename_form={@editing_slug && @id <> "-rename-person"}
+              renaming={@renaming_person}
+              target={@myself}
+            />
             <p class={hlp()}>
               {gettext(
-                "Write * for everyone, none for no one, or the ids of the people, separated by commas. Empty means everyone in an Admin connection and no one in a Support one. A channel can have its own list, set in the chat with /trainers; that one wins for that channel."
+                "Pick from the people who have written on any channel of this connection. A channel can have its own list, in its row below or in the chat with /trainers; that one wins for that channel."
               )}
             </p>
+          </div>
+
+          <div>
+            <label class={lbl()}>{gettext("Who may message this connection")}</label>
+            <.trainers_picker
+              id={@id <> "-allowed"}
+              field="allowed"
+              value={@form_values["allowed"]}
+              people={@form_people}
+              inherit_label={gettext("Anyone")}
+              modes={["default", "list"]}
+              rename_form={@editing_slug && @id <> "-rename-person"}
+              renaming={@renaming_person}
+              target={@myself}
+            />
+            <p class={hlp()}>{gettext("A message from anyone not on the list is ignored. Pick from the people who have written here, or add an id.")}</p>
           </div>
 
           <div :if={mention_gated?(@adding)}>
@@ -232,6 +293,8 @@ defmodule PepeWeb.ConnectionsComponent do
           <button type="button" phx-click="cancel" phx-target={@myself} class={btn_ghost()}>{gettext("Cancel")}</button>
         </div>
       </form>
+      <%!-- Outside the connection form on purpose: a person's inline rename submits here. --%>
+      <.rename_form :if={@editing_slug} id={@id <> "-rename-person"} target={@myself} />
     </div>
     """
   end
@@ -250,16 +313,19 @@ defmodule PepeWeb.ConnectionsComponent do
       p ->
         values = %{
           "slug" => slug,
+          "label" => entry["label"] || "",
+          "allowed" => TrainersPicker.form_value(allowed_value(entry["allowed_numbers"])),
           "project" => entry["project"] || "default",
           "agent" => entry["agent"] || "",
           "mode" => entry["mode"] || "support",
-          "trainers" => Pepe.Webhooks.trainers_value(entry["trainers"]),
+          "trainers" => TrainersPicker.form_value(entry["trainers"]),
           "mention_optional" => to_string(entry["mention_optional"] == true),
           "cfg" => entry["config"] || %{}
         }
 
         {:noreply,
          assign(socket,
+           form_people: TrainersPicker.people(slug),
            adding: p.name,
            editing_slug: slug,
            form_label: p.label,
@@ -271,10 +337,28 @@ defmodule PepeWeb.ConnectionsComponent do
   end
 
   def handle_event("delete", %{"slug" => slug}, socket) do
+    text = Labels.connection(slug).text
     Config.delete_webhook(slug)
     Pepe.SeenChannels.delete_connection(slug)
-    send(self(), {:flash, :info, gettext("Connection %{s} removed.", s: slug)})
+    Pepe.SeenPeople.delete_connection(slug)
+    send(self(), {:flash, :info, gettext("Connection %{s} removed.", s: text)})
     {:noreply, assign(socket, webhooks: Config.webhooks())}
+  end
+
+  def handle_event("rename", %{"slug" => slug}, socket), do: {:noreply, assign(socket, renaming: slug)}
+
+  def handle_event("save_label", %{"slug" => slug, "label" => label}, socket) do
+    {:noreply, socket |> put_connection_label(slug, label) |> assign(renaming: nil)}
+  end
+
+  def handle_event("clear_label", %{"slug" => slug}, socket) do
+    {:noreply, socket |> put_connection_label(slug, nil) |> assign(renaming: nil)}
+  end
+
+  # The people's inline rename inside the form's pickers (see PepeWeb.TrainersPicker).
+  def handle_event(event, params, socket) when event in ["rename_person", "save_person_label", "clear_person_label"] do
+    socket = TrainersPicker.person_event(event, params, socket, socket.assigns.editing_slug)
+    {:noreply, assign(socket, form_people: TrainersPicker.people(socket.assigns.editing_slug))}
   end
 
   def handle_event("cancel", _p, socket) do
@@ -336,7 +420,10 @@ defmodule PepeWeb.ConnectionsComponent do
         # A support channel is customer-facing: history is ephemeral and it never
         # trains memory; an admin channel keeps history and enables slash commands.
         "commands" => mode == "admin",
-        "trainers" => Pepe.Webhooks.parse_trainers(params["trainers"]) || if(support?, do: [], else: nil),
+        "label" => Labels.clean(params["label"]),
+        "trainers" => TrainersPicker.to_list(params["trainers"]) || if(support?, do: [], else: nil),
+        # An empty list means anyone, which is what absent means too, so it is not stored.
+        "allowed_numbers" => allowed_value(TrainersPicker.to_list(params["allowed"])),
         # Stored only when set: absent is "a mention is required", the default since always.
         "mention_optional" => if(params["mention_optional"] == "true", do: true),
         "ephemeral" => support?,
@@ -345,11 +432,24 @@ defmodule PepeWeb.ConnectionsComponent do
 
     if editing && editing != slug, do: Config.delete_webhook(editing)
     Config.put_webhook(slug, entry)
-    send(self(), {:flash, :info, gettext("Saved connection %{s}.", s: slug)})
+    send(self(), {:flash, :info, gettext("Saved connection %{s}.", s: Labels.connection(slug, entry).text)})
     send(self(), {:channel_form, :closed})
   end
 
   # ---- helpers -----------------------------------------------------------------------
+
+  defp put_connection_label(socket, slug, label) do
+    case Config.get_webhook(slug) do
+      nil -> socket
+      entry -> Config.put_webhook(slug, put_or_delete(entry, "label", Labels.clean(label)))
+    end
+
+    assign(socket, webhooks: Config.webhooks())
+  end
+
+  # `allowed_numbers` absent or empty both mean anyone; the picker shows that as its default.
+  defp allowed_value(list) when is_list(list) and list != [], do: list
+  defp allowed_value(_anyone), do: nil
 
   # The stored value is "support"/"admin"; the badge shows the translated word, never the raw one.
   defp mode_badge("admin"), do: gettext("Admin")
@@ -422,7 +522,9 @@ defmodule PepeWeb.ConnectionsComponent do
           form_label: p.label,
           form_schema: p.schema,
           form_values: %{"project" => default_project, "mode" => "support"},
-          form_errors: %{}
+          form_errors: %{},
+          # Nobody has written to a connection that does not exist yet.
+          form_people: []
         )
     end
   end

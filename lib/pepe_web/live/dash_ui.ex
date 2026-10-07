@@ -128,6 +128,25 @@ defmodule PepeWeb.DashUI do
     """
   end
 
+  attr :text, :string, required: true, doc: "what to call it (see Pepe.Labels)"
+  attr :id, :string, required: true, doc: "the platform id it is keyed by"
+  attr :class, :any, default: nil
+
+  @doc """
+  A connection, a channel or a person as a reader sees it: the label (or the provider's name)
+  first, the raw id small and muted beside it so two with the same name can be told apart.
+  When there is nothing but the id, the id alone. Every screen that shows one of these uses
+  this, with `Pepe.Labels` picking the text, so a new screen gets labels for free.
+  """
+  def named(assigns) do
+    ~H"""
+    <span class={["inline-flex min-w-0 flex-wrap items-baseline gap-x-2", @class]}>
+      <span class="break-words">{@text}</span>
+      <span :if={@text != @id} class="break-all font-mono text-xs font-normal text-zinc-500">{@id}</span>
+    </span>
+    """
+  end
+
   attr :ok, :boolean, required: true
   attr :class, :any, default: nil
 

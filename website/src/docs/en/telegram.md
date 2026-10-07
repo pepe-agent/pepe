@@ -290,6 +290,13 @@ Set it three ways: from the command line with `--progress`; from a chat with the
 `manage_channel` tool (`set_progress`); or in the **dashboard** under Channels →
 your bot → *Edit* → "While the agent works", where each mode is spelled out.
 
+The same *Edit* form sets **who can train the bot** by picking from the people who have
+written to it (Pepe remembers each one's id and name per chat), with a field for a Telegram
+user id that has not written yet; the stored list is the same `trainers` the CLI writes.
+It also takes an optional **label**, how the bot is shown in the dashboard (the pencil next
+to its card title does the same); the bot's name stays its id. The bot's card lists the
+groups, topics and chats it has heard from, each of which can be given a label too.
+
 ### Heartbeat: proactive check-ins
 
 A bot can periodically give its agent the floor to say something **on its own

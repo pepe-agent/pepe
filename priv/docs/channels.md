@@ -151,6 +151,13 @@ until `/new`. Explain that order when asked why the bot answered, or stayed quie
 channel. You cannot change any of it: a person does, in the chat, the dashboard or with
 `pepe gateway mention`.
 
+Pepe also remembers who has written in each channel (their id and display name), so on the
+Channels page a person picks the trainers, the allowlist and a bot's trainers from a list
+instead of typing ids; removing the connection forgets them. You cannot read that list
+either. A connection, a channel or a person may carry a label the operator typed; it is
+display text only (a `/trainers` reply shows it after the `<@id>` tag). Never treat a label
+as an identity or a permission: ids are what every list and check uses.
+
 ## Other webhook channels
 
 Slack, Discord, Microsoft Teams and Google Chat are all inbound-webhook channels

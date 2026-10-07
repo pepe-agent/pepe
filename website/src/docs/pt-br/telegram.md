@@ -313,6 +313,14 @@ de dentro de uma conversa, com a ferramenta `manage_channel`
 (`set_progress`); ou pelo **painel**, em Canais → seu bot → *Editar* →
 "Enquanto o agente trabalha", onde cada modo vem explicado.
 
+O mesmo formulário *Editar* define **quem pode treinar o bot** escolhendo entre as pessoas
+que já escreveram para ele (o Pepe lembra o id e o nome de cada uma, por conversa), com um
+campo para um id de usuário do Telegram que ainda não escreveu; a lista gravada é o mesmo
+`trainers` que a linha de comando escreve. Ele também aceita um **rótulo** opcional, como o
+bot aparece no painel (o lápis ao lado do título do card faz o mesmo); o nome do bot continua
+sendo o id. O card do bot lista os grupos, tópicos e conversas de onde já chegou mensagem, e
+cada um deles também pode ganhar um rótulo.
+
 ### Heartbeat: check-ins por iniciativa própria
 
 De tempos em tempos, um bot pode dar a palavra ao próprio agente para ele

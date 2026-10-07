@@ -38,7 +38,7 @@ A barra lateral espelha a CLI, então quase tudo que você faz com o comando `pe
 - **Learning**: a linha do tempo do TimeLearn. Veja [Aprendizado](../learning/).
 - **Scheduled**: criar, rodar e gerenciar tarefas agendadas. Veja [Tarefas agendadas](../scheduled/).
 - **Watches**: o "me avise quando X" de uma vez só. Veja [Watches](../watches/).
-- **Channels**: adicionar, remover e editar bots do Telegram e conexões por webhook (Slack, Discord, Teams, Google Chat, WhatsApp), aplicado ao vivo. Cada card lista os canais e grupos de onde já chegou mensagem, com o agente, a menção e os treinadores daquele canal. Veja [Telegram](../telegram/) e [Canais por webhook](../webhooks/).
+- **Channels**: adicionar, remover e editar bots do Telegram e conexões por webhook (Slack, Discord, Teams, Google Chat, WhatsApp), aplicado ao vivo. Cada card lista os canais e grupos de onde já chegou mensagem, com o agente, a menção e os treinadores daquele canal. Os treinadores são escolhidos entre as pessoas que já escreveram ali, e uma conexão, um canal ou uma pessoa pode ganhar um rótulo que aparece no lugar do id em todo o painel. Veja [Telegram](../telegram/) e [Canais por webhook](../webhooks/).
 - **MCP**: servidores de ferramentas externas. Veja [Servidores MCP](../mcp/).
 - **Configuração**: uma aba para idioma, atualizações, voz (respostas e transcrição), histórico de mudanças e o `~/.pepe/config.json` bruto (validado ao salvar). Cada seção salva sozinha.
 

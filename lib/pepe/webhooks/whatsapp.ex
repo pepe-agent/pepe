@@ -113,6 +113,8 @@ defmodule Pepe.Webhooks.WhatsApp do
       |> Enum.flat_map(fn e -> List.wrap(e["changes"]) end)
       |> Enum.flat_map(fn c -> Enum.map(List.wrap(get_in(c, ["value", "messages"])), &{&1, contact_names(c)}) end)
       |> Enum.flat_map(fn {m, names} -> normalize(m, names) end)
+      # A WhatsApp conversation is one person, so the sender is the number the reply goes to.
+      |> Enum.map(&Map.put_new(&1, :sender_id, &1.from))
 
     if messages == [], do: :ignore, else: {:ok, messages}
   end
