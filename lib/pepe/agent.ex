@@ -16,14 +16,20 @@ defmodule Pepe.Agent do
   is persisted or touches the agent's own config (see `Pepe.Eval`'s `--models`).
   """
   def oneshot(agent_name, prompt, opts \\ []) do
-    case resolve(agent_name) do
-      {:ok, agent} ->
-        {model, opts} = Keyword.pop(opts, :model)
-        agent = if model, do: %{agent | model: model}, else: agent
-        converse_with_hooks(agent, prompt, opts)
+    with false <- Pepe.Drain.draining?(),
+         {:ok, agent} <- resolve(agent_name) do
+      {model, opts} = Keyword.pop(opts, :model)
+      agent = if model, do: %{agent | model: model}, else: agent
+      token = Pepe.Drain.enter(self())
 
-      error ->
-        error
+      try do
+        converse_with_hooks(agent, prompt, opts)
+      after
+        Pepe.Drain.leave(token)
+      end
+    else
+      true -> {:error, :shutting_down}
+      error -> error
     end
   end
 

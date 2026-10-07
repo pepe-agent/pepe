@@ -26,6 +26,7 @@ defmodule PepeWeb.WebhookController do
       :ok -> send_resp(conn, 200, "ok")
       {:respond, status, content_type, body} -> conn |> put_resp_content_type(content_type) |> send_resp(status, body)
       {:error, :unauthorized} -> send_resp(conn, 401, "unauthorized")
+      {:error, :shutting_down} -> conn |> put_resp_header("retry-after", "5") |> send_resp(503, "shutting down")
       {:error, _} -> send_resp(conn, 404, "not found")
     end
   end

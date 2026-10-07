@@ -439,6 +439,44 @@ defmodule Pepe.Gateways.Telegram do
 
   @impl true
   def handle_info(:poll, state) do
+    if Pepe.Drain.draining?() do
+      # Shutting down: take no more updates. Their offset is never confirmed, so Telegram hands
+      # them to the next instance instead of losing them with a turn that dies with the VM.
+      {:noreply, state}
+    else
+      poll_once(state)
+    end
+  end
+
+  # Opt-in proactive engine: once a minute, check whether this bot's heartbeat is
+  # due (config `"heartbeat_minutes"`, nil = disabled) and, if so, pulse each of its
+  # sessions off-process. A quiet pulse (the overwhelmingly common case) never
+  # reaches the chat; only a genuine `{:ok, text}` gets delivered.
+  @impl true
+  def handle_info(:heartbeat_tick, state) do
+    b = bot()
+    now = System.system_time(:second)
+
+    state = maybe_pulse_heartbeat(state, b, now)
+
+    prune_sent()
+    schedule_heartbeat_tick()
+    {:noreply, state}
+  end
+
+  # An album has gone quiet: no new part arrived within the flush window, so process what we
+  # buffered as one turn. `take` removes it atomically, so a late straggler just starts a new one.
+  @impl true
+  def handle_info({:flush_album, key}, state) do
+    case :ets.take(@albums, key) do
+      [{^key, entry}] -> flush_album(entry)
+      _ -> :ok
+    end
+
+    {:noreply, state}
+  end
+
+  defp poll_once(state) do
     # `bot()` is a process-dictionary snapshot; re-read this bot's config from the file at the
     # top of every poll so a change to any of its fields (require_mention, allowlists, bound
     # agent, trainers, heartbeat, the token) takes effect live, without restarting the gateway.
@@ -478,34 +516,6 @@ defmodule Pepe.Gateways.Telegram do
       end
 
     send(self(), :poll)
-    {:noreply, state}
-  end
-
-  # Opt-in proactive engine: once a minute, check whether this bot's heartbeat is
-  # due (config `"heartbeat_minutes"`, nil = disabled) and, if so, pulse each of its
-  # sessions off-process. A quiet pulse (the overwhelmingly common case) never
-  # reaches the chat; only a genuine `{:ok, text}` gets delivered.
-  @impl true
-  def handle_info(:heartbeat_tick, state) do
-    b = bot()
-    now = System.system_time(:second)
-
-    state = maybe_pulse_heartbeat(state, b, now)
-
-    prune_sent()
-    schedule_heartbeat_tick()
-    {:noreply, state}
-  end
-
-  # An album has gone quiet: no new part arrived within the flush window, so process what we
-  # buffered as one turn. `take` removes it atomically, so a late straggler just starts a new one.
-  @impl true
-  def handle_info({:flush_album, key}, state) do
-    case :ets.take(@albums, key) do
-      [{^key, entry}] -> flush_album(entry)
-      _ -> :ok
-    end
-
     {:noreply, state}
   end
 
@@ -1669,6 +1679,9 @@ defmodule Pepe.Gateways.Telegram do
   end
 
   # Map internal errors to a short, user-safe message (no structs/stacktraces).
+  defp friendly_error(:shutting_down),
+    do: gettext("I'm restarting right now. Send that again in a minute.")
+
   defp friendly_error(%Req.TransportError{}),
     do: gettext("I'm having a connection problem right now. Could you try again?")
 

@@ -1026,6 +1026,8 @@ defmodule Pepe.Agent.Session do
         first_turn?(state.messages)
 
     {pid, ref} = spawn_run(state.key, agent, base, text, state.pii_map, opts, should_triage?)
+    # Counted as work in flight until it exits, so a shutdown waits for this turn (Pepe.Drain).
+    Pepe.Drain.enter(pid)
 
     running = %{task: pid, ref: ref, from: from, on_event: opts[:on_event], folded_froms: [], text: text, opts: opts}
     {:noreply, %{state | running: running, pending_resume: text}}
@@ -1323,7 +1325,17 @@ defmodule Pepe.Agent.Session do
   # apply this session's model override), so tools/model changes apply live. Replies an
   # error to `from` directly on a failure so it works both as a direct call and when
   # draining the queue. Returns `{:noreply, state}` (running set on success).
+  # A shutdown has begun (Pepe.Drain): no new turn starts, and the caller is told so it can retry.
   defp start_turn(state, text, opts, from) do
+    if Pepe.Drain.draining?() do
+      reply(from, {:error, :shutting_down})
+      {:noreply, state}
+    else
+      admit_turn(state, text, opts, from)
+    end
+  end
+
+  defp admit_turn(state, text, opts, from) do
     case resolve_agent(state) do
       nil ->
         reply(from, {:error, :no_agent})

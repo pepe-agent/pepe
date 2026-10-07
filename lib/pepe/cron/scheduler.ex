@@ -58,7 +58,7 @@ defmodule Pepe.Cron.Scheduler do
 
   @impl true
   def handle_info(:tick, state) do
-    state = Enum.reduce(Config.crons(), state, &maybe_fire/2)
+    state = if Pepe.Drain.draining?(), do: state, else: Enum.reduce(Config.crons(), state, &maybe_fire/2)
     schedule_tick()
 
     {:noreply,

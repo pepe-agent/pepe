@@ -1,6 +1,12 @@
 defmodule Pepe.ApplicationPrepStopTest do
   use ExUnit.Case, async: false
 
+  # prep_stop starts draining, which is global; leave the gate open for the tests after this one.
+  setup do
+    Pepe.Drain.reset()
+    on_exit(&Pepe.Drain.reset/0)
+  end
+
   test "prep_stop drains in-flight cron tasks before returning" do
     start_supervised!({Task.Supervisor, name: Pepe.Cron.TaskSupervisor})
 
@@ -19,5 +25,25 @@ defmodule Pepe.ApplicationPrepStopTest do
 
   test "prep_stop is a no-op when no cron scheduler was ever started" do
     assert Pepe.Application.prep_stop(:some_state) == :some_state
+  end
+
+  test "prep_stop stops admitting new work, and waits for a turn that is already running" do
+    {:ok, _} = Application.ensure_all_started(:pepe)
+    refute Pepe.Drain.draining?()
+
+    test_pid = self()
+
+    turn =
+      spawn(fn ->
+        Process.sleep(200)
+        send(test_pid, :turn_finished)
+      end)
+
+    Pepe.Drain.enter(turn)
+
+    assert Pepe.Application.prep_stop(:some_state) == :some_state
+    assert Pepe.Drain.draining?()
+    assert_received :turn_finished
+    assert Pepe.Drain.in_flight() == 0
   end
 end

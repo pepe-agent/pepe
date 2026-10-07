@@ -72,12 +72,18 @@ defmodule Pepe.Application do
   # (a message sent, a file written) is left half-done with nothing to show for it.
   @impl true
   def prep_stop(state) do
+    # First, stop admitting: a message that arrives from here on is refused (and a webhook sender
+    # or a Telegram poll retries it after the restart) instead of starting a turn that dies with
+    # the VM. What is already running is waited for below.
+    Pepe.Drain.start()
+
     drain_tasks(Pepe.Cron.TaskSupervisor, "cron job")
     drain_tasks(Pepe.Board.TaskSupervisor, "board card")
     drain_tasks(Pepe.Watch.TaskSupervisor, "watch")
     drain_tasks(Pepe.Commitments.TaskSupervisor, "commitment")
     drain_tasks(Pepe.Insight.TaskSupervisor, "insight retrain")
     drain_tasks(Pepe.Webhooks.TaskSupervisor, "inbound message")
+    drain_turns()
     state
   end
 
@@ -117,6 +123,23 @@ defmodule Pepe.Application do
     end
   end
 
+  # The conversation turns and one-shot runs that were mid-flight when the shutdown began (a chat
+  # from the dashboard or the API, a Telegram turn): not covered by the task supervisors above.
+  defp drain_turns do
+    case Pepe.Drain.in_flight() do
+      0 ->
+        :ok
+
+      n ->
+        Logger.info("draining #{n} in-flight conversation turn(s) before shutdown")
+
+        case Pepe.Drain.await(@drain_timeout_ms) do
+          :ok -> :ok
+          {:timeout, left} -> Logger.warning("turn drain timed out with #{left} turn(s) still running; shutting down anyway")
+        end
+    end
+  end
+
   # Base supervision tree + (optionally) the Phoenix endpoint.
   defp start_supervisor(endpoint_children) do
     # Scheduler utilization is a cumulative counter that has to be switched on before
@@ -135,6 +158,7 @@ defmodule Pepe.Application do
         repo_children() ++
         [
           # Registry + dynamic supervisor for live agent conversation sessions
+          Pepe.Drain,
           {Registry, keys: :unique, name: Pepe.Agent.Registry},
           Pepe.Agent.SessionSupervisor,
           # In-memory session-scoped tool approvals (the `:session` permission grant)

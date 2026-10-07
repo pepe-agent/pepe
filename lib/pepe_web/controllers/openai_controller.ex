@@ -39,6 +39,16 @@ defmodule PepeWeb.OpenAIController do
   end
 
   def chat_completions(conn, params) do
+    # Pepe is shutting down (Pepe.Drain): nothing new starts, and a client that retries gets the
+    # restarted instance.
+    if Pepe.Drain.draining?() do
+      conn |> put_resp_header("retry-after", "5") |> error(503, "shutting down, try again in a moment")
+    else
+      admit_chat_completions(conn, params)
+    end
+  end
+
+  defp admit_chat_completions(conn, params) do
     messages = normalize_messages(params["messages"] || [])
     scope = conn.assigns[:api_scope] || :unrestricted
     {agent, model} = resolve(params["model"], scope)

@@ -150,16 +150,25 @@ defmodule Pepe.Webhooks do
           {:respond, status, content_type, body}
 
         {:reply_async, status, content_type, body} ->
-          run_parse(mod, entry, payload)
-          {:respond, status, content_type, body}
+          accept_inbound(mod, entry, payload, {:respond, status, content_type, body})
 
         :cont ->
-          run_parse(mod, entry, payload)
-          :ok
+          accept_inbound(mod, entry, payload, :ok)
       end
     else
       :error -> {:error, :unauthorized}
       _ -> {:error, :unknown_connection}
+    end
+  end
+
+  # While Pepe shuts down (Pepe.Drain) a message is refused with a 5xx, which the sender retries
+  # after the restart, rather than starting a turn that would die with the VM.
+  defp accept_inbound(mod, entry, payload, answer) do
+    if Pepe.Drain.draining?() do
+      {:error, :shutting_down}
+    else
+      run_parse(mod, entry, payload)
+      answer
     end
   end
 
@@ -444,12 +453,14 @@ defmodule Pepe.Webhooks do
   authenticated with the bot's own token when it was opened, and there is no request to
   authenticate. `slug` names the connection.
   """
-  @spec handle_gateway_event(String.t(), map()) :: :ok | {:error, :unknown_connection}
+  @spec handle_gateway_event(String.t(), map()) :: :ok | {:error, :unknown_connection | :shutting_down}
   def handle_gateway_event(slug, payload) do
-    with entry when is_map(entry) <- Config.get_webhook(slug),
+    with false <- Pepe.Drain.draining?(),
+         entry when is_map(entry) <- Config.get_webhook(slug),
          mod when not is_nil(mod) <- provider(entry["provider"]) do
       run_parse(mod, Map.put(entry, "slug", slug), payload)
     else
+      true -> {:error, :shutting_down}
       _ -> {:error, :unknown_connection}
     end
   end
