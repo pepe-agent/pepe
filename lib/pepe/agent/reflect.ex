@@ -57,8 +57,38 @@ defmodule Pepe.Agent.Reflect do
   instruction and can quietly override what the user actually asks for then. Favour
   what will spare the user from correcting or reminding you again. Keep these files
   LEAN - if one is getting long, consolidate or drop stale lines instead of piling
-  on. Save durable preferences and facts, not one-off task status. If there's
-  nothing genuinely new, leave memory alone.
+  on. Save durable preferences and facts, not one-off task status.
+  If there's nothing genuinely new, leave memory alone.
+  """
+
+  # A job of its own, not a clause of the memory one: folded into "about the user" a model reads
+  # it as optional and answers "nothing". Measured against a real model, that is exactly what
+  # it did after a conversation that had just found a working command.
+  @recipes_job """
+  RECIPES - about how things get done here, in `TOOLS.md` (loaded at the start of every
+  conversation). Did this conversation get a task done by running something: a command, a
+  script, a tool or a service, with arguments, a prompt or a style that took some finding out?
+  Then make sure `TOOLS.md` has ONE entry for that kind of task with what someone else needs to
+  repeat it: what the task is called, where the thing is (path, host, vault item name), the exact
+  command or call that worked and its arguments, and the trap that failed first. Read the file
+  first if it exists (it may not yet: then create it with `write_file`, that is expected, not an
+  error); edit the entry that exists instead of adding a second, and drop a line that turned out
+  to be wrong. NEVER the value of a password, token or key: only where it is kept and how it is
+  read. Write to the relative path `TOOLS.md` (your own workspace); a path outside it, such as
+  another agent's, is refused - do not retry it and do not stop there, carry on with your own
+  file. Skip it only if the work was a one-off that nobody will ask for again.
+  """
+
+  # What happened, as a thread the next conversation can pick up: the daily log. Raw and short on
+  # purpose - the standing facts, recipes and skills have their own jobs, and the consolidation
+  # pass folds an old day's log into them.
+  @log_job """
+  LOG - today's log, `memory/%{date}.md` (create it if it is not there; the folder too). Append,
+  never rewrite: one to three short lines on what happened in this conversation that someone
+  picking the work up tomorrow would want - what was done, what was decided, what is still open,
+  with the names, ids and file paths involved. Not who the user is (that is `USER.md`), not how a
+  thing is done (that is `TOOLS.md`), no secrets. A greeting or a one-line question is not worth a
+  line: write nothing.
   """
 
   @skills_job """
@@ -143,7 +173,7 @@ defmodule Pepe.Agent.Reflect do
     [Background review - the user will NOT see this turn.]
 
     Look back over the conversation and improve what you've learned, using ONLY your tools.
-    #{jobs(scope)}
+    #{jobs(scope, SkillLearning.tainted?(messages))}
     #{hint(scope, messages)}\
     Make small, real improvements when warranted; if there is genuinely nothing to
     save or update, do nothing. End with a one-line summary of what you changed (or
@@ -151,9 +181,22 @@ defmodule Pepe.Agent.Reflect do
     """
   end
 
-  defp jobs(:memory), do: "\n" <> numbered([@memory_job])
-  defp jobs(:skills), do: "\n" <> numbered([@skills_job])
-  defp jobs(:all), do: "Two separate jobs:\n\n" <> numbered([@memory_job, @skills_job])
+  # `TOOLS.md` is read at the start of every later conversation and holds commands, so a
+  # conversation that took in outside content (what a stranger's page says) never gets the recipes
+  # job: it can still be reviewed for memory, which the same rule has always allowed.
+  defp jobs(:memory, true), do: "\n" <> numbered([@memory_job])
+  defp jobs(:memory, false), do: "\n" <> numbered([@memory_job, @recipes_job, log_job()])
+  defp jobs(:skills, _tainted?), do: "\n" <> numbered([@skills_job])
+  defp jobs(:all, _tainted?), do: "Four separate jobs:\n\n" <> numbered([@memory_job, @recipes_job, log_job(), @skills_job])
+
+  defp log_job, do: String.replace(@log_job, "%{date}", today())
+
+  defp today do
+    case DateTime.now(Config.default_timezone()) do
+      {:ok, now} -> now |> DateTime.to_date() |> Date.to_iso8601()
+      _ -> Date.utc_today() |> Date.to_iso8601()
+    end
+  end
 
   defp numbered(jobs) do
     jobs
@@ -163,9 +206,25 @@ defmodule Pepe.Agent.Reflect do
 
   # Where the last exchange already shows evidence: told to the reviewer so it starts there
   # instead of re-deriving it, and only when skills are in scope.
-  defp hint(:memory, _messages), do: ""
+  defp hint(:memory, messages), do: recipe_hint(messages)
 
   defp hint(_scope, messages) do
+    recipe_hint(messages) <> skill_hint(messages)
+  end
+
+  # The last exchange ran its steps and nothing in it wrote the recipe down: say so, so the
+  # reviewer starts there instead of re-deriving whether this conversation has anything to keep.
+  defp recipe_hint(messages) do
+    turn = SkillLearning.current_turn(messages)
+
+    if not SkillLearning.tainted?(turn) and Pepe.Agent.RecipeNote.earned?(turn) and
+         not Pepe.Agent.RecipeNote.written?(turn),
+       do:
+         "\nThe last exchange took several tool steps to get a result and `TOOLS.md` was not touched: unless it already has an entry for this task, this is the moment to record the recipe.\n\n",
+       else: ""
+  end
+
+  defp skill_hint(messages) do
     case messages |> SkillLearning.current_turn() |> SkillLearning.review_signal() do
       :save ->
         "\nThe last exchange took several steps to work out with no skill in play: if it is a repeatable procedure, this is the moment to save it.\n\n"
@@ -228,16 +287,23 @@ defmodule Pepe.Agent.Reflect do
   There is no conversation to learn from here. The job is pure housekeeping over the
   memory and skills you have ALREADY saved, using ONLY your tools:
 
-  1) Read each knowledge file you keep that exists (`USER.md`, `MEMORY.md`, `people.md`)
-     and your skills.
+  1) Read each knowledge file you keep that exists (`USER.md`, `MEMORY.md`, `people.md`,
+     `TOOLS.md`), the daily logs in `memory/` (list the folder; they are named by date) and
+     your skills.
   2) Consolidate: merge entries that duplicate or overlap, drop lines that are stale,
      superseded, or contradicted by a newer one, and tighten wordy entries. Keep every
      durable fact, decision, preference and name - only compress, never lose information.
-  3) For skills, prefer merging overlapping ones into a richer skill over keeping many
+     `TOOLS.md` and `MEMORY.md` open every conversation, so keep each well under 10,000
+     characters: ONE entry per kind of task in `TOOLS.md`, the working command kept and the
+     failed attempts dropped.
+  3) Fold the daily logs older than two days into the standing files: a lasting fact or
+     decision into `MEMORY.md` or `USER.md`, a recipe into `TOOLS.md`, then leave the log
+     itself as it is. Today's and yesterday's logs are not yours to touch.
+  4) For skills, prefer merging overlapping ones into a richer skill over keeping many
      narrow files. Use `skill_manage` (open each skill with `skill` first; only the skills an
      agent wrote are yours to change; archive a merged one with `delete` and
      `absorbed_into`).
-  4) Invent nothing. Only reorganize what is already there.
+  5) Invent nothing. Only reorganize what is already there. Never the value of a secret.
 
   Make real improvements only where warranted; if everything is already lean, change
   nothing. End with a one-line summary of what you changed (or "nothing").
@@ -252,6 +318,64 @@ defmodule Pepe.Agent.Reflect do
   def consolidate(agent) do
     reviewer = Reviewer.agent(agent, :all, max_iterations: 12)
     Reviewer.with_run("review", fn run_opts -> Runtime.converse(reviewer, @consolidate_prompt, run_opts) end)
+  end
+
+  # The standing notes open every conversation, so they must not be left to grow until they are
+  # clipped. After a review, an agent whose notes have outgrown this - or that has piled up daily
+  # logs - is consolidated, at most once a day, with nothing to switch on. The scheduled cron below
+  # is still how to do it at a fixed hour.
+  @consolidate_over_chars 10_000
+  @consolidate_log_days 3
+  @consolidate_every_seconds 20 * 60 * 60
+
+  @doc """
+  Consolidate `agent`'s notes if they have outgrown their budget (or its daily logs have piled up)
+  and no pass has run in the last day. Cheap to call: it reads file sizes and one marker file.
+  Returns `:started`, or `:not_needed`.
+  """
+  @spec consolidate_if_needed(Pepe.Config.Agent.t()) :: :started | :not_needed
+  def consolidate_if_needed(agent) do
+    dir = Pepe.Agent.Workspace.dir(agent.name)
+    marker = Path.join(dir, ".last_consolidation")
+
+    if notes_outgrown?(dir) and consolidated_long_ago?(marker) do
+      File.mkdir_p!(dir)
+      File.write!(marker, "")
+
+      Task.start(fn -> consolidate(agent) end)
+      :started
+    else
+      :not_needed
+    end
+  end
+
+  defp notes_outgrown?(dir) do
+    standing = ~w(TOOLS.md MEMORY.md USER.md)
+
+    Enum.any?(standing, &(file_chars(Path.join(dir, &1)) > @consolidate_over_chars)) or
+      old_logs(dir) >= @consolidate_log_days
+  end
+
+  defp file_chars(path) do
+    case File.stat(path) do
+      {:ok, %{size: size}} -> size
+      _ -> 0
+    end
+  end
+
+  # Daily logs older than the two the prompt loads.
+  defp old_logs(dir) do
+    case File.ls(Path.join(dir, "memory")) do
+      {:ok, entries} -> entries |> Enum.filter(&String.ends_with?(&1, ".md")) |> Enum.sort() |> Enum.drop(-2) |> length()
+      _ -> 0
+    end
+  end
+
+  defp consolidated_long_ago?(marker) do
+    case File.stat(marker, time: :posix) do
+      {:ok, %{mtime: at}} -> System.os_time(:second) - at >= @consolidate_every_seconds
+      _ -> true
+    end
   end
 
   ###

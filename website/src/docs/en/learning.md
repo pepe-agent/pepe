@@ -39,14 +39,29 @@ deliberately kept separate:
 
 - **Memory** is about *you*, and it lives in `USER.md`, `MEMORY.md`, and `people.md`.
   It is kept lean, so the agent consolidates instead of piling on.
+- **`TOOLS.md`** is about *how things get done here*: where your data and systems live,
+  which tool or service does which job, and the recipe behind a result that worked (the
+  tool, the prompt, the style, the reference files, the script). It is loaded into every
+  conversation, so the agent starts out knowing it instead of having to remember to look.
+  The agent writes to it as soon as something works, not only in the background review.
+  It never holds a password or token, only where one is kept.
 - **Skills** are about *technique*. The reviewer prefers updating a rich existing
   skill over spawning a narrow new one.
 
 To find one thing without reading a whole file, an agent has the `memory_search`
-tool: a plain, case-insensitive search over its own `MEMORY.md`/`USER.md`/`people.md`
-entries, each match tagged with the file it came from. It looks for the words
-themselves, not their meaning, and makes no model or API call, so it adds no cost
+tool: a search over the entries of its own notes (`MEMORY.md`, `USER.md`, `people.md`, `TOOLS.md`
+and any other note it keeps), each match tagged with the file it came from. It compares
+words, ignoring case and accents, and ranks entries by how many words match. It looks for
+the words themselves, not their meaning, and makes no model or API call, so it adds no cost
 and no delay: the right fit for a memory kept small on purpose.
+
+`TOOLS.md` is loaded into every conversation. `MEMORY.md` and `USER.md` are loaded only
+in a private conversation that may feed what the agent keeps (the dashboard, the API, the terminal,
+an editor, a one-to-one Telegram chat with someone the bot learns from), because they describe a
+person and a group's session belongs to everyone in it. An anonymous widget visitor or a client
+of a customer-facing bot never gets them, and is never told to write notes.
+When a turn took trial and error to get working, the agent also gets a one-line reminder, on that model call only, to write the recipe into `TOOLS.md` before answering. Each file is clipped at 20,000 characters, and the three together at 40,000; when something
+is cut, the prompt says so. Today's and yesterday's daily log (`memory/YYYY-MM-DD.md`, written by the same review) load with them, and `memory_search` reads every day. When the notes pass 10,000 characters, or older daily logs pile up, the consolidation pass runs on its own, at most once a day: one entry per kind of task, failed attempts dropped, old logs folded into the standing notes. `mix pepe agent footprint` shows what they cost.
 
 The review is a background run with its tools restricted to file and skill
 management. It has no shell and no network, so it can update the workspace and

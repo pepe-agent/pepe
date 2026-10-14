@@ -216,19 +216,124 @@ defmodule Pepe.Agent.WorkspaceTest do
   test "system_prompt lists knowledge files by name (not content) and adds the note" do
     agent = %{name: "zak", system_prompt: "seed"}
     File.mkdir_p!(Workspace.dir("zak"))
-    File.write!(Path.join(Workspace.dir("zak"), "USER.md"), "The user is Jho.")
+    File.write!(Path.join(Workspace.dir("zak"), "clients.md"), "The Acme account renews in May.")
     File.write!(Path.join(Workspace.dir("zak"), "people.md"), "lots of people data")
 
     prompt = Workspace.system_prompt(agent)
 
     # listed by name, read on demand - content NOT preloaded
-    assert prompt =~ "- USER.md"
+    assert prompt =~ "- clients.md"
     assert prompt =~ "- people.md"
-    refute prompt =~ "The user is Jho."
+    refute prompt =~ "The Acme account renews in May."
     refute prompt =~ "lots of people data"
 
     assert prompt =~ "Your workspace"
     assert prompt =~ "shared/"
+  end
+
+  test "system_prompt lists scripts the agent wrote earlier, by name, newest first, skipping shared/" do
+    agent = %{name: "zak", system_prompt: "seed"}
+    dir = Workspace.dir("zak")
+    File.mkdir_p!(Path.join(dir, "scripts"))
+    File.mkdir_p!(Path.join(dir, "shared"))
+    File.write!(Path.join(dir, "scripts/leads_report.sql"), "select 1")
+    File.write!(Path.join(dir, "export.py"), "print(1)")
+    File.write!(Path.join(dir, "shared/other.sh"), "echo")
+    File.write!(Path.join(dir, "notes.txt"), "not a script")
+
+    prompt = Workspace.system_prompt(agent)
+
+    assert prompt =~ "Scripts you wrote earlier"
+    assert prompt =~ "- scripts/leads_report.sql"
+    assert prompt =~ "- export.py"
+    refute prompt =~ "other.sh"
+    refute prompt =~ "notes.txt"
+    refute prompt =~ "select 1"
+  end
+
+  test "an agent with no scripts gets no scripts section" do
+    refute Workspace.system_prompt(%{name: "zak", system_prompt: "seed"}) =~ "Scripts you wrote earlier"
+  end
+
+  describe "the notes every conversation starts with" do
+    setup do
+      dir = Workspace.dir("zak")
+      File.mkdir_p!(dir)
+      File.write!(Path.join(dir, "TOOLS.md"), "Instagram posts: use the image tool, style ref posts/ref.png.")
+      File.write!(Path.join(dir, "MEMORY.md"), "The user prefers short answers.")
+      File.write!(Path.join(dir, "USER.md"), "The user is Jho.")
+      {:ok, agent: %{name: "zak", system_prompt: "seed"}}
+    end
+
+    test "a private chat starts with TOOLS.md, MEMORY.md and USER.md already in context", %{agent: agent} do
+      for key <- ["telegram:12345", "telegram:bot2:12345", "telegram:12345#t7", "web:abc", "api:x"] do
+        prompt = Workspace.system_prompt(agent, key: key)
+        assert prompt =~ "style ref posts/ref.png", key
+        assert prompt =~ "prefers short answers", key
+        assert prompt =~ "The user is Jho.", key
+      end
+
+      refute Workspace.system_prompt(agent, key: "web:abc") =~ "- MEMORY.md"
+    end
+
+    test "a group or an unknown chat app gets TOOLS.md but never the personal notes", %{agent: agent} do
+      for key <- ["telegram:-100123", "telegram:bot2:-100123#t4", "slack:C1", "discord:9", "whatsapp:55"] do
+        prompt = Workspace.system_prompt(agent, key: key)
+        assert prompt =~ "style ref posts/ref.png", key
+        refute prompt =~ "prefers short answers", key
+        refute prompt =~ "The user is Jho.", key
+        assert prompt =~ "- MEMORY.md", key
+      end
+    end
+
+    test "a conversation that may not learn (a widget visitor, a client on a customer bot) never gets the personal notes", %{agent: agent} do
+      for key <- ["widget:example.com:abc", "telegram:12345", "api:x", "web:abc"] do
+        prompt = Workspace.system_prompt(agent, key: key, learn: false)
+        refute prompt =~ "prefers short answers", key
+        refute prompt =~ "The user is Jho.", key
+        refute prompt =~ "Write it down as you go", key
+        refute prompt =~ "## Reactions as feedback", key
+        assert prompt =~ "style ref posts/ref.png", key
+      end
+    end
+
+    test "the instruction to write things down goes only to a learning conversation of an agent that can write", %{agent: agent} do
+      assert Workspace.system_prompt(agent, key: "web:abc", learn: true) =~ "Write it down as you go"
+      assert Workspace.system_prompt(agent) =~ "Write it down as you go"
+
+      refute Workspace.system_prompt(%{agent | system_prompt: "seed"} |> Map.put(:tools, ["read_file"]), key: "web:abc") =~
+               "Write it down as you go"
+
+      refute Workspace.system_prompt(Map.put(agent, :tools, []), key: "web:abc") =~ "Write it down as you go"
+    end
+
+    test "today's and yesterday's daily log open a private conversation; older days and groups do not", %{agent: agent} do
+      dir = Workspace.dir("zak")
+      File.mkdir_p!(Path.join(dir, "memory"))
+      {:ok, now} = DateTime.now(Pepe.Config.default_timezone())
+      today = DateTime.to_date(now)
+
+      File.write!(Path.join(dir, Workspace.daily_path(today)), "Sent the weekly report to finance.")
+      File.write!(Path.join(dir, Workspace.daily_path(Date.add(today, -1))), "Migration still open.")
+      File.write!(Path.join(dir, Workspace.daily_path(Date.add(today, -5))), "An old day.")
+
+      private = Workspace.system_prompt(agent, key: "web:abc")
+      assert private =~ "Sent the weekly report to finance."
+      assert private =~ "Migration still open."
+      refute private =~ "An old day."
+
+      for opts <- [[key: "telegram:-100123"], [key: "web:abc", learn: false], [key: "widget:x:1", learn: false]] do
+        refute Workspace.system_prompt(agent, opts) =~ "Sent the weekly report to finance.", inspect(opts)
+      end
+    end
+
+    test "a notes file that grows is clipped, and says so", %{agent: agent} do
+      File.write!(Path.join(Workspace.dir("zak"), "TOOLS.md"), String.duplicate("recipe line\n", 5_000))
+      prompt = Workspace.system_prompt(agent, key: "web:abc")
+
+      assert prompt =~ "clipped to keep every conversation light"
+      assert String.length(prompt) < 60_000
+    end
   end
 
   describe "langfuse_prompt" do
@@ -289,7 +394,7 @@ defmodule Pepe.Agent.WorkspaceTest do
     prompt = Workspace.system_prompt(agent)
 
     assert prompt =~ "[reacted <emoji>]"
-    assert prompt =~ "append a short note to MEMORY.md"
+    assert prompt =~ "append a short note to TOOLS.md"
     assert prompt =~ "never answer it"
   end
 

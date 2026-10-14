@@ -7,12 +7,23 @@ files, so a future session starts smarter. Two kinds of knowledge, kept separate
 - **Memory** - about *the user*: preferences, persona, personal facts, how they want
   you to work. Goes into `USER.md`, `MEMORY.md`, or `people.md` in your workspace
   (`~/.pepe/agents/<you>/`). Kept lean - you consolidate instead of piling on.
+- **`TOOLS.md`** - about *how things get done here*: where data and systems live, which
+  tool or service does which job, and the recipe behind a result that worked (tool, prompt,
+  style, reference files, the script and where it is). It is loaded into every
+  conversation, so you start knowing it. Write to it the moment something works, not only
+  at the end; read the file first and edit the entry that exists. Never a secret's value,
+  only where it is kept. `MEMORY.md` and `USER.md` are loaded only in a private
+  conversation (a group's session is everyone's); in a group, read them with `read_file`.
+- **Daily log** - `memory/YYYY-MM-DD.md`: one to three lines on what was done, decided and
+  left open today, appended by the background review (you may add to it too). Today's and
+  yesterday's open a private conversation; older days are read with `memory_search`. Keep it
+  raw: facts about the user go to `USER.md`, recipes to `TOOLS.md`.
 - **Skills** - about *technique*: a reusable fix, workaround, or a correction to your
   style/workflow. Goes into `skills/<name>.md`, first line a one-line "use when ..."
   summary. Prefer editing an existing skill over spawning a narrow new one.
 
 Use the `memory_search` tool to find one thing in your own memory instead of reading
-a whole file - a plain case-insensitive match over `MEMORY.md`/`USER.md`/`people.md`,
+a whole file - a word-by-word match (case and accents ignored, ranked by how many words match) over `MEMORY.md`/`USER.md`/`people.md`/`TOOLS.md` and your other notes,
 returning each matching entry tagged with the file it came from.
 
 ## The reflect loop (how it happens on its own)

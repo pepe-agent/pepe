@@ -38,6 +38,7 @@ defmodule Pepe.Agent.Runtime do
 
   alias Pepe.Agent.Compaction
   alias Pepe.Agent.LoopGuard
+  alias Pepe.Agent.RecipeNote
   alias Pepe.Agent.SkillLearning
   alias Pepe.Config
   alias Pepe.Config.Agent
@@ -79,6 +80,7 @@ defmodule Pepe.Agent.Runtime do
           source: String.t() | nil,
           sender: String.t() | nil,
           review: boolean(),
+          learn: boolean(),
           review_run: String.t() | nil,
           review_actor: String.t() | nil,
           untrusted: boolean(),
@@ -285,6 +287,9 @@ defmodule Pepe.Agent.Runtime do
       # Set only for a background skill review or curator pass (see Pepe.Skills.Review): an
       # id the tools use to remember what this run has read, and who to name in the ledger.
       # Its presence is what marks a skill write as "nobody is present" to Pepe.Skills.Manage.
+      # Whether this conversation may feed what the agent keeps (set by the surface through
+      # Session): false for an anonymous widget visitor or a client on a customer-facing bot.
+      learn: opts[:learn] != false,
       review_run: opts[:review_run],
       review_actor: opts[:review_actor],
       # The agent-to-agent call chain, for routing loop/hop guards (send_to_agent).
@@ -399,7 +404,9 @@ defmodule Pepe.Agent.Runtime do
     # turn, and persisting it would have a later turn read it back as conversation. See
     # Pepe.Agent.SkillLearning for the criterion and why it lives in code rather than in
     # the system prompt.
-    to_send = compact_for_send(agent, chain, messages, ctx) ++ SkillLearning.reminders(agent, messages)
+    to_send =
+      compact_for_send(agent, chain, messages, ctx) ++
+        SkillLearning.reminders(agent, messages) ++ RecipeNote.reminders(agent, messages, ctx)
 
     result = chat_with_failover(chain, to_send, chat_opts, ctx, opts)
 

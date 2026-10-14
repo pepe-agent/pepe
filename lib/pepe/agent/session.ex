@@ -696,7 +696,7 @@ defmodule Pepe.Agent.Session do
         Pepe.Trace.set_prompt(redacted)
 
         messages =
-          ensure_system(state.messages, agent, state.key) ++
+          ensure_system(state.messages, agent, state.key, state.learn_allowed) ++
             Workspace.time_reminder() ++
             goal_reminder(state.key) ++ [Message.user(resume_prompt(redacted))]
 
@@ -742,7 +742,10 @@ defmodule Pepe.Agent.Session do
 
       agent ->
         prompt = Pepe.Heartbeat.build_prompt(state.key, agent.name)
-        messages = ensure_system(state.messages, agent, state.key) ++ Workspace.time_reminder() ++ [Message.user(prompt)]
+
+        messages =
+          ensure_system(state.messages, agent, state.key, state.learn_allowed) ++ Workspace.time_reminder() ++ [Message.user(prompt)]
+
         opts = [session_key: state.key, agent_switch_locked: state.agent_switch_locked]
 
         # The pulse prompt itself is internal (never user text, so no inbound
@@ -780,7 +783,10 @@ defmodule Pepe.Agent.Session do
         # hook entries stranded in the process dictionary. It stays ephemeral: `state` (its
         # `pii_map` included) is left untouched, so the aside changes nothing about the session.
         {redacted, entries} = Pepe.Hooks.transform(:inbound, text, agent, %{"map" => state.pii_map})
-        messages = ensure_system(state.messages, agent, state.key) ++ Workspace.time_reminder() ++ [Message.user(redacted)]
+
+        messages =
+          ensure_system(state.messages, agent, state.key, state.learn_allowed) ++ Workspace.time_reminder() ++ [Message.user(redacted)]
+
         opts = Keyword.put(opts, :session_key, state.key)
 
         Pepe.Hooks.start_map(state.pii_map ++ entries)
@@ -999,6 +1005,8 @@ defmodule Pepe.Agent.Session do
     opts = Keyword.put(opts, :session_key, state.key)
     # Whether this conversation may feed the memory/skill review (set by the surface).
     state = %{state | learn_allowed: Keyword.get(opts, :learn, state.learn_allowed)}
+    opts = Keyword.put(opts, :learn, state.learn_allowed)
+    state = drop_personal_notes_if_not_learning(state, agent)
     # Whether the owning connection refuses agent-switching this turn (set by the surface,
     # same pattern as learn_allowed above) - remembered on state so a heartbeat/resume turn
     # (which builds its own opts with no surface in the loop) still carries it forward.
@@ -1014,7 +1022,7 @@ defmodule Pepe.Agent.Session do
     # Run off-process so the session stays responsive (e.g. to `/stop`). The raw
     # user text and the reversible map go in; the task redacts (inbound hooks)
     # before the model sees anything and restores the reply on the way out.
-    base = state.messages |> ensure_system(agent, state.key) |> maybe_add_lang_hint(opts, state.messages)
+    base = state.messages |> ensure_system(agent, state.key, state.learn_allowed) |> maybe_add_lang_hint(opts, state.messages)
     mark_pending(state, text)
     # Complexity-triage only ever runs on a session's first-ever turn (same
     # boundary as the lang hint above), never when a model override is already
@@ -1173,7 +1181,10 @@ defmodule Pepe.Agent.Session do
          agent when not is_nil(agent) <- Config.get_agent(state.agent_name) do
       # Idleness means "something just happened": look at the last few exchanges, not the
       # whole history (see Pepe.Agent.Reflect's moduledoc for why).
-      Pepe.Agent.Reflect.review_async(agent, state.messages, digest: 8)
+      Pepe.Agent.Reflect.review_async(agent, state.messages,
+        digest: 8,
+        on_done: fn _ -> Pepe.Agent.Reflect.consolidate_if_needed(agent) end
+      )
     end
 
     {:noreply, %{state | idle_ref: nil}}
@@ -1693,10 +1704,26 @@ defmodule Pepe.Agent.Session do
   end
 
   # A session started before any agent existed has no system message yet - seed one.
-  defp ensure_system([%{"role" => "system"} | _] = messages, _agent, _key), do: messages
+  # A session's system prompt is built when the session starts, before the first message says whether
+  # this conversation may feed what the agent keeps (an anonymous widget visitor, a client on a
+  # customer-facing bot: no). It is built assuming yes, so the first turn that turns out to be no
+  # rebuilds it without the notes about a person. The other direction is left alone on purpose: a
+  # prompt that was built without them stays without, which is the cautious side to be wrong on.
+  defp drop_personal_notes_if_not_learning(%{learn_allowed: false, messages: [%{"role" => "system"} | rest]} = state, agent) do
+    if Map.get(state, :prompt_learn, true) do
+      system = Message.system(Workspace.system_prompt(agent, key: state.key, learn: false))
+      state |> Map.put(:prompt_learn, false) |> Map.put(:messages, [system | rest])
+    else
+      state
+    end
+  end
 
-  defp ensure_system(messages, agent, key),
-    do: [Message.system(Workspace.system_prompt(agent, key: key)) | messages]
+  defp drop_personal_notes_if_not_learning(state, _agent), do: state
+
+  defp ensure_system([%{"role" => "system"} | _] = messages, _agent, _key, _learn?), do: messages
+
+  defp ensure_system(messages, agent, key, learn?),
+    do: [Message.system(Workspace.system_prompt(agent, key: key, learn: learn?)) | messages]
 
   # Who sent the message being answered right now (a multi-person Telegram group chat;
   # nil for DMs and every non-group source). Ephemeral like goal_reminder/1, and for
