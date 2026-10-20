@@ -212,6 +212,7 @@ defmodule Pepe.Webhooks do
 
         case Pepe.SeenChannels.touch(entry["slug"], entry["provider"], from, kind: kind, name: name) do
           :new when not is_binary(name) -> lookup_channel_name(mod, entry, from)
+          :seen when not is_binary(name) -> retry_channel_name(mod, entry, from)
           _ -> :ok
         end
 
@@ -231,12 +232,40 @@ defmodule Pepe.Webhooks do
 
       case Pepe.SeenPeople.touch(entry["slug"], from, person, name: name) do
         :new when not is_binary(name) -> lookup_person_name(mod, entry, person)
+        :seen when not is_binary(name) -> retry_person_name(mod, entry, person)
         _ -> :ok
       end
     end
   end
 
   defp note_person(_mod, _entry, _message), do: :ok
+
+  # The first lookup is one try. When it came to nothing (the app had no scope to read names yet,
+  # or the platform was busy), the person or channel would stay an id for good, so a later
+  # message tries again while the name is still missing: at most once every half hour for each.
+  @name_retry_s 1_800
+
+  @doc false
+  @spec retry_channel_name(module(), map(), String.t(), integer()) :: :ok
+  def retry_channel_name(mod, entry, channel, now \\ System.os_time(:second)) do
+    with %{name: nil} <- Pepe.SeenChannels.get(entry["slug"], channel),
+         true <- Pepe.SeenChannels.throttle_due?({:channel_lookup, entry["slug"], channel}, now, @name_retry_s) do
+      lookup_channel_name(mod, entry, channel)
+    else
+      _ -> :ok
+    end
+  end
+
+  @doc false
+  @spec retry_person_name(module(), map(), String.t(), integer()) :: :ok
+  def retry_person_name(mod, entry, person, now \\ System.os_time(:second)) do
+    with %{name: nil} <- Pepe.SeenPeople.get(entry["slug"], person),
+         true <- Pepe.SeenChannels.throttle_due?({:person_lookup, entry["slug"], person}, now, @name_retry_s) do
+      lookup_person_name(mod, entry, person)
+    else
+      _ -> :ok
+    end
+  end
 
   defp lookup_person_name(mod, entry, person) do
     if function_exported?(mod, :person_name, 2) do

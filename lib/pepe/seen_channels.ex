@@ -118,15 +118,15 @@ defmodule Pepe.SeenChannels do
   # one VM, a test suite, must not share it). Without the table (no supervision tree) every
   # message is due: correctness over economy in a setting that has no traffic anyway. Shared
   # with `Pepe.SeenPeople`, which rides the same table under its own key shape.
-  @spec throttle_due?(tuple(), integer()) :: boolean()
-  def throttle_due?(what, now) do
+  @spec throttle_due?(tuple(), integer(), pos_integer()) :: boolean()
+  def throttle_due?(what, now, window \\ @refresh_s) do
     if :ets.whereis(@table) == :undefined do
       true
     else
       key = {Pepe.Config.home(), what}
 
       case :ets.lookup(@table, key) do
-        [{^key, at}] when now - at < @refresh_s ->
+        [{^key, at}] when now - at < window ->
           false
 
         _ ->
