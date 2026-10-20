@@ -743,15 +743,38 @@ defmodule Pepe.Webhooks do
   def finish(%{entry: entry, mod: mod, message: message}, result) do
     case result do
       {:ok, reply} ->
-        deliver(mod, entry, message.from, reply)
+        deliver(mod, entry, message.from, reply_or_notice(reply))
 
       {:error, :busy} ->
         :ok
 
+      # A message the platform showed as seen (the eyes reaction on Slack) must never end in
+      # silence: whoever asked cannot tell a run that failed from one that is still going.
+      # The reason stays in the log and in the trace, never in a chat that may be a customer's.
       {:error, reason} ->
         Logger.warning("[webhooks] #{entry["slug"]}: run failed: #{inspect(reason)}")
+
+        deliver(
+          mod,
+          entry,
+          message.from,
+          dgettext(
+            "webhooks",
+            "Something went wrong on my end and I could not finish that. Try again in a moment, and if it keeps happening, ask whoever manages Pepe to look at the traces."
+          )
+        )
     end
   end
+
+  # A run can end well and still have nothing to say (it only used tools). Sending nothing is
+  # the same silence as a failure, so say that it finished.
+  defp reply_or_notice(reply) when is_binary(reply) do
+    if String.trim(reply) == "",
+      do: dgettext("webhooks", "I finished, but I have nothing to show for it. Ask me again if you were expecting an answer."),
+      else: reply
+  end
+
+  defp reply_or_notice(_reply), do: reply_or_notice("")
 
   defp reply_async(mod, entry, to, text) do
     Task.Supervisor.start_child(Pepe.Webhooks.TaskSupervisor, fn ->

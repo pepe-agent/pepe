@@ -115,12 +115,12 @@ msgstr ""
 msgid "(unset)"
 msgstr "(sin definir)"
 
-#: lib/pepe/webhooks.ex:1030
+#: lib/pepe/webhooks.ex:1053
 #, elixir-autogen, elixir-format
 msgid "Available models:"
 msgstr "Modelos disponibles:"
 
-#: lib/pepe/webhooks.ex:1051
+#: lib/pepe/webhooks.ex:1074
 #, elixir-autogen, elixir-format
 msgid "Change %{name} for this conversation only, or for everyone? Reply /model %{name} session or /model %{name} global."
 msgstr ""
@@ -132,42 +132,42 @@ msgstr ""
 msgid "Current model: %{model}"
 msgstr "Modelo actual: %{model}"
 
-#: lib/pepe/webhooks.ex:1062
+#: lib/pepe/webhooks.ex:1085
 #, elixir-autogen, elixir-format
 msgid "Model set to %{name} (%{scope})."
 msgstr "Modelo cambiado a %{name} (%{scope})."
 
-#: lib/pepe/webhooks.ex:1064
+#: lib/pepe/webhooks.ex:1087
 #, elixir-autogen, elixir-format
 msgid "No agent to set the model on."
 msgstr "No hay agente sobre el que fijar el modelo."
 
-#: lib/pepe/webhooks.ex:1027
+#: lib/pepe/webhooks.ex:1050
 #, elixir-autogen, elixir-format
 msgid "No models are configured for this project."
 msgstr "Este proyecto no tiene modelos configurados."
 
-#: lib/pepe/webhooks.ex:1033
+#: lib/pepe/webhooks.ex:1056
 #, elixir-autogen, elixir-format
 msgid "Unknown model: %{name}"
 msgstr "Modelo desconocido: %{name}"
 
-#: lib/pepe/webhooks.ex:1032
+#: lib/pepe/webhooks.ex:1055
 #, elixir-autogen, elixir-format
 msgid "Usage: /model NAME [session|global]"
 msgstr "Uso: /model NOMBRE [session|global]"
 
-#: lib/pepe/webhooks.ex:1042
+#: lib/pepe/webhooks.ex:1065
 #, elixir-autogen, elixir-format
 msgid "You don't have permission to change the model here."
 msgstr "No tienes permiso para cambiar el modelo aquí."
 
-#: lib/pepe/webhooks.ex:963
+#: lib/pepe/webhooks.ex:986
 #, elixir-autogen, elixir-format
 msgid "📣 @mention required again in this chat."
 msgstr "📣 Vuelve a hacer falta @mención en este chat."
 
-#: lib/pepe/webhooks.ex:793
+#: lib/pepe/webhooks.ex:816
 #, elixir-autogen, elixir-format
 msgid "🧹 New conversation."
 msgstr "🧹 Nueva conversación."
@@ -339,12 +339,12 @@ msgstr "No tienes permiso para cambiar si este canal necesita una @mención. Pí
 msgid "Learn from reactions"
 msgstr "Aprender de las reacciones"
 
-#: lib/pepe/webhooks/approval.ex:133
+#: lib/pepe/webhooks/approval.ex:153
 #, elixir-autogen, elixir-format
 msgid "Reply with: allow / allow all / allow session / deny"
 msgstr "Responde con: allow / allow all / allow session / deny"
 
-#: lib/pepe/webhooks/approval.ex:134
+#: lib/pepe/webhooks/approval.ex:154
 #, elixir-autogen, elixir-format
 msgid "Reply with: allow / allow all / deny"
 msgstr "Responde con: allow / allow all / deny"
@@ -359,27 +359,27 @@ msgstr "Responder a estos bots y apps"
 msgid "Messages from other apps are ignored by default. To answer one (a help desk posting each new ticket, say), list its bot or app id, separated by commas. Ignored ones are logged with their ids."
 msgstr "Los mensajes de otras apps se ignoran por defecto. Para responder a una (un help desk que publica cada ticket nuevo, por ejemplo), indica el id del bot o de la app, separados por comas. Las ignoradas quedan en el log con sus ids."
 
-#: lib/pepe/webhooks.ex:826
+#: lib/pepe/webhooks.ex:849
 #, elixir-autogen, elixir-format
 msgid "Usage: /mention on|off [always]"
 msgstr "Uso: /mention on|off [always]"
 
-#: lib/pepe/webhooks.ex:941
+#: lib/pepe/webhooks.ex:964
 #, elixir-autogen, elixir-format
 msgid "👂 I'll reply here without being @mentioned, even after /new, until you send /mention on always."
 msgstr "👂 Voy a responder aquí sin necesidad de @mención, incluso después de /new, hasta que envíes /mention on always."
 
-#: lib/pepe/webhooks.ex:937
+#: lib/pepe/webhooks.ex:960
 #, elixir-autogen, elixir-format
 msgid "👂 I'll reply here without being @mentioned, until /new."
 msgstr "👂 Voy a responder aquí sin necesidad de @mención, hasta el próximo /new."
 
-#: lib/pepe/webhooks.ex:972
+#: lib/pepe/webhooks.ex:995
 #, elixir-autogen, elixir-format
 msgid "📣 @mention required again in this channel, for good."
 msgstr "📣 @mención exigida de nuevo en este canal, para siempre."
 
-#: lib/pepe/webhooks.ex:950
+#: lib/pepe/webhooks.ex:973
 #, elixir-autogen, elixir-format
 msgid "📣 @mention required again until /new. This channel is still set to answer without one, so that comes back after /new."
 msgstr "📣 @mención exigida de nuevo hasta /new. Este canal sigue configurado para responder sin ella, así que eso vuelve después de /new."
@@ -399,103 +399,113 @@ msgstr "Solo en los mensajes del propio bot"
 msgid "A 👍 or ❤️ on one of the bot's own messages is told to the agent as feedback. Choose Ignore reactions to turn that off."
 msgstr "Un 👍 o ❤️ en un mensaje del propio bot le llega al agente como feedback. Elige Ignorar reacciones para desactivarlo."
 
-#: lib/pepe/webhooks.ex:888
+#: lib/pepe/webhooks.ex:911
 #, elixir-autogen, elixir-format
 msgid "Usage: /trainers [* | none | default | @person ...]"
 msgstr "Uso: /trainers [* | none | default | @persona ...]"
 
-#: lib/pepe/webhooks.ex:924
+#: lib/pepe/webhooks.ex:947
 #, elixir-autogen, elixir-format
 msgid "Who can train this channel: %{who} (set for this channel). /trainers default goes back to the connection's setting."
 msgstr "Quién puede entrenar este canal: %{who} (definido para este canal). /trainers default vuelve a la configuración de la conexión."
 
-#: lib/pepe/webhooks.ex:916
+#: lib/pepe/webhooks.ex:939
 #, elixir-autogen, elixir-format
 msgid "Who can train this channel: %{who} (the connection's setting). Use /trainers to see or change it for this channel only."
 msgstr "Quién puede entrenar este canal: %{who} (configuración de la conexión). Usa /trainers para verlo o cambiarlo solo en este canal."
 
-#: lib/pepe/webhooks.ex:866
+#: lib/pepe/webhooks.ex:889
 #, elixir-autogen, elixir-format
 msgid "You don't have permission to change who can train this channel. Ask one of its trainers."
 msgstr "No tienes permiso para cambiar quién puede entrenar este canal. Pídeselo a uno de sus entrenadores."
 
-#: lib/pepe/webhooks.ex:900
-#: lib/pepe/webhooks.ex:903
+#: lib/pepe/webhooks.ex:923
+#: lib/pepe/webhooks.ex:926
 #, elixir-autogen, elixir-format
 msgid "everyone here"
 msgstr "todos aquí"
 
-#: lib/pepe/webhooks.ex:901
+#: lib/pepe/webhooks.ex:924
 #, elixir-autogen, elixir-format
 msgid "no one"
 msgstr "nadie"
 
-#: lib/pepe/webhooks.ex:934
+#: lib/pepe/webhooks.ex:957
 #, elixir-autogen, elixir-format
 msgid "🎓 Now %{who} can train this channel."
 msgstr "🎓 Ahora %{who} puede entrenar este canal."
 
-#: lib/pepe/webhooks.ex:931
+#: lib/pepe/webhooks.ex:954
 #, elixir-autogen, elixir-format
 msgid "🎓 This channel follows the connection again: %{who} can train."
 msgstr "🎓 Este canal vuelve a seguir la conexión: %{who} puede entrenar."
 
-#: lib/pepe/webhooks.ex:988
+#: lib/pepe/webhooks.ex:1011
 #, elixir-autogen, elixir-format
 msgid "Right now I need an @mention here, for this conversation until /new. After /new: %{after}.\nUse /mention on or /mention off; add always to set it for this channel."
 msgstr "Ahora mismo necesito una @mención aquí, solo en esta conversación, hasta /new. Después de /new: %{after}.\nUsa /mention on o /mention off; añade always para fijarlo en el canal."
 
-#: lib/pepe/webhooks.ex:980
+#: lib/pepe/webhooks.ex:1003
 #, elixir-autogen, elixir-format
 msgid "Right now I reply here without being @mentioned, for this conversation until /new. After /new: %{after}.\nUse /mention on or /mention off; add always to set it for this channel."
 msgstr "Ahora mismo respondo aquí sin que me @mencionen, solo en esta conversación, hasta /new. Después de /new: %{after}.\nUsa /mention on o /mention off; añade always para fijarlo en el canal."
 
-#: lib/pepe/webhooks.ex:996
+#: lib/pepe/webhooks.ex:1019
 #, elixir-autogen, elixir-format
 msgid "This channel answers without an @mention, set for this channel and kept after /new.\nUse /mention on always to require one again."
 msgstr "Este canal responde sin @mención, fijado para este canal y mantenido tras /new.\nUsa /mention on always para volver a exigirla."
 
-#: lib/pepe/webhooks.ex:1010
+#: lib/pepe/webhooks.ex:1033
 #, elixir-autogen, elixir-format
 msgid "This channel answers without an @mention, the connection's default for every channel.\nUse /mention on always to require one in this channel only."
 msgstr "Este canal responde sin @mención, el valor por defecto de la conexión para todos los canales.\nUsa /mention on always para exigirla solo en este canal."
 
-#: lib/pepe/webhooks.ex:1017
+#: lib/pepe/webhooks.ex:1040
 #, elixir-autogen, elixir-format
 msgid "This channel needs an @mention (the default).\nUse /mention off for this conversation, or /mention off always to keep it for this channel."
 msgstr "Este canal necesita @mención (el valor por defecto).\nUsa /mention off para esta conversación, o /mention off always para mantenerlo en el canal."
 
-#: lib/pepe/webhooks.ex:1003
+#: lib/pepe/webhooks.ex:1026
 #, elixir-autogen, elixir-format
 msgid "This channel requires an @mention, set for this channel and kept after /new.\nUse /mention off always to open it up again."
 msgstr "Este canal exige @mención, fijado para este canal y mantenido tras /new.\nUsa /mention off always para abrirlo de nuevo."
 
-#: lib/pepe/webhooks.ex:1025
+#: lib/pepe/webhooks.ex:1048
 #, elixir-autogen, elixir-format
 msgid "a mention is required, the default"
 msgstr "mención obligatoria, el valor por defecto"
 
-#: lib/pepe/webhooks.ex:1024
+#: lib/pepe/webhooks.ex:1047
 #, elixir-autogen, elixir-format
 msgid "the connection answers without one in every channel"
 msgstr "la conexión responde sin mención en todos los canales"
 
-#: lib/pepe/webhooks.ex:1022
+#: lib/pepe/webhooks.ex:1045
 #, elixir-autogen, elixir-format
 msgid "this channel is set to answer without one"
 msgstr "este canal está fijado para responder sin mención"
 
-#: lib/pepe/webhooks.ex:1023
+#: lib/pepe/webhooks.ex:1046
 #, elixir-autogen, elixir-format
 msgid "this channel is set to require one"
 msgstr "este canal está fijado para exigir mención"
 
-#: lib/pepe/webhooks.ex:967
+#: lib/pepe/webhooks.ex:990
 #, elixir-autogen, elixir-format
 msgid "📣 @mention required again in this channel, for good, while the connection's other channels keep answering without one."
 msgstr "📣 @mención obligatoria de nuevo en este canal, para siempre, mientras los demás canales de la conexión siguen respondiendo sin ella."
 
-#: lib/pepe/webhooks.ex:957
+#: lib/pepe/webhooks.ex:980
 #, elixir-autogen, elixir-format
 msgid "📣 @mention required again until /new. This connection answers without one in every channel, so that comes back after /new."
 msgstr "📣 @mención obligatoria de nuevo hasta /new. Esta conexión responde sin mención en todos los canales, así que eso vuelve después de /new."
+
+#: lib/pepe/webhooks.ex:773
+#, elixir-autogen, elixir-format
+msgid "I finished, but I have nothing to show for it. Ask me again if you were expecting an answer."
+msgstr "Terminé, pero no tengo nada que mostrar. Vuelve a preguntarme si esperabas una respuesta."
+
+#: lib/pepe/webhooks.ex:761
+#, elixir-autogen, elixir-format
+msgid "Something went wrong on my end and I could not finish that. Try again in a moment, and if it keeps happening, ask whoever manages Pepe to look at the traces."
+msgstr "Algo salió mal de mi lado y no pude terminar eso. Inténtalo de nuevo en un momento y, si sigue pasando, pide a quien gestiona Pepe que revise los traces."
