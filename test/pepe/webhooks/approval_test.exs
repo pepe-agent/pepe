@@ -43,6 +43,41 @@ defmodule Pepe.Webhooks.ApprovalTest do
     assert Approval.authorizer(%{@entry | "trainers" => []}, FakeProvider, "C1", @key) == nil
   end
 
+  describe "approvers are a list of their own" do
+    test "a connection with no approvers falls back to its trainers, as before" do
+      assert Approval.approvers(@entry) == ["boss"]
+      assert Approval.enabled?(@entry)
+    end
+
+    test "approvers wins over trainers, so teaching does not grant approving" do
+      entry = Map.put(@entry, "approvers", ["owner"])
+      assert Approval.approvers(entry) == ["owner"]
+
+      {task, _} = ask(entry)
+      assert Approval.reply(entry, @key, "boss", "allow") == :pass
+      assert Approval.reply(entry, @key, "owner", "allow") == :consumed
+      assert Task.await(task) == :once
+    end
+
+    test "an explicit empty approvers list turns typed approval off even with trainers set" do
+      entry = Map.put(@entry, "approvers", [])
+      refute Approval.enabled?(entry)
+      assert Approval.authorizer(entry, FakeProvider, "C1", @key) == nil
+    end
+
+    test "approvers set but no trainers still works" do
+      entry = @entry |> Map.delete("trainers") |> Map.put("approvers", ["owner"])
+      assert Approval.enabled?(entry)
+    end
+
+    test "approvers can be everyone, said on purpose" do
+      entry = Map.put(@entry, "approvers", ["*"])
+      {task, _} = ask(entry)
+      assert Approval.reply(entry, @key, "anyone", "allow all") == :consumed
+      assert Task.await(task) == :this_run
+    end
+  end
+
   test "the question shows the real command and how to answer" do
     {task, text} = ask(@entry)
     assert text =~ "bash"

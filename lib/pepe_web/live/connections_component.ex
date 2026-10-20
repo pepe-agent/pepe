@@ -234,6 +234,25 @@ defmodule PepeWeb.ConnectionsComponent do
           </div>
 
           <div>
+            <label class={lbl()}>{gettext("Who can approve risky actions")}</label>
+            <.trainers_picker
+              id={@id <> "-approvers"}
+              field="approvers"
+              value={@form_values["approvers"]}
+              people={@form_people}
+              inherit_label={gettext("Default: the same people who can train")}
+              rename_form={@editing_slug && @id <> "-rename-person"}
+              renaming={@renaming_person}
+              target={@myself}
+            />
+            <p class={hlp()}>
+              {gettext(
+                "They settle a risky action by replying in the chat, on Slack, Teams, WhatsApp and the like. Pick specific people: choosing everyone lets anyone in the conversation approve a command. With nobody picked, nobody can be asked and the action waits for an operator."
+              )}
+            </p>
+          </div>
+
+          <div>
             <label class={lbl()}>{gettext("Who may message this connection")}</label>
             <.trainers_picker
               id={@id <> "-allowed"}
@@ -319,6 +338,7 @@ defmodule PepeWeb.ConnectionsComponent do
           "agent" => entry["agent"] || "",
           "mode" => entry["mode"] || "support",
           "trainers" => TrainersPicker.form_value(entry["trainers"]),
+          "approvers" => TrainersPicker.form_value(entry["approvers"]),
           "mention_optional" => to_string(entry["mention_optional"] == true),
           "cfg" => entry["config"] || %{}
         }
@@ -422,6 +442,8 @@ defmodule PepeWeb.ConnectionsComponent do
         "commands" => mode == "admin",
         "label" => Labels.clean(params["label"]),
         "trainers" => TrainersPicker.to_list(params["trainers"]) || if(support?, do: [], else: nil),
+        # Absent means the same people as `trainers`; set, it is its own list (see Pepe.Webhooks.Approval).
+        "approvers" => TrainersPicker.to_list(params["approvers"]),
         # An empty list means anyone, which is what absent means too, so it is not stored.
         "allowed_numbers" => allowed_value(TrainersPicker.to_list(params["allowed"])),
         # Stored only when set: absent is "a mention is required", the default since always.

@@ -467,10 +467,16 @@ defmodule Pepe.Permissions do
     "Error: `#{name}` did not run - it needs a human's OK, nobody was available to give " <>
       "one, so it was #{reason} Do not retry the call yourself and do not treat this as " <>
       "the user refusing: if a human approves it, the stored call runs exactly as issued " <>
-      "and its result arrives in this conversation as a new message. Tell the person " <>
-      "only that this is waiting for approval from whoever manages Pepe; never quote " <>
-      "the `mix` command or the id to them, it only works on the operator's own " <>
-      "machine and means nothing in a chat. Only if they say they are that operator " <>
+      "and its result arrives in this conversation as a new message. Tell the person, in " <>
+      "their own language and plainly, that you could not ask them to confirm here and why: " <>
+      "nobody is named to approve in this chat, so the action is waiting for whoever " <>
+      "manages Pepe. If this is a chat channel (Slack, Teams, WhatsApp, Discord), also tell " <>
+      "them how to fix it for good: whoever manages Pepe opens Channels in the dashboard, " <>
+      "opens this connection, and in the field \"Who can approve risky actions\" (\"Quem pode " <>
+      "aprovar ações de risco\" in Portuguese) picks the specific people who may approve; " <>
+      "after that you ask yes or no right here in the chat. Do not suggest \"everyone\". " <>
+      "Never quote the `mix` command or the id to them, it only works on the operator's " <>
+      "own machine and means nothing in a chat. Only if they say they are that operator " <>
       "with terminal access, give them the command above. Then continue with " <>
       "whatever does not depend on this call."
   end

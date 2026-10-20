@@ -123,15 +123,17 @@ Cambiarlo **globalmente**, para todo lo que atiende esa conexión, queda reserva
 
 ## Aprobar herramientas de riesgo en el chat
 
-Por defecto, un canal por webhook no tiene a nadie a quien preguntar, así que una herramienta de riesgo que no está en el `auto_approve` del agente se rechaza y queda guardada para que un operador la apruebe desde la línea de comandos (`mix pepe approvals`). Para que las personas de la conversación lo decidan ahí mismo, indica los **trainers** en la conexión: una lista explícita, o `["*"]` para todos los de la conversación. Entonces, cuando el agente quiere hacer algo arriesgado, pregunta en el propio chat, muestra el comando real y espera una respuesta escrita:
+Por defecto, un canal por webhook no tiene a nadie a quien preguntar, así que una herramienta de riesgo que no está en el `auto_approve` del agente se rechaza y queda guardada para que un operador la apruebe desde la línea de comandos (`mix pepe approvals`). Para que las personas de la conversación lo decidan ahí mismo, indica los **aprobadores** en la conexión (el campo **Quién puede aprobar acciones de riesgo**): una lista explícita, o `["*"]` para todos los de la conversación. Entonces, cuando el agente quiere hacer algo arriesgado, pregunta en el propio chat, muestra el comando real y espera una respuesta escrita:
 
 ```text
 Reply with: allow / allow all / allow session / deny
 ```
 
-Solo cuenta la respuesta exacta de un trainer, y no se le pasa al agente como mensaje. La respuesta de cualquier otra persona, o una frase más larga que contenga "allow", es solo un mensaje. Las dos respuestas más amplias ("permitir todo en la sesión" y "siempre") no se pueden escribir aquí; usa una superficie con botones para esas. Si nadie responde en cinco minutos, cuenta como un no, y al agente se le avisa de que nadie respondió, en lugar de que se rechazó.
+Solo cuenta la respuesta exacta de un aprobador, y no se le pasa al agente como mensaje. La respuesta de cualquier otra persona, o una frase más larga que contenga "allow", es solo un mensaje. Las dos respuestas más amplias ("permitir todo en la sesión" y "siempre") no se pueden escribir aquí; usa una superficie con botones para esas. Si nadie responde en cinco minutos, cuenta como un no, y al agente se le avisa de que nadie respondió, en lugar de que se rechazó.
 
-Sin trainers indicados no cambia nada: solo corre lo que el agente ya tiene preaprobado.
+Una conexión sin aprobadores propios usa los **trainers**, que es como funcionaba antes de existir la segunda lista. Deja los aprobadores en nadie para desactivar la aprobación por texto incluso donde hay trainers. Enseñar al agente y aprobar un comando son poderes distintos, así que conviene nombrar personas concretas en vez de todo el mundo.
+
+Sin aprobadores (ni trainers) indicados no cambia nada: solo corre lo que el agente ya tiene preaprobado. En ese caso el agente le explica a la persona, en la propia conversación, por qué no pudo preguntar y dónde solucionarlo: en el dashboard, abre **Canales**, abre la conexión y rellena **Quién puede aprobar acciones de riesgo** con las personas que pueden aprobar.
 
 ## Por dentro: el contrato del proveedor
 

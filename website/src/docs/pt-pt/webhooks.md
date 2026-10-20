@@ -123,15 +123,17 @@ Mudar **globalmente**, para todos com quem a ligação fala, fica reservado aos 
 
 ## Aprovar ferramentas de risco na conversa
 
-Por predefinição, um canal por webhook não tem ninguém a quem perguntar, pelo que uma ferramenta de risco que não esteja no `auto_approve` do agente é recusada e fica guardada para um operador aprovar pela linha de comandos (`mix pepe approvals`). Para que as pessoas da conversa decidam ali mesmo, indica os **trainers** na ligação: uma lista explícita, ou `["*"]` para todos os da conversa. Assim, quando o agente quer fazer algo arriscado, pergunta na própria conversa, mostra o comando verdadeiro e espera uma resposta escrita:
+Por predefinição, um canal por webhook não tem ninguém a quem perguntar, pelo que uma ferramenta de risco que não esteja no `auto_approve` do agente é recusada e fica guardada para um operador aprovar pela linha de comandos (`mix pepe approvals`). Para que as pessoas da conversa decidam ali mesmo, indica os **aprovadores** na ligação (o campo **Quem pode aprovar ações de risco**): uma lista explícita, ou `["*"]` para todos os da conversa. Assim, quando o agente quer fazer algo arriscado, pergunta na própria conversa, mostra o comando verdadeiro e espera uma resposta escrita:
 
 ```text
 Reply with: allow / allow all / allow session / deny
 ```
 
-Só conta a resposta exata de um trainer, e ela não é passada ao agente como mensagem. A resposta de qualquer outra pessoa, ou uma frase mais longa que contenha "allow", é apenas uma mensagem. As duas respostas mais abrangentes ("permitir tudo na sessão" e "sempre") não podem ser escritas aqui; usa uma superfície com botões para essas. Se ninguém responder em cinco minutos, conta como um não, e o agente é avisado de que ninguém respondeu, e não de que foi recusado.
+Só conta a resposta exata de um aprovador, e ela não é passada ao agente como mensagem. A resposta de qualquer outra pessoa, ou uma frase mais longa que contenha "allow", é apenas uma mensagem. As duas respostas mais abrangentes ("permitir tudo na sessão" e "sempre") não podem ser escritas aqui; usa uma superfície com botões para essas. Se ninguém responder em cinco minutos, conta como um não, e o agente é avisado de que ninguém respondeu, e não de que foi recusado.
 
-Sem trainers indicados, nada muda: só corre o que o agente já tem pré-aprovado.
+Uma ligação sem aprovadores próprios usa os **trainers**, que é como funcionava antes de existir a segunda lista. Deixa os aprovadores em ninguém para desligar a aprovação por texto mesmo onde há trainers. Ensinar o agente e aprovar um comando são poderes diferentes, por isso prefere indicar pessoas específicas em vez de todos.
+
+Sem aprovadores (nem trainers) indicados, nada muda: só corre o que o agente já tem pré-aprovado. Nesse caso o agente explica à pessoa, na própria conversa, porque não conseguiu perguntar e onde resolver: no dashboard, abra **Canais**, abra a ligação e preencha **Quem pode aprovar ações de risco** com as pessoas que podem aprovar.
 
 ## Por baixo do capô: o contrato do fornecedor
 

@@ -80,4 +80,42 @@ defmodule PepeWeb.ChannelsNativeTest do
     assert entry["config"]["bot_token"] == "xoxb-1"
     assert entry["config"]["signing_secret"] == "${SLACK_SECRET}"
   end
+
+  test "the connection form keeps who can approve separate from who can train" do
+    {:ok, view, _html} = live(conn(), "/bots")
+    view |> element("button[phx-value-name='slack']") |> render_click()
+
+    view
+    |> form("form[phx-submit=save]", %{
+      "slug" => "ops",
+      "agent" => "default/assistant",
+      "mode" => "admin",
+      "project" => "default",
+      "approvers" => %{"mode" => "*"},
+      "cfg" => %{"bot_token" => "xoxb-1", "signing_secret" => "${SLACK_SECRET}"}
+    })
+    |> render_submit()
+
+    entry = Config.get_webhook("ops")
+    assert entry["approvers"] == ["*"]
+    # trainers was left at its default, so it is not stored: approvers did not change it
+    refute Map.has_key?(entry, "trainers")
+  end
+
+  test "approvers left at its default is not stored, so the connection follows its trainers" do
+    {:ok, view, _html} = live(conn(), "/bots")
+    view |> element("button[phx-value-name='slack']") |> render_click()
+
+    view
+    |> form("form[phx-submit=save]", %{
+      "slug" => "plain",
+      "agent" => "default/assistant",
+      "mode" => "admin",
+      "project" => "default",
+      "cfg" => %{"bot_token" => "xoxb-1", "signing_secret" => "${SLACK_SECRET}"}
+    })
+    |> render_submit()
+
+    refute Map.has_key?(Config.get_webhook("plain"), "approvers")
+  end
 end

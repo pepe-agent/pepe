@@ -5099,6 +5099,18 @@ defmodule Mix.Tasks.Pepe do
   # Whether a webhook connection answers without an @mention: the connection's default for every
   # channel (`mention_optional`), and, per channel, that channel's own answer, which wins over the
   # default in either direction. A person's decision: the model has no way to change it.
+  # Who may approve a risky action by replying in the chat of a webhook connection (Slack, Teams,
+  # WhatsApp, ...). A different power from training, so a different list; absent means "the same
+  # people as the trainers", which is how every connection worked before this list existed.
+  defp gateway_cmd(["approvers", slug | rest]) do
+    {opts, _, _} = OptionParser.parse(rest, strict: [set: :string])
+
+    case Config.get_webhook(slug) do
+      nil -> error("no connection named #{slug}")
+      entry -> approvers_cmd(slug, entry, opts)
+    end
+  end
+
   defp gateway_cmd(["mention", slug | rest]) do
     {opts, _, _} = OptionParser.parse(rest, strict: [channel: :string, set: :string, default: :boolean])
 
@@ -5131,6 +5143,7 @@ defmodule Mix.Tasks.Pepe do
           verify_token: :string,
           max_attachment_mb: :integer,
           trainers: :string,
+          approvers: :string,
           ttl_min: :integer,
           ephemeral: :boolean,
           commands: :boolean,
@@ -5218,6 +5231,7 @@ defmodule Mix.Tasks.Pepe do
           gateway: :boolean,
           max_attachment_mb: :integer,
           trainers: :string,
+          approvers: :string,
           ttl_min: :integer,
           ephemeral: :boolean,
           commands: :boolean,
@@ -5377,6 +5391,9 @@ defmodule Mix.Tasks.Pepe do
       telegram                    run the gateway - one poller per bot (long-polling)
       trainers SLUG [--set none|*|id1,id2] [--channel C [--set ...|--default]]
                                   who may train a webhook connection, or one channel of it
+      approvers SLUG [--set none|*|id1,id2|default]
+                                  who may approve a risky action by replying in the chat of a
+                                  webhook connection (default: the same people as the trainers)
       mention SLUG [--set optional|required] [--channel C [--set optional|required|--default]]
                                   whether a webhook connection answers without an @mention,
                                   for every channel or for one channel of it
@@ -5463,6 +5480,7 @@ defmodule Mix.Tasks.Pepe do
         "mode" => mode,
         "commands" => Keyword.get(opts, :commands, mode == "admin"),
         "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
+        "approvers" => Pepe.Webhooks.parse_trainers(opts[:approvers]),
         "ephemeral" => Keyword.get(opts, :ephemeral, support?),
         "agent_switch_locked" => Keyword.get(opts, :agent_switch_locked, false),
         "session_ttl_min" => opts[:ttl_min],
@@ -5503,6 +5521,7 @@ defmodule Mix.Tasks.Pepe do
         "mode" => mode,
         "commands" => Keyword.get(opts, :commands, mode == "admin"),
         "trainers" => parse_trainers(opts[:trainers]) || if(support?, do: [], else: nil),
+        "approvers" => Pepe.Webhooks.parse_trainers(opts[:approvers]),
         "ephemeral" => Keyword.get(opts, :ephemeral, support?),
         "agent_switch_locked" => Keyword.get(opts, :agent_switch_locked, false),
         "session_ttl_min" => opts[:ttl_min],
@@ -5588,6 +5607,31 @@ defmodule Mix.Tasks.Pepe do
 
       true ->
         show_trainers(slug, entry)
+    end
+  end
+
+  defp approvers_cmd(slug, entry, opts) do
+    case opts[:set] do
+      nil ->
+        info("#{slug}: #{approvers_label(entry)}")
+
+      "default" ->
+        Config.put_webhook(slug, Map.delete(entry, "approvers"))
+        ok("#{slug} approvers: #{approvers_label(Map.delete(entry, "approvers"))}")
+
+      text ->
+        list = Pepe.Webhooks.parse_trainers(text) || []
+        Config.put_webhook(slug, Map.put(entry, "approvers", list))
+        ok("#{slug} approvers: #{trainers_label(list)}")
+    end
+  end
+
+  defp approvers_label(%{"approvers" => list}) when is_list(list), do: trainers_label(list)
+
+  defp approvers_label(entry) do
+    case Pepe.Webhooks.Approval.approvers(entry) do
+      [] -> "no one (nobody can be asked, a risky action waits for an operator)"
+      list -> "#{trainers_label(list)} (the same as the trainers)"
     end
   end
 

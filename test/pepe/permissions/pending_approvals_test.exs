@@ -108,6 +108,14 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
     assert [record] = PendingApprovals.list()
     assert why =~ "mix pepe approvals approve #{record.id}"
     assert why =~ "mix pepe approvals deny #{record.id}"
+
+    # What the agent is told to say to the person: why it could not ask, and where the
+    # permanent fix lives, not a bare "waiting for approval".
+    message = Permissions.denied_message("bash", why)
+    assert message =~ "nobody is named to approve in this chat"
+    assert message =~ "Who can approve risky actions"
+    assert message =~ "Do not suggest \"everyone\""
+
     assert record.tool == "bash"
     assert record.status == "pending"
     assert record.agent == agent.name

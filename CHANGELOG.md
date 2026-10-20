@@ -5,8 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Who can approve risky actions is now its own list on a chat connection, separate from who can train.** Teaching the agent and approving a command are different powers, but approving used to follow the trainers list. Set it in the connection form on the Channels page, with `mix pepe gateway approvers SLUG --set none|*|id1,id2|default` or `--approvers` on `gateway whatsapp add` and `gateway discord add`. It accepts `*` for everyone in the conversation, said on purpose. A connection with no approvers of its own keeps using its trainers, so nothing changes until you set it; an explicit empty list turns typed approval off even where trainers are set.
+
 ### Fixed
 
+- **When a risky action cannot be approved in a chat, the agent says why and where to fix it, instead of just "waiting for approval".** A connection with nobody named to approve has nobody to ask, so the action is parked; the agent now explains that and points to Channels, the connection, "Who can approve risky actions".
 - **Traces now show a run while it is still going, with a status of in progress, finished or interrupted.** Until now a run only appeared once it ended, so a run that was stuck or had died left no trace at all and you could not tell whether an answer was missing because of an error. A run is listed the moment it starts and its steps appear as it works; one that stopped before recording its result shows as interrupted. The Traces page refreshes by itself while something is running, and the outcome filter has in-progress and interrupted options.
 - **`memory_search` finds a note when you ask for it in other words.** It used to look for the whole question as one literal phrase, so "where is the leads database" found nothing in a note saying "leads Postgres", and `conexao` never matched `conexão`. It now compares words with case and accents ignored, ranks entries by how many words match, and also reads the agent's other knowledge notes (not only `MEMORY.md`, `USER.md` and `people.md`).
 

@@ -9,10 +9,14 @@ defmodule Pepe.Webhooks.Approval do
   by `Pepe.Permissions.TextDecision`, and if it is an answer from someone who may give it, it
   settles the question instead of reaching the agent.
 
-  Off unless the connection names its approvers. `trainers` must be an explicit, non-empty list
-  (`["*"]` meaning everyone, said on purpose); absent or `[]` leaves things as they were, with
-  nobody to ask. The default for `trainers` is "everyone may teach", which is the right default
-  for learning and the wrong one for approving a shell command, so it is not read as consent.
+  Off unless the connection names its approvers: the connection's `approvers`, an explicit,
+  non-empty list (`["*"]` meaning everyone, said on purpose). Absent or `[]` leaves things as
+  they were, with nobody to ask. Teaching the agent and approving a shell command are different
+  powers, so they are different lists: a connection that has no `approvers` of its own falls
+  back to its `trainers`, which is what every connection did before the second list existed, and
+  an explicit `approvers: []` turns typed approval off even where `trainers` is set. The default
+  for `trainers` is "everyone may teach", which is the right default for learning and the wrong
+  one for approving a shell command, so it is not read as consent.
 
   Only the safer answers can be typed here: `allow`, `allow all` (this task), `allow session`
   and `deny`. The two widest grants, for the whole session and for good, stay with the surfaces
@@ -50,9 +54,22 @@ defmodule Pepe.Webhooks.Approval do
     end
   end
 
+  @doc """
+  The people who may answer a permission question on this connection: its own `approvers` when
+  that list is set (even to `[]`), otherwise its `trainers`, otherwise nobody.
+  """
+  @spec approvers(map()) :: [String.t()]
+  def approvers(entry) do
+    case {entry["approvers"], entry["trainers"]} do
+      {list, _} when is_list(list) -> list
+      {_, list} when is_list(list) -> list
+      _ -> []
+    end
+  end
+
   @doc "Whether this connection has named approvers at all."
   @spec enabled?(map()) :: boolean()
-  def enabled?(entry), do: match?([_ | _], entry["trainers"])
+  def enabled?(entry), do: match?([_ | _], approvers(entry))
 
   @doc """
   Offer a message to the question waiting on this conversation, if there is one. `:consumed`
@@ -72,7 +89,10 @@ defmodule Pepe.Webhooks.Approval do
     end
   end
 
-  defp approver?(entry, actor), do: "*" in entry["trainers"] or actor in entry["trainers"]
+  defp approver?(entry, actor) do
+    list = approvers(entry)
+    "*" in list or actor in list
+  end
 
   # Runs in the session's process, which is the one the reply is sent back to.
   defp ask(entry, mod, from, key, name, args, ctx) do

@@ -176,4 +176,56 @@ defmodule Mix.Tasks.PepeGatewayWebhookCliTest do
       refute Map.has_key?(Config.get_webhook("wa")["config"], "max_attachment_mb")
     end
   end
+
+  describe "approvers" do
+    setup do
+      pepe(["gateway", "discord", "add", "chat", "--agent", "acme/support", "--gateway", "--bot-token", "${DISCORD_TOKEN}"])
+      :ok
+    end
+
+    test "a connection starts with no approvers of its own, so it follows its trainers" do
+      assert Config.get_webhook("chat")["approvers"] == nil
+      assert pepe(["gateway", "approvers", "chat"]) =~ "no one"
+    end
+
+    test "--set stores the list, and a list of its own is not the trainers" do
+      out = pepe(["gateway", "approvers", "chat", "--set", "U1,U2"])
+      assert out =~ "U1, U2"
+      assert Config.get_webhook("chat")["approvers"] == ["U1", "U2"]
+      assert Config.get_webhook("chat")["trainers"] == []
+    end
+
+    test "--set * and --set none are explicit, and default goes back to following the trainers" do
+      pepe(["gateway", "approvers", "chat", "--set", "*"])
+      assert Config.get_webhook("chat")["approvers"] == ["*"]
+
+      pepe(["gateway", "approvers", "chat", "--set", "none"])
+      assert Config.get_webhook("chat")["approvers"] == []
+
+      pepe(["gateway", "approvers", "chat", "--set", "default"])
+      refute Map.has_key?(Config.get_webhook("chat"), "approvers")
+    end
+
+    test "an unknown connection is an error" do
+      assert pepe_err(["gateway", "approvers", "nope"]) =~ "no connection named nope"
+    end
+
+    test "--approvers on add stores the list from the start" do
+      pepe([
+        "gateway",
+        "discord",
+        "add",
+        "ops",
+        "--agent",
+        "acme/support",
+        "--gateway",
+        "--bot-token",
+        "${DISCORD_TOKEN}",
+        "--approvers",
+        "U9"
+      ])
+
+      assert Config.get_webhook("ops")["approvers"] == ["U9"]
+    end
+  end
 end

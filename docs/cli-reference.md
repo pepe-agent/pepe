@@ -140,6 +140,7 @@ console, so `/model` always offers the session-vs-global choice. See
 mix pepe gateway telegram setup      # interactive: bot token, allowlists, which agent
 mix pepe gateway telegram            # run the gateway in the foreground (long-polling)
 mix pepe gateway trainers SLUG [--set none|*|id1,id2] [--channel C [--set ...|--default]]   # who may train a webhook connection, or one channel of it
+mix pepe gateway approvers SLUG [--set none|*|id1,id2|default]   # who may approve a risky action by replying in the chat of a webhook connection (default: the same people as the trainers)
 mix pepe gateway mention SLUG [--set optional|required] [--channel C [--set optional|required|--default]]   # whether a webhook connection answers without an @mention: the default for every channel, or one channel's own answer
 ```
 

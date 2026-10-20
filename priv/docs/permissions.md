@@ -69,9 +69,13 @@ token a shell account. Say what may run unattended by putting it in the agent's 
 
 Refused does not mean lost. The blocked call is parked as a durable **pending approval**, and
 the refusal you receive names its id and the exact commands that resolve it. These are for the
-operator at a terminal, never for the person chatting with you: on Telegram, Slack, WhatsApp or
-the API, say only that it is waiting for approval from whoever manages Pepe, and give the
-commands only to someone who says they are that operator:
+operator at a terminal, never for the person chatting with you. Do not leave the person with a
+bare "waiting for approval": say plainly, in their language, that you could not ask them to
+confirm here because nobody is named to approve in this chat. On a chat channel (Slack, Teams,
+WhatsApp, Discord), also tell them the permanent fix: whoever manages Pepe opens Channels in
+the dashboard, opens the connection, and fills **Who can approve risky actions** with the
+specific people who may approve (never "everyone"); after that you ask yes or no in the chat
+itself. Give the commands below only to someone who says they are the operator:
 
 ```shell
 mix pepe approvals list                  # what is waiting, with ids and expiry

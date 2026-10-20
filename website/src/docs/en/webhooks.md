@@ -176,15 +176,17 @@ adds a tappable picker instead of typed commands.
 
 ## Approving risky tools in the chat
 
-By default a webhook channel has nobody to ask, so a risky tool that is not in the agent's `auto_approve` is refused and held for an operator to approve from the command line (`mix pepe approvals`). To let the people in the conversation settle it instead, name the **trainers** on the connection: an explicit list, or `["*"]` for everyone in the conversation. Then, when the agent wants to do something risky, it asks right there, shows the actual command, and waits for a typed answer:
+By default a webhook channel has nobody to ask, so a risky tool that is not in the agent's `auto_approve` is refused and held for an operator to approve from the command line (`mix pepe approvals`). To let the people in the conversation settle it instead, name the **approvers** on the connection (the field **Who can approve risky actions**): an explicit list, or `["*"]` for everyone in the conversation. Then, when the agent wants to do something risky, it asks right there, shows the actual command, and waits for a typed answer:
 
 ```text
 Reply with: allow / allow all / allow session / deny
 ```
 
-Only an exact reply from a trainer counts, and it is not passed on to the agent as a message. Anyone else's reply, or a longer sentence that happens to contain "allow", is just a message. The two widest answers ("allow everything for the session" and "always") cannot be typed here; use a surface with buttons for those. If nobody answers in five minutes it counts as a no, and the agent is told that nobody answered rather than that it was refused.
+Only an exact reply from an approver counts, and it is not passed on to the agent as a message. Anyone else's reply, or a longer sentence that happens to contain "allow", is just a message. The two widest answers ("allow everything for the session" and "always") cannot be typed here; use a surface with buttons for those. If nobody answers in five minutes it counts as a no, and the agent is told that nobody answered rather than that it was refused.
 
-Without named trainers nothing changes: only what the agent has pre-approved runs.
+A connection with no approvers of its own uses its **trainers** instead, which is how this worked before the second list existed. Set the approvers to nobody to turn typed approval off even where trainers are set. Teaching the agent and approving a command are different powers, so prefer naming specific people over everyone.
+
+Without named approvers (or trainers) nothing changes: only what the agent has pre-approved runs. In that case the agent tells the person in the chat why it could not ask, and where to fix it: in the dashboard, open **Channels**, open the connection, and fill **Who can approve risky actions** with the people who may approve.
 
 ## Under the hood: the provider contract
 
