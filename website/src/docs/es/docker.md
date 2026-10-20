@@ -305,21 +305,18 @@ docker exec -it pepe bin/pepe remote            # o: docker compose exec pepe bi
 Abre una shell IEx conectada a la release en ejecución, para inspeccionar el
 sistema desde dentro.
 
-Si solo necesitas un comando puntual de `pepe` en vez de una shell completa,
-usa `bin/pepe rpc` con `dispatch_attached/1`: son los mismos comandos que
-`pepe` corre en cualquier otro lado, pero adaptados para ejecutarse sin
-riesgo contra un nodo que ya está sirviendo:
+Si solo necesitas un comando puntual de `pepe` en vez de una shell completa, corre el
+propio `pepe`. La imagen trae el mismo comando que escribirías en cualquier otra
+instalación, ya apuntado al nodo que está corriendo:
 
 ```bash
-docker exec pepe bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["agent", "list"])'
+docker exec pepe pepe agent list
 ```
 
-`bin/pepe <comando>` por sí solo no funciona aquí: el contenedor es una
-release simple, y su despacho de CLI solo se activa en el binario Burrito,
-que se distribuye aparte. `bin/pepe rpc`/`remote` es, en cualquier caso, la
-puerta de entrada. `dispatch_attached/1` existe porque bastantes comandos
-(`plugin install`, `eval`, `doctor`, `cron`, y otros más, no solo
-`run`/`chat`/`tui`) de otro modo terminarían cambiando ajustes globales
-pensados para decidirse una sola vez, al arrancar. Eso no tiene ningún costo
-en un proceso de CLI recién levantado que termina enseguida, pero sí lo
-tendría en un nodo que ya está corriendo y va a seguir así.
+Por debajo, entrega los argumentos al nodo en ejecución (`bin/pepe rpc` llamando a
+`dispatch_attached/1`), lo que es seguro para un nodo que ya está sirviendo: bastantes
+comandos (`plugin install`, `eval`, `doctor`, `cron`, y otros más, no solo
+`run`/`chat`/`tui`) de otro modo terminarían cambiando ajustes globales pensados para
+decidirse una sola vez, al arrancar. Eso no tiene ningún costo en un proceso de CLI
+recién levantado que termina enseguida, pero sí lo tendría en un nodo que ya está
+corriendo y va a seguir así.

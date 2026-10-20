@@ -5544,19 +5544,13 @@ msgstr "En este bot no se puede cambiar de agente."
 
 #: lib/pepe/gateways/telegram.ex:1723
 #, elixir-autogen, elixir-format
-msgid "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `mix pepe agent add` (`mix pepe setup` walks through both)."
-msgstr ""
-"Este bot aún no tiene ningún agente, así que no puedo responder. Un operador"
-" debe crear uno desde el panel o con `mix pepe agent add` (`mix pepe setup` "
-"guía por ambos caminos)."
+msgid "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `pepe agent add` (`pepe setup` walks through both)."
+msgstr "Este bot aún no tiene ningún agente, así que no puedo responder. Un operador debe crear uno desde el panel o con `pepe agent add` (`pepe setup` guía por ambos caminos)."
 
 #: lib/pepe/gateways/telegram.ex:1717
 #, elixir-autogen, elixir-format
-msgid "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `mix pepe model add` (`mix pepe setup` walks through both)."
-msgstr ""
-"Aún no hay ninguna conexión de modelo, así que no puedo responder. Un "
-"operador debe agregar una desde el panel o con `mix pepe model add` (`mix "
-"pepe setup` guía por ambos caminos)."
+msgid "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `pepe model add` (`pepe setup` walks through both)."
+msgstr "Aún no hay ninguna conexión de modelo, así que no puedo responder. Un operador debe agregar una desde el panel o con `pepe model add` (`pepe setup` guía por ambos caminos)."
 
 #: lib/pepe/agent/workspace.ex:303
 #, elixir-autogen, elixir-format
@@ -7449,12 +7443,8 @@ msgstr "Omitir la aprobación tras leer archivos o páginas web"
 
 #: lib/pepe_web/live/skills_live.ex:49
 #, elixir-autogen, elixir-format
-msgid "Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with mix pepe skill."
-msgstr ""
-"Instrucciones paso a paso que un agente lee cuando una petición las "
-"necesita. Cada una muestra si los agentes pueden usarla y, si no, por qué. "
-"Puedes desactivarla en todas partes o en un solo canal. Instala y crea "
-"skills desde el chat o con mix pepe skill."
+msgid "Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with pepe skill."
+msgstr "Instrucciones paso a paso que un agente lee cuando una petición las necesita. Cada una muestra si los agentes pueden usarla y, si no, por qué. Puedes desactivarla en todas partes o en un solo canal. Instala y crea skills desde el chat o con pepe skill."
 
 #: lib/pepe_web/live/traces_live.ex:232
 #, elixir-autogen, elixir-format

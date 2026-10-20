@@ -262,6 +262,21 @@ mkdir -p "$HOME" "$PEPE_HOME"
 exec "$@"
 SH
 
+# `pepe <args>` inside the container, the same command a person types on any other install.
+# The release's own `bin/pepe` only starts or talks to the node, so this hands the arguments
+# to the node that is already running (`rpc` + `dispatch_attached`). Backslash, double quote
+# and `#` are escaped so an argument can never turn into Elixir code.
+COPY --chmod=0755 <<'SH' /usr/local/bin/pepe
+#!/bin/sh
+set -e
+list=""
+for arg in "$@"; do
+  esc=$(printf '%s' "$arg" | sed 's/\\/\\\\/g; s/"/\\"/g; s/#/\\#/g')
+  list="$list${list:+,}\"$esc\""
+done
+exec /app/bin/pepe rpc "Mix.Tasks.Pepe.dispatch_attached([$list])"
+SH
+
 USER pepe
 
 COPY --from=build --chown=pepe:pepe /src/_build/prod/rel/pepe ./

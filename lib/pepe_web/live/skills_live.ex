@@ -46,7 +46,7 @@ defmodule PepeWeb.SkillsLive do
         <.view_header active="skills"
           icon="📚"
           title={gettext("Skills")}
-          desc={gettext("Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with mix pepe skill.")}
+          desc={gettext("Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with pepe skill.")}
         />
         <div class="page-body flex-1 space-y-3 overflow-y-auto px-4 pb-8 pt-1 sm:px-8 xl:px-14">
           <div :if={@skills == []} class="text-base text-zinc-500">{gettext("No skills found.")}</div>

@@ -50,9 +50,9 @@ team.
 Prices change, so the cache refreshes:
 
 - **on demand** - the "Refresh prices" button on the Usage page, or
-  `mix pepe usage prices --refresh`;
+  `pepe usage prices --refresh`;
 - **automatically** - once it's older than a week, while a server surface
-  (`mix pepe serve` / `gateway`) is running.
+  (`pepe serve` / `gateway`) is running.
 
 The seed keeps working with zero network; the cache just layers current prices on
 top.
@@ -66,11 +66,11 @@ top.
 - **CLI**:
 
   ```bash
-  mix pepe usage                                  # all scopes, by month, per project
-  mix pepe usage --project acme --granularity day
-  mix pepe usage prices --refresh                 # update the live price cache
-  mix pepe usage runs [--project acme]            # one line per inbound message
-  mix pepe usage runs <id>                        # that message, call by call
+  pepe usage                                  # all scopes, by month, per project
+  pepe usage --project acme --granularity day
+  pepe usage prices --refresh                 # update the live price cache
+  pepe usage runs [--project acme]            # one line per inbound message
+  pepe usage runs <id>                        # that message, call by call
   ```
 
   A cycle report counts model *calls*; `usage runs` counts *messages*. Use it when
@@ -92,8 +92,8 @@ as an email body) or CSV (for a spreadsheet). Line items are per model, with the
 provider cost and the marked-up amount due.
 
 ```bash
-mix pepe usage export --project acme                       # this month, Markdown, to stdout
-mix pepe usage export --project acme --month 2026-06 --format csv --output acme-june.csv
+pepe usage export --project acme                       # this month, Markdown, to stdout
+pepe usage export --project acme --month 2026-06 --format csv --output acme-june.csv
 ```
 
 An **agent** can do this itself with the `export_invoice` tool - it saves the invoice

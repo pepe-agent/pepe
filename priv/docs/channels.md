@@ -115,9 +115,9 @@ tools run and deleted when the turn ends, so only the final answer stays in the 
 
 WhatsApp connects over a webhook, not polling. Each connection has its own URL -
 `/webhooks/<project>/whatsapp/<slug>` (project is `default` when none is named) - served
-by `mix pepe serve`. Add one from chat with the CLI or the dashboard Channels tab:
+by `pepe serve`. Add one from chat with the CLI or the dashboard Channels tab:
 
-    mix pepe gateway whatsapp add support --agent acme/support --project acme \
+    pepe gateway whatsapp add support --agent acme/support --project acme \
       --mode support --phone-number-id 123 --ttl-min 30
 
 A connection binds to an agent (like a Telegram bot) and has a `mode`: `admin`
@@ -163,9 +163,9 @@ as an identity or a permission: ids are what every list and check uses.
 
 Slack, Discord, Microsoft Teams and Google Chat are all inbound-webhook channels
 like WhatsApp - each is a connection at `/webhooks/<project>/<provider>/<slug>`
-served by `mix pepe serve`, binding an agent to a session keyed
+served by `pepe serve`, binding an agent to a session keyed
 `<provider>:<agent>:<from>`, with the same `admin` / `support` modes. Unlike Telegram
-(`manage_channel`) and WhatsApp (`mix pepe gateway whatsapp add`), these four have no
+(`manage_channel`) and WhatsApp (`pepe gateway whatsapp add`), these four have no
 agent tool or CLI to set them up - a human configures them on the dashboard
 Integrations tab (which shows the URL to paste into the platform). If a user asks you
 to "add a Slack channel", point them there rather than reaching for a tool. All

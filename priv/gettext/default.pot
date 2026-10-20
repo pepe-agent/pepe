@@ -5417,12 +5417,12 @@ msgstr ""
 
 #: lib/pepe/gateways/telegram.ex:1723
 #, elixir-autogen, elixir-format
-msgid "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `mix pepe agent add` (`mix pepe setup` walks through both)."
+msgid "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `pepe agent add` (`pepe setup` walks through both)."
 msgstr ""
 
 #: lib/pepe/gateways/telegram.ex:1717
 #, elixir-autogen, elixir-format
-msgid "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `mix pepe model add` (`mix pepe setup` walks through both)."
+msgid "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `pepe model add` (`pepe setup` walks through both)."
 msgstr ""
 
 #: lib/pepe/agent/workspace.ex:303
@@ -7102,7 +7102,7 @@ msgstr ""
 
 #: lib/pepe_web/live/skills_live.ex:49
 #, elixir-autogen, elixir-format
-msgid "Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with mix pepe skill."
+msgid "Step-by-step instructions an agent reads when a request needs them. Each one shows whether agents can use it, and if not, why. You can turn one off everywhere or on a single channel. Install and create skills from chat or with pepe skill."
 msgstr ""
 
 #: lib/pepe_web/live/traces_live.ex:232

@@ -78,10 +78,10 @@ specific people who may approve (never "everyone"); after that you ask yes or no
 itself. Give the commands below only to someone who says they are the operator:
 
 ```shell
-mix pepe approvals list                  # what is waiting, with ids and expiry
-mix pepe approvals approve <id>          # runs the stored call; its result comes back to you as a new turn
-mix pepe approvals approve <id> --always # ...and persists the grant so this call shape stops asking
-mix pepe approvals deny <id> --reason "..."  # refuses it; the reason is relayed to you
+pepe approvals list                  # what is waiting, with ids and expiry
+pepe approvals approve <id>          # runs the stored call; its result comes back to you as a new turn
+pepe approvals approve <id> --always # ...and persists the grant so this call shape stops asking
+pepe approvals deny <id> --reason "..."  # refuses it; the reason is relayed to you
 ```
 
 Do not retry a parked call yourself - there is no prompt a retry could show anyone on that

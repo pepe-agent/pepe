@@ -209,10 +209,10 @@ docker exec -it pepe bin/pepe remote            # ou: docker compose exec pepe b
 
 Isso abre um shell IEx ligado ao release em execução, para inspecionar o sistema por dentro.
 
-Quando o que você precisa é rodar um único comando `pepe`, não um shell inteiro, use `bin/pepe rpc` com `dispatch_attached/1`: são os mesmos comandos que o `pepe` roda em qualquer lugar, só que seguros de executar contra um nó que já está no ar.
+Quando o que você precisa é rodar um único comando `pepe`, não um shell inteiro, rode o próprio `pepe`. A imagem traz o mesmo comando que você digitaria em qualquer outra instalação, já apontado para o nó que está no ar:
 
 ```bash
-docker exec pepe bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["agent", "list"])'
+docker exec pepe pepe agent list
 ```
 
-`bin/pepe <comando>` sozinho não funciona aqui: o container é um release puro, e o dispatch de CLI dele só é ativado no binário Burrito, que é distribuído à parte. `bin/pepe rpc`/`remote` acaba sendo o caminho de entrada de qualquer jeito. O motivo de existir `dispatch_attached/1` é que vários comandos, não só `run`/`chat`/`tui` mas também `plugin install`, `eval`, `doctor`, `cron` e outros, mexem em configurações globais pensadas para serem decididas uma única vez, no boot. Num processo de CLI recém-aberto que já vai fechar em seguida, isso é inofensivo; num nó que já está de pé e vai continuar assim, não.
+Por baixo, ele entrega os argumentos ao nó em execução (`bin/pepe rpc` chamando `dispatch_attached/1`), o que é seguro para um nó que já está servindo: vários comandos, não só `run`/`chat`/`tui` mas também `plugin install`, `eval`, `doctor`, `cron` e outros, mexeriam em configurações globais pensadas para serem decididas uma única vez, no boot. Num processo de CLI recém-aberto que já vai fechar em seguida, isso é inofensivo; num nó que já está de pé e vai continuar assim, não.

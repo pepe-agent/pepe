@@ -106,8 +106,8 @@ defmodule Pepe.Permissions.PendingApprovalsTest do
     assert {:deny, why} = Permissions.gate("bash", ~s({"command":"rm -rf build"}), %{agent: agent})
     assert why =~ "parked for a human's approval"
     assert [record] = PendingApprovals.list()
-    assert why =~ "mix pepe approvals approve #{record.id}"
-    assert why =~ "mix pepe approvals deny #{record.id}"
+    assert why =~ "pepe approvals approve #{record.id}"
+    assert why =~ "pepe approvals deny #{record.id}"
 
     # What the agent is told to say to the person: why it could not ask, and where the
     # permanent fix lives, not a bare "waiting for approval".

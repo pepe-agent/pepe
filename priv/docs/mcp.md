@@ -83,7 +83,7 @@ it. Do not try to work around that, and do not report it as a broken connection.
 it is and hand over the one command:
 
 ```
-mix pepe mcp login <name>
+pepe mcp login <name>
 ```
 
 (Or: the Sign in button on the dashboard's MCP page.) After they run it,

@@ -78,6 +78,6 @@ authority over. Routing stays directed: allowing `A -> B` never adds `B -> A`. T
 owner can also wire routes from the CLI:
 
 ```bash
-mix pepe agent route sales billing            # let sales message billing
-mix pepe agent route sales billing --remove   # revoke it
+pepe agent route sales billing            # let sales message billing
+pepe agent route sales billing --remove   # revoke it
 ```

@@ -77,7 +77,7 @@ see one:
 
 ## Skills from the marketplace
 
-An operator can also install a skill with `mix pepe skill install NAME` (resolved against
+An operator can also install a skill with `pepe skill install NAME` (resolved against
 their configured taps and the bundled registry) instead of the `install-skill` flow above -
 that's an operator/CLI action, not something you do yourself. What matters to you: when you
 read a skill via the `skill` tool and its content is wrapped in an

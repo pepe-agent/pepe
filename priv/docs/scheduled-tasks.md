@@ -30,7 +30,7 @@ When created from a chat, `deliver` defaults to that same chat. Confirm the deta
 
 - Schedule is a standard 5-field cron expression. Timezone is any IANA name - never
   hard-code it; use what the user asked (e.g. "6am German time" -> `Europe/Berlin`).
-- Tasks only fire while a long-running surface is up (`mix pepe serve` / `gateway`).
+- Tasks only fire while a long-running surface is up (`pepe serve` / `gateway`).
 - Each due task runs in its own process, so many can fire at once without blocking.
 
 ## A task does not run on top of itself
@@ -50,7 +50,7 @@ them so, and offer the three real fixes: a longer interval, less work per run, o
 
 A **flow** (a proven, identical tool-call sequence promoted from real traces - see the
 `docs` tool for `flows` if it's in your index) can also run on a schedule, but not
-through `schedule_task`: that's an operator action (`mix pepe flow schedule`), not
+through `schedule_task`: that's an operator action (`pepe flow schedule`), not
 something you create from chat. If a user asks to "schedule my flow," tell them that's
 set up by an operator on the CLI, not something you can do here - don't offer to create
 it as a regular scheduled task instead, since a flow replays exact tool calls with no

@@ -36,16 +36,14 @@ defmodule Pepe.InvocationTest do
     refute Pepe.Invocation.plain_release?()
   end
 
-  test "plain OTP release (Docker): the rpc/dispatch_attached form, not mix pepe or bare pepe" do
+  test "plain OTP release (Docker): the same bare pepe command, served by the image's wrapper" do
     System.put_env("RELEASE_NAME", "pepe")
 
-    assert Pepe.Invocation.hint(["dashboard", "password"]) ==
-             ~s|bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "password"])'|
-
+    assert Pepe.Invocation.hint(["dashboard", "password"]) == "pepe dashboard password"
     assert Pepe.Invocation.plain_release?()
   end
 
-  test "an arg containing a space is quoted for the two free-text prefixes" do
+  test "an arg containing a space is quoted" do
     assert Pepe.Invocation.hint(["run", "my agent", "hello there"]) ==
              "mix pepe run 'my agent' 'hello there'"
   end

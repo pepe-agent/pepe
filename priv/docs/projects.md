@@ -54,22 +54,22 @@ operation, so you'd run it via `bash` (or the owner `manage_pepe` power-tool) ra
 than a structured tool call. The commands:
 
 ```bash
-mix pepe project add acme --description "Acme Inc"   # create an isolated tenant
-mix pepe project list                                # list projects (default included)
-mix pepe project rename acme umbrella                # relabels it + moves its dir;
+pepe project add acme --description "Acme Inc"   # create an isolated tenant
+pepe project list                                # list projects (default included)
+pepe project rename acme umbrella                # relabels it + moves its dir;
                                                      # every id-based reference follows
-mix pepe project remove acme                         # refuses while it owns agents...
-mix pepe project remove acme --force                 # ...unless forced (drops them too)
+pepe project remove acme                         # refuses while it owns agents...
+pepe project remove acme --force                 # ...unless forced (drops them too)
 ```
 
 Agents, models, routes and tokens all take `--project` to act inside one:
 
 ```bash
-mix pepe agent add support --project acme --prompt "..." --model llm
-mix pepe agent list --project acme    # only Acme's
-mix pepe agent list                   # only the default project
-mix pepe agent list --all             # every project
-mix pepe run acme/support "hello"     # run a project agent by full handle
+pepe agent add support --project acme --prompt "..." --model llm
+pepe agent list --project acme    # only Acme's
+pepe agent list                   # only the default project
+pepe agent list --all             # every project
+pepe run acme/support "hello"     # run a project agent by full handle
 ```
 
 You don't "switch context" mid-conversation - a request already carries its scope

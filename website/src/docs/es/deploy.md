@@ -30,15 +30,12 @@ servidor es un problema, porque las cookies de sesión firmadas con el secreto a
 dejan de ser válidas. Genera uno una sola vez (`openssl rand -base64 48`) y consérvalo.
 
 **Dos ajustes solo existen en `config.json`.** No tienen variable de entorno, así que se
-configuran después del primer arranque, no al levantar el contenedor. El propio CLI
-`pepe` dentro del contenedor solo despacha comandos en el binario Burrito, no en esta
-release simple, así que el camino es `bin/pepe rpc`, llamando a `dispatch_attached/1`
-(seguro incluso contra un nodo que ya está sirviendo tráfico, ver
-[Docker](/es/docs/docker/#acceso-al-nodo)):
+configuran después del primer arranque, no al levantar el contenedor. Ejecútalos con el comando `pepe` que trae la imagen (habla con el nodo que ya está
+sirviendo, ver [Docker](/es/docs/docker/#acceso-al-nodo)):
 
 ```bash
-docker exec -it <contenedor> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "hosts", "agents.example.com"])'
-docker exec -it <contenedor> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "trusted-proxies", "10.0.1.0/24"])'
+docker exec -it <contenedor> pepe dashboard hosts agents.example.com
+docker exec -it <contenedor> pepe dashboard trusted-proxies 10.0.1.0/24
 ```
 
 `allowed_hosts` cierra la puerta al DNS rebinding: con contraseña puesta pero sin lista

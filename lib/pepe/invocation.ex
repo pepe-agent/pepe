@@ -2,14 +2,12 @@ defmodule Pepe.Invocation do
   @moduledoc """
   How an operator actually invokes this program right now, for instructional text meant
   for THEM to type back (an error page, a "run this to fix it" hint). `mix pepe ...`
-  only means anything to a developer running from source with deps installed; a real
-  install runs the compiled `pepe` binary directly, and a plain OTP release (the
-  Docker image, `PEPE_PLAIN_RELEASE=1`) is a THIRD case, distinct from both: it has no
-  `mix`, and its own `bin/pepe <args>` doesn't dispatch a CLI at all (that only fires for
-  the Burrito binary, see `Pepe.Application.release_cli?/0`), so telling that operator to
-  type either `mix pepe ...` or plain `pepe ...` hands them a command that doesn't work.
-  A plain release is only reachable while running via `bin/pepe rpc`/`remote`, which needs
-  `Mix.Tasks.Pepe.dispatch_attached/1`, not the free-text shape the other two cases use.
+  only means anything to a developer running from source with deps installed; every
+  real install has a plain `pepe` command. The Burrito binary is that command itself, and
+  the Docker image (a plain OTP release, `PEPE_PLAIN_RELEASE=1`) ships a small `pepe`
+  wrapper that hands the arguments to the running node through
+  `Mix.Tasks.Pepe.dispatch_attached/1` (see the Dockerfile), so the hint is the same
+  short command in both.
   """
 
   @doc """
@@ -18,10 +16,10 @@ defmodule Pepe.Invocation do
   """
   @spec hint([String.t()]) :: String.t()
   def hint(args) when is_list(args) do
-    cond do
-      Burrito.Util.running_standalone?() -> Enum.join(["pepe" | Enum.map(args, &shell_word/1)], " ")
-      plain_release?() -> "bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(#{inspect(args)})'"
-      true -> Enum.join(["mix pepe" | Enum.map(args, &shell_word/1)], " ")
+    if Burrito.Util.running_standalone?() or plain_release?() do
+      Enum.join(["pepe" | Enum.map(args, &shell_word/1)], " ")
+    else
+      Enum.join(["mix pepe" | Enum.map(args, &shell_word/1)], " ")
     end
   end
 

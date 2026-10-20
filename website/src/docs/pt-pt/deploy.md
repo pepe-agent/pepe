@@ -31,14 +31,12 @@ tem de voltar a entrar. Gera-o uma vez (`openssl rand -base64 48`) e guarda-o.
 
 **Duas definições só existem dentro do `config.json`.** Não têm variável de ambiente
 correspondente, por isso aplicam-se depois do primeiro arranque, em vez de serem passadas
-logo na subida. O dispatch da própria CLI `pepe` dentro do contentor só funciona no
-binário Burrito, não nesta versão simples, e por isso o caminho é passar por
-`bin/pepe rpc`, chamando `dispatch_attached/1` (seguro mesmo com um nó que já está a
-servir, ver [Docker](/pt-pt/docs/docker/#uma-shell-dentro-do-nó)):
+logo na subida. Corre-as com o comando `pepe` que a imagem traz (fala com o nó que já está a servir, ver
+[Docker](/pt-pt/docs/docker/#uma-shell-dentro-do-nó)):
 
 ```bash
-docker exec -it <contentor> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "hosts", "agents.example.com"])'
-docker exec -it <contentor> bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["dashboard", "trusted-proxies", "10.0.1.0/24"])'
+docker exec -it <contentor> pepe dashboard hosts agents.example.com
+docker exec -it <contentor> pepe dashboard trusted-proxies 10.0.1.0/24
 ```
 
 O `allowed_hosts` define os domínios a que o Pepe deve responder. Com a palavra-passe

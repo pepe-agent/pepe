@@ -1715,13 +1715,13 @@ defmodule Pepe.Gateways.Telegram do
   defp friendly_error(:no_model_configured),
     do:
       gettext(
-        "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `mix pepe model add` (`mix pepe setup` walks through both)."
+        "No model connection is set up yet, so I can't answer. An operator needs to add one first - from the dashboard, or with `pepe model add` (`pepe setup` walks through both)."
       )
 
   defp friendly_error(reason) when reason in [:no_agent, :no_agent_configured],
     do:
       gettext(
-        "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `mix pepe agent add` (`mix pepe setup` walks through both)."
+        "No agent is configured for this bot yet, so I can't answer. An operator needs to create one first - from the dashboard, or with `pepe agent add` (`pepe setup` walks through both)."
       )
 
   defp friendly_error(_),

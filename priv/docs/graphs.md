@@ -22,7 +22,7 @@ No new template language beyond a single `{{key}}` substitution. Five node types
   That word picks the next node - and it can be an EARLIER one, which is the real
   revise loop: the earlier node sees the critique via `{{this_verifier_id}}`.
 - **human**: no model call. The run pauses (`waiting_human`) and returns; a human's
-  later answer (`mix pepe graph resume`, or someone tells you their answer and you
+  later answer (`pepe graph resume`, or someone tells you their answer and you
   relay it) becomes `{{id}}`.
 - **parallel**: fans `tasks` out to read-only workers, exactly like `delegate` (same
   restrictions - workers may read, not act). The combined answer becomes `{{id}}`.
@@ -63,7 +63,7 @@ run_graph(graph_name: "research-and-verify", input: "the Q3 numbers")
 
 Returns a run id and status. `"done"` includes the terminal node's output right there.
 `"waiting_human"` includes exactly what it's asking - relay that to the person, then
-resolve it later (`mix pepe graph resume RUN_ID "their answer"`, or tell them that
+resolve it later (`pepe graph resume RUN_ID "their answer"`, or tell them that
 command). The run stays parked until then; nothing is lost. `inspect_graph_run(run_id:
 "...")` shows the full history any time, including after it's done.
 

@@ -47,7 +47,7 @@ Hooks are set on the agent's config and configured once under `"hooks"` in
 `~/.pepe/config.json` - not from a chat tool (`config_set` is fail-closed and won't
 touch them). Enable them one of these ways:
 
-- per agent at creation - `mix pepe agent add support --hooks pii_redact,llm_redact`
+- per agent at creation - `pepe agent add support --hooks pii_redact,llm_redact`
   (or the dashboard Agents form),
 - a deployment-wide default - `default_hooks`,
 - and configure each hook's settings under `"hooks"` in the config file.
@@ -55,9 +55,9 @@ touch them). Enable them one of these ways:
 Two CLI helpers:
 
 ```bash
-mix pepe hooks list       # the registered hooks + where settings live
+pepe hooks list       # the registered hooks + where settings live
 # let a model build a validated pii_redact config from plain language:
-mix pepe hooks generate "cpf, cnpj and our policy numbers APOL-12345678" --model local --save
+pepe hooks generate "cpf, cnpj and our policy numbers APOL-12345678" --model local --save
 ```
 
 `hooks generate` asks a model to build a `pii_redact` config (packs + custom regex),

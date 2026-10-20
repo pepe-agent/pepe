@@ -307,21 +307,17 @@ docker exec -it pepe bin/pepe remote            # ou: docker compose exec pepe b
 Abre uma shell IEx ligada à versão em execução, para inspecionares o
 sistema por dentro.
 
-Para um único comando `pepe`, sem precisares de uma shell completa, usa
-`bin/pepe rpc` com `dispatch_attached/1`: são os mesmos comandos que o
-`pepe` corre em qualquer outro sítio, só que já preparados para serem
-seguros contra um nó que já está a servir:
+Para um único comando `pepe`, sem precisares de uma shell completa, corre o próprio
+`pepe`. A imagem traz o mesmo comando que escreverias em qualquer outra instalação, já
+ligado ao nó que está a correr:
 
 ```bash
-docker exec pepe bin/pepe rpc 'Mix.Tasks.Pepe.dispatch_attached(["agent", "list"])'
+docker exec pepe pepe agent list
 ```
 
-O `bin/pepe <comando>` sozinho não funciona aqui: o contentor é uma versão
-pura, e o dispatch de CLI dela só se ativa no binário Burrito, distribuído
-à parte. `bin/pepe rpc`/`remote` é sempre o caminho de entrada, seja como
-for. O `dispatch_attached/1` existe porque vários comandos (`plugin
-install`, `eval`, `doctor`, `cron`, entre outros, não só `run`/`chat`/
-`tui`) alteram definições globais pensadas para serem decididas uma única
-vez, no arranque. Isso é inofensivo num processo de CLI recém-iniciado que
-já vai terminar logo a seguir, mas já não é inofensivo num nó que já está
-de pé e vai continuar assim.
+Por baixo, entrega os argumentos ao nó em execução (`bin/pepe rpc` a chamar
+`dispatch_attached/1`), o que é seguro para um nó que já está a servir: vários comandos
+(`plugin install`, `eval`, `doctor`, `cron`, entre outros, não só `run`/`chat`/`tui`)
+alterariam definições globais pensadas para serem decididas uma única vez, no arranque.
+Isso é inofensivo num processo de CLI recém-iniciado que já vai terminar logo a seguir,
+mas já não é inofensivo num nó que já está de pé e vai continuar assim.

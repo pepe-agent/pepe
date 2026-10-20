@@ -114,33 +114,33 @@ yourself (it moves this directory too).
 
 ## Backup, extract, and restore
 
-`mix pepe backup` tars the durable parts of `~/.pepe` - `config.json`, every project's
+`pepe backup` tars the durable parts of `~/.pepe` - `config.json`, every project's
 agent workspaces, `shared`, and sessions - into a `.tgz`, skipping the disposable
 Mnesia cache (it rebuilds itself). Optional `--output FILE.tgz` picks the path.
 
 ```bash
-mix pepe backup                          # writes pepe-backup-YYYY-MM-DD.tgz
-mix pepe backup --output ~/pepe-safe.tgz
+pepe backup                          # writes pepe-backup-YYYY-MM-DD.tgz
+pepe backup --output ~/pepe-safe.tgz
 ```
 
-`mix pepe extract PROJECT` lifts one project out as a **standalone, default-project**
+`pepe extract PROJECT` lifts one project out as a **standalone, default-project**
 archive: its `project/agent` handles are rewritten to bare names, so the `.tgz` is a
 fresh single-tenant install that is only that project - drop it on a new server and run.
 Only that project's agents, models, workspaces and usage travel, plus any shared model
 its agents depend on (the command names them). Nothing of the other tenants goes with it.
 
 ```bash
-mix pepe extract acme                    # writes acme-extract-YYYY-MM-DD.tgz
-mix pepe extract acme --output ~/acme.tgz
+pepe extract acme                    # writes acme-extract-YYYY-MM-DD.tgz
+pepe extract acme --output ~/acme.tgz
 ```
 
-`mix pepe restore FILE.tgz` unpacks either archive (a backup or an extract - same shape)
+`pepe restore FILE.tgz` unpacks either archive (a backup or an extract - same shape)
 into `~/.pepe`. It **replaces** what is there, so it refuses a non-empty home unless you
 pass `--force`.
 
 ```bash
-mix pepe restore ~/acme.tgz              # into a fresh ~/.pepe
-mix pepe restore ~/pepe-safe.tgz --force # over an existing one
+pepe restore ~/acme.tgz              # into a fresh ~/.pepe
+pepe restore ~/pepe-safe.tgz --force # over an existing one
 ```
 
 Because every secret is a `${ENV_VAR}` reference, **no secret is in any of these

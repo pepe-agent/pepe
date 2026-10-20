@@ -35,7 +35,7 @@ admin scope - see below).
 - **`["*"]`** -> every agent (an explicit super-admin).
 
 An agent can only `manage_agent` a target inside its `can_manage`. Authority defaults
-to closed. Grant it deliberately (CLI: `mix pepe agent manage ADMIN TARGET`). For the
+to closed. Grant it deliberately (CLI: `pepe agent manage ADMIN TARGET`). For the
 full admin-agent playbook, read `admin-agents.md`; for agent-to-agent routing read
 `routing.md`.
 
@@ -69,7 +69,7 @@ How it behaves:
 Configure it when creating the agent:
 
 ```bash
-mix pepe agent add support --model gpt-4o --triage-model gpt-4o-mini --simple-model gpt-4o-mini
+pepe agent add support --model gpt-4o --triage-model gpt-4o-mini --simple-model gpt-4o-mini
 ```
 
 Here a cheap model both judges the message and answers it when the chat is simple,
@@ -78,18 +78,18 @@ while anything needing real reasoning runs on `gpt-4o`.
 ### A decision-only connection for `triage_model`
 
 `triage_model` (and the mid-turn check of `midrun_fold`) may be a *decision-only* connection,
-for example TypeSafe Jev (provider "typesafe", `mix pepe model add NAME` and pick it, or the
+for example TypeSafe Jev (provider "typesafe", `pepe model add NAME` and pick it, or the
 dashboard Models page). It does not chat: it picks one of a few options and returns how sure it
 is, which makes it the cheapest and fastest way to sort. It is shown with a "Decisions only"
 label and is offered only for `triage_model`; it is never valid as an agent's `model`,
 `simple_model`, `utility_model`, a backup model, or the install default.
 
 Set it for a user who asks to make sorting cheaper: `manage_agent` `set_triage_model` (an empty
-`value` turns it off), or `mix pepe agent add NAME --triage-model CONNECTION`. Tell them to give
+`value` turns it off), or `pepe agent add NAME --triage-model CONNECTION`. Tell them to give
 the connection a backup chat model on the Models page ("Add a backup model"): when the connection
 fails (no credit, wrong key, down, slow) or is unsure about the cheap option, that backup decides
 as a chat triage model always did, and with no backup answering the message counts as complex, so
-a conversation is never blocked by it. `mix pepe model test NAME` makes a real decision to check it.
+a conversation is never blocked by it. `pepe model test NAME` makes a real decision to check it.
 
 With a decision connection set up, the agent also gets a `decide` tool: one pick among options it
 names for a piece of text, returned with a confidence band (high: act, medium: confirm, low: do not
@@ -128,7 +128,7 @@ message without the user repeating it. On no the agent keeps answering and does 
 again until the subject changes again.
 
 Turn it on for a user who asks to stop getting stuck with the wrong agent: `manage_agent`
-`set_flag` with `topic_reroute`, or `mix pepe agent add NAME --topic-reroute`. The agent only
+`set_flag` with `topic_reroute`, or `pepe agent add NAME --topic-reroute`. The agent only
 judges its own scope, so there is nothing else to configure and no list of other agents to
 keep. It does nothing on the channel's own agent, on a channel that locks agent switching,
 and a side question the agent can answer itself should just be answered. A routing agent

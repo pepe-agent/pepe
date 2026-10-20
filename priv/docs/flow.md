@@ -2,13 +2,13 @@
 
 A flow is a named, exact sequence of tool calls, promoted from real traces of things
 you've already done - it replays argument-for-argument, calling no model at all. There
-is no tool for you to create or run one yourself: promotion (`mix pepe flow promote`,
-picking specific past trace ids to turn into a flow) and scheduling (`mix pepe flow
+is no tool for you to create or run one yourself: promotion (`pepe flow promote`,
+picking specific past trace ids to turn into a flow) and scheduling (`pepe flow
 schedule`, a cron of kind "flow") are both operator actions on the CLI, not something
 you can do from chat.
 
 If a user asks you to "make this a flow," "schedule my flow," or similar: tell them
-that's an operator action on the CLI (`mix pepe flow promote` / `mix pepe flow
+that's an operator action on the CLI (`pepe flow promote` / `pepe flow
 schedule`), and don't offer `schedule_task` as a substitute - a flow replays exact,
 already-proven tool calls with no model in the loop; a scheduled task is a fresh agent
 turn every time, which is a different guarantee.

@@ -19,14 +19,14 @@ installing is not the same as enabling:
   `hooks: ["the_hook_name"]`, or the operator adding it on the dashboard's agent
   form. An agent with no `hooks` runs completely unaffected by any installed hook.
 - **Slot** (`memory`/`web_search`/`sandbox`/`compaction`/`harness`): installation-wide
-  by default (`mix pepe slot set NAME PLUGIN`, or `slots` in `config.json`), but can
-  be overridden per agent (`mix pepe agent add NAME --slots memory:PLUGIN`) or per
+  by default (`pepe slot set NAME PLUGIN`, or `slots` in `config.json`), but can
+  be overridden per agent (`pepe agent add NAME --slots memory:PLUGIN`) or per
   project (`default_slots`) - resolution is agent -> project -> installation-wide ->
   builtin. Pinning `harness` is a bigger decision than the others: it hands that
   plugin the whole turn, not just one call - see its own manifest/docs before
   suggesting it.
 - **HTTP route** (`Pepe.PluginRoute`): a **second, explicit** opt-in beyond
-  installing, and **operator-only** - `mix pepe plugin route enable NAME` at the
+  installing, and **operator-only** - `pepe plugin route enable NAME` at the
   terminal, never from chat. `manage_plugin`'s `route_list` action shows what's
   claimed/enabled (read-only); there is no `route_enable` action on purpose, unlike
   every other action on that tool - a route answers *any* inbound request, not one you
@@ -39,7 +39,7 @@ installing is not the same as enabling:
 - **Policy**: no grant of any kind, and an agent can never opt itself out of one -
   that would defeat the whole point of it being fail-closed. The *operator* can
   still narrow which agents/projects a policy is even consulted for
-  (`mix pepe policy scope NAME --agents a,b --projects x,y`, or `policy_scope` in
+  (`pepe policy scope NAME --agents a,b --projects x,y`, or `policy_scope` in
   `config.json`) - unscoped (the default) means every agent. A policy's optional
   `check_run/3` vetoes a whole run, before the first model call, same scope rules.
 - **Run observer**: no grant, no scoping at all - installed means active, for
@@ -70,7 +70,7 @@ name alone (a hook and a tool can plausibly share a similar-sounding name).
    The install itself re-scans with `Pepe.Skills.Sentinel`. A `danger` verdict is
    **always refused** - there is no `force` from chat. Tell the user what was
    flagged and, if they've reviewed the code themselves and still want it, point
-   them at `mix pepe plugin install SRC --force` in a terminal. Never suggest they
+   them at `pepe plugin install SRC --force` in a terminal. Never suggest they
    ask you to bypass it - that decision is not yours to make on their behalf.
 
 3. **list** / **remove** - manage what's installed.
@@ -78,7 +78,7 @@ name alone (a hook and a tool can plausibly share a similar-sounding name).
 ## After installing, grant the tool
 
 Installing a plugin does not hand its tools to any agent automatically. A new tool
-appears in the registry (`mix pepe tools` / `Pepe.Tools.names/0`), but an agent only
+appears in the registry (`pepe tools` / `Pepe.Tools.names/0`), but an agent only
 gets to call it once it's on that agent's `tools` list - use `manage_agent`
 `add_tool`, or the user can tick it on the dashboard. Same permission gate as any
 other tool after that: a plugin tool is not in the always-safe set, so its first

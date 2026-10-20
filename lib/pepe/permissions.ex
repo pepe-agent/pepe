@@ -58,7 +58,7 @@ defmodule Pepe.Permissions do
 
   Refused, but no longer *forever*: the call is also parked as a durable pending approval
   (`Pepe.Permissions.PendingApprovals`), and the refusal itself tells the model the literal
-  `mix pepe approvals approve <id>` / `deny <id>` command a human can type within 30 minutes.
+  `pepe approvals approve <id>` / `deny <id>` command a human can type within 30 minutes.
   Approving runs the exact stored call and hands its result back into the owning session as a
   new turn - the same decision an attended prompt would have put in front of a human, moved in
   time, never a different (or weaker) one. Nothing executes before a human says so, and nothing
@@ -592,7 +592,7 @@ defmodule Pepe.Permissions do
         # stranger, which withdraws pre-approval), so it does not happen NOW - standing
         # aside here is what made an API token a shell account. But "does not happen now"
         # no longer has to mean "fails closed forever": the call is parked as a durable
-        # pending approval a human can approve or deny later (`mix pepe approvals`), the
+        # pending approval a human can approve or deny later (`pepe approvals`), the
         # same decision an attended prompt would have put in front of them, just moved in
         # time. Callers with their own refusal semantics opt out via `:no_pending_approval`
         # (run_code's in-script bridge, a flow replay), and a store that isn't reachable
@@ -622,9 +622,9 @@ defmodule Pepe.Permissions do
     @parked_prefix <>
       " (id #{record.id}): there is no one to ask on this surface." <>
       parked_taint_note(ctx) <>
-      " A human can run `mix pepe approvals approve #{record.id}` to execute this exact call " <>
+      " A human can run `pepe approvals approve #{record.id}` to execute this exact call " <>
       "and deliver its result back into this conversation, or " <>
-      "`mix pepe approvals deny #{record.id} --reason \"...\"` to refuse it. " <>
+      "`pepe approvals deny #{record.id} --reason \"...\"` to refuse it. " <>
       "The request expires in #{minutes} minutes."
   end
 

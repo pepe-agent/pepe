@@ -48,7 +48,7 @@ default. See **channels** for how a bot's `trainers` is set.
 
 ## Reviewing and steering what you learned
 
-- **`mix pepe timelearn <you>`** shows your learning on a timeline - skills (🧠) and
+- **`pepe timelearn <you>`** shows your learning on a timeline - skills (🧠) and
   memory entries (📝), newest first, with source and date. There's also a **Learn**
   tab in the dashboard. (The reflect loop produces; TimeLearn just displays.)
 - **`remember`** on the `manage_agent` tool appends a durable fact straight into a
@@ -64,11 +64,11 @@ and tidies them - merging duplicates, dropping stale or contradicted lines, comb
 overlapping skills - without losing a durable fact.
 
 ```bash
-mix pepe learn consolidate <you>          # run a pass now
-mix pepe learn auto <you>                  # schedule it nightly (default 0 3 * * *)
-mix pepe learn auto <you> --at "0 */12 * * *"   # or a custom schedule
-mix pepe learn auto <you> --off            # stop the schedule
-mix pepe learn status                      # which agents consolidate on a schedule
+pepe learn consolidate <you>          # run a pass now
+pepe learn auto <you>                  # schedule it nightly (default 0 3 * * *)
+pepe learn auto <you> --at "0 */12 * * *"   # or a custom schedule
+pepe learn auto <you> --off            # stop the schedule
+pepe learn status                      # which agents consolidate on a schedule
 ```
 
 The nightly job is a managed `consolidate` entry on the scheduled-tasks page, and each
@@ -79,13 +79,13 @@ run is recorded like any other run.
 Skills are written through the `skill_manage` tool (actions `create`, `edit`, `patch`,
 `delete`, `write_file`, `remove_file`), not with the file tools. Every change is scanned,
 size-limited, snapshotted and recorded (who, what, before and after), so a person can undo
-it with `mix pepe skill undo ID`. Rules that apply to you:
+it with `pepe skill undo ID`. Rules that apply to you:
 
 - In a conversation with a person present, the call goes through the normal permission
   prompt, and what you create is **theirs** afterwards.
 - In the background review and the curator, nobody is asked, so the rules are tighter: you
   may only change skills an **agent wrote in the background** (or a person handed over with
-  `mix pepe skill adopt`). Skills the person wrote, installed skills, bundled skills and
+  `pepe skill adopt`). Skills the person wrote, installed skills, bundled skills and
   pinned skills are refused - suggest the change in your summary instead. You must open a
   skill with `skill` before you patch or overwrite it. Prefer `patch` on the skill you
   used, then on a broader "umbrella" skill, then a support file (`references/`,
@@ -98,7 +98,7 @@ it with `mix pepe skill undo ID`. Rules that apply to you:
 Unused skills an agent wrote in the background are tidied by the **curator**: after
 `stale_after_days` (default 14) without being used, opened or changed a skill is marked
 stale, after `archive_after_days` (default 30) it is archived (moved aside, never
-deleted; `mix pepe skill restore NAME` brings it back). It runs on its own about weekly,
+deleted; `pepe skill restore NAME` brings it back). It runs on its own about weekly,
 only when nothing has been said in any conversation for a couple of hours, takes a
 snapshot of the whole skills directory first, and writes a report. An optional model pass
 (`consolidate`, off by default) merges overlapping skills into broader ones through
@@ -106,6 +106,6 @@ snapshot of the whole skills directory first, and writes a report. An optional m
 
 A person can look after it from chat with the `skill_curator` tool (`status`, `usage`,
 `run` with `dry_run`, `pause`/`resume`, `settings`, `adopt`/`release`, `pin`/`unpin`,
-`restore`, `log`, `undo`), from `mix pepe skill curator ...`, from the Learning page of
-the dashboard, or from `mix pepe setup` (Skills). Prefer a dry run first when asked to
+`restore`, `log`, `undo`), from `pepe skill curator ...`, from the Learning page of
+the dashboard, or from `pepe setup` (Skills). Prefer a dry run first when asked to
 "clean up my skills", and say what it found before running it for real.

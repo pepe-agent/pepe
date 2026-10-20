@@ -59,8 +59,8 @@ A call against a target outside your `can_manage` is refused - and refused discr
 user. The owner grants this scope deliberately from the CLI:
 
 ```bash
-mix pepe agent manage owner sales      # let "owner" administer "sales"
-mix pepe agent manage owner "*"        # make "owner" a super-admin over every agent
+pepe agent manage owner sales      # let "owner" administer "sales"
+pepe agent manage owner "*"        # make "owner" a super-admin over every agent
 ```
 
 ## A typical flow
